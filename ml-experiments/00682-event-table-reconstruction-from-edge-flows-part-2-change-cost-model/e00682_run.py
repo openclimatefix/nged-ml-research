@@ -104,16 +104,32 @@ def decode_inputs(
     return events, {s: residual[s] - to_half_hours(slow=slows[s]) for s in slows}
 
 
-def sums(*, rows: list[dict], decoded: int, lo: int) -> dict:
+def match_validation(*, truth: list, events: list[Event]) -> list[dict]:
+    """Score validation events whose true end may lie beyond the hidden readings.
+
+    The overlap test uses each truth end clipped to the end of the readings. The reported
+    length, and so the cell, keeps the true end.
+    """
+    clipped = [
+        replace(t, end=None if t.end is not None and t.end > SCORED_FROM else t.end) for t in truth
+    ]
+    rows = match(truth=clipped, events=events, world_end=SCORED_FROM)
+    true_days = {(t.site, t.start): t for t in truth}
+    for row in rows:
+        t = true_days[(row["site"], row["start"])]
+        row["days"] = -1.0 if t.end is None else (t.end - t.start) / 48
+    return rows
+
+
+def sums(*, rows: list[dict], decoded: int) -> dict:
     """Deep-cell paired megawatts, their total, correct ends, and decoded transfers."""
     df = with_cells(df=pl.DataFrame(rows))
     d = df.filter(pl.col("cell").is_in(DEEP) & pl.col("edge_truth"))
     return {
         "paired": float((d["right_class"] * d["amp_mw"].abs()).sum()),
         "total": float(d["amp_mw"].abs().sum()),
-        "right": int(df["right_class"].sum()),
+        "right": sum(bool(x["right_class"]) for x in rows),
         "decoded": decoded,
-        "lo": lo,
     }
 
 
@@ -132,9 +148,7 @@ def tune(*, config_name: str, n_worlds: int) -> None:
         cands = candidates(events=events, xh=xh, sigma=rig.frozen.sigma, neighbours=nb)
         j = search_recipients(events=events, xh=xh, sigma=rig.frozen.sigma, neighbours=nb)
         ref_dec += sum(e.cls.endswith("transfer") and e.start >= TRAIN_END for e in j)
-        ref_right += sum(
-            bool(r["right_class"]) for r in match(truth=truth, events=j, world_end=SCORED_FROM)
-        )
+        ref_right += sum(bool(r["right_class"]) for r in match_validation(truth=truth, events=j))
         for g in grid:
             ev = reconstruct(
                 events=events,
@@ -144,9 +158,9 @@ def tune(*, config_name: str, n_worlds: int) -> None:
                 costs=FlowCosts(*g),
                 cands=cands,
             )
-            rows = match(truth=truth, events=ev, world_end=SCORED_FROM)
+            rows = match_validation(truth=truth, events=ev)
             dec = sum(e.cls.endswith("transfer") and e.start >= TRAIN_END for e in ev)
-            s = sums(rows=rows, decoded=dec, lo=TRAIN_END)
+            s = sums(rows=rows, decoded=dec)
             for key in ("paired", "total", "right", "decoded"):
                 acc[g][key] += s[key]
         print(config_name, "validation world", k, flush=True)
@@ -156,12 +170,16 @@ def tune(*, config_name: str, n_worlds: int) -> None:
         false = 1 - a["right"] / a["decoded"] if a["decoded"] else float("nan")
         table.append({"c_edge": g[0], "delta": g[1], "deep_paired": paired, "false_share": false})
     ref_false = 1 - ref_right / max(1, ref_dec)
+    table = [t for t in table if np.isfinite(t["deep_paired"]) and np.isfinite(t["false_share"])]
     ok = [t for t in table if t["false_share"] <= ref_false]
     pool = ok or table
     best = max(pool, key=lambda t: (t["deep_paired"], t["delta"]))
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"costs_{config_name}.json").write_text(
-        json.dumps({"chosen": best, "e1j_false_share": ref_false, "table": table}, indent=1)
+        json.dumps(
+            {"chosen": best, "fallback": not ok, "e1j_false_share": ref_false, "table": table},
+            indent=1,
+        )
     )
     print("chosen", best, "E1-J false share", ref_false)
 
@@ -241,6 +259,14 @@ def run_real(*, costs_name: str) -> None:
         if arm in ("E1-F", "E1-F all pairs"):
             res[arm]["d5_d16"] = verified_d5_d16(events=ev)
             res[arm]["edge_rows"] = edge.to_dicts()
+    j = search_recipients(events=events, xh=xh, sigma=frozen.sigma, neighbours=rig.p653.neighbours)
+    jt = events_table(events=j)
+    jt.write_parquet(OUT / "real_events_E1-J.parquet")
+    res["E1-J"] = {
+        "edge_events": jt.filter(
+            pl.col("cls").is_in(["edge_transfer", "permanent_transfer"])
+        ).height
+    }
     counts, kept_all = [], []
     for _ in range(N_REWIRE_REAL):
         nb, kept = rewire_low_overlap(rig=rig, rng=rng)

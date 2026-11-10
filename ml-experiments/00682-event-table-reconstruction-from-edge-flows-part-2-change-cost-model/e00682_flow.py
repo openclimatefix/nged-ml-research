@@ -103,7 +103,10 @@ def candidates(
         if e.cls not in (*UNPAIRED, "routine", "edge_transfer", "permanent_transfer"):
             continue
         amp = step_size(xh=xh[e.primary], start=e.start, end=e.end)
-        seeds.append(Step(e.primary, e.start, e.end, amp if np.isfinite(amp) else e.amp_mw, sg, e))
+        amp = amp if np.isfinite(amp) else e.amp_mw
+        if abs(amp) < MIN_UNITS * sg or amp * e.amp_mw <= 0:
+            continue
+        seeds.append(Step(e.primary, e.start, e.end, amp, sg, e))
     out = list(seeds)
     for s in seeds:
         sign = -1 if s.amp > 0 else 1
@@ -137,12 +140,10 @@ def misfit(*, donor_z: float, recip_z: float, sd: float, sr: float) -> float:
         The smallest misfit over the share grid.
     """
     d = -donor_z
-    best = float("inf")
-    for rho in RHO_GRID:
-        a = (d / sd**2 + rho * recip_z / sr**2) / (1 / sd**2 + rho**2 / sr**2)
-        fit = 0.5 * ((d - a) ** 2 / sd**2 + (recip_z - rho * a) ** 2 / sr**2)
-        prior = 0.5 * ((np.log(rho) - LOG_RHO_MEAN) / LOG_RHO_SD) ** 2
-        best = min(best, fit + prior)
+    rho = RHO_GRID
+    a = (d / sd**2 + rho * recip_z / sr**2) / (1 / sd**2 + rho**2 / sr**2)
+    fit = 0.5 * ((d - a) ** 2 / sd**2 + (recip_z - rho * a) ** 2 / sr**2)
+    best = np.min(fit + 0.5 * ((np.log(rho) - LOG_RHO_MEAN) / LOG_RHO_SD) ** 2)
     return float(best)
 
 
@@ -185,6 +186,8 @@ def merge(
         for k in range(1, min(MAX_RECIPIENTS, len(near)) + 1):
             for sub in itertools.combinations(near, k):
                 if len({r.primary for r in sub}) < k:
+                    continue
+                if d.event is None and all(r.event is None for r in sub):
                     continue
                 g = gain(d=d, rs=sub, costs=costs)
                 if g > 0:
@@ -236,12 +239,14 @@ def reconstruct(
         return ev
 
     for d, rs, _ in merge(cands=cands, neighbours=neighbours, costs=costs):
-        kind = (d.event or next(r.event for r in rs if r.event is not None)).kind
+        anchor = d.event or next(r.event for r in rs if r.event is not None)
+        kind = anchor.kind
         de = event_of(d, kind)
         res = [event_of(r, kind) for r in rs]
         cls = "permanent_transfer" if kind == "permanent" else "edge_transfer"
         de.cls, de.partners = cls, [r.primary for r in rs]
         de.partner_amp = {r.primary: r.amp for r in rs}
+        de.share = sum(r.amp for r in rs) / abs(d.amp)
         for re_ in res:
             re_.cls, re_.partners, re_.partner_amp = cls, [d.primary], {d.primary: d.amp}
     return out + added
