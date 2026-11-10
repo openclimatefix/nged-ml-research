@@ -16,6 +16,7 @@
 | [PV-664](#planned-experiments) | Does building the net-demand distribution as the gross-demand distribution minus a random ensemble member's solar curve beat the free network, and beat a plain recalibration of the free network's quantile widths? | 1 | Nothing | Experiment 00664 planned; inference only on stored networks, GPU under 1.5 hours |
 | [PV-671](#planned-experiments) | Does the fold model lose recovery at Primaries where the floor does not apply, once the denominator is the linear probe's signed-world recovery, and which probe should be trusted at D2, D3, D4, D19, and D21? | 1 | Nothing | Experiment 00671 finished; CPU only, re-scored stored experiment 662 outputs |
 | [PV-673](#planned-experiments) | What unmetered solar capacity does the probe read behind each of the 14 Primaries, and how does it compare with the registered solar capacity inside each Primary's service area? | 1 | Nothing | Experiment 00673 planned; CPU only, no fitting; maintainer-approved NGED deliverable |
+| [PV-679](#planned-experiments) | Does the linear probe lose less recovery under apparent power with a small reactive floor than under the power-factor 0.97 world, at the 0.5-times level that matches the five MVA Primaries that never fold? | 1 | Nothing | Experiment 00679 planned; about 0.4 GPU-hours, 9 networks |
 
 ## Planned experiments
 
