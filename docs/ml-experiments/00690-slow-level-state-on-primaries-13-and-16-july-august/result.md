@@ -5,7 +5,7 @@ title: >-
   Does the slow-level state track the July to August level change at Primaries 13 and 16?
 theme: lsc-detectors
 also_relevant_to: []
-status: planned
+status: finished
 date: 2026-11-10
 kind: other
 size: >-
@@ -39,37 +39,99 @@ metric: >-
   it; days from the start to half of the change; median absolute error and q05 to q95 coverage in
   July to September with and without the level added.
 code: ml-experiments/00690-slow-level-state-on-primaries-13-and-16-july-august/
+verdict: partly supported
+best_arm: >-
+  Masked frozen slow level (the main arm): it crossed half of the change within 3 days of the
+  residual's own crossing at ids 13 and 16 and cut the median absolute error by 50.3% (95%
+  interval -59.9 to -34.8) at id 13 and 51.3% (-55.8 to -35.3) at id 16, in hindsight.
+headline: >-
+  The slow-level state follows the July to August level change at Primaries 13 and 16 (weekly
+  correlation 0.66 and 0.87), but it spreads the change over months, and a control Primary moved
+  by 5.5% and the other by 7.5%, above the 5% pre-registered.
+lessons: >-
+  A smooth level fitted in hindsight on a related residual absorbs most of the level miss at these
+  two Primaries, so the miss is a slow drift, not a step the model needs an event for. The level
+  rises over May to July at id 13 and so crosses half of the change before July, which makes the
+  14-day timing test easy to pass. The diagnostic uses hindsight and is never a forecast.
+take_home_message: >-
+  The level miss at Primaries 13 and 16 in July and August is a slow drift that a smooth slow level
+  tracks: adding it to q50 halves the median absolute error at both Primaries (a hindsight
+  diagnostic, not a forecast). The state also moves two control Primaries by 5.5% and 7.5%, so the
+  pre-registered "controls move by less than 5%" test fails and the verdict is partly supported.
+advice:
+  - >-
+    Treat the level miss at ids 13 and 16 as explained by a slow drift, not as unexplained, while
+    keeping the caveat that NGED's event labels are incomplete.
+  - >-
+    Do not read the 14-day timing pass as proof of a step: the level estimate ramps over months
+    (see the figure of the targets).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**Planned. The plan below is fixed before any residual is read.** The maintainer approved the
-experiment on 2026-11-10, including reading July to September 2026 descriptively. Nothing is chosen
-from that window.
+**The slow-level state of the edge-state addendum tracks the July to August level change at
+Primaries 13 and 16, so the miss is a slow drift.** The stored normal-running forecasts miss the
+observed power by +0.84 MW at Primary 13 (D18, mean power 2.1 MW before the change) and by -1.09 MW
+at Primary 16 (D14, 5.9 MW). The masked frozen level crossed half of that change 3 days before (id
+13) and 2 days before (id 16) the residual's own crossing, and adding it to q50 halves the median
+absolute error at both Primaries. Two control Primaries moved by 5.5% and 7.5%, which is above the
+5% limit, so the verdict is *partly supported*. The stop rule did not fire, because neither id
+missed.
 
-## Plan
+**What it narrows.** The level miss is a gradual drift that a smooth level absorbs, not an
+unexplained step. This is a hindsight diagnostic on a lab setting: the level was fitted on the whole
+record, including the window, from a different forecast's residual. July to September 2026 lies in
+the final-test window and is read descriptively only; no choice is made from it.
 
-- **Arm 1, the miss.** Observed power (`ground_truth_primaries.parquet`, cleaned `power`) minus the
-  stored `q50`, on normal-running rows, by week from 2026-05 to 2026-09 at ids 13 and 16. One row
-  per half-hour: the stored row with the smallest lead. The clean-power level sits beside it.
-- **Arm 2, the state.** The slow level of experiment 653 (`fit_slow`, arm `masked`: 3 harmonics, a
-  yearly spline, Huber fit, three masking passes), run on experiment 685's residual panel (the
-  lag-free forecast against power, 2022 to 2026-10-31), because the stored backtest holds only 8
-  months before July and the design needs years. Noise units and the mask threshold are frozen on
-  the residual before 2026-07-01, as in experiment 685. The weekly level estimate is compared with
-  arm 1's weekly median residual: correlation, the lag of the best agreement (−28 to +28 days), and
-  the day each crosses half of its change. Half of the change means half of the difference between
-  the mean over 2026-05-01 to 2026-06-14 and the mean over 2026-07-15 to 2026-08-31.
-- **Arm 3, controls.** The two ids, other than 11, 13, 16, and 18, with the smallest mean absolute
-  distance of the stored normal-running q05 to q95 coverage from 0.90 over 2026-07 and 2026-08. The
-  rule is fixed here; the ids are chosen by it afterwards.
-- **Arm 4, diagnostic.** The level estimate (taken from the arm 2 level at the half-hour, in
-  megawatts) is added to q50 over 2026-07 to 2026-09. Reported: the change in median absolute error
-  and in q05 to q95 coverage, with day-block bootstrap intervals (7-day blocks, 2,000 draws). This
-  is a diagnostic with hindsight, never a forecast.
-- **Secondary arms, from the addendum, labelled so:** S1 (Huber, no mask) and S0 (30-day random
-  walk) on the same residual, because the main arm masks long deviations by design. They change no
-  verdict.
-- **Reuse.** No model is fitted. The stored forecasts, the ground truth, experiment 685's panel,
-  and experiment 653's slow-level code are reused.
-- **Limits.** July to September 2026 lies in the final-test window and is read descriptively
-  only. NGED's event labels are an incomplete dump, so "no transfer" is a lower bound. Primaries
-  are named and dated; no generator is shown.
+![Weekly median of observed power minus the stored q50, with the weekly 5th to 95th percentile.](figure_miss.svg)
+
+![The stored forecast's miss and the three slow-level estimates at the two Primaries.](figure_level_targets.svg)
+
+![The same at the two control Primaries.](figure_level_controls.svg)
+
+![Change in median absolute error from adding the level to q50, with 95% intervals.](figure_error_change.svg)
+
+## Results
+
+- **Arms and data.** Arm 1: observed `power` minus stored `q50` on normal-running rows (one row per
+  half-hour, the smallest lead). Arm 2: `fit_slow` of experiment 653 (masked, frozen) on experiment
+  685's lag-free residual panel (ERA5 and CAMS weather at the target time, so a lab setting), noise
+  units frozen on the residual before 2026-07-01. S1 (Huber, no mask) and S0 (30-day random walk)
+  are the addendum's other arms, reported beside it. No model was fitted and no schedule applies.
+- **Controls, by the rule fixed in the plan:** ids 26 and 17 (stored q05 to q95 coverage 0.89 and
+  0.91 in July, 0.91 and 0.86 in August). Only the 15 panel ids were candidates, because the state
+  needs the panel.
+- **Timing (main arm).** Half of the change is passed at day 0 (id 13) and day 3 (id 16), counted
+  from 2026-07-01, against day 3 and day 5 for the residual. At id 13 the level estimate rises from
+  May, so the crossing is early. Level change is +0.41 MW at id 13 (residual +0.84) and -0.64 MW at
+  id 16 (residual -1.09).
+- **Agreement.** Weekly correlation of level with residual: 0.66 at id 13 and 0.87 at id 16 (S0:
+  0.89 and 0.90). Best daily lag: 28 days at id 13 (the edge of the search) and 6 days at id 16.
+- **Median absolute error, July to September, level added (main arm).** Id 13: 0.78 to 0.39 MW,
+  -50.3% (95% day-block interval -59.9 to -34.8). Id 16: 0.83 to 0.40 MW, -51.3% (-55.8 to -35.3).
+  Controls: id 26 -5.5% (-9.9 to +1.3); id 17 +7.5% (+1.6 to +14.0).
+- **q05 to q95 coverage, same rows.** Id 13: 36% to 51%. Id 16: 49% to 66%. Control 26: 85% to 86%.
+  Control 17: 90% to 87%. The level does not restore 90% coverage.
+- **Variants.** The post hoc variant that adds only the change from the 2026-05-01 to 2026-06-14
+  mean gives -44.0% and -55.1% at ids 13 and 16 and +8.5% and -1.2% at the controls. The random-walk
+  arm S0 gives -52.9% and -59.9%, and +0.7% and +14.4% at the controls.
+- **Caveats.** The level is a smooth spline, so it ramps over months and misses the step on
+  2026-07-01 and the fall from late August. The residual panel belongs to a different forecast from
+  the stored one, so a constant offset between them enters the "level" variant. Control crossing
+  days are not meaningful because their changes are under 0.4 MW. NGED's event labels are an
+  incomplete dump, so "no transfer" in experiment 685 is a lower bound. The 5% limit on the controls
+  was met by neither control, so the main arm fails the pre-registered test on that count.
+- **Checks.** No new forecast was scored, so the median-minus-mean and mean-forecast audit checks do
+  not apply, and no audit trigger fired.
+- **What to try next.** Fit the level causally (data before each origin only) to see whether it
+  could be used live; this is a proposal for the maintainer.
+
+## Method
+
+The code is in `ml-experiments/00690-slow-level-state-on-primaries-13-and-16-july-august/`
+(`e00690_run.py`, `e00690_figures.py`); it imports the folders of experiments 653 and 685.
+Intermediate tables are in the experiment's data folder (private, not committed): `weekly_miss.csv`,
+`daily_level_and_residual.parquet`, `results.json`, and `control_choice.csv`. Bootstrap: 7-day
+blocks, 2,000 draws, paired. Reviews: one fresh Sonnet code review before the run (it found no
+blocking fault; the weekly table, a check that the frozen noise unit is finite, and this naming of
+the main variant were added); a Sonnet review of the numbers and the prose follows.
