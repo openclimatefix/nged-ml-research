@@ -2,7 +2,8 @@
 
 **It is worth running one small known-answer test of a simulator that fits, to each Primary
 substation's metered power, a list of the assets behind the meter and a few parameters per asset.**
-The simulator's value would be an asset list per Primary and scenarios months ahead, not a better
+The simulator's value would be an asset list per Primary, which NGED cannot confirm beyond the
+register and so is shown as inferred, and scenarios mostly at long horizons, not a better
 short-range forecast. Gross demand is the demand before the embedded generation behind a substation
 is netted off; a Primary's meter records only the net. No experiment in this theme has run yet.
 
@@ -17,8 +18,9 @@ different Primary from the one whose meter records a 6 MW gas engine.
 
 - [An asset-inventory simulator](asset-inventory-simulator.md): what fitting an asset list with a
   few parameters per asset, instead of the state of each asset at every half-hour, can and cannot
-  identify; what the register and the repository already supply; the candidate uses ranked; the
-  smallest test; the risks; and the open questions for the maintainer.
+  identify; what the register and the repository already supply; the maintainer's answers; what a forward
+  model with real operating logic means and which parts exist; the candidate uses ranked; the
+  smallest test; the risks; and the open question for the maintainer.
 - [The simulator discussion of 2026-11-09](simulator-discussion-2026-11-09.md): the take-home of the
   discussion session that started this theme, with the discussion's numbers checked against merged
   pages.
