@@ -4,6 +4,8 @@ Run with the environment of `e00678_run.py`: `uv run --no-sync python e00678_rep
 `rows_*.parquet` from the experiment's data folder and writes `summary.json` there.
 """
 
+# ruff: noqa: E501  # research code; long expressions kept as run
+
 from __future__ import annotations
 
 import json
@@ -88,7 +90,7 @@ def main() -> None:
             donor = share(tab=tab, fam=fam, seeds=seeds[fam], cell=cell, worlds=worlds, col=2)
             row[fam] = {"paired": paired, "donor_found": donor, "seeds": len(seeds[fam]),
                         "paired_per_seed": [share(tab=tab, fam=fam, seeds=[s], cell=cell, worlds=worlds, col=0) for s in seeds[fam]]}  # fmt: skip
-            if fam not in ("E1-J",):
+            if fam != "E1-J":
                 bs = [
                     share(tab=tab, fam=fam, seeds=seeds[fam], cell=cell, worlds=w, col=0)
                     - share(tab=tab, fam="E1-J", seeds=[0], cell=cell, worlds=w, col=0)

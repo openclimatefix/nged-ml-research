@@ -46,13 +46,13 @@ decision_rule: >-
   in experiments 670 and 675. The final-test window from 2026-07-01 is never read. Donor
   construction: for each alarm of a probe (the peak hour of each merged run of hours above the
   threshold), the donor start is the half-hour in [alarm - 24 hours, alarm + 12 hours] (the window
-  in which experiment 675 credits an alarm) with the
-  most negative step size of experiment 670's `step_size`, and the end is the first half-hour at
-  least 2 days after the start where the 1-day running median of the residual returns to within
-  half of the step from its level before the start, or none. An alarm whose start lies within 24 half-hours of an
-  E1 downward event of 4 noise units or more at the same Primary, or of a donor already added
-  there, adds nothing. An open-ended donor with 180 or more days of record left is permanent, as
-  in experiment 653. Each added donor is a downward event of the measured step size, then experiment 670's
+  in which experiment 675 credits an alarm) with the most negative step size of experiment 670's
+  `step_size`, and the end is the first half-hour at least 2 days after the start where the 1-day
+  running median of the residual returns to within half of the step from its level before the
+  start, or none. An alarm whose start lies within 24 half-hours of an E1 downward event of 4
+  noise units or more at the same Primary, or of a donor already added there, adds nothing. An
+  open-ended donor with 180 or more days of record left is permanent, as in experiment 653. Each
+  added donor is a downward event of the measured step size, then experiment 670's
   `search_recipients` runs unchanged on E1's events plus the added donors. Hybrids: F-hyb, R-hyb,
   P-M-hyb, and P-C-hyb (3 seeds each except F), and E1-J itself as the reference. The adoption
   rule: if a hybrid's mean paired share is 0.60 or more in both the long and deep and the medium
@@ -60,12 +60,12 @@ decision_rule: >-
   `supported` if P1 holds for F-hyb or R-hyb (either one is enough) in both deep cells and P4
   holds for that hybrid; `partly supported` if P1 holds in one deep cell only, or holds for a
   hybrid for which P4 fails; `not supported` otherwise. The other predictions are reported as held
-  or failed and do not enter the verdict. A deep cell with fewer than 20 events or 10 edge-transfer
-  ends is unreadable and is handled as in experiment 675. If no hybrid reaches +0.10 in either
-  deep cell, the graph line is closed at 15 Primaries and the edge-state network is not built. If
-  a hybrid passes but pairs under 0.60, the edge-state network (a joint donor and recipient model
-  with a recipient lag) is a candidate for a separate experiment. The porting threshold is zero,
-  because the result is a research table that changes no production code.
+  or failed and do not enter the verdict. A deep cell with fewer than 20 events or 10
+  edge-transfer ends is unreadable and is handled as in experiment 675. If no hybrid reaches +0.10
+  in either deep cell, the graph line is closed at 15 Primaries and the edge-state network is not
+  built. If a hybrid passes but pairs under 0.60, the edge-state network (a joint donor and
+  recipient model with a recipient lag) is a candidate for a separate experiment. The porting
+  threshold is zero, because the result is a research table that changes no production code.
 benchmark: >-
   E1-J on the same 40 worlds, re-run here from experiment 670's code and the stored arm-C
   residuals, with world-resampled 95% intervals

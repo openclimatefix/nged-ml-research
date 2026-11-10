@@ -1,4 +1,4 @@
-"""Experiment 678: donor alarms of experiment 675's probes fed into experiment 670's recipient search.
+"""Experiment 678: donor alarms of experiment 675's probes fed into the recipient search of 670.
 
 Run (from the repository root; see `e00675_step0a.py` for the environment) on worlds `first_seed`
 to `first_seed + n_worlds - 1`:
@@ -33,13 +33,15 @@ from e00653_common import DAY, GRID_LENGTH, SCORED_FROM
 from e00653_core import decode_world, match
 from e00653_segment import Event, classify
 from e00653_slow import to_half_hours
-from e00660_ev34_detector import truths  # ty: ignore[unresolved-import]
-from e00660_ev34_detector import Rig
+from e00660_ev34_detector import (
+    Rig,
+    truths,  # ty: ignore[unresolved-import]
+)
 from e00665_score import cell_of  # ty: ignore[unresolved-import]
 from e00670_run import CONFIGS, params653, record_end_of, rewire_low_overlap  # ty: ignore[unresolved-import]
 from e00670_search import search_recipients, step_size
-from e00675_pretrain import ROOT as PROBE_ROOT
-from e00675_score import SCORED_H, episodes
+from e00675_pretrain import ROOT as PROBE_ROOT  # ty: ignore[unresolved-import]
+from e00675_score import SCORED_H, episodes  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 OUT: Final[Path] = (
@@ -73,7 +75,7 @@ def thresholds() -> dict[tuple[str, int], float]:
 
 
 def donor_end(*, xh: np.ndarray, start: int, step: float) -> int | None:
-    """First half-hour from 2 days after `start` where the 1-day median has recovered half the step."""
+    """First half-hour from 2 days after `start` where the 1-day median recovered half the step."""
     before = xh[max(0, start - 3 * DAY) : start]
     if np.isfinite(before).sum() < 48:
         return None

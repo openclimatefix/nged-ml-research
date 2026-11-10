@@ -1,6 +1,6 @@
 """Figure for experiment 678: paired share of each hybrid minus E1-J, per cell."""
 
-# ruff: noqa: E501, F821  # research chart script
+# ruff: noqa: E501  # research chart script
 
 from __future__ import annotations
 
@@ -31,15 +31,15 @@ def main(out: Path) -> None:
         color=alt.Color("arm:N", sort=names, scale=alt.Scale(domain=names, range=[v[1] for v in ARMS.values()]),
                         legend=alt.Legend(title="Hybrid with donor alarms from", orient="top", direction="vertical")),
     )  # fmt: skip
-    pts = base.mark_point(filled=True, size=60, aria=False).encode(
+    pts = base.mark_point(filled=True, size=60, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "diff:Q",
             title="Paired share of transfer megawatts: hybrid minus E1-J (more positive is better)",
         )
     )
-    bars = base.mark_rule(aria=False).encode(x="lo:Q", x2="hi:Q")
+    bars = base.mark_rule(aria=False).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}))
+        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#555", strokeDash=[4, 3])
         .encode(x="x:Q")
     )
