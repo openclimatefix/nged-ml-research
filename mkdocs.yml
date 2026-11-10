@@ -114,6 +114,7 @@ nav:
           - Summary: ml-experiments/themes/calibration-and-uncertainty/index.md
           - Experiments: ml-experiments/themes/calibration-and-uncertainty/experiments.md
           - Research plan: ml-experiments/themes/calibration-and-uncertainty/plan.md
+          - Delivery recommendation: ml-experiments/themes/calibration-and-uncertainty/delivery-recommendation.md
       - Curtailment cost:
           - Summary: ml-experiments/themes/curtailment-cost/index.md
           - Experiments: ml-experiments/themes/curtailment-cost/experiments.md
