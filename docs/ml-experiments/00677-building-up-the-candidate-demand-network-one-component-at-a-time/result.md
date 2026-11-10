@@ -61,9 +61,10 @@ lessons: >-
 take_home_message: >-
   Pre-training the date-time and weather encoders on ERA5 and CAMS (step 3b, 8.30) is the first
   step to beat the manual heuristic (8.73), and the lags bring step 5 to 7.88. Steps 6 to 8 add no
-  annual skill: the Candidate (step 8) scores 7.99, which is 0.105 worse than step 5. Steps 6 to 8 cut the share of an injected shift that the
-  median copies from 5.9% to 2.8%, and they raise MAE by 0.05 to 0.12 off the logged events. Monthly refits improve step 5 and step 8 by about 0.47. The year
-  overlaps the Candidate's development months, so the scores are not a ranking.
+  annual skill: the Candidate (step 8) scores 7.99, which is 0.105 worse than step 5. Steps 6 to 8
+  cut the share of an injected shift that the median copies from 5.9% to 2.8%, and they raise MAE
+  by 0.05 to 0.12 off the logged events. Monthly refits improve step 5 and step 8 by about 0.47.
+  The year overlaps the Candidate's development months, so the scores are not a ranking.
 advice:
   - >-
     Refit the Candidate monthly rather than quarterly, because monthly refits lowered MAE by 0.47
