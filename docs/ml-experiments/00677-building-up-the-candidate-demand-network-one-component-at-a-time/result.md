@@ -50,7 +50,7 @@ production_status: not-for-production
 adopted_in: none
 best_arm: >-
   Not a ranking of arms. Step 9a (step 5 with monthly refits) has the lowest annual MAE of the
-  median, 7.39 points of capacity, and the Candidate at monthly refits (step 9b) scores 7.49.
+  median, 7.39 points of capacity, and the Candidate at monthly refits (step 9b) scores 7.48.
 headline: >-
   The date-time and weather encoders pre-trained on ERA5 and CAMS are the first step to beat the
   manual heuristic, and the lag components after step 5 add no annual skill.
@@ -61,9 +61,8 @@ lessons: >-
 take_home_message: >-
   Pre-training the date-time and weather encoders on ERA5 and CAMS (step 3b, 8.30) is the first
   step to beat the manual heuristic (8.73), and the lags bring step 5 to 7.88. Steps 6 to 8 add no
-  annual skill: the Candidate (step 8) scores 7.99, which is 0.105 worse than step 5. They cut the
-  share of an injected shift that the median copies from 5.9% to 2.8%, and they raise MAE by 0.05 to
-  0.12 off the logged events. Monthly refits improve step 5 and step 8 by about 0.47. The year
+  annual skill: the Candidate (step 8) scores 7.99, which is 0.105 worse than step 5. Steps 6 to 8 cut the share of an injected shift that the
+  median copies from 5.9% to 2.8%, and they raise MAE by 0.05 to 0.12 off the logged events. Monthly refits improve step 5 and step 8 by about 0.47. The year
   overlaps the Candidate's development months, so the scores are not a ranking.
 advice:
   - >-
@@ -78,21 +77,36 @@ advice:
     methods table).
 ---
 
-**The first step to beat the manual heuristic is step 3b, the date-time and weather encoders
-pre-trained on ERA5 and CAMS. Steps 6 to 8 add no skill over step 5 on the annual mean.** Step 5 is
-the first step with both lags, and it scores 7.88 points of capacity of normalised MAE of the
-median, against 8.73 for the manual heuristic. Step 8, which is the Candidate, scores 7.99, which is
-0.105 (95% interval 0.078 to 0.132) worse than step 5. Monthly refits improve both step 5 and step 8
-by about 0.47 points, which is a larger gain than any component added after step 3b.
+**This page builds the Candidate demand neural network up one component at a time.** The Candidate
+is the neural network that forecasts demand at 16 Primary substations (substations that step 33 kV
+or 66 kV down to 11 kV). Step 1 has the date-time encoder alone, each later step adds one component,
+and step 8 is the Candidate. The sequence of steps is the ladder. Steps 9a and 9b refit step 5 and
+step 8 monthly instead of quarterly. Scores are the normalised mean absolute error (MAE) of the
+median forecast, in points of capacity, over 12 months of daily forecasts up to 14 days ahead.
+
+**The earliest step in this ladder to score below the manual heuristic is step 3b, the date-time and
+weather encoders pre-trained on ERA5 and CAMS.** (ERA5 and CAMS are two reanalyses, which are
+estimates of past weather.) Step 3b scores 8.30 against 8.73 for the manual heuristic. Step 5, the
+first step with both lags, scores 7.88.
+
+![Normalised MAE of the median by forecast horizon, steps 1 to 5](ladder_horizon_early.svg)
+
+**Steps 6 to 8 add no skill over step 5 on the annual mean.** Step 8 is the Candidate. It scores
+7.99, which is 0.105 worse than step 5 (95% interval 0.078 to 0.132). Monthly refits improve both
+step 5 and step 8 by about 0.47 points, which is a larger gain than any component added after step
+3b.
 
 ![Normalised MAE of the median by forecast horizon, steps 5 to 8 and the monthly refits](ladder_horizon_late.svg)
 
-**What the later steps buy is a smaller copied share of an injected shift, paid for with event-free
-error.** On a held-out bank of simulated shifts injected into the lag inputs only, the median
-forecast of step 5 copies 5.9% of the shift, and the Candidate copies 2.8%. Steps 6 and 7 copy 4.7%
-and 3.3%. Off the logged events, the same steps raise MAE by 0.05 (step 6) and 0.12 (steps 7 and 8)
-against step 5. On the 12 logged events that were long enough to score, every step's error jumps at
-the event start, because the normal-running output is not meant to follow a shift.
+**Steps 6 to 8 make the median forecast copy less of an injected shift, and they raise error on rows
+away from logged events.** An injected shift is a simulated step added to the lag inputs. The copied
+share is the fraction of the shift's depth that the median forecast reproduces, so 0 means the
+forecast ignores the shift. On a held-out bank of such shifts, the median of step 5 copies 5.9% of
+the shift and the Candidate copies 2.8%. Steps 6 and 7 copy 4.7% and 3.3%. Away from the logged
+events, the same steps raise MAE by 0.05 (step 6) and 0.12 (steps 7 and 8) against step 5. Gap
+columns, which step 6 adds, hold the difference between the observed power at the lag time and the
+forecast made with both lags masked. Step 7 adds exponentially weighted averages of that gap, and
+step 8 adds the same columns from neighbouring substations.
 
 ## Take-home
 
@@ -101,15 +115,16 @@ the event start, because the normal-running output is not meant to follow a shif
   adds −0.13. Steps 6 to 8 add +0.04, +0.06, and +0.005.
 - **Steps 1 and 2 are worse than the manual heuristic** (9.73 and 9.61 against 8.73), and step 3a is
   too (8.89). Climatology scores 11.79.
-- **The injected-event training costs 0.07 points of MAE on every row and halves the copied share.**
-  Step 5 trained without injected events copies 11.0% of a shift, and the Candidate trained without
-  them copies 8.1%.
-- **Monthly refits (step 9) improve skill more than any component added after step 3b.** They lower
-  MAE by 0.47 (interval 0.31 to 0.64) for step 5 and 0.47 (0.32 to 0.64) for step 8 on matched
-  seeds. The Candidate at monthly refits (step 9b) scores 7.49, against 7.53 for the monthly file of
-  experiment 667.
-- **The GAM beats every ladder step on the six MW Primaries; the networks win on the seven MVA-only
-  Primaries.** See [Standard methods beside the ladder](#standard-methods-beside-the-ladder).
+- **Training with injected events raises MAE by 0.07 to 0.10 points on every row and cuts the copied
+  share by about half to two-thirds.** Step 5 trained without injected events copies 11.0% of a
+  shift, and the Candidate trained without them copies 8.1%.
+- **Monthly refits (step 9) improve skill more than any component added after step 3b.** Monthly
+  refits lower MAE by 0.47 (interval 0.31 to 0.64) for step 5 and 0.47 (0.32 to 0.64) for step 8 on
+  matched seeds. The Candidate at monthly refits (step 9b) scores 7.48, against 7.53 for the monthly
+  file of experiment 667.
+- **On the six MW Primaries the GAM is level with the best monthly arm and ahead of every quarterly
+  step; the networks win on the seven MVA-only Primaries.** See [Standard methods beside the
+  ladder](#standard-methods-beside-the-ladder).
 - **The ladder describes one order of adding components, on 12 months that overlap the Candidate's
   development months.** It ranks nothing for production.
 
@@ -124,7 +139,8 @@ separate network trained with the Candidate's settings and the components named 
 
 The table lists the annual scores in points of capacity. CRPS is the continuous ranked probability
 score, which scores the whole forecast distribution. The 95% intervals come from resampling 7-day
-blocks of origin days, and the number of rows is the same for every step.
+blocks of origin days, and every step is scored on the same 3,879,313 rows, which are the rows that
+all the steps share.
 
 | Step | MAE of the median | 95% interval | CRPS |
 |---|---|---|---|
@@ -137,11 +153,14 @@ blocks of origin days, and the number of rows is the same for every step.
 | 6: + gap columns | 7.93 | | 4.52 |
 | 7: + weighted averages of the gap | 7.98 | | 4.56 |
 | 8: + neighbour columns (Candidate) | 7.99 | 7.66 to 8.33 | 4.57 |
-| 9a: step 5, monthly refits | 7.39 | 7.14 to 7.67 | 4.20 |
-| 9b: step 8, monthly refits | 7.49 | 7.21 to 7.77 | 4.26 |
+| 9a: step 5, monthly refits | 7.39 | 7.14 to 7.67 | 4.19 |
+| 9b: step 8, monthly refits | 7.48 | 7.21 to 7.77 | 4.26 |
 | Manual heuristic | 8.73 | 8.41 to 9.07 | 4.98 |
 | Climatology | 11.79 | | 6.60 |
-| Experiment 667, monthly refits | 7.53 | | 4.29 |
+| Experiment 667, monthly refits (a) | 7.53 | | 4.29 |
+
+(a) Experiment 667's file scored on the same rows with the scoring code of experiment 668; the
+private table is `scores_668/primaries_NRA/scores.csv`.
 
 The contrast between adjacent steps carries intervals that are tighter than the intervals of the
 scores themselves, because the two steps are scored on the same rows.
@@ -150,11 +169,11 @@ scores themselves, because the two steps are scored on the same rows.
 
 ### Whether the later steps ride through load shifts better
 
-**Real events cannot answer this: every step's error jumps at the event start by the same amount.**
-The figure pools 12 logged events (10 shifts that lasted more than 7 days and involved two units or
-more, plus the verified transfer at D5 and D16). NGED's event labels are an incomplete dump, so
-these counts are lower bounds. The normal-running output is meant to carry on as if the shift had
-not happened, so a jump in error is expected at every step.
+**The logged events cannot show which step handles a load shift better, because every step's error
+jumps at the event start.** The figure pools 12 logged events (10 shifts that lasted more than 7
+days and involved two units or more, plus the verified transfer at D5 and D16). NGED's event labels
+are an incomplete dump, so these counts are lower bounds. The normal-running output is meant to
+carry on as if the shift had not happened, so a jump in error is expected at every step.
 
 ![Error of the median forecast by whole days since the event start](event_aligned_start.svg)
 
@@ -176,28 +195,29 @@ forecast ignores the shift, and smaller is better for the normal-running output.
 | 8 | 0.028 | 0.081 | 0.030 |
 
 Each cell is the mean over seeds 0 to 2 of the pooled share over days 0 to 14, and the standard
-deviation over seeds is 0.002 to 0.010. The monthly column is the "trained with" version. Steps 7
-and 8 copy about the same share, so the neighbour columns add little here.
+deviation over seeds is 0.002 to 0.008. The monthly column is the "trained with" version. Steps 7
+and 8 copy similar shares (0.033 and 0.028), so the neighbour columns add little here.
 
-**The reduction has a price off the logged events.** On rows more than 14 days from any logged event
-of the same series, MAE rises against step 5 by 0.049 (interval 0.037 to 0.061) at step 6, 0.120
-(0.084 to 0.156) at step 7, and 0.119 (0.082 to 0.155) at step 8.
+**Away from the logged events, the later steps have a higher MAE.** On rows more than 14 days from
+any logged event of the same series, MAE rises against step 5 by 0.049 (interval 0.037 to 0.061) at
+step 6, 0.120 (0.084 to 0.156) at step 7, and 0.119 (0.082 to 0.155) at step 8.
 
-**After the end of an event the monthly refits do worse.** In the 7 days after the 10 long logged
-shifts, step 9a scores 5.77 against 5.15 for step 5 at quarterly refits, and step 9b scores 5.69
-against 5.14 for step 8. The monthly arms use seeds 0 to 2 and the quarterly arms seeds 0 to 4, so
-the gap includes a difference in seed count.
+**In the 7 days after an event the monthly refits score worse on these 10 logged shifts.** The
+slice holds 34,706 half-hours from 102 origin days, and no interval was computed, so the result is
+descriptive. With seeds 0 to 2 on both sides, step 9a scores 5.77 against 5.23 for step 5 at
+quarterly refits, and step 9b scores 5.69 against 5.15 for step 8. Inside the events and on all
+other rows, the monthly arms score better.
 
 ### The Candidate's prevailing output
 
-**Only experiment 667's Candidate has a prevailing output.** The prevailing output is the survival
-head (R-haz) that follows a shift once it is detected, and it needs the lag-free table's signals, so
+**Only experiment 667's Candidate has a prevailing output.** The normal-running output (NRA) is the
+forecast made as if no shift had happened. The prevailing output is the forecast that follows a
+detected shift. It comes from a survival head (R-haz), and it needs the lag-free table's signals, so
 the ladder's steps have none. The rows of experiment 667 used here are the extra-lag head of
-experiment 681 (the folds 2025-11
-and 2025-12 keep the older head). Over the 8 logged events where the shift could be timed, the
-prevailing output recovered half of the shift after a median of 4 days (range 2 to 6 days). The two
-figures below show the normal-running (NRA) and prevailing outputs of experiment 667 over the
-verified transfer.
+experiment 681 (the folds 2025-11 and 2025-12 keep the older head). Over the 8 logged events where
+the shift could be timed, the prevailing output recovered half of the shift after a median of 4 days
+(range 2 to 6 days). The two figures below show the NRA and prevailing outputs of experiment 667
+over the verified transfer.
 
 ![D16, verified transfer: NRA and prevailing outputs of experiment 667, 1 to 2 days ahead](prevailing_verified_transfer_D16_lead1.svg)
 
@@ -205,13 +225,13 @@ verified transfer.
 
 ### Time series of the forecasts
 
-**Both step 5 and step 8 follow the daily shape of D16 and D5 but stay well below the observed
-peaks during the confirmed shift.** Each figure has one arm per panel. The line is the median, the
-dark band is q25 to q75, the light band is q05 to q95, and the orange line is the observed power.
-The grey rectangle marks the confirmed load shift of D5 and D16 from 2025-12-30 to 2026-01-15, with
-at least 14 days either side. At D16 the observed peaks reach about 13 MW, and the medians of both
-steps stay near 9 to 10 MW through the shift. This is the intended behaviour of the normal-running
-output.
+**Both step 5 and step 8 follow the daily shape of D16 and D5 but stay well below the observed peaks
+during the confirmed shift.** Each figure has one arm per panel. The line is the median, the dark
+band is q25 to q75, the light band is q05 to q95, and the orange line is the observed power. The
+grey rectangle marks the confirmed load shift of D5 and D16 from 2025-12-30 to 2026-01-15, with at
+least 14 days either side. At D16 the observed peaks reach about 13 MW, and the medians of both
+steps stay near 9 to 10 MW through the shift. The normal-running output is meant to carry on as if
+the shift had not happened.
 
 ![D16, verified transfer, steps 5 and 8, forecasts made 1 to 2 days ahead](bands_verified_transfer_D16_lead1.svg)
 
@@ -231,20 +251,22 @@ A cold week and a warm week at D16 show the same arms away from the event.
 
 **The forecasts are under-dispersed at both ends.** For steps 5 to 8, 3.4% to 3.8% of observations
 fall at or below the q01 forecast and 3.6% to 3.9% fall above q99, against a nominal 1%. Step 3b has
-4.4% below q01 and 4.0% above q99. Monthly refits narrow the gap by about half a point.
+4.4% below q01 and 4.0% above q99. Monthly refits move the observed shares about half a point closer
+to the nominal 1%.
 
-**Curtailment cost follows the CRPS ranking of the arms, with the GAM lowest.** The curtailment-cost
-scale is set by a stress limit of 50% (and 90%) of each series' earlier maximum, so the amounts in
-pounds are an index of ranking and not a forecast of spend. Each cell is relative to the manual
-heuristic (1.00) on the six MW Primaries, summed:
+**Curtailment cost mostly follows the CRPS ranking of the arms, with the GAM lowest.** XGBoost is
+the exception: its CRPS equals step 8's, but its cost is lower than every network's. The
+curtailment-cost scale is set by a stress limit of 50% (and 90%) of each series' earlier maximum, so
+the amounts in pounds are an index of ranking and not a forecast of spend. Each cell is relative to
+the manual heuristic (1.00) on the six MW Primaries, summed:
 
 | Arm | Cost at the 50% limit | Cost at the 90% limit |
 |---|---|---|
-| GAM | 0.54 | 0.40 |
+| GAM | 0.54 | 0.41 |
 | XGBoost | 0.68 | 0.70 |
 | Experiment 667 | 0.74 | 0.83 |
-| 3b | 0.90 | 0.99 |
-| 5 | 0.76 | 0.88 |
+| 3b | 0.90 | 1.00 |
+| 5 | 0.76 | 0.89 |
 | 8 | 0.81 | 0.92 |
 | 9a | 0.70 | 0.80 |
 | 9b | 0.74 | 0.83 |
@@ -252,11 +274,11 @@ heuristic (1.00) on the six MW Primaries, summed:
 ### Standard methods beside the ladder
 
 **Both stored arms cover a different row set than the ladder, so this section is scored on the rows
-they share.** The GAM (Primary demand research default 3) and XGBoost (arm `p_s6_bg2` of experiment
-87) are stored with 09:00 UTC origins, and the rows the arms share run from origin 2025-11-01 to
-2026-06-29 at lead times of 0 to 10 days (1,365,447 half-hours over the 16 Primaries). The six MW
-Primaries are scored separately from the seven MVA-only Primaries, because the MVA meters hide
-reverse flow.
+that the stored arms and the ladder both cover.** The GAM (Primary demand research default 3) and
+XGBoost (arm `p_s6_bg2` of experiment 87) are stored with 09:00 UTC origins, and the rows the arms
+share run from origin 2025-11-01 to 2026-06-29 at lead times of 0 to 10 days (1,365,447 half-hours
+over the 16 Primaries). The six MW Primaries are scored separately from the seven MVA-only
+Primaries, because the MVA meters hide reverse flow.
 
 | Group, slice | GAM | XGBoost | Manual heuristic | 667 | 3b | 5 | 8 | 9a | 9b |
 |---|---|---|---|---|---|---|---|---|---|
@@ -271,37 +293,40 @@ reverse flow.
 | Seven MVA-only Primaries, cold nights | 4.11 | 5.13 | 7.58 | 4.67 | 5.53 | 4.64 | 4.79 | 4.43 | 4.60 |
 | Seven MVA-only Primaries, Christmas | 4.95 | 5.83 | 7.90 | 4.51 | 5.44 | 4.55 | 4.62 | 4.41 | 4.49 |
 
-Each cell is in points of capacity, and the MAE rows are for the median. The three Primaries in
-neither group are left out. On the six MW Primaries the GAM is level with the best monthly arm (5.36
-against 5.35) and ahead of every quarterly arm; on the cold nights the GAM leads by 0.5 to 1.0
-points. On the seven MVA-only Primaries the networks at step 4 and above beat the GAM and XGBoost on
-all rows, and the GAM leads on cold nights. The Christmas rows hold 20,448 and 23,856 half-hours, so
-those columns are descriptive. The all-rows cells use 537,136 half-hours for the six MW Primaries
-and 628,272 for the seven MVA-only Primaries.
+The seven MVA-only Primaries are those whose meters record apparent power in megavolt-amperes, which
+hides the direction of flow; the six MW Primaries record real power in megawatts. twCRPS is the
+threshold-weighted CRPS, which weights errors at high demand more heavily. Each cell is in points of
+capacity, and the MAE rows are for the median. The three Primaries in neither group are left out. On
+the six MW Primaries the GAM is level with the best monthly arm (5.36 against 5.35) and ahead of
+every quarterly arm; on the cold nights the GAM leads steps 5 and above by 0.5 to 1.0 points. On the
+seven MVA-only Primaries the networks at step 5 and above beat the GAM and XGBoost on all rows, and
+the GAM leads on cold nights. The Christmas rows hold 20,448 and 23,856 half-hours, so those columns
+are descriptive. The all-rows cells use 537,136 half-hours for the six MW Primaries and 628,272 for
+the seven MVA-only Primaries.
 
 ## Predictions that could fail
 
-- **P1 (step 8 matches experiment 667 within 0.10 CRPS on the pilot fold): met.** The pilot passed
-  before the other folds ran. At the annual scale, step 9b scores 4.26 CRPS against 4.29 for the
-  monthly file of experiment 667.
+- **P1 (step 8 matches experiment 667 within 0.10 CRPS on the pilot fold): met.** At the annual
+  scale, step 9b scores 4.26 CRPS against 4.29 for the monthly file of experiment 667.
 - **P2 (the drop from step 3b to 5 exceeds every other adjacent drop over days 0 to 3): not met.**
   The drops from step 2 to 3a and from 3a to 3b are larger over the same days.
 - **P3 (step 8 lowers the copied share by at least 0.03 against step 5): met by a small margin.**
   The drop is 0.031, from 0.059 to 0.028, and the standard deviation over seeds is 0.007.
 - **P4 (no step before step 4 beats the manual heuristic over days 0 to 14): refuted.** Step 3b
-  beats the heuristic at every horizon, 8.30 against 8.73 over all rows.
+  scores below the heuristic in all four lead bands, 8.30 against 8.73 over all rows. The intervals
+  of the two scores overlap, and the paired contrast was not computed.
 
-The decision rule called a contrast separable only when its interval excludes zero and it exceeds
+The decision rule counts a contrast separable only when its interval excludes zero and it exceeds
 the standard deviation of the CRPS across seeds 0 to 2 of the same step. Every contrast in the
-contrast figure has an interval that excludes zero except step 7 to step 8 on MAE (+0.005, interval
-−0.003 to 0.012). The per-seed standard deviation of the CRPS was not tabulated, so the second half
-of the rule and the minimum detectable effect that the plan printed beside each contrast are not
-reported; the only seed spread reported is that of the injected-shift measure.
+contrast figure has an interval that excludes zero except step 1 to step 2 and, on MAE, step 7 to
+step 8 (+0.005, interval −0.003 to 0.012). The per-seed standard deviation of the CRPS was not
+tabulated, so the second half of the rule and the minimum detectable effect beside each contrast are
+not reported; the only seed spread reported is that of the injected-shift measure.
 
 ## Caveats
 
 - **The step-8 network does not reproduce the monthly file of experiment 667 at the quarterly
-  cadence** (7.99 against 7.53). The monthly step 9b (7.49) is level with it. The two
+  cadence** (7.99 against 7.53). The monthly step 9b (7.48) is level with it. The two
   ladders differ from experiment 667 by seed count (5 or 3 against 2) and by the per-fold reference
   month of the signal noise.
 - **The Candidate's settings were tuned on 5 of the 12 months**, which favours the later steps. The
@@ -325,15 +350,15 @@ reported; the only seed spread reported is that of the injected-shift measure.
 
 ## Method
 
-**The ladder is built from the Candidate's own recipe by removing components, and every step keeps
-the Candidate's other settings.** The Candidate is the class 2 neural network of experiment 620
-(arm P7 with D50 of experiment 610). Each step adds one component to the previous step. The order
-matters: a reverse ablation gives each component's gain given the components already present, and
-says nothing about what removing the component from the full Candidate would cost.
+**Each step adds one component to the previous step, and every step keeps the Candidate's other
+settings.** The Candidate is the class 2 neural network of experiment 620 (arm P7 with D50 of
+experiment 610). Each step adds one component to the previous step. The order matters: a reverse
+ablation gives each component's gain given the components already present, and says nothing about
+what removing the component from the full Candidate would cost.
 
 ### Components of the Candidate and where each sits on the ladder
 
-Held fixed in every step that has the part they belong to:
+These settings are the same in every step that contains the part the setting belongs to:
 
 - Loss and output: a three-component Gaussian mixture, negative log-likelihood, 11 quantiles from
   the mixture CDF, sorted (so no step has crossing quantiles).
@@ -377,17 +402,15 @@ means a ladder step.
 
 Steps 3b, 4, and 5 each have their own pre-training, because the lag encoder is trained in stage 1,
 so the contrast between adjacent steps includes a re-pre-trained encoder. Steps 4 and onward do not
-start from the step-3b checkpoint. The verification item for the code review is which stages of the
-Candidate see the 581 shifts (experiment 620, lines 229 to 252); the plan assumes only stage 3.
+start from the step-3b checkpoint. Only stage 3 of the Candidate sees the 581 shifts.
 
-**The lag-free table T** is the median of the step-5 stage-2 checkpoint of the same version and
-seed with both lags masked, taken at the freshest origin with lead at most 24 hours. This is the
+**The lag-free table T** is the median of the step-5 stage-2 checkpoint of the same version and seed
+with both lags masked, taken at the freshest origin with lead at most 24 hours. This is the
 Candidate's own construction (its stage-2 network), not a fine-tuned network. Steps 6 to 8 build T
-once per fold, version, and seed and share it (in-fold, as the Candidate does). The earlier review
-suggested the step-3 network instead; the plan departs from that because the Candidate uses its
-stage-2 lag network, and step 8 must reproduce the Candidate. The 606 reference month for the signal
-noise is the latest month before each fold's cutoff, not the Candidate's fixed 2026-06, which is
-future data for earlier folds.
+once per fold, version, and seed and share it (in-fold, as the Candidate does). The lag-free table
+uses the stage-2 lag network because the Candidate does, and step 8 reproduces the Candidate. The
+606 reference month for the signal noise is the latest month before each fold's cutoff, not the
+Candidate's fixed 2026-06, which is future data for earlier folds.
 
 ### What "without injected events" removes
 
@@ -404,16 +427,15 @@ the Candidate, in both ladders). Decisions:
   steps (own lags only before step 8, own lags plus neighbours at step 8).
 - The **held-out scoring bank** is built by experiment 581's own generator with seeds disjoint from
   every training seed, so the bank matches the "with" arm's training distribution, which favours the
-  "with" version by design. A second bank from experiment 660's generator
-  (`e00660_generator.py`, the shared generator its page tells readers to import) is scored as a
-  check on that bias. Both inject into lag inputs only. Each bank also mirrors the shift into one
-  neighbour's summaries, so step 8's neighbour columns can show their effect. Whether to inject into
-  targets too is a question for the Discuss session and is settled before the code review.
+  "with" version by design. A second bank from experiment 660's generator (`e00660_generator.py`,
+  the shared generator its page tells readers to import) is scored as a check on that bias. Both
+  inject into lag inputs only. Each bank also mirrors the shift into one neighbour's summaries, so
+  step 8's neighbour columns can show their effect. The injection reaches lag inputs only, never the
+  targets.
 - **Follow** is the share of an injected shift's depth that the median forecast copies (0 means the
   forecast ignores the shift, 1 means it copies all of it); lower is better for an NRA forecast.
   **Absorption** is the share of the shift that the network's fitted values take up in its training
-  power (experiment 595's definition). The code review checks both formulas against experiments 595
-  and 610.
+  power (experiment 595's definition). Absorption was not scored on this page.
 
 The real long-and-deep cell is nearly empty (experiment 665 found none of NGED's 77 logged shifts
 lasting more than a day in the long-and-deep type), so the real-record slices are descriptive and
