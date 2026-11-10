@@ -220,10 +220,12 @@ other rows, the monthly arms score better.
 forecast made as if no shift had happened. The prevailing output is the forecast that follows a
 detected shift. It comes from a survival head (R-haz), and it needs the lag-free table's signals, so
 the ladder's steps have none. The rows of experiment 667 used here are the extra-lag head of
-experiment 681 (the folds 2025-11 and 2025-12 keep the older head). Over the 8 logged events where
-the shift could be timed, the prevailing output recovered half of the shift after a median of 4 days
-(range 2 to 6 days). The two figures below show the NRA and prevailing outputs of experiment 667
-over the verified transfer.
+[experiment
+681](../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md)
+(the folds 2025-11 and 2025-12 keep the older head). Over the 8 logged events where the shift could
+be timed, the prevailing output recovered half of the shift after a median of 4 days (range 2 to 6
+days). The two figures below show the NRA and prevailing outputs of experiment 667 over the verified
+transfer.
 
 ![D16, verified transfer: NRA and prevailing outputs of experiment 667, 1 to 2 days ahead](prevailing_verified_transfer_D16_lead1.svg)
 
