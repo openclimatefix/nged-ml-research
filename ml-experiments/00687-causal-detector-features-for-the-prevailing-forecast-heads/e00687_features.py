@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501, PLR0915
 """Experiment 687: causal detector features of a lag, in noise units (pure numpy).
 
 Time is the half-hour grid index of experiment 578 (48 per UTC day); power is a share of effective
@@ -104,7 +104,14 @@ def _shift(*, a: np.ndarray, k: int) -> np.ndarray:
     return out
 
 
-def build_grids(*, gap: np.ndarray, gap_sig: np.ndarray, gap_ref: np.ndarray, units: dict[int, np.ndarray], start: int) -> Grids:
+def build_grids(
+    *,
+    gap: np.ndarray,
+    gap_sig: np.ndarray,
+    gap_ref: np.ndarray,
+    units: dict[int, np.ndarray],
+    start: int,
+) -> Grids:
     """Return the grids for the column window `gap[:, :]`, whose column 0 is grid index `start`.
 
     `gap_ref` is the uninjected gap; the all-Primaries median is taken over it, so that only the

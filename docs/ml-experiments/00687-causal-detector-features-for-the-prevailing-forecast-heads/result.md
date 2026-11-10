@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -63,159 +63,184 @@ metric: >-
   injected shift starts and ends; CRPS (twice the mean pinball loss over 11 quantiles) and
   normalised MAE of the median for both outputs by lead band; q05 to q95 coverage; q01, q05, q95,
   and q99 pinball loss; false-alarm rate on event-free rows.
+verdict: partly supported
+best_arm: >-
+  F1 (detector features) and F1d46 (D4 to D6 only) react 1.6 and 1.4 days sooner than B0 after a
+  shift starts; L1 (extra lags) reacts 1.25 days sooner, and F1 minus L1 is -0.33 [-0.72, +0.07]
+  days.
+headline: >-
+  Detector features cut the start-of-shift reaction time of the prevailing output by 1.59 days
+  [-2.26, -1.00] against experiment 652's head (median 1 day), but plain extra lagged power inputs
+  get 1.25 days, so the features are not shown to beat them.
+lessons: >-
+  Most of the gain comes from letting the head see readings newer than the day lag and from a
+  survival gate that opens when the newest readings show a shift, not from the detector's
+  statistics. The hazard head's survival gate reads only the day lag, so no extra input can open
+  it; the new age rule alone (B0g) reacts 0.33 days sooner. The placebo arm is not independent
+  because every Primary is shifted at once, so P5 is not tested.
+take_home_message: >-
+  Giving the prevailing head a step detector's statistics makes it follow a new load shift about
+  1.6 days sooner than experiment 652's head, and it lets go of a shift about 0.6 days sooner.
+  Simply adding recent lagged power gets 1.25 days, so the detector features are not shown to be
+  better than extra lags. The gain does not improve the score on shifts already in force (in-force
+  CRPS -0.12 [-0.33, +0.06] points of capacity, below the 0.30 bar).
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Open the survival gate of a prevailing head from the newest readings, not only from the day-lag
+    age, because the gate alone caps how soon the head can react (B0g against B0, Results).
+  - >-
+    Compare a detector-feature head with a head that reads extra recent lags at the same delay,
+    because the lags get 1.25 of the 1.59 days of gain (F1 minus L1, Results).
+  - >-
+    Do not use another Primary as a placebo in a bank where every Primary is shifted at once,
+    because the placebo Primary is often in a shift itself (Checks, audit finding 2).
+  - >-
+    Report reaction time by event length and with a truth-relative release rule, because the
+    mean is dominated by 45-day events (Caveats).
 ---
+A load shift is a period when the electricity network operator moves part of one primary
+substation's (Primary's) demand onto or off a neighbouring Primary. The two-output demand neural
+network (K1 plus a small head) should follow such a shift in its prevailing output. We asked whether
+giving the small head the statistics of a simple step detector makes it follow a shift sooner, and
+compared it with giving the same head extra recent lagged power instead. Every shift is injected
+into real history, with its start and end known, so reaction time can be measured exactly.
 
-**Plan only. Nothing here has been run.** Revised after the plan review (findings and triage are
-in the pull request).
+**Take-home message.** Detector features make the prevailing output cover half of a new shift
+1.59 days [-2.26, -1.00] sooner than experiment 652's head (B0), and release half of it 0.63 days
+[-0.91, -0.36] sooner after the shift ends. Extra lagged power inputs (L1, experiment 681's block)
+get 1.25 days [-1.87, -0.74] at the start and 0.45 days at the end, and F1 minus L1 is -0.33 [-0.72,
++0.07] at the start, so the features are not shown to beat plain lags. The scaled CRPS where a shift
+is in force improves by 0.12 points of capacity [-0.33, +0.06], below the 0.30 bar. Verdict: partly
+supported.
 
-## Question and approach
+## Figures
 
-**The question.** A load shift is a period when the network operator moves part of one primary
-substation's demand onto or off a neighbouring one. The prevailing output of the two-output neural
-network for demand should follow such a shift, and today it takes days to do so (experiment 668
-measured 181 and 52 hours at the verified D5 and D16 transfer). Experiment 681 tests one remedy,
-extra lagged power inputs. This experiment tests another: give the small prevailing head the
-statistics that a simple step detector computes, and let the neural network learn how to use them.
+![Reaction time against B0: detector features and extra lags both react about 1.3 to 1.8 days sooner](fig1_reaction.svg)
 
-**Approach.** Step 1 runs on the CPU with no refit and tests whether the features separate "this
-lag lies inside an injected shift" from "it does not" better than the gap summaries the lag encoder
-reads today. Step 2 refits the small heads of experiment 652 (two layers of 64 units, about 9,000
-parameters) with the features as extra inputs. Both steps use the stored banks of experiments 650
-and 652, whose injected shifts are known exactly. The size of the bank's concurrent shifts is a
-limit stated under "Banks".
+![Scaled CRPS against B0 by state of the shift: gains where a shift has just ended, none near the end](fig3_crps.svg)
 
-## Features (all causal; D numbering follows the spec)
+![AUROC of "this lag lies inside an injected shift", with and without D1 to D5](fig2_auroc.svg)
 
-All power is a share of effective capacity. The gap at a half-hour is the cleaned power minus the
-lag-free median `T` of the same half-hour (experiments 598 and 606). The noise unit of a Primary,
-for each block width, is 1.4826 times the median absolute deviation of consecutive non-overlapping
-block-mean gap differences, measured on the uninjected cleaned power. The unit uses all five
-development months, including the scored one. It is a scale of unshifted power and not a target, and
-a sensitivity check recomputes it without the scored month and reports the largest change.
+![Three signed-MW Primaries with an injected shift: NRA output above, prevailing output below](fig4_events_1.svg)
 
-- **D1, common-mode-removed level.** The block mean of the gap minus the median over all Primaries
-  of the uninjected block mean at that time, in noise units, for blocks of 6 hours, 1 day, and 3
-  days. Only the scored Primary carries its injected shift, as in real operation, where few shifts
-  run at once.
-- **D2, opposite-sign neighbour step.** The largest over the electrical neighbours of minus the sign
-  of the Primary's own step times the neighbour's step (6-hour and 1-day), and the hours between the
-  Primary's last 2-noise-unit step and the neighbour's.
-- **D3, routine-step rate.** The share of the previous 60 days whose common-mode-removed 6-hour step
-  exceeded 3 noise units, computed on the shifted series, so injected steps count.
-- **D4, causal step statistics.** The block mean ending at the cutoff minus the block mean ending
-  one block earlier, for blocks of 6 hours, 1 day, and 3 days, in noise units (raw and
-  common-mode-removed).
-- **D5, cumulative-sum detector** over the previous 24 six-hour blocks of D1 (drift 1.5, threshold
-  6 noise units): the depth at the excursion's extreme, hours since the excursion began, and the sum
-  over its threshold. Its start window is fixed (6 days before the cutoff). The explicit flag of
-  arm F2 is "the sum exceeds the threshold".
-- **D6, return to level.** (Current level minus the extreme) divided by the excursion's size: 0 at
-  the extreme and -1 when the level is back to where the excursion began.
+![Three MVA-only Primaries with an injected shift](fig4_events_2.svg)
 
-Cutoffs. The day-lag and week-lag features end at the lag's own time (24 hours and 7 days before the
-origin). The newest-reading features end 6 hours before the origin, the same delay as experiment
-681's L1 block (its stated production delay). A lab arm uses 4 hours before the origin, the
-freshness of the `fresh` signal of experiment 598, to measure what lower latency would be worth. A
-unit test perturbs the power after each cutoff and checks that no feature changes, and each table
-build asserts that no index at or after the origin minus the cutoff delay is read.
+![The verified D5 and D16 transfer of December 2025 (real rows)](fig5_verified.svg)
 
-## Banks (not experiment 651's banks)
+![A day-ahead series and a 10-day forecast during an injected shift](fig6_horizon.svg)
 
-Experiment 650's banks inject one independent shift per Primary and pass, with one or two
-receivers at a random gain of 0.5 to 1 (15% of events have no receiver, and for those the stored
-and no-mirror banks are identical). Step 1 uses three versions: **stored** (neighbour signals carry
-the mirror), **mirror x0.6** (the mirror at 60% of its stored strength, an approximation of a
-split; it is not experiment 651's 60/40 split over two neighbours, which the stored bank cannot
-reproduce), and **no mirror**. In every version the features of a Primary read that Primary's
-shifted power, the neighbours' unshifted power plus the mirror (if any), and a median over the
-other Primaries' unshifted power. The bank's other 15 simultaneous shifts therefore do not reach the
-features, but they remain in the stored 58-column origin features of experiment 606's summaries
-that the heads and the baseline logistic scorer read. This asymmetry is a limit, stated in the
-write-up.
+## Results
 
-## Step 1: separability, no refit
+Scores are CRPS in points of capacity (1 point is 1% of a Primary's effective capacity), scaled to
+a q05 to q95 coverage of 0.90 as in experiment 652, mean of 2 seeds, then of the 5 development months
+(2025-10, 2025-12, 2026-01, 2026-03, 2026-06). Intervals are percentile bootstraps over the months
+(5 blocks, so coarse) or over events. B0 refitted here equals experiment 652's stored R-haz exactly
+(the gate passes).
 
-- **Rows.** Every Primary and origin of the five development months and 16 passes. A row has one
-  label per lag: whether that lag's half-hour lies inside the Primary's injected shift (day-lag and
-  week-lag labels are scored separately). The held-out family (passes 200 to 203) is reported
-  separately from the training family.
-- **Scorers.** Logistic regression with standardised inputs and missing values set to zero beside a
-  missing flag, on (a) experiment 606's summaries, (b) those plus D1 to D5, (c) those plus D1 to D5
-  of an unrelated Primary of the same metering group (the placebo, the same map as arm P). Folds
-  hold out the scored month. AUROC with a month-block bootstrap (5 blocks, so coarse) and an
-  event-block bootstrap.
-- **Stop rule.** As in the decision rule.
+- **Step 1, separability (no refit).** A logistic regression on experiment 606's summaries and their
+  absolute values reaches an AUROC of 0.83 to 0.85 (training-family shifts) and 0.87 to 0.89
+  (held-out shifts) for "this lag lies inside an injected shift". Adding D1 to D5 raises it by
+  +0.061 (day lag) and +0.059 (week lag) on training-family shifts, and by +0.063 and +0.048 on
+  held-out shifts, on the stored bank; the mirror-at-60% and no-mirror banks differ by under 0.002.
+  Predicted +0.05 on every bank: met except the week lag on held-out shifts (+0.047). Stop rule
+  (gain under 0.03): not triggered. The placebo scorer (D1 to D5 of another Primary) adds under
+  0.005.
+- **Reaction time, start of a shift (281 held-out events).** Mean origin days to cover half the
+  shift, minus B0: F1 -1.59 [-2.26, -1.00] (median -1.0), F1d46 -1.39, F2 -1.79, F1h4 (4 h cutoff)
+  -1.62, L1 -1.25 [-1.87, -0.74], B0g (new age rule, no extra inputs) -0.33 [-0.67, -0.05], P +0.04
+  [-0.59, +0.59]. P2 (at least 1 day, interval excluding zero) is met for the mean and the median.
+  By event length F1 minus B0 is -0.66, -1.17, -1.48, and -3.34 days (5, 10, 21, and 45 days), so it
+  is below 1 day for 5-day shifts (audit's own code).
+- **Reaction time, end of a shift.** F1 minus B0 -0.63 [-0.91, -0.36] mean, median 0.0, so P2's 1-day
+  bar is not met at the end. F1 minus L1: -0.33 [-0.72, +0.07] at the start and -0.18 [-0.42, +0.07]
+  at the end. The 4 hour cutoff buys nothing over 6 hours (F1h4 minus F1: -0.03 and -0.08).
+- **Scaled CRPS minus B0.** In force: F1 -0.12 [-0.33, +0.06], F1d46 -0.23, L1 -0.25 [-0.40, -0.13],
+  P +0.06. Near the end: F1 +0.02, L1 -0.02, B0g -0.31. Just ended: F1 -0.37 [-0.66, -0.10], L1
+  -0.34, F1d46 -0.43. Event-free: F1 +0.01 [-0.16, +0.20], L1 -0.03. P3 (-0.30 in force and near the
+  end) is not met. Within 7 days after the end, the gain of -0.37 meets the 0.30 bar.
+- **False alarms.** Share of event-free rows where the head departs from K1's median by 3 points or
+  more: B0 0.18, F1 0.19, F1d46 0.18, L1 0.23, K1 0.00. P4 (at most +1 percentage point and +0.02
+  CRPS) holds for F1 on the bank (+0.7 points; +0.01 CRPS) and not for L1 (+4.5 points). On real
+  event-free rows F1's CRPS is +0.05 [-0.02, +0.13] against B0, which cannot tell and sits above the
+  0.02 limit.
+- **Held-out shifts, scaled in-force CRPS.** B0 10.96, L1 10.28 (-0.67), F1 10.42 (-0.54), F1d46
+  10.22 (-0.74), K1 16.05, R0 (168 h) 12.43.
+- **Tails, in force (unscaled).** q05 to q95 coverage: K1 0.49, B0 0.83, F1 0.85, L1 0.84. Pinball loss
+  at q01, q05, q95, and q99: B0 0.53, 1.45, 1.51, and 0.52; F1 0.43, 1.31, 1.49, and 0.49; L1 0.43,
+  1.33, 1.41, and 0.45.
+- **Verified D5 and D16 transfer (real rows, one episode, 13,068 rows).** CRPS: K1 14.9, B0 9.73, B0g
+  9.35, F1 8.58, L1 8.63, P 9.92. Descriptive only.
+- **Avoidable-curtailment cost (experiment 601 units, six MW Primaries, leads 12 to 36 h).** Inside a
+  shift: K1 549,533, B0 162,976, F1 136,173, F1d46 124,801, L1 136,284. In the 7 days after the end:
+  K1 541, B0 10,786, F1 9,105, L1 9,148. All rows: K1 316,942, B0 95,937, F1 80,090, L1 80,185.
+- **Placebo (P).** P reacts like B0 at the start (+0.04) and slower at the end (+0.54, an artefact of
+  the release rule, see Caveats), and has a false-alarm rate of 0.36. It cannot serve as the plan's
+  placebo, because the placebo Primary is itself in a shift on 44% to 55% of the target's events
+  (every Primary is shifted in every pass). P5 is not tested.
 
-## Step 2: the refit
+## Arms, data, and method
 
-- **Heads, all 2 seeds x 5 months.** B0 is experiment 652's R-haz (m50 mixture), refitted with
-  the same code, rows, and seeds. L1 is B0 plus experiment 681's L1 block (cleaned-power residuals
-  at 6, 9, 12, 18, 24, 36, 48, and 72 hours before the origin), built here on experiment 650's
-  banks because experiment 681 scores a different bank. F1 is B0 plus all features D1 to D6 at the
-  day lag, week lag, and 6-hour cutoff. F1-D46 is B0 plus D4 to D6 at the 6-hour cutoff only (the
-  spec's "with and without D4 to D6"). F2 is F1 plus the explicit flag. P is F1 with every feature
-  taken from an unrelated Primary of the same metering group (a fixed map that skips the Primary
-  and its neighbours). F1-4h is F1 with the 4-hour cutoff, a lab arm. B-haz (the no-fit survival
-  curve) is not refitted: it has no fitted weights, and experiment 652's stored scores serve as
-  its reference.
-- **The survival gate.** Experiment 652's head sets the survival probability to zero when the age
-  of the departure at the day lag is under 0.5 days, so a shift that began after the day lag leaves
-  the prevailing output equal to the NRA output whatever the head reads. For the feature arms the
-  age input becomes the larger of the day-lag age and the age (in days) of the 6-hour-cutoff
-  detector excursion. L1's age becomes the larger of the day-lag age and 1 day when the mean of its
-  6, 9, 12, 18, and 24-hour residuals exceeds 5 points of capacity. B0 keeps the stored age. A
-  further sensitivity run gives B0 the same extended age rule using the 6-hour residual mean.
-- **Dropout.** The feature block of F1, F1-D46, F2, F1-4h, and P gets 50% row-wise dropout during
-  training (experiment 610's recipe); L1's lag block gets the same, and B0 has none. One run of F1
-  without dropout (F1-nd) separates the effect of the features from the effect of the dropout.
-- **Fits.** 9 arms x 5 months x 2 seeds = 90 small fits (experiment 652 took 6 minutes for 40 on 8
-  processes). CPU only, at most 4 processes, no GPU. Fitted weights are saved to the experiment's
-  data folder.
-- **Gate.** B0 minus experiment 652's stored R-haz scaled CRPS must agree within 0.01 points of
-  capacity; otherwise the experiment stops and reports the mismatch.
-- **Reaction time.** For each injected event, the first origin day on or after the onset (or end)
-  at which the head's median at leads of 24 to 48 hours differs from the NRA output (K1 run on the
-  shifted lags, the bank's stored `q`) by at least half of the shift's depth at the valid time (at the
-  end, by at most half of the in-force departure). Resolution is 1 day. An event whose head never
-  reacts before the shift ends (at the start) or before 14 days pass (at the end) is censored at
-  that point. The page reports the reacting share, the median over events of the censored time with a
-  bootstrap interval over events, and the restricted-mean difference. Experiment 681 excluded
-  non-reacting events and used a different bank, so its published numbers are not comparable, and
-  only the arm L1 refitted here is the contrast.
-- **Verified transfers.** D5 and D16 (2025-12-29) are scored descriptively on the real rows: one
-  episode, no interval.
-- **Scoring.** CRPS and normalised MAE of the median by lead band (24 to 48 hours, 2 to 5 days, and
-  5 to 10 days) and by stratum (event-free, far, middle, near, just ended), scaled and unscaled;
-  q05 to q95 coverage; tail pinball loss at q01, q05, q95, and q99; the avoidable-curtailment cost in
-  three row sets (inside an event, the 7 days after, all rows); and the false-alarm rate on
-  event-free rows. The NRA output is unchanged by construction (a head on frozen K1 quantiles), so
-  it is reported once as an identity check.
+- **Arms.** B0 (experiment 652's R-haz, refitted), B0x (B0 with L1's age rule), B0g (B0 with F1's
+  age rule, no extra inputs), L1 (B0 plus experiment 681's lag block at 6 to 72 hours before the
+  origin, built here), F1 (B0 plus D1 to D6 at the day lag, week lag, and 6-hour cutoff), F1d46 (D4 to
+  D6 at the 6-hour cutoff only), F2 (F1 plus the explicit flag), F1h4 (4 hour cutoff), F1nd (F1 without
+  dropout), P (features of another Primary). 10 arms x 5 months x 2 seeds = 100 fits.
+- **Code.** `ml-experiments/00687-*/`: features `e00687_features.py`, tables `e00687_tables.py`,
+  separability `e00687_separability.py`, fits `e00687_fit.py`, scores `e00687_score.py`. Reuses the
+  code of experiments 598, 606, 647, 650, and 652 (imported). Fitted weights and tables are in
+  `data/ml-experiments/00687-*/`.
+- **Cadence and compute.** One small head per scored month (no refit cadence), 4 CPU processes,
+  about 25 minutes for the fits, no GPU. Data before 2026-07-01 only (asserted). Cleaned power, as
+  in experiment 650.
+- **Features.** D1 to D6 of the plan, in noise units; the noise unit uses all five months, including
+  the scored month (scale only; no sensitivity check was run). The age that gates the survival
+  probability is the larger of the day-lag age and the detector's age (F arms), or 1 day when the
+  mean residual at 6 to 24 hours before the origin exceeds 5 points (L1, B0x).
 
-## Standing practices followed
+## Checks
 
-- Each head is fitted once per scored month on the other four months (small heads, no refit
-  cadence), as in experiment 652.
-- Cleaned data throughout, as in experiment 650's stored clean stack; D15 and D18 rows before
-  2025-03-01 are cut (all development months are later); the dropped half-hours per month are
-  reported.
-- Stored predictions reused: experiment 652's R-haz scores as the gate, K1 rows from experiment 650.
-  Fitted here: B0, L1, F1, F1-D46, F2, P, F1-4h, F1-nd.
-- Weather: the lag-free table `T` comes from experiment 598 and was built from the weather forecast
-  at the forecast time; the features read no weather themselves, only past power up to the cutoff.
-- Data before 2026-07-01 only, asserted on every index range.
-- Reviews: one Sonnet plan review (done), one fresh Sonnet code review before the first fit, a
-  fresh Sonnet re-derivation of the headline numbers, and one Sonnet prose review. No Opus.
+- **Median minus mean forecast, in force, points of capacity:** B0 -0.34, L1 -0.40, F1 -0.51. Mean
+  absolute error of the mean forecast: B0 10.22, L1 9.96, F1 10.15; of the median: 10.20, 9.87,
+  10.18. The mean-forecast contrast agrees in direction with the CRPS contrast.
+- **Triggers fired.** (1) The placebo P gained on rows near the end of a shift. (2) The in-force
+  CRPS gain missed its own prediction (P3). (3) F1 scored worse than its subset F1d46 on some strata
+  (nested arm). A Sonnet audit re-derived the contrasts from the stored predictions with its own
+  code and matched them (`briefs/e687_audit.md`, private). Its findings: the placebo is not independent
+  (accepted: P5 untested, P not read as a control); P's near-end gain is shrinkage, because K1 itself
+  scores 5.93 there against B0's 7.35, so that stratum rewards departing less (accepted); the F1
+  against F1d46 gap is seed variance of 0.1 to 0.6 points (accepted); the reaction-time definition is
+  partly unsound (accepted, see Caveats). B0 equals experiment 652's stored head exactly because the
+  refit is deterministic, not because a file was read twice.
+- **Reviews.** A Sonnet plan review (14 findings, 13 accepted, noise-unit leakage kept with a
+  stated reason), a Sonnet code review before the fits (13 findings: pass-family leak in the AUROC,
+  a gate-only arm, assertions fixed; 5 low items noted), the audit above, and a Sonnet prose review
+  (see the pull request).
 
-## Figures planned
+## Caveats
 
-- Take-home first: reaction time at the start and at the end of a shift, by arm, with intervals.
-- AUROC by bank, with and without D1 to D5.
-- In-force, near-end, just-ended, and event-free scaled CRPS by arm.
-- Six time series of real and injected shifts (both metering groups, generators anonymised), a light
-  grey rectangle over each event, the NRA panel above the prevailing panel, bands shaded, 1 px lines,
-  at least 280 px per panel; two example forecasts (day-ahead and full 14-day horizon).
+- **The injected world flatters the features.** Shifts are exact constants added to clean power,
+  every Primary is shifted in every pass, and the neighbour sees the opposite step at a gain of 0.5
+  to 1. The fits and scores use only the stored-mirror tables. NGED's event labels are incomplete,
+  so real event-free rows may hold unlogged shifts, and the real-row numbers are optimistic.
+- **The reaction-time start rule counts noise.** A hit needs only a departure of half the shift at
+  one origin, so false departures count; a two-origin rule gives P minus B0 +0.73 [+0.02, +1.40] and
+  leaves F1 minus B0 unchanged (audit). A start with no hit is censored at the event length, so the
+  mean is dominated by 45-day events (use the median, -1 day).
+- **The end rule is relative to each head's own earlier level.** With a sign-aware, truth-relative
+  release, F1 minus B0 at the end is -0.46 [-0.65, -0.29] and P minus B0 is +0.01 (audit). Only 55%
+  of events are released within 14 days.
+- **Seed noise.** The per-event start reaction differs by a standard deviation of 5.7 days (B0) and
+  3.9 days (F1) between the two seeds.
+- **Stored banks.** The no-mirror and 60% banks enter only the separability step. The 60% bank is an
+  approximation of a split, not experiment 651's bank.
+- **Lead range.** The stored rows stop at 10 days, which is NGED's horizon.
 
-## Compute
+## What to try next
 
-CPU only, at most 4 cores, `MemoryMax=16G`. Step 1 about 1 hour; step 2 about 1 hour of wall-clock
-for 90 fits on 4 processes. No GPU hours are asked for.
+- Open the survival gate from the newest readings in every prevailing head, and re-test the
+  detector features against extra lags in a world with few concurrent shifts and a placebo Primary
+  that is never shifted.
+- The cheapest gain here came from fresher readings and the gate, so test whether a feature block
+  helps beyond the lag block on real shifts, where the two cannot be separated yet.

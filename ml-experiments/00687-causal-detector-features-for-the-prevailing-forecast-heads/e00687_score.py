@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, D103, PLR0912, PLR0915
+# ruff: noqa: E501, D103, PLR0915, F841
 """Experiment 687, step 3: score every arm by origin state, lead band, and reaction time (CPU).
 
 Arms: `K1` (the NRA output), `R0-168`, `R652` (experiment 652's stored R-haz m50 fit, the gate), and the
@@ -44,11 +44,17 @@ def band_of(lead: np.ndarray) -> np.ndarray:
     return out
 
 
-def reaction_rows(*, z: dict, idx: np.ndarray, q50_head: np.ndarray, events: dict, month: str, arm: str, seed: int) -> list[dict]:
+def reaction_rows(
+    *, z: dict, idx: np.ndarray, q50_head: np.ndarray, events: dict, month: str, arm: str, seed: int
+) -> list[dict]:
     """Return per event the origin-day reaction at the start and the end of the shift (censored if none)."""
     lead = z["lead"][idx]
     sel = (lead >= 24.0) & (lead < 48.0)
-    pa, pr, oi = z["pass_"][idx][sel].astype(int), z["prim"][idx][sel].astype(int), z["oi"][idx][sel].astype(np.int64)
+    pa, pr, oi = (
+        z["pass_"][idx][sel].astype(int),
+        z["prim"][idx][sel].astype(int),
+        z["oi"][idx][sel].astype(np.int64),
+    )
     diff = (q50_head[sel] - z["q"][idx][sel][:, 5]).astype(np.float64)
     shift = z["shift"][idx][sel].astype(np.float64)
     df = pl.DataFrame({"pa": pa, "pr": pr, "oi": oi, "diff": diff, "shift": shift}).group_by("pa", "pr", "oi").agg(pl.col("diff").mean(), pl.col("shift").mean()).sort("pa", "pr", "oi")  # fmt: skip
@@ -69,7 +75,11 @@ def reaction_rows(*, z: dict, idx: np.ndarray, q50_head: np.ndarray, events: dic
         pre = np.flatnonzero(o < en)[-3:]
         level = np.abs(d[pre]).mean() if len(pre) else np.nan
         after = np.flatnonzero((o >= en) & (o < en + REACT_CAP_DAYS * 48))
-        released = after[np.abs(d[after]) <= REACT_FRACTION * level] if np.isfinite(level) else np.array([], int)
+        released = (
+            after[np.abs(d[after]) <= REACT_FRACTION * level]
+            if np.isfinite(level)
+            else np.array([], int)
+        )
         end_days = float((o[released[0]] - en) / 48.0) if len(released) else float(REACT_CAP_DAYS)
         rows.append({
             "month": month, "arm": arm, "seed": seed, "pass": int(a), "prim": int(p),
@@ -89,10 +99,15 @@ def main() -> None:
     for m in c650.MONTHS:
         src = f650.sources(month=m, bank="new")
         f652.with_state(z=src["bank"], month=m)
-        events = {(int(r["pass"]), int(r["primary"])): r for r in c652.events_table(month=m).iter_rows(named=True)}
+        events = {
+            (int(r["pass"]), int(r["primary"])): r
+            for r in c652.events_table(month=m).iter_rows(named=True)
+        }
         for setname in SETS:
             z = src["real" if setname == "real" else "bank"]
-            fits = {a: [np.load(f687.OUT / f"{a}_{m}_s{s}.npz") for s in c652.SEEDS] for a in f687.ARMS}
+            fits = {
+                a: [np.load(f687.OUT / f"{a}_{m}_s{s}.npz") for s in c652.SEEDS] for a in f687.ARMS
+            }
             fits["R652"] = [np.load(f652.OUT / f"Rhaz_m50_{m}_s{s}.npz") for s in c652.SEEDS]
             idx = fits["B0"][0][f"{setname}_idx"]
             for fs in fits.values():
@@ -112,7 +127,10 @@ def main() -> None:
             band = band_of(lead)
             free = np.isin(stratum, ["free", "real_free"])
             arms = {"K1": [(0, k1)], "R0-168": [(0, r0)]}
-            arms |= {a: [(s, np.sort(f[f"{setname}_q"], axis=1)) for s, f in enumerate(fs)] for a, fs in fits.items()}
+            arms |= {
+                a: [(s, np.sort(f[f"{setname}_q"], axis=1)) for s, f in enumerate(fs)]
+                for a, fs in fits.items()
+            }
             scale_rows = keep & ~np.isin(stratum, ["censored", "real_other"])
             for arm, lst in arms.items():
                 for seed, q in lst:
@@ -126,16 +144,39 @@ def main() -> None:
                         "pin01": p[:, 0], "pin05": p[:, 1], "pin95": p[:, 9], "pin99": p[:, 10], "false_alarm": far,
                     }).filter(pl.Series(keep))  # fmt: skip
                     df = pl.concat([df, df.filter(pl.col("stratum").is_in(["far", "middle", "near"])).with_columns(stratum=pl.lit("inforce"))])  # fmt: skip
-                    cols = ["crps", "crps_s", "ae_med", "cov90", "pin01", "pin05", "pin95", "pin99", "false_alarm"]
-                    g = df.group_by("stratum", "band").agg(pl.len().alias("n"), *[pl.col(c).sum() for c in cols])
+                    cols = [
+                        "crps",
+                        "crps_s",
+                        "ae_med",
+                        "cov90",
+                        "pin01",
+                        "pin05",
+                        "pin95",
+                        "pin99",
+                        "false_alarm",
+                    ]
+                    g = df.group_by("stratum", "band").agg(
+                        pl.len().alias("n"), *[pl.col(c).sum() for c in cols]
+                    )
                     agg.append(g.with_columns(month=pl.lit(m), set=pl.lit(setname), arm=pl.lit(arm), seed=pl.lit(seed), factor=pl.lit(float(fac))))  # fmt: skip
                     if setname == "held" and arm != "K1":
-                        react += reaction_rows(z=z, idx=idx, q50_head=q[:, 5], events=events, month=m, arm=arm, seed=seed)
+                        react += reaction_rows(
+                            z=z,
+                            idx=idx,
+                            q50_head=q[:, 5],
+                            events=events,
+                            month=m,
+                            arm=arm,
+                            seed=seed,
+                        )
                     if setname == "held":
                         pr = z["prim"][idx].astype(int)
-                        ev = [events.get((int(a), int(b))) for a, b in zip(z["pass_"][idx], pr, strict=True)]
-                        on = np.array([e["onset_idx"] for e in ev])
-                        en = np.array([e["end_idx"] for e in ev])
+                        ev = [
+                            events.get((int(a), int(b)))
+                            for a, b in zip(z["pass_"][idx], pr, strict=True)
+                        ]
+                        on = np.array([e["onset_idx"] for e in ev])  # ty: ignore[not-subscriptable]
+                        en = np.array([e["end_idx"] for e in ev])  # ty: ignore[not-subscriptable]
                         vi = z["vi"][idx].astype(int)
                         okc = six[pr] & keep & (lead >= LEAD[0]) & (lead < LEAD[1])
                         for sname, s0 in (("inside", (vi >= on) & (vi < en)), ("7 days after the end", (vi >= en) & (vi < en + 7 * 48)), ("all rows", np.ones(len(vi), bool))):  # fmt: skip

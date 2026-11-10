@@ -43,9 +43,22 @@ def placebo_map() -> np.ndarray:
 def load_month(*, month: str, bank: str, pmap: np.ndarray) -> dict:
     b = np.load(c650.WORK / "head_data" / f"bank_{month}.npz")
     z = np.load(t.WORK / "feats" / f"{month}_{bank}.npz")
-    key = {(int(p), int(o), int(r)): i for i, (p, o, r) in enumerate(zip(z["prim"], z["oi"], z["pass_"], strict=True))}
-    org = np.array([key[(int(p), int(o), int(r))] for p, o, r in zip(b["org_prim"], b["org_oi"], b["org_pass"], strict=True)])
-    plc = np.array([key[(int(pmap[p]), int(o), int(r))] for p, o, r in zip(b["org_prim"], b["org_oi"], b["org_pass"], strict=True)])
+    key = {
+        (int(p), int(o), int(r)): i
+        for i, (p, o, r) in enumerate(zip(z["prim"], z["oi"], z["pass_"], strict=True))
+    }
+    org = np.array(
+        [
+            key[(int(p), int(o), int(r))]
+            for p, o, r in zip(b["org_prim"], b["org_oi"], b["org_pass"], strict=True)
+        ]
+    )
+    plc = np.array(
+        [
+            key[(int(pmap[p]), int(o), int(r))]
+            for p, o, r in zip(b["org_prim"], b["org_oi"], b["org_pass"], strict=True)
+        ]
+    )
     base = b["feat"].astype(np.float64)
     own = z["feat"][org][:, :2, :][:, :, D_COLS].reshape(len(org), -1)
     oth = z["feat"][plc][:, :2, :][:, :, D_COLS].reshape(len(org), -1)
@@ -80,12 +93,21 @@ def main() -> None:
                 scores = {}
                 for m in c650.MONTHS:
                     tr = [k for k in c650.MONTHS if k != m]
-                    fam_tr = [data[k]["pass_"] < 200 for k in tr]  # train on the training family only
-                    x_tr = np.concatenate([data[k][scorer][mk] for k, mk in zip(tr, fam_tr, strict=True)])
-                    y_tr = np.concatenate([data[k][label][mk] for k, mk in zip(tr, fam_tr, strict=True)])
+                    fam_tr = [
+                        data[k]["pass_"] < 200 for k in tr
+                    ]  # train on the training family only
+                    x_tr = np.concatenate(
+                        [data[k][scorer][mk] for k, mk in zip(tr, fam_tr, strict=True)]
+                    )
+                    y_tr = np.concatenate(
+                        [data[k][label][mk] for k, mk in zip(tr, fam_tr, strict=True)]
+                    )
                     s = fit_score(x_tr=x_tr, y_tr=y_tr, x_te=data[m][scorer])
                     scores[m] = s
-                    for fam, mask in (("train_family", data[m]["pass_"] < 200), ("held_out", data[m]["pass_"] >= 200)):
+                    for fam, mask in (
+                        ("train_family", data[m]["pass_"] < 200),
+                        ("held_out", data[m]["pass_"] >= 200),
+                    ):
                         per_month[(m, fam)] = auroc(data[m][label][mask], s[mask])
                 for fam in ("train_family", "held_out"):
                     res[f"{bank}|{label}|{scorer}|{fam}"] = {
@@ -93,7 +115,7 @@ def main() -> None:
                         "mean": float(np.nanmean([per_month[(m, fam)] for m in c650.MONTHS])),
                     }
                 # pooled event-block bootstrap on the difference is done in the report from stored scores
-                np.savez(t.WORK / "sep_scores" / f"{bank}_{label}_{scorer}.npz", **{m: scores[m] for m in c650.MONTHS}) if (t.WORK / "sep_scores").exists() else None  # fmt: skip
+                np.savez(t.WORK / "sep_scores" / f"{bank}_{label}_{scorer}.npz", **{m: scores[m] for m in c650.MONTHS}) if (t.WORK / "sep_scores").exists() else None  # fmt: skip  # ty: ignore[invalid-argument-type]
         print(bank, "done", flush=True)
     OUT.write_text(json.dumps(res, indent=1))
     for bank in BANKS:
@@ -102,7 +124,9 @@ def main() -> None:
                 b0 = res[f"{bank}|{label}|base|{fam}"]["mean"]
                 p1 = res[f"{bank}|{label}|plus|{fam}"]["mean"]
                 pl = res[f"{bank}|{label}|placebo|{fam}"]["mean"]
-                print(f"{bank} {label} {fam}: base {b0:.3f} plus {p1:.3f} (+{p1 - b0:.3f}) placebo {pl:.3f}")
+                print(
+                    f"{bank} {label} {fam}: base {b0:.3f} plus {p1:.3f} (+{p1 - b0:.3f}) placebo {pl:.3f}"
+                )
 
 
 if __name__ == "__main__":

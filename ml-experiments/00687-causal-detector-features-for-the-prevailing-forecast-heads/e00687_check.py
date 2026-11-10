@@ -16,15 +16,29 @@ def main() -> None:
     nb = {p: [q for q in range(n_p) if q != p][:2] for p in range(n_p)}
     prim = np.arange(n_p).repeat(4)
     t = np.tile(np.array([2500, 3100, 3500, 4200]), n_p)
-    a, fa = f.features_at(g=f.build_grids(gap=gap, gap_sig=sig, gap_ref=ref, units=units, start=0), prim=prim, t=t, neighbours=nb)
+    a, fa = f.features_at(
+        g=f.build_grids(gap=gap, gap_sig=sig, gap_ref=ref, units=units, start=0),
+        prim=prim,
+        t=t,
+        neighbours=nb,
+    )
     g2, s2, r2 = gap.copy(), sig.copy(), ref.copy()
     for arr in (g2, s2, r2):
-        arr[:, 2501:] += rng.normal(0, 5.0, arr[:, 2501:].shape)  # perturb everything after the earliest cutoff
+        arr[:, 2501:] += rng.normal(
+            0, 5.0, arr[:, 2501:].shape
+        )  # perturb everything after the earliest cutoff
     sel = t == 2500
-    b, fb = f.features_at(g=f.build_grids(gap=g2, gap_sig=s2, gap_ref=r2, units=units, start=0), prim=prim[sel], t=t[sel], neighbours=nb)
+    b, fb = f.features_at(
+        g=f.build_grids(gap=g2, gap_sig=s2, gap_ref=r2, units=units, start=0),
+        prim=prim[sel],
+        t=t[sel],
+        neighbours=nb,
+    )
     assert np.allclose(a[sel], b, equal_nan=True), np.abs(a[sel] - b).max()
     assert (fa[sel] == fb).all()
-    print("causality check passed: no feature at cutoff 2500 changed when later gaps were perturbed")
+    print(
+        "causality check passed: no feature at cutoff 2500 changed when later gaps were perturbed"
+    )
 
 
 if __name__ == "__main__":

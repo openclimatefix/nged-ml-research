@@ -30,7 +30,6 @@
 | 650 | Does a departure head trained on shifts with random ends, varied shapes, and varied depths beat K1 shifted by its own decayed recent error, once band widening is removed? | High (manager, 2026-11-08) | Nothing | Finished: partly supported, see experiment 650 |
 | 652 | Does a departure head with an explicit survival output beat the best forecast that does not know when a shift ends, once each forecast is scored under its own rules? | High (maintainer, 2026-11-08) | Nothing | Finished: not supported, see experiment 652 |
 | 654 | Does one network with an NRA output and a prevailing output, trained end to end with a learned end detector, beat a frozen K1 plus a separate survival head? | High (maintainer, 2026-11-09) | Nothing | Planned |
-| 687 | Do causal step statistics, the neighbour mirror, and a return-to-level statistic let the small prevailing heads react sooner to a load shift than extra lagged power inputs do? | High (Graph Discuss session, 2026-11-10) | Nothing | Planned |
 
 ## Planned experiments
 

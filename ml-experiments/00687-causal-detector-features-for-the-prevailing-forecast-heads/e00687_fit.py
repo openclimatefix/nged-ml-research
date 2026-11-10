@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, PLR0912, PLR0915, E501
+# ruff: noqa: ANN001, D103, PLR0915, E501
 """Experiment 687, step 2: fit the hazard head of experiment 652 with detector features or extra lags (CPU).
 
 Arms (`ARMS`): `B0` (experiment 652's R-haz, refitted), `B0x` (B0 with L1's age rule), `B0g` (B0 with F1's age rule and no extra columns),
@@ -60,7 +60,9 @@ def extra_block(*, arm: str, z: dict, month: str, kind: str) -> tuple[np.ndarray
     if arm in ("L1", "B0x"):
         lag, miss = tb["lags"][rows], tb["lags_miss"][rows]
         mean = lag[:, :5].mean(axis=1) / feats_lag_scale()
-        age_new = np.where((np.abs(mean) > LAG_AGE_THRESHOLD) & ~miss[:, :5].any(axis=1), 1.0, 0.0).astype(np.float32)
+        age_new = np.where(
+            (np.abs(mean) > LAG_AGE_THRESHOLD) & ~miss[:, :5].any(axis=1), 1.0, 0.0
+        ).astype(np.float32)
         extra = np.concatenate([lag, miss.astype(np.float32)], axis=1) if arm == "L1" else np.zeros((n, 0), np.float32)  # fmt: skip
         return extra.astype(np.float32), age_new
     if arm == "B0":
@@ -211,7 +213,9 @@ def fit_one(job: tuple[str, str, int]) -> str:
         with torch.no_grad():
             for a in range(0, len(idx), 50000):
                 ix = np.arange(a, min(a + 50000, len(idx)))
-                x, q, age, lead, _y = f647.batch_inputs(x_org=x_te, age_org=age_te, pool=pool, ix=ix)
+                x, q, age, lead, _y = f647.batch_inputs(
+                    x_org=x_te, age_org=age_te, pool=pool, ix=ix
+                )
                 qq, p = head(x=x, q=q, age=age, lead_h=lead)
                 qs.append(qq.numpy())
                 ps.append(p.numpy())

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, D103
+# ruff: noqa: E501, D103
 """Experiment 687, step 1: causal feature tables for the stored banks of experiments 650 and 652 (CPU).
 
 For each development month, writes `feats/<month>_<bank>.npz` where `<bank>` is `M` (the stored bank,
@@ -60,7 +60,9 @@ def passes_of(*, month: str) -> list[int]:
     return list(c650.ALL_PASSES)
 
 
-def build_rows(*, grids: f.Grids, gap_own: np.ndarray, oi: np.ndarray, neighbours: dict) -> dict[str, np.ndarray]:
+def build_rows(
+    *, grids: f.Grids, gap_own: np.ndarray, oi: np.ndarray, neighbours: dict
+) -> dict[str, np.ndarray]:
     """Return the feature arrays of every (origin in `oi`, Primary) row, Primary-major within an origin."""
     n_p = gap_own.shape[0]
     prim = np.tile(np.arange(n_p), len(oi))
@@ -70,11 +72,13 @@ def build_rows(*, grids: f.Grids, gap_own: np.ndarray, oi: np.ndarray, neighbour
     for k, (_name, back) in enumerate(CUTOFFS.items()):
         assert (o - back - grids.start >= 0).all(), "cutoff before the window"
         assert (o - back <= o - 8).all(), "a cutoff later than origin minus 4 hours"
-        feat[:, k], flag[:, k] = f.features_at(g=grids, prim=prim, t=o - back, neighbours=neighbours)
+        feat[:, k], flag[:, k] = f.features_at(
+            g=grids, prim=prim, t=o - back, neighbours=neighbours
+        )
     lags = np.zeros((len(o), len(LAG_HOURS)), np.float32)
     miss = np.zeros((len(o), len(LAG_HOURS)), bool)
     for j, h in enumerate(LAG_HOURS):
-        assert (2 * h >= 12), "a lag newer than 6 hours before the origin"
+        assert 2 * h >= 12, "a lag newer than 6 hours before the origin"
         v = gap_own[prim, o - 2 * h - grids.start]
         bad = ~np.isfinite(v)
         miss[:, j] = bad
@@ -112,10 +116,15 @@ def main(month: str) -> None:
         ev_all.append(ev)
         for name, scale in (("M", 1.0), ("X", 0.0), ("S", MIRROR_S)):
             sig = np.where(np.isfinite(c), c + scale * mir, c) - med
-            grids = f.build_grids(gap=gap_own, gap_sig=sig, gap_ref=gap_ref, units=units, start=start)
+            grids = f.build_grids(
+                gap=gap_own, gap_sig=sig, gap_ref=gap_ref, units=units, start=start
+            )
             rows = build_rows(grids=grids, gap_own=gap_own, oi=oi, neighbours=nb_of)
             rows["pass_"] = np.full(len(rows["oi"]), r, np.int16)
-            on = {int(p): (int(a), int(b)) for p, a, b in zip(ev["primary"], ev["onset_idx"], ev["end_idx"], strict=True)}
+            on = {
+                int(p): (int(a), int(b))
+                for p, a, b in zip(ev["primary"], ev["onset_idx"], ev["end_idx"], strict=True)
+            }
             for k, key in ((0, "in_day"), (1, "in_week"), (2, "in_new4")):
                 t = rows["oi"] - list(CUTOFFS.values())[k]
                 lo = np.array([on[int(p)][0] for p in rows["prim"]])
@@ -125,7 +134,7 @@ def main(month: str) -> None:
         print(f"{month} r{r:02d} {time.time() - t0:.0f}s", flush=True)
     for name, parts in results.items():
         cat = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
-        np.savez(out_dir / f"{month}_{name}.npz", **cat)
+        np.savez(out_dir / f"{month}_{name}.npz", **cat)  # ty: ignore[invalid-argument-type]
     # real rows: no shift
     c = clean[:, start:end_idx].astype(np.float64)
     gap = c - med
@@ -133,8 +142,8 @@ def main(month: str) -> None:
     oi = np.unique(real["org_oi"]).astype(np.int64)
     rows = build_rows(grids=grids, gap_own=gap, oi=oi, neighbours=nb_of)
     rows["pass_"] = np.zeros(len(rows["oi"]), np.int16)
-    np.savez(out_dir / f"{month}_real.npz", **rows)
-    np.savez(out_dir / "units.npz", **{f"w{w}": u for w, u in units.items()})
+    np.savez(out_dir / f"{month}_real.npz", **rows)  # ty: ignore[invalid-argument-type]
+    np.savez(out_dir / "units.npz", **{f"w{w}": u for w, u in units.items()})  # ty: ignore[invalid-argument-type]
     print(f"{month} done in {time.time() - t0:.0f}s", flush=True)
 
 
