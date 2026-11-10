@@ -2,12 +2,15 @@
 
 uv run --no-sync python ml-experiments/00677-*/e00677_score.py step8w_with_injected_name 0 1 2
 
-Writes CSV tables to `<backtest folder>/scores_668/<file>[_<kind>]/` (private). Systems: the model
+Writes CSV tables to `<experiment folder>/scores/<name>_s<seeds>/` (private). Systems: the model
 in the file, the manual heuristic, and climatology, all scored on the rows where every system has
 a forecast and the observed power is a finite, unflagged reading.
 """
 
+import os
+import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -16,7 +19,11 @@ import numpy as np
 import polars as pl
 
 NAME: Final = "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
-ROOT: Final[Path] = lib.FOLDER.parent / NAME
+ROOT: Final[Path] = (
+    Path(os.environ["E00677_ROOT"]) if os.environ.get("E00677_ROOT") else lib.FOLDER.parent / NAME
+)
+FIRST_MONTH_INDEX: Final = 2025 * 12 + 10
+"""2025-11, the first scored month and the first refit."""
 QCOLS: Final = tuple(lib.QCOLS)
 
 
@@ -25,6 +32,7 @@ def seed_mean(*, name: str, seeds: tuple[int, ...]) -> pl.DataFrame:
     keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
     raw = pl.read_parquet(ROOT / "backtests" / f"{name}.parquet").filter(pl.col("seed").is_in(list(seeds)))
     assert set(raw["seed"].unique().to_list()) == set(seeds), (name, seeds)
+    assert raw.group_by(keys).len()["len"].unique().to_list() == [len(seeds)], "a seed lacks some rows"
     mean = raw.group_by(keys).agg(pl.col(list(QCOLS)).mean()).sort(keys)
     q = np.sort(mean.select(list(QCOLS)).to_numpy().astype(np.float32), axis=1)
     return mean.with_columns([pl.Series(c, q[:, i]) for i, c in enumerate(QCOLS)])
@@ -41,7 +49,7 @@ def season_label(*, origin: pl.Series) -> np.ndarray:
     year = origin.dt.year().to_numpy()
     base = np.array([SEASONS[m] for m in month], dtype=object)
     autumn = base == "autumn"
-    base[autumn] = np.where(year[autumn] == 2025, "autumn (Nov 2025)", "autumn (Sep to Oct 2026)")
+    base[autumn] = np.where(year[autumn] == 2025, "autumn (Nov 2025)", "autumn (Sep to Nov 2026)")
     return base
 
 
@@ -62,7 +70,16 @@ def main(name: str, kind: str | None, seeds: tuple[int, ...] = (0, 1, 2)) -> Non
         )
     lead_h = (vidx - oidx) / 2.0
     y = grid[row, vidx].copy()
-    month_start = forecast["power_fcst_init_time"].dt.truncate("1mo")
+    span = int(re.search(r"_sp(\d+)$", name).group(1))
+    month_index = (
+        forecast["power_fcst_init_time"].dt.year().to_numpy().astype(int) * 12
+        + forecast["power_fcst_init_time"].dt.month().to_numpy().astype(int) - 1
+    )
+    refit_index = month_index - (month_index - FIRST_MONTH_INDEX) % span
+    """The climatology trains on data before the refit month, like the networks (not before each origin's month)."""
+    month_start = pl.Series(
+        [datetime(int(i) // 12, int(i) % 12 + 1, 1, tzinfo=UTC) for i in refit_index]
+    )
     cutoff = lib.grid_index(times=month_start)
     scale = 100.0 / cap[row]
     q_model = forecast.select(lib.QCOLS).to_numpy().astype(np.float64) * scale[:, None]

@@ -9,7 +9,7 @@ head exists only in experiment 667's file).
 
 Usage: python e00677_export.py STEP SPAN MONTH [MONTH ...] [--seeds 0 1 2]
 STEP is one of 1, 2, 3a, 3b, 4, 5w, 5wo, 6w, 6wo, 7w, 7wo, 8w, 8wo. Writes
-`backtests/step<N>_<with|without|ens_only|...>.parquet` once per call (all MONTHs given).
+`backtests/step<N>_<version>_sp<SPAN>.parquet` once per call (all MONTHs given).
 """
 
 import argparse
@@ -39,12 +39,15 @@ def fits_dir(*, step: str, span: int, month: str) -> Path:
 
 def step_rows(*, step: str, span: int, months: list[str], seeds: list[int]) -> pl.DataFrame:
     parts = []
+    keys: dict[str, pl.DataFrame] = {}
     for month in months:
         for seed in seeds:
             raw = pl.read_parquet(
                 fits_dir(step=step, span=span, month=month) / f"{month}_d0_s{seed}.parquet",
                 columns=[*x667.KEYS, *x667.QCOLS],
             )
+            keys.setdefault(month, raw.select(x667.KEYS).sort(x667.KEYS))
+            assert raw.select(x667.KEYS).sort(x667.KEYS).equals(keys[month]), f"seeds differ in keys: {step} {month} s{seed}"
             assert raw.height == raw.unique(x667.KEYS).height, f"duplicate keys: {step} {month} s{seed}"
             parts.append(x667.contract_rows(mean=raw.sort(x667.KEYS)).with_columns(seed=pl.lit(seed, pl.Int8)))
     out = pl.concat(parts).with_columns(
@@ -67,7 +70,7 @@ def main() -> None:
     frame = step_rows(step=args.step, span=args.span, months=args.months, seeds=args.seeds)
     out = ROOT / "backtests"
     out.mkdir(exist_ok=True)
-    target = out / f"step{args.step}_{VERSION[args.step]}.parquet"
+    target = out / f"step{args.step}_{VERSION[args.step]}_sp{args.span}.parquet"
     tmp = target.with_suffix(".tmp")
     frame.write_parquet(tmp)
     tmp.rename(target)

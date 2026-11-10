@@ -162,7 +162,7 @@ def _step2_file(*, month: str, seed: int):
 
 def _stats_file(*, month: str):
     # the reference month (the month before the fold) reads the fold's own statistics, as experiment 620 did
-    p = CHAIN / "stats" / e.SPEC.b1 / f"{fold.FINAL_MONTH}.npz"
+    p = Path(os.environ.get("STATS677", CHAIN)) / "stats" / e.SPEC.b1 / f"{fold.FINAL_MONTH}.npz"
     assert p.exists(), p
     return p
 
@@ -436,7 +436,7 @@ def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> Non
 
 
 GRID_SHAPE = (16, e.data.grid_length())
-"""16 Primaries by the dense grid: 121,248 half-hours in the training phase, longer once the inputs are extended."""
+"""16 Primaries by the dense grid: the grid length of the extended inputs."""
 assert GRID_SHAPE[0] == 16, GRID_SHAPE
 
 
@@ -765,6 +765,7 @@ def run_fit(*, device: str = "cuda") -> None:
                     model.eval()
                     log: dict = {"name": f"{ARM}/{month}_d{day}_s{seed}", "reused": str(mfile)}
                 else:
+                    assert fold.PHASE != "predict", "the prediction phase must reuse the train phase's model"
                     model, log = e.fine_tune(g=g, month=month, cut=cut, seed=seed, device=device)
                     mfile.parent.mkdir(parents=True, exist_ok=True)
                     tmp = mfile.with_suffix(".tmp")
