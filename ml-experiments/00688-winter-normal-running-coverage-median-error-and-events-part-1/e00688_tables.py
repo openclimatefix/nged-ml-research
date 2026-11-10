@@ -24,7 +24,8 @@ def reproduction_gate(*, daily: pl.DataFrame) -> pl.DataFrame:
     """Compare stage `none` of both sets with experiment 683's per-day sums (arms 0 and 2)."""
     ref = pl.read_parquet(dg.DATA_683 / "daily" / "primaries_NRA.parquet").filter(
         pl.col("arm").is_in([0, 2])
-        & pl.col("origin_month").is_between(dg.FIRST_MONTH, dg.LAST_MONTH)
+        & (pl.col("origin_month") >= pl.lit(dg.FIRST_MONTH))
+        & (pl.col("origin_month") <= pl.lit(dg.LAST_MONTH))
     )
     ref = (
         ref.group_by("arm", "origin_month")
@@ -203,11 +204,11 @@ def main() -> None:
         float(gate["diff"].abs().max()),  # ty: ignore[invalid-argument-type]
         int(gate["n_diff"].abs().max()),  # ty: ignore[invalid-argument-type]
     )
-    early = gate.filter(pl.col("origin_month") < "2026-06")
+    early = gate.filter(pl.col("origin_month") < pl.lit("2026-06"))
     if early["n_diff"].abs().max() != 0 or early["diff"].abs().max() > 1e-3:
         msg = "stage none does not reproduce experiment 683 before 2026-06"
         raise ValueError(msg)
-    print(gate.filter(pl.col("origin_month") == "2026-06"))
+    print(gate.filter(pl.col("origin_month") == pl.lit("2026-06")))
     boot = dg.Boot(daily=daily)
     cov = coverage_table(boot=boot)
     cov.write_csv(dg.TABLES / "coverage_by_stage.csv")

@@ -62,7 +62,7 @@ def coverage_by_month(*, tables: Path, out: Path) -> None:
         y=alt.Y("coverage:Q", title="q05-to-q95 coverage (%)", scale=alt.Scale(domain=[70, 100])),
         color=alt.Color("stage_name:N", title="Stage", scale=STAGE_SCALE),
     )
-    err = base.mark_errorbar(ticks=True).encode(  # ty: ignore[unresolved-attribute]
+    err = base.mark_rule(strokeWidth=1, opacity=0.6).encode(  # ty: ignore[unresolved-attribute]
         x=x,
         y=alt.Y("coverage_lo:Q", title="q05-to-q95 coverage (%)"),
         y2="coverage_hi:Q",
@@ -84,6 +84,7 @@ def series_coverage(*, tables: Path, out: Path) -> None:
     order = ser.filter(pl.col("stage") == "none").sort("coverage")["primary"].to_list()
     base = alt.Chart(ser.to_pandas()).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("primary:N", title="Primary (time series id)", sort=order),
+        yOffset=alt.YOffset("stage_name:N"),
         color=alt.Color("stage_name:N", title="Stage", scale=STAGE_SCALE),
     )
     dots = base.mark_point(filled=True, size=40).encode(  # ty: ignore[unresolved-attribute]
