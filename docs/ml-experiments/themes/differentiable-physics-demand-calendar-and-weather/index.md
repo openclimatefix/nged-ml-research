@@ -1,5 +1,8 @@
 # Differentiable physics (demand, calendar, and weather)
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **This theme covers the demand model of a six-part series on forecasting with physical terms.**
 
 Background: [Differentiable physics: background](../differentiable-physics-background.md) explains
