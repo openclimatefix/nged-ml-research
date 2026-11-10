@@ -33,7 +33,8 @@ prediction: >-
 decision_rule: >-
   Support needs all of: the best arm's reaction-time gain over the baseline, with a 95% interval
   over events, excludes zero on the injected events and has the right sign on both verified
-  transfers (January origins onward); the NRA CRPS equals the baseline's to four decimals; the false-alarm share and the
+  transfers (January origins onward);
+  the NRA CRPS equals the baseline's to four decimals; the false-alarm share and the
   prevailing CRPS on event-free rows exceed the baseline's by no more than the baseline's own
   seed-to-seed spread; and the placebo gain is below a third of the arm's gain. The smallest gain
   worth a port is 1 day of reaction time at no cost on event-free rows, because the extra
@@ -124,7 +125,8 @@ experiment changes only the inputs of the prevailing head.
 
 - The head is a 2-hidden-layer network of 64 units fitted on the CPU in experiment 667. The plan
   fits the head only, so it needs no GPU hours (ceiling 4 GPU-h unused). It uses at most 4 CPU cores
-  and a 16 GB memory cap per job. Experiment 667's stored Candidate quantiles are reused. The bank stores only the feature block, so
+  and a 16 GB memory cap per job. Experiment 667's stored Candidate quantiles are reused. The bank
+  stores only the feature block, so
   `build_real` and `build_bank` are rerun to build the lag block, and the regenerated injected events
   are checked against the stored ones.
   the new fits are 4 arms x 2 seeds x 6 folds.
