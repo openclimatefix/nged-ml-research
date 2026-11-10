@@ -17,9 +17,8 @@ same names) in place. Nothing in an earlier experiment's folder is edited.
 import dataclasses
 import os
 from datetime import UTC, datetime, timedelta
-from typing import Final
-
 from pathlib import Path
+from typing import Final
 
 import numpy as np
 

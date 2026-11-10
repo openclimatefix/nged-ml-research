@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: C416, D103, E501
 """Experiment 677: figures of the ladder (SVG, public) from the private score tables.
 
 Usage: python e00677_figures.py SPAN OUT_DIR
@@ -13,10 +13,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import altair as alt
-import pandas as pd
 import e00677_export as exp
 import e00677_score as sc
 import numpy as np
+import pandas as pd  # noqa: TID251  (Altair takes pandas frames)
 import polars as pl
 
 LABEL = {
@@ -123,7 +123,7 @@ def horizon(*, span: int, which: str) -> alt.Chart:
         else "Steps 1 to 5. "
     )
     return (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=2, clip=True)
         .encode(
             x=alt.X(
@@ -219,16 +219,16 @@ def contrasts(*, span: int) -> alt.Chart:
         yOffset="metric:N",
     )
     zero = (
-        alt.Chart(pd.DataFrame({"x": [0]}))
+        alt.Chart(pd.DataFrame({"x": [0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#555555", strokeDash=[4, 3])
         .encode(x="x:Q")
     )
     chart = (
         zero
-        + base.mark_point(filled=True, size=50).encode(
+        + base.mark_point(filled=True, size=50).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("diff:Q", title="Change in score (points of capacity; below 0 is better)")
         )
-        + base.mark_rule(strokeWidth=1.5).encode(x="lo:Q", x2="hi:Q")
+        + base.mark_rule(strokeWidth=1.5).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
     )
     return chart.properties(
         width=WIDTH - 260,
@@ -288,7 +288,7 @@ def example(
         )
     frame = pl.concat(parts).to_pandas()
     return (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1)
         .encode(
             x=alt.X("valid_time:T", title=None),
@@ -365,13 +365,13 @@ ARM_COLOUR = {"3b": "#009C75", "5w": "#0B215F", "6w": "#B701FF", "7w": "#FC9700"
 def event_rect(*, start: datetime, stop: datetime) -> alt.LayerChart:
     """Return a light grey rectangle over the confirmed event, with a short label."""
     frame = pd.DataFrame({"start": [start], "stop": [stop], "label": ["confirmed load shift"]})
-    rect = alt.Chart(frame).mark_rect(color="#D9D9D9", opacity=0.6).encode(x="start:T", x2="stop:T")
+    rect = alt.Chart(frame).mark_rect(color="#D9D9D9", opacity=0.6).encode(x="start:T", x2="stop:T")  # ty: ignore[unresolved-attribute]
     text = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_text(align="left", baseline="top", dx=4, dy=2, fontSize=11, color="#555555")
         .encode(x="start:T", y=alt.value(0), text="label:N")
     )
-    return alt.layer(rect, text)
+    return alt.layer(rect, text)  # ty: ignore[invalid-return-type]
 
 
 def band_panel(
@@ -430,7 +430,7 @@ def band_panel(
     colour = ARM_COLOUR[step] if not kind else {"NRA": "#B701FF", "prevailing": "#009C75"}[kind]
     x = alt.X("valid_time:T", title=None)
     wide = (
-        alt.Chart(f)
+        alt.Chart(f)  # ty: ignore[unresolved-attribute]
         .mark_area(opacity=0.2, color=colour)
         .encode(
             x=x,
@@ -438,11 +438,11 @@ def band_panel(
             y2="q95:Q",
         )
     )
-    narrow = alt.Chart(f).mark_area(opacity=0.35, color=colour).encode(x=x, y="q25:Q", y2="q75:Q")
-    med = alt.Chart(f).mark_line(strokeWidth=1, color=colour).encode(x=x, y="q50:Q")
-    obs = alt.Chart(truth).mark_line(strokeWidth=1, color="#FF4901").encode(x=x, y="observed:Q")
+    narrow = alt.Chart(f).mark_area(opacity=0.35, color=colour).encode(x=x, y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+    med = alt.Chart(f).mark_line(strokeWidth=1, color=colour).encode(x=x, y="q50:Q")  # ty: ignore[unresolved-attribute]
+    obs = alt.Chart(truth).mark_line(strokeWidth=1, color="#FF4901").encode(x=x, y="observed:Q")  # ty: ignore[unresolved-attribute]
     layers = [event_rect(start=event[0], stop=event[1])] if event else []
-    return alt.layer(*layers, wide, narrow, med, obs).properties(
+    return alt.layer(*layers, wide, narrow, med, obs).properties(  # ty: ignore[invalid-return-type]
         width=WIDTH, height=PANEL_HEIGHT, title=title
     )
 

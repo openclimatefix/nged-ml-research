@@ -45,7 +45,7 @@ def main() -> None:
 
     def panel(lab: str) -> alt.Chart:
         return (
-            alt.Chart(prof[prof.lab == lab])
+            alt.Chart(prof[prof.lab == lab])  # ty: ignore[unresolved-attribute]
             .mark_line(strokeWidth=1.2)
             .encode(
                 x=alt.X(

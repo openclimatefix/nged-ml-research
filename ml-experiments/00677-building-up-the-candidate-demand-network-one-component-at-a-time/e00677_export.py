@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, PT018
+# ruff: noqa: D103
 """Experiment 677: turn each ladder step's fits into per-seed contract rows (private Parquet).
 
 The networks run at their native origin of 09:00 UTC. Experiment 667's `contract_rows` relabels it

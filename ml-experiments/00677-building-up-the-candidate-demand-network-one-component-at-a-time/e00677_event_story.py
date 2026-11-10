@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: B007, D103, D415, E501
 """Experiment 677: do steps 6 to 8 ride through load-shift events better than step 5? (private CSV and SVG)
 
 Usage: python e00677_event_story.py OUT_DIR
@@ -18,11 +18,9 @@ Writes `scores/event_story_*.csv` and the SVG figures under OUT_DIR.
 """
 
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 import altair as alt
-import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 import e00668_slices_primaries as s668  # ty: ignore[unresolved-import]
 import e00677_bank_score as bk
 import e00677_export as exp
@@ -67,7 +65,7 @@ def all_rows() -> pl.DataFrame:
                 r.drop("lead_h"), on=["time_series_id", "valid_idx", "origin_idx"], how="inner"
             )
         )
-    return out.join(site.select("time_series_id", "label"), on="time_series_id")
+    return out.join(site.select("time_series_id", "label"), on="time_series_id")  # ty: ignore[unresolved-attribute]
 
 
 def events() -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -149,21 +147,21 @@ def line_chart(
             orient="top", columns=1, symbolType="stroke", symbolStrokeWidth=3, labelLimit=500
         ),
     )
-    import pandas as pd
+    import pandas as pd  # noqa: TID251  (Altair takes pandas frames)
 
     rect = (
-        alt.Chart(pd.DataFrame({"a": [shade[0]], "b": [shade[1]], "t": ["confirmed load shift"]}))
+        alt.Chart(pd.DataFrame({"a": [shade[0]], "b": [shade[1]], "t": ["confirmed load shift"]}))  # ty: ignore[unresolved-attribute]
         .mark_rect(color="#D9D9D9", opacity=0.6)
         .encode(x="a:Q", x2="b:Q")
     )
     text = (
-        alt.Chart(pd.DataFrame({"a": [shade[0]], "t": ["confirmed load shift"]}))
+        alt.Chart(pd.DataFrame({"a": [shade[0]], "t": ["confirmed load shift"]}))  # ty: ignore[unresolved-attribute]
         .mark_text(align="left", baseline="top", dx=4, dy=2, fontSize=11, color="#555555")
         .encode(x="a:Q", y=alt.value(0), text="t:N")
     )
     x = alt.X("rel:Q", title=xtitle)
     line = (
-        alt.Chart(pdf)
+        alt.Chart(pdf)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1)
         .encode(
             x=x,
@@ -175,7 +173,7 @@ def line_chart(
             color=colour,
         )
     )
-    return alt.layer(rect, text, line).properties(
+    return alt.layer(rect, text, line).properties(  # ty: ignore[invalid-return-type]
         width=620, height=300, title=alt.TitleParams(title, anchor="start", fontSize=12)
     )
 
@@ -278,7 +276,7 @@ def main() -> None:
         shade = (0.0, length) if anchor == "start" else (-length, 0.0)
         line_chart(
             frame=pool,
-            title=[
+            title=[  # ty: ignore[invalid-argument-type]
                 f"Error of the median forecast by whole days since the event {anchor}; {ev.height} logged events pooled.",
                 "Mean over events and seeds 0 to 4. The steps nearly coincide.",
             ],
@@ -296,7 +294,6 @@ def main() -> None:
     fd = follow_by_depth()
     fd.write_csv(sc.ROOT / "scores" / "event_story_follow_by_depth.csv")
     print(fd)
-    import pandas as pd
 
     d = (
         fd.with_columns(depth=(pl.col("depth") * 100).round().cast(pl.Int32) / 100.0)
@@ -337,7 +334,7 @@ def main() -> None:
         sub = d[d.injected == inj]
         panels.append(
             (
-                alt.Chart(sub)
+                alt.Chart(sub)  # ty: ignore[unresolved-attribute]
                 .mark_line(strokeWidth=1.2, point=True)
                 .encode(
                     x=x,
@@ -348,7 +345,7 @@ def main() -> None:
                     ),
                     color=colour,
                 )
-                + alt.Chart(sub)
+                + alt.Chart(sub)  # ty: ignore[unresolved-attribute]
                 .mark_rule(strokeWidth=1)
                 .encode(x=x, y="lo:Q", y2="hi:Q", color=colour)
             ).properties(

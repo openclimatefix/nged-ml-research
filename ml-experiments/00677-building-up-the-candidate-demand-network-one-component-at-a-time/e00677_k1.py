@@ -1,4 +1,4 @@
-# ruff: noqa: ANN003, ANN201, ANN202, E402, E501, I001, PT018
+# ruff: noqa: ANN001, ANN003, ANN201, ANN202, D103, E402, E501, I001, PT018
 """Experiment 620: pre-train, step-2, and fit K1 (class 1) on the final-test fold 2026-07 (GPU).
 
 A copy of experiment 613's `e00613_arm.py` (K1 with D5 and E3 only), with `e00677_fold` patched

@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, E402, E501
 """Experiment 677: slice tables and step-to-step contrasts of the ladder (private CSV).
 
 Usage: python e00677_slices.py SPAN NAME [NAME ...]   (NAME is a step file stem without the span, such as
@@ -14,7 +14,6 @@ the backtest year and is printed with its row count first.
 
 import sys
 
-import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 import e00668_slices_primaries as s668  # ty: ignore[unresolved-import]
 import e00677_export as exp
 import e00677_score as sc
@@ -64,8 +63,8 @@ def load(*, span: int, names: list[str]) -> tuple[pl.DataFrame, list[str]]:
         r = r.select(*keep, *cols)
         out = r if out is None else out.join(r, on=keep, how="inner")
         labels.append(name)
-    rows = out.join(site.select("time_series_id", "label", "primary"), on="time_series_id")
-    return rows, site
+    rows = out.join(site.select("time_series_id", "label", "primary"), on="time_series_id")  # ty: ignore[unresolved-attribute]
+    return rows, site  # ty: ignore[invalid-return-type]
 
 
 def block_bootstrap(*, day: np.ndarray, values: np.ndarray, seed: int = 0) -> np.ndarray:
@@ -129,7 +128,7 @@ def main() -> None:
                         float(v[mask].mean()),
                         (float(x) for x in np.quantile(draws, [0.025, 0.975])),
                     )
-                records.append({"set": sname, "part": part, "system": system, "metric": metric, "mean": mean, "lo": lo, "hi": hi, "rows": n, "origin_days": int(len(np.unique(day[mask]))) if n else 0})  # fmt: skip
+                records.append({"set": sname, "part": part, "system": system, "metric": metric, "mean": mean, "lo": lo, "hi": hi, "rows": n, "origin_days": len(np.unique(day[mask])) if n else 0})  # fmt: skip
     out = sc.ROOT / "scores"
     pl.DataFrame(records).write_csv(out / f"slices_sp{span}{OUT_SUFFIX}.csv")
     contrasts = []

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0915
 """Experiment 677 (adapted from experiment 668): score one ladder step against observed power.
 
 uv run --no-sync python ml-experiments/00677-*/e00677_score.py step8w_with_injected_name 0 1 2
@@ -14,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
-import e00668_score_lib as lib
+import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 
@@ -74,7 +75,7 @@ def main(name: str, kind: str | None, seeds: tuple[int, ...] = (0, 1, 2)) -> Non
         )
     lead_h = (vidx - oidx) / 2.0
     y = grid[row, vidx].copy()
-    span = int(re.search(r"_sp(\d+)$", name).group(1))
+    span = int(re.search(r"_sp(\d+)$", name).group(1))  # ty: ignore[unresolved-attribute]
     month_index = (
         forecast["power_fcst_init_time"].dt.year().to_numpy().astype(int) * 12
         + forecast["power_fcst_init_time"].dt.month().to_numpy().astype(int)

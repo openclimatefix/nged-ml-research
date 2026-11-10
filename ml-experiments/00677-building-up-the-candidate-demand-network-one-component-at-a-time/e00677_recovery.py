@@ -13,12 +13,12 @@ first whole day since the event start on which the forecast's change reaches hal
 `scores/recovery_prevailing.csv` (one row per event) and prints the median with a 95% interval from resampling events.
 """
 
-import numpy as np
-import polars as pl
 import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 import e00668_slices_primaries as s668  # ty: ignore[unresolved-import]
 import e00677_event_story as story
 import e00677_score as sc
+import numpy as np
+import polars as pl
 
 DAY = s668.DAY
 
@@ -70,16 +70,16 @@ def main() -> None:
                 }
             )
             continue
-        delta = lvl_mean - pre_mean
+        delta = lvl_mean - pre_mean  # ty: ignore[unsupported-operator]
         fc_pre = pre["fc"].drop_nulls().mean()
         rec = None
         if abs(delta) >= 0.1 * cap and fc_pre is not None and length >= 4:
-            for day in range(0, int(min(length, 21))):
+            for day in range(int(min(length, 21))):
                 w = s.filter(
                     (pl.col("idx") >= e["start"] + day * DAY)
                     & (pl.col("idx") < e["start"] + (day + 1) * DAY)
                 )["fc"].drop_nulls()
-                if len(w) and (w.mean() - fc_pre) / delta >= 0.5:
+                if len(w) and (w.mean() - fc_pre) / delta >= 0.5:  # ty: ignore[unsupported-operator]
                     rec = day
                     break
         rows.append(

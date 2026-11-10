@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, E501, PLR0915
 """Experiment 677: score the ladder, the stored standard methods, and experiment 667's file by the protocol.
 
 Usage: python e00677_protocol.py TAG STEP[:FILE_SPAN:SEEDS] ...   (for example `3 1 2 3b 4 5w 8w 8wo`)
