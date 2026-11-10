@@ -7,7 +7,7 @@ Importing this module patches `mixture_parts`, `mixture_nll`, and `mixture_quant
 and its target mean and standard deviation, which the original signatures do not carry, so:
 
 - the `forward` of the four network classes records the batch's Primary index in `STATE.primary`;
-- `FoldTrain.__init__` of `e00397_prep` records the fold's per-Primary target mean and standard
+- `Rows.__init__` of `e00428_data` (the fold's rows, `mr.base`) records the fold's per-Primary target mean and standard
   deviation in `STATE`.
 
 `E00684_FAMILY` is `gauss` (nothing is patched), `tgauss` (the Gaussian mixture conditioned on
@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from typing import Final
 
 import e00397_models as base  # ty: ignore[unresolved-import]
-import e00397_prep as prep  # ty: ignore[unresolved-import]
+import e00428_data as data  # ty: ignore[unresolved-import]
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
 
@@ -37,8 +37,8 @@ assert FAMILY in {"gauss", "tgauss", "gamma"}, FAMILY
 POSITIVE_IDS: Final = tuple(
     int(v) for v in os.environ.get("E00684_POSITIVE_IDS", "14,15,26,17").split(",")
 )
-W_FLOOR: Final = 1e-3
-"""Smallest `power / std` in the gamma density (an observed zero is raised to this)."""
+W_FLOOR_POWER: Final = 1e-4
+"""Smallest power, as a share of capacity, in the gamma density (an observed zero is raised to it)."""
 CV_BASE: Final = 0.3
 BISECTION_STEPS: Final = 50
 
@@ -89,6 +89,13 @@ def row_info(*, device: torch.device, dtype: torch.dtype) -> tuple[torch.Tensor,
     return positive_t[p], z0_t[p]
 
 
+def floor_w(*, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+    """Return each row's floor of `power / std`: `W_FLOOR_POWER` over the Primary's std (capacity units)."""
+    assert STATE.std is not None and STATE.primary is not None
+    std = torch.tensor(STATE.std, dtype=dtype, device=device)[STATE.primary]
+    return W_FLOOR_POWER / std
+
+
 def gamma_parts(
     *, out: torch.Tensor, z0: torch.Tensor, components: int
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -128,7 +135,7 @@ def mixture_nll(*, out: torch.Tensor, z: torch.Tensor, components: int) -> torch
         )
     else:
         g_log_w, g_mean, g_cv = gamma_parts(out=out, z0=z0, components=components)
-        w = (z - z0).clamp_min(W_FLOOR)[..., None]
+        w = torch.maximum(z - z0, floor_w(dtype=out.dtype, device=out.device))[..., None]
         family = -torch.logsumexp(g_log_w + gamma_log_pdf(w=w, mean=g_mean, cv=g_cv), dim=-1)
     return torch.where(positive, family, gaussian)
 
@@ -220,13 +227,18 @@ def install() -> None:
     for cls in (m545.ModularMdn, m560.LagModularMdn, m591.AuxLagMdn, m613.PermLagMdn):
         if "forward" in cls.__dict__:
             cls.forward = record_primary(cls.__dict__["forward"])
-    init = prep.FoldTrain.__init__
+    init = data.Rows.__init__
 
     def record_stats(self, *args, **kwargs):
         init(self, *args, **kwargs)
-        STATE.mean, STATE.std = np.asarray(self.target_mean), np.asarray(self.target_std)
+        mean, std = np.asarray(self.target_mean), np.asarray(self.target_std)
+        if STATE.mean is not None:
+            assert np.array_equal(STATE.mean, mean) and np.array_equal(STATE.std, std), (
+                "a second Rows with other target statistics in one process"
+            )
+        STATE.mean, STATE.std = mean, std
 
-    prep.FoldTrain.__init__ = record_stats
+    data.Rows.__init__ = record_stats
 
 
 install()

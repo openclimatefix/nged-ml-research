@@ -11,7 +11,7 @@ shift; M=$1; shift
 STEPS=${*:-step2 table fit ptable pfit}
 export E00667_MONTH=$M CHAIN667=$R/chains/$M/work
 mkdir -p $R/logs $CHAIN667/logs
-for l in pretrained_P2 stats; do [ -e $CHAIN667/$l ] || ln -s $SRC/chains/$M/work/$l $CHAIN667/$l; done
+for l in pretrained_P2 stats; do [ -e $SRC/chains/$M/work/$l ] || { echo missing $l; exit 1; }; [ -e $CHAIN667/$l ] || ln -s $SRC/chains/$M/work/$l $CHAIN667/$l; done
 A="--months $M --seeds 0 1"
 set -e
 run() { "$F667/gpu.sh" ../$(basename "$D")/e00684_run.py "$@"; }
