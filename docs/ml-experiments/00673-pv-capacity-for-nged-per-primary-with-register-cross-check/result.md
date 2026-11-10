@@ -91,9 +91,9 @@ small reactive floor. Under that assumption experiment 679 measures a conversion
 is a whole-summer value, so none shows how capacity grew from month to month.
 
 **The hypothesis, that the probe's 90th percentile is at or above the floor at every Primary, fails
-at D2, D3, D5, and D21.** The verdict "supported" follows the decision rule fixed before any total was
-computed, which reads only the six MW Primaries (5 of 6). The count falls to 5 of 12 if the Feed-in
-Tariff band of 50 kW to 1 MW is added to the floor.
+at D2, D3, D5, and D21.** The verdict "supported" follows the decision rule fixed before any total
+was computed, which reads only the six MW Primaries (5 of 6). The count falls to 5 of 12 if the
+Feed-in Tariff band of 50 kW to 1 MW is added to the floor.
 
 Every probe number on this page is a stored row of experiments
 [649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md),
@@ -150,13 +150,14 @@ real solar farm that the probe finds again.
 recovery of 0.79. The fold model's figure is an upper bound.** The linear probe is experiment 662's
 L0 and the fold model is its FA, both at the 2026-06 cutoff. The signed-world recovery is experiment
 662's recovery of an added farm at 0.5 times the midday reading, measured on the six MW Primaries
-with no apparent-power conversion (median 0.79). Dividing by it assumes that NGED's meters read
-power factor 1 with a small always-present reactive floor. Experiment
+with no apparent-power conversion (median 0.79). Dividing by the signed-world recovery assumes that
+NGED's meters read power factor 1 with a small always-present reactive floor. Experiment
 [679](../00679-pv-mva-conversion-loss-reactive-floor-at-half-level/result.md) measured the
 conversion loss of the linear probe at 0.5 times under that assumption: 0.5 points (80% interval
 -1.0 to 7.7), against 10.7 points when the six MW Primaries are converted with a reactive part of
 0.25 times the median real power (power factor 0.97, the "PF arm"). The upper end of the interval
-does not rule out a loss of 7.7 points, and the loss may lie in the earlier range of 5 to 12 points.
+does not rule out a loss of 7.7 points, and the loss may lie in the 5-to-12-point range that
+experiment 671 reported for the PF arm.
 Experiment 671 recommends the same probe and marks all five figures provisional.
 
 | Primary | Raw linear p50 | Linear, calibrated 0.79: p10 / p50 / p90 | Sensitivity, calibrated 0.68 (PF-arm loss): p10 / p50 / p90 | Fold model, upper bound: p10 / p50 / p90 |
@@ -185,20 +186,23 @@ call that D12 folds.
 
 **Conversion loss and the reactive-power setting.** The calibrated 0.79 column divides the raw
 linear reading by the linear probe's recovery in the signed (no apparent-power) world. The
-sensitivity column divides by 0.68 instead, the recovery when the conversion is the PF arm. It is
-the capacity if the conversion loss were the PF arm's 10.7 points, and is about 16% higher than the
-main figure. NGED's statement, relayed by the maintainer, is to assume power factor 1 for the
-substation meters, with some reactive power always present. Experiment 662 simulated that with a
-reactive-floor arm (a constant reactive power of 0.10 times the median sunny-midday power) and a
-zero-reactive arm (a reactive power of zero, so the reading is the absolute value of the real
-power). Median recovery of the injected farm over the six MW Primaries, first farm rotation, with
-the 0.5-times cells of the two arms measured in experiment 679:
+sensitivity column divides by 0.68, the recovery when the conversion is the PF arm. The sensitivity
+column is the capacity if the conversion loss were the PF arm's 10.7 points, and its figures are
+about 16% higher than the main figures. NGED's statement, relayed by the maintainer, is to assume
+power factor 1 for the substation meters, with some reactive power always present. Experiment 662
+simulated that with a reactive-floor arm (a constant reactive power of 0.10 times the median
+sunny-midday power) and a zero-reactive arm (a reactive power of zero, so the reading is the
+absolute value of the real power). The table gives the median recovery of the injected farm over the
+six MW Primaries for the first farm rotation. The cells marked (679) are experiment 679's, which use
+all farm rotations (signed recovery 0.746 at 0.5 times, not 0.79), so compare them with 0.746 and
+not with the 0.79 beside them. The zero-reactive linear cell is derived as 0.746 plus the loss of
+-0.5 points.
 
 | Probe and reactive model | 0.5 times | 1 times | 2 times | 6 times |
 |---|---|---|---|---|
 | Linear, PF arm | 0.68 | 0.53 | -0.12 | -0.80 |
 | Linear, reactive-floor arm | 0.73 (679) | 0.63 | -0.11 | -0.83 |
-| Linear, zero-reactive arm | about 0.75 (679) | not run | -0.10 | not run |
+| Linear, zero-reactive arm | about 0.75 (679, derived) | not run | -0.10 | not run |
 | Linear, signed (no conversion) | 0.79 | 0.78 | 0.77 | 0.78 |
 | Fold model, PF arm | 0.73 | 0.71 | 0.78 | 0.88 |
 | Fold model, reactive-floor arm | 0.88 (679) | 0.67 | 0.78 | 0.88 |
@@ -208,22 +212,24 @@ the 0.5-times cells of the two arms measured in experiment 679:
 **At 0.5 times, the level of the five MVA Primaries, the reactive-floor arm loses 0.5 points of
 linear-probe recovery, against 10.7 points in the PF arm.** Experiment 679 states the loss as the
 median over the six MW Primaries of each Primary's own difference between the signed and converted
-recoveries, so it differs from the difference of the medians in this table, and its recoveries use
-all farm rotations (signed 0.746) rather than the first. The interval of the loss is -1.0 to 7.7
-points (80%), and the zero-reactive arm's is -0.5 (-3.3 to 6.8). The fold model's 0.5-times cells
-carry no verdict, because experiment 679 finds it reads above the signed world in the floor world
-(0.88 against 0.80). At 1 times the floor arm recovers 0.63 and the PF arm 0.53, against 0.78
-without the conversion, and at 2 times the arms match (-0.11, -0.10, and -0.12).
+recoveries, so it differs from the difference of the medians in this table. Experiment 679's
+recoveries use all farm rotations (signed 0.746), not the first. The interval of the loss is -1.0 to
+7.7 points (80%), and the zero-reactive arm's is -0.5 (-3.3 to 6.8). The fold model's 0.5-times
+cells are not read as a loss, because experiment 679 finds it reads above the signed world in the
+floor world (0.88 against 0.80). At 1 times the floor arm recovers 0.63 and the PF arm 0.53, against
+0.78 without the conversion, and at 2 times the arms match (-0.11, -0.10, and -0.12).
 
 **The conversion loss is therefore probably small at the MVA Primaries, but the data do not rule
 out a loss of up to 7.7 points.** If the meters read power factor 1 with a small floor, the main
-figures need no further correction. If the loss were 7.7 points, the divisor would be about 0.71
-(0.79 minus 0.077) and the figures would be about 11% higher. The loss measured at 0.5 times in the
-PF arm was 5 to 12 points at D9, D11, D14, and D16 (experiment 671). The reactive
-power of the real meters is unknown, and no native-world read at the five MVA Primaries exists
-under the floor arm, because experiment 662's code builds no native floor-arm worlds. Using
-experiment 671's per-Primary signed-world values of 0.73 to 0.82 instead of 0.79, the main figures
-would change by about +8% to -4%.
+figures need no further correction. If the loss were 7.7 points, the divisor would be approximately
+0.71 (0.79 minus 0.077) and the figures would be about 11% higher. The loss measured at 0.5 times in
+the PF arm was 5 to 12 points at D9, D11, D14, and D16 (experiment 671). Using experiment 671's
+per-Primary signed-world values of 0.73 to 0.82 instead of 0.79, the main figures would change by
+about +8% to -4%.
+
+**The reactive power of the real meters is unknown, and no native-world read at the five MVA
+Primaries exists under the floor arm.** Experiment 662's code builds no native floor-arm worlds, so
+the loss is measured on the six MW Primaries and carried over to the five MVA Primaries.
 
 **The main MVA figures use the signed-world recovery 0.79; the PF-arm calibration (reactive power
 0.25 times the median real power) appears only in the sensitivity column** and in the known-answer
@@ -369,10 +375,10 @@ probe's median over the floor.
 
 ## Caveats
 
-- **The 0.68 factor may not transfer to rooftop panels with other tilts.** The probe finds 0.68 of
-  an injected real farm's AC MW (0.676 to 0.708 across the four injected farms). The factor comes
-  from four injected farms that resemble each other, and may not transfer to a fleet of rooftop
-  panels with other tilts.
+- **The MW-Primary factor 0.68 may not transfer to rooftop panels with other tilts.** The probe
+  finds 0.68 of an injected real farm's AC MW (0.676 to 0.708 across the four injected farms). The
+  factor comes from four injected farms that resemble each other, and may not transfer to a fleet of
+  rooftop panels with other tilts.
 - **Energy-basis spread.** Measured in energy, the recovery is 0.78 (donor rows) to 0.88 (all
   daylight rows), so the capacity of a physics-shaped plant carrying the same energy is 0.77 to 0.87
   times the megawatt-basis capacity.
@@ -404,9 +410,9 @@ probe's median over the floor.
 
 - **NGED's list of connected solar behind a Primary, if it lies outside the probe interval by more
   than the interval's width.** Where the list (a count and total capacity at 11 kV and below) does,
-  the probe's calibration or the floor's match to metered sites is wrong at that Primary. D3, D5,
-  and D21 are the three where the flags already point that way, so those three records would settle
-  most. D2's margin is 0.002 MW.
+  the probe's calibration or the floor's match to metered sites is wrong at that Primary. D2, D3,
+  D5, and D21 are the four where the flags already point that way, so those four records would
+  settle most. D2's probe 90th percentile is 1.12 MW below its floor.
 - **A reactive-floor arm in the native worlds of the five MVA Primaries.** That would replace the
   MW-Primary measurement of the conversion loss with a measurement at the five MVA Primaries
   themselves. It needs a code change in experiment 662's native-world builder.
