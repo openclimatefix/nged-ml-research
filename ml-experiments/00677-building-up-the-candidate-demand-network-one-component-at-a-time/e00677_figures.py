@@ -171,7 +171,7 @@ def prevailing_figure(*, span: int, label: str, start: datetime, stop: datetime,
         band_panel(span=span, step="8w", start=start, stop=stop, series=series, lead_day=lead_day, kind=k, event=EVENT, title=prefix + f"{label}, Candidate (experiment 667, monthly refits), {name} output: {note}")
         for k, name in (("NRA", "NRA"), ("prevailing", "prevailing-conditions"))
     ]
-    return alt.vconcat(*panels).properties(title=alt.TitleParams("Median (line), 50% band (dark shade), 90% band (light shade); observed power in orange. Ladder steps 1 to 8 have no prevailing output.", anchor="start", fontSize=11))
+    return alt.vconcat(*panels).properties(title=alt.TitleParams("Median (line), 50% band (dark shade), 90% band (light shade); observed power in orange. Prevailing output: the extra-lag head of experiment 681 (folds 2025-11 and 2025-12 keep the earlier head). Ladder steps 1 to 8 have no prevailing output.", anchor="start", fontSize=11))
 
 
 def band_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int, event: tuple[datetime, datetime] | None = None, steps: tuple[str, str] = ("5w", "8w")) -> alt.VConcatChart:
