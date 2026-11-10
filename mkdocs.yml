@@ -163,6 +163,12 @@ nav:
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
           - Research plan: ml-experiments/themes/generator-forecasting/plan.md
           - State and next steps: ml-experiments/themes/generator-forecasting/state-and-next-steps.md
+      - Gross-demand simulation:
+          - Summary: ml-experiments/themes/gross-demand-simulation/index.md
+          - Experiments: ml-experiments/themes/gross-demand-simulation/experiments.md
+          - Research plan: ml-experiments/themes/gross-demand-simulation/plan.md
+          - Asset-inventory simulator: ml-experiments/themes/gross-demand-simulation/asset-inventory-simulator.md
+          - Simulator discussion of 2026-11-09: ml-experiments/themes/gross-demand-simulation/simulator-discussion-2026-11-09.md
       - Hierarchy and pooling:
           - Summary: ml-experiments/themes/hierarchy-and-pooling/index.md
           - Experiments: ml-experiments/themes/hierarchy-and-pooling/experiments.md
