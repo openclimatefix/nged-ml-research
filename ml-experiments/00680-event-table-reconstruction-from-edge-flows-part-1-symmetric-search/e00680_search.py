@@ -101,7 +101,7 @@ def search_donors(
             if taken or not params.share_low <= share <= params.share_high:
                 continue
             var = sigma[r.primary] ** 2 + sigma[n] ** 2
-            cost = (hit[1] + r_step) ** 2 / (var + (params.kappa * abs(hit[1])) ** 2)
+            cost = (hit[1] + r_step) ** 2 / (var + (params.kappa * abs(r_step)) ** 2)
             if cost < best_cost:
                 best, best_cost = (n, hit[0], hit[1]), cost
         if best is None or best_cost > params.conservation_max:

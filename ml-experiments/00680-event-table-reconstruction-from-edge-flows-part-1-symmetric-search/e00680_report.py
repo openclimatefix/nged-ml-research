@@ -51,8 +51,16 @@ def gate(*, raw: pl.DataFrame) -> dict:
     for cell in CELLS:
         a = cell_stats(frames=[old], cell=cell)
         b = cell_stats(frames=[new], cell=cell)
-        out[cell] = {"stored": a["paired_mw"], "rerun": b["paired_mw"]}
+        ok = abs(a["paired_mw"] - b["paired_mw"]) <= 0.005 or (
+            np.isnan(a["paired_mw"]) and np.isnan(b["paired_mw"])
+        )
+        out[cell] = {"stored": a["paired_mw"], "rerun": b["paired_mw"], "ok": bool(ok)}
         print(f"GATE {cell:16s} stored paired {a['paired_mw']:.4f} rerun {b['paired_mw']:.4f}")
+    worlds_new = set(raw.filter(pl.col("method") == "E1-J")["world"].to_list())
+    worlds_old = set(old["world"].to_list())
+    out["same_worlds"] = worlds_new == worlds_old
+    out["passed"] = out["same_worlds"] and all(v["ok"] for k, v in out.items() if k in CELLS)
+    print("GATE passed:", out["passed"], "(same worlds:", out["same_worlds"], ")")
     return out
 
 
@@ -111,13 +119,36 @@ def report(*, config: str) -> dict:
         branch = (
             "a: adopt E1-J-sym as the event table"
             if all(x >= 0.10 for x in diffs)
-            else "c: weak mechanism, run E1-F with prior 20% or less"
+            else "b: weak mechanism, run part 2 with a prior of 20% or less"
             if all(x < 0.03 for x in diffs)
-            else "b: run E1-F"
+            else "c: run part 2"
         )
         res["stage1_branch"] = branch
         print("STAGE 1:", branch, diffs)
+        res["verdict"] = verdict(res=res)
+        print("VERDICT:", res["verdict"])
     return res
+
+
+def verdict(*, res: dict) -> str:
+    """The pre-registered verdict from the deep-cell differences and their intervals."""
+    if not res["gate"]["passed"]:
+        return "invalid"
+    d = {c: res["sym_minus_J"][c] for c in DEEP}
+    small = any(
+        res["E1-J-sym"][c]["n_events"] < 20 or res["E1-J-sym"][c]["n_edge"] < 10 for c in DEEP
+    )
+    rewired_edge = res["E1-J-sym rewired"]["edge_events"]
+    holds = rewired_edge <= res["E1-J-sym"]["edge_events"] / 3
+    if small:
+        return "inconclusive"
+    if all(v[0] >= 0.10 for v in d.values()) and holds:
+        return "supported"
+    if any(v[0] >= 0.10 for v in d.values()) or all(v[0] >= 0.05 for v in d.values()):
+        return "partly supported"
+    if all(v[1] > 0 for v in d.values()):
+        return "small gain"
+    return "not supported"
 
 
 def main() -> None:

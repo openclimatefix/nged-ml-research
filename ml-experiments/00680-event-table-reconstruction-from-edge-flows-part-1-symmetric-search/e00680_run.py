@@ -94,7 +94,7 @@ def run_injected(*, config_name: str, first_seed: int, n_worlds: int) -> None:
         )
         residual = rig.residual_of(world=world)
         truth = truths(events=world.events, lo=SCORED_FROM, hi=GRID_LENGTH)
-        variants, kept = decode_variants(
+        variants, _ = decode_variants(
             rig=rig,
             residual=residual,
             frozen=rig.frozen,
@@ -113,7 +113,6 @@ def run_injected(*, config_name: str, first_seed: int, n_worlds: int) -> None:
                     "method": method,
                     "world_edge_events": len(decoded),
                     "world_right_pairs": n_right,
-                    "rewired_kept": kept,
                 }
                 for r in scored
             )
@@ -145,6 +144,7 @@ def run_real() -> None:
         edge = t.filter(pl.col("cls").is_in(["edge_transfer", "permanent_transfer"]))
         res[m] = {
             "events": t.height,
+            "events_per_primary_year": t.height / scored_years,
             "edge_events": edge.height,
             "edge_events_by_cell": {c: edge.filter(pl.col("cell") == c).height for c in CELLS},
             "logged_matched_all": matched(table=t, logged=logged),
