@@ -7,8 +7,8 @@ Importing this module patches `mixture_parts`, `mixture_nll`, and `mixture_quant
 and its target mean and standard deviation, which the original signatures do not carry, so:
 
 - the `forward` of the four network classes records the batch's Primary index in `STATE.primary`;
-- `Rows.__init__` of `e00428_data` (the fold's rows, `mr.base`) records the fold's per-Primary target mean and standard
-  deviation in `STATE`.
+- `Rows.__init__` of `e00428_data` (the fold's rows, `mr.base`) records the fold's per-Primary
+  target mean and standard deviation in `STATE`.
 
 `E00684_FAMILY` is `gauss` (nothing is patched), `tgauss` (the Gaussian mixture conditioned on
 power at or above zero), or `gamma` (three gamma components on power over the Primary's standard

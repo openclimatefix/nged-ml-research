@@ -178,7 +178,7 @@ def fans(out: Path) -> None:
 
 
 def ladders(out: Path) -> None:
-    """Return nothing; write the 11 quantiles of each arm at two example half-hours of Primary 26 (the fitted shape)."""
+    """Return nothing; write each arm's 11 quantiles at two example half-hours of Primary 26."""
     rows = []
     for tag, hour in (("night trough", 3), ("evening peak", 18)):
         for arm in ARMS:
