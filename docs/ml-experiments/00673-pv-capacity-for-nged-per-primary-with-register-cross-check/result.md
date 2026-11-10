@@ -358,8 +358,10 @@ probe's median over the floor.
 - **D16's all-sites floor of 59.37 MW is not a comparison.** It includes 56.70 MW of sites of 1 MW
   and above that connect at 33 kV or above.
 - **Feed-in Tariff band of 50 kW to 1 MW.** Adding it to the floor lowers the count above the floor
-  from 8 to 5 of 12 (D10, D11, and D16 move to "overlaps"), but it is probably counted twice with
-  the Embedded Capacity Register's sheet below 1 MW, so the main floor leaves it out.
+  from 8 to 5 of 12 (D11 and D16 move to "overlaps", and D10 moves to "below floor", because its floor
+  of 2.27 MW plus 0.54 MW is 2.81 MW against a probe 90th percentile of 2.62 MW), but it is
+  probably counted twice with the Embedded Capacity Register's sheet below 1 MW, so the main floor
+  leaves it out.
 - **Double counting that remains.** The Feed-in Tariff between 50 kW and 1 MW overlaps the Embedded
   Capacity Register's smaller sheet. The band is left out of the floor and listed in the table. The
   Feed-in Tariff is a share of postcode districts, so it can over- or under-count a Primary whose
