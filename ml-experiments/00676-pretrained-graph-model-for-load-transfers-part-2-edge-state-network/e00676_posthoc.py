@@ -17,6 +17,8 @@ $P/00665-event-table-recall-by-length-and-depth
     OMP_NUM_THREADS=1 uv run --no-sync python e00676_posthoc.py <first_seed> <n_worlds>
 """
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import e00678_run as base  # ty: ignore[unresolved-import]
