@@ -10,7 +10,7 @@ sunny-run step, slow ramp, slow-level misfit, other step.
 from __future__ import annotations
 
 import json
-from typing import Final
+from typing import Final, cast
 
 import numpy as np
 import polars as pl
@@ -65,13 +65,13 @@ def main() -> None:
     fe.write_parquet(WORK / "classes.parquet")
     n = fe.height
     rng = np.random.default_rng(686)
-    per_world = {
+    per_world: dict[str, np.ndarray] = {
         c: np.array(
             [fe.filter((pl.col("world") == w) & (pl.col("cls686") == c)).height for w in worlds]
         )
         for c in CLASSES
     }
-    total_w = sum(per_world.values())
+    total_w: np.ndarray = np.sum(list(per_world.values()), axis=0)
     out: dict = {"n_events": n, "n_worlds": len(worlds)}
     rate = total_w / PRIMARY_YEARS_PER_WORLD
     boots = [rate[rng.integers(0, len(worlds), len(worlds))].mean() for _ in range(2000)]
@@ -118,12 +118,13 @@ def main() -> None:
     out["unknown_clearness"] = int(fe["mean_clearness_3d"].is_nan().sum())
     out["edge_incomplete"] = int((~fe["edge_complete"]).sum())
     out["near_season_boundary_14d"] = int((fe["dist_season_boundary_days"] <= 14).sum())
-    out["share_midday_ge_0p6"] = float((fe["share_midday"] >= 0.6).mean())
+    out["share_midday_ge_0p6"] = float(np.mean(fe["share_midday"].to_numpy() >= 0.6))
     out["median_share_midday_by_class"] = {
-        c: float(fe.filter(pl.col("cls686") == c)["share_midday"].median()) for c in CLASSES
+        c: float(cast(float, fe.filter(pl.col("cls686") == c)["share_midday"].median()))
+        for c in CLASSES
     }
     out["median_days_by_class"] = {
-        c: float(fe.filter(pl.col("cls686") == c)["days"].median()) for c in CLASSES
+        c: float(cast(float, fe.filter(pl.col("cls686") == c)["days"].median())) for c in CLASSES
     }
     # Post hoc (after the first look): duration and clear-sky cross-tabulation, because the
     # pre-registered ramp class mixes slow ramps with short bumps whose edge never completes.
@@ -140,10 +141,8 @@ def main() -> None:
     out["post_hoc_clear_share"] = [k / n, *wilson(k=k, n=n)]
     k = int(short.sum())
     out["post_hoc_short_share"] = [k / n, *wilson(k=k, n=n)]
-    k = int(
-        (fe["cls686"] == "slow ramp").sum()
-        - ((fe["cls686"] == "slow ramp") & ~fe["edge_complete"]).sum()
-    )
+    ramp = fe["cls686"] == "slow ramp"
+    k = int((ramp & fe["edge_complete"]).sum())
     out["post_hoc_completed_ramp"] = [k, k / n, *wilson(k=k, n=n)]
     (WORK / "classes.json").write_text(json.dumps(out, indent=1))
     print(json.dumps(out, indent=1))

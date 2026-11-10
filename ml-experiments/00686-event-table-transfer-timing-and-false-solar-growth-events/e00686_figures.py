@@ -124,17 +124,25 @@ def draw_example(*, ax: plt.Axes, ev: dict, title: str) -> None:
     mid_base = midday_daily(res[site])[lo:hi]
     mid_slow = midday_daily(to_half_hours(slow=slows[site] - base_slow[site]))[lo:hi]
     ax.axvspan(
-        GRID_START + timedelta(days=d0),
-        GRID_START + timedelta(days=max(d1, d0 + 1)),
+        GRID_START + timedelta(days=d0),  # ty: ignore[invalid-argument-type]
+        GRID_START + timedelta(days=max(d1, d0 + 1)),  # ty: ignore[invalid-argument-type]
         color="#dddddd",
         lw=0,
     )
-    ax.plot(when, mid_world - mid_base, color=ORANGE, lw=1, label="injected growth (truth)")
+    ax.plot(when, mid_world - mid_base, color=ORANGE, lw=1, label="injected growth (truth)")  # ty: ignore[invalid-argument-type]
     ax.plot(
-        when, mid_slow, color=GREEN, lw=1, label="slow level's change from the un-injected record"
+        when,  # ty: ignore[invalid-argument-type]
+        mid_slow,
+        color=GREEN,
+        lw=1,
+        label="slow level's change from the un-injected record",
     )
     ax.plot(
-        when, mid_world - np.nanmedian(mid_world), color=BLUE, lw=1, label="residual with growth"
+        when,  # ty: ignore[invalid-argument-type]
+        mid_world - np.nanmedian(mid_world),
+        color=BLUE,
+        lw=1,
+        label="residual with growth",
     )
     ax.axhline(0, color=GREY, lw=0.5)
     ax.set_ylabel("MW, midday daily mean")
