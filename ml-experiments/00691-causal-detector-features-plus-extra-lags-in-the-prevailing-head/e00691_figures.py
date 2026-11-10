@@ -21,7 +21,9 @@ COL = {"L1": "#B701FF", "F1": "#FF4901", "FL1": "#306BFF"}
 LABEL = {"L1": "L1 (extra lags)", "F1": "F1 (detector features)", "FL1": "FL1 (both)"}
 
 
-def paired(r: pl.DataFrame, a: str, b: str, col: str, rng: np.random.Generator) -> tuple[float, float, float]:
+def paired(
+    r: pl.DataFrame, a: str, b: str, col: str, rng: np.random.Generator
+) -> tuple[float, float, float]:
     xa = r.filter(pl.col("arm") == a).sort("month", "seed", "pass", "prim")
     xb = r.filter(pl.col("arm") == b).sort("month", "seed", "pass", "prim")
     key = (xb["month"] + "_" + xb["pass"].cast(str) + "_" + xb["prim"].cast(str)).to_numpy()

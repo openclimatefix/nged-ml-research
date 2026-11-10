@@ -118,12 +118,12 @@ Primary is shifted at once in the banks, so prediction P5 (the placebo gains les
 the features arm's gain) is untested.
 
 [Experiment
-691](../../00691-causal-detector-features-plus-extra-lags-in-the-prevailing-head/result.md) gave
-the head both the features and the extra lags. FL1 reacts 1.75 days sooner than experiment 652's
-head, but only 0.16 days sooner than the features alone (interval -0.45 to +0.14), below the
-0.5-day bar, so the features and the lags carry mostly the same information. The in-force score
-gain is 0.20 points of capacity, below the 0.30 bar, and false alarms on event-free injected rows
-rise by 5.1 points.
+691](../../00691-causal-detector-features-plus-extra-lags-in-the-prevailing-head/result.md) gave the
+head both the features and the extra lags (arm FL1). FL1 reacts 1.75 days sooner than experiment
+652's head, but only 0.16 days sooner than the features alone (interval -0.45 to +0.14), below the
+pre-registered 0.5-day gain, so the lags add under 0.5 days to the features. The in-force score gain
+is 0.20 points of capacity, below the 0.30 bar, and false alarms on event-free injected rows rise by
+5.1 points.
 
 ## Findings the merged pages do not carry yet
 
