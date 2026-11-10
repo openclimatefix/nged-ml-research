@@ -105,7 +105,7 @@ def example(*, span: int, label: str, start: datetime, stop: datetime, series: i
         f = f.group_by("valid_time", "power_fcst_init_time").agg(pl.col("q50").mean()).with_columns(lead=((pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours() / 24).floor().cast(pl.Int32)).filter(pl.col("lead") == lead_day)
         parts.append(f.select("valid_time", pl.col("q50").alias("value")).with_columns(source=pl.lit(LABEL[s])))
     frame = pl.concat(parts).to_pandas()
-    return alt.Chart(frame).mark_line(strokeWidth=1.5).encode(x=alt.X("valid_time:T", title=None), y=alt.Y("value:Q", title="Power (MW or MVA)", scale=alt.Scale(zero=False)), color=alt.Color("source:N", title=None, legend=alt.Legend(orient="top", columns=2))).properties(width=WIDTH, height=280, title=alt.TitleParams(f"{label}: median forecast {lead_day} to {lead_day + 1} days ahead", anchor="start", fontSize=13))
+    return alt.Chart(frame).mark_line(strokeWidth=1).encode(x=alt.X("valid_time:T", title=None), y=alt.Y("value:Q", title="Power (MW or MVA)", scale=alt.Scale(zero=False)), color=alt.Color("source:N", title=None, legend=alt.Legend(orient="top", columns=2))).properties(width=WIDTH, height=280, title=alt.TitleParams(f"{label}: median forecast {lead_day} to {lead_day + 1} days ahead", anchor="start", fontSize=13))
 
 
 def two_leads(*, span: int, label: str, start: datetime, stop: datetime, series: int, steps: tuple[str, ...], event: tuple[datetime, datetime] | None = None) -> alt.VConcatChart:
@@ -157,8 +157,8 @@ def band_panel(*, span: int, step: str, start: datetime, stop: datetime, series:
     x = alt.X("valid_time:T", title=None)
     wide = alt.Chart(f).mark_area(opacity=0.2, color=colour).encode(x=x, y=alt.Y("q05:Q", title="Power (MW or MVA)", scale=alt.Scale(zero=False)), y2="q95:Q")
     narrow = alt.Chart(f).mark_area(opacity=0.35, color=colour).encode(x=x, y="q25:Q", y2="q75:Q")
-    med = alt.Chart(f).mark_line(strokeWidth=1.5, color=colour).encode(x=x, y="q50:Q")
-    obs = alt.Chart(truth).mark_line(strokeWidth=1.2, color="#FF4901").encode(x=x, y="observed:Q")
+    med = alt.Chart(f).mark_line(strokeWidth=1, color=colour).encode(x=x, y="q50:Q")
+    obs = alt.Chart(truth).mark_line(strokeWidth=1, color="#FF4901").encode(x=x, y="observed:Q")
     layers = [event_rect(start=event[0], stop=event[1])] if event else []
     return alt.layer(*layers, wide, narrow, med, obs).properties(width=WIDTH, height=PANEL_HEIGHT, title=title)
 
