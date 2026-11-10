@@ -23,7 +23,7 @@ CELLS: Final[tuple[str, ...]] = (
     "short, shallow",
 )
 FAMILIES: Final[tuple[str, ...]] = (
-    "E1", "E1-J", "E1-J rewired",
+    "E1-J", "E1", "E1-J rewired",
     "F-hyb", "R-hyb", "P-M-hyb", "P-C-hyb",
     "F-hyb rewired", "R-hyb rewired",
 )  # fmt: skip
@@ -39,7 +39,9 @@ def family_of(method: str) -> tuple[str, int]:
     return method, 0
 
 
-def tables(*, df: pl.DataFrame) -> dict[tuple[str, int, str, int], tuple[float, float, float, float]]:
+def tables(
+    *, df: pl.DataFrame
+) -> dict[tuple[str, int, str, int], tuple[float, float, float, float]]:
     """(family, seed, cell, world) -> paired MW, edge MW, donor-found MW, donor MW."""
     edge = df.filter(pl.col("edge_truth") & (pl.col("units") >= 2.0))
     out: dict = {}
@@ -56,7 +58,9 @@ def tables(*, df: pl.DataFrame) -> dict[tuple[str, int, str, int], tuple[float, 
     return out
 
 
-def share(*, tab: dict, fam: str, seeds: list[int], cell: str, worlds: np.ndarray, col: int) -> float:
+def share(
+    *, tab: dict, fam: str, seeds: list[int], cell: str, worlds: np.ndarray, col: int
+) -> float:
     """Mean over seeds of the MW-weighted share of one column over a multiset of worlds."""
     vals = []
     for s in seeds:
@@ -92,10 +96,14 @@ def main() -> None:
                 ]
                 row[fam]["paired_minus_e1j_ci"] = [float(x) for x in np.nanpercentile(bs, [2.5, 97.5])]  # fmt: skip
                 row[fam]["paired_minus_e1j"] = paired - row["E1-J"]["paired"]
-            lo = [share(tab=tab, fam=fam, seeds=seeds[fam], cell=cell, worlds=w, col=0) for w in boots]
+            lo = [
+                share(tab=tab, fam=fam, seeds=seeds[fam], cell=cell, worlds=w, col=0) for w in boots
+            ]
             row[fam]["paired_ci"] = [float(x) for x in np.nanpercentile(lo, [2.5, 97.5])]
         out["cells"][cell] = row
-        print(cell, {f: (round(v["paired"], 3), round(v["donor_found"], 3)) for f, v in row.items()})
+        print(
+            cell, {f: (round(v["paired"], 3), round(v["donor_found"], 3)) for f, v in row.items()}
+        )
     for method, g in df.group_by("method"):
         m = method[0]
         per_world = g.group_by("world").agg(
@@ -104,7 +112,16 @@ def main() -> None:
         false = float((per_world["world_edge_events"] - per_world["world_right_pairs"]).sum())
         out["false_transfers_per_primary_year"][m] = false / (len(worlds) * 15 * YEARS)
     (OUT / "summary.json").write_text(json.dumps(out, indent=1))
-    print(json.dumps({k: round(v, 2) for k, v in out["false_transfers_per_primary_year"].items() if "/0" in k or "/" not in k}, indent=0))
+    print(
+        json.dumps(
+            {
+                k: round(v, 2)
+                for k, v in out["false_transfers_per_primary_year"].items()
+                if "/0" in k or "/" not in k
+            },
+            indent=0,
+        )
+    )
 
 
 if __name__ == "__main__":

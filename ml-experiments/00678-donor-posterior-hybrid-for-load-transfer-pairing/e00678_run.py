@@ -42,7 +42,9 @@ from e00675_pretrain import ROOT as PROBE_ROOT
 from e00675_score import SCORED_H, episodes
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-OUT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00678-donor-posterior-hybrid-for-load-transfer-pairing"
+OUT: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00678-donor-posterior-hybrid-for-load-transfer-pairing"
+)
 PROBE: Final[Path] = PROBE_ROOT / "probe"
 ARMS: Final[tuple[tuple[str, int], ...]] = (
     ("F", 0),
@@ -99,9 +101,7 @@ def added_donors(
         if site not in xh or not np.isfinite(sigma.get(site, float("nan"))):
             continue
         existing = [
-            e.start
-            for e in events
-            if e.primary == site and e.amp_mw < 0 and e.units >= 4.0
+            e.start for e in events if e.primary == site and e.amp_mw < 0 and e.units >= 4.0
         ]
         for a, _ in episodes(hot=score[i, SCORED_H:] > thr, score=score[i, SCORED_H:]):
             centre = 2 * (SCORED_H + a)
@@ -142,7 +142,13 @@ def score_rows(*, truth: list, events: list[Event], method: str, world: int) -> 
     n_edge = sum(e.cls.endswith("transfer") and e.start >= SCORED_FROM for e in events)
     n_right = sum(bool(r["right_class"]) for r in scored)
     return [
-        {**r, "world": world, "method": method, "world_edge_events": n_edge, "world_right_pairs": n_right}
+        {
+            **r,
+            "world": world,
+            "method": method,
+            "world_edge_events": n_edge,
+            "world_right_pairs": n_right,
+        }
         for r in scored
     ]
 
