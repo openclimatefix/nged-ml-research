@@ -44,8 +44,8 @@ decision_rule: >-
   scaled CRPS over B0, the features are reported as not useful and the fine-tune of K1 with the
   features (about 2 GPU-hours, not part of this plan) is not run. Step 2 always runs, because it is
   cheap and the stop rule needs its stratum scores. The verdict reads two contrasts.
-  Primary contrast: F1 minus B0, reaction time at the start and end of injected shifts of the held-out family, with a 95% interval
-  from a paired bootstrap over events; support needs the interval to exclude zero in the
+  Primary contrast: F1 minus B0, reaction time at the start and end of injected shifts of the
+  held-out family, with a 95% interval from a paired bootstrap over events; support needs the interval to exclude zero in the
   predicted direction with a gain of at least 1 day (origins are daily, so reaction time resolves to
   1 day, and a port adds a feature block to the head and nothing else). Secondary: the in-force and
   near-end scaled CRPS contrasts (month-block 95% interval over the 5 development months),
