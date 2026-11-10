@@ -152,6 +152,14 @@ and from the maintainer.
   beside a soft prior. D8's gas generator is the large-generator case. The reviewer of detector
   check 4 (part C of the detector spec) is one Sonnet agent. A learnt scorer combines the logistic
   regression with E1-J-sym.
+- **A Sonnet reviewer failed the pre-registered gate on injected truth, which holds real-record
+  events, so the result is inconclusive.** [Experiment
+  692](../../00692-event-table-reviewer-calibration-gate/result.md) gave the reviewer 102 figures,
+  and its precision was 0.45 against the gate of 0.80 (at recall 0.75). Post hoc, found after the
+  answers were read, 21 of its 29 false calls were on five candidates that recur in the real record
+  under many injected worlds, and without them precision is 0.75 (interval 0.58 to 0.87), still
+  under 0.80. The new [data-processing rule](../../data-processing.md) (medium confidence) says to
+  drop such candidates before scoring on injected truth.
 - **Experiment 685's event table stays private.** Its rows are in the private data folder only
   ([experiment 685](../../00685-event-table-on-the-final-test-window-all-primaries/result.md) found
   13 candidate events from 2026-07-01 to 2026-10-31 and none that explains the one-year-backtest
@@ -159,9 +167,9 @@ and from the maintainer.
 
 ## Not started, parked
 
-**None of the seven options below has started, and the reviewer's calibration gate and the learnt
-scorer are the two with the most preparation.** The reviewer's gate (part C of the detector spec) is
-one Sonnet agent, gated on a calibration set of 400 blinded figures. FLOW-C, FLOW-P, and FLOW-H are
+**Six of the seven options below have not started, and the learnt scorer is the one with the most
+preparation.** Option 2, the reviewer's gate (part C of the detector spec), has run in a reduced
+form as experiment 692 (102 blinded figures, not 400). FLOW-C, FLOW-P, and FLOW-H are
 the three FLOW-E proposals of the Opus sub-agent, and only FLOW-C is in the ranked table, as option
 6. The causal-features test on the production forecast heads goes beyond experiment 687.
 
@@ -173,7 +181,7 @@ the Discuss session's view.
 | Rank | Option | Question | Cost | Depends on |
 |---|---|---|---|---|
 | 1 | Learnt candidate scorer over E1-J-sym's candidates | Does a logistic regression, then small trees, on timing, shape, and context features cut the false-transfer share to 0.45 or less without losing paired share? | About 5 to 9 CPU-hours (spec estimate) | Experiments 660, 675, and 680; part A of the detector spec |
-| 2 | The one-Sonnet reviewer against the candidates | Does a reviewer reach 0.80 precision at 0.60 recall on a blinded calibration set? | About 5 million tokens (spec estimate, made for two Sonnet reviewers plus Opus) | A scorer's candidates and the calibration set; part C |
+| 2 | The one-Sonnet reviewer against the candidates | Does a reviewer reach 0.80 precision at 0.60 recall on a blinded calibration set? Experiment 692 (102 figures): the pre-registered gate failed (precision 0.45 at recall 0.75); post hoc (found after the answers were read), without five real-record candidates that the injected truth omits, precision is 0.75, still under the 0.80 gate. | About 5 million tokens (spec estimate, made for two Sonnet reviewers plus Opus) | A scorer's candidates and the calibration set; part C |
 | 3 | The neural lag-free year-fold residual with explicit PV | Does a residual built from a neural cross-fit lower the noise unit or the event-free decoded rate against arm C? | About 1.5 GPU-hours (ceiling 2 GPU-hours) | Part B; the maintainer's backtests keep GPU priority |
 | 4 | Causal detector features for the lag encoder and the prevailing head | Do the features help the production heads beyond the extra lags of experiment 681? (Experiment 691: features and lags together add under 0.5 days over the features alone.) | About 2 GPU-hours for the fine-tune, after a CPU test | Experiment 687; part D |
 | 5 | The MVA sign label with the hard-mask arm and the D8 gas-generator state | Does a per-Primary masked day labeller recover reverse flow at the eight apparent-power Primaries? | CPU only, zero fits | The MVA spec; no known answer at D12's export level |
@@ -184,7 +192,8 @@ the Discuss session's view.
 cost per change cannot tell a true pair from a coincident one, and timing and shape features might.
 The donor limits how many pairs are found, and the false-transfer share is a separate precision
 problem that option 1 targets. Option 2 follows because the reviewer's precision has to be measured
-before it cuts false positives. Option 5 runs on CPU alone. Options 6 and 7 are the least likely to
+before it cuts false positives, and experiment 692's measurement needs a calibration set free of
+real-record events. Option 5 runs on CPU alone. Options 6 and 7 are the least likely to
 improve the result at 15 Primaries.
 
 ## Where the specs went
