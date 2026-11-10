@@ -19,6 +19,42 @@ maintainer to choose; the project is not starting new experiments unprompted. Th
 | 3. Gas-engine plant equations | Can equations with ramping time and minimum on-duration reproduce the known spells of Gas A and the D8 engine's change? | Medium: no such model exists, and the running data is 44 days for Gas A | Nothing for the equations; option 1 for use in the fit |
 | 4. Long-horizon scenario calibration | Issued a month ahead, are the scenarios' tail quantiles calibrated, and narrower than a block bootstrap of the Primary's own history? | Medium to high | Options 1 to 3 |
 | 5. Days-1-to-10 what-if for a dormant generator | Does a simulated turn-on reproduce a known start or stop within 30% (a proposed threshold)? | Medium | Option 3 |
+| 6. Language-model loop on the register match and the simulator (an idea) | Does a large language model (LLM) that matches Primary signals to the registers and edits the simulator's assets, parameters, and operating profiles recover the known answers better than the plain register-constrained fit? | Unknown; the loop would add LLM calls to the CPU-only fits of option 1 | Option 1 first: the plain fit and its known-answer test must exist before the loop has anything to be compared against |
+
+## Option 6 in detail: a language-model loop
+
+**Option 6 is an idea, not agreed work, and no experiment has been started.** The maintainer's
+thought is that an LLM could help with the fuzzy matching between the signals in a Primary's time
+series and the very incomplete registers (the Embedded Capacity Register and the others listed on
+[the asset-inventory page](asset-inventory-simulator.md#what-the-register-can-supply)). The LLM could
+also make intelligent adjustments to the simulator's assets, parameters, and operating profiles, so
+that the simulator's statistical properties match the observed Primary data as closely as possible.
+
+**The nearest evidence is one reviewer on one task, and it does not settle whether the loop would
+work.** In [experiment
+692](../../00692-event-table-reviewer-calibration-gate/result.md), a Claude Sonnet reviewer judged a
+figure of each candidate load transfer from the event table. It missed the pre-registered precision
+gate: 0.45 against 0.80. It reached 0.75 after 21 of its 29 false calls on five recurring candidates
+were removed, a post-hoc reading. Those candidates are real-record events that the injected truth
+omits. The experiment did not test an LLM editing a simulator.
+
+**The asset-inventory page's own risks apply to the loop, and each needs a control.** The risks are
+circularity, fits left free that invent generators, and bands doing the work (see
+[Risks](asset-inventory-simulator.md#risks)). A loop that edits assets freely could also invent
+generators to match the statistics. The controls the loop would need, as options:
+
+- **Register-constrained asset types:** the LLM may only choose among asset types that the register
+  lists for the Primary.
+- **Held-out months:** the match is scored on months the loop has not seen.
+- **A fixed budget of edits:** each run has a set number of changes.
+- **Every move logged:** each edit and the reason given for it are stored.
+- **The same known-answer test as option 1:** real metered output added to the readings, with an
+  absent decoy asset and an unlisted asset.
+
+**Prediction that could fail, and a proposed stop rule.** The loop recovers listed, injected assets'
+capacities and running-time parameters at least as well as option 1's plain fit, and gives the
+absent decoy asset under 0.5 MW. Stop if the decoy gets 1 MW or more at 3 or more of the 6 Primaries,
+the stop rule of [the smallest test](asset-inventory-simulator.md#the-smallest-test).
 
 ## Planned experiments
 

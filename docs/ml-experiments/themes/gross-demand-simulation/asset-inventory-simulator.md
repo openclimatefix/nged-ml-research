@@ -306,6 +306,9 @@ an option for the maintainer, not a planned experiment.
   finds a listed engine wherever it is told to look would give an asset list that cannot be trusted.
 - **Effort:** CPU only, about a day of one-core fits. The figure is a guess, scaled from the size of
   the solar-capacity fits.
+- **Option for later:** a language-model loop that matches the registers to the signals and edits
+  the simulator, to be compared with this fit; see
+  [option 6 of the plan](plan.md#option-6-in-detail-a-language-model-loop).
 
 ## Risks
 
