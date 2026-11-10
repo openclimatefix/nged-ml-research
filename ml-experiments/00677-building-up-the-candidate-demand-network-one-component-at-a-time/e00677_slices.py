@@ -36,9 +36,11 @@ def load(*, span: int, names: list[str]) -> tuple[pl.DataFrame, list[str]]:
     out = None
     labels = []
     for name in names:
-        step = name.removeprefix("step")
-        folder = f"{name}_{exp.VERSION[step]}_sp{span}"
-        r = pl.read_parquet(sc.ROOT / "scores" / f"{folder}_{SEEDS_TAG_LATE if step[0] in '5678' else SEEDS_TAG}" / "rows.parquet").filter(pl.col("ok"))
+        base, _, at = name.rstrip("!").partition("@")  # "step8w@1" is step 8 with monthly refits (span 1, seeds 0 to 2)
+        step = base.removeprefix("step")
+        folder = f"{base}_{exp.VERSION[step]}_sp{at or span}"
+        tag = "s012" if at or name.endswith("!") else (SEEDS_TAG_LATE if step[0] in "5678" else SEEDS_TAG)
+        r = pl.read_parquet(sc.ROOT / "scores" / f"{folder}_{tag}" / "rows.parquet").filter(pl.col("ok"))
         keep = ["time_series_id", "valid_idx", "origin_idx", "lead_h"]
         cols = [pl.col("Model_crps").alias(f"{name}_crps"), pl.col("Model_mae").alias(f"{name}_mae")]
         if out is None:
@@ -62,6 +64,21 @@ def block_bootstrap(*, day: np.ndarray, values: np.ndarray, seed: int = 0) -> np
     rng = np.random.default_rng(seed)
     pick = rng.integers(0, len(ids), size=(N_BOOT, len(ids)))
     return sums[pick].sum(axis=1) / cnt[pick].sum(axis=1)
+
+
+PAIRS = [
+    ("step1", "step2"), ("step2", "step3a"), ("step3a", "step3b"), ("step3b", "step4"),
+    ("step4", "step5w"), ("step5w", "step6w"), ("step6w", "step7w"), ("step7w", "step8w"),
+    ("step4", "step5wo"), ("step5wo", "step6wo"), ("step6wo", "step7wo"), ("step7wo", "step8wo"),
+    ("step5w", "step5wo"), ("step6w", "step6wo"), ("step7w", "step7wo"), ("step8w", "step8wo"),
+    ("step5w", "step8w"), ("step5wo", "step8wo"),
+    ("step5w!", "step5w@1"), ("step8w!", "step8w@1"), ("step5wo!", "step5wo@1"), ("step8wo!", "step8wo@1"), ("step5w@1", "step8w@1"),
+]  # fmt: skip
+
+
+def pairs(*, names: list[str]) -> list[tuple[str, str]]:
+    """Return each step-to-step contrast whose two steps were scored: the two chains of added components, then with against without injected events."""
+    return [p for p in PAIRS if p[0] in names and p[1] in names]
 
 
 def main() -> None:
@@ -95,7 +112,7 @@ def main() -> None:
     out = sc.ROOT / "scores"
     pl.DataFrame(records).write_csv(out / f"slices_sp{span}{OUT_SUFFIX}.csv")
     contrasts = []
-    for a, b in zip(names[:-1], names[1:], strict=True):
+    for a, b in pairs(names=names):
         for (sname, part), mask in slices.items():
             if not mask.any():
                 continue

@@ -7,6 +7,7 @@ forecast files; writes `ladder_horizon.svg`, `ladder_contrasts.svg`, and the exa
 Only Primaries appear, so the figures carry no generator series.
 """
 
+import os
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -17,40 +18,71 @@ import e00677_score as sc
 import numpy as np
 import polars as pl
 
-STEPS = ("1", "2", "3a", "3b", "4", "5w", "6w", "7w", "8w")
 LABEL = {
-    "1": "1 date-time", "2": "2 weather", "3a": "3a both (ENS only)", "3b": "3b both (pre-trained)",
-    "4": "4 + 1-day lag", "5w": "5 + 1-week lag", "6w": "6 + gap", "7w": "7 + averages", "8w": "8 + neighbours (Candidate)",
+    "1": "1: date-time only",
+    "2": "2: weather only",
+    "3a": "3a: date-time + weather (ENS only)",
+    "3b": "3b: date-time + weather (pre-trained)",
+    "4": "4: + 24 h lag",
+    "5w": "5: + 24 h and 1-week lags",
+    "6w": "6: + gap columns",
+    "7w": "7: + weighted averages of the gap",
+    "8w": "8: + neighbour columns (Candidate)",
+    "5w@1": "9a: step 5 with monthly refits",
+    "8w@1": "9b: step 8 with monthly refits",
 }  # fmt: skip
-RAMP = ["#C8D9FF", "#A9C3FF", "#8AADFF", "#6B96FF", "#4C80FF", "#306BFF", "#2252C9", "#173A94", "#0B215F"]
-OTHER = {"Manual heuristic": "#FF4901", "Climatology": "#7F7F7F"}
-WIDTH, HEIGHT = 620, 320
+# Two figures, each with its own colour set; a colour means one step within a figure. The six colours are
+# Data Purple, Data Amber, Data Green, Data Deep Teal, Data Burnt Orange, and a dark navy: the worst pair
+# stays 25 delta-E apart under normal vision and under deuteranopia, protanopia, and tritanopia.
+COLOURS = ["#B701FF", "#FC9700", "#17E58F", "#009C75", "#BF4F04", "#0B215F"]
+FIGURE_STEPS = {
+    "early": ("1", "2", "3a", "3b", "4", "5w"),
+    "late": ("5w", "6w", "7w", "8w", "5w@1", "8w@1"),
+}
+FIGURE_COLOURS = {"early": COLOURS, "late": ["#0B215F", "#B701FF", "#FC9700", "#009C75", "#BF4F04", "#17E58F"]}
+REFS = {"Manual heuristic": ("#555555", [6, 3]), "Climatology": ("#9A9A9A", [2, 2]), "Experiment 667 (monthly refits)": ("#000000", [1, 0])}
+WIDTH, HEIGHT = 620, 300
+INTERIM = bool(os.environ.get("E677_INTERIM"))
 
 
 def scores_of(*, span: int, step: str) -> pl.DataFrame:
-    tag = "s01234" if step[0] in "5678" else "s012"
-    folder = f"step{step}_{exp.VERSION[step]}_sp{span}_{tag}"
+    base, _, at = step.partition("@")
+    tag = "s012" if at else ("s01234" if base[0] in "5678" else "s012")
+    folder = f"step{base}_{exp.VERSION[base]}_sp{at or span}_{tag}"
     return pl.read_csv(sc.ROOT / "scores" / folder / "scores.csv").with_columns(step_label=pl.lit(LABEL.get(step, step)))
 
 
-def horizon(*, span: int) -> alt.Chart:
+def horizon(*, span: int, which: str) -> alt.Chart:
+    steps = [s for s in FIGURE_STEPS[which] if (sc.ROOT / "scores" / f"step{s.partition('@')[0]}_{exp.VERSION[s.partition('@')[0]]}_sp{s.partition('@')[2] or span}_{'s012' if s.partition('@')[2] or s[0] in '1234' else 's01234'}").exists()]
     frames = []
-    for s in STEPS:
+    for s in steps:
         f = scores_of(span=span, step=s).filter((pl.col("slice") == "lead day") & (pl.col("metric") == "mae"))
         frames.append(f.filter(pl.col("system") == "Model").with_columns(system=pl.lit(LABEL[s])))
-        if s == STEPS[-1]:
-            frames.append(f.filter(pl.col("system") != "Model"))
+    f = scores_of(span=span, step=steps[-1]).filter((pl.col("slice") == "lead day") & (pl.col("metric") == "mae") & (pl.col("system") != "Model"))
+    frames.append(f.filter(pl.col("system") == "Manual heuristic"))
+    ref = pl.read_csv(sc.lib.FOLDER / "scores_668" / "primaries_NRA" / "scores.csv").filter((pl.col("slice") == "lead day") & (pl.col("metric") == "mae") & (pl.col("system") == "Model"))
+    frames.append(ref.with_columns(system=pl.lit("Experiment 667 (monthly refits)"), step_label=pl.lit("")).select(*frames[0].columns))
+    if which == "early":
+        frames.append(f.filter(pl.col("system") == "Climatology"))
     frame = pl.concat(frames, how="diagonal").with_columns(day=pl.col("group").cast(pl.Int32) + 0.5).to_pandas()
-    domain = [LABEL[s] for s in STEPS] + list(OTHER)
+    refs = [r for r in REFS if r in set(frame["system"])]
+    domain = [LABEL[s] for s in steps] + refs
+    colours = FIGURE_COLOURS[which][: len(steps)] + [REFS[r][0] for r in refs]
+    dashes = [[1, 0]] * len(steps) + [REFS[r][1] for r in refs]
+    late = which == "late"
+    lo_hi = alt.Scale(domain=[6.6, 9.1], zero=False) if late else alt.Scale(zero=False)
+    prefix = "INTERIM, quarterly refits (steps 1 to 8). " if INTERIM else ""
+    sub = "Steps 5 to 9 zoomed in. Steps with injected events. " if late else "Steps 1 to 5. "
     return (
         alt.Chart(frame)
-        .mark_line(point=True, strokeWidth=2)
+        .mark_line(point=True, strokeWidth=2, clip=True)
         .encode(
             x=alt.X("day:Q", title="Forecast horizon (days after the forecast origin)", axis=alt.Axis(values=[0, 2, 4, 6, 8, 10, 12, 14]), scale=alt.Scale(domain=[0, 14])),
-            y=alt.Y("mean:Q", title="Median-forecast MAE (points of capacity; smaller is better)", scale=alt.Scale(zero=False)),
-            color=alt.Color("system:N", title=None, scale=alt.Scale(domain=domain, range=[*RAMP, *OTHER.values()]), legend=alt.Legend(orient="right", columns=1)),
+            y=alt.Y("mean:Q", title="Median-forecast MAE (points of capacity; smaller is better)", scale=lo_hi),
+            color=alt.Color("system:N", title=None, scale=alt.Scale(domain=domain, range=colours), legend=alt.Legend(orient="top", columns=1, symbolType="stroke", symbolStrokeWidth=3, labelLimit=500)),
+            strokeDash=alt.StrokeDash("system:N", legend=None, scale=alt.Scale(domain=domain, range=dashes)),
         )
-        .properties(width=WIDTH, height=HEIGHT, title=alt.TitleParams(["Normalised MAE of the median forecast by horizon, each ladder step", "Backtest origins 12:00 UTC, refits every 3 months, 16 Primaries; steps with injected events; mean of seeds 0 to 2 (steps 1 to 4) and 0 to 4 (steps 5 to 8)."], anchor="start", fontSize=13))
+        .properties(width=WIDTH, height=HEIGHT, title=alt.TitleParams([prefix + "Normalised MAE of the median forecast by horizon.", sub + "Backtest origins 12:00 UTC, 16 Primaries, refits every 3 months unless stated; mean of seeds."], anchor="start", fontSize=12))
     )
 
 
@@ -72,15 +104,36 @@ def example(*, span: int, label: str, start: datetime, stop: datetime, series: i
     return alt.Chart(frame).mark_line(strokeWidth=1.5).encode(x=alt.X("valid_time:T", title=None), y=alt.Y("value:Q", title="Power (MW or MVA)", scale=alt.Scale(zero=False)), color=alt.Color("source:N", title=None, legend=alt.Legend(orient="top", columns=2))).properties(width=WIDTH, height=280, title=alt.TitleParams(f"{label}: median forecast {lead_day} to {lead_day + 1} days ahead", anchor="start", fontSize=13))
 
 
+def two_leads(*, span: int, label: str, start: datetime, stop: datetime, series: int, steps: tuple[str, ...]) -> alt.VConcatChart:
+    panels = [
+        example(span=span, label=label, start=start, stop=stop, series=series, steps=steps, lead_day=d).properties(width=WIDTH, height=280, title=("INTERIM, quarterly refits. " if INTERIM else "") + f"{label}: median forecast {d} to {d + 1} days ahead")
+        for d in (1, 5)
+    ]
+    return alt.vconcat(*panels).resolve_scale(color="shared")
+
+
+def pick_weeks(*, series: int) -> dict[str, tuple[datetime, datetime]]:
+    """Return the highest-demand winter week and the lowest-demand summer week of one series in the backtest year."""
+    truth = pl.read_parquet(sc.lib.FOLDER / "ground_truth_primaries.parquet").filter(pl.col("time_series_id") == series).select("valid_time", "power")
+    weekly = truth.group_by_dynamic("valid_time", every="1w", start_by="monday").agg(pl.col("power").mean(), pl.len().alias("n")).filter(pl.col("n") > 300)
+    cold = weekly.filter(pl.col("valid_time").dt.month().is_in([12, 1, 2])).sort("power", descending=True)["valid_time"][0]
+    warm = weekly.filter(pl.col("valid_time").dt.month().is_in([6, 7, 8])).sort("power")["valid_time"][0]
+    return {"cold week": (cold, cold + timedelta(days=7)), "warm week": (warm, warm + timedelta(days=7))}
+
+
 def main() -> None:
     span = int(sys.argv[1])
     out = Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
-    horizon(span=span).save(out / "ladder_horizon.svg")
+    for which in FIGURE_STEPS:
+        horizon(span=span, which=which).save(out / f"ladder_horizon_{which}.svg")
     contrasts(span=span).save(out / "ladder_contrasts.svg")
     steps = ("3b", "5w", "8w")
     for series, name in ((17, "D5"), (18, "D16")):
-        example(span=span, label=f"{name}, the verified transfer", start=datetime(2025, 12, 28, tzinfo=UTC), stop=datetime(2026, 1, 15, tzinfo=UTC), series=series, steps=steps, lead_day=1).save(out / f"ladder_transfer_{name}.svg")
+        two_leads(span=span, label=f"{name}, the verified transfer", start=datetime(2025, 12, 28, tzinfo=UTC), stop=datetime(2026, 1, 15, tzinfo=UTC), series=series, steps=steps).save(out / f"ladder_transfer_{name}.svg")
+    for series, name in ((17, "D5"), (18, "D16")):
+        for kind, (start, stop) in pick_weeks(series=series).items():
+            two_leads(span=span, label=f"{name}, {kind} ({start:%d %b %Y})", start=start, stop=stop, series=series, steps=steps).save(out / f"ladder_{kind.replace(' ', '_')}_{name}.svg")
     print("figures written to", out)
 
 

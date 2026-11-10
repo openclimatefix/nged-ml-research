@@ -65,8 +65,12 @@ def main() -> None:
     out = sc.ROOT / "scores" / f"protocol_{tag}"
     out.mkdir(parents=True, exist_ok=True)
     rows_out = []
+    signed = series.filter(pl.col("label").is_in(cp.GROUPS["signed-MW six"]))
+    flows = actuals.rename({"actual": "flow_mw"})
+    cost_inputs: dict[str, pl.DataFrame] = {}
     for name, frame in forecasts.items():
         kept = metrics.restrict_to_slice_table(forecast=frame, slice_table=table)
+        cost_inputs[name] = kept.filter(pl.col("time_series_id").is_in(signed["time_series_id"].to_list())).join(actuals, on=["time_series_id", "valid_time"])
         rows = metrics.scored_rows(forecast=kept, actuals=actuals, series=series, thresholds=thresholds, slice_table=table).with_columns(arm=pl.lit(name))
         rows_out.append(rows.select(*cp.KEYS, "label", "arm", *cp.METRICS, *cp.SLICES))
         del kept, rows
@@ -88,6 +92,11 @@ def main() -> None:
                     draws = lib.day_bootstrap(day=day[pick], values={arm: v})[arm]
                     records.append({"group": group_name, "slice": slice_name, "metric": metric, "arm": arm, "mean": float(v.mean()), "lo": float(np.quantile(draws, 0.025)), "hi": float(np.quantile(draws, 0.975)), "half_hours": int(pick.sum())})
     pl.DataFrame(records).write_csv(out / "scores.csv")
+    costs = []
+    for fraction in (0.5, 0.9):
+        cost = metrics.avoidable_curtailment_cost(forecasts=cost_inputs, series=signed, flows=flows, scored_start=datetime(2025, 7, 1, tzinfo=UTC), fraction=fraction)
+        costs.append(cost.with_columns(limit_fraction=pl.lit(fraction)))
+    pl.concat(costs).write_csv(out / "curtailment_cost.csv")
     print("wrote", out)
 
 
