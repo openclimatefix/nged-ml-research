@@ -26,7 +26,7 @@ import e00667_export as x667
 import e00668_clamp_fixes as clamp
 import e00668_score_lib as lib
 import numpy as np
-import p667_export as p667
+import p667_export as p667  # ty: ignore[unresolved-import]
 import polars as pl
 
 FOLDER: Final[Path] = lib.FOLDER
@@ -122,12 +122,10 @@ def replace() -> None:
     (BACKUP_DIR / "primaries.parquet.sha256").write_text(f"{digest}  primaries.parquet\n")
     nra = old.filter(pl.col("NRA_or_prevailing") == "NRA")
     prev_old = old.filter(pl.col("NRA_or_prevailing") == "prevailing")
-    new_months = [
-        pl.read_parquet(EXPORTS / f"prevailing_{m}.parquet") for m in CHANGED_MONTHS
-    ]
+    new_months = [pl.read_parquet(EXPORTS / f"prevailing_{m}.parquet") for m in CHANGED_MONTHS]
     kept = [month_rows(frame=prev_old, month=m) for m in FALLBACK_MONTHS]
     prev_new = pl.concat(
-        [*kept, *[f.cast(dict(prev_old.drop("NRA_or_prevailing").schema)) for f in new_months]]
+        [*kept, *[f.cast(dict(prev_old.drop("NRA_or_prevailing").schema)) for f in new_months]]  # ty: ignore[no-matching-overload]
     ).with_columns(NRA_or_prevailing=pl.lit("prevailing"))
     prev_new = prev_new.select(old.columns).cast(dict(old.schema))  # ty: ignore[no-matching-overload]
     df = pl.concat([nra, prev_new]).sort(KEY)
@@ -146,9 +144,7 @@ def replace() -> None:
     )
     assert fb_new.equals(pl.concat(kept).sort(KEY)), "fallback fold rows changed"
     tmp = old_path.with_suffix(".tmp")
-    df.write_parquet(
-        tmp, compression="zstd", row_group_size=N_ROWS // ROW_GROUPS, statistics=True
-    )
+    df.write_parquet(tmp, compression="zstd", row_group_size=N_ROWS // ROW_GROUPS, statistics=True)
     check = pl.read_parquet(tmp)
     assert check.equals(df)
     tmp.rename(old_path)

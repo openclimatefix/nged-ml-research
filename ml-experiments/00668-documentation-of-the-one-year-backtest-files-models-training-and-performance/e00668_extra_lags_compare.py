@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: ANN001, D103, E501
 """Compare the prevailing rows before and after the extra-lag head: CRPS, normalised MAE, coverage.
 
 uv run --no-sync python e00668_extra_lags_compare.py
@@ -31,14 +31,18 @@ def load(*, rows_dir, path, kind: str = "prevailing") -> pl.DataFrame:
     scores = pl.read_parquet(rows_dir / "rows.parquet")
     forecast = pl.read_parquet(path).filter(pl.col("NRA_or_prevailing") == kind)
     assert forecast.height == scores.height
-    cap = pl.read_parquet(lib.FOLDER / "series_capacity.parquet").select("time_series_id", "capacity")
+    cap = pl.read_parquet(lib.FOLDER / "series_capacity.parquet").select(
+        "time_series_id", "capacity"
+    )
     forecast = forecast.join(cap, on="time_series_id", how="left")
     ids = sorted(forecast["time_series_id"].unique().to_list())
     grid = lib.cleaned_grid(ids=ids)
     row = forecast["time_series_id"].replace_strict({t: i for i, t in enumerate(ids)}).to_numpy()
     vidx = lib.grid_index(times=forecast["valid_time"])
     if vidx.max() >= grid.shape[1]:
-        grid = np.pad(grid, ((0, 0), (0, int(vidx.max()) + 1 - grid.shape[1])), constant_values=np.nan)
+        grid = np.pad(
+            grid, ((0, 0), (0, int(vidx.max()) + 1 - grid.shape[1])), constant_values=np.nan
+        )
     y = grid[row, vidx]
     scale = 100.0 / forecast["capacity"].to_numpy()
     q05 = forecast["q05"].to_numpy().astype(np.float64) * scale

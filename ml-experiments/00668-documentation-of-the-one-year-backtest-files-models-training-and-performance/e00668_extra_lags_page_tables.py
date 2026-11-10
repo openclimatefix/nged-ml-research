@@ -134,7 +134,9 @@ def main(page: Path) -> None:
     j = next(k for k in range(i, len(lines)) if not lines[k].startswith("|"))
     k = next(k for k in range(j, len(lines)) if lines[k].startswith("|"))
     m = next(n for n in range(k, len(lines)) if not lines[n].startswith("|"))
-    lines[k:m] = slice_table(set_name="verified transfer", parts=three, metric="mae", counts=False).split("\n")
+    lines[k:m] = slice_table(
+        set_name="verified transfer", parts=three, metric="mae", counts=False
+    ).split("\n")
     page.write_text("\n".join(lines))
 
 
