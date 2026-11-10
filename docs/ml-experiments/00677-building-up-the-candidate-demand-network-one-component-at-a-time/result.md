@@ -90,7 +90,7 @@ weather encoders pre-trained on ERA5 and CAMS.** (ERA5 and CAMS are two reanalys
 estimates of past weather.) Step 3b scores 8.30 against 8.73 for the manual heuristic. Step 5, the
 first step with both lags, scores 7.88.
 
-![Normalised MAE of the median by forecast horizon, steps 1 to 5, with the manual heuristic, climatology, and experiment 667](ladder_horizon_early.svg)
+![Normalised MAE of the median by horizon, steps 1 to 5 and reference arms](ladder_horizon_early.svg)
 
 **Steps 6 to 8 add no skill over step 5 on the annual mean.** Step 8 is the Candidate. It scores
 7.99, which is 0.105 worse than step 5 (95% interval 0.078 to 0.132). Monthly refits improve both
