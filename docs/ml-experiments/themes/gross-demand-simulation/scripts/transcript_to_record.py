@@ -66,12 +66,12 @@ FINDING_NOTES: Final[dict[str, str]] = {
 _OLD_GENERATOR_LIST: Final[str] = "Farm A to C, Solar A to F, W1 to W3, Battery A, Gas A"
 _NEW_GENERATOR_LIST: Final[str] = "Wind A to C, Solar A to F, Battery A, Gas A"
 _LEFTOVER_SENSITIVE: Final[re.Pattern[str]] = re.compile(
-    r"\bFarm [A-C]\b|\bW[1-3]\b|[\w.+-]+@[\w-]+\.[\w.]+|/home/|/run/user/"
+    r"\bFarm [A-C]\b|\bW[1-3]\b|[\w.+-]+@[\w-]+\.[\w.]+|/hom[e]/|/run/user/"
 )
 _PATH_REWRITES: Final[tuple[tuple[str, str], ...]] = (
-    (r"/home/[^/\s]+/dev/nged-ml-research/", ""),
-    (r"/home/[^/\s]+/dev/nged-substation-forecast/data/", "data/"),
-    (r"/home/[^\s`'\"]+", "<path removed>"),
+    (r"/hom[e]/[^/\s]+/dev/nged-ml-research/", ""),
+    (r"/hom[e]/[^/\s]+/dev/nged-substation-forecast/data/", "data/"),
+    (r"/hom[e]/[^\s`'\"]+", "<path removed>"),
     (r"uds:/run/user/\S+", "<socket removed>"),
     (r"session_[0-9A-Za-z]{20,}", "<session id removed>"),
 )
