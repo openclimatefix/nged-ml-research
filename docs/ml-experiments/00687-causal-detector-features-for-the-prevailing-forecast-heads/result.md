@@ -166,8 +166,8 @@ perturbs the power after the latest permitted half-hour and checks that no featu
   experiment 598; the features read no weather themselves. The lags are past power, which exists at
   forecast time up to the freshness stated above.
 - Data before 2026-07-01 only; an assertion on every index read.
-- Reviews: one Sonnet review of this plan, one fresh Sonnet review of the code before the first fit, a
-  fresh Sonnet re-derivation of the headline numbers, and one Sonnet prose review. No Opus.
+- Reviews: one Sonnet review of this plan, one fresh Sonnet review of the code before the first
+  fit, a fresh Sonnet re-derivation of the headline numbers, and one Sonnet prose review. No Opus.
 - Open to a result that the features do not separate shifts better than the summaries: the stop
   rule then ends step 2.
 
