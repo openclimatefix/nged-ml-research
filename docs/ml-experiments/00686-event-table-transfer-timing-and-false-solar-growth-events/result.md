@@ -61,6 +61,15 @@ Planned. The write-up replaces this body when the experiment finishes.
 
 ## Plan
 
+**Changes after the code review, before the scored run.** A fresh Sonnet agent found that the
+midday slices were not aligned to the clock, that the edge width read from all hours was blind to a
+midday-only growth, that the first misfit measure (the change over 3 days) was near zero by
+construction, that the likelihood-ratio statistic pooled the two noise levels, and that the
+bootstrap null took its step shape from the separate fit. The code and the class definitions below
+are the fixed versions. The likelihood ratio is exp(statistic / 2), so a ratio of 4 is a statistic of
+2.77, computed per Primary. The p-value is (1 + exceedances) / (1 + draws). The injection check
+also injects ends, and windows are 10 or more days apart.
+
 **Check 1 asks whether the two ends of a verified transfer start together.** The residual of both
 Primaries (cleaned power minus the lag-free forecast of experiment 327's arm C) is fitted in a
 window of 5 days either side of the nominal edge. Each Primary gets a level, a trend, and a step
@@ -75,11 +84,13 @@ the identical fit reads the gap back.
 
 **Check 2 re-runs experiment 653's solar-growth worlds with 24 seeds instead of 2.** Worlds 0 and 1
 reuse 653's seeds and must reproduce its 5 and 9 false events in the masked arm. Each false event
-is assigned to the first matching class: a step inside a sunny run (edge width 1 hour or less, and the
-midday ERA5 clearness index over the first 3 days at least 0.7), a slow ramp (edge width a day or
-more, or an edge that does not complete within 2 days), a misfit of the slow level (the injected
-change over the first 3 days differs from the slow level's change by 0.5 noise units or more), and
-otherwise another step. Shares carry Wilson intervals, and the false-event rate per Primary-year
+is assigned to the first matching class: a step inside a sunny run (the midday level rises from 10% to
+90% within 1 day, and the midday ERA5 clearness index over the first 3 days is at least 0.7), a slow
+ramp (the rise takes more than 1 day, or does not complete within 14 days), a misfit of the slow
+level (the accumulated injected growth over the first 30 days exceeds the slow level's change by 0.5
+noise units or more), and otherwise another step. The edge width is read from the daily mean of the
+10:00 to 14:30 UTC half-hours, so its resolution is 1 day and the plan cannot separate a step of 1
+hour from one of 1 day. Shares carry Wilson intervals, and the false-event rate per Primary-year
 carries a bootstrap interval over worlds. The solar-growth term is injected at 3 of 15 Primaries per
 world over 2.5 years.
 

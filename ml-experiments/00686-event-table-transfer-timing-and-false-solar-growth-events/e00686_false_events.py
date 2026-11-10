@@ -16,7 +16,6 @@ measurements that decide its class.
 
 from __future__ import annotations
 
-import sys
 from datetime import timedelta
 from multiprocessing import get_context
 from typing import Final
@@ -27,12 +26,10 @@ from e00653_common import DAY, GRID_LENGTH, GRID_START, SCORED_FROM  # ty: ignor
 from e00653_core import decode_world  # ty: ignore[unresolved-import]
 from e00653_inject import GenParams, inject  # ty: ignore[unresolved-import]
 from e00653_run import _overlap, load_params, setup  # ty: ignore[unresolved-import]
-from e00653_segment import step_width  # ty: ignore[unresolved-import]
 from e00653_slow import to_half_hours  # ty: ignore[unresolved-import]
 from e00657_solar import haurwitz, load_irradiance  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-sys.path.insert(0, "ml-experiments/00686-event-table-transfer-timing-and-false-solar-growth-events")
 WORK: Final = (
     ML_EXPERIMENTS_DATA_DIR / "00686-event-table-transfer-timing-and-false-solar-growth-events"
 )
@@ -50,7 +47,6 @@ def seed_of(*, k: int) -> int:
 
 def clearness_by_site() -> dict[str, np.ndarray]:
     """ERA5 shortwave over Haurwitz clear-sky irradiance per half-hour, for the 15 Primaries."""
-    import polars as pl
     from e00653_common import SERIES_PATH  # ty: ignore[unresolved-import]
 
     series = pl.read_parquet(SERIES_PATH)
@@ -73,6 +69,63 @@ def season_boundary_distance_days(*, start: int) -> float:
             d = abs((when - GRID_START.replace(year=year, month=month, day=1)).total_seconds())
             best = min(best, d / 86400)
     return best
+
+
+def midday_edge_width(*, xh: np.ndarray, start: int, sigma: float) -> tuple[float, bool]:
+    """Days the midday level takes to go from 10% to 90% of its rise, and whether it completes.
+
+    The series is the daily mean of the 10:00 to 14:30 UTC half-hours of `xh`, smoothed over 3
+    days. The rise runs from the median of the 14 days before the start to the median of days 4
+    to 10 after it. A rise under half a noise unit, or one whose 90% level is not reached within
+    14 days, is reported as not complete.
+    """
+    days = xh[: len(xh) // DAY * DAY].reshape(-1, DAY)[:, MIDDAY]
+    with np.errstate(invalid="ignore"):
+        mid = np.nanmean(days, axis=1)
+    d0 = start // DAY
+    if d0 < 14 or d0 + 17 >= len(mid):
+        return float("nan"), False
+    pre = np.nanmedian(mid[d0 - 14 : d0])
+    post = np.nanmedian(mid[d0 + 4 : d0 + 11])
+    rise = post - pre
+    if not np.isfinite(rise) or abs(rise) < 0.5 * sigma:
+        return float("nan"), False
+    seg = np.convolve(np.nan_to_num(mid[d0 - 3 : d0 + 18], nan=pre), np.ones(3) / 3, mode="same")
+    frac = (seg - pre) / rise
+    up10 = np.flatnonzero(frac > 0.1)
+    up90 = np.flatnonzero(frac > 0.9)
+    if len(up10) == 0 or len(up90) == 0:
+        return float("nan"), False
+    return float(max(0, up90[0] - up10[0])), True
+
+
+def first_days_clearness(*, clearness: np.ndarray, start: int) -> tuple[float, float]:
+    """Mean ERA5 clearness, and the share at 0.7 or more, over midday of the first 3 days."""
+    idx = start + np.arange(3 * DAY)
+    if idx[-1] >= GRID_LENGTH:
+        return float("nan"), float("nan")
+    mid = clearness[idx[(idx % DAY >= 20) & (idx % DAY < 30)]]
+    if not np.isfinite(mid).any():
+        return float("nan"), float("nan")
+    return float(np.nanmean(mid)), float(np.nanmean(mid[np.isfinite(mid)] >= SUNNY))
+
+
+def midday_share(*, x: np.ndarray, start: int) -> float:
+    """Share of the change in daily profile (7 days after minus 7 days before) in 10:00 to 15:00."""
+    if start < 7 * DAY or start + 7 * DAY > len(x):
+        return float("nan")
+
+    def profile(lo: int) -> np.ndarray:
+        idx = lo + np.arange(7 * DAY)
+        v = x[idx]
+        ok = np.isfinite(v)
+        tot = np.bincount(idx[ok] % DAY, weights=v[ok], minlength=DAY)
+        cnt = np.bincount(idx[ok] % DAY, minlength=DAY)
+        return np.where(cnt > 0, tot / np.maximum(cnt, 1), np.nan)
+
+    d = profile(start) - profile(start - 7 * DAY)
+    total = float(np.nansum(d))
+    return float(np.nansum(d[MIDDAY]) / total) if abs(total) > 1e-9 else float("nan")
 
 
 def one_world(k: int) -> list[dict]:
@@ -103,35 +156,13 @@ def one_world(k: int) -> list[dict]:
         sigma = fz.sigma[site]
         xh = world[site] - to_half_hours(slow=slows[site])
         injected = world[site] - res[site]
-        width = step_width(xh=xh, t=e.start, span=2 * DAY)
-        b0 = e.start // 12
-        # Slow level's misfit: injected change over the 3 days after the start, less the slow
-        # level's own change relative to the un-injected record, in noise units.
-        a, b = e.start, min(e.start + 3 * DAY, GRID_LENGTH)
-        pre = slice(max(0, e.start - 3 * DAY), e.start)
-        inj_change = np.nanmean(injected[a:b]) - np.nanmean(injected[pre])
-        slow_change = float(
-            np.nanmean((slows[site] - base_slow[site])[b0 : b0 + 3 * 4 * 2])
-            - np.nanmean((slows[site] - base_slow[site])[max(0, b0 - 12) : b0])
-        )
-        misfit = (inj_change - slow_change) / sigma
-        clear3 = clearness[site][a:b].reshape(-1, DAY)[:, MIDDAY] if (b - a) % DAY == 0 else None
-        mean_clear = float(np.nanmean(clear3)) if clear3 is not None else float("nan")
-        sunny_share = float(np.nanmean(clear3 >= SUNNY)) if clear3 is not None else float("nan")
-        # Share of the event's megawatts in 10:00 to 15:00 UTC, from the diurnal difference between
-        # the 7 days after and the 7 days before the start.
-        post_d = world[site][e.start : e.start + 7 * DAY]
-        pre_d = world[site][max(0, e.start - 7 * DAY) : e.start]
-        if len(post_d) == 7 * DAY and len(pre_d) == 7 * DAY:
-            dprof = np.nanmean(post_d.reshape(7, DAY), axis=0) - np.nanmean(
-                pre_d.reshape(7, DAY), axis=0
-            )
-            total = float(np.nansum(dprof))
-            share_mid = (
-                float(np.nansum(dprof[MIDDAY]) / total) if abs(total) > 1e-9 else float("nan")
-            )
-        else:
-            share_mid = float("nan")
+        edge_days, edge_complete = midday_edge_width(xh=xh, start=e.start, sigma=sigma)
+        # Accumulated injected growth over the first 30 days that the slow level has not absorbed.
+        a, b = e.start, min(e.start + 30 * DAY, GRID_LENGTH)
+        diff = to_half_hours(slow=slows[site] - base_slow[site])[a:b]
+        misfit = (np.nanmean(injected[a:b]) - np.nanmean(diff)) / sigma
+        mean_clear, sunny_share = first_days_clearness(clearness=clearness[site], start=e.start)
+        share_mid = midday_share(x=world[site], start=e.start)
         rows.append(
             {
                 "world": k,
@@ -143,7 +174,8 @@ def one_world(k: int) -> list[dict]:
                 "amp_mw": e.amp_mw,
                 "units": e.units,
                 "ramp_fraction": e.ramp_fraction,
-                "width_hh": width,
+                "edge_days": edge_days,
+                "edge_complete": edge_complete,
                 "cls": e.cls,
                 "dist_season_boundary_days": season_boundary_distance_days(start=e.start),
                 "mean_clearness_3d": mean_clear,
@@ -163,7 +195,9 @@ def main() -> None:
     ctx = get_context("spawn")
     with ctx.Pool(2) as pool:
         parts = pool.map(one_world, range(N_WORLDS), chunksize=1)
-    pl.DataFrame([r for part in parts for r in part]).write_parquet(WORK / "false_events.parquet")
+    pl.DataFrame([r for part in parts for r in part], infer_schema_length=None).write_parquet(
+        WORK / "false_events.parquet"
+    )
 
 
 if __name__ == "__main__":

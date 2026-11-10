@@ -17,8 +17,8 @@ fit, to show what lag the method reports when the true lag is 0.
 
 from __future__ import annotations
 
+import itertools
 import json
-import sys
 from dataclasses import dataclass
 from typing import Final
 
@@ -26,8 +26,6 @@ import e00660_data as data  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from e00660_ev1_real_edges import OFFSET_2019, verified_rows  # ty: ignore[unresolved-import]
-
-sys.path.insert(0, "ml-experiments/00686-event-table-transfer-timing-and-false-solar-growth-events")
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 DAY: Final[int] = data.DAY
@@ -117,6 +115,14 @@ def summarise(*, td: Table, tr: Table) -> dict:
         "onset_shared_hh": int(shifts[i_sh]),
         "sse_separate": float(td.sse[i_d] + tr.sse[i_r]),
         "sse_shared": float(joint[i_sh]),
+        "sse_sep_donor": float(td.sse[i_d]),
+        "sse_sep_recipient": float(tr.sse[i_r]),
+        "sse_sh_donor": float(td.sse[i_sh]),
+        "sse_sh_recipient": float(tr.sse[i_sh]),
+        "share_donor_shared": float(td.best_wc[i_sh][1]),
+        "share_recipient_shared": float(tr.best_wc[i_sh][1]),
+        "width_donor_shared": int(td.best_wc[i_sh][0]),
+        "width_recipient_shared": int(tr.best_wc[i_sh][0]),
         "step_donor": float(td.amp[i_d]),
         "step_recipient": float(tr.amp[i_r]),
         "step_donor_shared": float(td.amp[i_sh]),
@@ -129,9 +135,16 @@ def summarise(*, td: Table, tr: Table) -> dict:
 
 
 def lr_stat(*, s: dict, n_total: int) -> float:
-    """Twice the log likelihood ratio of separate against shared onsets, from the Gaussian fit."""
-    sigma2 = s["sse_separate"] / n_total
-    return (s["sse_shared"] - s["sse_separate"]) / sigma2
+    """Twice the log likelihood ratio of separate against shared onsets (Gaussian, per Primary).
+
+    ``n_total`` is the number of half-hours of both windows together. The likelihood ratio itself
+    is ``exp(lr_stat / 2)``, so a ratio of 4 is a statistic of 2.77.
+    """
+    n = n_total / 2
+    return float(
+        n * np.log(s["sse_sh_donor"] / s["sse_sep_donor"])
+        + n * np.log(s["sse_sh_recipient"] / s["sse_sep_recipient"])
+    )
 
 
 def window(*, site: str, pair_centre: int, forecasts: dict[str, np.ndarray], power: dict) -> tuple:
@@ -140,6 +153,11 @@ def window(*, site: str, pair_centre: int, forecasts: dict[str, np.ndarray], pow
     r = power[site][lo : lo + 2 * HALF] - forecasts[site][lo : lo + 2 * HALF]
     ok = np.isfinite(r)
     return np.where(ok, r, np.nanmedian(r)), ok
+
+
+def donor_profile(*, f: np.ndarray) -> np.ndarray:
+    """The donor's forecast with gaps filled by its median, so no NaN reaches the fit."""
+    return np.where(np.isfinite(f), f, np.nanmedian(f))
 
 
 def fit_pair(
@@ -164,7 +182,7 @@ def bootstrap(
     n = len(yd)
     centre = n // 2
 
-    def fitted(site_amp: float, t0: int, w: int, c: float, y: np.ndarray) -> np.ndarray:
+    def fitted(t0: int, w: int, c: float, y: np.ndarray) -> np.ndarray:
         tau = np.linspace(-1, 1, n)
         shape = (1 - c) + c * fd / np.nanmean(fd)
         x = np.stack(
@@ -174,16 +192,18 @@ def bootstrap(
         return x @ beta
 
     def with_model(
-        onset_d: int, onset_r: int
+        onset_d: int, onset_r: int, suffix: str
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        fd_fit = fitted(0, centre + onset_d, s["width_donor"], s["share_donor"], yd)
-        fr_fit = fitted(0, centre + onset_r, s["width_recipient"], s["share_recipient"], yr)
+        fd_fit = fitted(centre + onset_d, s[f"width_donor{suffix}"], s[f"share_donor{suffix}"], yd)
+        fr_fit = fitted(
+            centre + onset_r, s[f"width_recipient{suffix}"], s[f"share_recipient{suffix}"], yr
+        )
         return fd_fit, fr_fit, yd - fd_fit, yr - fr_fit
 
     nday = n // DAY
     lr_null, gap_sep = [], []
-    fd0, fr0, rd0, rr0 = with_model(s["onset_shared_hh"], s["onset_shared_hh"])
-    fd1, fr1, rd1, rr1 = with_model(s["onset_donor_hh"], s["onset_recipient_hh"])
+    fd0, fr0, rd0, rr0 = with_model(s["onset_shared_hh"], s["onset_shared_hh"], "_shared")
+    fd1, fr1, rd1, rr1 = with_model(s["onset_donor_hh"], s["onset_recipient_hh"], "")
     for _ in range(N_BOOT):
         pick = rng.integers(0, nday, size=nday)
         for kind in ("null", "sep"):
@@ -214,7 +234,7 @@ def real_fits() -> list[dict]:
             centre = (nominal[d] + nominal[r]) // 2
             yd, okd = window(site=d, pair_centre=centre, forecasts=fcst, power=power)
             yr, okr = window(site=r, pair_centre=centre, forecasts=fcst, power=power)
-            fd = fcst[d][centre - HALF : centre + HALF]
+            fd = donor_profile(f=fcst[d][centre - HALF : centre + HALF])
             reverse = edge_name == "end"
             s, _, _ = fit_pair(yd=yd, yr=yr, fd=fd, reverse=reverse)
             b = bootstrap(yd=yd, yr=yr, fd=fd, reverse=reverse, s=s, rng=rng)
@@ -234,7 +254,7 @@ def real_fits() -> list[dict]:
                     **s,
                     "lr": float(lr),
                     "lr_null_p95": float(np.percentile(null, 95)),
-                    "p_value": float((null >= lr).mean()),
+                    "p_value": float((1 + (null >= lr).sum()) / (1 + len(null))),
                     "gap_lo": float(np.percentile(gaps, 5)),
                     "gap_hi": float(np.percentile(gaps, 95)),
                     "gap_boot": gaps.tolist(),
@@ -250,8 +270,14 @@ def real_fits() -> list[dict]:
     return out
 
 
-def clean_windows(*, site_a: str, site_b: str, rng: np.random.Generator, n: int) -> list[int]:
-    """Window centres before 2026-07-01 with no labelled or verified event within 8 days."""
+def clean_windows(
+    *, site_a: str, site_b: str, forecast: np.ndarray, rng: np.random.Generator, n: int
+) -> list[int]:
+    """Window centres, 10 days or more apart, with no labelled or verified event within 8 days.
+
+    `forecast` is the donor's forecast; windows where it has a gap are skipped. Events that
+    NGED's logs miss cannot be excluded.
+    """
     info = data.series_info()
     table = pl.read_parquet(data.E580 / "events_labelled_status.parquet")
     spans = [
@@ -273,8 +299,16 @@ def clean_windows(*, site_a: str, site_b: str, rng: np.random.Generator, n: int)
             continue
         if any(np.isnan(p[s][c - HALF : c + HALF]).mean() > 0.05 for s in p):
             continue
+        if np.isnan(forecast[c - HALF : c + HALF]).any():
+            continue
         cands.append(c)
-    return sorted(rng.choice(cands, size=min(n, len(cands)), replace=False).tolist())
+    chosen: list[int] = []
+    for c in rng.permutation(cands):
+        if all(abs(int(c) - k) >= 2 * HALF for k in chosen):
+            chosen.append(int(c))
+        if len(chosen) == n:
+            break
+    return sorted(chosen)
 
 
 def injection_check(real: list[dict]) -> list[dict]:
@@ -290,23 +324,25 @@ def injection_check(real: list[dict]) -> list[dict]:
         fcst = {s: data.load_forecast(site=s) for s in (d, r)}
         onset = next(x for x in real if x["pair"] == name and x["edge"] == "onset")
         amp_d, amp_r = onset["step_donor_shared"], onset["step_recipient_shared"]
-        for centre in clean_windows(site_a=d, site_b=r, rng=rng, n=N_INJECT):
+        for centre in clean_windows(site_a=d, site_b=r, forecast=fcst[d], rng=rng, n=N_INJECT):
             lo = centre - HALF
             yd0, _ = window(site=d, pair_centre=centre, forecasts=fcst, power=power)
             yr0, _ = window(site=r, pair_centre=centre, forecasts=fcst, power=power)
-            fd = fcst[d][lo : lo + 2 * HALF]
+            fd = donor_profile(f=fcst[d][lo : lo + 2 * HALF])
             n = len(yd0)
             for share in (0.0, 1.0):
                 shape = (1 - share) + share * fd / np.nanmean(fd)
-                for lag in (0, 29):
+                for lag, edge in itertools.product((0, 29), ("onset", "end")):
+                    rev = edge == "end"
                     t0d = n // 2
                     t0r = t0d + lag
-                    yd = yd0 + amp_d * basis(n=n, t0=t0d, w=2, shape=shape, reverse=False)
-                    yr = yr0 + amp_r * basis(n=n, t0=t0r, w=2, shape=shape, reverse=False)
-                    s, _, _ = fit_pair(yd=yd, yr=yr, fd=fd, reverse=False)
+                    yd = yd0 + amp_d * basis(n=n, t0=t0d, w=2, shape=shape, reverse=rev)
+                    yr = yr0 + amp_r * basis(n=n, t0=t0r, w=2, shape=shape, reverse=rev)
+                    s, _, _ = fit_pair(yd=yd, yr=yr, fd=fd, reverse=rev)
                     out.append(
                         {
                             "pair": name,
+                            "edge": edge,
                             "true_lag_hh": lag,
                             "true_share": share,
                             "centre_idx": int(centre),
@@ -326,15 +362,16 @@ def main() -> None:
     pl.DataFrame(inj).write_parquet(WORK / "timing_injected.parquet")
     summary = (
         pl.DataFrame(inj)
-        .group_by("pair", "true_lag_hh", "true_share")
+        .group_by("pair", "edge", "true_lag_hh", "true_share")
         .agg(
             pl.col("gap_hh").median().alias("median_gap"),
             pl.col("gap_hh").quantile(0.05).alias("gap_p05"),
             pl.col("gap_hh").quantile(0.95).alias("gap_p95"),
             (pl.col("gap_hh").abs() >= 24).mean().alias("share_gap_24plus"),
+            ((pl.col("gap_hh") - pl.col("true_lag_hh")).abs() <= 4).mean().alias("share_within_4"),
             pl.len().alias("n"),
         )
-        .sort("pair", "true_lag_hh", "true_share")
+        .sort("pair", "edge", "true_lag_hh", "true_share")
     )
     with pl.Config(tbl_rows=40, tbl_cols=20):
         print(summary)
