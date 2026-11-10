@@ -20,10 +20,11 @@ size: >-
   for the first look, 5 GPU-hours in total); the post hoc variant of experiment 678 runs on at most
   2 CPU cores.
 hypothesis: >-
-  Experiments 672 and 678 closed the graph line at 15 Primaries under their stop rules, and the
+  Experiments 672 and 678 each closed the graph line at 15 Primaries under their stop rules, and the
   maintainer asked to continue it. Experiment 678 bolted a donor posterior onto E1-J's recipient
   search; the explicit per-link state with a recipient lag, decoded jointly with the Primaries'
-  states, is the one core of the design no experiment has tested. A network that learns the state of
+  states, is a core of the design that experiments 672 and 678 did not test. A network that learns
+  the state of
   every link (off, first Primary donates, second Primary donates) hour by hour, and the lag at which
   the recipient follows, pairs more injected transfer megawatts in the long and deep and the medium
   and deep cells than the hybrids of experiment 678 do. A post hoc variant of experiment 678, whose
@@ -31,9 +32,14 @@ hypothesis: >-
   at a false-transfer rate that stays within 1.5 times E1-J's.
 prediction: >-
   Written before any score is read. "Paired" is the MW-weighted share of injected edge-transfer
-  ends paired correctly, as in experiment 670. Cells are those of experiment 665. Network
-  predictions (Part B) are for the first look, one seed per arm; the three-seed predictions apply
-  only if the continuation gate is met. G is the edge-state network on the real graph. G1: G pairs at
+  ends paired correctly, as in experiment 670. Cells are those of experiment 665. Predictions of
+  Part B are for the first look, one seed per arm. The first look is a coarse screen: R-hyb's own
+  three seeds span 0.31 to 0.37 in the long and deep cell, so a margin of 0.05 sits inside seed
+  noise. The three-seed predictions apply only if the continuation gate is met. The bars are
+  computed from experiment 678's stored rows, and the figures quoted here are rounded. G is the
+  edge-state neural network on the real graph. E1-J is experiment 653's event table with experiment
+  670's recipient search. F-hyb and R-hyb are the hybrids of experiment 678 with a
+  logistic-regression probe and with a randomly initialised encoder probe. G1: G pairs at
   least the mean paired share of R-hyb (experiment 678, three seeds) plus 0.05 in the long and deep
   cell (R-hyb 0.345, bar 0.395) and in the medium and deep cell (R-hyb 0.297, bar 0.347). G2: G
   pairs at least E1-J plus 0.10 in both cells (E1-J 0.286 and 0.245, bars 0.386 and 0.345). G3: the
@@ -42,8 +48,9 @@ prediction: >-
   at most 1.5 times E1-J's (0.379, bar 0.57). G5: G's median recipient lag error on correctly paired
   recipients is at most 4 half-hours. Post hoc variant (Part A): H1: F-hyb and R-hyb with donors
   that may end after 6 hours or more pair at least 0.03 more than E1-J in the medium and shallow
-  cell and at least 0.02 more in each short cell (E1-J 0.131, 0.080, 0.027), with false transfers at
-  most 1.5 times E1-J's.
+  cell (for both F-hyb and R-hyb, R-hyb as a mean of three seeds) and at least 0.02 more in each
+  short cell (E1-J 0.131, 0.080, 0.027), with false transfers at most 1.5 times E1-J's. The 6-hour
+  setting was chosen after seeing experiment 678's short cells and is the only one run.
 decision_rule: >-
   Fixed before any score is read. Worlds: experiment 678's 40 scored worlds (experiment 660's
   default generator, seeds 900 to 939, scored years 2024-01-01 to 2026-06-30). Residual panel:
@@ -51,16 +58,25 @@ decision_rule: >-
   2026-07-01 is never read. Training worlds: the 200 worlds of experiment 675 (seeds from 100000,
   events starting before 2023-07-01, every later reading hidden). Validation worlds, for the decoder
   grid only: 20 worlds from seed 105000, readings kept to 2024-01-01, events scored only when they
-  start from 2023-07-01. Reference rows: E1-J and the hybrids of experiment 678, read from its stored
-  rows (same worlds, same panel); E1-J and R-hyb are not rerun. Branch rule for Part B: if G meets G1
-  in both deep cells, train two more seeds of G (total ceiling 5 GPU-hours) and report the three-seed
+  start from 2023-07-01. Reference rows: E1-J and the hybrids of experiment 678, read from its
+  stored
+  rows (same worlds, same panel); E1-J and R-hyb are not rerun. Branch rule for Part B: if G meets
+  G1
+  in both deep cells, train two more seeds of G (total ceiling 5 GPU-hours) and report the
+  three-seed
   means; otherwise stop and close the learnt-graph line at 15 Primaries on the page, naming the
   branch taken and the numbers. Verdict. `supported` if, after the continuation, the three-seed mean
-  of G meets G1 and G2 in both deep cells with no seed more than 0.05 below its bar, and G3 and G4
+  of G meets G1 and G2 in both deep cells with no seed more than 0.05 below its G1 bar or its G2
+  bar, and G3 and G4
   hold; `partly supported` if the continuation ran and G1 holds in both deep cells but G2, G3, or G4
   fails, or if G1 holds in one deep cell only; `not supported` otherwise. G5, Part A, and the short
   and shallow cells are reported as held or failed and do not enter the verdict. A deep cell with
-  fewer than 20 events or 10 edge-transfer ends is unreadable. Adoption: if G's mean paired share is
+  fewer than 20 events or 10 edge-transfer ends is unreadable, and a verdict that needs it is
+  `inconclusive`. If the first look fails G1, G3 and G4 are reported for the single seed and the
+  verdict is `not supported`. The verdict mean is taken over three seeds, and the mean of the two
+  fresh seeds is reported beside it because the gate selected the first seed. G4 is looser than the
+  specification's share of false transfers, which is undefined for hybrids. Adoption: if G's mean
+  paired share is
   0.60 or more in both deep cells the page recommends adopting G as the event table. The porting
   threshold is zero, because the result is a research table that changes no production code.
 benchmark: >-
@@ -79,14 +95,12 @@ metric: >-
 code: ml-experiments/00676-pretrained-graph-model-for-load-transfers-part-2-edge-state-network/
 ---
 
-**This is the plan, committed before any score is read.** The graph line was closed by earlier stop
-rules ([experiment
-672](../00672-graph-model-that-finds-the-donor-of-a-load-transfer/result.md) at 15 Primaries, and
-[experiment 678](../00678-donor-posterior-hybrid-for-load-transfer-pairing/result.md), whose stop
-rule closed it again). It is continued here at the maintainer's request, because only 1.8 of the 9
-GPU-hours budgeted for the line were used and the explicit link state of the original design has
-never been built. Experiment 676 is a time-boxed final try, and the page says so again in its
-results.
+**This is the plan, committed before any score is read.** Earlier stop rules closed the graph line
+([experiment 672](../00672-graph-model-that-finds-the-donor-of-a-load-transfer/result.md) and
+[experiment 678](../00678-donor-posterior-hybrid-for-load-transfer-pairing/result.md)), and the
+maintainer asked to continue it. Experiment 676 is a time-boxed final try: only 1.8 of the 9
+GPU-hours budgeted for the line were used, and the explicit link state of the original design has
+not been built.
 
 ## The question
 
@@ -103,7 +117,8 @@ reads whether it pairs more transfer megawatts than the hybrids do.
 - **Question.** Experiment 678's added donors could not end sooner than 2 days after their start, so
   the short cells equalled E1-J exactly. Do donors that may end after 6 hours or more help the short
   cells?
-- **Construction.** Everything of experiment 678's donor construction is kept except the earliest end
+- **Construction.** Everything of experiment 678's donor construction is kept except the earliest
+  end
   (6 hours after the start instead of 2 days) and the running-median window of the end search (6
   hours instead of 1 day). The probe scores, thresholds, duplicate rule, and recipient search are
   experiment 678's, so the arms are F-hyb and R-hyb (three seeds), each with the changed end rule.
@@ -140,8 +155,10 @@ the Opus specification of the line in the ways listed under "Departures from the
 - **Training worlds and labels.** 200 injected worlds (seeds from 100000, experiment 660's default
   generator, unchanged). Link labels come from the generator's truth table: the link is "donates" in
   the donor's hours, the lag is the recipient's start minus the donor's, and all other time is "off"
-  at full weight, except in the hours where E1 decodes an event on the un-injected real record
-  (weight 0). That mask uses no label. The weight of the transfer states is 5.
+  at full weight, except in the hours before 2023-07-01 where E1 decodes an event on the un-injected
+  real record (weight 0). That mask uses no label and no hour from the scored years. Training worlds
+  start their events before 2023-07-01 (the generator's cutoff), so no training onset lies in the
+  validation or scored years. The weight of the transfer states is 5.
 - **Loss and optimiser.** Cross-entropy on the link state (weight 1.0), on the lag (0.3), and on the
   node state (0.5). AdamW with a learning rate of 1e-3 and cosine decay, windows of 2,880 hours, a
   batch of 4, half the windows centred on an injected edge transfer. The number of steps follows
@@ -149,30 +166,45 @@ the Opus specification of the line in the ways listed under "Departures from the
   steps and a rerun resumes.
 - **Arms.** G (the network on the real graph), G-R (the same network trained and scored on the
   degree-preserving rewired graph that keeps the fewest real links, from 300 draws, with the share
-  kept reported), and G-0 (the link features zeroed, so the link head sees only each Primary's own
-  encoder output and cannot tell the true neighbour from any other). References, read from
+  kept reported), and G-0 (no links: the neighbour averaging in the encoder and the link features
+  are both zeroed, so the link head has no information about neighbours; G minus G-0 is read without
+  a bar). References, read from
   experiment 678's stored rows: E1-J, F-hyb, and R-hyb.
-- **Departures from the specification.** The following are not built, to keep the first look
-  inside 2 GPU-hours: masked pretraining (experiment 675 found it did not help), the daily-scale
+- **Departures from the specification.** The following are not built, to keep the first look inside
+  2 GPU-hours (the brief's logistic baseline is F-hyb, read from experiment 678's stored rows):
+  masked pretraining (experiment 675 found it did not help), the daily-scale
   pretraining masks, 1,000 or more training worlds (200 are used), the lag-free modular network as
   the residual panel (experiment 327's arm C is used, as in experiments 670 to 678), the amplitude
   and recipient-share head, the conservation and wobble terms, the donor head (the node state
-  replaces it), the 16-wide weather embedding, the cross-injector arms, and the semi-Markov duration
-  prior (a fixed stay probability replaces it). Each departure makes the network weaker than the
-  specification, so a failure here is a failure of this smaller network.
+  replaces it), the 16-wide weather embedding, the cross-injector arms, the fine-tuning curriculum,
+  three rounds of message passing (one is built), the boundary loss and half-hour refinement, G-hyb
+  (Part A is a related post hoc test), the timing and real-record rate predictions and the D5 and
+  D16 check, step 0a's diagnosis (done in experiment 675), and the semi-Markov duration prior (a
+  fixed stay probability replaces it). Each departure may make the neural network weaker than the
+  specification, so a failure here is a failure of this smaller neural network.
 - **Leak tests.** Both run in a fresh Sonnet code review, before any GPU fit, on CPU with a fixed
   seed. First, replacing the residual inside a hidden window (Gaussian noise of 10 noise units, then
-  a step of +20 noise units) at one Primary and at its neighbours leaves every node input and every
-  link feature bit-identical in float64, including the cross-correlations; a positive control that
+  a step of +20 noise units), with the mask drawn before any statistic is computed and the
+  statistics recomputed from the readings outside it, leaves every node input and every link feature
+  bit-identical in float64, including the cross-correlations, at the masked Primary and its
+  neighbours; a positive control that
   reads the unmasked panel must fail the same test. Second, replacing a scored world's truth table
   with a shuffled copy leaves the network's outputs bit-identical, because labels enter only the
   loss.
 
 ## Reviews and running
 
-- **Order.** Sonnet writes the plan and the code. A fresh Sonnet agent reviews the plan, then
-  another reviews the code (including both leak tests passing) before the first fit. A fresh Sonnet
-  agent reviews the results and the write-up, and a second reviews the prose. At most one Opus review
+- **Panel caveat.** The residual panel, experiment 327's arm C, is the one that experiments 670 to
+  678 used, and training, validation, and scored worlds share it. The neural network could therefore
+  memorise real residual patterns of the training years. Scored events lie in 2024 to 2026, which
+  the training worlds never show.
+
+- **Order.** Sonnet writes the plan and the code. A fresh Sonnet agent has reviewed the plan
+  (findings triaged in the pull request), then
+  two more review the code, one after the other (including both leak tests passing) before the first
+  fit. A fresh Sonnet
+  agent reviews the results and the write-up, and a second reviews the prose. At most one Opus
+  review
   is added, and only if a verdict could change.
 - **Running.** CPU work runs under `systemd-run --user --scope -p MemoryMax=16G -p
   OOMPolicy=continue`, with `OMP_NUM_THREADS=1`, at most 2 cores. One GPU process runs at a time,
