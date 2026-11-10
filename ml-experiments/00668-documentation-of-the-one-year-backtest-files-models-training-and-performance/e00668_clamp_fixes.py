@@ -212,13 +212,15 @@ def main(mode: str) -> None:
     if mode != "apply":
         return
     PRE_CLAMP_DIR.mkdir(exist_ok=True)
+    targets = (("solar", solar_after), ("primaries", prim_after))
+    for name, _ in targets:
+        if (PRE_CLAMP_DIR / f"{name}.parquet").exists():
+            msg = f"pre_clamp/{name}.parquet exists; refusing to overwrite the saved original"
+            raise FileExistsError(msg)
     hashes: dict[str, dict[str, str]] = {}
-    for name, frame in (("solar", solar_after), ("primaries", prim_after)):
+    for name, frame in targets:
         original = lib.FOLDER / f"{name}.parquet"
         backup = PRE_CLAMP_DIR / f"{name}.parquet"
-        if backup.exists():
-            msg = f"{backup} exists; refusing to overwrite the saved original"
-            raise FileExistsError(msg)
         shutil.copy2(original, backup)
         before_hash = sha256(original)
         if sha256(backup) != before_hash:
@@ -227,9 +229,12 @@ def main(mode: str) -> None:
         tmp = lib.FOLDER / f"{name}.parquet.tmp"
         row_group = 91980 if name == "solar" else 122640
         frame.write_parquet(tmp, compression="zstd", row_group_size=row_group)
+        if not pl.read_parquet(tmp).equals(frame):
+            msg = f"{tmp} does not read back equal to the clamped frame"
+            raise RuntimeError(msg)
         tmp.rename(original)
         hashes[name] = {"before": before_hash, "after": sha256(original)}
-    (REPORT_DIR / "sha256.json").write_text(json.dumps(hashes, indent=1))
+        (REPORT_DIR / "sha256.json").write_text(json.dumps(hashes, indent=1))
     print(json.dumps(hashes, indent=1))
 
 

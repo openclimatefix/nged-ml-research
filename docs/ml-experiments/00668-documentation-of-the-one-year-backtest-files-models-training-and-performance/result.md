@@ -135,6 +135,22 @@ description of one year and not a ranking.
 - **Checks.** Each file is checked for the row count above, no duplicate key, no null or
   non-finite quantile, no crossing quantiles, and UTC time-zone. Each experiment's page states the
   results and a spot check that no input is newer than the limits above.
+- **Clamps applied after the models ran.** Two files are post-processed, and only the quantile
+  values change. In `solar.parquet`, every quantile is zero on the half-hours where the sun is not
+  above the horizon at the middle of the half-hour (the rule that the scores use for daylight); this
+  changes 271,808 of 1,471,680 rows (18.5%), and the largest change is 6.1% of capacity. The daylight
+  rows are bit-identical to the unclamped file. In `primaries.parquet`, every quantile of the eight
+  MVA-only Primaries is at least zero, because apparent power cannot be negative; this changes
+  202,598 of 7,848,960 rows (2.6%), in D12, D22, and D8 only, and the largest change is 2.21 MVA (D8).
+  Both clamps are monotone, so no quantile crosses. The wind file is not clamped. The Primaries
+  measured in MW keep their negative lower quantiles; the observed power of D10 and D15 is also
+  negative at times.
+- **Effect of the clamps on the scores.** The solar scores are unchanged, because the scores use
+  daylight half-hours only. The Primaries CRPS falls by at most 0.0004 points of capacity in the
+  pooled lead bands (0.004 points for D8 in the prevailing output, the largest change of any series),
+  and the median absolute error and the q05 to q95 coverage do not change. The tables and figures on
+  this page were scored before the clamps; a few cells of the Primaries tables differ by one in the
+  last printed digit after them.
 
 ## The ground-truth files
 
@@ -935,9 +951,12 @@ experiment 666.
   (experiments 430 and 659 stopped at 251.5 hours). Solar has no idle mask, and the target is the
   raw output.
 - **Night rows.** The network forecasts only the half-hours where the mean cosine of the solar
-  zenith angle over the ensemble step is above zero. The night quantiles of the file are set to 0.
-  This gate is not the daylight rule that the scores use, which takes the zenith at the middle of
-  the half-hour.
+  zenith angle over the ensemble step is above zero, and the network sets the quantiles of the other
+  half-hours to 0. That gate is not the daylight rule that the scores use, which takes the zenith at
+  the middle of the half-hour, so a coarse ensemble step that contains a sunrise or a sunset leaves
+  small non-zero quantiles on the neighbouring night half-hours. The file is clamped afterwards (see
+  "The files"): every quantile is 0 wherever the zenith at the middle of the half-hour is 90 degrees
+  or more.
 - **Refits.** Quarterly: 2025-11-01, 2026-02-01, 2026-05-01, and 2026-08-01, each scoring
   the next
   three months, 3 seeds each, with no pre-training.
@@ -1364,6 +1383,21 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
     and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks.
 - **The prevailing output over-persists after a load shift ends.** One verified load shift, at D5
     and D16, is the only example, so the size of the effect is not estimated.
+- **Quantiles above table capacity remain in the files.** The highest quantile reaches 2.1 times
+    the capacity table's value for D15 and 2.2 times for GSP D1 (observed maxima 1.28 and 1.34 times),
+    1.4 times for GSP D6, and 1.35 to 1.7 times for five more Primaries (D5, D12, D16, D18, and D22;
+    observed maxima 1.2 to 1.55 times). Capacity is therefore not a ceiling for the demand series.
+    The wind and solar files exceed it by up to 12%.
+- **The q05 to q95 band covers less than 90% of observations.** Coverage is 81.4% for the Primaries
+    in normal running and 84.9% for the prevailing output, 86.7% for the BSPs, 87.7% for the GSPs,
+    91.3% for wind, and 89.3% for solar on daylight half-hours.
+- **Band widths step at some refits.** D4 narrows by about a third at the refit that starts the
+    late-spring month; D18 widens by about half at the early-autumn refit; six Primaries widen by
+    1.2 to 1.5 times at the refit that starts February 2026.
+- **Two Primaries miss for two months.** The normal-running band of D18 and D14 covers about 22%
+    to 28% of observations over two consecutive summer months, probably because of a load shift
+    that normal running deliberately ignores; the cause has not been checked against the event
+    table.
 - **Numbers are provisional until the pages of experiments 667, 669, and 666 merge.** Those pages
     own the models behind the files.
 - **The last origins cannot be fully scored.** Observed power ends on 2026-11-09 and the wind idle
