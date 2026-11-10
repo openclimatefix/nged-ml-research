@@ -7,7 +7,7 @@ Primaries chosen by a rule fixed in the plan. Arm 4 adds the level to q50 as a d
 
 Run from the repository root:
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     P=ml-experiments
     export PYTHONPATH=$P/00653-edge-state-event-table-penalised-segmentation:\
 $P/00670-event-table-recipient-search-on-six-cell-grid:\
