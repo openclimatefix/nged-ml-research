@@ -1,13 +1,13 @@
 # Final models: architectures and training regimes for the production port
 
-**This page states, for each forecast type, what the final model is and how it is trained.** It is
-written for the person who ports the models into `nged-substation-forecast`. Each section covers one
-forecast type and has the same five blocks: architecture, training regime, post-processing, scores,
-and port notes. Every choice links to the experiment page that decided it. The page adds no new
-scoring. Where two pages disagree, the page says so and names the current one.
+**This page states, for each forecast type, which neural network the one-year backtest used and how
+it was trained.** It is written for the person who ports the models into `nged-substation-forecast`.
+Each section covers one forecast type and has the same five blocks: architecture, training regime,
+post-processing, scores, and port notes. Most choices link to the experiment page that decided them.
+The page adds no new scoring. Where two pages disagree, the page says so and names the current one.
 
-**None of these models is adopted for production, and every score comes from one backtest year that
-overlaps the development months.** The backtest is described in [experiment
+**No neural network on this page is adopted for production.** Every score comes from one backtest
+year that overlaps the development months. The backtest is described in [experiment
 668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md):
 one forecast origin per day at 12:00 UTC from 2025-11-01 to 2026-10-31, and 672 half-hours (14 days)
 per origin. The origin months from 2026-07 lie in the window that earlier experiments kept as a
@@ -15,15 +15,24 @@ final test, so those months are descriptive and no choice rests on them. The exp
 which builds up the Candidate demand neural network one component at a time, is not merged. Its slot
 in the Primaries section is marked.
 
-**Terms used throughout.** A Primary is a primary substation, a BSP is a bulk supply point, and a
-GSP is a grid supply point. CRPS is the continuous ranked probability score, computed here as twice
-the mean pinball loss over the 11 quantile levels, divided by capacity, times 100. A CRPS of 4
-therefore means 4% of capacity. The normalised MAE of the median is the mean absolute error of the
-50% quantile in the same units. Smaller is better for both. The q05-to-q95 coverage is the share of
-observed power inside the band from the 5% quantile to the 95% quantile, and its nominal value is
-0.90. NRA is the normal running arrangement, the electricity network configuration without any load
-shift. A load shift is a transfer of demand between neighbouring Primaries, usually for days to
-weeks, that NGED's logs record incompletely.
+**Nine terms recur on this page, and the definitions below fix their meaning.** NGED is National
+Grid Electricity Distribution. A Primary is a primary substation, a BSP is a bulk supply point, and
+a GSP is a grid supply point. MVA is apparent power, which cannot be negative, and MW is real power.
+The Candidate is the demand neural network that outputs the NRA forecast. The prevailing output is a
+second forecast that allows for a load shift still in progress at the forecast origin, made by a
+small neural network called the survival head, which estimates how likely the shift is to persist. A
+calibrated copy of a backtest file is a copy whose quantile bands are rescaled (see "Walk-forward
+band calibration"). The lag-enabled neural network reads recent observed power. CRPS is the
+continuous ranked probability score, computed here as twice the mean pinball loss over the 11
+quantile levels, divided by capacity, times 100. A CRPS of 4 therefore means 4% of capacity. The
+normalised MAE (mean absolute error) of the median is the mean absolute error of the 50% quantile in
+the same units. Smaller is better for both. The q05-to-q95 coverage is the share of observed power
+inside the band from the 5% quantile to the 95% quantile, and its nominal value is 0.90. NRA is the
+normal running arrangement, the electricity network configuration without any load shift. ECMWF is
+the European Centre for Medium-Range Weather Forecasts, ENS is its ensemble forecast of 51 members,
+ERA5 is its reanalysis of past weather, and CAMS is the Copernicus Atmosphere Monitoring Service. A
+load shift is a transfer of demand between neighbouring Primaries, usually for days to weeks, that
+NGED's logs record incompletely.
 
 ## Overview
 
@@ -33,25 +42,23 @@ weeks, that NGED's logs record incompletely.
 | Primaries, prevailing output | 16 Primaries | The Candidate's quantiles mixed with a shifted copy by a survival head with 14 extra lagged inputs | Same clamp. Walk-forward band scale in the calibrated copy. | 3.37 and 4.47 |
 | BSPs | 2 BSPs | Lag-enabled mixture neural network, one per group | Walk-forward band scale in the calibrated copy | 4.27 and 6.41 |
 | GSPs | 2 GSPs | Lag-enabled mixture neural network, one per group | Walk-forward band scale in the calibrated copy | 10.52 and 14.78 |
-| Wind | 3 wind farms | Network S, a 3-component Gaussian mixture on ensemble weather | None | 4.58 and 9.86 |
-| Solar | 6 solar farms | Network PLP, a 3-component Gaussian mixture on ensemble weather and physics-lite power | Night quantiles set to zero. Walk-forward band scale in the calibrated copy. | 4.83 and 7.18 |
+| Wind | 3 wind farms | Neural network S, a 3-component Gaussian mixture on ensemble weather | None | 4.58 and 9.86 |
+| Solar | 6 solar farms | Neural network PLP, a 3-component Gaussian mixture on ensemble weather and physics-lite power | Night quantiles set to zero. Walk-forward band scale in the calibrated copy. | 4.83 and 7.18 |
 
 The scores in the last column come from [experiment
 668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md).
-The days 10 to 14 column is the band of that page's table that spans days 10 to 14. Section "Scores"
-of each forecast type gives the other lead bands, the coverage, and the climatology and
-manual-heuristic references.
+Section "Scores" of each forecast type gives the other lead bands, the coverage, and the climatology
+and manual-heuristic references.
 
 ## Series, identifiers, and units
 
-**The backtest files identify a series by its original `time_series_id`, an 8-bit integer, and the
-experiment pages mix that identifier with NGED's D-labels.** Page [experiment
+**The backtest files identify a series by its original `time_series_id`, and the experiment pages
+mix that identifier with NGED's D-labels.** Pages [experiment
 683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)
-and page [experiment
-684](00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)
-write "Primary 13" for identifier 13, which is the Primary labelled D18. The table fixes the
-correspondence for the 16 Primaries. The mapping comes from `site_map.csv` of experiment 521, which
-the scoring code of [experiment
+and [experiment 688](00688-winter-normal-running-coverage-median-error-and-events-part-1/result.md)
+write bare identifiers such as "Primary 13" for identifier 13, which is the Primary labelled D18.
+The table fixes the correspondence for the 16 Primaries. The mapping comes from `site_map.csv` of
+experiment 521, which the scoring code of [experiment
 668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
 reads.
 
@@ -78,10 +85,11 @@ reads.
   effective-capacity table with one value per series. That capacity is a normalising constant and
   not a limit, for demand and for generators alike. The highest quantile reaches 2.1 times the table
   value at D15, 2.2 times at the GSP D1, 1.4 times at the GSP D6, and 1.35 to 1.7 times at five more
-  Primaries (D5, D12, D16, D18, and D22), and the wind and solar quantiles exceed it by up to 12%
+  Primaries (D5, D12, D16, D18, and D22). The wind and solar quantiles exceed it by up to 12%
   ([experiment
   668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md),
-  Caveats).
+  Caveats). The files keep these quantiles on purpose, because the maintainer decided to leave
+  quantiles above capacity uncapped.
 
 ## Demand at the 16 Primaries
 
@@ -90,28 +98,30 @@ reads.
 **The Primaries are forecast by the Candidate, a modular demand neural network that outputs 11
 quantiles, plus a small prevailing head.** The Candidate is arm `P7+D50` of [experiment
 612](00612-nra-combined-networks-three-class-roster-completion/result.md) and [experiment
-613](00613-nra-roster-contrasts-with-intervals-five-seeds/result.md), which [experiment
-620](00620-bakeoff-final-test-demand-networks-at-primaries/result.md) tested on the final-test
-months. Its output is the NRA output. The prevailing output comes from the survival-hazard head of
-[experiment 652](00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md), with
-the 14 extra lagged inputs of [experiment
+613](00613-nra-roster-contrasts-with-intervals-five-seeds/result.md) (P7 is the neighbour power
+summaries and D50 a 50% dropout of the signal columns, described under "Neighbour and gap signals"),
+which [experiment 620](00620-bakeoff-final-test-demand-networks-at-primaries/result.md) tested on
+the final-test months. The Candidate's output is the NRA output. The prevailing output comes from
+the survival-hazard head of [experiment
+652](00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md), with the 14 extra
+lagged inputs of [experiment
 681](00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md). [experiment
 667](00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md) is the first
-backtest of the pair, and [experiment
+backtest of the two outputs, and [experiment
 668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
 restates every detail below and is the current page where the two differ.
 
 - **One row** is a (Primary, ensemble run, valid half-hour). The neural network runs once per
   ensemble run, on summaries of the 51 members. The weather is the ECMWF ensemble (ENS) 00Z run of
   the origin day, which the neural network treats as available at 09:00 UTC. The forecast is made at
-  that native 09:00 UTC origin and relabelled to the contract's 12:00 UTC origin by adding 3 hours.
-  Valid times before 12:00 UTC are dropped. The lead runs to 339 hours, because ENS summaries reach
-  about 351 hours.
+  that native 09:00 UTC origin and relabelled to the origin of the production forecast contract,
+  12:00 UTC, by adding 3 hours. Valid times before 12:00 UTC are dropped. The lead runs to 339
+  hours, because ENS summaries reach about 351 hours.
 - **Weather inputs.** The mean and the standard deviation (`ddof=0`) over the 51 members of 7
   variables: shortwave and longwave radiation, 2 m temperature, 2 m dew point, surface pressure,
   precipitation (after `log1p` of the value clipped at zero), and 10 m wind speed. All 14 columns
   are z-scored with the training rows' mean and standard deviation and clipped at plus or minus 5.
-  Each series reads the weather of the H3 resolution-5 cell that holds it.
+  Each series reads the weather of the H3 resolution-5 cell (a hexagonal grid cell) that holds it.
 - **Calendar and sun inputs.** 21 columns: the cosine of the solar zenith angle, the sine and cosine
   of the azimuth, the sine and cosine of the local hour (Europe/London) at periods of 24 hours and
   12 hours, a one-hot day of week, a COVID flag, 3 Christmas columns, and 3 bank-holiday columns.
@@ -123,20 +133,21 @@ restates every detail below and is the current page where the two differ.
   trailing temperature means (3, 6, and 24 hours), temperature changes (3 and 6 hours), the day's
   minimum and maximum, the count of cold-snap days, trailing shortwave means (3, 6, and 24 hours),
   the 3-hour change in the clear-sky index, and two columns from the previous day's CAMS irradiance.
-  Before the origin they use the analysis proxy built from the first day of the previous 00Z run,
-  which exists at forecast time.
+  Before the origin they use the analysis proxy, a stand-in for observed weather built from the
+  first day of the previous 00Z ensemble run, which exists at forecast time.
 - **Power lags.** A day lag and a week lag. Each is the latest same-half-hour reading at least 24
   hours before the neural network's own 09:00 origin, entered as a z-scored value, a missing flag,
   and an age code. The newest lag is therefore the 09:00 reading of the day before the origin day,
-  27 hours before the contract's 12:00 origin, so the contract's 6-hour rule needed no change.
+  27 hours before the contract's 12:00 origin, so the production contract's rule that power inputs
+  be at least 6 hours old needed no change.
 - **Neighbour and gap signals.** 60 columns read only by the lag encoder. For each lag: the gap
   between the observed power and a lag-free forecast table (the median of the lags-masked neural
-  network of the same seed at its freshest earlier origin with a lead of at most 24 hours),
-  exponentially weighted means of that gap with half-lives of 1, 3, and 7 days, and, over the
-  electrical neighbours of the Primary, the sum, mean, minimum, and maximum of those quantities
-  scaled by capacity ratio, the own-plus-neighbour sum, a neighbour count, and a flag for no
-  neighbour. The neighbours are the Primaries that NGED's "Primary Substation Interconnections" list
-  links to the Primary ([experiment
+  network of the same seed at its freshest earlier origin with a lead of at most 24 hours). The
+  signals are exponentially weighted means of that gap with half-lives of 1, 3, and 7 days. Over the
+  electrical neighbours of the Primary, the sum, mean, minimum, and maximum of those quantities are
+  scaled by capacity ratio, and the own-plus-neighbour sum, a neighbour count, and a flag for no
+  neighbour are added. The neighbours are the Primaries that NGED's "Primary Substation
+  Interconnections" list links to the Primary ([experiment
   610](00610-nra-neighbour-summary-lag-encoder-inputs-iteration/result.md)). During fine-tuning, all
   signal columns of a random 50% of rows are set to no information (the "D50" dropout).
 - **Series identity.** An 8-dimensional embedding of the Primary. The target is cleaned power
@@ -167,10 +178,10 @@ units with 10% dropout, and outputs 9 numbers: the logits, means, and log standa
 - **Loss.** The negative log-likelihood of the mixture on the standardised target, weighted, plus
   the knot penalty.
 
-**The output distribution may be truncated at zero for Primaries that cannot go negative, and only
-[experiment
+**Truncating the output distribution at zero is an option for the Primaries that cannot go negative,
+and only [experiment
 684](00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)
-has tested that.** The backtest files carry a post hoc clamp instead (see "Post-processing").
+has tested it.** The backtest files carry a post hoc clamp instead (see "Post-processing").
 [experiment
 684](00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)
 refitted the Candidate with the mixture conditioned on power at or above zero, so the negative
@@ -185,21 +196,24 @@ dropped, and it also worsened the Primaries that kept a Gaussian output. Whether
 family helps the other five MVA Primaries (D2, D3, D4, D19, and D21), and the prevailing output, was
 not tested.
 
-**The prevailing output is a second small neural network, the head R-haz, that mixes the Candidate's
-quantiles with a shifted copy.** The Candidate's 11 quantiles define a piecewise-linear cumulative
-distribution with two tail knots, 1.5 times the outer spacing beyond the 1% and 99% quantiles. The
-prevailing distribution is the mixture `(1 - p)` times the Candidate's distribution plus `p` times
-the Candidate's distribution shifted by a learned depth, with the depth uncertain at three
-Gauss-Hermite points ([experiment
-647](00647-two-output-forecast-departure-head-on-frozen-k1/result.md)). The 11 prevailing quantiles
-are read off that mixture and are monotone by construction. When `p` is 0, the prevailing rows equal
-the NRA rows. R-haz sits on the frozen Candidate and has these parts:
+**The prevailing output comes from a second small neural network, the head R-haz, which mixes the
+Candidate's quantiles with a shifted copy of them.** The Candidate's 11 quantiles define a
+piecewise-linear cumulative distribution with two tail knots, 1.5 times the outer spacing beyond the
+1% and 99% quantiles. The prevailing distribution is the mixture `(1 - p)` times the Candidate's
+distribution plus `p` times the Candidate's distribution shifted by a learned depth, with the depth
+uncertain at three Gauss-Hermite points ([experiment
+647](00647-two-output-forecast-departure-head-on-frozen-k1/result.md), with the form restated in
+[experiment 652](00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md) and
+[experiment
+668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)).
+The 11 prevailing quantiles are read off that mixture and are monotone by construction. When `p` is
+0, the prevailing rows equal the NRA rows. R-haz sits on the frozen Candidate and has these parts:
 
-- **Inputs, 93 in all.** 58 origin features (the gap and neighbour signals above, built from lags),
-  4 age columns (the log of the departure's age in days, that age over 30, a gate flag, and the age
-  of the freshest lag), and 3 row inputs (the lead over 240 hours and the lower and upper
-  half-widths of the Candidate's band). The gate flag is kept as a column and set to zero, which
-  gives 65 columns. The 14 extra lagged power inputs of [experiment
+- **Inputs, 93 in all.** The head reads 58 origin features (the gap and neighbour signals above,
+  built from lags), 4 age columns (the log of the departure's age in days, that age over 30, a gate
+  flag that is always set to zero, and the age of the freshest lag), and 3 row inputs (the lead over
+  240 hours and the lower and upper half-widths of the Candidate's band). Together these make 65
+  columns. The 14 extra lagged power inputs of [experiment
   681](00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md), each as a residual
   plus a missing flag, add 28 columns.
 - **The 14 extra lagged inputs.** Every time is measured back from the neural network's origin
@@ -215,14 +229,18 @@ the NRA rows. R-haz sits on the frozen Candidate and has these parts:
   daily hazards. Each hazard is `softplus(output - 3)`. The survival probability `p` is the
   exponential of minus the hazards accumulated over the days before the lead, and `p` is 0 when the
   departure is younger than half a day. The head has 11,216 parameters.
-- **Which extra-lag set was chosen.** [experiment
-  681](00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md) found that 14 extra
-  inputs (set L3) make the prevailing output react 20.4 hours sooner (95% interval 16.3 to 24.8) to
-  the start of an injected load shift, and 8 inputs (set L1) 19.1 hours sooner. The verdict was a
-  small gain, under the 24 hours set in advance as worth porting. Only 2 real events could be read,
-  and the 8-input set scored worst inside the real events. Which set to port is open on that page.
-  The backtest files use the 14-input set, adopted by nged-ml-research PR 353 (Replace the
-  prevailing rows of the Primaries backtest file with the extra-lag head).
+- **The backtest files use the 14-input extra-lag set, and which set to port is undecided.**
+  [experiment 681](00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md) found that
+  14 extra inputs (set L3) make the prevailing output react 20.4 hours sooner (95% interval 16.3 to
+  24.8) to the start of an injected load shift, and 8 inputs (set L1) 19.1 hours sooner. The verdict
+  was a small gain, under the 24 hours set in advance as worth porting. Only 2 real events could be
+  read, and the 8-input set scored worst inside the real events. [experiment
+  687](00687-causal-detector-features-for-the-prevailing-forecast-heads/result.md) measured a larger
+  gain for extra lagged power (1.25 days sooner than the head of [experiment
+  652](00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md)) on a different
+  bank of injected events and different folds, so the two reaction times are not comparable. The
+  14-input set was adopted for the backtest files by nged-ml-research PR 353 (Replace the prevailing
+  rows of the Primaries backtest file with the extra-lag head).
 - **The fallback head B-haz.** With fewer than 2 earlier banks of injected shifts (the folds 2025-11
   and 2025-12), the prevailing rows come from B-haz: the Candidate plus its own recent residual
   times a log-normal survival curve fitted on synthetic durations, with no fit on observed power.
@@ -231,9 +249,9 @@ the NRA rows. R-haz sits on the frozen Candidate and has these parts:
 
 **Experiment 687 tried causal step-detector features for the prevailing head and did not adopt
 them.** The features reacted 1.59 days sooner than the head of [experiment
-652](00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md) (interval -2.26 to
--1.00), but extra lagged power alone reacted 1.25 days sooner, so the features are not shown to beat
-plain lags ([experiment
+652](00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md) (95% interval 1.00
+to 2.26 days sooner), but extra lagged power alone reacted 1.25 days sooner, so the features are not
+shown to beat plain lags ([experiment
 687](00687-causal-detector-features-for-the-prevailing-forecast-heads/result.md)). The prevailing
 head of the backtest therefore carries no detector features.
 
@@ -247,8 +265,8 @@ head of the backtest therefore carries no detector features.
 
 ### Training regime
 
-**The Candidate is refitted 12 times, once per test month, in three steps, and each fit sees only
-data from before its month.** The folds are the test months 2025-11 to 2026-10. [experiment
+**Each of the 12 refits of the Candidate, one per test month, runs three steps and sees only data
+from before its month.** The folds are the test months 2025-11 to 2026-10. [experiment
 667](00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md) and
 [experiment
 668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
@@ -264,33 +282,35 @@ embargoed schedule), and [experiment
 599](00599-nra-refit-embargo-and-down-weighting-of-the-newest-rows-against-load-shift-absorption/result.md)
 (the refit rule).
 
-- **Data.** Cleaned power, with the `substation_zero` half-hours dropped (the only rule in the
-  production cleaning code when [experiment
-  668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
-  was written), and the D15 and D18 histories cut before 2025-03-01. The ENS history starts on
+- **Data.** Cleaned power, with the `substation_zero` half-hours dropped (the one cleaning rule the
+  backtest applied), and the D15 and D18 histories cut before 2025-03-01. The ENS history starts on
   2024-04-01, so the early folds fine-tune on less ensemble data than the later folds.
 - **Step 1, pre-training.** The weather, datetime, and lag encoders pre-train on ERA5 and CAMS
   (shortwave) as stand-in weather, in pseudo-runs every 2 days from 2019-09-01 at 09:00 UTC with
   leads of 0.5 to 351 hours (about 8.1 million rows for the 2026-07 fold). Five Primaries start
   later (D11 on 2019-09-17, D10 on 2019-12-01, D5 on 2020-02-01, D14 on 2020-07-01, and D16 on
   2021-02-01). ERA5 has no ensemble, so the 7 spread columns hold the fold's median ensemble spread
-  for each 24-hour lead band. All weights train, with AdamW, learning rate 5e-4, weight decay 1e-3,
-  batch 8,192, 20% of the rows per epoch, up to 60 epochs, patience 8, and gradient-norm clip 1.0.
+  for each 24-hour lead band. All weights train, with AdamW, learning rate 0.0005, weight decay
+  0.001, batch 8,192, 20% of the rows per epoch, up to 60 epochs, patience 8, and gradient-norm clip
+  1.0.
 - **Step 2, fresh mixer.** The pre-trained weights load except the mixer. A fresh mixer is drawn
   with seed 12345, the weather and datetime encoders are frozen, and training runs on the 730-day
-  history with uniform weights and a 3-day embargo, at learning rate 2e-4 (5e-4 for the fresh
+  history with uniform weights and a 3-day embargo, at learning rate 0.0002 (0.0005 for the fresh
   mixer).
 - **Step 3, daily fine-tune.** The fine-tune starts from the step-2 weights with the same frozen
-  encoders and learning rate 2e-4. Row weights are 0.5 to the power of the age in days over 90, a
-  90-day half-life. The refit rule drops rows whose valid time lies in the newest 7 days before the
-  cut-off and halves the weight of rows 7 to 14 days old. Early stopping holds out one week in every
-  12 weeks of origin days, with 15 days purged before and 9 days after each held week, and uses at
-  most 200,000 held rows. The ensemble weather is the input at this stage and at inference.
+  encoders and learning rate 0.0002. Row weights are 0.5 raised to the power (age in days divided by
+  90), a 90-day half-life. The refit rule drops rows whose valid time lies in the newest 7 days
+  before the cut-off and halves the weight of rows 7 to 14 days old. Early stopping holds out one
+  week in every 12 weeks of origin days, with 15 days purged before and 9 days after each held week,
+  and uses at most 200,000 held rows. The ensemble weather is the input at this stage and at
+  inference.
 - **Seeds and widening.** Two seeds are averaged quantile by quantile and sorted again. The backtest
   applies no widening. The final test of [experiment
-  620](00620-bakeoff-final-test-demand-networks-at-primaries/result.md) averaged 5 seeds and widened
-  the band about the median by a factor of 1.0934, which [experiment
-  613](00613-nra-roster-contrasts-with-intervals-five-seeds/result.md) fixed before that test.
+  620](00620-bakeoff-final-test-demand-networks-at-primaries/result.md) widened the band about the
+  median by a factor of 1.0934, the mean of the five development-month factors of [experiment
+  613](00613-nra-roster-contrasts-with-intervals-five-seeds/result.md), and [experiment
+  668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
+  states that it averaged 5 seeds.
 - **Missing and delayed inputs.** A flagged or absent lag reads as value 0, a missing flag, and the
   maximum age code. In training, 30% of origin days mask both lags and, of those, 15% mask only the
   day lag. Absent signal columns read as 0 with a missing flag. Neighbour-signal columns whose
@@ -300,16 +320,19 @@ embargoed schedule), and [experiment
   only, until they cover 5% of its row span: depth 15%, 30%, or 50% of capacity, length 3, 7, 15, or
   30 days, and random sign. Each shift on a Primary is subtracted, scaled by the capacity ratio,
   from one electrical neighbour, so the neighbour summaries see the transfer.
-- **Training the prevailing head.** Each month's R-haz trains on "banks" of injected-shift rows, one
-  bank per earlier test month, built from the real history of that month with synthetic shifts and
-  forecast by that month's Candidate chain (inference only), so fold M's head trains only on banks
-  of months before M and on rows whose valid time is before the start of M. The training rows mix
-  real rows with injected shifts, with durations drawn half from 3 to 14 days and half from 28 to
-  112 days (an assumed mixture, none from 15 to 27 days), and each fit samples 60,000 real rows and
-  6,000 bank rows. Origin days 0 to 17 of an injected shift train the head and origin days from 21
-  onward validate it. The loss is the pinball loss over the 11 levels plus 0.05 times the binary
+- **Banks.** Each month's R-haz trains on "banks" of injected-shift rows, one bank per earlier test
+  month, built from the real history of that month with synthetic shifts and forecast by that
+  month's Candidate chain (inference only), so fold M's head trains only on banks of months before M
+  and on rows whose valid time is before the start of M. Each fit samples 60,000 real rows and 6,000
+  bank rows. Origin days 0 to 17 of an injected shift train the head and origin days from 21 onward
+  validate it. The lag inputs of an injected shift are built from the same shifted power as its
+  target.
+- **Duration mix.** The injected shifts have durations drawn half from 3 to 14 days and half from 28
+  to 112 days, an assumed mixture with none from 15 to 27 days, and each injected shift counts
+  equally.
+- **Loss and optimiser.** The loss is the pinball loss over the 11 levels plus 0.05 times the binary
   cross-entropy of `p` against the observed state of an injected shift. The optimiser is Adam with
-  learning rate 0.003, weight decay 1e-4, batch 4,096, up to 30 epochs, patience 4, and 2 seeds
+  learning rate 0.003, weight decay 0.0001, batch 4,096, up to 30 epochs, patience 4, and 2 seeds
   averaged by mean quantile. The lag inputs of an injected shift are built from the same shifted
   power as its target.
 - **Hardware and run time.** About 0.5 GPU-hours per fold for the Candidate chains ([experiment
@@ -320,8 +343,8 @@ embargoed schedule), and [experiment
 ### Post-processing
 
 **The backtest file of the Primaries has one post hoc clamp, and the calibrated copy adds a scale
-for the prevailing rows only.** Both are applied to stored quantiles after the neural networks run,
-and neither changes the median.
+for the prevailing rows only.** Both act on stored quantiles after the neural networks run. The band
+scale leaves the median unchanged.
 
 - **Clamp at zero.** Every quantile of the eight MVA Primaries is at least zero, because apparent
   power cannot be negative. The clamp changes 206,487 of 7,848,960 rows (2.6%), in D12, D22, and D8
@@ -362,10 +385,12 @@ as defined on that page.
 - **Normalised MAE of the median, all rows.** 7.58 for the NRA output and 7.30 for the prevailing
   output.
 - **Coverage.** The q05-to-q95 band holds 0.814 of observed half-hours for the NRA output and 0.851
-  for the prevailing output, against a nominal 0.90. Both bands are too narrow. [experiment
+  for the prevailing output, against a nominal 0.90. Both bands cover less than the nominal 0.90.
+  [experiment 688](00688-winter-normal-running-coverage-median-error-and-events-part-1/result.md)
+  found that the winter NRA shortfall comes mostly from error in the median and from load transfers,
+  and [experiment
   683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)
-  found that the NRA shortfall is mostly error in the median, not band width (see "Walk-forward band
-  calibration").
+  had only suggested that cause (see "Walk-forward band calibration").
 - **Prevailing against NRA.** The prevailing output scores 0.03 points of capacity worse in the two
   fallback months (3.98 against 3.95), 0.17 better from 2026-01 to 2026-06, and 0.42 better from
   2026-07 to 2026-10. After the one verified load shift, at D5 and D16 in December 2025, the
@@ -407,10 +432,10 @@ as defined on that page.
 622](00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch/result.md), retrained with
 fresher lags.** The backtest is [experiment
 669](00669-one-year-backtest-of-the-lag-network-at-bulk-and-grid-supply-points/result.md). The
-neural network has no neighbour inputs and no model of load shifts, and its readings are net of
-embedded generation, which no input models. One neural network is fitted per group (the two BSPs
-together, the two GSPs together), so the weights are shared across the 2 series of a group except
-for the series embedding and the offset.
+neural network has no neighbour inputs and no component that represents load shifts, and the series'
+readings are net of embedded generation, which no input represents. One neural network is fitted per
+group (the two BSPs together, the two GSPs together), so the weights are shared across the 2 series
+of a group except for the series embedding and the offset.
 
 - **Inputs.** The same 37 lag-free columns, 8 lag columns, knot position, expected-weather table for
   the lag encoder (the weather and calendar columns of the freshest run issued at or before the
@@ -455,8 +480,9 @@ for the series embedding and the offset.
   633](00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network/result.md) was one fit at
   2026-07-01. The early-stopping weeks are purged by 9 days, shorter than the 14-day leads, so a
   held-out week's targets can sit in training rows of later origins. [experiment
-  669](00669-one-year-backtest-of-the-lag-network-at-bulk-and-grid-supply-points/result.md) found no
-  leak from this and records it as a caveat.
+  669](00669-one-year-backtest-of-the-lag-network-at-bulk-and-grid-supply-points/result.md) records
+  the shorter purge as a caveat, ran a perturbation test that found no leak, and states that it
+  changed no result.
 - **Targets and capacity.** Power divided by effective capacity (D13 55.3 MW, D17 47.6 MW, D6 384.3
   MW, and D1 170.9 MW), z-scored per series. All four are signed MW series.
 - **Weather at lag times.** The thermal-lag and solar-gain columns use the analysis proxy built from
@@ -476,9 +502,10 @@ for the series embedding and the offset.
 
 ### Scores
 
-**The lag-enabled neural network beats the manual heuristic and climatology at every lead band, and
+**The lag-enabled neural network beats climatology and the manual heuristic at every lead band, and
 the margin shrinks with lead.** The table gives CRPS in points of capacity from [experiment
-668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md).
+668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md),
+with climatology as the reference. The manual-heuristic columns are on that page.
 
 | Lead band | BSP CRPS | BSP climatology | GSP CRPS | GSP climatology |
 |---|---:|---:|---:|---:|
@@ -517,10 +544,10 @@ the margin shrinks with lead.** The table gives CRPS in points of capacity from 
   modelled, and NGED's event labels are incomplete.
 - **Open questions.** Whether the 3.5-hour cap or a longer one gives the better score with the same
   refit schedule, which [experiment
-  669](00669-one-year-backtest-of-the-lag-network-at-bulk-and-grid-supply-points/result.md) says was
-  not tested on matched schedules. The D1 median is on average 18 MW below the observed median, and
-  its monthly mean error swings between -39.8 MW and +25 MW. The Float64 originals of the BSP and
-  GSP files are not recast to the Float32 of the calibrated copies.
+  669](00669-one-year-backtest-of-the-lag-network-at-bulk-and-grid-supply-points/result.md) did not
+  test on matched schedules. The D1 median is on average 18 MW below the observed median, and its
+  monthly mean error swings between -39.8 MW and +25 MW. The Float64 originals of the BSP and GSP
+  files are not recast to the Float32 of the calibrated copies.
 
 ## Wind
 
@@ -535,8 +562,9 @@ ensemble weather and the lead.
 - **Inputs.** The mean and standard deviation over the 51 members of 10 m and 100 m wind speed, the
   sine and cosine of the 100 m wind direction, and 2 m air temperature, plus the lead (the sine and
   cosine of the lead in hours modulo 24, and the lead in hundreds of hours) and a one-hot wind-farm
-  column. There is no power lag, no calendar column, and no physics-lite input. Inputs are
-  standardised with the fit rows' mean and standard deviation.
+  column. One wind farm is a MW series and two are MVA series. There is no power lag, no calendar
+  column, and no physics-lite input. Inputs are standardised with the fit rows' mean and standard
+  deviation.
 - **Layers and output.** Two hidden layers of 64 units feeding a 3-component Gaussian mixture over
   power as a fraction of capacity, centred on the training mean of the target. The 11 quantiles are
   read from the mixture and clamped to the range 0 to 1 of the neural network's own capacity scale.
@@ -548,8 +576,10 @@ ensemble weather and the lead.
 
 ### Training regime
 
-- **Refits.** Wind refits on day 0 of each month (12 refits), on runs and valid times before 62 days
-  earlier, with the last 62 days used for early stopping. [experiment
+- **Refits.** Wind refits on day 0 of each month (12 refits), on ensemble runs and valid times
+  before the 62 days that precede the refit, and uses those last 62 days for early stopping
+  ([experiment 666](00666-one-year-backtest-of-simple-wind-and-solar-networks/result.md)).
+  [experiment
   659](00659-simple-shared-network-with-fixed-physics-lite-power-wind-and-solar/result.md) refitted
   twice a month.
 - **Optimiser.** AdamW, learning rate 0.002, batch 2,048, weight decay 0.0001, and 40 epochs,
@@ -570,8 +600,8 @@ ensemble weather and the lead.
 
 ### Post-processing
 
-None. The wind file is not clamped, and wind has no calibrated copy, because its stored coverage
-(0.913) already exceeds 0.90 and a scale did not improve it ([experiment
+**The wind file has no post-processing and no calibrated copy.** Its stored coverage (0.913) already
+exceeds 0.90, and a scale did not improve it ([experiment
 683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)).
 
 ### Scores
@@ -605,8 +635,8 @@ over 709,776 scored half-hours.
   share.
 - **Coverage.** 0.913 over all rows ([experiment
   668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)).
-  The wind median at days 10 to 14 is low in some months, and wide bands at long leads may explain
-  why the coverage stays near 0.90.
+  Wide bands at long leads may explain why the coverage stays near 0.90 ([experiment
+  666](00666-one-year-backtest-of-simple-wind-and-solar-networks/result.md)).
 - **Matched check.** On rows that [experiment
   659](00659-simple-shared-network-with-fixed-physics-lite-power-wind-and-solar/result.md) also
   covers, the backtest scores 4.174 where [experiment
@@ -640,11 +670,11 @@ a fixed physics-lite power to the ensemble weather.** The backtest is [experimen
   precipitation, and surface pressure. The mean and standard deviation of the physics-lite power and
   of the Faiman cell temperature. The sun's elevation and the sine and cosine of its azimuth. The
   lead. There is no farm column and no calendar column.
-- **Physics-lite power.** Irradiance over 1,000 W per square metre, times one minus 0.004 per kelvin
-  times the cell temperature minus 25 degrees Celsius, clipped to the range 0 to 1, with the Faiman
-  cell temperature `T_air + G / (25 + 6.84 x wind speed)`. The formula runs on each of the 51
-  members separately, and the neural network reads the mean and standard deviation. The mixture is
-  centred on the mean physics-lite power. It has no fitted parameters.
+- **Physics-lite power.** The physics-lite power is `clip((G / 1000) * (1 - 0.004 * (T_cell - 25)),
+  0, 1)`, where G is shortwave radiation in W per square metre and `T_cell` is the Faiman cell
+  temperature `T_air + G / (25 + 6.84 * wind speed)`. The formula runs on each of the 51 members
+  separately, and the neural network reads the mean and standard deviation. The mixture is centred
+  on the mean physics-lite power. It has no fitted parameters.
 - **Layers and output.** As for wind: two hidden layers of 64 units and a 3-component Gaussian
   mixture over power as a fraction of capacity, with the quantiles clamped to the range 0 to 1 of
   the neural network's capacity scale.
@@ -654,18 +684,20 @@ a fixed physics-lite power to the ensemble weather.** The backtest is [experimen
 
 ### Training regime
 
-- **Refits.** Quarterly, on the first day of the first month of the backtest year and of each third
-  month after it, each fit scoring the next three months, with 3 seeds and no pre-training. Training
-  uses valid times before one day earlier, with the last 61 days for early stopping, 20 epochs,
-  daylight rows only, and leads below 348 hours from the 00Z run ([experiment
-  430](00430-unified-forecaster-solar-and-pretraining-ablations/result.md) and [experiment
+- **Refits.** The solar neural network is refitted quarterly, on the first day of the first month of
+  the backtest year and of each third month after it. Each fit scores the next three months, uses 3
+  seeds, and has no pre-training. Training uses valid times before one day earlier, with the last 61
+  days for early stopping, 20 epochs, daylight rows only, and leads below 348 hours from the 00Z
+  run, as [experiment 666](00666-one-year-backtest-of-simple-wind-and-solar-networks/result.md)
+  states ([experiment 430](00430-unified-forecaster-solar-and-pretraining-ablations/result.md) and
+  [experiment
   659](00659-simple-shared-network-with-fixed-physics-lite-power-wind-and-solar/result.md) stopped
   at 251.5 hours, so the lead range is extended). Solar trains on all daylight half-hours, including
   more low-sun half-hours than [experiment
   659](00659-simple-shared-network-with-fixed-physics-lite-power-wind-and-solar/result.md) kept.
 - **Optimiser and seeds.** As for wind (AdamW, learning rate 0.002, batch 2,048, weight decay
   0.0001), keeping the epoch with the lowest negative log-likelihood on the last 61 days. The target
-  is the raw output, because solar has no idle mask.
+  is the raw power as a fraction of capacity, because solar has no idle mask.
 - **Capacity.** As for wind: the 99.9th percentile of cleaned power over the 730 days before each
   refit.
 - **Hardware and run time.** See the wind section.
@@ -739,8 +771,8 @@ to 1 to 7.6% at days 10 to 14.** The table gives CRPS in points of capacity on d
 
 ## Walk-forward band calibration
 
-**A scale on the width of the quantile bands, fitted only on earlier months, brings four of five
-outputs close to 0.90 coverage and is the one calibration the backtest files hold.** [experiment
+**The backtest files hold one calibration, a scale on the width of the quantile bands fitted only on
+earlier months, which brings the four calibrated outputs close to 0.90 coverage.** [experiment
 683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)
 tested it on the origin months 2025-12 to 2026-06, and the README of the backtest folder describes
 the four calibrated copies. The scale is post-processing on stored quantiles and is not part of any
@@ -760,25 +792,40 @@ neural network above.
   ([experiment
   683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)).
   The first month, 2025-11, has no earlier forecast to fit on and is left as stored.
-- **Effect on coverage.** On 2025-12 to 2026-06, the q05-to-q95 coverage moves from 84.0% to 87.9%
-  (stored) to 88.0% to 88.4% for the prevailing Primaries, from 87.5% to 89.3% to 89.8% to 90.9% for
-  the BSPs, from 86.4% to 90.3% to 89.1% to 89.8% for the GSPs, and from 87.8% to 89.5% to 89.4% to
-  91.0% for solar, each as a range over the four lead bands. The CRPS change is +0.047 for the
-  prevailing Primaries, +0.005 for the BSPs, +0.003 for the GSPs, and -0.002 for solar.
-- **A level shift made every file worse.** Adding a per-series level shift fitted on earlier months
-  raised the NRA Primaries CRPS by 0.306 points and the GSPs' by 0.842, because the median bias
-  changes from month to month.
-- **The scale must not be fitted through an unexplained stretch.** A scale fitted through the July
-  and August 2026 load transfers overshoots after they end: D18 (identifier 13) reaches 97.5%
-  coverage in 2026-09 under the scale. The calibrated copies hold D18 and D14 (identifiers 13 and
-  16) at their 2026-06 factor from 2026-07, a rule chosen after seeing the final-test months, so it
-  is post hoc. D18 stays at 63% to 77% coverage in 2026-07, 2026-08, and 2026-10 even so.
+- **Effect on coverage.** On 2025-12 to 2026-06, the q05-to-q95 coverage and CRPS change are as in
+  the table, each coverage a range over the four lead bands ([experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)).
+
+| Output | Stored coverage | Calibrated coverage | CRPS change |
+|---|---|---|---:|
+| Prevailing Primaries | 84.0% to 87.9% | 88.0% to 88.4% | +0.047 |
+| BSPs | 87.5% to 89.3% | 89.8% to 90.9% | +0.005 |
+| GSPs | 86.4% to 90.3% | 89.1% to 89.8% | +0.003 |
+| Solar | 87.8% to 89.5% | 89.4% to 91.0% | -0.002 |
+
+- **Adding a level shift made the files tested worse.** A per-series level shift fitted on earlier
+  months raised the NRA Primaries CRPS by 0.306 points and the GSPs' by 0.842, and [experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)
+  reports that every file got worse. The median bias changes from month to month.
+- **A scale fitted through an unexplained stretch overshoots afterwards.** A scale fitted through
+  the July and August 2026 load transfers overshoots after they end: D18 (identifier 13) reaches
+  97.5% coverage in 2026-09 under the scale. The calibrated copies hold D18 and D14 (identifiers 13
+  and 16) at their 2026-06 factor from 2026-07, a rule chosen after seeing the final-test months, so
+  it is post hoc. D18 stays at 63% to 77% coverage in 2026-07, 2026-08, and 2026-10 even so.
 - **The winter NRA shortfall is mostly error in the median.** [experiment
   688](00688-winter-normal-running-coverage-median-error-and-events-part-1/result.md) dropped the
   half-hours inside labelled and verified load transfers and shifted each band by its month's
   observed median error, and the coverage of the NRA Primaries rose from 80.1% to 90.1% in 2025-12
   and from 80.3% to 88.6% in 2026-01. The shift used the month's own errors, so it is a diagnostic
-  and not a method. The stop rule that would have justified a learned width head did not fire.
+  and not a method. The 80.1% and 80.3% baselines are the NRA bands after the walk-forward scale
+  (arm 2 of [experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)).
+  The stored files give 81.7% and 77.7%. [experiment
+  688](00688-winter-normal-running-coverage-median-error-and-events-part-1/result.md) supersedes the
+  suggestion of [experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)
+  to try a learned width head, because the stop rule that would have justified it did not fire. The
+  stop rule that would have justified a learned width head did not fire.
 - **Calibrated copies on disk.** `primaries_calibrated.parquet` (prevailing rows),
   `bsps_calibrated.parquet`, `gsps_calibrated.parquet`, and `solar_calibrated.parquet`. The NRA rows
   of the first are copied unchanged. The prevailing rows of `primaries_calibrated.parquet` were
@@ -800,25 +847,30 @@ neural network above.
 
 - **Series and units.** Carry the unit with the series, because the 8 MVA Primaries and 2 of the 3
   wind farms are apparent-power series and the rest are MW.
-- **Origin and lags.** Every network reads the ENS 00Z run of the origin day as available at 09:00
-  UTC and is relabelled to a 12:00 UTC origin. The Candidate's own lags are at least 24 hours old at
-  its 09:00 origin, the BSP and GSP lags at least 3.5 hours old, and the prevailing head's extra
-  lags at least 6 hours old. Wind and solar read no power lag. Whether the Primaries should also
-  read 3.5-hour lags is not tested on a page read for this one.
-- **What a service has to store.** For each demand and generator network, the fitted weights of each
-  monthly (or quarterly, for solar) refit. For the prevailing head, a bank of injected-shift rows
-  per earlier month. For calibration, a scale per series and lead band refreshed each month.
+- **Origin and lags.** Every neural network reads the ENS 00Z run of the origin day as available at
+  09:00 UTC and is relabelled to a 12:00 UTC origin. The Candidate's own lags are at least 24 hours
+  old at its 09:00 origin, the BSP and GSP lags at least 3.5 hours old, and the prevailing head's
+  extra lags at least 6 hours old. Wind and solar read no power lag. [experiment
+  572](00572-two-offset-part-1-lags-versus-the-slow-output-offset/result.md) tested a 3.5-hour lag
+  cap at the Primaries, and none of the pages read for this one tests it together with the
+  Candidate's neighbour signals and the prevailing head.
+- **What a production forecasting service has to store.** For each demand and generator neural
+  network, the fitted weights of each monthly (or quarterly, for solar) refit. For the prevailing
+  head, a bank of injected-shift rows per earlier month. For calibration, a scale per series and
+  lead band refreshed each month.
 - **Serving path.** The production design principle is to keep the serving path close to loading a
-  model and calling `predict`. The post hoc clamps and the band scale are the only steps here that
-  act on predicted quantiles.
-- **Unmetered solar.** None of the networks above has an explicit term for unmetered solar behind a
-  Primary. [experiment
+  fitted forecasting model and calling `predict`. The post hoc clamps and the band scale are the
+  only steps here that act on predicted quantiles.
+- **Unmetered solar.** None of the neural networks above has an explicit term for unmetered solar
+  behind a Primary. [experiment
   673](00673-pv-capacity-for-nged-per-primary-with-register-cross-check/result.md) reads the
-  capacity of unmetered solar from the demand networks' response to sunshine, as 2.4 to 3.9 MW at
-  the six Primaries metered in MW and 1.25 to 6.62 MW at five main Primaries metered in MVA, and
-  [experiment 679](00679-pv-mva-conversion-loss-reactive-floor-at-half-level/result.md) measures a
-  conversion loss of 0.5 points (80% interval -1.0 to 7.7) in the reactive-floor world. These are
-  context and are not inputs to any network above.
+  capacity of unmetered solar from a neural-network probe of the response of net demand to sunshine,
+  and calls its figures provisional. The probe gives 2.4 to 3.9 MW at six of the eight MW Primaries
+  (D5, D9, D10, D11, D14, and D16) and 1.25 to 6.62 MW at five MVA Primaries (D2, D3, D4, D19, and
+  D21). [experiment 679](00679-pv-mva-conversion-loss-reactive-floor-at-half-level/result.md)
+  measures the loss in recovery of an added solar farm when MW readings are converted to MVA, as 0.5
+  percentage points (80% interval -1.0 to 7.7) if the meters read power factor 1 with a small
+  reactive floor. These results are context and are not inputs to any neural network above.
 
 ## Where the pages disagree
 
@@ -847,11 +899,46 @@ neural network above.
   668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
   counts 206,487. The current page is [experiment
   668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md).
-- **Where the D4 width step falls.** [experiment
+- **The D4 and D18 width steps.** [experiment
   683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)
-  places the days 10 to 14 narrowing of identifier 11 at an April month start, and [experiment
+  places the days 10 to 14 narrowing of D4 (identifier 11) at an April month start, with a factor of
+  0.76. [experiment
   668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
-  at the refit that starts May 2026.
+  places it at the refit that starts May 2026 and calls it about a third, and the README says about
+  37%. For D18, [experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)
+  gives a widening of 1.48 times, [experiment
+  668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
+  about half, and the README 55%.
+- **Calibrated-copy scores.** The README gives CRPS changes of +0.044 (prevailing Primaries), +0.001
+  (BSPs), +0.026 (GSPs), and +0.006 (solar), against +0.047, +0.005, +0.003, and -0.002 in
+  [experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md).
+  The README's prevailing figures come from the file from before the extra lagged inputs. The
+  current page for the experiment's own numbers is [experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md).
+- **"As stored" NRA coverage.** [experiment
+  688](00688-winter-normal-running-coverage-median-error-and-events-part-1/result.md) calls 80.1%
+  and 80.3% the bands as stored. They are the scaled bands of [experiment
+  683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md),
+  whose stored values are 81.7% and 77.7%.
+- **Solar lead cap.** [experiment
+  666](00666-one-year-backtest-of-simple-wind-and-solar-networks/result.md) gives training leads
+  below 348 hours and [experiment
+  668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
+  says the range was extended to 336 hours. The current page is [experiment
+  666](00666-one-year-backtest-of-simple-wind-and-solar-networks/result.md).
+- **Width factor of the Candidate.** [experiment
+  612](00612-nra-combined-networks-three-class-roster-completion/result.md) mentions a band scaled
+  by 1.12 to 1.18, and [experiment
+  613](00613-nra-roster-contrasts-with-intervals-five-seeds/result.md) and [experiment
+  620](00620-bakeoff-final-test-demand-networks-at-primaries/result.md) use 1.0934. This page uses
+  1.0934 because the final test used it.
+- **Extra-lag reaction gains.** [experiment
+  681](00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md) reports 19.1 and 20.4
+  hours sooner for 8 and 14 inputs, and [experiment
+  687](00687-causal-detector-features-for-the-prevailing-forecast-heads/result.md) reports 1.25 days
+  sooner for extra lags, on different banks and folds.
 - **Calibrated copy of the prevailing Primaries rows.** `primaries_calibrated.parquet` was built
   before the extra lagged inputs, so its prevailing rows differ from those of `primaries.parquet`
   that this page scores.
@@ -871,10 +958,13 @@ These are listed for the maintainer. None is decided here.
   steps at month-start refits ([experiment
   683](00683-walk-forward-calibration-of-the-quantile-bands-in-the-one-year-backtest-files/result.md)).
 - Why the NRA bands of D18 and D14 (identifiers 13 and 16) cover only about 22% to 28% of
-  observations in two summer months. [experiment
+  observations in July and August 2026. [experiment
   668](00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/result.md)
-  suggests a load shift that normal running ignores, and the cause has not been checked against the
-  event table.
+  suggests a load shift that normal running ignores. [experiment
+  685](00685-event-table-on-the-final-test-window-all-primaries/result.md), an event table on the
+  final-test window, finds no transfer between the two Primaries in those months, and names a level
+  offset in the lag-free forecast as an untested candidate. The current page is [experiment
+  685](00685-event-table-on-the-final-test-window-all-primaries/result.md).
 - What the Candidate needs and what each component adds: pending experiment 677.
 - Whether wind needs a power lag or a different long-lead rule, given its score against climatology
   at days 10 to 14.
