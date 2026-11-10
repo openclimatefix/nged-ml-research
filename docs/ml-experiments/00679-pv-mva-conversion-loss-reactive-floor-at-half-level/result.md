@@ -52,13 +52,13 @@ metric: >-
   zero-reactive arm only at 2 times. This experiment adds both arms at 0.5 times, the level that
   matches the five non-folding MVA Primaries (D2, D3, D4, D19, and D21).
 - **Arms (2026-06 cutoff only, seeds 0 to 2, the six MW Primaries).**
-  - Reactive-floor arm at 0.5 times: `floor_fleet_l05_r0`, new, against the reused `floor_twin`.
-  - Zero-reactive arm at 0.5 and 1 times: `q0_fleet_l05_r0` and `q0_fleet_l1_r0`, new, against the
-    reused `q0_twin`.
-  - Signed world at 0.5 and 1 times, and the PF arm at 0.5 and 1 times: experiment 662's networks,
-    reused for seeds 0 to 2.
-  - Probes L0, L1, and FA, as in experiment 671. Same injection (fleet, 2.0 MW floor) as experiment
-    662.
+    - Reactive-floor arm at 0.5 times: `floor_fleet_l05_r0`, new, against the reused `floor_twin`.
+    - Zero-reactive arm at 0.5 and 1 times: `q0_fleet_l05_r0` and `q0_fleet_l1_r0`, new, against the
+      reused `q0_twin`.
+    - Signed world at 0.5 and 1 times, and the PF arm at 0.5 and 1 times: experiment 662's networks,
+      reused for seeds 0 to 2.
+    - Probes L0, L1, and FA, as in experiment 671. Same injection (fleet, 2.0 MW floor) as experiment
+      662.
 - **Reused code.** `ml-experiments/00662-pv-probe-through-the-mva-fold-matched-level-redesign/`
   (fit, probe, and analysis), edited not at all.
 - **Native worlds at the five MVA Primaries in the floor arm.** Experiment 662's target builder
