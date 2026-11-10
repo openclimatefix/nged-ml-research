@@ -383,8 +383,9 @@ observed power, and the 667 page scores the full ground truth.
 
 **From 2026-01 the prevailing output has a lower (better) CRPS than the normal-running output, by
 0.17 points of capacity in 2026-01 to 2026-06 and by 0.42 in 2026-07 to 2026-10.** The prevailing
-head has trained weights and the extra lagged inputs from 2026-01. The table splits the pooled scores by the months of the forecast origin. The months
-from 2026-07 form the final-test window, so no choice rests on them.
+head has trained weights and the extra lagged inputs from 2026-01. The table splits the pooled
+scores by the months of the forecast origin. The months from 2026-07 form the final-test window, so
+no choice rests on them.
 
 | Origin months | Half-hours | CRPS, normal running | CRPS, prevailing | MAE, normal running | MAE, prevailing | q05 to q95 coverage, prevailing |
 |---|---:|---:|---:|---:|---:|---:|
@@ -571,9 +572,8 @@ Normalised MAE of the median, prevailing, by Primary:
 #### The load shift at D5 and D16
 
 **The December 2025 transfer of load between D5 and D16 is the one verified load shift in the
-backtest year, and the prevailing output first moved at the first origin of January 2026, 61 hours (D5) and 52
-hours (D16) after the step starts.** The
-transfer is experiment 580's transfer 23: a fitted -1.47 MW at D5 and +1.37 MW at D16, 15 days from
+backtest year, and the prevailing output first moved at the first origin of January 2026, 61 hours
+(D5) and 52 hours (D16) after the step starts.** The transfer is experiment 580's transfer 23: a fitted -1.47 MW at D5 and +1.37 MW at D16, 15 days from
 2025-12-29. The step found in the observed power is at 2025-12-29 23:00 UTC and ends at 2026-01-14
 11:30 UTC at D5, and starts at 2025-12-30 08:30 UTC and ends at 2026-01-14 19:30 UTC at D16. These
 times are the largest change of the 12-hour mean of the observed power within 3 days of the dates of
