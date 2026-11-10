@@ -25,22 +25,22 @@ maintainer to choose; the project is not starting new experiments unprompted. Th
 
 **Option 6 is an idea, not agreed work, and no experiment has been started.** The maintainer's
 thought is that an LLM could help with the fuzzy matching between the signals in a Primary's time
-series and the very incomplete registers (the Embedded Capacity Register and the others listed on
+series and the very incomplete registers (the Embedded Capacity Register and the other registers on
 [the asset-inventory page](asset-inventory-simulator.md#what-the-register-can-supply)). The LLM could
-also make intelligent adjustments to the simulator's assets, parameters, and operating profiles, so
+also make adjustments to the simulator's assets, parameters, and operating profiles, so
 that the simulator's statistical properties match the observed Primary data as closely as possible.
 
 **The nearest evidence is one reviewer on one task, and it does not settle whether the loop would
 work.** In [experiment
 692](../../00692-event-table-reviewer-calibration-gate/result.md), a Claude Sonnet reviewer judged a
 figure of each candidate load transfer from the event table. It missed the pre-registered precision
-gate: 0.45 against 0.80. It reached 0.75 after 21 of its 29 false calls on five recurring candidates
-were removed, a post-hoc reading. Those candidates are real-record events that the injected truth
-omits. The experiment did not test an LLM editing a simulator.
+gate: 0.45 against 0.80. The reviewer's precision was 0.75, still under 0.80, after the 22 recurring
+candidates were removed from the calibration set, a post-hoc reading. Those candidates are events in
+the real record that the injected truth leaves out. The experiment did not test an LLM editing a simulator.
 
-**The asset-inventory page's own risks apply to the loop, and each needs a control.** The risks are
-circularity, fits left free that invent generators, and bands doing the work (see
-[Risks](asset-inventory-simulator.md#risks)). A loop that edits assets freely could also invent
+**The asset-inventory page's own risks apply to the loop.** The risks are circularity and bands
+doing the work (see [Risks](asset-inventory-simulator.md#risks)), and fits left free that invent
+generators (see [that section](asset-inventory-simulator.md#fits-left-free-to-add-generators-report-generators-that-are-absent-or-unconfirmed)). A loop that edits assets freely could also invent
 generators to match the statistics. The controls the loop would need, as options:
 
 - **Register-constrained asset types:** the LLM may only choose among asset types that the register
@@ -51,9 +51,10 @@ generators to match the statistics. The controls the loop would need, as options
 - **The same known-answer test as option 1:** real metered output added to the readings, with an
   absent decoy asset and an unlisted asset.
 
-**Prediction that could fail, and a proposed stop rule.** The loop recovers listed, injected assets'
-capacities and running-time parameters at least as well as option 1's plain fit, and gives the
-absent decoy asset under 0.5 MW. Stop if the decoy gets 1 MW or more at 3 or more of the 6 Primaries,
+**The loop passes only if it matches option 1's plain fit on the known-answer test, and a proposed
+stop rule ends it otherwise.** The prediction that could fail: the loop recovers each listed,
+injected asset's capacity within 20% and the engine's median spell length within 30%, as in the
+smallest test, and gives the absent decoy asset under 0.5 MW at 5 or more of the 6 Primaries. Stop if the decoy gets 1 MW or more at 3 or more of the 6 Primaries,
 the stop rule of [the smallest test](asset-inventory-simulator.md#the-smallest-test).
 
 ## Planned experiments
