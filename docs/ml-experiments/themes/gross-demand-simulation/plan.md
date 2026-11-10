@@ -40,8 +40,10 @@ the real record that the injected truth leaves out. The experiment did not test 
 
 **The asset-inventory page's own risks apply to the loop.** The risks are circularity and bands
 doing the work (see [Risks](asset-inventory-simulator.md#risks)), and fits left free that invent
-generators (see [that section](asset-inventory-simulator.md#fits-left-free-to-add-generators-report-generators-that-are-absent-or-unconfirmed)). A loop that edits assets freely could also invent
-generators to match the statistics. The controls the loop would need, as options:
+generators (see
+[that section](asset-inventory-simulator.md#fits-left-free-to-add-generators-report-generators-that-are-absent-or-unconfirmed)).
+A loop that edits assets freely could also invent generators to match the statistics. The
+controls the loop would need, as options:
 
 - **Register-constrained asset types:** the LLM may only choose among asset types that the register
   lists for the Primary.
@@ -54,8 +56,9 @@ generators to match the statistics. The controls the loop would need, as options
 **The loop passes only if it matches option 1's plain fit on the known-answer test, and a proposed
 stop rule ends it otherwise.** The prediction that could fail: the loop recovers each listed,
 injected asset's capacity within 20% and the engine's median spell length within 30%, as in the
-smallest test, and gives the absent decoy asset under 0.5 MW at 5 or more of the 6 Primaries. Stop if the decoy gets 1 MW or more at 3 or more of the 6 Primaries,
-the stop rule of [the smallest test](asset-inventory-simulator.md#the-smallest-test).
+smallest test, and gives the absent decoy asset under 0.5 MW at 5 or more of the 6 Primaries.
+Stop if the decoy gets 1 MW or more at 3 or more of the 6 Primaries, the stop rule of
+[the smallest test](asset-inventory-simulator.md#the-smallest-test).
 
 ## Planned experiments
 
