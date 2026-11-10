@@ -127,7 +127,7 @@ def pick_weeks(*, series: int) -> dict[str, tuple[datetime, datetime]]:
     return {"cold week": (cold, cold + timedelta(days=7)), "warm week": (warm, warm + timedelta(days=7))}
 
 
-ARM_COLOUR = {"3b": "#009C75", "5w": "#0B215F", "8w": "#B701FF"}
+ARM_COLOUR = {"3b": "#009C75", "5w": "#0B215F", "6w": "#B701FF", "7w": "#FC9700", "8w": "#17E58F"}
 
 
 def event_rect(*, start: datetime, stop: datetime) -> alt.LayerChart:
@@ -174,12 +174,12 @@ def prevailing_figure(*, span: int, label: str, start: datetime, stop: datetime,
     return alt.vconcat(*panels).properties(title=alt.TitleParams("Median (line), 50% band (dark shade), 90% band (light shade); observed power in orange. Ladder steps 1 to 8 have no prevailing output.", anchor="start", fontSize=11))
 
 
-def band_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int, event: tuple[datetime, datetime] | None = None) -> alt.VConcatChart:
+def band_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int, event: tuple[datetime, datetime] | None = None, steps: tuple[str, str] = ("5w", "8w")) -> alt.VConcatChart:
     note = f"forecast made {lead_day} to {lead_day + 1} days ahead"
     prefix = "INTERIM, quarterly refits. " if INTERIM else ""
     panels = [
         band_panel(span=span, step=s, start=start, stop=stop, series=series, lead_day=lead_day, event=event, title=prefix + f"{label}, {LABEL[s]}: {note}")
-        for s in ("5w", "8w")
+        for s in steps
     ]
     return alt.vconcat(*panels).properties(title=alt.TitleParams("Median (line), 50% band (dark shade), 90% band (light shade) of the forecast; observed power in orange.", anchor="start", fontSize=11))
 
@@ -202,6 +202,8 @@ def main() -> None:
         for kind, (start, stop) in scen.items():
             for d in (1, 5):
                 band_figure(span=span, label=f"{name}, {kind}", start=start, stop=stop, series=series, lead_day=d, event=EVENT if kind == "verified transfer" else None).save(out / f"bands_{kind.replace(' ', '_')}_{name}_lead{d}.svg")
+                if kind == "verified transfer":
+                    band_figure(span=span, label=f"{name}, {kind}", start=start, stop=stop, series=series, lead_day=d, event=EVENT, steps=("6w", "7w")).save(out / f"bands_{kind.replace(' ', '_')}_{name}_lead{d}_steps6_7.svg")
     for series, name in ((17, "D5"), (18, "D16")):
         for d in (1, 5):
             prevailing_figure(span=span, label=f"{name}, verified transfer", start=EVENT_WINDOW[0], stop=EVENT_WINDOW[1], series=series, lead_day=d).save(out / f"prevailing_verified_transfer_{name}_lead{d}.svg")
