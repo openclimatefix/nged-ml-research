@@ -124,12 +124,12 @@ def pick_weeks(*, series: int) -> dict[str, tuple[datetime, datetime]]:
 ARM_COLOUR = {"3b": "#009C75", "5w": "#0B215F", "8w": "#B701FF"}
 
 
-def band_panel(*, span: int, step: str, start: datetime, stop: datetime, series: int, lead_day: int, title: str) -> alt.LayerChart:
+def band_panel(*, span: int, step: str, start: datetime, stop: datetime, series: int, lead_day: int, title: str, kind: str | None = None) -> alt.LayerChart:
     """Return one panel: one arm's median with its q05 to q95 and q25 to q75 bands, and the observed power on top."""
     truth = pl.read_parquet(sc.lib.FOLDER / "ground_truth_primaries.parquet").filter((pl.col("time_series_id") == series) & pl.col("valid_time").is_between(start, stop, closed="left")).select("valid_time", pl.col("power").alias("observed")).to_pandas()
     q = ["q05", "q25", "q50", "q75", "q95"]
     f = (
-        pl.scan_parquet(sc.ROOT / "backtests" / f"step{step}_{exp.VERSION[step]}_sp{span}.parquet")
+        (pl.scan_parquet(sc.lib.FOLDER / "primaries.parquet").filter(pl.col("NRA_or_prevailing") == kind) if kind else pl.scan_parquet(sc.ROOT / "backtests" / f"step{step}_{exp.VERSION[step]}_sp{span}.parquet"))
         .filter((pl.col("time_series_id") == series) & pl.col("valid_time").is_between(start, stop, closed="left"))
         .group_by("valid_time", "power_fcst_init_time")
         .agg(pl.col(q).mean())
@@ -139,13 +139,24 @@ def band_panel(*, span: int, step: str, start: datetime, stop: datetime, series:
     )
     srt = np.sort(f.select(q).to_numpy(), axis=1)
     f = f.with_columns([pl.Series(c, srt[:, i]) for i, c in enumerate(q)]).sort("valid_time").to_pandas()
-    colour = ARM_COLOUR[step]
+    colour = ARM_COLOUR[step] if not kind else {"NRA": "#B701FF", "prevailing": "#009C75"}[kind]
     x = alt.X("valid_time:T", title=None)
     wide = alt.Chart(f).mark_area(opacity=0.2, color=colour).encode(x=x, y=alt.Y("q05:Q", title="Power (MW or MVA)", scale=alt.Scale(zero=False)), y2="q95:Q")
     narrow = alt.Chart(f).mark_area(opacity=0.35, color=colour).encode(x=x, y="q25:Q", y2="q75:Q")
     med = alt.Chart(f).mark_line(strokeWidth=1.5, color=colour).encode(x=x, y="q50:Q")
     obs = alt.Chart(truth).mark_line(strokeWidth=1.2, color="#FF4901").encode(x=x, y="observed:Q")
     return alt.layer(wide, narrow, med, obs).properties(width=WIDTH, height=280, title=title)
+
+
+def prevailing_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int) -> alt.VConcatChart:
+    """Return the NRA output (above) and the prevailing-conditions output (below) of experiment 667's Candidate."""
+    note = f"forecast made {lead_day} to {lead_day + 1} days ahead"
+    prefix = "INTERIM. " if INTERIM else ""
+    panels = [
+        band_panel(span=span, step="8w", start=start, stop=stop, series=series, lead_day=lead_day, kind=k, title=prefix + f"{label}, Candidate (experiment 667, monthly refits), {name} output: {note}")
+        for k, name in (("NRA", "NRA"), ("prevailing", "prevailing-conditions"))
+    ]
+    return alt.vconcat(*panels).properties(title=alt.TitleParams("Median (line), 50% band (dark shade), 90% band (light shade); observed power in orange. Ladder steps 1 to 8 have no prevailing output.", anchor="start", fontSize=11))
 
 
 def band_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int) -> alt.VConcatChart:
@@ -176,6 +187,9 @@ def main() -> None:
         for kind, (start, stop) in scen.items():
             for d in (1, 5):
                 band_figure(span=span, label=f"{name}, {kind}", start=start, stop=stop, series=series, lead_day=d).save(out / f"bands_{kind.replace(' ', '_')}_{name}_lead{d}.svg")
+    for series, name in ((17, "D5"), (18, "D16")):
+        for d in (1, 5):
+            prevailing_figure(span=span, label=f"{name}, verified transfer", start=datetime(2025, 12, 28, tzinfo=UTC), stop=datetime(2026, 1, 15, tzinfo=UTC), series=series, lead_day=d).save(out / f"prevailing_verified_transfer_{name}_lead{d}.svg")
     print("figures written to", out)
 
 
