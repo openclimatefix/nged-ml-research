@@ -35,7 +35,7 @@ import e00660_generator as gen  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from e00653_common import GRID_LENGTH, GRID_START, SCORED_FROM, idx_of
-from e00653_core import decode_world, freeze, match
+from e00653_core import Frozen, decode_world, freeze, match
 from e00653_segment import Event, Params
 from e00653_slow import to_half_hours
 from e00660_ev34_detector import Rig, truths  # ty: ignore[unresolved-import]
@@ -65,6 +65,9 @@ TRAIN_END: Final[int] = idx_of(when=datetime(2023, 7, 1, tzinfo=UTC))
 VAL_SEED0: Final[int] = 20_000
 C_EDGE_GRID: Final[tuple[float, ...]] = (2.0, 4.0, 6.0, 8.0, 12.0)
 DELTA_GRID: Final[tuple[float, ...]] = (0.5, 1.0, 2.0, 4.0, 8.0)
+WIDE_C_EDGE_GRID: Final[tuple[float, ...]] = (8.0, 16.0, 32.0)
+WIDE_DELTA_GRID: Final[tuple[float, ...]] = (8.0, 16.0, 32.0, 64.0)
+"""Post hoc grid, run only because the plan's grid met no pair under E1-J's false share."""
 ARMS: Final[tuple[str, ...]] = ("E1-F", "E1-F rewired", "E1-F no edges", "E1-F all pairs")
 DEEP: Final[tuple[str, str]] = ("long, deep", "medium, deep")
 
@@ -95,11 +98,11 @@ def graphs(*, rig: Rig, rng: np.random.Generator) -> dict[str, dict[str, list[st
 
 
 def decode_inputs(
-    *, rig: Rig, residual: dict, params: Params
+    *, rig: Rig, residual: dict, params: Params, frozen: Frozen | None = None
 ) -> tuple[list[Event], dict[str, np.ndarray]]:
     """E1's events and the residual minus its slow level."""
     events, slows = decode_world(
-        panel=rig.p653, residual=residual, frozen=rig.frozen, arm="masked", params=params
+        panel=rig.p653, residual=residual, frozen=frozen or rig.frozen, arm="masked", params=params
     )
     return events, {s: residual[s] - to_half_hours(slow=slows[s]) for s in slows}
 
@@ -133,11 +136,15 @@ def sums(*, rows: list[dict], decoded: int) -> dict:
     }
 
 
-def tune(*, config_name: str, n_worlds: int) -> None:
+def tune(*, config_name: str, n_worlds: int, wide: bool = False) -> None:
     """Choose the change costs on validation worlds from the fixed grid (rule in the plan)."""
     rig = Rig()
     params = params653()
-    grid = list(itertools.product(C_EDGE_GRID, DELTA_GRID))
+    grid = list(
+        itertools.product(
+            WIDE_C_EDGE_GRID if wide else C_EDGE_GRID, WIDE_DELTA_GRID if wide else DELTA_GRID
+        )
+    )
     ref_dec = ref_right = 0
     acc = {g: {"paired": 0.0, "total": 0.0, "right": 0, "decoded": 0} for g in grid}
     for k in range(n_worlds):
@@ -175,7 +182,7 @@ def tune(*, config_name: str, n_worlds: int) -> None:
     pool = ok or table
     best = max(pool, key=lambda t: (t["deep_paired"], t["delta"]))
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / f"costs_{config_name}.json").write_text(
+    (OUT / f"costs_{config_name}{'_wide' if wide else ''}.json").write_text(
         json.dumps(
             {"chosen": best, "fallback": not ok, "e1j_false_share": ref_false, "table": table},
             indent=1,
@@ -233,7 +240,7 @@ def run_real(*, costs_name: str) -> None:
     costs = load_costs(name=costs_name)
     resid = rig.real_residual
     frozen = freeze(panel=rig.p653, residual=resid)
-    events, xh = decode_inputs(rig=rig, residual=resid, params=params)
+    events, xh = decode_inputs(rig=rig, residual=resid, params=params, frozen=frozen)
     rng = np.random.default_rng(682)
     scored_years = sum(
         int(np.isfinite(rig.p653.residual[s][SCORED_FROM:GRID_LENGTH]).sum())
@@ -283,8 +290,8 @@ def run_real(*, costs_name: str) -> None:
 
 
 if __name__ == "__main__":
-    if sys.argv[1] == "tune":
-        tune(config_name=sys.argv[2], n_worlds=int(sys.argv[3]))
+    if sys.argv[1] in ("tune", "tune_wide"):
+        tune(config_name=sys.argv[2], n_worlds=int(sys.argv[3]), wide=sys.argv[1] == "tune_wide")
     elif sys.argv[1] == "injected":
         run_injected(
             config_name=sys.argv[2],
