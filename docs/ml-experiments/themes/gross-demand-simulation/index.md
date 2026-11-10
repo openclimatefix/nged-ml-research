@@ -24,4 +24,7 @@ different Primary from the one whose meter records a 6 MW gas engine.
 - [The simulator discussion of 2026-11-09](simulator-discussion-2026-11-09.md): the take-home of the
   discussion session that started this theme, with the discussion's numbers checked against merged
   pages.
+- [Options for proposing the simulator to NGED](proposal-to-nged-options.md): an AI advisor's
+  analysis of 2026-11-10, recorded as options: whether to propose the simulator as a complement to the
+  forecast, what NGED's planning chain already has, a phased outline, the risks, and open questions.
 - [Experiments](experiments.md) and [Research plan](plan.md): empty until an experiment is agreed.

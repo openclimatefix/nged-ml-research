@@ -2,7 +2,9 @@
 
 **No experiment in this theme has been agreed to run.** The options below are queued for the
 maintainer to choose; the project is not starting new experiments unprompted. The reasoning is on
-[the asset-inventory simulator page](asset-inventory-simulator.md).
+[the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how
+to propose the simulator to NGED, with phases as options, is on
+[Options for proposing the simulator to NGED](proposal-to-nged-options.md).
 
 ## Priority
 
