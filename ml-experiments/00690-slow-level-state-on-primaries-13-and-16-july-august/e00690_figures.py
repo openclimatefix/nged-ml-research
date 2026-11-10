@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Figures of experiment 690, drawn from the stored tables.
 
     DATA_PATH_INTERNAL=... uv run --no-sync python e00690_figures.py
