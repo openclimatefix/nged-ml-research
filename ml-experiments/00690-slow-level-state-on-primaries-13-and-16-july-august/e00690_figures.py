@@ -59,8 +59,8 @@ def shade(ax: plt.Axes) -> None:
         (dt.date(2026, 7, 15), dt.date(2026, 9, 1), "after"),
     )
     for a, b, t in spans:
-        ax.axvspan(a, b, color="#eeeeee", zorder=0)
-        ax.text(a, ax.get_ylim()[1], t, va="top", fontsize=7, color=GREY)
+        ax.axvspan(a, b, color="#eeeeee", zorder=0)  # ty: ignore[invalid-argument-type]
+        ax.text(a, ax.get_ylim()[1], t, va="top", fontsize=7, color=GREY)  # ty: ignore[invalid-argument-type]
 
 
 def fig_miss(ids: list[int], name: str) -> None:
