@@ -70,7 +70,7 @@ def means(*, frame: pl.DataFrame, by: list[str]) -> pl.DataFrame:
 
 
 def boot_contrast(*, frame: pl.DataFrame, arm: int, band: int | None) -> dict[str, float]:
-    """Return the CRPS change and the gain in |coverage - 90| of `arm` over arm 0, with 95% intervals."""
+    """Return the change in CRPS and the gain in |coverage - 90| of `arm`, with 95% intervals."""
     sub = frame if band is None else frame.filter(pl.col("band") == band)
     by_day = (
         sub.group_by("arm", "origin_day")
@@ -122,12 +122,12 @@ def main() -> None:  # noqa: PLR0915
                 file=pl.lit(file), period=pl.lit(which)
             )
             all_cells.append(cell)
-            for arm in (1, 2, 3):
-                for band in (None, 0, 1, 2, 3):
-                    contrast_rows.append(
-                        {"file": file, "period": which, "arm": arm, "band": band}
-                        | boot_contrast(frame=sub, arm=arm, band=band)
-                    )
+            contrast_rows.extend(
+                {"file": file, "period": which, "arm": arm, "band": band}
+                | boot_contrast(frame=sub, arm=arm, band=band)
+                for arm in (1, 2, 3)
+                for band in (None, 0, 1, 2, 3)
+            )
     cells = pl.concat(all_cells)
     cells.write_csv(TABLES / "cells.csv")
     contrasts = pl.DataFrame(contrast_rows)

@@ -1,8 +1,7 @@
 # ruff: noqa: E501
 """Figures of experiment 683 (CPU only), written as SVG to the folder given as the first argument.
 
-PYTHONPATH=ml-experiments/00668-*:ml-experiments/00683-* uv run --no-sync python \
-    ml-experiments/00683-*/e00683_figures.py OUT_DIR
+Run it from the repository root with `PYTHONPATH` set to the folders of experiments 668 and 683.
 Substations only appear with identifiers; wind and solar appear only pooled.
 """
 
@@ -11,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import altair as alt
-import e00668_score_lib as lib
+import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 import polars as pl
 from e00683_calibrate import BAND_LABELS, EXPERIMENT_DIR, FIRST_SCORED_MONTH
 from e00683_tables import ARM_NAMES, FILES, load, means, period
@@ -47,7 +46,7 @@ def coverage_by_band(*, out: Path) -> None:
     for title in FILE_TITLES.values():
         sub = frame.filter(pl.col("file") == title).to_pandas()
         line = (
-            alt.Chart(sub)
+            alt.Chart(sub)  # ty: ignore[unresolved-attribute]
             .mark_line(strokeWidth=1, point=True)
             .encode(
                 x=alt.X(
@@ -63,7 +62,7 @@ def coverage_by_band(*, out: Path) -> None:
             )
         )
         rule = (
-            alt.Chart(pl.DataFrame({"y": [90.0]}).to_pandas())
+            alt.Chart(pl.DataFrame({"y": [90.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(strokeDash=[4, 3], color="#000000", strokeWidth=1)
             .encode(y="y:Q")
         )
@@ -78,7 +77,7 @@ def monthly_primaries(*, out: Path) -> None:
         arm_name=pl.col("arm").replace_strict(ARM_NAMES)
     )
     line = (
-        alt.Chart(m.to_pandas())
+        alt.Chart(m.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1, point=True)
         .encode(
             x=alt.X("origin_month:O", title="Origin month", axis=alt.Axis(labelAngle=-45)),
@@ -89,12 +88,12 @@ def monthly_primaries(*, out: Path) -> None:
         )
     )
     stop = (
-        alt.Chart(pl.DataFrame({"y": [86.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"y": [86.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color="#000000", strokeWidth=1)
         .encode(y="y:Q")
     )
     nominal = (
-        alt.Chart(pl.DataFrame({"y": [90.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"y": [90.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#000000", strokeWidth=1)
         .encode(y="y:Q")
     )
@@ -112,17 +111,17 @@ def refit_widths(*, out: Path) -> None:
     )
     lo, hi = float(spread["lo"][0]), float(spread["hi"][0])
     band = (
-        alt.Chart(pl.DataFrame({"lo": [lo], "hi": [hi]}).to_pandas())
+        alt.Chart(pl.DataFrame({"lo": [lo], "hi": [hi]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rect(opacity=0.15, color="#7F7F7F")
         .encode(y="lo:Q", y2="hi:Q")
     )
     one = (
-        alt.Chart(pl.DataFrame({"y": [1.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"y": [1.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#000000", strokeWidth=1)
         .encode(y="y:Q")
     )
     lines = (
-        alt.Chart(steps.with_columns(series=pl.col("time_series_id").cast(pl.String)).to_pandas())
+        alt.Chart(steps.with_columns(series=pl.col("time_series_id").cast(pl.String)).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1, point=True)
         .encode(
             x=alt.X("refit_month:O", title="Month of the refit", axis=alt.Axis(labelAngle=-45)),
@@ -172,12 +171,12 @@ def fans(*, out: Path) -> None:
     for label, hours in (("14_days", 336.0), ("first_day", 24.0)):
         sub = frame.filter(pl.col("hours") <= hours).to_pandas()
         base = alt.Chart().encode(x=alt.X("hours:Q", title="Hours after the forecast origin"))
-        band90 = base.mark_area(opacity=0.25, color="#306BFF").encode(
+        band90 = base.mark_area(opacity=0.25, color="#306BFF").encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title="Power (% of capacity)"), y2="q95:Q"
         )
-        band50 = base.mark_area(opacity=0.35, color="#306BFF").encode(y="q25:Q", y2="q75:Q")
-        median = base.mark_line(strokeWidth=1, color="#306BFF").encode(y="q50:Q")
-        actual = base.mark_line(strokeWidth=1, color="#FF4901").encode(y="y:Q")
+        band50 = base.mark_area(opacity=0.35, color="#306BFF").encode(y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+        median = base.mark_line(strokeWidth=1, color="#306BFF").encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
+        actual = base.mark_line(strokeWidth=1, color="#FF4901").encode(y="y:Q")  # ty: ignore[unresolved-attribute]
         chart = (
             (band90 + band50 + median + actual)
             .properties(width=300, height=280)

@@ -1,9 +1,7 @@
 """Walk-forward calibration of the quantile bands in the one-year backtest files (CPU only).
 
-PYTHONPATH=ml-experiments/00668-* uv run --no-sync python \
-    ml-experiments/00683-*/e00683_calibrate.py bsps
-PYTHONPATH=ml-experiments/00668-* uv run --no-sync python \
-    ml-experiments/00683-*/e00683_calibrate.py primaries NRA
+Run it from the repository root with `PYTHONPATH` set to the folder of experiment 668 and the
+arguments `bsps`, `gsps`, `wind`, `solar`, `primaries NRA`, or `primaries prevailing`.
 
 Arms: 0 the file as stored; 1 every quantile moved away from `q50` by 1.0934 (experiment 613);
 2 a per-series, per-output, per-lead-band scale on the distance from `q50`, fitted at each origin
@@ -25,7 +23,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
-import e00668_score_lib as lib
+import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.pv_dataset import pv_sites
