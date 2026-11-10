@@ -1,5 +1,8 @@
 # Lagged power and error correction
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **On 16 Primary substations over one validation year, both recent power fed to a second-stage
 calibrator and a correction by the mean error of the last 14 days lower the forecast error, by
 similar amounts against different reference forecasts; on solar farms, wind farms, and supply points

@@ -1,5 +1,8 @@
 # Production reference and best guess
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **On one validation year, the best recipe tested so far beats the stored production-style forecast
 at Primary substations, supply points, 6 solar farms, and 3 wind farms.** Most of the gain at
 [Primary substations](../../glossary.md#primary-substation) comes from correcting each forecast by

@@ -1,5 +1,8 @@
 # Generator forecasting
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **For 6 solar farms and 3 wind farms over one validation year, the largest gain was from the Met
 Office's UKV weather forecast at wind farms, about 0.2 points of capacity at 24 to 54 hours ahead (a
 `small gain`: its interval excludes zero but not the pre-registered 0.15), measured on a research

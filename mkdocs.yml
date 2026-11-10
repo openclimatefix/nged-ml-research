@@ -120,6 +120,7 @@ nav:
           - Summary: ml-experiments/themes/curtailment-cost/index.md
           - Experiments: ml-experiments/themes/curtailment-cost/experiments.md
           - Research plan: ml-experiments/themes/curtailment-cost/plan.md
+          - State and next steps: ml-experiments/themes/curtailment-cost/state-and-next-steps.md
       - Demand inputs:
           - Summary: ml-experiments/themes/demand-inputs/index.md
           - Experiments: ml-experiments/themes/demand-inputs/experiments.md
@@ -157,6 +158,7 @@ nav:
           - Summary: ml-experiments/themes/generator-forecasting/index.md
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
           - Research plan: ml-experiments/themes/generator-forecasting/plan.md
+          - State and next steps: ml-experiments/themes/generator-forecasting/state-and-next-steps.md
       - Hierarchy and pooling:
           - Summary: ml-experiments/themes/hierarchy-and-pooling/index.md
           - Experiments: ml-experiments/themes/hierarchy-and-pooling/experiments.md
@@ -166,10 +168,12 @@ nav:
           - Summary: ml-experiments/themes/lagged-power-and-error-correction/index.md
           - Experiments: ml-experiments/themes/lagged-power-and-error-correction/experiments.md
           - Research plan: ml-experiments/themes/lagged-power-and-error-correction/plan.md
+          - State and next steps: ml-experiments/themes/lagged-power-and-error-correction/state-and-next-steps.md
       - Production reference and best guess:
           - Summary: ml-experiments/themes/production-reference-and-best-guess/index.md
           - Experiments: ml-experiments/themes/production-reference-and-best-guess/experiments.md
           - Research plan: ml-experiments/themes/production-reference-and-best-guess/plan.md
+          - State and next steps: ml-experiments/themes/production-reference-and-best-guess/state-and-next-steps.md
           - Neural simplification series: ml-experiments/themes/production-reference-and-best-guess/neural-simplification-series.md
       - Retraining and training history:
           - Summary: ml-experiments/themes/retraining-and-training-history/index.md
@@ -180,6 +184,7 @@ nav:
           - Summary: ml-experiments/themes/metered-solar-farms/index.md
           - Experiments: ml-experiments/themes/metered-solar-farms/experiments.md
           - Research plan: ml-experiments/themes/metered-solar-farms/plan.md
+          - State and next steps: ml-experiments/themes/metered-solar-farms/state-and-next-steps.md
       - Solar disaggregation:
           - Summary: ml-experiments/themes/solar-disaggregation/index.md
           - Experiments: ml-experiments/themes/solar-disaggregation/experiments.md
