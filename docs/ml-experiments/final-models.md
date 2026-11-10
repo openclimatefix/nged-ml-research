@@ -13,8 +13,8 @@ year that overlaps the development months. The backtest is described in [experim
 one forecast origin per day at 12:00 UTC from 2025-11-01 to 2026-10-31, and 672 half-hours (14 days)
 per origin. The origin months from 2026-07 lie in the window that earlier experiments kept as a
 final test, so those months are descriptive and no choice rests on them. The experiment 677 page,
-which builds up the Candidate demand neural network one component at a time, is not merged. Its slot
-in the Primaries section is marked.
+which builds up the Candidate demand neural network one component at a time, is summarised in the
+Primaries section.
 
 **Where to start.** A porter should read, in order, the "Production code that exists today" section,
 the "Output contract" section, the section of the forecast type to port, the "Open issues for the
@@ -438,13 +438,59 @@ them.** The features reacted 1.59 days sooner than the head of experiment 652 (9
 shown to beat plain lags (experiment 687). The prevailing head of the backtest therefore carries no
 detector features.
 
-!!! note "Pending experiment 677"
+#### What each component adds (experiment 677)
 
-    Experiment 677 builds up the Candidate one component at a time, from the date-time encoder to
-    the full Candidate, with reference lines from a generalised additive model and an XGBoost model.
-    Its plan is in the open nged-ml-research PR 338 (Experiment 677: building up the Candidate
-    demand network one component at a time (plan)). This slot will state which components the
-    Candidate needs and what each adds once the page merges.
+**The date-time and weather encoders pre-trained on ERA5 and CAMS are the first components to beat
+the manual heuristic, and the lag components after step 5 add no annual skill.** [Experiment
+677](00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md) builds the
+Candidate up one component per step, from the date-time encoder alone (step 1) to the Candidate
+(step 8). Steps 9a and 9b refit step 5 and step 8 monthly instead of quarterly. Scores are the
+normalised mean absolute error (MAE) of the median, in points of capacity, over the 12 months of the
+one-year backtest at leads of 0 to 14 days, on the 3,879,313 half-hours that every step covers.
+
+| Step | Components added | MAE of the median | CRPS |
+|---|---|---|---|
+| 1 | Date-time encoder | 9.73 | 5.50 |
+| 2 | Weather encoder alone | 9.61 | 5.47 |
+| 3a | Both encoders, trained on ENS only | 8.89 | 5.12 |
+| 3b | Both encoders, pre-trained on ERA5 and CAMS | 8.30 | 4.74 |
+| 4 | 24-hour lag | 8.01 | 4.56 |
+| 5 | 1-week lag | 7.88 | 4.49 |
+| 6 | Gap columns | 7.93 | 4.52 |
+| 7 | Weighted averages of the gap | 7.98 | 4.56 |
+| 8 | 42 neighbour columns (the Candidate) | 7.99 | 4.57 |
+| 9a | Step 5, monthly refits | 7.39 | 4.19 |
+| 9b | Step 8, monthly refits | 7.48 | 4.26 |
+| | Manual heuristic | 8.73 | 4.98 |
+| | Climatology | 11.79 | 6.60 |
+| | Experiment 667, monthly refits | 7.53 | 4.29 |
+
+- **Pre-training and the first lags account for most of the gain over the manual heuristic.**
+  Pre-training the encoders (step 3b) lowers MAE by 0.59 against step 3a, and the 24-hour lag
+  (step 4) by 0.28. The 1-week lag lowers it by a further 0.13. Steps 6 to 8 change it by +0.04,
+  +0.06, and +0.005. Steps 1, 2, and 3a score worse than the manual heuristic.
+- **Step 8, the Candidate, scores 0.105 worse than step 5 on the annual mean** (95% interval 0.078
+  to 0.132). Steps 6 to 8 lower the share of an injected lag-only shift that the median copies from
+  5.9% to 2.8%, and they raise MAE by 0.05 (step 6) and 0.12 (steps 7 and 8) on rows more than 14
+  days from any logged event. The experiment advises judging steps 6 to 8 on the copied share and on
+  event-free error together, because they lower the first and raise the second.
+- **Monthly refits lower MAE by about 0.47 for both step 5 and step 8** (intervals 0.31 to 0.64 and
+  0.32 to 0.64), more than any component added after step 3b. In the 7 days after the 10 logged
+  shifts that the experiment pools, the monthly arms score worse (5.77 against 5.23 for step 5, and
+  5.69 against 5.15 for step 8); no interval was computed for that slice.
+- **The final Candidate is step 8 trained with injected events.** The one-year backtest files use it
+  at monthly refits, which is step 9b (7.48). The monthly file of experiment 667 scores 7.53 on the
+  same rows. The experiment 677 ladder differs from experiment 667 by seed count (3 or 5 against 2)
+  and by the reference month of the signal noise.
+- **On the six MW Primaries the GAM is level with the best monthly arm, and the networks win on the
+  seven MVA-only Primaries.** Over the 8 months and 10 days of lead that the stored GAM and XGBoost
+  forecasts share with the ladder, the six MW Primaries score 5.36 for the GAM, 5.62 for XGBoost,
+  5.41 for experiment 667, and 5.35 for step 9a. The seven MVA-only Primaries score 6.08, 5.92,
+  5.62, and 5.54.
+- **Caveats.** The Candidate's settings were tuned on 5 of the 12 months, which favours the later
+  steps, and the year overlaps the final-test window. The ladder is one order of adding components,
+  so it says what each component adds given those already present, not what removing it from the
+  Candidate would cost. NGED's event labels are incomplete, so every event count is a lower bound.
 
 ### Input tables
 
@@ -822,7 +868,7 @@ use it is not decided.
   685](00685-event-table-on-the-final-test-window-all-primaries/result.md)).
 - **Open questions.** Whether to port the 8-input or the 14-input extra-lag set (the backtest uses
   14). Whether the fallback head is needed in production, because the backtest needed it only for
-  the first two folds. What experiment 677 concludes about the necessary components (pending). Which
+  the first two folds. Which
   of the 00:00, 06:00, 12:00, and 18:00 UTC slots the Candidate must serve, and what the service
   does with a stale NWP run, a missing lag, or missing CAMS. Whether the band scale is fitted at
   refit time or in the serving path. Whether the porter rebuilds the cached inputs from source or
@@ -1860,7 +1906,6 @@ These are listed for the maintainer. None is decided here.
   two control Primaries by 5.5% and 7.5%, against a limit of 5%, so the verdict is partly supported,
   and the experiment proposes no new method. The miss is still not explained by a load transfer
   (experiment 685), and the current pages are experiments 685 and 690.
-- What the Candidate needs and what each component adds: pending experiment 677.
 - Whether wind needs a power lag or a different long-lead rule, given its score against climatology
   at days 10 to 14.
 - Whether a calendar input or more frequent refits remove the solar median's seasonal bias.
