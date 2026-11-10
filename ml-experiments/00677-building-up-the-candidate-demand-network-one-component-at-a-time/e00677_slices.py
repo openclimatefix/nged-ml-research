@@ -23,7 +23,11 @@ import polars as pl
 
 N_BOOT = 2000
 BLOCK_DAYS = 7
-SEEDS_TAG = "s012"
+import os
+
+SEEDS_TAG = "s012"  # steps 1 to 4 have seeds 0 to 2 only
+SEEDS_TAG_LATE = os.environ.get("S677SEEDS", "s012")  # steps 5 to 8: "s01234" when seeds 3 and 4 are scored
+OUT_SUFFIX = "" if SEEDS_TAG_LATE == "s012" else f"_{SEEDS_TAG_LATE}"
 
 
 def load(*, span: int, names: list[str]) -> tuple[pl.DataFrame, list[str]]:
@@ -34,7 +38,7 @@ def load(*, span: int, names: list[str]) -> tuple[pl.DataFrame, list[str]]:
     for name in names:
         step = name.removeprefix("step")
         folder = f"{name}_{exp.VERSION[step]}_sp{span}"
-        r = pl.read_parquet(sc.ROOT / "scores" / f"{folder}_{SEEDS_TAG}" / "rows.parquet").filter(pl.col("ok"))
+        r = pl.read_parquet(sc.ROOT / "scores" / f"{folder}_{SEEDS_TAG_LATE if step[0] in '5678' else SEEDS_TAG}" / "rows.parquet").filter(pl.col("ok"))
         keep = ["time_series_id", "valid_idx", "origin_idx", "lead_h"]
         cols = [pl.col("Model_crps").alias(f"{name}_crps"), pl.col("Model_mae").alias(f"{name}_mae")]
         if out is None:
@@ -89,7 +93,7 @@ def main() -> None:
                     mean, (lo, hi) = float(v[mask].mean()), (float(x) for x in np.quantile(draws, [0.025, 0.975]))
                 records.append({"set": sname, "part": part, "system": system, "metric": metric, "mean": mean, "lo": lo, "hi": hi, "rows": n, "origin_days": int(len(np.unique(day[mask]))) if n else 0})  # fmt: skip
     out = sc.ROOT / "scores"
-    pl.DataFrame(records).write_csv(out / f"slices_sp{span}.csv")
+    pl.DataFrame(records).write_csv(out / f"slices_sp{span}{OUT_SUFFIX}.csv")
     contrasts = []
     for a, b in zip(names[:-1], names[1:], strict=True):
         for (sname, part), mask in slices.items():
@@ -99,7 +103,7 @@ def main() -> None:
                 d = (rows[f"{b}_{metric}"] - rows[f"{a}_{metric}"]).to_numpy().astype(np.float64)[mask]
                 draws = block_bootstrap(day=day[mask], values=d)
                 contrasts.append({"set": sname, "part": part, "from": a, "to": b, "metric": metric, "diff": float(d.mean()), "lo": float(np.quantile(draws, 0.025)), "hi": float(np.quantile(draws, 0.975)), "rows": int(mask.sum())})  # fmt: skip
-    pl.DataFrame(contrasts).write_csv(out / f"contrasts_sp{span}.csv")
+    pl.DataFrame(contrasts).write_csv(out / f"contrasts_sp{span}{OUT_SUFFIX}.csv")
     print(pl.DataFrame(counts))
     print({k: int(v.sum()) for k, v in slices.items()})
 
