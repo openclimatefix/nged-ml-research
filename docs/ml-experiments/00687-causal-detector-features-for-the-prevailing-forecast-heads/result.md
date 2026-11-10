@@ -18,51 +18,51 @@ size: >-
   650, and 652 (their scripts are imported, and no caller outside this folder exists); (4) it
   touches no serving path or degradation rule; (5) it changes no contract.
 hypothesis: >-
-  Per-lag causal step statistics in noise units, the gap with the all-Primaries median removed, the
-  opposite-sign neighbour gap, the routine-step rate, and a return-to-level statistic carry
-  information about whether a lag lies inside a load shift that the gap summaries of experiments 606
-  and 610 do not, and a small prevailing head that reads them reacts sooner to the start and the end
-  of a shift than the same head reading extra lagged power inputs (the arm of experiment 681).
+  Per-lag causal step statistics in noise units, the gap with the all-Primaries median removed,
+  the opposite-sign neighbour gap, the routine-step rate, and a return-to-level statistic carry
+  information about whether a lag lies inside a load shift that the gap summaries of experiments
+  606 and 610 do not, and a small prevailing head that reads them reacts sooner to the start and
+  the end of a shift than the same head reading extra lagged power inputs (the arm of experiment
+  681).
 prediction: >-
   Written before any fit or score. P1 (separability, no refit): on the stored bank of experiments
-  650 and 652, the area under the receiver operating characteristic curve (AUROC) of "this lag lies
-  inside an injected shift" rises by 0.05 or more when D1 to D5 are added to experiment 606's
-  summaries, on each of the three banks (stored, mirror at 60%, no mirror). P2 (reaction time, enters
-  the verdict): the features-only arm F1 covers half of the new level at least 1 day sooner than
-  the departure head of experiment 652 (B0) at the start of an injected shift and at its end.
-  Descriptive only: F1 against the extra-lags arm L1. P3 (descriptive): in-force
-  scaled CRPS improves by 0.30 points of capacity or more against B0, and near-end and
-  just-ended scaled CRPS by 0.30 or more. P4: the false-alarm rate on event-free rows (the share of
-  rows where the prevailing output departs from the NRA output by 3 points of capacity or more)
-  rises by at most 1 percentage point against B0, and event-free CRPS by at most 0.02 points against
-  both B0 and K1. P5:
-  the placebo arm (features computed for an unrelated Primary) gains less than a third of the
-  features-only arm's reaction-time gain.
+  650 and 652, the area under the receiver operating characteristic curve (AUROC) of "this lag
+  lies inside an injected shift" rises by 0.05 or more when D1 to D5 are added to experiment 606's
+  summaries, on each of the three banks (stored, mirror at 60%, no mirror). P2 (reaction time,
+  enters the verdict): the features-only arm F1 covers half of the new level at least 1 day sooner
+  than the departure head of experiment 652 (B0) at the start of an injected shift and at its end.
+  Descriptive only: F1 against the extra-lags arm L1. P3 (descriptive): in-force scaled CRPS
+  improves by 0.30 points of capacity or more against B0, and near-end and just-ended scaled CRPS
+  by 0.30 or more. P4: the false-alarm rate on event-free rows (the share of rows where the
+  prevailing output departs from the NRA output by 3 points of capacity or more) rises by at most
+  1 percentage point against B0, and event-free CRPS by at most 0.02 points against both B0 and
+  K1. P5: the placebo arm (features computed for an unrelated Primary) gains less than a third of
+  the features-only arm's reaction-time gain.
 decision_rule: >-
-  Stop rule (from the spec, fixed before any score is read): if the AUROC gain is under 0.03 on every
-  bank and no prevailing stratum (in force, near the end, just ended) gains 0.15 points of capacity of
-  scaled CRPS over B0, the features are reported as not useful and the fine-tune of K1 with the
-  features (about 2 GPU-hours, not part of this plan) is not run. Step 2 always runs, because it is
-  cheap and the stop rule needs its stratum scores. The verdict reads two contrasts.
+  Stop rule (from the spec, fixed before any score is read): if the AUROC gain is under 0.03 on
+  every bank and no prevailing stratum (in force, near the end, just ended) gains 0.15 points of
+  capacity of scaled CRPS over B0, the features are reported as not useful and the fine-tune of K1
+  with the features (about 2 GPU-hours, not part of this plan) is not run. Step 2 always runs,
+  because it is cheap and the stop rule needs its stratum scores. The verdict reads two contrasts.
   Primary contrast: F1 minus B0, reaction time at the start and end of injected shifts of the
-  held-out family, with a 95% interval from a paired bootstrap over events; support needs the interval to exclude zero in the
-  predicted direction with a gain of at least 1 day (origins are daily, so reaction time resolves to
-  1 day, and a port adds a feature block to the head and nothing else). Secondary: the in-force and
-  near-end scaled CRPS contrasts (month-block 95% interval over the 5 development months),
-  descriptive and uncorrected for multiplicity. The veto: event-free CRPS and false-alarm rate
-  within the limits of P4, and the placebo gain below a third of the features-only gain. Any failed
-  condition is reported plainly with no rescue tuning.
+  held-out family, with a 95% interval from a paired bootstrap over events; support needs the
+  interval to exclude zero in the predicted direction with a gain of at least 1 day (origins are
+  daily, so reaction time resolves to 1 day, and a port adds a feature block to the head and
+  nothing else). Secondary: the in-force and near-end scaled CRPS contrasts (month-block 95%
+  interval over the 5 development months), descriptive and uncorrected for multiplicity. The veto:
+  event-free CRPS and false-alarm rate within the limits of P4, and the placebo gain below a third
+  of the features-only gain. Any failed condition is reported plainly with no rescue tuning.
 benchmark: >-
   Experiment 652's R-haz head (arm B0, refitted here from the same code so that features and
-  baseline share rows and seeds, and checked against 652's stored scores), experiment 681's
-  extra-lags arm (arm L1, built here on the same banks because experiment 681 has run on the
-  backtest folds only), K1 as context, and the placebo.
+  baseline share rows and seeds, and checked against 652's stored scores), experiment 681's extra-
+  lags arm (arm L1, built here on the same banks because experiment 681 has run on the backtest
+  folds only), K1 as context, and the placebo.
 row_set_id: dev_months_origins_2025_10_to_2026_06_export_roster
 metric: >-
-  AUROC of lag-inside-shift; reaction time in days to cover half of the new level after an injected
-  shift starts and ends; CRPS (twice the mean pinball loss over 11 quantiles) and normalised MAE of
-  the median for both outputs by lead band; q05 to q95 coverage; q01, q05, q95, and q99 pinball
-  loss; false-alarm rate on event-free rows.
+  AUROC of lag-inside-shift; reaction time in days to cover half of the new level after an
+  injected shift starts and ends; CRPS (twice the mean pinball loss over 11 quantiles) and
+  normalised MAE of the median for both outputs by lead band; q05 to q95 coverage; q01, q05, q95,
+  and q99 pinball loss; false-alarm rate on event-free rows.
 ---
 
 **Plan only. Nothing here has been run.** Revised after the plan review (findings and triage are
