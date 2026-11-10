@@ -1,7 +1,8 @@
 """Band-width steps at the model refits under a fixed-lookback scale, by seed handling (CPU only).
 
-PYTHONPATH=ml-experiments/00668-*:ml-experiments/00683-* DATA_PATH_INTERNAL=... \
-    uv run --no-sync python ml-experiments/00689-*/e00689_boundary.py
+Run from the repository root with `DATA_PATH_INTERNAL` set and
+`PYTHONPATH=ml-experiments/00668-*:ml-experiments/00683-*`:
+`uv run --no-sync python ml-experiments/00689-*/e00689_boundary.py`.
 
 Reads the stored normal-running Primaries file (seed mean) and the per-seed quantiles of experiment
 667 (`P7_D50_<month>/work/fits/P5/<month>_d0_s{0,1}.parquet`). Fits the scale of experiment 683 (its
