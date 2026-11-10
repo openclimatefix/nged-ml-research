@@ -1,6 +1,7 @@
+# ruff: noqa: PLR0915, PERF401
 """Experiment 692: score the reviewer's answers against the answer key.
 
-    uv run --no-sync python e00692_score.py
+uv run --no-sync python e00692_score.py
 """
 
 from __future__ import annotations
@@ -62,7 +63,9 @@ def main() -> None:
     right_dir = called_pos.filter(pl.col("direction") == "as_drawn").height
     res["direction_right"] = (right_dir, called_pos.height)
     ver = cal.filter(pl.col("stratum") == "verified_real")
-    res["verified_called"] = {r["donor"] + "_" + r["recipient"]: r["verdict"] for r in ver.to_dicts()}
+    res["verified_called"] = {
+        r["donor"] + "_" + r["recipient"]: r["verdict"] for r in ver.to_dicts()
+    }
     by = (
         cal.group_by("stratum")
         .agg(pl.len().alias("n"), pl.col("called").sum().alias("called"))
@@ -124,6 +127,46 @@ def main() -> None:
             "real_called_real": tpr_r,
             "injected_called_injected": tnr,
         }
+    # Post hoc: a false candidate that recurs in 10 or more of the 40 worlds is a real-record event.
+    rec = (
+        cand.filter(~pl.col("true"))
+        .with_columns((pl.col("onset") // 48).alias("day"))
+        .group_by(["donor", "recipient", "day"])
+        .agg(pl.col("seed").n_unique().alias("worlds"))
+        .filter(pl.col("worlds") >= 10)
+    )
+    cal2 = (
+        cal.with_columns((pl.col("onset") // 48).alias("day"))
+        .join(
+            rec.select(["donor", "recipient", "day"]).with_columns(pl.lit(True).alias("recurring")),
+            on=["donor", "recipient", "day"],
+            how="left",
+        )
+        .with_columns(pl.col("recurring").fill_null(False))
+    )
+    res["recurring_real_in_calibration"] = cal2.filter(
+        pl.col("recurring") & ~pl.col("positive") & (pl.col("source") == "injected")
+    ).height
+    kept = cal2.filter(~(pl.col("recurring") & ~pl.col("positive")))
+    tp2 = kept.filter(pl.col("called") & pl.col("positive")).height
+    fp2 = kept.filter(pl.col("called") & ~pl.col("positive")).height
+    res["post_hoc_without_recurring"] = {
+        "n_removed": cal2.height - kept.height,
+        "tp": tp2,
+        "fp": fp2,
+        "precision": tp2 / (tp2 + fp2),
+        "precision_ci": wilson(tp2, tp2 + fp2),
+        "removed_called": cal2.filter(
+            pl.col("recurring") & ~pl.col("positive") & pl.col("called")
+        ).height,
+    }
+    res["recurring_real_candidates_of_460_false"] = int(
+        cand.filter(~pl.col("true"))
+        .with_columns((pl.col("onset") // 48).alias("day"))
+        .join(rec.select(["donor", "recipient", "day"]), on=["donor", "recipient", "day"])
+        .height
+    )
+    res["recurring_groups"] = rec.height
     (OUT / "scores.json").write_text(json.dumps(res, indent=1, default=float))
     print(json.dumps({k: v for k, v in res.items() if k != "wrong"}, indent=1, default=float))
 

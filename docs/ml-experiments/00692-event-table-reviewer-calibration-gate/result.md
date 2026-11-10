@@ -6,15 +6,15 @@ title: >-
   false transfers?
 theme: lsc-detectors
 also_relevant_to: []
-status: planned
+status: finished
 date: 2026-11-10
 kind: other
 size: >-
   medium. (1) Stored: private figures, answer files, and answer key under
   data/ml-experiments/00692-event-table-reviewer-calibration-gate/ only. (2) Serving path: not
   touched. (3) Degradation rule: not touched. (4) Designs: more than one is defensible for the
-  candidate set, the calibration mix, and the figure, so this plan fixes the cheapest of each before
-  any answer is read. (5) Callers: the scripts import the folders of experiments 653, 660, 670, and
+  candidate set, the calibration mix, and the figure, so the plan fixed the cheapest of each before
+  any answer was read. (5) Callers: the scripts import the folders of experiments 653, 660, 670, and
   680 by path; nothing imports this folder. CPU only, 2 cores, plus Sonnet reviewer calls.
 hypothesis: >-
   A Sonnet reviewer shown one figure per candidate transfer of the event table (E1-J-sym) agrees
@@ -44,71 +44,181 @@ metric: >-
   direction accuracy; the false-transfer share before and after the gate, reweighted to the
   natural mix of candidates; tokens per review; a list of what the reviewer got wrong.
 code: ml-experiments/00692-event-table-reviewer-calibration-gate/
+verdict: not supported
+best_arm: >-
+  Not applicable: one reviewer. Pre-registered gate: precision 0.45 (95% interval 0.33 to 0.59) at
+  recall 0.75 (0.58 to 0.87), so the gate fails. Post hoc, without 22 candidates that are real-record
+  transfers: precision 0.75 (0.58 to 0.87).
+headline: >-
+  The Sonnet reviewer called 24 of 32 true transfers and 29 of 70 non-transfers a transfer (precision
+  0.45, below the 0.80 gate), but 21 of those 29 false calls are the same five real-record transfers
+  that the injected worlds' truth does not list. Without them precision is 0.75, and the gate
+  cannot be passed or failed cleanly on injected truth alone.
+lessons: >-
+  The injected worlds sit on the real record, so a decoded candidate that recurs in many worlds is a
+  real event that the truth omits. The highest-confidence "false" candidates were mostly such
+  events, which made the false stratum too easy for the reviewer to fail.
+take_home_message: >-
+  A Claude reviewer looking at one figure per candidate recognises a clean transfer (it called 24 of
+  32 true ones, and both verified real transfers, with the direction right in 23 of 24), and it is
+  fooled by little else: it called a transfer on 6 of 28 other false candidates and 2 of 20
+  look-alikes. It failed the pre-registered precision gate (0.45 against 0.80) because 21 of its 29
+  false calls were five real transfers that sit in the real record under every injected world. The
+  reviewer cannot be trusted or dropped on this evidence. A calibration set free of real-record
+  events is needed first.
+advice:
+  - >-
+    Remove candidates that recur in many injected worlds before scoring any detector or reviewer on
+    injected truth, because they are real-record events the truth omits (see Headline rows).
+  - >-
+    Calibrate a figure reviewer on a set whose negatives are known not to be real transfers, and
+    ask for a confidence on a 1 to 5 scale in a form a script can check (see Checks).
+  - >-
+    Do not read the false-transfer share after the gate from this page: the reviewer's false calls
+    are mostly real events, so the share is overstated (see Headline rows).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Plan only. The reviewer has not run.** This is check 4 of the private spec
-(`data/ml-experiments/briefs/event_detector_next_spec.md`) for the next steps of the hindsight
-load-shift detector. The detector's main fault is false
-transfers: about three in four decoded transfer ends match no injected end. We ask whether a
-Claude reviewer that looks at one figure per candidate can tell a real transfer from a false one,
-by first measuring its agreement with the injected truth on a calibration set.
+**A Claude reviewer shown one figure per candidate load transfer called a transfer on 24 of 32
+true ones, and on 29 of 70 candidates that are not injected transfers, so it failed the
+pre-registered precision gate of 0.80 (it scored 0.45).** A *Primary substation* steps electricity
+down to a local distribution network. A *load shift* is a lasting change in a Primary's demand with
+no change in the weather, and a *load transfer* is a load shift that moves between two neighbouring
+Primaries. We asked whether a Sonnet reviewer can tell a true transfer from a false one by looking at
+a picture, because about three in four transfers that the event table decodes match no injected
+transfer.
 
-## Plan (choices the spec left open, all the cheapest)
+We took 613 candidate transfers that the event table (E1-J-sym, from [experiment
+680](../00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/result.md))
+decodes in 40 worlds in which synthetic transfers were added to the real record of power. We drew one
+figure per candidate and asked Sonnet to score nine questions and give a verdict. **Most of the
+reviewer's false calls were not mistakes.** Five real transfers sit in the real record under every
+injected world, so the same candidate appears in 13 to 28 of the 40 worlds. The injected truth does
+not list them, and so it labels them false.
 
-- **Candidates.** The pairs of a donor end and a recipient end that E1-J-sym decodes in
-  experiment 680's 40 scored default worlds. A candidate is a *true* transfer when its donor end
-  matches an injected donor end (same Primary, same sign, start within 24 half-hours, overlap of
-  0.5 or more) and a decoded partner is a partner of the injected transfer. The spec's scorer over
-  candidate pairs (part A) does not exist, so the *score* used to find the "highest-scoring false
-  pairs" is the detector's own confidence for the donor end.
-- **Calibration set of 100 figures.** 30 true candidates drawn at random; 20 false candidates with
-  the highest confidence; 30 false candidates drawn at random (these give the natural false-call
-  rate); 20 placebo candidates decoded on a rewired graph (false by construction). Plus the two
-  verified real transfers, as 2 more figures. The spec asks for 400 figures with routine-step and
-  sunny-run negatives; we use 100 because the reviewer's precision needs only an interval of about
-  ±0.10, and routine steps and sunny runs are left out.
-- **Figure.** One image per candidate, identical for injected and real cases: no NGED labels, no
-  truth marks, no dates (days relative to the onset), neutral Primary labels. Panels: observed power
-  and expected power for the donor and the recipient; each residual in noise units with the decoded
-  steps; the median residual of the other Primaries; the residual of the other neighbours. Three
-  time ranges: an overview from 7 days before the onset to 7 days after the end (capped at 60
-  days), and half-hourly zooms of ±48 hours at the onset and at the end. The spec's ERA5 and CAMS
-  panels are left out.
-- **Reviewer.** Sonnet only, never Opus, with one fixed brief (the nine rubric items R1 to R9 of
-  the spec scored 0 to 2, a verdict among transfer with direction, solo shift, generator or
-  routine, weather or common mode, PV, and unclear, a confidence from 1 to 5, JSON output). It runs
-  in fresh sessions of about 10 figures each to bound the context, with the order shuffled; the
-  brief is identical, so this is one reviewer. It never starts a sub-agent.
-- **Realness check.** A separate Sonnet session sees 30 injected and 30 real candidate figures
-  (E1-J-sym's real transfers before 2026-07-01) and answers "injected or real?". The spec asks for
-  100; 60 gives an interval of about ±0.13.
-- **Natural mix.** The false-transfer share after the gate is reweighted from the calibration set's
-  rates to the 40 worlds' natural mix of true and false candidates, using the random-false stratum
-  for the false-call rate, and is reported with a Wilson interval.
-- **Model tier.** No Opus comparison (the brief forbids Opus), so the spec's step of using Sonnet
-  only if it is within 0.05 of Opus is not run.
-- **Cost.** CPU: 40 worlds at about 3 seconds, rendering a few minutes. Tokens: about 1,000 for each
-  image plus about 3,000 for the brief and reply, so about 160 reviews cost under 1 million tokens;
-  stop and tell the manager if the first batch's cost projects above 2 million.
+**Every row is a candidate, never a label.** NGED's event labels are an incomplete dump, so a clean
+half-hour may hold an event that no label covers. The injected worlds are built on the real record,
+so they inherit its unlabelled events. No data on or after 2026-07-01 was read.
 
-## Predictions that could fail
+## Headline rows
 
-| Measure | Prediction |
+| Measure | Result |
 |---|---|
-| Precision for "transfer" on the calibration set | 0.80 or more at recall 0.60 or more |
-| Direction of called true transfers | right for 90% or more |
-| D5 to D16 and D3/D22 | both called a transfer |
-| False-transfer share, natural mix | 0.45 or less after the gate, from about 0.6 before |
-| Realness accuracy | 60% or less |
+| Precision for "transfer" on the calibration set (102 figures) | 0.45 (24 of 53 calls; 95% interval 0.33 to 0.59); gate 0.80, **fails** |
+| Recall of the 32 true transfers (30 injected, 2 verified real) | 0.75 (24 of 32; 0.58 to 0.87); gate 0.60, passes |
+| Direction of the called true transfers | 23 of 24 as drawn; gate 90%, passes |
+| The two verified real transfers (D5 to D16, D3 to D22) | Both called a transfer, passes |
+| Realness: "injected or real?" on 38 figures (30 injected, 8 real) | 39% right (balanced 43%); gate 60% or less, passes, but with 8 real figures the interval is wide |
+| Candidates that recur in 10 or more worlds, among the 460 false candidates | 111, from 5 distinct real-record transfers |
+| Post hoc: precision without the 22 recurring candidates in the calibration set | 0.75 (24 of 32; 0.58 to 0.87), still under 0.80 but the interval contains it |
+| False-transfer share of candidates, natural mix (before, after the gate) | 0.75, then 0.56 (95% interval 0.44 to 0.66); not at the 0.45 target |
 
-**Stop rule.** If the reviewer fails the gate, the manual review is dropped and the detector's
-automatic tiers stay.
+**The 0.56 after the gate overstates the false share.** The gate keeps 21 of the 22 recurring
+real-record candidates, and the 0.56 counts them as false. We did not recompute the share without them,
+because the random sample of non-recurring false candidates holds 28 figures.
 
-## Standing practices
+![Share of figures the reviewer called a transfer, by kind of candidate](call_rate_by_kind.svg)
 
-- **Followed:** cleaned power, the D15 and D18 cut before 2025-03-01 (inherited from experiment
-  653's residual), draft pull request, code review before the run, and prose review.
-- **Not applicable:** no forecast is scored, so there is no refit, no tail calibration, and no
-  curtailment cost. The unlogged-event caveat applies: NGED's event labels are an incomplete dump.
+| Kind of candidate | Called a transfer |
+|---|---|
+| Injected transfers that the detector found | 22 of 30 |
+| Verified real transfers | 2 of 2 |
+| Recurring real-record transfers (labelled false) | 21 of 22 |
+| Other false candidates | 6 of 28 |
+| Injected look-alikes (placebos, solo shifts) | 2 of 20 |
+
+## What the reviewer got wrong
+
+- **The 8 true transfers it missed.** 5 were called "unclear" (a gradual donor step, a recipient
+  dominated by solar output, or an end beyond the record), 2 "solo shift" (one Primary shows no
+  clear step), and 1 "unclear" at a recipient that ramps over weeks.
+- **The 8 calls on candidates that do not recur.** 6 were on the 28 other false candidates and 2 on
+  injected look-alikes. Of the 27 calls on false candidates that are not look-alikes, 4 overlap an
+  injected transfer between the same two Primaries whose start lies 3 to 129 half-hours from the
+  decoded start, so the label "false" comes from the 24-half-hour start rule.
+- **Example of a call on a high-confidence false candidate.** In the first figure both Primaries
+  step together at the onset and return together, as a transfer does, which is why the reviewer
+  called it a transfer.
+
+![Candidate labelled false that the reviewer called a transfer](example_false_called_transfer.png)
+
+- **Example of a missed true transfer.** The second figure is an injected transfer that the reviewer
+  called "unclear" because the recipient's step is smaller than its day-to-day swings.
+
+![Injected transfer that the reviewer called unclear](example_true_missed.png)
+
+## Checks
+
+- **Median minus mean forecast, and mean-forecast error beside each quantile-score contrast:** not
+  applicable, because no forecast is scored.
+- **Audit triggers:** none fired. The result does contradict the prediction of a false-transfer share
+  of about 0.6 before the gate (it is 0.75). Experiment 680 reports 0.77 of the ends, and the
+  per-candidate share here is 0.75, so the prediction was only a wrong guess. The contaminated
+  labels were found and explained by the recurrence check, which is recorded as post hoc.
+- **Confidence field.** Some reviewer sessions wrote a probability (such as 0.9999) in the field that
+  asked for an integer from 1 to 5, so the confidence is not used.
+- **Code review.** One fresh Sonnet code review ran before the first reviewer call. It found that the
+  figure identifiers revealed the source (injected, real, or verified), that injected solo shifts were
+  labelled false and not hard, and that the true label has no one-to-one assignment. The identifiers
+  were randomised and the hard set widened. The one-to-one rule and the unmatched real-case step
+  scaling were not changed, and both are small against the recurrence effect.
+- **Load-shift scenarios and event plots:** not applicable, because no forecast is scored. The two
+  figures above are the example candidates.
+- **Unlogged events:** the recurrence check shows the real record holds at least 5 transfers that no
+  injected label covers, so every false-transfer share here is an overstatement.
+
+## Method
+
+- **Candidates.** A candidate is a donor end (a decoded fall) of E1-J-sym with its largest decoded
+  partner, in each of the 40 default worlds of experiment 680 (seeds 900 to 939) with a start in
+  2024-01-01 to 2026-06-30. There are 613 (153 true, 460 false). A candidate is *true* when its donor
+  end matches an injected donor end (same Primary, start within 24 half-hours, overlap of 0.5 or
+  more) and a decoded partner is a partner of that injected transfer. A candidate is *hard* when an
+  injected placebo, common-mode, solo-shift, or hard-negative event at either Primary starts within 2
+  days of its start. The spec's scorer over candidate pairs does not exist, so the "highest-scoring"
+  false pairs are the ones with the highest detector confidence for the donor end.
+- **Calibration set (102 figures).** 30 true candidates drawn at random, excluding hard ones; 20
+  false candidates of the highest confidence, excluding hard ones; 30 false candidates drawn at
+  random, excluding hard ones; 20 hard false candidates drawn at random; and the 2 verified real
+  transfers. The spec asks for 400 figures including routine steps and sunny runs.
+- **Figure.** One image per candidate, identical for injected and real cases: neutral Primary labels,
+  no dates, no truth marks. Panels: the donor's power and expected power, the donor's residual in
+  noise units with the decoded step, the same for the recipient, the residual of up to 4 other
+  neighbours, and the median residual of all Primaries. Columns: an overview from 7 days before the
+  onset to 7 days after the end (6-hour means, capped at 60 days), and half-hourly zooms of 48
+  hours either side of the onset and of the end. The ERA5 and CAMS panels of the spec are left out.
+  Figure identifiers are random three-digit numbers.
+- **Reviewer.** Sonnet, never Opus, with one fixed brief (the nine questions R1 to R9 of the spec
+  scored 0 to 2, a verdict, a direction, and a confidence, as JSON), run in fresh sessions of about
+  10 figures each. Each session reads only the brief and its figures and starts no sub-agent. The
+  answer key was kept in a different folder. Cost: 15 sessions at about 93,000 tokens each, about
+  1.4 million tokens in all, about 9,000 tokens per figure.
+- **Realness check.** A second brief, 4 sessions, 38 figures: 30 injected candidates and 8 real ones
+  (the 6 real transfer pairs of experiment 680's real-record table, and the 2 verified transfers).
+  The real record holds too few pairs for the 30 real figures the spec asks for.
+- **Scoring.** A call is a verdict of "transfer". Precision and recall use the calibration set with
+  [Wilson (1927)](https://doi.org/10.1080/01621459.1927.10502953) intervals. The false share after the
+  gate is reweighted to the natural mix of the 40 worlds (153 true, 276 plain false, 184 hard false
+  candidates), using each stratum's call rate, with a bootstrap over the figures of each stratum.
+- **Post hoc recurrence check.** A false candidate that has the same donor, recipient, and day in 10
+  or more of the 40 worlds is a real-record event, because the worlds differ only in what is injected.
+  5 such groups cover 111 of the 460 false candidates. The check was run after the answers were read.
+- **Standing practices.** No refit, no forecast, no tails or curtailment cost. Cleaned power and the
+  D18 cut before 2025-03-01 come from experiment 653's residual. CPU only, 2 cores.
+
+## Files
+
+- `ml-experiments/00692-.../e00692_run.py`: decodes the 40 worlds, lists the candidates, picks the
+  sets, and draws the figures and the key.
+- `e00692_common.py`: draws one candidate figure.
+- `e00692_ids.py`: renames the figures to random identifiers.
+- `e00692_score.py`: scores the answers against the key and writes `scores.json`.
+- `e00692_diagnose.py`: post hoc check of which injected transfers overlap the reviewer's false calls.
+- `e00692_figures.py`: draws the figure above and copies the two example candidates.
+- Private data, not in git, in `data/ml-experiments/00692-event-table-reviewer-calibration-gate/`:
+  `figures/` (the 140 figures), `answers/` (the reviewer's JSON lines), `reviewer_brief.md` and
+  `realness_brief.md`, `answer_key_private/` (`candidates.parquet`, `key.parquet`, and
+  `diagnose.parquet`), and `scores.json`. Inputs are experiment 680's stored real-record table and
+  the generator of [experiment
+  660](../00660-shared-generator-of-injected-load-transfer-events/result.md).

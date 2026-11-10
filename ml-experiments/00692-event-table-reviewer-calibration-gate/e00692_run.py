@@ -1,3 +1,4 @@
+# ruff: noqa: ANN001, PLR0915
 """Experiment 692: build and render the calibration and realness figures for the reviewer.
 
 Run from the repository root (see experiment 680's `e00680_run.py` for the environment):
@@ -23,10 +24,10 @@ from datetime import UTC, datetime
 
 import numpy as np
 import polars as pl
-from e00653_common import DAY, GRID_LENGTH, SCORED_FROM
-from e00653_inject import OFFSET_2019
-from e00680_run import CONFIGS, Rig, decode_variants, params653
-from e00692_common import OUT, render
+from e00653_common import DAY, GRID_LENGTH, SCORED_FROM  # ty: ignore[unresolved-import]
+from e00653_inject import OFFSET_2019  # ty: ignore[unresolved-import]
+from e00680_run import CONFIGS, Rig, decode_variants, params653  # ty: ignore[unresolved-import]
+from e00692_common import OUT, render  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 import e00660_generator as gen  # ty: ignore[unresolved-import]  # isort: skip
@@ -164,7 +165,7 @@ def _draw(
 ) -> None:
     sites = rig.panel.sites
     raw = {s: power[s] - rig.forecast[s] for s in sites}
-    stack = np.stack([raw[s] / rig.p653._scale(raw[s]) for s in sites])  # noqa: SLF001
+    stack = np.stack([raw[s] / rig.p653._scale(raw[s]) for s in sites])
     med = np.nanmedian(stack, axis=0)
     nb = [
         s

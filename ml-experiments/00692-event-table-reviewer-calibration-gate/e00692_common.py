@@ -1,3 +1,4 @@
+# ruff: noqa: ANN001, ANN202, PLR0915
 """Shared constants and the figure renderer of experiment 692.
 
 A candidate is a donor end (a decoded fall) of E1-J-sym with its largest decoded partner. The figure
@@ -83,8 +84,8 @@ def render(
         ("Donor: residual (noise units)", donor, "resid"),
         ("Recipient: power and expected power (MW)", recipient, "power"),
         ("Recipient: residual (noise units)", recipient, "resid"),
-        ("Other neighbours' residual (noise units)", None, "others"),
-        ("Median residual of all Primaries (noise units)", None, "median"),
+        ("Other neighbours' residual (noise units)", donor, "others"),
+        ("Median residual of all Primaries (noise units)", donor, "median"),
     ]
     for c, (title, a, b, overview) in enumerate(windows):
         if c == 2 and end is None:
@@ -92,7 +93,7 @@ def render(
                 axes[r, c].axis("off")
             axes[0, c].set_title(title, fontsize=8)
             continue
-        t_ref = onset if c < 2 else end
+        t_ref = onset if c < 2 or end is None else end
         axes[0, c].set_title(title, fontsize=8)
         for r, (label, site, kind) in enumerate(rows):
             ax = axes[r, c]
