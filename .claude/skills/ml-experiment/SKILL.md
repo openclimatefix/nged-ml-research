@@ -82,10 +82,9 @@ human review.
 
 - **The id and the slug.** Call `studies.experiment_store.reserve_experiment(slug=...)`. It returns
   the next id, written as five digits, and creates `data/ml-experiments/<id>-<slug>/`. Make the slug
-  descriptive.
-  **Write the id without leading zeros in the title of a pull request or an issue**, as in
-  "Experiment 6: which input features work best", never "Experiment 00006". The five digits belong
-  to folder and file names only.
+  descriptive. Export `DATA_PATH_INTERNAL` as this repository's `CLAUDE.md` says before calling
+  `reserve_experiment`. Without it the id comes from the research checkout's own `data/` folder,
+  which holds few ids, and collides with an id another session has taken.
 - **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it. The
   page is not in the navigation, because the generated Experiments table of its theme links to it,
   so do not edit `mkdocs.yml`.
@@ -102,6 +101,12 @@ human review.
   on `PYTHONPATH`, because only the script's own folder is on `sys.path` otherwise. An example is
   `PYTHONPATH=ml-experiments/<earlier-folder> uv run --no-sync python <script>`. An experiment has
   no tests of its own scripts; the machinery it calls is tested in `src/studies/`.
+  **Commit every script that wrote a stored file or produced a number the page publishes.** That
+  includes the code that built a cached input table which a later experiment reads, and the
+  `result.md` names the table's lineage. A script that exists only in a worktree, a scratch folder,
+  or `data/` cannot be audited or rerun. **Do not rerun a published script unless the manager
+  assigned you the rerun**, because all worktrees share one data folder and a rerun overwrites the
+  evidence that other worktrees' pages cite.
 - **Reuse of an earlier experiment's code:** when a script imports another experiment's module,
   name that experiment's folder in the `result.md` bullets. Never edit an earlier experiment's
   script after its PR merged, except to fix a bug, and record that fix in the later experiment's PR
@@ -201,6 +206,11 @@ model trains or scores on it.
   to at least 7 days after a real event where one exists. The plots follow the "Method" and
   "Files" rules of the write-up, and anonymise any generator.
 
+**A pre-registered gate stays pre-registered.** When a reading chosen after the scores were seen
+changes the verdict, report the pre-registered result first, label the later number as post hoc, and
+say plainly that the experiment does not pass the gate (experiment 692: 0.45 against a gate of 0.80,
+and 0.75 post hoc).
+
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
 
@@ -250,8 +260,9 @@ time would have taken under an hour.
   job's own CPU use. If the job uses well under its quota and will run for more than about 30
   minutes, split it into parallel workers before letting it run on.
 - **Stay inside the slot.** The worker count times the threads per worker stays at or below the
-  slot's cores, and the workers' GPU memory adds up to no more than the slot's share. Ask the
-  manager before exceeding either.
+  slot's cores, and the workers' GPU memory adds up to no more than the slot's share. Set each fit's
+  memory cap from its measured peak, and run no more concurrent fits than the slot's cores and free
+  memory allow. Ask the manager before exceeding any of the three.
 - **Keep the results independent of the schedule.** Fix the seed of each job, write each job's output
   to its own file, and write it atomically, so that a run in parallel gives the numbers a run in
   series would, and a crashed worker is rerun without touching the others.
@@ -472,8 +483,10 @@ the verdict in one sentence, the winner with its interval, each arm's absolute s
 (load the `dataviz` skill), the failures, and the lessons for later experiments, which also become
 `advice`. **A published page never names a generator, gives its identifier, or shows its time series
 beside either.** Use the anonymised labels the `study` skill describes. Print every number the page
-quotes from a committed script, as the `study` skill requires. An experiment that plots feature
-importance follows the recipe in the `study` skill's "Design rules that keep a comparison fair".
+quotes from a committed script, as the `study` skill requires. Never call a stored file stale or
+current without checking its modification time and its hash against the file that should have
+produced it. An experiment that plots feature importance follows the recipe in the `study` skill's
+"Design rules that keep a comparison fair".
 
 ## Running a night's experiments
 
@@ -498,15 +511,15 @@ write-up.** The [background index](../../../docs/ml-experiments/background/index
 owns the full rule, including the evidence tag every bullet carries.
 
 **Record every new finding about data processing in `docs/ml-experiments/data-processing.md`, in the
-same PR as the write-up.** A finding about data processing is a step that the data needs before a
-model trains or scores on it: a period to cut or mask, a series to exclude, a unit, sign, or
-timestamp convention, a product that cannot be mixed with another, or a check that failed silently.
-Write it as an instruction with a bold lead, followed by where it applies (experiments, production,
-or both), the evidence with a link to the experiment, the series and period it covers, and the
-confidence. Update an existing entry instead of adding a second one, and mark the entry provisional
-until the experiment has had its reviews. A result that contradicts an entry changes the entry in the
-same PR. Keep a rule about how to run an experiment, such as a control arm or a scoring rule, in this
-skill and not on that page.
+same PR as the write-up, and read the page before scoring a detector on injected truth.** A finding
+about data processing is a step that the data needs before a model trains or scores on it: a period
+to cut or mask, a series to exclude, a unit, sign, or timestamp convention, a product that cannot be
+mixed with another, or a check that failed silently. Write it as an instruction with a bold lead,
+followed by where it applies (experiments, production, or both), the evidence with a link to the
+experiment, the series and period it covers, and the confidence. Update an existing entry instead of
+adding a second one, and mark the entry provisional until the experiment has had its reviews. A
+result that contradicts an entry changes the entry in the same PR. Keep a rule about how to run an
+experiment, such as a control arm or a scoring rule, in this skill and not on that page.
 
 ## Audit before merge
 
@@ -593,7 +606,9 @@ file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoc
 run on a draft pull request, so pushes to a draft cost no CI minutes. Open the pull request with
 `gh pr create --draft`. When the local checks pass and the reviews are triaged, run `gh pr ready N`,
 which starts CI once. Wait for the `ci` check to pass before you merge. Every later push to a ready
-pull request runs CI again, so batch the fixes into one commit.
+pull request runs CI again, so batch the fixes into one commit. If `ci` shows "skipping" after the
+ready-for-review click, the draft gate has raced the ready event and `ci` will never run. Push one
+more commit, and merge only after a real green run on the final head.
 
 **Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its
 `take_home_message`.** The agent receives the files and no account of the reasoning behind them,
