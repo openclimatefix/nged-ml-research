@@ -12,6 +12,7 @@
 | 625 | How few member paths do NGED's power-flow studies need, and does a Schaake shuffle of anomaly paths help the Primaries? | 3 | Experiments 434 and 436 (finished) | Finished (`partly supported`) |
 | 629 | Do coherent Primary scenarios, summed to a bulk supply point, give a trustworthy tail for the flow through that point? | 4 | Experiments 625 and 626 (finished) | Finished (`not supported`) |
 | 631 | Once the metered farms beneath a bulk supply point are in the sum, does a coherent scenario sum give a usable tail for the flow through that point? | 5 | Experiment 629 (finished) | Finished (`not supported`) |
+| 689 | Does a width scale fitted on a fixed lookback remove the steps in band width at the model refits, or does seed averaging matter? | 2 | Experiment 683 (finished) | Finished |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 6 | The scoring harness and experiment 00016 | Answered for the farms and the Primaries by experiments 434, 436, and 625; open for coherence with the direct forecast of the bulk supply point's meter (see the [delivery recommendation](delivery-recommendation.md)) |
 
 ## Planned experiments
