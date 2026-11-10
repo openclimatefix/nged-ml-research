@@ -106,8 +106,8 @@ hours that experiment 660 reported is the gap between the two Primaries' *labell
 gaps are 2.0 hours at the D5/D16 onset, 2.5 hours at its end, −0.5 hours at the D3/D22 onset, and
 −2.0 hours at its end. Experiment 660's own fitted shifts, added to the labelled times, also give
 gaps under 1 hour. Of the 333 false events that injected solar growth causes, few are abrupt
-steps inside a sunny run, but half last 3 days or less. A composite capacity curve for slow drift would therefore remove fewer false events than the
-ramp share suggests.
+steps inside a sunny run, but half last 3 days or less. A composite capacity curve for slow
+drift would therefore remove fewer false events than the ramp share suggests.
 
 **Check 1 asks whether the two ends of a verified transfer start together.** A transfer happens
 when an operator switches a circuit from one Primary substation (the donor) to a neighbour (the
