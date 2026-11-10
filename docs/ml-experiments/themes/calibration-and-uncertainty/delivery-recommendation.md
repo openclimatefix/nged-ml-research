@@ -17,10 +17,10 @@ runs for 16 Primaries, 3 wind farms, and 6 solar farms. The BSP results and the 
 of experiments 629 to 631 rest on 5 development months, and the BSP results on 2 BSPs. NGED has not
 yet confirmed that any part of this design suits its workflow.
 
-Terms: K is the number of paths in a scenario set. q05 and q95 are the forecasts at the 5% and 95%
-levels. CRPS (continuous ranked probability score) scores one series' marginal forecast. The
-variogram score scores how well a scenario set's dependence between series and leads matches
-reality.
+Terms: K is the number of paths in a scenario set. A quantile such as q05, q95, or q99 is the
+forecast at the 5%, 95%, or 99% level. CRPS (continuous ranked probability score) scores one series'
+marginal forecast. The variogram score scores how well a scenario set's dependence between series
+and leads matches reality.
 
 ## The recommendation
 
@@ -175,33 +175,35 @@ are worth building.
 ## Advisor review of the delivery design (2026-11-07)
 
 This section summarises an advisor review that read the background docs and experiments 430, 434,
-and 436 and proposed the delivery design above. The review is the only place the full reasoning for
-the design is written down. Statements about NGED's workflow that no source states are marked
-(guess) and need NGED's confirmation.
+and 436 and proposed the delivery design above. The review is the fullest account we have of the
+reasoning for the design (the answer file is private to the research team). Statements about NGED's
+workflow that the review flagged as unsupported are marked (guess), and every statement about NGED's
+workflow needs NGED's confirmation.
 
 **The binding quantity is the flow through one constrained element, and that flow is a weighted sum
-over many nodes.** For about half of NGED's generators the limit sits at a BSP or GSP. For most of
-the rest it sits on a circuit and binds only after the next fault, found by power flow plus N-1
-contingency analysis (one outage simulated at a time). In an almost radial part of the electricity
-network every weight is 1 for the nodes below the element. In a meshed 33 kV part the weights are
-power transfer distribution factors (the share of an injection at a node that flows through the
-element). The flow is then close to linear in the node injections: F is about the sum of w_i times
-P_i.
+over many nodes.** According to the background docs, for about half of NGED's generators the limit
+sits at a BSP or a GSP. For most of the rest it sits on a circuit and binds only
+after the next fault, found by power flow plus N-1 contingency analysis (one outage simulated at a
+time). In an almost radial part of the electricity network every weight is 1 for the nodes below the
+element. In a meshed 33 kV part the weights are power transfer distribution factors (the share of an
+injection at a node that flows through the element). The flow F through the element is then close to
+linear in the node injections: it is about the sum, over nodes i, of the weight w_i times the node's
+injection P_i.
 
 **The review corrected four parts of the working understanding.**
 
-- Reverse flow is not itself a breach. It is a breach only where it exceeds the reverse-direction
-  rating of a transformer or circuit, or pushes voltage or protection out of limits (guess about
-  which binds most often in the trial area).
-- Real-time curtailment is done by active network management (ANM), not by a study days ahead. A
-  study 1 to 10 days ahead is more plausibly for outage planning, flexibility procurement, or
-  warning generators of likely curtailment (guess).
+- Reverse flow is a breach only where it exceeds the reverse-direction rating of a transformer or
+  circuit, or pushes voltage or protection out of limits (guess about which binds most often in the
+  trial area).
+- According to the background docs, real-time curtailment is done by active network management
+  (ANM), not by a study days ahead. A study 1 to 10 days ahead is more plausibly for outage
+  planning, flexibility procurement, or warning generators of likely curtailment (guess).
 - "A power-flow model takes only scalars" is true of one run and is not the constraint. A
   time-series power flow takes one scalar per node per half-hour. The real limit is how many runs
   the analyst can afford, which depends on whether the runs are scripted.
-- The power flow needs nodes we do not forecast: unmetered generators, other Primaries, and the 10
-  sites metered in MVA (megavolt-amperes, which carry no flow direction). Our scenarios cover only
-  part of the sum.
+- The power flow needs nodes we do not forecast: unmetered generators, other Primaries, and the
+  sites metered in MVA (megavolt-amperes, which carry no flow direction; 8 of the 16 Primaries in
+  experiment 629). Our scenarios cover only part of the sum.
 
 **For curtailment, the tail of the sum decides the outcome, so dependence between nodes matters more
 than any single site's tail.** The review's worked example is two neighbouring solar farms under one
@@ -222,9 +224,10 @@ simplification, because solar output is bounded by clear sky and capacity):
   the Primaries are independent. Their realised correlation was 0.29, so the sd of a sum of 16 equal
   Primaries is 2.3 times the independent value. Experiment 436's tail table showed 13.9% of actual
   group net flows above the q95 of independent-draw sums, against 6.6% for the Schaake shuffle and
-  2.6% for ensemble copula coupling, while the variogram score barely moved. The group-sum
-  exceedance rate is therefore the right instrument for this decision, and the variogram score is
-  the wrong one.
+  2.6% for ensemble copula coupling. The variogram score barely moved. Experiment 436 also found the
+  51-value marginals too narrow in the upper tail, so these exceedances partly reflect the
+  marginals. The review's conclusion is that the group-sum exceedance rate is the right instrument
+  for this decision, and the variogram score is the wrong one.
 - Demand and solar errors are negatively correlated (-0.36 realised), so in the export direction a
   sunnier-than-forecast day also lowers demand through embedded solar and the two errors add. No
   experiment has tested cross-family dependence.
@@ -239,20 +242,25 @@ simplification, because solar output is bounded by clear sky and capacity):
 | Many draws (marginals plus copula), analyst picks | Moderate: sampling code, then choosing what "extreme" means | Only as far as the marginal tails and the copula's tail dependence allow; 1,000 draws carry about +/-0.3 points of Monte Carlo error at q99 | Indirectly, through group sums |
 | (a) Pre-chosen stress scenarios per element | Least: feed K vectors straight into the power flow | Yes at the chosen level, if the element flow's quantile is right | The element quantile, yes; the split across nodes, no |
 | (b) Distribution of the element flow itself | Low, but the result cannot be fed into a power flow | Best, where the element is metered | Yes, against the element's own meter |
-| (c) Importance sampling or conditional simulation | High: weighted samples confuse non-statisticians | Yes, efficiently | As for (a) |
+| (c) Importance sampling or conditional simulation | High: weighted samples confuse non-statisticians | Yes, efficiently | Same as option (a) |
 | (d) Quantiles of group sums as extra series | Low | Yes for the named groups | Yes |
 
 - Option (b) has an advantage: the Boston and Skegness BSPs are metered and already among the
-  series, so a direct forecast is trained and scored on the true flow with no copula. A sum of node
-  scenarios cannot match it, because unmetered load, losses, and the direction-blind MVA Primaries
-  sit inside the BSP meter but outside any sum of our nodes. Experiments 629 and 631 confirmed this.
+  series, so a direct forecast is trained and scored on the true flow with no copula. The review
+  argued that a sum of node scenarios cannot match it, because unmetered load, losses, and the
+  direction-blind MVA Primaries sit inside the BSP meter but outside any sum of our nodes.
+  Experiments 629 and 631 found that sums of the Primaries missed the export tail of both BSPs, that
+  adding the metered wind and solar farms removed most of the export-side miss at Skegness but
+  widened the import-side miss, and that the direct forecast of each BSP meter came closest to
+  nominal (within two binomial errors on three of four tails in experiment 631). Neither experiment
+  tested the unmetered load, the losses, or the MVA Primaries separately.
 - Options (a) and (c) reduce to one recipe. For element E, day d, and level tau (for example 0.5,
   0.9, 0.95, and 0.99 of that day's peak export), deliver the coherent vector of node values most
   likely given that the flow equals its tau quantile. Under a Gaussian copula and a linear flow this
-  vector has a closed form, mu + Sigma w (q - mu_F) / sigma_F squared. With Schaake paths it is the
-  drawn path whose element flow lies nearest the quantile. The label "Skegness export, day 3, 95th
-  percentile" names the target quantity and level, is recomputed in every run, and never refers to a
-  member's identity, so nothing carries over from day to day.
+  vector has a closed form, mu + Sigma w (q - mu_F) / sigma_F squared. With Schaake paths, the
+  vector is the drawn path whose element flow lies nearest the quantile. The label "Skegness export,
+  day 3, 95th percentile" names the target quantity and level, is recomputed in every run, and never
+  refers to a member's identity, so nothing carries over from day to day.
 - A deterministic bounding case is worth adding beside the statistics: maximum generation with
   minimum demand. For solar, maximum generation is clear-sky output capped at capacity and needs no
   tail statistics. The added value is the probability that a day approaches that ceiling (guess that
@@ -260,8 +268,8 @@ simplification, because solar output is bounded by clear sky and capacity):
 
 **The review recommended validating the element flow against its own meter on four quantities.**
 
-- The exceedance rate at q90, q95, and q99 (and q01 to q10 on the export side), by lead band, with
-  summer middays separately.
+- The exceedance rate at q90, q95, and q99 (and the 1%, 5%, and 10% levels on the export side), by
+  lead band, with summer middays separately.
 - Threshold-weighted CRPS at the scaled limit (0.9 times the maximum export observed before the
   scored period). The score is proper and fits curtailment, because it scores every half-hour and
   weights only the region above the line.
@@ -272,11 +280,17 @@ simplification, because solar output is bounded by clear sky and capacity):
 **The independent sample is the weather day, not the half-hour, so q99 cannot be validated.**
 Export-side tails live on roughly 150 to 180 summer half days a year per BSP (estimate). A q95 test
 then rests on about 8 to 9 exceedance days per BSP per year (binomial error about +/-1.6 points on a
-5% rate), and a q99 test on about 2. The firm limit had been reached once in the pilot. What cannot
-be validated with our data: q99 and beyond; tail dependence in the far tail; any element that is not
-metered, including every post-fault circuit; combined rare events such as an outage on a clear-sky,
-low-demand day; and the split of a stress scenario across nodes, as distinct from the sum. The
-review advised stating these limits to NGED's analyst rather than covering them with a score.
+5% rate), and a q99 test on about 2. The review said the firm limit had been reached once in the
+pilot, a statement we could not trace to experiments 629 or 631, which found the scaled limit never
+reached in the development months. The review listed what cannot be validated with our data:
+
+- q99 and beyond.
+- Tail dependence in the far tail.
+- Any element that is not metered, including every post-fault circuit.
+- Combined rare events, such as an outage on a clear-sky, low-demand day.
+- The split of a stress scenario across nodes, as distinct from the sum.
+
+The review advised stating these limits to NGED's analyst rather than covering them with a score.
 
 **The review's recommended design.** For each element NGED names, starting with the export side of
 the Boston and Skegness BSPs:
@@ -284,15 +298,16 @@ the Boston and Skegness BSPs:
 - Deliver the element flow's quantiles from a direct forecast of the metered flow.
 - Deliver 3 to 5 conditional stress vectors per element per day, at tau in {0.5, 0.9, 0.95, 0.99} of
   the daily peak export, generated from Schaake paths and rescaled to hit the element quantile.
-- Keep per-node marginals (13 quantiles, with widened tails) and the Schaake template dates on S3,
-  so a scripted analyst can draw more scenarios.
+- Keep per-node marginals (the review said 13 quantiles; the stored forecasts hold 11, see question
+  5) with widened tails, and the Schaake template dates, in Amazon S3 object storage, so a scripted
+  analyst can draw more scenarios.
 
 The fallback is marginals plus a Schaake or copula table with client-side sampling, a 20-line client
 recipe, and published group-sum quantiles for the two BSPs so the analyst can check their own sums.
 The review's cheapest next experiment was a CPU-only re-score of experiment 436's stored scenario
-tables as BSP-group sums against the BSP meters, which became experiments 629 and 631. The design
-with conditional stress vectors (the second bullet) has not been built or tested, and is the open
-question below.
+tables as BSP-group sums against the BSP meters. That proposal led to experiments 629 and 631, which
+used the daily-run forecasts rather than experiment 436's stored tables. The design with conditional
+stress vectors (the second bullet) has not been built or tested, and is the open question below.
 
 ## Open question
 
