@@ -11,6 +11,7 @@
 | 525 | Does a 0/1 metering-type input (signed MW or apparent power in MVA) improve the lag-free demand network, compared with a constant column and with the 37-input L-Ww? | Medium | Experiments 519 and 522 | Finished: not supported, see experiment 525 |
 | 619 | Does a lag-enabled demand network forecast the 2 bulk supply points and the 2 grid supply points better than the lag-free network at days 1 to 3? | High (bake-off development) | Experiment 611 | Finished: partly supported, see experiment 619 |
 | 622 | Does a lag-enabled demand network beat a lag-free network at days 1 to 3 at the 2 bulk supply points and the 2 grid supply points, when both use the D5 offset and the thermal-lag columns? | High (bake-off development) | Experiment 619 | Finished: partly supported, see experiment 622 |
+| [604](../../00604-bsp-gsp-pilot-design-for-the-bake-off/result.md) | What would a pilot that backtests the best demand forecast at the 2 bulk supply points and 2 grid supply points need, and what would it cost? | Done | Nothing | Finished (inconclusive): The pilot is affordable and the data are clean, but the 4 series differ from the Primaries in two ways (see the result page). |
 
 ## Planned experiments
 
