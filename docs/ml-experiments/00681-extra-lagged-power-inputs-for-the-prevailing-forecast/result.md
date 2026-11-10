@@ -72,6 +72,17 @@ experiment changes only the inputs of the prevailing head.
     - L3: L2 plus the differences between consecutive daily means for the last 3 days (14 inputs).
     - P: placebo with the width of the best of L1 to L3: its lag inputs come from another Primary of
     the same metering group (a fixed permutation, no Primary maps to itself).
+- **Bank rows.** The injected shift is applied to the new lags exactly as to the target, from the
+  same shifted power series. The residual's lag-free median is not shifted, because the lag-free
+  network reads no power. The code checks that bank shifts start or end 6 to 72 hours before some
+  origins, or the new lags cannot be learned.
+- **Delay assertion.** The code asserts, for every row, that each lag time, rolling-mean end, and
+  difference input is at most origin minus 6 hours.
+- **Veto (designer, 2026-11-10).** Experiment 663's end detector read the freshest half-hours and
+  worsened the prevailing forecast (+0.30 in force, +0.20 net). The one veto here is an event-free
+  CRPS cost against L0 above 0.03 points of capacity. Scores are reported in the strata event-free,
+  event-free more than 14 days from any event, in force, near the end, and ended in the last 24
+  hours, with the off-shift false-alarm rate.
 - **Folds.** The development folds of experiment 667: 2025-11 to 2026-06. Folds 2025-11 and 2025-12
   have fewer than two earlier banks and use the fallback head with no trained weights, so the six
   folds 2026-01 to 2026-06 carry the contrasts. The final-test window (from 2026-07-01) is not read.
