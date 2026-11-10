@@ -298,9 +298,9 @@ def main(out: Path) -> None:  # noqa: PLR0915
                 )  # ty: ignore[invalid-argument-type]
                 t0 = to_time(o)
                 a = datetime.fromtimestamp(
-                    float(t0.astype("datetime64[s]").astype(int)) - 3 * 86400,
-                    tz=UTC,  # ty: ignore
-                )  # ty: ignore[unresolved-attribute]
+                    float(t0.astype("datetime64[s]").astype(int)) - 3 * 86400,  # ty: ignore[unresolved-attribute]
+                    tz=UTC,
+                )
                 fan_panels.append(
                     (
                         f"{name}: {np.datetime_as_string(t0, unit='m')} UTC",  # ty: ignore
@@ -330,8 +330,8 @@ def main(out: Path) -> None:  # noqa: PLR0915
                     ).sort("vidx")
                     parts.append(
                         s.select(
-                            time=pl.Series(to_time(s["vidx"].to_numpy())),
-                            q50="q50",  # ty: ignore
+                            time=pl.Series(to_time(s["vidx"].to_numpy())),  # ty: ignore[invalid-argument-type]
+                            q50="q50",
                         ).with_columns(lead=pl.lit(lead_name))
                     )  # ty: ignore[invalid-argument-type]
                 lp.append(
