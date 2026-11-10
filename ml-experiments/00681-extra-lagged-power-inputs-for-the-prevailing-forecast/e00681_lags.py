@@ -81,7 +81,7 @@ def lag_block(
 
 
 def placebo_map() -> np.ndarray:
-    """Return, for each Primary, another Primary of the same metering group that is no electrical neighbour of it (fixed)."""
+    """Return, for each Primary, another Primary of its metering group that is no neighbour (fixed)."""
     nb_of, _cap, is_mw = c650.world()
     n = len(is_mw)
     out = np.zeros(n, np.int64)
@@ -171,7 +171,7 @@ def main(month: str, *, run_selftest: bool) -> None:
     assert abs(share[0] - share[1]) < 0.1, (
         f"finite share differs between real and bank rows: {share}"
     )
-    np.savez(OUT / f"lags_{month}.npz", **out)
+    np.savez(OUT / f"lags_{month}.npz", **out)  # ty: ignore[invalid-argument-type]
     print(
         f"{month}: real {len(real['org_prim'])} origins, bank {len(bp)} origins; events match the stored table; finite share {np.isfinite(out['real_true']).mean():.3f}",
         flush=True,

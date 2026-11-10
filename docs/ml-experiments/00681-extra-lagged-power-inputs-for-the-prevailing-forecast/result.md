@@ -206,6 +206,39 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
 - **Not computed.** The median minus mean forecast per site and the curtailment cost are not
   computed.
 
+## Reusing the L3 head
+
+- **The L3 lag set (14 inputs, each as a residual plus a missing flag, so 28 columns).** For a
+  Primary and a forecast origin, with every time in hours before the origin and every value the
+  cleaned power minus the Candidate's lag-free median at that time, as a fraction of capacity:
+  columns 0 to 7 are the residuals at 6, 9, 12, 18, 24, 36, 48, and 72 hours; columns 8 to 10 are
+  the means over the last 6, 12, and 24 hours ending 6 hours before the origin; columns 11 to 13 are
+  the differences between consecutive trailing 24-hour means (the 24 hours ending 6 hours before the
+  origin minus the 24 hours before that, then the next two pairs). A mean is missing when under half
+  of its window is finite. The code is `e00681_lags.py` (`lag_block`).
+- **The head recipe.** Experiment 667's survival-hazard head (`p667_head.HazardHead`: two hidden
+  layers of 64 units, outputs a depth, a spread, and 14 daily hazards) with its inputs widened by the
+  28 lag columns, appended after experiment 667's columns. Everything else is experiment 667's recipe,
+  unchanged: its training months, its pre-training chain, the loss and optimiser of experiments 647
+  and 652, and two seeds averaged. `e00681_fit.py` wraps experiment 667's `p667_fit.fit_rhaz` and
+  changes only its input loader. The fitted heads are in `fits/L3/` of the experiment's private data
+  folder.
+- **Folds fitted: 6 of the 12 monthly folds of experiment 667.** The folds are 2026-01 to 2026-06.
+  The missing folds are 2025-11 and 2025-12, which use the fallback hazard head with no trained
+  weights (so there is no head to widen), and 2026-07 to 2026-10, the final-test window, which this
+  experiment does not read. The lag blocks and the head fits for those four months need only
+  `e00681_lags.py MONTH` and `run_arm.sh L3 14 MONTH`; experiment 667's banks and Candidate quantiles
+  for them already exist.
+- **Fit time per head.** 34 to 95 seconds per head and seed (including the prediction pass) on one
+  CPU thread with four fits running at once; the longer times are the later folds, which train on
+  more months. All 12 L3 head fits (6 folds, 2 seeds) take about 12 minutes of one thread. The lag blocks take about 1 minute per
+  month.
+- **Leakage check.** Every lag is at least 6 hours older than the origin. `lag_block` asserts that
+  the newest half-hour any input reads is the origin minus 12 half-hours, and `selftest` adds 123
+  to every half-hour newer than that for 200 real origins and checks that no input moves (and moves
+  the half-hour at that limit to confirm that the test can detect a change). A head for fold M trains
+  only on the real and injected rows of earlier months, with valid times before the first day of M.
+
 ## Caveats and what to try next
 
 - **The conclusions rest on injected events.** The generator that builds the injected events also

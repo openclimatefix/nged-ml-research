@@ -64,7 +64,10 @@ def origin_departure(*, z: dict, q_prev: np.ndarray, q_nra: np.ndarray) -> np.nd
 def reaction(
     *, o: np.ndarray, d: np.ndarray, onset: int, end: int, transfer: float
 ) -> tuple[float, float]:
-    """Return (hours from the start to the first reacting origin, hours from the end to the first agreeing origin); NaN if none."""
+    """Return the hours from the start, and from the end, to the first reacting origin.
+
+    The second value is the hours from the end to the first origin that agrees again; NaN if none.
+    """
     half = 0.5 * abs(transfer)
     sgn = np.sign(transfer)
     ok = np.isfinite(d)
