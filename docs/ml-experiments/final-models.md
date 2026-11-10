@@ -4,8 +4,8 @@
 it was trained.** It is written for the person who ports the models into `nged-substation-forecast`.
 Each section covers one forecast type and has the same blocks: architecture, training regime,
 post-processing, scores, code, input tables, and port notes. Most choices link to the experiment
-page that decided them. The page adds no new scoring. Where two pages disagree, the page says so and names the current
-one.
+page that decided them. The page adds no new scoring. Where two pages disagree, the page says so
+and names the current one.
 
 **No neural network on this page is adopted for production.** Every score comes from one backtest
 year that overlaps the development months. The backtest is described in [experiment
@@ -1690,9 +1690,9 @@ The per-type sections give the detail where it belongs.
   the BSPs and GSPs in `ml-experiments/00669-*/e00669_testrows.py`, and experiment 667 rebuilt the
   Primaries' rows from 2025-07-01 onward (`REPLACE_FROM` in `e00667_extend.py`). A port must
   forecast every half-hour of the horizon.
-- **The last 62 days of a wind refit window only stop training early.** Wind cases whose origin is at or after
-  the cut-off (62 days before the refit date) and whose valid time is before the refit date are used
-  to choose the best epoch and never enter a gradient (`STOP_WINDOW_DAYS` in `e00666_wind_fit.py`).
+- **The last 62 days of a wind refit window only stop training early.** Wind cases whose origin is at or
+  after the cut-off (62 days before the refit date) and whose valid time is before the refit date
+  are used to choose the best epoch and never enter a gradient (`STOP_WINDOW_DAYS` in `e00666_wind_fit.py`).
 - **ERA5 arrives about 5 days late.** At a real cut-off, the last roughly 5 days of ERA5 and CAMS
   pre-training rows could not be read. The BSP and GSP section states this. The same lateness
   applies to any Candidate or wind input built from ERA5.
