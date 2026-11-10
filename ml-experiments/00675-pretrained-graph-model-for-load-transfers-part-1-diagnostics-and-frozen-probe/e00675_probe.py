@@ -20,7 +20,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00653_common import DAY, SCORED_FROM
 from e00665_score import cell_of  # ty: ignore[unresolved-import]
 from e00675_inputs import causalise, node_inputs
