@@ -34,7 +34,7 @@ def main(out: Path) -> None:
     pts = base.mark_point(filled=True, size=60, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "diff:Q",
-            title="Paired share of transfer megawatts: hybrid minus E1-J (more positive is better)",
+            title="Paired share of transfer megawatts: hybrid minus E1-J, in share (more positive is better)",
         )
     )
     bars = base.mark_rule(aria=False).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
@@ -43,10 +43,19 @@ def main(out: Path) -> None:
         .mark_rule(color="#555", strokeDash=[4, 3])
         .encode(x="x:Q")
     )
-    chart = (bars + pts + zero).properties(width=680 - 130, height=300, title=alt.Title(
-        ["Donor alarms add 0.03 to 0.08 of paired share in the deep cells,",
-         "below the +0.10 bar. Dot: mean of seeds. Line: 95% interval from resampling",
-         "the 40 scored worlds. Dashed line: same as E1-J."]))  # fmt: skip
+    bar = (
+        alt.Chart(pl.DataFrame({"x": [0.10]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(color="#000", strokeDash=[1, 3])
+        .encode(x="x:Q")
+    )  # ty: ignore[unresolved-attribute]
+    chart = (bars + pts + zero + bar).properties(
+        width=680 - 130, height=300,
+        title=alt.Title(
+            "Donor alarms raise pairing by 0.03 to 0.08 in the deep cells, below the bar",
+            subtitle=["Dot: mean of seeds (F is one fit). Line: 95% interval from resampling the 40 worlds,",
+                      "not fit variance. Dashed line: same as E1-J. Dotted line: the pre-registered +0.10 bar."],
+        ),
+    )  # fmt: skip
     chart.save(out / "figure_paired_minus_e1j.svg")
     if (png := __import__("os").environ.get("PNG_DIR")) is not None:
         chart.save(Path(png) / "figure_paired_minus_e1j.png", scale_factor=2)
