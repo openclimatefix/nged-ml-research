@@ -117,6 +117,14 @@ extra lags react 1.25 days sooner, and the features-minus-lags difference is -0.
 Primary is shifted at once in the banks, so prediction P5 (the placebo gains less than a third of
 the features arm's gain) is untested.
 
+[Experiment
+691](../../00691-causal-detector-features-plus-extra-lags-in-the-prevailing-head/result.md) gave
+the head both the features and the extra lags. FL1 reacts 1.75 days sooner than experiment 652's
+head, but only 0.16 days sooner than the features alone (interval -0.45 to +0.14), below the
+0.5-day bar, so the features and the lags carry mostly the same information. The in-force score
+gain is 0.20 points of capacity, below the 0.30 bar, and false alarms on event-free injected rows
+rise by 5.1 points.
+
 ## Findings the merged pages do not carry yet
 
 **Four items below appear on no merged page. The first, a re-analysis of experiment 651's outputs,
@@ -167,7 +175,7 @@ the Discuss session's view.
 | 1 | Learnt candidate scorer over E1-J-sym's candidates | Does a logistic regression, then small trees, on timing, shape, and context features cut the false-transfer share to 0.45 or less without losing paired share? | About 5 to 9 CPU-hours (spec estimate) | Experiments 660, 675, and 680; part A of the detector spec |
 | 2 | The one-Sonnet reviewer against the candidates | Does a reviewer reach 0.80 precision at 0.60 recall on a blinded calibration set? | About 5 million tokens (spec estimate, made for two Sonnet reviewers plus Opus) | A scorer's candidates and the calibration set; part C |
 | 3 | The neural lag-free year-fold residual with explicit PV | Does a residual built from a neural cross-fit lower the noise unit or the event-free decoded rate against arm C? | About 1.5 GPU-hours (ceiling 2 GPU-hours) | Part B; the maintainer's backtests keep GPU priority |
-| 4 | Causal detector features for the lag encoder and the prevailing head | Do the features help the production heads beyond the extra lags of experiment 681? | About 2 GPU-hours for the fine-tune, after a CPU test | Experiment 687; part D |
+| 4 | Causal detector features for the lag encoder and the prevailing head | Do the features help the production heads beyond the extra lags of experiment 681? (Experiment 691: features and lags together add under 0.5 days over the features alone.) | About 2 GPU-hours for the fine-tune, after a CPU test | Experiment 687; part D |
 | 5 | The MVA sign label with the hard-mask arm and the D8 gas-generator state | Does a per-Primary masked day labeller recover reverse flow at the eight apparent-power Primaries? | CPU only, zero fits | The MVA spec; no known answer at D12's export level |
 | 6 | FLOW-C | Does FLOW-E keep a lower follow than G0 across five months, against a rewired placebo? | About 6 GPU-hours | Only if the forecast side still wants FLOW-E |
 | 7 | Graph-learnt models | Do learnt graph models pair better with more data? | Not estimated | Fleet adjacency from NGED, or more verified events |
