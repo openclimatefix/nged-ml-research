@@ -14,8 +14,9 @@ import e00425_fit as fit  # ty: ignore[unresolved-import]
 import e00425_prep as prep  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments/00537-a-pool-minus-lags")
+WORK = Path(str(ML_EXPERIMENTS_DATA_DIR / "00537-a-pool-minus-lags"))
 _, _, LAYOUT = base.feature_names(scheme="summary")
 LAG_COLS = LAYOUT.columns_of(groups=["lags"])
 assert len(LAG_COLS) == 9, LAG_COLS

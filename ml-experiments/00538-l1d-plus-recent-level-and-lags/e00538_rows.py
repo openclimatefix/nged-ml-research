@@ -9,10 +9,9 @@ import e00470_heads as heads470  # ty: ignore[unresolved-import]
 import e00470_score as score470  # ty: ignore[unresolved-import]
 import e00511_score as k511  # ty: ignore[unresolved-import]
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-W = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00538-l1d-plus-recent-level-and-lags/work"
-)
+W = Path(str(ML_EXPERIMENTS_DATA_DIR / "00538-l1d-plus-recent-level-and-lags/work"))
 SRC511 = k511.WORK_DIR / "predictions"
 FIVE = build470.MONTHS
 assert FIVE == ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06"), FIVE

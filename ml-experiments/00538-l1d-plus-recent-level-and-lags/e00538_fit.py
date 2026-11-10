@@ -26,10 +26,9 @@ import e00511_fit as f  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00538-l1d-plus-recent-level-and-lags"
-)
+WORK = Path(str(ML_EXPERIMENTS_DATA_DIR / "00538-l1d-plus-recent-level-and-lags"))
 W = WORK / "work"
 EXTRA_IDX = {"R1": [0, 3, 6], "R9": list(range(9))}
 parser = argparse.ArgumentParser()

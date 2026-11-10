@@ -8,17 +8,16 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-sys.path[:0] = [
-    str(p) for p in Path("/home/jack/dev/nged-ml-research/ml-experiments").iterdir() if p.is_dir()
-]
+sys.path[:0] = [str(p) for p in Path(__file__).resolve().parents[1].iterdir() if p.is_dir()]
 sys.path.insert(
     0,
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00533-l1d-vs-a-pool-same-rows/code",
+    str(ML_EXPERIMENTS_DATA_DIR / "00533-l1d-vs-a-pool-same-rows/code"),
 )
 import e00521_stats as s  # ty: ignore[unresolved-import]
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = Path(str(ML_EXPERIMENTS_DATA_DIR))
 W = DD / "00537-a-pool-minus-lags"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]

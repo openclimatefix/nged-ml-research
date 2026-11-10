@@ -4,8 +4,9 @@
 from pathlib import Path
 
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = Path(str(ML_EXPERIMENTS_DATA_DIR))
 W = DD / "00538-l1d-plus-recent-level-and-lags/work/fits"
 L = DD / "00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/work/fits/L-1d"
 MONTHS = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")

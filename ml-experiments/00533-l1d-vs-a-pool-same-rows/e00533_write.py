@@ -1,7 +1,8 @@
 # ruff: noqa: ANN001, ANN201, D100, D103, E501, PTH123, SIM115
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-D = "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00533-l1d-vs-a-pool-same-rows/"
+D = str(ML_EXPERIMENTS_DATA_DIR / "00533-l1d-vs-a-pool-same-rows") + "/"
 c = pl.read_csv(D + "scores/contrasts.csv")
 ORDER = ["0-6h", "6-12h", "12-24h", "24-48h", "48-72h", "72-120h", "120-240h", "all"]
 

@@ -60,6 +60,7 @@ class CutModels:
         months: The window's calendar months, `datetime64[M]`, matching the rows of `left_out`.
         pinned: The pinned capacity of the cut.
         clip: The export clip of the site and pinned capacity.
+        layout: The column layout of the design matrix.
     """
 
     cut: datetime

@@ -1,5 +1,5 @@
 #!/bin/bash
-D=/home/jack/dev/nged-substation-forecast/data/ml-experiments/00539-l1d-plus-day-and-week-lags/code
+D=${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}/ml-experiments/00539-l1d-plus-day-and-week-lags/code
 for arm in R-DW; do
   $D/run.sh fit --arm $arm && $D/run.sh assemble --arm $arm || exit 1
 done
