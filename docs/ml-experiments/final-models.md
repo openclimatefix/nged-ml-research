@@ -895,7 +895,7 @@ Paths are relative to `data/ml-experiments/`, which is private and outside git.
 | Input | Path | Built by | Source data |
 |---|---|---|---|
 | Node ensemble summaries (mean and standard deviation over 51 members, 7 variables, one file per daily 00Z run from 2024-04-01 to 2026-10-31) | `00633-*/inputs/ens_summary_nodes/init=<date>.parquet` | Runs to 2026-06-29: links to the files of `e00415_prep.py summaries`. Runs from 2026-07-01: `e00633_frames.py` (weather frames), then `e00633_nodes.py summaries` | The ECMWF ENS archive, read through `e00048_build_frames._half_hourly_rows` |
-| Fine-tuning and step-2 matrices of the 4 nodes (observed, unflagged half-hours only) | `00633-*/inputs/raw/summary/<site>.npz` | `e00415_prep.py raw` writes experiment 564's stored matrix, and `e00633_nodes.py raw` appends the rows of runs after 2026-06-29 | The node summaries above, the power grid, and the flag file below |
+| Fine-tuning and step-2 matrices of the 4 nodes (observed, unflagged half-hours only) | `00633-*/inputs/raw/summary/<site>.npz` | `e00415_prep.py raw` writes experiment 415's matrix files, experiment 564's `prepare_folders()` links the 4 nodes' files, and `e00633_nodes.py raw` appends the rows of runs after 2026-06-29 | The node summaries above, the power grid, and the flag file below |
 | Test matrices (every half-hour, observed or not) | `00669-*/inputs/raw_test/` | `e00669_testrows.py` | The same sources, without the observed-power filter |
 | Pre-training matrices (ERA5 and CAMS pseudo-runs, ending 2026-07-31) | `00564-*/work/raw_pretrain/<site>.npz` | `e00564_fit.py build-pretrain-rows`, which calls experiment 418's `write_raw` | ERA5 and CAMS tables at the 4 nodes |
 | Thermal-lag and solar-gain tables | `00633-*/inputs/trailing437_nodes/` | `e00633_tables.py build` (experiment 437's `site_table`, through `e00622_b1.py`) | The node summaries above, and CAMS irradiance from 2019-09-01 to 2026-11-01 in `00620-*/inputs/cams_demand_points_extended.parquet` |
@@ -1155,7 +1155,7 @@ stores: the ECMWF ENS `Nwp` Delta table (`NWP`, from 2024-04-01), the cleaned po
   runs to a full 15 days, and `member_paths` in `e00666_wind_features.py` takes the rebuilt file
   wherever both exist.
 - **Run order.** The scripts below run from the repository root, with `DATA_PATH_INTERNAL` set. The
-  first, second, and fourth read `e00259_common`, `e00615_common`, and `e00303_common` and need the
+  second, third, and fourth read `e00259_common`, `e00615_common`, and `e00303_common` and need the
   experiment folders on `PYTHONPATH`, as the docstrings of the scripts say.
     1. `e00210_data.py` then `e00210_analysis.py` (the idle mask).
     2. `e00259_hindcast.py`.
@@ -1164,8 +1164,9 @@ stores: the ECMWF ENS `Nwp` Delta table (`NWP`, from 2024-04-01), the cleaned po
     5. `e00666_wind_members.py`.
     6. `e00666_wind_features.py`, which asserts that its summaries reproduce experiment 659's stored
        summaries to 1e-5 before the valid time 2026-07-01.
-    7. `e00666_wind_fit.py`, then `e00666_export.py` (which writes `wind.parquet` and
-       `solar.parquet` together).
+    7. `e00666_wind_fit.py`, then the solar steps of the Solar section's "Input tables", then
+       `e00666_export.py` (which writes `wind.parquet` and `solar.parquet` together, so it needs the
+       solar fits as well).
 - **The idle mask needs ERA5 wind.** `e00210_data.py` joins the farms' power to the ERA5 100 m wind
   speed in `data/handover/era5_wind_at_nged_wind_farms_anonymised.parquet`, interpolated linearly
   to each half-hour's midpoint. The wind-speed detector in `e00210_analysis.py` writes the mask from
