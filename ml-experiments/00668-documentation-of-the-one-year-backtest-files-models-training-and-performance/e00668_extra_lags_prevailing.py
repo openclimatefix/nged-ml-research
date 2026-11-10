@@ -22,7 +22,7 @@ from typing import Final
 
 sys.path.insert(0, str(next(Path(__file__).resolve().parents[1].glob("00667-*/prevailing"))))
 
-import e00667_export as x667
+import e00667_export as x667  # ty: ignore[unresolved-import]
 import e00668_clamp_fixes as clamp
 import e00668_score_lib as lib
 import numpy as np
