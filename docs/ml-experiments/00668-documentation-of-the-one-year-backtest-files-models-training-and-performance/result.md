@@ -574,10 +574,10 @@ Normalised MAE of the median, prevailing, by Primary:
 **The December 2025 transfer of load between D5 and D16 is the one verified load shift in the
 backtest year, and the prevailing output first moved at the first origin of January 2026, 61 hours
 (D5) and 52 hours (D16) after the step starts.** The transfer is experiment 580's transfer 23: a
-fitted -1.47 MW at D5 and +1.37 MW at D16, 15 days from 2025-12-29. The step found in the observed power is at 2025-12-29 23:00 UTC and ends at 2026-01-14
-11:30 UTC at D5, and starts at 2025-12-30 08:30 UTC and ends at 2026-01-14 19:30 UTC at D16. These
-times are the largest change of the 12-hour mean of the observed power within 3 days of the dates of
-experiment 580.
+fitted -1.47 MW at D5 and +1.37 MW at D16, 15 days from 2025-12-29. The step found in the observed
+power is at 2025-12-29 23:00 UTC and ends at 2026-01-14 11:30 UTC at D5, and starts at 2025-12-30
+08:30 UTC and ends at 2026-01-14 19:30 UTC at D16. These times are the largest change of the 12-hour
+mean of the observed power within 3 days of the dates of experiment 580.
 
 From the file, the first daily origin at which the mean of the prevailing median over the next 24
 hours differs from the normal-running median by at least half of the fitted transfer is 61.0 hours
