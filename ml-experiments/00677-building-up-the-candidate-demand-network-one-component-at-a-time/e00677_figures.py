@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import altair as alt
+import pandas as pd
 import e00677_export as exp
 import e00677_score as sc
 import numpy as np
@@ -42,6 +43,9 @@ FIGURE_STEPS = {
 FIGURE_COLOURS = {"early": COLOURS, "late": ["#0B215F", "#B701FF", "#FC9700", "#009C75", "#BF4F04", "#17E58F"]}
 REFS = {"Manual heuristic": ("#555555", [6, 3]), "Climatology": ("#9A9A9A", [2, 2]), "Experiment 667 (monthly refits)": ("#000000", [1, 0])}
 WIDTH, HEIGHT = 620, 300
+EVENT = (datetime(2025, 12, 30, tzinfo=UTC), datetime(2026, 1, 15, tzinfo=UTC))  # the verified transfer at D5 and D16 (grid indices 110928 to 111696 of the protocol)
+EVENT_WINDOW = (datetime(2025, 12, 16, tzinfo=UTC), datetime(2026, 1, 29, tzinfo=UTC))  # 14 days before and after
+PANEL_HEIGHT = 320
 INTERIM = bool(os.environ.get("E677_INTERIM"))
 
 
@@ -104,11 +108,13 @@ def example(*, span: int, label: str, start: datetime, stop: datetime, series: i
     return alt.Chart(frame).mark_line(strokeWidth=1.5).encode(x=alt.X("valid_time:T", title=None), y=alt.Y("value:Q", title="Power (MW or MVA)", scale=alt.Scale(zero=False)), color=alt.Color("source:N", title=None, legend=alt.Legend(orient="top", columns=2))).properties(width=WIDTH, height=280, title=alt.TitleParams(f"{label}: median forecast {lead_day} to {lead_day + 1} days ahead", anchor="start", fontSize=13))
 
 
-def two_leads(*, span: int, label: str, start: datetime, stop: datetime, series: int, steps: tuple[str, ...]) -> alt.VConcatChart:
-    panels = [
-        example(span=span, label=label, start=start, stop=stop, series=series, steps=steps, lead_day=d).properties(width=WIDTH, height=280, title=("INTERIM, quarterly refits. " if INTERIM else "") + f"{label}: median forecast {d} to {d + 1} days ahead")
-        for d in (1, 5)
-    ]
+def two_leads(*, span: int, label: str, start: datetime, stop: datetime, series: int, steps: tuple[str, ...], event: tuple[datetime, datetime] | None = None) -> alt.VConcatChart:
+    panels = []
+    for d in (1, 5):
+        chart = example(span=span, label=label, start=start, stop=stop, series=series, steps=steps, lead_day=d)
+        if event:
+            chart = alt.layer(event_rect(start=event[0], stop=event[1]), chart)
+        panels.append(chart.properties(width=WIDTH, height=PANEL_HEIGHT, title=("INTERIM, quarterly refits. " if INTERIM else "") + f"{label}: median forecast {d} to {d + 1} days ahead"))
     return alt.vconcat(*panels).resolve_scale(color="shared")
 
 
@@ -124,7 +130,15 @@ def pick_weeks(*, series: int) -> dict[str, tuple[datetime, datetime]]:
 ARM_COLOUR = {"3b": "#009C75", "5w": "#0B215F", "8w": "#B701FF"}
 
 
-def band_panel(*, span: int, step: str, start: datetime, stop: datetime, series: int, lead_day: int, title: str, kind: str | None = None) -> alt.LayerChart:
+def event_rect(*, start: datetime, stop: datetime) -> alt.LayerChart:
+    """Return a light grey rectangle over the confirmed event, with a short label."""
+    frame = pd.DataFrame({"start": [start], "stop": [stop], "label": ["confirmed load shift"]})
+    rect = alt.Chart(frame).mark_rect(color="#D9D9D9", opacity=0.6).encode(x="start:T", x2="stop:T")
+    text = alt.Chart(frame).mark_text(align="left", baseline="top", dx=4, dy=2, fontSize=11, color="#555555").encode(x="start:T", y=alt.value(0), text="label:N")
+    return alt.layer(rect, text)
+
+
+def band_panel(*, span: int, step: str, start: datetime, stop: datetime, series: int, lead_day: int, title: str, kind: str | None = None, event: tuple[datetime, datetime] | None = None) -> alt.LayerChart:
     """Return one panel: one arm's median with its q05 to q95 and q25 to q75 bands, and the observed power on top."""
     truth = pl.read_parquet(sc.lib.FOLDER / "ground_truth_primaries.parquet").filter((pl.col("time_series_id") == series) & pl.col("valid_time").is_between(start, stop, closed="left")).select("valid_time", pl.col("power").alias("observed")).to_pandas()
     q = ["q05", "q25", "q50", "q75", "q95"]
@@ -145,7 +159,8 @@ def band_panel(*, span: int, step: str, start: datetime, stop: datetime, series:
     narrow = alt.Chart(f).mark_area(opacity=0.35, color=colour).encode(x=x, y="q25:Q", y2="q75:Q")
     med = alt.Chart(f).mark_line(strokeWidth=1.5, color=colour).encode(x=x, y="q50:Q")
     obs = alt.Chart(truth).mark_line(strokeWidth=1.2, color="#FF4901").encode(x=x, y="observed:Q")
-    return alt.layer(wide, narrow, med, obs).properties(width=WIDTH, height=280, title=title)
+    layers = [event_rect(start=event[0], stop=event[1])] if event else []
+    return alt.layer(*layers, wide, narrow, med, obs).properties(width=WIDTH, height=PANEL_HEIGHT, title=title)
 
 
 def prevailing_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int) -> alt.VConcatChart:
@@ -153,17 +168,17 @@ def prevailing_figure(*, span: int, label: str, start: datetime, stop: datetime,
     note = f"forecast made {lead_day} to {lead_day + 1} days ahead"
     prefix = "INTERIM. " if INTERIM else ""
     panels = [
-        band_panel(span=span, step="8w", start=start, stop=stop, series=series, lead_day=lead_day, kind=k, title=prefix + f"{label}, Candidate (experiment 667, monthly refits), {name} output: {note}")
+        band_panel(span=span, step="8w", start=start, stop=stop, series=series, lead_day=lead_day, kind=k, event=EVENT, title=prefix + f"{label}, Candidate (experiment 667, monthly refits), {name} output: {note}")
         for k, name in (("NRA", "NRA"), ("prevailing", "prevailing-conditions"))
     ]
     return alt.vconcat(*panels).properties(title=alt.TitleParams("Median (line), 50% band (dark shade), 90% band (light shade); observed power in orange. Ladder steps 1 to 8 have no prevailing output.", anchor="start", fontSize=11))
 
 
-def band_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int) -> alt.VConcatChart:
+def band_figure(*, span: int, label: str, start: datetime, stop: datetime, series: int, lead_day: int, event: tuple[datetime, datetime] | None = None) -> alt.VConcatChart:
     note = f"forecast made {lead_day} to {lead_day + 1} days ahead"
     prefix = "INTERIM, quarterly refits. " if INTERIM else ""
     panels = [
-        band_panel(span=span, step=s, start=start, stop=stop, series=series, lead_day=lead_day, title=prefix + f"{label}, {LABEL[s]}: {note}")
+        band_panel(span=span, step=s, start=start, stop=stop, series=series, lead_day=lead_day, event=event, title=prefix + f"{label}, {LABEL[s]}: {note}")
         for s in ("5w", "8w")
     ]
     return alt.vconcat(*panels).properties(title=alt.TitleParams("Median (line), 50% band (dark shade), 90% band (light shade) of the forecast; observed power in orange.", anchor="start", fontSize=11))
@@ -178,18 +193,18 @@ def main() -> None:
     contrasts(span=span).save(out / "ladder_contrasts.svg")
     steps = ("3b", "5w", "8w")
     for series, name in ((17, "D5"), (18, "D16")):
-        two_leads(span=span, label=f"{name}, the verified transfer", start=datetime(2025, 12, 28, tzinfo=UTC), stop=datetime(2026, 1, 15, tzinfo=UTC), series=series, steps=steps).save(out / f"ladder_transfer_{name}.svg")
+        two_leads(span=span, label=f"{name}, the verified transfer", start=EVENT_WINDOW[0], stop=EVENT_WINDOW[1], series=series, steps=steps, event=EVENT).save(out / f"ladder_transfer_{name}.svg")
     for series, name in ((17, "D5"), (18, "D16")):
         for kind, (start, stop) in pick_weeks(series=series).items():
             two_leads(span=span, label=f"{name}, {kind} ({start:%d %b %Y})", start=start, stop=stop, series=series, steps=steps).save(out / f"ladder_{kind.replace(' ', '_')}_{name}.svg")
     for series, name in ((17, "D5"), (18, "D16")):
-        scen = {"verified transfer": (datetime(2025, 12, 28, tzinfo=UTC), datetime(2026, 1, 15, tzinfo=UTC)), **{k: v for k, v in pick_weeks(series=series).items()}}
+        scen = {"verified transfer": EVENT_WINDOW, **{k: v for k, v in pick_weeks(series=series).items()}}
         for kind, (start, stop) in scen.items():
             for d in (1, 5):
-                band_figure(span=span, label=f"{name}, {kind}", start=start, stop=stop, series=series, lead_day=d).save(out / f"bands_{kind.replace(' ', '_')}_{name}_lead{d}.svg")
+                band_figure(span=span, label=f"{name}, {kind}", start=start, stop=stop, series=series, lead_day=d, event=EVENT if kind == "verified transfer" else None).save(out / f"bands_{kind.replace(' ', '_')}_{name}_lead{d}.svg")
     for series, name in ((17, "D5"), (18, "D16")):
         for d in (1, 5):
-            prevailing_figure(span=span, label=f"{name}, verified transfer", start=datetime(2025, 12, 28, tzinfo=UTC), stop=datetime(2026, 1, 15, tzinfo=UTC), series=series, lead_day=d).save(out / f"prevailing_verified_transfer_{name}_lead{d}.svg")
+            prevailing_figure(span=span, label=f"{name}, verified transfer", start=EVENT_WINDOW[0], stop=EVENT_WINDOW[1], series=series, lead_day=d).save(out / f"prevailing_verified_transfer_{name}_lead{d}.svg")
     print("figures written to", out)
 
 
