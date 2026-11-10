@@ -1,7 +1,8 @@
 # LSC detectors
 
 A short report on whether a better detector is worth building is on the [decision
-report](decision-report.md) page.
+report](decision-report.md) page. A plain-words summary of the event-table and graph-model line
+(experiments 653 to 676) is on the [event-table summary](event-table-summary.md) page.
 
 **The best switching detector, [RO-NC](../../glossary.md#ro-nc), finds most of the [moved
 power](../../glossary.md#recall-mw-weighted) (the megawatts a transfer moves) of injected load
