@@ -132,6 +132,10 @@ def replace() -> None:
     prev_new = prev_new.select(old.columns).cast(dict(old.schema))  # ty: ignore[no-matching-overload]
     df = pl.concat([nra, prev_new]).sort(KEY)
     structural_checks(df=df)
+    key_cols = [*KEY, "nwp_init_time"]
+    assert prev_new.select(key_cols).sort(KEY).equals(prev_old.select(key_cols).sort(KEY)), (
+        "the new prevailing rows have different keys or nwp_init_time from the old ones"
+    )
     # The NRA rows must be bit-identical to the current file.
     nra_new = df.filter(pl.col("NRA_or_prevailing") == "NRA")
     assert nra_new.equals(nra.sort(KEY)), "NRA rows changed"

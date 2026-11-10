@@ -141,16 +141,13 @@ description of one year and not a ranking.
   clamp changes 271,808 of 1,471,680 rows (18.5%), and the largest change is 6.1% of capacity. The
   daylight rows are bit-identical to the unclamped file. In `primaries.parquet`, every quantile of
   the eight MVA-only Primaries is at least zero, because apparent power cannot be negative. That
-  clamp changes 202,598 of 7,848,960 rows (2.6%), in D12, D22, and D8 only, and the largest change
-  is 2.21 MVA (D8). Both clamps are monotone, so no quantile crosses. The wind file is not clamped.
+  clamp changes 206,487 of 7,848,960 rows (2.6%), in D12, D22, and D8 only, and the largest change
+  is 2.80 MVA. Both clamps are monotone, so no quantile crosses. The wind file is not clamped.
   The Primaries measured in MW keep their negative lower quantiles; the observed power of D10 and
   D15 is also negative at times.
 - **Effect of the clamps on the scores.** The solar scores are unchanged, because the scores use
-  daylight half-hours only. The CRPS of the Primaries falls by at most 0.0004 points of capacity in the
-  pooled lead bands (0.004 points for D8 in the prevailing output, the largest change of any series),
-  and the median absolute error and the q05 to q95 coverage do not change. The tables and figures on
-  this page use the unclamped files. Rescoring the clamped files changes a few cells of the
-  Primaries tables by one in the last printed digit.
+  daylight half-hours only. The Primaries tables and figures on this page score the clamped
+  `primaries.parquet`. The other tables and figures use the unclamped files.
 
 ## The ground-truth files
 
@@ -305,8 +302,9 @@ fixes the choices that the earlier experiments left open, and this section resta
   features (the gap and neighbour signals above, built from lags), 4 age columns (the log of the
   departure's age in days, the age over 30, the gate flag, and the age of the freshest lag), and
   3 row inputs (the lead over 240 hours and the lower and upper half-widths of the Candidate's
-  band). The gate flag is kept as a column and set to zero, so the head has 65 inputs. It
-  has two hidden layers of 64 ReLU units and 12 outputs: a signed depth (0.5 times the
+  band). The gate flag is kept as a column and set to zero, so these columns number 65. The backtest
+  head appends 28 more columns, the extra lagged power inputs described next, so it has 93 inputs.
+  It has two hidden layers of 64 ReLU units and 12 outputs: a signed depth (0.5 times the
   hyperbolic tangent of the first output, so up to half of capacity), a spread, and daily hazards.
   Each hazard is `softplus(output - 3)`, and the survival probability `p` is the exponential of
   minus the hazards accumulated over the days before the lead. The probability is 0 when the
@@ -318,6 +316,21 @@ fixes the choices that the earlier experiments left open, and this section resta
   distribution plus `p` times the Candidate's distribution shifted by the depth, with the depth
   uncertain at three Gauss-Hermite points. The 11 prevailing quantiles are read off that mixture
   and are monotone by construction. When `p` is 0, the prevailing rows equal the NRA rows.
+- **Extra lagged power inputs of R-haz.** The head reads 14 lagged inputs of the Primary's own
+  cleaned power, each as a residual plus a missing flag (28 columns), appended after the 65 columns
+  above. [Experiment
+  681](../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md) chose them. Every
+  time below is measured back from the network origin, and every residual is the cleaned power
+  minus the Candidate's lag-free median at that time, as a fraction of capacity. The 14 inputs are
+  the residuals at 6, 9, 12, 18, 24, 36, 48, and 72 hours; the means of the residuals over the last
+  6, 12, and 24 hours, each window ending 6 hours before the origin; and the three differences
+  between consecutive trailing 24-hour means (the 24 hours ending 6 hours before the origin minus
+  the 24 hours before that, and the next two pairs). A mean is missing when under half of its
+  window holds a reading. The newest reading any input uses is 6 hours old, and a test perturbs
+  every later half-hour and checks that no input moves. Each of the 12 monthly refits trains on
+  the banks of earlier months only, and the lag inputs of an injected shift are built from the same
+  shifted power as its target. 2025-11 and 2025-12 use the fallback head, which has no inputs to
+  widen, so those two months carry no extra lagged inputs.
 - **Loss and training of R-haz.** The loss is the pinball loss over the 11 levels plus 0.05 times
   the binary cross-entropy of `p` against the observed state of an injected shift. The training rows
   mix real rows with injected shifts, with durations drawn half from 3 to 14 days and half from 28
@@ -325,7 +338,7 @@ fixes the choices that the earlier experiments left open, and this section resta
   112 days (an assumed mixture) and each injected shift counted equally. Adam, learning rate 0.003,
   weight decay 1e-4, batch 4096, up to 30 epochs, patience 4, 2 seeds averaged by mean quantile.
   The head of experiment 652 has 9,164 parameters (12 outputs) and no dropout. The backtest head has
-  14 daily hazards (16 outputs) and 65 inputs, which gives 9,424 parameters.
+  14 daily hazards (16 outputs) and 93 inputs, which gives 11,216 parameters.
 - **B-haz, the fallback prevailing head (2025-11 and 2025-12).** B-haz fits a survival curve to
   the durations of the injected shifts. It multiplies that curve by the residual of the Candidate's
   day-ahead median over the days 2 to 8 before the origin, and adds the product to the normal-running
@@ -352,24 +365,37 @@ output scores better than the normal-running output overall but worse in the 7 d
 verified load shift ends.** Every number is a normalised error in points of capacity (percent of
 capacity; smaller is better) over all 16 Primaries, pooled. For the MVA-only Primaries the
 denominator is the capacity in MVA, so the numbers mix real and apparent power. Of the 3,924,480
-rows of each output, 3,893,864 are scored: the rest have no observed power, the cleaning flagged the
+rows of each output, 3,895,784 are scored: the rest have no observed power, the cleaning flagged the
 half-hour, or a baseline is missing. The manual heuristic and climatology are described under
 [Comparison baselines](#comparison-baselines-slices-and-summary-figures). Gains are those of the
 output over the baseline, with a 95% day-block bootstrap interval from 2,000 resamples of origin
 days.
 
-Over all rows, the CRPS is 4.31 for normal running and 4.14 for prevailing, and the normalised MAE
-of the median is 7.58 and 7.38. The
+Over all rows, the CRPS is 4.31 for normal running and 4.09 for prevailing, and the normalised MAE
+of the median is 7.58 and 7.30. The
 [experiment 667 page](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)
-reports 4.32 and 4.14 for CRPS and 7.59 and 7.39 for the normalised MAE. The values agree to within
-0.01. This page scores the 3,893,864 half-hour rows that have cleaned observed power, and the 667
-page scores the full ground truth, which may explain the 0.01.
+scores the prevailing head without the extra lagged inputs, so its prevailing numbers are higher
+(4.14 for CRPS and 7.39 for the normalised MAE); its normal-running numbers (4.32 and 7.59) agree
+with this page to within 0.01. This page scores the 3,895,784 half-hour rows that have cleaned
+observed power, and the 667 page scores the full ground truth.
+
+**From 2026-01, when the prevailing head has its trained weights and the extra lagged inputs, the
+prevailing output scores lower than the normal-running output, and its margin is larger from 2026-07
+than before.** The table splits the pooled scores by the months of the forecast origin. The months
+from 2026-07 form the final-test window, so no choice rests on them.
+
+| Origin months | Half-hours | CRPS, normal running | CRPS, prevailing | MAE, normal running | MAE, prevailing | q05 to q95 coverage, prevailing |
+|---|---:|---:|---:|---:|---:|---:|
+| 2025-11 to 2025-12 (fallback head) | 650,457 | 3.95 | 3.98 | 6.92 | 6.95 | 85.6% |
+| 2026-01 to 2026-06 | 1,940,242 | 4.22 | 4.05 | 7.56 | 7.31 | 85.7% |
+| 2026-07 to 2026-10 (final-test window) | 1,305,085 | 4.63 | 4.21 | 7.94 | 7.47 | 83.9% |
+| All months | 3,895,784 | 4.31 | 4.09 | 7.58 | 7.30 | 85.1% |
 
 The two outputs of `NRA_or_prevailing` were scored separately. 2025-11 and 2025-12 use the B-haz
 fallback head and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks, so the
 prevailing output of the first two months comes from a different head. Every Primaries number on
 this page comes from the version of `primaries.parquet` whose SHA-256 digest starts with
-`5ef64625765f1801f9c4`.
+`9450ba70a286ff030a99`.
 
 #### Normal running (`NRA`)
 
@@ -380,8 +406,8 @@ Normalised MAE of the median:
 | days 0 to 1 | 279,369 | 6.70 | 8.59 | 10.89 | 22.0 (20.5 to 23.5) | 38.5 (37.2 to 39.6) |
 | days 1 to 3 | 558,598 | 6.92 | 8.59 | 10.95 | 19.4 (17.9 to 20.8) | 36.8 (35.6 to 37.9) |
 | days 3 to 7 | 1,115,942 | 7.43 | 8.60 | 11.06 | 13.7 (12.3 to 15.0) | 32.9 (31.8 to 33.9) |
-| days 7 to 10 | 835,703 | 7.85 | 8.91 | 11.17 | 11.9 (10.4 to 13.4) | 29.7 (28.5 to 31.0) |
-| days 10 to 14 | 1,104,252 | 8.10 | 8.94 | 11.33 | 9.4 (7.9 to 10.7) | 28.5 (27.3 to 29.7) |
+| days 7 to 10 | 836,087 | 7.85 | 8.91 | 11.17 | 12.0 (10.4 to 13.4) | 29.7 (28.5 to 31.0) |
+| days 10 to 14 | 1,105,788 | 8.09 | 8.94 | 11.33 | 9.4 (8.0 to 10.7) | 28.5 (27.3 to 29.7) |
 
 CRPS (2 × mean pinball loss over the 11 levels):
 
@@ -389,9 +415,9 @@ CRPS (2 × mean pinball loss over the 11 levels):
 |---|---:|---:|---:|---:|---|---|
 | days 0 to 1 | 279,369 | 3.84 | 4.89 | 5.94 | 21.5 (19.9 to 23.2) | 35.3 (34.1 to 36.5) |
 | days 1 to 3 | 558,598 | 3.96 | 4.89 | 5.98 | 19.0 (17.4 to 20.6) | 33.8 (32.6 to 34.8) |
-| days 3 to 7 | 1,115,942 | 4.23 | 4.90 | 6.07 | 13.8 (12.4 to 15.1) | 30.3 (29.2 to 31.3) |
-| days 7 to 10 | 835,703 | 4.45 | 5.11 | 6.16 | 12.9 (11.4 to 14.4) | 27.8 (26.6 to 29.0) |
-| days 10 to 14 | 1,104,252 | 4.59 | 5.12 | 6.28 | 10.4 (8.9 to 11.7) | 26.9 (25.7 to 28.0) |
+| days 3 to 7 | 1,115,942 | 4.23 | 4.90 | 6.07 | 13.8 (12.4 to 15.2) | 30.3 (29.2 to 31.3) |
+| days 7 to 10 | 836,087 | 4.45 | 5.11 | 6.16 | 12.9 (11.4 to 14.4) | 27.8 (26.6 to 29.0) |
+| days 10 to 14 | 1,105,788 | 4.59 | 5.12 | 6.27 | 10.4 (8.9 to 11.7) | 26.9 (25.7 to 28.0) |
 
 ![Normalised MAE of the median by forecast horizon for 16 Primaries, normal running](primaries_NRA_mae_by_horizon.svg)
 
@@ -401,21 +427,21 @@ Normalised MAE of the median:
 
 | Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
 |---|---:|---:|---:|---:|---|---|
-| days 0 to 1 | 279,369 | 6.12 | 8.59 | 10.89 | 28.7 (27.0 to 30.5) | 43.8 (42.4 to 45.0) |
-| days 1 to 3 | 558,598 | 6.48 | 8.59 | 10.95 | 24.5 (22.8 to 26.2) | 40.8 (39.5 to 42.1) |
-| days 3 to 7 | 1,115,942 | 7.19 | 8.60 | 11.06 | 16.4 (14.9 to 18.0) | 35.0 (33.8 to 36.2) |
-| days 7 to 10 | 835,703 | 7.75 | 8.91 | 11.17 | 13.0 (11.4 to 14.7) | 30.6 (29.2 to 32.0) |
-| days 10 to 14 | 1,104,252 | 8.07 | 8.94 | 11.33 | 9.7 (8.2 to 11.1) | 28.8 (27.3 to 30.1) |
+| days 0 to 1 | 279,369 | 5.97 | 8.59 | 10.89 | 30.5 (28.8 to 32.2) | 45.2 (43.9 to 46.4) |
+| days 1 to 3 | 558,598 | 6.37 | 8.59 | 10.95 | 25.9 (24.2 to 27.6) | 41.9 (40.6 to 43.1) |
+| days 3 to 7 | 1,115,942 | 7.12 | 8.60 | 11.06 | 17.2 (15.7 to 18.8) | 35.7 (34.4 to 36.9) |
+| days 7 to 10 | 836,087 | 7.69 | 8.91 | 11.17 | 13.7 (12.1 to 15.4) | 31.2 (29.7 to 32.6) |
+| days 10 to 14 | 1,105,788 | 8.01 | 8.94 | 11.33 | 10.4 (8.9 to 11.9) | 29.3 (27.8 to 30.6) |
 
 CRPS:
 
 | Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
 |---|---:|---:|---:|---:|---|---|
-| days 0 to 1 | 279,369 | 3.46 | 4.89 | 5.94 | 29.2 (27.5 to 31.0) | 41.7 (40.3 to 43.0) |
-| days 1 to 3 | 558,598 | 3.66 | 4.89 | 5.98 | 25.1 (23.4 to 26.7) | 38.8 (37.5 to 40.0) |
-| days 3 to 7 | 1,115,942 | 4.04 | 4.90 | 6.07 | 17.7 (16.3 to 19.1) | 33.4 (32.3 to 34.6) |
-| days 7 to 10 | 835,703 | 4.33 | 5.11 | 6.16 | 15.2 (13.7 to 16.6) | 29.7 (28.4 to 31.0) |
-| days 10 to 14 | 1,104,252 | 4.50 | 5.12 | 6.28 | 12.2 (10.9 to 13.4) | 28.3 (27.0 to 29.6) |
+| days 0 to 1 | 279,369 | 3.37 | 4.89 | 5.94 | 31.1 (29.5 to 32.7) | 43.2 (42.0 to 44.4) |
+| days 1 to 3 | 558,598 | 3.60 | 4.89 | 5.98 | 26.5 (24.7 to 28.2) | 39.9 (38.6 to 41.1) |
+| days 3 to 7 | 1,115,942 | 4.00 | 4.90 | 6.07 | 18.5 (17.1 to 20.0) | 34.1 (32.9 to 35.3) |
+| days 7 to 10 | 836,087 | 4.30 | 5.11 | 6.16 | 15.8 (14.4 to 17.3) | 30.2 (28.8 to 31.5) |
+| days 10 to 14 | 1,105,788 | 4.47 | 5.12 | 6.27 | 12.8 (11.5 to 14.0) | 28.8 (27.5 to 30.0) |
 
 ![Normalised MAE of the median by forecast horizon for 16 Primaries, prevailing](primaries_prevailing_mae_by_horizon.svg)
 
@@ -432,7 +458,7 @@ Normalised MAE of the median, normal running:
 | winter | 966,838 | 7.16 | 8.31 | 10.48 | 13.9 (11.3 to 16.3) | 31.7 (29.4 to 34.0) |
 | spring | 984,705 | 8.27 | 9.75 | 12.38 | 15.1 (13.8 to 16.5) | 33.2 (31.7 to 34.5) |
 | summer | 981,805 | 7.72 | 8.62 | 11.75 | 10.4 (8.4 to 12.5) | 34.3 (32.8 to 35.9) |
-| autumn (Sep to Oct 2026) | 642,670 | 7.55 | 8.28 | 9.97 | 8.9 (6.2 to 11.5) | 24.3 (23.1 to 25.4) |
+| autumn (Sep to Oct 2026) | 644,590 | 7.54 | 8.27 | 9.95 | 8.9 (6.2 to 11.6) | 24.3 (23.1 to 25.4) |
 
 CRPS, normal running:
 
@@ -442,17 +468,17 @@ CRPS, normal running:
 | winter | 966,838 | 4.08 | 4.97 | 5.95 | 17.9 (15.7 to 20.0) | 31.4 (29.8 to 32.9) |
 | spring | 984,705 | 4.57 | 5.40 | 6.67 | 15.4 (13.9 to 16.9) | 31.5 (30.1 to 32.7) |
 | summer | 981,805 | 4.56 | 4.88 | 6.32 | 6.7 (4.2 to 9.3) | 28.0 (26.2 to 29.8) |
-| autumn (Sep to Oct 2026) | 642,670 | 4.25 | 4.72 | 5.50 | 9.9 (7.7 to 12.1) | 22.7 (21.4 to 24.0) |
+| autumn (Sep to Oct 2026) | 644,590 | 4.25 | 4.72 | 5.49 | 10.0 (7.7 to 12.1) | 22.7 (21.3 to 24.0) |
 
 CRPS, prevailing:
 
 | Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
 |---|---:|---:|---:|---:|---|---|
 | autumn (Nov 2025) | 317,846 | 3.53 | 4.83 | 5.61 | 26.9 (24.7 to 28.8) | 37.1 (33.5 to 40.8) |
-| winter | 966,838 | 4.11 | 4.97 | 5.95 | 17.4 (15.0 to 19.8) | 31.0 (29.0 to 32.9) |
-| spring | 984,705 | 4.31 | 5.40 | 6.67 | 20.3 (18.5 to 22.0) | 35.4 (33.7 to 36.9) |
-| summer | 981,805 | 4.27 | 4.88 | 6.32 | 12.7 (10.6 to 14.4) | 32.5 (31.0 to 33.9) |
-| autumn (Sep to Oct 2026) | 642,670 | 4.02 | 4.72 | 5.50 | 14.9 (13.0 to 16.7) | 26.9 (24.9 to 28.7) |
+| winter | 966,838 | 4.06 | 4.97 | 5.95 | 18.3 (15.7 to 20.8) | 31.7 (29.7 to 33.7) |
+| spring | 984,705 | 4.25 | 5.40 | 6.67 | 21.3 (19.6 to 23.0) | 36.2 (34.6 to 37.8) |
+| summer | 981,805 | 4.19 | 4.88 | 6.32 | 14.1 (12.3 to 15.9) | 33.7 (32.2 to 35.1) |
+| autumn (Sep to Oct 2026) | 644,590 | 4.02 | 4.72 | 5.49 | 14.9 (12.6 to 16.9) | 26.9 (25.1 to 28.5) |
 
 ![Normalised MAE of the median by season for 16 Primaries, normal running](primaries_NRA_mae_by_season.svg)
 
@@ -472,12 +498,12 @@ CRPS by month of the forecast origin, normal running:
 | 2026-02 | 300,915 | 3.80 | 4.58 | 5.56 | 17.0 (15.2 to 18.8) | 31.6 (29.8 to 33.6) |
 | 2026-03 | 333,065 | 5.45 | 6.07 | 7.31 | 10.1 (8.2 to 12.1) | 25.4 (24.1 to 26.8) |
 | 2026-04 | 321,245 | 4.26 | 5.14 | 6.56 | 17.1 (14.7 to 19.4) | 35.1 (33.9 to 36.2) |
-| 2026-05 | 330,395 | 3.98 | 5.00 | 6.13 | 20.3 (18.5 to 21.9) | 35.0 (32.8 to 37.1) |
+| 2026-05 | 330,395 | 3.98 | 5.00 | 6.13 | 20.3 (18.5 to 21.9) | 35.0 (32.9 to 37.1) |
 | 2026-06 | 321,310 | 3.64 | 4.61 | 5.94 | 21.1 (19.1 to 22.9) | 38.8 (37.1 to 40.5) |
 | 2026-07 | 330,096 | 5.12 | 5.48 | 7.09 | 6.7 (3.8 to 9.2) | 27.8 (26.5 to 29.0) |
 | 2026-08 | 330,399 | 4.89 | 4.55 | 5.94 | -7.4 (-8.9 to -6.0) | 17.6 (16.7 to 18.5) |
-| 2026-09 | 322,539 | 4.32 | 4.42 | 5.70 | 2.3 (-0.3 to 4.7) | 24.2 (23.2 to 25.1) |
-| 2026-10 | 320,131 | 4.18 | 5.02 | 5.29 | 16.8 (15.7 to 17.8) | 21.1 (18.7 to 23.7) |
+| 2026-09 | 322,539 | 4.32 | 4.42 | 5.70 | 2.3 (-0.3 to 4.7) | 24.2 (23.3 to 25.1) |
+| 2026-10 | 322,051 | 4.17 | 5.01 | 5.29 | 16.8 (15.7 to 17.8) | 21.1 (18.7 to 23.7) |
 
 CRPS by month of the forecast origin, prevailing:
 
@@ -485,16 +511,16 @@ CRPS by month of the forecast origin, prevailing:
 |---|---:|---:|---:|---:|---|---|
 | 2025-11 | 317,846 | 3.53 | 4.83 | 5.61 | 26.9 (24.7 to 28.8) | 37.1 (33.5 to 40.8) |
 | 2025-12 | 332,611 | 4.42 | 5.44 | 6.50 | 18.8 (15.5 to 21.5) | 32.1 (30.1 to 33.7) |
-| 2026-01 | 333,312 | 4.14 | 4.87 | 5.76 | 14.8 (8.6 to 20.9) | 28.1 (22.7 to 32.7) |
-| 2026-02 | 300,915 | 3.73 | 4.58 | 5.56 | 18.6 (16.9 to 20.4) | 33.0 (31.4 to 34.7) |
-| 2026-03 | 333,065 | 4.88 | 6.07 | 7.31 | 19.5 (18.0 to 21.0) | 33.2 (30.5 to 35.8) |
-| 2026-04 | 321,245 | 4.15 | 5.14 | 6.56 | 19.2 (15.0 to 23.3) | 36.7 (34.5 to 38.8) |
-| 2026-05 | 330,395 | 3.88 | 5.00 | 6.13 | 22.3 (19.4 to 25.1) | 36.6 (33.6 to 39.6) |
-| 2026-06 | 321,310 | 3.79 | 4.61 | 5.94 | 17.8 (15.4 to 20.2) | 36.2 (34.0 to 38.5) |
-| 2026-07 | 330,096 | 4.62 | 5.48 | 7.09 | 15.7 (13.8 to 17.7) | 34.8 (33.3 to 36.3) |
-| 2026-08 | 330,399 | 4.38 | 4.55 | 5.94 | 3.9 (-0.3 to 7.4) | 26.3 (23.2 to 28.8) |
-| 2026-09 | 322,539 | 3.98 | 4.42 | 5.70 | 10.0 (7.4 to 12.4) | 30.1 (29.2 to 31.0) |
-| 2026-10 | 320,131 | 4.05 | 5.02 | 5.29 | 19.2 (17.4 to 21.0) | 23.5 (20.0 to 26.7) |
+| 2026-01 | 333,312 | 4.04 | 4.87 | 5.76 | 17.1 (10.5 to 23.3) | 29.9 (24.4 to 34.8) |
+| 2026-02 | 300,915 | 3.71 | 4.58 | 5.56 | 19.1 (17.4 to 20.8) | 33.3 (31.6 to 35.2) |
+| 2026-03 | 333,065 | 4.76 | 6.07 | 7.31 | 21.6 (19.5 to 23.5) | 34.9 (31.9 to 37.6) |
+| 2026-04 | 321,245 | 4.09 | 5.14 | 6.56 | 20.4 (16.2 to 24.4) | 37.6 (35.5 to 39.8) |
+| 2026-05 | 330,395 | 3.90 | 5.00 | 6.13 | 22.0 (19.2 to 24.7) | 36.4 (33.5 to 39.3) |
+| 2026-06 | 321,310 | 3.77 | 4.61 | 5.94 | 18.2 (15.6 to 20.8) | 36.5 (34.2 to 38.9) |
+| 2026-07 | 330,096 | 4.51 | 5.48 | 7.09 | 17.7 (15.7 to 19.8) | 36.3 (34.5 to 38.1) |
+| 2026-08 | 330,399 | 4.29 | 4.55 | 5.94 | 5.8 (2.5 to 8.7) | 27.7 (25.4 to 29.8) |
+| 2026-09 | 322,539 | 4.05 | 4.42 | 5.70 | 8.5 (5.3 to 11.3) | 29.0 (27.5 to 30.2) |
+| 2026-10 | 322,051 | 3.99 | 5.01 | 5.29 | 20.5 (18.9 to 21.9) | 24.6 (21.4 to 27.7) |
 
 #### By Primary
 
@@ -502,48 +528,48 @@ Normalised MAE of the median, normal running, by Primary:
 
 | Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
 |---|---:|---:|---:|---:|---|---|
-| D3 | 244,276 | 2.70 | 3.58 | 5.00 | 24.5 (21.6 to 27.1) | 45.9 (44.3 to 47.4) |
-| D9 | 244,122 | 4.40 | 5.20 | 5.64 | 15.4 (13.4 to 17.4) | 22.0 (20.3 to 23.7) |
-| D11 | 244,052 | 5.11 | 6.31 | 7.25 | 19.0 (14.8 to 23.4) | 29.5 (26.2 to 33.0) |
-| D19 | 244,248 | 5.58 | 6.90 | 8.59 | 19.1 (17.4 to 20.8) | 35.0 (32.8 to 37.1) |
-| D10 | 244,234 | 6.90 | 8.69 | 9.18 | 20.5 (18.7 to 22.3) | 24.8 (22.0 to 27.5) |
-| D4 | 244,416 | 3.92 | 5.04 | 5.41 | 22.1 (19.8 to 24.4) | 27.5 (25.4 to 29.6) |
-| D15 | 236,626 | 24.71 | 27.77 | 36.91 | 11.0 (8.0 to 14.1) | 33.1 (30.2 to 35.9) |
-| D18 | 242,456 | 8.92 | 10.70 | 14.36 | 16.6 (14.8 to 18.4) | 37.9 (33.8 to 41.8) |
-| D12 | 242,750 | 12.56 | 14.64 | 14.10 | 14.2 (12.4 to 16.1) | 10.9 (9.8 to 12.1) |
-| D22 | 244,374 | 7.63 | 7.99 | 8.41 | 4.4 (2.0 to 6.8) | 9.2 (6.2 to 12.0) |
-| D14 | 244,444 | 5.13 | 5.83 | 7.34 | 11.9 (8.2 to 15.4) | 30.1 (27.4 to 32.6) |
-| D5 | 241,644 | 6.91 | 7.81 | 8.86 | 11.5 (8.7 to 14.0) | 22.0 (18.9 to 24.8) |
-| D16 | 244,136 | 5.60 | 6.10 | 8.65 | 8.3 (6.2 to 10.4) | 35.3 (33.2 to 37.2) |
-| D21 | 243,436 | 4.16 | 4.94 | 6.14 | 15.7 (13.7 to 17.7) | 32.3 (30.9 to 33.6) |
-| D2 | 244,416 | 4.07 | 5.09 | 5.68 | 20.2 (17.8 to 22.5) | 28.4 (26.5 to 30.2) |
-| D8 | 244,234 | 13.57 | 14.21 | 27.44 | 4.5 (3.4 to 5.7) | 50.6 (49.0 to 52.1) |
+| D3 | 244,396 | 2.70 | 3.58 | 4.99 | 24.6 (21.7 to 27.2) | 45.9 (44.3 to 47.3) |
+| D9 | 244,242 | 4.40 | 5.20 | 5.64 | 15.4 (13.4 to 17.4) | 22.0 (20.3 to 23.7) |
+| D11 | 244,172 | 5.11 | 6.31 | 7.25 | 19.0 (14.8 to 23.4) | 29.5 (26.2 to 33.0) |
+| D19 | 244,368 | 5.58 | 6.90 | 8.59 | 19.1 (17.4 to 20.8) | 35.0 (32.8 to 37.1) |
+| D10 | 244,354 | 6.90 | 8.68 | 9.18 | 20.5 (18.7 to 22.3) | 24.8 (22.0 to 27.5) |
+| D4 | 244,536 | 3.92 | 5.04 | 5.41 | 22.1 (19.8 to 24.4) | 27.5 (25.4 to 29.6) |
+| D15 | 236,746 | 24.70 | 27.76 | 36.89 | 11.0 (8.0 to 14.1) | 33.1 (30.2 to 35.9) |
+| D18 | 242,576 | 8.92 | 10.70 | 14.36 | 16.6 (14.8 to 18.4) | 37.9 (33.8 to 41.8) |
+| D12 | 242,870 | 12.56 | 14.64 | 14.09 | 14.2 (12.4 to 16.1) | 10.9 (9.7 to 12.1) |
+| D22 | 244,494 | 7.64 | 7.99 | 8.41 | 4.4 (2.1 to 6.8) | 9.2 (6.2 to 11.9) |
+| D14 | 244,564 | 5.13 | 5.83 | 7.34 | 12.0 (8.2 to 15.4) | 30.1 (27.4 to 32.6) |
+| D5 | 241,764 | 6.91 | 7.81 | 8.86 | 11.5 (8.7 to 14.0) | 22.0 (18.9 to 24.8) |
+| D16 | 244,256 | 5.59 | 6.10 | 8.64 | 8.3 (6.2 to 10.4) | 35.3 (33.2 to 37.2) |
+| D21 | 243,556 | 4.16 | 4.94 | 6.14 | 15.7 (13.7 to 17.8) | 32.3 (30.9 to 33.6) |
+| D2 | 244,536 | 4.07 | 5.09 | 5.68 | 20.2 (17.8 to 22.5) | 28.4 (26.5 to 30.2) |
+| D8 | 244,354 | 13.57 | 14.21 | 27.44 | 4.5 (3.4 to 5.7) | 50.6 (49.0 to 52.1) |
 
 Normalised MAE of the median, prevailing, by Primary:
 
 | Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
 |---|---:|---:|---:|---:|---|---|
-| D3 | 244,276 | 2.69 | 3.58 | 5.00 | 24.8 (22.0 to 27.4) | 46.1 (44.5 to 47.6) |
-| D9 | 244,122 | 4.41 | 5.20 | 5.64 | 15.1 (13.1 to 17.2) | 21.7 (20.0 to 23.6) |
-| D11 | 244,052 | 4.86 | 6.31 | 7.25 | 22.9 (19.0 to 27.0) | 32.9 (29.7 to 36.1) |
-| D19 | 244,248 | 5.56 | 6.90 | 8.59 | 19.5 (17.7 to 21.1) | 35.3 (33.1 to 37.4) |
-| D10 | 244,234 | 7.09 | 8.69 | 9.18 | 18.4 (15.2 to 21.5) | 22.8 (19.4 to 26.1) |
-| D4 | 244,416 | 3.90 | 5.04 | 5.41 | 22.5 (20.2 to 25.0) | 27.9 (25.7 to 30.0) |
-| D15 | 236,626 | 23.30 | 27.77 | 36.91 | 16.1 (12.1 to 20.0) | 36.9 (33.3 to 40.2) |
-| D18 | 242,456 | 7.22 | 10.70 | 14.36 | 32.6 (28.9 to 35.9) | 49.8 (45.8 to 53.3) |
-| D12 | 242,750 | 13.12 | 14.64 | 14.10 | 10.4 (8.5 to 12.3) | 7.0 (5.1 to 8.7) |
-| D22 | 244,374 | 7.47 | 7.99 | 8.41 | 6.5 (3.7 to 9.2) | 11.2 (8.2 to 14.0) |
-| D14 | 244,444 | 4.53 | 5.83 | 7.34 | 22.3 (19.7 to 24.9) | 38.3 (35.5 to 41.1) |
-| D5 | 241,644 | 6.97 | 7.81 | 8.86 | 10.8 (7.5 to 14.0) | 21.4 (17.8 to 24.8) |
-| D16 | 244,136 | 5.69 | 6.10 | 8.65 | 6.8 (1.6 to 11.4) | 34.2 (30.6 to 37.4) |
-| D21 | 243,436 | 4.17 | 4.94 | 6.14 | 15.6 (13.6 to 17.6) | 32.2 (30.7 to 33.5) |
-| D2 | 244,416 | 4.07 | 5.09 | 5.68 | 20.2 (17.7 to 22.5) | 28.4 (26.5 to 30.2) |
-| D8 | 244,234 | 13.62 | 14.21 | 27.44 | 4.2 (2.9 to 5.3) | 50.4 (48.8 to 51.9) |
+| D3 | 244,396 | 2.69 | 3.58 | 4.99 | 24.9 (22.1 to 27.5) | 46.1 (44.5 to 47.6) |
+| D9 | 244,242 | 4.42 | 5.20 | 5.64 | 15.1 (13.1 to 17.1) | 21.7 (20.0 to 23.5) |
+| D11 | 244,172 | 4.82 | 6.31 | 7.25 | 23.6 (19.6 to 27.7) | 33.5 (30.4 to 36.7) |
+| D19 | 244,368 | 5.53 | 6.90 | 8.59 | 19.9 (18.0 to 21.6) | 35.6 (33.5 to 37.6) |
+| D10 | 244,354 | 6.89 | 8.68 | 9.18 | 20.7 (17.8 to 23.4) | 24.9 (21.9 to 27.7) |
+| D4 | 244,536 | 3.87 | 5.04 | 5.41 | 23.1 (20.7 to 25.5) | 28.4 (26.3 to 30.5) |
+| D15 | 236,746 | 22.67 | 27.76 | 36.89 | 18.3 (14.3 to 22.4) | 38.6 (35.0 to 42.0) |
+| D18 | 242,576 | 7.09 | 10.70 | 14.36 | 33.7 (30.4 to 36.9) | 50.6 (46.8 to 54.0) |
+| D12 | 242,870 | 13.05 | 14.64 | 14.09 | 10.9 (9.0 to 12.9) | 7.4 (5.7 to 9.1) |
+| D22 | 244,494 | 7.33 | 7.99 | 8.41 | 8.3 (5.9 to 10.6) | 12.8 (10.3 to 15.2) |
+| D14 | 244,564 | 4.46 | 5.83 | 7.34 | 23.5 (21.1 to 25.8) | 39.2 (36.6 to 41.7) |
+| D5 | 241,764 | 6.97 | 7.81 | 8.86 | 10.8 (7.2 to 14.3) | 21.4 (17.7 to 25.0) |
+| D16 | 244,256 | 5.63 | 6.10 | 8.64 | 7.7 (3.3 to 11.9) | 34.9 (31.7 to 37.8) |
+| D21 | 243,556 | 4.17 | 4.94 | 6.14 | 15.6 (13.6 to 17.6) | 32.2 (30.8 to 33.5) |
+| D2 | 244,536 | 4.06 | 5.09 | 5.68 | 20.3 (17.9 to 22.6) | 28.5 (26.6 to 30.3) |
+| D8 | 244,354 | 13.71 | 14.21 | 27.44 | 3.5 (2.1 to 4.8) | 50.0 (48.4 to 51.6) |
 
 #### The load shift at D5 and D16
 
 **The December 2025 transfer of load between D5 and D16 is the one verified load shift in the
-backtest year, and the prevailing output took 181 hours (D5) and 52 hours (D16) to move.** The
+backtest year, and the prevailing output took 61 hours (D5) and 52 hours (D16) to move.** The
 transfer is experiment 580's transfer 23: a fitted -1.47 MW at D5 and +1.37 MW at D16, 15 days from
 2025-12-29. The step found in the observed power is at 2025-12-29 23:00 UTC and ends at 2026-01-14
 11:30 UTC at D5, and starts at 2025-12-30 08:30 UTC and ends at 2026-01-14 19:30 UTC at D16. These
@@ -551,14 +577,17 @@ times are the largest change of the 12-hour mean of the observed power within 3 
 experiment 580.
 
 From the file, the first daily origin at which the mean of the prevailing median over the next 24
-hours differs from the normal-running median by at least half of the fitted transfer is 181.0 hours
+hours differs from the normal-running median by at least half of the fitted transfer is 61.0 hours
 after the start at D5 and 51.5 hours at D16. After the end, the first origin at which the two
-outputs agree to within half of the transfer again is 48.5 hours after the end at D5 and 40.5 hours
+outputs agree to within half of the transfer again is 24.5 hours after the end at D5 and 40.5 hours
 at D16. Origins are daily, so each figure has a resolution of one day. This is one descriptive event
 at two Primaries, so it supports no general statement about the delay.
 
 The prevailing output of December 2025 comes from the B-haz fallback head, and the end of the shift
-in January 2026 from R-haz, so the two ends of the event are forecast by different heads.
+in January 2026 from R-haz, so the two ends of the event are forecast by different heads. The D5
+step starts on 2025-12-29, in a fallback month, so the first origin with a trained head is
+2026-01-01 12:00 UTC, which is 61 hours after the step start: 61 hours is the earliest reaction
+that the D5 start allows.
 
 ![D5, day-ahead forecasts through the load shift, normal running above and prevailing below](event_D5_day_ahead.svg)
 
@@ -1137,7 +1166,7 @@ another.
     only for the fold months of that experiment that fall in the backtest year (December 2025,
     January 2026, March 2026, and June 2026), beside the gate-off origin days of the same months.
 
-Each slice is scored on the subset of the 3,893,864 scored rows that fits it. A row is "inside" if
+Each slice is scored on the subset of the 3,895,784 scored rows that fits it. A row is "inside" if
 its valid time falls within an event of its own Primary, "7 days after" if it falls in the 7 days
 after the end, and "outside" otherwise, for the same Primaries. Counts of events: the long and deep
 set has 0 events, the event-table proxy has 10 events at 7 Primaries inside the year, and the
@@ -1157,43 +1186,43 @@ CRPS by slice:
 
 | Slice | Half-hours | Origin days | Normal running | Prevailing | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|
-| inside | 111,894 | 129 | 7.30 | 6.50 | 8.04 | 10.69 |
-| 7 days after | 34,706 | 102 | 3.26 | 5.15 | 4.78 | 5.96 |
-| outside (same Primaries) | 1,557,200 | 365 | 3.52 | 3.32 | 4.16 | 4.69 |
+| inside | 111,894 | 129 | 7.30 | 6.45 | 8.04 | 10.69 |
+| 7 days after | 34,706 | 102 | 3.26 | 5.07 | 4.78 | 5.96 |
+| outside (same Primaries) | 1,558,040 | 365 | 3.52 | 3.30 | 4.16 | 4.69 |
 
 **Verified transfer, D5 and D16** (2 events).
 
 | Slice | Half-hours | Origin days | Normal running | Prevailing | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|
-| inside | 21,504 | 30 | 14.98 | 12.58 | 13.61 | 13.43 |
-| 7 days after | 9,408 | 21 | 3.31 | 8.90 | 5.11 | 7.03 |
-| outside (same Primaries) | 454,868 | 356 | 3.19 | 3.12 | 3.64 | 4.46 |
+| inside | 21,504 | 30 | 14.98 | 11.95 | 13.61 | 13.43 |
+| 7 days after | 9,408 | 21 | 3.31 | 9.36 | 5.11 | 7.03 |
+| outside (same Primaries) | 455,108 | 356 | 3.19 | 3.12 | 3.64 | 4.46 |
 
 **Gate-on origin days** (the G4 gate, fold months with stored gate states).
 
 | Slice | Half-hours | Origin days | Normal running | Prevailing | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|
-| gate-on origin days | 29,564 | 24 | 8.24 | 7.62 | 8.22 | 9.60 |
-| gate-off origin days | 1,286,150 | 123 | 4.27 | 4.21 | 5.16 | 6.30 |
+| gate-on origin days | 29,564 | 24 | 8.24 | 7.45 | 8.22 | 9.60 |
+| gate-off origin days | 1,286,150 | 123 | 4.27 | 4.14 | 5.16 | 6.30 |
 
 Normalised MAE of the median by slice (the event-table proxy and the verified transfer; the gate-on
 set has no inside or outside rows):
 
 | Slice | Normal running | Prevailing | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|
-| inside | 11.11 | 10.29 | 11.67 | 17.04 |
-| 7 days after | 5.85 | 9.50 | 7.54 | 11.02 |
-| outside (same Primaries) | 6.10 | 5.92 | 7.28 | 8.21 |
+| inside | 11.11 | 10.26 | 11.67 | 17.04 |
+| 7 days after | 5.85 | 9.22 | 7.54 | 11.02 |
+| outside (same Primaries) | 6.10 | 5.88 | 7.28 | 8.21 |
 
 | Slice | Normal running | Prevailing | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|
-| inside | 19.58 | 17.05 | 18.08 | 19.06 |
-| 7 days after | 5.33 | 16.84 | 8.33 | 12.31 |
+| inside | 19.58 | 16.14 | 18.08 | 19.06 |
+| 7 days after | 5.33 | 17.36 | 8.33 | 12.31 |
 | outside (same Primaries) | 5.64 | 5.60 | 6.40 | 8.19 |
 
 **After the one verified load shift ended, the prevailing output scored worse than the
 normal-running output.** In the 7 days after the verified transfer ends, the CRPS of the prevailing
-output is 8.90 against 3.31 for the normal-running output; inside the transfer it is 12.58 against
+output is 9.36 against 3.31 for the normal-running output; inside the transfer it is 11.95 against
 14.98. The time-series figures of the verified transfer are under [The load shift at D5 and
 D16](#the-load-shift-at-d5-and-d16).
 
@@ -1237,52 +1266,52 @@ Primaries, 7 are in the comparison (D8 is not). The comparison does not score th
 
 | Slice | Half-hours | Backtest, normal running | Backtest, prevailing | Default 3 | BG2 | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Day 1 | 55,417 | 4.73 | 4.34 | 4.23 | 4.65 | 6.92 | 7.56 |
-| Day 2 | 55,240 | 4.84 | 4.59 | 4.64 | 4.92 | 6.86 | 7.53 |
-| Days 3 to 4 | 109,575 | 5.16 | 4.99 | 5.06 | 5.31 | 6.84 | 7.48 |
-| Days 5 to 7 | 162,977 | 5.61 | 5.63 | 5.66 | 5.82 | 6.90 | 7.56 |
-| Days 8 to 10 | 153,927 | 5.82 | 5.98 | 5.94 | 6.23 | 6.87 | 7.42 |
-| All days | 537,136 | 5.41 | 5.36 | 5.36 | 5.62 | 6.88 | 7.50 |
-| Winter (Dec to Feb) | 204,768 | 6.25 | 6.05 | 5.67 | 6.24 | 7.91 | 8.63 |
-| Winter nights | 123,688 | 5.68 | 5.45 | 4.90 | 5.27 | 6.96 | 7.45 |
-| Cold nights (3 °C or below) | 35,496 | 6.94 | 6.33 | 6.24 | 6.93 | 10.00 | 10.77 |
-| Economy 7 step hours | 67,768 | 4.04 | 3.94 | 3.66 | 3.85 | 5.04 | 6.56 |
-| Christmas (24 Dec to 1 Jan) | 20,448 | 6.22 | 5.86 | 6.94 | 6.11 | 10.71 | 11.01 |
-| Bank holidays | 36,360 | 6.07 | 5.91 | 6.68 | 6.60 | 9.70 | 10.07 |
-| Sunny half-hours | 79,885 | 7.45 | 7.57 | 8.04 | 7.34 | 9.29 | 8.42 |
+| Day 1 | 55,417 | 4.73 | 4.23 | 4.23 | 4.65 | 6.92 | 7.56 |
+| Day 2 | 55,240 | 4.84 | 4.53 | 4.64 | 4.92 | 6.86 | 7.53 |
+| Days 3 to 4 | 109,575 | 5.16 | 4.94 | 5.06 | 5.31 | 6.84 | 7.48 |
+| Days 5 to 7 | 162,977 | 5.61 | 5.60 | 5.66 | 5.82 | 6.90 | 7.56 |
+| Days 8 to 10 | 153,927 | 5.82 | 5.97 | 5.94 | 6.23 | 6.87 | 7.42 |
+| All days | 537,136 | 5.41 | 5.32 | 5.36 | 5.62 | 6.88 | 7.50 |
+| Winter (Dec to Feb) | 204,768 | 6.25 | 5.88 | 5.67 | 6.24 | 7.91 | 8.63 |
+| Winter nights | 123,688 | 5.68 | 5.27 | 4.90 | 5.27 | 6.96 | 7.45 |
+| Cold nights (3 °C or below) | 35,496 | 6.94 | 6.07 | 6.24 | 6.93 | 10.00 | 10.77 |
+| Economy 7 step hours | 67,768 | 4.04 | 3.88 | 3.66 | 3.85 | 5.04 | 6.56 |
+| Christmas (24 Dec to 1 Jan) | 20,448 | 6.22 | 5.85 | 6.94 | 6.11 | 10.71 | 11.01 |
+| Bank holidays | 36,360 | 6.07 | 5.92 | 6.68 | 6.60 | 9.70 | 10.07 |
+| Sunny half-hours | 79,885 | 7.45 | 7.62 | 8.04 | 7.34 | 9.29 | 8.42 |
 
 **Six MW Primaries, CRPS:**
 
 | Slice | Half-hours | Backtest, normal running | Backtest, prevailing | Default 3 | BG2 | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Day 1 | 55,417 | 2.79 | 2.46 | 2.42 | 2.71 | 3.99 | 4.27 |
-| Day 2 | 55,240 | 2.85 | 2.61 | 2.68 | 2.87 | 3.96 | 4.24 |
-| Days 3 to 4 | 109,575 | 3.02 | 2.84 | 2.93 | 3.09 | 3.93 | 4.22 |
-| Days 5 to 7 | 162,977 | 3.25 | 3.20 | 3.29 | 3.39 | 3.98 | 4.26 |
-| Days 8 to 10 | 153,927 | 3.33 | 3.39 | 3.46 | 3.62 | 4.00 | 4.19 |
-| All days | 537,136 | 3.14 | 3.04 | 3.11 | 3.27 | 3.97 | 4.23 |
-| Winter (Dec to Feb) | 204,768 | 3.80 | 3.53 | 3.45 | 3.77 | 4.69 | 5.01 |
-| Winter nights | 123,688 | 3.58 | 3.25 | 3.12 | 3.25 | 4.15 | 4.41 |
-| Cold nights (3 °C or below) | 35,496 | 4.73 | 4.11 | 4.18 | 4.55 | 6.28 | 6.57 |
-| Economy 7 step hours | 67,768 | 2.48 | 2.34 | 2.24 | 2.34 | 2.97 | 3.77 |
+| Day 1 | 55,417 | 2.79 | 2.40 | 2.42 | 2.71 | 3.99 | 4.27 |
+| Day 2 | 55,240 | 2.85 | 2.57 | 2.68 | 2.87 | 3.96 | 4.24 |
+| Days 3 to 4 | 109,575 | 3.02 | 2.81 | 2.93 | 3.09 | 3.93 | 4.22 |
+| Days 5 to 7 | 162,977 | 3.25 | 3.18 | 3.29 | 3.39 | 3.98 | 4.26 |
+| Days 8 to 10 | 153,927 | 3.33 | 3.38 | 3.46 | 3.62 | 4.00 | 4.19 |
+| All days | 537,136 | 3.14 | 3.02 | 3.11 | 3.27 | 3.97 | 4.23 |
+| Winter (Dec to Feb) | 204,768 | 3.80 | 3.43 | 3.45 | 3.77 | 4.69 | 5.01 |
+| Winter nights | 123,688 | 3.58 | 3.14 | 3.12 | 3.25 | 4.15 | 4.41 |
+| Cold nights (3 °C or below) | 35,496 | 4.73 | 3.92 | 4.18 | 4.55 | 6.28 | 6.57 |
+| Economy 7 step hours | 67,768 | 2.48 | 2.30 | 2.24 | 2.34 | 2.97 | 3.77 |
 | Christmas (24 Dec to 1 Jan) | 20,448 | 3.88 | 3.78 | 4.38 | 3.71 | 5.85 | 5.84 |
 | Bank holidays | 36,360 | 3.66 | 3.66 | 4.11 | 3.95 | 5.41 | 5.41 |
-| Sunny half-hours | 79,885 | 4.14 | 4.20 | 4.43 | 4.13 | 5.09 | 4.63 |
+| Sunny half-hours | 79,885 | 4.14 | 4.23 | 4.43 | 4.13 | 5.09 | 4.63 |
 
 **Six MW Primaries, twCRPS:**
 
 | Slice | Half-hours | Backtest, normal running | Backtest, prevailing | Default 3 | BG2 | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Day 1 | 55,417 | 0.49 | 0.36 | 0.35 | 0.44 | 0.61 | 0.64 |
-| Day 2 | 55,240 | 0.49 | 0.39 | 0.40 | 0.46 | 0.60 | 0.62 |
-| Days 3 to 4 | 109,575 | 0.50 | 0.41 | 0.43 | 0.49 | 0.60 | 0.62 |
-| Days 5 to 7 | 162,977 | 0.51 | 0.49 | 0.51 | 0.54 | 0.61 | 0.63 |
-| Days 8 to 10 | 153,927 | 0.51 | 0.54 | 0.56 | 0.58 | 0.63 | 0.62 |
-| All days | 537,136 | 0.51 | 0.47 | 0.48 | 0.52 | 0.61 | 0.63 |
-| Winter (Dec to Feb) | 204,768 | 1.14 | 1.03 | 1.05 | 1.14 | 1.32 | 1.37 |
-| Winter nights | 123,688 | 0.89 | 0.80 | 0.83 | 0.86 | 0.96 | 1.01 |
-| Cold nights (3 °C or below) | 35,496 | 1.40 | 1.06 | 1.20 | 1.37 | 1.67 | 1.66 |
-| Economy 7 step hours | 67,768 | 0.13 | 0.11 | 0.11 | 0.13 | 0.14 | 0.14 |
+| Day 1 | 55,417 | 0.49 | 0.34 | 0.35 | 0.44 | 0.61 | 0.64 |
+| Day 2 | 55,240 | 0.49 | 0.37 | 0.40 | 0.46 | 0.60 | 0.62 |
+| Days 3 to 4 | 109,575 | 0.50 | 0.39 | 0.43 | 0.49 | 0.60 | 0.62 |
+| Days 5 to 7 | 162,977 | 0.51 | 0.48 | 0.51 | 0.54 | 0.61 | 0.63 |
+| Days 8 to 10 | 153,927 | 0.51 | 0.53 | 0.56 | 0.58 | 0.63 | 0.62 |
+| All days | 537,136 | 0.51 | 0.45 | 0.48 | 0.52 | 0.61 | 0.63 |
+| Winter (Dec to Feb) | 204,768 | 1.14 | 0.98 | 1.05 | 1.14 | 1.32 | 1.37 |
+| Winter nights | 123,688 | 0.89 | 0.75 | 0.83 | 0.86 | 0.96 | 1.01 |
+| Cold nights (3 °C or below) | 35,496 | 1.40 | 1.01 | 1.20 | 1.37 | 1.67 | 1.66 |
+| Economy 7 step hours | 67,768 | 0.13 | 0.09 | 0.11 | 0.13 | 0.14 | 0.14 |
 | Christmas (24 Dec to 1 Jan) | 20,448 | 0.52 | 0.50 | 0.72 | 0.53 | 0.65 | 0.58 |
 | Bank holidays | 36,360 | 0.44 | 0.44 | 0.56 | 0.46 | 0.52 | 0.48 |
 | Sunny half-hours | 79,885 | 0.03 | 0.04 | 0.05 | 0.04 | 0.06 | 0.04 |
@@ -1295,55 +1324,55 @@ Primaries, 7 are in the comparison (D8 is not). The comparison does not score th
 
 | Slice | Half-hours | Backtest, normal running | Backtest, prevailing | Default 3 | BG2 | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Day 1 | 64,805 | 4.86 | 4.80 | 5.59 | 4.95 | 7.10 | 7.85 |
-| Day 2 | 64,609 | 4.96 | 4.93 | 5.76 | 5.23 | 7.01 | 7.76 |
-| Days 3 to 4 | 128,185 | 5.30 | 5.31 | 6.00 | 5.66 | 7.03 | 7.76 |
-| Days 5 to 7 | 190,613 | 5.81 | 5.84 | 6.16 | 6.10 | 7.05 | 7.76 |
-| Days 8 to 10 | 180,060 | 6.15 | 6.20 | 6.35 | 6.52 | 7.00 | 7.56 |
-| All days | 628,272 | 5.62 | 5.64 | 6.08 | 5.92 | 7.03 | 7.71 |
-| Winter (Dec to Feb) | 238,896 | 5.11 | 5.28 | 5.28 | 5.41 | 6.28 | 6.93 |
-| Winter nights | 144,320 | 4.27 | 4.42 | 4.14 | 4.40 | 5.23 | 5.83 |
-| Cold nights (3 °C or below) | 31,760 | 4.67 | 4.67 | 4.11 | 5.13 | 7.58 | 8.47 |
-| Economy 7 step hours | 79,264 | 4.05 | 4.01 | 3.86 | 4.15 | 4.93 | 5.84 |
+| Day 1 | 64,805 | 4.86 | 4.76 | 5.59 | 4.95 | 7.10 | 7.85 |
+| Day 2 | 64,609 | 4.96 | 4.90 | 5.76 | 5.23 | 7.01 | 7.76 |
+| Days 3 to 4 | 128,185 | 5.30 | 5.29 | 6.00 | 5.66 | 7.03 | 7.76 |
+| Days 5 to 7 | 190,613 | 5.81 | 5.83 | 6.16 | 6.10 | 7.05 | 7.76 |
+| Days 8 to 10 | 180,060 | 6.15 | 6.17 | 6.35 | 6.52 | 7.00 | 7.56 |
+| All days | 628,272 | 5.62 | 5.61 | 6.08 | 5.92 | 7.03 | 7.71 |
+| Winter (Dec to Feb) | 238,896 | 5.11 | 5.17 | 5.28 | 5.41 | 6.28 | 6.93 |
+| Winter nights | 144,320 | 4.27 | 4.30 | 4.14 | 4.40 | 5.23 | 5.83 |
+| Cold nights (3 °C or below) | 31,760 | 4.67 | 4.60 | 4.11 | 5.13 | 7.58 | 8.47 |
+| Economy 7 step hours | 79,264 | 4.05 | 4.00 | 3.86 | 4.15 | 4.93 | 5.84 |
 | Christmas (24 Dec to 1 Jan) | 23,856 | 4.51 | 5.10 | 4.95 | 5.83 | 7.90 | 8.08 |
-| Bank holidays | 42,420 | 5.80 | 6.07 | 6.79 | 6.99 | 8.56 | 9.69 |
-| Sunny half-hours | 93,512 | 8.47 | 8.62 | 10.03 | 8.65 | 10.44 | 10.04 |
+| Bank holidays | 42,420 | 5.80 | 6.05 | 6.79 | 6.99 | 8.56 | 9.69 |
+| Sunny half-hours | 93,512 | 8.47 | 8.58 | 10.03 | 8.65 | 10.44 | 10.04 |
 
 **Seven MVA-only Primaries, CRPS:**
 
 | Slice | Half-hours | Backtest, normal running | Backtest, prevailing | Default 3 | BG2 | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Day 1 | 64,805 | 2.74 | 2.69 | 3.18 | 2.86 | 4.02 | 4.44 |
-| Day 2 | 64,609 | 2.80 | 2.77 | 3.30 | 3.02 | 3.98 | 4.40 |
-| Days 3 to 4 | 128,185 | 2.98 | 2.97 | 3.44 | 3.22 | 3.98 | 4.38 |
-| Days 5 to 7 | 190,613 | 3.24 | 3.25 | 3.54 | 3.43 | 4.00 | 4.39 |
-| Days 8 to 10 | 180,060 | 3.41 | 3.44 | 3.66 | 3.65 | 3.99 | 4.28 |
-| All days | 628,272 | 3.14 | 3.14 | 3.49 | 3.35 | 3.99 | 4.36 |
-| Winter (Dec to Feb) | 238,896 | 2.85 | 2.94 | 3.06 | 3.11 | 3.59 | 3.99 |
-| Winter nights | 144,320 | 2.39 | 2.49 | 2.45 | 2.58 | 2.98 | 3.39 |
-| Cold nights (3 °C or below) | 31,760 | 2.63 | 2.65 | 2.41 | 2.93 | 4.51 | 4.86 |
+| Day 1 | 64,805 | 2.74 | 2.68 | 3.18 | 2.86 | 4.02 | 4.44 |
+| Day 2 | 64,609 | 2.80 | 2.76 | 3.30 | 3.02 | 3.98 | 4.40 |
+| Days 3 to 4 | 128,185 | 2.98 | 2.96 | 3.44 | 3.22 | 3.98 | 4.38 |
+| Days 5 to 7 | 190,613 | 3.24 | 3.24 | 3.54 | 3.43 | 4.00 | 4.39 |
+| Days 8 to 10 | 180,060 | 3.41 | 3.42 | 3.66 | 3.65 | 3.99 | 4.28 |
+| All days | 628,272 | 3.14 | 3.12 | 3.49 | 3.35 | 3.99 | 4.36 |
+| Winter (Dec to Feb) | 238,896 | 2.85 | 2.88 | 3.06 | 3.11 | 3.59 | 3.99 |
+| Winter nights | 144,320 | 2.39 | 2.42 | 2.45 | 2.58 | 2.98 | 3.39 |
+| Cold nights (3 °C or below) | 31,760 | 2.63 | 2.61 | 2.41 | 2.93 | 4.51 | 4.86 |
 | Economy 7 step hours | 79,264 | 2.33 | 2.29 | 2.25 | 2.40 | 2.87 | 3.35 |
 | Christmas (24 Dec to 1 Jan) | 23,856 | 2.47 | 2.81 | 2.86 | 3.34 | 4.27 | 4.84 |
-| Bank holidays | 42,420 | 3.25 | 3.38 | 3.97 | 3.99 | 4.93 | 5.68 |
-| Sunny half-hours | 93,512 | 4.67 | 4.75 | 5.58 | 4.79 | 5.75 | 5.57 |
+| Bank holidays | 42,420 | 3.25 | 3.37 | 3.97 | 3.99 | 4.93 | 5.68 |
+| Sunny half-hours | 93,512 | 4.67 | 4.72 | 5.58 | 4.79 | 5.75 | 5.57 |
 
 **Seven MVA-only Primaries, twCRPS:**
 
 | Slice | Half-hours | Backtest, normal running | Backtest, prevailing | Default 3 | BG2 | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Day 1 | 64,805 | 0.22 | 0.24 | 0.25 | 0.25 | 0.36 | 0.36 |
-| Day 2 | 64,609 | 0.22 | 0.24 | 0.26 | 0.26 | 0.34 | 0.35 |
-| Days 3 to 4 | 128,185 | 0.23 | 0.24 | 0.26 | 0.26 | 0.33 | 0.34 |
-| Days 5 to 7 | 190,613 | 0.26 | 0.27 | 0.28 | 0.29 | 0.35 | 0.36 |
-| Days 8 to 10 | 180,060 | 0.27 | 0.28 | 0.30 | 0.30 | 0.34 | 0.34 |
-| All days | 628,272 | 0.25 | 0.26 | 0.28 | 0.28 | 0.34 | 0.35 |
-| Winter (Dec to Feb) | 238,896 | 0.37 | 0.40 | 0.40 | 0.39 | 0.48 | 0.50 |
-| Winter nights | 144,320 | 0.22 | 0.24 | 0.24 | 0.22 | 0.28 | 0.29 |
-| Cold nights (3 °C or below) | 31,760 | 0.28 | 0.34 | 0.30 | 0.37 | 0.57 | 0.56 |
-| Economy 7 step hours | 79,264 | 0.03 | 0.04 | 0.04 | 0.04 | 0.04 | 0.04 |
+| Day 1 | 64,805 | 0.22 | 0.23 | 0.25 | 0.25 | 0.36 | 0.36 |
+| Day 2 | 64,609 | 0.22 | 0.23 | 0.26 | 0.26 | 0.34 | 0.35 |
+| Days 3 to 4 | 128,185 | 0.23 | 0.23 | 0.26 | 0.26 | 0.33 | 0.34 |
+| Days 5 to 7 | 190,613 | 0.26 | 0.26 | 0.28 | 0.29 | 0.35 | 0.36 |
+| Days 8 to 10 | 180,060 | 0.27 | 0.27 | 0.30 | 0.30 | 0.34 | 0.34 |
+| All days | 628,272 | 0.25 | 0.25 | 0.28 | 0.28 | 0.34 | 0.35 |
+| Winter (Dec to Feb) | 238,896 | 0.37 | 0.37 | 0.40 | 0.39 | 0.48 | 0.50 |
+| Winter nights | 144,320 | 0.22 | 0.21 | 0.24 | 0.22 | 0.28 | 0.29 |
+| Cold nights (3 °C or below) | 31,760 | 0.28 | 0.31 | 0.30 | 0.37 | 0.57 | 0.56 |
+| Economy 7 step hours | 79,264 | 0.03 | 0.03 | 0.04 | 0.04 | 0.04 | 0.04 |
 | Christmas (24 Dec to 1 Jan) | 23,856 | 0.13 | 0.14 | 0.27 | 0.15 | 0.24 | 0.24 |
-| Bank holidays | 42,420 | 0.44 | 0.43 | 0.48 | 0.54 | 0.67 | 0.69 |
-| Sunny half-hours | 93,512 | 0.25 | 0.26 | 0.29 | 0.25 | 0.30 | 0.28 |
+| Bank holidays | 42,420 | 0.44 | 0.42 | 0.48 | 0.54 | 0.67 | 0.69 |
+| Sunny half-hours | 93,512 | 0.25 | 0.25 | 0.29 | 0.25 | 0.30 | 0.28 |
 
 ![Error by forecast horizon, seven MVA Primaries](dots_mva_horizon.svg)
 
@@ -1380,7 +1409,11 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
     origins are joined on valid time with 3 hours subtracted from the lead. BSPs and GSPs have no
     such comparison.
 - **The Primaries heads change in January 2026.** 2025-11 and 2025-12 use the B-haz fallback head,
-    and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks.
+    and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. Only R-haz reads the extra
+    lagged power inputs.
+- **Time-series figures of the load shift other than the day-ahead ones.** The 14-day forecast
+    figures from five origins (`event_D5_fan_*.svg` and `event_D16_fan_*.svg`) were drawn before the
+    extra lagged inputs, so their prevailing panels show the earlier head.
 - **The prevailing output over-persists after a load shift ends.** One verified load shift, at D5
     and D16, is the only example, so the size of the effect is not estimated.
 - **Quantiles exceed table capacity in the files.** The highest quantile reaches 2.1 times
@@ -1389,7 +1422,7 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
     observed maxima 1.2 to 1.55 times). Capacity is therefore not a ceiling for the demand series.
     The wind and solar files exceed it by up to 12%.
 - **The q05 to q95 band covers less than 90% of observations.** Coverage is 81.4% for the Primaries
-    in normal running and 84.9% for the prevailing output, 86.7% for the BSPs, 87.7% for the GSPs,
+    in normal running and 85.1% for the prevailing output, 86.7% for the BSPs, 87.7% for the GSPs,
     91.3% for wind, and 89.3% for solar on daylight half-hours.
 - **Band widths step at some refits.** D4 narrows by about a third at the refit that starts May 2026;
     D18 widens by about half at the refit that starts September 2026; six Primaries widen by
