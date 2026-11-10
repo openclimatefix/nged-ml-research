@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     export NGED_S3_BUCKET_URL=https://example.com NGED_S3_BUCKET_ACCESS_KEY=dummy
     export NGED_S3_BUCKET_SECRET=dummy
     P=ml-experiments
