@@ -179,6 +179,9 @@ def main() -> None:
         for seed in (0, 1, 2):
             if (probe / f"{arm}_seed{seed}_donors.parquet").exists():
                 arms[(arm, seed)] = score_arm(arm=arm, seed=seed, probe=probe, truth=truth, sites=sites, target=target)
+    for (arm, seed), (df, _, _) in arms.items():
+        df.write_parquet(probe / f"found_{arm}_seed{seed}.parquet")
+    e1j.write_parquet(probe / "found_E1-J.parquet")
     rng = np.random.default_rng(0)
     boots = [rng.choice(WORLDS, len(WORLDS)) for _ in range(1000)]
     out: dict = {"e1j_false_rate": target, "cells": {}}
