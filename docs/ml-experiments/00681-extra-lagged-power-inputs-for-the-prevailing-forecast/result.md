@@ -169,10 +169,12 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
   L3 adds the differences of consecutive trailing 24-hour means. A lag is the cleaned power minus the
   Candidate's lag-free median at that time, as a fraction of capacity, with a missing flag per input.
   P reads another Primary of the same metering group that is no electrical neighbour (a fixed map);
-  P7 reads L3's own lags 7 days earlier.
+  P7 reads L3's own lags 7 days earlier. The placebo reads the other Primary's cleaned power with no
+  injected shift, so it controls for extra capacity and not for a shift in the placebo Primary.
 - **Data delay.** No input reads power newer than 6 hours before the origin; a test perturbs every
   later half-hour and checks that no input moves (and that moving the 6-hour half-hour does).
-- **Bank rows.** The injected shift enters the new lags exactly as it enters the target; the
+- **Bank rows.** The injected shift enters the new lags exactly as it enters the target, and L0's
+  existing lag features are built from the same shifted series; the
   regenerated injected events match experiment 667's stored table for every fold month.
 - **Code reused.** Experiment 667's `p667_fit.py`, `p667_data.py`, and `p667_head.py` run
   unchanged (folder `ml-experiments/00667-*/prevailing`), with experiments 647, 650, and 668.
@@ -199,6 +201,11 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
   measurement noise. Only 2 real events can be read, and one (D16) does not change.
 - **The event labels are an incomplete dump.** NGED says load shifts may be missing from its logs, so
   the event-free rows hold unlabelled events and every real count is a lower bound.
+- **The event-table events have no reaction time.** The events of experiment 653 carry no fitted
+  transfer, so they appear only in the inside-event scores, and only the 2 verified transfers have a
+  real reaction time.
+- **Proportional injected events.** For an event whose shift scales with the Primary's power, the
+  half-of-the-depth threshold is approximate. It is the same for every arm.
 - **Reaction time resolves to 24 hours.** The daily origins make the 20-hour mean difference a
   mixture of 0-day and 1-day steps.
 - **Mean reaction times on the figure** use only events that react, so they exclude the 17% of
