@@ -28,7 +28,8 @@ WIDTH, HEIGHT = 620, 320
 
 
 def scores_of(*, span: int, step: str) -> pl.DataFrame:
-    folder = f"step{step}_{exp.VERSION[step]}_sp{span}_s012"
+    tag = "s01234" if step[0] in "5678" else "s012"
+    folder = f"step{step}_{exp.VERSION[step]}_sp{span}_{tag}"
     return pl.read_csv(sc.ROOT / "scores" / folder / "scores.csv").with_columns(step_label=pl.lit(LABEL.get(step, step)))
 
 
@@ -49,12 +50,12 @@ def horizon(*, span: int) -> alt.Chart:
             y=alt.Y("mean:Q", title="Median-forecast MAE (points of capacity; smaller is better)", scale=alt.Scale(zero=False)),
             color=alt.Color("system:N", title=None, scale=alt.Scale(domain=domain, range=[*RAMP, *OTHER.values()]), legend=alt.Legend(orient="right", columns=1)),
         )
-        .properties(width=WIDTH, height=HEIGHT, title=alt.TitleParams(["Normalised MAE of the median forecast by horizon, each ladder step", "Backtest origins 12:00 UTC, refits every 3 months, 16 Primaries; steps with injected events; mean of seeds 0 to 2."], anchor="start", fontSize=13))
+        .properties(width=WIDTH, height=HEIGHT, title=alt.TitleParams(["Normalised MAE of the median forecast by horizon, each ladder step", "Backtest origins 12:00 UTC, refits every 3 months, 16 Primaries; steps with injected events; mean of seeds 0 to 2 (steps 1 to 4) and 0 to 4 (steps 5 to 8)."], anchor="start", fontSize=13))
     )
 
 
 def contrasts(*, span: int) -> alt.Chart:
-    c = pl.read_csv(sc.ROOT / "scores" / f"contrasts_sp{span}.csv").filter((pl.col("set") == "all rows") & (pl.col("part") == "all"))
+    c = pl.read_csv(sc.ROOT / "scores" / f"contrasts_sp{span}_s01234.csv").filter((pl.col("set") == "all rows") & (pl.col("part") == "all"))
     c = c.with_columns(contrast=pl.col("from").str.replace("step", "") + " to " + pl.col("to").str.replace("step", "")).to_pandas()
     base = alt.Chart(c).encode(y=alt.Y("contrast:N", title=None, sort=None), color=alt.Color("metric:N", title=None, scale=alt.Scale(domain=["mae", "crps"], range=["#306BFF", "#FF4901"])), yOffset="metric:N")
     return (base.mark_point(filled=True, size=70).encode(x=alt.X("diff:Q", title="Change in score when the component is added (points of capacity; below 0 is better)")) + base.mark_rule(strokeWidth=2).encode(x="lo:Q", x2="hi:Q")).properties(width=WIDTH, height=300, title=alt.TitleParams(["Change in score from each added component", "Dot: mean change. Line: 95% interval from resampling 7-day blocks of origin days. MAE: median error; CRPS: whole distribution."], anchor="start", fontSize=13))
@@ -78,7 +79,7 @@ def main() -> None:
     horizon(span=span).save(out / "ladder_horizon.svg")
     contrasts(span=span).save(out / "ladder_contrasts.svg")
     steps = ("3b", "5w", "8w")
-    for series, name in ((5, "D5"), (16, "D16")):
+    for series, name in ((17, "D5"), (18, "D16")):
         example(span=span, label=f"{name}, the verified transfer", start=datetime(2025, 12, 28, tzinfo=UTC), stop=datetime(2026, 1, 15, tzinfo=UTC), series=series, steps=steps, lead_day=1).save(out / f"ladder_transfer_{name}.svg")
     print("figures written to", out)
 
