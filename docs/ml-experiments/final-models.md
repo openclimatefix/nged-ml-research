@@ -467,8 +467,8 @@ one-year backtest at leads of 0 to 14 days, on the 3,879,313 half-hours that eve
 
 - **Pre-training and the first lags account for most of the gain over the manual heuristic.**
   Pre-training the encoders (step 3b) lowers MAE by 0.59 against step 3a, and the 24-hour lag
-  (step 4) by 0.28. The 1-week lag lowers it by a further 0.13. Steps 6 to 8 change it by +0.04,
-  +0.06, and +0.005. Steps 1, 2, and 3a score worse than the manual heuristic.
+  (step 4) by 0.28. The 1-week lag lowers it by a further 0.13. Steps 6 to 8 raise it by 0.04,
+  0.06, and 0.005. Steps 1, 2, and 3a score worse than the manual heuristic.
 - **Step 8, the Candidate, scores 0.105 worse than step 5 on the annual mean** (95% interval 0.078
   to 0.132). Steps 6 to 8 lower the share of an injected lag-only shift that the median copies from
   5.9% to 2.8%, and they raise MAE by 0.05 (step 6) and 0.12 (steps 7 and 8) on rows more than 14
@@ -478,18 +478,19 @@ one-year backtest at leads of 0 to 14 days, on the 3,879,313 half-hours that eve
   0.32 to 0.64), more than any component added after step 3b. In the 7 days after the 10 logged
   shifts that the experiment pools, the monthly arms score worse (5.77 against 5.23 for step 5, and
   5.69 against 5.15 for step 8); no interval was computed for that slice.
-- **The final Candidate is step 8 trained with injected events.** The one-year backtest files use it
-  at monthly refits, which is step 9b (7.48). The monthly file of experiment 667 scores 7.53 on the
-  same rows. The experiment 677 ladder differs from experiment 667 by seed count (3 or 5 against 2)
-  and by the reference month of the signal noise.
-- **On the six MW Primaries the GAM is level with the best monthly arm, and the networks win on the
-  seven MVA-only Primaries.** Over the 8 months and 10 days of lead that the stored GAM and XGBoost
-  forecasts share with the ladder, the six MW Primaries score 5.36 for the GAM, 5.62 for XGBoost,
-  5.41 for experiment 667, and 5.35 for step 9a. The seven MVA-only Primaries score 6.08, 5.92,
-  5.62, and 5.54.
+- **The final Candidate is step 8 trained with injected events.** The one-year backtest files are
+  the monthly-refit files of experiment 667, which score 7.53 on the same rows. Step 9b, the
+  Candidate at monthly refits, scores 7.48. The experiment 677 ladder differs from experiment 667 by
+  seed count (3 or 5 against 2) and by the reference month of the signal noise.
+- **On the six MW Primaries the GAM is level with the best monthly arm and ahead of every
+  quarterly arm.** Over the 8 months and 10 days of lead that the stored GAM and XGBoost forecasts
+  share with the ladder, the six MW Primaries score 5.36 for the GAM, 5.62 for XGBoost, 5.41 for
+  experiment 667, and 5.35 for step 9a. On the seven MVA-only Primaries, steps 5, 8, 9a, and 9b
+  beat the GAM and XGBoost on all rows (5.54 to 5.60 against 6.08 and 5.92), but the GAM leads on
+  cold nights.
 - **Caveats.** The Candidate's settings were tuned on 5 of the 12 months, which favours the later
   steps, and the year overlaps the final-test window. The ladder is one order of adding components,
-  so it says what each component adds given those already present, not what removing it from the
+  so the ladder says what each component adds given those already present, not what removing it from the
   Candidate would cost. NGED's event labels are incomplete, so every event count is a lower bound.
 
 ### Input tables
