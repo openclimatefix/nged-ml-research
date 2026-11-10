@@ -107,6 +107,7 @@ nav:
           - Evaluation protocol, solar: ml-experiments/evaluation-protocol-solar.md
           - Evaluation protocol, wind: ml-experiments/evaluation-protocol-wind.md
           - Log of versions: ml-experiments/research-default-log.md
+      - Final models for the production port: ml-experiments/final-models.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
       - Kalman filter explainer: ml-experiments/kalman-gam-explainer.md
