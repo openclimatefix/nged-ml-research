@@ -20,20 +20,23 @@ size: >-
 hypothesis: >-
   A positive output family at the four Primaries that cannot go below zero, and a solar output that
   is the physics-lite power at the half-hour's own zenith times the network's ratio, remove the
-  negative lower quantiles and the non-zero night quantiles of the backtest files without costing
+  negative lower quantiles and the non-zero night quantiles of the backtest files without reducing
   accuracy.
 prediction: >-
   Written before any fit. P1: after the change no q01 is negative at ids 14, 15, 26, and 17. P2:
-  CRPS at those four series changes by within 0.01 points of capacity against the control (the
-  stored output of experiment 667), per family. P3: q05 to q95 coverage is not worse than the
-  control by more than 0.01. P4: at Solar B and Solar E no night half-hour carries a non-zero
+  CRPS at those four series changes by within 0.01 points of capacity against the Gaussian refit
+  (the second control below), per family. P1 holds by construction for the two new families, so P2
+  and P3 are the tests that can fail. P3: q05 to q95 coverage is not lower than the
+  control's by more than 0.01. P4: at Solar B and Solar E no night half-hour carries a non-zero
   quantile, and the daylight CRPS changes by within 0.01 points of capacity against experiment
   666's output.
 decision_rule: >-
   Stop rule for demand: if a family worsens the CRPS of any of the four series by 0.05 points or
   more, keep the clamp and drop that family. A family passes if P1, P2, and P3 hold for all four
-  series. Solar passes if P4 holds at both farms. The model-level fix is compared with the post
-  hoc clamp of the stored files as a fourth arm. No ranking beyond that, and no claim of benefit
+  series. Solar passes if P4 holds at both farms. A worsening of 0.01 to 0.05 points fails P2 without
+  triggering the stop rule, and is reported as a cost. A change is read against the Gaussian refit,
+  whose distance from the stored files is the seed noise floor. The model-level fix is compared
+  with the post hoc clamp of the stored files as a fourth arm. No ranking beyond that, and no claim of benefit
   from two test months.
 benchmark: >-
   The stored forecasts of experiment 667 (demand, normal-running output) and experiment 666 (solar),
@@ -58,8 +61,7 @@ half-hour's own sun position (solar), and whether the refit costs accuracy.
 
 **Scope.** Demand: Primaries with ids 14, 15, and 26 (MVA, median within one band-width of zero on
 65% to 97% of rows, upper half-width 1.2 to 1.5 times the lower) and id 17 (MW, observed power
-never negative, kept as a control that must not get worse). Original ids appear only in this plan.
-Solar: Solar B and Solar E (original ids 22 and 30). Only the normal-running (NRA) output of
+never negative, kept as a control that must not get worse). Solar: Solar B and Solar E. Original ids stay out of this page. Only the normal-running (NRA) output of
 experiment 667 is refitted. The prevailing output mixes the NRA quantiles with a shifted copy, so a
 fix there waits for the NRA result.
 
@@ -69,8 +71,11 @@ before 2025-03-01, cleaned power). Test month 2026-08 lies inside the final-test
 read. Only the output family changes, and only at ids 14, 15, 26, and 17. Every other Primary keeps
 the Gaussian mixture, so a Gaussian mixture also remains for ids 10 and 12, which do go negative.
 
-- **Control:** the stored forecasts of experiment 667 for the same folds. The stored clamped file
-  (`primaries.parquet`) is the fourth comparison.
+- **Controls:** the stored forecasts of experiment 667 for the same folds, and a Gaussian refit
+  with the same chain as the new arms (the noise floor). The stored clamped file
+  (`primaries.parquet`) is the fourth comparison: its clamp (negative lower quantiles set to zero at
+  the three MVA Primaries) is applied to the control rows. The other 12 Primaries are refitted in
+  the same shared network and are scored too, as a check that the change does not harm them.
 - **Truncated Gaussian mixture:** the same three-component Gaussian mixture, normalised over
   power at or above zero. The negative log likelihood adds the log of the mixture's mass above zero,
   and the quantiles are the mixture's quantiles conditioned on power at or above zero, read by
@@ -79,27 +84,44 @@ the Gaussian mixture, so a Gaussian mixture also remains for ids 10 and 12, whic
   component's mean and coefficient of variation read from the head's outputs. The negative log
   likelihood uses the gamma log density (observed power is clipped to 1e-4 of capacity), and the
   quantiles are read by bisection on the mixture's cumulative distribution (the regularised
-  incomplete gamma function). A log-normal mixture is not run: it needs a positive offset that
+  incomplete gamma function). A log-normal mixture is not run: the log-normal mixture needs a positive offset that
   re-creates negative quantiles.
 
-**What is refitted.** The lag, weather, and date-time encoders keep the weights pre-trained on ERA5
-and CAMS, and the K1 chain's step-2 weights are reused. The fresh mixer and the daily fine-tune are
-refitted with the new loss, because the Candidate re-initialises its mixer at that stage
-(`fresh_mixer`). The limit is therefore that the encoders were pre-trained under the Gaussian loss,
-and the write-up says so. The check that comes first in implementation is that a refit with the
-Gaussian loss reproduces experiment 667's stored quantiles on one fold to within seed-level
-differences. If it does not, the plan is revised and the manager told.
+**What is refitted.** The Candidate's `fit` loads the K1 chain's step-2 weights and continues them,
+so the mixer is not re-initialised there. A new output family therefore re-runs the chain from the
+step-2 stage: `step2`, `table`, `fit`, `ptable`, and `pfit` of `chain.sh`, per fold and seed, under a
+new `E00667_ROOT`. The encoder pre-training (`pretrain`) is reused unchanged, so the encoders were
+pre-trained under the Gaussian loss, and the write-up says so. The new loss must be patched into
+`step2` and `fit` (`e.row_nll`), and the cross-fit tables keep the Gaussian read-out because they
+only supply the Candidate's inputs; the code review checks both. The check that comes first in
+implementation is that a Gaussian-loss run of this chain reproduces experiment 667's stored
+quantiles on one fold to within seed-level differences. If the check fails, the plan is revised
+and the manager told.
+
+**Injecting the family.** `mixture_nll` and `mixture_quantiles` see only the standardised target, so
+the implementation passes the Primary index and the per-Primary target mean and standard deviation
+into `row_nll`, `serving_quantiles`, and the window read-out, and a per-row mask on the Primary
+selects the family (one shared head, read as Gaussian at 12 Primaries and as the new family at the
+four). Truncated Gaussian: the log of the mass above zero is computed with `logsumexp` of
+`log_ndtr` terms so that it does not underflow when the median is near zero, and the bisection's
+lower bound is the standardised zero. Gamma: each component's mean is a softplus and its
+coefficient of variation a clamped exponential of the head outputs, and the head bias starts the
+components at equal weights with means spread around the Primary's mean.
 
 **Solar arm.** One quarterly refit, 2026-02-01 (it scores origins from February to April 2026, all
-before 2026-07-01), 3 seeds, at Solar B and Solar E, and the other four farms to keep the pooled
-network the same as in experiment 666. The physics-lite power already uses the half-hour's own
-zenith cosine, so it is exactly zero at night. The network now outputs a mixture on the ratio of
-observed power to the physics-lite power (centred at 1), the loss carries the Jacobian of that
-change of scale, and each quantile is the physics-lite power times the ratio's quantile, clamped at
-zero and at capacity. Night half-hours (zenith at the middle of the half-hour at or above 90
-degrees) have zero physics-lite power, so their quantiles are zero by construction, with no gate.
-Training rows are the daylight half-hours with positive physics-lite power. The control is the
-stored output of experiment 666.
+before 2026-07-01), 3 seeds, at Solar B and Solar E, with the other four farms kept in the pooled
+network as in experiment 666. In `build_day` the physics-lite power (`pl_mean`) uses the half-hour's
+own zenith cosine, so it is exactly zero at an own-night half-hour inside a daylight period. The
+network now outputs a mixture on the ratio of observed power to `pl_mean` (centred at 1), the loss
+carries the Jacobian of that change of scale, and each quantile is `pl_mean` times the ratio's
+quantile, clamped at capacity. Training rows are the daylight half-hours with `pl_mean` of at
+least 1% of the farm's capacity, which avoids the division at low sun, and the ratio is bounded
+below at zero by the clamp. Half-hours of periods that are not daylight, or without a stamp, have no
+inputs and are still set to zero at export. Two things change together against the control (the
+additive residual about `pl_mean`, gated by the period): the construction and the loss. The
+write-up says so and does not credit either alone. P4's night clause holds by construction, so
+the daylight CRPS clause is the test that can fail. The control is the stored output of experiment
+666.
 
 **Scoring.** The scoring code is experiment 667's (`e00667_score.py`) and experiment 666's
 (`e00666_score.py`): CRPS (twice the mean pinball loss over 11 levels) and median error in points of
@@ -121,8 +143,8 @@ predictions reused as controls; tails reported; no load-shift event is scored. T
 not arise because the inputs are the ENS forecast and the lags are at least 24 hours old, as in
 experiment 667.
 
-**Compute.** About 1 GPU-hour for the demand refits (4 fits; the Candidate's `fit` step is a small
-share of experiment 667's 0.5 GPU-hours per fold) and about 20 minutes for solar, inside the
+**Compute.** About 2 GPU-hours for the demand refits (three chains of two folds, each about 0.3 of
+experiment 667's 0.5 GPU-hours per fold without the encoder pre-training) and about 20 minutes for solar, inside the
 ceiling of 4 GPU-hours, with one GPU process at a time and at most 4 CPU cores, sharing the GPU with
 experiment 677.
 
