@@ -103,17 +103,28 @@ def blocks(*, series_true, series_other, median, prim, oi, pmap) -> dict[str, np
     }
 
 
-def selftest(*, clean: np.ndarray, median: np.ndarray) -> None:
-    """Perturbing every half-hour newer than origin minus 6 hours must not move any input."""
+def selftest(*, clean: np.ndarray, median: np.ndarray, prim: np.ndarray, oi: np.ndarray) -> None:
+    """Perturbing every half-hour newer than origin minus 6 hours must not move any input.
+
+    The rows are real origins, where the lag-free median is finite, so the test is not vacuous. A
+    positive control perturbs the half-hour at origin minus 6 hours and expects the inputs to move.
+    """
     rng = np.random.default_rng(0)
-    prim = rng.integers(0, 16, 200)
-    oi = rng.integers(20_000, clean.shape[1] - 500, 200)
+    pick = rng.choice(len(prim), size=min(200, len(prim)), replace=False)
+    prim, oi = prim[pick].astype(np.int64), oi[pick].astype(np.int64)
     base = lag_block(series=clean, median=median, prim=prim, oi=oi)
-    for k in range(200):
+    assert np.isfinite(base).mean() > 0.5, "the selftest rows have mostly missing inputs"
+    moved = 0
+    for k in range(len(prim)):
         bad = clean.copy()
         bad[prim[k], oi[k] - DELAY + 1 :] += 123.0
         got = lag_block(series=bad, median=median, prim=prim[k : k + 1], oi=oi[k : k + 1])
         assert np.array_equal(got, base[k : k + 1], equal_nan=True), "an input moved"
+        ctl = clean.copy()
+        ctl[prim[k], oi[k] - DELAY] += 123.0
+        got = lag_block(series=ctl, median=median, prim=prim[k : k + 1], oi=oi[k : k + 1])
+        moved += int(not np.array_equal(got, base[k : k + 1], equal_nan=True))
+    assert moved > 0.9 * len(prim), "the positive control did not move the inputs"
     print("selftest passed: no input reads newer than origin minus 6 hours", flush=True)
 
 
@@ -122,7 +133,8 @@ def main(month: str, *, run_selftest: bool) -> None:
     clean = k578.clean()
     median = dat.month_table(month=month).median
     if run_selftest:
-        selftest(clean=clean, median=median)
+        r0 = np.load(dat.HEAD_DATA / f"real_{month}.npz")
+        selftest(clean=clean, median=median, prim=r0["org_prim"], oi=r0["org_oi"])
     pmap = placebo_map()
     nb_of, cap, is_mw = c650.world()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -139,7 +151,8 @@ def main(month: str, *, run_selftest: bool) -> None:
     }
     view = dat.generator_view(clean=clean, month=month)
     events_now = []
-    for r in sorted(set(bq.tolist())):
+    assert set(bq.tolist()) == set(range(gen.N_TRAIN_PASSES)), "a training pass has no bank rows"
+    for r in range(gen.N_TRAIN_PASSES):
         own, _mirror, events = gen.build(clean=view, month_idx=ms, month_start_idx=ms, r=r, nb_of=nb_of,
                                          capacity=cap, is_mw=is_mw, window_end_idx=dat.YEAR_END_IDX)  # fmt: skip
         events_now += [e.row() for e in events]
@@ -153,6 +166,10 @@ def main(month: str, *, run_selftest: bool) -> None:
     stored = pl.read_parquet(dat.HEAD_DATA / f"events_{month}.parquet")
     assert pl.DataFrame(events_now).equals(stored), (
         "regenerated injected events differ from experiment 667's stored events"
+    )
+    share = (np.isfinite(out["real_true"]).mean(), np.isfinite(out["bank_true"]).mean())
+    assert abs(share[0] - share[1]) < 0.1, (
+        f"finite share differs between real and bank rows: {share}"
     )
     np.savez(OUT / f"lags_{month}.npz", **out)
     print(

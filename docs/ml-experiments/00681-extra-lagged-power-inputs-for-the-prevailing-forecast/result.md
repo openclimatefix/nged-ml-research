@@ -73,7 +73,8 @@ experiment changes only the inputs of the prevailing head.
       (11 inputs).
     - L3: L2 plus the differences between consecutive daily means for the last 3 days (14 inputs).
     - P: placebo with the width of the best of L1 to L3: its lag inputs come from another Primary of
-    the same metering group (a fixed permutation, no Primary maps to itself).
+      the same metering group (a fixed map, never to the Primary itself or to its electrical
+      neighbour).
 - **Bank rows.** The injected shift is applied to the new lags exactly as to the target, from the
   same shifted power series. The residual's lag-free median is not shifted, because the lag-free
   network reads no power. The code checks that bank shifts start or end 6 to 72 hours before some
@@ -90,12 +91,13 @@ experiment changes only the inputs of the prevailing head.
   are therefore not the L0 baseline. L0 is re-measured on origins from 2026-01-01, and the start
   reaction is also taken from the real and injected events in the January to June folds.
 - **Placebo exclusions.** The injected shift is mirrored onto electrical neighbours, so the
-  permutation excludes every neighbour of the Primary and any Primary with an overlapping injected
-  event.
+  map never picks a neighbour of the Primary. It reads the cleaned power of the other Primary,
+  without any injected shift.
 - **Definitions.** Lags are indexed at origin minus 12 half-hours or earlier (the bound is
   inclusive, and a reading at time t is complete at t). Rolling means and daily means are trailing
-  24-hour windows ending 6 hours before the origin, not calendar days. A missing or flagged reading
-  enters as zero residual plus a missing flag. A unit test perturbs data after that time and checks
+  24-hour windows ending 6 hours before the origin, not calendar days. A mean is missing when
+  under half its window is finite. A missing input enters as zero residual plus a missing flag.
+  A unit test perturbs data after that time and checks
   that no feature moves. L1's 24-hour lag repeats an existing input, and no 7-day lag is added.
 - **Events.** Injected and real events are reported separately, with the injected-event count per
   fold. Reaction-time contrasts use a paired bootstrap over events, with a threshold in whole days.
@@ -129,7 +131,7 @@ experiment changes only the inputs of the prevailing head.
   stores only the feature block, so
   `build_real` and `build_bank` are rerun to build the lag block, and the regenerated injected events
   are checked against the stored ones.
-  the new fits are 4 arms x 2 seeds x 6 folds.
+  the new fits are 6 arms (L0 to L3, P, P7) x 2 seeds x 6 folds, after L0 reproduces the stored head.
 
 ## Reporting and merge
 

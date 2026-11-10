@@ -93,12 +93,20 @@ def main() -> None:
     )
     width = WIDTH_OF.get(a.arm) or a.width
     assert width or a.arm == "L0", "the placebo arms need --width"
-    install(arm=a.arm, width=width)
     earlier = [m for m in base.MONTHS if m < a.month]
+    for m in [*earlier, a.month]:
+        assert (lags.OUT / f"lags_{m}.npz").exists(), f"run e00681_lags.py {m} first"
+    install(arm=a.arm, width=width)
     for seed in a.seeds:
         t0 = time.time()
         print(base.fit_rhaz(month=a.month, seed=seed, train_months=earlier), flush=True)
         write_bank_q(month=a.month, seed=seed)
+        if a.arm == "L0":  # gate: the refit must reproduce experiment 667's stored head
+            stored = np.load(base.dat.ROOT / "prevailing" / "fits" / f"Rhaz_{a.month}_s{seed}.npz")
+            mine = np.load(base.OUT / f"Rhaz_{a.month}_s{seed}.npz")
+            gap = float(np.abs(stored["real_q"] - mine["real_q"]).max())
+            print(f"L0 reproduces the stored head: max |difference| {gap:.2e}", flush=True)
+            assert gap < 1e-4, "L0 does not reproduce experiment 667's stored head"
         print(f"{a.arm} {a.month} s{seed} width {width}: {time.time() - t0:.0f}s", flush=True)
 
 
