@@ -1,6 +1,6 @@
 """Train one edge-state neural network of experiment 676 (GPU).
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the private data folder>
     (PYTHONPATH as in `e00676_posthoc.py`, plus experiment 675's and this folder)
     uv run --no-sync python e00676_train.py <arm: G|G-R|G-0> <seed> <steps>
 

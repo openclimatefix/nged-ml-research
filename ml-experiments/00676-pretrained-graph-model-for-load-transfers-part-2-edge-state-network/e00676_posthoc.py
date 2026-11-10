@@ -5,7 +5,7 @@ E1-J. Here the earliest end is 6 hours after the start and the running-median wi
 search is 6 hours. Everything else is experiment 678's, imported and patched; only the F and R
 probes are run.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the private data folder>
     P=ml-experiments
     export PYTHONPATH=$P/00676-pretrained-graph-model-for-load-transfers-part-2-edge-state-network:\
 $P/00678-donor-posterior-hybrid-for-load-transfer-pairing:\

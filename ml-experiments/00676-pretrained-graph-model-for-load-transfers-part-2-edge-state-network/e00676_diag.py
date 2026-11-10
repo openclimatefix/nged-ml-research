@@ -1,6 +1,7 @@
 """Experiment 676 diagnostic (post hoc, CPU).
 
-Edge events per Primary-year of a trained network on the real, un-injected record, by period, with the decoder chosen on validation worlds.
+Edge events per Primary-year of a trained network on the real, un-injected record, by period,
+with the decoder chosen on validation worlds.
 
     uv run --no-sync python e00676_diag.py <arm> <seed>   (PYTHONPATH as in `e00676_train.py`)
 """

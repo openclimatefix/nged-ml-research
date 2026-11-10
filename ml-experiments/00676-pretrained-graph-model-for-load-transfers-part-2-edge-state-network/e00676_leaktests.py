@@ -8,15 +8,17 @@
    fail the same comparison.
 2. Scored-target leak. `labels()` is patched to raise while a world is predicted and decoded, so no
    truth table can reach inference.
-4. Receptive field (at the production window of 2,880 hours). Replacing the hours after a cut with noise instead of NaN leaves the posterior
-   unchanged more than 800 hours before the cut (a window's quarter margin plus 80), and changes it just before the cut. The routine-step rate channel (a share over the whole 2,880-hour
-   window, as in experiment 675) is zeroed for this test: it is the one input that reads the whole
-   window, so hidden hours inside a window reach every hour of it. Training windows never contain
-   hidden hours, and validation and scored worlds hold them as NaN.
 3. Antisymmetry. Reversing a link's orientation swaps its two donating logits and its two lag heads,
    and leaves its off logit unchanged.
+4. Receptive field (at the production window of 2,880 hours). Replacing the hours after a cut with
+   noise instead of NaN leaves the posterior unchanged more than 800 hours before the cut (a
+   window's quarter margin plus 80), and changes it just before the cut. The routine-step rate
+   channel (a share over the whole 2,880-hour window, as in experiment 675) is zeroed for this test:
+   it is the one input that reads the whole window, so hidden hours inside a window reach every hour
+   of it. Training windows never contain hidden hours, and validation and scored worlds hold them as
+   NaN.
 
-    uv run --no-sync python e00676_leaktests.py [1|2|3]   (PYTHONPATH as in `e00676_train.py`)
+    uv run --no-sync python e00676_leaktests.py [1|2|3|4]   (PYTHONPATH as in `e00676_train.py`)
 """
 
 # ruff: noqa: ANN003, ANN201, ANN202, D103, E501, PT018, PT028
