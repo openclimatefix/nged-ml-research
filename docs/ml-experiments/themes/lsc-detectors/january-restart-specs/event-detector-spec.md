@@ -1,14 +1,17 @@
 # Spec: next steps for the hindsight load-shift detector
 
-**This is a copy of the specification that the Discuss session of 2026-11-10 wrote for the
-January restart, trimmed of conversation.** The page [state at the January
+**This is a copy of the specification that the Discuss session of 2026-11-10 wrote for the January
+restart, trimmed of conversation.** The page [state at the January
 pause](../state-at-january-pause.md) says which parts ran since. A0 ran as [experiment
 686](../../../00686-event-table-transfer-timing-and-false-solar-growth-events/result.md), whose
 result replaces the conflict that the take-home below describes: the two ends of the verified
 transfers step together within the noise. Part D's cheap test ran as [experiment
 687](../../../00687-causal-detector-features-for-the-prevailing-forecast-heads/result.md). Parts A1
-to A4, B, and C have not run. Probabilities and costs are the spec author's estimates, not
-commitments.
+to A4, B, and C have not run. Two statements below are out of date. Step 1 of part B1 (a
+register-based solar capacity trajectory) cannot be built, because the registers do not record
+recent domestic PV. Part C now uses one Sonnet reviewer, not two. The maintainer's amendment to part
+D was not re-reviewed by the spec's author. Probabilities and costs are the spec author's estimates,
+not commitments.
 
 **Terms.**
 
@@ -439,3 +442,4 @@ the features that the simple detector uses (per-lag causal step statistics in no
 scales, the gap with the all-Primaries median removed, the opposite-sign neighbour gap, the
 routine-step rate, the return-to-level statistic), and let the network learn how to use them. Test
 the explicit flag only as a comparison arm: features only against features plus flag.
+
