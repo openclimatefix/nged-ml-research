@@ -184,6 +184,7 @@ nav:
           - Experiments: ml-experiments/themes/lsc-detectors/experiments.md
           - Research plan: ml-experiments/themes/lsc-detectors/plan.md
           - Event-table summary: ml-experiments/themes/lsc-detectors/event-table-summary.md
+          - State at the January pause: ml-experiments/themes/lsc-detectors/state-at-january-pause.md
       - Load-shift labels in the forecast:
           - Summary: ml-experiments/themes/switching-labels-in-the-forecast/index.md
           - Experiments: ml-experiments/themes/switching-labels-in-the-forecast/experiments.md
