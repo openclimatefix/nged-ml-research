@@ -180,6 +180,7 @@ nav:
           - Summary: ml-experiments/themes/solar-disaggregation/index.md
           - Experiments: ml-experiments/themes/solar-disaggregation/experiments.md
           - Research plan: ml-experiments/themes/solar-disaggregation/plan.md
+          - Unmetered PV capacity: ml-experiments/themes/solar-disaggregation/unmetered-pv-capacity.md
       - LSC detectors:
           - Summary: ml-experiments/themes/lsc-detectors/index.md
           - Experiments: ml-experiments/themes/lsc-detectors/experiments.md
