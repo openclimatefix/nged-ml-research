@@ -1,25 +1,33 @@
 # An asset-inventory simulator
 
 **An asset-inventory simulator is worth one small test on data whose answer is known, as a source of
-an asset list per substation and of scenarios months ahead, and not as a better short-range
-forecast.** The simulator would fit, for each Primary substation (a substation that steps 33 kV down
-to 11 kV), a list of the assets behind its meter and a few parameters per asset. Examples are a
-solar capacity, the size of each unit of a gas engine and how long the engine usually runs, and a
-battery's power. The simulator would then run in the forward direction, from assets to power, to
-give scenarios. Fitting a fixed list, rather than explaining every half-hour, drops the step that
+an asset list per substation and of scenarios, mostly at long horizons, and not as a better
+short-range forecast.** The simulator would fit, for each Primary substation (a substation that
+steps 33 kV down to 11 kV), a list of the assets behind its meter and a few parameters per asset.
+Examples are a solar capacity, the size of each unit of a gas engine and how long the engine usually
+runs, and a battery's power. The simulator would then run in the forward direction, from assets to
+power, to give scenarios. The forward direction needs a model with real operating logic for each
+asset type, described under [What the forward direction means](#what-the-forward-direction-means).
+Fitting a fixed list, rather than explaining every half-hour, drops the step that
 failed in the gas-engine experiments read for this page: deciding when each asset is on.
 
+**The maintainer's answers make the asset list a deliverable and long-horizon scenarios the main
+use.** NGED hold nothing beyond the Embedded Capacity Register about what sits under each
+substation, so no ground truth exists to check the list against, and the list is shown as inferred. See
+[Maintainer's answers (2026-11-10)](#maintainers-answers-2026-11-10).
+
 **Two conditions, drawn from the merged experiments, decide whether the idea can work.** The asset
-list has to come from NGED's Embedded Capacity Register, because in the four experiments read for
+list has to start from NGED's Embedded Capacity Register, because in the four experiments read for
 this page that let a fit decide on its own whether a generator exists, the fit reported generators
-that are absent or unconfirmed. And the output has to be judged against NGED's own records, because
+that are absent or unconfirmed. And the output has to be judged on known-answer tests, because
 the half-hourly power the meter records (demand minus the generation below it) cannot separate
 several assets of one type.
 
 **The smallest test would add real metered generator output to the readings of the six Primaries
 metered in megawatts (MW), and give the fit an asset list that includes one asset known to be
 absent.** The other Primaries are metered in apparent power (MVA). The test is described under [The
-smallest test](#the-smallest-test) and is an option for the maintainer; nothing has been started.
+smallest test](#the-smallest-test) and is an option for the maintainer, who has not yet chosen it;
+nothing has been started.
 The test would show cheaply whether the fit recovers the capacities and running-time parameters of
 assets it is told about, and whether it gives near-zero capacity to a listed asset that is absent.
 
@@ -51,6 +59,46 @@ discussion that led to it is recorded on [The simulator discussion of
 - **Recovery:** the share of a known, injected asset's capacity that a fit finds again; 1 is all of
   it.
 - **NGED's metered generators** are anonymised as Wind A to C, Solar A to F, Battery A, and Gas A.
+
+## Maintainer's answers (2026-11-10)
+
+- **The asset list is itself a deliverable.** NGED do not know exactly what sits under each
+  substation, and they have nothing beyond the register, so no ground truth exists. A confirmed
+  asset list per substation is one of the main benefits, together with a forward simulator of
+  demand.
+- **NGED cannot confirm the lists beyond the register.** The known-answer test is therefore the main
+  validation, and each list is shown as inferred.
+- **Scenarios matter much more at long horizons.** They are also interesting at days 1 to 10 for
+  what-if questions. One example: a generator known to exist that has been off for months turns on
+  during the 10-day horizon, and the question is what happens to the substation's demand.
+- **A forward model means real operating logic.** A battery model implements what a battery
+  scheduler would do given the available price signals and the state of charge, with several
+  scheduling profiles, because there are several ways to optimise. The same holds for other
+  price-driven generators. A gas generator is a physical model written as equations that capture its
+  ramping time, its minimum on-duration, and similar limits.
+- **Training the forecaster on simulated series is conceivable if the simulator becomes good
+  enough.** The maintainer calls training on simulated series "a bit sketchy".
+- **Not yet answered:** whether the decoy rule should apply to solar too (see [Open
+  question](#open-question-for-the-maintainer)).
+
+## What the forward direction means
+
+**The forward direction needs, for each asset type, a model that decides what the asset does from the
+signals it would see.** A fitted profile of the asset's past output is not enough. The table says
+which parts of the research repository (`nged-ml-research`) already hold such a model.
+
+| Asset type | Forward model wanted | In the repository today |
+|---|---|---|
+| Battery | A scheduler with the price signals available and the state of charge, in several profiles | Partly. `studies.battery_dispatch` holds a daily linear-programme schedule for a price taker, with a state of charge, an energy limit, a cycle cap, and a rank-rule schedule; `studies.battery_templates` holds tariff-window, charge-only, merchant, Agile-tariff, and home-battery schedules; `studies.battery_state_space` holds the differentiable estimator that mixes them. The estimator fits the schedules to substation data. We found no module that runs the schedules forward for a registered battery |
+| Other price-driven generator | An optimiser that follows the price signal within the plant's limits | No. We found none in `src/studies` or in the experiments read for this page |
+| Gas engine | Plant equations with ramping time, minimum on-duration, and similar limits | No. The engine detector is a hidden Markov model of whole-number units and spell lengths, fitted to the residual (experiments 196 and 291), and has no ramping or minimum-on-duration equation |
+| Solar | Output from sunshine and panel geometry | Yes: the physics solar plant curve (experiment 282), with the assumed tilt fitting worse than the farms' best |
+| Wind | Output from each ensemble member | Yes: the physics wind plant run on each ensemble member, followed by a mixture-density head (experiment 347) |
+| Demand under the assets | Calendar, temperature, heating, holidays, and the night step | Yes: the demand GAM (`studies.dp_gam`) |
+
+**The demand GAM, the solar and wind plants, and the battery schedules exist. The gas-engine
+equations and the other price-driven generators do not.** The only recorded gas-engine output
+we read for this page is Gas A's, which covers 44 days.
 
 ## Strict and relaxed disaggregation identify different quantities
 
@@ -212,21 +260,23 @@ and the battery term into one fit, with the register deciding which terms exist 
 
 ## Candidate uses, ranked
 
-**The two uses that rank highest are an asset list per Primary that NGED can check, and tail
-scenarios months ahead for curtailment and planning.** The ranking is a judgement of the value to
-NGED against the effort of building and testing. The values are our estimates and need NGED's
-confirmation. Each use carries a prediction that could fail and the measurement that would show it.
+**The two uses that rank highest are an asset list per Primary, shown as inferred, and scenarios
+at long horizons for curtailment and planning.** The ranking is a judgement of the value to
+NGED against the effort of building and testing, and the ranking puts the asset list and the
+long-horizon scenarios first because the maintainer gave them most weight. The values are our
+estimates. Each use carries a prediction that could fail and the measurement that would show it.
 
 | Rank | Use | Value to NGED | Effort to build and test | Prediction that could fail | How it would be measured |
 |---|---|---|---|---|---|
-| 1 | An asset list per Primary, with parameters, beside the register | High: shows where the register name and the meter disagree, as for the D8 engine registered under D14 | Low: reuses the parts above | On injected known answers, capacity within 20% for every listed asset that steps 8 noise units or more, and under 0.5 MW for a listed asset that is absent | The smallest test below; then the list sent to NGED for comment |
-| 2 | Tail scenarios months ahead, for curtailment and planning | High: reducing curtailment is a stated aim of the forecast | Medium: needs a running-time model per asset and a demand scenario model | Issued a month ahead, between 0.5% and 2% of held-out half-hours fall above the scenarios' 0.99 quantile, and likewise below the 0.01 quantile, with a narrower 0.01-to-0.99 band than a block bootstrap of the Primary's own residual history | Coverage and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles on held-out months of 2026-01 to 2026-06 |
-| 3 | A new connection added from the register before it appears in the data | Medium to high for planning; needs NGED to say which connections matter | Medium | For assets connected in 2024 to 2026, a scenario that adds the registered asset at its connection date moves the post-connection error of the solar or step term by at least half the asset's registered MW | Retrospective: hold out the data after each connection date and compare with and without the registered asset |
-| 4 | A fallback when telemetry is missing or wrong | Medium: the service must degrade, not fail | Low | The forward simulator scores better than climatology at days 1 to 10 when no recent power is available | CRPS and tail pinball loss against climatology and the lag-free forecast on the same rows |
-| 5 | A known-answer test bed of substations with known inventories | Medium: helps the evaluation problem behind the discussion | Low once use 1 exists | Existing forecasting methods keep their ranking on the simulated series (Kendall rank correlation of at least 0.8 with their real scores, where 1 means the same ranking) | Rank transfer, as proposed in the discussion |
-| 6 | Counterfactuals ("the load without the engine") | Low until NGED asks | Low | None measurable: no truth exists | Not measurable |
+| 1 | An asset list per Primary, with parameters, beside the register | High: a stated main benefit; shows where the register name and the meter disagree, as for the D8 engine registered under D14 | Low: reuses the parts above | On injected known answers, capacity within 20% for every listed asset that steps 8 noise units or more, and under 0.5 MW for a listed asset that is absent | The smallest test below; the list is then shown as inferred |
+| 2 | Scenarios at long horizons (months ahead), for curtailment and planning | High: a stated aim of the forecast, and the horizon the maintainer says matters most | Medium to high: needs a running-time model per asset, forward models with real operating logic, and a demand scenario model | Issued a month ahead, between 0.5% and 2% of held-out half-hours fall above the scenarios' 0.99 quantile, and likewise below the 0.01 quantile, with a narrower 0.01-to-0.99 band than a block bootstrap of the Primary's own residual history | Coverage and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles on held-out months of 2026-01 to 2026-06 |
+| 3 | A what-if at days 1 to 10, such as a dormant generator that turns on | Medium to high: a question the maintainer named | Medium: needs a gas-engine plant model, which does not exist | Replaying a known start or stop, such as the D8 engine's change on 2023-08-15, the simulated change in the net series is within 30% of the observed change (a proposed threshold) | Error of the simulated step against the observed step on the known events |
+| 4 | A new connection added from the register before it appears in the data | Medium to high for planning; needs NGED to say which connections matter | Medium | For assets connected in 2024 to 2026, a scenario that adds the registered asset at its connection date moves the post-connection error of the solar or step term by at least half the asset's registered MW | Retrospective: hold out the data after each connection date and compare with and without the registered asset |
+| 5 | A fallback when telemetry is missing or wrong | Medium: the service must degrade, not fail | Low | The forward simulator scores better than climatology at days 1 to 10 when no recent power is available | CRPS and tail pinball loss against climatology and the lag-free forecast on the same rows |
+| 6 | Simulated series for a known-answer test bed, and conceivably for training the forecaster | Medium: helps the evaluation problem behind the discussion; the maintainer calls training on simulated series "a bit sketchy" | Low once use 1 exists | Existing forecasting methods keep their ranking on the simulated series (Kendall rank correlation of at least 0.8 with their real scores, where 1 means the same ranking) | Rank transfer, as proposed in the discussion |
+| 7 | Counterfactuals ("the load without the engine") | Low until NGED asks | Low | None measurable: no truth exists | Not measurable |
 
-**Use 4 is unlikely to matter, because a lag-free forecast already covers missing telemetry.** The
+**Use 5 is unlikely to matter, because a lag-free forecast already covers missing telemetry.** The
 fallback would have to beat that forecast, not climatology, to change the service. Onboarding a
 Primary with a short history would be another use. The maintainer has paused onboarding work, so
 onboarding is not ranked here.
@@ -268,30 +318,19 @@ an option for the maintainer, not a planned experiment.
   month and is no longer informative. Each scenario test must report the band width beside the
   coverage, and compare with a block bootstrap of the Primary's own history, which needs no asset
   inventory at all.
-- **Validation of the asset list.** Only NGED can confirm which assets sit behind which meter. The
-  D8 engine registered under D14 shows that agreement with the register is not proof.
+- **What NGED could still say.** NGED's records may cover the running hours of the larger engines,
+  which Primaries have export limits or flexible connections, and whether any metered generator's
+  output is still added back into a Primary's reading. We have not asked.
+- **Validation of the asset list.** NGED cannot confirm which assets sit behind which meter beyond
+  the register, so only known-answer tests validate the list. The D8 engine registered under D14
+  shows that agreement with the register is not proof.
 - **Bands may do the work.** At D8, widening the bands from past residuals cut the quantile score by
   9% to 19% and lifted the share of readings inside the 90% band from 42% to between 80% and 87%
   (experiment 264). A scenario use must beat that simpler widening before an engine term is worth
   adding.
-- **What NGED would need to tell us:**
-    - the running hours of the larger engines;
-    - which meter each registered asset is behind, starting with the 6 MW engine;
-    - whether any metered generator's output is still added back into a Primary's reading;
-    - which Primaries have export limits or flexible connections;
-    - which planning questions the scenarios would answer.
 
-## Open questions for the maintainer
+## Open question for the maintainer
 
-- **Is the asset list itself a deliverable for NGED, or only a step towards scenarios?** If the list
-  is a deliverable, use 1 is worth doing alone and the test above would be a sufficient first step.
-  If not, the scenario test (use 2) has to pass before any of the inventory work is worth it.
-- **Will NGED confirm the asset lists?** If NGED can say which meter each asset is behind and give
-  engine running hours, the inventory can be validated. If not, the known-answer test is the only
-  validation, and the list should be shown as inferred on the substation cards.
-- **Which horizon matters for the scenarios: days 1 to 10, or months?** Days 1 to 10 compete with
-  the current forecasts, which are more skilful at short leads. We found no months-ahead forecast in
-  the repository, so a months-ahead scenario would be judged on tail calibration alone.
 - **Should the decoy rule apply to solar too?** Every register name lists solar, so a decoy can only
   be tested for engines, batteries, and wind. If solar matters most, the existing solar-capacity
   work already covers the inventory's solar term, and the test can drop the solar term.
