@@ -17,15 +17,15 @@ made by one shared generator ([experiment
 history of 15 Primaries, because the real record holds almost no verified long transfers.
 
 Five terms recur. **E1** is the event table of [experiment
-653](../../00653-edge-state-event-table-penalised-segmentation/result.md), which cuts each
-Primary's residual (the demand forecast error) into steps. **E1-J** is E1 plus the recipient search
-of [experiment 670](../../00670-event-table-recipient-search-on-six-cell-grid/result.md), which
-looks at each connected Primary for a step of the opposite sign shortly after a large downward
-step. **Found** means an injected event has a decoded event at the right Primary, with the right
-sign and start. **Paired** means the decoded donor and recipient are the right two Primaries. Every
-share is weighted by megawatts. A noise unit is a Primary's usual difference between successive
-6-hour means. A *deep* shift is 8 noise units or more and a *shallow* one is 2 to 8. A *long* shift
-lasts over 7 days (or has no end), a *medium* one 1 to 7 days, and a *short* one 1 day or less.
+653](../../00653-edge-state-event-table-penalised-segmentation/result.md), which cuts each Primary's
+residual (the demand forecast error) into steps. **E1-J** is E1 plus the recipient search of
+[experiment 670](../../00670-event-table-recipient-search-on-six-cell-grid/result.md), which looks
+at each connected Primary for a step of the opposite sign shortly after a large downward step.
+**Found** means an injected event has a decoded event at the right Primary, with the right sign and
+start. **Paired** means the decoded donor and recipient are the right two Primaries. Every share is
+weighted by megawatts. A noise unit is a Primary's usual difference between successive 6-hour means.
+A *deep* shift is 8 noise units or more and a *shallow* one is 2 to 8. A *long* shift lasts over 7
+days (or has no end), a *medium* one 1 to 7 days, and a *short* one 1 day or less.
 
 ## What works
 
@@ -36,9 +36,13 @@ lasts over 7 days (or has no end), a *medium* one 1 to 7 days, and a *short* one
   transfer megawatts and 0.25 of the medium and deep ones, against 0.09 for E1 (experiment 670).
   Rearranging the connections at random removes the gain, so the gain comes from the real
   neighbours.
-- **The real record supports the method only thinly.** The one verified transfer, between
-  Primaries D5 and D16 in December 2025, is paired in the right direction, but the decoded starts
-  are late.
+- **Searching from the rise as well as the fall helps a little more.** E1-J-sym, which also looks
+  for the donor of each unpaired rise, pairs 0.38 of the long and deep megawatts against 0.29, and
+  0.32 of the medium and deep megawatts against 0.25, but adds 442 decoded transfers for 63 more
+  correct ends ([experiment
+  680](../../00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/result.md)).
+- **The real record supports the method only thinly.** The one verified transfer, between Primaries
+  D5 and D16 in December 2025, is paired in the right direction, but the decoded starts are late.
 
 ![Paired and found shares per cell for E1, E1-J, and E1-J on a rewired
 graph](../../00670-event-table-recipient-search-on-six-cell-grid/figure_recall_by_cell.svg)
@@ -51,11 +55,10 @@ graph](../../00670-event-table-recipient-search-on-six-cell-grid/figure_recall_b
   678](../../00678-donor-posterior-hybrid-for-load-transfer-pairing/result.md) paired 0.36 at best,
   and the edge-state neural network of experiment 676 paired no more than the hybrids.
 - **The donor is the bottleneck.** [Experiment
-675](../../00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe/result.md)
+  675](../../00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe/result.md)
   found that, of the recipient megawatts that E1-J located but left unpaired, 0.87 belonged to
   transfers whose donor E1-J had not found. A pretrained encoder made the donor probe worse, and a
-  logistic regression on the node
-  inputs did as well as any neural encoder.
+  logistic regression on the node inputs did as well as any neural encoder.
 - **Short events are not paired.** Transfers of a day or less are paired for 0.08 (deep) and 0.03
   (shallow) of their megawatts, and ending the added donors after 6 hours instead of 2 days did not
   change that (experiment 676, post hoc).
@@ -99,3 +102,4 @@ graph](../../00670-event-table-recipient-search-on-six-cell-grid/figure_recall_b
 | [675](../../00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe/result.md) | Why are recipients unpaired, and does pretraining help the donor? | Not supported | Donor missing for 0.87; pretraining worse |
 | [678](../../00678-donor-posterior-hybrid-for-load-transfer-pairing/result.md) | Do a probe's donor alarms raise the pairing? | Not supported | 0.36 against 0.29 |
 | [676](../../00676-pretrained-graph-model-for-load-transfers-part-2-edge-state-network/result.md) | Does an edge-state neural network pair more than the hybrids? | Not supported | Pairs 0.32 against 0.36 (best hybrid); a copy without links pairs as much |
+| [680](../../00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/result.md) | Does also searching from each unpaired rise for its donor pair more? | Partly supported | 0.38 against 0.29 (long and deep); 442 added transfers |
