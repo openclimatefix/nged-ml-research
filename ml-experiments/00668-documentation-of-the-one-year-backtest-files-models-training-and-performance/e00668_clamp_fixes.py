@@ -111,8 +111,8 @@ def change_stats(*, before: pl.DataFrame, after: pl.DataFrame, by: str = "time_s
     return {
         "rows": before.height,
         "rows_changed": int(diffs["changed"].sum()),
-        "share_changed": float(diffs["changed"].mean()),
-        "largest_change": float(diffs["max_change"].max()),
+        "share_changed": float(diffs.select(pl.col("changed").mean()).item()),
+        "largest_change": float(diffs.select(pl.col("max_change").max()).item()),
         "per_series": per.to_dicts(),
     }
 
