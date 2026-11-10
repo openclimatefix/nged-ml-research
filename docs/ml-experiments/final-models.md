@@ -3,8 +3,8 @@
 **This page states, for each forecast type, which neural network the one-year backtest used and how
 it was trained.** It is written for the person who ports the models into `nged-substation-forecast`.
 Each section covers one forecast type and has the same blocks: architecture, training regime,
-post-processing, scores, code, and port notes. Most choices link to the experiment page that decided
-them. The page adds no new scoring. Where two pages disagree, the page says so and names the current
+post-processing, scores, code, input tables, and port notes. Most choices link to the experiment
+page that decided them. The page adds no new scoring. Where two pages disagree, the page says so and names the current
 one.
 
 **No neural network on this page is adopted for production.** Every score comes from one backtest
@@ -209,7 +209,7 @@ files, and the checks of [experiment
 | `valid_time` | UTC microsecond timestamp, the end of the half-hour, so the lead-0 row covers the half-hour that ends at the origin (11:30 to 12:00) | `valid_time`, constrained to be strictly after `power_fcst_init_time` |
 | `nwp_init_time` | UTC, the 00Z ENS run that the forecast used | `nwp_init_time` |
 | `power_fcst_init_time` | UTC, always 12:00 | `power_fcst_init_time` |
-| `q01` to `q99` | 11 Float32 columns in the order 0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99, in the series' own unit | No quantile column; `power_fcst` is one value per `ensemble_member` |
+| `q01` to `q99` | 11 Float32 columns (the BSP and GSP files were recast from Float64 on 2026-11-10) in the order 0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99, in the series' own unit | No quantile column; `power_fcst` is one value per `ensemble_member` |
 | `NRA_or_prevailing` | String, `NRA` or `prevailing`; `primaries.parquet` only | No field |
 | none | Model identity and run identity are not in the files | `power_fcst_model_name`, `power_fcst_model_version`, `experiment_name`, `ml_flow_experiment_id`, `fold_id` |
 
@@ -1078,8 +1078,8 @@ use it is not decided.
   modelled, and NGED's event labels are incomplete.
 - **Open questions.** Whether the 3.5-hour cap or a longer one gives the better score with the same
   refit schedule, which experiment 669 did not test on matched schedules. The D1 median is on
-  average 18 MW below the observed median, and its monthly mean error swings between -39.8 MW and
-  +25 MW. Which forecast slots (00:00, 06:00, 12:00, and 18:00 UTC) this neural network must serve,
+  average 18 MW below the observed median, and its monthly mean error swings between -39.8 MW
+  and +25 MW. Which forecast slots (00:00, 06:00, 12:00, and 18:00 UTC) this neural network must serve,
   and what it does with a stale run, is not decided.
 
 ## Wind
@@ -1563,8 +1563,8 @@ neural network above.
   apply to wind, whose coverage already exceeds 0.90, and it does not apply to the NRA Primaries
   rows. Two arms of experiment 683 tried the NRA rows. Arm 2, the walk-forward scale, brought their
   coverage to only 87.1% and raised their CRPS by 0.081 points. Arm 1, the fixed factor 1.0934 about
-  the median that experiment 613 fixed, lowered their CRPS by 0.027 points (interval -0.031 to
-  -0.023) and raised their coverage to 86.0% to 87.6%. The backtest files apply neither arm to the
+  the median that experiment 613 fixed, lowered their CRPS by 0.027 points (interval -0.031
+  to -0.023) and raised their coverage to 86.0% to 87.6%. The backtest files apply neither arm to the
   NRA rows. The first month, 2025-11, has no earlier forecast to fit on and is left as stored.
 - **Effect on coverage.** On 2025-12 to 2026-06, the q05-to-q95 coverage and CRPS change are as in
   the table, each coverage a range over the four lead bands (experiment 683).
@@ -1690,9 +1690,9 @@ The per-type sections give the detail where it belongs.
   the BSPs and GSPs in `ml-experiments/00669-*/e00669_testrows.py`, and experiment 667 rebuilt the
   Primaries' rows from 2025-07-01 onward (`REPLACE_FROM` in `e00667_extend.py`). A port must
   forecast every half-hour of the horizon.
-- **The last 62 days of a wind refit window only stop training early.** Wind cases whose valid time
-  lies in the 62 days before the refit date are used to choose the best epoch and never enter a
-  gradient (`STOP_WINDOW_DAYS` in `e00666_wind_fit.py`).
+- **The last 62 days of a wind refit window only stop training early.** Wind cases whose origin is at or after
+  the cut-off (62 days before the refit date) and whose valid time is before the refit date are used
+  to choose the best epoch and never enter a gradient (`STOP_WINDOW_DAYS` in `e00666_wind_fit.py`).
 - **ERA5 arrives about 5 days late.** At a real cut-off, the last roughly 5 days of ERA5 and CAMS
   pre-training rows could not be read. The BSP and GSP section states this. The same lateness
   applies to any Candidate or wind input built from ERA5.
@@ -1706,9 +1706,9 @@ The per-type sections give the detail where it belongs.
   because the quantiles are clamped at the neural network's own capacity (backtest README).
 - **At least two capacities are in play.** The wind and solar networks train with the 99.9th
   percentile of the 730 days before each refit. Every score divides by the production effective
-  capacity, one value per series. The neighbour power ratios of the demand neural networks read a
-  `capacity_mw` column in `e00400_blend.py`, and the source table of that column was not traced for
-  this page.
+  capacity, one value per series. The neighbour power ratios of the demand neural networks divide
+  the `capacity_mw` column of `site_map.csv` (set in `world()` of `e00647_data.py`), a third
+  capacity that is not the effective-capacity table.
 - **Hide all power after the cutoff in every refit.** Experiment 667 sets the power after the cutoff
   to NaN in its `train` phase (`TRAIN_ONLY` in `e00667_fold.py`). Experiment 669 has the same switch
   (`E00669_HIDE=1`), and its docstring says that only the pre-flight gate used it, so the year's
