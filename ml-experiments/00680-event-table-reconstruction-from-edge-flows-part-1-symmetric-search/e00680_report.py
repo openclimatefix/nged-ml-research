@@ -47,7 +47,7 @@ def gate(*, raw: pl.DataFrame) -> dict:
     old = pl.concat([pl.read_parquet(f) for f in sorted(E670.glob("injected_default_*.parquet"))])
     old = with_cells(df=old.filter(pl.col("method") == "E1-J"))
     new = with_cells(df=raw.filter(pl.col("method") == "E1-J"))
-    out = {}
+    out: dict = {}
     for cell in CELLS:
         a = cell_stats(frames=[old], cell=cell)
         b = cell_stats(frames=[new], cell=cell)
@@ -59,7 +59,7 @@ def gate(*, raw: pl.DataFrame) -> dict:
     worlds_new = set(raw.filter(pl.col("method") == "E1-J")["world"].to_list())
     worlds_old = set(old["world"].to_list())
     out["same_worlds"] = worlds_new == worlds_old
-    out["passed"] = out["same_worlds"] and all(v["ok"] for k, v in out.items() if k in CELLS)
+    out["passed"] = out["same_worlds"] and all(out[c]["ok"] for c in CELLS)
     print("GATE passed:", out["passed"], "(same worlds:", out["same_worlds"], ")")
     return out
 
