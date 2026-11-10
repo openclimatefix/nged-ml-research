@@ -23,7 +23,7 @@ from e00653_core import decode_world
 from e00660_ev34_detector import Rig, truths  # ty: ignore[unresolved-import]
 from e00670_run import CONFIGS, params653  # ty: ignore[unresolved-import]
 from e00672_data import TRAIN_END, inject_world  # ty: ignore[unresolved-import]
-from e00675_pretrain import hourly_of
+from e00675_pretrain import hourly_of  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 ROOT: Final[Path] = (

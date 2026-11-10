@@ -19,7 +19,7 @@
     uv run --no-sync python e00676_leaktests.py [1|2|3]   (PYTHONPATH as in `e00676_train.py`)
 """
 
-# ruff: noqa: ANN201, E501, PT018
+# ruff: noqa: ANN003, ANN201, ANN202, D103, E501, PT018, PT028
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ import sys
 
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
-from e00675_inputs import node_inputs
+from e00675_inputs import node_inputs  # ty: ignore[unresolved-import]
 from e00676_net import EdgeStateNet
 
 N, SPAN = 6, 480
@@ -108,18 +108,18 @@ def test2() -> None:
     torch.manual_seed(0)
     net = EdgeStateNet(edges=EDGES).float().eval()
     adj = torch.full((N, N), 1 / N, dtype=torch.float64)
-    dec.SPAN = SPAN
+    dec.SPAN = SPAN  # ty: ignore[invalid-assignment]
 
     def boom(**_: object) -> None:
         raise AssertionError("labels() was called at inference")
 
     real = data.labels
-    data.labels = boom
+    data.labels = boom  # ty: ignore[invalid-assignment]
     try:
         post = dec.predict_world(net=net, resid=resid, sigma=sigma, mva=mva, adj=adj, device=torch.device("cpu"))  # fmt: skip
         names = [f"s{i}" for i in range(N)]
         xh = {s: np.repeat(resid[i].astype(np.float64) * sigma[i], 2) for i, s in enumerate(names)}
-        dec.decode(post=post, edges=EDGES, sites=names, xh=xh, sigma=dict(zip(names, sigma, strict=True)), onset=2.0, cutoff=0.0, lo=0, hi=post.link.shape[1])  # fmt: skip
+        dec.decode(post=post, edges=EDGES, sites=names, xh=xh, sigma=dict(zip(names, sigma, strict=True)), onset=2.0, cutoff=0.0, lo=0, hi=post.link.shape[1])  # fmt: skip  # ty: ignore[invalid-argument-type]
     finally:
         data.labels = real
     print("test 2 passed")
@@ -142,7 +142,7 @@ def test4() -> None:
     hidden, noisy = base.copy(), base.copy()
     hidden[:, cut:] = np.nan
     noisy[:, cut:] = 10.0 * rng.normal(size=(N, hours - cut))
-    from e00675_inputs import N_CHANNELS
+    from e00675_inputs import N_CHANNELS  # ty: ignore[unresolved-import]
 
     orig = dec.window_inputs
 
@@ -151,10 +151,10 @@ def test4() -> None:
         h[..., N_CHANNELS - 7] = 0.0  # the routine-step rate is a whole-window statistic by design
         return h, d
 
-    dec.window_inputs = no_rate
+    dec.window_inputs = no_rate  # ty: ignore[invalid-assignment]
     kw = {"net": net, "sigma": sigma, "mva": mva, "adj": adj, "device": torch.device("cpu")}
-    a = dec.predict_world(resid=hidden.astype(np.float32), **kw)
-    b = dec.predict_world(resid=noisy.astype(np.float32), **kw)
+    a = dec.predict_world(resid=hidden.astype(np.float32), **kw)  # ty: ignore[invalid-argument-type]
+    b = dec.predict_world(resid=noisy.astype(np.float32), **kw)  # ty: ignore[invalid-argument-type]
     safe = slice(0, cut - 2880 // 4 - 80)
     assert np.allclose(a.link[:, safe], b.link[:, safe], atol=1e-4), "future hours leaked"
     assert not np.allclose(a.link[:, cut - 100 : cut], b.link[:, cut - 100 : cut], atol=1e-4)
@@ -170,7 +170,7 @@ def test3() -> None:
     n1 = EdgeStateNet(edges=EDGES).double().eval()
     n2 = EdgeStateNet(edges=[(b, a) for a, b in EDGES]).double().eval()
     n2.load_state_dict(n1.state_dict(), strict=False)
-    n2.ia, n2.ib = n1.ib.clone(), n1.ia.clone()
+    n2.ia, n2.ib = n1.ib.clone(), n1.ia.clone()  # ty: ignore[call-non-callable]
     l1, g1, _ = forward(n1, h, d, mva)
     l2, g2, _ = forward(n2, h, d, mva)
     assert torch.allclose(l1[..., 0], l2[..., 0], atol=1e-10)

@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Final
 
 import torch  # ty: ignore[unresolved-import]
-from e00675_net import Encoder
+from e00675_net import Encoder  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]
 
 N_LAGS: Final[int] = 19
@@ -41,7 +41,7 @@ class EdgeStateNet(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Oriented features of every link: (a, b) and (b, a), each (batch, links, hours, FEAT)."""
         ia, ib = self.ia, self.ib
-        hi, hj, si, sj = h[:, ia], h[:, ib], s[:, ia], s[:, ib]
+        hi, hj, si, sj = h[:, ia], h[:, ib], s[:, ia], s[:, ib]  # ty: ignore[invalid-argument-type]
 
         def xcorr(donor: torch.Tensor, rec: torch.Tensor) -> torch.Tensor:
             shifted = torch.stack(
@@ -58,8 +58,8 @@ class EdgeStateNet(nn.Module):
             return torch.asinh(5.0 * peak / (donor.abs() + 0.02))[..., None]
 
         t = h.shape[2]
-        mi = mva[ia][None, :, None, None].expand(h.shape[0], -1, t, 1)
-        mj = mva[ib][None, :, None, None].expand(h.shape[0], -1, t, 1)
+        mi = mva[ia][None, :, None, None].expand(h.shape[0], -1, t, 1)  # ty: ignore[invalid-argument-type]
+        mj = mva[ib][None, :, None, None].expand(h.shape[0], -1, t, 1)  # ty: ignore[invalid-argument-type]
         f_ab = torch.cat([hi, hj, xcorr(si, sj), ratio(si, sj), mi, mj], -1)
         f_ba = torch.cat([hj, hi, xcorr(sj, si), ratio(sj, si), mj, mi], -1)
         if self.no_links:  # only the donating Primary's own output remains

@@ -27,9 +27,9 @@ from e00653_core import match
 from e00653_inject import Truth
 from e00660_ev34_detector import Rig  # ty: ignore[unresolved-import]
 from e00665_score import cell_of  # ty: ignore[unresolved-import]
-from e00672_data import TRAIN_END
-from e00675_pretrain import ROOT as ROOT675
-from e00675_pretrain import hourly_residual
+from e00672_data import TRAIN_END  # ty: ignore[unresolved-import]
+from e00675_pretrain import ROOT as ROOT675  # ty: ignore[unresolved-import]
+from e00675_pretrain import hourly_residual  # ty: ignore[unresolved-import]
 from e00676_decode import decode, predict_world
 from e00676_net import EdgeStateNet
 from e00676_train import DEV, graph_of
@@ -143,7 +143,7 @@ def main() -> None:
     rows = []
     for w in range(900, 940):
         z = np.load(ROOT675 / "worlds" / f"test_{w}.npz")
-        post = predict_world(resid=z["resid"], sigma=z["sigma"], **kw)
+        post = predict_world(resid=z["resid"], sigma=z["sigma"], **kw)  # ty: ignore[invalid-argument-type]
         truth = truths_of(pl.read_parquet(ROOT675 / "worlds" / f"test_{w}_truth.parquet"))
         sg = dict(zip(sites, z["sigma"], strict=True))
         ev = decode(post=post, edges=edges, sites=sites, xh=xh_of(resid=z["resid"], sigma=z["sigma"], sites=sites), sigma=sg, onset=onset, cutoff=cutoff, lo=SCORED_H, hi=GRID_LENGTH // 2)  # fmt: skip

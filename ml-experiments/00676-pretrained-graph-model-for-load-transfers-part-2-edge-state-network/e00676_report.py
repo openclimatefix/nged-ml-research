@@ -18,8 +18,8 @@ import numpy as np
 import polars as pl
 from e00653_common import DAY, GRID_LENGTH, SCORED_FROM
 from e00676_worlds import ROOT
-from e00678_report import CELLS, family_of, share, tables
-from e00678_run import OUT as OUT678
+from e00678_report import CELLS, family_of, share, tables  # ty: ignore[unresolved-import]
+from e00678_run import OUT as OUT678  # ty: ignore[unresolved-import]
 
 REFS: Final = ("E1-J", "F-hyb", "R-hyb")
 N_BOOT: Final[int] = 2000
@@ -34,7 +34,11 @@ def load() -> pl.DataFrame:
     mine = [pl.read_parquet(f) for f in sorted((ROOT / "scored").glob("*_rows.parquet")) if "seed999" not in f.name]  # fmt: skip
     cols = ref.columns
     out = pl.concat([ref] + [m.select(cols) for m in mine])
-    return out.unique(subset=["method", "world", "site", "start", "amp_mw", "kind"], keep="first", maintain_order=True)
+    return out.unique(
+        subset=["method", "world", "site", "start", "amp_mw", "kind"],
+        keep="first",
+        maintain_order=True,
+    )
 
 
 def main() -> None:
@@ -65,7 +69,7 @@ def main() -> None:
         pw = g.group_by("world").agg(pl.col("world_edge_events").first(), pl.col("world_right_pairs").first())  # fmt: skip
         out["false_transfers_per_primary_year"][method[0]] = float((pw["world_edge_events"] - pw["world_right_pairs"]).sum()) / (len(worlds) * 15 * YEARS)  # fmt: skip
         rec = g.filter(pl.col("edge_truth") & (pl.col("amp_mw") > 0) & pl.col("right_class"))
-        out["start_err"][method[0]] = [float(rec["start_err_hh"].abs().median()) if rec.height else float("nan"), rec.height]  # fmt: skip
+        out["start_err"][method[0]] = [float(rec["start_err_hh"].abs().median()) if rec.height else float("nan"), rec.height]  # fmt: skip  # ty: ignore[invalid-argument-type]
     (ROOT / "summary.json").write_text(json.dumps(out, indent=1))
     print(json.dumps({k: round(v, 2) for k, v in out["false_transfers_per_primary_year"].items()}))
     print(out["start_err"])

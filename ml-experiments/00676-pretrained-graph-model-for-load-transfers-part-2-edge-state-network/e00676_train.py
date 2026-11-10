@@ -24,8 +24,8 @@ import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from e00670_run import rewire_low_overlap  # ty: ignore[unresolved-import]
-from e00672_data import TRAIN_END
-from e00675_pretrain import ROOT as ROOT675
+from e00672_data import TRAIN_END  # ty: ignore[unresolved-import]
+from e00675_pretrain import ROOT as ROOT675  # ty: ignore[unresolved-import]
 from e00676_data import labels, window_inputs
 from e00676_net import EdgeStateNet
 from e00676_worlds import ROOT, WORLDS

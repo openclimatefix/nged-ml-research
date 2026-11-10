@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
-from e00675_inputs import node_inputs
+from e00675_inputs import node_inputs  # ty: ignore[unresolved-import]
 from e00676_net import N_LAGS
 
 

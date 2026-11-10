@@ -8,7 +8,7 @@ experiment 653's `Event` class, with sizes measured on the residual by experimen
 Labels never enter. There is no post hoc pairing window.
 """
 
-# ruff: noqa: E501
+# ruff: noqa: E501, RUF007
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def predict_world(
 ) -> Posterior:  # fmt: skip
     """Run `net` over the first `hours` hours (default all) in overlapping windows."""
     total = (hours or resid.shape[1]) // 24 * 24
-    n_links, n_nodes = len(net.ia), resid.shape[0]
+    n_links, n_nodes = len(net.ia), resid.shape[0]  # ty: ignore[invalid-argument-type]
     link = np.zeros((n_links, total, 3), np.float32)
     lag = np.zeros((n_links, total, 2, N_LAGS), np.float32)
     node = np.zeros((n_nodes, total, 3), np.float32)
@@ -183,7 +183,7 @@ def to_events(
                 cls=cls,
                 partners=[d_site],
                 partner_amp={d_site: d_step},
-            )  # fmt: skip
+            )
         )
     return events
 
