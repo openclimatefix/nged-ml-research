@@ -1,5 +1,6 @@
 # ruff: noqa: D107, E501
-"""Experiment 677: experiment 591's A1 network with whole input groups removed, for the ladder steps 1 to 4.
+"""Experiment 677: experiment 591's A1 network with whole input groups removed, for the ladder steps
+1 to 4.
 
 Removal multiplies the inputs by zero in pre-training, stage 2, and stage 3 alike (the networks are
 trained from scratch with the group absent), so the layer shapes stay those of A1 and the stored

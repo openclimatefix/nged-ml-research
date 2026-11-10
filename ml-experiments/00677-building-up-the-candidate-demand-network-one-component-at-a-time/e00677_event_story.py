@@ -5,13 +5,18 @@ Usage: python e00677_event_story.py OUT_DIR
 
 Three analyses on the quarterly ladder (seeds 0 to 4 for steps 5 to 8):
 
-1. Event-aligned error on the real logged events. The events are the 10 logged shifts that last more than
-   7 days and involve 2 units or more, plus the verified D5 and D16 transfer. For each step, the mean absolute
-   error of the median is taken by whole days since the event start and by whole days since the event end,
+1. Event-aligned error on the real logged events. The events are the 10 logged shifts that last more
+   than
+   7 days and involve 2 units or more, plus the verified D5 and D16 transfer. For each step, the
+   mean absolute
+   error of the median is taken by whole days since the event start and by whole days since the
+   event end,
    with a 95% interval from resampling events.
-2. Follow of an injected shift by shift depth, from the held-out bank (`e00677_bank_score.py`'s files). The
+2. Follow of an injected shift by shift depth, from the held-out bank (`e00677_bank_score.py`'s
+   files). The
    ignored share is one minus the follow.
-3. Mean absolute error on event-free rows: rows more than 14 days from every logged event of the same series
+3. Mean absolute error on event-free rows: rows more than 14 days from every logged event of the
+   same series
    (all lengths), with the contrast against step 5 and a 7-day block bootstrap over origin days.
 
 Writes `scores/event_story_*.csv` and the SVG figures under OUT_DIR.

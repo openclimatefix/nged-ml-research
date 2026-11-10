@@ -1,11 +1,13 @@
 # ruff: noqa: D103, E402, E501
 """Experiment 677: slice tables and step-to-step contrasts of the ladder (private CSV).
 
-Usage: python e00677_slices.py SPAN NAME [NAME ...]   (NAME is a step file stem without the span, such as
+Usage: python e00677_slices.py SPAN NAME [NAME ...]   (NAME is a step file stem without the span,
+such as
 `step8w`; stems map to `step<N>_<version>_sp<SPAN>` through `e00677_export.VERSION`)
 
 Reads each step's per-row scores (`scores/<file>_s012/rows.parquet`, written by `e00677_score.py`),
-keeps the rows that every listed step, the manual heuristic, and climatology can all be scored on, and writes
+keeps the rows that every listed step, the manual heuristic, and climatology can all be scored on,
+and writes
 `scores/slices_sp<SPAN>.csv` (mean and 95% interval by slice, system, and metric) and
 `scores/contrasts_sp<SPAN>.csv` (adjacent-step differences with a block bootstrap over 7-day blocks of
 origin days). The event sets are those of `e00668_slices_primaries`; the long-and-deep set is empty in
@@ -89,7 +91,8 @@ PAIRS = [
 
 
 def pairs(*, names: list[str]) -> list[tuple[str, str]]:
-    """Return each step-to-step contrast whose two steps were scored: the two chains of added components, then with against without injected events."""
+    """Return each step-to-step contrast whose two steps were scored: the two chains of added
+    components, then with against without injected events."""
     return [p for p in PAIRS if p[0] in names and p[1] in names]
 
 

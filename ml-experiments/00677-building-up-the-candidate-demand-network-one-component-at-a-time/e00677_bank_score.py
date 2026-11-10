@@ -1,14 +1,19 @@
 # ruff: noqa: D103, E501
 """Experiment 677: follow of each ladder step on the held-out injected bank (private CSV).
 
-Usage: python e00677_bank_score.py [SPAN]   (SPAN 3 for quarterly refits, the default; 1 for monthly refits)
+Usage: python e00677_bank_score.py [SPAN]   (SPAN 3 for quarterly refits, the default; 1 for monthly
+refits)
 
 Reads the bank files written by `e00677_cand.py bank` (one per month window, fold, and seed), which hold,
-for every scored row whose 1-day lag falls inside an injected shift, the shift (a share of capacity) and the
-median forecast from the observed lags and from the shifted lags. The follow of one group of rows is the
-least-squares slope of the median's change on the shift, sum(change * shift) / sum(shift ** 2): 0 means the
+for every scored row whose 1-day lag falls inside an injected shift, the shift (a share of capacity)
+and the
+median forecast from the observed lags and from the shifted lags. The follow of one group of rows is
+the
+least-squares slope of the median's change on the shift, sum(change * shift) / sum(shift ** 2): 0
+means the
 median ignores the shift, 1 means it copies the shift in full. Writes `scores/bank_follow.csv` (by step,
-version, seed, and lead band) and `scores/bank_follow_summary.csv` (by step and version, with the spread over
+version, seed, and lead band) and `scores/bank_follow_summary.csv` (by step and version, with the
+spread over
 seeds and folds).
 """
 

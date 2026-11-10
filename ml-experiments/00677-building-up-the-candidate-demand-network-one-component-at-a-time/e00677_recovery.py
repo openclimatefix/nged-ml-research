@@ -1,16 +1,23 @@
 # ruff: noqa: D103, E501
-"""Experiment 677: days for experiment 667's prevailing output to recover half of a confirmed event's new level (private CSV).
+"""Experiment 677: days for experiment 667's prevailing output to recover half of a confirmed
+event's new level (private CSV).
 
 Usage: python e00677_recovery.py
 
 Only experiment 667's prevailing output is meant to follow a shift, so only it is timed; the ladder steps
 have no prevailing output, and the NRA output is not meant to follow a shift. For each of the 12 events
-(10 logged shifts lasting over 7 days with 2 units or more, and the verified D5 and D16 transfer), the new level
-is the mean observed power over days 3 to the event end (or day 14, whichever is earlier) minus the mean over the 7 days
-before the start. An event is timed only if that change is at least 10% of the series' capacity. The prevailing
-forecast's change is its daily mean (forecasts made 0 to 36 hours ahead) minus its mean over the same 7 days before. The time to recover half is the
-first whole day since the event start on which the forecast's change reaches half of the observed change. Writes
-`scores/recovery_prevailing.csv` (one row per event) and prints the median with a 95% interval from resampling events.
+(10 logged shifts lasting over 7 days with 2 units or more, and the verified D5 and D16 transfer),
+the new level
+is the mean observed power over days 3 to the event end (or day 14, whichever is earlier) minus the
+mean over the 7 days
+before the start. An event is timed only if that change is at least 10% of the series' capacity. The
+prevailing
+forecast's change is its daily mean (forecasts made 0 to 36 hours ahead) minus its mean over the
+same 7 days before. The time to recover half is the
+first whole day since the event start on which the forecast's change reaches half of the observed
+change. Writes
+`scores/recovery_prevailing.csv` (one row per event) and prints the median with a 95% interval from
+resampling events.
 """
 
 import e00668_score_lib as lib  # ty: ignore[unresolved-import]

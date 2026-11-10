@@ -336,7 +336,8 @@ def two_leads(
 
 
 def pick_weeks(*, series: int) -> dict[str, tuple[datetime, datetime]]:
-    """Return the highest-demand winter week and the lowest-demand summer week of one series in the backtest year."""
+    """Return the highest-demand winter week and the lowest-demand summer week of one series in the
+    backtest year."""
     truth = (
         pl.read_parquet(sc.lib.FOLDER / "ground_truth_primaries.parquet")
         .filter(pl.col("time_series_id") == series)
@@ -386,7 +387,8 @@ def band_panel(
     kind: str | None = None,
     event: tuple[datetime, datetime] | None = None,
 ) -> alt.LayerChart:
-    """Return one panel: one arm's median with its q05 to q95 and q25 to q75 bands, and the observed power on top."""
+    """Return one panel: one arm's median with its q05 to q95 and q25 to q75 bands, and the observed
+    power on top."""
     truth = (
         pl.read_parquet(sc.lib.FOLDER / "ground_truth_primaries.parquet")
         .filter(

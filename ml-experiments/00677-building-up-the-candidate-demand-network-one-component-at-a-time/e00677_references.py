@@ -1,10 +1,12 @@
 # ruff: noqa: D103, E501
-"""Experiment 677: score the GAM and XGBoost reference lines beside the ladder on their shared rows (private CSV).
+"""Experiment 677: score the GAM and XGBoost reference lines beside the ladder on their shared rows
+(private CSV).
 
 Usage: python e00677_references.py
 
 The GAM is Primary demand research default 3 (experiment 322's stored per-row CRPS) and XGBoost is BG2
-(`p_s6_bg2` of experiment 87), both on the six MW Primaries and 09:00 UTC origins. The ladder's origins are
+(`p_s6_bg2` of experiment 87), both on the six MW Primaries and 09:00 UTC origins. The ladder's
+origins are
 12:00 UTC, so the two sets are joined on the Primary, the valid time, and the origin day; a ladder row
 therefore leads its stored partner by 3 hours. Only CRPS is compared, because experiment 322 stores no
 median. Rows are the valid times from 2025-11-01 12:00 UTC up to the last valid time that the stored

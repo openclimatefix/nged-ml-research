@@ -1,10 +1,12 @@
 # ruff: noqa: D103, E501
-"""Experiment 677: calibration of the 11 quantile levels of each ladder step, with the tails in focus (private CSV).
+"""Experiment 677: calibration of the 11 quantile levels of each ladder step, with the tails in
+focus (private CSV).
 
 Usage: python e00677_tails.py STEP[:SPAN:SEEDS] ...
 
 For each step, the share of scored half-hours whose observed power is at or below each forecast quantile
-(the nominal level is the quantile's own level), pooled over the Primaries with data and the backtest year,
+(the nominal level is the quantile's own level), pooled over the Primaries with data and the
+backtest year,
 for the seed-mean forecast with the quantiles sorted within each row. Writes `scores/tail_calibration.csv`.
 """
 

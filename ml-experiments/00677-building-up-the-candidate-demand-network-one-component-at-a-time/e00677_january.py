@@ -1,5 +1,6 @@
 # ruff: noqa: D103, E501
-"""Experiment 677: observed Monday-to-Friday half-hour profiles of D16 and D5 before, during, and after the confirmed transfer (SVG).
+"""Experiment 677: observed Monday-to-Friday half-hour profiles of D16 and D5 before, during, and
+after the confirmed transfer (SVG).
 
 Usage: python e00677_january.py OUT.svg
 """

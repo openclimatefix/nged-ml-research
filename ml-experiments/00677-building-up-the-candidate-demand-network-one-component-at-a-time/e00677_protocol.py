@@ -5,10 +5,13 @@ Usage: python e00677_protocol.py TAG STEP[:FILE_SPAN:SEEDS] ...   (for example `
 
 Builds the arms of `e00668_compare_primaries` (Primary demand research default 3 as "GAM", BG2 as
 "XGBoost", the manual heuristic, climatology, and experiment 667's NRA output), adds one arm per ladder
-step (the mean of its seeds' quantiles, sorted within each row), and scores every arm on the rows that all
+step (the mean of its seeds' quantiles, sorted within each row), and scores every arm on the rows
+that all
 arms share, with `studies.eval_protocol.metrics`: MAE of the median, CRPS, and twCRPS, by the slices
-of the protocol (lead days, winter, cold nights, the Economy 7 step, sunny shape, bank holidays) for the six
-MW and the seven MVA Primaries separately. Steps 1 to 4 use seeds 0 to 2 and steps 5 to 8 use seeds 0 to 4
+of the protocol (lead days, winter, cold nights, the Economy 7 step, sunny shape, bank holidays) for
+the six
+MW and the seven MVA Primaries separately. Steps 1 to 4 use seeds 0 to 2 and steps 5 to 8 use seeds
+0 to 4
 unless the argument gives `STEP:SPAN:SEEDS` (for example `8w:1:012` for monthly refits).
 Writes `scores/protocol_<TAG>/{rows.parquet,scores.csv}` (private).
 """
