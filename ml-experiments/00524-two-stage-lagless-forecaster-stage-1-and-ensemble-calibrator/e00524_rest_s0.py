@@ -1,14 +1,14 @@
 # ruff: noqa: ANN001, ANN201, ANN202, ANN204, D102, D103, D107, E501, E731, PERF401, PLR0915, PT018, PTH123
 r"""Stage 0 of the 524 remaining arms: an adaptor in weather space.
 
-Interim and unaudited. Stage 0 maps the ENS mean weather (the seven `mean_*` stage-1 inputs) towards the ERA5 and CAMS
-weather at the same valid time, then frozen stage 1 reads the corrected values. Pairs at a
-weekly cutoff: ERA5 variables with valid time <= cutoff - 5 days, shortwave (CAMS) <= cutoff - 1
-day, origin <= cutoff, valid time within 730 days. Form 1: per variable and lead band (8 bands
-of 30 h) weighted least-squares bias and scale. Form 2: 2 x 32 multilayer perceptron on the 7
-variables, lead / 240, sin and cos of the hour; residual. Arms: `S0-A-F1`, `S0-A-F2` (stage 0 +
-frozen stage 1), `S0-S2` (stage 0 of the chosen form, then a form-B stage 2 trained on
-cross-fitted stage-1 outputs of the corrected ENS rows).
+Interim and unaudited. Stage 0 maps the ENS mean weather (the seven `mean_*` stage-1 inputs)
+towards the ERA5 and CAMS weather at the same valid time, then frozen stage 1 reads the
+corrected values. Pairs at a weekly cutoff: ERA5 variables with valid time <= cutoff - 5 days,
+shortwave (CAMS) <= cutoff - 1 day, origin <= cutoff, valid time within 730 days. Form 1: per
+variable and lead band (8 bands of 30 h) weighted least-squares bias and scale. Form 2: 2 x 32
+multilayer perceptron on the 7 variables, lead / 240, sin and cos of the hour; residual. Arms:
+`S0-A-F1`, `S0-A-F2` (stage 0 + frozen stage 1), `S0-S2` (stage 0 of the chosen form, then a
+form-B stage 2 trained on cross-fitted stage-1 outputs of the corrected ENS rows).
 """
 
 import argparse
