@@ -8,7 +8,7 @@ title: >-
 theme: lsc-detectors
 also_relevant_to:
   - differentiable-physics-network
-status: planned
+status: finished
 date: 2026-11-10
 kind: other
 size: >-
@@ -68,56 +68,126 @@ metric: >-
   decoded transfers and correct ends; on the real record, decoded transfers per Primary-year, the
   verified D5 and D16 transfer, and logged shifts matched.
 code: ml-experiments/00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/
+verdict: partly supported
+best_arm: >-
+  E1-J-sym on the long and deep cell: 0.38 of injected transfer megawatts paired (95% interval 0.28
+  to 0.50), against 0.29 for E1-J (0.20 to 0.40); the difference is +0.094 (0.043 to 0.151)
+headline: >-
+  Starting the search from each unpaired rise as well as from each fall raises the paired share of
+  injected transfer megawatts by 0.094 in the long and deep cell and 0.071 in the medium and deep
+  cell, short of the predicted +0.10 in both. It adds 442 decoded transfers (788 to 1230) for 63
+  more correct ends (220 to 283), and a rewired graph removes the gain.
+lessons: >-
+  The donor end is only partly recoverable by searching from the recipient. Donor megawatts found
+  in the long and deep cell rise from 0.44 to 0.48, not to the predicted 0.54, so most of the
+  gain comes from pairing donors the event table already held. Most of the added
+  transfers match no injected end (63 correct ends for 442 added transfers).
+take_home_message: >-
+  Searching from each unpaired rise for the matching fall at a neighbouring Primary pairs 0.38 of
+  the injected transfer megawatts in the longest and deepest transfers, against 0.29 for the
+  one-way search, a gain of 0.09. That is a real gain, because a randomly rewired graph removes
+  it, but it falls just short of the 0.10 needed to adopt it and brings 442 extra decoded
+  transfers, most of which match no injected end. The donor is still found for only 0.48 of its
+  megawatts, so the joint reconstruction model of part 2 has room to add something, and its
+  false-transfer rate is the number to watch.
+advice:
+  - >-
+    Compare any new pairing method with E1-J-sym rather than E1-J alone, because the symmetric
+    search adds +0.09 paired share in the long and deep cell at no cost in compute (paired share
+    table).
+  - >-
+    Report decoded transfers beside correct ends, because E1-J-sym adds 442 decoded transfers for
+    63 more correct ends (decoded transfers).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**This is the plan of part 1 of a two-part line. Part 2 would reconstruct the event table from
-flows on the edges between Primaries; part 1 tests the cheaper mechanism that part 2 would also
-rely on.** The learnt-graph line was closed at 15 Primaries by experiments 672 and 676. Part 2 is a
-different model: a reconstruction of the residual by flows on edges, not a learnt neural network.
+---
 
-## Question
+**Searching from each unpaired rise for the matching fall at a neighbouring Primary pairs 0.38 of
+the injected transfer megawatts in the longest and deepest transfers, against 0.29 for the one-way
+search of experiment 670. The gain of 0.09 is just under the 0.10 needed to adopt it, and it
+comes with 442 more decoded transfers, most of which match no injected end.** A *Primary
+substation* steps electricity down to a local distribution network. A *load transfer* moves part
+of one Primary's demand (the *donor*) onto a neighbour (the *recipient*). The learnt-graph line
+was closed at 15 Primaries by experiments 672 and 676; this line does not use a neural network.
 
-A *Primary substation* steps electricity down to a local distribution network. A *load transfer*
-moves demand from one Primary (the *donor*) to a neighbour (the *recipient*). Experiment 670's
-search starts at a large fall and looks for the rise at a neighbour. That search finds the
-recipient end often (0.73 of the long and deep megawatts) and the donor end rarely (0.44).
-This experiment adds the mirror search: it starts at each rise that is still unpaired and looks for
-the fall at a neighbour.
+[Experiment 670](../00670-event-table-recipient-search-on-six-cell-grid/result.md)'s search (E1-J)
+starts at a large fall and looks for the rise at a neighbour. [Experiment
+675](../00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe/result.md)
+found that the donor is the bottleneck. This experiment adds the mirror search (E1-J-sym): it starts
+at each rise of 4 noise units or more that is still unpaired, and looks for a fall of 2 noise
+units or more that starts up to 36 half-hours before it. The verdict is *partly supported*: both
+deep-cell differences exceed +0.05, neither reaches +0.10. The stage 1 rule therefore sends the
+line on to the edge-flow reconstruction model (part 2).
 
-## Arms
+![Paired share per cell for E1-J, E1-J-sym, and E1-J-sym on a rewired
+graph](figure_paired_by_cell.svg)
 
-- **E1-J** is experiment 670's event table with its recipient search. It is re-run as the gate.
-- **E1-J-sym** is E1-J, then the donor search from each unpaired rise of 4 noise units or more. The
-  donor must be a fall of 2 noise units or more that starts from 42 half-hours before to 6
-  half-hours after the rise. Among the connected Primaries, the one whose step best conserves
-  the rise (experiment 653's loose conservation cost, share 0.3 to 2.0) is accepted.
-- **E1-J-sym rewired** is E1-J-sym on a degree-preserving rewired graph (the draw of 30 that keeps
-  the fewest real links, as in experiment 670). It is the placebo.
+## Results
 
-References from stored rows: E1 (experiment 670), F-hyb, R-hyb (experiment 678), and 676-G.
+- **Gate passed.** E1-J, re-run here on the same 40 default worlds (seeds 900 to 939), reproduces
+  experiment 670's paired share in every cell to four decimals.
+- **Paired share, E1-J-sym minus E1-J (95% interval from resampling worlds):** long and deep
+  +0.094 (0.043 to 0.151); medium and deep +0.071 (0.025 to 0.139); long and shallow +0.076
+  (0.038 to 0.117); medium and shallow +0.028 (0.004 to 0.061); short and deep +0.003 (0.0 to
+  0.011); short and shallow +0.003 (0.0 to 0.011).
+- **Absolute paired share, E1-J-sym:** long and deep 0.379 (0.281 to 0.500); medium and deep 0.316
+  (0.186 to 0.478); long and shallow 0.263; medium and shallow 0.159; short and deep 0.083; short
+  and shallow 0.030.
+- **Found share barely moves** (long and deep 0.503 to 0.515). Donor megawatts found in the long and
+  deep cell rise from 0.441 to 0.481, and in the medium and deep cell from 0.399 to 0.434. Most of
+  the gain is therefore pairing of donors that the event table already held.
+- **Decoded transfers.** E1-J-sym decodes 1230 transfers with 283 correct ends, against 788 and 220
+  for E1-J. So 63 correct ends cost 442 added transfers.
+- **Placebo.** On a rewired graph E1-J-sym pairs 0.057 (long and deep) and 0.064 (medium and deep),
+  with 730 decoded transfers and 39 correct ends. The gain depends on the real graph.
+- **Robustness.** On 20 long-heavy worlds the long and deep difference is +0.043 (0.019 to 0.072);
+  the other two generator configurations are in `injected_by_cell.json`.
 
-## Plan
+## Real record
 
-- Worlds: the 40 default worlds of experiment 670 (seeds 900 to 939). The thresholds are those
-  of experiment 670 mirrored, and are fixed in `e00680_search.py` before any score is read. No
-  tuning is done.
-- Cells, found and paired definitions, and false-pairing counts as in experiment 670. The
-  other three generator configurations (long heavy, short heavy, constant-MW square) are run as a
-  robustness check.
-- Real record: decoded transfers per Primary-year, the verified D5 and D16 transfer, the 8
-  transfers E1-J calls, and the 77 logged shifts longer than 1 day, as in experiment 670.
-- Standing practices: cleaned data, the D15 and D18 cut and the final-test window exclusion are
-  inherited from experiment 653's panel. No XGBoost model is fitted, so retraining cadence, saved
-  boosters, and the forecast graphs do not apply. NGED's event labels are an incomplete dump, so
-  every count of real events is a lower bound. No NGED generator is named.
-- Compute: about 7 seconds per world on one core, so under 10 minutes in all. Run with
-  `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue` and one thread per process.
-- Reviews: one fresh Sonnet code review before the first scored run, one Sonnet review of the
-  results, and one Sonnet prose review before merge. No Opus review.
+- **Decoded transfers** (2024-01 to 2026-06, 36.0 Primary-years): 8 for E1-J, 12 for E1-J-sym,
+  0 for E1-J-sym on rewired graphs (median of 100 rewired graphs: 2).
+- **Verified D5 to D16 transfer (December 2025):** kept in the right direction, with the same late
+  starts as E1-J (D5 24 hours, D16 12.5 hours late).
+- **Logged shifts longer than 1 day (77 in the scored years):** 9 of 77 have an event start within 2
+  hours (E1-J: 8) and 19 within 24 hours (E1-J: 18). NGED's event labels are an incomplete dump,
+  so every count of real events here is a lower bound.
+- **Event-free time:** neither method calls a transfer in the 27.6 Primary-years more than 14
+  days from any logged or verified event.
 
-## Stop rules
+## Pre-registered predictions
 
-The stage 1 rule above. Part 2 (the edge-flow reconstruction model, spec in the maintainer's
-brief) is planned in its own result page once part 1 reports.
+- Held: long and shallow +0.03 (got +0.076); medium and shallow +0.02 (+0.028); short cells no worse
+  than -0.03; rewired graph at a third or fewer of the real record's transfers; D5 to D16 kept.
+- Did not hold: long and deep +0.10 (+0.094); medium and deep +0.10 (+0.071); donor megawatts
+  found 0.54 or more (0.481).
+
+## Method
+
+- **Code:** `ml-experiments/00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/`,
+  importing the folders of experiments 653, 660, 665, and 670. Unchanged from experiment 670: the
+  panel, the residual, the worlds, the cells, and the found and paired definitions.
+- **Thresholds,** fixed in the plan: rise at least 4 noise units; donor fall at least 2 noise
+  units; donor start from 42 half-hours before to 6 half-hours after the rise; share 0.3 to 2.0;
+  loose conservation cost at most 2.5. No tuning was done.
+- **Reviews.** A fresh Sonnet code review ran before the first scored run. It found that the gate
+  only printed, that the stage 1 branch letters were swapped against the plan, that the verdict
+  rule was not encoded, and that the conservation cost used the found donor's step where
+  experiment 670 uses the anchor event's step. All four were fixed before the scored run.
+- **Compute:** CPU only, about 7 seconds per world on one core, under 10 minutes in all.
+- **Not used:** no XGBoost model is fitted, so retraining cadence, saved boosters, and forecast
+  plots do not apply. The final-test window from 2026-07-01 is never read. No NGED generator is
+  named.
+
+## What the next experiment should answer
+
+Whether a joint reconstruction of both Primaries' residuals by an edge flow, with a fixed cost per
+change, pairs more megawatts than E1-J-sym without adding as many transfers that match no
+injected end (part 2).
+
+## Files
+
+- `figure_paired_by_cell.svg`: the figure above.
+- Private tables: `data/ml-experiments/00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/`.
