@@ -236,16 +236,10 @@ simplification, because solar output is bounded by clear sky and capacity):
 
 | Option | Analyst's work | Gets the tail right? | Can we validate it? |
 |---|---|---|---|
-| Many draws (marginals plus copula), analyst picks | Moderate: sampling code, then choosing what
-"extreme" means | Only as far as the marginal tails and the copula's tail dependence allow; 1,000
-draws carry about +/-0.3 points of Monte Carlo error at q99 | Indirectly, through group sums |
-| (a) Pre-chosen stress scenarios per element | Least: feed K vectors straight into the power flow |
-Yes at the chosen level, if the element flow's quantile is right | The element quantile, yes; the
-split across nodes, no |
-| (b) Distribution of the element flow itself | Low, but the result cannot be fed into a power flow
-| Best, where the element is metered | Yes, against the element's own meter |
-| (c) Importance sampling or conditional simulation | High: weighted samples confuse
-non-statisticians | Yes, efficiently | As for (a) |
+| Many draws (marginals plus copula), analyst picks | Moderate: sampling code, then choosing what "extreme" means | Only as far as the marginal tails and the copula's tail dependence allow; 1,000 draws carry about +/-0.3 points of Monte Carlo error at q99 | Indirectly, through group sums |
+| (a) Pre-chosen stress scenarios per element | Least: feed K vectors straight into the power flow | Yes at the chosen level, if the element flow's quantile is right | The element quantile, yes; the split across nodes, no |
+| (b) Distribution of the element flow itself | Low, but the result cannot be fed into a power flow | Best, where the element is metered | Yes, against the element's own meter |
+| (c) Importance sampling or conditional simulation | High: weighted samples confuse non-statisticians | Yes, efficiently | As for (a) |
 | (d) Quantiles of group sums as extra series | Low | Yes for the named groups | Yes |
 
 - Option (b) has an advantage: the Boston and Skegness BSPs are metered and already among the
