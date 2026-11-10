@@ -20,6 +20,8 @@ stores no quantiles. Past statistics use only the past, so the causal arm zeroes
 use the future (`future_channels`).
 """
 
+# ruff: noqa: RUF059  # research code run once; behaviour fixed by the results
+
 from __future__ import annotations
 
 import math
@@ -61,7 +63,9 @@ def causalise(hourly: torch.Tensor, daily: torch.Tensor) -> tuple[torch.Tensor, 
     return hourly, daily
 
 
-def _window(cs: torch.Tensor, cn: torch.Tensor, lo: int, hi: int) -> tuple[torch.Tensor, torch.Tensor]:
+def _window(
+    cs: torch.Tensor, cn: torch.Tensor, lo: int, hi: int
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Mean and coverage over [t + lo, t + hi) for every t (zero mean where nothing is present)."""
     n = cs.shape[-1] - 1
     t = torch.arange(n, device=cs.device)

@@ -11,6 +11,8 @@ E1-J's, and a donor is found when an alarm lies in its window. Shares are weight
 intervals resample whole worlds.
 """
 
+# ruff: noqa: E402, E501  # research code run once; behaviour fixed by the results
+
 from __future__ import annotations
 
 import json
@@ -23,8 +25,16 @@ from e00653_common import DAY, GRID_LENGTH, SCORED_FROM
 from e00665_score import cell_of  # ty: ignore[unresolved-import]
 from e00675_pretrain import ROOT
 
-CELLS = ["long, deep", "long, shallow", "medium, deep", "medium, shallow", "short, deep", "short, shallow"]
+CELLS = [
+    "long, deep",
+    "long, shallow",
+    "medium, deep",
+    "medium, shallow",
+    "short, deep",
+    "short, shallow",
+]
 import os
+
 WORLDS = list(range(900, 903 if os.environ.get("E675_SMOKE") else 940))
 SCORED_H = SCORED_FROM // 2
 YEARS = (GRID_LENGTH - SCORED_FROM) / (365.25 * DAY)
@@ -48,7 +58,9 @@ def truth_tables(*, worlds: list[int]) -> dict[int, pl.DataFrame]:
     return {w: pl.read_parquet(ROOT / "worlds" / f"test_{w}_truth.parquet") for w in worlds}
 
 
-def e1j_numbers(*, worlds: list[int], truth: dict[int, pl.DataFrame], sites: list[str]) -> tuple[float, pl.DataFrame]:
+def e1j_numbers(
+    *, worlds: list[int], truth: dict[int, pl.DataFrame], sites: list[str]
+) -> tuple[float, pl.DataFrame]:
     """E1-J's false-donor rate per Primary-year and its donor-found rows.
 
     E1-J's alarms are its decoded downward events of 4 noise units or more, one hour each, merged
@@ -68,7 +80,13 @@ def e1j_numbers(*, worlds: list[int], truth: dict[int, pl.DataFrame], sites: lis
     rate = false_rate(eps=eps, wins=wins) / (len(worlds) * 15 * YEARS)
     rows = []
     for w in worlds:
-        for d in truth[w].filter((pl.col("amp_mw") < 0) & (pl.col("kind") == "edge") & (pl.col("partners") != "")).iter_rows(named=True):
+        for d in (
+            truth[w]
+            .filter(
+                (pl.col("amp_mw") < 0) & (pl.col("kind") == "edge") & (pl.col("partners") != "")
+            )
+            .iter_rows(named=True)
+        ):
             h0 = d["start"] // 2 - SCORED_H
             hit = any(a <= h0 + 24 and b >= h0 - 12 for a, b in eps[(w, sites.index(d["site"]))])
             rows.append({"world": w, "cell": cell(d), "amp": abs(d["amp_mw"]), "found": float(hit)})
@@ -97,14 +115,20 @@ def episodes(*, hot: np.ndarray, score: np.ndarray | None = None) -> list[tuple[
     return [(p, p) for p in peaks]
 
 
-def probe_episodes(*, scores: dict[int, np.ndarray], thr: float) -> dict[tuple[int, int], list[tuple[int, int]]]:
+def probe_episodes(
+    *, scores: dict[int, np.ndarray], thr: float
+) -> dict[tuple[int, int], list[tuple[int, int]]]:
     """Alarm episodes per (world, node) among the scored hours."""
     return {
-        (w, i): episodes(hot=sc[i, SCORED_H:] > thr, score=sc[i, SCORED_H:]) for w, sc in scores.items() for i in range(sc.shape[0])
+        (w, i): episodes(hot=sc[i, SCORED_H:] > thr, score=sc[i, SCORED_H:])
+        for w, sc in scores.items()
+        for i in range(sc.shape[0])
     }
 
 
-def windows_of(*, truth: dict[int, pl.DataFrame], sites: list[str]) -> dict[tuple[int, int], list[tuple[int, int]]]:
+def windows_of(
+    *, truth: dict[int, pl.DataFrame], sites: list[str]
+) -> dict[tuple[int, int], list[tuple[int, int]]]:
     """Windows (hours after SCORED_H) of every injected downward event, per (world, node)."""
     out: dict[tuple[int, int], list[tuple[int, int]]] = {}
     for w, t in truth.items():
@@ -134,22 +158,36 @@ def auroc(*, y: np.ndarray, s: np.ndarray) -> float:
     return float((ranks[pos].sum() - pos.sum() * (pos.sum() + 1) / 2) / (pos.sum() * (~pos).sum()))
 
 
-def score_arm(*, arm: str, seed: int, probe: Path, truth: dict, sites: list[str], target: float) -> tuple[pl.DataFrame, pl.DataFrame, float]:
+def score_arm(
+    *, arm: str, seed: int, probe: Path, truth: dict, sites: list[str], target: float
+) -> tuple[pl.DataFrame, pl.DataFrame, float]:
     """Donor-found rows at E1-J's false rate, and the recipient pairs, of one arm and seed."""
     scores = {w: np.load(probe / f"score_{arm}_seed{seed}_world{w}.npy") for w in WORLDS}
     wins = windows_of(truth=truth, sites=sites)
     lo, hi = -6.0, 6.0
     for _ in range(25):
         mid = (lo + hi) / 2
-        rate = false_rate(eps=probe_episodes(scores=scores, thr=mid), wins=wins) / (len(WORLDS) * 15 * YEARS)
+        rate = false_rate(eps=probe_episodes(scores=scores, thr=mid), wins=wins) / (
+            len(WORLDS) * 15 * YEARS
+        )
         lo, hi = (mid, hi) if rate > target else (lo, mid)
     thr = hi
-    achieved = false_rate(eps=probe_episodes(scores=scores, thr=thr), wins=wins) / (len(WORLDS) * 15 * YEARS)
-    print(f"{arm} seed {seed}: threshold {thr:.2f}, false-episode rate {achieved:.3f} (target {target:.3f})")
+    achieved = false_rate(eps=probe_episodes(scores=scores, thr=thr), wins=wins) / (
+        len(WORLDS) * 15 * YEARS
+    )
+    print(
+        f"{arm} seed {seed}: threshold {thr:.2f}, false-episode rate {achieved:.3f} (target {target:.3f})"
+    )
     eps = probe_episodes(scores=scores, thr=thr)
     rows = []
     for w in WORLDS:
-        for d in truth[w].filter((pl.col("amp_mw") < 0) & (pl.col("kind") == "edge") & (pl.col("partners") != "")).iter_rows(named=True):
+        for d in (
+            truth[w]
+            .filter(
+                (pl.col("amp_mw") < 0) & (pl.col("kind") == "edge") & (pl.col("partners") != "")
+            )
+            .iter_rows(named=True)
+        ):
             h0 = d["start"] // 2 - SCORED_H
             hit = any(a <= h0 + 24 and b >= h0 - 12 for a, b in eps[(w, sites.index(d["site"]))])
             rows.append({"world": w, "cell": cell(d), "amp": abs(d["amp_mw"]), "found": float(hit)})
@@ -160,7 +198,9 @@ def score_arm(*, arm: str, seed: int, probe: Path, truth: dict, sites: list[str]
 def share(*, df: pl.DataFrame, cell_name: str, worlds: np.ndarray) -> float:
     """Weighted found share of a cell over a multiset of worlds."""
     sub = df.filter(pl.col("cell") == cell_name)
-    g = sub.group_by("world").agg((pl.col("amp") * pl.col("found")).sum().alias("f"), pl.col("amp").sum().alias("t"))
+    g = sub.group_by("world").agg(
+        (pl.col("amp") * pl.col("found")).sum().alias("f"), pl.col("amp").sum().alias("t")
+    )
     f = {r["world"]: (r["f"], r["t"]) for r in g.iter_rows(named=True)}
     num = sum(f.get(int(w), (0, 0))[0] for w in worlds)
     den = sum(f.get(int(w), (0, 0))[1] for w in worlds)
@@ -178,7 +218,9 @@ def main() -> None:
     for arm in ("P-M", "P-C", "R", "F"):
         for seed in (0, 1, 2):
             if (probe / f"{arm}_seed{seed}_donors.parquet").exists():
-                arms[(arm, seed)] = score_arm(arm=arm, seed=seed, probe=probe, truth=truth, sites=sites, target=target)
+                arms[(arm, seed)] = score_arm(
+                    arm=arm, seed=seed, probe=probe, truth=truth, sites=sites, target=target
+                )
     for (arm, seed), (df, _, _) in arms.items():
         df.write_parquet(probe / f"found_{arm}_seed{seed}.parquet")
     e1j.write_parquet(probe / "found_E1-J.parquet")
@@ -189,7 +231,11 @@ def main() -> None:
         out["cells"][c] = {"E1-J": share(df=e1j, cell_name=c, worlds=np.array(WORLDS))}
         for (arm, seed), (df, rec, thr) in arms.items():
             sub = rec.filter(pl.col("cell") == c)
-            au = auroc(y=sub["label"].to_numpy(), s=sub["score"].to_numpy()) if sub.height else float("nan")
+            au = (
+                auroc(y=sub["label"].to_numpy(), s=sub["score"].to_numpy())
+                if sub.height
+                else float("nan")
+            )
             out["cells"][c][f"{arm}/{seed}"] = {
                 "donor_found": share(df=df, cell_name=c, worlds=np.array(WORLDS)),
                 "donor_found_ci": [float(x) for x in np.nanpercentile([share(df=df, cell_name=c, worlds=b) for b in boots[:300]], [2.5, 97.5])],
@@ -198,7 +244,17 @@ def main() -> None:
             }  # fmt: skip
     (probe / "summary.json").write_text(json.dumps(out, indent=1))
     for c in CELLS:
-        print(c, json.dumps({k: (round(v["donor_found"], 3), round(v["recipient_auroc"], 3)) if isinstance(v, dict) else round(v, 3) for k, v in out["cells"][c].items()}))
+        print(
+            c,
+            json.dumps(
+                {
+                    k: (round(v["donor_found"], 3), round(v["recipient_auroc"], 3))
+                    if isinstance(v, dict)
+                    else round(v, 3)
+                    for k, v in out["cells"][c].items()
+                }
+            ),
+        )
 
 
 if __name__ == "__main__":

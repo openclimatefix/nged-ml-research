@@ -16,8 +16,8 @@ ml-experiments/00327-lsc-label-free-detect-mask-train-pipeline \
 from __future__ import annotations
 
 import multiprocessing as mp
-import sys
 import os
+import sys
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -51,8 +51,15 @@ def pin_for(*, site: str, series: int, cache: object) -> PinnedCapacity | None:
     """The pinned capacity of this variant for a Primary, or None to fit the capacity."""
     table = cache.sites[site].table  # ty: ignore[unresolved-attribute]
     if VARIANT == "p649":
-        t = pl.read_parquet(ROOT.parent / "00649-pv-capacity-table-season-year-from-stored-probes/work/capacity_table.parquet")
-        t = t.filter((pl.col("probe_year") == 2025) & (pl.col("cutoff") == "2026-06") & (pl.col("site") == site))
+        t = pl.read_parquet(
+            ROOT.parent
+            / "00649-pv-capacity-table-season-year-from-stored-probes/work/capacity_table.parquet"
+        )
+        t = t.filter(
+            (pl.col("probe_year") == 2025)
+            & (pl.col("cutoff") == "2026-06")
+            & (pl.col("site") == site)
+        )
         if t.is_empty():
             return None
         points = 100.0 * float(t["cal_p50"][0]) / table.effective_capacity_mw
@@ -95,7 +102,9 @@ def fit_job(series: int) -> str:
             window=TrainingWindow(),
             season_years=g.SEASON_YEARS,
         )
-        target = np.flatnonzero((year_of == year) & np.isfinite(features.y) & (end < np.datetime64("2026-07-01", "us")))
+        target = np.flatnonzero(
+            (year_of == year) & np.isfinite(features.y) & (end < np.datetime64("2026-07-01", "us"))
+        )
         if not len(target):
             continue
         points = predict_gam(cache=cache, fit=fit, index=target)

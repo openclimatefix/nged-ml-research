@@ -5,6 +5,8 @@ Noise unit: 1.4826 times the median absolute deviation of successive 6-hour bloc
 Run with `PYTHONPATH` holding experiment 660's folder: `uv run --no-sync python <this file>`.
 """
 
+# ruff: noqa: B007, PERF102  # research code run once; behaviour fixed by the results
+
 import datetime as dt
 import sys
 
@@ -13,7 +15,12 @@ import numpy as np
 from studies.sources import ML_EXPERIMENTS_DATA_DIR as DATA
 
 ROOT = DATA / "00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe"
-ARMS = {"C": None, "loyo": "forecast_loyo", "p649": "forecast_loyo_p649", "v45": "forecast_loyo_v45"}
+ARMS = {
+    "C": None,
+    "loyo": "forecast_loyo",
+    "p649": "forecast_loyo_p649",
+    "v45": "forecast_loyo_v45",
+}
 
 
 def spread(r: np.ndarray, lo: int, hi: int) -> float:
@@ -31,12 +38,16 @@ def main() -> None:
     panel, info = d.load_panel(), d.series_info()
     cut = d.idx_of(when=dt.datetime(2024, 1, 1, tzinfo=dt.UTC))
     print("site  " + "  ".join(f"{a:>12s}" for a in ARMS) + "   (2024+ | 2022-23)")
-    wins = {a: 0 for a in ARMS}
+    wins = dict.fromkeys(ARMS, 0)
     for s, i in info.items():
         p = panel.power[s]
         row = []
         for a, folder in ARMS.items():
-            f = d.load_forecast(site=s) if folder is None else np.load(ROOT / folder / f"forecast_{i['id']}.npy")
+            f = (
+                d.load_forecast(site=s)
+                if folder is None
+                else np.load(ROOT / folder / f"forecast_{i['id']}.npy")
+            )
             r = p - f
             row.append((spread(r, cut, len(p)), spread(r, 0, cut)))
         best = min(range(len(row)), key=lambda k: row[k][0])

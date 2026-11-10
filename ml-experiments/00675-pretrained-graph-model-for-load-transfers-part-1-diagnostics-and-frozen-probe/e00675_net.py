@@ -6,6 +6,8 @@ The daily features are projected, repeated 24 times, and added to the hourly fea
 neighbour averaging over the connection graph follows. The causal variant pads on the left only.
 """
 
+# ruff: noqa: SIM108  # research code run once; behaviour fixed by the results
+
 from __future__ import annotations
 
 import torch
@@ -55,9 +57,13 @@ class Encoder(nn.Module):
         super().__init__()
         self.ch, self.causal = ch, causal
         self.h_in = nn.Conv1d(N_CHANNELS, ch, 1)
-        self.h_blocks = nn.ModuleList(Block(ch=ch, dilation=d, causal=causal) for d in HOURLY_DILATIONS)
+        self.h_blocks = nn.ModuleList(
+            Block(ch=ch, dilation=d, causal=causal) for d in HOURLY_DILATIONS
+        )
         self.d_in = nn.Conv1d(D_CHANNELS, dch, 1)
-        self.d_blocks = nn.ModuleList(Block(ch=dch, dilation=d, causal=causal) for d in DAILY_DILATIONS)
+        self.d_blocks = nn.ModuleList(
+            Block(ch=dch, dilation=d, causal=causal) for d in DAILY_DILATIONS
+        )
         self.fuse = nn.Conv1d(dch, ch, 1)
         self.nb = nn.Conv1d(ch, ch, 1)
         self.out_norm = ChannelNorm(ch)

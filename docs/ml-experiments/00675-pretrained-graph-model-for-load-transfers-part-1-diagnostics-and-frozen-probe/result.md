@@ -89,45 +89,46 @@ metric: >-
 code: ml-experiments/00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe/
 verdict: not supported
 best_arm: >-
-  The random-init encoder (R) on the long and deep cell: 0.59 of donor megawatts found at E1-J's
-  false-donor rate, against 0.28 for masked pretraining (P-M), 0.63 for the no-encoder logistic
-  regression (F), and 0.44 for E1-J
+  The no-encoder logistic regression (F) on the long and deep cell: 0.63 of donor megawatts found
+  at E1-J's false-donor rate (one fit), against 0.59 for the random-init encoder (R, seeds 0.46 to
+  0.70), 0.28 for masked pretraining (P-M), and 0.44 for E1-J
 headline: >-
   Masked pretraining finds 0.28 of the long and deep donor megawatts and 0.16 of the medium and deep,
   which is 0.31 below a random-init encoder of the same shape in both cells (intervals -0.43 to -0.19
   and -0.51 to -0.16) and 0.35 and 0.25 below a logistic regression on the node inputs. The
-  recipient AUROC is 0.93 for every encoder arm.
+  recipient AUROC is between 0.91 and 0.94 for every arm in the two deep cells.
 lessons: >-
   Step 0a: for 0.87 (long and deep) and 0.84 (medium and deep) of the found-but-unpaired recipient
-  megawatts the donor was not found, so the donor end limits pairing, not the recipient search. A
-  logistic regression on the node inputs finds more long and deep donor megawatts than E1-J (0.63
-  against 0.44) at the same false-donor rate, so supervised training on injected worlds helps the
-  donor end. Pretraining on masked windows of real history did not help: the random-init encoder
-  finds twice as many, and its result varies strongly by seed (0.70, 0.62, 0.46).
+  megawatts the donor was not found, so the donor end limits pairing, not the recipient search. In
+  the long and deep cell only, a logistic regression on the node inputs finds more donor megawatts
+  than E1-J (0.63 against 0.44, one fit, no interval for E1-J) at the same false-donor rate; in the
+  medium and deep cell the two tie (0.41 and 0.40), and in both shallow cells the regression finds
+  fewer. Pretraining on masked windows of real history did not help: the random-init encoder finds
+  twice as many in the deep cells, and its result varies strongly by seed (0.70, 0.62, 0.46).
 take_home_message: >-
   The donor of a transfer, not the link to its recipient, is what the event table of experiment 670
-  misses, and a probe trained on injected worlds finds more donors than the event table does. An
-  encoder pretrained to reconstruct masked windows of real residuals made the probe worse, not
-  better, so experiment 676 should start from a randomly initialised encoder (the pre-registered
-  stop rule) and should not spend GPU time on pretraining.
+  misses. An encoder pretrained to reconstruct masked windows of real residuals made the probe
+  worse, not better, so the stop rule drops masked pretraining. The stop rule's first clause points
+  experiment 676 to a randomly initialised encoder and its second clause to the causal arm's
+  weights, so the choice is open.
 advice:
   - >-
     Do not pretrain the encoder by masked reconstruction before fitting a donor probe, because the
     random-init encoder finds twice as many long and deep donor megawatts (0.59 against 0.28; donor
-    megawatts found).
+    megawatts found). Decide between a random-init encoder and the causal arm's weights for
+    experiment 676 first (stop rule clauses).
   - >-
     Aim the next detector at the donor end: it holds 0.87 of the found-but-unpaired recipient
     megawatts in the long and deep cell (step 0a shares).
   - >-
     Read any seed-averaged probe result with its per-seed spread, because the random-init encoder's
-    long and deep result ranges from 0.46 to 0.70 across 3 seeds (donor megawatts found).
+    long and deep result ranges from 0.46 to 0.70 across three seeds (donor megawatts found).
 production_status: not-for-production
 adopted_in: none
-
 ---
 
 **Masked pretraining did not help find the donor of a load transfer, and the donor end, not the
-recipient search, is where E1-J loses megawatts.** This reopens the graph line that [experiment
+recipient search, is where E1-J loses megawatts.** Experiment 675 reopens the graph line that [experiment
 672](../00672-graph-model-that-finds-the-donor-of-a-load-transfer/result.md) closed under its
 stop rule, at the maintainer's request, with experiment 660's generator unchanged. Step 0 found that
 the donor was not found for 0.87 of the found-but-unpaired recipient megawatts in the long and deep
@@ -143,25 +144,39 @@ verdict is *not supported*.
   pretrained to predict the next 3 to 6 hours causally. R: the same encoder, randomly initialised,
   frozen. F: a logistic regression on the node inputs, with no encoder.
 - **Cell, donor, recipient, found, paired, E1-J.** As in [experiment
-  672](../00672-graph-model-that-finds-the-donor-of-a-load-transfer/result.md#terms).
+  672](../00672-graph-model-that-finds-the-donor-of-a-load-transfer/result.md#terms). In short:
+  cells group injected events by length (long: over 7 days or no end; medium: over 1 up to 7 days;
+  short: up to 1 day) and depth (deep: 8 noise units or more; shallow: 2 up to 8). A noise unit is
+  the block-difference noise of a Primary substation's residual, in megawatts. E1-J is experiment
+  653's event table plus experiment 670's recipient search. Stop rule 0 adopts E1-J on the new
+  residual panel if it pairs 0.60 or more in both deep cells. Arm C is experiment 327's residual.
 - **Donor megawatts found at E1-J's false-donor rate.** The share of the megawatts of injected
   donor steps (edge transfers with a metered recipient) that lie within -12 to +24 hours of an
-  alarm, where each arm's alarm threshold is set so that its false alarms per Primary-year equal
-  E1-J's (0.63). Every arm's achieved rate matched that target.
+  alarm, where each arm's alarm threshold is set so that its false alarms per Primary substation
+  and year equal E1-J's (0.63). Every arm's achieved rate matched that target. E1-J's own figures
+  differ from the 0.22 and 0.29 of experiment 670's page only by cell and measure: 0.22 is the
+  paired share of recipient megawatts, and 0.29 the paired share of all transfer megawatts.
 
 ## Figures
 
-**The figure shows that masked pretraining finds fewer donor megawatts than a random-init encoder and
-than the no-encoder regression in both deep cells, and more than them in the shallow cells.**
+**The figure shows that masked pretraining finds fewer donor megawatts than the random-init encoder
+and than the no-encoder regression in both deep cells, fewer than causal pretraining in the medium
+and deep cell, and more than the no-encoder regression in both shallow cells.** The intervals
+resample worlds only: they leave out fit variance, the random-init encoder's seeds range from 0.46 to
+0.70, and the no-encoder regression is one fit.
 
 ![Masked pretraining minus three comparison arms, donor megawatts found per
 cell](figure_contrasts.svg)
 
 ## Results
 
+- **Step 0 has four CPU-only parts.** 0a diagnoses where E1-J loses recipient megawatts, 0b chooses
+  the residual panel, 0c re-runs E1-J on that panel, and 0d classifies the verified D5 and D16
+  transfer into a cell.
 - **Step 0a, where E1-J loses recipient megawatts.** E1-J re-run on worlds 900 to 939 reproduces
   experiment 670's long and deep count exactly (37 found-but-unpaired recipient ends, 139.8 MW).
-  Share of those megawatts by first reason that applies, long and deep (37 ends) and medium and deep
+  Each end is sorted into the first reason in this list that applies. Share of those megawatts,
+  long and deep (37 ends) and medium and deep
   (24 ends): donor not found 0.87 and 0.84; recipient start outside the search window 0.02 and
   0.00; megawatt ratio outside the share window 0.01 and 0.00; linked to the wrong donor 0.00 and
   0.00; split across 2 or 3 recipients 0.04 and 0.02; other 0.05 and 0.14.
@@ -177,13 +192,14 @@ cell](figure_contrasts.svg)
   so stop rule 0 does not fire.
 - **Step 0d.** The verified D5 transfer lasts 15.4 days at 9.04 noise units (long and deep); D16
   lasts 14.8 days at 4.52 noise units (long and shallow).
-- **Donor megawatts found, mean of 3 seeds** (donors per cell in brackets; E1-J has no seeds).
+- **Donor megawatts found, mean of three seeds** (donors per cell in brackets; E1-J and F have no
+  seeds, F being one fit).
 
     | Cell | E1-J | P-M | P-C | R | F |
     |---|---|---|---|---|---|
     | Long, deep (59) | 0.44 | 0.28 | 0.33 | 0.59 | 0.63 |
     | Medium, deep (47) | 0.40 | 0.16 | 0.28 | 0.47 | 0.41 |
-    | Long, shallow (303) | 0.25 | 0.24 | 0.14 | 0.21 | 0.11 |
+    | Long, shallow (303) | 0.25 | 0.24 | 0.14 | 0.21 | 0.10 |
     | Medium, shallow (214) | 0.17 | 0.26 | 0.17 | 0.14 | 0.05 |
     | Short, deep (55) | 0.17 | 0.09 | 0.31 | 0.28 | 0.12 |
     | Short, shallow (229) | 0.05 | 0.06 | 0.11 | 0.04 | 0.02 |
@@ -192,12 +208,15 @@ cell](figure_contrasts.svg)
   to -0.19) and -0.35 (-0.49 to -0.20). Medium and deep: -0.31 (-0.51 to -0.16) and -0.25 (-0.47 to
   -0.07). Long and shallow: +0.02 (-0.03 to +0.07) and +0.13 (+0.07 to +0.19). Medium and shallow:
   +0.13 (+0.06 to +0.20) and +0.21 (+0.14 to +0.28).
-- **Seed spread.** R's long and deep result is 0.70, 0.62, and 0.46 over its 3 seeds, and 0.55,
-  0.56, and 0.31 in the medium and deep cell. P-M's seeds give 0.26 to 0.29 and 0.12 to 0.21. Every
-  P-M seed is below every R seed in both deep cells.
+- **Seed spread.** R's long and deep result is 0.70, 0.62, and 0.46 over its three seeds, and
+  0.55, 0.56, and 0.31 in the medium and deep cell. P-M's seeds give 0.26 to 0.29 and 0.12 to 0.21.
+  Every P-M seed is below every R seed in both deep cells.
+- **Short cells.** The short and deep and the short and shallow cells are in the table but not in
+  the figure or the verdict, which the plan restricts to the deep cells. In the short and deep cell
+  the causal arm P-C finds 0.31, more than P-M (0.09) and F (0.12) and about as much as R (0.28).
 - **Recipient AUROC.** Between 0.91 and 0.94 for every arm in the two deep cells (P-M minus R: +0.01
-  long and deep, 0.00 medium and deep), set mostly by the pair block of neighbour step ratios that
-  all arms share.
+  long and deep, 0.00 medium and deep). The pair block of neighbour step ratios, shared by all
+  arms, sets most of it.
 
 ## Predictions
 
@@ -211,40 +230,45 @@ cell](figure_contrasts.svg)
 - **P-M minus P-C: failed** in both deep cells (-0.05 and -0.11, needed 0 or more).
 - **Step 0 prediction: held.** The largest reason is the donor not being found, and E1-J pairs
   under 0.60.
-- **Probe stop rule fires.** P-M fails both its R bar and its F bar in both deep cells, so pretraining
-  is dropped. P-C beats P-M by 0.05 and 0.11 in the deep cells, but P-C is itself 0.26 and 0.20
-  below R, so the two clauses of the rule point to different starting weights for experiment 676.
+- **Probe stop rule fires.** P-M fails both its R bar and its F bar in both deep cells, so
+  pretraining is dropped. P-C beats P-M by 0.05 (interval -0.16 to +0.07, within noise) and 0.11 in
+  the deep cells, which meets the rule's 0.03 bar, but P-C is itself 0.26 and 0.20 below R. The two
+  clauses of the rule therefore point to different starting weights for experiment 676.
+- **Per-seed condition.** For the held predictions, every seed is above its bar (medium and
+  shallow, P-M minus R; long and shallow, P-M minus F).
 
 ## Checks
 
 - **Leak tests.** The masked-window and scored-target leak tests, and a causal test, passed in the
   code review before any fit, with a positive control for each.
 - **Matched false-donor rate.** All arms reached 0.625 per Primary-year, E1-J's rate.
-- **Audit.** A fresh Sonnet reviewer
-  re-derived the long and deep donor megawatts found for P-M seed 0 (0.262), R seeds 0 and 2 (0.701,
-  0.461), and F (0.625) from the raw score files with its own code, and found no train and test
-  mismatch, normalisation error, window error, threshold-matching error, or world mismatch that
-  explains the deficit. The audit triggers fired (R beats P-M, R varies by seed, and a nested control
-  beats the pretrained arm); the reading stands because P-M is below R in all 3 seeds in both deep
-  cells. The intervals resample worlds only: they do not include fit variance, and F is one fit.
-- **Caveats.** The probe trains on 200 injected worlds and tests on 40, with 3 seeds; R's seed
-  spread is as large as some contrasts. NGED's logs may miss load shifts, so matched logged shifts
-  are lower bounds. The long and deep cell has 59 donor steps and the medium and deep 47. The noise
-  units saw the validation months, and the injected start hours come from NGED's logged onsets up
-  to 2026-07, as in experiments 670 and 672. Pretraining ran 10,000 steps per arm and seed (the plan said about 20,000, timed against the GPU
-  budget) and used about 1.8 GPU-hours over 6 runs; its masked loss was still falling slowly, so a
-  longer run might change P-M, though not by the 0.3 that separates it from R. The probe fits are
-  small.
+- **Audit.** A fresh Sonnet reviewer re-derived the long and deep donor megawatts found for P-M
+  seed 0 (0.262), R seeds 0 and 2 (0.701, 0.461), and F (0.625) from the raw score files with its
+  own code. It found no train and test mismatch, normalisation error, window error,
+  threshold-matching error, or world mismatch that explains the deficit. The audit triggers fired
+  (R beats P-M, R varies by seed, and a nested control beats the pretrained arm). The reading
+  stands because P-M is below R in all three seeds in both deep cells. The intervals resample
+  worlds only, so they do not include fit variance, and F is one fit.
+- **Sample sizes.** The probe trains on 200 injected worlds and tests on 40, with three seeds, and
+  R's seed spread is as large as some contrasts. The long and deep cell has 59 donor steps and the
+  medium and deep cell 47.
+- **Inherited caveats.** NGED's logs may miss load shifts, so matched logged shifts are lower
+  bounds. The noise units saw the validation months, and the injected start hours come from NGED's
+  logged onsets up to 2026-07, as in experiments 670 and 672.
+- **Pretraining length.** Pretraining ran 10,000 steps per arm and seed (the plan said about
+  20,000, timed against the GPU budget) and used about 1.8 GPU-hours over six runs. The masked loss
+  was still falling slowly, so a longer run might change P-M, though not by the 0.3 that separates
+  it from R.
 
 ## What to try next
 
-- Experiment 676 starts from the random-init encoder (G-noPT) with the hybrid arm (the network's
-  donor posterior as the candidate source inside E1-J's recipient search), because step 0a puts the
-  loss at the donor end. Which starting weights it uses where the two clauses of the stop rule
-  disagree is for the graph Discuss session.
-- A logistic regression on the node inputs already finds more long and deep donor megawatts than
-  E1-J (0.63 against 0.44). Whether that holds with the false-donor rate measured on the real record
-  is untested.
+- Experiment 676 should use the hybrid arm (the graph neural network's donor posterior as the
+  candidate source inside E1-J's recipient search), because step 0a puts the loss at the donor end.
+  Whether it starts from a randomly initialised encoder or from the causal arm's weights is for the
+  graph Discuss session, because the two clauses of the stop rule disagree.
+- In the long and deep cell, a logistic regression on the node inputs finds more donor megawatts
+  than E1-J (0.63 against 0.44). Whether that holds with the false-donor rate measured on the real
+  record is untested.
 
 ## The plan as committed
 

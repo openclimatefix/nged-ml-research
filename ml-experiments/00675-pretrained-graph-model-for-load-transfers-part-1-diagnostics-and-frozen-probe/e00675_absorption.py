@@ -6,6 +6,8 @@ year). A smaller event-window shift under arm C than under the cross-fit means a
 of the event.
 """
 
+# ruff: noqa: E501  # research code run once; behaviour fixed by the results
+
 import datetime as dt
 
 import e00660_data as d  # ty: ignore[unresolved-import]
@@ -25,11 +27,16 @@ def main() -> None:
         for name, f in (
             ("arm C", d.load_forecast(site=s)),
             ("cross-fit", np.load(ROOT / "forecast_loyo" / f"forecast_{info[s]['id']}.npy")),
-            ("cross-fit, 45 pin", np.load(ROOT / "forecast_loyo_v45" / f"forecast_{info[s]['id']}.npy")),
+            (
+                "cross-fit, 45 pin",
+                np.load(ROOT / "forecast_loyo_v45" / f"forecast_{info[s]['id']}.npy"),
+            ),
         ):
             r = p - f
             shift = np.nanmean(r[a:b]) - np.nanmean(r[a - 28 * 48 : a])
-            print(f"{s} {name}: event-window shift {shift:+.2f} MW ({shift / panel.noise[s]:+.1f} noise units)")
+            print(
+                f"{s} {name}: event-window shift {shift:+.2f} MW ({shift / panel.noise[s]:+.1f} noise units)"
+            )
 
 
 if __name__ == "__main__":

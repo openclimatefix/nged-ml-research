@@ -10,8 +10,10 @@
 3. Scored-target leak: with the probe fitted on the same training worlds, shuffling the *scored*
    worlds' truth tables must leave every saved donor score bit-identical.
 
-    PYTHONPATH=<this folder>:... uv run --no-sync python e00675_leaktests.py [1|2|3]
+    PYTHONPATH=the_experiment_folder:... uv run --no-sync python e00675_leaktests.py [1|2|3]
 """
+
+# ruff: noqa: ANN202, PT018  # research code run once; behaviour fixed by the results
 
 from __future__ import annotations
 
@@ -53,10 +55,14 @@ def masked_leak_test(*, n_samples: int = 200, seed: int = 0) -> float:
             window = xv[:, 24 : 24 + pre.SPAN]
             full_mask = mask & torch.isfinite(window)
             if variant == "noise":
-                window[full_mask] = 10.0 * torch.randn(int(full_mask.sum()), generator=gen, dtype=window.dtype)
+                window[full_mask] = 10.0 * torch.randn(
+                    int(full_mask.sum()), generator=gen, dtype=window.dtype
+                )
             elif variant == "step":
                 window[full_mask] = 20.0
-            h, d, _, _ = pre.build_sample(x_all=xv, start=24, mask=mask, sigma=sigma, mva=mva, causal=False)
+            h, d, _, _ = pre.build_sample(
+                x_all=xv, start=24, mask=mask, sigma=sigma, mva=mva, causal=False
+            )
             out = _forward(model, h, d)
             if ref is None:
                 ref = (h, d, out)
@@ -80,14 +86,18 @@ def positive_control() -> None:
     x, sigma, mva = pre.synthetic_panel(gen=gen, n_nodes=N, hours=pre.SPAN + 48)
     mask = pre.draw_masks(gen=gen, n_nodes=N, hours=pre.SPAN, centre=(360, pre.SPAN - 360))
     outs = []
-    pre.node_inputs = leaky
+    pre.node_inputs = leaky  # ty: ignore[invalid-assignment]
     try:
         for fill in (0.0, 20.0):
             xv = x.clone()
             win = xv[:, 24 : 24 + pre.SPAN]
             win[mask & torch.isfinite(win)] = fill
             holder["x"] = xv[:, 24 : 24 + pre.SPAN]
-            outs.append(pre.build_sample(x_all=xv, start=24, mask=mask, sigma=sigma, mva=mva, causal=False)[0])
+            outs.append(
+                pre.build_sample(x_all=xv, start=24, mask=mask, sigma=sigma, mva=mva, causal=False)[
+                    0
+                ]
+            )
     finally:
         pre.node_inputs = original
     assert not torch.equal(outs[0], outs[1]), "the positive control did not leak: the test is blind"
@@ -108,7 +118,9 @@ def causal_test(*, n_samples: int = 20) -> float:
         for model, is_causal in ((causal, True), (bidir, False)):
             outs = []
             for arr in (x, xp):
-                h, d, _, _ = pre.build_sample(x_all=arr, start=24, mask=no_mask, sigma=sigma, mva=mva, causal=is_causal)
+                h, d, _, _ = pre.build_sample(
+                    x_all=arr, start=24, mask=no_mask, sigma=sigma, mva=mva, causal=is_causal
+                )
                 adj = torch.full((N, N), 1 / N, dtype=torch.float64)
                 with torch.no_grad():
                     out, _ = model(h[None], d[None], adj)
@@ -119,7 +131,9 @@ def causal_test(*, n_samples: int = 20) -> float:
             else:
                 bidir_moves = max(bidir_moves, diff)
     assert worst <= TOL, f"the causal network sees the future: {worst}"
-    assert bidir_moves > 1e-6, "the perturbation does not reach the bidirectional network: test is blind"
+    assert bidir_moves > 1e-6, (
+        "the perturbation does not reach the bidirectional network: test is blind"
+    )
     return worst
 
 
@@ -141,13 +155,19 @@ def target_leak_test() -> None:
     def shuffled(*, kind: str, seed: int):
         resid, sigma, truth = original(kind=kind, seed=seed)
         if kind == "test":
-            truth = truth.with_columns(pl.col("start").shuffle(seed=1), pl.col("site").shuffle(seed=2), pl.col("amp_mw").shuffle(seed=3))
+            truth = truth.with_columns(
+                pl.col("start").shuffle(seed=1),
+                pl.col("site").shuffle(seed=2),
+                pl.col("amp_mw").shuffle(seed=3),
+            )
         return resid, sigma, truth
 
-    probe.load_world = shuffled
+    probe.load_world = shuffled  # ty: ignore[invalid-assignment]
     probe.run(arm="F", seed=0)
     for w, a in first.items():
-        assert np.array_equal(a, np.load(probe.OUT / f"score_F_seed0_world{w}.npy")), f"world {w} scores moved"
+        assert np.array_equal(a, np.load(probe.OUT / f"score_F_seed0_world{w}.npy")), (
+            f"world {w} scores moved"
+        )
 
 
 if __name__ == "__main__":

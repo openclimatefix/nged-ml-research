@@ -10,6 +10,8 @@ experiment 670's, scored from 2024-01-01. Output: `worlds/<kind>_<seed>.npz` (ho
 `worlds/test_<seed>_e1j.parquet`, E1-J's decoded events.
 """
 
+# ruff: noqa: E501  # research code run once; behaviour fixed by the results
+
 from __future__ import annotations
 
 import multiprocessing as mp
@@ -39,7 +41,9 @@ def build(job: tuple[str, int]) -> str:
         return f"{kind} {seed} cached"
     rig = Rig()
     sites = rig.p653.sites
-    sigma = np.array([rig.frozen.sigma[s] if np.isfinite(rig.frozen.sigma[s]) else 1.0 for s in sites])
+    sigma = np.array(
+        [rig.frozen.sigma[s] if np.isfinite(rig.frozen.sigma[s]) else 1.0 for s in sites]
+    )
     if kind == "test":
         world = gen.inject(
             panel=rig.panel, config=CONFIGS["default"], seed=seed, start_times=rig.starts
@@ -49,7 +53,9 @@ def build(job: tuple[str, int]) -> str:
         world = inject_world(config=CONFIGS["default"], seed=seed, upto=TRAIN_END)
         lo, hi = 0, TRAIN_END
     residual = rig.residual_of(world=world)
-    hourly = np.stack([hourly_of(x=residual[s] / sigma[i]) for i, s in enumerate(sites)]).astype(np.float32)
+    hourly = np.stack([hourly_of(x=residual[s] / sigma[i]) for i, s in enumerate(sites)]).astype(
+        np.float32
+    )
     rows = [
         {
             "site": t.site, "start": t.start, "end": -1 if t.end is None else t.end,

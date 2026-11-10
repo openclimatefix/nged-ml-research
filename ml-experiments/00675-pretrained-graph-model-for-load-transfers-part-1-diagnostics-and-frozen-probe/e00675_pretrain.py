@@ -13,6 +13,8 @@ hours from causal convolutions and past statistics only. Rows from 2024-01-01 on
 Checkpoints every 1,000 steps; a rerun resumes.
 """
 
+# ruff: noqa: ANN201, D205, E501, E702  # research code run once; behaviour fixed by the results
+
 from __future__ import annotations
 
 import math
@@ -40,10 +42,14 @@ T_DF: Final[float] = 4.0
 BATCH: Final[int] = 4
 
 
-def hourly_residual(*, rig: object) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def hourly_residual(
+    *, rig: object
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Real residual in noise units (hourly), noise units, MVA flags, and the neighbour matrix."""
     sites = rig.p653.sites  # ty: ignore[unresolved-attribute]
-    sigma = np.array([rig.frozen.sigma[s] if np.isfinite(rig.frozen.sigma[s]) else 1.0 for s in sites])  # ty: ignore[unresolved-attribute]
+    sigma = np.array(
+        [rig.frozen.sigma[s] if np.isfinite(rig.frozen.sigma[s]) else 1.0 for s in sites]  # ty: ignore[unresolved-attribute]
+    )  # ty: ignore[unresolved-attribute]
     rows = []
     for i, s in enumerate(sites):
         rows.append(hourly_of(x=rig.real_residual[s] / sigma[i]))  # ty: ignore[unresolved-attribute]
@@ -90,7 +96,8 @@ def draw_masks(
     *, gen: torch.Generator, n_nodes: int, hours: int, centre: tuple[int, int]
 ) -> torch.Tensor:
     """Masked hours (True) per node: 40% of nodes get 1-3 windows of 3-24 h and, half of those, a
-    window of 1-7 whole days; in 30% of samples each window is also masked at 1-2 other nodes."""
+    window of 1-7 whole days; in 30% of samples each window is also masked at 1-2 other nodes.
+    """
     mask = torch.zeros(n_nodes, hours, dtype=torch.bool)
     lo, hi = centre
     co = torch.rand(1, generator=gen).item() < 0.3
@@ -104,12 +111,16 @@ def draw_masks(
             wins.append((start, start + length))
         if torch.rand(1, generator=gen).item() < 0.5:
             days = int(torch.randint(1, 8, (1,), generator=gen))
-            start = lo // 24 * 24 + 24 * int(torch.randint(0, max(1, (hi - lo) // 24 - days), (1,), generator=gen))
+            start = lo // 24 * 24 + 24 * int(
+                torch.randint(0, max(1, (hi - lo) // 24 - days), (1,), generator=gen)
+            )
             wins.append((start, start + 24 * days))
         for a, b in wins:
             mask[i, a:b] = True
             if co and n_nodes > 2:
-                for j in torch.randperm(n_nodes, generator=gen)[: int(torch.randint(1, 3, (1,), generator=gen))]:
+                for j in torch.randperm(n_nodes, generator=gen)[
+                    : int(torch.randint(1, 3, (1,), generator=gen))
+                ]:
                     mask[int(j), a:b] = True
     return mask
 
@@ -121,7 +132,13 @@ def student_t_nll(*, y: torch.Tensor, loc: torch.Tensor, log_scale: torch.Tensor
 
 
 def build_sample(
-    *, x_all: torch.Tensor, start: int, mask: torch.Tensor, sigma: torch.Tensor, mva: torch.Tensor, causal: bool,
+    *,
+    x_all: torch.Tensor,
+    start: int,
+    mask: torch.Tensor,
+    sigma: torch.Tensor,
+    mva: torch.Tensor,
+    causal: bool,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Inputs of one masked sample: statistics are computed after the mask is applied."""
     x = x_all[:, start : start + SPAN].clone()
@@ -134,16 +151,27 @@ def build_sample(
 
 
 def make_batch(
-    *, x_all: torch.Tensor, sigma: torch.Tensor, mva: torch.Tensor, gen: torch.Generator,
-    causal: bool, device: torch.device,
+    *,
+    x_all: torch.Tensor,
+    sigma: torch.Tensor,
+    mva: torch.Tensor,
+    gen: torch.Generator,
+    causal: bool,
+    device: torch.device,
 ) -> tuple[torch.Tensor, ...]:
     """Inputs, targets, and loss masks of one batch."""
     n = x_all.shape[0]
     hourly, daily, truth, masks = [], [], [], []
     for _ in range(BATCH):
         s = 24 * int(torch.randint(0, (PRE_HOURS - SPAN) // 24, (1,), generator=gen))
-        mask = torch.zeros(n, SPAN, dtype=torch.bool) if causal else draw_masks(gen=gen, n_nodes=n, hours=SPAN, centre=(360, SPAN - 360))
-        h, d, x, mask = build_sample(x_all=x_all, start=s, mask=mask, sigma=sigma, mva=mva, causal=causal)
+        mask = (
+            torch.zeros(n, SPAN, dtype=torch.bool)
+            if causal
+            else draw_masks(gen=gen, n_nodes=n, hours=SPAN, centre=(360, SPAN - 360))
+        )
+        h, d, x, mask = build_sample(
+            x_all=x_all, start=s, mask=mask, sigma=sigma, mva=mva, causal=causal
+        )
         hourly.append(h.float()); daily.append(d.float()); truth.append(x); masks.append(mask)  # fmt: skip
     return (
         torch.stack(hourly).to(device), torch.stack(daily).to(device),
@@ -152,8 +180,13 @@ def make_batch(
 
 
 def loss_of(
-    *, model: Pretrainer, hourly: torch.Tensor, daily: torch.Tensor, truth: torch.Tensor,
-    masks: torch.Tensor, adj: torch.Tensor,
+    *,
+    model: Pretrainer,
+    hourly: torch.Tensor,
+    daily: torch.Tensor,
+    truth: torch.Tensor,
+    masks: torch.Tensor,
+    adj: torch.Tensor,
 ) -> torch.Tensor:
     """The reconstruction loss (masked arm) or the next-6-hours loss (causal arm)."""
     out, day = model(hourly, daily, adj)
@@ -174,7 +207,9 @@ def loss_of(
     sel = masks & inside[None, None] & torch.isfinite(truth)
     hour_loss = student_t_nll(y=torch.nan_to_num(y), loc=loc, log_scale=log_scale)[sel].mean()
     b, n, _ = masks.shape
-    day_masked = masks.reshape(b, n, SPAN // 24, 24).all(-1) & torch.isfinite(truth).reshape(b, n, SPAN // 24, 24).all(-1)
+    day_masked = masks.reshape(b, n, SPAN // 24, 24).all(-1) & torch.isfinite(truth).reshape(
+        b, n, SPAN // 24, 24
+    ).all(-1)
     dtrue = torch.nan_to_num(y).reshape(b, n, SPAN // 24, 24).mean(-1) * 0.2
     if day_masked.any():
         return hour_loss + 0.5 * nn_huber(day[day_masked], dtrue[day_masked])
@@ -212,7 +247,9 @@ def train(*, arm: str, seed: int, steps: int) -> Path:
     while step < steps:
         for g in opt.param_groups:
             g["lr"] = 1e-3 * 0.5 * (1 + math.cos(math.pi * step / steps))
-        h, d, tr, mk = make_batch(x_all=x_all, sigma=sigma, mva=mva, gen=gen, causal=arm == "causal", device=device)
+        h, d, tr, mk = make_batch(
+            x_all=x_all, sigma=sigma, mva=mva, gen=gen, causal=arm == "causal", device=device
+        )
         loss = loss_of(model=model, hourly=h, daily=d, truth=tr, masks=mk, adj=adj_d)
         opt.zero_grad(set_to_none=True)
         loss.backward()
@@ -220,7 +257,10 @@ def train(*, arm: str, seed: int, steps: int) -> Path:
         opt.step()
         step += 1
         if step % 100 == 0:
-            print(f"{arm} seed {seed} step {step} loss {loss.item():.4f} {time.time() - t0:.0f}s", flush=True)
+            print(
+                f"{arm} seed {seed} step {step} loss {loss.item():.4f} {time.time() - t0:.0f}s",
+                flush=True,
+            )
         if step % 1000 == 0 or step == steps:
             torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "step": step}, ckpt)
     torch.save(model.state_dict(), final)

@@ -14,6 +14,8 @@ $P/00665-event-table-recall-by-length-and-depth
     uv run --no-sync python $P/00675-*/e00675_step0a.py <first_seed> <n_worlds>
 """
 
+# ruff: noqa: E501  # research code run once; behaviour fixed by the results
+
 from __future__ import annotations
 
 import sys
@@ -31,7 +33,10 @@ from e00670_run import CONFIGS, decode_variants, params653  # ty: ignore[unresol
 from e00670_search import SearchParams
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-OUT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe"
+OUT: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe"
+)
 REASONS: Final[tuple[str, ...]] = (
     "1 donor not found",
     "2 recipient start outside search window",

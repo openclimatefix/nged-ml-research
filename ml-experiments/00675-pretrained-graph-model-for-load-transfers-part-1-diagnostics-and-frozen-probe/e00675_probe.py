@@ -9,6 +9,8 @@ recipient. Encoder arms are frozen (random initialisation for R). Arm F uses the
 channels alone. Output: `probe/<arm>_seed<k>_{donor,recipient}.parquet`.
 """
 
+# ruff: noqa: ANN201, B023, E501, E702, PLR0915  # research code run once; behaviour fixed by the results
+
 from __future__ import annotations
 
 import os
@@ -40,10 +42,19 @@ def step6_channel() -> int:
 
 def donor_rows(*, truth: pl.DataFrame) -> pl.DataFrame:
     """Donor steps of edge transfers (negative step, at least one linked recipient)."""
-    return truth.filter((pl.col("kind") == "edge") & (pl.col("amp_mw") < 0) & (pl.col("partners") != ""))
+    return truth.filter(
+        (pl.col("kind") == "edge") & (pl.col("amp_mw") < 0) & (pl.col("partners") != "")
+    )
 
 
-def embed(*, model: Pretrainer | None, resid: np.ndarray, sigma: np.ndarray, mva: torch.Tensor, adj: torch.Tensor):
+def embed(
+    *,
+    model: Pretrainer | None,
+    resid: np.ndarray,
+    sigma: np.ndarray,
+    mva: torch.Tensor,
+    adj: torch.Tensor,
+):
     """Per-hour features (nodes, hours, d) and the raw channels (nodes, hours, C) of one world.
 
     The record is cut into windows of `SPAN` hours (the length pretraining saw), each encoded on
@@ -62,14 +73,20 @@ def embed(*, model: Pretrainer | None, resid: np.ndarray, sigma: np.ndarray, mva
         lo = 0 if k == 0 else s + quarter
         hi = total if k == len(starts) - 1 else s + SPAN - quarter
         lo_i, hi_i = lo - s, hi - s
-        hourly, daily = node_inputs(x=x[:, s : s + SPAN], sigma=torch.tensor(sigma), is_mva=mva, hour0=s)
-        raw[:, lo:hi] = hourly[:, lo_i:hi_i].float()  # pair features use the full inputs in every arm
+        hourly, daily = node_inputs(
+            x=x[:, s : s + SPAN], sigma=torch.tensor(sigma), is_mva=mva, hour0=s
+        )
+        raw[:, lo:hi] = hourly[
+            :, lo_i:hi_i
+        ].float()  # pair features use the full inputs in every arm
         if model is not None and model.causal:
             hourly, daily = causalise(hourly, daily)
         if model is not None:
             with torch.no_grad():
-                h, _ = model.encoder(hourly.float()[None].to(DEV), daily.float()[None].to(DEV), adj.float().to(DEV))
-            feat[:, lo:hi] = h[0, :, lo_i:hi_i].cpu()
+                h, _ = model.encoder(
+                    hourly.float()[None].to(DEV), daily.float()[None].to(DEV), adj.float().to(DEV)
+                )
+            feat[:, lo:hi] = h[0, :, lo_i:hi_i].cpu()  # ty: ignore[invalid-assignment]
     return feat, raw
 
 
@@ -82,7 +99,9 @@ def pair_block(*, raw: torch.Tensor, donor: int, nb: int, t0: int) -> torch.Tens
     return torch.cat([nbs, ds[None], ratio[None]])
 
 
-def features(*, feat: torch.Tensor | None, raw: torch.Tensor, adj: torch.Tensor, idx: tuple[int, int]) -> torch.Tensor:
+def features(
+    *, feat: torch.Tensor | None, raw: torch.Tensor, adj: torch.Tensor, idx: tuple[int, int]
+) -> torch.Tensor:
     """Feature vector of one (node, hour): the embedding, or the raw channels with neighbour mean."""
     i, t = idx
     if feat is not None:
@@ -91,7 +110,9 @@ def features(*, feat: torch.Tensor | None, raw: torch.Tensor, adj: torch.Tensor,
     return torch.cat([raw[i, t], nb])
 
 
-def fit_logistic(*, x: torch.Tensor, y: torch.Tensor, steps: int = 300) -> tuple[torch.nn.Linear, torch.Tensor, torch.Tensor]:
+def fit_logistic(
+    *, x: torch.Tensor, y: torch.Tensor, steps: int = 300
+) -> tuple[torch.nn.Linear, torch.Tensor, torch.Tensor]:
     """Standardise, then fit an L2-regularised logistic regression with LBFGS."""
     mu, sd = x.mean(0), x.std(0).clamp(min=1e-6)
     xs = (x - mu) / sd
@@ -130,14 +151,19 @@ def run(*, arm: str, seed: int) -> None:
     adj = adjacency(rig=rig)
     mva = torch.tensor([float(rig.panel.is_mva[s]) for s in sites], dtype=torch.float64)
     index = {s: i for i, s in enumerate(sites)}
-    nbrs = {i: [index[n] for n in rig.p653.neighbours.get(s, []) if n in index] for s, i in index.items()}
+    nbrs = {
+        i: [index[n] for n in rig.p653.neighbours.get(s, []) if n in index]
+        for s, i in index.items()
+    }
     model = None
     if arm != "F":
         torch.manual_seed(seed)
         model = Pretrainer(causal=arm == "P-C").to(DEV).eval()
         if arm != "R":
             name = {"P-M": "masked", "P-C": "causal"}[arm]
-            model.load_state_dict(torch.load(ROOT / "weights" / f"encoder_{name}_seed{seed}.pt", map_location=DEV))
+            model.load_state_dict(
+                torch.load(ROOT / "weights" / f"encoder_{name}_seed{seed}.pt", map_location=DEV)
+            )
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
     xd, yd, xr, yr = [], [], [], []
@@ -159,7 +185,9 @@ def run(*, arm: str, seed: int) -> None:
         n_neg = 600
         ii = rng.integers(0, len(sites), n_neg * 3)
         tt = rng.integers(24, HOURS - 24, n_neg * 3)
-        keep = [(a, b) for a, b in zip(ii, tt, strict=True) if not near[a, b] and raw[a, b, 1] > 0][:n_neg]
+        keep = [(a, b) for a, b in zip(ii, tt, strict=True) if not near[a, b] and raw[a, b, 1] > 0][
+            :n_neg
+        ]
         for a, b in keep:
             xd.append(features(feat=feat, raw=raw, adj=adj, idx=(int(a), int(b)))); yd.append(0.0)  # fmt: skip
     dl = fit_logistic(x=torch.stack(xd), y=torch.tensor(yd))
@@ -170,19 +198,34 @@ def run(*, arm: str, seed: int) -> None:
     for w in range(900, 903 if SMOKE else 940):
         resid, sigma, truth = load_world(kind="test", seed=w)
         feat, raw = embed(model=model, resid=resid, sigma=sigma, mva=mva, adj=adj)
-        base = feat if feat is not None else torch.cat([raw, torch.einsum("ij,jtc->itc", adj.float(), raw)], -1)
+        base = (
+            feat
+            if feat is not None
+            else torch.cat([raw, torch.einsum("ij,jtc->itc", adj.float(), raw)], -1)
+        )
         sc = donor_scores(base=base, dl=dl)
         np.save(OUT / f"score_{arm}_seed{seed}_world{w}.npy", sc.numpy().astype(np.float32))
         for r in donor_rows(truth=truth).iter_rows(named=True):
             days = None if r["end"] < 0 else (r["end"] - r["start"]) / DAY
             cell = cell_of(days=days, units=r["units"]) if r["units"] >= 2.0 else "under 2"
-            scores.append({"world": w, "site": r["site"], "start": r["start"], "amp_mw": r["amp_mw"], "cell": cell})
+            scores.append(
+                {
+                    "world": w,
+                    "site": r["site"],
+                    "start": r["start"],
+                    "amp_mw": r["amp_mw"],
+                    "cell": cell,
+                }
+            )
             i, h0 = index[r["site"]], r["start"] // 2
             for nb in nbrs[i]:
                 t0 = h0 + 3
                 fe = lambda a: features(feat=feat, raw=raw, adj=adj, idx=(a, t0))  # noqa: E731
                 x = torch.cat([fe(i), fe(nb), pair_block(raw=raw, donor=i, nb=nb, t0=t0)])
-                s = float((((x - rl[1]) / rl[2]) @ rl[0].weight.T.detach()).squeeze() + rl[0].bias.detach())
+                s = float(
+                    (((x - rl[1]) / rl[2]) @ rl[0].weight.T.detach()).squeeze()
+                    + rl[0].bias.detach()
+                )
                 pairs.append({"world": w, "cell": cell, "amp_mw": r["amp_mw"], "label": int(sites[nb] in r["partners"].split(",")), "score": s})  # fmt: skip
     pl.DataFrame(scores).write_parquet(OUT / f"{arm}_seed{seed}_donors.parquet")
     pl.DataFrame(pairs).write_parquet(OUT / f"{arm}_seed{seed}_recipient.parquet")
