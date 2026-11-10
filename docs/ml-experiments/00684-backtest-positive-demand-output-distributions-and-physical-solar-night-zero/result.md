@@ -59,8 +59,9 @@ best_arm: >-
 headline: >-
   Conditioning the Gaussian mixture on power at or above zero removes every negative q01 at the four
   Primaries and leaves CRPS within 0.07 points of capacity of the stored forecasts (it improves
-  two clearly, leaves one indistinguishable, and worsens one by 0.03). The gamma mixture fails its stop rule at two Primaries and is dropped.
-  At the two solar farms the night gate leaves no non-zero night quantile and changes no daylight score.
+  two clearly, leaves one indistinguishable, and worsens one by 0.03). The gamma mixture fails its
+  stop rule at two Primaries and is dropped. At the two solar farms the night gate leaves no non-zero
+  night quantile and changes no daylight score.
 lessons: >-
   A mixture cut at zero is a drop-in positive output for Primaries that cannot go negative. The gamma
   head, trained inside the shared network, hurt the Gaussian Primaries as well, so a mixed-family
@@ -94,10 +95,10 @@ families that cannot go below zero, on two test months (2026-02 and 2026-05), an
 quantiles at night at each half-hour's own sun position. The truncated Gaussian mixture changed CRPS
 by -0.070, -0.015, -0.010, and +0.030 points of capacity at four Primaries, and the gamma mixture
 raised it by 0.68 to 1.48 points at two of them, so it failed its stop rule. Both new families
-remove every negative q01. The gate removes every non-zero night quantile, lowers night CRPS, and changes no daylight or
-dawn score. Its zero quantiles lie below night observations that are slightly positive, so the
-share above q99 at night rises. Two test months and one pair of seeds can rank these ideas but
-cannot support a claim of benefit.
+remove every negative q01. The gate removes every non-zero night quantile, lowers night CRPS, and
+changes no daylight or dawn score. Its zero quantiles lie below night observations that are
+slightly positive, so the share above q99 at night rises. Two test months and one pair of seeds can
+rank these ideas but cannot support a claim of benefit.
 
 ![Change in CRPS against the stored forecasts at four Primaries, truncated Gaussian (orange) and gamma
 (purple)](crps_change.svg)
