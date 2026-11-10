@@ -58,7 +58,7 @@ def origin_departure(*, z: dict, q_prev: np.ndarray, q_nra: np.ndarray) -> np.nd
     d = (q_prev[:, 5] - q_nra[:, 5]).astype(np.float64)
     s = np.bincount(z["org"][use], weights=d[use], minlength=n_org)
     c = np.bincount(z["org"][use], minlength=n_org)
-    return np.where(c >= 40, s / np.maximum(c, 1), np.nan)
+    return np.where(c >= 12, s / np.maximum(c, 1), np.nan)
 
 
 def reaction(
@@ -124,6 +124,7 @@ def summarise(*, arm: str) -> tuple[dict, list[dict]]:
     tail_hits = {t: [] for t in (0, 1, 9, 10)}
     tail_pin = {t: [] for t in (0, 1, 9, 10)}
     bank_acc: dict[str, list[np.ndarray]] = {k: [] for k in ("crps", "state", "lead")}
+    blocks: dict[str, dict] = {}
     for month in MONTHS:
         z = dict(np.load(dat.HEAD_DATA / f"real_{month}.npz"))
         q_nra = np.sort(z["q"], axis=1)
@@ -145,6 +146,14 @@ def summarise(*, arm: str) -> tuple[dict, list[dict]]:
                 (vi >= a - 14 * DAY) & (vi < b + 14 * DAY)
                 | (oi >= a - 14 * DAY) & (oi < b + 14 * DAY)
             )
+        free_m = ok & ~near
+        for pp in range(16):
+            sel_b = free_m & (prim == pp)
+            blocks[f"{pp}|{month}"] = {
+                "n": int(sel_b.sum()),
+                "crps": float(crps_rows(y=y, q=q_prev)[sel_b].sum()),
+                "mae": float((np.abs(q_prev[:, 5] - y) * 100.0)[sel_b].sum()),
+            }
         acc["crps_p"].append(crps_rows(y=y, q=q_prev)[ok])
         acc["crps_n"].append(crps_rows(y=y, q=q_nra)[ok])
         acc["mae_p"].append((np.abs(q_prev[:, 5] - y) * 100.0)[ok])
@@ -260,6 +269,7 @@ def summarise(*, arm: str) -> tuple[dict, list[dict]]:
             }
     free = cat["free14"]
     res["table"] = table
+    res["event_free_blocks"] = blocks
     res["false_alarm_share_event_free"] = float(cat["alarm"][free].mean())
     res["event_free_crps"] = float(cat["crps_p"][free].mean())
     res["all_crps"] = float(cat["crps_p"].mean())
