@@ -236,7 +236,7 @@ def fig_injected() -> None:
         ax.set_ylim(1.6, -0.6)
         ax.axvline(0, color=GREY, lw=0.5)
         ax.set_title(
-            f"Injected at the {edge} (60 windows per Primary pair and gap; black tick = median)",
+            f"Injected at the {edge} (120 windows per Primary pair and gap, two step shapes pooled; black tick = median)",
             fontsize=8,
             loc="left",
         )

@@ -62,11 +62,11 @@ best_arm: >-
   -13.0 to 16.5) at the D5/D16 onset and -0.5 hours (-6.0 to 0.0) at the D3/D22 onset. Check 2:
   0.05 of the 333 false events are sunny-run steps (95% interval 0.03 to 0.08).
 headline: >-
-  The donor and the recipient of both verified transfers step at the same time within the noise of
-  the fit (fitted gaps of -2.0 to 2.5 hours at four edges, shared-onset p of 0.06 to 0.36), so the
-  recipient lag of 14.5 and 15 hours reported in experiment 660 is the gap between the labelled
-  times, not a fitted lag. The fit has limited power at D5/D16, where it misplaces a true
-  simultaneous step by more than 2 hours in 17% to 25% of windows. Of 333 false events that
+  At D3/D22 the donor and the recipient step together (fitted gaps of -0.5 hours at the onset and
+  -2.0 at the end, both within noise), and at D5/D16 the end gap is 2.5 hours, but the D5/D16 onset
+  interval (-13.0 to 16.5 hours) cannot exclude a lag of 15 hours. The lag of 14.5 and 15 hours in
+  experiment 660 is the gap between the labelled times. Where the true gap is 0, the fit misplaces
+  the step by 2 hours or more in 3% to 25% of windows, worst at D5/D16. Of 333 false events that
   injected solar growth causes, 5% are steps inside a sunny run, 79% fail the step test (a slow
   ramp or a short bump), and 37% start in a clear run.
 lessons: >-
@@ -76,56 +76,68 @@ lessons: >-
   false events last 3 days or less, so a better slow level would remove fewer of them than the
   ramp share suggests.
 take_home_message: >-
-  At both verified transfers the substation that lost demand and the substation that gained it
-  stepped at the same time to within the fit's noise, so a detector may require both ends to
-  coincide, with a tolerance of about 4 half-hours (2 hours) in most windows and more at D5/D16.
-  The 14.5 and 15 hours reported earlier is the gap between the labelled times. Of the false events
-  that solar growth causes, few are abrupt steps in a sunny run, but half last 3 days or less, so
-  building a better solar-capacity curve would remove only part of them.
+  The two verified transfers give no sign of a lag between the substation that lost demand and the
+  one that gained it: the D3/D22 steps coincide within noise, and the D5/D16 steps are 2.5 hours
+  apart at the end and too noisy at the onset to say. The 14.5 and 15 hours reported earlier is
+  the gap between the labelled times. Of the false events that solar growth causes, few are
+  abrupt steps in a sunny run, but half last 3 days or less, so a better solar-capacity curve would
+  remove only part of them.
 advice:
   - >-
-    Allow a tolerance of about 4 half-hours when requiring the two ends of a transfer to coincide,
-    and expect the fit to scatter a true simultaneous step by 6 hours or more in 1 window in 6 at
-    a Primary pair like D5/D16 (section "Check 1").
+    Do not read the gap between labelled onsets as a physical lag; fit both Primaries in one
+    window centred between the labels, with a search of at least 2 days (section "Results").
   - >-
     Calibrate any likelihood-ratio rule for onset timing with a day-block bootstrap or injected
     simultaneous transfers, because a cut-off of 4 rejected simultaneous truth in 25% to 32% of
-    windows (section "Check 1").
+    windows (section "Results").
   - >-
-    Do not read the gap between labelled onsets as a physical lag; fit both Primaries in one
-    window centred between the labels, with a search of at least 2 days (section "Check 1").
+    Allow a tolerance of at least 4 half-hours when requiring the two ends of a transfer to
+    coincide, and test it on injected worlds, because the fit misplaces a true simultaneous step by
+    6 hours or more in 7.5% to 18% of D5/D16 windows (section "Results").
   - >-
     Split false solar-growth events by duration before deciding that a better slow level helps:
-    52% last 3 days or less (section "Check 2").
+    52% last 3 days or less (section "Results").
 production_status: not-for-production
 adopted_in: none
 ---
-**At both verified transfers the donor and the recipient step at the same time to within the noise
-of the fit, so a detector may require the two ends to coincide.** The recipient lag of 14.5 and 15
-hours that experiment 660 reported is the gap between the two Primaries' *labelled* times. The fitted
-gaps are 2.0 hours at the D5/D16 onset, 2.5 hours at its end, −0.5 hours at the D3/D22 onset, and
-−2.0 hours at its end. Experiment 660's own fitted shifts, added to the labelled times, also give
-gaps under 1 hour. Of the 333 false events that injected solar growth causes, few are abrupt
-steps inside a sunny run, but half last 3 days or less. A composite capacity curve for slow
-drift would therefore remove fewer false events than the ramp share suggests.
+**At D3/D22 the donor and the recipient step together, and at D5/D16 the two ends start within
+2.5 hours of each other, although the D5/D16 onset is too noisy to exclude a lag of 15 hours.** The
+recipient lag of 14.5 and 15 hours that experiment 660 reported is the gap between the two
+Primaries' *labelled* times. The fitted gaps are 2.0 hours at the D5/D16 onset, 2.5 hours at its
+end, −0.5 hours at the D3/D22 onset, and −2.0 hours at its end. Of the 333 false events that
+injected solar growth causes, few are abrupt steps inside a sunny run, but half last 3 days or
+less. A composite capacity curve for slow drift would therefore remove fewer false events than the
+ramp share suggests.
 
 **Check 1 asks whether the two ends of a verified transfer start together.** A transfer happens
 when an operator switches a circuit from one Primary substation (the donor) to a neighbour (the
 recipient). The answer decides how tightly a detector may require the two steps to coincide. **Check
-2 asks what kind of false event solar growth causes** in the event table of experiment 653.
+2 asks what kind of false event solar growth causes** in the event table of experiment 653. A
+"world" is a copy of the real power record with solar growth injected at 3 Primaries. The "slow
+level" is the smooth seasonal level the detector subtracts before it looks for events. An "onset" is
+the start of a transfer and an "end" is its finish. "ERA5" is a weather reanalysis, and "NGED" is
+the distribution network operator.
 
-The verdict is *partly supported*. Hypothesis 1 (a lag of 12 hours or more) is not supported, the
-method check P2 fails at D5/D16, and hypothesis 2 is supported on the pre-registered definition. The
-page says in each section how much the definition matters.
+**The verdict is *partly supported*, and the decision rule does not produce it by itself.**
+Prediction P1 (a recipient lag of 12 hours or more) is not supported: the fitted gaps are 2.0 and
+−0.5 hours at the onsets. Prediction P2 (the fit recovers a true gap of 0) fails at D5/D16, where
+83% of the injected windows at the onset and 75% at the end fall within 4 half-hours, against the 90%
+bar. Prediction P3 (most false events are slow ramps or misfits, under a third are sunny-run steps)
+is supported on the pre-registered definition. The plan gives no rule for combining the three, so
+the verdict is a judgement. Because P2 fails at D5/D16, the D5/D16 gaps are reported as
+measurements with their intervals and not as findings. Each section says how far its definition
+matters.
 
 ## Figures
 
 ![Fitted gap](figure_gap.svg)
 
-**Figure 1 shows that the fitted gap is near zero at all four edges, and that the labelled gap is
-not.** The dot is the fitted gap (recipient minus donor) and the line is a 90% interval from
+**Figure 1 shows that the fitted gap is within 2.5 hours of zero at all four edges, while the
+labelled gap is 14.5 to 18.5 hours at three of them and 0 at the fourth.** The dot is the fitted
+gap (recipient minus donor) and the line is a 90% interval from
 resampling whole days. The interval at the D5/D16 onset is wide (−13.0 to 16.5 hours), so that
-edge alone cannot exclude a lag of 14.5 hours. The other three intervals can.
+edge alone cannot exclude a lag of 15 hours. The other three intervals can. The D5/D16 end
+interval (1.5 to 3.5 hours) excludes 0, so that end shows a small lag.
 
 ![Real edge](figure_real_edge.svg)
 
@@ -136,7 +148,8 @@ another, and the step fitted separately for each Primary falls beside the step f
 
 **Figure 3 shows what the fit reports when the true gap is known.** A gap of 0 is read as within
 2 hours in most windows, but a few windows scatter by 6 hours or more, most at D5/D16. A gap of 14.5
-hours is read back with a median of 14.5 to 15 hours.
+hours is read back with a median of 14.5 to 15 hours. Each dot is one of 120 windows (two step
+shapes pooled).
 
 ![False event classes](figure_class_shares.svg)
 
@@ -148,9 +161,9 @@ ramps with short bumps (see the post hoc bullets below).
 ![Examples 2](figure_examples_2.svg)
 
 **Figures 5 and 6 show one example of each class,** each the event whose size is nearest its
-class's median size. The grey band marks the false event, the orange line is the injected growth,
-and the green line is the change in the slow level. The slow level absorbs little of the midday-only
-growth in any example.
+class's median size. The grey band marks the false event, the orange line is the injected growth
+(negative, because it lowers the residual), and the green line is the change in the slow level. The
+slow level follows only a fraction of the midday-only growth in every example.
 
 ## Results
 
@@ -178,12 +191,13 @@ bootstrap under the shared model (300 draws).
   windows with a true gap of 0, so a rule of "ratio under 4 means simultaneous" would reject a truly
   simultaneous transfer about 3 times in 10. The bootstrap null is the calibrated test. The D5/D16 end
   has a statistic of 43.8, which sits at the 95th percentile of its own bootstrap null (44.9).
-- **The labelled gap is not a fitted lag.** Experiment 660 fitted each Primary in its own window
-  and searched 24 hours either side of its labelled time. Adding each Primary's fitted shift to its
-  labelled time gives a recipient lag of 0.5 hours at D5/D16 and 0 hours at D3/D22, although four
-  of its eight shifts sat at the limit of the search.
-- **Post hoc, constant-MW steps only:** the fitted gaps are 0.5, 2.0, −0.5, and −0.5 hours at the
-  four edges, so the profile-shaped alternative does not explain the finding.
+- **The labelled gap is not a fitted lag.** Experiment 660 fitted each Primary in its own window and
+  searched 24 hours either side of its labelled time. Adding each Primary's fitted shift to its
+  labelled time gives recipient lags of 0.5 hours (D5/D16 onset), 2.0 (D5/D16 end), −0.5 (D3/D22
+  onset), and 18.5 (D3/D22 end). The last equals the labelled gap because both of its shifts sat at
+  the limit of the search, and four of its eight shifts did.
+- **Post hoc, constant-MW steps only** (`constant_only.json`): the fitted gaps are 0.5, 2.0, −0.5,
+  and −0.5 hours at the four edges, so allowing a profile-shaped step does not explain the finding.
 
 **Check 2, classes of the false events.** The 24 worlds (worlds 0 and 1 reproduce experiment 653's
 5 and 9 false events) hold 333 false events, or 1.85 per injected Primary-year (95% interval 1.06
@@ -198,17 +212,18 @@ to 2.86 from resampling worlds), against experiment 653's 0.93 on its two worlds
 
 - **P3 is supported on the pre-registered definition.** Slow ramps and misfits are 0.89 of the
   events (0.83 to 0.93 from resampling worlds), and sunny-run steps are 0.05 (0.03 to 0.09).
-- **Post hoc, the ramp class is mostly not a slow ramp.** 167 of the 333 events have no completed
+- **Post hoc, the ramp class is mostly not a slow ramp.** Of the 333 events, 167 have no completed
   edge on the midday series, and 173 (52%, interval 47% to 57%) last 3 days or less. Only 97 (29%)
   are ramps that complete over more than 1 day.
-- **Post hoc, a loose reading of "sunny run" gives a different answer.** 122 of 333 (37%, 32% to
-  42%) start in a run whose first 3 days have a midday clearness of 0.7 or more. Under the
+- **Post hoc, a loose reading of "sunny run" gives a different answer.** Of the 333 events, 122
+  (37%, 32% to 42%) start in a run whose first 3 days have a midday clearness of 0.7 or more. Under the
   pre-registered definition only the 17 with a step-like edge count. The page does not decide which
   reading the detector needs.
 - **Daily shape.** The median share of an event's megawatts that falls between 10:00 and 15:00 UTC
-  is 0.26 to 0.29 for the sunny-run, ramp, and misfit classes. A constant step would give 0.21, so
+  is 0.26 to 0.29 for the sunny-run, ramp, and misfit classes.
+  A constant step would give 10 of 48 half-hours, 0.21, so
   the events are only weakly midday-shaped.
-- **Season boundaries.** 20 of 333 events start within 14 days of 1 April or 1 October.
+- **Season boundaries.** Of the 333 events, 20 start within 14 days of 1 April or 1 October.
 
 ## Caveats
 
@@ -239,13 +254,9 @@ to 2.86 from resampling worlds), against experiment 653's 0.93 on its two worlds
 - **Median minus mean forecast, and error of the mean beside each quantile-score contrast:** not
   applicable, because this experiment trains and scores no forecast.
 - **Audit triggers:** none of the seven apply (no forecast, no leakage path, no tuned threshold read
-  from the scored rows). The class definitions were fixed in the plan and then changed once, after
-  the code review and before any scored number was read; the plan page records the change.
-- **Process:** the timing script was run once as a trial before the plan commit and the code review,
-  and its output was not read. A fresh Sonnet agent then reviewed the code and found four bugs
-  (midday slices not aligned to the clock, a bootstrap null that used the separate fit's step shape,
-  a forecast gap that made every fit NaN, and a pooled noise level in the statistic). All were fixed
-  before the scored run. A fresh Sonnet agent reviewed the numbers and the prose.
+  from the scored rows).
+- **Reviews:** a fresh Sonnet agent reviewed the code before the scored run, and another reviewed the
+  numbers and the prose.
 - **Final-test window:** never read. All windows and worlds end before 2026-07-01.
 - **Standing practices:** no forecast is trained, so monthly refits, saved models, tail scores, and
   curtailment cost do not apply. D18's rows before 2025-03-01 are dropped as in experiment 653.
@@ -256,6 +267,7 @@ to 2.86 from resampling worlds), against experiment 653's 0.93 on its two worlds
   check 1, the fits, the bootstrap, and the injection check. Imports the folder of experiment 660.
 - `.../e00686_false_events.py`: check 2, the re-injection of the solar-growth worlds and the
   per-event measurements. Imports the folders of experiments 653 and 657.
+- `.../e00686_constant_only.py`: the post hoc refit of the four edges with constant-MW steps.
 - `.../e00686_classes.py`: assigns the classes and prints the shares and rates.
 - `.../e00686_figures.py`: draws the six figures.
 - `data/ml-experiments/00686-event-table-transfer-timing-and-false-solar-growth-events/`: private
