@@ -1,4 +1,4 @@
-# ruff: noqa: C416, D103, E501
+# ruff: noqa: C416, D103, D205, D209, E501
 """Experiment 677: figures of the ladder (SVG, public) from the private score tables.
 
 Usage: python e00677_figures.py SPAN OUT_DIR

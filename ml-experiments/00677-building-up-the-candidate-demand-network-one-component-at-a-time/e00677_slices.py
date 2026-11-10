@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E402, E501
+# ruff: noqa: D103, D205, D209, E402, E501
 """Experiment 677: slice tables and step-to-step contrasts of the ladder (private CSV).
 
 Usage: python e00677_slices.py SPAN NAME [NAME ...]   (NAME is a step file stem without the span,

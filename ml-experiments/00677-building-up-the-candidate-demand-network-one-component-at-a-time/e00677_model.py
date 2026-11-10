@@ -1,4 +1,4 @@
-# ruff: noqa: D107, E501
+# ruff: noqa: D107, D205, E501
 """Experiment 677: experiment 591's A1 network with whole input groups removed, for the ladder steps
 1 to 4.
 

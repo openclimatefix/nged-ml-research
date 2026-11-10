@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, D205, E501
 """Experiment 677: days for experiment 667's prevailing output to recover half of a confirmed
 event's new level (private CSV).
 

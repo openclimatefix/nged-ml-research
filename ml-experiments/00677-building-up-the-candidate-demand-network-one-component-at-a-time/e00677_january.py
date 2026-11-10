@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, D205, E501
 """Experiment 677: observed Monday-to-Friday half-hour profiles of D16 and D5 before, during, and
 after the confirmed transfer (SVG).
 

@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, D205, E501
 """Experiment 677: calibration of the 11 quantile levels of each ladder step, with the tails in
 focus (private CSV).
 

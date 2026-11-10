@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, D205, E501
 """Experiment 677: score the GAM and XGBoost reference lines beside the ladder on their shared rows
 (private CSV).
 
