@@ -56,23 +56,24 @@ headline: >-
   Giving the prevailing head 14 extra lagged power inputs shortens its reaction to the start of an
   injected load shift by 20.4 hours (95% interval 16.3 to 24.8) and to its end by 8.1 hours, over
   1152 injected events in six development folds. Both placebos move the reaction by under 3 hours.
-  The NRA output is unchanged, and the event-free CRPS falls by 0.050 points of capacity (95%
+  The NRA output is unchanged, and the event-free CRPS does not rise (-0.050 points of capacity, 95%
   interval -0.119 to +0.000).
 lessons: >-
-  The gain is real and specific to the content of the lags, because a head given the same number of
-  lags from another Primary, or the same lags read 7 days earlier, gains nothing. It is smaller than
-  the 24 hours pre-registered as worth porting, and it rests on injected events and one real
-  transfer where the prevailing output changes.
+  On injected events the gain is specific to the content of the lags, because a head given the same
+  number of lags from another Primary, or the same lags read 7 days earlier, gains nothing. It is
+  smaller than the 24 hours pre-registered as worth porting. Only 2 real events can be read, so
+  whether the gain carries over to real load shifts is untested.
 take_home_message: >-
   Giving the prevailing forecast 8 to 14 extra lagged power inputs makes it follow a new load level
-  about 20 hours sooner on 1152 simulated load shifts, and 120 hours sooner at D5 in the one verified
-  real transfer, without making the normal-running output or the event-free forecast
-  worse. The gain is under the 24 hours set in advance as worth the extra inputs, and 8 inputs give
-  nearly all of it, so a port should use the 8-input set.
+  about 20 hours sooner on 1152 simulated load shifts, and 120 hours sooner at D5 in one verified
+  real transfer (D16 did not change), without making the normal-running (NRA) output or the
+  event-free forecast worse. The gain is under the 24 hours set in advance as worth the extra
+  inputs. On injected events 8 inputs give 19.1 of the 20.4 hours, but at D5 only 72 of the 120
+  hours, and the 8-input set scores worst inside the real events, so which set to port is open.
 advice:
   - >-
-    Give the prevailing head the 8 lagged residuals at 6 to 72 hours before the origin when
-    porting it; the rolling means and differences add under 2 hours (reaction by lags figure).
+    Choose between the 8-input set (L1) and the 14-input set (L3) on real events before porting; the
+    injected events do not separate them (reaction by lags figure and the inside-event scores).
   - >-
     Test any further lagged input against a same-width placebo from another Primary and against the
     same lags read 7 days earlier, because both gained nothing here (placebo rows).
@@ -84,8 +85,9 @@ adopted_in: none
 ---
 
 **Giving the prevailing head 8 to 14 extra lagged power inputs makes the prevailing output react
-about 20 hours sooner to the start of a load shift and about 8 hours sooner to its end, and costs
-nothing on event-free rows.** Over 1152 injected load shifts in the six development folds, the
+about 20 hours sooner to the start of an injected load shift and about 8 hours sooner to its end,
+and does not raise the event-free CRPS.** The head was trained on injected shifts from the same
+generator. Over 1152 injected load shifts in the six development folds, the
 first origin at which the prevailing median has moved half-way to the new level comes 20.4 hours
 earlier with the 14-input set L3 (95% interval 16.3 to 24.8 hours) and 19.1 hours earlier with the
 8-input set L1. Neither placebo gains anything: lags taken from another Primary change the reaction
@@ -130,14 +132,16 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
 
 - **Share of injected events that react at all.** L0 reacts to 78.3% of events after the start and
   45.6% after the end; L3 reacts to 82.7% and 45.8%. Events that never react before they end or
-  before the data stop are excluded from the paired differences (counts in the table).
+  before the data stop are excluded from the paired differences (the paired counts are in the
+  table).
 - **Verified D5 and D16 transfer (2 events, origins from 2026-01-01 only).** At D5 the first
   reacting origin comes 201 hours after the start with L0 and 81 hours with L2 and L3 (129 hours
   with L1); the placebos give 225 hours. The end moves from 57 hours (L0) to 33 hours (L1 to L3). At
-  D16 nothing changes: 81 hours after the start and 57 hours after the end for every arm. Two events
+  D16 the start stays at 81 hours for L0 to L3 and P (129 hours for P7), and the end stays at 57
+  hours for every arm. Two events
   support no interval and no general statement.
 - **Score, event-free rows more than 14 days from any event** (CRPS in points of capacity, 1.78
-  million half-hours): NRA 4.14 to 4.52 by lead band, L0 4.092, L3 4.042 pooled. The paired
+  million half-hours): NRA 3.45 to 4.52 by lead band, L0 4.092, L3 4.042 pooled. The paired
   difference L3 minus L0 is -0.050 (95% interval -0.119 to +0.000, blocks of Primary and month);
   the placebo P is -0.021 (-0.059 to +0.007). Normalised MAE of the median: L3 minus L0 is -0.098
   points (-0.226 to -0.002).
@@ -147,8 +151,9 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
   0.89, 0.88, 0.86, and 0.85 of observed power (L3), against a nominal 0.90.
 - **Inside the real events** (the 2 verified transfers and the event-table events of experiment 653
   that last over 7 days; 1,836 to 13,086 half-hours per band): L3 scores 3.55, 4.56, 6.32, and 6.73
-  against 3.64, 4.49, 6.30, and 6.61 for L0, so there is no gain there and a small loss at days 7
-  to 14.
+  against 3.64, 4.49, 6.30, and 6.61 for L0, so L3 gains 0.09 at days 0 to 1 and loses 0.07, 0.02,
+  and 0.12 at days 1 to 3, 3 to 7, and 7 to 14. L1 scores 3.69, 4.76, 6.71, and 6.91, worse than L0
+  in every band, and L2 scores 3.53, 4.59, 6.50, and 6.81.
   The NRA output scores 6.29, 6.56, 7.03, and 6.44, and covers only 0.38 to 0.48 of observed power.
 - **Cost of false alarms.** The share of event-free rows on which the prevailing median departs from
   the NRA median by 3 points of capacity or more is 0.1165 for L0 and 0.1144 for L3 (0.1031 for L1,
@@ -159,47 +164,55 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
 - **Injected events by stage** (CRPS of the prevailing output against the shifted power, L3 minus
   L0): before the onset or no event -0.16; in force -0.65; ended in the last 24 hours -1.02; in the
   last 3 days before the end **+0.33** (3.2 million, 5.4 million, 0.17 million, and 0.53 million
-  half-hours). The lags help at the start and in the middle of a shift and cost a little near its end.
+  half-hours). The lags help at the start and in the middle of a shift and cost a little near its
+  end.
 
 ## Arms, method, and checks
 
 - **Arms.** L0 is experiment 667's head as stored; a refit reproduces its real-row quantiles with a
   maximum difference of 0 (the gate for every other arm). L1 adds the residual power at 6, 9, 12,
   18, 24, 36, 48, and 72 hours before the origin; L2 adds the means of the last 6, 12, and 24 hours;
-  L3 adds the differences of consecutive trailing 24-hour means. A lag is the cleaned power minus the
-  Candidate's lag-free median at that time, as a fraction of capacity, with a missing flag per input.
+  L3 adds the differences of consecutive trailing 24-hour means. A lag is the cleaned power minus
+  the
+  Candidate's lag-free median at that time, as a fraction of capacity, with a missing flag per
+  input.
   P reads another Primary of the same metering group that is no electrical neighbour (a fixed map);
   P7 reads L3's own lags 7 days earlier. The placebo reads the other Primary's cleaned power with no
   injected shift, so it controls for extra capacity and not for a shift in the placebo Primary.
 - **Data delay.** No input reads power newer than 6 hours before the origin; a test perturbs every
   later half-hour and checks that no input moves (and that moving the 6-hour half-hour does).
 - **Bank rows.** The injected shift enters the new lags exactly as it enters the target, and L0's
-  existing lag features are built from the same shifted series; the
-  regenerated injected events match experiment 667's stored table for every fold month.
+  existing lag features are built from the same shifted series. The regenerated injected events
+  match experiment 667's stored table for every fold month.
 - **Code reused.** Experiment 667's `p667_fit.py`, `p667_data.py`, and `p667_head.py` run
   unchanged (folder `ml-experiments/00667-*/prevailing`), with experiments 647, 650, and 668.
 - **Fallback months.** November and December 2025 use the fallback hazard head with no trained
   weights, so no arm changes them and no arm is scored there. The D5 start in the transfer, 29
-  December, falls in a fallback month, so only the first origins of January carry the start reaction.
+  December, falls in a fallback month, so only the first origins of January carry the start
+  reaction.
 - **Pre-registered conditions.** P2 (NRA unchanged) holds. P3 holds: the false-alarm share is lower
-  with L3, not higher. P4 holds: the placebos gain under a tenth of L3's gain, well under the
-  third pre-registered. P1 fails by its size: the gain on injected events is 20 hours, not
+  with L3, not higher. P4 holds: P gains 1.6 hours (under a tenth of L3's 20.4) and P7 loses 2.3
+  hours, well under the third pre-registered. P1 fails by its size: the gain on injected events is
+  20 hours, not
   the 24 hours pre-registered, and the 95% interval reaches 24.8 hours at its upper end. The D5 gain
-  of 120 hours is real but one event. The veto (an event-free CRPS cost above 0.03) is not triggered.
+  of 120 hours is real but one event. The veto (an event-free CRPS cost above 0.03) is not
+  triggered.
 - **Audit triggers.** None fires: no control fails (the placebos gain nothing); P1's size miss is
-  explained by the 24-hour resolution and by censoring, not by a method fault; the CRPS and
+  plausibly due to the 24-hour resolution and to censoring, not to a method fault (untested); the
+  CRPS and
   median-error contrasts agree in sign; leaving any one Primary out of the injected start contrast
   moves it between -21.5 and -17.5 hours for L1 to L3 and +1.8 to +3.1 hours for P7; the placebo
   moves the event-free CRPS by -0.021, inside its own half-width of 0.033.
-- **Not computed.** The median minus mean forecast per site and the curtailment-cost metric are not
-  computed; the experiment changes how a shift is carried, not the distribution tails.
+- **Not computed.** The median minus mean forecast per site and the curtailment cost are not
+  computed.
 
 ## Caveats and what to try next
 
 - **The conclusions rest on injected events.** The generator that builds the injected events also
   built the bank on which the head trains, so the head meets familiar shapes: exact steps with no
   measurement noise. Only 2 real events can be read, and one (D16) does not change.
-- **The event labels are an incomplete dump.** NGED says load shifts may be missing from its logs, so
+- **The event labels are an incomplete dump.** NGED says load shifts may be missing from its logs,
+  so
   the event-free rows hold unlabelled events and every real count is a lower bound.
 - **The event-table events have no reaction time.** The events of experiment 653 carry no fitted
   transfer, so they appear only in the inside-event scores, and only the 2 verified transfers have a
@@ -212,6 +225,6 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
   events that never react after the start and the 54% that never agree again after the end.
 - **The weather inputs are unchanged.** Lags use cleaned power only; nothing here needs ERA5, so no
   past-weather ceiling applies.
-- **Next, for the maintainer to choose.** Port the 8-input set (L1) into the prevailing head, and
-  test whether the loss near the end of a shift (+0.33) goes away when the head also reads the
+- **Next, for the maintainer to choose.** Settle the choice between L1 and L3 on more real events,
+  and test whether the loss near the end of a shift (+0.33) goes away when the head also reads the
   age of the departure. A port needs one check on the final-test months.
