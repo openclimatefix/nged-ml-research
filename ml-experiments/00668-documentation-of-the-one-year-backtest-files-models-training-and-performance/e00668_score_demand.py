@@ -9,6 +9,7 @@ a forecast and the observed power is a finite, unflagged reading.
 """
 
 import sys
+from pathlib import Path
 
 import e00668_score_lib as lib
 import numpy as np
@@ -29,8 +30,15 @@ def season_label(*, origin: pl.Series) -> np.ndarray:
     return base
 
 
-def main(name: str, kind: str | None) -> None:
-    """Score one file."""
+def earlier_ok(*, like: Path, n: int) -> np.ndarray:
+    """Return the `ok` mask of an earlier scoring run, which must have scored the same `n` rows."""
+    earlier = pl.read_parquet(like / "rows.parquet")["ok"].to_numpy()
+    assert len(earlier) == n
+    return earlier
+
+
+def main(name: str, kind: str | None, *, like: Path | None = None) -> None:  # noqa: PLR0915
+    """Score one file; `like` restricts the scored rows to those an earlier scoring run scored."""
     forecast = pl.read_parquet(lib.FOLDER / f"{name}.parquet")
     if kind is not None:
         forecast = forecast.filter(pl.col("NRA_or_prevailing") == kind)
@@ -58,6 +66,8 @@ def main(name: str, kind: str | None) -> None:
     ok = np.isfinite(y)
     for q in (q_model, q_heur, q_clim):
         ok &= np.isfinite(q).all(axis=1)
+    if like is not None:  # keep the row set of an earlier run, after the cleaned power store grew
+        ok &= earlier_ok(like=like, n=len(ok))
     out_dir = lib.FOLDER / "scores_668" / (name if kind is None else f"{name}_{kind}")
     out_dir.mkdir(parents=True, exist_ok=True)
     month = forecast["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
@@ -124,4 +134,8 @@ def main(name: str, kind: str | None) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    main(
+        sys.argv[1],
+        sys.argv[2] if len(sys.argv) > 2 else None,
+        like=Path(sys.argv[3]) if len(sys.argv) > 3 else None,
+    )
