@@ -583,8 +583,8 @@ From the file, the first daily origin at which the mean of the prevailing median
 hours differs from the normal-running median by at least half of the fitted transfer is 61.0 hours
 after the start at D5 and 51.5 hours at D16. After the end, the first origin at which the two
 outputs agree to within half of the transfer again is 24.5 hours after the end at D5 and 40.5 hours
-at D16. Origins are daily, so each of these hours has a resolution of one day. This is one descriptive event
-at two Primaries, so it supports no general statement about the delay.
+at D16. Origins are daily, so each of these hours has a resolution of one day. This is one
+descriptive event at two Primaries, so it supports no general statement about the delay.
 
 The prevailing output of December 2025 comes from the B-haz fallback head, and the end of the shift
 in January 2026 from R-haz, so the two ends of the event are forecast by different heads. Both
