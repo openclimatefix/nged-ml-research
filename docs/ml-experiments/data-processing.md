@@ -82,6 +82,15 @@ Primaries hold long histories: D5, D10, and D11 start in 2019-09, D14 in 2019-10
 2020-12. The late starters begin between 2023 and 2025. Applies to experiments. Evidence:
 [experiment 103](00103-differentiable-physics-1-data-look/result.md).
 
+**Drop a candidate that recurs in many injected worlds before scoring a detector on injected truth
+(experiments; medium confidence).** The injected worlds are built on the real record, which holds
+transfers that no log lists, so a decoded candidate with the same Primaries and day in 10 or more of
+the 40 worlds of [experiment
+680](00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/result.md) is a
+real-record event, not a false one. In [experiment
+692](00692-event-table-reviewer-calibration-gate/result.md), 5 such events made up 111 of 460
+false candidates. The evidence covers 15 Primaries from 2024-01-01 to 2026-06-30.
+
 **Do not treat a missing half-hour at a solar or wind farm as a fault (medium confidence,
 provisional).** None of the 6 solar and 3 wind series has a half-hour that reads exactly 0 after
 2026-03-26, although each read 0 in 47% to 68% (solar) and 0.3% to 4.8% (wind) of half-hours a month
