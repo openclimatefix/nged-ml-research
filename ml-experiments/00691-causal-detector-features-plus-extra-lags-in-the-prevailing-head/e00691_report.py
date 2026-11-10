@@ -115,7 +115,7 @@ def main() -> None:
     import e00650_common as c650  # ty: ignore[unresolved-import]
     import e00650_fit as f650  # ty: ignore[unresolved-import]
     import e00652_fit as f652  # ty: ignore[unresolved-import]
-    import e00687_fit as f687
+    import e00687_fit as f687  # ty: ignore[unresolved-import]
     import e00691_fit as f691
 
     tau = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])

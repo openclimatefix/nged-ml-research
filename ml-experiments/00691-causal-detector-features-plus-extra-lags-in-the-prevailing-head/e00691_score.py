@@ -25,7 +25,7 @@ import e00650_fit as f650  # ty: ignore[unresolved-import]
 import e00650_score as s650  # ty: ignore[unresolved-import]
 import e00652_common as c652  # ty: ignore[unresolved-import]
 import e00652_fit as f652  # ty: ignore[unresolved-import]
-import e00687_fit as f687
+import e00687_fit as f687  # ty: ignore[unresolved-import]
 import e00687_score as s687  # ty: ignore[unresolved-import]
 import e00691_fit as f691
 import numpy as np
