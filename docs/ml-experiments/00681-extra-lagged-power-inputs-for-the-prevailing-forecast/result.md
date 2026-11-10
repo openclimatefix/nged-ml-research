@@ -231,8 +231,8 @@ all at least 6 hours old) to that head only, so the NRA output is unchanged by c
   for them already exist.
 - **Fit time per head.** 34 to 95 seconds per head and seed (including the prediction pass) on one
   CPU thread with four fits running at once; the longer times are the later folds, which train on
-  more months. All 12 L3 head fits (6 folds, 2 seeds) take about 12 minutes of one thread. The lag blocks take about 1 minute per
-  month.
+  more months. All 12 L3 head fits (6 folds, 2 seeds) take about 12 minutes of one thread. The lag
+  blocks take about 1 minute per month.
 - **Leakage check.** Every lag is at least 6 hours older than the origin. `lag_block` asserts that
   the newest half-hour any input reads is the origin minus 12 half-hours, and `selftest` adds 123
   to every half-hour newer than that for 200 real origins and checks that no input moves (and moves
