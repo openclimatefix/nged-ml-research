@@ -205,7 +205,7 @@ def main() -> None:
         int(gate["n_diff"].abs().max()),  # ty: ignore[invalid-argument-type]
     )
     early = gate.filter(pl.col("origin_month") < pl.lit("2026-06"))
-    if early["n_diff"].abs().max() != 0 or early["diff"].abs().max() > 1e-3:
+    if early["n_diff"].abs().max() != 0 or early["diff"].abs().max() > 1e-3:  # ty: ignore[unsupported-operator]
         msg = "stage none does not reproduce experiment 683 before 2026-06"
         raise ValueError(msg)
     print(gate.filter(pl.col("origin_month") == pl.lit("2026-06")))
