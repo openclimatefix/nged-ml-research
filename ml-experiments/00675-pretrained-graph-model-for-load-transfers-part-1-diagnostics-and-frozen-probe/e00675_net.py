@@ -10,9 +10,9 @@ neighbour averaging over the connection graph follows. The causal variant pads o
 
 from __future__ import annotations
 
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00675_inputs import D_CHANNELS, N_CHANNELS
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 HOURLY_DILATIONS = (1, 3, 9, 27, 81, 243)
 DAILY_DILATIONS = (1, 2, 4, 8)

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00653_common import SCORED_FROM
 from e00675_inputs import causalise, node_inputs
 from e00675_net import Pretrainer

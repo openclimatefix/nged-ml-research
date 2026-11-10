@@ -27,7 +27,7 @@ from __future__ import annotations
 import math
 from typing import Final
 
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 CLIP: Final[float] = 30.0
 SCALE: Final[float] = 0.2

@@ -20,7 +20,7 @@ from __future__ import annotations
 import sys
 
 import e00675_pretrain as pre
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00675_inputs import node_inputs as real_node_inputs
 from e00675_net import Pretrainer
 
