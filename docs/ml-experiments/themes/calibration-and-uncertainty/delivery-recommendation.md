@@ -172,6 +172,134 @@ are worth building.
   scaled export limit that was never reached, so the threshold-weighted CRPS could not rank the
   sums.
 
+## Advisor review of the delivery design (2026-11-07)
+
+This section summarises an advisor review that read the background docs and experiments 430, 434,
+and 436 and proposed the delivery design above. The review is the only place the full reasoning for
+the design is written down. Statements about NGED's workflow that no source states are marked
+(guess) and need NGED's confirmation.
+
+**The binding quantity is the flow through one constrained element, and that flow is a weighted sum
+over many nodes.** For about half of NGED's generators the limit sits at a BSP or GSP. For most of
+the rest it sits on a circuit and binds only after the next fault, found by power flow plus N-1
+contingency analysis (one outage simulated at a time). In an almost radial part of the electricity
+network every weight is 1 for the nodes below the element. In a meshed 33 kV part the weights are
+power transfer distribution factors (the share of an injection at a node that flows through the
+element). The flow is then close to linear in the node injections: F is about the sum of w_i times
+P_i.
+
+**The review corrected four parts of the working understanding.**
+
+- Reverse flow is not itself a breach. It is a breach only where it exceeds the reverse-direction
+  rating of a transformer or circuit, or pushes voltage or protection out of limits (guess about
+  which binds most often in the trial area).
+- Real-time curtailment is done by active network management (ANM), not by a study days ahead. A
+  study 1 to 10 days ahead is more plausibly for outage planning, flexibility procurement, or
+  warning generators of likely curtailment (guess).
+- "A power-flow model takes only scalars" is true of one run and is not the constraint. A
+  time-series power flow takes one scalar per node per half-hour. The real limit is how many runs
+  the analyst can afford, which depends on whether the runs are scripted.
+- The power flow needs nodes we do not forecast: unmetered generators, other Primaries, and the 10
+  sites metered in MVA (megavolt-amperes, which carry no flow direction). Our scenarios cover only
+  part of the sum.
+
+**For curtailment, the tail of the sum decides the outcome, so dependence between nodes matters more
+than any single site's tail.** The review's worked example is two neighbouring solar farms under one
+circuit with a 15 MW export limit, each forecast roughly Normal(6 MW, sd 2 MW) at noon (a
+simplification, because solar output is bounded by clear sky and capacity):
+
+| Assumed correlation | sd of the sum | P(sum > 15 MW) | q95 of the sum |
+|---|---|---|---|
+| 0 (independent draws) | 2.83 MW | 14.5% | 16.7 MW |
+| 0.62 (realised in experiment 436) | 3.60 MW | 20.3% | 17.9 MW |
+| 0.95 (ensemble copula coupling) | 3.95 MW | 22.4% | 18.5 MW |
+
+- Independent draws understate the chance of a breach by about a quarter and put the q95 1.2 MW too
+  low. An overstated correlation puts the q95 0.6 MW too high, so generators are curtailed more than
+  needed. The curtailment metric prices a breach at 20 times the curtailed energy, so overstating
+  dependence is the safer error, but not a free one.
+- Experiment 436's finding that nothing beat independent draws across the Primaries does not mean
+  the Primaries are independent. Their realised correlation was 0.29, so the sd of a sum of 16 equal
+  Primaries is 2.3 times the independent value. Experiment 436's tail table showed 13.9% of actual
+  group net flows above the q95 of independent-draw sums, against 6.6% for the Schaake shuffle and
+  2.6% for ensemble copula coupling, while the variogram score barely moved. The group-sum
+  exceedance rate is therefore the right instrument for this decision, and the variogram score is
+  the wrong one.
+- Demand and solar errors are negatively correlated (-0.36 realised), so in the export direction a
+  sunnier-than-forecast day also lowers demand through embedded solar and the two errors add. No
+  experiment has tested cross-family dependence.
+- A Gaussian copula has no tail dependence. A Schaake shuffle copies real past days and keeps tail
+  dependence empirically, limited by the size of its date pool, which favours the shuffle for the
+  tail.
+
+**No single delivery option wins.** The review's comparison:
+
+| Option | Analyst's work | Gets the tail right? | Can we validate it? |
+|---|---|---|---|
+| Many draws (marginals plus copula), analyst picks | Moderate: sampling code, then choosing what
+"extreme" means | Only as far as the marginal tails and the copula's tail dependence allow; 1,000
+draws carry about +/-0.3 points of Monte Carlo error at q99 | Indirectly, through group sums |
+| (a) Pre-chosen stress scenarios per element | Least: feed K vectors straight into the power flow |
+Yes at the chosen level, if the element flow's quantile is right | The element quantile, yes; the
+split across nodes, no |
+| (b) Distribution of the element flow itself | Low, but the result cannot be fed into a power flow
+| Best, where the element is metered | Yes, against the element's own meter |
+| (c) Importance sampling or conditional simulation | High: weighted samples confuse
+non-statisticians | Yes, efficiently | As for (a) |
+| (d) Quantiles of group sums as extra series | Low | Yes for the named groups | Yes |
+
+- Option (b) has an advantage: the Boston and Skegness BSPs are metered and already among the
+  series, so a direct forecast is trained and scored on the true flow with no copula. A sum of node
+  scenarios cannot match it, because unmetered load, losses, and the direction-blind MVA Primaries
+  sit inside the BSP meter but outside any sum of our nodes. Experiments 629 and 631 confirmed this.
+- Options (a) and (c) reduce to one recipe. For element E, day d, and level tau (for example 0.5,
+  0.9, 0.95, and 0.99 of that day's peak export), deliver the coherent vector of node values most
+  likely given that the flow equals its tau quantile. Under a Gaussian copula and a linear flow this
+  vector has a closed form, mu + Sigma w (q - mu_F) / sigma_F squared. With Schaake paths it is the
+  drawn path whose element flow lies nearest the quantile. The label "Skegness export, day 3, 95th
+  percentile" names the target quantity and level, is recomputed in every run, and never refers to a
+  member's identity, so nothing carries over from day to day.
+- A deterministic bounding case is worth adding beside the statistics: maximum generation with
+  minimum demand. For solar, maximum generation is clear-sky output capped at capacity and needs no
+  tail statistics. The added value is the probability that a day approaches that ceiling (guess that
+  NGED's analyst already runs this case).
+
+**The review recommended validating the element flow against its own meter on four quantities.**
+
+- The exceedance rate at q90, q95, and q99 (and q01 to q10 on the export side), by lead band, with
+  summer middays separately.
+- Threshold-weighted CRPS at the scaled limit (0.9 times the maximum export observed before the
+  scored period). The score is proper and fits curtailment, because it scores every half-hour and
+  weights only the region above the line.
+- The Brier score of the flow exceeding the scaled limit, with a reliability diagram.
+- The tier 1 curtailment energy proxy of `studies.node_curtailment`, with the realised unmet
+  fraction.
+
+**The independent sample is the weather day, not the half-hour, so q99 cannot be validated.**
+Export-side tails live on roughly 150 to 180 summer half days a year per BSP (estimate). A q95 test
+then rests on about 8 to 9 exceedance days per BSP per year (binomial error about +/-1.6 points on a
+5% rate), and a q99 test on about 2. The firm limit had been reached once in the pilot. What cannot
+be validated with our data: q99 and beyond; tail dependence in the far tail; any element that is not
+metered, including every post-fault circuit; combined rare events such as an outage on a clear-sky,
+low-demand day; and the split of a stress scenario across nodes, as distinct from the sum. The
+review advised stating these limits to NGED's analyst rather than covering them with a score.
+
+**The review's recommended design.** For each element NGED names, starting with the export side of
+the Boston and Skegness BSPs:
+
+- Deliver the element flow's quantiles from a direct forecast of the metered flow.
+- Deliver 3 to 5 conditional stress vectors per element per day, at tau in {0.5, 0.9, 0.95, 0.99} of
+  the daily peak export, generated from Schaake paths and rescaled to hit the element quantile.
+- Keep per-node marginals (13 quantiles, with widened tails) and the Schaake template dates on S3,
+  so a scripted analyst can draw more scenarios.
+
+The fallback is marginals plus a Schaake or copula table with client-side sampling, a 20-line client
+recipe, and published group-sum quantiles for the two BSPs so the analyst can check their own sums.
+The review's cheapest next experiment was a CPU-only re-score of experiment 436's stored scenario
+tables as BSP-group sums against the BSP meters, which became experiments 629 and 631. The design
+with conditional stress vectors (the second bullet) has not been built or tested, and is the open
+question below.
+
 ## Open question
 
 **No experiment yet tests how to make coherent node scenarios agree with the direct forecast of the
