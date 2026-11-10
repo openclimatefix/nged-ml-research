@@ -18,17 +18,34 @@ import polars as pl
 
 
 def main() -> None:
-    truth = pl.read_parquet(lib.FOLDER / "ground_truth_primaries.parquet").select("time_series_id", "valid_time", "power")
+    truth = pl.read_parquet(lib.FOLDER / "ground_truth_primaries.parquet").select(
+        "time_series_id", "valid_time", "power"
+    )
     rows = []
     for arg in sys.argv[1:]:
         step, _, rest = arg.partition(":")
-        span, seeds = (int(rest.split(":")[0]), tuple(int(c) for c in rest.split(":")[1])) if rest else (3, (0, 1, 2, 3, 4) if step[0] in "5678" else (0, 1, 2))
-        f = sc.seed_mean(name=f"step{step}_{exp.VERSION[step]}_sp{span}", seeds=seeds).join(truth, on=["time_series_id", "valid_time"]).filter(pl.col("power").is_not_null() & pl.col("power").is_finite())
+        span, seeds = (
+            (int(rest.split(":")[0]), tuple(int(c) for c in rest.split(":")[1]))
+            if rest
+            else (3, (0, 1, 2, 3, 4) if step[0] in "5678" else (0, 1, 2))
+        )
+        f = (
+            sc.seed_mean(name=f"step{step}_{exp.VERSION[step]}_sp{span}", seeds=seeds)
+            .join(truth, on=["time_series_id", "valid_time"])
+            .filter(pl.col("power").is_not_null() & pl.col("power").is_finite())
+        )
         y = f["power"].to_numpy().astype(np.float64)
         q = f.select(list(sc.QCOLS)).to_numpy().astype(np.float64)
         below = (y[:, None] <= q).mean(axis=0)
         for tau, share in zip(lib.TAUS, below, strict=True):
-            rows.append({"step": f"{step}" + (" monthly" if span == 1 else ""), "level": float(tau), "share_at_or_below": float(share), "half_hours": f.height})
+            rows.append(
+                {
+                    "step": f"{step}" + (" monthly" if span == 1 else ""),
+                    "level": float(tau),
+                    "share_at_or_below": float(share),
+                    "half_hours": f.height,
+                }
+            )
         print(step, np.round(below, 3).tolist(), flush=True)
     pl.DataFrame(rows).write_csv(sc.ROOT / "scores" / "tail_calibration.csv")
 

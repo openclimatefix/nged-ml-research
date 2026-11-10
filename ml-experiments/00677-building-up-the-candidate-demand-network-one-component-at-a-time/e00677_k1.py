@@ -69,7 +69,11 @@ import e00677_fold as fold
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00677_MONTH"
 
 NAME = "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
-ROOT = Path(os.environ["E00677_ROOT"]) if os.environ.get("E00677_ROOT") else ML_EXPERIMENTS_DATA_DIR / NAME
+ROOT = (
+    Path(os.environ["E00677_ROOT"])
+    if os.environ.get("E00677_ROOT")
+    else ML_EXPERIMENTS_DATA_DIR / NAME
+)
 OUT = ROOT / "arms" / f"{MINE.name}_sp{fold.SPAN_MONTHS}"
 """One folder per scored span, so the monthly pilot and the quarterly fold of 2026-05 never share fits."""
 DOWN_WEIGHT = 0.5
@@ -114,7 +118,9 @@ if MINE.ens_only:  # no ERA5 or CAMS pre-training: random initialisation, nothin
         e.fresh_mixer(model=model)
 
     e.load_pretrained_fresh = load_random_fresh
-    e.pretrained_file = lambda *, month, seed: e.W / "no_pretraining" / f"{month}_s{seed}.pt"  # a name only: it carries the seed
+    e.pretrained_file = lambda *, month, seed: (
+        e.W / "no_pretraining" / f"{month}_s{seed}.pt"
+    )  # a name only: it carries the seed
 if fold.is_final(months=MINE.months):
     # the final fold has no stored B1 statistics: pre-training derives them into the chain folder
     # and every later command reads them from there

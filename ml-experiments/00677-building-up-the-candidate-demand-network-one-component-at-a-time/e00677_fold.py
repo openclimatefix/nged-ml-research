@@ -100,9 +100,14 @@ def redirect_to_extended_inputs(e) -> None:
         for j in range(SPAN_MONTHS):
             idx = _Y * 12 + (_M - 1) + j
             parts.append(_inner(month=f"{idx // 12}-{idx % 12 + 1:02d}", standardiser=standardiser))
-        cat = {f.name: np.concatenate([getattr(p, f.name) for p in parts]) for f in dataclasses.fields(parts[0])}
+        cat = {
+            f.name: np.concatenate([getattr(p, f.name) for p in parts])
+            for f in dataclasses.fields(parts[0])
+        }
         test = type(parts[0])(**cat)
-        assert test.origin.max() >= (FINAL_STOP - timedelta(days=2)).timestamp() * 1e6, "the last scored month is missing"
+        assert test.origin.max() >= (FINAL_STOP - timedelta(days=2)).timestamp() * 1e6, (
+            "the last scored month is missing"
+        )
         return test
 
     e._build_test = build_test_all_months

@@ -32,9 +32,17 @@ def ladder_crps(*, step: str, label_of: dict[int, str]) -> pl.DataFrame:
         .with_columns(
             site=pl.col("time_series_id").cast(pl.Int64).replace_strict(label_of),
             valid_time=pl.lit(start) + pl.duration(minutes=30) * pl.col("valid_idx").cast(pl.Int64),
-            origin_day=(pl.lit(start) + pl.duration(minutes=30) * pl.col("origin_idx").cast(pl.Int64)).dt.date(),
+            origin_day=(
+                pl.lit(start) + pl.duration(minutes=30) * pl.col("origin_idx").cast(pl.Int64)
+            ).dt.date(),
         )
-        .select("site", "valid_time", "origin_day", pl.col("Model_crps").alias(f"step{step}"), pl.col("Manual heuristic_crps").alias("Manual heuristic"))
+        .select(
+            "site",
+            "valid_time",
+            "origin_day",
+            pl.col("Model_crps").alias(f"step{step}"),
+            pl.col("Manual heuristic_crps").alias("Manual heuristic"),
+        )
     )
 
 
@@ -43,23 +51,51 @@ def main() -> None:
     label_of = dict(zip(site["time_series_id"].to_list(), site["label"].to_list(), strict=True))
     k = stored.load().filter(pl.col("loss_bg2").is_finite() & (pl.col("lead_hours") <= 168.0))
     k = k.with_columns(origin_day=pl.col("power_fcst_init_time").dt.date()).select(
-        "site", "valid_time", "origin_day", "lead_hours", pl.col("loss_d3").alias("GAM"), pl.col("loss_bg2").alias("XGBoost")
+        "site",
+        "valid_time",
+        "origin_day",
+        "lead_hours",
+        pl.col("loss_d3").alias("GAM"),
+        pl.col("loss_bg2").alias("XGBoost"),
     )
     for step in STEPS:
         d = ladder_crps(step=step, label_of=label_of)
-        k = k.join(d.drop("Manual heuristic") if step != STEPS[0] else d, on=["site", "valid_time", "origin_day"], how="inner")
+        k = k.join(
+            d.drop("Manual heuristic") if step != STEPS[0] else d,
+            on=["site", "valid_time", "origin_day"],
+            how="inner",
+        )
     names = ["GAM", "XGBoost", "Manual heuristic", *[f"step{s}" for s in STEPS]]
     k = k.filter(pl.all_horizontal([pl.col(n).is_finite() for n in names]))
-    print(k.height, "common rows;", k["valid_time"].min(), "to", k["valid_time"].max(), "; Primaries", sorted(k["site"].unique().to_list()))
+    print(
+        k.height,
+        "common rows;",
+        k["valid_time"].min(),
+        "to",
+        k["valid_time"].max(),
+        "; Primaries",
+        sorted(k["site"].unique().to_list()),
+    )
     day = (k["origin_day"].cast(pl.Int32)).to_numpy()
     lead = k["lead_hours"].to_numpy()
     rows = []
 
     def add(mask: np.ndarray, **tag: str) -> None:
-        draws = lib.day_bootstrap(day=day[mask], values={n: k[n].to_numpy().astype(np.float64)[mask] for n in names})
+        draws = lib.day_bootstrap(
+            day=day[mask], values={n: k[n].to_numpy().astype(np.float64)[mask] for n in names}
+        )
         for n in names:
             lo, hi = np.quantile(draws[n], [0.025, 0.975])
-            rows.append({**tag, "system": n, "crps": float(k[n].to_numpy()[mask].mean()), "lo": float(lo), "hi": float(hi), "rows": int(mask.sum())})
+            rows.append(
+                {
+                    **tag,
+                    "system": n,
+                    "crps": float(k[n].to_numpy()[mask].mean()),
+                    "lo": float(lo),
+                    "hi": float(hi),
+                    "rows": int(mask.sum()),
+                }
+            )
 
     add(np.ones(k.height, dtype=bool), slice="all rows", group="all")
     for name, (lo, hi) in lib.LEAD_BANDS.items():

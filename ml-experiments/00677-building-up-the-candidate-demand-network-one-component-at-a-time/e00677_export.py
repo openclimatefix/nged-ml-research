@@ -22,12 +22,26 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME: Final = "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
-ROOT: Final[Path] = Path(os.environ["E00677_ROOT"]) if os.environ.get("E00677_ROOT") else ML_EXPERIMENTS_DATA_DIR / NAME
+ROOT: Final[Path] = (
+    Path(os.environ["E00677_ROOT"])
+    if os.environ.get("E00677_ROOT")
+    else ML_EXPERIMENTS_DATA_DIR / NAME
+)
 CAND_ARMS: Final = {"6": "P3_D50", "7": "P5_D50", "8": "P7_D50"}
 VERSION: Final = {
-    "1": "ens_only", "2": "ens_only", "3a": "ens_only", "3b": "pretrained", "4": "pretrained",
-    "5w": "with_injected", "5wo": "without_injected", "6w": "with_injected", "6wo": "without_injected",
-    "7w": "with_injected", "7wo": "without_injected", "8w": "with_injected", "8wo": "without_injected",
+    "1": "ens_only",
+    "2": "ens_only",
+    "3a": "ens_only",
+    "3b": "pretrained",
+    "4": "pretrained",
+    "5w": "with_injected",
+    "5wo": "without_injected",
+    "6w": "with_injected",
+    "6wo": "without_injected",
+    "7w": "with_injected",
+    "7wo": "without_injected",
+    "8w": "with_injected",
+    "8wo": "without_injected",
 }
 
 
@@ -47,9 +61,17 @@ def step_rows(*, step: str, span: int, months: list[str], seeds: list[int]) -> p
                 columns=[*x667.KEYS, *x667.QCOLS],
             )
             keys.setdefault(month, raw.select(x667.KEYS).sort(x667.KEYS))
-            assert raw.select(x667.KEYS).sort(x667.KEYS).equals(keys[month]), f"seeds differ in keys: {step} {month} s{seed}"
-            assert raw.height == raw.unique(x667.KEYS).height, f"duplicate keys: {step} {month} s{seed}"
-            parts.append(x667.contract_rows(mean=raw.sort(x667.KEYS)).with_columns(seed=pl.lit(seed, pl.Int8)))
+            assert raw.select(x667.KEYS).sort(x667.KEYS).equals(keys[month]), (
+                f"seeds differ in keys: {step} {month} s{seed}"
+            )
+            assert raw.height == raw.unique(x667.KEYS).height, (
+                f"duplicate keys: {step} {month} s{seed}"
+            )
+            parts.append(
+                x667.contract_rows(mean=raw.sort(x667.KEYS)).with_columns(
+                    seed=pl.lit(seed, pl.Int8)
+                )
+            )
     out = pl.concat(parts).with_columns(
         step=pl.lit(step),
         version=pl.lit(VERSION[step]),
@@ -74,7 +96,14 @@ def main() -> None:
     tmp = target.with_suffix(".tmp")
     frame.write_parquet(tmp)
     tmp.rename(target)
-    print(target.name, frame.height, "rows;", frame["power_fcst_init_time"].n_unique(), "origins;", sorted(frame["seed"].unique().to_list()))
+    print(
+        target.name,
+        frame.height,
+        "rows;",
+        frame["power_fcst_init_time"].n_unique(),
+        "origins;",
+        sorted(frame["seed"].unique().to_list()),
+    )
 
 
 if __name__ == "__main__":

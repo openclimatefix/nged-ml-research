@@ -1,7 +1,7 @@
 # ruff: noqa: D103, E501
 """Experiment 677: follow of each ladder step on the held-out injected bank (private CSV).
 
-Usage: python e00677_bank_score.py
+Usage: python e00677_bank_score.py [SPAN]   (SPAN 3 for quarterly refits, the default; 1 for monthly refits)
 
 Reads the bank files written by `e00677_cand.py bank` (one per month window, fold, and seed), which hold,
 for every scored row whose 1-day lag falls inside an injected shift, the shift (a share of capacity) and the
@@ -13,6 +13,7 @@ seeds and folds).
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Final
 
@@ -20,8 +21,26 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME: Final = "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
-ROOT: Final[Path] = Path(os.environ["E00677_ROOT"]) if os.environ.get("E00677_ROOT") else ML_EXPERIMENTS_DATA_DIR / NAME
+ROOT: Final[Path] = (
+    Path(os.environ["E00677_ROOT"])
+    if os.environ.get("E00677_ROOT")
+    else ML_EXPERIMENTS_DATA_DIR / NAME
+)
 FOLDS: Final = ("2025-11", "2026-02", "2026-05", "2026-08")
+MONTHS: Final = (
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06",
+    "2026-07",
+    "2026-08",
+    "2026-09",
+    "2026-10",
+)
 ARM: Final = {"5": "P0_D50", "6": "P3_D50", "7": "P5_D50", "8": "P7_D50"}
 BANDS: Final = [(0, 24), (24, 72), (72, 168), (168, 336)]
 
@@ -29,18 +48,31 @@ BANDS: Final = [(0, 24), (24, 72), (72, 168), (168, 336)]
 def load(*, span: int = 3) -> pl.DataFrame:
     frames = []
     for step in ("5w", "5wo", "6w", "6wo", "7w", "7wo", "8w", "8wo"):
-        for month in FOLDS:
+        for month in MONTHS if span == 1 else FOLDS:
             folder = ROOT / f"{ARM[step[0]]}_{month}_{step}_sp{span}" / "work" / "bank"
             files = sorted(folder.glob("*.parquet"))
             assert files, folder
             for f in files:
                 seed = int(f.stem.rsplit("_s", 1)[1])
                 frames.append(
-                    pl.read_parquet(f, columns=["power_fcst_init_time", "valid_time", "median_base", "median_bank", "lag_shift"])
+                    pl.read_parquet(
+                        f,
+                        columns=[
+                            "power_fcst_init_time",
+                            "valid_time",
+                            "median_base",
+                            "median_bank",
+                            "lag_shift",
+                        ],
+                    )
                     .filter(pl.col("lag_shift") != 0)
                     .with_columns(
-                        step=pl.lit(step), fold=pl.lit(month), seed=pl.lit(seed),
-                        lead_h=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours(),
+                        step=pl.lit(step),
+                        fold=pl.lit(month),
+                        seed=pl.lit(seed),
+                        lead_h=(
+                            pl.col("valid_time") - pl.col("power_fcst_init_time")
+                        ).dt.total_hours(),
                         change=pl.col("median_bank") - pl.col("median_base"),
                     )
                     .select("step", "fold", "seed", "lead_h", "change", "lag_shift")
@@ -57,22 +89,40 @@ def slope(frame: pl.DataFrame, by: list[str]) -> pl.DataFrame:
 
 
 def main() -> None:
-    rows = load()
+    span = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+    suffix = "" if span == 3 else "_monthly"
+    rows = load(span=span)
     out = ROOT / "scores"
     bands = pl.concat(
-        [slope(rows.filter((pl.col("lead_h") >= lo) & (pl.col("lead_h") < hi)).with_columns(band=pl.lit(f"{lo // 24}-{hi // 24} d")), ["step", "seed", "fold", "band"]) for lo, hi in BANDS]
+        [
+            slope(
+                rows.filter((pl.col("lead_h") >= lo) & (pl.col("lead_h") < hi)).with_columns(
+                    band=pl.lit(f"{lo // 24}-{hi // 24} d")
+                ),
+                ["step", "seed", "fold", "band"],
+            )
+            for lo, hi in BANDS
+        ]
     )
     allb = slope(rows.with_columns(band=pl.lit("0-14 d")), ["step", "seed", "fold", "band"])
     per = pl.concat([allb, bands]).sort("step", "band", "fold", "seed")
-    per.write_csv(out / "bank_follow.csv")
+    per.write_csv(out / f"bank_follow{suffix}.csv")
     # Pool folds with weights equal to the number of shifted rows; summarise the spread over seeds.
     pooled = per.group_by("step", "band", "seed").agg(
-        follow=(pl.col("follow") * pl.col("rows")).sum() / pl.col("rows").sum(), rows=pl.col("rows").sum()
+        follow=(pl.col("follow") * pl.col("rows")).sum() / pl.col("rows").sum(),
+        rows=pl.col("rows").sum(),
     )
-    summary = pooled.group_by("step", "band").agg(
-        follow_mean=pl.col("follow").mean(), follow_sd_over_seeds=pl.col("follow").std(), seeds=pl.len(), rows_per_seed=pl.col("rows").mean()
-    ).sort("step", "band")
-    summary.write_csv(out / "bank_follow_summary.csv")
+    summary = (
+        pooled.group_by("step", "band")
+        .agg(
+            follow_mean=pl.col("follow").mean(),
+            follow_sd_over_seeds=pl.col("follow").std(),
+            seeds=pl.len(),
+            rows_per_seed=pl.col("rows").mean(),
+        )
+        .sort("step", "band")
+    )
+    summary.write_csv(out / f"bank_follow_summary{suffix}.csv")
     print(summary.filter(pl.col("band") == "0-14 d"))
     print(summary)
 

@@ -26,7 +26,9 @@ BLOCK_DAYS = 7
 import os
 
 SEEDS_TAG = "s012"  # steps 1 to 4 have seeds 0 to 2 only
-SEEDS_TAG_LATE = os.environ.get("S677SEEDS", "s012")  # steps 5 to 8: "s01234" when seeds 3 and 4 are scored
+SEEDS_TAG_LATE = os.environ.get(
+    "S677SEEDS", "s012"
+)  # steps 5 to 8: "s01234" when seeds 3 and 4 are scored
 OUT_SUFFIX = "" if SEEDS_TAG_LATE == "s012" else f"_{SEEDS_TAG_LATE}"
 
 
@@ -36,13 +38,24 @@ def load(*, span: int, names: list[str]) -> tuple[pl.DataFrame, list[str]]:
     out = None
     labels = []
     for name in names:
-        base, _, at = name.rstrip("!").partition("@")  # "step8w@1" is step 8 with monthly refits (span 1, seeds 0 to 2)
+        base, _, at = name.rstrip("!").partition(
+            "@"
+        )  # "step8w@1" is step 8 with monthly refits (span 1, seeds 0 to 2)
         step = base.removeprefix("step")
         folder = f"{base}_{exp.VERSION[step]}_sp{at or span}"
-        tag = "s012" if at or name.endswith("!") else (SEEDS_TAG_LATE if step[0] in "5678" else SEEDS_TAG)
-        r = pl.read_parquet(sc.ROOT / "scores" / f"{folder}_{tag}" / "rows.parquet").filter(pl.col("ok"))
+        tag = (
+            "s012"
+            if at or name.endswith("!")
+            else (SEEDS_TAG_LATE if step[0] in "5678" else SEEDS_TAG)
+        )
+        r = pl.read_parquet(sc.ROOT / "scores" / f"{folder}_{tag}" / "rows.parquet").filter(
+            pl.col("ok")
+        )
         keep = ["time_series_id", "valid_idx", "origin_idx", "lead_h"]
-        cols = [pl.col("Model_crps").alias(f"{name}_crps"), pl.col("Model_mae").alias(f"{name}_mae")]
+        cols = [
+            pl.col("Model_crps").alias(f"{name}_crps"),
+            pl.col("Model_mae").alias(f"{name}_mae"),
+        ]
         if out is None:
             cols += [
                 pl.col("Manual heuristic_crps").alias("heur_crps"), pl.col("Manual heuristic_mae").alias("heur_mae"),
@@ -88,7 +101,12 @@ def main() -> None:
     day = (rows["origin_idx"].to_numpy() // s668.DAY).astype(np.int64)
     sets = s668.event_sets(site=site)
     slices: dict[tuple[str, str], np.ndarray] = {("all rows", "all"): np.ones(rows.height, bool)}
-    for lo, hi, label in ((0, 24, "days 0 to 1"), (24, 72, "days 1 to 3"), (72, 168, "days 3 to 7"), (168, 340, "days 7 to 14")):
+    for lo, hi, label in (
+        (0, 24, "days 0 to 1"),
+        (24, 72, "days 1 to 3"),
+        (72, 168, "days 3 to 7"),
+        (168, 340, "days 7 to 14"),
+    ):
         lead = rows["lead_h"].to_numpy()
         slices[("lead band", label)] = (lead >= lo) & (lead < hi)
     counts = []
@@ -107,7 +125,10 @@ def main() -> None:
                     mean = lo = hi = float("nan")
                 else:
                     draws = block_bootstrap(day=day[mask], values=v[mask])
-                    mean, (lo, hi) = float(v[mask].mean()), (float(x) for x in np.quantile(draws, [0.025, 0.975]))
+                    mean, (lo, hi) = (
+                        float(v[mask].mean()),
+                        (float(x) for x in np.quantile(draws, [0.025, 0.975])),
+                    )
                 records.append({"set": sname, "part": part, "system": system, "metric": metric, "mean": mean, "lo": lo, "hi": hi, "rows": n, "origin_days": int(len(np.unique(day[mask]))) if n else 0})  # fmt: skip
     out = sc.ROOT / "scores"
     pl.DataFrame(records).write_csv(out / f"slices_sp{span}{OUT_SUFFIX}.csv")
@@ -117,7 +138,11 @@ def main() -> None:
             if not mask.any():
                 continue
             for metric in ("crps", "mae"):
-                d = (rows[f"{b}_{metric}"] - rows[f"{a}_{metric}"]).to_numpy().astype(np.float64)[mask]
+                d = (
+                    (rows[f"{b}_{metric}"] - rows[f"{a}_{metric}"])
+                    .to_numpy()
+                    .astype(np.float64)[mask]
+                )
                 draws = block_bootstrap(day=day[mask], values=d)
                 contrasts.append({"set": sname, "part": part, "from": a, "to": b, "metric": metric, "diff": float(d.mean()), "lo": float(np.quantile(draws, 0.025)), "hi": float(np.quantile(draws, 0.975)), "rows": int(mask.sum())})  # fmt: skip
     pl.DataFrame(contrasts).write_csv(out / f"contrasts_sp{span}{OUT_SUFFIX}.csv")

@@ -30,9 +30,13 @@ QCOLS: Final = tuple(lib.QCOLS)
 def seed_mean(*, name: str, seeds: tuple[int, ...]) -> pl.DataFrame:
     """Return the ladder step's rows with each quantile averaged over `seeds` and sorted within the row."""
     keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
-    raw = pl.read_parquet(ROOT / "backtests" / f"{name}.parquet").filter(pl.col("seed").is_in(list(seeds)))
+    raw = pl.read_parquet(ROOT / "backtests" / f"{name}.parquet").filter(
+        pl.col("seed").is_in(list(seeds))
+    )
     assert set(raw["seed"].unique().to_list()) == set(seeds), (name, seeds)
-    assert raw.group_by(keys).len()["len"].unique().to_list() == [len(seeds)], "a seed lacks some rows"
+    assert raw.group_by(keys).len()["len"].unique().to_list() == [len(seeds)], (
+        "a seed lacks some rows"
+    )
     mean = raw.group_by(keys).agg(pl.col(list(QCOLS)).mean()).sort(keys)
     q = np.sort(mean.select(list(QCOLS)).to_numpy().astype(np.float32), axis=1)
     return mean.with_columns([pl.Series(c, q[:, i]) for i, c in enumerate(QCOLS)])
@@ -73,7 +77,8 @@ def main(name: str, kind: str | None, seeds: tuple[int, ...] = (0, 1, 2)) -> Non
     span = int(re.search(r"_sp(\d+)$", name).group(1))
     month_index = (
         forecast["power_fcst_init_time"].dt.year().to_numpy().astype(int) * 12
-        + forecast["power_fcst_init_time"].dt.month().to_numpy().astype(int) - 1
+        + forecast["power_fcst_init_time"].dt.month().to_numpy().astype(int)
+        - 1
     )
     refit_index = month_index - (month_index - FIRST_MONTH_INDEX) % span
     """The climatology trains on data before the refit month, like the networks (not before each origin's month)."""

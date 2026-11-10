@@ -43,7 +43,11 @@ _p.add_argument("--passes", nargs="+", type=int, default=None)
 _p.add_argument("--work-suffix", default="")
 _p.add_argument("--e3", type=int, default=1)
 _p.add_argument("--synthetic", type=int, default=1)
-_p.add_argument("--models-from", default=None, help="a folder with the fine-tuned models (the K1-type step 5 keeps them elsewhere)")
+_p.add_argument(
+    "--models-from",
+    default=None,
+    help="a folder with the fine-tuned models (the K1-type step 5 keeps them elsewhere)",
+)
 MINE = _p.parse_args()
 assert set(MINE.months) <= {
     "2025-11",
@@ -767,7 +771,9 @@ def run_fit(*, device: str = "cuda") -> None:
                     model.eval()
                     log: dict = {"name": f"{ARM}/{month}_d{day}_s{seed}", "reused": str(mfile)}
                 else:
-                    assert fold.PHASE != "predict", "the prediction phase must reuse the train phase's model"
+                    assert fold.PHASE != "predict", (
+                        "the prediction phase must reuse the train phase's model"
+                    )
                     model, log = e.fine_tune(g=g, month=month, cut=cut, seed=seed, device=device)
                     mfile.parent.mkdir(parents=True, exist_ok=True)
                     tmp = mfile.with_suffix(".tmp")
@@ -829,7 +835,9 @@ def run_bank(*, device: str = "cuda") -> None:
     e.k.build_month = build_month_syn
     e.k.GpuMonth = SigGpuMonth
     sites = k578.sites()
-    prim_of_ts = dict(zip(sites["time_series_id"].to_list(), sites["primary"].to_list(), strict=True))
+    prim_of_ts = dict(
+        zip(sites["time_series_id"].to_list(), sites["primary"].to_list(), strict=True)
+    )
     for month in e.ARGS.months:
         cuts = e.k.cutoffs(month=month, cadence=e.CADENCE)
         mr = e.k.build_month(month=month, clean=clean)
@@ -840,40 +848,99 @@ def run_bank(*, device: str = "cuda") -> None:
         fixed, n_events = bank.synthetic_clean(
             clean=clean, first=first, last=last, seed=BANK_SEED_BASE + int(month.replace("-", ""))
         )
-        shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0).astype(np.float32)
-        blk = e.block_of(clean=fixed, primary=test.primary, target_idx=test.target_idx, origin_idx=test.origin_idx)
+        shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0).astype(
+            np.float32
+        )
+        blk = e.block_of(
+            clean=fixed,
+            primary=test.primary,
+            target_idx=test.target_idx,
+            origin_idx=test.origin_idx,
+        )
         lag_x = test.x.copy()
         lag_x[:, LAG_FIRST : LAG_FIRST + LAG_WIDTH] = blk
         day_idx = test.x[:, LEAD_OF["day"]].astype(np.int64)
-        row_shift = np.where(day_idx >= 0, shift[test.primary, np.clip(day_idx, 0, shift.shape[1] - 1)], 0.0)
-        print(f"{month}: bank with {n_events} events; {int((row_shift != 0).sum()):,} scored rows have a shifted 1-day lag", flush=True)
+        row_shift = np.where(
+            day_idx >= 0, shift[test.primary, np.clip(day_idx, 0, shift.shape[1] - 1)], 0.0
+        )
+        print(
+            f"{month}: bank with {n_events} events; {int((row_shift != 0).sum()):,} scored rows have a shifted 1-day lag",
+            flush=True,
+        )
         keys = pl.DataFrame(
             {
-                "time_series_id": np.array([sites["time_series_id"][int(i)] for i in test.primary], dtype=np.int64),
+                "time_series_id": np.array(
+                    [sites["time_series_id"][int(i)] for i in test.primary], dtype=np.int64
+                ),
                 "power_fcst_init_time": test.origin,
                 "valid_time": test.valid,
                 "lag_shift": row_shift,
             }
         ).with_columns(
-            pl.col("power_fcst_init_time").cast(pl.Datetime("us", "UTC")), pl.col("valid_time").cast(pl.Datetime("us", "UTC"))
+            pl.col("power_fcst_init_time").cast(pl.Datetime("us", "UTC")),
+            pl.col("valid_time").cast(pl.Datetime("us", "UTC")),
         )
         for seed in e.ARGS.seeds:
             fs = fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
             for i, cut in enumerate(cuts):
                 day = e.f.day_of(month=month, cut=cut)
-                mfile = Path(MINE.models_from) / f"{month}_d{day}_s{seed}.pt" if MINE.models_from else e.model_file(tag=e.SPEC.tag, month=month, day=day, seed=seed)
+                mfile = (
+                    Path(MINE.models_from) / f"{month}_d{day}_s{seed}.pt"
+                    if MINE.models_from
+                    else e.model_file(tag=e.SPEC.tag, month=month, day=day, seed=seed)
+                )
                 assert mfile.exists(), mfile
                 model = new_model(n_primaries=len(mr.base.target_mean)).to(device)
                 model.load_state_dict(torch.load(mfile, map_location=device))
                 model.eval()
                 lo, hi = e.k.window_of(month=month, cadence=e.CADENCE, index=i)
-                base = forecast_window(model=model, test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi, power_lag=clean, power_sig=clean)
-                power_sig = s598.mirrored_power(base=fixed, shift=shift, choice=fs.choice, capacity=NB.capacity) if fs is not None else None
-                inj = forecast_window(model=model, test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi, power_lag=fixed, power_sig=power_sig, lag_x=lag_x)
+                base = forecast_window(
+                    model=model,
+                    test=test,
+                    mr=mr,
+                    device=device,
+                    fs=fs,
+                    lo=lo,
+                    hi=hi,
+                    power_lag=clean,
+                    power_sig=clean,
+                )
+                power_sig = (
+                    s598.mirrored_power(
+                        base=fixed, shift=shift, choice=fs.choice, capacity=NB.capacity
+                    )
+                    if fs is not None
+                    else None
+                )
+                inj = forecast_window(
+                    model=model,
+                    test=test,
+                    mr=mr,
+                    device=device,
+                    fs=fs,
+                    lo=lo,
+                    hi=hi,
+                    power_lag=fixed,
+                    power_sig=power_sig,
+                    lag_x=lag_x,
+                )
                 k3 = ["time_series_id", "power_fcst_init_time", "valid_time"]
                 j = (
-                    base.select(*k3, pl.col("q50").alias("median_base"), pl.col("q05").alias("q05_base"), pl.col("q95").alias("q95_base"))
-                    .join(inj.select(*k3, pl.col("q50").alias("median_bank"), pl.col("q05").alias("q05_bank"), pl.col("q95").alias("q95_bank")), on=k3)
+                    base.select(
+                        *k3,
+                        pl.col("q50").alias("median_base"),
+                        pl.col("q05").alias("q05_base"),
+                        pl.col("q95").alias("q95_base"),
+                    )
+                    .join(
+                        inj.select(
+                            *k3,
+                            pl.col("q50").alias("median_bank"),
+                            pl.col("q05").alias("q05_bank"),
+                            pl.col("q95").alias("q95_bank"),
+                        ),
+                        on=k3,
+                    )
                     .join(keys, on=k3)
                 )
                 assert j.height == base.height == inj.height, (j.height, base.height, inj.height)
@@ -881,7 +948,10 @@ def run_bank(*, device: str = "cuda") -> None:
                 out.parent.mkdir(parents=True, exist_ok=True)
                 j.write_parquet(out.with_suffix(".tmp"))
                 out.with_suffix(".tmp").rename(out)
-                print(f"{ARM} {month} s{seed}: {j.height:,} rows, {int((j['lag_shift'] != 0).sum()):,} with a shifted lag -> {out}", flush=True)
+                print(
+                    f"{ARM} {month} s{seed}: {j.height:,} rows, {int((j['lag_shift'] != 0).sum()):,} with a shifted lag -> {out}",
+                    flush=True,
+                )
                 del model
         del mr, test
         FOLD.clear()
