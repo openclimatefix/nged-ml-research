@@ -138,11 +138,11 @@ the 28 non-recurring false figures would give an interval too wide to compare wi
 - **The 8 true transfers it missed.** Six were called "unclear" (a gradual donor step, a recipient
   dominated by solar output, a recipient that ramps over weeks, or an end beyond the record) and two
   "solo shift" (one Primary shows no clear step).
-- **The 8 calls on candidates that do not recur.** Six were on the 28 other false candidates and
-  two on injected look-alikes. Of the 27 calls on false candidates that are not look-alikes, 4
-  overlap an injected transfer between the same two Primaries whose start lies 3 to 129 half-hours
-  from the decoded start. The label "false" there comes from the rule that a true candidate starts
-  within 24 half-hours of the injected start.
+- **The 8 calls on candidates that do not recur.** Six were on the 28 other false candidates and two
+  on injected look-alikes. Of the 27 calls on false candidates that are not look-alikes, 4 overlap
+  an injected transfer between the same two Primaries whose start lies 3 to 129 half-hours from the
+  decoded start. The label "false" there comes from the rule that a true candidate starts within 24
+  half-hours of the injected start.
 - **Example of a call on a high-confidence false candidate.** In the figure below both Primaries
   step together at the onset and return together, as a transfer does, which is why the reviewer
   called it a transfer.
@@ -158,58 +158,61 @@ the 28 non-recurring false figures would give an interval too wide to compare wi
 
 - **Median minus mean forecast, and mean-forecast error beside each quantile-score contrast:** not
   applicable, because no forecast is scored.
-- **Audit triggers:** none fired. The result does contradict the prediction of a false-transfer share
-  of about 0.6 before the gate (it is 0.75). Experiment 680 reports 0.77 of the ends, and the
+- **Audit triggers:** none fired. The result does contradict the prediction of a false-transfer
+  share of about 0.6 before the gate (it is 0.75). Experiment 680 reports 0.77 of the ends, and the
   per-candidate share here is 0.75, so the prediction was only a wrong guess. The contaminated
   labels were found and explained by the recurrence check, which is recorded as post hoc.
-- **Confidence field.** Some reviewer sessions wrote a probability (such as 0.9999) in the field that
-  asked for an integer from 1 to 5, so the confidence is not used.
-- **Code review.** One fresh Sonnet code reviewer ran before the first reviewer call. It found that the
-  figure identifiers revealed the source (injected, real, or verified), that injected solo shifts were
-  labelled false and not hard, and that the true label has no one-to-one assignment. The identifiers
-  were randomised and the hard set widened. The one-to-one rule and the unmatched real-case step
-  scaling were not changed, and both are small against the recurrence effect.
+- **Confidence field.** Some reviewer sessions wrote a probability (such as 0.9999) in the field
+  that asked for an integer from 1 to 5, so the confidence is not used.
+- **Code review.** One fresh Sonnet code reviewer ran before the first reviewer call. It found that
+  the figure identifiers revealed the source (injected, real, or verified), that injected solo
+  shifts were labelled false and not hard, and that the true label has no one-to-one assignment. The
+  identifiers were randomised and the hard set widened. The one-to-one rule and the unmatched
+  real-case step scaling were not changed, and both are small against the recurrence effect.
 - **Load-shift scenarios and event plots:** not applicable, because no forecast is scored. The two
   figures above are the example candidates.
 - **Unlogged events:** the recurrence check shows the real record holds at least five events that no
-  injected label covers, so the false-transfer shares here are overstated by at least those candidates.
+  injected label covers, so the false-transfer shares here are overstated by at least those
+  candidates.
 
 ## Method
 
 - **Candidates.** A candidate is a donor end (a decoded fall) of E1-J-sym with its largest decoded
   partner, in each of the 40 default worlds of experiment 680 (seeds 900 to 939) with a start in
-  2024-01-01 to 2026-06-30. There are 613 (153 true, 460 false). A candidate is *true* when its donor
-  end matches an injected donor end (same Primary, start within 24 half-hours, overlap of 0.5 or
-  more) and a decoded partner is a partner of that injected transfer. A candidate is *hard* when an
-  injected placebo, common-mode, solo-shift, or hard-negative event at either Primary starts within 2
-  days of its start. The spec's scorer over candidate pairs does not exist, so the "highest-scoring"
-  false pairs are the ones with the highest detector confidence for the donor end.
+  2024-01-01 to 2026-06-30. There are 613 (153 true, 460 false). A candidate is *true* when its
+  donor end matches an injected donor end (same Primary, start within 24 half-hours, overlap of 0.5
+  or more) and a decoded partner is a partner of that injected transfer. A candidate is *hard* when
+  an injected placebo, common-mode, solo-shift, or hard-negative event at either Primary starts
+  within 2 days of its start. The spec's scorer over candidate pairs does not exist, so the
+  "highest-scoring" false pairs are the ones with the highest detector confidence for the donor end.
 - **Calibration set (102 figures).** 30 true candidates drawn at random, excluding hard ones; 20
   false candidates of the highest confidence, excluding hard ones; 30 false candidates drawn at
   random, excluding hard ones; 20 hard false candidates drawn at random; and the 2 verified real
   transfers. The spec asks for 400 figures including routine steps and sunny runs.
-- **Figure.** One image per candidate, identical for injected and real cases: neutral Primary labels,
-  no dates, no truth marks. Panels: the donor's power and expected power, the donor's residual in
-  noise units with the decoded step, the same for the recipient, the residual of up to 4 other
-  neighbours, and the median residual of all Primaries. Columns: an overview from 7 days before the
-  onset to 7 days after the end (6-hour means, capped at 60 days), and half-hourly zooms of 48
-  hours either side of the onset and of the end. The ERA5 and CAMS panels of the spec are left out.
-  Figure identifiers are random three-digit numbers.
+- **Figure.** One image per candidate, identical for injected and real cases: neutral Primary
+  labels, no dates, no truth marks. Panels: the donor's power and expected power, the donor's
+  residual in noise units with the decoded step, the same for the recipient, the residual of up to 4
+  other neighbours, and the median residual of all Primaries. Columns: an overview from 7 days
+  before the onset to 7 days after the end (6-hour means, capped at 60 days), and half-hourly zooms
+  of 48 hours either side of the onset and of the end. The ERA5 and CAMS panels of the spec are left
+  out. Figure identifiers are random three-digit numbers.
 - **Figure reviewer.** Claude Sonnet, never Opus, with one fixed brief (the nine questions R1 to R9
   of the spec scored 0 to 2, a verdict, a direction, and a confidence, as JSON), run in fresh
-  sessions of about 10 figures each. Each session reads only the brief and its figures and starts no sub-agent. The
-  answer key was kept in a different folder. Cost: 14 sessions at about 93,000 tokens each, about
-  1.3 million tokens in all, about 9,000 tokens per figure.
-- **Realness reviewer.** A second brief, 4 sessions, 38 figures: 30 injected candidates and 8 real ones
-  (the 6 real transfer pairs of experiment 680's real-record table, and the 2 verified transfers).
-  The real record holds too few pairs for the 30 real figures the spec asks for.
+  sessions of about 10 figures each. Each session reads only the brief and its figures and starts no
+  sub-agent. The answer key was kept in a different folder. Cost: 14 sessions at about 93,000 tokens
+  each, about 1.3 million tokens in all, about 9,000 tokens per figure.
+- **Realness reviewer.** A second brief, 4 sessions, 38 figures: 30 injected candidates and 8 real
+  ones (the 6 real transfer pairs of experiment 680's real-record table, and the 2 verified
+  transfers). The real record holds too few pairs for the 30 real figures the spec asks for.
 - **Scoring.** A call is a verdict of "transfer". Precision and recall use the calibration set with
-  [Wilson (1927)](https://doi.org/10.1080/01621459.1927.10502953) intervals. The false share after the
-  gate is reweighted to the natural mix of the 40 worlds (153 true, 276 plain false, 184 hard false
-  candidates), using each stratum's call rate, with a bootstrap over the figures of each stratum.
+  [Wilson (1927)](https://doi.org/10.1080/01621459.1927.10502953) intervals. The false share after
+  the gate is reweighted to the natural mix of the 40 worlds (153 true, 276 plain false, 184 hard
+  false candidates), using each stratum's call rate, with a bootstrap over the figures of each
+  stratum.
 - **Post hoc recurrence check.** A false candidate that has the same donor, recipient, and day in 10
-  or more of the 40 worlds is a real-record event, because the worlds differ only in what is injected.
-  Five such groups cover 111 of the 460 false candidates. The check was run after the answers were read.
+  or more of the 40 worlds is a real-record event, because the worlds differ only in what is
+  injected. Five such groups cover 111 of the 460 false candidates. The check was run after the
+  answers were read.
 - **Standing practices.** No refit, no forecast, no tails or curtailment cost. Cleaned power and the
   D18 cut before 2025-03-01 come from experiment 653's residual. CPU only, 2 cores.
 
@@ -220,7 +223,8 @@ the 28 non-recurring false figures would give an interval too wide to compare wi
 - `e00692_common.py`: draws one candidate figure.
 - `e00692_ids.py`: renames the figures to random identifiers.
 - `e00692_score.py`: scores the answers against the key and writes `scores.json`.
-- `e00692_diagnose.py`: post hoc check of which injected transfers overlap the reviewer's false calls.
+- `e00692_diagnose.py`: post hoc check of which injected transfers overlap the reviewer's false
+  calls.
 - `e00692_figures.py`: draws the call-rate figure and copies the two example candidates.
 - Private data, not in git, in `data/ml-experiments/00692-event-table-reviewer-calibration-gate/`:
   `figures/` (the 140 figures), `answers/` (the reviewer's JSON lines), `reviewer_brief.md` and
