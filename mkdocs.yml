@@ -107,6 +107,7 @@ nav:
           - Evaluation protocol, solar: ml-experiments/evaluation-protocol-solar.md
           - Evaluation protocol, wind: ml-experiments/evaluation-protocol-wind.md
           - Log of versions: ml-experiments/research-default-log.md
+      - Final models for the production port: ml-experiments/final-models.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
       - Kalman filter explainer: ml-experiments/kalman-gam-explainer.md
@@ -185,6 +186,7 @@ nav:
           - Experiments: ml-experiments/themes/lsc-detectors/experiments.md
           - Research plan: ml-experiments/themes/lsc-detectors/plan.md
           - Event-table summary: ml-experiments/themes/lsc-detectors/event-table-summary.md
+          - State at the January pause: ml-experiments/themes/lsc-detectors/state-at-january-pause.md
       - Load-shift labels in the forecast:
           - Summary: ml-experiments/themes/switching-labels-in-the-forecast/index.md
           - Experiments: ml-experiments/themes/switching-labels-in-the-forecast/experiments.md
