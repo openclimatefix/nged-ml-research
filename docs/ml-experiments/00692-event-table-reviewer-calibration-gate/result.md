@@ -196,8 +196,8 @@ the 28 non-recurring false figures would give an interval too wide to compare wi
   hours either side of the onset and of the end. The ERA5 and CAMS panels of the spec are left out.
   Figure identifiers are random three-digit numbers.
 - **Figure reviewer.** Claude Sonnet, never Opus, with one fixed brief (the nine questions R1 to R9
-  of the spec scored 0 to 2, a verdict, a direction, and a confidence, as JSON), run in fresh sessions of about
-  10 figures each. Each session reads only the brief and its figures and starts no sub-agent. The
+  of the spec scored 0 to 2, a verdict, a direction, and a confidence, as JSON), run in fresh
+  sessions of about 10 figures each. Each session reads only the brief and its figures and starts no sub-agent. The
   answer key was kept in a different folder. Cost: 14 sessions at about 93,000 tokens each, about
   1.3 million tokens in all, about 9,000 tokens per figure.
 - **Realness reviewer.** A second brief, 4 sessions, 38 figures: 30 injected candidates and 8 real ones
