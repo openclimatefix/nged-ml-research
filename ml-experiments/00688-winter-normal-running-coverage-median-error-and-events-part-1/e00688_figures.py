@@ -1,8 +1,7 @@
 """Figures of experiment 688 (CPU only), written as SVG to the folder given as the first argument.
 
-PYTHONPATH=ml-experiments/00668-*:ml-experiments/00683-*:ml-experiments/00688-* \
-    DATA_PATH_INTERNAL=<production data folder> \
-    uv run --no-sync python e00688_figures.py <output folder>
+Run it from the repository root with `DATA_PATH_INTERNAL` set to the production data folder and
+`PYTHONPATH` set to the folders of experiments 668, 683, and 688.
 
 Reads the tables written by `e00688_tables.py`. Every panel is at least 280 px wide, every line is
 1 px, and a light grey rectangle marks a labelled or verified load transfer. Substations are

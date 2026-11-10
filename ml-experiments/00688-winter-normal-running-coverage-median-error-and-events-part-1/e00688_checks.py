@@ -1,7 +1,7 @@
 """Error of the median forecast by stage, and the size of the oracle shift (CPU only).
 
-PYTHONPATH=ml-experiments/00668-*:ml-experiments/00683-*:ml-experiments/00688-* \
-    DATA_PATH_INTERNAL=<production data folder> uv run --no-sync python e00688_checks.py
+Run it from the repository root with `DATA_PATH_INTERNAL` set to the production data folder and
+`PYTHONPATH` set to the folders of experiments 668, 683, and 688.
 
 The stored files hold quantiles only, so no mean forecast exists; the median's absolute and signed
 error (percent of capacity, the two winter months, arm 2) stand beside the coverage contrasts.

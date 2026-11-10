@@ -1,7 +1,7 @@
 """Tables of experiment 688 (CPU only): coverage by stage, share explained, spread, sensitivities.
 
-PYTHONPATH=ml-experiments/00668-*:ml-experiments/00683-*:ml-experiments/00688-* \
-    DATA_PATH_INTERNAL=<production data folder> uv run --no-sync python e00688_tables.py
+Run it from the repository root with `DATA_PATH_INTERNAL` set to the production data folder and
+`PYTHONPATH` set to the folders of experiments 668, 683, and 688.
 
 Prints every number the write-up quotes and writes CSV tables to `<data>/00688-*/tables/`, and the
 per-day counts to `<data>/00688-*/daily.parquet` (private).
