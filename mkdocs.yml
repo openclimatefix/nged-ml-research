@@ -124,6 +124,7 @@ nav:
           - Summary: ml-experiments/themes/demand-inputs/index.md
           - Experiments: ml-experiments/themes/demand-inputs/experiments.md
           - Research plan: ml-experiments/themes/demand-inputs/plan.md
+          - State and next steps: ml-experiments/themes/demand-inputs/state-and-next-steps.md
       - Differentiable physics:
           - Background: ml-experiments/themes/differentiable-physics-background.md
           - Literature scan: ml-experiments/themes/differentiable-physics-literature.md
@@ -160,6 +161,7 @@ nav:
           - Summary: ml-experiments/themes/hierarchy-and-pooling/index.md
           - Experiments: ml-experiments/themes/hierarchy-and-pooling/experiments.md
           - Research plan: ml-experiments/themes/hierarchy-and-pooling/plan.md
+          - State and next steps: ml-experiments/themes/hierarchy-and-pooling/state-and-next-steps.md
       - Lagged power and error correction:
           - Summary: ml-experiments/themes/lagged-power-and-error-correction/index.md
           - Experiments: ml-experiments/themes/lagged-power-and-error-correction/experiments.md
@@ -173,6 +175,7 @@ nav:
           - Summary: ml-experiments/themes/retraining-and-training-history/index.md
           - Experiments: ml-experiments/themes/retraining-and-training-history/experiments.md
           - Research plan: ml-experiments/themes/retraining-and-training-history/plan.md
+          - State and next steps: ml-experiments/themes/retraining-and-training-history/state-and-next-steps.md
       - Metered solar farms:
           - Summary: ml-experiments/themes/metered-solar-farms/index.md
           - Experiments: ml-experiments/themes/metered-solar-farms/experiments.md
@@ -196,3 +199,4 @@ nav:
           - Summary: ml-experiments/themes/weather-products-and-blending/index.md
           - Experiments: ml-experiments/themes/weather-products-and-blending/experiments.md
           - Research plan: ml-experiments/themes/weather-products-and-blending/plan.md
+          - State and next steps: ml-experiments/themes/weather-products-and-blending/state-and-next-steps.md

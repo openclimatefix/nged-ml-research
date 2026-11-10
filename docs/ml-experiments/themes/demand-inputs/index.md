@@ -1,5 +1,8 @@
 # Demand inputs
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **At Primary substations, a calendar-and-solar set of inputs lowered the demand forecast error by
 0.1 points of capacity or more with an interval clear of zero: the hour and weekday, the COVID
 indicator, a Christmas column limited to the 14 days either side of 25 December, and an explicit
