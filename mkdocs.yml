@@ -107,6 +107,7 @@ nav:
           - Evaluation protocol, solar: ml-experiments/evaluation-protocol-solar.md
           - Evaluation protocol, wind: ml-experiments/evaluation-protocol-wind.md
           - Log of versions: ml-experiments/research-default-log.md
+      - Final models for the production port: ml-experiments/final-models.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
       - Kalman filter explainer: ml-experiments/kalman-gam-explainer.md
@@ -114,14 +115,17 @@ nav:
           - Summary: ml-experiments/themes/calibration-and-uncertainty/index.md
           - Experiments: ml-experiments/themes/calibration-and-uncertainty/experiments.md
           - Research plan: ml-experiments/themes/calibration-and-uncertainty/plan.md
+          - Delivery recommendation: ml-experiments/themes/calibration-and-uncertainty/delivery-recommendation.md
       - Curtailment cost:
           - Summary: ml-experiments/themes/curtailment-cost/index.md
           - Experiments: ml-experiments/themes/curtailment-cost/experiments.md
           - Research plan: ml-experiments/themes/curtailment-cost/plan.md
+          - State and next steps: ml-experiments/themes/curtailment-cost/state-and-next-steps.md
       - Demand inputs:
           - Summary: ml-experiments/themes/demand-inputs/index.md
           - Experiments: ml-experiments/themes/demand-inputs/experiments.md
           - Research plan: ml-experiments/themes/demand-inputs/plan.md
+          - State and next steps: ml-experiments/themes/demand-inputs/state-and-next-steps.md
       - Differentiable physics:
           - Background: ml-experiments/themes/differentiable-physics-background.md
           - Literature scan: ml-experiments/themes/differentiable-physics-literature.md
@@ -130,10 +134,12 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/state-and-next-steps.md
           - Embedded generation:
               - Summary: ml-experiments/themes/differentiable-physics-embedded-generation/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-embedded-generation/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-embedded-generation/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-embedded-generation/state-and-next-steps.md
           - Long history and drift:
               - Summary: ml-experiments/themes/differentiable-physics-long-history-and-drift/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-long-history-and-drift/experiments.md
@@ -142,10 +148,12 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-pooling-across-substations/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-pooling-across-substations/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-pooling-across-substations/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-pooling-across-substations/state-and-next-steps.md
           - Forecast engine:
               - Summary: ml-experiments/themes/differentiable-physics-forecast-engine/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-forecast-engine/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-forecast-engine/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-forecast-engine/state-and-next-steps.md
           - Network:
               - Summary: ml-experiments/themes/differentiable-physics-network/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-network/experiments.md
@@ -154,40 +162,51 @@ nav:
           - Summary: ml-experiments/themes/generator-forecasting/index.md
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
           - Research plan: ml-experiments/themes/generator-forecasting/plan.md
+          - State and next steps: ml-experiments/themes/generator-forecasting/state-and-next-steps.md
       - Hierarchy and pooling:
           - Summary: ml-experiments/themes/hierarchy-and-pooling/index.md
           - Experiments: ml-experiments/themes/hierarchy-and-pooling/experiments.md
           - Research plan: ml-experiments/themes/hierarchy-and-pooling/plan.md
+          - State and next steps: ml-experiments/themes/hierarchy-and-pooling/state-and-next-steps.md
       - Lagged power and error correction:
           - Summary: ml-experiments/themes/lagged-power-and-error-correction/index.md
           - Experiments: ml-experiments/themes/lagged-power-and-error-correction/experiments.md
           - Research plan: ml-experiments/themes/lagged-power-and-error-correction/plan.md
+          - State and next steps: ml-experiments/themes/lagged-power-and-error-correction/state-and-next-steps.md
       - Production reference and best guess:
           - Summary: ml-experiments/themes/production-reference-and-best-guess/index.md
           - Experiments: ml-experiments/themes/production-reference-and-best-guess/experiments.md
           - Research plan: ml-experiments/themes/production-reference-and-best-guess/plan.md
+          - State and next steps: ml-experiments/themes/production-reference-and-best-guess/state-and-next-steps.md
           - Neural simplification series: ml-experiments/themes/production-reference-and-best-guess/neural-simplification-series.md
       - Retraining and training history:
           - Summary: ml-experiments/themes/retraining-and-training-history/index.md
           - Experiments: ml-experiments/themes/retraining-and-training-history/experiments.md
           - Research plan: ml-experiments/themes/retraining-and-training-history/plan.md
+          - State and next steps: ml-experiments/themes/retraining-and-training-history/state-and-next-steps.md
       - Metered solar farms:
           - Summary: ml-experiments/themes/metered-solar-farms/index.md
           - Experiments: ml-experiments/themes/metered-solar-farms/experiments.md
           - Research plan: ml-experiments/themes/metered-solar-farms/plan.md
+          - State and next steps: ml-experiments/themes/metered-solar-farms/state-and-next-steps.md
       - Solar disaggregation:
           - Summary: ml-experiments/themes/solar-disaggregation/index.md
           - Experiments: ml-experiments/themes/solar-disaggregation/experiments.md
           - Research plan: ml-experiments/themes/solar-disaggregation/plan.md
+          - Unmetered PV capacity: ml-experiments/themes/solar-disaggregation/unmetered-pv-capacity.md
       - LSC detectors:
           - Summary: ml-experiments/themes/lsc-detectors/index.md
           - Experiments: ml-experiments/themes/lsc-detectors/experiments.md
           - Research plan: ml-experiments/themes/lsc-detectors/plan.md
+          - Event-table summary: ml-experiments/themes/lsc-detectors/event-table-summary.md
+          - State at the January pause: ml-experiments/themes/lsc-detectors/state-at-january-pause.md
       - Load-shift labels in the forecast:
           - Summary: ml-experiments/themes/switching-labels-in-the-forecast/index.md
           - Experiments: ml-experiments/themes/switching-labels-in-the-forecast/experiments.md
           - Research plan: ml-experiments/themes/switching-labels-in-the-forecast/plan.md
+          - State and next steps: ml-experiments/themes/switching-labels-in-the-forecast/state-and-next-steps.md
       - Weather products and blending:
           - Summary: ml-experiments/themes/weather-products-and-blending/index.md
           - Experiments: ml-experiments/themes/weather-products-and-blending/experiments.md
           - Research plan: ml-experiments/themes/weather-products-and-blending/plan.md
+          - State and next steps: ml-experiments/themes/weather-products-and-blending/state-and-next-steps.md

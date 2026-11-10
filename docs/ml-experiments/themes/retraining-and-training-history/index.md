@@ -1,5 +1,8 @@
 # Retraining and training history
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **On 16 Primary substations, refitting the XGBoost demand model every week with no error correction
 scored 0.20 to 0.24 points of capacity below a model fitted once with the correction, on two
 separate sets of forecast runs (292 runs at 16 Primaries, and 274 control-member-only runs at 13).**

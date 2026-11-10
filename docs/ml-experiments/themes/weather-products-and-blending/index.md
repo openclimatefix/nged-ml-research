@@ -1,5 +1,8 @@
 # Weather products and blending
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **Of the weather changes tested, only training on estimates of past weather (ERA5) clearly lowered
 the error in a test without power lags, for 6 solar farms and 3 wind farms up to 6 days ahead, and
 no extra weather forecast has yet been shown to help in a way a live service could use.**

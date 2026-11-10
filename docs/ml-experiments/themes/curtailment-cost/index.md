@@ -1,5 +1,8 @@
 # Curtailment cost
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **We can now score a demand forecast by the curtailment cost of its errors at a bulk supply point,
 but the two supply points of the pilot hold too few events to rank forecasts at the headline limit
 of 0.9 times their earlier maximum export, so no forecast has yet been shown to curtail less
