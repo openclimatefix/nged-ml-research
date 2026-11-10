@@ -1,10 +1,11 @@
 # Unmetered PV capacity: what we know
 
 **A probe of a trained neural network reads the whole-summer capacity of photovoltaic (PV) solar
-panels behind each Primary substation, with a calibration measured on injected real solar farms.** The probe followed a step in capacity only when the step began in
-an ordinary spring. An explicit solar term built from the probed capacity improved the forecast with
-estimates of past weather and worsened it with ensemble forecast weather. The maintainer paused the
-work after 10 November 2026. This page is meant to let a reader restart it in January.
+panels behind each Primary substation, with a calibration measured on injected real solar farms.**
+The probe followed a step in capacity only when the step began in an ordinary spring. An explicit
+solar term built from the probed capacity improved the forecast with estimates of past weather and
+worsened it with ensemble forecast weather. The maintainer paused the work after 10 November 2026.
+This page is meant to let a reader restart it in January.
 
 **Sources.** Every figure comes from a merged result page of the theme, linked at its first use.
 Items marked "(brief)" come from briefs in `data/ml-experiments/briefs/` of the production
