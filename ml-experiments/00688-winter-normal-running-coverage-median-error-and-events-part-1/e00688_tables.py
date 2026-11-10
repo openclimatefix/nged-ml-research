@@ -147,8 +147,12 @@ def spread_table(*, rows: dict[str, np.ndarray], evt: np.ndarray) -> pl.DataFram
                     resid = y - qq[:, 5]
                     half = (qq[:, 9] - qq[:, 1]) / 2.0
                     emp = (np.percentile(resid, 95) - np.percentile(resid, 5)) / 2.0
+                    if emp <= 0:
+                        continue
                     z = cal.z_scores(y=y, q05=qq[:, 1], q50=qq[:, 5], q95=qq[:, 9])
                     z = z[np.isfinite(z)]
+                    if len(z) == 0:
+                        continue
                     out.append(
                         {
                             "set": which,
@@ -159,6 +163,10 @@ def spread_table(*, rows: dict[str, np.ndarray], evt: np.ndarray) -> pl.DataFram
                             "median_half_width": float(np.median(half)),
                             "empirical_half_width": float(emp),
                             "ratio": float(np.median(half) / emp),
+                            "mean_half_width": float(np.mean(half)),
+                            "mean_abs_residual_over_half_width": float(
+                                np.mean(np.abs(resid) / np.maximum(half, 1e-9))
+                            ),
                             "needed_scale": float(np.quantile(z, 0.90)),
                             "mean_abs_shift": float(np.abs(shift[sel]).mean()),
                         }
@@ -195,6 +203,11 @@ def main() -> None:
         float(gate["diff"].abs().max()),  # ty: ignore[invalid-argument-type]
         int(gate["n_diff"].abs().max()),  # ty: ignore[invalid-argument-type]
     )
+    early = gate.filter(pl.col("origin_month") < "2026-06")
+    if early["n_diff"].abs().max() != 0 or early["diff"].abs().max() > 1e-3:
+        msg = "stage none does not reproduce experiment 683 before 2026-06"
+        raise ValueError(msg)
+    print(gate.filter(pl.col("origin_month") == "2026-06"))
     boot = dg.Boot(daily=daily)
     cov = coverage_table(boot=boot)
     cov.write_csv(dg.TABLES / "coverage_by_stage.csv")

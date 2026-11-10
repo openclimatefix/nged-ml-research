@@ -96,7 +96,7 @@ def event_spans(*, kind: str) -> pl.DataFrame:
                 {
                     "time_series_id": ids[r["label"]],
                     "start": r["label_onset_idx"],
-                    "end": r["label_end_idx"],
+                    "end": r["label_end_idx"] + 1,  # the label end is the last half-hour
                     "source": f"labelled event {r['event_id']}",
                 }
             )
@@ -196,6 +196,7 @@ def load_rows() -> dict[str, np.ndarray]:
         "stored": arrays["stored"][keep],
         "scaled": arrays["scaled"][keep],
         "nonneg": np.asarray(nonneg)[row][keep],
+        "inwin": (vidx < idx_of(PERIOD_END))[keep],
     }
 
 
@@ -231,7 +232,7 @@ def stage_quantiles(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the quantiles of one stage and the mask of the rows that stage scores."""
     q = rows[which]
-    use = ~evt if stage.startswith("events") else np.ones(len(q), dtype=bool)
+    use = rows["inwin"] & (~evt if stage.startswith("events") else True)
     if "shift" not in stage:
         return q, use
     rows["resid"] = rows["y"] - q[:, 5]
