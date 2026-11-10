@@ -21,7 +21,6 @@
 | 633 | How does BG2 score on the held-out months July to October 2026 beside the three demand networks at the 16 Primaries, and how does the lag-enabled network score at the bulk and grid supply points? | High (maintainer decided 2026-11-07) | Experiment 620's scores | Planned |
 | 637 | How do the five bake-off systems score on July to October 2026 once days that a frozen detector flags as an abnormal running arrangement are removed? | High (maintainer approved 2026-11-07) | Nothing | Planned |
 | 668 | What do the one-year backtest files hold, how were the five models behind them built and trained, and how well do they forecast? | High (maintainer asked 2026-11-09) | The four backtest workers' files | Planned |
-| 684 | Can output distributions that cannot go below zero, and a solar output that is zero at night by construction, replace the post hoc clamps in the one-year backtest files? | High (maintainer approved 2026-11-10) | One GPU process shared with experiment 677 | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 

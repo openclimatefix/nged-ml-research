@@ -76,6 +76,6 @@ if fam.FAMILY != "gauss":
         is_val=None, standardiser=None, target_mean=np.arange(3.0), target_std=np.ones(3),
         power_mean=0.0, power_std=1.0, columns=[], dropped=0,
     )  # fmt: skip
-    assert np.array_equal(fam.STATE.mean, np.arange(3.0)), fam.STATE.mean
+    assert np.array_equal(fam.STATE.mean, np.arange(3.0)), fam.STATE.mean  # ty: ignore[invalid-argument-type]
     print("Rows.__init__ records the target statistics")
 print("all checks passed for", fam.FAMILY)

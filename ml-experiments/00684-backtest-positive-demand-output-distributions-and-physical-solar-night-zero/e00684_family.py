@@ -233,7 +233,7 @@ def install() -> None:
         init(self, *args, **kwargs)
         mean, std = np.asarray(self.target_mean), np.asarray(self.target_std)
         if STATE.mean is not None:
-            assert np.array_equal(STATE.mean, mean) and np.array_equal(STATE.std, std), (
+            assert np.array_equal(STATE.mean, mean) and np.array_equal(STATE.std, std), (  # ty: ignore[invalid-argument-type]
                 "a second Rows with other target statistics in one process"
             )
         STATE.mean, STATE.std = mean, std
