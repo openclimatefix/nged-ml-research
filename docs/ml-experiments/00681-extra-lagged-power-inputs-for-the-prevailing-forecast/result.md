@@ -22,8 +22,9 @@ hypothesis: >-
   of a new load level after a confirmed load shift starts.
 prediction: >-
   Written before any fit. P1: the best lag arm covers half of the new level at least 24 hours
-  sooner than the baseline on the verified D5 and D16 transfer (181 and 52 hours in experiment
-  668), and 12 hours sooner on the injected events of experiment 660. P2: the NRA output is
+  sooner than L0 on the verified D5 and D16 transfers, scored on origins from 2026-01-01 only, and 1
+  day sooner on the injected events of experiment 660 (origins are daily, so reaction time
+  resolves to 24 hours). P2: the NRA output is
   identical to the baseline's, because the head is a separate network on frozen Candidate
   quantiles. P3: the share of event-free rows on which the prevailing output departs from the NRA
   output by 3 points of capacity or more rises by at most 1 percentage point. P4: the placebo arm,
@@ -32,10 +33,10 @@ prediction: >-
 decision_rule: >-
   Support needs all of: the best arm's reaction-time gain over the baseline, with a 95% interval
   over events, excludes zero on the injected events and has the right sign on both verified
-  transfers; the NRA CRPS equals the baseline's to four decimals; the false-alarm share and the
+  transfers (January origins onward); the NRA CRPS equals the baseline's to four decimals; the false-alarm share and the
   prevailing CRPS on event-free rows exceed the baseline's by no more than the baseline's own
   seed-to-seed spread; and the placebo gain is below a third of the arm's gain. The smallest gain
-  worth a port is 12 hours of reaction time at no cost on event-free rows, because the extra
+  worth a port is 1 day of reaction time at no cost on event-free rows, because the extra
   inputs add a column block to the head and nothing else. Any failed condition is reported plainly,
   with no rescue tuning.
 benchmark: >-
@@ -62,7 +63,7 @@ experiment changes only the inputs of the prevailing head.
 - **Why the NRA output cannot change.** The NRA output is the Candidate's seed-mean quantiles. The
   prevailing head is a separate network trained afterwards on those frozen quantiles, so each arm
   re-fits the head only. The write-up still reports the NRA score next to the baseline, and the
-  check is an equality test of the stored NRA table.
+  check compares hashes of the stored NRA table.
 - **Arms.** Each extra lag is a residual in points of capacity: the cleaned power at that time
   minus the Candidate's lag-free median for the same time, as the head's existing gap columns are.
   Every lag ends at least 6 hours before the origin.
@@ -83,6 +84,20 @@ experiment changes only the inputs of the prevailing head.
   CRPS cost against L0 above 0.03 points of capacity. Scores are reported in the strata event-free,
   event-free more than 14 days from any event, in force, near the end, and ended in the last 24
   hours, with the off-shift false-alarm rate.
+- **Fallback months.** The D5 and D16 transfer starts on 2025-12-29, and the December prevailing
+  output comes from the fallback head, which no arm changes. The 181 and 52 hours of experiment 668
+  are therefore not the L0 baseline. L0 is re-measured on origins from 2026-01-01, and the start
+  reaction is also taken from the real and injected events in the January to June folds.
+- **Placebo exclusions.** The injected shift is mirrored onto electrical neighbours, so the
+  permutation excludes every neighbour of the Primary and any Primary with an overlapping injected
+  event.
+- **Definitions.** Lags are indexed at origin minus 12 half-hours or earlier (the bound is
+  inclusive, and a reading at time t is complete at t). Rolling means and daily means are trailing
+  24-hour windows ending 6 hours before the origin, not calendar days. A missing or flagged reading
+  enters as zero residual plus a missing flag. A unit test perturbs data after that time and checks
+  that no feature moves. L1's 24-hour lag repeats an existing input, and no 7-day lag is added.
+- **Events.** Injected and real events are reported separately, with the injected-event count per
+  fold. Reaction-time contrasts use a paired bootstrap over events, with a threshold in whole days.
 - **Folds.** The development folds of experiment 667: 2025-11 to 2026-06. Folds 2025-11 and 2025-12
   have fewer than two earlier banks and use the fallback head with no trained weights, so the six
   folds 2026-01 to 2026-06 carry the contrasts. The final-test window (from 2026-07-01) is not read.
@@ -109,8 +124,17 @@ experiment changes only the inputs of the prevailing head.
 
 - The head is a 2-hidden-layer network of 64 units fitted on the CPU in experiment 667. The plan
   fits the head only, so it needs no GPU hours (ceiling 4 GPU-h unused). It uses at most 4 CPU cores
-  and a 16 GB memory cap per job. Experiment 667's stored Candidate quantiles and bank are reused;
+  and a 16 GB memory cap per job. Experiment 667's stored Candidate quantiles are reused. The bank stores only the feature block, so
+  `build_real` and `build_bank` are rerun to build the lag block, and the regenerated injected events
+  are checked against the stored ones.
   the new fits are 4 arms x 2 seeds x 6 folds.
+
+## Reporting and merge
+
+One line goes to the manager at plan PR open, fits started, fits finished, and merge. Figures follow
+the brief: 1 px lines, shaded bands, observed power on top, a light grey rectangle over the
+confirmed event span, and at least 280 px per panel. No NGED metered generator appears. The merge
+follows the ml-experiment merge rules.
 
 ## Reviews
 
