@@ -15,12 +15,12 @@ The record is written between the `<!-- record-start -->` and `<!-- record-end -
 page. Rewrap the page afterwards with `scripts/lint/reflow_docs.py`, because transcript paragraphs
 arrive as single long lines.
 
-Usage::
+Usage, from the repository root, with `PAGE` set to this folder's
+`../simulator-discussion-2026-11-09.md`::
 
     python3 -I docs/ml-experiments/themes/gross-demand-simulation/scripts/transcript_to_record.py \
-        <transcript.jsonl> docs/ml-experiments/themes/gross-demand-simulation/simulator-discussion-2026-11-09.md
-    python3 scripts/lint/reflow_docs.py \
-        docs/ml-experiments/themes/gross-demand-simulation/simulator-discussion-2026-11-09.md
+        <transcript.jsonl> "$PAGE"
+    (cd scripts/lint && python3 reflow_docs.py "$PAGE")
 """
 
 import json
@@ -95,9 +95,58 @@ def _sanitise(text: str) -> str:
 
 
 def _demote_headings(text: str) -> str:
-    """Push transcript headings below the record's own level-3 entry headings."""
-    return re.sub(r"^(#{1,3}) ", lambda match: "#" * (len(match.group(1)) + 3) + " ", text,
-                  flags=re.MULTILINE)
+    """Push transcript headings below the record's own level-3 entry headings.
+
+    A level-1 or level-2 heading becomes level 4 and a level-3 heading becomes level 5, so the
+    levels never skip one under the entry heading.
+    """
+    return re.sub(
+        r"^(#{1,3}) ",
+        lambda match: "#" * max(4, len(match.group(1)) + 2) + " ",
+        text,
+        flags=re.MULTILINE,
+    )
+
+
+def _nest_bullets_under_numbers(text: str) -> str:
+    """Indent the unindented bullets that a plain-text message writes under a numbered item.
+
+    A peer session's message writes `1. Topic` and then `- detail` lines at column 0, meaning the
+    details belong to the topic. Markdown reads them as a second list, so they are indented by 4
+    spaces, with their continuation lines, until a line at column 0 that is neither.
+    """
+    out: list[str] = []
+    under_number = False
+    for line in text.split("\n"):
+        if re.match(r"^\d+\. ", line):
+            under_number = True
+        elif under_number and line.strip() and re.match(r"^(- |  (?! ))", line):
+            out.append(f"    {line}")
+            continue
+        elif line.strip():
+            under_number = False
+        out.append(line)
+    return "\n".join(out)
+
+
+def _lint_safe(text: str) -> str:
+    """Make transcript markdown pass the docs linter without changing its words.
+
+    A paragraph that is only bold text gains a trailing colon, a list that follows a paragraph line
+    gains the blank line before it, and a 3-space continuation indent under a numbered item
+    becomes the 4 spaces the docs renderer needs.
+    """
+    text = re.sub(r"^(\*\*[^*\n]+\*\*)$", r"\1:", text, flags=re.MULTILINE)
+    text = re.sub(r"^   (?=\S)", "    ", text, flags=re.MULTILINE)
+    out: list[str] = []
+    for line in _nest_bullets_under_numbers(text).split("\n"):
+        previous = out[-1] if out else ""
+        starts_list = re.match(r"^(- |\d+\. )", line) is not None
+        previous_is_list = re.match(r"^\s*(- |\d+\. )", previous) is not None
+        if starts_list and previous.strip() and not previous_is_list:
+            out.append("")
+        out.append(line)
+    return "\n".join(out)
 
 
 def _parse_timestamp(record: dict) -> datetime | None:
@@ -109,11 +158,19 @@ def _user_string_entry(*, record: dict, text: str, is_first: bool) -> RecordEntr
     timestamp = _parse_timestamp(record)
     if text.startswith("[Cross-session idle notice]"):
         return None
-    peer = re.search(r'<cross-session-message [^>]*from-name="([^"]+)"[^>]*>(.*?)'
-                     r"</cross-session-message>", text, flags=re.DOTALL)
+    peer = re.search(
+        r'<cross-session-message [^>]*from-name="([^"]+)"[^>]*>(.*?)'
+        r"</cross-session-message>",
+        text,
+        flags=re.DOTALL,
+    )
     if peer:
-        return RecordEntry(speaker="Message from a peer session", timestamp=timestamp,
-                           text=peer.group(2).strip(), peer_name=peer.group(1))
+        return RecordEntry(
+            speaker="Message from a peer session",
+            timestamp=timestamp,
+            text=peer.group(2).strip(),
+            peer_name=peer.group(1),
+        )
     speaker: SpeakerType = "Launch instruction" if is_first else "Maintainer"
     return RecordEntry(speaker=speaker, timestamp=timestamp, text=text.strip())
 
@@ -122,12 +179,16 @@ def _assistant_entries(*, record: dict, content: list[dict]) -> Iterator[RecordE
     timestamp = _parse_timestamp(record)
     for block in content:
         if block.get("type") == "text":
-            yield RecordEntry(speaker="Session reply", timestamp=timestamp,
-                              text=block["text"].strip())
+            yield RecordEntry(
+                speaker="Session reply", timestamp=timestamp, text=block["text"].strip()
+            )
         elif block.get("type") == "tool_use" and block.get("name") == "SendMessage":
-            yield RecordEntry(speaker="Message sent to a peer session", timestamp=timestamp,
-                              text=block["input"]["message"].strip(),
-                              peer_name=re.sub(r"\s*\[\w+\]$", "", block["input"]["to"]))
+            yield RecordEntry(
+                speaker="Message sent to a peer session",
+                timestamp=timestamp,
+                text=block["input"]["message"].strip(),
+                peer_name=re.sub(r"\s*\[\w+\]$", "", block["input"]["to"]),
+            )
 
 
 def read_entries(transcript: Path) -> list[RecordEntry]:
@@ -153,9 +214,13 @@ def read_entries(transcript: Path) -> list[RecordEntry]:
             if entry:
                 entries.append(entry)
         elif record["type"] == "user" and record.get("uuid") in FINDING_NOTES:
-            entries.append(RecordEntry(speaker="Finding from a tool result",
-                                       timestamp=_parse_timestamp(record),
-                                       text=FINDING_NOTES[record["uuid"]]))
+            entries.append(
+                RecordEntry(
+                    speaker="Finding from a tool result",
+                    timestamp=_parse_timestamp(record),
+                    text=FINDING_NOTES[record["uuid"]],
+                )
+            )
         elif record["type"] == "assistant":
             entries.extend(_assistant_entries(record=record, content=content))
     return entries
@@ -178,7 +243,7 @@ def render(entries: list[RecordEntry]) -> str:
     for number, entry in enumerate(entries, start=1):
         when = f", {entry.timestamp:%Y-%m-%d %H:%M} UTC" if entry.timestamp else ""
         who = f"{entry.speaker} ({entry.peer_name})" if entry.peer_name else entry.speaker
-        body = _demote_headings(_sanitise(entry.text))
+        body = _lint_safe(_demote_headings(_sanitise(entry.text)))
         parts.append(f"### {number}. {who}{when}\n\n{body}\n")
     record = "\n".join(parts)
     leftover = _LEFTOVER_SENSITIVE.search(record)
