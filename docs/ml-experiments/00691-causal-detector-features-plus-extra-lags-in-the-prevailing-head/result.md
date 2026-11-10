@@ -102,8 +102,8 @@ stored fits, and the report reproduces its numbers.
 
 - **Real rows first.** On real event-free rows the scaled CRPS minus B0 is +0.01 [-0.04, +0.07]
   for FL1, +0.01 for L1, and +0.05 for F1: no arm moves. The false-alarm rate on those rows is B0
-  0.104, F1 0.127, L1 0.138, FL1 0.142. The verified D5 and D16 transfer of December 2025 is one episode (13,068 rows) with no
-  known shift size, so reaction time is not scored on it. Its CRPS (descriptive): B0 9.73, F1
+  0.104, F1 0.127, L1 0.138, FL1 0.142. The verified D5 and D16 transfer of December 2025 is one
+  episode (13,068 rows) with no known shift size, so reaction time is not scored on it. Its CRPS (descriptive): B0 9.73, F1
   8.58, L1 8.63, FL1 8.67, K1 14.93.
 - **Reaction time, start of an injected shift (281 held-out events), minus B0.** FL1 -1.75
   [-2.34, -1.24] (median -1.0), F1 -1.59 [-2.23, -0.98], L1 -1.25 [-1.86, -0.71].
