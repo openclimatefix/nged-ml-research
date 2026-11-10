@@ -75,36 +75,38 @@ metric: >-
   MW-weighted share of injected events found and of injected edge-transfer ends paired correctly,
   per cell, with 95% intervals from resampling whole worlds; donor and recipient megawatts found;
   decoded transfers and correct ends; on the real record, decoded transfers per Primary-year, the
-  verified D5 and D16 transfer, the 8 transfers E1-J calls, and logged shifts matched.
+  verified D5 and D16 transfer, the eight transfers E1-J calls, and logged shifts matched.
 code: ml-experiments/00682-event-table-reconstruction-from-edge-flows-part-2-change-cost-model/
 verdict: not supported
 best_arm: >-
-  E1-J-sym of experiment 680 remains the best method: 0.38 of long and deep megawatts paired. E1-F
-  pairs 0.33 (95% interval 0.23 to 0.46), +0.041 (-0.041 to 0.124) over E1-J
+  E1-J-sym of experiment 680 remains the best of the methods compared in experiments 670 to 682:
+  0.38 of long and deep megawatts paired. E1-F pairs 0.33 (95% interval 0.23 to 0.46), +0.041
+  (-0.041 to 0.124) over E1-J
 headline: >-
   Choosing edge flows by a fixed cost per change pairs 0.33 of the long and deep injected transfer
   megawatts and 0.27 of the medium and deep ones, +0.04 and +0.03 over E1-J and below the
-  symmetric search of experiment 680, and it accepts 2990 transfers with 329 correct ends. An all-
-  pairs graph does almost as well, so the objective does not identify the real edges.
+  symmetric search of experiment 680, and it accepts 2990 transfers with 329 correct ends. A graph
+  that connects every pair of Primaries pairs 0.32 and 0.26, so the cost objective gains almost
+  nothing from knowing the real edges.
 lessons: >-
-  A cost per change and a bounded recipient share do not tell a true pair from a coincident pair:
-  with the real edges 89% of decoded transfers match no injected end, and letting every pair of
-  Primaries connect pairs 0.32 against 0.33. The costs hardly changed the result, so the
-  selectivity has to come from somewhere other than the cost, such as information about which
-  neighbour received the load.
+  With the real edges, 89% of the transfers E1-F decodes have no correct end, and letting every
+  pair of Primaries connect pairs 0.32 against 0.33. Change costs from 0 to 64 left the share of
+  such transfers at 0.88 to 0.90, so the cost does not choose between a true pair and a coincident
+  pair. Whatever separates them has to come from the misfit term or from information that the
+  residuals lack, such as which neighbour received the load.
 take_home_message: >-
   Explaining pairs of steps by one flow on an edge, chosen by a fixed cost per change, does not
   find the donor and recipient of an injected load transfer better than the simple searches: it
   pairs 0.33 of the long and deep megawatts against 0.29 for the one-way search and 0.38 for the
   two-way search. It accepts almost every pair that roughly conserves megawatts, 2990 transfers
-  for 329 correct ends, and a model allowed to connect any two Primaries does nearly as well as
-  one restricted to the real neighbours. The power readings of 15 Primaries therefore do not
-  identify where a transfer went by this route, and the line closes here.
+  for 329 correct ends, and a graph that connects any two Primaries pairs nearly as much as the
+  real neighbours. Within the 15 Primaries tested, this cost objective gains almost nothing from
+  knowing the real edges, and the edge-flow line closes here.
 advice:
   - >-
-    Do not tune change costs to restrict which pairs of steps become flows: across 25 cost pairs
-    and a post hoc grid of 12 more, the false-transfer share on validation worlds stayed at 0.88
-    (cost grid).
+    Do not expect a change cost to make a flow model selective: across the 25 cost pairs of the
+    plan and two post hoc grids (costs from 0 to 64), the share of decoded transfers without a
+    correct end stayed between 0.88 and 0.90 on validation worlds (cost grids).
   - >-
     Compare any graph method with the same method on an all-pairs graph, because here the
     all-pairs graph paired 0.32 against 0.33 for the real edges (all-pairs arm).
@@ -114,22 +116,32 @@ adopted_in: none
 
 **Choosing edge flows by a fixed cost per change does not pair injected load transfers better than
 the simple searches of experiments 670 and 680: it pairs 0.33 of the long and deep transfer
-megawatts, against 0.29 and 0.38, and it accepts 2990 transfers of which only 329 ends are
+megawatts, against 0.29 and 0.38, and it decodes 2990 transfers of which only 329 ends are
 correct.** A *Primary substation* steps electricity down to a local distribution network. A *load
-transfer* moves part of one Primary's demand (the *donor*) onto a neighbour (the *recipient*).
-Experiments 672 and 676 closed the neural-network graph-learning approach at 15 Primaries; the model
-here uses no neural network. A *noise unit* is a Primary's usual difference between successive
-6-hour means. The long, medium, and short cells are over 7 days, 1 to 7 days, and 1 day or less, and
-*deep* means 8 noise units or more. *Found* means an injected event has a decoded event at the right
-Primary, sign, and start; *paired* means the decoded donor and recipient are the right two
-Primaries.
+transfer* moves part of one Primary's demand (the *donor*) onto a neighbour (the *recipient*). An
+*edge* joins two neighbouring Primaries, and an *edge flow* is the megawatts that move along it.
+Experiments 672 and 676 closed the neural-network graph-learning approach at 15 Primaries; E1-F uses
+no neural network.
 
-**E1-F decides every pair of opposite steps at two connected Primaries by cost.** For each pair it
-compares the saving in change cost with the misfit of one common flow (the donor's step and the
-recipient's step must roughly match, with a prior on their ratio), and takes the largest savings
-first. Either end can propose the other. The verdict is *not supported*: the stop rule of the plan
-closes the edge-flow line at 15 Primaries, because E1-F misses E1-J + 0.10 in both deep cells and
-the all-pairs graph matches E1-F on false transfers.
+The terms of the line are these. **E1** is the event table of [experiment
+653](../00653-edge-state-event-table-penalised-segmentation/result.md), a list of steps at each
+Primary. **E1-J** adds a search for a recipient from each large fall ([experiment
+670](../00670-event-table-recipient-search-on-six-cell-grid/result.md)), and **E1-J-sym** adds a
+search for a donor from each rise ([experiment
+680](../00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/result.md)). A
+*noise unit* is a Primary's usual difference between successive 6-hour means. The long, medium, and
+short cells are over 7 days, 1 to 7 days, and 1 day or less. *Deep* means 8 noise units or more, and
+*shallow* means 2 to 8. *Found* means an injected event has a decoded event at the right Primary,
+sign, and start. *Paired* means the decoded donor and recipient are the right two Primaries. F-hyb
+and R-hyb are the donor-probe hybrids of experiment 678.
+
+**E1-F decides every pair of opposite steps at two connected Primaries by cost.** E1-F compares the
+saving in change cost with the misfit of one common flow (the donor's step and the recipient's step
+must roughly match, with a prior on their ratio), and takes the largest savings first. Either end
+can propose the other. The verdict is *not supported*: stop rule (a) of the decision rule closes the
+edge-flow line at 15 Primaries, because E1-F misses E1-J + 0.10 in both deep cells. Stop rule (b)
+also trips, because the all-pairs graph's false-transfer share is only 0.068 below E1-F's, inside
+the 0.10 tolerance.
 
 ![Paired share per cell for E1-J, E1-J-sym, E1-F, E1-F on all pairs, and E1-F
 rewired](figure_paired_by_cell.svg)
@@ -147,57 +159,75 @@ rewired](figure_paired_by_cell.svg)
   0.154). **E1-F minus E1-J-sym:** long and deep -0.053 (-0.113 to 0.000); medium and deep -0.045
   (-0.120 to 0.029).
 - **Donor megawatts found,** long and deep: E1-F 0.491, E1-J 0.441, E1-J-sym 0.481.
-- **Decoded transfers and correct ends:** E1-F 2990 and 329 (89% of decoded transfers beyond the
-  ends); E1-J 788 and 220 (72%); E1-J-sym 1230 and 283 (77%).
+- **Decoded transfers and correct ends.** The false-transfer share is one minus the correct ends
+  over the decoded transfers. E1-F decodes 2990 transfers with 329 correct ends (share 0.89); E1-J
+  788 and 220 (0.72); E1-J-sym 1230 and 283 (0.77).
 - **Placebos.** E1-F on a rewired graph pairs 0.022 and 0.053 in the two deep cells (2310 transfers,
-  44 correct ends). E1-F on all pairs pairs 0.316 and 0.257 (7099 transfers, 301 correct ends). E1-F
-  on the real edges is therefore only 0.011 and 0.015 above the all-pairs graph, and its
+  44 correct ends). E1-F on all pairs pairs 0.316 and 0.257 (7099 transfers, 301 correct ends, share
+  0.96). E1-F on the real edges is therefore only 0.011 and 0.015 above the all-pairs graph, and its
   false-transfer share is 0.068 lower, under the 0.10 predicted.
-- **Costs.** The tuning rule chose `c_edge` 2 and `delta` 8, and no pair of the 25 met the
-  constraint of a false-transfer share no higher than E1-J's (0.75 on the validation worlds), so the
-  page uses the fallback of the highest paired share. Every pair had a false share of 0.88 to 0.89.
+- **Costs.** The tuning rule chose `c_edge` 2 and `delta` 8. None of the 25 pairs met the constraint
+  of a false-transfer share no higher than E1-J's (0.75 on the validation worlds), so the highest
+  paired share was used. All 25 pairs gave a share of 0.876 to 0.884.
 - **Cross-injector check.** Tuning on constant-MW square worlds chose the same costs, so the drop is
   zero by construction. On 20 constant-MW square worlds E1-F minus E1-J is +0.036 (-0.171 to 0.303)
-  long and deep and +0.302 (0.161 to 0.473) medium and deep. On long-heavy worlds it is +0.003 and
-  +0.040, and on short-heavy worlds +0.020 and +0.101; all those intervals include zero.
+  long and deep and +0.302 (0.161 to 0.473) medium and deep, the one interval that excludes zero. On
+  long-heavy worlds the differences are +0.003 and +0.040, and on short-heavy worlds +0.020 and
+  +0.101; those intervals include zero.
 
-## Post hoc grid (not pre-registered)
+## Post hoc grids (not pre-registered)
 
-Because every pair of the planned grid met the same false share, a second grid was run on the same
-validation worlds: `c_edge` 8, 16, or 32 and `delta` 8, 16, 32, or 64. It also met no pair under
-E1-J's false share (best 0.876), and chose `c_edge` 8 and `delta` 64. On the scored worlds it pairs
-0.349 and 0.293 in the two deep cells (+0.063 and +0.048 over E1-J, intervals -0.016 to 0.148 and
--0.019 to 0.135), with 3008 decoded transfers and 348 correct ends. The conclusion is unchanged. In
-this model a larger change cost for a step that stands alone makes merging more attractive, so no
-cost in either grid restricts the merges.
+Because the planned grid gave nearly the same false-transfer share at every pair, two more grids
+were run on the same validation worlds, and the best pair of each was scored on the 40 default
+worlds.
+
+- **Wide grid:** `c_edge` 8, 16, or 32 and `delta` 8, 16, 32, or 64. No pair met the constraint
+  (best share 0.875). The chosen pair (`c_edge` 8, `delta` 64) pairs 0.349 and 0.293 in the two deep
+  cells (+0.063 and +0.048 over E1-J, intervals -0.016 to 0.148 and -0.019 to 0.135), with 3008
+  decoded transfers and 348 correct ends. In E1-F a larger cost for a step that stands alone raises
+  the saving from merging, so this grid ran in the direction that cannot restrict merges.
+- **Low grid:** `c_edge` 0, 0.5, or 1 and `delta` 0, 0.1, or 0.25. No pair met the constraint
+  (shares 0.884 to 0.897). The chosen pair (`c_edge` 0, `delta` 0.25) pairs 0.314 and 0.257, with
+  2858 decoded transfers and 307 correct ends, and the all-pairs graph pairs 0.302 and 0.174.
+
+Costs from 0 to 64 therefore left the false-transfer share between 0.88 and 0.90. The costs of E1-F
+do not separate a true pair from a coincident pair. The misfit term, the compatibility rule, and the
+candidate steps were not varied.
 
 ## Real record
 
-- **Decoded transfers** (2024-01 to 2026-06, 36.0 Primary-years): E1-F 17; E1-J 8; E1-F on a rewired
-  graph 4, with a median of 6 over 100 rewired graphs; E1-F on all pairs 30. NGED's event labels are
-  an incomplete dump, so every count of real events is a lower bound.
+- **Decoded transfers** (2024-01 to 2026-06, 36.0 Primary-years): E1-F 17; E1-J 8; E1-F on the
+  stored rewired graph 4, with a median of 6 over 100 rewired graphs; E1-F on all pairs 30. NGED's
+  event labels are an incomplete dump, so every count of real events is a lower bound.
 - **Verified D5 to D16 transfer (December 2025):** one flow with D5 as the donor (-1.08 MW) and D16
   as the recipient (+1.28 MW, a share of 1.19), the same pair as E1-J found. Both starts are late
-  (D5 by 24 hours, D16 by 12.5 hours), and both ends are 24 hours late, so the plan's bars of 6
-  hours at the start and 12 hours at the end do not hold. The donor amplitude is under the 1.2 to
-  2.2 MW range.
+  (D5 by 24 hours, D16 by 12.5 hours), and both ends are 24 hours late, so the pre-registered bars
+  of 6 hours at the start and 12 hours at the end do not hold. The donor amplitude is under the 1.2
+  to 2.2 MW range.
 - **Logged shifts longer than 1 day (77 in the scored years):** 10 have an event start within 2
-  hours (E1-J: 8) and 21 within 24 hours (E1-J: 18).
+  hours (E1-J: 8, from experiment 670) and 21 within 24 hours (E1-J: 18).
 - **Event-free time** (27.6 Primary-years more than 14 days from a logged or verified event): E1-F
-  calls 3 transfers; E1-F on all pairs calls 11.
+  calls three transfers; E1-F on all pairs calls 11.
 
 ## Pre-registered predictions
 
-- Held: long and shallow E1-J + 0.05 (+0.097); medium and shallow E1-J + 0.03 (+0.090); short cells
-  no worse than E1-J - 0.03; paired share on all pairs no more than 0.03 below E1-F.
-- Did not hold: long and deep 0.39 or more (0.327); medium and deep 0.35 or more (0.272); 0.03 above
-  the better hybrid; donor megawatts found 0.54 or more (0.491); E1-F minus E1-J-sym +0.05 (negative
-  in both deep cells); false-transfer share 0.10 below all pairs (0.068 below); rewired pairs 0.05
-  or less (0.053 in the medium and deep cell); rewired calls a third or fewer of the real-record
-  transfers (4 against 17 for the stored graph, but a median of 6 over 100 graphs); no-edges found
-  within 0.03 of E1-F (0.039 and 0.044 below); D5 to D16 timing bars.
-- References: the better of F-hyb and R-hyb pairs about 0.36 and 0.33 in the two deep cells
-  (experiment 678), so E1-F is below both hybrids.
+- **Held:**
+    - Long and shallow E1-J + 0.05: +0.097.
+    - Medium and shallow E1-J + 0.03: +0.090.
+    - Short cells no worse than E1-J - 0.03.
+    - Paired share on all pairs no more than 0.03 below E1-F: 0.011 and 0.015 below.
+    - E1-F on the stored rewired graph calls a third or fewer of E1-F's real-record transfers: 4
+      of 17. The median over 100 rewired graphs is 6, just over a third.
+    - D5 to D16: one flow with D5 as the donor, a share of 1.19, and D16 at 1.28 MW.
+- **Did not hold:**
+    - Long and deep paired 0.39 or more: 0.327. Medium and deep 0.35 or more: 0.272.
+    - Three points above the better hybrid in both deep cells (about 0.36 and 0.33).
+    - Donor megawatts found 0.54 or more: 0.491.
+    - E1-F minus E1-J-sym +0.05: -0.053 and -0.045.
+    - False-transfer share 0.10 below all pairs: 0.068 below.
+    - Rewired pairs 0.05 or less: 0.022 and 0.053.
+    - No-edges found share within 0.03 of E1-F: 0.039 and 0.044 below.
+    - D5 to D16 start and end timing, and the donor amplitude of 1.2 MW or more.
 
 ## Method
 
@@ -206,29 +236,32 @@ cost in either grid restricts the merges.
   importing the folders of experiments 653, 660, 665, 670, and 680. The panel, residual, worlds,
   cells, and the found and paired definitions are unchanged. E1-J and E1-J-sym are read from the
   stored rows of experiments 670 and 680.
-- **Model.** Steps: E1's steps of 2 noise units or more, plus the opposite step each proposes at
-  each connected Primary. A step that stands alone costs `c_edge + delta`; an edge flow costs
-  `c_edge` plus 1 per extra recipient; the misfit is half the squared distance, in noise units, from
-  the best common amplitude and share (share between 0.3 and 2.0 on a 24-point grid, normal prior on
-  its logarithm with mean `log 0.8` and standard deviation 0.5). Not built: the segment-boundary
-  search with end moves, ramps, and a routine-step cost; E1's own segment boundaries are used.
-- **Tuning.** 60 validation worlds (seeds 20000 to 20059, events from 2023-07-01 to 2023-12-31,
-  readings after 2023-12-31 hidden).
-- **Reviews.** A fresh Sonnet code review ran before the first scored run. It found that a flow made
-  only of proposed steps crashed `reconstruct`, that tuning counted correct ends differently for
-  E1-J and E1-F, that validation truth ran past the hidden readings, that the fitted share was not
-  stored, and that the fallback was not recorded; all were fixed. A bug in the real-record run
-  (noise units from the wrong residual) was found afterwards and fixed before the real-record
-  numbers above. The results and the write-up were reviewed by fresh Sonnet agents.
-- **Compute:** CPU only, 2 cores, under 40 minutes. The final-test window from 2026-07-01 is never
-  read. No NGED generator is named.
+- **Steps and costs.** E1-F uses E1's steps of 2 noise units or more, plus the opposite step that
+  each proposes at each connected Primary. A step that stands alone costs `c_edge + delta`. An edge
+  flow costs `c_edge` plus 1 for each recipient beyond the first. The misfit is half the squared
+  distance, in noise units, from the best common amplitude and share (a share between 0.3 and 2.0 on
+  a 24-point grid, with a normal prior on its logarithm of mean `log 0.8` and standard deviation
+  0.5). E1-F does not build the segment-boundary search with end moves, ramps, or a routine-step
+  cost, and uses E1's own segment boundaries.
+- **Tuning.** The costs were tuned on 60 validation worlds (seeds 20000 to 20059, events from
+  2023-07-01 to 2023-12-31, readings after 2023-12-31 hidden).
+- **Reviews.** A fresh Sonnet code review ran before the first scored run. The review found that a
+  flow made only of proposed steps crashed `reconstruct`, that tuning counted correct ends
+  differently for E1-J and E1-F, that validation truth ran past the hidden readings, that the fitted
+  share was not stored, and that the fallback was not recorded; all were fixed. A bug in the
+  real-record run (noise units from the wrong residual) was found afterwards and fixed before the
+  real-record numbers above. A fresh Sonnet agent reviewed the results and the write-up; it found
+  two wrong cost-grid figures, a wrongly marked prediction, a misleading description of the
+  all-pairs comparison, and an unsupported conclusion from the wide grid, and all were corrected.
+- **Compute:** CPU only, 2 cores, under 1 hour. The final-test window from 2026-07-01 is never read.
+  No NGED generator is named.
 
 ## What the next experiment should answer
 
-The line closes at 15 Primaries for the reasons above. The remaining gap is information that the
-power of the 15 Primaries may not carry: which neighbour received the load. A source of that
-information, such as NGED's records of which circuits were switched, is the option left to explore.
-Another model fitted to the same residuals is not.
+The remaining gap is information that the power of the 15 Primaries may not carry: which neighbour
+received the load. One option is a source of that information, such as NGED's records of which
+circuits were switched. This experiment does not test whether another model fitted to the same
+residuals would do better.
 
 ## Files
 

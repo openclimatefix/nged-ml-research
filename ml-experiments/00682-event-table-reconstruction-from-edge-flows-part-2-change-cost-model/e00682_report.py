@@ -178,7 +178,7 @@ def main() -> None:
     """Report every configuration and cost choice found on disk."""
     out: dict = {}
     for config in ("default", "constant_mw_square", "long_heavy", "short_heavy"):
-        for costs in ("default", "constant_mw_square", "default_wide"):
+        for costs in ("default", "constant_mw_square", "default_wide", "default_low"):
             r = report(config=config, costs=costs)
             if r:
                 out[f"{config}|{costs}"] = r

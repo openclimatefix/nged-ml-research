@@ -68,6 +68,9 @@ DELTA_GRID: Final[tuple[float, ...]] = (0.5, 1.0, 2.0, 4.0, 8.0)
 WIDE_C_EDGE_GRID: Final[tuple[float, ...]] = (8.0, 16.0, 32.0)
 WIDE_DELTA_GRID: Final[tuple[float, ...]] = (8.0, 16.0, 32.0, 64.0)
 """Post hoc grid, run only because the plan's grid met no pair under E1-J's false share."""
+LOW_C_EDGE_GRID: Final[tuple[float, ...]] = (0.0, 0.5, 1.0)
+LOW_DELTA_GRID: Final[tuple[float, ...]] = (0.0, 0.1, 0.25)
+"""Second post hoc grid, below the plan's grid, where a larger saving needs a better fit."""
 ARMS: Final[tuple[str, ...]] = ("E1-F", "E1-F rewired", "E1-F no edges", "E1-F all pairs")
 DEEP: Final[tuple[str, str]] = ("long, deep", "medium, deep")
 
@@ -136,15 +139,16 @@ def sums(*, rows: list[dict], decoded: int) -> dict:
     }
 
 
-def tune(*, config_name: str, n_worlds: int, wide: bool = False) -> None:
+def tune(*, config_name: str, n_worlds: int, grid_name: str = "") -> None:
     """Choose the change costs on validation worlds from the fixed grid (rule in the plan)."""
     rig = Rig()
     params = params653()
-    grid = list(
-        itertools.product(
-            WIDE_C_EDGE_GRID if wide else C_EDGE_GRID, WIDE_DELTA_GRID if wide else DELTA_GRID
-        )
-    )
+    c_grid, d_grid = {
+        "": (C_EDGE_GRID, DELTA_GRID),
+        "wide": (WIDE_C_EDGE_GRID, WIDE_DELTA_GRID),
+        "low": (LOW_C_EDGE_GRID, LOW_DELTA_GRID),
+    }[grid_name]
+    grid = list(itertools.product(c_grid, d_grid))
     ref_dec = ref_right = 0
     acc = {g: {"paired": 0.0, "total": 0.0, "right": 0, "decoded": 0} for g in grid}
     for k in range(n_worlds):
@@ -182,7 +186,7 @@ def tune(*, config_name: str, n_worlds: int, wide: bool = False) -> None:
     pool = ok or table
     best = max(pool, key=lambda t: (t["deep_paired"], t["delta"]))
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / f"costs_{config_name}{'_wide' if wide else ''}.json").write_text(
+    (OUT / f"costs_{config_name}{'_' + grid_name if grid_name else ''}.json").write_text(
         json.dumps(
             {"chosen": best, "fallback": not ok, "e1j_false_share": ref_false, "table": table},
             indent=1,
@@ -290,8 +294,12 @@ def run_real(*, costs_name: str) -> None:
 
 
 if __name__ == "__main__":
-    if sys.argv[1] in ("tune", "tune_wide"):
-        tune(config_name=sys.argv[2], n_worlds=int(sys.argv[3]), wide=sys.argv[1] == "tune_wide")
+    if sys.argv[1].startswith("tune"):
+        tune(
+            config_name=sys.argv[2],
+            n_worlds=int(sys.argv[3]),
+            grid_name=sys.argv[1].removeprefix("tune").removeprefix("_"),
+        )
     elif sys.argv[1] == "injected":
         run_injected(
             config_name=sys.argv[2],

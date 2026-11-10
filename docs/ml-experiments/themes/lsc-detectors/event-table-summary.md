@@ -3,9 +3,9 @@
 **Reading only the power data, we find about two thirds of the megawatts of long, deep load shifts,
 but we name both substations of a transfer for only about a third of its megawatts. Nothing we tried
 reached the 0.60 share set for adopting a method, so the results describe single substations well
-and do not yet say where a transfer went.** The line ran from experiment 653 to experiment 676, the
-last of the graph models. NGED's event labels are incomplete, so every count of real events on this
-page is a lower bound.
+and do not yet say where a transfer went.** The line ran from experiment 653 to experiment 682,
+which tested a reconstruction by edge flows after the graph models of experiments 672 and 676.
+NGED's event labels are incomplete, so every count of real events on this page is a lower bound.
 
 ## What the line was trying to do
 
@@ -41,6 +41,12 @@ days (or has no end), a *medium* one 1 to 7 days, and a *short* one 1 day or les
   0.32 of the medium and deep megawatts against 0.25, but adds 442 decoded transfers for 63 more
   correct ends ([experiment
   680](../../00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/result.md)).
+- **Choosing edge flows by a fixed cost per change does not help.** E1-F, which accepts a pair of
+  steps when one flow explains both better than two separate steps, pairs 0.33 of the long and deep
+  megawatts, below the symmetric search, and decodes 2990 transfers for 329 correct ends. A graph
+  that connects any two Primaries pairs nearly as much as the real neighbours, so the edge-flow line
+  closes at 15 Primaries ([experiment
+  682](../../00682-event-table-reconstruction-from-edge-flows-part-2-change-cost-model/result.md)).
 - **The real record supports the method only thinly.** The one verified transfer, between Primaries
   D5 and D16 in December 2025, is paired in the right direction, but the decoded starts are late.
 
@@ -103,3 +109,4 @@ graph](../../00670-event-table-recipient-search-on-six-cell-grid/figure_recall_b
 | [678](../../00678-donor-posterior-hybrid-for-load-transfer-pairing/result.md) | Do a probe's donor alarms raise the pairing? | Not supported | 0.36 against 0.29 |
 | [676](../../00676-pretrained-graph-model-for-load-transfers-part-2-edge-state-network/result.md) | Does an edge-state neural network pair more than the hybrids? | Not supported | Pairs 0.32 against 0.36 (best hybrid); a copy without links pairs as much |
 | [680](../../00680-event-table-reconstruction-from-edge-flows-part-1-symmetric-search/result.md) | Does also searching from each unpaired rise for its donor pair more? | Partly supported | 0.38 against 0.29 (long and deep); 442 added transfers |
+| [682](../../00682-event-table-reconstruction-from-edge-flows-part-2-change-cost-model/result.md) | Does choosing edge flows by a fixed cost per change pair more? | Not supported | 0.33 against 0.29 (long and deep); all-pairs graph 0.32 |
