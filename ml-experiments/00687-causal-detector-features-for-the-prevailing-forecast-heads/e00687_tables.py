@@ -2,8 +2,7 @@
 """Experiment 687, step 1: causal feature tables for the stored banks of experiments 650 and 652 (CPU).
 
 For each development month, writes `feats/<month>_<bank>.npz` where `<bank>` is `M` (the stored bank,
-neighbour signals carry the mirror), `X` (no mirror: neighbour signals read the neighbour's own shifted
-power), `S` (mirror at 60% of its stored strength), or `real` (experiment 647's real rows, no shift).
+neighbour signals carry the mirror), `X` (no mirror: neighbour signals read the neighbour's unshifted power), `S` (mirror at 60% of its stored strength), or `real` (experiment 647's real rows, no shift).
 Keys, with one row per (pass, origin, Primary) of the *full grid* of that month's origins and all 16
 Primaries, so a placebo can read another Primary's row:
 
@@ -69,10 +68,13 @@ def build_rows(*, grids: f.Grids, gap_own: np.ndarray, oi: np.ndarray, neighbour
     feat = np.zeros((len(o), len(CUTOFFS), f.N_FEATURES), np.float32)
     flag = np.zeros((len(o), len(CUTOFFS)), bool)
     for k, (_name, back) in enumerate(CUTOFFS.items()):
+        assert (o - back - grids.start >= 0).all(), "cutoff before the window"
+        assert (o - back <= o - 8).all(), "a cutoff later than origin minus 4 hours"
         feat[:, k], flag[:, k] = f.features_at(g=grids, prim=prim, t=o - back, neighbours=neighbours)
     lags = np.zeros((len(o), len(LAG_HOURS)), np.float32)
     miss = np.zeros((len(o), len(LAG_HOURS)), bool)
     for j, h in enumerate(LAG_HOURS):
+        assert (2 * h >= 12), "a lag newer than 6 hours before the origin"
         v = gap_own[prim, o - 2 * h - grids.start]
         bad = ~np.isfinite(v)
         miss[:, j] = bad
