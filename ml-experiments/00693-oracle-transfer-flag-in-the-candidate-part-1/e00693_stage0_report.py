@@ -63,8 +63,10 @@ def boot(*, clusters: pl.DataFrame, rng: np.random.Generator) -> tuple[float, fl
 
 
 def follow(*, rows: pl.DataFrame, a: str, b: str) -> float:
-    """Return the share of the day-lag shift the median moves by: sum(change * shift) / sum(shift **
-    2) over rows with a day-lag shift."""
+    """Return the share of the day-lag shift that the median moves by.
+
+    The share is sum(change * shift) / sum(shift ** 2) over rows with a day-lag shift.
+    """
     r = rows.filter(pl.col("shift_day") != 0)
     change = (r[f"{a}_med"] - r[f"{b}_med"]).to_numpy()
     shift = r["shift_day"].to_numpy()

@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Experiment 693: per-row forecast scores in points of capacity (shared by the head scorers)."""
 
 from typing import Final
@@ -9,8 +8,10 @@ QUANTILES: Final = (0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 
 
 
 def row_scores(*, q: np.ndarray, y: np.ndarray) -> dict[str, np.ndarray]:
-    """Return per-row scores: CRPS (twice the mean pinball loss), absolute error of the median, tail
-    pinball, and the q05 to q95 cover.
+    """Return per-row scores of the quantile forecast `q` against the target `y`.
+
+    The scores are CRPS (twice the mean pinball loss), the absolute error of the median, the tail
+    pinball loss, and the q05 to q95 cover.
 
     `q` holds the 11 quantiles as shares of capacity, sorted within the row; `y` is the target as a
     share of capacity.

@@ -78,8 +78,10 @@ def month_idx(*, month: str) -> tuple[int, int]:
 
 
 def read_rows(*, files: list) -> dict[str, np.ndarray]:
-    """Return (prim, oi, vi, lead, q) of the seed-mean quantiles of the seeds' parquet files, leads
-    3 h to under 339 h."""
+    """Return (prim, oi, vi, lead, q) of the seed-mean quantiles of the seeds' parquet files.
+
+    Leads run from 3 h to under 339 h.
+    """
     cols = ["time_series_id", "power_fcst_init_time", "valid_time"]
     frames = [pl.read_parquet(f).sort(cols) for f in files]
     for f in frames[1:]:
@@ -109,8 +111,10 @@ def fold_table(*, fold: str) -> s598.LagFreeTable:
 
 
 def runs_of(*, mask: np.ndarray) -> dict[int, list[tuple[int, int | None]]]:
-    """Return per Primary the (onset, end) half-hour indices of the runs of `mask`; end is None for
-    a run reaching the grid's end."""
+    """Return per Primary the (onset, end) half-hour indices of the runs of `mask`.
+
+    `end` is `None` for a run reaching the grid's end.
+    """
     out: dict[int, list[tuple[int, int | None]]] = {}
     for p in range(mask.shape[0]):
         d = np.diff(np.concatenate([[0], mask[p].astype(np.int8), [0]]))
@@ -124,8 +128,10 @@ def runs_of(*, mask: np.ndarray) -> dict[int, list[tuple[int, int | None]]]:
 
 
 def dilate(*, mask: np.ndarray, before: int, after: int) -> np.ndarray:
-    """Return, per half-hour, whether `mask` is set within `before` half-hours behind it or `after`
-    half-hours ahead of it."""
+    """Return, per half-hour, whether `mask` is set near it.
+
+    Near means within `before` half-hours behind it or `after` half-hours ahead of it.
+    """
     c = np.concatenate([np.zeros((mask.shape[0], 1), np.int64), np.cumsum(mask, axis=1)], axis=1)
     n = mask.shape[1]
     i = np.arange(n)
@@ -257,8 +263,10 @@ def bank_part(
     n_days: int,
     keep_phase: bool,
 ) -> dict[str, np.ndarray]:
-    """Return the head's rows of one injected pass: its rows near an event, even half-hours only,
-    with origin-level inputs."""
+    """Return the head's rows of one injected pass, with origin-level inputs.
+
+    The rows are those near an event, at even half-hours only.
+    """
     prim, oi, vi = rows["prim"], rows["oi"], rows["vi"]
     obs_c = fixed[prim, vi].astype(np.float32)
     res = residuals(rows=rows, obs=obs_c, n_days=n_days)
