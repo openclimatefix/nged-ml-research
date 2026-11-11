@@ -33,12 +33,12 @@ def load(*, folds: tuple[str, ...]) -> pl.DataFrame:
     for fold in folds:
         files = sorted((ROOT / f"P7_D50_{fold}_stage0" / "work" / "stage0").glob("*.parquet"))
         assert files, fold
-        for f in files:
-            frames.append(
-                pl.read_parquet(f).with_columns(
-                    fold=pl.lit(fold), pass_=pl.lit(int(f.stem.split("_r")[1]))
-                )
+        frames.extend(
+            pl.read_parquet(f).with_columns(
+                fold=pl.lit(fold), pass_=pl.lit(int(f.stem.split("_r")[1]))
             )
+            for f in files
+        )
     return pl.concat(frames)
 
 
