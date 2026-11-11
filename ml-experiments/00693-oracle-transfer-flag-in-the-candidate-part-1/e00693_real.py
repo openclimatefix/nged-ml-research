@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 693: the real load transfers as spans on the Candidate's half-hourly grid.
 
 Two sets of spans mark real rows. The verified set is the transfers found in the telemetry alone

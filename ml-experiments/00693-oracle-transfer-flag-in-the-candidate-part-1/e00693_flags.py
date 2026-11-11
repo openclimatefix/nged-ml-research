@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, D103
+# ruff: noqa: E501, PT018
 """Experiment 693: the oracle and placebo transfer flags (pure numpy, no torch).
 
 The oracle is a perfect telemetry detector. It knows whether a reading lay inside a load transfer,

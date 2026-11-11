@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, PLR0915
+# ruff: noqa: D103, E501, PLR0915, PLR0912, PERF401, PT018
 """Experiment 693: score the prevailing head arms and print the planned contrasts (CPU).
 
 Reads `<root>/head_scores/<arm>_<fold>_<kind>_<label>.parquet` from `e00693_headfit.py` and writes
@@ -190,11 +190,7 @@ def main() -> None:
             ("OB-B P1", "OB", "B", 1),
             ("OB-B P2", "OB", "B", 2),
         ):
-            res = (
-                bank_contrast(a=a, b=b, phase=phase, kind=kind, rng=rng)
-                if (a not in {"OB", "B"} or True)
-                else None
-            )
+            res = bank_contrast(a=a, b=b, phase=phase, kind=kind, rng=rng)
             if res is None:
                 continue
             rows.append({"set": kind, "contrast": name, **res})

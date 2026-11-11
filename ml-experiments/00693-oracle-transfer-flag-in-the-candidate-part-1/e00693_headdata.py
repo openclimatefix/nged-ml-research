@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E501, PLR0913, PLR0915
+# ruff: noqa: ANN001, D103, E501
 """Experiment 693: the prevailing head's rows for the quarterly step-8 Candidate (CPU).
 
 A quarterly version of experiment 667's `p667_data.py`. The Candidate's quantiles come from

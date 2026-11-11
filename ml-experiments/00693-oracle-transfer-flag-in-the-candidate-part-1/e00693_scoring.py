@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 693: per-row forecast scores in points of capacity (shared by the head scorers)."""
 
 from typing import Final
