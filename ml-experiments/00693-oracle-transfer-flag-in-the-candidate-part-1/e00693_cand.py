@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN003, ANN201, ANN202, D102, D103, D107, D205, E402, E501, F841, I001, PLR0915, PT018
+# ruff: noqa: C408, ANN001, ANN003, ANN201, ANN202, D102, D103, D107, D205, E402, E501, F841, I001, PLR0915, PT018
 """Experiment 693 (copy of experiment 677's `e00677_cand.py`): the Candidate with oracle or placebo transfer flags.
 
 Experiment 677's script table-builds, fine-tunes, and scores the Candidate (arm `P7+D50`) one fold
@@ -85,7 +85,7 @@ assert ROOT != SRC677
 SHUFFLED = ARM.endswith("-p")
 SPEC_NAME = ARM[:-2] if SHUFFLED else ARM
 BASE_ARM, *MODS = SPEC_NAME.split("+")
-DIR = ARM.replace("-", "").replace("+", "_")
+DIR = ARM.replace("-", "").replace("+", "_") + (f"_f{MINE.flags}" if MINE.flags != "none" else "")
 TABLES = SRC677 / f"tables_sp{fold.SPAN_MONTHS}"
 """One folder per scored span: the table also covers the scored rows."""
 TABLES_610 = (
@@ -460,16 +460,25 @@ class FoldSignals:
         self.nbr_active = flg.neighbour_active(
             active=self.own_active, nb_of=NB.of, choice=self.choice
         )
-        self.placebo_offset = flg.placebo_offset(month=month, seed=seed, grid_length=clean.shape[1])
+        self.window = (int(mr.target_idx.min()), int(mr.target_idx.max()) + 1)
+        """The grid range where the fold's training events exist; the placebo rolls inside it."""
+        self.placebo_offset = flg.placebo_offset(
+            month=month, seed=seed, window_length=self.window[1] - self.window[0]
+        )
 
-    def masks(self, *, kind: str, own: np.ndarray | None = None, nbr: np.ndarray | None = None):
+    def masks(
+        self, *, kind: str, own: np.ndarray | None = None, nbr: np.ndarray | None = None,
+        window: tuple[int, int] | None = None, offset: int | None = None,
+    ):  # fmt: skip
         """Return the (own, nbr) transfer masks the `kind` flags read: the true ones or the rolled placebo."""
         own = self.own_active if own is None else own
         nbr = self.nbr_active if nbr is None else nbr
         if kind == "placebo":
+            window = window or self.window
+            offset = offset or self.placebo_offset
             return (
-                flg.roll_mask(mask=own, offset=self.placebo_offset),
-                flg.roll_mask(mask=nbr, offset=self.placebo_offset),
+                flg.roll_mask(mask=own, offset=offset, window=window),
+                flg.roll_mask(mask=nbr, offset=offset, window=window),
             )
         assert kind == "oracle", kind
         return own, nbr
@@ -569,6 +578,7 @@ class SigGpuMonth(e.LagGpuMonth):
     def refit_tensors(self, *, refit, shift_z=None):
         t = super().refit_tensors(refit=refit, shift_z=shift_z)  # applies block dropout
         if not N_EXTRA:
+            assert N_FLAG == 0, "flag columns need the signal block"
             return t
         fs = FOLD[(self.mr.month, e.CTX["seed"])]
         b = fs.train_block()[refit.index].copy()
@@ -595,6 +605,17 @@ class SigGpuMonth(e.LagGpuMonth):
             fl[day_masked, :2] = 0.0
             fl[week_masked, 2:] = 0.0
             e.CTX["flag_rate"] = {n: float(fl[:, j].mean()) for j, n in enumerate(flg.FLAG_NAMES)}
+            if MINE.flags == "placebo":  # per-Primary counts and span lengths are kept, so the rates match
+                tr = FOLD[(self.mr.month, e.CTX["seed"])]
+                true_rows = flg.lag_flags(
+                    own=tr.own_active, nbr=tr.nbr_active, prim=self.mr.primary[refit.index],
+                    origin_idx=origin_idx_of(origin_us=self.mr.origin_us[refit.index]),
+                    day_idx=self.mr.x[refit.index, LEAD_OF["day"]].astype(np.int64),
+                    week_idx=self.mr.x[refit.index, LEAD_OF["week"]].astype(np.int64),
+                    day_missing=day_masked, week_missing=week_masked,
+                )  # fmt: skip
+                ratio = fl.mean(axis=0) / np.maximum(true_rows.mean(axis=0), 1e-9)
+                assert ((ratio > 0.7) & (ratio < 1.3)).all(), f"placebo flag rate off: {ratio}"
             print(f"{self.mr.month} {MINE.flags} flag rates {e.CTX['flag_rate']}", flush=True)
             parts.append(torch.from_numpy(fl).to(self.device))
         if AUX_W > 0:
@@ -664,11 +685,35 @@ def forecast_window(
         parts = [sub.x, block]
         if N_FLAG:
             assert flags is not None, "an arm with flag columns needs the flag block"
-            parts.append(flags[sel])
+            fl = flags[sel].copy()
+            if mask_lags is not None:  # a masked lag carries no flag, as in training
+                fl[mask_lags[sel][:, 0], :2] = 0.0
+                fl[mask_lags[sel][:, 1], 2:] = 0.0
+            parts.append(fl)
         sub = dataclasses.replace(sub, x=np.concatenate(parts, axis=1))
     model.table = e.CTX["table_ft"]
     return e._window_frame(
         model=model, test=sub, mr=mr, lo=lo, hi=hi, flag=False, device=device
+    )  # fmt: skip
+
+
+def no_flags(*, test) -> np.ndarray | None:
+    """Return all-zero flags for rows of observed power: real transfers carry flag 0 in every arm's fine-tune."""
+    return np.zeros((len(test.x), flg.N_FLAGS), np.float32) if N_FLAG else None
+
+
+def bank_flags(*, fs, test, shift: np.ndarray, month: str, seed: int, window: tuple[int, int]):
+    """Return the flags of experiment 581's injected bank rows (shift in the lag inputs and the mirrored neighbours)."""
+    if not N_FLAG:
+        return None
+    own = flg.active_from_shift(shift=shift)
+    nbr = flg.neighbour_active(active=own, nb_of=NB.of, choice=fs.choice)
+    offset = flg.placebo_offset(month=month, seed=1000 + seed, window_length=window[1] - window[0])
+    own, nbr = fs.masks(kind=MINE.flags, own=own, nbr=nbr, window=window, offset=offset)
+    return flg.lag_flags(
+        own=own, nbr=nbr, prim=test.primary, origin_idx=test.origin_idx,
+        day_idx=test.x[:, LEAD_OF["day"]].astype(np.int64), week_idx=test.x[:, LEAD_OF["week"]].astype(np.int64),
+        day_missing=test.x[:, 38] > 0.5, week_missing=test.x[:, 41] > 0.5,
     )  # fmt: skip
 
 
@@ -804,6 +849,7 @@ def check_fingerprint(*, mr, month: str) -> None:
 
 
 def run_fit(*, device: str = "cuda") -> None:
+    flg.known_answer()
     if AUX_W > 0:
         e.row_nll = row_nll
     clean = e.c.clean_stack()
@@ -848,7 +894,7 @@ def run_fit(*, device: str = "cuda") -> None:
                 else:
                     frame = forecast_window(
                         model=model, test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi,
-                        power_lag=clean, power_sig=clean,
+                        power_lag=clean, power_sig=clean, flags=no_flags(test=test),
                     )  # fmt: skip
                 if frame is None:
                     out.parent.mkdir(parents=True, exist_ok=True)
@@ -893,6 +939,7 @@ def run_bank(*, device: str = "cuda") -> None:
     import polars as pl
 
     assert fold.PHASE == "predict", "the bank needs the scored window open"
+    flg.known_answer()
     clean = e.c.clean_stack()
     e.k.build_month = build_month_syn
     e.k.GpuMonth = SigGpuMonth
@@ -966,6 +1013,7 @@ def run_bank(*, device: str = "cuda") -> None:
                     hi=hi,
                     power_lag=clean,
                     power_sig=clean,
+                    flags=no_flags(test=test),
                 )
                 power_sig = (
                     s598.mirrored_power(
@@ -985,6 +1033,7 @@ def run_bank(*, device: str = "cuda") -> None:
                     power_lag=fixed,
                     power_sig=power_sig,
                     lag_x=lag_x,
+                    flags=bank_flags(fs=fs, test=test, shift=shift, month=month, seed=seed, window=(first, last + 1)),
                 )
                 k3 = ["time_series_id", "power_fcst_init_time", "valid_time"]
                 j = (
@@ -1055,8 +1104,8 @@ def bank660_config() -> gen660.GeneratorConfig:
 class World660:
     """One injected pass: the injected power of every Primary and the oracle's transfer masks."""
 
-    def __init__(self, *, clean: np.ndarray, fixed: np.ndarray, own_active: np.ndarray, events: pl.DataFrame) -> None:
-        self.fixed, self.own_active, self.events = fixed, own_active, events
+    def __init__(self, *, clean: np.ndarray, fixed: np.ndarray, own_active: np.ndarray, events: pl.DataFrame, stop: int, start: int) -> None:
+        self.fixed, self.own_active, self.events, self.stop, self.start = fixed, own_active, events, stop, start
         self.nbr_active = flg.neighbour_active(active=own_active, nb_of=NB.of, choice=None)
         both = np.isfinite(fixed) & np.isfinite(clean)
         self.shift = np.where(both, fixed - clean, 0.0).astype(np.float32)
@@ -1075,9 +1124,10 @@ def world660(*, clean: np.ndarray, month: str, r: int) -> World660:
     cap = NB.capacity
     start = int((fold.FINAL_START.timestamp() * 1e6 - GRID) // STEP) - PRE_WINDOW_DAYS * 48
     stop = min(
-        int((fold.FINAL_STOP.timestamp() * 1e6 - GRID) // STEP),
+        int((fold.FINAL_STOP.timestamp() * 1e6 - GRID) // STEP) + 15 * 48,
         int((gen660.CUTOFF.timestamp() * 1e6 - GRID) // STEP),
     )
+    """The panel runs 15 days past the fold's scored months, so the longest horizons of the last origins lie inside it."""
     sites = [lab for lab in labels if lab in noise]
     p_of = {lab: i for i, lab in enumerate(labels)}
     origin = datetime.fromtimestamp(GRID / 1e6, tz=UTC) + timedelta(minutes=30 * start)
@@ -1102,7 +1152,8 @@ def world660(*, clean: np.ndarray, month: str, r: int) -> World660:
     for lab, mask in gen660.event_windows(events=inj.events, length=stop - start).items():
         own[p_of[lab], start:stop] = mask
     assert not own[:, :start].any() and not own[:, stop:].any()
-    return World660(clean=clean, fixed=fixed, own_active=own, events=inj.events)
+    assert not (((np.abs(fixed - clean) > flg.SHIFT_EPS) & np.isfinite(fixed) & np.isfinite(clean)) & ~own).any(), "a shifted half-hour lies outside every event window"
+    return World660(clean=clean, fixed=fixed, own_active=own, events=inj.events, stop=stop, start=start)
 
 
 def ended_within(*, active: np.ndarray, days: int) -> np.ndarray:
@@ -1175,6 +1226,8 @@ def run_stage0(*, device: str = "cuda") -> None:
     (month,) = e.ARGS.months
     mr = e.k.build_month(month=month, clean=clean)
     test = e.build_test(month=month, standardiser=mr.base.standardiser)
+    for seed in e.ARGS.seeds:
+        assert table_file(month=month, seed=seed).exists(), "experiment 677's predict table is missing"
     ensure_tables(mr=mr, test=test, month=month, seeds=e.ARGS.seeds, device=device)
     keys = test_keys(test=test, sites=sites)
     lo, hi = e.k.window_of(month=month, cadence=e.CADENCE, index=0)
@@ -1187,11 +1240,19 @@ def run_stage0(*, device: str = "cuda") -> None:
         m.eval()
         models[seed] = m
         fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+    cutoff_idx = int((gen660.CUTOFF.timestamp() * 1e6 - GRID) // STEP)
     out_dir = e.W / "stage0"
     out_dir.mkdir(parents=True, exist_ok=True)
     day_idx = test.x[:, LEAD_OF["day"]].astype(np.int64)
     week_idx = test.x[:, LEAD_OF["week"]].astype(np.int64)
     y_all = clean[test.primary, test.target_idx].astype(np.float32)
+    clean_frames = {
+        seed: forecast_window(
+            model=model, test=test, mr=mr, device=device, fs=fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed),
+            lo=lo, hi=hi, power_lag=clean, power_sig=clean,
+        )
+        for seed, model in models.items()
+    }  # the observed-lag forecast (A0-clean) does not depend on the pass
     for r in range(MINE.bank_passes):
         out = out_dir / f"{month}_r{r:02d}.parquet"
         if out.exists():
@@ -1202,13 +1263,14 @@ def run_stage0(*, device: str = "cuda") -> None:
             day_idx=day_idx, week_idx=week_idx, day_missing=test.x[:, 38] > 0.5, week_missing=test.x[:, 41] > 0.5,
         )  # fmt: skip
         masked = np.stack([flags[:, 0] + flags[:, 1] > 0, flags[:, 2] + flags[:, 3] > 0], axis=1)
+        masked[:, 0] |= masked[:, 1]  # block dropout masks the day lag alone or both lags, never the week lag alone
         blk = e.block_of(clean=world.fixed, primary=test.primary, target_idx=test.target_idx, origin_idx=test.origin_idx)
         lag_x = test.x.copy()
         lag_x[:, LAG_FIRST : LAG_FIRST + LAG_WIDTH] = blk
         tin = world.own_active[test.primary, test.target_idx]
         after = ended_within(active=world.own_active, days=AFTER_DAYS)[test.primary, test.target_idx]
         phase = phases_of(flags=flags, tin=tin, after=after)
-        keep = (phase > 0) & np.isfinite(y_all) & (test.origin >= lo) & (test.origin < hi)
+        keep = (phase > 0) & np.isfinite(y_all) & (test.target_idx < world.stop) & (test.target_idx < cutoff_idx) & (test.origin >= lo) & (test.origin < hi)
         if not keep.any():
             continue
         keys_keep = keys.filter(pl.Series(keep))
@@ -1217,7 +1279,7 @@ def run_stage0(*, device: str = "cuda") -> None:
             fs = fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
             common = dict(model=model, test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi)
             frames = {
-                "clean": forecast_window(**common, power_lag=clean, power_sig=clean),
+                "clean": clean_frames[seed],
                 "inj": forecast_window(**common, power_lag=world.fixed, power_sig=world.fixed, lag_x=lag_x),
                 "mask": forecast_window(**common, power_lag=world.fixed, power_sig=world.fixed, lag_x=lag_x, mask_lags=masked),
             }  # fmt: skip

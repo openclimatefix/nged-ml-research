@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PT018, D103
 """Experiment 693: the oracle and placebo transfer flags (pure numpy, no torch).
 
 The oracle is a perfect telemetry detector. It knows whether a reading lay inside a load transfer,
@@ -52,36 +53,46 @@ def active_from_windows(*, windows: dict[int, np.ndarray], shape: tuple[int, int
 def neighbour_active(
     *, active: np.ndarray, nb_of: dict[int, list[int]], choice: dict[int, int] | None
 ) -> np.ndarray:
-    """Return, per Primary and grid time, whether an electrical neighbour was inside a transfer.
+    """Return, per Primary and grid time, whether an electrical neighbour's power carries a transfer.
 
-    `choice` maps each shifted Primary to the neighbour that receives its mirrored shift, as in the
-    fine-tune's synthetic events. A mirror receiver's own power stays clean, yet its neighbour
-    summaries carry the mirrored shift, so its neighbour flag is set whenever the donor is active.
-    Pass `None` where the transfer sits in the neighbours' own series (the experiment 660
-    generator, where a recipient's own power is shifted).
+    The network's neighbour summaries of Primary `x` read the power of every neighbour `q` of `x`.
+    That power carries `q`'s own shift, and also the mirrored shift that a donor's transfer puts on
+    its receiver `choice[donor]`. So a neighbour's power is shifted where `q` is active or where `q`
+    is the receiver of an active donor. Pass `choice=None` where the transfer sits in the
+    neighbours' own series (the experiment 660 generator, where a recipient's own power is shifted).
     """
+    shifted = active.copy()
+    if choice is not None:
+        for donor, receiver in choice.items():
+            shifted[receiver] |= active[donor]
     out = np.zeros_like(active)
     for p, qs in nb_of.items():
         for q in qs:
-            out[p] |= active[q]
-    if choice is not None:
-        for donor, receiver in choice.items():
-            out[receiver] |= active[donor]
+            out[p] |= shifted[q]
     return out
 
 
-def roll_mask(*, mask: np.ndarray, offset: int) -> np.ndarray:
-    """Return `mask` rolled by `offset` half-hours along time: the placebo spans."""
-    assert 0 < offset < mask.shape[1], offset
-    return np.roll(mask, offset, axis=1)
+def roll_mask(*, mask: np.ndarray, offset: int, window: tuple[int, int] | None = None) -> np.ndarray:
+    """Return `mask` rolled circularly by `offset` half-hours inside `window` (the whole grid if None): the placebo spans.
+
+    Rolling inside the window where events can exist keeps every span's length and every Primary's
+    span count, and moves each span to another time of the same window.
+    """
+    lo, hi = (0, mask.shape[1]) if window is None else window
+    n = hi - lo
+    assert n > 0 and offset % n != 0, (offset, n)
+    out = mask.copy()
+    out[:, lo:hi] = np.roll(mask[:, lo:hi], offset % n, axis=1)
+    return out
 
 
-def placebo_offset(*, month: str, seed: int, grid_length: int) -> int:
-    """Return the placebo's fixed roll in half-hours: 60 to 200 days, never a whole number of weeks."""
+def placebo_offset(*, month: str, seed: int, window_length: int) -> int:
+    """Return the placebo's fixed roll in half-hours: 7 days or more, under the window, never a whole number of weeks."""
+    assert window_length > 14 * PER_DAY, window_length
     rng = np.random.default_rng([693, int(month.replace("-", "")), seed])
     while True:
-        offset = int(rng.integers(60 * PER_DAY, 200 * PER_DAY))
-        if offset % (7 * PER_DAY) != 0 and offset < grid_length:
+        offset = int(rng.integers(7 * PER_DAY, window_length - 7 * PER_DAY))
+        if offset % (7 * PER_DAY) != 0:
             return offset
 
 
@@ -151,7 +162,8 @@ def known_answer() -> None:
     choice = {1: 2}
     nbr = neighbour_active(active=active, nb_of=nb_of, choice=choice)
     assert nbr[0, 4 * PER_DAY] and nbr[2, 4 * PER_DAY] and not nbr[3, 4 * PER_DAY]
-    assert not nbr[1, 4 * PER_DAY], "a Primary is not its own neighbour"
+    assert nbr[1, 4 * PER_DAY], "the donor's summaries read its receiver's mirrored shift"
+    assert not neighbour_active(active=active, nb_of={3: []}, choice=None)[3].any(), "a Primary is not its own neighbour"
     prim = np.array([1, 2, 0, 3])
     origin = np.full(4, 8 * PER_DAY)
     day = np.full(4, 4 * PER_DAY)
@@ -159,11 +171,11 @@ def known_answer() -> None:
     miss = np.zeros(4, bool)
     flags = lag_flags(own=active, nbr=nbr, prim=prim, origin_idx=origin, day_idx=day, week_idx=week, day_missing=miss, week_missing=miss)
     assert flags[:, 0].tolist() == [1, 0, 0, 0], flags
-    assert flags[:, 1].tolist() == [0, 1, 1, 0], flags
+    assert flags[:, 1].tolist() == [1, 1, 1, 0], flags
     assert flags[:, 2:].sum() == 0
     masked = lag_flags(own=active, nbr=nbr, prim=prim, origin_idx=origin, day_idx=day, week_idx=week, day_missing=np.ones(4, bool), week_missing=miss)
     assert masked[:, :2].sum() == 0, "a masked lag keeps its flag"
-    rolled = roll_mask(mask=active, offset=2 * PER_DAY + 5)
+    rolled = roll_mask(mask=active, offset=2 * PER_DAY + 5, window=(0, 9 * PER_DAY))
     assert rolled.sum() == active.sum() and not np.array_equal(rolled, active)
     inp, age = origin_flags(onsets={1: [(3 * PER_DAY, 6 * PER_DAY)]}, prim=np.array([1, 1, 1, 1]), oi=np.array([3 * PER_DAY + 5, 3 * PER_DAY + 12, 5 * PER_DAY, 7 * PER_DAY]))
     assert inp.tolist() == [False, True, True, False], inp
