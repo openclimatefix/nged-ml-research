@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, PLR0915, PLR0912, PERF401, PT018
+# ruff: noqa: D103, E501, PT018
 """Experiment 693: fit the prevailing head arms for one quarterly fold and score every row set (CPU).
 
 Experiment 667's `p667_fit.fit_rhaz` is called unchanged. Only its `load` is wrapped, as experiment

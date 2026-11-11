@@ -6,8 +6,8 @@ Two sets of spans mark real rows. The verified set is the transfers found in the
 to 60 days long). The label-plus-verified set adds every event in NGED's logs (experiment 580's
 `events_labelled_status.parquet`). The verified set decides; the other is a sensitivity.
 
-Indices in experiment 580's tables count half-hours from 2019-09-01 00:00 UTC. This module shifts
-them onto the grid that starts at 2022-01-01 00:00 UTC.
+Indices in experiment 580's tables count half-hours from 2019-09-01 00:00 UTC, the start of the
+common grid (`e00578_common.GRID_START`), so `OFFSET` is 0.
 """
 
 from datetime import UTC, datetime
@@ -21,9 +21,10 @@ E580: Final = (
     ML_EXPERIMENTS_DATA_DIR / "00580-verified-load-shift-event-set-and-label-audit" / "work"
 )
 LABEL_ORIGIN: Final = datetime(2019, 9, 1, tzinfo=UTC)
-GRID_START: Final = datetime(2022, 1, 1, tzinfo=UTC)
+GRID_START: Final = datetime(2019, 9, 1, tzinfo=UTC)
+"""The common grid starts at the same instant as experiment 580's label indices."""
 OFFSET: Final[int] = int((GRID_START - LABEL_ORIGIN).total_seconds() // 1800)
-"""Half-hours from the label origin to the grid start; subtract it from a label index."""
+"""Half-hours from the label origin to the grid start; subtract it from a label index (0: the grids agree)."""
 CUTOFF: Final = datetime(2026, 7, 1, tzinfo=UTC)
 """No scored valid time reaches this instant."""
 

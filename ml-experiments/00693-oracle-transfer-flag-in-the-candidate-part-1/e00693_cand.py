@@ -72,7 +72,7 @@ import numpy as np
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-import e00677_fold as fold
+import e00677_fold as fold  # ty: ignore[unresolved-import]
 
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00677_MONTH"
 
@@ -1346,8 +1346,8 @@ def run_stage0(*, device: str = "cuda") -> None:
             common = dict(model=model, test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi)
             frames = {
                 "clean": clean_frames[seed],
-                "inj": forecast_window(**common, power_lag=world.fixed, power_sig=world.fixed, lag_x=lag_x),
-                "mask": forecast_window(**common, power_lag=world.fixed, power_sig=world.fixed, lag_x=lag_x, mask_lags=masked),
+                "inj": forecast_window(**common, power_lag=world.fixed, power_sig=world.fixed, lag_x=lag_x),  # ty: ignore[invalid-argument-type]
+                "mask": forecast_window(**common, power_lag=world.fixed, power_sig=world.fixed, lag_x=lag_x, mask_lags=masked),  # ty: ignore[invalid-argument-type]
             }  # fmt: skip
             for name, frame in frames.items():
                 qs[name].append(frame_q(frame=frame, keys=keys_keep))
@@ -1479,7 +1479,7 @@ def run_headbank(*, device: str = "cuda") -> None:
 
     def write(*, name: str, rows: dict[str, np.ndarray]) -> None:
         tmp = out_dir / f"{name}.tmp.npz"
-        np.savez(tmp, **rows)
+        np.savez(tmp, **rows)  # ty: ignore[invalid-argument-type]
         tmp.rename(out_dir / f"{name}.npz")
 
     months_of_fold = []

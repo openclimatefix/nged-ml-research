@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, PLR0915, PLR0912, PERF401, PT018
+# ruff: noqa: D103, E501, PLR0912, PERF401
 """Experiment 693: score the prevailing head arms and print the planned contrasts (CPU).
 
 Reads `<root>/head_scores/<arm>_<fold>_<kind>_<label>.parquet` from `e00693_headfit.py` and writes

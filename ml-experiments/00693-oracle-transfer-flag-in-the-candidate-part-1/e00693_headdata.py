@@ -103,7 +103,7 @@ def fold_rows(*, fold: str) -> dict[str, np.ndarray]:
 
 
 def fold_table(*, fold: str) -> s598.LagFreeTable:
-    z = np.load(SRC677 / "tables_sp3" / f"T_{fold}_s0.npz")
+    z = np.load(SRC677 / "tables_sp3" / "predict" / f"T_{fold}_s0.npz")
     return s598.LagFreeTable(median=z["median"], origin_idx=z["origin_idx"])
 
 
@@ -233,7 +233,7 @@ def build_real(*, month: str, clean, nb, flags, n_days: int) -> None:
         HEAD_DATA / f"real_{month}.npz",
         prim=r["prim"].astype(np.int8), oi=r["oi"].astype(np.int32), vi=r["vi"].astype(np.int32), lead=r["lead"], q=r["q"], y=y,
         flagged=flags[r["prim"], r["vi"] // PER], verified=np.zeros(len(y), bool), org=org.astype(np.int32),
-        res=res["res"][in_month], res_star=res["res_star"][in_month], **block, **state,
+        res=res["res"][in_month], res_star=res["res_star"][in_month], **block, **state,  # ty: ignore[invalid-argument-type]
         gate=np.zeros(len(uniq), bool), org_prim=o_prim.astype(np.int8), org_oi=o_oi.astype(np.int32),
     )  # fmt: skip
     print(f"{month} real: {len(y):,} rows, {len(uniq):,} origins", flush=True)
@@ -353,7 +353,7 @@ def build_train_bank(*, month: str, kind: str, clean, nb, n_days: int) -> None:
     dt = {"prim": np.int8, "oi": np.int32, "vi": np.int32, "org": np.int32}
     np.savez(
         HEAD_DATA / (f"bank_{month}.npz" if kind == "bank" else f"bankheld_{month}.npz"),
-        **{k: (v.astype(dt[k]) if k in dt else v) for k, v in cat.items()},
+        **{k: (v.astype(dt[k]) if k in dt else v) for k, v in cat.items()},  # ty: ignore[invalid-argument-type]
     )
     if kind == "bank":
         pl.DataFrame(events_rows).write_parquet(HEAD_DATA / f"events_{month}.parquet")
@@ -387,7 +387,7 @@ def build_dec(*, fold: str, clean, nb, n_days: int) -> None:
     dt = {"prim": np.int8, "oi": np.int32, "vi": np.int32, "org": np.int32}
     np.savez(
         HEAD_DATA / f"bankdec_{fold}.npz",
-        **{k: (v.astype(dt[k]) if k in dt else v) for k, v in cat.items()},
+        **{k: (v.astype(dt[k]) if k in dt else v) for k, v in cat.items()},  # ty: ignore[invalid-argument-type]
     )
 
 

@@ -86,7 +86,7 @@ def main() -> None:
         out = {"phase": name, "rows": r.height}
         for metric in ("crps", "ae"):
             for v in VARIANTS:
-                out[f"{v}_{metric}"] = float(r[f"{v}_{metric}"].mean())
+                out[f"{v}_{metric}"] = float(r[f"{v}_{metric}"].mean())  # ty: ignore[invalid-argument-type]
         for label, (a, b) in {
             "A0 - A0-clean": ("inj", "clean"),
             "A0 - A0-mask": ("inj", "mask"),
@@ -100,14 +100,14 @@ def main() -> None:
         for seed in (0, 1, 2):
             if f"inj_crps_s{seed}" in r.columns:
                 out[f"seed{seed} A0 - A0-clean"] = float(
-                    (r[f"inj_crps_s{seed}"] - r[f"clean_crps_s{seed}"]).mean()
+                    (r[f"inj_crps_s{seed}"] - r[f"clean_crps_s{seed}"]).mean()  # ty: ignore[invalid-argument-type]
                 )
         tab.append(out)
     table = pl.DataFrame(tab, infer_schema_length=None)
     for fold in folds:
         r = rows.filter((pl.col("fold") == fold) & pl.col("phase").is_in([1, 2]))
         lines.append(
-            f"fold {fold} P1+P2 rows {r.height:,}: A0 - A0-clean {float((r['inj_crps'] - r['clean_crps']).mean()):+.3f}"
+            f"fold {fold} P1+P2 rows {r.height:,}: A0 - A0-clean {float((r['inj_crps'] - r['clean_crps']).mean()):+.3f}"  # ty: ignore[invalid-argument-type]
         )
     lines.append(
         f"copied share of the day-lag shift, A0 {follow(rows=rows, a='inj', b='clean'):.4f}, A0-mask {follow(rows=rows, a='mask', b='clean'):.4f}"

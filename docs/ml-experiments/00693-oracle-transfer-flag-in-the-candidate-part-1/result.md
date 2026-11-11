@@ -8,7 +8,7 @@ theme: switching-labels-in-the-forecast
 also_relevant_to:
   - lsc-detectors
   - lagged-power-and-error-correction
-status: planned
+status: finished
 kind: other
 size: >-
   Anything else. (1) It stores fitted networks and prediction files per arm, seed, and fold; (2)
@@ -50,17 +50,177 @@ metric: >-
   CRPS (twice the mean pinball loss over 11 quantiles) in points of capacity, normalised MAE of the
   median, q05-to-q95 coverage, q01, q05, q95, and q99 coverage and pinball loss, cold winter nights,
   avoidable-curtailment cost, copied share of an injected lag-only shift, reaction time.
+verdict: inconclusive
+best_arm: >-
+  None. No arm gained against its control: on the deciding bank of injected transfers the oracle arm
+  (A1) scored 0.395 points of capacity worse than the placebo arm (A2) while the target lay inside
+  a transfer (95% interval +0.235 to +0.560 over injected events).
+headline: >-
+  A perfect flag for load transfers did not lower the prevailing forecast's CRPS. The no-retraining
+  ceiling is 0.107 points of capacity (95% interval 0.087 to 0.129), under the 0.3 gate. After
+  retraining the prevailing head, the oracle minus the placebo is +0.395 inside a transfer and
+  +0.188 after its end on the deciding bank, but the heads' own refit noise is about 0.4 points, a
+  noise the event-resampled intervals do not see. The placebo check fails, so the verdict is
+  inconclusive.
+lessons: >-
+  The Candidate network already ignores most of a shifted lag (the lag-time ceiling is 0.1 points),
+  and a perfect flag lifts the prevailing head's age floor without lowering its error. Three
+  fits per arm cannot resolve differences under about 0.5 points of capacity. One fit (the oracle
+  head of the 2026-05 fold, seed 1) stopped at its first epoch and scored 4.2 points worse, which
+  moves the oracle contrast by 0.35.
+take_home_message: >-
+  Telling the demand forecast exactly when a load transfer is happening did not make it better on
+  simulated transfers, so a real switching detector has no measured gain to chase. The forecast
+  that reads yesterday's power loses only 0.1 points of capacity to a transfer, and the forecast
+  that adapts to a transfer scores about the same with a perfect flag or a random one. The test
+  could not rule out a gain or a loss of up to about half a point, because three refits of the same
+  forecast already differ by about 0.4 points, so a repeat needs at least 10 refits per arm.
+advice:
+  - >-
+    Use at least 10 refits per arm and fold when a contrast on the prevailing head is expected to be
+    under 0.5 points of capacity, and report the refit noise beside the interval (audit, C5).
+  - >-
+    Do not set an equivalence bound tighter than the refit noise of the heads allows, which is about
+    plus or minus 0.4 points for 3 refits (C5).
+  - >-
+    Keep switching labels in evaluation, not in the forecast, until a repeat with 10 or more refits
+    finds an oracle gain of at least 0.3 points (C2, C3).
+  - >-
+    Give real training rows a share of non-zero flags that matches the injected rows, or the flag
+    acts as a label that says the row is synthetic (audit finding 2).
+  - >-
+    Check each refit's validation curve before scoring, because a head that stops at its first epoch
+    can move a contrast by 0.35 points (audit finding 2).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**Status: planned. The design is fixed in the brief at
-`data/ml-experiments/briefs/oracle_switching_flag_design.md` (design v2, reviewed by an adversarial
-Opus reviewer and revised). No code has run.**
+We asked whether a forecast of electricity demand at 16 primary substations gets better when it is
+told exactly when a load transfer (a switch that moves load between two substations) is happening. We
+gave one copy of each forecast the true transfer times and another copy transfer times moved to
+random dates, added simulated transfers to the recorded power, and compared the errors. The
+perfect flag did not help. A forecast that reads only yesterday's power loses 0.1 points of capacity
+to a transfer, and the forecast that adapts to a transfer scored 0.395 points of capacity worse with
+the true times than with the random ones on simulated
+transfers. The comparison cannot separate a gain or loss under
+about 0.5 points from noise, because three refits of the same forecast already differ by about 0.4
+points.
 
-We ask whether telling the demand forecast neural network exactly which of its past power readings
-fell inside a load transfer would lower its error at 16 primary substations. We give one copy of the
-network the true flags and another copy flags at random times with the same lengths, then compare
-their errors on injected transfers and on real rows. The answer bounds what a real switching
-detector could add to the forecast.
+**Verdict: inconclusive.** The pre-registered rule makes the verdict inconclusive when the
+placebo check fails or the harm on real event-free rows exceeds 0.05 points. Both happened. No
+contrast reached the 0.3-point gain that would justify the work. The retraining of the lag-input
+network was not run, because its ceiling was 0.107 points. Retraining only the prevailing head
+tested the oracle.
+
+| Contrast (points of capacity; negative is better for the first-named arm) | Estimate | 95% interval | Bonferroni interval (3 tests) |
+|---|---|---|---|
+| C2: oracle minus placebo, target inside a transfer, injected transfers | +0.395 | +0.235 to +0.560 | +0.202 to +0.595 |
+| C3: oracle minus placebo, target after the end, injected transfers | +0.188 | -0.155 to +0.492 | -0.216 to +0.546 |
+| C4: oracle minus no flag, event-free real rows (5 month blocks) | +0.093 | -0.037 to +0.221 | -0.063 to +0.242 |
+| C5: placebo minus no flag, inside a transfer, injected transfers | +0.086 | -0.067 to +0.230 (90%: -0.041 to +0.212) | not in the family |
+
+**Ceilings.** The no-retraining ceiling is 0.107 points (stage 0, below). The no-fit ceiling for the
+prevailing output, the oracle hazard baseline minus the hazard baseline, is -0.068 points inside a
+transfer and +0.165 after its end. The prediction was a gain of 0.3 to 1.0 points. The oracle age
+does lift
+the age floor: the share of rows inside a transfer with a non-zero survival probability is 0.774
+for the arm with no flag, 0.998 for the oracle arm, and 0.898 for the placebo arm.
+
+**Intervals ignore the refit noise.** The audit found that the seed-to-seed standard deviation of
+one fit is 0.395 points inside a transfer, so a 3-seed contrast over 2 folds has a standard error of
+about 0.23 points. Per seed, C2 is +0.54, +1.65, and -0.45. One fit (oracle arm, fold 2026-05, seed 1)
+scored 4.2 points worse on every cluster; every oracle fit of that fold stopped after 5 epochs with
+the best
+validation loss at its first. Without that fit C2 is about +0.05.
+
+## Figures
+
+![Planned contrasts](contrasts.svg)
+
+![CRPS by phase on injected transfers](crps_by_phase.svg)
+
+**Six real transfers (day-ahead medians).** The shaded band is the logged transfer. The oracle,
+placebo, and no-flag heads exist only from the 2026-02 fold, so the December 2025 panels show the
+Candidate alone and the two hazard baselines. Observed power is the cleaned reading.
+
+![D5, December 2025 to January 2026](transfer_D5_202512.svg)
+
+![D16, December 2025 to January 2026](transfer_D16_202512.svg)
+
+![D10, May 2026](transfer_D10_202605.svg)
+
+![D11, May 2026](transfer_D11_202605.svg)
+
+![D12, May 2026](transfer_D12_202605.svg)
+
+![D16, May 2026](transfer_D16_202605.svg)
+
+**Day-ahead and 14-day forecasts.** Each figure shows the medians of one 09:00 origin out to 14
+days. The stored scores hold medians only, so the figures draw no quantile bands and cannot show
+whether the bands widen with lead.
+
+![D5, 14 days from 10 March 2026](fan_D5_winter.svg)
+
+![D5, 14 days from 10 June 2026](fan_D5_summer.svg)
+
+## Checks
+
+- **Median minus mean forecast.** Not computed: the stored scores hold quantiles and no mean.
+- **Error of the median beside every CRPS contrast.** On the deciding bank, in the phase inside a
+  transfer, the normalised MAE is 12.65 for the no-flag arm, 13.64 for the oracle arm, and 12.46 for
+  the placebo arm, in the same order as the CRPS (7.75, 8.23, 7.84). No trigger.
+- **Audit triggers fired.** Three: the placebo control failed its equivalence bound (trigger 1), the
+  result contradicts the pre-registered gain of 0.3 to 1.0 points (trigger 2), and a control moved
+  the score by more than its own interval's half-width (trigger 5). The audit report is
+  `data/ml-experiments/briefs/e693_audit_report.md`. Its findings, and their triage:
+    - **Accepted: the printed contrasts reproduce to three decimals.** Nothing to change.
+    - **Accepted: the intervals ignore refit noise, and the placebo check could not pass at plus or
+      minus 0.05.** The page states both, and the verdict stays inconclusive.
+    - **Accepted: one oracle fit (fold 2026-05, seed 1) stopped at its first epoch.** The page
+      reports it and the contrast without it. The fit was not rerun, because the pre-registered rule
+      fixes 3 seeds.
+    - **Accepted: the placebo is not neutral** (it lifts the age floor on rows without a transfer, and
+      the flag is almost always 0 on real training rows). Listed in the lessons.
+    - **Accepted: leave-one-out.** The harm on real event-free rows (C4) comes almost entirely from
+      one Primary that has no bank rows; without it C4 is about 0.000, and its sign flips by fold.
+    - **Not done: 10 or more seeds per arm, a placebo from an independent world, and matched training
+      and deciding generators.** They change the pre-registered design. They are the repeat's design.
+- **Code reviews.** Two Sonnet reviews of the code before any quoted fit or score. Review 1 (the flag
+  module and stage 0) found 5 must-fix problems, all fixed. Review 2 (the head banks, head data, and
+  head fit) found one must-fix problem, a reversed window in `dilate` that dropped half the "after the
+  end" rows, fixed and rebuilt before any fit. Its other findings were recorded as caveats: the
+  injected-bank residuals lose the first 8 days of each month (affects only the hazard baselines),
+  and phase P3 also holds transfers that began and ended after the origin's freshest reading.
+
+## Departures from the plan
+
+- **The bank panel runs 15 days past the fold's scored months,** so the longest horizons of the last
+  origins lie inside it.
+- **Phase flags count neighbour-only rows as "lag inside"** on bank L. On bank F the phase uses the
+  oracle's state at the origin's freshest reading (origin minus 6 hours); phase P1 needs that state
+  and the target inside a transfer, phase P2 needs it and a target within 14 days after the end, and
+  phase P3 needs neither and a target within 14 days after an end.
+- **The head's freshest reading is at 03:00 UTC.** The head's origin is the 09:00 network origin, so
+  its freshest reading lies 6 hours earlier. The plan text says 06:00 for the 12:00 contract origin.
+- **Bank L's generator rate was lowered** from the brief's plan to 3 events per Primary-year, because
+  at 6 events per Primary-year 99.7% of rows inside a transfer had a flagged neighbour and the bank
+  saturated. Settings: 48 passes, class mix `edge_transfer` 0.55, `edge_transfer_unseen_donor` 0.10,
+  `edge_transfer_unseen_recipient` 0.15, and `permanent_shift` 0.20, `hard_negatives=False`, and seed
+  693000 + 100 × (year × 12 + month) + pass. Bank F reuses the same worlds. Bank F's deciding bank
+  holds 150 to 197
+  events per scored month over 48 passes (printed by `e00693_event_counts.py`), under the brief's
+  target of about 200, so each month's interval is wider than planned.
+- **The Bonferroni family has 3 tests** (C2, C3, C4-prevailing), because the stage 0 gate dropped C1
+  and C4-NRA.
+- **Contrasts are oracle minus placebo** for C2 and C3, as the brief's contrast list states.
+- **The screen** reduced to its prevailing part: the share of rows inside a transfer with a non-zero
+  survival probability was higher for the oracle arm (0.776 to 0.998 on the 2026-02 fold), so the
+  remaining fold followed.
+- **Not done:** positive controls beyond the two ceilings, the flag-permutation wiring check, the
+  benchmark rows (climatology, the manual heuristic, experiments 677 and 667), the four load-shift
+  scenarios on every arm (real rows only), the tails, cold-winter-night and avoidable-curtailment
+  tables, the reaction-time measurement, and quantile-band figures. The sensitivity with
+  label-plus-verified spans is in the printed head report.
 
 ## Plan
 
@@ -155,7 +315,7 @@ covers
   measures the extra input columns and refit noise. C4's real rows are four or five month blocks, so
   its interval is coarse.
 
-## Stage 0 result (interim)
+## Stage 0 result
 
 **The no-retrain ceiling is 0.107 points of capacity, under the 0.3 gate, so the no-retrain-arm
 retraining is not run.** Stage 0 scored experiment 677's stored step-8 `P7+D50` networks on bank L
@@ -174,8 +334,54 @@ Source: `scores/stage0_report.md`, printed by `e00693_stage0_report.py`.
 
 ## Method
 
-To be written with the results.
+- **Architecture, Candidate.** The Candidate is [experiment 677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md)'s
+  step-8 `P7+D50` neural network: a K1 network with weather, date-time, lag, and neighbour inputs,
+  where the lag encoder reads signal columns, fine-tuned once per quarterly cut-off (2025-11-01,
+  2026-02-01, 2026-05-01) and seed (0 to 2); it is read, never retrained, here.
+- **Architecture, prevailing head.** The head is [experiment 667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)'s
+  survival-hazard head with 14 daily hazards on the Candidate's quantiles, with [experiment 681](../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md)'s
+  14 residual lags (28 columns), 93 inputs. Two hidden layers of 64 units output a signed depth, a
+  spread, and 14 hazards.
+- **Arms.** `A0` has no flag. `A1` adds three columns (whether a transfer is known to be in progress,
+  the logarithm of its age in days, and the age divided by 30) and takes the larger of the heuristic
+  age and the oracle age as the structural age. `A2` is `A1` with spans rolled to other times by one
+  fixed offset per Primary, which keeps each span's length and each Primary's span count. The
+  hazard baselines have no fit: `B` uses the heuristic age and `OB` the oracle age with a survival
+  probability of 0 outside a transfer.
+- **The oracle** knows whether the freshest reading (the 09:00 origin minus 6 hours) lay inside a
+  transfer and when that transfer began; it never knows the end or the depth.
+- **Training regime.** Each head trains on the real rows and the injected rows of experiment 650's 12
+  training passes of the months before its cut-off, only on valid times before the cut-off, with the
+  loss, optimiser, and early stopping of experiments 647 and 652 (about 40 seconds per fit on a CPU
+  core). Folds 2025-11 has fewer than 2 earlier banks, so it uses `B` and `OB`. A quarterly head is
+  applied to all three months of its fold.
+- **Stage 0** scores the stored Candidate on bank L (no retraining) with the observed lags (A0-clean),
+  the injected lags (A0), and the injected lags with every flagged lag masked (A0-mask).
+- **Measurement.** Valid times 2025-11-01 to 2026-06-30. CRPS is twice the mean pinball loss over 11
+  quantiles, in points of capacity, of the seed-mean forecast. The truth is the unshifted power on
+  bank L and the shifted power on bank F. Bank L and bank F's deciding bank are the [experiment 660](../00660-shared-generator-of-injected-load-transfer-events/result.md)
+  generator (48 passes per fold); bank F's check bank is experiment 650's held-out passes 200 to 203.
+  Real rows use experiment 580's verified transfers (the label-plus-verified set is a
+  sensitivity). Intervals resample clusters of (fold, pass, Primary) for banks and calendar months
+  for real rows, 2,000 resamples; the Bonferroni level is for 3 tests.
+- **Cost.** About 40 CPU-seconds per head fit and about 30 minutes of GPU time per fold for the bank
+  forecasts; no money was spent.
 
 ## Files
 
-To be written with the results.
+- `ml-experiments/00693-*/e00693_flags.py`: the oracle and placebo flags and a known-answer test.
+- `e00693_real.py`: the verified and label spans of real transfers on the common grid.
+- `e00693_cand.py`: a copy of experiment 677's Candidate script with the flag columns; its `stage0` command
+  runs stage 0 and its `headbank` command writes the Candidate's forecasts on the injected banks.
+- `e00693_stage0_report.py`: pools stage 0 and prints the gate.
+- `e00693_headdata.py`: builds the head's real and bank rows with the oracle and placebo state.
+- `e00693_headfit.py`: fits the head arms, runs the hazard baselines, and writes per-row scores.
+- `e00693_scoring.py`: per-row CRPS and error. `e00693_headreport.py`: the contrasts.
+  `e00693_figures.py`: the figures. `gpu.sh`, `cpu.sh`, `run_stage0.sh`, `run_headbank.sh`: launchers.
+- `data/ml-experiments/00693-*/P7_D50_<fold>_stage0/work/stage0/*.parquet`: per-row stage 0 scores
+  (written). `.../P7_D50_<fold>_headbank/work/headbank/*.npz`: Candidate quantiles on injected
+  passes (written). `.../head_data/*.npz`: head rows (written). `.../head_scores/*.parquet`:
+  per-row head scores (written). `.../scores/*.md` and `*.csv`: the printed reports (written).
+- Read from earlier experiments: 677's stored fits, models, and tables
+  (`data/ml-experiments/00677-*`); 667's and 681's code; 650's and 660's generators; 580's
+  verified transfers (`events_verified.parquet`).
