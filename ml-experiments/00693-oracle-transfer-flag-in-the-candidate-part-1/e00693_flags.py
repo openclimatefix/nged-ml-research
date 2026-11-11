@@ -72,7 +72,9 @@ def neighbour_active(
     return out
 
 
-def roll_mask(*, mask: np.ndarray, offset: int, window: tuple[int, int] | None = None) -> np.ndarray:
+def roll_mask(
+    *, mask: np.ndarray, offset: int, window: tuple[int, int] | None = None
+) -> np.ndarray:
     """Return `mask` rolled circularly by `offset` half-hours inside `window` (the whole grid if None): the placebo spans.
 
     Rolling inside the window where events can exist keeps every span's length and every Primary's
@@ -115,7 +117,9 @@ def lag_flags(
     out = np.zeros((len(prim), N_FLAGS), np.float32)
     for j, (idx, miss) in enumerate(((day_idx, day_missing), (week_idx, week_missing))):
         live = ~miss & (idx >= 0)
-        assert (idx[live] <= origin_idx[live] - LAG_MIN_AGE).all(), "a flagged lag is under 24 h old"
+        assert (idx[live] <= origin_idx[live] - LAG_MIN_AGE).all(), (
+            "a flagged lag is under 24 h old"
+        )
         i = np.clip(idx, 0, own.shape[1] - 1)
         out[:, 2 * j] = np.where(live, own[prim, i], False)
         out[:, 2 * j + 1] = np.where(live, nbr[prim, i], False)
@@ -148,7 +152,9 @@ def origin_flags(
             first_onset[sel] = np.minimum(first_onset[sel], onset)
             in_progress[sel] = True
     age[in_progress] = (oi[in_progress] - first_onset[in_progress]) / PER_DAY
-    assert (age[in_progress] >= ORIGIN_DELAY / PER_DAY - 1e-6).all(), "a flag uses an onset after the freshest reading"
+    assert (age[in_progress] >= ORIGIN_DELAY / PER_DAY - 1e-6).all(), (
+        "a flag uses an onset after the freshest reading"
+    )
     return in_progress, age
 
 
@@ -163,20 +169,44 @@ def known_answer() -> None:
     nbr = neighbour_active(active=active, nb_of=nb_of, choice=choice)
     assert nbr[0, 4 * PER_DAY] and nbr[2, 4 * PER_DAY] and not nbr[3, 4 * PER_DAY]
     assert nbr[1, 4 * PER_DAY], "the donor's summaries read its receiver's mirrored shift"
-    assert not neighbour_active(active=active, nb_of={3: []}, choice=None)[3].any(), "a Primary is not its own neighbour"
+    assert not neighbour_active(active=active, nb_of={3: []}, choice=None)[3].any(), (
+        "a Primary is not its own neighbour"
+    )
     prim = np.array([1, 2, 0, 3])
     origin = np.full(4, 8 * PER_DAY)
     day = np.full(4, 4 * PER_DAY)
     week = np.full(4, 0)
     miss = np.zeros(4, bool)
-    flags = lag_flags(own=active, nbr=nbr, prim=prim, origin_idx=origin, day_idx=day, week_idx=week, day_missing=miss, week_missing=miss)
+    flags = lag_flags(
+        own=active,
+        nbr=nbr,
+        prim=prim,
+        origin_idx=origin,
+        day_idx=day,
+        week_idx=week,
+        day_missing=miss,
+        week_missing=miss,
+    )
     assert flags[:, 0].tolist() == [1, 0, 0, 0], flags
     assert flags[:, 1].tolist() == [1, 1, 1, 0], flags
     assert flags[:, 2:].sum() == 0
-    masked = lag_flags(own=active, nbr=nbr, prim=prim, origin_idx=origin, day_idx=day, week_idx=week, day_missing=np.ones(4, bool), week_missing=miss)
+    masked = lag_flags(
+        own=active,
+        nbr=nbr,
+        prim=prim,
+        origin_idx=origin,
+        day_idx=day,
+        week_idx=week,
+        day_missing=np.ones(4, bool),
+        week_missing=miss,
+    )
     assert masked[:, :2].sum() == 0, "a masked lag keeps its flag"
     rolled = roll_mask(mask=active, offset=2 * PER_DAY + 5, window=(0, 9 * PER_DAY))
     assert rolled.sum() == active.sum() and not np.array_equal(rolled, active)
-    inp, age = origin_flags(onsets={1: [(3 * PER_DAY, 6 * PER_DAY)]}, prim=np.array([1, 1, 1, 1]), oi=np.array([3 * PER_DAY + 5, 3 * PER_DAY + 12, 5 * PER_DAY, 7 * PER_DAY]))
+    inp, age = origin_flags(
+        onsets={1: [(3 * PER_DAY, 6 * PER_DAY)]},
+        prim=np.array([1, 1, 1, 1]),
+        oi=np.array([3 * PER_DAY + 5, 3 * PER_DAY + 12, 5 * PER_DAY, 7 * PER_DAY]),
+    )
     assert inp.tolist() == [False, True, True, False], inp
     assert abs(age[2] - 2.0) < 1e-6 and age[0] == 0 and age[3] == 0

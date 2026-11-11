@@ -16,7 +16,9 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-E580: Final = ML_EXPERIMENTS_DATA_DIR / "00580-verified-load-shift-event-set-and-label-audit" / "work"
+E580: Final = (
+    ML_EXPERIMENTS_DATA_DIR / "00580-verified-load-shift-event-set-and-label-audit" / "work"
+)
 LABEL_ORIGIN: Final = datetime(2019, 9, 1, tzinfo=UTC)
 GRID_START: Final = datetime(2022, 1, 1, tzinfo=UTC)
 OFFSET: Final[int] = int((GRID_START - LABEL_ORIGIN).total_seconds() // 1800)
@@ -49,7 +51,11 @@ def labelled_spans() -> dict[str, list[tuple[int, int]]]:
 
 
 def mask_of(
-    *, spans: dict[str, list[tuple[int, int]]], labels: list[str], length: int, before: int | None = None
+    *,
+    spans: dict[str, list[tuple[int, int]]],
+    labels: list[str],
+    length: int,
+    before: int | None = None,
 ) -> np.ndarray:
     """Return the (Primaries, length) mask of half-hours inside any span.
 

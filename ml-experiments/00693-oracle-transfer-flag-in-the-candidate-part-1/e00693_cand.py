@@ -22,7 +22,7 @@ from typing import Final
 
 _p = argparse.ArgumentParser()
 _p.add_argument("arm")
-_p.add_argument("command", choices=("table", "check", "fit", "bank", "stage0"))
+_p.add_argument("command", choices=("table", "check", "fit", "bank", "stage0", "headbank"))
 _p.add_argument("--flags", choices=("none", "oracle", "placebo"), default="none")
 _p.add_argument("--bank-passes", type=int, default=48)
 _p.add_argument("--bank-kind", choices=("L", "F"), default="L")
@@ -77,7 +77,10 @@ import e00677_fold as fold
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00677_MONTH"
 
 NAME = "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
-SRC677 = ML_EXPERIMENTS_DATA_DIR / "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
+SRC677 = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
+)
 """Experiment 677's data folder: chains, step-2 weights, tables, and stored networks, read only."""
 ROOT = ML_EXPERIMENTS_DATA_DIR / "00693-oracle-transfer-flag-in-the-candidate-part-1"
 """Everything this experiment writes."""
@@ -600,12 +603,16 @@ class SigGpuMonth(e.LagGpuMonth):
                 ]
             sig.drop_signals(block=b, columns=COLUMNS, rows=rows, only=only)
         parts = [t["x"], torch.from_numpy(b).to(self.device)]
-        if N_FLAG:  # the flags are exempt from signal dropout and are 0 wherever their lag is masked
+        if (
+            N_FLAG
+        ):  # the flags are exempt from signal dropout and are 0 wherever their lag is masked
             fl = fs.train_flags()[refit.index].copy()
             fl[day_masked, :2] = 0.0
             fl[week_masked, 2:] = 0.0
             e.CTX["flag_rate"] = {n: float(fl[:, j].mean()) for j, n in enumerate(flg.FLAG_NAMES)}
-            if MINE.flags == "placebo":  # per-Primary counts and span lengths are kept, so the rates match
+            if (
+                MINE.flags == "placebo"
+            ):  # per-Primary counts and span lengths are kept, so the rates match
                 tr = FOLD[(self.mr.month, e.CTX["seed"])]
                 true_rows = flg.lag_flags(
                     own=tr.own_active, nbr=tr.nbr_active, prim=self.mr.primary[refit.index],
@@ -1033,7 +1040,14 @@ def run_bank(*, device: str = "cuda") -> None:
                     power_lag=fixed,
                     power_sig=power_sig,
                     lag_x=lag_x,
-                    flags=bank_flags(fs=fs, test=test, shift=shift, month=month, seed=seed, window=(first, last + 1)),
+                    flags=bank_flags(
+                        fs=fs,
+                        test=test,
+                        shift=shift,
+                        month=month,
+                        seed=seed,
+                        window=(first, last + 1),
+                    ),
                 )
                 k3 = ["time_series_id", "power_fcst_init_time", "valid_time"]
                 j = (
@@ -1104,8 +1118,23 @@ def bank660_config() -> gen660.GeneratorConfig:
 class World660:
     """One injected pass: the injected power of every Primary and the oracle's transfer masks."""
 
-    def __init__(self, *, clean: np.ndarray, fixed: np.ndarray, own_active: np.ndarray, events: pl.DataFrame, stop: int, start: int) -> None:
-        self.fixed, self.own_active, self.events, self.stop, self.start = fixed, own_active, events, stop, start
+    def __init__(
+        self,
+        *,
+        clean: np.ndarray,
+        fixed: np.ndarray,
+        own_active: np.ndarray,
+        events: pl.DataFrame,
+        stop: int,
+        start: int,
+    ) -> None:
+        self.fixed, self.own_active, self.events, self.stop, self.start = (
+            fixed,
+            own_active,
+            events,
+            stop,
+            start,
+        )
         self.nbr_active = flg.neighbour_active(active=own_active, nb_of=NB.of, choice=None)
         both = np.isfinite(fixed) & np.isfinite(clean)
         self.shift = np.where(both, fixed - clean, 0.0).astype(np.float32)
@@ -1135,7 +1164,9 @@ def world660(*, clean: np.ndarray, month: str, r: int) -> World660:
         power={lab: clean[p_of[lab], start:stop].astype(float) * cap[p_of[lab]] for lab in sites},
         is_mva={lab: lab in MVA_ONLY_LABELS for lab in sites},
         noise={lab: float(noise[lab]) for lab in sites},
-        neighbours={lab: [labels[q] for q in NB.of[p_of[lab]] if labels[q] in sites] for lab in sites},
+        neighbours={
+            lab: [labels[q] for q in NB.of[p_of[lab]] if labels[q] in sites] for lab in sites
+        },
         origin=origin,
     )
     inj = gen660.inject(
@@ -1152,13 +1183,19 @@ def world660(*, clean: np.ndarray, month: str, r: int) -> World660:
     for lab, mask in gen660.event_windows(events=inj.events, length=stop - start).items():
         own[p_of[lab], start:stop] = mask
     assert not own[:, :start].any() and not own[:, stop:].any()
-    assert not (((np.abs(fixed - clean) > flg.SHIFT_EPS) & np.isfinite(fixed) & np.isfinite(clean)) & ~own).any(), "a shifted half-hour lies outside every event window"
-    return World660(clean=clean, fixed=fixed, own_active=own, events=inj.events, stop=stop, start=start)
+    assert not (
+        ((np.abs(fixed - clean) > flg.SHIFT_EPS) & np.isfinite(fixed) & np.isfinite(clean)) & ~own
+    ).any(), "a shifted half-hour lies outside every event window"
+    return World660(
+        clean=clean, fixed=fixed, own_active=own, events=inj.events, stop=stop, start=start
+    )
 
 
 def ended_within(*, active: np.ndarray, days: int) -> np.ndarray:
     """Return, per Primary and grid time, whether a transfer ended within the last `days` days (and none is active)."""
-    c = np.concatenate([np.zeros((active.shape[0], 1), np.int64), np.cumsum(active, axis=1)], axis=1)
+    c = np.concatenate(
+        [np.zeros((active.shape[0], 1), np.int64), np.cumsum(active, axis=1)], axis=1
+    )
     w = days * 48
     lo = np.clip(np.arange(active.shape[1]) + 1 - w, 0, None)
     seen = c[:, np.arange(active.shape[1]) + 1] - c[:, lo]
@@ -1191,7 +1228,11 @@ def row_scores(*, q: np.ndarray, y: np.ndarray) -> dict[str, np.ndarray]:
 def frame_q(*, frame: pl.DataFrame, keys: pl.DataFrame) -> np.ndarray:
     """Return the frame's quantiles in the row order of `keys`."""
     k3 = ["time_series_id", "power_fcst_init_time", "valid_time"]
-    j = keys.select(k3).with_row_index("i").join(frame.select(*k3, *QCOLS), on=k3, how="left", maintain_order="left")
+    j = (
+        keys.select(k3)
+        .with_row_index("i")
+        .join(frame.select(*k3, *QCOLS), on=k3, how="left", maintain_order="left")
+    )
     q = j.select(QCOLS).to_numpy().astype(np.float32)
     assert len(q) == len(keys) and np.isfinite(q).all(), "the frame misses some key rows"
     return np.sort(q, axis=1)
@@ -1227,7 +1268,9 @@ def run_stage0(*, device: str = "cuda") -> None:
     mr = e.k.build_month(month=month, clean=clean)
     test = e.build_test(month=month, standardiser=mr.base.standardiser)
     for seed in e.ARGS.seeds:
-        assert table_file(month=month, seed=seed).exists(), "experiment 677's predict table is missing"
+        assert table_file(month=month, seed=seed).exists(), (
+            "experiment 677's predict table is missing"
+        )
     ensure_tables(mr=mr, test=test, month=month, seeds=e.ARGS.seeds, device=device)
     keys = test_keys(test=test, sites=sites)
     lo, hi = e.k.window_of(month=month, cadence=e.CADENCE, index=0)
@@ -1248,8 +1291,15 @@ def run_stage0(*, device: str = "cuda") -> None:
     y_all = clean[test.primary, test.target_idx].astype(np.float32)
     clean_frames = {
         seed: forecast_window(
-            model=model, test=test, mr=mr, device=device, fs=fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed),
-            lo=lo, hi=hi, power_lag=clean, power_sig=clean,
+            model=model,
+            test=test,
+            mr=mr,
+            device=device,
+            fs=fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed),
+            lo=lo,
+            hi=hi,
+            power_lag=clean,
+            power_sig=clean,
         )
         for seed, model in models.items()
     }  # the observed-lag forecast (A0-clean) does not depend on the pass
@@ -1263,14 +1313,30 @@ def run_stage0(*, device: str = "cuda") -> None:
             day_idx=day_idx, week_idx=week_idx, day_missing=test.x[:, 38] > 0.5, week_missing=test.x[:, 41] > 0.5,
         )  # fmt: skip
         masked = np.stack([flags[:, 0] + flags[:, 1] > 0, flags[:, 2] + flags[:, 3] > 0], axis=1)
-        masked[:, 0] |= masked[:, 1]  # block dropout masks the day lag alone or both lags, never the week lag alone
-        blk = e.block_of(clean=world.fixed, primary=test.primary, target_idx=test.target_idx, origin_idx=test.origin_idx)
+        masked[:, 0] |= masked[
+            :, 1
+        ]  # block dropout masks the day lag alone or both lags, never the week lag alone
+        blk = e.block_of(
+            clean=world.fixed,
+            primary=test.primary,
+            target_idx=test.target_idx,
+            origin_idx=test.origin_idx,
+        )
         lag_x = test.x.copy()
         lag_x[:, LAG_FIRST : LAG_FIRST + LAG_WIDTH] = blk
         tin = world.own_active[test.primary, test.target_idx]
-        after = ended_within(active=world.own_active, days=AFTER_DAYS)[test.primary, test.target_idx]
+        after = ended_within(active=world.own_active, days=AFTER_DAYS)[
+            test.primary, test.target_idx
+        ]
         phase = phases_of(flags=flags, tin=tin, after=after)
-        keep = (phase > 0) & np.isfinite(y_all) & (test.target_idx < world.stop) & (test.target_idx < cutoff_idx) & (test.origin >= lo) & (test.origin < hi)
+        keep = (
+            (phase > 0)
+            & np.isfinite(y_all)
+            & (test.target_idx < world.stop)
+            & (test.target_idx < cutoff_idx)
+            & (test.origin >= lo)
+            & (test.origin < hi)
+        )
         if not keep.any():
             continue
         keys_keep = keys.filter(pl.Series(keep))
@@ -1308,9 +1374,161 @@ def run_stage0(*, device: str = "cuda") -> None:
         tmp.rename(out)
         in12 = np.isin(phase[keep], (1, 2))
         crps = {n: row_scores(q=np.sort(np.mean(qs[n], axis=0), axis=1), y=y)["crps"] for n in qs}
-        gap = float(crps["inj"][in12].mean() - crps["clean"][in12].mean()) if in12.any() else float("nan")
-        print(f"{month} r{r:02d}: {int(keep.sum()):,} rows ({int(in12.sum()):,} in P1+P2), CRPS(A0) - CRPS(A0-clean) = {gap:+.3f}", flush=True)
+        gap = (
+            float(crps["inj"][in12].mean() - crps["clean"][in12].mean())
+            if in12.any()
+            else float("nan")
+        )
+        print(
+            f"{month} r{r:02d}: {int(keep.sum()):,} rows ({int(in12.sum()):,} in P1+P2), CRPS(A0) - CRPS(A0-clean) = {gap:+.3f}",
+            flush=True,
+        )
     print("stage 0 done", month, flush=True)
+
+
+def head_rows(*, frames: list[pl.DataFrame], prim_of_ts: dict[int, int]) -> dict[str, np.ndarray]:
+    """Return (prim, oi, vi, lead, q) of the seed-mean quantiles of the seeds' frames, rows sorted by key.
+
+    `lead` is in hours. Rows keep leads from 3 hours to below 339 hours, the contract's valid times.
+    """
+    cols = ["time_series_id", "power_fcst_init_time", "valid_time"]
+    ordered = [f.sort(cols) for f in frames]
+    for f in ordered[1:]:
+        assert f.select(cols).equals(ordered[0].select(cols)), (
+            "the seeds' frames hold different rows"
+        )
+    ref = ordered[0]
+    prim = np.array([prim_of_ts[int(t)] for t in ref["time_series_id"].to_list()], np.int64)
+    oi = ((ref["power_fcst_init_time"].dt.epoch("us") - GRID) // STEP).to_numpy()
+    vi = ((ref["valid_time"].dt.epoch("us") - GRID) // STEP).to_numpy()
+    lead = ((vi - oi) / 2.0).astype(np.float32)
+    q = np.sort(np.mean([f.select(QCOLS).to_numpy() for f in ordered], axis=0), axis=1).astype(
+        np.float32
+    )
+    keep = (lead >= 3.0) & (lead < 339.0)
+    return {"prim": prim[keep], "oi": oi[keep], "vi": vi[keep], "lead": lead[keep], "q": q[keep]}
+
+
+def month_bounds_us(*, month: str) -> tuple[int, int]:
+    """Return the first microsecond of `month` and of the next month."""
+    y, m = (int(v) for v in month.split("-"))
+    nxt = datetime(y + (m == 12), m % 12 + 1, 1, tzinfo=UTC)
+    return int(datetime(y, m, 1, tzinfo=UTC).timestamp() * 1e6), int(nxt.timestamp() * 1e6)
+
+
+def run_headbank(*, device: str = "cuda") -> None:
+    """The A0 Candidate's forecasts on the prevailing head's injected banks (bank F), no retraining.
+
+    Sources, written to `headbank/<source>.npz` as seed-mean quantile rows:
+    `tr_<month>_r<pass>` (experiment 650's training passes, per month of the fold, as experiment 667
+    injected them), `held_<month>_r<pass>` (its held-out passes 200 to 203), and `dec_r<pass>` (the
+    experiment 660 generator over the fold's whole window, `--bank-passes` passes). The shift enters
+    the lag inputs, the signals, and the target (written by the data step).
+    """
+    import e00650_bank as gen650  # ty: ignore[unresolved-import]
+    import e00650_common as c650  # ty: ignore[unresolved-import]
+
+    assert fold.PHASE == "predict", "the bank needs the scored window open"
+    flg.known_answer()
+    clean = e.c.clean_stack()
+    e.k.build_month = build_month_syn
+    e.k.GpuMonth = SigGpuMonth
+    sites = k578.sites()
+    prim_of_ts = dict(
+        zip(sites["time_series_id"].to_list(), sites["primary"].to_list(), strict=True)
+    )
+    (month,) = e.ARGS.months
+    mr = e.k.build_month(month=month, clean=clean)
+    test = e.build_test(month=month, standardiser=mr.base.standardiser)
+    ensure_tables(mr=mr, test=test, month=month, seeds=e.ARGS.seeds, device=device)
+    lo_fold, hi_fold = e.k.window_of(month=month, cadence=e.CADENCE, index=0)
+    models = {}
+    for seed in e.ARGS.seeds:
+        m = new_model(n_primaries=len(mr.base.target_mean)).to(device)
+        m.load_state_dict(
+            torch.load(Path(MINE.models_from) / f"{month}_d0_s{seed}.pt", map_location=device)
+        )
+        m.eval()
+        models[seed] = m
+        fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+    out_dir = e.W / "headbank"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    nb_of, cap, is_mw = c650.world()
+    year_end = int((datetime(2026, 11, 1, tzinfo=UTC).timestamp() * 1e6 - GRID) // STEP)
+
+    def forecast(
+        *, fixed: np.ndarray, power_sig: np.ndarray, lo: int, hi: int
+    ) -> dict[str, np.ndarray] | None:
+        blk = e.block_of(
+            clean=fixed,
+            primary=test.primary,
+            target_idx=test.target_idx,
+            origin_idx=test.origin_idx,
+        )
+        lag_x = test.x.copy()
+        lag_x[:, LAG_FIRST : LAG_FIRST + LAG_WIDTH] = blk
+        frames = []
+        for seed, model in models.items():
+            fs = fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+            frame = forecast_window(model=model, test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi,
+                                    power_lag=fixed, power_sig=power_sig, lag_x=lag_x, flags=no_flags(test=test))  # fmt: skip
+            if frame is None:
+                return None
+            frames.append(frame)
+        return head_rows(frames=frames, prim_of_ts=prim_of_ts)
+
+    def write(*, name: str, rows: dict[str, np.ndarray]) -> None:
+        tmp = out_dir / f"{name}.tmp.npz"
+        np.savez(tmp, **rows)
+        tmp.rename(out_dir / f"{name}.npz")
+
+    months_of_fold = []
+    y, m0 = (int(v) for v in month.split("-"))
+    for k in range(fold.SPAN_MONTHS):
+        t = m0 - 1 + k
+        months_of_fold.append(f"{y + t // 12}-{t % 12 + 1:02d}")
+    n = clean.shape[1]
+    for sub in months_of_fold:
+        ms = c650.month_start_idx(month=sub)
+        lo, hi = month_bounds_us(month=sub)
+        view = clean.copy()
+        # hide every half-hour from the next month's start, as experiment 667's generator view does
+        y2, m2 = (int(v) for v in sub.split("-"))
+        nxt = c650.month_start_idx(month=f"{y2 + (m2 == 12)}-{m2 % 12 + 1:02d}")
+        view[:, nxt:] = np.nan
+        for r in (
+            *range(gen650.N_TRAIN_PASSES),
+            *range(gen650.HELD_OUT_FIRST, gen650.HELD_OUT_FIRST + gen650.N_HELD_OUT_PASSES),
+        ):
+            kind = "tr" if r < gen650.HELD_OUT_FIRST else "held"
+            name = f"{kind}_{sub}_r{r:03d}"
+            if (out_dir / f"{name}.npz").exists():
+                continue
+            own, mirror, _events = gen650.build(clean=view, month_idx=ms, month_start_idx=ms, r=r, nb_of=nb_of,
+                                                capacity=cap, is_mw=is_mw, window_end_idx=year_end)  # fmt: skip
+            fixed = np.where(np.isfinite(clean), clean + own[:, :n], clean)
+            mirrored = np.where(np.isfinite(fixed), fixed + mirror[:, :n], fixed)
+            rows = forecast(fixed=fixed, power_sig=mirrored, lo=lo, hi=hi)
+            if rows is not None:
+                write(name=name, rows=rows)
+                print(f"{name}: {len(rows['prim']):,} rows", flush=True)
+    for r in range(MINE.bank_passes):
+        name = f"dec_r{r:02d}"
+        if (out_dir / f"{name}.npz").exists():
+            continue
+        world = world660(clean=clean, month=month, r=r)
+        rows = forecast(fixed=world.fixed, power_sig=world.fixed, lo=lo_fold, hi=hi_fold)
+        if rows is not None:
+            np.savez(
+                out_dir / f"{name}_world.npz",
+                fixed=world.fixed.astype(np.float32),
+                own_active=world.own_active,
+                start=world.start,
+                stop=world.stop,
+            )
+            write(name=name, rows=rows)
+            print(f"{name}: {len(rows['prim']):,} rows", flush=True)
+    print("headbank done", month, flush=True)
 
 
 if __name__ == "__main__":
@@ -1326,5 +1544,5 @@ if __name__ == "__main__":
         run_bank()
     elif CMD == "stage0":
         run_stage0()
-
-
+    elif CMD == "headbank":
+        run_headbank()
