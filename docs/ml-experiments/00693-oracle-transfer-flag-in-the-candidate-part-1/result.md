@@ -82,10 +82,13 @@ detector could add to the forecast.
   rules are asserted per row in code.
 - **Banks (pre-registered).** Deciding banks L and F use the experiment 660 generator with
   `hard_negatives=False`, class probabilities edge_transfer 0.55, edge_transfer_unseen_donor 0.10,
-  edge_transfer_unseen_recipient 0.15, and permanent_shift 0.20, `events_per_primary_year=6`, and 24
-  passes with seeds 693000 to 693023, injected into the cleaned panel of 15 Primaries (the 16th has
-  no noise unit). If a scored month holds under about 200 events, the pass count is raised in a
-  commit before the first fit. Check banks: experiment 581's generator with seeds disjoint from
+  edge_transfer_unseen_recipient 0.15, and permanent_shift 0.20, `events_per_primary_year=3`, and 48
+  passes, injected into the cleaned panel of 15 Primaries (the 16th has no noise unit) from 60 days
+  before the fold's first scored month to the end of its scored months. A pass's seed is 693000
+  plus 100 times (calendar year times 12 plus fold month) plus the pass number, so all arms and
+  network seeds see the same injected worlds. A smoke pass at 6 events per Primary-year left 99.7% of
+  phase P1 rows with a neighbour flag, so the rate was lowered before any quoted run. If a scored
+  month still holds under about 200 events, the pass count is raised in a commit before the first fit. Check banks: experiment 581's generator with seeds disjoint from
   training (bank L), and experiment 650's held-out passes (bank F).
 - **Contrasts** (A1 minus A2 unless stated; negative is better). C1: no-retrain-arm (NRA) output,
   bank L, phases P1 plus P2, November 2025 to June 2026. C2: prevailing output, bank F, phase P1,
