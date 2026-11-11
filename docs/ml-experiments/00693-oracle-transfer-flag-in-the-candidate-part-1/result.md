@@ -51,8 +51,6 @@ metric: >-
   avoidable-curtailment cost, copied share of an injected lag-only shift, reaction time.
 ---
 
-# Would a perfect flag for load transfers improve the Candidate demand forecast?
-
 **Status: planned. The design is fixed in the brief at
 `data/ml-experiments/briefs/oracle_switching_flag_design.md` (design v2, reviewed by an adversarial
 Opus reviewer and revised). No code has run.**
