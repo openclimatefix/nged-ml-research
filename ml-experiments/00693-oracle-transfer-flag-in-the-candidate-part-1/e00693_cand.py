@@ -1,5 +1,6 @@
 # ruff: noqa: C408, ANN001, ANN003, ANN201, ANN202, D102, D103, D107, D205, E402, E501, F841, I001, PLR0915, PT018
-"""Experiment 693 (copy of experiment 677's `e00677_cand.py`): the Candidate with oracle or placebo transfer flags.
+"""Experiment 693 (copy of experiment 677's `e00677_cand.py`): the Candidate with oracle or placebo
+transfer flags.
 
 Experiment 677's script table-builds, fine-tunes, and scores the Candidate (arm `P7+D50`) one fold
 at a time. This copy adds `--flags {none,oracle,placebo}`, which appends four columns (`own_day`,
@@ -1192,7 +1193,8 @@ def world660(*, clean: np.ndarray, month: str, r: int) -> World660:
 
 
 def ended_within(*, active: np.ndarray, days: int) -> np.ndarray:
-    """Return, per Primary and grid time, whether a transfer ended within the last `days` days (and none is active)."""
+    """Return, per Primary and grid time, whether a transfer ended within the last `days` days (and
+    none is active)."""
     c = np.concatenate(
         [np.zeros((active.shape[0], 1), np.int64), np.cumsum(active, axis=1)], axis=1
     )
@@ -1213,7 +1215,8 @@ def phases_of(*, flags: np.ndarray, tin: np.ndarray, after: np.ndarray) -> np.nd
 
 
 def row_scores(*, q: np.ndarray, y: np.ndarray) -> dict[str, np.ndarray]:
-    """Return per-row scores, in points of capacity: CRPS (twice the mean pinball loss), absolute error of the median, tail pinball, and the q05 to q95 cover."""
+    """Return per-row scores, in points of capacity: CRPS (twice the mean pinball loss), absolute
+    error of the median, tail pinball, and the q05 to q95 cover."""
     lv = np.asarray(QUANTILES, np.float32)
     err = y[:, None] - q
     pin = np.maximum(lv * err, (lv - 1.0) * err) * 100.0

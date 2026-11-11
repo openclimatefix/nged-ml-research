@@ -9,9 +9,11 @@ QUANTILES: Final = (0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 
 
 
 def row_scores(*, q: np.ndarray, y: np.ndarray) -> dict[str, np.ndarray]:
-    """Return per-row scores: CRPS (twice the mean pinball loss), absolute error of the median, tail pinball, and the q05 to q95 cover.
+    """Return per-row scores: CRPS (twice the mean pinball loss), absolute error of the median, tail
+    pinball, and the q05 to q95 cover.
 
-    `q` holds the 11 quantiles as shares of capacity, sorted within the row; `y` is the target as a share of capacity.
+    `q` holds the 11 quantiles as shares of capacity, sorted within the row; `y` is the target as a
+    share of capacity.
     """
     lv = np.asarray(QUANTILES, np.float32)
     err = y[:, None] - q

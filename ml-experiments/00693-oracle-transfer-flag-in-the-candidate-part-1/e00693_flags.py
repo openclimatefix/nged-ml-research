@@ -75,7 +75,8 @@ def neighbour_active(
 def roll_mask(
     *, mask: np.ndarray, offset: int, window: tuple[int, int] | None = None
 ) -> np.ndarray:
-    """Return `mask` rolled circularly by `offset` half-hours inside `window` (the whole grid if None): the placebo spans.
+    """Return `mask` rolled circularly by `offset` half-hours inside `window` (the whole grid if
+    None): the placebo spans.
 
     Rolling inside the window where events can exist keeps every span's length and every Primary's
     span count, and moves each span to another time of the same window.
@@ -89,7 +90,8 @@ def roll_mask(
 
 
 def placebo_offset(*, month: str, seed: int, window_length: int) -> int:
-    """Return the placebo's fixed roll in half-hours: 7 days or more, under the window, never a whole number of weeks."""
+    """Return the placebo's fixed roll in half-hours: 7 days or more, under the window, never a
+    whole number of weeks."""
     assert window_length > 14 * PER_DAY, window_length
     rng = np.random.default_rng([693, int(month.replace("-", "")), seed])
     while True:

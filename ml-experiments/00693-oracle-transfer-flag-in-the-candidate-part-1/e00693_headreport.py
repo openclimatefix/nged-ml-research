@@ -105,7 +105,8 @@ def event_masks() -> dict[str, np.ndarray]:
 
 
 def real_slices(*, df: pl.DataFrame, active: np.ndarray) -> pl.DataFrame:
-    """Add the real-row scenario: 0 outside every event and at least 7 days after; 1 target inside; 2 within 7 days after; 3 origin inside only."""
+    """Add the real-row scenario: 0 outside every event and at least 7 days after; 1 target inside;
+    2 within 7 days after; 3 origin inside only."""
     after = hd.ended_within(active=active, days=7)
     near = active | after
     prim, oi, vi = (
