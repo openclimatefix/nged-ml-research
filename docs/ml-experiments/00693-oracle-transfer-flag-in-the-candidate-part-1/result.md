@@ -155,6 +155,23 @@ covers
   measures the extra input columns and refit noise. C4's real rows are four or five month blocks, so
   its interval is coarse.
 
+## Stage 0 result (interim)
+
+**The no-retrain ceiling is 0.107 points of capacity, under the 0.3 gate, so the no-retrain-arm
+retraining is not run.** Stage 0 scored experiment 677's stored step-8 `P7+D50` networks on bank L
+(the experiment 660 generator, 48 passes per fold, seeds 0 to 2, folds 2025-11, 2026-02, and
+2026-05; 47.9 million scored rows). The gate statistic is CRPS(A0) minus CRPS(A0-clean) on phases P1
+and P2 pooled over the three folds: +0.107 points, 95% interval [+0.087, +0.129] from 2,000
+resamples of (fold, pass, Primary) clusters. By fold it is +0.125, +0.073, and +0.128.
+
+- **Copied share.** A0 copies 0.031 of the day-lag shift into its median, and A0-mask copies 0.003.
+- **Masking.** A0 minus A0-mask is +0.017 [+0.004, +0.050] on P1 and negative on P2.
+- **Phase P3.** The gap is 0.000, as it must be when every lag is clean.
+- **Consequence.** C1 and C4-NRA are dropped, the Bonferroni family becomes C2, C3, and
+  C4-prevailing, and stage 1 retrains only the prevailing head.
+
+Source: `scores/stage0_report.md`, printed by `e00693_stage0_report.py`.
+
 ## Method
 
 To be written with the results.
