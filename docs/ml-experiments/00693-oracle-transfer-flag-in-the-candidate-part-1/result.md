@@ -42,7 +42,8 @@ decision_rule: >-
   floor (share of P1 rows with p > 0, per arm). Stage 0 gate - if CRPS(A0) minus CRPS(A0-clean) on
   bank L's affected rows is under 0.3 points, the NRA retraining is not run.
 benchmark: >-
-  Experiment 677's quarterly step-8 Candidate (arm A0, near 7.99 MAE and 4.57 CRPS), experiment 667's
+  Experiment 677's quarterly step-8 Candidate (arm A0, near 7.99 MAE and 4.57 CRPS), experiment
+  667's
   monthly file (7.53 MAE) for scale, ClimatologyForecaster, and NGED's manual heuristic.
 row_set_id: oracle693_c1_bankL_nov25_jun26
 metric: >-
@@ -63,22 +64,26 @@ detector could add to the forecast.
 
 ## Plan
 
-- **Arms.** A0 (default: [experiment 677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md)'s
+- **Arms.** A0 (default: [experiment
+677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md)'s
   step-8 Candidate network and the adopted lag-input prevailing head of [experiment
   681](../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md)), A1 (default plus
   oracle flags), A2 (placebo flags with matched span lengths, overlaps, and per-Primary counts).
   Stage 0 adds the inference-only ceilings A0-mask, A0-clean, and oracle B-haz (the no-fit hazard
   baseline of
-  [experiment 667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)).
+  [experiment
+  667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)).
 - **Folds.** Quarterly refits at the maintainer's request (cut-offs 2025-11-01, 2026-02-01,
   2026-05-01), scored on valid times 2025-11-01 to 2026-06-30 only. Seeds 0 to 2.
 - **Information sets.** The Candidate lag flags use 09:00 UTC origins, and every lag lies at least
-  24 hours before the origin. The prevailing head uses the 12:00 UTC contract origin, and its freshest
+  24 hours before the origin. The prevailing head uses the 12:00 UTC contract origin, and its
+  freshest
   reading is 6 hours before the network origin. `in_progress` is the transfer state at that freshest
   reading, never at the origin: it is 1 only if the onset is at or before it and no end is at or
   before it. The oracle age is the origin minus the earliest onset in progress, and is 0 when
   `in_progress` is 0. The flags cover the row's own Primary for the prevailing head, and the own
-  Primary and its electrical neighbours for the Candidate. The placebo flags obey the same rules. Both
+  Primary and its electrical neighbours for the Candidate. The placebo flags obey the same rules.
+  Both
   rules are asserted per row in code.
 - **Banks (pre-registered).** Deciding banks L and F use the experiment 660 generator with
   `hard_negatives=False`, class probabilities edge_transfer 0.55, edge_transfer_unseen_donor 0.10,
@@ -86,9 +91,11 @@ detector could add to the forecast.
   passes, injected into the cleaned panel of 15 Primaries (the 16th has no noise unit) from 60 days
   before the fold's first scored month to the end of its scored months. A pass's seed is 693000
   plus 100 times (calendar year times 12 plus fold month) plus the pass number, so all arms and
-  network seeds see the same injected worlds. A smoke pass at 6 events per Primary-year left 99.7% of
+  network seeds see the same injected worlds. A smoke pass at 6 events per Primary-year left 99.7%
+  of
   phase P1 rows with a neighbour flag, so the rate was lowered before any quoted run. If a scored
-  month still holds under about 200 events, the pass count is raised in a commit before the first fit. Check banks: experiment 581's generator with seeds disjoint from
+  month still holds under about 200 events, the pass count is raised in a commit before the first
+  fit. Check banks: experiment 581's generator with seeds disjoint from
   training (bank L), and experiment 650's held-out passes (bank F).
 - **Contrasts** (A1 minus A2 unless stated; negative is better). C1: no-retrain-arm (NRA) output,
   bank L, phases P1 plus P2, November 2025 to June 2026. C2: prevailing output, bank F, phase P1,
@@ -99,9 +106,11 @@ detector could add to the forecast.
   inside it; P2 = same, but the target is after the end; P3 = lags clean, target after the end; P4 =
   event-free origin and target. Each contrast has its own row set: `oracle693_c1_bankL_nov25_jun26`,
   `oracle693_c2_c3_bankF_feb_jun26`, and `oracle693_c4_real_p4`. Experiment 677's file has another
-  `row_set_id`, so A0 is re-scored on these rows (valid times to 2026-06-30) and checked against 677's
+  `row_set_id`, so A0 is re-scored on these rows (valid times to 2026-06-30) and checked against
+  677's
   stored scores, rather than read as 677's file.
-- **Bars apply to the unweighted deciding-bank contrast.** The reweighting to the verified transfers'
+- **Bars apply to the unweighted deciding-bank contrast.** The reweighting to the verified
+transfers'
   depth and duration and the implied all-rows annual effect are reported beside it. Each contrast is
   also reported per seed.
 - **Stage 0 gate.** Seed-mean CRPS(A0) minus CRPS(A0-clean) on bank L, phases P1 plus P2, all three
@@ -124,18 +133,24 @@ detector could add to the forecast.
   fold), D15 and D18 cut before 2025-03-01, every network saved, stored predictions reused,
   origin-time weather only (asserted per row), no new calendar inputs (the Candidate's own date-time
   encoder is unchanged), and normalised MAE of the median in every table. The four load-shift
-  scenarios (all rows; outside events and at least 7 days after; inside events; the 7 days after) are
-  reported, with a day-ahead forecast, a 14-day forecast, and at least 6 load-shift time series across
+  scenarios (all rows; outside events and at least 7 days after; inside events; the 7 days after)
+  are
+  reported, with a day-ahead forecast, a 14-day forecast, and at least 6 load-shift time series
+  across
   both metering groups. **Departures:** quarterly instead of monthly refits (the maintainer's
   request; experiment 677's advice favours monthly, and any gain here applies to quarterly refits),
   and a one-fold screen instead of four seasonal months.
-- **Earlier advice and background.** `docs/ml-experiments/background/index.md`, `data-processing.md`,
-  and the `advice` lists of experiments 667, 677, 681, 687, and the switching-detector experiments were
+- **Earlier advice and background.** `docs/ml-experiments/background/index.md`,
+`data-processing.md`,
+  and the `advice` lists of experiments 667, 677, 681, 687, and the switching-detector experiments
+  were
   read. The plan follows experiment 677's advice to judge on copied share and event-free error
   together, and treats a seed contrast under 0.03 points as unresolved without five seeds
-  ([experiment 651](../00651-graph-layer-over-electrical-neighbours-in-the-demand-network-part-1/result.md));
+  ([experiment
+  651](../00651-graph-layer-over-electrical-neighbours-in-the-demand-network-part-1/result.md));
   it departs from the advice to refit monthly.
-- **Caveats.** NGED's logs miss transfers, so event-free real rows may hold transfers no label covers
+- **Caveats.** NGED's logs miss transfers, so event-free real rows may hold transfers no label
+covers
   and the C4 harm figure is optimistic. C4 compares A1 with A0 on rows the oracle never flags, so it
   measures the extra input columns and refit noise. C4's real rows are four or five month blocks, so
   its interval is coarse.
