@@ -67,8 +67,9 @@ detector could add to the forecast.
   step-8 Candidate network and the adopted lag-input prevailing head of [experiment
   681](../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md)), A1 (default plus
   oracle flags), A2 (placebo flags with matched span lengths, overlaps, and per-Primary counts).
-  Stage 0 adds the inference-only ceilings A0-mask, A0-clean, and oracle B-haz (the no-fit hazard baseline of [experiment
-  667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)).
+  Stage 0 adds the inference-only ceilings A0-mask, A0-clean, and oracle B-haz (the no-fit hazard
+  baseline of
+  [experiment 667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)).
 - **Folds.** Quarterly refits at the maintainer's request (cut-offs 2025-11-01, 2026-02-01,
   2026-05-01), scored on valid times 2025-11-01 to 2026-06-30 only. Seeds 0 to 2.
 - **Information sets.** The Candidate lag flags use 09:00 UTC origins, and every lag lies at least
