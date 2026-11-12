@@ -26,10 +26,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-import e00695_score as s695
+import e00695_score as s695  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-from e00695_common import (
+from e00695_common import (  # ty: ignore[unresolved-import]
     D8_CAPACITY_MVA,
     D8_SERIES,
     ENGINE_MONTHS,
@@ -39,7 +39,7 @@ from e00695_common import (
     SHARED_DIR,
     d8_truth,
 )
-from e00695_score import (
+from e00695_score import (  # ty: ignore[unresolved-import]
     KEYS,
     NATIVE_TO_CONTRACT,
     TAIL_NAMES,
@@ -382,7 +382,7 @@ def main() -> None:
     parser.add_argument("--resamples", type=int, default=FAMILY_RESAMPLES)
     args = parser.parse_args()
     SCORES_DIR.mkdir(parents=True, exist_ok=True)
-    import e00695_clean as clean
+    import e00695_clean as clean  # ty: ignore[unresolved-import]
 
     host_y = clean.load_setup(arm="W0").y
     host_truth = grid_truth(y=host_y)

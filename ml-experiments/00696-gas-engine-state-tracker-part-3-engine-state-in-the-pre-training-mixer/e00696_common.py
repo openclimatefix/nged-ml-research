@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal
 
-from e00695_common import DATA_DIR as E695_DIR
+from e00695_common import DATA_DIR as E695_DIR  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 EXPERIMENT_ID: Final[int] = 696
@@ -79,13 +79,14 @@ ARMS: Final[dict[str, Arm]] = {
         Arm("SZ", "d8", "zero", None, None),
         Arm("S1d", "d8", "hidden", "A1", None),
         Arm("W0", "host", "none", None, "W0", probe=True),
+        Arm("G0W", "host", "none", None, "W0", probe=True),
         Arm("WST", "host", "true", None, "W0", probe=True),
         Arm("WS1", "host", "tracked", "W1", "W0"),
         Arm("W0p", "host", "none", None, "W0", probe=True),
     )
 }
-"""Arm G0 is A0 refitted for seed 0 of the first fold only, in a folder of its own, to check the reproduction. Arm W0p runs no fit: it loads experiment 695's stored pre-trained weights of W0 for seeds 0 to 2 and runs the encoder probe on them."""
-STATE_FREE_ARMS: Final[frozenset[str]] = frozenset({"A0", "G0", "W0"})
+"""Arm G0 is A0 refitted for seed 0 of the first fold only, in a folder of its own, to check the reproduction. Arm G0W does the same for W0, through the code path that produces W0 seeds 3 to 9. Arm W0p runs no fit: it loads experiment 695's stored pre-trained weights of W0 for seeds 0 to 2 and runs the encoder probe on them."""
+STATE_FREE_ARMS: Final[frozenset[str]] = frozenset({"A0", "G0", "G0W", "W0"})
 
 
 def runs_dir(*, arm: str) -> Path:

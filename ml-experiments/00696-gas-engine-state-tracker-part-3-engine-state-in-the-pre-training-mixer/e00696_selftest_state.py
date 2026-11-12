@@ -4,7 +4,7 @@
 from datetime import timedelta
 
 import numpy as np
-from e00695_common import PIPELINE_GRID_START
+from e00695_common import PIPELINE_GRID_START  # ty: ignore[unresolved-import]
 from e00696_state import (
     DAY,
     hide_half_of_origin_days,
@@ -89,6 +89,21 @@ def test_permute_days_keeps_groups_and_blocks_and_never_reads_past_the_cut() -> 
     np.testing.assert_array_equal(
         permute_days(state=changed, first=first, stop=stop, seed=0)[:stop], out[:stop]
     )
+
+
+def test_permute_days_stays_within_its_era() -> None:
+    """With an era boundary, a day only takes the content of a day of its own era."""
+    state = _day_ids(n_days=500)
+    first, boundary_day = 48 * 20, 260
+    stop = first + 48 * 400 + 17
+    out = permute_days(state=state, first=first, stop=stop, seed=0, era_starts=(48 * boundary_day,))
+    blocks = out[first : first + 48 * 400].reshape(400, DAY, 3)
+    sources = blocks[:, 0, 0].astype(int)
+    destination_days = np.arange(20, 420)
+    assert ((sources >= boundary_day) == (destination_days >= boundary_day)).all()
+    assert (sources != destination_days).mean() > 0.5, "the permutation left most days alone"
+    tail = out[first + 48 * 400 : stop]
+    assert tail[0, 0] >= boundary_day, "the partial day crossed into the earlier era"
 
 
 def test_hide_half_of_origin_days_hides_whole_days() -> None:

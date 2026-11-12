@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
-from e00695_common import READING_DELAY
+from e00695_common import READING_DELAY  # ty: ignore[unresolved-import]
 from e00696_common import N_STATE, Arm
 from e00696_probe import probe_model
 from e00696_state import hide_half_of_origin_days, rows_state

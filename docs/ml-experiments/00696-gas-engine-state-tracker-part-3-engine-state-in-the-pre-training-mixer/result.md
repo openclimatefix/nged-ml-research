@@ -72,7 +72,9 @@ decision_rule: >-
   because a gain that the placebo matches is not information about the engine. (4) `inconclusive`
   if C1 and C2 pass and M1 fails, because the gain then has no measured mechanism. (5) `supported`
   if C1 passes with an estimate of -0.16 or beyond, C2 passes, M1 passes, the C3 intervals do not
-  all lie above zero, the normalised MAE of the median at D8 does not rise beyond its 95% interval,
+  all lie above zero, the normalised MAE of the median at D8 does not rise (the code reads "rises"
+  as the lower end of the 95% month-bootstrap interval of the S1 minus A0 MAE contrast lying
+  above zero),
   and no other Primary moves for the worse. (6) `partly supported` if C1 passes at -0.16 or beyond,
   C2 and M1 pass, and another condition of branch 5 fails. (7) `small gain` if C1 passes with an
   estimate short of -0.16 and C2 and M1 pass. (8) `refuted` if all three C1 intervals lie above
@@ -194,9 +196,10 @@ pre-training target is the metered reading and the state is a covariate of that 
 the lag times would be a different experiment, because the forecast could also read it.
 
 **Arm SP tests whether a gain is information about the engine or an effect of the extra input.** SP
-permutes whole days of S1's state columns within calendar month and within weekday or weekend class
-(seed 0), using only days before the fold's cut. SP keeps the state's seasonal profile, its
-calendar average, and its within-day shape, and loses which days the engine ran. Experiment 570's
+permutes whole days of S1's state columns within era (era 1 to 2025-03-23, era 2 from
+2025-03-24), calendar month, and weekday or weekend class (seed 0), using only days at or before
+the fold's cut. SP keeps the state's seasonal profile, its calendar average, and its within-day
+shape, and loses which days the engine ran. Experiment 570's
 noise-fed encoder is the reason SP sits in the verdict table.
 
 **Arm S1d is descriptive and decides nothing.** S1d hides the state on a random half of origin days
@@ -274,7 +277,8 @@ and it needs a fresh mixer at stage 3 and a control of its own.
 ## Controls and checks
 
 - **G0, reproduction:** refit A0 seed 0 of fold 2025-11 in the new run folder and match experiment
-  695's stored fit to 1e-4 of capacity.
+  695's stored fit to 1e-4 of capacity. Arm G0W does the same for W0, through the code path that
+  produces W0 seeds 3 to 9, so that C3 and C4 compare against W0 seeds from one reproduced path.
 - **Identity, arm SZ:** forecasts match A0's to 1e-4 of capacity for fold 2025-11, seeds 0 to 2.
   With zero inputs the padded weights receive no gradient and no weight decay, so they stay at
   zero; the tolerance allows for a matrix product that rounds differently at the wider shape.
@@ -295,9 +299,11 @@ and it needs a fresh mixer at stage 3 and a control of its own.
 - **No engine input at forecast time:** assert that the stage 2 and stage 3 tensors have A0's
   column layout.
 - **Leakage:** rerun experiment 695's cut tests (`check_cut_at_train_end`, `check_real_stack_cut`)
-  on the state columns: perturbing readings from 3.5 hours before the refit onward changes no
-  state column and no pre-training row. Assert origin-time weather for every origin of every arm
-  with `assert_origin_time_weather` (242 origins per arm).
+  on the state columns: perturbing readings at or after 3.5 hours before the refit
+  changes no state column and no pre-training row. A pre-training row's target is at or before
+  3.5 hours before the refit, and the state there never reads its own target. Assert
+  origin-time weather for every origin of every arm with `assert_origin_time_weather` (242 origins
+  per arm).
 - **Checks list:** the median minus the mean forecast per site, the MAE contrast beside every CRPS
   contrast, pre-training epochs and validation loss per arm, and the audit triggers.
 

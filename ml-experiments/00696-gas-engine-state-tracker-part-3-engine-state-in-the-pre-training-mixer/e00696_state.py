@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
-from e00695_common import (
+from e00695_common import (  # ty: ignore[unresolved-import]
     D8_CAPACITY_MVA,
     ERA1_START,
     ERA2_START,
@@ -79,13 +79,15 @@ def _day_calendar(*, first_day: int, n_days: int) -> tuple[np.ndarray, np.ndarra
     return months, weekday >= 5
 
 
-def permute_days(*, state: np.ndarray, first: int, stop: int, seed: int) -> np.ndarray:
-    """Return `state` with whole UTC days shuffled within calendar month and weekday class.
+def permute_days(
+    *, state: np.ndarray, first: int, stop: int, seed: int, era_starts: tuple[int, ...] = ()
+) -> np.ndarray:
+    """Return `state` with whole UTC days shuffled within era, calendar month, and weekday class.
 
     Only half-hours from `first` (a day boundary) up to `stop` (exclusive) are touched, so no day
     after a fold's cut is read. A complete day takes the content of a day drawn without replacement
-    from the same calendar month and the same weekday class (Monday to Friday, or Saturday and Sunday)
-    over every year in the span, so the permutation keeps the state's seasonal profile and within-day
+    from the same era, the same calendar month, and the same weekday class (Monday to Friday, or
+    Saturday and Sunday), so the permutation keeps the state's seasonal profile and within-day
     shape and loses which days the engine ran. The trailing partial day takes the first half-hours of
     a complete day of the same group, drawn with replacement. A group of one day keeps its day.
 
@@ -94,6 +96,8 @@ def permute_days(*, state: np.ndarray, first: int, stop: int, seed: int) -> np.n
         first: The first half-hour of the span, which must start a UTC day.
         stop: One past the last half-hour that may be read.
         seed: The seed of the permutation.
+        era_starts: The first half-hours of the eras after the first, each starting a UTC day. A day
+            only takes the content of a day of its own era.
 
     Returns:
         A copy of `state` with the span permuted.
@@ -102,21 +106,31 @@ def permute_days(*, state: np.ndarray, first: int, stop: int, seed: int) -> np.n
     n_full, partial = divmod(stop - first, DAY)
     first_day = first // DAY
     months, weekend = _day_calendar(first_day=first_day, n_days=n_full + (1 if partial else 0))
+    n_days = n_full + (1 if partial else 0)
+    era = np.searchsorted(
+        np.asarray(era_starts, dtype=int) // DAY, first_day + np.arange(n_days), side="right"
+    )
     rng = np.random.default_rng(seed)
     out = state.copy()
     blocks = state[first : first + n_full * DAY].reshape(n_full, DAY, -1)
     destination = np.empty_like(blocks)
-    for month in range(1, 13):
-        for is_weekend in (False, True):
-            group = np.flatnonzero((months[:n_full] == month) & (weekend[:n_full] == is_weekend))
-            if len(group):
-                destination[group] = blocks[rng.permutation(group)]
+    for era_number in np.unique(era[:n_full]):
+        for month in range(1, 13):
+            for is_weekend in (False, True):
+                group = np.flatnonzero(
+                    (era[:n_full] == era_number)
+                    & (months[:n_full] == month)
+                    & (weekend[:n_full] == is_weekend)
+                )
+                if len(group):
+                    destination[group] = blocks[rng.permutation(group)]
     out[first : first + n_full * DAY] = destination.reshape(n_full * DAY, -1)
     if partial:
-        same_class = (months[:n_full] == months[n_full]) & (weekend[:n_full] == weekend[n_full])
-        same_month = months[:n_full] == months[n_full]
+        same_era = era[:n_full] == era[n_full]
+        same_month = same_era & (months[:n_full] == months[n_full])
+        same_class = same_month & (weekend[:n_full] == weekend[n_full])
         pool = next(
-            (np.flatnonzero(mask) for mask in (same_class, same_month) if mask.any()),
+            (np.flatnonzero(mask) for mask in (same_class, same_month, same_era) if mask.any()),
             np.arange(n_full),
         )
         out[first + n_full * DAY : stop] = blocks[int(rng.choice(pool))][:partial]
@@ -187,8 +201,8 @@ def build_fold(*, arm: str, month: str) -> Path:
     first = grid_index(when=ERA1_START)
     era2 = grid_index(when=ERA2_START)
     if spec.series == "host":
-        from e00695_engine import drive_series
-        from e00695_score import capacity_of, host_series_id
+        from e00695_engine import drive_series  # ty: ignore[unresolved-import]
+        from e00695_score import capacity_of, host_series_id  # ty: ignore[unresolved-import]
 
         capacity = capacity_of()[host_series_id()]
         row = int(np.load(E695_DIR / "stacks" / "W0" / f"{month}.npz")["row"])
@@ -206,7 +220,8 @@ def build_fold(*, arm: str, month: str) -> Path:
             capacity=capacity,
         )
         if spec.kind == "placebo":
-            grid = permute_days(state=grid, first=first, stop=stop, seed=0)
+            # stop + 1 so the half-hour at `stop`, the last target a pre-training row may have, is permuted too
+            grid = permute_days(state=grid, first=first, stop=stop + 1, seed=0, era_starts=(era2,))
     else:
         n_grid = len(np.load(E695_DIR / "states" / "A1" / f"{month}.npz")["pk"])
         if spec.kind == "true":

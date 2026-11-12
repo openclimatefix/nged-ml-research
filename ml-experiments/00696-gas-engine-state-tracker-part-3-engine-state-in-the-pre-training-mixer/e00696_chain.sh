@@ -1,8 +1,8 @@
 #!/bin/bash
 # usage: e00696_chain.sh ARM MONTH [COMMAND...]: experiment 677's step 9a (monthly refit of step 5 with injected
 # shifts), run by experiment 695's route (e00695_k1.py's stack replacement and chain) with the engine state in
-# the pre-training mixer, for one fold month. ARM is one of the arms of e00696_common.ARMS (A0, G0, S1, SP, SZ,
-# S1d, W0, W0p, WST, WS1). Commands, in order: state pretrain step2 fit pfit (default: pretrain step2 fit pfit;
+# the pre-training mixer, for one fold month. ARM is one of the arms of e00696_common.ARMS (A0, G0, G0W, S1, SP,
+# SZ, S1d, W0, W0p, WST, WS1). Commands, in order: state pretrain step2 fit pfit (default: state pretrain step2 fit pfit;
 # `state` builds the arm's per-fold state file on the CPU; W0p takes only `pretrain`).
 # Seeds: SEEDS="0 1 2" (default; A0 and W0 are run for seeds 3 to 9 only). Seed groups of one arm and fold share
 # folders, so each group's log carries its seeds in its name.
@@ -22,16 +22,22 @@ set -e
 mkdir -p $R/runs/$ARM/logs $CHAIN677 $STATS677/stats
 # the B1 columns are weather statistics, the same for every arm: start from experiment 677's file
 [ -f $STATS677/stats/B1/$M.npz ] || cp -r $R677/chains/3b/$M/work/stats/. $STATS677/stats/
-CMDS=${*:-pretrain step2 fit pfit}
-# no network is fitted before the synthetic checks have passed (e00696_checks.py --write)
+CMDS=${*:-state pretrain step2 fit pfit}
+# no network is fitted before the synthetic checks and the real-series leakage checks have passed
+# (e00696_checks.py --write --real all), and an arm with a state file needs it before the row build
 case " $CMDS " in *" pretrain "*|*" step2 "*|*" fit "*|*" pfit "*)
-  if ! python3 -c "import json,sys; sys.exit(0 if json.load(open('$R/checks.json')).get('synthetic_passed') is True else 1)" 2>/dev/null; then
-    echo "the synthetic checks have not passed: run e00696_checks.py --write first"; exit 1
-  fi ;;
+  if ! python3 -c "import json,sys; c=json.load(open('$R/checks.json')); sys.exit(0 if c.get('synthetic_passed') is True and c.get('leakage_passed') is True else 1)" 2>/dev/null; then
+    echo "synthetic_passed and leakage_passed are not both true: run e00696_checks.py --write --real all first"; exit 1
+  fi
+  case $ARM in A0|G0|G0W|W0|W0p) ;; *)
+    case " $CMDS " in *" state "*) ;; *) [ -f $R/states/$ARM/$M.npz ] || { echo "missing $R/states/$ARM/$M.npz: run the state command first"; exit 1; } ;; esac ;;
+  esac ;;
 esac
 for c in $CMDS; do
   case $c in
-    state) ( cd $D/../.. && source ml-experiments/00524*/env.sh && PYTHONPATH="src:$PYTHONPATH" .venv/bin/python $D/e00696_state.py $ARM --months $M ) ;;
+    state)
+      case $ARM in A0|G0|G0W|W0|W0p) ;; *)
+        [ -f $R/states/$ARM/$M.npz ] || $D/e00696_gpu.sh e00696_state.py $ARM --months $M ;; esac ;;
     pretrain|step2)
       E00677_PHASE=train $D/e00696_gpu.sh e00696_k1.py k1 $c --step 5 $A > $R/runs/$ARM/logs/${M}_${c}_$TAG.log 2>&1 ;;
     fit)

@@ -4,7 +4,7 @@ r"""Experiment 696's checks: synthetic leakage, alignment, identity, liveness, a
     source ml-experiments/00524*/env.sh; export PYTHONPATH=src:$PYTHONPATH
     uv run --no-sync python ml-experiments/00696-*/e00696_checks.py --write   # synthetic checks (no GPU, no stored data)
     uv run --no-sync python ml-experiments/00696-*/e00696_checks.py --real 2026-02   # leakage and file checks on stored data
-    uv run --no-sync python ml-experiments/00696-*/e00696_checks.py --fits   # after the fits: identity control, G0, liveness, alignment
+    uv run --no-sync python ml-experiments/00696-*/e00696_checks.py --fits   # after the fits: identity control, G0, G0W, liveness, alignment
 
 The synthetic checks write nothing but `checks.json`. The chain script refuses to fit a network until
 `checks.json` holds `synthetic_passed: true`. The real-series checks read experiment 695's stored states
@@ -18,12 +18,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Final
 
-import e00695_checks as c695
-import e00695_tracker as tracker
+import e00695_checks as c695  # ty: ignore[unresolved-import]
+import e00695_tracker as tracker  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
-from e00695_common import FOLD_MONTHS, READING_DELAY, fold_refit, grid_index
+from e00695_common import FOLD_MONTHS, READING_DELAY, fold_refit, grid_index  # ty: ignore[unresolved-import]
 from e00696_common import DATA_DIR, E695_DIR, N_STATE
 from e00696_model import ORIGINAL_CLASS, StateAuxLagMdn
 from e00696_probe import fit_probe
@@ -326,7 +326,7 @@ def check_real_state_cut(*, source: str, month: str) -> float:
     As experiment 695's `check_real_stack_cut`, for the series whose states the arm reads (`A1` for
     D8, `W1` for the host). The states before the refit must not change.
     """
-    import e00695_clean as clean
+    import e00695_clean as clean  # ty: ignore[unresolved-import]
 
     setup = clean.load_setup(arm=source)
     refit = grid_index(when=fold_refit(month=month))
@@ -363,7 +363,7 @@ def check_state_files(*, arm: str, month: str) -> dict[str, float]:
 
 def c695_era1_start():  # noqa: ANN201
     """Return the first half-hour of the tracker's era 1."""
-    from e00695_common import ERA1_START
+    from e00695_common import ERA1_START  # ty: ignore[unresolved-import]
 
     return ERA1_START
 
@@ -386,12 +386,14 @@ def _quantiles_of(*, arm: str, month: str, seed: int, root: Path) -> pl.DataFram
     return frame.sort(keys)
 
 
-def compare_fits(*, arm: str, seeds: tuple[int, ...], month: str = "2025-11") -> dict[str, float]:
-    """Return the largest gap between `arm`'s fits and experiment 695's A0, per seed."""
+def compare_fits(
+    *, arm: str, seeds: tuple[int, ...], month: str = "2025-11", reference: str = "A0"
+) -> dict[str, float]:
+    """Return the largest gap between `arm`'s fits and experiment 695's `reference` fits, per seed."""
     out = {}
     for seed in seeds:
         mine = _quantiles_of(arm=arm, month=month, seed=seed, root=DATA_DIR)
-        theirs = _quantiles_of(arm="A0", month=month, seed=seed, root=E695_DIR)
+        theirs = _quantiles_of(arm=reference, month=month, seed=seed, root=E695_DIR)
         assert mine.height == theirs.height, (mine.height, theirs.height)
         numeric = [name for name, dtype in mine.schema.items() if dtype.is_float()]
         out[f"s{seed}"] = max(float((mine[name] - theirs[name]).abs().max()) for name in numeric)  # ty: ignore[invalid-argument-type]
@@ -482,7 +484,11 @@ def main() -> None:
         results["identity_sz"] = compare_fits(arm="SZ", seeds=(0, 1, 2))
         results["g0"] = compare_fits(arm="G0", seeds=(0,))
         results["identity_passed"] = max(results["identity_sz"].values()) <= IDENTITY_TOLERANCE
-        results["g0_passed"] = max(results["g0"].values()) <= IDENTITY_TOLERANCE
+        results["g0w"] = compare_fits(arm="G0W", seeds=(0,), reference="W0")
+        results["g0_passed"] = (
+            max(results["g0"].values()) <= IDENTITY_TOLERANCE
+            and max(results["g0w"].values()) <= IDENTITY_TOLERANCE
+        )
         results["pretrain_records"] = aggregate_pretrain_records()
         results["gate_failed"] = not (results["identity_passed"] and results["g0_passed"])
     print(json.dumps(results, indent=1, default=float))
