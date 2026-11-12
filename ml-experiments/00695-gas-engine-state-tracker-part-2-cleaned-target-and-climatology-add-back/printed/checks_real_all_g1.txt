@@ -1,0 +1,36 @@
+{
+ "cut_at_train_end": 0.0,
+ "origin_cut": 0.0,
+ "climatology_causal": 0.0,
+ "identity": {
+  "cleaned_minus_reading": 0.0,
+  "route_identity": 0.0,
+  "add_back_identity": 2.187608849624212e-07
+ },
+ "addback_against_simulation_mva": 0.08233922102167579,
+ "tracker_against_694": 7.771561172376096e-16,
+ "verdict_table": "ok",
+ "real_stack_cut": {
+  "2025-11": 0.0,
+  "2025-12": 0.0,
+  "2026-01": 0.0,
+  "2026-02": 0.0,
+  "2026-03": 0.0,
+  "2026-04": 0.0,
+  "2026-05": 0.0,
+  "2026-06": 0.0
+ },
+ "leakage_passed": true,
+ "g1": {
+  "f1": 0.7849235635213496,
+  "precision": 0.9979892761394102,
+  "recall": 0.6468288444830582,
+  "false_share": 0.0003140374751386999,
+  "passes": true
+ },
+ "g1_passed": true
+}
+
+real	15m14.115s
+user	15m12.938s
+sys	0m8.875s

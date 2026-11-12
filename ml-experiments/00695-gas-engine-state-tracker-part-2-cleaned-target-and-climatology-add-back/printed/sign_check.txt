@@ -1,0 +1,9 @@
+pooled A1 share 0.42059131817688944
+AH done 174s
+A1 done 193s
+W1 done 277s
+W0 done 322s
+A1 share of k>=1 rows where folded and no-fold cleaning differ by >1 MVA, per fold: [0.508, 0.494, 0.486, 0.48, 0.36, 0.356, 0.356, 0.353]
+A1n share of k>=1 rows where folded and no-fold cleaning differ by >1 MVA, per fold: [0.508, 0.494, 0.486, 0.48, 0.36, 0.356, 0.356, 0.353]
+AH share of k>=1 rows where folded and no-fold cleaning differ by >1 MVA, per fold: [0.347]
+W1 share of k>=1 rows where folded and no-fold cleaning differ by >1 MVA, per fold: [0.076, 0.075, 0.078, 0.074, 0.074, 0.073, 0.078, 0.081]

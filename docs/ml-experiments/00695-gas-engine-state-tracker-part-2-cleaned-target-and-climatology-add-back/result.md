@@ -339,9 +339,19 @@ cleaned value sits between the engine-free and the engine-on level.
 the sunny-midday slice, use the month of the valid time. C2, C3, and the bootstrap blocks use the
 month of the forecast origin.
 
+## Before-fit results
+
+The printed outputs are in `printed/` beside the scripts. All 8 cleaning builds (A1, A1n, AH, W0,
+W1) ran. Gate G1 at the host D4 passes: F1 0.785, precision 0.998, recall 0.647, and 0.03% of
+un-injected half-hours flagged. All leakage tests give a change of exactly 0 (the synthetic cut
+tests and the real-series cut test for each of the 8 refit months). The sign check finds that 42%
+of D8's half-hours with a unit running differ by more than 1 MVA between folded and no-fold
+cleaning, above the 10% trigger, so arm A1n runs.
+
 ## Items of the plan not implemented before the first fit
 
-- The sun check is defined (`sun_check` in `e00695_checks.py`) but nothing calls it yet.
+- The sun check is defined (`sun_check` in `e00695_checks.py`) but nothing calls it yet. It needs a
+  per-day sunniness measure that no script builds.
 - The false-alarm check at the 7 other MVA-only Primaries, twCRPS, the correlation of engine state
   with forecast error on training rows, and the `ClimatologyForecaster` row on the cleaned series
   with the add-back are not written.
