@@ -1,0 +1,27 @@
+MEDIAN MINUS MEAN OF THE 11 QUANTILES, arm A0 raw network output (points of capacity)
+  D3: mean minus median +0.168
+  D9: mean minus median +0.404
+  D11: mean minus median +0.155
+  D19: mean minus median +0.550
+  D10: mean minus median +0.996
+  D4: mean minus median +0.382
+  D15: mean minus median +8.562
+  D18: mean minus median +0.231
+  D12: mean minus median +2.648
+  D22: mean minus median +0.446
+  D14: mean minus median +0.206
+  D5: mean minus median +0.564
+  D16: mean minus median +0.424
+  D21: mean minus median +0.196
+  D2: mean minus median +0.408
+  D8: mean minus median +1.627
+MEDIAN MINUS MEAN, stored systems (points of capacity); MEDIAN ERROR = median minus reading
+  a0-d8: mean minus median +1.627
+    median error (mean over rows): all +0.24, tracked on +10.00, tracked off -4.91
+  a1-d8: mean minus median -2.774
+    median error (mean over rows): all +2.00, tracked on +12.91, tracked off -3.75
+  ah-d8: mean minus median -1.766
+    median error (mean over rows): all +1.15, tracked on +11.11, tracked off -4.10
+  w0-host: mean minus median -4.627
+  w1-host: mean minus median -4.483
+data folder name check: 00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back

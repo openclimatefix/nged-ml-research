@@ -1,0 +1,121 @@
+CONTRASTS (CRPS and MAE in points of effective capacity; negative is a gain)
+C1: A1 minus A0 (crps, 98.3% level) estimate +0.117; bootstrap [-0.070, +0.412]; t [-0.037, +0.268] over 8 months; seeds [+0.182, +0.062, +0.108]
+C2: A1 minus A0 (crps, 95.0% level) estimate +0.164; bootstrap [-0.133, +0.613]; t [-0.146, +0.472] over 4 months; seeds [+0.306, +0.115, +0.070]
+C3: A1 minus A0 (crps, 95.0% level) estimate +0.069; bootstrap [-0.071, +0.184]; t [+0.033, +0.103] over 4 months; seeds [+0.055, +0.007, +0.146]
+C4: W1 minus W0 (crps, 98.3% level) estimate -0.093; bootstrap [-0.203, +0.021]; t [-0.231, +0.043] over 8 months; seeds [-0.087, -0.085, -0.108]
+C5: WT minus W0 (crps, 98.3% level) estimate -0.100; bootstrap [-0.203, +0.062]; t [-0.224, +0.027] over 8 months; seeds [-0.119, -0.064, -0.116]
+MAE: A1 minus A0 (mae, 95.0% level) estimate +0.120; bootstrap [-0.487, +0.788]; t [-0.526, +0.720] over 8 months; seeds [+0.287, -0.019, +0.094]
+EXTRA CONTRASTS AND BOUNDS (descriptive, 95%; a contrast that involves a bound is a bound)
+AH minus A1: AH minus A1 (crps, 95.0% level) estimate -0.203; bootstrap [-0.363, -0.050]; t [-0.398, +0.004] over 8 months; seeds [-0.214, -0.206, -0.189] [BOUND, NOT A FORECAST]
+A1n minus A1: A1n minus A1 (crps, 95.0% level) estimate +0.334; bootstrap [+0.197, +0.457]; t [+0.193, +0.486] over 8 months; seeds [+0.311, +0.328, +0.364]
+A1+state minus A0: A1+state minus A0 (crps, 95.0% level) estimate -1.413; bootstrap [-2.245, -0.550]; t [-2.520, -0.353] over 8 months; seeds [-1.324, -1.485, -1.429] [BOUND, NOT A FORECAST]
+AH+state minus A0: AH+state minus A0 (crps, 95.0% level) estimate -2.354; bootstrap [-3.488, -1.344]; t [-3.736, -0.945] over 8 months; seeds [-2.299, -2.428, -2.334] [BOUND, NOT A FORECAST]
+W1 minus WT: W1 minus WT (crps, 95.0% level) estimate +0.007; bootstrap [-0.052, +0.069]; t [-0.034, +0.043] over 8 months; seeds [+0.032, -0.021, +0.009]
+WT+truth minus W0: WT+truth minus W0 (crps, 95.0% level) estimate -2.257; bootstrap [-2.583, -1.915]; t [-2.676, -1.854] over 8 months; seeds [-2.277, -2.212, -2.282] [BOUND, NOT A FORECAST]
+threshold 0.398 points (5.5% of refitted A0 CRPS 7.232)
+MEAN CRPS and MAE PER SYSTEM (rows per seed)
+A0: CRPS 7.232, MAE 13.252, rows 102310
+A1: CRPS 7.349, MAE 13.372, rows 102310
+AH [BOUND, NOT A FORECAST]: CRPS 7.146, MAE 12.942, rows 102310
+A1n: CRPS 7.683, MAE 13.891, rows 102310
+A1+state [BOUND, NOT A FORECAST]: CRPS 5.819, MAE 10.386, rows 102310
+AH+state [BOUND, NOT A FORECAST]: CRPS 4.878, MAE 8.830, rows 102310
+W0: CRPS 4.489, MAE 7.447, rows 102391
+W1: CRPS 4.396, MAE 7.390, rows 102391
+WT: CRPS 4.389, MAE 7.401, rows 102391
+WT+truth [BOUND, NOT A FORECAST]: CRPS 2.232, MAE 3.953, rows 102391
+OTHER PRIMARIES, D8 excluded (A1 minus A0, 95% month-block interval; moves needs |estimate| > sister)
+D3: -0.004 [-0.082, +0.071] sister 0.009 moves=False worse=False
+D9: +0.007 [-0.106, +0.094] sister 0.010 moves=False worse=False
+D11: +0.108 [-0.139, +0.559] sister 0.037 moves=False worse=False
+D19: +0.056 [-0.064, +0.243] sister 0.016 moves=False worse=False
+D10: +0.130 [-0.077, +0.402] sister 0.005 moves=False worse=False
+D4: +0.032 [-0.080, +0.123] sister 0.001 moves=False worse=False
+D15: -0.110 [-1.206, +1.139] sister 0.161 moves=False worse=False
+D18: -0.054 [-0.200, +0.092] sister 0.013 moves=False worse=False
+D12: +0.049 [-0.132, +0.341] sister 0.031 moves=False worse=False
+D22: -0.158 [-0.927, +0.150] sister 0.108 moves=False worse=False
+D14: -0.006 [-0.077, +0.071] sister 0.043 moves=False worse=False
+D5: +0.023 [-0.189, +0.275] sister 0.020 moves=False worse=False
+D16: -0.037 [-0.130, +0.048] sister 0.058 moves=False worse=False
+D21: -0.015 [-0.088, +0.080] sister 0.014 moves=False worse=False
+D2: -0.003 [-0.109, +0.089] sister 0.015 moves=False worse=False
+D8 SLICES
+shape: (66, 13)
+┌──────────────────────────────────┬──────────────────────────────────┬────────┬───────┬────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ system                           ┆ slice                            ┆ rows   ┆ crps  ┆ mae    ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ pinball_q99 ┆ coverage_q01 ┆ coverage_q05 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---                              ┆ ---                              ┆ ---    ┆ ---   ┆ ---    ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---          │
+│ str                              ┆ str                              ┆ i64    ┆ f64   ┆ f64    ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64          │
+╞══════════════════════════════════╪══════════════════════════════════╪════════╪═══════╪════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════════╪══════════════╡
+│ A0                               ┆ all rows                         ┆ 102310 ┆ 7.232 ┆ 13.252 ┆ 0.397       ┆ 1.702       ┆ 1.6         ┆ 0.393       ┆ 0.012        ┆ 0.059        ┆ 0.954        ┆ 0.989        │
+│ A0                               ┆ engine months (valid time)       ┆ 49574  ┆ 8.075 ┆ 14.691 ┆ 0.47        ┆ 2.044       ┆ 1.668       ┆ 0.403       ┆ 0.02         ┆ 0.075        ┆ 0.959        ┆ 0.996        │
+│ A0                               ┆ fade months (valid time)         ┆ 52736  ┆ 6.439 ┆ 11.898 ┆ 0.329       ┆ 1.381       ┆ 1.536       ┆ 0.385       ┆ 0.005        ┆ 0.044        ┆ 0.949        ┆ 0.983        │
+│ A0                               ┆ tracked on (hindsight M2 flag)   ┆ 35302  ┆ 8.453 ┆ 14.519 ┆ 0.379       ┆ 1.914       ┆ 2.349       ┆ 0.556       ┆ 0.029        ┆ 0.12         ┆ 0.994        ┆ 0.999        │
+│ A0                               ┆ tracked off (hindsight M2 flag)  ┆ 67008  ┆ 6.588 ┆ 12.584 ┆ 0.407       ┆ 1.591       ┆ 1.205       ┆ 0.308       ┆ 0.003        ┆ 0.027        ┆ 0.932        ┆ 0.984        │
+│ A0                               ┆ sunny by unit shape, fade months ┆ 10324  ┆ 7.061 ┆ 12.626 ┆ 0.267       ┆ 1.151       ┆ 2.1         ┆ 0.543       ┆ 0.012        ┆ 0.076        ┆ 0.982        ┆ 0.992        │
+│ A0                               ┆ cold winter nights               ┆ 5302   ┆ 7.137 ┆ 11.682 ┆ 0.674       ┆ 2.989       ┆ 1.326       ┆ 0.33        ┆ 0.032        ┆ 0.115        ┆ 0.914        ┆ 0.983        │
+│ A0                               ┆ lead 24 to 48 h                  ┆ 11534  ┆ 7.117 ┆ 13.059 ┆ 0.395       ┆ 1.686       ┆ 1.572       ┆ 0.39        ┆ 0.012        ┆ 0.056        ┆ 0.956        ┆ 0.991        │
+│ A0                               ┆ lead 48 to 96 h                  ┆ 22924  ┆ 7.148 ┆ 13.129 ┆ 0.39        ┆ 1.68        ┆ 1.582       ┆ 0.392       ┆ 0.012        ┆ 0.057        ┆ 0.956        ┆ 0.99         │
+│ A0                               ┆ lead 96 to 168 h                 ┆ 34026  ┆ 7.287 ┆ 13.357 ┆ 0.399       ┆ 1.713       ┆ 1.606       ┆ 0.395       ┆ 0.012        ┆ 0.06         ┆ 0.952        ┆ 0.989        │
+│ A0                               ┆ lead 168 to 240 h                ┆ 33826  ┆ 7.272 ┆ 13.294 ┆ 0.402       ┆ 1.712       ┆ 1.615       ┆ 0.395       ┆ 0.013        ┆ 0.06         ┆ 0.953        ┆ 0.989        │
+│ A1                               ┆ all rows                         ┆ 102310 ┆ 7.349 ┆ 13.372 ┆ 0.412       ┆ 1.842       ┆ 1.569       ┆ 0.396       ┆ 0.002        ┆ 0.013        ┆ 0.941        ┆ 0.991        │
+│ A1                               ┆ engine months (valid time)       ┆ 49574  ┆ 8.26  ┆ 15.216 ┆ 0.445       ┆ 2.011       ┆ 1.666       ┆ 0.418       ┆ 0.001        ┆ 0.013        ┆ 0.933        ┆ 0.991        │
+│ A1                               ┆ fade months (valid time)         ┆ 52736  ┆ 6.492 ┆ 11.638 ┆ 0.382       ┆ 1.683       ┆ 1.479       ┆ 0.375       ┆ 0.003        ┆ 0.012        ┆ 0.948        ┆ 0.992        │
+│ A1                               ┆ tracked on (hindsight M2 flag)   ┆ 35302  ┆ 9.002 ┆ 17.09  ┆ 0.29        ┆ 1.362       ┆ 2.298       ┆ 0.568       ┆ 0.003        ┆ 0.025        ┆ 0.991        ┆ 0.999        │
+│ A1                               ┆ tracked off (hindsight M2 flag)  ┆ 67008  ┆ 6.478 ┆ 11.413 ┆ 0.476       ┆ 2.095       ┆ 1.186       ┆ 0.305       ┆ 0.001        ┆ 0.006        ┆ 0.914        ┆ 0.988        │
+│ A1                               ┆ sunny by unit shape, fade months ┆ 10324  ┆ 6.856 ┆ 12.15  ┆ 0.29        ┆ 1.398       ┆ 1.983       ┆ 0.526       ┆ 0.012        ┆ 0.03         ┆ 0.979        ┆ 0.992        │
+│ A1                               ┆ cold winter nights               ┆ 5302   ┆ 7.593 ┆ 13.516 ┆ 0.464       ┆ 2.159       ┆ 1.49        ┆ 0.357       ┆ 0.002        ┆ 0.017        ┆ 0.84         ┆ 0.967        │
+│ A1                               ┆ lead 24 to 48 h                  ┆ 11534  ┆ 7.266 ┆ 13.216 ┆ 0.415       ┆ 1.843       ┆ 1.542       ┆ 0.397       ┆ 0.002        ┆ 0.013        ┆ 0.943        ┆ 0.991        │
+│ A1                               ┆ lead 48 to 96 h                  ┆ 22924  ┆ 7.306 ┆ 13.29  ┆ 0.414       ┆ 1.842       ┆ 1.552       ┆ 0.396       ┆ 0.002        ┆ 0.013        ┆ 0.941        ┆ 0.991        │
+│ A1                               ┆ lead 96 to 168 h                 ┆ 34026  ┆ 7.363 ┆ 13.39  ┆ 0.412       ┆ 1.84        ┆ 1.574       ┆ 0.397       ┆ 0.002        ┆ 0.012        ┆ 0.939        ┆ 0.991        │
+│ A1                               ┆ lead 168 to 240 h                ┆ 33826  ┆ 7.391 ┆ 13.463 ┆ 0.411       ┆ 1.844       ┆ 1.586       ┆ 0.394       ┆ 0.002        ┆ 0.013        ┆ 0.941        ┆ 0.992        │
+│ AH [BOUND, NOT A FORECAST]       ┆ all rows                         ┆ 102310 ┆ 7.146 ┆ 12.942 ┆ 0.404       ┆ 1.763       ┆ 1.556       ┆ 0.389       ┆ 0.002        ┆ 0.019        ┆ 0.939        ┆ 0.992        │
+│ AH [BOUND, NOT A FORECAST]       ┆ engine months (valid time)       ┆ 49574  ┆ 7.845 ┆ 14.313 ┆ 0.428       ┆ 1.851       ┆ 1.639       ┆ 0.4         ┆ 0.002        ┆ 0.026        ┆ 0.929        ┆ 0.993        │
+│ AH [BOUND, NOT A FORECAST]       ┆ fade months (valid time)         ┆ 52736  ┆ 6.489 ┆ 11.653 ┆ 0.382       ┆ 1.68        ┆ 1.479       ┆ 0.378       ┆ 0.003        ┆ 0.012        ┆ 0.948        ┆ 0.992        │
+│ AH [BOUND, NOT A FORECAST]       ┆ tracked on (hindsight M2 flag)   ┆ 35302  ┆ 8.375 ┆ 15.368 ┆ 0.275       ┆ 1.28        ┆ 2.246       ┆ 0.556       ┆ 0.004        ┆ 0.04         ┆ 0.992        ┆ 0.999        │
+│ AH [BOUND, NOT A FORECAST]       ┆ tracked off (hindsight M2 flag)  ┆ 67008  ┆ 6.499 ┆ 11.664 ┆ 0.472       ┆ 2.017       ┆ 1.193       ┆ 0.301       ┆ 0.001        ┆ 0.007        ┆ 0.911        ┆ 0.989        │
+│ AH [BOUND, NOT A FORECAST]       ┆ sunny by unit shape, fade months ┆ 10324  ┆ 6.841 ┆ 12.142 ┆ 0.291       ┆ 1.406       ┆ 1.985       ┆ 0.531       ┆ 0.01         ┆ 0.029        ┆ 0.98         ┆ 0.992        │
+│ AH [BOUND, NOT A FORECAST]       ┆ cold winter nights               ┆ 5302   ┆ 6.991 ┆ 12.215 ┆ 0.452       ┆ 2.064       ┆ 1.376       ┆ 0.314       ┆ 0.001        ┆ 0.021        ┆ 0.856        ┆ 0.982        │
+│ AH [BOUND, NOT A FORECAST]       ┆ lead 24 to 48 h                  ┆ 11534  ┆ 7.053 ┆ 12.765 ┆ 0.405       ┆ 1.76        ┆ 1.52        ┆ 0.389       ┆ 0.003        ┆ 0.019        ┆ 0.943        ┆ 0.993        │
+│ AH [BOUND, NOT A FORECAST]       ┆ lead 48 to 96 h                  ┆ 22924  ┆ 7.089 ┆ 12.835 ┆ 0.404       ┆ 1.751       ┆ 1.535       ┆ 0.387       ┆ 0.002        ┆ 0.018        ┆ 0.941        ┆ 0.992        │
+│ AH [BOUND, NOT A FORECAST]       ┆ lead 96 to 168 h                 ┆ 34026  ┆ 7.161 ┆ 12.968 ┆ 0.404       ┆ 1.764       ┆ 1.56        ┆ 0.388       ┆ 0.002        ┆ 0.018        ┆ 0.937        ┆ 0.992        │
+│ AH [BOUND, NOT A FORECAST]       ┆ lead 168 to 240 h                ┆ 33826  ┆ 7.202 ┆ 13.049 ┆ 0.403       ┆ 1.77        ┆ 1.579       ┆ 0.39        ┆ 0.002        ┆ 0.02         ┆ 0.938        ┆ 0.992        │
+│ A1n                              ┆ all rows                         ┆ 102310 ┆ 7.683 ┆ 13.891 ┆ 0.413       ┆ 1.958       ┆ 1.697       ┆ 0.534       ┆ 0.0          ┆ 0.006        ┆ 0.973        ┆ 0.999        │
+│ A1n                              ┆ engine months (valid time)       ┆ 49574  ┆ 8.501 ┆ 15.651 ┆ 0.459       ┆ 2.235       ┆ 1.731       ┆ 0.529       ┆ 0.0          ┆ 0.01         ┆ 0.971        ┆ 0.998        │
+│ A1n                              ┆ fade months (valid time)         ┆ 52736  ┆ 6.914 ┆ 12.237 ┆ 0.37        ┆ 1.697       ┆ 1.665       ┆ 0.539       ┆ 0.0          ┆ 0.002        ┆ 0.976        ┆ 1.0          │
+│ A1n                              ┆ tracked on (hindsight M2 flag)   ┆ 35302  ┆ 9.954 ┆ 19.453 ┆ 0.284       ┆ 1.414       ┆ 2.509       ┆ 0.699       ┆ 0.0          ┆ 0.015        ┆ 0.998        ┆ 1.0          │
+│ A1n                              ┆ tracked off (hindsight M2 flag)  ┆ 67008  ┆ 6.487 ┆ 10.961 ┆ 0.481       ┆ 2.244       ┆ 1.269       ┆ 0.447       ┆ 0.0          ┆ 0.001        ┆ 0.96         ┆ 0.999        │
+│ A1n                              ┆ sunny by unit shape, fade months ┆ 10324  ┆ 7.744 ┆ 13.563 ┆ 0.22        ┆ 1.099       ┆ 2.397       ┆ 0.682       ┆ 0.0          ┆ 0.001        ┆ 0.991        ┆ 1.0          │
+│ A1n                              ┆ cold winter nights               ┆ 5302   ┆ 7.657 ┆ 13.395 ┆ 0.491       ┆ 2.524       ┆ 1.401       ┆ 0.415       ┆ 0.0          ┆ 0.016        ┆ 0.916        ┆ 0.995        │
+│ A1n                              ┆ lead 24 to 48 h                  ┆ 11534  ┆ 7.611 ┆ 13.722 ┆ 0.414       ┆ 1.958       ┆ 1.685       ┆ 0.532       ┆ 0.0          ┆ 0.006        ┆ 0.975        ┆ 0.999        │
+│ A1n                              ┆ lead 48 to 96 h                  ┆ 22924  ┆ 7.639 ┆ 13.801 ┆ 0.413       ┆ 1.95        ┆ 1.689       ┆ 0.534       ┆ 0.0          ┆ 0.006        ┆ 0.974        ┆ 0.999        │
+│ A1n                              ┆ lead 96 to 168 h                 ┆ 34026  ┆ 7.698 ┆ 13.93  ┆ 0.413       ┆ 1.958       ┆ 1.7         ┆ 0.534       ┆ 0.0          ┆ 0.006        ┆ 0.973        ┆ 0.999        │
+│ A1n                              ┆ lead 168 to 240 h                ┆ 33826  ┆ 7.723 ┆ 13.971 ┆ 0.413       ┆ 1.963       ┆ 1.704       ┆ 0.535       ┆ 0.0          ┆ 0.006        ┆ 0.973        ┆ 1.0          │
+│ A1+state [BOUND, NOT A FORECAST] ┆ all rows                         ┆ 102310 ┆ 5.819 ┆ 10.386 ┆ 0.362       ┆ 1.425       ┆ 1.393       ┆ 0.388       ┆ 0.005        ┆ 0.024        ┆ 0.939        ┆ 0.988        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ engine months (valid time)       ┆ 49574  ┆ 6.506 ┆ 11.682 ┆ 0.393       ┆ 1.573       ┆ 1.474       ┆ 0.43        ┆ 0.006        ┆ 0.039        ┆ 0.928        ┆ 0.983        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ fade months (valid time)         ┆ 52736  ┆ 5.173 ┆ 9.167  ┆ 0.332       ┆ 1.286       ┆ 1.317       ┆ 0.348       ┆ 0.003        ┆ 0.011        ┆ 0.95         ┆ 0.993        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ tracked on (hindsight M2 flag)   ┆ 35302  ┆ 6.702 ┆ 11.973 ┆ 0.325       ┆ 1.428       ┆ 1.783       ┆ 0.498       ┆ 0.007        ┆ 0.029        ┆ 0.957        ┆ 0.99         │
+│ A1+state [BOUND, NOT A FORECAST] ┆ tracked off (hindsight M2 flag)  ┆ 67008  ┆ 5.354 ┆ 9.549  ┆ 0.381       ┆ 1.423       ┆ 1.188       ┆ 0.33        ┆ 0.003        ┆ 0.022        ┆ 0.93         ┆ 0.987        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ sunny by unit shape, fade months ┆ 10324  ┆ 6.864 ┆ 12.605 ┆ 0.29        ┆ 1.293       ┆ 1.884       ┆ 0.504       ┆ 0.013        ┆ 0.038        ┆ 0.978        ┆ 0.993        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ cold winter nights               ┆ 5302   ┆ 6.094 ┆ 10.754 ┆ 0.331       ┆ 1.499       ┆ 1.285       ┆ 0.306       ┆ 0.004        ┆ 0.043        ┆ 0.813        ┆ 0.965        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ lead 24 to 48 h                  ┆ 11534  ┆ 5.734 ┆ 10.146 ┆ 0.369       ┆ 1.463       ┆ 1.378       ┆ 0.397       ┆ 0.005        ┆ 0.026        ┆ 0.939        ┆ 0.987        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ lead 48 to 96 h                  ┆ 22924  ┆ 5.794 ┆ 10.309 ┆ 0.369       ┆ 1.452       ┆ 1.385       ┆ 0.393       ┆ 0.005        ┆ 0.025        ┆ 0.938        ┆ 0.987        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ lead 96 to 168 h                 ┆ 34026  ┆ 5.864 ┆ 10.458 ┆ 0.363       ┆ 1.44        ┆ 1.399       ┆ 0.39        ┆ 0.005        ┆ 0.025        ┆ 0.938        ┆ 0.988        │
+│ A1+state [BOUND, NOT A FORECAST] ┆ lead 168 to 240 h                ┆ 33826  ┆ 5.819 ┆ 10.447 ┆ 0.353       ┆ 1.379       ┆ 1.399       ┆ 0.379       ┆ 0.004        ┆ 0.023        ┆ 0.942        ┆ 0.989        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ all rows                         ┆ 102310 ┆ 4.878 ┆ 8.83   ┆ 0.325       ┆ 1.153       ┆ 1.188       ┆ 0.331       ┆ 0.002        ┆ 0.017        ┆ 0.948        ┆ 0.993        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ engine months (valid time)       ┆ 49574  ┆ 4.5   ┆ 8.271  ┆ 0.316       ┆ 1.012       ┆ 1.041       ┆ 0.308       ┆ 0.002        ┆ 0.022        ┆ 0.944        ┆ 0.993        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ fade months (valid time)         ┆ 52736  ┆ 5.233 ┆ 9.356  ┆ 0.333       ┆ 1.285       ┆ 1.325       ┆ 0.353       ┆ 0.003        ┆ 0.011        ┆ 0.951        ┆ 0.992        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ tracked on (hindsight M2 flag)   ┆ 35302  ┆ 4.639 ┆ 8.08   ┆ 0.27        ┆ 1.058       ┆ 1.314       ┆ 0.381       ┆ 0.002        ┆ 0.016        ┆ 0.967        ┆ 0.995        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ tracked off (hindsight M2 flag)  ┆ 67008  ┆ 5.004 ┆ 9.225  ┆ 0.353       ┆ 1.203       ┆ 1.121       ┆ 0.305       ┆ 0.002        ┆ 0.017        ┆ 0.937        ┆ 0.991        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ sunny by unit shape, fade months ┆ 10324  ┆ 6.93  ┆ 12.776 ┆ 0.291       ┆ 1.299       ┆ 1.901       ┆ 0.511       ┆ 0.011        ┆ 0.038        ┆ 0.979        ┆ 0.993        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ cold winter nights               ┆ 5302   ┆ 4.272 ┆ 7.543  ┆ 0.282       ┆ 1.281       ┆ 0.888       ┆ 0.22        ┆ 0.001        ┆ 0.034        ┆ 0.844        ┆ 0.983        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ lead 24 to 48 h                  ┆ 11534  ┆ 4.76  ┆ 8.561  ┆ 0.328       ┆ 1.156       ┆ 1.162       ┆ 0.334       ┆ 0.003        ┆ 0.017        ┆ 0.95         ┆ 0.993        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ lead 48 to 96 h                  ┆ 22924  ┆ 4.811 ┆ 8.683  ┆ 0.326       ┆ 1.161       ┆ 1.17        ┆ 0.33        ┆ 0.002        ┆ 0.016        ┆ 0.948        ┆ 0.993        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ lead 96 to 168 h                 ┆ 34026  ┆ 4.907 ┆ 8.893  ┆ 0.325       ┆ 1.153       ┆ 1.188       ┆ 0.33        ┆ 0.002        ┆ 0.017        ┆ 0.947        ┆ 0.993        │
+│ AH+state [BOUND, NOT A FORECAST] ┆ lead 168 to 240 h                ┆ 33826  ┆ 4.934 ┆ 8.958  ┆ 0.322       ┆ 1.147       ┆ 1.208       ┆ 0.332       ┆ 0.002        ┆ 0.017        ┆ 0.948        ┆ 0.993        │
+└──────────────────────────────────┴──────────────────────────────────┴────────┴───────┴────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+G0: {"rows": 102310, "refitted_a0_seed_mean_row_crps": 7.231587806333953, "stored_step9a_row_crps": 7.231586250880776, "difference": 1.5554531769268465e-06, "passes": true, "note": "both sides are scored per seed and averaged over seeds by row"}
+ORIGIN-TIME WEATHER ASSERTION: {"origins_weather_checked_per_fold": {"A0": {"2025-11": 30, "2025-12": 31, "2026-01": 31, "2026-02": 28, "2026-03": 31, "2026-04": 30, "2026-05": 31, "2026-06": 30}, "A1": {"2025-11": 30, "2025-12": 31, "2026-01": 31, "2026-02": 28, "2026-03": 31, "2026-04": 30, "2026-05": 31, "2026-06": 30}, "A1n": {"2025-11": 30, "2025-12": 31, "2026-01": 31, "2026-02": 28, "2026-03": 31, "2026-04": 30, "2026-05": 31, "2026-06": 30}, "AH": {"2025-11": 30, "2025-12": 31, "2026-01": 31, "2026-02": 28, "2026-03": 31, "2026-04": 30, "2026-05": 31, "2026-06": 30}, "W0": {"2025-11": 30, "2025-12": 31, "2026-01": 31, "2026-02": 28, "2026-03": 31, "2026-04": 30, "2026-05": 31, "2026-06": 30}, "W1": {"2025-11": 30, "2025-12": 31, "2026-01": 31, "2026-02": 28, "2026-03": 31, "2026-04": 30, "2026-05": 31, "2026-06": 30}}, "origins_weather_checked_total": {"A0": 242, "A1": 242, "A1n": 242, "AH": 242, "W0": 242, "W1": 242}, "nwp_init_time_in_fits": [], "rows_per_arm": 2625216}
+VERDICT INPUTS: {"leakage_failed": false, "g0_failed": false, "g1_failed": false, "seeds_disagree": false, "c1_passes": false, "c1_estimate": 0.117254341319855, "threshold": 0.3977373293483674, "c4_passes": false, "mae_rises": false, "other_primary_worse": false, "c2_below": false, "c3_below": false}
+VERDICT BRANCH 8: not supported
+HOLDOUT 2026-07-01: no valid time on or after it is scored

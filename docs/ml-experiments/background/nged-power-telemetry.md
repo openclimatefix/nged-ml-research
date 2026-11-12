@@ -123,6 +123,13 @@ page](https://openclimatefix.github.io/nged-substation-forecast/background/netwo
   raw reading ever, so "missing" is the baseline (exp 182; D8; provisional).
 - **A metered farm's `effective_capacity_mw` may itself be estimated from output.** Power over
   capacity near 1.0 is therefore not an independent level (exp 179, 183; 6 farms; provisional).
+- **The causal engine tracker (which reads only data available at the time) finds about 65% of an
+  injected engine's running half-hours.** At Primary D4, with a real gas engine's recorded output
+  added to its reading, the half-hour F1 score (the harmonic mean of precision and recall) for "any
+  unit running" is 0.785. Precision (the share of flagged half-hours that are running) is 0.998 and
+  recall (the share of running half-hours found) is 0.647. The tracker flags 0.03% of D4's
+  un-injected half-hours ([experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md))
+  (exp 695; one host Primary; provisional).
 
 ## Capacity
 

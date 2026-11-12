@@ -1,0 +1,86 @@
+(Output of the Opus audit script e00695_audit_rederive.py, run by the auditor on the stored fits.)
+Running as unit: run-p1468686-i5590908.scope; invocation ID: 4e2f5177a4e24a35a9ec5e2f9e67bb76
+pairing A1 vs A0: keys equal = True, rows 4915200
+pairing A1n vs A0: keys equal = True, rows 4915200
+pairing AH vs A0: keys equal = True, rows 4915200
+pairing W0 vs A0: keys equal = True, rows 4915200
+pairing W1 vs A0: keys equal = True, rows 4915200
+origin hours (contract): [12] fold==origin month: True fold==native origin month: True
+mean |q50 A0 - q50 A1raw| (fraction of capacity) per series: {3: 0.007300000172108412, 7: 0.011900000274181366, 8: 0.0142000000923872, 9: 0.0142000000923872, 10: 0.01640000008046627, 11: 0.010999999940395355, 12: 0.07289999723434448, 13: 0.012799999676644802, 14: 0.03229999914765358, 15: 0.020600000396370888, 16: 0.008899999782443047, 17: 0.0142000000923872, 18: 0.010599999688565731, 24: 0.00930000003427267, 25: 0.008899999782443047, 26: 0.1542000025510788}
+a0-d8 stored vs raw fits*capacity: rows 307200 of 307200 max |diff| MVA 8.419752113297818e-07
+series_capacity D8: [{'time_series_id': 26, 'capacity': 10.378999710083008, 'power_unit': 'MVA', 'rule': 'production effective capacity table (data/effective_capacity), dated 2026-09-22'}] fixed 10.379
+host D4 11 capacity 12.137999534606934
+a1-d8 stored vs rebuilt: rows 307200 max |diff| MVA 7.62939453125e-06
+w0 stored crps equals raw-fit crps: True
+
+MEAN CRPS / MAE per system (rows per seed)
+  A0: CRPS 7.232 MAE 13.252 rows/seed 102310 cov<q01 0.012 cov<q05 0.059 >q95 0.046 below median 0.528 median err +0.237 width90 51.31
+  A1raw(no add-back): CRPS 11.878 MAE 18.979 rows/seed 102310 cov<q01 0.122 cov<q05 0.320 >q95 0.044 below median 0.667 median err +14.553 width90 38.06
+  A1: CRPS 7.349 MAE 13.372 rows/seed 102310 cov<q01 0.002 cov<q05 0.013 >q95 0.059 below median 0.502 median err +1.996 width90 62.40
+  AH: CRPS 7.146 MAE 12.942 rows/seed 102310 cov<q01 0.002 cov<q05 0.019 >q95 0.061 below median 0.502 median err +1.147 width90 59.28
+  A1n: CRPS 7.683 MAE 13.891 rows/seed 102310 cov<q01 0.000 cov<q05 0.006 >q95 0.027 below median 0.562 median err +4.490 width90 70.21
+  A1+state: CRPS 5.819 MAE 10.386 rows/seed 102310 cov<q01 0.005 cov<q05 0.024 >q95 0.061 below median 0.474 median err +1.812 width90 46.39
+  AH+state: CRPS 4.878 MAE 8.830 rows/seed 102310 cov<q01 0.002 cov<q05 0.017 >q95 0.052 below median 0.493 median err +1.496 width90 41.25
+  W0: CRPS 4.489 MAE 7.447 rows/seed 102391 cov<q01 0.013 cov<q05 0.072 >q95 0.081 below median 0.504 median err +2.541 width90 31.56
+  W1: CRPS 4.396 MAE 7.390 rows/seed 102391 cov<q01 0.022 cov<q05 0.066 >q95 0.078 below median 0.494 median err +2.410 width90 32.18
+  WT: CRPS 4.389 MAE 7.401 rows/seed 102391 cov<q01 0.018 cov<q05 0.066 >q95 0.079 below median 0.540 median err +2.962 width90 32.94
+  WT+truth: CRPS 2.232 MAE 3.953 rows/seed 102391 cov<q01 0.029 cov<q05 0.108 >q95 0.086 below median 0.528 median err -0.188 width90 12.81
+
+CONTRASTS
+C1 A1-A0: est +0.117  boot(seed-mean) [+0.036,+0.245]  boot(seed-draw) [-0.072,+0.428]  t [-0.037,+0.268]  seeds [0.182, 0.062, 0.108]  monthly [0.427, 0.186, -0.007, 0.044, 0.074, 0.063, 0.093, 0.041] sd 0.138 rows 102310
+C4 W1-W0: est -0.093  boot(seed-mean) [-0.195,-0.001]  boot(seed-draw) [-0.202,+0.017]  t [-0.231,+0.043]  seeds [-0.087, -0.085, -0.108]  monthly [-0.21, -0.284, -0.143, 0.026, -0.007, 0.044, -0.002, -0.173] sd 0.124 rows 102391
+C5 WT-W0: est -0.100  boot(seed-mean) [-0.195,-0.016]  boot(seed-draw) [-0.202,+0.057]  t [-0.224,+0.027]  seeds [-0.119, -0.064, -0.116]  monthly [-0.191, -0.306, -0.139, 0.06, -0.03, -0.033, -0.042, -0.105] sd 0.114 rows 102391
+MAE A1-A0: est +0.120  boot(seed-mean) [-0.357,+0.599]  boot(seed-draw) [-0.475,+0.802]  t [-0.526,+0.720]  seeds [0.287, -0.019, 0.094]  monthly [1.199, 0.579, 0.933, -1.049, -0.12, -0.254, -0.194, -0.317] sd 0.745 rows 102310
+A1n-A1: est +0.334  boot(seed-mean) [+0.227,+0.456]  boot(seed-draw) [+0.198,+0.464]  t [+0.193,+0.486]  seeds [0.311, 0.328, 0.364]  monthly [0.283, 0.281, 0.094, 0.397, 0.172, 0.346, 0.636, 0.507] sd 0.175 rows 102310
+AH-A1: est -0.203  boot(seed-mean) [-0.369,-0.053]  boot(seed-draw) [-0.371,-0.049]  t [-0.398,+0.004]  seeds [-0.214, -0.206, -0.189]  monthly [-0.269, -0.504, -0.579, -0.231, 0.03, -0.008, -0.012, -0.004] sd 0.241 rows 102310
+A1+state-A0: est -1.413  boot(seed-mean) [-2.287,-0.597]  boot(seed-draw) [-2.293,-0.537]  t [-2.520,-0.353]  seeds [-1.324, -1.485, -1.429]  monthly [-0.908, 0.469, -2.592, -3.7, -1.952, -0.784, -0.605, -1.418] sd 1.296 rows 102310
+AH+state-A0: est -2.354  boot(seed-mean) [-3.515,-1.343]  boot(seed-draw) [-3.536,-1.318]  t [-3.736,-0.945]  seeds [-2.299, -2.428, -2.334]  monthly [-2.063, -2.733, -5.467, -3.95, -1.797, -0.734, -0.557, -1.421] sd 1.669 rows 102310
+WT+truth-W0: est -2.257  boot(seed-mean) [-2.578,-1.937]  boot(seed-draw) [-2.583,-1.916]  t [-2.676,-1.854]  seeds [-2.277, -2.212, -2.282]  monthly [-2.444, -2.875, -2.66, -1.79, -1.815, -2.178, -1.593, -2.762] sd 0.492 rows 102391
+W1-WT: est +0.007  boot(seed-mean) [-0.022,+0.034]  boot(seed-draw) [-0.053,+0.068]  t [-0.034,+0.043]  seeds [0.032, -0.021, 0.009]  monthly [-0.019, 0.021, -0.004, -0.034, 0.023, 0.077, 0.04, -0.068] sd 0.046 rows 102391
+D8 per-Primary row: A1raw-A0: est +4.646  boot(seed-mean) [+2.608,+6.927]  boot(seed-draw) [+2.562,+7.195]  t [+1.817,+7.307]  seeds [5.056, 4.355, 4.527]  monthly [8.43, 10.182, 5.084, 4.597, 3.61, 1.883, 1.335, 1.375] sd 3.284 rows 102310
+C2 engine months: est +0.164  boot(seed-mean) [+0.018,+0.337]  boot(seed-draw) [-0.133,+0.557]  t [-0.146,+0.472]  seeds [0.306, 0.115, 0.07]  monthly [0.427, 0.186, -0.007, 0.044] sd 0.194 rows 51943
+C3 fade months: est +0.069  boot(seed-mean) [+0.051,+0.086]  boot(seed-draw) [-0.076,+0.184]  t [+0.033,+0.103]  seeds [0.055, 0.007, 0.146]  monthly [0.074, 0.063, 0.093, 0.041] sd 0.022 rows 50367
+
+NULL / SISTER WIDTHS (98.3%)
+  A0 seed0-seed1: est -0.048 boot [-0.242,+0.119] monthly sd 0.219
+  A0 seed1-seed2: est +0.029 boot [-0.176,+0.214] monthly sd 0.242
+  A0 seed0-seed2: est -0.019 boot [-0.377,+0.231] monthly sd 0.375
+  677 5w rows/seed 102310 CRPS 7.232
+  677 5w-5wo (sister, D8): est +0.001  boot(seed-mean) [-0.028,+0.043]  boot(seed-draw) [-0.037,+0.062]  t [-0.047,+0.050]  seeds [-0.004, 0.007, -0.001]  monthly [-0.012, 0.097, -0.053, -0.0, -0.001, -0.012, -0.026, 0.018] sd 0.044 rows 102310
+  A0 - 677 5w (G0 paired): est +0.000  boot(seed-mean) [-0.000,+0.000]  boot(seed-draw) [-0.000,+0.000]  t [-0.000,+0.000]  seeds [0.0, -0.0, 0.0]  monthly [-0.0, -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] sd 0.000 rows 102310
+
+BY HINDSIGHT M2 FLAG (valid time): CRPS, MAE, median err (pts), <q05, >q95, below median, width90
+  A0                   on=True  rows/seed  35302 CRPS 8.453 MAE 14.519 med_err +9.998 <q05 0.120 >q95 0.006 belowmed 0.742 w90 58.39
+  A0                   on=False rows/seed  67008 CRPS 6.588 MAE 12.584 med_err -4.905 <q05 0.027 >q95 0.068 belowmed 0.415 w90 47.58
+  A1                   on=True  rows/seed  35302 CRPS 9.002 MAE 17.090 med_err +12.912 <q05 0.025 >q95 0.009 belowmed 0.751 w90 68.64
+  A1                   on=False rows/seed  67008 CRPS 6.478 MAE 11.413 med_err -3.754 <q05 0.006 >q95 0.086 belowmed 0.370 w90 59.11
+  A1raw(no add-back)   on=True  rows/seed  35302 CRPS 22.367 MAE 34.526 med_err +33.441 <q05 0.706 >q95 0.005 belowmed 0.930 w90 40.56
+  A1raw(no add-back)   on=False rows/seed  67008 CRPS 6.351 MAE 10.788 med_err +4.602 <q05 0.117 >q95 0.064 belowmed 0.529 w90 36.75
+  AH                   on=True  rows/seed  35302 CRPS 8.375 MAE 15.368 med_err +11.108 <q05 0.040 >q95 0.008 belowmed 0.741 w90 63.58
+  AH                   on=False rows/seed  67008 CRPS 6.499 MAE 11.664 med_err -4.101 <q05 0.007 >q95 0.089 belowmed 0.376 w90 57.01
+  A1n                  on=True  rows/seed  35302 CRPS 9.954 MAE 19.453 med_err +15.904 <q05 0.015 >q95 0.002 belowmed 0.800 w90 74.91
+  A1n                  on=False rows/seed  67008 CRPS 6.487 MAE 10.961 med_err -1.524 <q05 0.001 >q95 0.040 belowmed 0.437 w90 67.73
+  A1+state             on=True  rows/seed  35302 CRPS 6.702 MAE 11.973 med_err +1.863 <q05 0.029 >q95 0.043 belowmed 0.454 w90 52.67
+  A1+state             on=False rows/seed  67008 CRPS 5.354 MAE 9.549 med_err +1.784 <q05 0.022 >q95 0.070 belowmed 0.484 w90 43.08
+
+MONTH: climatology P(k>=1) used | causal fixed-lag state P(k>=1) at valid time | hindsight flag share
+  2025-11: 0.377 | 0.353 | 0.400
+  2025-12: 0.374 | 0.384 | 0.481
+  2026-01: 0.382 | 0.368 | 0.467
+  2026-02: 0.373 | 0.373 | 0.357
+  2026-03: 0.386 | 0.280 | 0.267
+  2026-04: 0.310 | 0.319 | 0.312
+  2026-05: 0.302 | 0.273 | 0.209
+  2026-06: 0.285 | 0.314 | 0.249
+C1 by origin month: {'2025-11': 0.427, '2025-12': 0.186, '2026-01': -0.007, '2026-02': 0.044, '2026-03': 0.074, '2026-04': 0.063, '2026-05': 0.093, '2026-06': 0.041}
+
+FOLD BRANCH: era-2 rows with khat>=1, scored months, share where cleaned level < khat*u (export)
+  A1 fold 2025-11: running rows 6565, level<k*u share 0.388, mean cleaned on running rows 5.40 MVA, mean level off rows 4.75
+  A1 fold 2026-03: running rows 7382, level<k*u share 0.270, mean cleaned on running rows 5.69 MVA, mean level off rows 4.97
+  A1n fold 2025-11: running rows 6565, level<k*u share 0.388, mean cleaned on running rows 7.66 MVA, mean level off rows 4.75
+  A1n fold 2026-03: running rows 7382, level<k*u share 0.270, mean cleaned on running rows 7.08 MVA, mean level off rows 4.97
+
+POWER: t half-width at 98.3% from monthly sd of C1; resolvable gain
+  monthly sd 0.138, t half-width 0.152, boot half-width 0.105
+
+MIXTURE MC CHECK (200 rows): median max |gap| 0.037 MVA, 95th pct 0.118 MVA
