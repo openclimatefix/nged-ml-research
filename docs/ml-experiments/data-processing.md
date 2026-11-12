@@ -311,6 +311,15 @@ Trained on the lagged state, the coefficient is 0.9 to 1.0 MW and the score is 3
 model without the term ([experiment
 294](00294-regime-aware-model-at-d8-engine-state-term/result.md)).
 
+**Treat D8's reading as apparent power that folds, and do not read its steps as signed (provisional,
+medium confidence).** *Applies to: experiments.* Where demand is below about 3 MVA, an engine start
+appears as a rise in the reading, and where demand is above about 8 MVA it appears as a fall. A
+tracker that assumes every start is a fall misses the low-demand starts. On real D8 data, a filter
+that models the fold predicts held-out months better than the same filter without it in 9 of 9
+months, by 51.6 log-likelihood units in total, and the two flag nearly the same share of
+half-hours ([experiment 694](00694-gas-engine-state-tracker-part-1/result.md); D8, 2023-09 to
+2025-02).
+
 **Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
 coefficients exactly at each step) to a window of three months or shorter.** An exact
 least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4

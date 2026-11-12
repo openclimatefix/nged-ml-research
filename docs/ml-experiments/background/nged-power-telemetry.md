@@ -95,6 +95,15 @@ count
   stretches. The link between the drops and the engine is not proved, because the drops and the
   detector both read D8's residual ([experiment
   291](../00291-d8-drops-engine-spells-load-shift/result.md); D8; provisional).
+- **D8's engine shows as a rise in the reading when demand is below about 3 MVA.** D8's reading is
+  apparent power and never negative, so it folds: from a level under 3 MVA, 626 of 627 merged steps
+  of at least 1.5 MVA in 2023-09 to 2025-02 are rises, and from 8 to 10 MVA, 259 of 260 are falls
+  ([experiment 694](../00694-gas-engine-state-tracker-part-1/result.md); D8; provisional).
+- **A tracker that fits the engine's unit count and size from the reading alone finds three units
+  of about 1.75 MW at D8 and flags none at the other seven Primaries.** It finds a 1 MW unit
+  injected into other Primaries in only 13 of 44 segments ([experiment
+  694](../00694-gas-engine-state-tracker-part-1/result.md); 8 Primaries, 44 injected segments;
+  provisional).
 - **Solar-farm outages are too rare to test an availability state.** Five of the six farms have at
   most 34 outage half-hours in the scored year, and the sixth has 165. An outage half-hour is a
   daylight half-hour with output under 5% of the physical power model's forecast (exp 301; 6 farms,

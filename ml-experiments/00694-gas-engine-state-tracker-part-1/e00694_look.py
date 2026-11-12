@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0912, PLR0915
 r"""Phase A: the data look. Draws D8's reading and its differences in four eras; fits no model.
 
     OMP_NUM_THREADS=1 PYTHONPATH=src:ml-experiments/00694-gas-engine-state-tracker-part-1 \
@@ -8,9 +9,9 @@ Gas A is drawn only as a histogram of output levels, with no dates. D8 is a subs
 
 import os
 import textwrap
-from pathlib import Path
 from datetime import UTC, datetime
-from typing import Final
+from pathlib import Path
+from typing import Any, Final
 
 import altair as alt
 import numpy as np
@@ -19,13 +20,13 @@ import polars as pl
 from e00694_common import (
     DATA_DIR,
     DOCS_DIR,
+    ENGINE_CONNECTED,
     EXPECTED_UNIT_COUNTS,
     FADE_START,
     GRID_START,
     NET_END,
     NET_START,
     SOLAR_START,
-    ENGINE_CONNECTED,
     causal_spread,
     load_panel,
     panel_power,
@@ -121,7 +122,7 @@ def main() -> None:
     if counts != EXPECTED_UNIT_COUNTS or len(units) != 2054:
         raise SystemExit("Phase A cannot reproduce experiment 194's counts: stop (verdict invalid)")
 
-    era_data = {}
+    era_data: dict[str, dict[str, Any]] = {}
     for name, (lo, hi) in ERAS.items():
         a, b = stamp(when=lo), min(stamp(when=hi), len(y_all))
         yy, lv = y_all[a:b], lvl_all[a:b]
@@ -132,7 +133,15 @@ def main() -> None:
             (base + (a + steps["first"]) * np.timedelta64(1800, "s")).astype("datetime64[h]")
             - (base + (a + steps["first"]) * np.timedelta64(1800, "s")).astype("datetime64[D]")
         ).astype(int)
-        era_data[name] = dict(a=a, b=b, y=yy, d1=d1, d2=d2, steps=steps, hours=hours)
+        era_data[name] = {
+            "a": a,
+            "b": b,
+            "y": yy,
+            "d1": d1,
+            "d2": d2,
+            "steps": steps,
+            "hours": hours,
+        }
         say(
             f"{name}: {b - a} half-hours, nan share {np.isnan(yy).mean():.3f}, "
             f"median {np.nanmedian(yy):.2f} MVA, merged steps {len(steps['size'])}"
@@ -161,7 +170,7 @@ def main() -> None:
         when = (base + (ed["a"] + start) * np.timedelta64(1800, "s")).astype("datetime64[D]")
         frame = pl.DataFrame({"day": np.arange(len(seg)) / 48.0, "mva": seg})
         panels.append(
-            alt.Chart(frame)
+            alt.Chart(frame)  # ty: ignore[unresolved-attribute]
             .mark_line(color=COLOURS[i], strokeWidth=1, clip=True)
             .encode(
                 x=alt.X(
@@ -196,7 +205,7 @@ def main() -> None:
                     )
     frame = pl.DataFrame(rows)
     fig2 = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(interpolate="step-after", strokeWidth=1.5)
         .encode(
             x=alt.X(
@@ -256,7 +265,7 @@ def main() -> None:
         ]
     )
     pts = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=1.5)
         .encode(
             x=alt.X("level:Q", title="Reading before the fall (MVA, 1 MVA bins)"),
@@ -271,7 +280,7 @@ def main() -> None:
         )
     )
     curves = (
-        alt.Chart(theory)
+        alt.Chart(theory)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeDash=[4, 3], strokeWidth=1.5, color=ocf.BLACK_2)
         .encode(x="level:Q", y="fall:Q", detail="curve:N")
     )
@@ -303,7 +312,7 @@ def main() -> None:
                     }
                 )
     sign = (
-        alt.Chart(pl.DataFrame(rows))
+        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X("era:N", title=None, sort=list(ERAS), axis=alt.Axis(labelAngle=0)),
@@ -334,10 +343,10 @@ def main() -> None:
         sub = dw.filter(pl.col("era") == name)["dwell"]
         if len(sub):
             say(
-                f"{name}: dwell from a fall to the next rise (half-hours): n {len(sub)}, median {sub.median():.0f}, share at 1 {float((sub <= 1).mean()):.2f}"
+                f"{name}: dwell from a fall to the next rise (half-hours): n {len(sub)}, median {sub.median():.0f}, share at 1 {float(np.mean(sub.to_numpy() <= 1)):.2f}"
             )
     dwell = (
-        alt.Chart(dw.filter(pl.col("dwell") <= 48))
+        alt.Chart(dw.filter(pl.col("dwell") <= 48))  # ty: ignore[unresolved-attribute]
         .mark_bar(opacity=0.7)
         .encode(
             x=alt.X(
@@ -364,7 +373,7 @@ def main() -> None:
         ]
     )
     hourly = (
-        alt.Chart(hod)
+        alt.Chart(hod)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
             x=alt.X(
@@ -395,7 +404,7 @@ def main() -> None:
     levels = np.round(g / 0.25) * 0.25
     h = pl.DataFrame({"mw": levels}).group_by("mw").len().sort("mw")
     fig5 = (
-        alt.Chart(h)
+        alt.Chart(h)  # ty: ignore[unresolved-attribute]
         .mark_bar(color=ocf.DATA_BLUE, size=8)
         .encode(
             x=alt.X(

@@ -116,10 +116,10 @@ def _emission(*, y_t: float, means: np.ndarray, occ: np.ndarray) -> np.ndarray:
 
 def _grid_forward(
     *, y: np.ndarray, lvl: np.ndarray, means: np.ndarray, a: np.ndarray, keep: bool, occ: np.ndarray
-) -> tuple[float, np.ndarray | None, np.ndarray]:
+) -> tuple[float, np.ndarray, np.ndarray]:
     """Scaled forward pass; returns the log evidence, the filtered states, and the scales."""
     n_t, n_s = len(y), means.shape[0]
-    alpha = np.empty((n_t, n_s, N_GRID)) if keep else None
+    alpha = np.empty((n_t if keep else 0, n_s, N_GRID))
     scales = np.empty(n_t)
     start = np.full((n_s, N_GRID), 1.0 / N_GRID)
     cur = start * e_prior(n_s=n_s)[:, None] * _emission(y_t=y[0], means=means, occ=occ)
@@ -128,7 +128,7 @@ def _grid_forward(
     scales[0] = total
     log_ev = np.log(total)
     if keep:
-        alpha[0] = cur  # type: ignore[index]
+        alpha[0] = cur
     at = a.T
     for t in range(1, n_t):
         pred = (at @ cur) @ KERNELS[lvl[t]]
@@ -138,7 +138,7 @@ def _grid_forward(
         scales[t] = total
         log_ev += np.log(total)
         if keep:
-            alpha[t] = cur  # type: ignore[index]
+            alpha[t] = cur
     return float(log_ev), alpha, scales
 
 
@@ -206,7 +206,8 @@ def grid_evidence(
 ) -> float:
     """Log evidence of M2 for given K, u, and transition matrix.
 
-    With `use_occupancy=False` the occupancy prior is left out, so the value is a predictive density.
+    With `use_occupancy=False` the occupancy prior is left out, so the value is a predictive
+    density.
     """
     means = _means(k_max=k_max, unit=unit, fold=fold, dwell=False)
     return _grid_forward(
@@ -229,7 +230,7 @@ def _grid_em(
     for _ in range(rounds):
         a = _state_transition(a_k=a_k, dwell=dwell)
         _, alpha, scales = _grid_forward(y=y, lvl=lvl, means=means, a=a, keep=True, occ=occ)
-        _, xi = _grid_backward(y=y, lvl=lvl, means=means, a=a, alpha=alpha, scales=scales, occ=occ)  # type: ignore[arg-type]
+        _, xi = _grid_backward(y=y, lvl=lvl, means=means, a=a, alpha=alpha, scales=scales, occ=occ)
         a_k = _m_step(xi=xi, k_max=k_max, dwell=dwell)
     a = _state_transition(a_k=a_k, dwell=dwell)
     ev, _, _ = _grid_forward(y=y, lvl=lvl, means=means, a=a, keep=False, occ=occ)
@@ -285,9 +286,9 @@ def grid_track(
     occ = occupancy(k_max=k_sel, dwell=dwell)
     a = _state_transition(a_k=a_k, dwell=dwell)
     ev, alpha, scales = _grid_forward(y=y, lvl=lvl, means=means, a=a, keep=True, occ=occ)
-    gamma, _ = _grid_backward(y=y, lvl=lvl, means=means, a=a, alpha=alpha, scales=scales, occ=occ)  # type: ignore[arg-type]
+    gamma, _ = _grid_backward(y=y, lvl=lvl, means=means, a=a, alpha=alpha, scales=scales, occ=occ)
     smooth = _fold_states(gamma=gamma, k_max=k_sel)
-    filt = _fold_states(gamma=alpha.sum(axis=2), k_max=k_sel)  # type: ignore[union-attr]
+    filt = _fold_states(gamma=alpha.sum(axis=2), k_max=k_sel)
     return TrackResult(
         k_max=k_sel,
         unit=u_sel,

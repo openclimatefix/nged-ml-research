@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 r"""Score the stored runs, print every number the write-up quotes, and draw the result figures.
 
     OMP_NUM_THREADS=1 PYTHONPATH=src:ml-experiments/00694-gas-engine-state-tracker-part-1 \
@@ -27,7 +28,7 @@ ALPHA_BONF: Final[float] = 0.05 / 3
 WIDTH: Final[int] = 560
 LINES: list[str] = []
 REPORT_PATH: Final[Path] = Path(__file__).resolve().parent / "printed_report.txt"
-ARM_COLOURS: Final[list[str]] = [ocf.GREY_2, ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]
+ARM_COLOURS: Final[list[str]] = [ocf.DATA_PURPLE, ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]
 
 
 def say(text: str = "") -> None:
@@ -36,7 +37,7 @@ def say(text: str = "") -> None:
     LINES.append(text)
 
 
-def load(name: str) -> Any:  # noqa: ANN401
+def load(name: str) -> Any:
     """Load one stored stage output."""
     return pickle.loads((DATA_DIR / f"{name}.pkl").read_bytes())
 
@@ -156,7 +157,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     # ---- false alarms on un-injected segments (stop rule 2, P3)
     say("== False alarms on un-injected segments (120 tracked days each) ==")
     hosts = sorted({r["host"] for r in fa})
-    fa_rows = []
+    fa_rows: list[dict[str, Any]] = []
     for host in hosts:
         for arm in ARMS:
             sel = [r["arms"][arm] for r in fa if r["host"] == host]
@@ -245,6 +246,18 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         ma = pooled_metrics(x=x_all)
         say(f"  all 9 schedules, pooled F1 by arm: {np.round(ma['f1'], 3).tolist()}")
 
+    # ---- every schedule on its own (the reported-only ones do not decide)
+    for rule in RULES:
+        say(f"\nPooled F1 by schedule, {rule} rule (M0, M1, M2, M2-dwell):")
+        for sched in sorted({r["sched"] for r in inj}):
+            xs, _ = tensor(runs=inj, rule=rule, scheds=(sched,))
+            ms = pooled_metrics(x=xs)
+            recs = unit_recall(runs=inj, rule=rule, scheds=(sched,))
+            say(
+                f"  {sched:<7} F1 {np.round(ms['f1'], 3).tolist()}  precision (M2) {ms['precision'][2]:.2f}"
+                f"  recall at 1/2/3 units (M2) {np.round(recs['M2'], 2).tolist()}"
+            )
+
     # ---- real record only (cluster = week of the one schedule)
     for rule in RULES:
         x, _ = tensor(runs=inj, rule=rule, scheds=("record",))
@@ -309,7 +322,6 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     # ---- verdict
     c1 = [verdict_bits[f"{r}_C1"] for r in RULES]
     c1_clears = all(pt >= 0.10 and lo > 0 for pt, lo, _ in c1)
-    c1_positive = all(lo > 0 for _, lo, _ in c1)
     p2_all = all(verdict_bits[f"{r}_p2"][0] for r in RULES)
     p2_core = all(verdict_bits[f"{r}_p2"][1] for r in RULES)
     m0_alone = all(verdict_bits[f"{r}_m0p2"] for r in RULES) and m0_p3
@@ -319,7 +331,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     elif p2_all and p3_ok and p1 and p5_ok and c1_clears:
         verdict = "supported"
     elif p2_all and p3_ok:
-        verdict = "partly supported" if (c1_positive or not p1 or not p5_ok) else "partly supported"
+        verdict = "partly supported"
     elif m0_alone or drift > 0.5:
         verdict = "inconclusive"
     else:
@@ -359,12 +371,20 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
     ]
     base = alt.Chart(pl.DataFrame(rows)).mark_line(strokeWidth=1, clip=True, color=ocf.DATA_BLUE)
     top = (
-        base.encode(
+        base.encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("day:Q", title=None, axis=alt.Axis(values=list(range(0, 57, 7)))),
             y=alt.Y("value:Q", title="MVA"),
         )
         .properties(width=WIDTH, height=90)
-        .facet(row=alt.Row("panel:N", title=None), spacing=4)
+        .facet(
+            row=alt.Row(
+                "panel:N",
+                title=None,
+                sort=["Reading before injection (MVA)", "Reading after injection (MVA)"],
+                header=alt.Header(labelOrient="top", labelAngle=0, labelFontSize=9),
+            ),
+            spacing=4,
+        )
     )
     state_rows = []
     for d, t in zip(day, truth, strict=True):
@@ -374,7 +394,7 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
         for d, f in zip(day, flag, strict=True):
             state_rows.append({"day": d, "who": f"{arm} flag", "units": int(f)})
     states = (
-        alt.Chart(pl.DataFrame(state_rows))
+        alt.Chart(pl.DataFrame(state_rows))  # ty: ignore[unresolved-attribute]
         .mark_line(interpolate="step-after", strokeWidth=1.2, clip=True)
         .encode(
             x=alt.X(
@@ -387,13 +407,20 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
                 "who:N",
                 scale=alt.Scale(
                     domain=["Truth (units)", "M2 flag", "M1 flag", "M0 flag"],
-                    range=[ocf.BLACK_2, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.GREY_2],
+                    range=[ocf.BLACK_2, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE],
                 ),
                 legend=alt.Legend(orient="top", title=None),
             ),
         )
         .properties(width=WIDTH, height=70)
-        .facet(row=alt.Row("who:N", title=None, header=alt.Header(labelFontSize=9)), spacing=2)
+        .facet(
+            row=alt.Row(
+                "who:N",
+                title=None,
+                header=alt.Header(labelOrient="top", labelAngle=0, labelFontSize=9),
+            ),
+            spacing=2,
+        )
     )
     fig6 = alt.vconcat(top, states).properties(
         title=alt.TitleParams(
@@ -430,7 +457,7 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
                 )
     frame = pl.DataFrame(rows)
     pts = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=60)
         .encode(
             x=alt.X(
@@ -445,7 +472,7 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
         )
     )
     bars = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeWidth=2)
         .encode(
             x="lo:Q",
@@ -482,7 +509,7 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
         ]
     )
     bars = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X("host:N", title=None, axis=alt.Axis(labelAngle=0)),
@@ -500,7 +527,7 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
         )
     )
     rule3 = (
-        alt.Chart(pl.DataFrame({"y": [3.0]}))
+        alt.Chart(pl.DataFrame({"y": [3.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color=ocf.BLACK_2)
         .encode(y="y:Q")
     )
@@ -535,7 +562,7 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
                     )
     frame = pl.DataFrame(rows).with_columns(pl.col("month").str.to_date("%Y-%m"))
     fig9 = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
             x=alt.X("month:T", title="Month", axis=alt.Axis(format="%Y-%m")),

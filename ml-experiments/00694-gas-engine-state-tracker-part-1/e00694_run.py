@@ -11,7 +11,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from multiprocessing import Pool
+from multiprocessing import get_context
 from typing import Any, Final
 
 import numpy as np
@@ -262,7 +262,7 @@ def stage_fa() -> None:
     """Un-injected false-alarm pass over every segment."""
     segs = segments()
     t0 = time.time()
-    with Pool(N_WORKERS) as pool:
+    with get_context("fork").Pool(N_WORKERS) as pool:
         res = pool.map(fa_task, segs, chunksize=1)
     save(name="fa", obj=res)
     print(f"fa: {len(res)} segments in {time.time() - t0:.0f} s")
@@ -273,7 +273,7 @@ def stage_inject() -> None:
     segs = segments()
     tasks = [(s, name, rule) for s in segs for name in SCHEDULES for rule in ("folded", "signed")]
     t0 = time.time()
-    with Pool(N_WORKERS) as pool:
+    with get_context("fork").Pool(N_WORKERS) as pool:
         res = pool.map(inject_task, tasks, chunksize=1)
     save(name="inject", obj=res)
     print(f"inject: {len(res)} runs in {time.time() - t0:.0f} s")
@@ -349,7 +349,7 @@ def d8_era(args: tuple[str, datetime, datetime]) -> dict[str, Any]:
     }
 
 
-def p5_task(_: int) -> dict[str, Any]:
+def p5_task(unused: int) -> dict[str, Any]:
     """P5: fit on odd months of D8's net era, score even months with and without the fold."""
     y_all = SERIES["D8"]
     spread = causal_spread(y=y_all)
@@ -364,8 +364,8 @@ def p5_task(_: int) -> dict[str, Any]:
     y_fit, lvl_fit = y_all[a:b][fit_mask], lvl_all[a:b][fit_mask]
     out: dict[str, Any] = {}
     for name, fold in (("fold", True), ("signed", False)):
-        k, u = select_grid(y=y_fit, lvl=lvl_fit, fold=fold)
-        k = max(k, 1)
+        k_sel, u = select_grid(y=y_fit, lvl=lvl_fit, fold=fold)
+        k = max(k_sel, 1)
         a_k, _ = _grid_em(
             y=y_fit, lvl=lvl_fit, k_max=k, unit=u, fold=fold, dwell=False, rounds=EM_ROUNDS
         )
@@ -405,7 +405,7 @@ def main() -> None:
             ("solar", SOLAR_START, FADE_START),
             ("fade", FADE_START, datetime(2026, 7, 1, tzinfo=UTC)),
         ]
-        with Pool(3) as pool:
+        with get_context("fork").Pool(3) as pool:
             res = pool.map(d8_era, eras)
         save(name="d8", obj=res)
         save(name="p5", obj=p5_task(0))
