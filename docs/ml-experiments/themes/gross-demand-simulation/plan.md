@@ -1,7 +1,7 @@
 # Gross-demand simulation: research plan
 
-**No experiment in this theme has been agreed to run.** The options below are queued for the
-maintainer to choose; the project is not starting new experiments unprompted. The reasoning is on
+**One experiment in this theme is planned, and the options below are queued for the maintainer to
+choose; the project is not starting further experiments unprompted.** The reasoning is on
 [the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how
 to propose the simulator to NGED, with phases as options, is on
 [Options for proposing the simulator to NGED](proposal-to-nged-options.md).
@@ -10,7 +10,7 @@ to propose the simulator to NGED, with phases as options, is on
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| - | None agreed | - | The maintainer's decision | - |
+| 694 | Can the on/off state of the gas engine at D8 be tracked from the raw half-hourly reading alone, with the number of units and the unit size inferred? | Agreed by the maintainer | Nothing | Planned |
 
 ## Options
 
