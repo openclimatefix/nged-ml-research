@@ -260,7 +260,7 @@ includes zero. A post hoc interval that averages the seeds first is +0.036 to +0
 reading is over all rows, and is suggestive because it bootstraps only 8 months. The pair is not
 worth porting for D8. A point of capacity is one percentage point of D8's effective capacity of
 10.379 MVA. Applies to experiments on D8's forecast. Evidence:
-[experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md),
+[experiment 695](00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md),
 D8 only, 8 monthly refits from 2025-11 to 2026-06.
 
 ## Fixed windows

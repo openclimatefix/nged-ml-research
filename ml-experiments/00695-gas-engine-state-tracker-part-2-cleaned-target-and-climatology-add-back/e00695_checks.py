@@ -70,7 +70,9 @@ def check_cut_at_train_end() -> float:
 
 
 def check_origin_cut() -> float:
-    """Return the largest change in an input state at least 24 hours old when readings after the origin are missing.
+    """Return the largest change in an input state at least 24 hours old without later readings.
+
+    Readings after the origin are hidden.
 
     The climatology reads states up to 48 half-hours before the native origin, and a reading takes 7
     half-hours to arrive. Hiding every reading from `origin - 7` on must leave those states unchanged.
