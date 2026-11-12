@@ -664,6 +664,53 @@ def climatology_reference() -> pl.DataFrame:
     )
 
 
+def _interval_line(*, label: str, result: dict) -> str:
+    """Return one contrast as a line: estimate, month-bootstrap interval, t interval, seed estimates."""
+    seeds = ", ".join(f"{x:+.3f}" for x in result["seed_estimates"])
+    return (
+        f"{label}: {result['treatment']} minus {result['reference']} ({result['metric']}, "
+        f"{result['level']:.1f}% level) estimate {result['estimate']:+.3f}; bootstrap "
+        f"[{result['lower']:+.3f}, {result['upper']:+.3f}]; t [{result['t_lower']:+.3f}, "
+        f"{result['t_upper']:+.3f}] over {result['n_months']} months; seeds [{seeds}]"
+    )
+
+
+def print_report(*, report: dict, d8_slices: pl.DataFrame) -> None:
+    """Print every contrast, the per-Primary moves, the slices, the bounds, the gates, and the verdict branch."""
+    print("CONTRASTS (CRPS and MAE in points of effective capacity; negative is a gain)")
+    for label in ("c1", "c2", "c3", "c4", "c5"):
+        print(_interval_line(label=label.upper(), result=report[label]))
+    print(_interval_line(label="MAE", result=report["mae_a1_minus_a0"]))
+    print("EXTRA CONTRASTS AND BOUNDS (descriptive, 95%)")
+    for name, result in report["extras"].items():
+        print(_interval_line(label=name, result=result))
+    print(
+        f"threshold {report['threshold_points']:.3f} points ({SMALLEST_GAIN_SHARE:.1%} of refitted "
+        f"A0 CRPS {report['a0_crps']:.3f})"
+    )
+    print("MEAN CRPS and MAE PER SYSTEM (rows per seed)")
+    for name, crps in report["mean_crps"].items():
+        print(
+            f"{name}: CRPS {crps:.3f}, MAE {report['mean_mae'][name]:.3f}, "
+            f"rows {report['rows_per_seed'][name]}"
+        )
+    print(
+        "OTHER PRIMARIES (A1 minus A0, 95% month-block interval; moves needs |estimate| > sister)"
+    )
+    for row in report["other_primaries"]:
+        print(
+            f"{row['series']}: {row['estimate']:+.3f} [{row['lower']:+.3f}, {row['upper']:+.3f}] "
+            f"sister {row['sister_difference']:.3f} moves={row['moves']} worse={row['worse']}"
+        )
+    print("D8 SLICES")
+    with pl.Config(tbl_rows=-1, tbl_cols=-1, fmt_str_lengths=60, tbl_width_chars=250):
+        print(d8_slices.with_columns(pl.col(pl.Float64).round(3)))
+    print(f"G0: {json.dumps(report['g0'])}")
+    print(f"ORIGIN-TIME WEATHER ASSERTION: {json.dumps(report['origin_time_assertion'])}")
+    print(f"VERDICT INPUTS: {json.dumps(report['verdict_inputs'])}")
+    print(f"VERDICT BRANCH {report['branch']}: {report['verdict']}")
+
+
 def main() -> None:
     """Score every system, compute the contrasts, and write the tables and the verdict."""
     parser = argparse.ArgumentParser()
@@ -677,7 +724,10 @@ def main() -> None:
     scored = scored_systems(workers=args.workers)
     losses = {name: pair[1] for name, pair in scored.items()}
     for name, (forecast, _) in scored.items():
-        if name in {"A0", "A1", "AH", "W0", "W1"}:
+        stored = DATA_DIR / "predictions" / f"{name.lower()}-{'d8' if name[0] == 'A' else 'host'}"
+        if (
+            name in {"A0", "A1", "AH", "W0", "W1"} and not stored.exists()
+        ):  # stored sets are immutable
             write_predictions(
                 experiment_id=695,
                 name=f"{name.lower()}-{'d8' if name[0] == 'A' else 'host'}",
@@ -815,9 +865,7 @@ def main() -> None:
     }
     (SCORES_DIR / "report.json").write_text(json.dumps(report, indent=1, default=float))
     climatology_reference().write_csv(SCORES_DIR / "references_d8.csv")
-    print(
-        json.dumps({k: report[k] for k in ("branch", "verdict", "mean_crps", "mean_mae")}, indent=1)
-    )
+    print_report(report=report, d8_slices=slices)
     print(f"HOLDOUT {HOLDOUT:%Y-%m-%d}: no valid time on or after it is scored")
 
 

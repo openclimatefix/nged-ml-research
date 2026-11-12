@@ -24,7 +24,7 @@ from e00695_common import DATA_DIR
 
 ARM = os.environ["E00695_ARM"]
 MONTH = os.environ["E00677_MONTH"]
-ARMS_WITH_ROWS = {"A1", "A1n", "AH", "W0", "W1"}
+ARMS_WITH_ROWS = {"A1", "A1n", "AH", "W0", "W1", "A1id"}  # A1id: the identity control
 assert ARM == "A0" or ARM in ARMS_WITH_ROWS, f"unknown arm {ARM}"
 
 if ARM != "A0":
