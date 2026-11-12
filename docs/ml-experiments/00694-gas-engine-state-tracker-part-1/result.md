@@ -74,7 +74,7 @@ metric: >-
 code: ml-experiments/00694-gas-engine-state-tracker-part-1/
 ---
 
-# Plan: gas-engine state tracker, part 1
+## Plan
 
 **This is the first experiment of an exploratory series on reading embedded generators out of a
 substation's raw reading.** It has a data look (Phase A) and four small trackers (Phase B), all
