@@ -31,8 +31,6 @@ ENGINE_CONNECTED: Final[datetime] = datetime(2023, 6, 13, tzinfo=UTC)
 NET_START: Final[datetime] = datetime(2023, 9, 1, tzinfo=UTC)
 NET_END: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
 FADE_START: Final[datetime] = datetime(2026, 3, 1, tzinfo=UTC)
-RECORD_START: Final[datetime] = datetime(2023, 7, 3, tzinfo=UTC)
-RECORD_END: Final[datetime] = datetime(2023, 8, 16, tzinfo=UTC)
 D8_SERIES: Final[int] = 26
 PRE_ROLL: Final[int] = 28 * 48
 """Half-hours of history before a segment's first tracked half-hour, for the causal spread."""

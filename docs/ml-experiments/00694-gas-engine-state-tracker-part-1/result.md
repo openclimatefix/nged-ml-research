@@ -71,93 +71,119 @@ metric: >-
   switch-time error in half-hours; estimated K and u against the truth; share of un-injected
   half-hours flagged and active days a month; held-out log-likelihood of M2 with and without the
   fold on D8.
-verdict: supported
+verdict: partly supported
 best_arm: >-
-  M2, the grid filter over demand level and units running (folded reading): pooled F1 0.819 under
-  the folded injection rule and 0.805 under the signed rule, with no false alarms at 8 Primaries.
+  M2, the grid filter over demand level and units running: F1 0.819 pooled over 5 injected
+  schedules (folded injection rule) and 0.678 on the one real engine record alone, with no false
+  alarms at 8 Primaries.
 headline: >-
-  The tracker passes every pre-registered threshold, but by thin margins: a plain count model on
-  differences scores almost as well, the one real engine record alone scores F1 0.68, and a 1 MW
-  unit is found in only 13 of 44 segments.
+  The pre-registered table reads `supported`, but an audit showed that its gate is not robust. On the
+  real engine record alone the tracker scores F1 0.68, the fold gives no demonstrated gain, and the
+  fitted unit size sits at 1.65 MW on a finer grid, outside the pre-registered range.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  A filter that tracks how many of D8's three gas-engine units (about 1.75 MW each) are running
-  from the substation's half-hourly reading alone finds about four in five running half-hours in
-  injected tests, with no false alarms at 8 Primaries, and it also fits D8's real data. The folded
-  (apparent-power) reading helps only a little, because a simpler model of the steps scores nearly
-  as well, and the tracker misses units of 1 MW. A later experiment should test it on registered
-  engines it has not seen, and on a forecast that subtracts the tracked engine.
+  A filter that tracks how many of D8's three gas-engine units are running, using only the
+  substation's half-hourly reading, finds about two thirds of the right half-hours on the one real
+  engine record we hold (F1 0.68), and more on easier synthetic schedules. It raised no false alarms
+  at 8 substations, but it almost never finds a 1 MW unit, and the unit size it infers depends on
+  the grid of sizes tried. The next experiment should test it on a harder, record-like schedule and
+  on registered engines it has not seen.
+lessons: >-
+  A pooled gate dominated by synthetic schedules overstated the tracker, and an audit that scored
+  the real record alone caught this. A count model on differences is as good as the folded grid
+  filter, so the fold is not yet worth its cost. The unit size is a coarse-grid result.
 advice:
   - >-
-    Compare any engine tracker with a count model on differences, not only with a step-pairing rule,
-    because the pairing rule scores 0.24 F1 lower and the count model only 0.03 (C1, C2).
+    Score an engine tracker on the real engine record alone as well as on synthetic schedules,
+    because the real record gave F1 0.68 against 0.82 pooled (Checks).
   - >-
-    Report an engine tracker's score on the real engine record alone as well as pooled with
-    synthetic schedules, because the record alone scores 0.68 against 0.82 pooled (Checks).
+    Compare an engine tracker with a count model on differences, not only a step-pairing rule,
+    because the pairing rule scored 0.24 F1 below the grid filter and the count model 0.03 below
+    under the folded injection rule, and 0.03 above under the signed rule (C1, C2).
   - >-
-    Do not add a minimum dwell of 2 half-hours to an engine tracker, because it lowers F1 by 0.04
-    under both injection rules (C3).
+    Search the unit size on a grid of 0.05 MW or finer before testing it against a range, because
+    the fitted size was 1.75 MW on a 0.25 MW grid and 1.65 MW on a 0.05 MW grid (Checks).
   - >-
-    Expect no detection of a unit of about 1 MW at a Primary with 5 to 12 MVA of demand: a tracker
-    found it in 13 of 44 segments, so an inventory needs another signal for small units (Figure 7
-    and the schedule table).
+    Build synthetic engine schedules from the real record's switching structure, with ramps and
+    part load, because an idealised record scored F1 0.735 and the synthetic schedules 0.84 to 0.89
+    (Checks).
   - >-
-    Anchor "off" with a prior on running time when tracking from differences, because the same
-    model without the prior learned "one unit on" as its resting state (Method).
+    Expect a unit of about 1 MW to be missed at Primaries with 5 to 12 MVA of demand: M2's F1 was
+    0.12 on injected 1 MW units, and it chose "no engine" in 31 of 44 segments (schedule table).
+  - >-
+    Penalise running time when tracking from differences, because the same count model without the
+    penalty settled on "one unit on" as its resting state in a first test on one Primary (Method).
 code: ml-experiments/00694-gas-engine-state-tracker-part-1/
 ---
 
-**A filter that tracks how many of D8's three gas-engine units are running, using only the
-substation's half-hourly reading, finds about four in five running half-hours in tests where we
-knew the answer, and it raises no false alarms at eight Primaries.** We asked whether the number of
-units running (0 to 3), and the size of each unit, can be inferred from the raw reading of a
-substation, with no price, no weather, and no forecast of ordinary demand to subtract. We took the
-recorded output of a metered gas engine ("Gas A") and subtracted it from the readings of eight
-substations (Primaries), in 44 segments of 120 days, and checked how many of the running
-half-hours each tracker found again. We also ran the trackers over the same Primaries without any
-injection, and over D8 itself. The trackers re-implement and extend the load-disaggregation idea of
-[Hart (1992)](https://doi.org/10.1109/5.192069) and [Kolter and Jaakkola
-(2012)](https://proceedings.mlr.press/v22/zico12.html), in which a hidden state per appliance is
-read from the total; the folded reading and the known-answer tests are this project's.
+**The tracker finds about two thirds of the right half-hours on the one real engine record we hold,
+and more on easier synthetic schedules.** We asked whether the number of gas-engine units running at
+a substation (0 to 3), and the size of each unit, can be inferred from the substation's own reading,
+with no price, no weather, and no forecast of ordinary demand to subtract. The test case is D8, a
+primary substation (a "Primary") whose reading is half-hourly apparent power in megavolt-amperes
+(MVA) and which has a gas engine of three units connected nearby. A metered gas-engine generator,
+labelled "Gas A", has its own output recorded for about 44 days (2,054 half-hours). We subtracted
+that recorded output from the readings of other Primaries, which makes a known answer ("injection"),
+and scored each tracker half-hour by half-hour with the F1 score (the harmonic mean of precision and
+recall of the flag "a unit is running"). On Gas A's record alone the best tracker scores F1 0.68
+(precision 0.61, recall 0.81); pooled with four synthetic schedules built from the record, it scores
+0.82. It flagged none of the half-hours of the same Primaries without injection. The trackers extend
+the load-disaggregation idea of [Hart (1992)](https://doi.org/10.1109/5.192069) and [Kolter and
+Jaakkola (2012)](https://proceedings.mlr.press/v22/zico12.html), in which a hidden state for each
+appliance is read from the total.
 
-**The pre-registered verdict is `supported`, and the margins are thin.** The best tracker (M2)
-reaches a half-hour F1 of 0.819 (folded injection rule) and 0.805 (signed rule) against the
-pre-registered bar of 0.80. A plain count model on differences (M1) scores 0.792 and 0.838, so the
-extra machinery of M2 adds +0.027 under one rule and -0.032 under the other. Three further limits
-apply. On the one real engine record alone, M2 scores F1 0.68, because its precision is 0.61. A
-unit of 1 MW is found in 13 of 44 segments. The tracker was tuned on nothing, but one prior (a
-small cost per unit-half-hour of running) was added after a first test on one Primary.
+**The pre-registered table reads `supported`, and the recorded verdict is `partly supported`,
+because an audit found the gate was not robust.** The pre-registered table passes every probe, with
+thin margins: the best tracker (M2, a filter over demand level and units running) scores F1 0.819
+against a bar of 0.80 under one injection rule and 0.805 under the other. The audit (by a fresh
+Sonnet agent, using its own scoring code) reproduced every stored count and then found three
+problems. First, the real record alone scores 0.68, because the 4 synthetic schedules are easier
+than the record (an idealised record, with output exactly a whole number of units, scores only 0.735
+too). Second, the fold (the assumption that the apparent-power reading folds when demand is near the
+engine's output) has no demonstrated benefit: removing it changes the record's F1 by +0.017 under
+one injection rule and -0.014 under the other, and both intervals include zero. Third, the fitted
+unit size is a coarse-grid result: on a 0.05 MW grid the fit for D8 is 1.65 MW, below the
+pre-registered range of 1.7 to 2.3 MW, and the engine record's own unit size is 1.97 MW. This
+reading is post hoc, and with it P1 fails, which gives `partly supported`.
 
-**On D8 itself, without any engine record, the tracker finds three units of about 1.75 MW and flags
-27% of half-hours from 2023-09 to 2025-02.** It needs the fold at low demand: from a level below 3
-MVA, 626 of 627 large steps are rises. In the three eras of D8, the fitted unit size moves from
-1.75 MW to 2.25 MW (0.50 MW, exactly the pre-registered limit) after 11 kV solar was connected.
-After 2026-03 the fit changes to K = 2 and u = 3.5 MW, which fits experiment 194's finding that
-the engine fades from D8's reading in 2026.
+**On D8 itself, without any engine record, the tracker finds three units and flags 27% of half-hours
+from 2023-09 to 2025-02.** The fit gives K = 3 units of 1.75 MW (on a 0.25 MW grid). Using a wider
+range of unit sizes, three units beat one 5 MVA block by about 2,500 on the Bayesian information
+criterion, so the cap of three units does not create this answer. The fold explains the step
+directions at low demand: from a level below 3 MVA, 626 of 627 large steps are rises. Fitting
+without the fold changes the flagged share only from 0.268 to 0.267. From 2025-03-24, when 11 kV
+solar was connected, the fitted size moves to 2.25 MW (0.50 MW on the coarse grid, exactly the
+pre-registered limit, and about 0.7 MW on the fine grid). The cause of the move is untested. After
+2026-03 the fit changes to 2 units of 3.5 MW. That change is consistent with experiment 194's
+finding that the engine fades from D8's reading in 2026, but the count model does not show it.
 
-The pre-registered probes (P1 to P5) are in the table below. The planned contrasts (C1 to C3) are in
-the next section.
+**The tracker almost never finds a 1 MW unit.** M2's F1 on injected 1 MW units is 0.12, and it chose
+"no engine" in 31 of 44 segments, so it found a unit in 13 of 44 segments only by choosing a unit
+count.
+
+The pre-registered probes (P1 to P5), at their pre-registered reading, are in the table.
 
 | Probe | Prediction | Result | Holds |
 |---|---|---|---|
-| P1 | K = 3 and u of 1.7 to 2.3 MW on D8, 2023-09 to 2025-02 | K = 3, u = 1.75 MW | yes |
-| P2, folded rule | F1 ≥ 0.80, precision ≥ 0.80, recall ≥ 0.80 at 2 and 3 units, ≥ 0.50 at 1 unit, switch error ≤ 1 half-hour | 0.819, 0.828, 0.87 and 0.87, 0.72, median 0 | yes |
-| P2, signed rule | same | 0.805, 0.824, 0.85 and 0.86, 0.68, median 0 | yes |
-| P3 | ≤ 3% of half-hours flagged and ≤ 1 active day a month on un-injected history, at each of 8 Primaries | 0.00% and 0.00 days at all 8 | yes |
-| P4 | M2 beats M0 by ≥ 0.10 F1, with an interval above zero | +0.238 (folded), +0.170 (signed) | yes |
+| P1 | K = 3 and a unit size of 1.7 to 2.3 MW on D8, 2023-09 to 2025-02 | K = 3, 1.75 MW (1.65 MW on a 0.05 MW grid, post hoc) | yes at the pre-registered grid; no on the fine grid |
+| P2, folded rule | F1 ≥ 0.80, precision ≥ 0.80, recall ≥ 0.80 at 2 and 3 units and ≥ 0.50 at 1 unit, switch error ≤ 1 half-hour | 0.819, 0.828, 0.87 and 0.87, 0.72, median 0 (0.71 of true switches matched) | yes |
+| P2, signed rule | same | 0.805, 0.824, 0.85 and 0.86, 0.68, median 0 (0.72 matched) | yes |
+| P3 | At most 3% of half-hours flagged and at most 1 active day a month on history without injection, at each of 8 Primaries | 0.00% and 0.00 days at all 8 | yes |
+| P4 | M2 beats M0 by at least 0.10 F1, with an interval above zero | +0.238 (folded), +0.170 (signed) | yes |
 | P5 | The fold predicts held-out months of D8 better | better in 9 of 9 months, +51.6 log-likelihood units | yes |
 
 ## Results
 
 **Phase A: D8's engine appears as steps of about 5 MVA, and the direction depends on the level.**
 The engine record reproduces experiment 194's counts exactly (1,704, 137, 133, and 80 half-hours at
-0, 1, 2, and 3 units, of 2,054), and one unit puts out 1.97 MW. The record holds 55 running
-spells (experiment 194 counted 56) with a median of 4 half-hours. D8's reading has steps of about
-5 MVA only after the engine connected (Figure 2). The fall that follows an engine start grows with
-the reading before it, as a folded reading predicts (Figure 3). From a level below 3 MVA, 626 of
-627 merged steps of at least 1.5 MVA in 2023-09 to 2025-02 are rises; from 8 to 10 MVA, 259 of 260
-are falls (Figure 4).
+0, 1, 2, and 3 units, of 2,054), and one unit puts out 1.97 MW. The record holds 55 running spells
+(experiment 194 counted 56), with a median of 4 half-hours. D8's reading has steps of about 5 MVA
+only after the engine connected (Figure 2). The fall that follows an engine start grows with the
+reading before it, as a folded reading predicts (Figure 3). From a level below 3 MVA, 626 of 627
+merged steps of at least 1.5 MVA in 2023-09 to 2025-02 are rises. From 8 to 10 MVA, 259 of 260 are
+falls (Figure 4). No local maximum of the step histogram sits at 1.75 MW or 3.5 MW, so three units
+of 1.75 MW is a model fit and not a visible pattern.
 
 ![D8's reading in four eras](figure_1_d8_reading_by_era.svg)
 
@@ -170,22 +196,25 @@ are falls (Figure 4).
 ![Output levels of Gas A](figure_5_gas_a_levels.svg)
 
 **Phase B: known answers.** Figure 6 shows one injected segment. Figure 7 gives the scores pooled
-over the engine record and four synthetic schedules (the schedules are built by resampling the
-record's runs). The pooled scores, with 95% intervals from resampling schedule-weeks and then
-segments, are in the table.
+over the engine record and four synthetic schedules, which are built by resampling the record's
+runs. The intervals are 95%, from resampling schedule-weeks and then segments.
 
-| Arm | F1, folded rule | F1, signed rule | Precision (folded) | Recall (folded) |
+| Tracker | F1, folded rule | F1, signed rule | Precision (folded) | Recall (folded) |
 |---|---|---|---|---|
 | M0, difference pairing | 0.581 [0.500, 0.646] | 0.635 [0.550, 0.701] | 0.467 | 0.769 |
 | M1, count model on differences | 0.792 [0.746, 0.832] | 0.838 [0.788, 0.880] | 0.775 | 0.810 |
 | M2, grid filter | 0.819 [0.777, 0.857] | 0.805 [0.765, 0.842] | 0.828 | 0.810 |
-| M2-dwell | 0.778 [0.746, 0.808] | 0.765 [0.731, 0.795] | 0.769 | 0.788 |
+| M2-dwell, grid filter with a minimum dwell | 0.778 [0.746, 0.808] | 0.765 [0.731, 0.795] | 0.769 | 0.788 |
+
+"Folded rule" and "signed rule" are the two ways of subtracting the engine's output from a Primary's
+reading. The folded rule subtracts it from the real power behind the reading and reads the result
+back as apparent power. The signed rule subtracts it from the reading directly.
 
 ![Injected example](figure_6_injected_example.svg)
 
 ![Known-answer scores](figure_7_known_answer_scores.svg)
 
-**The three planned contrasts, at 98.3% (Bonferroni for three), are the following.**
+**The three planned contrasts, at 98.3% (Bonferroni for three), are in the table.**
 
 | Contrast (difference in F1) | Folded rule | Signed rule |
 |---|---|---|
@@ -194,9 +223,11 @@ segments, are in the table.
 | C3, M2-dwell minus M2 (threshold 0) | -0.041 [-0.069, -0.018] | -0.040 [-0.067, -0.018] |
 
 M0 is a weak baseline, because after a large fall it stays flagged until a matching rise, so it
-flags 12.6% to 37.6% of un-injected half-hours at six of the eight Primaries. The fair comparison
-is M1, and it is nearly a tie. A minimum dwell of 2 half-hours lowers F1 under both rules, so the
-short spells of the real record (median 4 half-hours) are not noise.
+flags 12.6% to 37.6% of half-hours without injection at six of the eight Primaries. The fair
+comparison is M1, and M1 and M2 nearly tie: C2 changes sign with the injection rule. The minimum
+dwell of 2 half-hours lowers the pooled F1 under both rules, but on the record alone M2-dwell scores
+slightly higher than M2 (0.686 against 0.678 folded, 0.679 against 0.675 signed), so the pooled loss
+comes from the synthetic schedules.
 
 **Schedule by schedule (M2, folded rule), the tracker finds engines of 2 MW and 3 MW units, and it
 misses 1 MW units.**
@@ -210,14 +241,16 @@ misses 1 MW units.**
 | Synthetic, seed 6 | 1 unit of 2 MW | 0.695 | 6 of 44 |
 | Synthetic, seed 7 | 2 units of 2 MW | 0.858 | 0 of 44 |
 
-Where the engine is found, the fitted unit size is close to the true size (1.75 MW for the record,
-2.00 MW for 2 MW units, 3.00 MW for 3 MW units, and 1.00 MW for 1 MW units).
+Where the tracker finds the engine, the fitted unit size is near the true size on the 0.25 MW grid:
+2.00 MW for 2 MW units, 3.00 MW for 3 MW units, and 1.00 MW for 1 MW units. For the record, 36 of 44
+segments choose 1.75 MW, against a true 1.97 MW. The audit found that the evidence has a dip at 2.0
+MW and further modes beyond it.
 
 ![False alarms](figure_8_false_alarms.svg)
 
 **On real D8, the fitted size and the share flagged shift when the 11 kV solar was connected.**
 
-| Era of D8 | M2 K and u | M2 share flagged | M1 K and u | M2 without fold K and u |
+| Era of D8 | M2 units and size | M2 share flagged | M1 units and size | M2 without fold units and size |
 |---|---|---|---|---|
 | 2023-09 to 2025-02 | 3, 1.75 MW | 0.268 | 3, 1.75 MW | 3, 1.75 MW |
 | 2025-03-24 to 2026-02 | 3, 2.25 MW | 0.384 | 3, 1.50 MW | 3, 1.50 MW |
@@ -225,136 +258,174 @@ Where the engine is found, the fitted unit size is close to the true size (1.75 
 
 ![D8 running share by month](figure_9_d8_running_share.svg)
 
-K1 (D8's own 44-day reading with the record subtracted, not decisive) gives F1 0.769 for M2 (284
-true positives, 105 false positives, 66 false negatives), 0.731 for M1, 0.709 for M2-dwell, and
-0.534 for M0.
+K1 is D8's own 44-day reading with Gas A's record subtracted; it does not decide, because D8's
+reading already holds whatever D8's own engine did, and Gas A is a separate metered engine, so some
+of the false positives may be real running. M2 scores F1 0.769 (284 true positives, 105 false
+positives, 66 false negatives), M1 0.731, M2-dwell 0.709, and M0 0.534.
 
 ## Checks
 
-- **Median minus mean forecast, and the error of the mean or median forecast beside each
+- **Median forecast minus mean forecast, and the error of the mean or median forecast beside each
   quantile-score contrast:** not applicable, because the experiment forecasts nothing.
-- **Leave-one-Primary-out (trigger 4):** C1 stays between +0.227 and +0.245 (folded) and +0.156 and
-  +0.213 (signed). C2 stays positive (+0.006 to +0.034) under the folded rule and negative (-0.007
-  to -0.039) under the signed rule. No sign changes. Dropping D10 moves C2 the most.
-- **Triggers that fired:** none fired on the rules' own terms. Two readings come close and a reader
-  should know them. The real record alone misses the F1 bar (0.678 folded, 0.675 signed), because
-  its precision is 0.61, and 50 of its 1,704 "off" half-hours carry more than 0.3 MW of output (ramps
-  and part load), so some of the false positives are not errors of the tracker. The pooled gate is
-  weighted 4 to 1 towards synthetic schedules. K1 on D8 (F1 0.769) is under 0.80, and was declared
-  non-deciding in the plan. No audit was run.
-- **Fold versus no fold on real D8:** the fold predicts held-out months better in 9 of 9, but the
-  fitted K, u, and flagged share are almost the same with and without it (0.268 and 0.267), so the
-  fold's effect on the answer is small.
+- **Leave one Primary out (trigger 4):** C1 stays between +0.227 and +0.245 (folded) and between
+  +0.156 and +0.213 (signed). C2 stays positive (+0.006 to +0.034) under the folded rule and
+  negative (-0.007 to -0.039) under the signed rule. No sign changes.
+- **Triggers that fired, and the audit.** Trigger 1 (a known-answer test fails): the real record
+  alone misses the F1 bar (0.678 folded, 0.675 signed), the 1 MW schedule scores 0.12, and K1 scores
+  0.77. Trigger 5 (a simpler arm beats the arm that contains it, or a control moves the score): M1
+  beats M2 under the signed rule, and the fold barely changes D8's fit. Trigger 7 (a later design
+  depends on the result): the inventory project would. A fresh Sonnet agent audited the experiment
+  with its own scoring code, and its report is in the private
+  `data/ml-experiments/briefs/e694_audit/` folder.
+- **Audit findings and how each was triaged.**
+    - **Accepted: the stored counts replicate exactly.** The audit's own injection, window offsets,
+      truth, and week clusters matched all 264 stored comparisons (44 segments, both rules, M0, M1,
+      M2).
+    - **Accepted: the pooled F1 overstates the tracker.** The write-up now leads with the real
+      record's F1 of 0.68. An alternative truth (output above 0.3 MW counts as running) raises the
+      record's precision only from 0.615 to 0.655 and leaves F1 unchanged, and an idealised record
+      scores 0.735, so the cause is the record's switching structure and not ramps.
+    - **Accepted: the fold has no demonstrated benefit.** Without the fold, the record's F1 changes
+      by +0.017 (folded rule, 95% interval -0.006 to +0.041, fold wins 19 of 44 segments) and -0.014
+      (signed rule, -0.041 to +0.011, 11 of 44). The take-home no longer claims a benefit.
+    - **Accepted: the unit size is a coarse-grid result.** On a 0.05 MW grid, D8's fit is 1.65 MW,
+      and the move between eras is about 0.7 MW. The write-up reports this as a post hoc reading and
+      the verdict becomes `partly supported`. The experiment did not rerun P1 on the fine grid.
+    - **Accepted, and the control run by the audit: zero false alarms are not only "no engine"
+      selection.** Forcing 3 units at 1.75 MW or 2.0 MW on the 44 segments without injection flags a
+      mean of 0.1% of half-hours (maximum 1.9%).
+    - **Accepted: three units beat one 5 MVA block.** With a unit-size grid to 6.5 MW, the
+      information criterion prefers 3 units by about 2,500 on D8 and by 60 to 350 on injected
+      segments.
+    - **Deferred to the next experiment:** a harder, record-like synthetic schedule, and a grid of
+      0.05 MW in the fits.
+- **Fold versus no fold on real D8:** the fold predicts held-out months better in 9 of 9, by 51.6
+  log-likelihood units in total, but the fitted units, size, and flagged share are almost the same
+  with and without it (0.268 and 0.267).
 - **Code review:** a fresh Sonnet reviewer found one blocking bug (the backward pass used the
-  transpose of the level kernel, which gave wrong smoothed marginals near zero demand) and eight
-  advisory points. The bug is fixed before every number on this page, and seven of the eight
-  advisory points were applied. The eighth, matching a true switch to the nearest flagged switch of
-  either direction, is left as designed, and the share of true switches matched (0.62 to 0.82) is
-  reported beside the median error of 0 half-hours.
+  transpose of the level kernel, so smoothed marginals were wrong near zero demand) and eight
+  advisory points. The bug is fixed before every number on this page. Seven of the eight advisory
+  points were applied. The eighth is left as designed: matching a true switch to the nearest flagged
+  switch of either direction. The share of true switches matched (0.62 to 0.82) is reported beside
+  the median error.
+- **Write-up and prose reviews:** two fresh Sonnet reviewers found no number that disagrees with the
+  printed reports. Their findings on overclaims, undefined terms, and pronouns are applied, except
+  where a finding would have repeated a statement made above.
 
 ## Deviations from the plan
 
-- **An occupancy prior was added after one smoke test.** The first test on one Primary showed that
-  differences alone cannot tell "0 units" from "1 unit held all the time", and the model learned
-  "one unit on" as its resting state (5,238 of 5,760 half-hours). Every fit now multiplies each
-  half-hour's likelihood by exp(-0.02 k) for k units running. The cost leans the Bayesian
+- **A penalty on running time was added after one smoke test.** The first test on one Primary showed
+  that differences alone cannot tell "0 units" from "1 unit held all the time", and the count model
+  learned "one unit on" as its resting state (5,238 of 5,760 half-hours). Every fit now multiplies
+  each half-hour's likelihood by exp(-0.02 k) for k units running. The penalty leans the Bayesian
   information criterion towards K = 0 (about 17 log-likelihood units for 5% running over 5,760
-  half-hours), so the zero false alarms are partly a property of this prior.
-- **The prior transition matrix has a stay probability of 0.995, not 0.9.** With 0.9, a first
-  smoke test chose K = 0 on an injected segment, because each half-hour in the same state costs
-  log 0.9 once the model allows switches.
-- **K and u are selected in two steps, not by a full grid.** The unit size is profiled at K = 3, then
-  K = 0 to 3 are each refitted by 3 rounds of expectation-maximisation at that unit size.
+  half-hours). The audit's forced-3-unit control shows the zero false alarms hold without that
+  selection.
+- **The prior transition matrix has a stay probability of 0.995, not 0.9.** With 0.9, a first smoke
+  test chose K = 0 on an injected segment, because each half-hour in the same state costs log 0.9
+  once the model allows switches.
+- **K and u are selected in two steps, not by a full grid.** The unit size is profiled at K = 3,
+  then K = 0 to 3 are each refitted by 3 rounds of expectation-maximisation at that unit size.
 - **The reactive floor q is fixed at 0.14 MVA and is not fitted.**
-- **The verdict table has a default branch.** Any combination the plan did not list is `not supported`.
-  No result here fell into it.
+- **The verdict table has a default branch.** Any combination the plan did not list is `not
+  supported`. No result fell into it. The verdict `partly supported` follows the audit's post hoc
+  fine-grid reading, as set out above.
 - **K1 uses the same injection code as the other segments (both rules), and it is placed by
   timestamp.** The record has one gap of 12 half-hours, which is not scored in K1. The host segments
-  use the record as stored, so the schedule is shortened by the gap.
+  use the record as stored, so their schedule is shorter by the gap.
 - **P5 holds if the total difference is above zero and the fold wins at least two thirds of the
-  held-out months**, a definition fixed in the scoring code before the result was read. The
-  held-out months are the even-numbered months counted from 2023-09. P5's likelihood leaves out
-  the occupancy prior.
+  held-out months**, a definition fixed in the scoring code before the result was read. The held-out
+  months are the even-numbered months counted from 2023-09. P5's likelihood leaves out the penalty
+  on running time.
 - **One D16 segment was dropped** because under 90% of its half-hours were present, leaving 44
   segments.
+
+## What the next experiment should answer
+
+**Written after the results.** The tracker is not yet good enough to trust on its own. The next
+experiment should do four things: fit on a 0.05 MW grid; score a harder synthetic schedule built
+with the real record's ramps and part load; test whether the engines registered in the Embedded
+Capacity Register are found, and no others, at Primaries the tracker has not seen; and report what
+happens to a unit of 1 MW. The maintainer proposed a further use: if the engine is tracked well,
+subtracting it from the series, training the demand forecaster on the cleaned series, and adding
+back a climatology of the engine at forecast time could improve the forecast. That use needs the
+tracker's recall to be high, and it fails if the engine responds to something predictable other than
+price that the climatology cannot reproduce.
 
 ## Method
 
 **Architecture:** the design of each tracker.
 
 - All four trackers read only the segment's reading in MVA, with a causal spread of the lag-1
-  difference: 1.4826 times the median absolute difference at the same half-hour of the day over
-  the previous 28 days, rounded to one of 8 log-spaced levels.
+  difference: 1.4826 times the median absolute difference at the same half-hour of the day over the
+  previous 28 days (at least 7 earlier days, floor 0.03 MVA), rounded to one of 8 log-spaced levels.
 - M0 merges consecutive same-sign differences that each exceed 4 spreads, opens a spell at a merged
   fall of at least 1.5 MVA, and closes it at the next merged rise of at least half the fall.
-- M1 is a hidden Markov model on the number of units k (0 to 3). The lag-1 difference is
-  -(change in k) times u plus Student-t noise (4 degrees of freedom) at the spread. Any jump in k
-  is allowed.
-- M2 is a grid filter on (demand level L, k). L lies on a 0.1 MVA grid from 0 to 22 MVA and does a
-  random walk with Student-t steps (4 degrees of freedom) at the spread. The reading is
+- M1 is a hidden Markov model on the number of units k (0 to 3). The lag-1 difference is -(change in
+  k) times u plus Student-t noise (4 degrees of freedom) at the spread. Any jump in k is allowed.
+- M2 is a grid filter on the demand level L and k. L lies on a 0.1 MVA grid from 0 to 22 MVA and
+  does a random walk with Student-t steps (4 degrees of freedom) at the spread. The reading is
   sqrt((L - k u)^2 + q^2) with q = 0.14 MVA, plus Student-t noise with scale 0.08 MVA. The forward
-  pass costs O(T K G) for G = 221 grid points. The flag uses the smoothed probability that k is at
-  least 1; the filtered (online) flag is stored too.
-- M2-dwell expands the state to (k, age) so that k cannot change twice in successive half-hours, the
-  smallest explicit-duration model in the sense of [Yu
-  (2010)](https://doi.org/10.1016/j.artint.2009.11.011).
-- No arm uses a demand forecast, the price, the weather, or Gas A's record when it fits.
+  pass costs O(T K G) for G = 221 grid points.
+- M2-dwell expands the state to k and an age (1 or at least 2 half-hours), so that k cannot change
+  twice in successive half-hours. This is an explicit-duration model in the sense of [Yu
+  (2010)](https://doi.org/10.1016/j.artint.2009.11.011), with the shortest possible minimum
+  duration. It reuses the units and size that M2 selected for the same segment.
+- A half-hour is flagged when the smoothed probability that k is at least 1 exceeds 0.5. The
+  filtered (online) flag is stored too.
+- No tracker uses a demand forecast, the price, the weather, or Gas A's record when it fits.
 
 **Training regime:** how each tracker is fitted, and on what.
 
-- Each segment is fitted on its own reading: K and u by the Bayesian information criterion, then 5
-  rounds of expectation-maximisation on the transition matrix with a prior of 5 pseudo-counts.
-- The synthetic schedules resample the record's runs (a unit level and a duration) with
-  replacement. Seeds 0 to 3 give 3 units of 2 MW (the decisive set). Seeds 4 to 7 give 3 units of
-  1 MW, 3 units of 3 MW, 1 unit of 2 MW, and 2 units of 2 MW, and are reported only.
-- Segments: 28 days of pre-roll, then 120 days, with the 44-day schedule injected from day 38.
-  Hosts D3, D4, D11, D14, D16, D2, and D10 have 3 segments before 2025-03-24 and 3 from
-  2025-04-01; D8 has 3 before 2023-06-13.
-- No GPU was used. The whole run took about 7 CPU-minutes for the false-alarm pass and about 4
-  CPU-hours for the injections, on 24 cores.
+- Each segment is fitted on its own reading. The unit size u is profiled over 0.5 to 3.5 MW in steps
+  of 0.25 MW at K = 3. Then K = 0 to 3 are refitted by 3 rounds of expectation-maximisation at that
+  size and compared by the Bayesian information criterion. Then 5 rounds of expectation-maximisation
+  fit the transition matrix, with a prior of 5 pseudo-counts.
+- The synthetic schedules resample the record's runs (a unit level and a duration) with replacement.
+  Seeds 0 to 3 give 3 units of 2 MW and decide the pooled score. Seeds 4 to 7 give 3 units of 1 MW,
+  3 units of 3 MW, 1 unit of 2 MW, and 2 units of 2 MW, and are reported only.
+- Segments: 28 days of history for the spread, then 120 tracked days, with the schedule injected
+  from day 38. The first period ("pre-solar") has 3 consecutive segments per Primary from
+  2022-01-01, before the 11 kV solar connected near D8. The second period ("solar") has 3 from
+  2025-04-01. The Primaries are D3, D4, D11, D14, D16, D2, and D10. D8 has 3 segments before the
+  engine connected on 2023-06-13.
+- No GPU was used. The false-alarm pass took about 7 CPU-minutes and the injections about 4
+  CPU-hours, on 24 cores.
 
 **Measurement:** how the trackers are scored.
 
-- Two injection rules, run on every segment. The folded rule subtracts the engine output from the
-  real power behind the reading and reads it back as apparent power. The signed rule subtracts the
-  output from the reading and floors it at 0.01.
-- Scored: half-hour F1, precision, and recall for "any unit running" in the 44-day window, recall by
-  the number of units truly running, and the distance in half-hours from each true switch to the
+- Two injection rules (folded and signed, defined above) are run on every segment.
+- Scored: half-hour F1, precision, and recall for "any unit running" in the injected window, recall
+  by the number of units truly running, and the distance in half-hours from each true switch to the
   nearest flagged switch (within 6).
 - Intervals: 10,000 cluster-bootstrap draws. A cluster is one schedule-week (7 per schedule),
   resampled with replacement, and segments are resampled within each drawn cluster. Contrasts are
   read at 98.3%.
 - False alarms are scored on the same segments without injection: the share of half-hours flagged,
   and the days with at least 4 flagged half-hours.
-- The engine record's own counts are checked before any model runs, and the check passed.
+- The engine record's own counts are checked before any tracker runs, and the check passed.
+- P5: fit on the odd months and score on the even months of D8's 2023-09 to 2025-02 era, with the
+  fitted parameters frozen.
 
 ## Files
 
-- `ml-experiments/00694-gas-engine-state-tracker-part-1/e00694_common.py`: paths, constants, loaders,
-  the two injection rules, the causal spread, and the metrics.
+- `ml-experiments/00694-gas-engine-state-tracker-part-1/e00694_common.py`: paths, constants,
+  loaders, the two injection rules, the causal spread, and the metrics.
 - `e00694_trackers.py`: M0, M1, M2, and M2-dwell.
-- `e00694_look.py`: Phase A figures 1 to 5 and the Phase A printout (`printed_look.txt`, under `data/`).
+- `e00694_look.py`: Phase A figures 1 to 5, and the Phase A printout (`printed_look.txt`).
 - `e00694_run.py`: the false-alarm pass, the injections, K1, the example segment, the real D8 eras,
   and P5. Writes pickles under `data/ml-experiments/00694-gas-engine-state-tracker-part-1/`.
 - `e00694_report.py`: scoring, the cluster bootstrap, the verdict table, figures 6 to 9, and
   `printed_report.txt`.
-- `data/NGED/cleaned_power_time_series.delta` is not read here. The host and D8 readings come from
-  `data/ml-experiments/briefs/sw_false_alarms/work/arrays.pkl`, the residual panel that
-  [experiment 196](../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)
-  stored (a `power` array per site, half-hourly from 2022-01-01). Read only.
-- `data/ml-experiments/00194-*/g2_window.parquet`: Gas A's 44-day record (columns `time`, `power`,
-  `price`, `units`), stored by [experiment
-  194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md).
-  Read only. Not published with dates.
-- `data/ml-experiments/00694-gas-engine-state-tracker-part-1/{fa,inject,k1,example,d8,p5}.pkl`: stage
-  outputs written by `e00694_run.py`.
-
-## What the next experiment should answer
-
-**Written after the results.** The tracker is good enough to try on registered engines, but not yet
-good enough to trust where it is quiet. The next experiment should ask whether it finds the
-registered engines in the Embedded Capacity Register, and no others, at Primaries it has not seen,
-and what it reports for a unit of 1 MW. A second question comes from the maintainer: if the engine
-is tracked well, subtracting it from the series, training the demand forecaster on the cleaned
-series, and adding back a climatology of the engine at forecast time could improve the forecast,
-unless the engine turns out to respond to something predictable other than price.
+- `data/ml-experiments/briefs/sw_false_alarms/work/arrays.pkl`: the residual panel that [experiment
+  196](../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md) stored (a
+  `power` array per site, half-hourly from 2022-01-01). Read only. The Primaries' and D8's readings
+  come from it.
+- The engine's 44-day record: the window table that [experiment
+  194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)
+  stored in its data folder (columns `time`, `power`, `price`, `units`). Read only. It is never
+  published with dates.
+- `data/ml-experiments/00694-gas-engine-state-tracker-part-1/{fa,inject,k1,example,d8,p5}.pkl`:
+  stage outputs written by `e00694_run.py`. Written, private.
+- `data/ml-experiments/briefs/e694_audit/e694_audit.md`: the audit report, with its scripts.
+  Private.

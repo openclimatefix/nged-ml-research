@@ -316,8 +316,9 @@ medium confidence).** *Applies to: experiments.* Where demand is below about 3 M
 appears as a rise in the reading, and where demand is above about 8 MVA it appears as a fall. A
 tracker that assumes every start is a fall misses the low-demand starts. On real D8 data, a filter
 that models the fold predicts held-out months better than the same filter without it in 9 of 9
-months, by 51.6 log-likelihood units in total, and the two flag nearly the same share of
-half-hours ([experiment 694](00694-gas-engine-state-tracker-part-1/result.md); D8, 2023-09 to
+months, by 51.6 log-likelihood units in total, and the two filters flag nearly the same
+share of half-hours (0.268 and 0.267). The fold has no demonstrated benefit in known-answer
+scores ([experiment 694](00694-gas-engine-state-tracker-part-1/result.md); D8, 2023-09 to
 2025-02).
 
 **Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
