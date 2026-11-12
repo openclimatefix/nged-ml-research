@@ -65,7 +65,8 @@ decision_rule: >-
 benchmark: >-
   M0, the difference-pairing rule, on the same segments. Experiment 196's residual detector is a
   reference only, because its injections differ and it used a demand forecast.
-row_set_id: none (states are scored on injected half-hours and on un-injected history; nothing is forecast)
+row_set_id: none (states are scored on injected half-hours and on un-injected history; nothing is
+forecast)
 metric: >-
   Half-hour F1, precision, and recall for "any unit running" and by units running; spell recall;
   switch-time error in half-hours; estimated K and u against the truth; share of un-injected
@@ -73,26 +74,29 @@ metric: >-
   fold on D8.
 verdict: partly supported
 best_arm: >-
-  M2, the grid filter over demand level and units running: F1 0.819 pooled over 5 injected
+  M2, the grid filter over demand level and units running: F1 0.819 pooled over five injected
   schedules (folded injection rule) and 0.678 on the one real engine record alone, with no false
   alarms at 8 Primaries.
 headline: >-
-  The pre-registered table reads `supported`, but an audit showed that its gate is not robust. On the
+  The pre-registered table reads `supported`, but an audit showed that its gate is not robust. On
+  the
   real engine record alone the tracker scores F1 0.68, the fold gives no demonstrated gain, and the
   fitted unit size sits at 1.65 MW on a finer grid, outside the pre-registered range.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   A filter that tracks how many of D8's three gas-engine units are running, using only the
-  substation's half-hourly reading, finds about two thirds of the right half-hours on the one real
-  engine record we hold (F1 0.68), and more on easier synthetic schedules. It raised no false alarms
+  substation's half-hourly reading, scores F1 0.68 on the one real engine record we hold (it finds
+  most running half-hours but also flags others), and higher on easier synthetic schedules. It
+  raised no false alarms
   at 8 substations, but it almost never finds a 1 MW unit, and the unit size it infers depends on
   the grid of sizes tried. The next experiment should test it on a harder, record-like schedule and
   on registered engines it has not seen.
 lessons: >-
   A pooled gate dominated by synthetic schedules overstated the tracker, and an audit that scored
   the real record alone caught this. A count model on differences is as good as the folded grid
-  filter, so the fold is not yet worth its cost. The unit size is a coarse-grid result.
+  filter, so the fold is not yet justified by its extra complexity. The unit size is a coarse-grid
+  result.
 advice:
   - >-
     Score an engine tracker on the real engine record alone as well as on synthetic schedules,
@@ -109,16 +113,16 @@ advice:
     part load, because an idealised record scored F1 0.735 and the synthetic schedules 0.84 to 0.89
     (Checks).
   - >-
-    Expect a unit of about 1 MW to be missed at Primaries with 5 to 12 MVA of demand: M2's F1 was
-    0.12 on injected 1 MW units, and it chose "no engine" in 31 of 44 segments (schedule table).
+    Expect a unit of about 1 MW to be missed: on the one 1 MW schedule injected into Primaries, M2's
+    F1 was 0.12, and it chose "no engine" in 31 of 44 segments (schedule table).
   - >-
     Penalise running time when tracking from differences, because the same count model without the
     penalty settled on "one unit on" as its resting state in a first test on one Primary (Method).
 code: ml-experiments/00694-gas-engine-state-tracker-part-1/
 ---
 
-**The tracker finds about two thirds of the right half-hours on the one real engine record we hold,
-and more on easier synthetic schedules.** We asked whether the number of gas-engine units running at
+**The tracker scores F1 0.68 on the one real engine record we hold, and higher on easier synthetic
+schedules.** We asked whether the number of gas-engine units running at
 a substation (0 to 3), and the size of each unit, can be inferred from the substation's own reading,
 with no price, no weather, and no forecast of ordinary demand to subtract. The test case is D8, a
 primary substation (a "Primary") whose reading is half-hourly apparent power in megavolt-amperes
@@ -127,16 +131,20 @@ labelled "Gas A", has its own output recorded for about 44 days (2,054 half-hour
 that recorded output from the readings of other Primaries, which makes a known answer ("injection"),
 and scored each tracker half-hour by half-hour with the F1 score (the harmonic mean of precision and
 recall of the flag "a unit is running"). On Gas A's record alone the best tracker scores F1 0.68
-(precision 0.61, recall 0.81); pooled with four synthetic schedules built from the record, it scores
-0.82. It flagged none of the half-hours of the same Primaries without injection. The trackers extend
+(precision 0.61, recall about 0.76); pooled with four synthetic schedules built from the record, it
+scores
+0.82. The tracker flagged none of the half-hours of the same Primaries without injection. The
+trackers extend
 the load-disaggregation idea of [Hart (1992)](https://doi.org/10.1109/5.192069) and [Kolter and
 Jaakkola (2012)](https://proceedings.mlr.press/v22/zico12.html), in which a hidden state for each
 appliance is read from the total.
 
 **The pre-registered table reads `supported`, and the recorded verdict is `partly supported`,
 because an audit found the gate was not robust.** The pre-registered table passes every probe, with
-thin margins: the best tracker (M2, a filter over demand level and units running) scores F1 0.819
-against a bar of 0.80 under one injection rule and 0.805 under the other. The audit (by a fresh
+thin margins: the best tracker (M2, a filter over demand level and units running; M0 pairs steps and
+M1 is a count model, both defined in Method; K is the number of units and u the unit size) scores F1
+0.819 under the folded rule and 0.805 under the signed rule, against a bar of 0.80. The audit (by a
+fresh
 Sonnet agent, using its own scoring code) reproduced every stored count and then found three
 problems. First, the real record alone scores 0.68, because the 4 synthetic schedules are easier
 than the record (an idealised record, with output exactly a whole number of units, scores only 0.735
@@ -153,16 +161,18 @@ range of unit sizes, three units beat one 5 MVA block by about 2,500 on the Baye
 criterion, so the cap of three units does not create this answer. The fold explains the step
 directions at low demand: from a level below 3 MVA, 626 of 627 large steps are rises. Fitting
 without the fold changes the flagged share only from 0.268 to 0.267. From 2025-03-24, when 11 kV
-solar was connected, the fitted size moves to 2.25 MW (0.50 MW on the coarse grid, exactly the
-pre-registered limit, and about 0.7 MW on the fine grid). The cause of the move is untested. After
+solar was connected, the fitted size moves to 2.25 MW (a move of 0.50 MW on the coarse grid, exactly
+the pre-registered limit, and about 0.7 MW on the fine grid, which would trigger the `inconclusive`
+rule if applied post hoc). The cause of the move is untested. After
 2026-03 the fit changes to 2 units of 3.5 MW. That change is consistent with experiment 194's
 finding that the engine fades from D8's reading in 2026, but the count model does not show it.
 
-**The tracker almost never finds a 1 MW unit.** M2's F1 on injected 1 MW units is 0.12, and it chose
-"no engine" in 31 of 44 segments, so it found a unit in 13 of 44 segments only by choosing a unit
-count.
+**On the one 1 MW schedule we tried, the tracker almost never finds the units.** M2's F1 on injected
+1 MW units is 0.12, and it chose
+"no engine" in 31 of 44 segments, On that one 1 MW schedule, M2 chose at least one unit in only 13
+of 44 segments.
 
-The pre-registered probes (P1 to P5), at their pre-registered reading, are in the table.
+All five pre-registered probes (P1 to P5) hold at their pre-registered reading.
 
 | Probe | Prediction | Result | Holds |
 |---|---|---|---|
@@ -243,8 +253,8 @@ misses 1 MW units.**
 
 Where the tracker finds the engine, the fitted unit size is near the true size on the 0.25 MW grid:
 2.00 MW for 2 MW units, 3.00 MW for 3 MW units, and 1.00 MW for 1 MW units. For the record, 36 of 44
-segments choose 1.75 MW, against a true 1.97 MW. The audit found that the evidence has a dip at 2.0
-MW and further modes beyond it.
+segments choose 1.75 MW, against a true 1.97 MW. The audit found that the log-likelihood profile
+over unit size has a dip at 2.0 MW and further modes beyond it.
 
 ![False alarms](figure_8_false_alarms.svg)
 
@@ -342,15 +352,14 @@ positives, 66 false negatives), M1 0.731, M2-dwell 0.709, and M0 0.534.
 
 ## What the next experiment should answer
 
-**Written after the results.** The tracker is not yet good enough to trust on its own. The next
-experiment should do four things: fit on a 0.05 MW grid; score a harder synthetic schedule built
-with the real record's ramps and part load; test whether the engines registered in the Embedded
-Capacity Register are found, and no others, at Primaries the tracker has not seen; and report what
-happens to a unit of 1 MW. The maintainer proposed a further use: if the engine is tracked well,
-subtracting it from the series, training the demand forecaster on the cleaned series, and adding
-back a climatology of the engine at forecast time could improve the forecast. That use needs the
-tracker's recall to be high, and it fails if the engine responds to something predictable other than
-price that the climatology cannot reproduce.
+**The tracker is not yet good enough to trust on its own, and four questions remain open.** Does a
+fit on a 0.05 MW grid change the unit size? How does the tracker score on a harder synthetic
+schedule built with the real record's ramps and part load? Are the engines registered in the
+Embedded Capacity Register found, and no others, at Primaries the tracker has not seen? What happens
+to a unit of 1 MW? The maintainer proposed a further use: if the engine is tracked well, subtract it
+from the series, train the demand forecaster on the cleaned series, and add back a climatology of
+the engine at forecast time. That use needs the tracker's recall to be high, and it fails if the
+engine responds to something predictable other than price that the climatology cannot reproduce.
 
 ## Method
 
