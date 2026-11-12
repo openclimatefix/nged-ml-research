@@ -204,11 +204,11 @@ Rows before 2023-08-15 are untouched.
 **Add-back.** For each origin, p_j (j = 0 to 3) is the weighted mean of the smoothed marginal
 P(k = j) over states at least 24 hours older than the native origin, in the cell (local half-hour,
 weekend flag), within 84 days, with weight 0.5^(age / 28 days), smoothed over the neighbouring
-half-hours. The clean forecast is evaluated at 2,000 levels from the network's own mixture density
-(seed by seed), so the tails beyond q01 and q99 are kept; if the mixture parameters cannot be
-exported, the 11 quantiles are extrapolated linearly to levels 0.001 and 0.999. Each level c maps
-to c for j = 0 and to sqrt((c - j u)^2 + q^2) for j of 1 or more, with weight p_j, and the 11
-output quantiles are the weighted quantiles of that set. The add-back assumes the engine state is
+half-hours. The network does not export its mixture parameters, so the add-back extrapolates the 11 output
+quantiles linearly to the levels 0.001 and 0.999 and treats the quantile function as piecewise
+linear between them. Each level c maps to c for j = 0 and to sqrt((c - j u)^2 + q^2) for j of 1 or
+more, with weight p_j, and the 11 output quantiles are the weighted quantiles of that set. The
+signed variant of arm A1n maps c to max(c - j u, 0). The add-back assumes the engine state is
 independent of the demand forecast error within a cell, and the write-up reports the correlation
 on training rows.
 
@@ -329,6 +329,26 @@ These choices are fixed before any fit, and the code review checks each one.
   at the host with the true engine's climatology added back.
 - **Sunny middays.** The slice is the protocol's `sunny_unit_shape` column in the months 2026-03 to
   2026-06.
+
+**The cleaned series is a hedge wherever the engine's state is uncertain.** Where the most probable
+unit count is 1 or more, the cleaned value is the posterior mean of the demand level over all unit
+counts, so it includes some probability that no unit runs. Where that probability is not small, the
+cleaned value sits between the engine-free and the engine-on level.
+
+**Slices and bootstrap blocks use different months.** The engine-month and fade-month slices, and
+the sunny-midday slice, use the month of the valid time. C2, C3, and the bootstrap blocks use the
+month of the forecast origin.
+
+## Items of the plan not implemented before the first fit
+
+- The sun check is defined (`sun_check` in `e00695_checks.py`) but nothing calls it yet.
+- The false-alarm check at the 7 other MVA-only Primaries, twCRPS, the correlation of engine state
+  with forecast error on training rows, and the `ClimatologyForecaster` row on the cleaned series
+  with the add-back are not written.
+- The network-level identity run (the A1 pipeline with cleaning disabled, on one fold and seed) is
+  not written. Only the synthetic identity check exists.
+- No report or figure script exists yet.
+- The tracker's states for the 40 half-hours before a refit have less look-ahead than later ones.
 
 ## Risks
 

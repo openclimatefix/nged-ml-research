@@ -98,7 +98,9 @@ def mixture_quantiles(
         for j in live:
             o = float(outputs[j])
             if signed:
-                g += w[j] * cdf(grid + o)
+                g += w[j] * np.where(
+                    grid >= 0.0, cdf(grid + o), 0.0
+                )  # max(c - o, 0) is never negative
             elif o == 0.0:
                 g += w[j] * cdf(grid)
             else:

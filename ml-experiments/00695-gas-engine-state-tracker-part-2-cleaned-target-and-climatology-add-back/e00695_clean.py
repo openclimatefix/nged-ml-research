@@ -23,7 +23,7 @@ import json
 import pickle
 from dataclasses import dataclass
 from multiprocessing import get_context
-from typing import Final
+from typing import Final, Literal
 
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
@@ -45,6 +45,7 @@ from e00695_common import (
 )
 from e00695_engine import drive_series, inject_engine
 from e00695_tracker import (
+    LAG_HALF_HOURS,
     EraFit,
     States,
     cleaned_series,
@@ -53,6 +54,9 @@ from e00695_tracker import (
     spread_levels,
     track_segment,
 )
+
+ModeType = Literal["folded", "signed"]
+"""How a half-hour with a unit running is cleaned: through the fold, or by adding the output back."""
 
 ARMS: Final[tuple[str, ...]] = ("A1", "A1n", "AH", "W0", "W1")
 
@@ -127,7 +131,9 @@ def era1_states(*, setup: SeriesSetup, hindsight: bool) -> tuple[States, EraFit]
     first, second, _ = era_bounds(y=setup.y)
     segment = setup.y[first:second]
     fit = fit_era(y=segment, lvl=spread_levels(y=segment))
-    states = track_segment(y=segment, fit=fit, refit=None, lag=None if hindsight else 40)
+    states = track_segment(
+        y=segment, fit=fit, refit=None, lag=None if hindsight else LAG_HALF_HOURS
+    )
     cache.parent.mkdir(parents=True, exist_ok=True)
     tmp = cache.with_suffix(".tmp")
     tmp.write_bytes(pickle.dumps((states, fit)))
@@ -142,8 +148,8 @@ def era2_fit(*, y: np.ndarray, fit_stop: int) -> EraFit:
 
 
 def fold_states(
-    *, setup: SeriesSetup, month: str | None, hindsight: bool, mode: str
-) -> tuple[np.ndarray, States, EraFit, dict]:
+    *, setup: SeriesSetup, month: str | None, hindsight: bool, mode: ModeType
+) -> tuple[np.ndarray, States, EraFit, dict[str, int | float | str]]:
     """Return the states of every half-hour of D8 or the host for one fold, and the era 2 fit.
 
     Args:

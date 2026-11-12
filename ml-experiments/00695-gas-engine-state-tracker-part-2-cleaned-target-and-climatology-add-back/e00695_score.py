@@ -106,6 +106,11 @@ def mean_of(values: pl.Series) -> float:
     return float(values.to_numpy().mean())
 
 
+def active_systems() -> tuple[System, ...]:
+    """Return the systems whose fits exist; arm A1n runs only if the sign check triggered it."""
+    return tuple(s for s in SYSTEMS if s.fits_arm != "A1n" or fits_dir(arm="A1n").exists())
+
+
 def fits_dir(*, arm: str) -> Path:
     """Return the folder that holds an arm's prediction fits."""
     return DATA_DIR / "runs" / arm / "arms" / "k1_5w_sp1" / "work" / "fits" / "P5"
@@ -274,7 +279,7 @@ def scored_systems(*, workers: int) -> dict[str, tuple[pl.DataFrame, pl.DataFram
 
     n_grid = len(clean.load_setup(arm="W0").y)
     host = host_series_id()
-    tasks = [(s.name, D8_SERIES if s.series == "d8" else host, n_grid) for s in SYSTEMS]
+    tasks = [(s.name, D8_SERIES if s.series == "d8" else host, n_grid) for s in active_systems()]
     with get_context("spawn").Pool(min(workers, len(tasks))) as pool:
         results = pool.map(_score_system, tasks, chunksize=1)
     return {name: (forecast, losses) for name, forecast, losses in results}
@@ -466,34 +471,35 @@ def other_primaries(*, resamples: int) -> list[dict]:
 
 
 def g0_check(*, a0_losses: pl.DataFrame) -> dict:
-    """Compare the refitted A0's seed-mean D8 CRPS with the stored step 9a on shared rows.
+    """Compare the refitted A0's D8 CRPS with the stored step 9a, scored the same way on both sides.
 
-    The row keys of the stored file are asserted equal to A0's before the comparison.
+    The stored file is already in MVA, carries the 12:00 UTC origin, and holds one set of rows per
+    seed, so it needs no origin shift and no capacity multiply. Each side is scored per seed and
+    averaged over seeds by row. The row keys are asserted equal before the comparison.
     """
-    stored = (
-        pl.read_parquet(STEP9A_PATH)
-        .filter(pl.col("time_series_id") == D8_SERIES)
-        .with_columns(power_fcst_init_time=pl.col("power_fcst_init_time") + NATIVE_TO_CONTRACT)
+    stored = scored_window(
+        frame=pl.read_parquet(STEP9A_PATH)
+        .filter(pl.col("time_series_id") == D8_SERIES, pl.col("seed").is_in(list(SEEDS)))
+        .with_columns(
+            time_series_id=pl.col("time_series_id").cast(pl.Int64),
+            seed=pl.col("seed").cast(pl.Int64),
+        )
     )
-    stored = scored_window(frame=stored)
-    keys = a0_losses.select(*KEYS).unique()
-    stored_keys = stored.select(*KEYS).unique()
-    shared = keys.join(stored_keys, on=list(KEYS), how="inner")
-    assert shared.height == keys.height, (
-        "A0's row keys differ from the stored step 9a's",
-        keys.height,
-        shared.height,
+    return g0_compare(a0_losses=a0_losses, stored_forecast=stored)
+
+
+def g0_compare(*, a0_losses: pl.DataFrame, stored_forecast: pl.DataFrame) -> dict:
+    """Return the G0 figures for a refit's per-seed losses against a stored per-seed forecast (MVA)."""
+    stored_losses = row_scores(forecast=stored_forecast, truth=d8_truth(), capacity=D8_CAPACITY_MVA)
+    keys = a0_losses.select(*KEYS, "seed")
+    stored_keys = stored_losses.select(*KEYS, "seed")
+    assert keys.join(stored_keys, on=[*KEYS, "seed"], how="anti").is_empty(), (
+        "A0 holds a row the stored step 9a lacks"
     )
-    truth = d8_truth()
-    mean = stored.group_by(*KEYS).agg([pl.col(q).mean() for q in QUANTILE_COLUMNS])
-    cap = D8_CAPACITY_MVA
-    fractions = mean.with_columns(*[pl.col(q) * cap for q in QUANTILE_COLUMNS]).with_columns(
-        seed=pl.lit(0, dtype=pl.Int64)
-    )
-    stored_score = row_scores(forecast=fractions, truth=truth, capacity=cap)
-    refit = a0_losses.group_by(*KEYS).agg(crps=pl.col("crps").mean(), mae=pl.col("mae").mean())
-    stored_by_key = stored_score.select(*KEYS, stored_crps=pl.col("crps"))
-    joined = refit.join(stored_by_key, on=list(KEYS), how="inner")
+    refit = a0_losses.group_by(*KEYS).agg(crps=pl.col("crps").mean())
+    stored_mean = stored_losses.group_by(*KEYS).agg(stored_crps=pl.col("crps").mean())
+    joined = refit.join(stored_mean, on=list(KEYS), how="inner")
+    assert joined.height == refit.height, "the stored step 9a lacks some of A0's rows"
     gap = mean_of(joined["crps"]) - mean_of(joined["stored_crps"])
     return {
         "rows": joined.height,
@@ -501,7 +507,7 @@ def g0_check(*, a0_losses: pl.DataFrame) -> dict:
         "stored_step9a_row_crps": mean_of(joined["stored_crps"]),
         "difference": gap,
         "passes": abs(gap) <= G0_TOLERANCE,
-        "note": "the stored file's seed-mean quantiles are scored as one forecast; the refit's row scores are averaged over seeds",
+        "note": "both sides are scored per seed and averaged over seeds by row",
     }
 
 
@@ -593,22 +599,46 @@ def host_slices(*, losses: dict[str, pl.DataFrame], names: list[str], n_grid: in
 
 
 def assert_origin_time_weather(*, names: list[str]) -> dict:
-    """Assert that every scored row's forecast origin is the same in every system, and report it.
+    """Assert that every arm's inference read only origin-time weather, and that its rows equal A0's.
 
-    The network reads the 00Z ensemble run of the origin day, available at 09:00 UTC, and the
-    fits carry no weather column, so the assertion is on what they carry: the native origin of each
-    row is 09:00 UTC and equals A0's. The stored fits come from experiment 677's step-5 chain,
-    whose inference reads only the run of the origin day.
+    Experiment 677's fit code asserts `nwp_init_time <= power_fcst_init_time` for every row of every
+    test origin and counts the origins in `checks_fit.json`. This function requires that count to
+    be positive for each arm. If an arm's fit files carry `nwp_init_time`, it also asserts the
+    column is at or before the native origin on every row and equal to A0's. The keys of every arm
+    must equal A0's, and the native origin must be 09:00 UTC.
     """
+    arms = sorted({s.fits_arm for s in SYSTEMS if s.name in names} | {"A0"})
+    checked: dict[str, int] = {}
+    for arm in arms:
+        record = json.loads((fits_dir(arm=arm).parents[2] / "checks_fit.json").read_text())
+        checked[arm] = int(record["origins_weather_checked"])
+        assert checked[arm] > 0, f"arm {arm} checked no origin's weather"
+    nwp_columns = {}
+    for arm in arms:
+        frames = [
+            pl.read_parquet(fits_dir(arm=arm) / f"{m}_d0_s{seed}.parquet")
+            for m in SCORED_MONTHS
+            for seed in SEEDS
+        ]
+        if "nwp_init_time" in frames[0].columns:
+            frame = pl.concat(frames)
+            assert (frame["nwp_init_time"] <= frame["power_fcst_init_time"]).all(), arm
+            nwp_columns[arm] = frame.select(*KEYS, "nwp_init_time").unique().sort(*KEYS)
+    for arm, frame in nwp_columns.items():
+        assert frame.equals(nwp_columns["A0"]), f"arm {arm}'s nwp_init_time differs from A0's"
     base = read_fits(arm="A0").select(*KEYS).unique().sort(*KEYS)
-    for arm in {s.fits_arm for s in SYSTEMS if s.name in names}:
+    for arm in arms:
         other = read_fits(arm=arm).select(*KEYS).unique().sort(*KEYS)
         assert base.height == other.height and base.equals(other), (
             f"arm {arm}'s rows differ from A0's"
         )
     nwp = (base["power_fcst_init_time"] - NATIVE_TO_CONTRACT).dt.hour().unique().to_list()
     assert nwp == [9], nwp
-    return {"native_origin_hours": nwp, "rows_per_arm": base.height}
+    return {
+        "origins_weather_checked": checked,
+        "nwp_init_time_in_fits": sorted(nwp_columns),
+        "rows_per_arm": base.height,
+    }
 
 
 def climatology_reference() -> pl.DataFrame:
@@ -655,7 +685,7 @@ def main() -> None:
                 kind="forecast",  # ty: ignore[invalid-argument-type]
                 row_set_id=ROW_SET_ID,
             )
-    d8_names = ["A0", "A1", "AH", "A1n", "A1+state", "AH+state"]
+    d8_names = [n for n in ("A0", "A1", "AH", "A1n", "A1+state", "AH+state") if n in scored]
     host_names = ["W0", "W1", "WT", "WT+truth"]
     d8 = family_losses(losses=losses, names=d8_names)
     host = family_losses(losses=losses, names=host_names)
@@ -719,6 +749,7 @@ def main() -> None:
             resamples=2000,
         )
         for t, r in (("AH", "A1"), ("A1n", "A1"), ("A1+state", "A0"), ("AH+state", "A0"))
+        if t in scored
     } | {
         "W1 minus WT": contrast(
             frame=host,

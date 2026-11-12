@@ -18,6 +18,12 @@ mkdir -p $R/runs/$ARM/logs $CHAIN677 $STATS677/stats
 # the B1 columns are weather statistics, the same for every arm: start from experiment 677's file
 [ -f $STATS677/stats/B1/$M.npz ] || cp -r $R677/chains/3b/$M/work/stats/. $STATS677/stats/
 CMDS=${*:-pretrain step2 fit pfit}
+# no network is fitted before gate G1 has passed (set E00695_SKIP_G1=1 only for a deliberate exception)
+case " $CMDS " in *" pretrain "*|*" step2 "*|*" fit "*|*" pfit "*)
+  if [ -z "$E00695_SKIP_G1" ] && ! python3 -c "import json,sys; sys.exit(0 if json.load(open('$R/checks.json')).get('g1_passed') is True else 1)" 2>/dev/null; then
+    echo "gate G1 has not passed: run e00695_checks.py --g1 --write first"; exit 1
+  fi ;;
+esac
 for c in $CMDS; do
   case $c in
     clean) [ "$ARM" = A0 ] || ( cd $D/../.. && source ml-experiments/00524*/env.sh && PYTHONPATH="src:$PYTHONPATH" .venv/bin/python $D/e00695_clean.py $ARM --months $M --workers 1 ) ;;

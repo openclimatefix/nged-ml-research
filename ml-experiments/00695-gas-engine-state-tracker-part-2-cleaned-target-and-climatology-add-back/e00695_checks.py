@@ -14,20 +14,21 @@ key `leakage_passed` when every leakage test passed, which `e00695_score.py` rea
 import argparse
 import json
 from dataclasses import replace
+from typing import Final
 
 import e00695_addback as addback
 import e00695_tracker as tracker
 import numpy as np
 import polars as pl
-from e00695_common import DATA_DIR, READING_DELAY, fold_refit, grid_index
+from e00695_common import DATA_DIR, FOLD_MONTHS, READING_DELAY, fold_refit, grid_index
 from e00695_score import VerdictInputs, verdict
 from scipy.stats import norm
 
-CHECKS_PATH = DATA_DIR / "checks.json"
-G1_MIN_F1 = 0.60
-G1_MIN_PRECISION = 0.50
-G1_MAX_FALSE_SHARE = 0.03
-SUN_GAP_PERCENTAGE_POINTS = 10.0
+CHECKS_PATH: Final = DATA_DIR / "checks.json"
+G1_MIN_F1: Final = 0.60
+G1_MIN_PRECISION: Final = 0.50
+G1_MAX_FALSE_SHARE: Final = 0.03
+SUN_GAP_PERCENTAGE_POINTS: Final = 10.0
 
 
 def synthetic_series(*, n: int = 2400, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
@@ -327,16 +328,22 @@ def check_real_stack_cut(*, month: str) -> float:
 
 
 def main() -> None:
-    """Run the synthetic checks, and the real-series cut test if asked, and write `checks.json`."""
+    """Run the synthetic checks, and the real-series cut test if asked, and write `checks.json`.
+
+    `leakage_passed` is true only when the synthetic leakage tests and the real-series cut test
+    for every refit month all gave zero. The real-series results accumulate in `checks.json`
+    across runs, so `--real` can be given one month at a time.
+    """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--real", metavar="MONTH", default=None)
-    parser.add_argument("--write", action="store_true", help="write checks.json (leakage_passed)")
+    parser.add_argument("--real", nargs="+", metavar="MONTH", default=[], help="months, or `all`")
+    parser.add_argument("--write", action="store_true", help="write checks.json")
     parser.add_argument(
         "--g1",
         action="store_true",
         help="also run gate G1 on the host's states (needs stacks and states)",
     )
     args = parser.parse_args()
+    months = list(FOLD_MONTHS) if args.real == ["all"] else args.real
     results: dict = {
         "cut_at_train_end": check_cut_at_train_end(),
         "origin_cut": check_origin_cut(),
@@ -347,25 +354,24 @@ def main() -> None:
     }
     check_verdict_table()
     results["verdict_table"] = "ok"
-    if args.real:
-        results["real_stack_cut"] = check_real_stack_cut(month=args.real)
-    print(json.dumps(results, indent=1))
-    leak = [
-        results["cut_at_train_end"],
-        results["origin_cut"],
-        results["climatology_causal"],
-        results.get("real_stack_cut", 0.0),
-    ]
-    results["leakage_passed"] = bool(max(leak) == 0.0)
+    previous = json.loads(CHECKS_PATH.read_text()) if CHECKS_PATH.exists() else {}
+    real: dict[str, float] = dict(previous.get("real_stack_cut", {}))
+    for month in months:
+        real[month] = check_real_stack_cut(month=month)
+    results["real_stack_cut"] = real
     assert results["identity"]["cleaned_minus_reading"] == 0.0
     assert results["identity"]["add_back_identity"] < 1e-6
-    assert results["addback_against_simulation_mva"] < 0.15
+    assert results["addback_against_simulation_mva"] < 0.1
     assert results["tracker_against_694"] < 1e-9
+    synthetic = [results["cut_at_train_end"], results["origin_cut"], results["climatology_causal"]]
+    results["leakage_passed"] = bool(
+        max(synthetic) == 0.0 and set(real) >= set(FOLD_MONTHS) and max(real.values()) == 0.0
+    )
     if args.g1:
         results["g1"] = run_g1()
         results["g1_passed"] = results["g1"]["passes"]
+    print(json.dumps(results, indent=1))
     if args.write:
-        previous = json.loads(CHECKS_PATH.read_text()) if CHECKS_PATH.exists() else {}
         CHECKS_PATH.write_text(json.dumps(previous | results, indent=1))
 
 

@@ -21,7 +21,7 @@ Parameters (K, u, transition matrix) are fitted without truth by experiment 694'
 
 import warnings
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Literal
 
 import numpy as np
 from e00694_common import Q_FLOOR, SPREAD_LEVELS, causal_spread  # ty: ignore[unresolved-import]
@@ -289,7 +289,7 @@ def track_segment(
 
 
 def cleaned_series(
-    *, y: np.ndarray, states: States, fit: EraFit, mode: str = "folded"
+    *, y: np.ndarray, states: States, fit: EraFit, mode: Literal["folded", "signed"] = "folded"
 ) -> np.ndarray:
     """Return the cleaned reading (MVA) of a segment from its states.
 
