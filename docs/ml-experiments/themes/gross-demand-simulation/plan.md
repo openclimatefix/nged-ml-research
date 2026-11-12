@@ -1,16 +1,14 @@
 # Gross-demand simulation: research plan
 
-**One experiment in this theme is planned, and the options below are queued for the maintainer to
+**No experiment in this theme is planned, and the options below are queued for the maintainer to
 choose.** The project is not starting further experiments unprompted. The reasoning is on
 [the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how
 to propose the simulator to NGED, with phases as options, is on
-[Options for proposing the simulator to NGED](proposal-to-nged-options.md).
-
-## Priority
-
-| Id | Question | Priority | Waits for | State |
-|---|---|---|---|---|
-| [695](../../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md) | Does a demand network trained on D8's reading with the gas engine removed, plus a climatology of the engine added back at forecast time, forecast D8's metered apparent power better than the same network trained on the raw reading? | Asked for by the maintainer | The reviewed code and the 3 GPU-hour tracker gate | Planned |
+[Options for proposing the simulator to NGED](proposal-to-nged-options.md). The latest finished
+experiment, [695](../../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md),
+found that cleaning D8's engine out of the training target and adding a calendar average back did
+not improve the forecast; its next step is to forecast the engine's state from origin-time
+information.
 
 ## Options
 

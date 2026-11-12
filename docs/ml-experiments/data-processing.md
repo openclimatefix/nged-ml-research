@@ -252,6 +252,14 @@ removed from its negatives. In the 20 load shifts that start in other months bot
 (post hoc, [experiment 302](00302-lsc-learned-score-without-nged-labels/result.md)). Applies to
 experiments; provisional.
 
+**Do not remove D8's gas-engine output from the training target and add a calendar average of the
+engine back at forecast time (medium confidence, provisional).** The cleaned arm scored 0.117
+points of capacity worse than the raw arm (98.3% interval -0.070 to +0.412), probably by about 0.1
+points, mostly in the months the engine fades; the calendar average cannot say which days the engine
+runs. Applies to experiments and production. Evidence:
+[experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md),
+D8, origins 2025-11 to 2026-06.
+
 ## Fixed windows
 
 **Use the fixed lockdown window, 2020-03-23 to 2021-07-19, and do not detect the window from the

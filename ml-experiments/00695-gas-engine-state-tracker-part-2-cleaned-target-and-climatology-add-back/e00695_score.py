@@ -18,6 +18,7 @@ climatology), and the bound WT+truth. It prints no Gas A series, only aggregate 
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from datetime import timedelta
 from multiprocessing import get_context
@@ -70,6 +71,8 @@ LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
 KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
 SCORES_DIR: Final[Path] = DATA_DIR / "scores"
 CHECKS_PATH: Final[Path] = DATA_DIR / "checks.json"
+EXPECTED_ORIGINS: Final[int] = 242
+"""The origins of the 8 test months (30, 31, 31, 28, 31, 30, 31, and 30), each checked in its fold's log."""
 ROW_SET_ID: Final[str] = "backtest_year_2025_11_to_2026_06_daily_12utc"
 
 
@@ -423,7 +426,11 @@ def sister_differences() -> dict[str, float]:
 
 
 def other_primaries(*, resamples: int) -> list[dict]:
-    """Return A1 minus A0 at every Primary, with the plan's "moves" rule applied."""
+    """Return A1 minus A0 at every Primary except D8, with the plan's "moves" rule applied.
+
+    The other 15 Primaries are scored on the network's own output, which is the right object for
+    them. D8 is left out because its network output has no engine add-back; C1 covers D8.
+    """
     a0, a1 = read_fits(arm="A0"), read_fits(arm="A1")
     caps = capacity_of()
     truth = pl.read_parquet(SHARED_DIR / "ground_truth_primaries.parquet").with_columns(
@@ -453,6 +460,10 @@ def other_primaries(*, resamples: int) -> list[dict]:
             resamples=resamples,
         )
         label = label_of.get(series_id, str(series_id))
+        if label == "D8":
+            # A1's fits for D8 are the engine-free network output with no add-back: not a system, so
+            # scoring them against the metered reading says nothing about arm A1 (C1 scores A1 with it)
+            continue
         sister = sisters.get(label, float("nan"))
         excludes = result["upper"] < 0.0 or result["lower"] > 0.0
         moves = bool(excludes and abs(result["estimate"]) > sister)
@@ -602,17 +613,23 @@ def assert_origin_time_weather(*, names: list[str]) -> dict:
     """Assert that every arm's inference read only origin-time weather, and that its rows equal A0's.
 
     Experiment 677's fit code asserts `nwp_init_time <= power_fcst_init_time` for every row of every
-    test origin and counts the origins in `checks_fit.json`. This function requires that count to
-    be positive for each arm. If an arm's fit files carry `nwp_init_time`, it also asserts the
+    test origin and prints the count of origins in each fold's `<month>_pfit.log` ("CHECKS PASSED").
+    This function reads all 8 logs of each arm, requires each count to be positive, and requires
+    the counts to sum to 242. If an arm's fit files carry `nwp_init_time`, it also asserts the
     column is at or before the native origin on every row and equal to A0's. The keys of every arm
     must equal A0's, and the native origin must be 09:00 UTC.
     """
     arms = sorted({s.fits_arm for s in SYSTEMS if s.name in names} | {"A0"})
-    checked: dict[str, int] = {}
+    checked: dict[str, dict[str, int]] = {}
     for arm in arms:
-        record = json.loads((fits_dir(arm=arm).parents[2] / "checks_fit.json").read_text())
-        checked[arm] = int(record["origins_weather_checked"])
-        assert checked[arm] > 0, f"arm {arm} checked no origin's weather"
+        checked[arm] = {}
+        for month in SCORED_MONTHS:
+            log = (fits_dir(arm=arm).parents[4] / "logs" / f"{month}_pfit.log").read_text()
+            found = re.findall(r"CHECKS PASSED .*'origins_weather_checked': (\d+)", log)
+            assert len(found) == 1, f"arm {arm}, fold {month}: no single CHECKS PASSED line"
+            checked[arm][month] = int(found[0])
+        assert all(v > 0 for v in checked[arm].values()), f"arm {arm} checked no origin in a fold"
+        assert sum(checked[arm].values()) == EXPECTED_ORIGINS, (arm, checked[arm])
     nwp_columns = {}
     for arm in arms:
         frames = [
@@ -635,14 +652,15 @@ def assert_origin_time_weather(*, names: list[str]) -> dict:
     nwp = (base["power_fcst_init_time"] - NATIVE_TO_CONTRACT).dt.hour().unique().to_list()
     assert nwp == [9], nwp
     return {
-        "origins_weather_checked": checked,
+        "origins_weather_checked_per_fold": checked,
+        "origins_weather_checked_total": {arm: sum(v.values()) for arm, v in checked.items()},
         "nwp_init_time_in_fits": sorted(nwp_columns),
         "rows_per_arm": base.height,
     }
 
 
 def climatology_reference() -> pl.DataFrame:
-    """Return the stored climatology's seed-free scores at D8 on the decision window, if experiment 677's rows hold one."""
+    """Return the stored climatology's seed-free scores at D8 on the decision window."""
     frame = scored_window(
         frame=pl.read_parquet(
             E677_PROTOCOL_ROWS,
@@ -664,6 +682,16 @@ def climatology_reference() -> pl.DataFrame:
     )
 
 
+BOUNDS: Final[frozenset[str]] = frozenset({"AH", "A1+state", "AH+state", "WT+truth"})
+"""Systems that read the scored reading, a hindsight fit, or the true injected output: not forecasts."""
+BOUND_LABEL: Final[str] = " [BOUND, NOT A FORECAST]"
+
+
+def _tag(*, name: str) -> str:
+    """Return a system's name, with the bound label added for a system that is not a forecast."""
+    return name + BOUND_LABEL if name in BOUNDS else name
+
+
 def _interval_line(*, label: str, result: dict) -> str:
     """Return one contrast as a line: estimate, month-bootstrap interval, t interval, seed estimates."""
     seeds = ", ".join(f"{x:+.3f}" for x in result["seed_estimates"])
@@ -681,9 +709,12 @@ def print_report(*, report: dict, d8_slices: pl.DataFrame) -> None:
     for label in ("c1", "c2", "c3", "c4", "c5"):
         print(_interval_line(label=label.upper(), result=report[label]))
     print(_interval_line(label="MAE", result=report["mae_a1_minus_a0"]))
-    print("EXTRA CONTRASTS AND BOUNDS (descriptive, 95%)")
+    print(
+        "EXTRA CONTRASTS AND BOUNDS (descriptive, 95%; a contrast that involves a bound is a bound)"
+    )
     for name, result in report["extras"].items():
-        print(_interval_line(label=name, result=result))
+        involved = {result["treatment"], result["reference"]} & BOUNDS
+        print(_interval_line(label=name, result=result) + (BOUND_LABEL if involved else ""))
     print(
         f"threshold {report['threshold_points']:.3f} points ({SMALLEST_GAIN_SHARE:.1%} of refitted "
         f"A0 CRPS {report['a0_crps']:.3f})"
@@ -691,11 +722,12 @@ def print_report(*, report: dict, d8_slices: pl.DataFrame) -> None:
     print("MEAN CRPS and MAE PER SYSTEM (rows per seed)")
     for name, crps in report["mean_crps"].items():
         print(
-            f"{name}: CRPS {crps:.3f}, MAE {report['mean_mae'][name]:.3f}, "
+            f"{_tag(name=name)}: CRPS {crps:.3f}, MAE {report['mean_mae'][name]:.3f}, "
             f"rows {report['rows_per_seed'][name]}"
         )
     print(
-        "OTHER PRIMARIES (A1 minus A0, 95% month-block interval; moves needs |estimate| > sister)"
+        "OTHER PRIMARIES, D8 excluded (A1 minus A0, 95% month-block interval; moves needs "
+        "|estimate| > sister)"
     )
     for row in report["other_primaries"]:
         print(
@@ -704,7 +736,12 @@ def print_report(*, report: dict, d8_slices: pl.DataFrame) -> None:
         )
     print("D8 SLICES")
     with pl.Config(tbl_rows=-1, tbl_cols=-1, fmt_str_lengths=60, tbl_width_chars=250):
-        print(d8_slices.with_columns(pl.col(pl.Float64).round(3)))
+        print(
+            d8_slices.with_columns(
+                pl.col("system").map_elements(lambda n: _tag(name=n), return_dtype=pl.String),
+                pl.col(pl.Float64).round(3),
+            )
+        )
     print(f"G0: {json.dumps(report['g0'])}")
     print(f"ORIGIN-TIME WEATHER ASSERTION: {json.dumps(report['origin_time_assertion'])}")
     print(f"VERDICT INPUTS: {json.dumps(report['verdict_inputs'])}")
@@ -855,7 +892,7 @@ def main() -> None:
         "a0_crps": a0_crps,
         "g0": g0,
         "other_primaries": primaries,
-        "origin_time_assertion": assert_origin_time_weather(names=d8_names),
+        "origin_time_assertion": assert_origin_time_weather(names=[*d8_names, *host_names]),
         "verdict_inputs": inputs.__dict__,
         "branch": branch,
         "verdict": name,
