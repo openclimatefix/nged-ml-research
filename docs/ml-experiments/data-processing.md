@@ -252,14 +252,16 @@ removed from its negatives. In the 20 load shifts that start in other months bot
 (post hoc, [experiment 302](00302-lsc-learned-score-without-nged-labels/result.md)). Applies to
 experiments; provisional.
 
-**At D8 only, do not remove the gas engine's output from the training target and add a calendar
-average of the engine back at forecast time (low confidence, provisional).** The cleaned arm was not
-distinguishable from the raw arm: its CRPS difference was +0.117 points of capacity (98.3% interval
--0.070 to +0.412), and a post hoc seed-averaged interval was +0.036 to +0.245, on the rows where the
-engine runs. The calendar average cannot say which days the engine runs. Applies to experiments.
-Evidence:
+**At D8 only, no gain was found from removing the gas engine's output from the training target and
+adding a calendar average of the engine back at forecast time (low confidence, provisional).** In
+experiment 695, the CRPS (continuous ranked probability score, smaller is better) of the cleaned arm
+minus the raw arm's was +0.117 points of capacity, with a 98.3% interval from -0.070 to +0.412 that
+includes zero. A post hoc interval that averages the seeds first is +0.036 to +0.245. That
+reading is over all rows, and is suggestive because it bootstraps only 8 months. The pair is not
+worth porting for D8. A point of capacity is one percentage point of D8's effective capacity of
+10.379 MVA. Applies to experiments on D8's forecast. Evidence:
 [experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md),
-D8 only, origins 2025-11 to 2026-06.
+D8 only, 8 monthly refits from 2025-11 to 2026-06.
 
 ## Fixed windows
 

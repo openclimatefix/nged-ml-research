@@ -41,13 +41,14 @@ heuristic](https://openclimatefix.github.io/nged-substation-forecast/background/
   20.859.** The stack scored 13.559 ([experiment
   87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)) (exp 87; 4 supply points,
   one year; provisional).
-- **Removing D8's gas engine from the training target and adding a calendar average of the engine back
-  did not improve D8's forecast.** The cleaned arm's CRPS (continuous ranked probability score) was
-  0.117 points of capacity worse than the raw arm's, with a 98.3% interval from -0.070 to +0.412
+- **No gain was found from removing D8's gas engine from the training target and adding a calendar
+  average of the engine back.** The CRPS (continuous ranked probability score, smaller is better) of
+  the cleaned arm minus the raw arm A0's was +0.117 points of capacity (percentage points of D8's
+  capacity), with a 98.3% interval from -0.070 to +0.412 that includes zero
   ([experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md))
   (exp 695; D8, 8 monthly refits, 3 seeds; provisional).
-- **An upper limit that reads D8's engine state at the valid time lowers CRPS by 1.4 to 2.4 points.**
-  No forecast has that state, so the open question is predicting the engine's state at the origin
+- **An upper limit that reads D8's engine state at the valid time lowers CRPS by 1.4 to 2.4 points
+  against the raw arm A0.** No forecast has that state, so the limit shows where a gain could lie
   ([experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md))
   (exp 695; D8, 8 monthly refits, a bound and not a forecast; provisional).
 

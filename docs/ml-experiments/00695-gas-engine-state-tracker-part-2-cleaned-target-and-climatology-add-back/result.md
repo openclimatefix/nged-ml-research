@@ -54,7 +54,8 @@ decision_rule: >-
   gain does not justify that. The threshold is about 0.05 points on the headline of the MVA-only
   eight, 2.5 times the 0.02 that demand-v2 asks of a new fitted step. Three planned contrasts are
   read at 98.3% (Bonferroni for three) from a paired bootstrap over whole origin months (20,000
-  resamples, 170 draws per tail), with a paired t interval at 98.3% on the 8 monthly differences
+  resamples, planned as 170 draws per tail and 167 realised), with a paired t interval at 98.3% on
+  the 8 monthly differences
   beside each, because a month bootstrap under-covers at 8 months. C1: A1 minus A0, D8, all
   months. C4: W1 minus W0 at the host. C5: WT minus W0 at the host. C2 (C1 on 2025-11 to 2026-02)
   and C3 (C1 on 2026-03 to 2026-06) have 4 month blocks each, sit outside the family, and are
@@ -109,26 +110,30 @@ adopted_in: none
 take_home_message: >-
   Taking the gas engine out of D8's recorded demand before training, and adding the engine's average
   running pattern back when forecasting, did not improve the forecast. The cleaned arm was no better
-  than the raw arm, and a post hoc reading of the same data says it was about 0.1 points of capacity
-  worse, on the rows where the engine runs. At another substation with an engine injected, cleaning
-  gained about 0.1 points, within noise. Knowing whether the engine runs at the forecast's valid time
-  would lower the error by 1.4 to 2.4 points, but no forecast has that knowledge, so the next
-  experiments should forecast the engine's state from information available at the origin.
+  than the raw arm, and a post hoc reading of the same data suggests it was probably about 0.1
+  points of capacity worse over all rows. At another substation with an engine injected, cleaning
+  gained about 0.1 points, within noise. Knowing whether the engine runs at the forecast's valid
+  time
+  would lower the error by 1.4 to 2.4 points against the raw arm, but no forecast has that
+  knowledge. No gain was found, and cleaning plus a calendar add-back is not worth porting; one open
+  question is whether the engine's state can be forecast from information available at the origin.
 lessons: >-
-  A calendar average cannot say which days the engine runs, so adding it back turns each forecast
-  into a wider two-level mixture that raises the error on the rows where the engine runs. The paired
+  The wider forecast and the higher error on rows where the engine runs are consistent with the
+  add-back mixing two levels, but no arm separates the add-back from the cleaning, so the cause is
+  not isolated. The paired
   design and the identity control worked: the raw arm reproduced experiment 677's stored step 9a
   to 1.6e-6 points, and the neural network with cleaning disabled reproduced the raw arm to within
   1e-4 of capacity.
 advice:
   - >-
-      Do not clean D8's engine out of the training target and add a calendar average back: the
-      cleaned arm was not distinguishable from the raw arm (C1, interval -0.070 to +0.412), and a
-      post hoc seed-averaged interval puts it 0.036 to 0.245 points worse.
+      No gain was found from cleaning D8's engine out of the training target and adding a calendar
+      average back, so the pair is not worth porting (C1, interval -0.070 to +0.412; a post hoc
+      seed-averaged interval at 98.3% is +0.036 to +0.245).
   - >-
-      Spend the next experiment on forecasting the engine's on or off state from origin-time
-      information, because knowing the state at the valid time lowers the error by 1.4 to 2.4 points
-      as a bound that no forecast reaches (A1+state and AH+state).
+      One open question for a next experiment is forecasting the engine's on or off state from
+      origin-time information, because knowing the state at the valid time lowers the error by 1.4
+      to 2.4 points against the raw arm, as a bound that no forecast reaches (A1+state and
+      AH+state).
   - >-
       Read a bound that uses the valid-time engine state as an upper limit on performance, and
       never as an arm of a verdict, because it reads the scored reading (the bound rows of the
@@ -142,72 +147,104 @@ advice:
       and 8 months, because the library draws one seed per resample and its interval was 2.3 times
       wider (C1).
   - >-
-      Fit the no-fold cleaning only with a model of the export branch, because adding the unit
-      output to a reading that was already folded lifted the cleaned level on running rows by about
-      2.3 MVA (A1n minus A1, +0.334).
+      Treat the no-fold cleaning as mis-specified unless it models the export branch, because arm
+      A1n, which adds the unit output to a reading that was already folded, scored 0.334 CRPS points
+      worse than A1 (A1n minus A1).
 code: ml-experiments/00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/
 ---
 
 **This experiment asks whether a gas engine's output can be taken out of one substation's recorded
 demand before a neural network learns from it, and added back as an average when forecasting.** The
-substation, D8, is one of the 16 Primary substations in this research, and the output of a gas
-engine connected behind its meter is included in its recorded power. The engine switches on and off,
-so D8's recorded power jumps by up to about 50% of the substation's capacity. We took the engine out
-of the neural network's training data and recent-power inputs, using the on and off tracker of
-[experiment 694](../00694-gas-engine-state-tracker-part-1/result.md). We refitted the neural network
-every month, and added the engine back to each forecast as an average of the engine's running share
-for each half-hour of the day and for weekday or weekend, taken over the previous 12 weeks with
-recent weeks weighted more. Arm A1 is this method and arm A0 is the same neural network trained on
-the raw reading. We compared them over 8 monthly refits from 2025-11 to 2026-06, with 3 random seeds
-each, using the CRPS (continuous ranked probability score, in which smaller is better) of the
-forecast of D8's metered apparent power in MVA (megavolt-amperes). Scores are in points of capacity,
-which are percentage points of D8's effective capacity of 10.379 MVA.
+substation, D8, is one of the 16 Primary substations (the substations that supply the local
+distribution network) that this research forecasts. A gas engine, a set of generating units that run
+on and off, is connected behind D8's meter, so its output is included in D8's recorded power. An on
+and off tracker, from [experiment 694](../00694-gas-engine-state-tracker-part-1/result.md), infers
+from D8's half-hourly reading alone how many of the engine's units are running.
 
-**Cleaning and adding back did not improve the forecast.** The verdict is `not supported`, by branch
-8 of the pre-registered verdict table. The planned contrast C1 (A1 minus A0) is +0.117 points, with
-a 98.3% interval from -0.070 to +0.412 and a t interval from -0.037 to +0.268. A gain needs both
-intervals below zero and an estimate of at least 0.398 points (5.5% of A0's own score). The lower
-bound of -0.070 rules out any gain above about 0.07 points, so the predicted gain of 0.3 to 1.0
-points is ruled out. A post hoc reading, not pre-registered, averages the 3 seeds before resampling
-whole origin months. It gives +0.036 to +0.245 for C1, so A1 is probably about 0.1 points worse. The
-library interval is 2.3 times wider (0.48 against 0.21) mainly because it draws one seed per
+**We compared a neural network trained on the raw reading with one trained on the cleaned reading
+plus an add-back.** Arm A0 is the neural network trained on the raw reading. Arm A1 removes the
+tracked engine output from the training data and from the recent-power inputs, and adds the engine
+back to each forecast as an average: for each half-hour of the day, separately for weekdays and
+weekends, the share of past half-hours in which each number of units ran, over the previous 12 weeks
+with recent weeks weighted more. Each arm is refitted at the start of each of 8 months from 2025-11
+to 2026-06, with 3 random seeds (starting points for the training's random numbers) per refit. The
+score is the CRPS (continuous ranked probability score, in which smaller is better) of the forecast
+of D8's metered apparent power. Apparent power is in MVA (megavolt-amperes), and scores are in
+points of capacity, which are percentage points of D8's effective capacity of 10.379 MVA.
+
+**No gain was found, and cleaning plus a calendar add-back is not worth porting.** The verdict is
+`not supported`, branch 8 of the pre-registered verdict table. Branch 8 is the default that applies
+when no earlier branch does: no leakage test failed, the reproduction gate G0 (a refit of A0 must
+match experiment 677's stored result) and the tracker gate G1 (the tracker must find an injected
+engine) passed, the three seeds agree on the sign of C1, and C1 shows no gain. The planned contrast
+C1, A1 minus A0, is +0.117 points, with a 98.3% interval from -0.070 to +0.412 and a t interval from
+-0.037 to +0.268. A gain needs both intervals below zero and an estimate of at least 0.398 points
+(5.5% of A0's own score). The lower bound of -0.070 rules out any gain above about 0.07 points, so
+the predicted gain of 0.3 to 1.0 points is ruled out.
+
+**A post hoc reading, not pre-registered, suggests that A1 is probably about 0.1 points worse over
+all rows.** It averages the 3 seeds and then resamples whole origin months, which gives +0.036 to
++0.245 for C1 at 98.3%. A bootstrap over only 8 months under-covers, so the reading is suggestive.
+The library interval is 2.3 times wider (0.48 against 0.21) mainly because it draws one seed per
 resample, and the t interval stays the decision interval.
 
-**Next steps are options, not commitments.** A forecast of the engine's on or off state from
-information available at the forecast origin is the open question: an upper limit that reads the
-engine's state at the valid time lowers the error by 1.4 to 2.4 points. A private follow-on analysis
-of experiment 694 (`data/ml-experiments/briefs/e694_followon/predictability.md`) found that the
-state's persistence helps within about a day and that no input beyond a day beat a calendar
-climatology, except possibly a wind forecast out to a few days. Two options follow: part 3 of this
-series, which gives the neural network origin-time engine-state features, and a pre-registered test
-of a wind forecast as a predictor of the engine's state at days 2 to 5.
+**One open question is whether the engine's state can be forecast from information available at the
+forecast origin.** An upper limit that reads the engine's state at the valid time (the time being
+forecast) lowers the error by 1.4 to 2.4 points against the raw arm A0, but no forecast has that
+state. In a private analysis of one 43-day record of an engine's output and of the tracker's labels
+for D8, the state's persistence improved the Brier score of "running" within about a day, and no
+forecastable input beat a calendar climatology beyond a day, except possibly a wind forecast out to
+a few days. Two options follow, and neither is committed: part 3 of this series, which gives the
+neural network origin-time engine-state features (the tracker's state at the lag times and the
+engine's trailing running share for the forecast half-hour), and a pre-registered test of a wind
+forecast as a predictor of the engine's state at days 2 to 5.
 
 ## Predictions against outcomes
 
-**Three of the six pre-registered predictions fail, and two hold only in part.** "Bound" below means
-a system that reads the scored reading, a hindsight fit, or the true injected output, so no forecast
-can match it.
+**Three of the six pre-registered predictions fail, and two hold only in part.** "Bound" is defined
+under "Terms used in the tables below".
 
 | Prediction | Outcome |
 |---|---|
 | P1: A1 lowers CRPS by 0.3 to 1.0 points and the normalised MAE of the median by 0.5 to 1.5 | Fails: CRPS +0.117, MAE +0.120 |
 | P2: the gain is at least as large in the fade months (2026-03 to 2026-06) as in the engine months (2025-11 to 2026-02) | Fails: neither is a gain; C2 is +0.164 and C3 is +0.069 |
 | P3: AH (cleaning with hindsight) beats A1 by under 0.2 points | Fails by 0.003: AH minus A1 is -0.203 (interval -0.363 to -0.050), a bound |
-| P4: at the host, WT beats W0, and W1 recovers at least half of that gain | Holds in the estimates (-0.100, and W1 recovers 93%), but both intervals cross zero |
-| P5: the state at the valid time lowers CRPS by 2 points or more | Holds for AH+state (-2.354), fails for A1+state (-1.413); both are bounds |
+| P4: at the host, WT beats W0, and W1 recovers at least half of that gain | Holds in the estimates (WT minus W0 -0.100, W1 minus W0 -0.093, so W1 recovers 93%), but both intervals cross zero, so the ratio of the two estimates is not resolved |
+| P5: the state at the valid time lowers CRPS by 2 points or more | Holds for AH+state (AH+state minus A0 -2.354), fails for A1+state (A1+state minus A0 -1.413); both are bounds |
 | P6: no other Primary moves | Holds: all 15 intervals include zero |
 
 ## Results
 
+**Terms used in the tables below.**
+
+- **Row:** one half-hour of valid time in one forecast. All counts of rows are per seed.
+- **Bound:** a system that reads the scored reading, a hindsight fit, or the true injected output,
+  so that no forecast can match it.
+- **AH:** arm A1 with the tracker fitted and smoothed with hindsight, to 2026-06-30. The two eras of
+  the tracker are D8's reading before 2025-03-24 and from then on.
+- **A1n:** arm A1 with the no-fold cleaning (the engine's output is added to the reading without
+  allowing for the reading's fold, because apparent power is never negative) and a signed add-back
+  clamped at zero. The export branch is the part of the fold where the demand level is below the
+  engine's output, so the engine exports power.
+- **Host D4 and injected:** D4 is a Primary into which we added (injected) a real engine's recorded
+  output. W0 is the neural network trained on D4's raw injected reading, W1 is the A1 method on it,
+  and WT is the W0 network plus the add-back of the true injected engine's calendar average.
+- **+state arms:** A1 or AH with the tracked engine state at the valid time added back, and WT+truth
+  adds the true injected output at the valid time.
+- **Origins:** the contract origin is 12:00 UTC on the forecast day, and the native origin of the
+  neural network is 09:00 UTC, three hours earlier.
+- **Engine months and fade months:** 2025-11 to 2026-02 and 2026-03 to 2026-06, when the engine's
+  effect on D8's reading fades. Contrasts C2 and C3 split by the month of the forecast origin, and
+  the slices in the text split by the month of the valid time.
+- **Step 9a:** experiment 677's raw-reading neural network at monthly refits.
+
 **The cleaned arms do not beat the raw arm, and only the bounds score much lower.** Every row is
 scored against the metered apparent power at D8, or the injected reading at the host, for leads of
 24 to 240 hours from the 12:00 UTC forecast origin, origins 2025-11-01 to 2026-06-30, mean of 3
-seeds. "MAE" is the normalised mean absolute error of the median forecast. The host is D4, a Primary
-into which we injected (added) a real engine's recorded output. W0, W1, and WT are the host's raw,
-causally cleaned, and perfectly cleaned arms. The reference rows come from [experiment
+seeds. "MAE" is the normalised mean absolute error of the median forecast. The reference rows come
+from [experiment
 677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md) on its
-80,688 shared half-hours at D8, a different row set from the 102,310 scored here. Step 9a is
-experiment 677's raw-reading neural network at monthly refits.
+80,688 shared rows at D8, a different row set from the 102,310 rows scored here.
 
 | System | What it is | CRPS | MAE |
 |---|---|---|---|
@@ -251,39 +288,45 @@ the perfectly cleaned host arm are indistinguishable. A1n minus A1 is +0.334 (+0
 is a mis-specified variant, so its result says only that the fold is needed.
 
 **A1 is worse than A0 on rows where the engine is tracked as running, on cold winter nights, and
-over the fade months as a whole.** On the 35,302 rows per seed that the hindsight tracker flags as
-running, CRPS is 8.453 for A0 and 9.002 for A1. On the 67,008 rows flagged as not running, it is
-6.588 and 6.478. On cold winter nights it is 7.137 and 7.593, and in the fade months 6.439 and
-6.492. A1 scores better on sunny middays in the fade months (6.856 against 7.061). The median of A1
-sits 12.9 points above the reading on running rows, against 10.0 for A0, and the 90% band of A1 is
-62.4 points wide against 51.3 for A0, so A1 over-covers the low tail: the share of readings below
-the q05 forecast is 0.013 for A1 and 0.059 for A0.
+over the valid times of 2026-03 to 2026-06 as a whole.** On the 35,302 rows per seed that the
+hindsight tracker flags as running, CRPS is 8.453 for A0 and 9.002 for A1. On the 67,008 rows
+flagged as not running, it is 6.588 and 6.478. On cold winter nights it is 7.137 and 7.593, and for
+valid times in 2026-03 to 2026-06 6.439 and 6.492. The origin-month contrast C3, +0.069, splits by
+origin month and not by valid-time month, which explains the different size. A1 scores better on
+sunny middays of 2026-03 to 2026-06 (6.856 against 7.061). The median of A1 sits 12.9 points above
+the reading on running rows, against 10.0 for A0, and the 90% band of A1 is 62.4 points wide against
+51.3 for A0, so A1 over-covers the low tail: the share of readings below the q05 forecast is 0.013
+for A1 and 0.059 for A0.
 
 ![CRPS at D8 by whether the engine is tracked as running, for each system](figure_2_d8_crps_by_engine_state.svg)
 
-**A calendar average cannot say which days the engine runs, and the add-back turns that into a wider
-forecast.** In each engine month the add-back's running share was 0.37 to 0.38, against hindsight
+**A calendar average cannot say which days the engine runs, which is consistent with the add-back
+widening the forecast.** No arm separates the add-back from the cleaning, so the cause is not
+isolated. In each engine month the add-back's running share was 0.37 to 0.38, against hindsight
 shares of 0.36 to 0.48, and it lagged the fade: in 2026-03 it was 0.386 against a hindsight share of
-0.267 (`printed/e00695_audit_out.txt`). The add-back then mixes two levels, with and without the
-engine, in every forecast. At the host, perfect cleaning with a perfect calendar average gained no
-more than the causal tracker did, so the host does not show the tracker as the limit. At D8, the
-hindsight tracker (AH) scores 0.203 points better than the causal one (A1), and AH scores 7.146
-against A0's 7.232, so the tracker may be some of the limit at D8 as well.
+0.267 (`printed/e00695_audit_out.txt`). The add-back mixes two levels, with and without the engine,
+in every forecast. At the host, perfect cleaning with a perfect calendar average gained no more than
+the causal tracker did, so the host does not show the tracker as the limit. At D8, the hindsight
+tracker (AH) scores 0.203 points better than the causal one (A1), and AH scores 7.146 against A0's
+7.232, so the tracker may be some of the limit at D8 as well.
 
 ![CRPS at the host by whether the injected engine is running](figure_4_host_crps_by_engine_state.svg)
 
 ## Checks
 
-- **Median minus mean forecast.** The neural networks output 11 quantiles and no mean, so the mean
-  is the mean of the 11 quantile values. At D8 the mean of the quantiles minus the median is +1.627
-  points for A0, -2.774 for A1, and -1.766 for AH; across the other 15 Primaries on A0's output it
-  is +0.155 to +0.996 except +2.648 at D12 and +8.562 at D15, which were not investigated
+- **Median minus mean forecast.** The check looks for a spread that shifts the forecast: a positive
+  gap means the quantiles' mean sits above the median. The neural networks output 11 quantiles and
+  no mean, so the mean is the mean of the 11 quantile values. At D8 the mean of the quantiles minus
+  the median is +1.627 points for A0, -2.774 for A1, and -1.766 for AH; across the other 15
+  Primaries on A0's output it is +0.155 to +0.996 except +2.648 at D12 and +8.562 at D15, which were
+  not investigated. A1's gap is 4.4 points below A0's, the widening described above
   (`printed/e00695_median_mean.txt`).
 - **Error of the median beside the CRPS contrasts.** The MAE contrast is +0.120 (interval -0.487 to
   +0.788), the same sign as C1. The mean error of the median at D8 is +0.24 for A0, +2.00 for A1,
   and +1.15 for AH.
 - **Gate G0 (reproduction).** Refitted A0 scores 7.231588 at D8 against 7.231586 for the stored step
-  9a, on 102,310 shared rows. The audit found a paired difference of 0.000 at every seed.
+  9a, on 102,310 shared rows (a gap of 1.6e-6 before rounding). The audit found a paired difference
+  of 0.000 at every seed.
 - **Gate G1 (tracker in the scored era).** At the host, the causal tracker's F1 is 0.785, precision
   0.998, and recall 0.647, and it flags 0.03% of un-injected half-hours. The pre-registered bars
   were F1 0.60, precision 0.50, and at most 3% false flags. G1 passed before any neural network was
@@ -295,19 +338,32 @@ against A0's 7.232, so the tracker may be some of the limit at D8 as well.
   disabled, for fold 2025-11 and seeds 0 to 2. Its quantiles match A0's to a maximum of 8.8e-5 of
   capacity (`printed/e00695_identity_compare.txt`).
 - **Leakage and weather.** Every leakage test gives a change of exactly 0. The scorer reads all 8
-  per-fold prediction logs of each of the 6 scored arms, host arms included, and finds 242 origins
-  (30, 31, 31, 28, 31, 30, 31, and 30), each asserted to use a weather run at or before the origin.
-- **Audit triggers.** Trigger 2 (the result contradicts the prediction) and trigger 6 (the C1
-  interval is 0.48 wide, against 0.10 for experiment 677's two sister arms, which differ only in
-  injected shifts and barely differ at D8) fired and are explained by seed noise, which makes a
-  seed-against-seed contrast of A0 0.36 to 0.61 wide. Trigger 7 arguably fires, because part 3 would
-  depend on the sign of C1. Triggers 1, 3, 4, and 5 did not fire.
-- **Audit findings** (an Opus audit, `printed/e00695_audit_out.txt`; none rejected). Every headline
-  number reproduced, so branch 8 stands. The cleaned arm is reliably a little worse (reported as
-  post hoc). The scorer's D8 row in the per-Primary table scored A1 without the add-back (fixed: the
-  row is dropped). The scorer read only the last fold's weather count (fixed). The bounds were
-  unlabelled in the printed table (fixed). Weather alignment, the paired design, and leakage were
-  confirmed.
+  per-fold prediction logs of each of the 6 fitted arms (A0, A1, A1n, AH, W0, and W1; the other
+  systems reuse these fits), and finds 242 origins (30, 31, 31, 28, 31, 30, 31, and 30), each
+  asserted to use a weather run at or before the origin.
+- **Audit triggers** are the conditions under which the `ml-experiment` skill requires an
+  independent audit: a failed control, a result that contradicts its prediction, a quantile contrast
+  and an error contrast that disagree, a flip when one site is left out, a nested arm that beats its
+  container, an interval much wider or narrower than a sister experiment's, and a later design that
+  depends on the result.
+    - Trigger 2 (the result contradicts the prediction) fired: A1 lost 0.117 points where the
+      prediction was a gain of 0.3 to 1.0.
+    - Trigger 6 (interval width) fired: the C1 interval is 0.48 wide, against 0.10 for experiment
+      677's two sister arms, which differ only in injected shifts and barely differ at D8. A
+      contrast of one A0 seed against another is 0.36 to 0.61 wide, so seed noise explains the
+      width.
+    - Trigger 7 applies to part 3, if that is run, because its design would depend on the sign of
+      C1.
+    - Triggers 1, 3, 4, and 5 did not fire.
+- **Audit findings** (an Opus audit, `printed/e00695_audit_out.txt`; none rejected):
+    - Every headline number reproduced, so branch 8 stands.
+    - The post hoc seed-averaged interval suggests that A1 is a little worse; the page labels it
+      post hoc.
+    - The scorer's D8 row in the per-Primary table scored A1 without the add-back; the row is
+      dropped.
+    - The scorer read only the last fold's weather count; it now reads all 8 logs.
+    - The bounds were unlabelled in the printed table; they are now labelled.
+    - Weather alignment, the paired design, and the leakage tests were confirmed.
 - **Not done.** The sun check, the false-alarm check at the 7 other MVA-only Primaries, the
   correlation of engine state with forecast error, the climatology row on the cleaned series, and
   the per-fold count of dropped half-hours were not run; none can change the branch.
@@ -373,7 +429,7 @@ against A0's 7.232, so the tracker may be some of the limit at D8 as well.
 
 - **Rows:** all 16 Primaries are fitted, and D8 is the decision series. Scored rows have leads of 24
   to 240 hours from the 12:00 UTC contract origin, origins 2025-11-01 to 2026-06-30, valid times
-  before 2026-07-01, and a finite metered reading (102,310 half-hours per seed at D8, 102,391 at the
+  before 2026-07-01, and a finite metered reading (102,310 rows per seed at D8, 102,391 at the
   host). The row set is `backtest_year_2025_11_to_2026_06_daily_12utc`.
 - **Metrics:** CRPS (twice the mean pinball loss over 11 quantiles) and the normalised MAE of the
   median, in points of effective capacity, with D8's capacity fixed at 10.379 MVA for every arm.
