@@ -41,14 +41,15 @@ heuristic](https://openclimatefix.github.io/nged-substation-forecast/background/
   20.859.** The stack scored 13.559 ([experiment
   87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)) (exp 87; 4 supply points,
   one year; provisional).
-- **Removing D8's gas engine from the training target and adding a calendar average of the engine
-  back did not improve D8's forecast.** The cleaned arm scored 0.117 points of capacity worse than
-  the raw arm (98.3% interval -0.070 to +0.412) over 8 monthly refits and 3 seeds ([experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md))
-  (exp 695; D8, 8 months, 3 seeds; provisional).
-- **Knowing the engine's state at the valid time, which no forecast has, would lower D8's CRPS by 1.4
-  to 2.3 points.** The limit on the cleaning approach is predicting the state, not tracking it
+- **Removing D8's gas engine from the training target and adding a calendar average of the engine back
+  did not improve D8's forecast.** The cleaned arm's CRPS (continuous ranked probability score) was
+  0.117 points of capacity worse than the raw arm's, with a 98.3% interval from -0.070 to +0.412
   ([experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md))
-  (exp 695; D8, 8 months, bound only; provisional).
+  (exp 695; D8, 8 monthly refits, 3 seeds; provisional).
+- **An upper limit that reads D8's engine state at the valid time lowers CRPS by 1.4 to 2.4 points.**
+  No forecast has that state, so the open question is predicting the engine's state at the origin
+  ([experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md))
+  (exp 695; D8, 8 monthly refits, a bound and not a forecast; provisional).
 
 ## Problem 2: generator output
 
