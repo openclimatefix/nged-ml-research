@@ -1,0 +1,14 @@
+19:21:17 28524,46 load 7.79 availGB 41 njobs 7
+19:22:17 33182,100 load 7.61 availGB 38 njobs 7
+19:23:17 33182,100 load 7.74 availGB 38 njobs 7
+19:24:17 33182,100 load 7.54 availGB 38 njobs 7
+19:25:18 33188,100 load 7.44 availGB 37 njobs 7
+19:26:18 33188,100 load 7.30 availGB 38 njobs 7
+19:27:18 33188,100 load 7.31 availGB 38 njobs 7
+19:28:18 33190,100 load 7.18 availGB 38 njobs 7
+19:29:18 28632,100 load 6.95 availGB 40 njobs 7
+19:30:18 31446,100 load 7.11 availGB 36 njobs 7
+19:31:18 31446,100 load 7.84 availGB 35 njobs 7
+19:32:18 31446,100 load 7.37 availGB 36 njobs 7
+19:33:18 31446,100 load 7.13 availGB 36 njobs 7
+19:34:18 31446,100 load 7.08 availGB 36 njobs 7
