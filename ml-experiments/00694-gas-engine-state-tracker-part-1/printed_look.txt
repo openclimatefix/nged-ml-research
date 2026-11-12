@@ -1,0 +1,32 @@
+Gas A: rows 2054, half-hours at 0/1/2/3 units (1704, 137, 133, 80)
+Experiment 194 counts (1704, 137, 133, 80): match = True
+Gas A running spells (runs with at least 1 unit): 55, median 4 half-hours
+Gas A output per unit: median g/units 1.968 MW
+pre-engine: 25344 half-hours, nan share 0.000, median 7.00 MVA, merged steps 126
+  merged-step bins with local maxima (count >= 8): ['-1.0..-0.5: 40', '0.5..1.0: 52']
+  steps of at least 1.5 MVA from a level in [0, 3) MVA: 0 rises, 0 falls
+  steps of at least 1.5 MVA from a level in [3, 6) MVA: 3 rises, 0 falls
+  steps of at least 1.5 MVA from a level in [6, 8) MVA: 0 rises, 3 falls
+  steps of at least 1.5 MVA from a level in [8, 10) MVA: 1 rises, 3 falls
+net: 26256 half-hours, nan share 0.001, median 5.94 MVA, merged steps 2090
+  merged-step bins with local maxima (count >= 8): ['-5.0..-4.5: 168', '-1.0..-0.5: 30', '4.5..5.0: 233']
+  steps of at least 1.5 MVA from a level in [0, 3) MVA: 626 rises, 1 falls
+  steps of at least 1.5 MVA from a level in [3, 6) MVA: 366 rises, 256 falls
+  steps of at least 1.5 MVA from a level in [6, 8) MVA: 22 rises, 430 falls
+  steps of at least 1.5 MVA from a level in [8, 10) MVA: 1 rises, 259 falls
+net with 11 kV solar: 16416 half-hours, nan share 0.001, median 4.09 MVA, merged steps 1130
+  merged-step bins with local maxima (count >= 8): ['-4.5..-4.0: 77', '-2.5..-2.0: 58', '-1.0..-0.5: 24', '0.5..1.0: 25', '4.5..5.0: 118']
+  steps of at least 1.5 MVA from a level in [0, 3) MVA: 458 rises, 8 falls
+  steps of at least 1.5 MVA from a level in [3, 6) MVA: 109 rises, 238 falls
+  steps of at least 1.5 MVA from a level in [6, 8) MVA: 5 rises, 197 falls
+  steps of at least 1.5 MVA from a level in [8, 10) MVA: 0 rises, 31 falls
+from 2026-03: 5856 half-hours, nan share 0.002, median 3.94 MVA, merged steps 289
+  merged-step bins with local maxima (count >= 8): ['-4.0..-3.5: 28', '2.5..3.0: 26', '3.5..4.0: 30', '4.5..5.0: 26']
+  steps of at least 1.5 MVA from a level in [0, 3) MVA: 135 rises, 3 falls
+  steps of at least 1.5 MVA from a level in [3, 6) MVA: 17 rises, 87 falls
+  steps of at least 1.5 MVA from a level in [6, 8) MVA: 1 rises, 30 falls
+  steps of at least 1.5 MVA from a level in [8, 10) MVA: 0 rises, 6 falls
+pre-engine: dwell from a fall to the next rise (half-hours): n 6, median 3492, share at 1 0.17
+net: dwell from a fall to the next rise (half-hours): n 970, median 6, share at 1 0.15
+net with 11 kV solar: dwell from a fall to the next rise (half-hours): n 474, median 10, share at 1 0.10
+from 2026-03: dwell from a fall to the next rise (half-hours): n 125, median 12, share at 1 0.12

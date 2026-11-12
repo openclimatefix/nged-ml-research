@@ -1,0 +1,142 @@
+== False alarms on un-injected segments (120 tracked days each) ==
+ D10 M0        flagged  0.01%  active days/month 0.04  K per segment   by period {'pre-solar': 0.0, 'solar': 0.0002314814814814815}
+ D10 M1        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D10 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D10 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D11 M0        flagged 22.31%  active days/month 6.92  K per segment   by period {'pre-solar': 0.13576388888888888, 'solar': 0.3103587962962963}
+ D11 M1        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D11 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D11 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D14 M0        flagged 31.04%  active days/month 9.75  K per segment   by period {'pre-solar': 0.06284722222222222, 'solar': 0.5580439814814815}
+ D14 M1        flagged  0.06%  active days/month 0.00  K per segment [0, 0, 1, 0, 0, 0]  by period {'pre-solar': 0.0012152777777777778, 'solar': 0.0}
+ D14 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D14 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D16 M0        flagged 24.01%  active days/month 7.60  K per segment   by period {'pre-solar': 0.2769965277777778, 'solar': 0.21550925925925926}
+ D16 M1        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D16 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+ D16 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D2 M0        flagged 37.60%  active days/month 12.62  K per segment   by period {'pre-solar': 0.36770833333333336, 'solar': 0.3843171296296296}
+  D2 M1        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D2 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D2 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D3 M0        flagged 13.17%  active days/month 4.21  K per segment   by period {'pre-solar': 0.22019675925925927, 'solar': 0.043287037037037034}
+  D3 M1        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D3 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D3 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D4 M0        flagged  0.40%  active days/month 0.17  K per segment   by period {'pre-solar': 0.0, 'solar': 0.00798611111111111}
+  D4 M1        flagged  0.05%  active days/month 0.08  K per segment [0, 0, 1, 0, 0, 0]  by period {'pre-solar': 0.001099537037037037, 'solar': 0.0}
+  D4 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D4 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0, 0, 0, 0]  by period {'pre-solar': 0.0, 'solar': 0.0}
+  D8 M0        flagged 12.55%  active days/month 3.92  K per segment   by period {'pre-solar': 0.12546296296296297}
+  D8 M1        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0]  by period {'pre-solar': 0.0}
+  D8 M2        flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0]  by period {'pre-solar': 0.0}
+  D8 M2-dwell  flagged  0.00%  active days/month 0.00  K per segment [0, 0, 0]  by period {'pre-solar': 0.0}
+Stop rule 2 (M2 flags over 3% on 3 or more of 8 hosts): False; M2 over 3%: []
+P3 entries failing for M2: []
+
+== Known answers, folded rule, primary schedules (record + 4 synthetic), 44 segments ==
+M0        F1 0.581 [0.500, 0.646]  precision 0.467  recall 0.769  recall at 1/2/3 units 0.61/0.89/0.84  switch error median 0.0 half-hours, matched 0.80
+M1        F1 0.792 [0.746, 0.832]  precision 0.775  recall 0.810  recall at 1/2/3 units 0.73/0.87/0.83  switch error median 0.0 half-hours, matched 0.69
+M2        F1 0.819 [0.777, 0.857]  precision 0.828  recall 0.810  recall at 1/2/3 units 0.72/0.87/0.87  switch error median 0.0 half-hours, matched 0.71
+M2-dwell  F1 0.778 [0.746, 0.808]  precision 0.769  recall 0.788  recall at 1/2/3 units 0.68/0.83/0.88  switch error median 0.0 half-hours, matched 0.62
+C1 M2-M0: +0.238  98.3% interval [+0.153, +0.352]
+C2 M2-M1: +0.027  98.3% interval [+0.009, +0.047]
+C3 M2dwell-M2: -0.041  98.3% interval [-0.069, -0.018]
+P2 for M2 under folded: all True, core (precision, recall at 2 and 3 units) True
+  without D10: C1 +0.227  C2 +0.006
+  without D11: C1 +0.241  C2 +0.031
+  without D14: C1 +0.238  C2 +0.032
+  without D16: C1 +0.245  C2 +0.034
+  without D2: C1 +0.238  C2 +0.033
+  without D3: C1 +0.238  C2 +0.028
+  without D4: C1 +0.236  C2 +0.023
+  without D8: C1 +0.240  C2 +0.029
+  all 9 schedules, pooled F1 by arm: [0.539, 0.758, 0.781, 0.742]
+
+== Known answers, signed rule, primary schedules (record + 4 synthetic), 44 segments ==
+M0        F1 0.635 [0.550, 0.701]  precision 0.530  recall 0.794  recall at 1/2/3 units 0.58/0.92/0.94  switch error median 0.0 half-hours, matched 0.82
+M1        F1 0.838 [0.788, 0.880]  precision 0.823  recall 0.853  recall at 1/2/3 units 0.74/0.91/0.94  switch error median 0.0 half-hours, matched 0.72
+M2        F1 0.805 [0.765, 0.842]  precision 0.824  recall 0.787  recall at 1/2/3 units 0.68/0.85/0.86  switch error median 0.0 half-hours, matched 0.72
+M2-dwell  F1 0.765 [0.731, 0.795]  precision 0.766  recall 0.764  recall at 1/2/3 units 0.65/0.81/0.87  switch error median 0.0 half-hours, matched 0.62
+C1 M2-M0: +0.170  98.3% interval [+0.083, +0.288]
+C2 M2-M1: -0.032  98.3% interval [-0.049, -0.013]
+C3 M2dwell-M2: -0.040  98.3% interval [-0.067, -0.018]
+P2 for M2 under signed: all True, core (precision, recall at 2 and 3 units) True
+  without D10: C1 +0.213  C2 -0.007
+  without D11: C1 +0.164  C2 -0.038
+  without D14: C1 +0.159  C2 -0.036
+  without D16: C1 +0.169  C2 -0.036
+  without D2: C1 +0.156  C2 -0.035
+  without D3: C1 +0.160  C2 -0.039
+  without D4: C1 +0.170  C2 -0.035
+  without D8: C1 +0.168  C2 -0.033
+  all 9 schedules, pooled F1 by arm: [0.59, 0.809, 0.767, 0.73]
+
+Pooled F1 by schedule, folded rule (M0, M1, M2, M2-dwell):
+  record  F1 [0.452, 0.652, 0.678, 0.686]  precision (M2) 0.61  recall at 1/2/3 units (M2) [0.59, 0.87, 0.84]
+  synth0  F1 [0.494, 0.84, 0.864, 0.814]  precision (M2) 0.94  recall at 1/2/3 units (M2) [0.76, 0.92, 0.72]
+  synth1  F1 [0.62, 0.85, 0.889, 0.784]  precision (M2) 0.96  recall at 1/2/3 units (M2) [0.77, 0.86, 0.88]
+  synth2  F1 [0.606, 0.821, 0.86, 0.81]  precision (M2) 0.88  recall at 1/2/3 units (M2) [0.73, 0.86, 0.91]
+  synth3  F1 [0.693, 0.825, 0.835, 0.803]  precision (M2) 0.85  recall at 1/2/3 units (M2) [0.73, 0.85, 0.9]
+  synth4  F1 [0.387, 0.211, 0.116, 0.102]  precision (M2) 0.96  recall at 1/2/3 units (M2) [0.09, 0.05, 0.05]
+  synth5  F1 [0.514, 0.773, 0.872, 0.808]  precision (M2) 0.91  recall at 1/2/3 units (M2) [0.87, 0.87, 0.73]
+  synth6  F1 [0.519, 0.71, 0.695, 0.699]  precision (M2) 0.98  recall at 1/2/3 units (M2) [0.54, 0.0, 0.0]
+  synth7  F1 [0.463, 0.851, 0.858, 0.788]  precision (M2) 0.95  recall at 1/2/3 units (M2) [0.65, 0.93, 0.0]
+
+Pooled F1 by schedule, signed rule (M0, M1, M2, M2-dwell):
+  record  F1 [0.497, 0.682, 0.675, 0.679]  precision (M2) 0.60  recall at 1/2/3 units (M2) [0.59, 0.87, 0.9]
+  synth0  F1 [0.552, 0.88, 0.847, 0.802]  precision (M2) 0.93  recall at 1/2/3 units (M2) [0.74, 0.89, 0.69]
+  synth1  F1 [0.668, 0.91, 0.869, 0.778]  precision (M2) 0.94  recall at 1/2/3 units (M2) [0.75, 0.84, 0.87]
+  synth2  F1 [0.686, 0.886, 0.836, 0.776]  precision (M2) 0.87  recall at 1/2/3 units (M2) [0.69, 0.82, 0.88]
+  synth3  F1 [0.734, 0.867, 0.828, 0.798]  precision (M2) 0.88  recall at 1/2/3 units (M2) [0.67, 0.85, 0.89]
+  synth4  F1 [0.401, 0.261, 0.099, 0.098]  precision (M2) 0.88  recall at 1/2/3 units (M2) [0.09, 0.03, 0.04]
+  synth5  F1 [0.645, 0.918, 0.854, 0.821]  precision (M2) 0.89  recall at 1/2/3 units (M2) [0.84, 0.78, 0.86]
+  synth6  F1 [0.527, 0.725, 0.688, 0.688]  precision (M2) 0.98  recall at 1/2/3 units (M2) [0.53, 0.0, 0.0]
+  synth7  F1 [0.504, 0.882, 0.843, 0.773]  precision (M2) 0.95  recall at 1/2/3 units (M2) [0.63, 0.9, 0.0]
+Record only, folded: F1 by arm [0.452, 0.652, 0.678, 0.686]
+Record only, signed: F1 by arm [0.497, 0.682, 0.675, 0.679]
+
+== Fitted K and u by schedule (M2, folded rule; M1 in brackets) ==
+record: M2 K counts [0, 1, 10, 33] median u 1.75  (M1 K counts [0, 0, 8, 36] median u 1.75)
+synth0: M2 K counts [0, 1, 40, 3] median u 2.00  (M1 K counts [0, 2, 40, 2] median u 2.00)
+synth1: M2 K counts [0, 0, 18, 26] median u 2.00  (M1 K counts [0, 0, 29, 15] median u 2.00)
+synth2: M2 K counts [0, 0, 0, 44] median u 2.00  (M1 K counts [0, 0, 12, 32] median u 2.00)
+synth3: M2 K counts [0, 0, 9, 35] median u 2.00  (M1 K counts [0, 0, 21, 23] median u 2.00)
+synth4: M2 K counts [31, 11, 1, 1] median u 1.00  (M1 K counts [16, 25, 1, 2] median u 1.00)
+synth5: M2 K counts [0, 0, 19, 25] median u 3.00  (M1 K counts [0, 0, 37, 7] median u 3.00)
+synth6: M2 K counts [6, 38, 0, 0] median u 2.00  (M1 K counts [4, 39, 1, 0] median u 2.00)
+synth7: M2 K counts [0, 0, 44, 0] median u 2.00  (M1 K counts [0, 0, 44, 0] median u 2.00)
+
+== K1: D8's own reading with the record subtracted (does not decide) ==
+folded  M0        F1 0.534 tp 229 fp 279 fn 121 K None u None
+folded  M1        F1 0.731 tp 274 fp 126 fn 76 K 3 u 1.75
+folded  M2        F1 0.769 tp 284 fp 105 fn 66 K 3 u 1.75
+folded  M2-dwell  F1 0.709 tp 281 fp 162 fn 69 K 3 u 1.75
+signed  M0        F1 0.534 tp 229 fp 279 fn 121 K None u None
+signed  M1        F1 0.731 tp 274 fp 126 fn 76 K 3 u 1.75
+signed  M2        F1 0.769 tp 284 fp 105 fn 66 K 3 u 1.75
+signed  M2-dwell  F1 0.709 tp 281 fp 162 fn 69 K 3 u 1.75
+
+== Real D8, fitted without Gas A ==
+net: M2 K 3 u 1.75, share flagged 0.268; M1 K 3 u 1.75, share 0.270; M2 without the fold K 3 u 1.75, share 0.267
+   M2 transition matrix [[0.95, 0.013, 0.016, 0.021], [0.215, 0.216, 0.121, 0.449], [0.168, 0.005, 0.778, 0.049], [0.121, 0.015, 0.009, 0.856]]
+solar: M2 K 3 u 2.25, share flagged 0.384; M1 K 3 u 1.50, share 0.453; M2 without the fold K 3 u 1.50, share 0.405
+   M2 transition matrix [[0.941, 0.028, 0.021, 0.01], [0.158, 0.586, 0.223, 0.032], [0.076, 0.014, 0.906, 0.003], [0.096, 0.025, 0.029, 0.85]]
+fade: M2 K 2 u 3.50, share flagged 0.262; M1 K 3 u 1.50, share 0.312; M2 without the fold K 3 u 1.75, share 0.231
+   M2 transition matrix [[0.961, 0.023, 0.017], [0.102, 0.867, 0.031], [0.08, 0.038, 0.882]]
+P1 (K = 3 and u in [1.7, 2.3] on the net era): True; u drift net to solar 0.50 MW
+
+== P5: held-out predictive log-likelihood on even months of the net era ==
+2023-10: n 1488, fold -1454.0, signed -1455.9, difference +1.9
+2023-12: n 1488, fold -696.1, signed -698.1, difference +1.9
+2024-02: n 1392, fold -662.8, signed -663.0, difference +0.2
+2024-04: n 1440, fold -1046.3, signed -1052.0, difference +5.7
+2024-06: n 1440, fold -1217.7, signed -1242.7, difference +25.0
+2024-08: n 1488, fold -1190.9, signed -1194.5, difference +3.5
+2024-10: n 1488, fold -1160.8, signed -1171.9, difference +11.1
+2024-12: n 1488, fold -871.0, signed -872.3, difference +1.3
+2025-02: n 1344, fold -833.4, signed -834.3, difference +0.9
+fold fits K 3 u 1.75; signed fits K 3 u 1.75; total difference +51.6; fold better in 9 of 9 months
+P5 (total above zero and fold better in at least two thirds of months): True
+
+VERDICT by the pre-registered table: supported (stop2 False, P1 True, P2 all True, P2 core True, P3 failures [], P4/C1 clears True, P5 True, M0 alone False, u drift 0.50)
