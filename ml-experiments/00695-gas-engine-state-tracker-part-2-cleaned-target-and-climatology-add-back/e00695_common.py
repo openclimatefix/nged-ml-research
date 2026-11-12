@@ -119,3 +119,33 @@ def e694_flags() -> pl.DataFrame:
             ).with_columns(reading=pl.col("reading").fill_nan(None))
         )
     return pl.concat(frames)
+
+
+PIPELINE_GRID_START: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
+"""The first half-hour of the network pipeline's power grid (experiment 87's `GRID_START`)."""
+ERA1_START: Final[datetime] = datetime(2023, 8, 15, tzinfo=UTC)
+"""The tracker starts here; earlier half-hours are left untouched."""
+ERA2_START: Final[datetime] = datetime(2025, 3, 24, tzinfo=UTC)
+"""The first half-hour of the era with 11 kV solar, refitted per fold and never split at the fade."""
+HINDSIGHT_END: Final[datetime] = HOLDOUT
+"""The hindsight tracker (arm AH) reads and smooths readings before this instant."""
+READING_DELAY: Final[int] = 7
+"""Half-hours a reading takes to arrive (3.5 hours)."""
+D8_LABEL: Final[str] = "D8"
+Q_FLOOR_MVA: Final[float] = 0.14
+"""The reactive-power floor of the folded model, experiment 196's value."""
+HOST_CANDIDATES: Final[tuple[str, ...]] = ("D2", "D3", "D4")
+"""MVA-only Primaries that experiment 694 used as hosts, with no fold on sunny middays."""
+FOLD_MONTHS: Final[tuple[str, ...]] = SCORED_MONTHS
+"""The eight test months, one monthly refit each."""
+SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
+
+
+def grid_index(*, when: datetime) -> int:
+    """Return the index of the half-hour starting at `when` on the pipeline's power grid."""
+    return int((when - PIPELINE_GRID_START).total_seconds() // 1800)
+
+
+def fold_refit(*, month: str) -> datetime:
+    """Return a fold's refit time: 00:00 UTC on the first day of its test month."""
+    return datetime.fromisoformat(f"{month}-01").replace(tzinfo=UTC)

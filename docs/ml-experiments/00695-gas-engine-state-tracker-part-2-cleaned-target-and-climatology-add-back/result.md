@@ -309,6 +309,27 @@ arm over 8 folds takes about 1.1 GPU-hours. Six fitted arms come to about 7 GPU-
 would add 1.1. The tracker needs about 1 CPU-hour on 24 cores. Folds and arms run in parallel
 within the slot.
 
+## Choices the code makes where the plan leaves room
+
+These choices are fixed before any fit, and the code review checks each one.
+
+- **Training cut.** A training-time state never reads a reading from 3.5 hours (7 half-hours)
+  before the refit onward, because a reading takes 3.5 hours to arrive. States of half-hours before
+  the refit come from a forward pass on that hidden series and a backward pass of 20 hours that
+  stops at the cut.
+- **Era 2 fit.** The fit reads readings up to 3.5 hours before the refit, and the states after the
+  refit use the uncut series with the same fixed lag.
+- **Hindsight arm.** Arm AH uses one fit and one smoothed series to 2026-06-30 for every fold.
+- **Quantiles beyond q01 and q99.** The network's mixture parameters are not exported, so the
+  add-back extrapolates the 11 quantiles linearly to the levels 0.001 and 0.999.
+- **Host.** The host is the candidate whose median reading is closest to D8's tracked-off median,
+  and `e00695_phase_a.py` writes the choice to `host.json` before any fit.
+- **Injected days.** The engine record is cut into whole UTC days, and a day with a gap is dropped.
+- **Host truth.** The score at the host uses the injected reading, and arm WT uses arm A0's network
+  at the host with the true engine's climatology added back.
+- **Sunny middays.** The slice is the protocol's `sunny_unit_shape` column in the months 2026-03 to
+  2026-06.
+
 ## Risks
 
 - **The tracker may flag solar or cloud dips as the engine after 2025-03-24.** M2's unit size there

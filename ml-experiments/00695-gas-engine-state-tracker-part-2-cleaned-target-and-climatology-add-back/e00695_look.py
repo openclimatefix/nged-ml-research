@@ -176,7 +176,7 @@ def look_step9a() -> None:
     say(
         "  D8, monthly CRPS difference 5w minus 5wo: "
         + ", ".join(f"{r['month']} {r['difference']:+.3f}" for r in monthly.iter_rows(named=True))
-        + f"; standard deviation {float(monthly['difference'].std()):.3f}"
+        + f"; standard deviation {float(monthly['difference'].to_numpy().std(ddof=1)):.3f}"
     )
 
 
