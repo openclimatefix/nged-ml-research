@@ -1,0 +1,100 @@
+Experiment 697: data audit
+1. Gas A (aggregates and counts only; no date is printed)
+  [ok  ] 2,054 rows: 2054
+  [ok  ] unit counts 1,704 / 137 / 133 / 80: (1704, 137, 133, 80)
+  Gas A start stamps: 2054 stamps, 2066 expected, 12 missing, longest gap 12 steps, 0 duplicates, 0 null stamps
+  two private checks of the record: written to the data folder, not printed
+  [ok  ] no half-hour shared with experiment 694's labels: 0
+  [ok  ] 4 incomplete local days: 4
+  [ok  ] 40 complete local days: 40
+  [ok  ] 12 weekend days: 12
+  [ok  ] 3 weekend days with running: 3
+  levels from power differ from the stored `units` column on 0 half-hours
+  nulls: {'power': 0, 'units': 0, 'file_price': 0}
+2. D8's reading and local weather (experiment 196's panel)
+  [ok  ] panel holds D8 and the control Primaries
+  [ok  ] D8: 78816 half-hours
+  D8: 0.999 of half-hours finite
+  [ok  ] D2: 78816 half-hours
+  D2: 1.000 of half-hours finite
+  [ok  ] D3: 78816 half-hours
+  D3: 1.000 of half-hours finite
+  [ok  ] D4: 78816 half-hours
+  D4: 1.000 of half-hours finite
+  [ok  ] D11: 78816 half-hours
+  D11: 1.000 of half-hours finite
+  [ok  ] D14: 78816 half-hours
+  D14: 1.000 of half-hours finite
+  [ok  ] D16: 78816 half-hours
+  D16: 0.981 of half-hours finite
+  [ok  ] D10: 78816 half-hours
+  D10: 1.000 of half-hours finite
+  D8 power: 0.999 finite; range 0.01 to 11.94
+  D8 expected: 1.000 finite; range -3.43 to 10.76
+  D8 ghi: 1.000 finite; range 0.00 to 907.76
+  D8 temp: 1.000 finite; range -5.73 to 38.03
+  D8 wind100: 1.000 finite; range 0.09 to 24.18
+  [ok  ] panel power equals scan_power for series 26 on 1,000 random end stamps: 1000 finite, largest difference 4.77e-07
+3. Tracker labels
+  [ok  ] net: 26256 half-hours
+  [ok  ] net: flagged share 0.268: 0.2677
+  [ok  ] net: fitted unit 1.75 MW: 1.75
+  [ok  ] net: agreement of Ts with Ta is 0.999: 0.9992
+  net: K = 3, unit 1.75 MW
+  [ok  ] solar: 16416 half-hours
+  [ok  ] solar: flagged share 0.384: 0.3836
+  [ok  ] solar: fitted unit 2.25 MW: 2.25
+  [ok  ] solar: agreement of Ts with Ta is 0.989: 0.9889
+  solar: K = 3, unit 2.25 MW
+  [ok  ] fade: 5856 half-hours
+  [ok  ] fade: flagged share 0.262: 0.2623
+  [ok  ] fade: fitted unit 3.5 MW: 3.5
+  [ok  ] fade: agreement of Ts with Ta is 0.867: 0.8668
+  fade: K = 2, unit 3.5 MW
+  Weekday running share by local half-hour (start of the half-hour), 15:00 to 19:30:
+  net: block starts at 16:00 local; 15:00=0.37 15:30=0.49 16:00=0.75 16:30=0.83 17:00=0.85 17:30=0.87 18:00=0.86 18:30=0.83 19:00=0.65 19:30=0.57
+  solar: block starts at 16:00 local; 15:00=0.58 15:30=0.65 16:00=0.72 16:30=0.77 17:00=0.82 17:30=0.83 18:00=0.84 18:30=0.83 19:00=0.75 19:30=0.71
+  fade: block starts at 17:00 local; 15:00=0.34 15:30=0.39 16:00=0.46 16:30=0.49 17:00=0.59 17:30=0.63 18:00=0.67 18:30=0.67 19:00=0.60 19:30=0.57
+  The evening window of Q1 is local half-hours 32 to 37 (16:00 to 19:00); the day blocks are night, morning, day, evening, late.
+4. System price (Elexon, settlement-period start stamps)
+  system price: 2023-05-31 23:00 to 2026-07-01 22:30, 54096 stamps, 54096 expected, 0 missing, longest gap 0 steps, 0 duplicates, 0 null stamps
+  [ok  ] 54,096 half-hours: 54096
+  [ok  ] spans 2023-05-31T23:00Z to 2026-07-01T22:30Z
+  nulls: 0; range -185.3 to 2900.0 GBP per MWh
+  Gas A's running share by price fifth, cheapest to dearest, by minutes added:
+    -30 min: [0.042, 0.14, 0.141, 0.237, 0.289]
+    +0 min: [0.057, 0.135, 0.151, 0.225, 0.281]
+    +30 min: [0.089, 0.152, 0.151, 0.198, 0.259]
+    +60 min: [0.096, 0.173, 0.168, 0.173, 0.238]
+  [ok  ] fifths at the start join are 0.057, 0.135, 0.151, 0.225, 0.281: [0.057, 0.135, 0.151, 0.225, 0.281]
+  [ok  ] the end-stamp join reproduces experiment 194's fifths (0.089 ... 0.259): [0.089, 0.152, 0.151, 0.198, 0.259]
+  [ok  ] the stored file's price column is the price at the end stamp: share equal 1.000
+5. Gas price (National Gas SAP, pounds per MWh of gas)
+  gas price days: 2023-06-01 00:00 to 2026-07-01 00:00, 1122 stamps, 1127 expected, 5 missing, longest gap 1 steps, 0 duplicates, 0 null stamps
+  [ok  ] 1,122 days after dropping 4 bad values: 1122
+  dropped values (pence per kWh): (72.8, 63.9, 0.51, 0.47); kept range 1.88 to 5.23
+  The gas day for date D covers 05:00 on D to 05:00 on D + 1, so the join is on (local start - 5 h).date().
+6. Day-ahead price (NESO N2EX, hourly, from 2025-09-01; nothing earlier is stored)
+  day-ahead price: 2025-09-01 00:00 to 2026-09-30 23:00, 9480 stamps, 9480 expected, 0 missing, longest gap 0 steps, 0 duplicates, 0 null stamps
+  nulls 0; earlier periods are skipped and nothing is downloaded
+7. National wind (transmission wind from 2024-07-01)
+  national wind: 2024-06-30 23:00 to 2026-07-01 22:30, 35088 stamps, 35088 expected, 0 missing, longest gap 0 steps, 0 duplicates, 0 null stamps
+8. Bank holidays (England, from the `holidays` package, plus 24 December to 1 January)
+  [ok  ] 2024-12-25 is a bank holiday
+  [ok  ] 2024-12-26 is a bank holiday
+  [ok  ] 2024-05-27 is a bank holiday
+  [ok  ] 2024-08-26 is a bank holiday
+  [ok  ] 2024-08-05 is not a bank holiday
+  16 bank holidays in 2024 and 2025
+9. Red band
+  Weekdays 16:00 to 19:00 local, from the private note `predictability.md` of the engine-state follow-on. No charging statement is stored and no download is allowed, so whether the band applies on bank holidays is not checked.
+  join check on 400 days of D8's net era: system price 0 nulls, gas 48, day-ahead 19200, wind 14591
+  drops of experiment 159 from 2023-07: 28
+  [ok  ] 28 multi-day drops
+10. Stored false-alarm pass (experiment 694's fa.pkl)
+  [ok  ] 44 segments: 44
+  [ok  ] 253,440 half-hours: 253440
+  [ok  ] 0 half-hours flagged by M2: 0
+  hosts: ['D10', 'D11', 'D14', 'D16', 'D2', 'D3', 'D4', 'D8']
+
+0 failed checks

@@ -499,6 +499,31 @@ to production. Evidence: [experiment
 205](00205-dp-gamk-gap-robustness-coast-or-frozen-gam/result.md), at five Primary substations (up
 to 56 injected gaps each, made by hiding readings in clean data).
 
+**Move every power-derived stamp to the start of its half-hour before joining a price or converting to
+local time (provisional, high confidence).** A power stamp marks the end of the half-hour, and the
+Elexon system price stamp marks the start. A join on equal stamps pairs each power reading with the
+following half-hour's price. Applies to experiments that join power to a price, and to production.
+Evidence: [experiment 697](00697-gas-engine-state-tracker-part-4-running-patterns/result.md). Its
+audit reproduces the shares of half-hours in each fifth of the system price that [experiment
+194](00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)
+reports (0.089 to 0.259) only with the end-stamp join. With the start-stamp join the shares are 0.057
+to 0.281. The check used one engine record of 44 days.
+
+**Use the Elexon Market Index Data from the APX provider (`APXMIDP`) as the within-day price, and
+never call it the day-ahead price (provisional, medium confidence).** The N2EX provider returns 0.00
+in 2023. Treat the 20 half-hours of the APX index that carry price 0 with volume 0 as missing.
+NESO's stored day-ahead price is the N2EX hourly price, and the two series differ by a median
+absolute difference of 7.42 pounds per MWh over 14,540 overlapping half-hours. Applies to
+experiments. Evidence: [experiment 697](00697-gas-engine-state-tracker-part-4-running-patterns/result.md)
+(2023-06 to 2026-06).
+
+**Leave a gap in an open signal as a gap, and never fill it (provisional).** Experiment 697
+downloaded Elexon's indicated imbalance forecast (one vintage a day, 41,028 rows, from 2023-06),
+system warnings, NESO's day-ahead demand forecast and historic demand, Elexon's transmission wind
+(2023-06 to 2024-06, filling the gap before the held wind table, which starts in 2024-07), the
+Carbon Intensity API, and the gov.uk bank holidays. Each download prints its coverage in the
+experiment's `printed/signals_download.txt`.
+
 ## Weather products
 
 **Train each model on the history of the weather product that will serve it, and do not train on the

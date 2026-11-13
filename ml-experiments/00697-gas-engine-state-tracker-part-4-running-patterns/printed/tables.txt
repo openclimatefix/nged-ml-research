@@ -1,0 +1,1393 @@
+Experiment 697: tables and questions
+
+Q1
+  d8 net ts: +0.392 [+0.323, +0.464] over 79 weeks
+  d8 net tf: +0.347 [+0.271, +0.423] over 79 weeks
+  d8 net p_any_a: +0.383 [+0.313, +0.453] over 79 weeks
+  d8 solar ts: +0.256 [+0.156, +0.365] over 49 weeks
+  d8 solar tf: +0.128 [+0.025, +0.226] over 49 weeks
+  d8 solar p_any_a: +0.210 [+0.128, +0.295] over 49 weeks
+  d8 fade ts: +0.383 [+0.233, +0.530] over 19 weeks
+  d8 fade tf: +0.030 [-0.051, +0.105] over 19 weeks
+  d8 fade p_any_a: +0.399 [+0.314, +0.477] over 19 weeks
+  gas A r1 (rough interval, descriptive): +0.313 [+0.107, +0.526] over 7 weeks
+  gas A r2 (rough interval, descriptive): +0.233 [+0.057, +0.442] over 7 weeks
+
+Q2
+  d8 net ts: +0.284 [+0.251, +0.316] over 79 weeks
+  d8 net tf: +0.249 [+0.220, +0.278] over 79 weeks
+  d8 net p_any_a: +0.280 [+0.251, +0.310] over 79 weeks
+  d8 solar ts: +0.237 [+0.190, +0.285] over 49 weeks
+  d8 solar tf: +0.197 [+0.159, +0.234] over 49 weeks
+  d8 solar p_any_a: +0.224 [+0.186, +0.262] over 49 weeks
+  d8 fade ts: +0.195 [+0.136, +0.254] over 19 weeks
+  d8 fade tf: +0.081 [+0.031, +0.131] over 19 weeks
+  d8 fade p_any_a: +0.178 [+0.139, +0.215] over 19 weeks
+  gas A r1 (rough interval, descriptive): +0.123 [+0.038, +0.256] over 7 weeks
+  gas A r2 (rough interval, descriptive): +0.094 [+0.019, +0.212] over 7 weeks
+
+Q2Q
+  d8 net ts: +0.303 [+0.273, +0.334] over 79 weeks
+  d8 net tf: +0.268 [+0.238, +0.297] over 79 weeks
+  d8 net p_any_a: +0.299 [+0.270, +0.328] over 79 weeks
+  d8 solar ts: +0.250 [+0.190, +0.302] over 50 weeks
+  d8 solar tf: +0.202 [+0.156, +0.245] over 50 weeks
+  d8 solar p_any_a: +0.233 [+0.184, +0.279] over 50 weeks
+  d8 fade ts: +0.183 [+0.117, +0.252] over 19 weeks
+  d8 fade tf: +0.087 [+0.035, +0.135] over 19 weeks
+  d8 fade p_any_a: +0.175 [+0.130, +0.218] over 19 weeks
+  gas A r1 (rough interval, descriptive): +0.124 [+0.038, +0.244] over 7 weeks
+  gas A r2 (rough interval, descriptive): +0.083 [+0.015, +0.184] over 7 weeks
+
+Q3
+  d8 net ts: +0.007 [-0.014, +0.027] over 79 weeks
+  d8 net tf: +0.015 [-0.008, +0.037] over 79 weeks
+  d8 solar ts: +0.006 [-0.016, +0.028] over 49 weeks
+  d8 solar tf: +0.024 [-0.001, +0.050] over 48 weeks
+  d8 fade ts: +0.023 [-0.022, +0.060] over 19 weeks
+  d8 fade tf: +0.013 [-0.045, +0.071] over 19 weeks
+  gas A r1 (rough interval, descriptive): +0.045 [-0.081, +0.108] over 6 weeks
+  gas A r2 (rough interval, descriptive): +0.086 [-0.089, +0.270] over 5 weeks
+
+Q3A
+  d8 net ts: +0.125 [+0.098, +0.151] over 79 weeks
+  d8 net tf: +0.159 [+0.131, +0.187] over 79 weeks
+  d8 solar ts: +0.095 [+0.072, +0.120] over 49 weeks
+  d8 solar tf: +0.178 [+0.144, +0.212] over 48 weeks
+  d8 fade ts: +0.129 [+0.083, +0.172] over 19 weeks
+  d8 fade tf: +0.248 [+0.175, +0.323] over 19 weeks
+  gas A r1 (rough interval, descriptive): +0.130 [+0.074, +0.185] over 6 weeks
+  gas A r2 (rough interval, descriptive): +0.250 [+0.192, +0.289] over 5 weeks
+
+Q6
+  d8 net ts: +0.011 [-0.064, +0.083] over 79 weeks
+  d8 net tf: +0.036 [-0.041, +0.112] over 79 weeks
+  d8 net p_any_a: +0.018 [-0.054, +0.092] over 79 weeks
+
+Q7
+  d8 net ts: +0.133 [-0.032, +0.294] over 78 weeks
+  d8 net tf: +0.155 [+0.002, +0.307] over 78 weeks
+  d8 solar ts: not estimable (a bin holds fewer than the minimum days or spells)
+  d8 solar tf: +0.295 [-0.019, +0.540] over 49 weeks
+  d8 fade ts: not estimable (a bin holds fewer than the minimum days or spells)
+  d8 fade tf: not estimable (a bin holds fewer than the minimum days or spells)
+  gas A r1 (rough interval, descriptive): +0.718 [+0.000, +0.933] over 6 weeks
+  gas A r2 (rough interval, descriptive): +0.417 [-0.064, +0.643] over 6 weeks
+
+Q8
+  d8 net ts: {'winter_mode': 32, 'summer_mode': 32, 'same': True, 'share_of_resamples_same': 0.7425}
+  d8 net tf: {'winter_mode': 31, 'summer_mode': 32, 'same': False, 'share_of_resamples_same': 0.454}
+  d8 solar ts: {'winter_mode': 14, 'summer_mode': 13, 'same': False, 'share_of_resamples_same': 0.018}
+  d8 solar tf: {'winter_mode': 14, 'summer_mode': 13, 'same': False, 'share_of_resamples_same': 0.0435}
+  d8 fade ts: {'winter_mode': 13, 'summer_mode': 13, 'same': True, 'share_of_resamples_same': 0.1435}
+  d8 fade tf: {'winter_mode': 13, 'summer_mode': 45, 'same': False, 'share_of_resamples_same': 0.059}
+  gas A r1 (rough interval, descriptive): not estimable (a bin holds fewer than the minimum days or spells)
+  gas A r2 (rough interval, descriptive): not estimable (a bin holds fewer than the minimum days or spells)
+
+Q5 (night share after the solar start minus a year earlier): {'d8_ts': '+0.074 [+0.031, +0.123] over 128 weeks', 'd8_tf': '+0.078 [+0.035, +0.125] over 128 weeks', 'd8_p_any_a': '+0.102 [+0.062, +0.145] over 128 weeks', 'c2_d2_null_ts': '-0.003 [-0.029, +0.020] over 128 weeks', 'c2_d2_null_truth1': '-0.005 [-0.029, +0.018] over 128 weeks', 'c2_d3_null_ts': '-0.003 [-0.021, +0.015] over 128 weeks', 'c2_d3_null_truth1': '-0.004 [-0.022, +0.014] over 128 weeks', 'c2_d4_null_ts': '-0.006 [-0.025, +0.013] over 128 weeks', 'c2_d4_null_truth1': '-0.002 [-0.019, +0.015] over 128 weeks', 'record_r1': 'not estimable (a bin holds fewer than the minimum days or spells)', 'record_r2': 'not estimable (a bin holds fewer than the minimum days or spells)', 'difference_c2_d2_null': '+0.078 [+0.028, +0.131] over 128 weeks', 'difference_c2_d3_null': '+0.078 [+0.029, +0.130] over 128 weeks', 'difference_c2_d4_null': '+0.080 [+0.034, +0.131] over 128 weeks'}
+D q1 net against c1_null: +0.376 [+0.297, +0.454] over 73 weeks
+D q1 net against c1s_net_null: +0.375 [+0.293, +0.454] over 73 weeks
+D q1 net against c1s_solar_null: +0.337 [+0.260, +0.416] over 73 weeks
+D q1 net against c2_d2_null: +0.426 [+0.348, +0.503] over 79 weeks
+D q1 net against c2_d3_null: +0.399 [+0.310, +0.481] over 79 weeks
+D q1 net against c2_d4_null: +0.447 [+0.364, +0.532] over 79 weeks
+D q1 solar against c1_null: +0.241 [+0.138, +0.349] over 49 weeks
+D q1 solar against c1s_net_null: +0.240 [+0.131, +0.352] over 49 weeks
+D q1 solar against c1s_solar_null: +0.202 [+0.097, +0.311] over 49 weeks
+D q1 solar against c2_d2_null: +0.289 [+0.182, +0.403] over 49 weeks
+D q1 solar against c2_d3_null: +0.235 [+0.119, +0.352] over 49 weeks
+D q1 solar against c2_d4_null: +0.240 [+0.125, +0.360] over 49 weeks
+D q2 net against c2_d2_null: +0.294 [+0.260, +0.328] over 79 weeks
+D q2 net against c2_d3_null: +0.289 [+0.255, +0.324] over 79 weeks
+D q2 net against c2_d4_null: +0.293 [+0.257, +0.329] over 79 weeks
+D q2 solar against c2_d2_null: +0.238 [+0.187, +0.289] over 49 weeks
+D q2 solar against c2_d3_null: +0.244 [+0.195, +0.294] over 49 weeks
+D q2 solar against c2_d4_null: +0.236 [+0.185, +0.286] over 49 weeks
+D q2q net against c2_d2_null: +0.312 [+0.278, +0.345] over 79 weeks
+D q2q net against c2_d3_null: +0.304 [+0.271, +0.337] over 79 weeks
+D q2q net against c2_d4_null: +0.312 [+0.278, +0.345] over 79 weeks
+D q2q solar against c2_d2_null: +0.255 [+0.193, +0.312] over 50 weeks
+D q2q solar against c2_d3_null: +0.256 [+0.195, +0.313] over 50 weeks
+D q2q solar against c2_d4_null: +0.247 [+0.186, +0.303] over 50 weeks
+D q3 net against c1_null: -0.115 [-0.142, -0.088] over 72 weeks
+D q3 net against c1s_net_null: -0.093 [-0.119, -0.068] over 73 weeks
+D q3 net against c1s_solar_null: -0.098 [-0.128, -0.068] over 73 weeks
+D q3 net against c2_d2_null: -0.065 [-0.099, -0.032] over 79 weeks
+D q3 net against c2_d3_null: -0.084 [-0.113, -0.056] over 79 weeks
+D q3 net against c2_d4_null: -0.085 [-0.117, -0.053] over 79 weeks
+D q3 solar against c1_null: -0.116 [-0.145, -0.086] over 49 weeks
+D q3 solar against c1s_net_null: -0.094 [-0.122, -0.066] over 49 weeks
+D q3 solar against c1s_solar_null: -0.099 [-0.130, -0.068] over 49 weeks
+D q3 solar against c2_d2_null: -0.055 [-0.092, -0.021] over 49 weeks
+D q3 solar against c2_d3_null: -0.090 [-0.122, -0.057] over 49 weeks
+D q3 solar against c2_d4_null: -0.085 [-0.119, -0.050] over 49 weeks
+D q3a net against c1_null: -0.033 [-0.066, -0.000] over 72 weeks
+D q3a net against c1s_net_null: -0.008 [-0.039, +0.021] over 73 weeks
+D q3a net against c1s_solar_null: -0.071 [-0.108, -0.036] over 73 weeks
+D q3a net against c2_d2_null: -0.019 [-0.061, +0.019] over 79 weeks
+D q3a net against c2_d3_null: -0.015 [-0.048, +0.018] over 79 weeks
+D q3a net against c2_d4_null: -0.016 [-0.051, +0.020] over 79 weeks
+D q3a solar against c1_null: -0.063 [-0.094, -0.032] over 49 weeks
+D q3a solar against c1s_net_null: -0.038 [-0.066, -0.008] over 49 weeks
+D q3a solar against c1s_solar_null: -0.101 [-0.135, -0.068] over 49 weeks
+D q3a solar against c2_d2_null: -0.054 [-0.098, -0.013] over 49 weeks
+D q3a solar against c2_d3_null: -0.027 [-0.062, +0.007] over 49 weeks
+D q3a solar against c2_d4_null: -0.045 [-0.087, -0.009] over 49 weeks
+D q6 net against c1_null: +0.012 [-0.077, +0.095] over 72 weeks
+D q6 net against c1s_net_null: +0.005 [-0.084, +0.090] over 72 weeks
+D q6 net against c1s_solar_null: -0.047 [-0.130, +0.034] over 72 weeks
+D q6 net against c2_d2_null: +0.023 [-0.055, +0.098] over 79 weeks
+D q6 net against c2_d3_null: +0.089 [+0.001, +0.173] over 79 weeks
+D q6 net against c2_d4_null: -0.012 [-0.094, +0.070] over 79 weeks
+D q7 net against c1_null: +0.136 [-0.036, +0.312] over 71 weeks
+D q7 net against c1s_net_null: +0.144 [-0.030, +0.325] over 71 weeks
+D q7 net against c1s_solar_null: +0.117 [-0.060, +0.290] over 71 weeks
+D q7 net against c2_d2_null: +0.096 [-0.090, +0.274] over 78 weeks
+D q7 net against c2_d3_null: +0.138 [-0.047, +0.318] over 78 weeks
+D q7 net against c2_d4_null: +0.137 [-0.045, +0.313] over 78 weeks
+
+T1 coverage: d8 (share of half-hours missing per input)
+shape: (6, 9)
+┌───────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era   ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---   ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str   ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═══════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ fade  ┆ false       ┆ 1347       ┆ 30   ┆ 0.003           ┆ 0.000                ┆ 0.000                     ┆ 0.000                   ┆ 0.000                    │
+│ fade  ┆ true        ┆ 4509       ┆ 95   ┆ 0.001           ┆ 0.000                ┆ 0.021                     ┆ 0.000                   ┆ 0.000                    │
+│ net   ┆ false       ┆ 13389      ┆ 280  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.552                    │
+│ net   ┆ true        ┆ 12867      ┆ 270  ┆ 0.001           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.559                    │
+│ solar ┆ false       ┆ 6336       ┆ 134  ┆ 0.000           ┆ 0.000                ┆ 0.008                     ┆ 0.046                   ┆ 0.000                    │
+│ solar ┆ true        ┆ 10080      ┆ 211  ┆ 0.001           ┆ 0.000                ┆ 0.000                     ┆ 0.738                   ┆ 0.000                    │
+└───────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: record (share of half-hours missing per input)
+shape: (1, 9)
+┌────────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era    ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---    ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str    ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞════════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ record ┆ true        ┆ 2054       ┆ 44   ┆ 0.000           ┆ 0.000                ┆ 0.000                     ┆ 1.000                   ┆ 1.000                    │
+└────────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c1_null (share of half-hours missing per input)
+shape: (2, 9)
+┌─────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ --- ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ pre ┆ false       ┆ 29385      ┆ 207  ┆ 0.000           ┆ 1.000                ┆ 1.000                     ┆ 1.000                   ┆ 1.000                    │
+│ pre ┆ true        ┆ 42615      ┆ 298  ┆ 0.000           ┆ 0.959                ┆ 0.960                     ┆ 1.000                   ┆ 1.000                    │
+└─────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c1s_net_null (share of half-hours missing per input)
+shape: (2, 9)
+┌─────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ --- ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ pre ┆ false       ┆ 29385      ┆ 207  ┆ 0.000           ┆ 1.000                ┆ 1.000                     ┆ 1.000                   ┆ 1.000                    │
+│ pre ┆ true        ┆ 42615      ┆ 298  ┆ 0.000           ┆ 0.959                ┆ 0.960                     ┆ 1.000                   ┆ 1.000                    │
+└─────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c1s_solar_null (share of half-hours missing per input)
+shape: (2, 9)
+┌─────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ --- ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ pre ┆ false       ┆ 29385      ┆ 207  ┆ 0.000           ┆ 1.000                ┆ 1.000                     ┆ 1.000                   ┆ 1.000                    │
+│ pre ┆ true        ┆ 42615      ┆ 298  ┆ 0.000           ┆ 0.959                ┆ 0.960                     ┆ 1.000                   ┆ 1.000                    │
+└─────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c2_d2_null (share of half-hours missing per input)
+shape: (4, 9)
+┌───────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era   ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---   ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str   ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═══════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ net   ┆ false       ┆ 26778      ┆ 280  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.552                    │
+│ net   ┆ true        ┆ 25734      ┆ 270  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.559                    │
+│ solar ┆ false       ┆ 12672      ┆ 134  ┆ 0.000           ┆ 0.000                ┆ 0.008                     ┆ 0.046                   ┆ 0.000                    │
+│ solar ┆ true        ┆ 20160      ┆ 211  ┆ 0.000           ┆ 0.000                ┆ 0.000                     ┆ 0.738                   ┆ 0.000                    │
+└───────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c2_d3_null (share of half-hours missing per input)
+shape: (4, 9)
+┌───────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era   ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---   ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str   ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═══════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ net   ┆ false       ┆ 26778      ┆ 280  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.552                    │
+│ net   ┆ true        ┆ 25734      ┆ 270  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.559                    │
+│ solar ┆ false       ┆ 12672      ┆ 134  ┆ 0.000           ┆ 0.000                ┆ 0.008                     ┆ 0.046                   ┆ 0.000                    │
+│ solar ┆ true        ┆ 20160      ┆ 211  ┆ 0.000           ┆ 0.000                ┆ 0.000                     ┆ 0.738                   ┆ 0.000                    │
+└───────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c2_d4_null (share of half-hours missing per input)
+shape: (4, 9)
+┌───────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era   ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---   ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str   ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═══════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ net   ┆ false       ┆ 26778      ┆ 280  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.552                    │
+│ net   ┆ true        ┆ 25734      ┆ 270  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.559                    │
+│ solar ┆ false       ┆ 12672      ┆ 134  ┆ 0.000           ┆ 0.000                ┆ 0.008                     ┆ 0.046                   ┆ 0.000                    │
+│ solar ┆ true        ┆ 20160      ┆ 211  ┆ 0.000           ┆ 0.000                ┆ 0.000                     ┆ 0.738                   ┆ 0.000                    │
+└───────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c1_weekday (share of half-hours missing per input)
+shape: (2, 9)
+┌─────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ --- ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ pre ┆ false       ┆ 29385      ┆ 207  ┆ 0.000           ┆ 1.000                ┆ 1.000                     ┆ 1.000                   ┆ 1.000                    │
+│ pre ┆ true        ┆ 42615      ┆ 298  ┆ 0.000           ┆ 0.959                ┆ 0.960                     ┆ 1.000                   ┆ 1.000                    │
+└─────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c2_d2_weekday (share of half-hours missing per input)
+shape: (4, 9)
+┌───────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era   ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---   ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str   ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═══════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ net   ┆ false       ┆ 26778      ┆ 280  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.552                    │
+│ net   ┆ true        ┆ 25734      ┆ 270  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.559                    │
+│ solar ┆ false       ┆ 12672      ┆ 134  ┆ 0.000           ┆ 0.000                ┆ 0.008                     ┆ 0.046                   ┆ 0.000                    │
+│ solar ┆ true        ┆ 20160      ┆ 211  ┆ 0.000           ┆ 0.000                ┆ 0.000                     ┆ 0.738                   ┆ 0.000                    │
+└───────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c2_d3_weekday (share of half-hours missing per input)
+shape: (4, 9)
+┌───────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era   ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---   ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str   ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═══════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ net   ┆ false       ┆ 26778      ┆ 280  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.552                    │
+│ net   ┆ true        ┆ 25734      ┆ 270  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.559                    │
+│ solar ┆ false       ┆ 12672      ┆ 134  ┆ 0.000           ┆ 0.000                ┆ 0.008                     ┆ 0.046                   ┆ 0.000                    │
+│ solar ┆ true        ┆ 20160      ┆ 211  ┆ 0.000           ┆ 0.000                ┆ 0.000                     ┆ 0.738                   ┆ 0.000                    │
+└───────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T1 coverage: c2_d4_weekday (share of half-hours missing per input)
+shape: (4, 9)
+┌───────┬─────────────┬────────────┬──────┬─────────────────┬──────────────────────┬───────────────────────────┬─────────────────────────┬──────────────────────────┐
+│ era   ┆ summer_half ┆ half_hours ┆ days ┆ reading_missing ┆ system_price_missing ┆ gas_price_gbp_mwh_missing ┆ day_ahead_price_missing ┆ national_wind_mw_missing │
+│ ---   ┆ ---         ┆ ---        ┆ ---  ┆ ---             ┆ ---                  ┆ ---                       ┆ ---                     ┆ ---                      │
+│ str   ┆ bool        ┆ u32        ┆ u32  ┆ f64             ┆ f64                  ┆ f64                       ┆ f64                     ┆ f64                      │
+╞═══════╪═════════════╪════════════╪══════╪═════════════════╪══════════════════════╪═══════════════════════════╪═════════════════════════╪══════════════════════════╡
+│ net   ┆ false       ┆ 26778      ┆ 280  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.552                    │
+│ net   ┆ true        ┆ 25734      ┆ 270  ┆ 0.000           ┆ 0.000                ┆ 0.004                     ┆ 1.000                   ┆ 0.559                    │
+│ solar ┆ false       ┆ 12672      ┆ 134  ┆ 0.000           ┆ 0.000                ┆ 0.008                     ┆ 0.046                   ┆ 0.000                    │
+│ solar ┆ true        ┆ 20160      ┆ 211  ┆ 0.000           ┆ 0.000                ┆ 0.000                     ┆ 0.738                   ┆ 0.000                    │
+└───────┴─────────────┴────────────┴──────┴─────────────────┴──────────────────────┴───────────────────────────┴─────────────────────────┴──────────────────────────┘
+
+T2a D8: Ts against Tf, Ta (stored probabilities), and Tc (fixed lag)
+shape: (3, 9)
+┌───────┬────────────┬────────────┬────────────┬─────────────────────┬─────────────┬─────────────┬─────────────┬──────┐
+│ era   ┆ flagged_ts ┆ flagged_tf ┆ flagged_ta ┆ mean_probability_ta ┆ agree_ts_tf ┆ agree_ts_ta ┆ agree_ts_tc ┆ n_tc │
+│ ---   ┆ ---        ┆ ---        ┆ ---        ┆ ---                 ┆ ---         ┆ ---         ┆ ---         ┆ ---  │
+│ str   ┆ f64        ┆ f64        ┆ f64        ┆ f64                 ┆ f64         ┆ f64         ┆ f64         ┆ u32  │
+╞═══════╪════════════╪════════════╪════════════╪═════════════════════╪═════════════╪═════════════╪═════════════╪══════╡
+│ fade  ┆ 0.262      ┆ 0.150      ┆ 0.257      ┆ 0.294               ┆ 0.798       ┆ 0.867       ┆ 0.870       ┆ 5856 │
+│ net   ┆ 0.268      ┆ 0.236      ┆ 0.268      ┆ 0.267               ┆ 0.958       ┆ 0.999       ┆ null        ┆ 0    │
+│ solar ┆ 0.384      ┆ 0.302      ┆ 0.375      ┆ 0.384               ┆ 0.825       ┆ 0.989       ┆ 0.902       ┆ 5760 │
+└───────┴────────────┴────────────┴────────────┴─────────────────────┴─────────────┴─────────────┴─────────────┴──────┘
+
+T2b controls: Ts against the injected truth, by control and span
+shape: (32, 8)
+┌────────────────┬───────┬──────────┬───────┬───────────┬────────┬─────────┬─────────────┐
+│ control        ┆ span  ┆ truth_at ┆ f1    ┆ precision ┆ recall ┆ flagged ┆ truth_share │
+│ ---            ┆ ---   ┆ ---      ┆ ---   ┆ ---       ┆ ---    ┆ ---     ┆ ---         │
+│ str            ┆ str   ┆ str      ┆ f64   ┆ f64       ┆ f64    ┆ f64     ┆ f64         │
+╞════════════════╪═══════╪══════════╪═══════╪═══════════╪════════╪═════════╪═════════════╡
+│ c1_null        ┆ pre   ┆ truth1   ┆ 0.831 ┆ 0.994     ┆ 0.714  ┆ 0.107   ┆ 0.149       │
+│ c1_null        ┆ pre   ┆ truth2   ┆ 0.866 ┆ 0.772     ┆ 0.987  ┆ 0.107   ┆ 0.084       │
+│ c1s_net_null   ┆ pre   ┆ truth1   ┆ 0.862 ┆ 0.995     ┆ 0.761  ┆ 0.123   ┆ 0.161       │
+│ c1s_net_null   ┆ pre   ┆ truth2   ┆ 0.873 ┆ 0.780     ┆ 0.992  ┆ 0.123   ┆ 0.097       │
+│ c1s_solar_null ┆ pre   ┆ truth1   ┆ 0.648 ┆ 0.883     ┆ 0.512  ┆ 0.101   ┆ 0.174       │
+│ c1s_solar_null ┆ pre   ┆ truth2   ┆ 0.622 ┆ 0.618     ┆ 0.626  ┆ 0.101   ┆ 0.100       │
+│ c2_d2_null     ┆ net   ┆ truth1   ┆ 0.543 ┆ 0.875     ┆ 0.394  ┆ 0.074   ┆ 0.165       │
+│ c2_d2_null     ┆ net   ┆ truth2   ┆ 0.655 ┆ 0.740     ┆ 0.587  ┆ 0.074   ┆ 0.094       │
+│ c2_d2_null     ┆ solar ┆ truth1   ┆ 0.594 ┆ 0.961     ┆ 0.429  ┆ 0.077   ┆ 0.172       │
+│ c2_d2_null     ┆ solar ┆ truth2   ┆ 0.729 ┆ 0.821     ┆ 0.656  ┆ 0.077   ┆ 0.096       │
+│ c2_d3_null     ┆ net   ┆ truth1   ┆ 0.827 ┆ 0.995     ┆ 0.707  ┆ 0.114   ┆ 0.160       │
+│ c2_d3_null     ┆ net   ┆ truth2   ┆ 0.856 ┆ 0.783     ┆ 0.945  ┆ 0.114   ┆ 0.094       │
+│ c2_d3_null     ┆ solar ┆ truth1   ┆ 0.874 ┆ 0.992     ┆ 0.781  ┆ 0.125   ┆ 0.159       │
+│ c2_d3_null     ┆ solar ┆ truth2   ┆ 0.858 ┆ 0.755     ┆ 0.994  ┆ 0.125   ┆ 0.095       │
+│ c2_d4_null     ┆ net   ┆ truth1   ┆ 0.870 ┆ 0.991     ┆ 0.775  ┆ 0.124   ┆ 0.158       │
+│ c2_d4_null     ┆ net   ┆ truth2   ┆ 0.808 ┆ 0.694     ┆ 0.966  ┆ 0.124   ┆ 0.089       │
+│ c2_d4_null     ┆ solar ┆ truth1   ┆ 0.875 ┆ 0.991     ┆ 0.783  ┆ 0.128   ┆ 0.162       │
+│ c2_d4_null     ┆ solar ┆ truth2   ┆ 0.803 ┆ 0.687     ┆ 0.966  ┆ 0.128   ┆ 0.091       │
+│ c1_weekday     ┆ pre   ┆ truth1   ┆ 0.829 ┆ 0.990     ┆ 0.713  ┆ 0.111   ┆ 0.155       │
+│ c1_weekday     ┆ pre   ┆ truth2   ┆ 0.861 ┆ 0.765     ┆ 0.986  ┆ 0.111   ┆ 0.086       │
+│ c2_d2_weekday  ┆ net   ┆ truth1   ┆ 0.551 ┆ 0.935     ┆ 0.391  ┆ 0.068   ┆ 0.162       │
+│ c2_d2_weekday  ┆ net   ┆ truth2   ┆ 0.665 ┆ 0.781     ┆ 0.578  ┆ 0.068   ┆ 0.092       │
+│ c2_d2_weekday  ┆ solar ┆ truth1   ┆ 0.620 ┆ 0.957     ┆ 0.458  ┆ 0.082   ┆ 0.171       │
+│ c2_d2_weekday  ┆ solar ┆ truth2   ┆ 0.701 ┆ 0.799     ┆ 0.624  ┆ 0.082   ┆ 0.105       │
+│ c2_d3_weekday  ┆ net   ┆ truth1   ┆ 0.831 ┆ 0.992     ┆ 0.714  ┆ 0.116   ┆ 0.161       │
+│ c2_d3_weekday  ┆ net   ┆ truth2   ┆ 0.872 ┆ 0.792     ┆ 0.970  ┆ 0.116   ┆ 0.095       │
+│ c2_d3_weekday  ┆ solar ┆ truth1   ┆ 0.856 ┆ 0.994     ┆ 0.751  ┆ 0.122   ┆ 0.161       │
+│ c2_d3_weekday  ┆ solar ┆ truth2   ┆ 0.861 ┆ 0.783     ┆ 0.955  ┆ 0.122   ┆ 0.100       │
+│ c2_d4_weekday  ┆ net   ┆ truth1   ┆ 0.884 ┆ 0.987     ┆ 0.801  ┆ 0.128   ┆ 0.158       │
+│ c2_d4_weekday  ┆ net   ┆ truth2   ┆ 0.809 ┆ 0.696     ┆ 0.964  ┆ 0.128   ┆ 0.093       │
+│ c2_d4_weekday  ┆ solar ┆ truth1   ┆ 0.902 ┆ 0.994     ┆ 0.826  ┆ 0.138   ┆ 0.166       │
+│ c2_d4_weekday  ┆ solar ┆ truth2   ┆ 0.817 ┆ 0.702     ┆ 0.977  ┆ 0.138   ┆ 0.099       │
+└────────────────┴───────┴──────────┴───────┴───────────┴────────┴─────────┴─────────────┘
+
+T2c attenuation: Q1 of the labels over Q1 of the truth, weekday-class controls
+shape: (8, 5)
+┌───────────────┬───────┬───────────┬──────────┬─────────────┐
+│ control       ┆ era   ┆ q1_labels ┆ q1_truth ┆ attenuation │
+│ ---           ┆ ---   ┆ ---       ┆ ---      ┆ ---         │
+│ str           ┆ str   ┆ f64       ┆ f64      ┆ f64         │
+╞═══════════════╪═══════╪═══════════╪══════════╪═════════════╡
+│ c1_weekday    ┆ net   ┆ 0.206     ┆ 0.277    ┆ 0.745       │
+│ c1_weekday    ┆ solar ┆ 0.206     ┆ 0.277    ┆ 0.745       │
+│ c2_d2_weekday ┆ net   ┆ 0.040     ┆ 0.269    ┆ 0.149       │
+│ c2_d2_weekday ┆ solar ┆ 0.065     ┆ 0.292    ┆ 0.221       │
+│ c2_d3_weekday ┆ net   ┆ 0.182     ┆ 0.266    ┆ 0.687       │
+│ c2_d3_weekday ┆ solar ┆ 0.202     ┆ 0.281    ┆ 0.716       │
+│ c2_d4_weekday ┆ net   ┆ 0.206     ┆ 0.261    ┆ 0.790       │
+│ c2_d4_weekday ┆ solar ┆ 0.233     ┆ 0.284    ┆ 0.821       │
+└───────────────┴───────┴───────────┴──────────┴─────────────┘
+
+T2d C3 (experiment 694's stored false-alarm pass, read and not rerun): {'segments': 44, 'half_hours': 253440, 'flagged': 0}
+T2e C4 (experiment 695's stored host states against its day draw): {'host': 'D4', 'f1': 0.785, 'precision': 0.998, 'reproduces_0.785_and_0.998': True}
+
+T3 running share by block of the day: d8 net ts
+shape: (10, 5)
+┌─────────┬─────────┬───────┬──────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n    ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---  ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32  ┆ u32  │
+╞═════════╪═════════╪═══════╪══════╪══════╡
+│ false   ┆ day     ┆ 0.285 ┆ 5473 ┆ 391  │
+│ false   ┆ evening ┆ 0.833 ┆ 2346 ┆ 391  │
+│ false   ┆ late    ┆ 0.291 ┆ 3909 ┆ 391  │
+│ false   ┆ morning ┆ 0.339 ┆ 3126 ┆ 391  │
+│ false   ┆ night   ┆ 0.041 ┆ 3909 ┆ 391  │
+│ true    ┆ day     ┆ 0.150 ┆ 2138 ┆ 153  │
+│ true    ┆ evening ┆ 0.441 ┆ 918  ┆ 153  │
+│ true    ┆ late    ┆ 0.193 ┆ 1530 ┆ 153  │
+│ true    ┆ morning ┆ 0.065 ┆ 1222 ┆ 153  │
+│ true    ┆ night   ┆ 0.022 ┆ 1524 ┆ 153  │
+└─────────┴─────────┴───────┴──────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: d8 net ts
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.923             ┆ 78   │
+│ 2       ┆ 0.896             ┆ 77   │
+│ 3       ┆ 0.896             ┆ 77   │
+│ 4       ┆ 0.962             ┆ 78   │
+│ 5       ┆ 0.935             ┆ 77   │
+│ 6       ┆ 0.688             ┆ 77   │
+│ 7       ┆ 0.616             ┆ 73   │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: d8 net Ta mean probability
+shape: (10, 5)
+┌─────────┬─────────┬───────┬──────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n    ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---  ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32  ┆ u32  │
+╞═════════╪═════════╪═══════╪══════╪══════╡
+│ false   ┆ day     ┆ 0.282 ┆ 5473 ┆ 391  │
+│ false   ┆ evening ┆ 0.823 ┆ 2346 ┆ 391  │
+│ false   ┆ late    ┆ 0.286 ┆ 3909 ┆ 391  │
+│ false   ┆ morning ┆ 0.338 ┆ 3126 ┆ 391  │
+│ false   ┆ night   ┆ 0.044 ┆ 3909 ┆ 391  │
+│ true    ┆ day     ┆ 0.156 ┆ 2138 ┆ 153  │
+│ true    ┆ evening ┆ 0.440 ┆ 918  ┆ 153  │
+│ true    ┆ late    ┆ 0.193 ┆ 1530 ┆ 153  │
+│ true    ┆ morning ┆ 0.069 ┆ 1222 ┆ 153  │
+│ true    ┆ night   ┆ 0.024 ┆ 1524 ┆ 153  │
+└─────────┴─────────┴───────┴──────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: d8 net Ta mean probability
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.923             ┆ 78   │
+│ 2       ┆ 0.909             ┆ 77   │
+│ 3       ┆ 0.896             ┆ 77   │
+│ 4       ┆ 0.962             ┆ 78   │
+│ 5       ┆ 0.935             ┆ 77   │
+│ 6       ┆ 0.688             ┆ 77   │
+│ 7       ┆ 0.630             ┆ 73   │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: d8 solar ts
+shape: (10, 5)
+┌─────────┬─────────┬───────┬──────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n    ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---  ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32  ┆ u32  │
+╞═════════╪═════════╪═══════╪══════╪══════╡
+│ false   ┆ day     ┆ 0.485 ┆ 3428 ┆ 245  │
+│ false   ┆ evening ┆ 0.800 ┆ 1467 ┆ 245  │
+│ false   ┆ late    ┆ 0.440 ┆ 2450 ┆ 245  │
+│ false   ┆ morning ┆ 0.420 ┆ 1959 ┆ 245  │
+│ false   ┆ night   ┆ 0.116 ┆ 2450 ┆ 245  │
+│ true    ┆ day     ┆ 0.290 ┆ 1324 ┆ 95   │
+│ true    ┆ evening ┆ 0.544 ┆ 568  ┆ 95   │
+│ true    ┆ late    ┆ 0.329 ┆ 950  ┆ 96   │
+│ true    ┆ morning ┆ 0.167 ┆ 759  ┆ 95   │
+│ true    ┆ night   ┆ 0.136 ┆ 950  ┆ 95   │
+└─────────┴─────────┴───────┴──────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: d8 solar ts
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.917             ┆ 48   │
+│ 2       ┆ 0.958             ┆ 48   │
+│ 3       ┆ 0.957             ┆ 47   │
+│ 4       ┆ 0.918             ┆ 49   │
+│ 5       ┆ 0.894             ┆ 47   │
+│ 6       ┆ 0.860             ┆ 43   │
+│ 7       ┆ 0.795             ┆ 44   │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: d8 solar Ta mean probability
+shape: (10, 5)
+┌─────────┬─────────┬───────┬──────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n    ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---  ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32  ┆ u32  │
+╞═════════╪═════════╪═══════╪══════╪══════╡
+│ false   ┆ day     ┆ 0.488 ┆ 3428 ┆ 245  │
+│ false   ┆ evening ┆ 0.756 ┆ 1467 ┆ 245  │
+│ false   ┆ late    ┆ 0.426 ┆ 2450 ┆ 245  │
+│ false   ┆ morning ┆ 0.417 ┆ 1959 ┆ 245  │
+│ false   ┆ night   ┆ 0.128 ┆ 2450 ┆ 245  │
+│ true    ┆ day     ┆ 0.328 ┆ 1324 ┆ 95   │
+│ true    ┆ evening ┆ 0.547 ┆ 568  ┆ 95   │
+│ true    ┆ late    ┆ 0.317 ┆ 950  ┆ 96   │
+│ true    ┆ morning ┆ 0.181 ┆ 759  ┆ 95   │
+│ true    ┆ night   ┆ 0.153 ┆ 950  ┆ 95   │
+└─────────┴─────────┴───────┴──────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: d8 solar Ta mean probability
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.917             ┆ 48   │
+│ 2       ┆ 0.958             ┆ 48   │
+│ 3       ┆ 0.936             ┆ 47   │
+│ 4       ┆ 0.898             ┆ 49   │
+│ 5       ┆ 0.894             ┆ 47   │
+│ 6       ┆ 0.860             ┆ 43   │
+│ 7       ┆ 0.773             ┆ 44   │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: d8 fade ts
+shape: (10, 5)
+┌─────────┬─────────┬───────┬──────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n    ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---  ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32  ┆ u32  │
+╞═════════╪═════════╪═══════╪══════╪══════╡
+│ false   ┆ day     ┆ 0.317 ┆ 1211 ┆ 87   │
+│ false   ┆ evening ┆ 0.584 ┆ 522  ┆ 87   │
+│ false   ┆ late    ┆ 0.367 ┆ 870  ┆ 87   │
+│ false   ┆ morning ┆ 0.251 ┆ 694  ┆ 87   │
+│ false   ┆ night   ┆ 0.212 ┆ 871  ┆ 88   │
+│ true    ┆ day     ┆ 0.109 ┆ 476  ┆ 34   │
+│ true    ┆ evening ┆ 0.201 ┆ 204  ┆ 34   │
+│ true    ┆ late    ┆ 0.185 ┆ 341  ┆ 35   │
+│ true    ┆ morning ┆ 0.022 ┆ 271  ┆ 34   │
+│ true    ┆ night   ┆ 0.009 ┆ 340  ┆ 34   │
+└─────────┴─────────┴───────┴──────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: d8 fade ts
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.750             ┆ 16   │
+│ 2       ┆ 0.941             ┆ 17   │
+│ 3       ┆ 0.875             ┆ 16   │
+│ 4       ┆ 0.733             ┆ 15   │
+│ 5       ┆ 0.875             ┆ 16   │
+│ 6       ┆ 0.375             ┆ 16   │
+│ 7       ┆ 0.412             ┆ 17   │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: d8 fade Ta mean probability
+shape: (10, 5)
+┌─────────┬─────────┬───────┬──────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n    ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---  ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32  ┆ u32  │
+╞═════════╪═════════╪═══════╪══════╪══════╡
+│ false   ┆ day     ┆ 0.427 ┆ 1211 ┆ 87   │
+│ false   ┆ evening ┆ 0.652 ┆ 522  ┆ 87   │
+│ false   ┆ late    ┆ 0.341 ┆ 870  ┆ 87   │
+│ false   ┆ morning ┆ 0.280 ┆ 694  ┆ 87   │
+│ false   ┆ night   ┆ 0.120 ┆ 871  ┆ 88   │
+│ true    ┆ day     ┆ 0.243 ┆ 476  ┆ 34   │
+│ true    ┆ evening ┆ 0.253 ┆ 204  ┆ 34   │
+│ true    ┆ late    ┆ 0.185 ┆ 341  ┆ 35   │
+│ true    ┆ morning ┆ 0.083 ┆ 271  ┆ 34   │
+│ true    ┆ night   ┆ 0.036 ┆ 340  ┆ 34   │
+└─────────┴─────────┴───────┴──────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: d8 fade Ta mean probability
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.875             ┆ 16   │
+│ 2       ┆ 0.882             ┆ 17   │
+│ 3       ┆ 1.000             ┆ 16   │
+│ 4       ┆ 0.800             ┆ 15   │
+│ 5       ┆ 0.875             ┆ 16   │
+│ 6       ┆ 0.250             ┆ 16   │
+│ 7       ┆ 0.412             ┆ 17   │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: gas A at 1 or more units
+shape: (10, 5)
+┌─────────┬─────────┬───────┬─────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n   ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ --- ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32 ┆ u32  │
+╞═════════╪═════════╪═══════╪═════╪══════╡
+│ false   ┆ day     ┆ 0.202 ┆ 436 ┆ 32   │
+│ false   ┆ evening ┆ 0.355 ┆ 186 ┆ 31   │
+│ false   ┆ late    ┆ 0.278 ┆ 306 ┆ 31   │
+│ false   ┆ morning ┆ 0.258 ┆ 248 ┆ 31   │
+│ false   ┆ night   ┆ 0.056 ┆ 302 ┆ 31   │
+│ true    ┆ day     ┆ 0.006 ┆ 168 ┆ 12   │
+│ true    ┆ evening ┆ 0.042 ┆ 72  ┆ 12   │
+│ true    ┆ late    ┆ 0.075 ┆ 120 ┆ 12   │
+│ true    ┆ morning ┆ 0.104 ┆ 96  ┆ 12   │
+│ true    ┆ night   ┆ 0.058 ┆ 120 ┆ 12   │
+└─────────┴─────────┴───────┴─────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: gas A at 1 or more units
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.333             ┆ 6    │
+│ 2       ┆ 0.667             ┆ 6    │
+│ 3       ┆ 0.500             ┆ 6    │
+│ 4       ┆ 0.400             ┆ 5    │
+│ 5       ┆ 0.600             ┆ 5    │
+│ 6       ┆ 0.167             ┆ 6    │
+│ 7       ┆ 0.167             ┆ 6    │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: gas A at 2 or more units
+shape: (10, 5)
+┌─────────┬─────────┬───────┬─────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n   ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ --- ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32 ┆ u32  │
+╞═════════╪═════════╪═══════╪═════╪══════╡
+│ false   ┆ day     ┆ 0.096 ┆ 436 ┆ 32   │
+│ false   ┆ evening ┆ 0.247 ┆ 186 ┆ 31   │
+│ false   ┆ late    ┆ 0.209 ┆ 306 ┆ 31   │
+│ false   ┆ morning ┆ 0.161 ┆ 248 ┆ 31   │
+│ false   ┆ night   ┆ 0.053 ┆ 302 ┆ 31   │
+│ true    ┆ day     ┆ 0.000 ┆ 168 ┆ 12   │
+│ true    ┆ evening ┆ 0.014 ┆ 72  ┆ 12   │
+│ true    ┆ late    ┆ 0.000 ┆ 120 ┆ 12   │
+│ true    ┆ morning ┆ 0.000 ┆ 96  ┆ 12   │
+│ true    ┆ night   ┆ 0.033 ┆ 120 ┆ 12   │
+└─────────┴─────────┴───────┴─────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: gas A at 2 or more units
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.167             ┆ 6    │
+│ 2       ┆ 0.667             ┆ 6    │
+│ 3       ┆ 0.500             ┆ 6    │
+│ 4       ┆ 0.400             ┆ 5    │
+│ 5       ┆ 0.200             ┆ 5    │
+│ 6       ┆ 0.000             ┆ 6    │
+│ 7       ┆ 0.000             ┆ 6    │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: control c1 null: labels
+shape: (10, 5)
+┌─────────┬─────────┬───────┬───────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n     ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---   ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32   ┆ u32  │
+╞═════════╪═════════╪═══════╪═══════╪══════╡
+│ false   ┆ day     ┆ 0.076 ┆ 14943 ┆ 356  │
+│ false   ┆ evening ┆ 0.185 ┆ 6408  ┆ 356  │
+│ false   ┆ late    ┆ 0.151 ┆ 10683 ┆ 357  │
+│ false   ┆ morning ┆ 0.119 ┆ 8544  ┆ 356  │
+│ false   ┆ night   ┆ 0.046 ┆ 10683 ┆ 357  │
+│ true    ┆ day     ┆ 0.084 ┆ 5922  ┆ 141  │
+│ true    ┆ evening ┆ 0.169 ┆ 2538  ┆ 141  │
+│ true    ┆ late    ┆ 0.148 ┆ 4230  ┆ 141  │
+│ true    ┆ morning ┆ 0.137 ┆ 3384  ┆ 141  │
+│ true    ┆ night   ┆ 0.043 ┆ 4227  ┆ 141  │
+└─────────┴─────────┴───────┴───────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: control c1 null: labels
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.361             ┆ 216  │
+│ 2       ┆ 0.333             ┆ 213  │
+│ 3       ┆ 0.333             ┆ 213  │
+│ 4       ┆ 0.305             ┆ 213  │
+│ 5       ┆ 0.333             ┆ 210  │
+│ 6       ┆ 0.319             ┆ 213  │
+│ 7       ┆ 0.348             ┆ 207  │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: control c1 null: truth
+shape: (10, 5)
+┌─────────┬─────────┬───────┬───────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n     ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---   ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32   ┆ u32  │
+╞═════════╪═════════╪═══════╪═══════╪══════╡
+│ false   ┆ day     ┆ 0.129 ┆ 14943 ┆ 356  │
+│ false   ┆ evening ┆ 0.234 ┆ 6408  ┆ 356  │
+│ false   ┆ late    ┆ 0.204 ┆ 10683 ┆ 357  │
+│ false   ┆ morning ┆ 0.180 ┆ 8544  ┆ 356  │
+│ false   ┆ night   ┆ 0.047 ┆ 10683 ┆ 357  │
+│ true    ┆ day     ┆ 0.127 ┆ 5922  ┆ 141  │
+│ true    ┆ evening ┆ 0.224 ┆ 2538  ┆ 141  │
+│ true    ┆ late    ┆ 0.201 ┆ 4230  ┆ 141  │
+│ true    ┆ morning ┆ 0.177 ┆ 3384  ┆ 141  │
+│ true    ┆ night   ┆ 0.044 ┆ 4227  ┆ 141  │
+└─────────┴─────────┴───────┴───────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: control c1 null: truth
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.389             ┆ 216  │
+│ 2       ┆ 0.394             ┆ 213  │
+│ 3       ┆ 0.366             ┆ 213  │
+│ 4       ┆ 0.352             ┆ 213  │
+│ 5       ┆ 0.410             ┆ 210  │
+│ 6       ┆ 0.333             ┆ 213  │
+│ 7       ┆ 0.401             ┆ 207  │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: control c1 weekday: labels
+shape: (10, 5)
+┌─────────┬─────────┬───────┬───────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n     ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---   ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32   ┆ u32  │
+╞═════════╪═════════╪═══════╪═══════╪══════╡
+│ false   ┆ day     ┆ 0.118 ┆ 14943 ┆ 356  │
+│ false   ┆ evening ┆ 0.252 ┆ 6408  ┆ 356  │
+│ false   ┆ late    ┆ 0.198 ┆ 10683 ┆ 357  │
+│ false   ┆ morning ┆ 0.179 ┆ 8544  ┆ 356  │
+│ false   ┆ night   ┆ 0.040 ┆ 10683 ┆ 357  │
+│ true    ┆ day     ┆ 0.002 ┆ 5922  ┆ 141  │
+│ true    ┆ evening ┆ 0.045 ┆ 2538  ┆ 141  │
+│ true    ┆ late    ┆ 0.024 ┆ 4230  ┆ 141  │
+│ true    ┆ morning ┆ 0.041 ┆ 3384  ┆ 141  │
+│ true    ┆ night   ┆ 0.050 ┆ 4227  ┆ 141  │
+└─────────┴─────────┴───────┴───────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: control c1 weekday: labels
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.389             ┆ 216  │
+│ 2       ┆ 0.432             ┆ 213  │
+│ 3       ┆ 0.408             ┆ 213  │
+│ 4       ┆ 0.408             ┆ 213  │
+│ 5       ┆ 0.452             ┆ 210  │
+│ 6       ┆ 0.146             ┆ 213  │
+│ 7       ┆ 0.174             ┆ 207  │
+└─────────┴───────────────────┴──────┘
+
+T3 running share by block of the day: control c1 weekday: truth
+shape: (10, 5)
+┌─────────┬─────────┬───────┬───────┬──────┐
+│ weekend ┆ block   ┆ share ┆ n     ┆ days │
+│ ---     ┆ ---     ┆ ---   ┆ ---   ┆ ---  │
+│ bool    ┆ str     ┆ f64   ┆ u32   ┆ u32  │
+╞═════════╪═════════╪═══════╪═══════╪══════╡
+│ false   ┆ day     ┆ 0.188 ┆ 14943 ┆ 356  │
+│ false   ┆ evening ┆ 0.328 ┆ 6408  ┆ 356  │
+│ false   ┆ late    ┆ 0.263 ┆ 10683 ┆ 357  │
+│ false   ┆ morning ┆ 0.231 ┆ 8544  ┆ 356  │
+│ false   ┆ night   ┆ 0.039 ┆ 10683 ┆ 357  │
+│ true    ┆ day     ┆ 0.005 ┆ 5922  ┆ 141  │
+│ true    ┆ evening ┆ 0.051 ┆ 2538  ┆ 141  │
+│ true    ┆ late    ┆ 0.078 ┆ 4230  ┆ 141  │
+│ true    ┆ morning ┆ 0.089 ┆ 3384  ┆ 141  │
+│ true    ┆ night   ┆ 0.054 ┆ 4227  ┆ 141  │
+└─────────┴─────────┴───────┴───────┴──────┘
+
+T3 share of running days (4 or more running half-hours) by weekday: control c1 weekday: truth
+shape: (7, 3)
+┌─────────┬───────────────────┬──────┐
+│ weekday ┆ running_day_share ┆ days │
+│ ---     ┆ ---               ┆ ---  │
+│ i8      ┆ f64               ┆ u32  │
+╞═════════╪═══════════════════╪══════╡
+│ 1       ┆ 0.458             ┆ 216  │
+│ 2       ┆ 0.498             ┆ 213  │
+│ 3       ┆ 0.455             ┆ 213  │
+│ 4       ┆ 0.441             ┆ 213  │
+│ 5       ┆ 0.519             ┆ 210  │
+│ 6       ┆ 0.155             ┆ 213  │
+│ 7       ┆ 0.184             ┆ 207  │
+└─────────┴───────────────────┴──────┘
+
+T4 complete spells in half-hours (hazard: ends at n over reaches n)
+shape: (28, 25)
+┌────────┬───────┬────────┬────────┬───────┬───────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬───────┬───────┬───────┐
+│ set    ┆ state ┆ n      ┆ mean   ┆ p10   ┆ p25   ┆ median ┆ p75    ┆ p90    ┆ max    ┆ share_ ┆ share_ ┆ hazard ┆ hazard ┆ hazard ┆ hazard ┆ hazard ┆ hazard ┆ hazard ┆ hazard ┆ hazard ┆ hazard ┆ hazar ┆ hazar ┆ survi │
+│ ---    ┆ ---   ┆ ---    ┆ ---    ┆ ---   ┆ ---   ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ len1   ┆ len_le ┆ _1     ┆ _2     ┆ _3     ┆ _4     ┆ _5     ┆ _6     ┆ _7     ┆ _8     ┆ _9     ┆ _10    ┆ d_11  ┆ d_12  ┆ val_1 │
+│ str    ┆ str   ┆ f64    ┆ f64    ┆ f64   ┆ f64   ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ ---    ┆ 2      ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ ---    ┆ ---   ┆ ---   ┆ 2     │
+│        ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆ f64    ┆ ---    ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ f64    ┆ f64   ┆ f64   ┆ ---   │
+│        ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆ f64    ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆ f64   │
+╞════════╪═══════╪════════╪════════╪═══════╪═══════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪════════╪═══════╪═══════╪═══════╡
+│ d8 net ┆ on    ┆ 986.00 ┆ 7.102  ┆ 1.000 ┆ 3.000 ┆ 6.000  ┆ 10.000 ┆ 14.000 ┆ 40.000 ┆ 0.125  ┆ 0.245  ┆ 0.125  ┆ 0.138  ┆ 0.112  ┆ 0.091  ┆ 0.115  ┆ 0.158  ┆ 0.145  ┆ 0.151  ┆ 0.172  ┆ 0.190  ┆ 0.243 ┆ 0.194 ┆ 0.167 │
+│ ts     ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8 net ┆ off   ┆ 986.00 ┆ 19.421 ┆ 2.000 ┆ 4.000 ┆ 14.000 ┆ 25.000 ┆ 41.500 ┆ 236.00 ┆ 0.083  ┆ 0.163  ┆ 0.083  ┆ 0.087  ┆ 0.064  ┆ 0.066  ┆ 0.032  ┆ 0.043  ┆ 0.033  ┆ 0.043  ┆ 0.040  ┆ 0.025  ┆ 0.045 ┆ 0.053 ┆ 0.560 │
+│ ts     ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8 net ┆ on    ┆ 976.00 ┆ 6.290  ┆ 1.000 ┆ 2.000 ┆ 5.000  ┆ 9.000  ┆ 13.000 ┆ 34.000 ┆ 0.159  ┆ 0.286  ┆ 0.159  ┆ 0.151  ┆ 0.132  ┆ 0.101  ┆ 0.142  ┆ 0.150  ┆ 0.171  ┆ 0.179  ┆ 0.181  ┆ 0.217  ┆ 0.266 ┆ 0.220 ┆ 0.130 │
+│ tf     ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8 net ┆ off   ┆ 979.00 ┆ 20.448 ┆ 2.000 ┆ 4.000 ┆ 14.000 ┆ 27.000 ┆ 42.000 ┆ 236.00 ┆ 0.069  ┆ 0.152  ┆ 0.069  ┆ 0.089  ┆ 0.061  ┆ 0.062  ┆ 0.036  ┆ 0.038  ┆ 0.029  ┆ 0.041  ┆ 0.035  ┆ 0.039  ┆ 0.041 ┆ 0.048 ┆ 0.573 │
+│ tf     ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ on    ┆ 579.00 ┆ 10.604 ┆ 2.000 ┆ 4.000 ┆ 8.000  ┆ 14.000 ┆ 24.200 ┆ 81.000 ┆ 0.095  ┆ 0.183  ┆ 0.095  ┆ 0.097  ┆ 0.078  ┆ 0.096  ┆ 0.074  ┆ 0.082  ┆ 0.107  ┆ 0.114  ┆ 0.083  ┆ 0.099  ┆ 0.114 ┆ 0.119 ┆ 0.335 │
+│ solar  ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ ts     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ off   ┆ 582.00 ┆ 16.837 ┆ 2.000 ┆ 4.000 ┆ 13.000 ┆ 23.000 ┆ 37.900 ┆ 146.00 ┆ 0.098  ┆ 0.182  ┆ 0.098  ┆ 0.093  ┆ 0.065  ┆ 0.067  ┆ 0.048  ┆ 0.041  ┆ 0.026  ┆ 0.041  ┆ 0.031  ┆ 0.061  ┆ 0.031 ┆ 0.054 ┆ 0.536 │
+│ solar  ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ ts     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ on    ┆ 641.00 ┆ 7.626  ┆ 1.000 ┆ 2.000 ┆ 5.000  ┆ 10.000 ┆ 18.000 ┆ 81.000 ┆ 0.178  ┆ 0.289  ┆ 0.178  ┆ 0.135  ┆ 0.112  ┆ 0.133  ┆ 0.108  ┆ 0.166  ┆ 0.157  ┆ 0.150  ┆ 0.107  ┆ 0.066  ┆ 0.109 ┆ 0.129 ┆ 0.217 │
+│ solar  ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ tf     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ off   ┆ 636.00 ┆ 17.395 ┆ 2.000 ┆ 4.000 ┆ 12.000 ┆ 23.250 ┆ 39.500 ┆ 372.00 ┆ 0.088  ┆ 0.168  ┆ 0.088  ┆ 0.088  ┆ 0.059  ┆ 0.074  ┆ 0.046  ┆ 0.055  ┆ 0.038  ┆ 0.060  ┆ 0.048  ┆ 0.039  ┆ 0.038 ┆ 0.063 ┆ 0.520 │
+│ solar  ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ tf     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ on    ┆ 139.00 ┆ 10.496 ┆ 1.000 ┆ 3.000 ┆ 8.000  ┆ 14.000 ┆ 25.200 ┆ 40.000 ┆ 0.129  ┆ 0.194  ┆ 0.129  ┆ 0.074  ┆ 0.080  ┆ 0.117  ┆ 0.022  ┆ 0.067  ┆ 0.084  ┆ 0.118  ┆ 0.090  ┆ 0.115  ┆ 0.204 ┆ 0.093 ┆ 0.309 │
+│ fade   ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ ts     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ off   ┆ 137.00 ┆ 29.416 ┆ 2.000 ┆ 8.000 ┆ 19.000 ┆ 40.000 ┆ 79.200 ┆ 160.00 ┆ 0.058  ┆ 0.124  ┆ 0.058  ┆ 0.070  ┆ 0.050  ┆ 0.026  ┆ 0.027  ┆ 0.019  ┆ 0.028  ┆ 0.058  ┆ 0.031  ┆ 0.011  ┆ 0.032 ┆ 0.022 ┆ 0.657 │
+│ fade   ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ ts     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ on    ┆ 153.00 ┆ 5.425  ┆ 1.000 ┆ 2.000 ┆ 4.000  ┆ 8.000  ┆ 11.800 ┆ 21.000 ┆ 0.248  ┆ 0.320  ┆ 0.248  ┆ 0.096  ┆ 0.163  ┆ 0.218  ┆ 0.147  ┆ 0.155  ┆ 0.163  ┆ 0.146  ┆ 0.114  ┆ 0.226  ┆ 0.333 ┆ 0.188 ┆ 0.105 │
+│ fade   ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ tf     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ d8     ┆ off   ┆ 151.00 ┆ 30.788 ┆ 2.000 ┆ 7.500 ┆ 20.000 ┆ 41.500 ┆ 77.000 ┆ 164.00 ┆ 0.053  ┆ 0.139  ┆ 0.053  ┆ 0.091  ┆ 0.046  ┆ 0.032  ┆ 0.025  ┆ 0.026  ┆ 0.009  ┆ 0.027  ┆ 0.036  ┆ 0.038  ┆ 0.029 ┆ 0.051 ┆ 0.656 │
+│ fade   ┆       ┆ 0      ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ tf     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ gas A  ┆ on    ┆ 54.000 ┆ 6.222  ┆ 1.000 ┆ 2.000 ┆ 4.000  ┆ 8.750  ┆ 11.000 ┆ 29.000 ┆ 0.130  ┆ 0.352  ┆ 0.130  ┆ 0.255  ┆ 0.114  ┆ 0.194  ┆ 0.120  ┆ 0.182  ┆ 0.111  ┆ 0.125  ┆ 0.286  ┆ 0.200  ┆ 0.375 ┆ 0.000 ┆ 0.093 │
+│ 1+     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ units  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ gas A  ┆ off   ┆ 54.000 ┆ 30.481 ┆ 2.000 ┆ 3.000 ┆ 8.500  ┆ 17.500 ┆ 43.500 ┆ 517.00 ┆ 0.093  ┆ 0.167  ┆ 0.093  ┆ 0.082  ┆ 0.156  ┆ 0.053  ┆ 0.167  ┆ 0.067  ┆ 0.000  ┆ 0.036  ┆ 0.111  ┆ 0.000  ┆ 0.125 ┆ 0.095 ┆ 0.389 │
+│ 1+     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ units  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ gas A  ┆ on    ┆ 32.000 ┆ 6.594  ┆ 1.000 ┆ 1.750 ┆ 5.000  ┆ 10.000 ┆ 11.900 ┆ 28.000 ┆ 0.250  ┆ 0.344  ┆ 0.250  ┆ 0.125  ┆ 0.143  ┆ 0.056  ┆ 0.118  ┆ 0.000  ┆ 0.067  ┆ 0.286  ┆ 0.100  ┆ 0.222  ┆ 0.429 ┆ 0.250 ┆ 0.125 │
+│ 2+     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ units  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ gas A  ┆ off   ┆ 31.000 ┆ 52.516 ┆ 3.000 ┆ 4.500 ┆ 11.000 ┆ 16.000 ┆ 59.000 ┆ 558.00 ┆ 0.065  ┆ 0.097  ┆ 0.065  ┆ 0.034  ┆ 0.143  ┆ 0.042  ┆ 0.130  ┆ 0.050  ┆ 0.053  ┆ 0.000  ┆ 0.056  ┆ 0.059  ┆ 0.188 ┆ 0.077 ┆ 0.419 │
+│ 2+     ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ units  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_nul ┆ on    ┆ 1472.0 ┆ 5.226  ┆ 1.000 ┆ 2.000 ┆ 3.000  ┆ 8.000  ┆ 11.000 ┆ 26.000 ┆ 0.158  ┆ 0.475  ┆ 0.158  ┆ 0.377  ┆ 0.162  ┆ 0.127  ┆ 0.155  ┆ 0.176  ┆ 0.000  ┆ 0.165  ┆ 0.164  ┆ 0.109  ┆ 0.453 ┆ 0.172 ┆ 0.091 │
+│ l      ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (ts)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_nul ┆ off   ┆ 1463.0 ┆ 42.913 ┆ 3.000 ┆ 5.000 ┆ 13.000 ┆ 51.000 ┆ 125.00 ┆ 692.00 ┆ 0.082  ┆ 0.092  ┆ 0.082  ┆ 0.011  ┆ 0.103  ┆ 0.056  ┆ 0.096  ┆ 0.046  ┆ 0.054  ┆ 0.035  ┆ 0.054  ┆ 0.027  ┆ 0.018 ┆ 0.036 ┆ 0.546 │
+│ l      ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆ 0      ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (ts)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_nul ┆ on    ┆ 1303.0 ┆ 4.735  ┆ 1.000 ┆ 2.000 ┆ 2.000  ┆ 8.000  ┆ 11.000 ┆ 30.000 ┆ 0.206  ┆ 0.509  ┆ 0.206  ┆ 0.381  ┆ 0.156  ┆ 0.087  ┆ 0.142  ┆ 0.151  ┆ 0.028  ┆ 0.229  ┆ 0.149  ┆ 0.192  ┆ 0.524 ┆ 0.205 ┆ 0.068 │
+│ l      ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (tf)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_nul ┆ off   ┆ 1294.0 ┆ 49.670 ┆ 2.000 ┆ 5.000 ┆ 15.000 ┆ 65.750 ┆ 142.70 ┆ 719.00 ┆ 0.077  ┆ 0.107  ┆ 0.077  ┆ 0.033  ┆ 0.098  ┆ 0.055  ┆ 0.104  ┆ 0.044  ┆ 0.027  ┆ 0.007  ┆ 0.013  ┆ 0.037  ┆ 0.022 ┆ 0.036 ┆ 0.585 │
+│ l      ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆ 0      ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (tf)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_nul ┆ on    ┆ 1846.0 ┆ 5.800  ┆ 1.000 ┆ 2.000 ┆ 4.000  ┆ 8.000  ┆ 11.000 ┆ 27.000 ┆ 0.164  ┆ 0.413  ┆ 0.164  ┆ 0.298  ┆ 0.129  ┆ 0.144  ┆ 0.171  ┆ 0.209  ┆ 0.057  ┆ 0.102  ┆ 0.232  ┆ 0.162  ┆ 0.394 ┆ 0.000 ┆ 0.095 │
+│ l      ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ truth  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_nul ┆ off   ┆ 1839.0 ┆ 32.614 ┆ 1.000 ┆ 3.000 ┆ 9.000  ┆ 31.000 ┆ 99.000 ┆ 692.00 ┆ 0.103  ┆ 0.159  ┆ 0.103  ┆ 0.062  ┆ 0.154  ┆ 0.054  ┆ 0.153  ┆ 0.071  ┆ 0.008  ┆ 0.041  ┆ 0.075  ┆ 0.008  ┆ 0.015 ┆ 0.082 ┆ 0.455 │
+│ l      ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆        ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ truth  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_wee ┆ on    ┆ 1536.0 ┆ 5.219  ┆ 1.000 ┆ 2.000 ┆ 3.000  ┆ 8.000  ┆ 11.000 ┆ 42.000 ┆ 0.145  ┆ 0.467  ┆ 0.145  ┆ 0.377  ┆ 0.162  ┆ 0.131  ┆ 0.138  ┆ 0.177  ┆ 0.007  ┆ 0.164  ┆ 0.185  ┆ 0.108  ┆ 0.447 ┆ 0.277 ┆ 0.092 │
+│ kday   ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (ts)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_wee ┆ off   ┆ 1528.0 ┆ 40.819 ┆ 3.000 ┆ 4.000 ┆ 12.000 ┆ 51.000 ┆ 122.00 ┆ 432.00 ┆ 0.076  ┆ 0.088  ┆ 0.076  ┆ 0.013  ┆ 0.120  ┆ 0.068  ┆ 0.092  ┆ 0.041  ┆ 0.051  ┆ 0.037  ┆ 0.077  ┆ 0.032  ┆ 0.026 ┆ 0.038 ┆ 0.518 │
+│ kday   ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆ 0      ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (ts)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_wee ┆ on    ┆ 1380.0 ┆ 4.801  ┆ 1.000 ┆ 2.000 ┆ 2.000  ┆ 8.000  ┆ 11.000 ┆ 27.000 ┆ 0.191  ┆ 0.509  ┆ 0.191  ┆ 0.393  ┆ 0.152  ┆ 0.080  ┆ 0.146  ┆ 0.137  ┆ 0.036  ┆ 0.205  ┆ 0.171  ┆ 0.141  ┆ 0.498 ┆ 0.234 ┆ 0.078 │
+│ kday   ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (tf)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_wee ┆ off   ┆ 1371.0 ┆ 46.389 ┆ 2.000 ┆ 4.000 ┆ 14.000 ┆ 61.000 ┆ 140.00 ┆ 422.00 ┆ 0.061  ┆ 0.101  ┆ 0.061  ┆ 0.043  ┆ 0.112  ┆ 0.081  ┆ 0.100  ┆ 0.039  ┆ 0.032  ┆ 0.011  ┆ 0.025  ┆ 0.030  ┆ 0.032 ┆ 0.035 ┆ 0.557 │
+│ kday   ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆ 0      ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ labels ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ (tf)   ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_wee ┆ on    ┆ 1923.0 ┆ 5.787  ┆ 1.000 ┆ 2.000 ┆ 4.000  ┆ 8.000  ┆ 11.000 ┆ 30.000 ┆ 0.155  ┆ 0.414  ┆ 0.155  ┆ 0.307  ┆ 0.142  ┆ 0.143  ┆ 0.158  ┆ 0.227  ┆ 0.065  ┆ 0.103  ┆ 0.232  ┆ 0.147  ┆ 0.389 ┆ 0.000 ┆ 0.094 │
+│ kday   ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ truth  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ c1_wee ┆ off   ┆ 1917.0 ┆ 30.980 ┆ 1.000 ┆ 3.000 ┆ 9.000  ┆ 31.000 ┆ 101.00 ┆ 405.00 ┆ 0.103  ┆ 0.156  ┆ 0.103  ┆ 0.059  ┆ 0.172  ┆ 0.066  ┆ 0.132  ┆ 0.064  ┆ 0.006  ┆ 0.046  ┆ 0.098  ┆ 0.009  ┆ 0.023 ┆ 0.059 ┆ 0.439 │
+│ kday   ┆       ┆ 00     ┆        ┆       ┆       ┆        ┆        ┆ 0      ┆ 0      ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+│ truth  ┆       ┆        ┆        ┆       ┆       ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆        ┆       ┆       ┆       │
+└────────┴───────┴────────┴────────┴───────┴───────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┴───────┴───────┘
+
+T4 on-spells by the block of the day in which the spell starts
+shape: (70, 5)
+┌─────────┬─────┬───────────────┬────────┬────────────────────────┐
+│ block   ┆ n   ┆ share_len_le2 ┆ median ┆ set                    │
+│ ---     ┆ --- ┆ ---           ┆ ---    ┆ ---                    │
+│ str     ┆ u32 ┆ f64           ┆ f64    ┆ str                    │
+╞═════════╪═════╪═══════════════╪════════╪════════════════════════╡
+│ day     ┆ 323 ┆ 0.226         ┆ 8.000  ┆ d8 net ts              │
+│ evening ┆ 239 ┆ 0.130         ┆ 6.000  ┆ d8 net ts              │
+│ late    ┆ 98  ┆ 0.551         ┆ 2.000  ┆ d8 net ts              │
+│ morning ┆ 270 ┆ 0.215         ┆ 5.500  ┆ d8 net ts              │
+│ night   ┆ 56  ┆ 0.464         ┆ 3.000  ┆ d8 net ts              │
+│ day     ┆ 311 ┆ 0.260         ┆ 8.000  ┆ d8 net tf              │
+│ evening ┆ 255 ┆ 0.173         ┆ 6.000  ┆ d8 net tf              │
+│ late    ┆ 103 ┆ 0.602         ┆ 2.000  ┆ d8 net tf              │
+│ morning ┆ 248 ┆ 0.254         ┆ 5.000  ┆ d8 net tf              │
+│ night   ┆ 59  ┆ 0.492         ┆ 3.000  ┆ d8 net tf              │
+│ day     ┆ 204 ┆ 0.196         ┆ 11.000 ┆ d8 solar ts            │
+│ evening ┆ 80  ┆ 0.075         ┆ 8.000  ┆ d8 solar ts            │
+│ late    ┆ 85  ┆ 0.424         ┆ 3.000  ┆ d8 solar ts            │
+│ morning ┆ 155 ┆ 0.058         ┆ 8.000  ┆ d8 solar ts            │
+│ night   ┆ 55  ┆ 0.273         ┆ 5.000  ┆ d8 solar ts            │
+│ day     ┆ 202 ┆ 0.317         ┆ 5.500  ┆ d8 solar tf            │
+│ evening ┆ 94  ┆ 0.319         ┆ 5.000  ┆ d8 solar tf            │
+│ late    ┆ 111 ┆ 0.495         ┆ 3.000  ┆ d8 solar tf            │
+│ morning ┆ 168 ┆ 0.083         ┆ 7.000  ┆ d8 solar tf            │
+│ night   ┆ 66  ┆ 0.333         ┆ 4.500  ┆ d8 solar tf            │
+│ day     ┆ 40  ┆ 0.175         ┆ 11.000 ┆ d8 fade ts             │
+│ evening ┆ 30  ┆ 0.000         ┆ 8.000  ┆ d8 fade ts             │
+│ late    ┆ 29  ┆ 0.379         ┆ 4.000  ┆ d8 fade ts             │
+│ morning ┆ 30  ┆ 0.200         ┆ 9.500  ┆ d8 fade ts             │
+│ night   ┆ 10  ┆ 0.300         ┆ 5.000  ┆ d8 fade ts             │
+│ day     ┆ 42  ┆ 0.476         ┆ 3.000  ┆ d8 fade tf             │
+│ evening ┆ 12  ┆ 0.333         ┆ 4.000  ┆ d8 fade tf             │
+│ late    ┆ 56  ┆ 0.268         ┆ 4.000  ┆ d8 fade tf             │
+│ morning ┆ 32  ┆ 0.188         ┆ 6.000  ┆ d8 fade tf             │
+│ night   ┆ 11  ┆ 0.364         ┆ 3.000  ┆ d8 fade tf             │
+│ day     ┆ 20  ┆ 0.450         ┆ 5.000  ┆ gas A 1+ units         │
+│ evening ┆ 9   ┆ 0.556         ┆ 2.000  ┆ gas A 1+ units         │
+│ late    ┆ 4   ┆ 0.000         ┆ 5.500  ┆ gas A 1+ units         │
+│ morning ┆ 15  ┆ 0.200         ┆ 4.000  ┆ gas A 1+ units         │
+│ night   ┆ 6   ┆ 0.333         ┆ 3.500  ┆ gas A 1+ units         │
+│ day     ┆ 11  ┆ 0.273         ┆ 7.000  ┆ gas A 2+ units         │
+│ evening ┆ 7   ┆ 0.429         ┆ 10.000 ┆ gas A 2+ units         │
+│ late    ┆ 2   ┆ 0.000         ┆ 6.500  ┆ gas A 2+ units         │
+│ morning ┆ 7   ┆ 0.429         ┆ 4.000  ┆ gas A 2+ units         │
+│ night   ┆ 5   ┆ 0.400         ┆ 3.000  ┆ gas A 2+ units         │
+│ day     ┆ 479 ┆ 0.514         ┆ 2.000  ┆ c1_null labels (ts)    │
+│ evening ┆ 295 ┆ 0.617         ┆ 2.000  ┆ c1_null labels (ts)    │
+│ late    ┆ 116 ┆ 0.052         ┆ 6.000  ┆ c1_null labels (ts)    │
+│ morning ┆ 318 ┆ 0.381         ┆ 3.000  ┆ c1_null labels (ts)    │
+│ night   ┆ 264 ┆ 0.545         ┆ 2.000  ┆ c1_null labels (ts)    │
+│ day     ┆ 398 ┆ 0.460         ┆ 4.000  ┆ c1_null labels (tf)    │
+│ evening ┆ 277 ┆ 0.650         ┆ 2.000  ┆ c1_null labels (tf)    │
+│ late    ┆ 87  ┆ 0.149         ┆ 6.000  ┆ c1_null labels (tf)    │
+│ morning ┆ 264 ┆ 0.504         ┆ 2.000  ┆ c1_null labels (tf)    │
+│ night   ┆ 277 ┆ 0.556         ┆ 2.000  ┆ c1_null labels (tf)    │
+│ day     ┆ 626 ┆ 0.495         ┆ 5.000  ┆ c1_null truth          │
+│ evening ┆ 328 ┆ 0.613         ┆ 2.000  ┆ c1_null truth          │
+│ late    ┆ 152 ┆ 0.000         ┆ 5.000  ┆ c1_null truth          │
+│ morning ┆ 450 ┆ 0.240         ┆ 4.000  ┆ c1_null truth          │
+│ night   ┆ 290 ┆ 0.493         ┆ 3.000  ┆ c1_null truth          │
+│ day     ┆ 508 ┆ 0.506         ┆ 2.000  ┆ c1_weekday labels (ts) │
+│ evening ┆ 310 ┆ 0.613         ┆ 2.000  ┆ c1_weekday labels (ts) │
+│ late    ┆ 119 ┆ 0.067         ┆ 6.000  ┆ c1_weekday labels (ts) │
+│ morning ┆ 357 ┆ 0.387         ┆ 3.000  ┆ c1_weekday labels (ts) │
+│ night   ┆ 242 ┆ 0.512         ┆ 2.000  ┆ c1_weekday labels (ts) │
+│ day     ┆ 442 ┆ 0.462         ┆ 4.000  ┆ c1_weekday labels (tf) │
+│ evening ┆ 299 ┆ 0.666         ┆ 2.000  ┆ c1_weekday labels (tf) │
+│ late    ┆ 85  ┆ 0.165         ┆ 6.000  ┆ c1_weekday labels (tf) │
+│ morning ┆ 285 ┆ 0.502         ┆ 2.000  ┆ c1_weekday labels (tf) │
+│ night   ┆ 269 ┆ 0.528         ┆ 2.000  ┆ c1_weekday labels (tf) │
+│ day     ┆ 665 ┆ 0.499         ┆ 5.000  ┆ c1_weekday truth       │
+│ evening ┆ 348 ┆ 0.638         ┆ 2.000  ┆ c1_weekday truth       │
+│ late    ┆ 150 ┆ 0.000         ┆ 6.000  ┆ c1_weekday truth       │
+│ morning ┆ 501 ┆ 0.240         ┆ 4.000  ┆ c1_weekday truth       │
+│ night   ┆ 259 ┆ 0.475         ┆ 3.000  ┆ c1_weekday truth       │
+└─────────┴─────┴───────────────┴────────┴────────────────────────┘
+
+T5 gas A levels (from power, not from the `units` column): {'share_of_running_at_1_units': 0.3914285714285714, 'share_of_running_at_2_units': 0.38, 'share_of_running_at_3_units': 0.22857142857142856, 'share_of_running_at_full_level': 0.8542857142857143, 'running_half_hours': 350.0}
+T5 gas A edges: 54 complete on-spells with 3 half-hours either side; first full level within 1 half-hour 0.667, within 2 0.944
+
+T5 the tracker's fitted block size in MW among flagged half-hours, by era
+shape: (8, 6)
+┌───────┬────────┬─────────┬──────┬──────────┬───────┐
+│ era   ┆ k_path ┆ unit_mw ┆ n    ┆ block_mw ┆ share │
+│ ---   ┆ ---    ┆ ---     ┆ ---  ┆ ---      ┆ ---   │
+│ str   ┆ i64    ┆ f64     ┆ u32  ┆ f64      ┆ f64   │
+╞═══════╪════════╪═════════╪══════╪══════════╪═══════╡
+│ fade  ┆ 1      ┆ 3.500   ┆ 868  ┆ 3.500    ┆ 0.625 │
+│ fade  ┆ 2      ┆ 3.500   ┆ 521  ┆ 7.000    ┆ 0.375 │
+│ net   ┆ 1      ┆ 1.750   ┆ 377  ┆ 1.750    ┆ 0.054 │
+│ net   ┆ 2      ┆ 1.750   ┆ 1596 ┆ 3.500    ┆ 0.230 │
+│ net   ┆ 3      ┆ 1.750   ┆ 4971 ┆ 5.250    ┆ 0.716 │
+│ solar ┆ 1      ┆ 2.250   ┆ 500  ┆ 2.250    ┆ 0.084 │
+│ solar ┆ 2      ┆ 2.250   ┆ 4935 ┆ 4.500    ┆ 0.830 │
+│ solar ┆ 3      ┆ 2.250   ┆ 513  ┆ 6.750    ┆ 0.086 │
+└───────┴────────┴─────────┴──────┴──────────┴───────┘
+
+D8's reading does not give a unit count: the tracker's count is a block size.
+
+T6 running share by driver bin (bins under 20 days are left out)
+shape: (366, 6)
+┌─────────────────────────┬───────────────────────────────────────────┬─────┬────────────┬──────┬───────┐
+│ set                     ┆ driver                                    ┆ bin ┆ half_hours ┆ days ┆ share │
+│ ---                     ┆ ---                                       ┆ --- ┆ ---        ┆ ---  ┆ ---   │
+│ str                     ┆ str                                       ┆ i64 ┆ i64        ┆ i64  ┆ f64   │
+╞═════════════════════════╪═══════════════════════════════════════════╪═════╪════════════╪══════╪═══════╡
+│ d8 net ts               ┆ d8 system price third within cell         ┆ 0   ┆ 9112       ┆ 527  ┆ 0.139 │
+│ d8 net ts               ┆ d8 system price third within cell         ┆ 1   ┆ 8701       ┆ 542  ┆ 0.257 │
+│ d8 net ts               ┆ d8 system price third within cell         ┆ 2   ┆ 8282       ┆ 519  ┆ 0.423 │
+│ d8 net ts               ┆ d8 system price fifth overall             ┆ 0   ┆ 5187       ┆ 428  ┆ 0.036 │
+│ d8 net ts               ┆ d8 system price fifth overall             ┆ 1   ┆ 5235       ┆ 476  ┆ 0.147 │
+│ d8 net ts               ┆ d8 system price fifth overall             ┆ 2   ┆ 5230       ┆ 506  ┆ 0.186 │
+│ d8 net ts               ┆ d8 system price fifth overall             ┆ 3   ┆ 5184       ┆ 500  ┆ 0.403 │
+│ d8 net ts               ┆ d8 system price fifth overall             ┆ 4   ┆ 5259       ┆ 381  ┆ 0.568 │
+│ d8 net ts               ┆ d8 spark spread fifth                     ┆ 0   ┆ 5200       ┆ 435  ┆ 0.043 │
+│ d8 net ts               ┆ d8 spark spread fifth                     ┆ 1   ┆ 5200       ┆ 497  ┆ 0.133 │
+│ d8 net ts               ┆ d8 spark spread fifth                     ┆ 2   ┆ 5199       ┆ 507  ┆ 0.179 │
+│ d8 net ts               ┆ d8 spark spread fifth                     ┆ 3   ┆ 5200       ┆ 535  ┆ 0.336 │
+│ d8 net ts               ┆ d8 spark spread fifth                     ┆ 4   ┆ 5200       ┆ 475  ┆ 0.652 │
+│ d8 net ts               ┆ d8 gas price fifth                        ┆ 0   ┆ 5183       ┆ 120  ┆ 0.229 │
+│ d8 net ts               ┆ d8 gas price fifth                        ┆ 1   ┆ 5182       ┆ 133  ┆ 0.241 │
+│ d8 net ts               ┆ d8 gas price fifth                        ┆ 2   ┆ 5191       ┆ 127  ┆ 0.317 │
+│ d8 net ts               ┆ d8 gas price fifth                        ┆ 3   ┆ 5221       ┆ 122  ┆ 0.253 │
+│ d8 net ts               ┆ d8 gas price fifth                        ┆ 4   ┆ 5222       ┆ 117  ┆ 0.303 │
+│ d8 net ts               ┆ d8 national wind third                    ┆ 0   ┆ 3871       ┆ 142  ┆ 0.367 │
+│ d8 net ts               ┆ d8 national wind third                    ┆ 1   ┆ 3871       ┆ 173  ┆ 0.283 │
+│ d8 net ts               ┆ d8 national wind third                    ┆ 2   ┆ 3871       ┆ 131  ┆ 0.170 │
+│ d8 net ts               ┆ d8 price rank in day quarter              ┆ 0   ┆ 6522       ┆ 544  ┆ 0.073 │
+│ d8 net ts               ┆ d8 price rank in day quarter              ┆ 1   ┆ 5982       ┆ 544  ┆ 0.164 │
+│ d8 net ts               ┆ d8 price rank in day quarter              ┆ 2   ┆ 6524       ┆ 544  ┆ 0.266 │
+│ d8 net ts               ┆ d8 price rank in day quarter              ┆ 3   ┆ 7067       ┆ 544  ┆ 0.540 │
+│ d8 net ts               ┆ d8 temperature third within cell          ┆ 0   ┆ 9120       ┆ 339  ┆ 0.306 │
+│ d8 net ts               ┆ d8 temperature third within cell          ┆ 1   ┆ 8681       ┆ 413  ┆ 0.267 │
+│ d8 net ts               ┆ d8 temperature third within cell          ┆ 2   ┆ 8294       ┆ 317  ┆ 0.228 │
+│ d8 net ts               ┆ d8 100 m wind third within cell           ┆ 0   ┆ 9120       ┆ 397  ┆ 0.332 │
+│ d8 net ts               ┆ d8 100 m wind third within cell           ┆ 1   ┆ 8681       ┆ 463  ┆ 0.267 │
+│ d8 net ts               ┆ d8 100 m wind third within cell           ┆ 2   ┆ 8294       ┆ 356  ┆ 0.201 │
+│ d8 net ts               ┆ d8 irradiance third within cell           ┆ 0   ┆ 4920       ┆ 435  ┆ 0.429 │
+│ d8 net ts               ┆ d8 irradiance third within cell           ┆ 1   ┆ 16793      ┆ 544  ┆ 0.212 │
+│ d8 net ts               ┆ d8 irradiance third within cell           ┆ 2   ┆ 4382       ┆ 392  ┆ 0.304 │
+│ d8 net p_any_a          ┆ d8 system price third within cell         ┆ 0   ┆ 9112       ┆ 527  ┆ 0.139 │
+│ d8 net p_any_a          ┆ d8 system price third within cell         ┆ 1   ┆ 8701       ┆ 542  ┆ 0.256 │
+│ d8 net p_any_a          ┆ d8 system price third within cell         ┆ 2   ┆ 8282       ┆ 519  ┆ 0.419 │
+│ d8 net p_any_a          ┆ d8 system price fifth overall             ┆ 0   ┆ 5187       ┆ 428  ┆ 0.038 │
+│ d8 net p_any_a          ┆ d8 system price fifth overall             ┆ 1   ┆ 5235       ┆ 476  ┆ 0.148 │
+│ d8 net p_any_a          ┆ d8 system price fifth overall             ┆ 2   ┆ 5230       ┆ 506  ┆ 0.186 │
+│ d8 net p_any_a          ┆ d8 system price fifth overall             ┆ 3   ┆ 5184       ┆ 500  ┆ 0.401 │
+│ d8 net p_any_a          ┆ d8 system price fifth overall             ┆ 4   ┆ 5259       ┆ 381  ┆ 0.561 │
+│ d8 net p_any_a          ┆ d8 spark spread fifth                     ┆ 0   ┆ 5200       ┆ 435  ┆ 0.045 │
+│ d8 net p_any_a          ┆ d8 spark spread fifth                     ┆ 1   ┆ 5200       ┆ 497  ┆ 0.134 │
+│ d8 net p_any_a          ┆ d8 spark spread fifth                     ┆ 2   ┆ 5199       ┆ 507  ┆ 0.178 │
+│ d8 net p_any_a          ┆ d8 spark spread fifth                     ┆ 3   ┆ 5200       ┆ 535  ┆ 0.335 │
+│ d8 net p_any_a          ┆ d8 spark spread fifth                     ┆ 4   ┆ 5200       ┆ 475  ┆ 0.646 │
+│ d8 net p_any_a          ┆ d8 gas price fifth                        ┆ 0   ┆ 5183       ┆ 120  ┆ 0.229 │
+│ d8 net p_any_a          ┆ d8 gas price fifth                        ┆ 1   ┆ 5182       ┆ 133  ┆ 0.237 │
+│ d8 net p_any_a          ┆ d8 gas price fifth                        ┆ 2   ┆ 5191       ┆ 127  ┆ 0.316 │
+│ d8 net p_any_a          ┆ d8 gas price fifth                        ┆ 3   ┆ 5221       ┆ 122  ┆ 0.254 │
+│ d8 net p_any_a          ┆ d8 gas price fifth                        ┆ 4   ┆ 5222       ┆ 117  ┆ 0.300 │
+│ d8 net p_any_a          ┆ d8 national wind third                    ┆ 0   ┆ 3871       ┆ 142  ┆ 0.366 │
+│ d8 net p_any_a          ┆ d8 national wind third                    ┆ 1   ┆ 3871       ┆ 173  ┆ 0.280 │
+│ d8 net p_any_a          ┆ d8 national wind third                    ┆ 2   ┆ 3871       ┆ 131  ┆ 0.170 │
+│ d8 net p_any_a          ┆ d8 price rank in day quarter              ┆ 0   ┆ 6522       ┆ 544  ┆ 0.074 │
+│ d8 net p_any_a          ┆ d8 price rank in day quarter              ┆ 1   ┆ 5982       ┆ 544  ┆ 0.164 │
+│ d8 net p_any_a          ┆ d8 price rank in day quarter              ┆ 2   ┆ 6524       ┆ 544  ┆ 0.265 │
+│ d8 net p_any_a          ┆ d8 price rank in day quarter              ┆ 3   ┆ 7067       ┆ 544  ┆ 0.535 │
+│ d8 net p_any_a          ┆ d8 temperature third within cell          ┆ 0   ┆ 9120       ┆ 339  ┆ 0.308 │
+│ d8 net p_any_a          ┆ d8 temperature third within cell          ┆ 1   ┆ 8681       ┆ 413  ┆ 0.264 │
+│ d8 net p_any_a          ┆ d8 temperature third within cell          ┆ 2   ┆ 8294       ┆ 317  ┆ 0.225 │
+│ d8 net p_any_a          ┆ d8 100 m wind third within cell           ┆ 0   ┆ 9120       ┆ 397  ┆ 0.330 │
+│ d8 net p_any_a          ┆ d8 100 m wind third within cell           ┆ 1   ┆ 8681       ┆ 463  ┆ 0.265 │
+│ d8 net p_any_a          ┆ d8 100 m wind third within cell           ┆ 2   ┆ 8294       ┆ 356  ┆ 0.201 │
+│ d8 net p_any_a          ┆ d8 irradiance third within cell           ┆ 0   ┆ 4920       ┆ 435  ┆ 0.424 │
+│ d8 net p_any_a          ┆ d8 irradiance third within cell           ┆ 1   ┆ 16793      ┆ 544  ┆ 0.212 │
+│ d8 net p_any_a          ┆ d8 irradiance third within cell           ┆ 2   ┆ 4382       ┆ 392  ┆ 0.305 │
+│ d8 solar ts             ┆ d8 system price third within cell         ┆ 0   ┆ 5810       ┆ 335  ┆ 0.272 │
+│ d8 solar ts             ┆ d8 system price third within cell         ┆ 1   ┆ 5457       ┆ 339  ┆ 0.395 │
+│ d8 solar ts             ┆ d8 system price third within cell         ┆ 2   ┆ 4989       ┆ 335  ┆ 0.509 │
+│ d8 solar ts             ┆ d8 system price fifth overall             ┆ 0   ┆ 3260       ┆ 260  ┆ 0.146 │
+│ d8 solar ts             ┆ d8 system price fifth overall             ┆ 1   ┆ 3260       ┆ 316  ┆ 0.290 │
+│ d8 solar ts             ┆ d8 system price fifth overall             ┆ 2   ┆ 3262       ┆ 331  ┆ 0.351 │
+│ d8 solar ts             ┆ d8 system price fifth overall             ┆ 3   ┆ 3262       ┆ 331  ┆ 0.481 │
+│ d8 solar ts             ┆ d8 system price fifth overall             ┆ 4   ┆ 3261       ┆ 301  ┆ 0.658 │
+│ d8 solar ts             ┆ d8 spark spread fifth                     ┆ 0   ┆ 3251       ┆ 267  ┆ 0.153 │
+│ d8 solar ts             ┆ d8 spark spread fifth                     ┆ 1   ┆ 3250       ┆ 322  ┆ 0.267 │
+│ d8 solar ts             ┆ d8 spark spread fifth                     ┆ 2   ┆ 3252       ┆ 331  ┆ 0.368 │
+│ d8 solar ts             ┆ d8 spark spread fifth                     ┆ 3   ┆ 3250       ┆ 333  ┆ 0.462 │
+│ d8 solar ts             ┆ d8 spark spread fifth                     ┆ 4   ┆ 3254       ┆ 318  ┆ 0.682 │
+│ d8 solar ts             ┆ d8 gas price fifth                        ┆ 0   ┆ 3216       ┆ 81   ┆ 0.427 │
+│ d8 solar ts             ┆ d8 gas price fifth                        ┆ 1   ┆ 3246       ┆ 95   ┆ 0.360 │
+│ d8 solar ts             ┆ d8 gas price fifth                        ┆ 2   ┆ 3273       ┆ 98   ┆ 0.394 │
+│ d8 solar ts             ┆ d8 gas price fifth                        ┆ 3   ┆ 3250       ┆ 91   ┆ 0.374 │
+│ d8 solar ts             ┆ d8 gas price fifth                        ┆ 4   ┆ 3272       ┆ 78   ┆ 0.378 │
+│ d8 solar ts             ┆ d8 day-ahead price third                  ┆ 0   ┆ 2877       ┆ 157  ┆ 0.185 │
+│ d8 solar ts             ┆ d8 day-ahead price third                  ┆ 1   ┆ 2877       ┆ 170  ┆ 0.404 │
+│ d8 solar ts             ┆ d8 day-ahead price third                  ┆ 2   ┆ 2881       ┆ 170  ┆ 0.696 │
+│ d8 solar ts             ┆ d8 national wind third                    ┆ 0   ┆ 5433       ┆ 190  ┆ 0.417 │
+│ d8 solar ts             ┆ d8 national wind third                    ┆ 1   ┆ 5437       ┆ 245  ┆ 0.416 │
+│ d8 solar ts             ┆ d8 national wind third                    ┆ 2   ┆ 5435       ┆ 192  ┆ 0.322 │
+│ d8 solar ts             ┆ d8 price rank in day quarter              ┆ 0   ┆ 3739       ┆ 341  ┆ 0.217 │
+│ d8 solar ts             ┆ d8 price rank in day quarter              ┆ 1   ┆ 4413       ┆ 340  ┆ 0.315 │
+│ d8 solar ts             ┆ d8 price rank in day quarter              ┆ 2   ┆ 4076       ┆ 340  ┆ 0.396 │
+│ d8 solar ts             ┆ d8 price rank in day quarter              ┆ 3   ┆ 4077       ┆ 340  ┆ 0.606 │
+│ d8 solar ts             ┆ d8 temperature third within cell          ┆ 0   ┆ 5804       ┆ 212  ┆ 0.401 │
+│ d8 solar ts             ┆ d8 temperature third within cell          ┆ 1   ┆ 5468       ┆ 277  ┆ 0.405 │
+│ d8 solar ts             ┆ d8 temperature third within cell          ┆ 2   ┆ 4984       ┆ 193  ┆ 0.349 │
+│ d8 solar ts             ┆ d8 100 m wind third within cell           ┆ 0   ┆ 5804       ┆ 257  ┆ 0.451 │
+│ d8 solar ts             ┆ d8 100 m wind third within cell           ┆ 1   ┆ 5468       ┆ 306  ┆ 0.383 │
+│ d8 solar ts             ┆ d8 100 m wind third within cell           ┆ 2   ┆ 4984       ┆ 226  ┆ 0.314 │
+│ d8 solar ts             ┆ d8 irradiance third within cell           ┆ 0   ┆ 3366       ┆ 285  ┆ 0.482 │
+│ d8 solar ts             ┆ d8 irradiance third within cell           ┆ 1   ┆ 10026      ┆ 339  ┆ 0.323 │
+│ d8 solar ts             ┆ d8 irradiance third within cell           ┆ 2   ┆ 2864       ┆ 250  ┆ 0.494 │
+│ d8 solar p_any_a        ┆ d8 system price third within cell         ┆ 0   ┆ 5810       ┆ 335  ┆ 0.281 │
+│ d8 solar p_any_a        ┆ d8 system price third within cell         ┆ 1   ┆ 5457       ┆ 339  ┆ 0.391 │
+│ d8 solar p_any_a        ┆ d8 system price third within cell         ┆ 2   ┆ 4989       ┆ 335  ┆ 0.504 │
+│ d8 solar p_any_a        ┆ d8 system price fifth overall             ┆ 0   ┆ 3260       ┆ 260  ┆ 0.167 │
+│ d8 solar p_any_a        ┆ d8 system price fifth overall             ┆ 1   ┆ 3260       ┆ 316  ┆ 0.298 │
+│ d8 solar p_any_a        ┆ d8 system price fifth overall             ┆ 2   ┆ 3262       ┆ 331  ┆ 0.350 │
+│ d8 solar p_any_a        ┆ d8 system price fifth overall             ┆ 3   ┆ 3262       ┆ 331  ┆ 0.477 │
+│ d8 solar p_any_a        ┆ d8 system price fifth overall             ┆ 4   ┆ 3261       ┆ 301  ┆ 0.635 │
+│ d8 solar p_any_a        ┆ d8 spark spread fifth                     ┆ 0   ┆ 3251       ┆ 267  ┆ 0.172 │
+│ d8 solar p_any_a        ┆ d8 spark spread fifth                     ┆ 1   ┆ 3250       ┆ 322  ┆ 0.277 │
+│ d8 solar p_any_a        ┆ d8 spark spread fifth                     ┆ 2   ┆ 3252       ┆ 331  ┆ 0.366 │
+│ d8 solar p_any_a        ┆ d8 spark spread fifth                     ┆ 3   ┆ 3250       ┆ 333  ┆ 0.459 │
+│ d8 solar p_any_a        ┆ d8 spark spread fifth                     ┆ 4   ┆ 3254       ┆ 318  ┆ 0.659 │
+│ d8 solar p_any_a        ┆ d8 gas price fifth                        ┆ 0   ┆ 3216       ┆ 81   ┆ 0.426 │
+│ d8 solar p_any_a        ┆ d8 gas price fifth                        ┆ 1   ┆ 3246       ┆ 95   ┆ 0.360 │
+│ d8 solar p_any_a        ┆ d8 gas price fifth                        ┆ 2   ┆ 3273       ┆ 98   ┆ 0.390 │
+│ d8 solar p_any_a        ┆ d8 gas price fifth                        ┆ 3   ┆ 3250       ┆ 91   ┆ 0.389 │
+│ d8 solar p_any_a        ┆ d8 gas price fifth                        ┆ 4   ┆ 3272       ┆ 78   ┆ 0.368 │
+│ d8 solar p_any_a        ┆ d8 day-ahead price third                  ┆ 0   ┆ 2877       ┆ 157  ┆ 0.185 │
+│ d8 solar p_any_a        ┆ d8 day-ahead price third                  ┆ 1   ┆ 2877       ┆ 170  ┆ 0.407 │
+│ d8 solar p_any_a        ┆ d8 day-ahead price third                  ┆ 2   ┆ 2881       ┆ 170  ┆ 0.667 │
+│ d8 solar p_any_a        ┆ d8 national wind third                    ┆ 0   ┆ 5433       ┆ 190  ┆ 0.421 │
+│ d8 solar p_any_a        ┆ d8 national wind third                    ┆ 1   ┆ 5437       ┆ 245  ┆ 0.413 │
+│ d8 solar p_any_a        ┆ d8 national wind third                    ┆ 2   ┆ 5435       ┆ 192  ┆ 0.322 │
+│ d8 solar p_any_a        ┆ d8 price rank in day quarter              ┆ 0   ┆ 3739       ┆ 341  ┆ 0.232 │
+│ d8 solar p_any_a        ┆ d8 price rank in day quarter              ┆ 1   ┆ 4413       ┆ 340  ┆ 0.318 │
+│ d8 solar p_any_a        ┆ d8 price rank in day quarter              ┆ 2   ┆ 4076       ┆ 340  ┆ 0.394 │
+│ d8 solar p_any_a        ┆ d8 price rank in day quarter              ┆ 3   ┆ 4077       ┆ 340  ┆ 0.590 │
+│ d8 solar p_any_a        ┆ d8 temperature third within cell          ┆ 0   ┆ 5804       ┆ 212  ┆ 0.400 │
+│ d8 solar p_any_a        ┆ d8 temperature third within cell          ┆ 1   ┆ 5468       ┆ 277  ┆ 0.404 │
+│ d8 solar p_any_a        ┆ d8 temperature third within cell          ┆ 2   ┆ 4984       ┆ 193  ┆ 0.351 │
+│ d8 solar p_any_a        ┆ d8 100 m wind third within cell           ┆ 0   ┆ 5804       ┆ 257  ┆ 0.447 │
+│ d8 solar p_any_a        ┆ d8 100 m wind third within cell           ┆ 1   ┆ 5468       ┆ 306  ┆ 0.385 │
+│ d8 solar p_any_a        ┆ d8 100 m wind third within cell           ┆ 2   ┆ 4984       ┆ 226  ┆ 0.317 │
+│ d8 solar p_any_a        ┆ d8 irradiance third within cell           ┆ 0   ┆ 3366       ┆ 285  ┆ 0.481 │
+│ d8 solar p_any_a        ┆ d8 irradiance third within cell           ┆ 1   ┆ 10026      ┆ 339  ┆ 0.326 │
+│ d8 solar p_any_a        ┆ d8 irradiance third within cell           ┆ 2   ┆ 2864       ┆ 250  ┆ 0.486 │
+│ d8 fade ts              ┆ d8 system price third within cell         ┆ 0   ┆ 2104       ┆ 121  ┆ 0.182 │
+│ d8 fade ts              ┆ d8 system price third within cell         ┆ 1   ┆ 1923       ┆ 120  ┆ 0.250 │
+│ d8 fade ts              ┆ d8 system price third within cell         ┆ 2   ┆ 1771       ┆ 115  ┆ 0.377 │
+│ d8 fade ts              ┆ d8 system price fifth overall             ┆ 0   ┆ 1160       ┆ 98   ┆ 0.152 │
+│ d8 fade ts              ┆ d8 system price fifth overall             ┆ 1   ┆ 1160       ┆ 115  ┆ 0.174 │
+│ d8 fade ts              ┆ d8 system price fifth overall             ┆ 2   ┆ 1160       ┆ 119  ┆ 0.190 │
+│ d8 fade ts              ┆ d8 system price fifth overall             ┆ 3   ┆ 1151       ┆ 119  ┆ 0.295 │
+│ d8 fade ts              ┆ d8 system price fifth overall             ┆ 4   ┆ 1169       ┆ 111  ┆ 0.508 │
+│ d8 fade ts              ┆ d8 spark spread fifth                     ┆ 0   ┆ 1141       ┆ 94   ┆ 0.132 │
+│ d8 fade ts              ┆ d8 spark spread fifth                     ┆ 1   ┆ 1141       ┆ 114  ┆ 0.178 │
+│ d8 fade ts              ┆ d8 spark spread fifth                     ┆ 2   ┆ 1140       ┆ 119  ┆ 0.207 │
+│ d8 fade ts              ┆ d8 spark spread fifth                     ┆ 3   ┆ 1141       ┆ 119  ┆ 0.304 │
+│ d8 fade ts              ┆ d8 spark spread fifth                     ┆ 4   ┆ 1141       ┆ 112  ┆ 0.491 │
+│ d8 fade ts              ┆ d8 gas price fifth                        ┆ 0   ┆ 1104       ┆ 28   ┆ 0.258 │
+│ d8 fade ts              ┆ d8 gas price fifth                        ┆ 1   ┆ 1151       ┆ 31   ┆ 0.278 │
+│ d8 fade ts              ┆ d8 gas price fifth                        ┆ 2   ┆ 1151       ┆ 31   ┆ 0.195 │
+│ d8 fade ts              ┆ d8 gas price fifth                        ┆ 3   ┆ 1148       ┆ 32   ┆ 0.295 │
+│ d8 fade ts              ┆ d8 gas price fifth                        ┆ 4   ┆ 1150       ┆ 29   ┆ 0.286 │
+│ d8 fade ts              ┆ d8 day-ahead price third                  ┆ 0   ┆ 1933       ┆ 104  ┆ 0.164 │
+│ d8 fade ts              ┆ d8 day-ahead price third                  ┆ 1   ┆ 1933       ┆ 117  ┆ 0.245 │
+│ d8 fade ts              ┆ d8 day-ahead price third                  ┆ 2   ┆ 1934       ┆ 114  ┆ 0.384 │
+│ d8 fade ts              ┆ d8 national wind third                    ┆ 0   ┆ 1933       ┆ 70   ┆ 0.276 │
+│ d8 fade ts              ┆ d8 national wind third                    ┆ 1   ┆ 1933       ┆ 93   ┆ 0.297 │
+│ d8 fade ts              ┆ d8 national wind third                    ┆ 2   ┆ 1934       ┆ 75   ┆ 0.220 │
+│ d8 fade ts              ┆ d8 price rank in day quarter              ┆ 0   ┆ 1449       ┆ 121  ┆ 0.207 │
+│ d8 fade ts              ┆ d8 price rank in day quarter              ┆ 1   ┆ 1450       ┆ 121  ┆ 0.191 │
+│ d8 fade ts              ┆ d8 price rank in day quarter              ┆ 2   ┆ 1448       ┆ 121  ┆ 0.252 │
+│ d8 fade ts              ┆ d8 price rank in day quarter              ┆ 3   ┆ 1453       ┆ 123  ┆ 0.406 │
+│ d8 fade ts              ┆ d8 temperature third within cell          ┆ 0   ┆ 2106       ┆ 76   ┆ 0.275 │
+│ d8 fade ts              ┆ d8 temperature third within cell          ┆ 1   ┆ 1919       ┆ 105  ┆ 0.282 │
+│ d8 fade ts              ┆ d8 temperature third within cell          ┆ 2   ┆ 1773       ┆ 70   ┆ 0.231 │
+│ d8 fade ts              ┆ d8 100 m wind third within cell           ┆ 0   ┆ 2106       ┆ 92   ┆ 0.312 │
+│ d8 fade ts              ┆ d8 100 m wind third within cell           ┆ 1   ┆ 1919       ┆ 113  ┆ 0.247 │
+│ d8 fade ts              ┆ d8 100 m wind third within cell           ┆ 2   ┆ 1773       ┆ 81   ┆ 0.225 │
+│ d8 fade ts              ┆ d8 irradiance third within cell           ┆ 0   ┆ 1432       ┆ 97   ┆ 0.291 │
+│ d8 fade ts              ┆ d8 irradiance third within cell           ┆ 1   ┆ 3159       ┆ 121  ┆ 0.221 │
+│ d8 fade ts              ┆ d8 irradiance third within cell           ┆ 2   ┆ 1207       ┆ 82   ┆ 0.345 │
+│ d8 fade p_any_a         ┆ d8 system price third within cell         ┆ 0   ┆ 2104       ┆ 121  ┆ 0.216 │
+│ d8 fade p_any_a         ┆ d8 system price third within cell         ┆ 1   ┆ 1923       ┆ 120  ┆ 0.293 │
+│ d8 fade p_any_a         ┆ d8 system price third within cell         ┆ 2   ┆ 1771       ┆ 115  ┆ 0.394 │
+│ d8 fade p_any_a         ┆ d8 system price fifth overall             ┆ 0   ┆ 1160       ┆ 98   ┆ 0.220 │
+│ d8 fade p_any_a         ┆ d8 system price fifth overall             ┆ 1   ┆ 1160       ┆ 115  ┆ 0.218 │
+│ d8 fade p_any_a         ┆ d8 system price fifth overall             ┆ 2   ┆ 1160       ┆ 119  ┆ 0.234 │
+│ d8 fade p_any_a         ┆ d8 system price fifth overall             ┆ 3   ┆ 1151       ┆ 119  ┆ 0.294 │
+│ d8 fade p_any_a         ┆ d8 system price fifth overall             ┆ 4   ┆ 1169       ┆ 111  ┆ 0.514 │
+│ d8 fade p_any_a         ┆ d8 spark spread fifth                     ┆ 0   ┆ 1141       ┆ 94   ┆ 0.203 │
+│ d8 fade p_any_a         ┆ d8 spark spread fifth                     ┆ 1   ┆ 1141       ┆ 114  ┆ 0.228 │
+│ d8 fade p_any_a         ┆ d8 spark spread fifth                     ┆ 2   ┆ 1140       ┆ 119  ┆ 0.220 │
+│ d8 fade p_any_a         ┆ d8 spark spread fifth                     ┆ 3   ┆ 1141       ┆ 119  ┆ 0.319 │
+│ d8 fade p_any_a         ┆ d8 spark spread fifth                     ┆ 4   ┆ 1141       ┆ 112  ┆ 0.507 │
+│ d8 fade p_any_a         ┆ d8 gas price fifth                        ┆ 0   ┆ 1104       ┆ 28   ┆ 0.333 │
+│ d8 fade p_any_a         ┆ d8 gas price fifth                        ┆ 1   ┆ 1151       ┆ 31   ┆ 0.296 │
+│ d8 fade p_any_a         ┆ d8 gas price fifth                        ┆ 2   ┆ 1151       ┆ 31   ┆ 0.261 │
+│ d8 fade p_any_a         ┆ d8 gas price fifth                        ┆ 3   ┆ 1148       ┆ 32   ┆ 0.298 │
+│ d8 fade p_any_a         ┆ d8 gas price fifth                        ┆ 4   ┆ 1150       ┆ 29   ┆ 0.291 │
+│ d8 fade p_any_a         ┆ d8 day-ahead price third                  ┆ 0   ┆ 1933       ┆ 104  ┆ 0.231 │
+│ d8 fade p_any_a         ┆ d8 day-ahead price third                  ┆ 1   ┆ 1933       ┆ 117  ┆ 0.254 │
+│ d8 fade p_any_a         ┆ d8 day-ahead price third                  ┆ 2   ┆ 1934       ┆ 114  ┆ 0.404 │
+│ d8 fade p_any_a         ┆ d8 national wind third                    ┆ 0   ┆ 1933       ┆ 70   ┆ 0.330 │
+│ d8 fade p_any_a         ┆ d8 national wind third                    ┆ 1   ┆ 1933       ┆ 93   ┆ 0.315 │
+│ d8 fade p_any_a         ┆ d8 national wind third                    ┆ 2   ┆ 1934       ┆ 75   ┆ 0.243 │
+│ d8 fade p_any_a         ┆ d8 price rank in day quarter              ┆ 0   ┆ 1449       ┆ 121  ┆ 0.263 │
+│ d8 fade p_any_a         ┆ d8 price rank in day quarter              ┆ 1   ┆ 1450       ┆ 121  ┆ 0.210 │
+│ d8 fade p_any_a         ┆ d8 price rank in day quarter              ┆ 2   ┆ 1448       ┆ 121  ┆ 0.276 │
+│ d8 fade p_any_a         ┆ d8 price rank in day quarter              ┆ 3   ┆ 1453       ┆ 123  ┆ 0.435 │
+│ d8 fade p_any_a         ┆ d8 temperature third within cell          ┆ 0   ┆ 2106       ┆ 76   ┆ 0.300 │
+│ d8 fade p_any_a         ┆ d8 temperature third within cell          ┆ 1   ┆ 1919       ┆ 105  ┆ 0.304 │
+│ d8 fade p_any_a         ┆ d8 temperature third within cell          ┆ 2   ┆ 1773       ┆ 70   ┆ 0.283 │
+│ d8 fade p_any_a         ┆ d8 100 m wind third within cell           ┆ 0   ┆ 2106       ┆ 92   ┆ 0.340 │
+│ d8 fade p_any_a         ┆ d8 100 m wind third within cell           ┆ 1   ┆ 1919       ┆ 113  ┆ 0.281 │
+│ d8 fade p_any_a         ┆ d8 100 m wind third within cell           ┆ 2   ┆ 1773       ┆ 81   ┆ 0.259 │
+│ d8 fade p_any_a         ┆ d8 irradiance third within cell           ┆ 0   ┆ 1432       ┆ 97   ┆ 0.350 │
+│ d8 fade p_any_a         ┆ d8 irradiance third within cell           ┆ 1   ┆ 3159       ┆ 121  ┆ 0.232 │
+│ d8 fade p_any_a         ┆ d8 irradiance third within cell           ┆ 2   ┆ 1207       ┆ 82   ┆ 0.399 │
+│ gas A r1                ┆ record system price third within cell     ┆ 0   ┆ 768        ┆ 44   ┆ 0.124 │
+│ gas A r1                ┆ record system price third within cell     ┆ 1   ┆ 694        ┆ 44   ┆ 0.157 │
+│ gas A r1                ┆ record system price third within cell     ┆ 2   ┆ 592        ┆ 44   ┆ 0.247 │
+│ gas A r1                ┆ record system price fifth overall         ┆ 0   ┆ 406        ┆ 35   ┆ 0.057 │
+│ gas A r1                ┆ record system price fifth overall         ┆ 1   ┆ 416        ┆ 38   ┆ 0.135 │
+│ gas A r1                ┆ record system price fifth overall         ┆ 2   ┆ 410        ┆ 42   ┆ 0.151 │
+│ gas A r1                ┆ record system price fifth overall         ┆ 3   ┆ 395        ┆ 44   ┆ 0.225 │
+│ gas A r1                ┆ record system price fifth overall         ┆ 4   ┆ 427        ┆ 41   ┆ 0.281 │
+│ gas A r1                ┆ record spark spread fifth                 ┆ 0   ┆ 409        ┆ 36   ┆ 0.056 │
+│ gas A r1                ┆ record spark spread fifth                 ┆ 1   ┆ 413        ┆ 41   ┆ 0.109 │
+│ gas A r1                ┆ record spark spread fifth                 ┆ 2   ┆ 408        ┆ 42   ┆ 0.142 │
+│ gas A r1                ┆ record spark spread fifth                 ┆ 3   ┆ 413        ┆ 44   ┆ 0.201 │
+│ gas A r1                ┆ record spark spread fifth                 ┆ 4   ┆ 411        ┆ 41   ┆ 0.343 │
+│ gas A r1                ┆ record gas price fifth                    ┆ 0   ┆ 372        ┆ 10   ┆ 0.167 │
+│ gas A r1                ┆ record gas price fifth                    ┆ 1   ┆ 432        ┆ 14   ┆ 0.340 │
+│ gas A r1                ┆ record gas price fifth                    ┆ 2   ┆ 384        ┆ 12   ┆ 0.083 │
+│ gas A r1                ┆ record gas price fifth                    ┆ 3   ┆ 432        ┆ 14   ┆ 0.155 │
+│ gas A r1                ┆ record gas price fifth                    ┆ 4   ┆ 434        ┆ 13   ┆ 0.097 │
+│ gas A r1                ┆ record price rank in day quarter          ┆ 0   ┆ 511        ┆ 44   ┆ 0.096 │
+│ gas A r1                ┆ record price rank in day quarter          ┆ 1   ┆ 473        ┆ 44   ┆ 0.125 │
+│ gas A r1                ┆ record price rank in day quarter          ┆ 2   ┆ 514        ┆ 44   ┆ 0.158 │
+│ gas A r1                ┆ record price rank in day quarter          ┆ 3   ┆ 556        ┆ 44   ┆ 0.290 │
+│ gas A r2                ┆ record system price third within cell     ┆ 0   ┆ 768        ┆ 44   ┆ 0.073 │
+│ gas A r2                ┆ record system price third within cell     ┆ 1   ┆ 694        ┆ 44   ┆ 0.084 │
+│ gas A r2                ┆ record system price third within cell     ┆ 2   ┆ 592        ┆ 44   ┆ 0.167 │
+│ gas A r2                ┆ record system price fifth overall         ┆ 0   ┆ 406        ┆ 35   ┆ 0.027 │
+│ gas A r2                ┆ record system price fifth overall         ┆ 1   ┆ 416        ┆ 38   ┆ 0.094 │
+│ gas A r2                ┆ record system price fifth overall         ┆ 2   ┆ 410        ┆ 42   ┆ 0.088 │
+│ gas A r2                ┆ record system price fifth overall         ┆ 3   ┆ 395        ┆ 44   ┆ 0.106 │
+│ gas A r2                ┆ record system price fifth overall         ┆ 4   ┆ 427        ┆ 41   ┆ 0.199 │
+│ gas A r2                ┆ record spark spread fifth                 ┆ 0   ┆ 409        ┆ 36   ┆ 0.024 │
+│ gas A r2                ┆ record spark spread fifth                 ┆ 1   ┆ 413        ┆ 41   ┆ 0.056 │
+│ gas A r2                ┆ record spark spread fifth                 ┆ 2   ┆ 408        ┆ 42   ┆ 0.100 │
+│ gas A r2                ┆ record spark spread fifth                 ┆ 3   ┆ 413        ┆ 44   ┆ 0.092 │
+│ gas A r2                ┆ record spark spread fifth                 ┆ 4   ┆ 411        ┆ 41   ┆ 0.246 │
+│ gas A r2                ┆ record gas price fifth                    ┆ 0   ┆ 372        ┆ 10   ┆ 0.118 │
+│ gas A r2                ┆ record gas price fifth                    ┆ 1   ┆ 432        ┆ 14   ┆ 0.289 │
+│ gas A r2                ┆ record gas price fifth                    ┆ 2   ┆ 384        ┆ 12   ┆ 0.057 │
+│ gas A r2                ┆ record gas price fifth                    ┆ 3   ┆ 432        ┆ 14   ┆ 0.005 │
+│ gas A r2                ┆ record gas price fifth                    ┆ 4   ┆ 434        ┆ 13   ┆ 0.046 │
+│ gas A r2                ┆ record price rank in day quarter          ┆ 0   ┆ 511        ┆ 44   ┆ 0.045 │
+│ gas A r2                ┆ record price rank in day quarter          ┆ 1   ┆ 473        ┆ 44   ┆ 0.072 │
+│ gas A r2                ┆ record price rank in day quarter          ┆ 2   ┆ 514        ┆ 44   ┆ 0.101 │
+│ gas A r2                ┆ record price rank in day quarter          ┆ 3   ┆ 556        ┆ 44   ┆ 0.187 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price third within cel… ┆ 0   ┆ 18208      ┆ 527  ┆ 0.114 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price third within cel… ┆ 1   ┆ 17386      ┆ 542  ┆ 0.118 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price third within cel… ┆ 2   ┆ 16626      ┆ 521  ┆ 0.110 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price fifth overall     ┆ 0   ┆ 10374      ┆ 428  ┆ 0.108 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price fifth overall     ┆ 1   ┆ 10474      ┆ 476  ┆ 0.106 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price fifth overall     ┆ 2   ┆ 10464      ┆ 506  ┆ 0.110 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price fifth overall     ┆ 3   ┆ 10372      ┆ 500  ┆ 0.122 │
+│ c2_d3_null net labels   ┆ c2_d3_null system price fifth overall     ┆ 4   ┆ 10536      ┆ 381  ┆ 0.124 │
+│ c2_d3_null net labels   ┆ c2_d3_null spark spread fifth             ┆ 0   ┆ 10406      ┆ 435  ┆ 0.108 │
+│ c2_d3_null net labels   ┆ c2_d3_null spark spread fifth             ┆ 1   ┆ 10402      ┆ 497  ┆ 0.111 │
+│ c2_d3_null net labels   ┆ c2_d3_null spark spread fifth             ┆ 2   ┆ 10408      ┆ 507  ┆ 0.103 │
+│ c2_d3_null net labels   ┆ c2_d3_null spark spread fifth             ┆ 3   ┆ 10404      ┆ 535  ┆ 0.116 │
+│ c2_d3_null net labels   ┆ c2_d3_null spark spread fifth             ┆ 4   ┆ 10408      ┆ 475  ┆ 0.135 │
+│ c2_d3_null net labels   ┆ c2_d3_null gas price fifth                ┆ 0   ┆ 10368      ┆ 120  ┆ 0.105 │
+│ c2_d3_null net labels   ┆ c2_d3_null gas price fifth                ┆ 1   ┆ 10368      ┆ 133  ┆ 0.121 │
+│ c2_d3_null net labels   ┆ c2_d3_null gas price fifth                ┆ 2   ┆ 10386      ┆ 127  ┆ 0.116 │
+│ c2_d3_null net labels   ┆ c2_d3_null gas price fifth                ┆ 3   ┆ 10442      ┆ 122  ┆ 0.120 │
+│ c2_d3_null net labels   ┆ c2_d3_null gas price fifth                ┆ 4   ┆ 10464      ┆ 117  ┆ 0.109 │
+│ c2_d3_null net labels   ┆ c2_d3_null national wind third            ┆ 0   ┆ 7740       ┆ 142  ┆ 0.125 │
+│ c2_d3_null net labels   ┆ c2_d3_null national wind third            ┆ 1   ┆ 7746       ┆ 173  ┆ 0.118 │
+│ c2_d3_null net labels   ┆ c2_d3_null national wind third            ┆ 2   ┆ 7744       ┆ 131  ┆ 0.125 │
+│ c2_d3_null net labels   ┆ c2_d3_null price rank in day quarter      ┆ 0   ┆ 11968      ┆ 544  ┆ 0.103 │
+│ c2_d3_null net labels   ┆ c2_d3_null price rank in day quarter      ┆ 1   ┆ 13056      ┆ 544  ┆ 0.111 │
+│ c2_d3_null net labels   ┆ c2_d3_null price rank in day quarter      ┆ 2   ┆ 13054      ┆ 544  ┆ 0.106 │
+│ c2_d3_null net labels   ┆ c2_d3_null price rank in day quarter      ┆ 3   ┆ 14142      ┆ 544  ┆ 0.133 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price third within cel… ┆ 0   ┆ 11614      ┆ 336  ┆ 0.127 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price third within cel… ┆ 1   ┆ 10914      ┆ 340  ┆ 0.127 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price third within cel… ┆ 2   ┆ 10018      ┆ 335  ┆ 0.120 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price fifth overall     ┆ 0   ┆ 6528       ┆ 260  ┆ 0.114 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price fifth overall     ┆ 1   ┆ 6526       ┆ 316  ┆ 0.112 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price fifth overall     ┆ 2   ┆ 6530       ┆ 331  ┆ 0.128 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price fifth overall     ┆ 3   ┆ 6528       ┆ 331  ┆ 0.116 │
+│ c2_d3_null solar labels ┆ c2_d3_null system price fifth overall     ┆ 4   ┆ 6528       ┆ 301  ┆ 0.152 │
+│ c2_d3_null solar labels ┆ c2_d3_null spark spread fifth             ┆ 0   ┆ 6502       ┆ 267  ┆ 0.117 │
+│ c2_d3_null solar labels ┆ c2_d3_null spark spread fifth             ┆ 1   ┆ 6514       ┆ 322  ┆ 0.105 │
+│ c2_d3_null solar labels ┆ c2_d3_null spark spread fifth             ┆ 2   ┆ 6510       ┆ 331  ┆ 0.135 │
+│ c2_d3_null solar labels ┆ c2_d3_null spark spread fifth             ┆ 3   ┆ 6504       ┆ 333  ┆ 0.117 │
+│ c2_d3_null solar labels ┆ c2_d3_null spark spread fifth             ┆ 4   ┆ 6514       ┆ 318  ┆ 0.149 │
+│ c2_d3_null solar labels ┆ c2_d3_null gas price fifth                ┆ 0   ┆ 6432       ┆ 81   ┆ 0.148 │
+│ c2_d3_null solar labels ┆ c2_d3_null gas price fifth                ┆ 1   ┆ 6508       ┆ 95   ┆ 0.104 │
+│ c2_d3_null solar labels ┆ c2_d3_null gas price fifth                ┆ 2   ┆ 6548       ┆ 98   ┆ 0.120 │
+│ c2_d3_null solar labels ┆ c2_d3_null gas price fifth                ┆ 3   ┆ 6506       ┆ 91   ┆ 0.114 │
+│ c2_d3_null solar labels ┆ c2_d3_null gas price fifth                ┆ 4   ┆ 6550       ┆ 78   ┆ 0.138 │
+│ c2_d3_null solar labels ┆ c2_d3_null day-ahead price third          ┆ 0   ┆ 5756       ┆ 157  ┆ 0.109 │
+│ c2_d3_null solar labels ┆ c2_d3_null day-ahead price third          ┆ 1   ┆ 5756       ┆ 170  ┆ 0.134 │
+│ c2_d3_null solar labels ┆ c2_d3_null day-ahead price third          ┆ 2   ┆ 5762       ┆ 170  ┆ 0.159 │
+│ c2_d3_null solar labels ┆ c2_d3_null national wind third            ┆ 0   ┆ 10880      ┆ 190  ┆ 0.115 │
+│ c2_d3_null solar labels ┆ c2_d3_null national wind third            ┆ 1   ┆ 10880      ┆ 245  ┆ 0.117 │
+│ c2_d3_null solar labels ┆ c2_d3_null national wind third            ┆ 2   ┆ 10880      ┆ 192  ┆ 0.141 │
+│ c2_d3_null solar labels ┆ c2_d3_null price rank in day quarter      ┆ 0   ┆ 7482       ┆ 341  ┆ 0.115 │
+│ c2_d3_null solar labels ┆ c2_d3_null price rank in day quarter      ┆ 1   ┆ 8160       ┆ 340  ┆ 0.110 │
+│ c2_d3_null solar labels ┆ c2_d3_null price rank in day quarter      ┆ 2   ┆ 8160       ┆ 340  ┆ 0.124 │
+│ c2_d3_null solar labels ┆ c2_d3_null price rank in day quarter      ┆ 3   ┆ 8838       ┆ 340  ┆ 0.147 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price third within cel… ┆ 0   ┆ 18208      ┆ 527  ┆ 0.126 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price third within cel… ┆ 1   ┆ 17386      ┆ 542  ┆ 0.129 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price third within cel… ┆ 2   ┆ 16626      ┆ 521  ┆ 0.117 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price fifth overall     ┆ 0   ┆ 10374      ┆ 428  ┆ 0.109 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price fifth overall     ┆ 1   ┆ 10474      ┆ 476  ┆ 0.122 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price fifth overall     ┆ 2   ┆ 10464      ┆ 506  ┆ 0.135 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price fifth overall     ┆ 3   ┆ 10372      ┆ 500  ┆ 0.116 │
+│ c2_d4_null net labels   ┆ c2_d4_null system price fifth overall     ┆ 4   ┆ 10536      ┆ 381  ┆ 0.139 │
+│ c2_d4_null net labels   ┆ c2_d4_null spark spread fifth             ┆ 0   ┆ 10406      ┆ 435  ┆ 0.111 │
+│ c2_d4_null net labels   ┆ c2_d4_null spark spread fifth             ┆ 1   ┆ 10402      ┆ 497  ┆ 0.118 │
+│ c2_d4_null net labels   ┆ c2_d4_null spark spread fifth             ┆ 2   ┆ 10408      ┆ 507  ┆ 0.127 │
+│ c2_d4_null net labels   ┆ c2_d4_null spark spread fifth             ┆ 3   ┆ 10404      ┆ 535  ┆ 0.128 │
+│ c2_d4_null net labels   ┆ c2_d4_null spark spread fifth             ┆ 4   ┆ 10408      ┆ 475  ┆ 0.138 │
+│ c2_d4_null net labels   ┆ c2_d4_null gas price fifth                ┆ 0   ┆ 10368      ┆ 120  ┆ 0.145 │
+│ c2_d4_null net labels   ┆ c2_d4_null gas price fifth                ┆ 1   ┆ 10368      ┆ 133  ┆ 0.114 │
+│ c2_d4_null net labels   ┆ c2_d4_null gas price fifth                ┆ 2   ┆ 10386      ┆ 127  ┆ 0.098 │
+│ c2_d4_null net labels   ┆ c2_d4_null gas price fifth                ┆ 3   ┆ 10442      ┆ 122  ┆ 0.129 │
+│ c2_d4_null net labels   ┆ c2_d4_null gas price fifth                ┆ 4   ┆ 10464      ┆ 117  ┆ 0.136 │
+│ c2_d4_null net labels   ┆ c2_d4_null national wind third            ┆ 0   ┆ 7740       ┆ 142  ┆ 0.097 │
+│ c2_d4_null net labels   ┆ c2_d4_null national wind third            ┆ 1   ┆ 7746       ┆ 173  ┆ 0.123 │
+│ c2_d4_null net labels   ┆ c2_d4_null national wind third            ┆ 2   ┆ 7744       ┆ 131  ┆ 0.140 │
+│ c2_d4_null net labels   ┆ c2_d4_null price rank in day quarter      ┆ 0   ┆ 11968      ┆ 544  ┆ 0.106 │
+│ c2_d4_null net labels   ┆ c2_d4_null price rank in day quarter      ┆ 1   ┆ 13056      ┆ 544  ┆ 0.112 │
+│ c2_d4_null net labels   ┆ c2_d4_null price rank in day quarter      ┆ 2   ┆ 13054      ┆ 544  ┆ 0.129 │
+│ c2_d4_null net labels   ┆ c2_d4_null price rank in day quarter      ┆ 3   ┆ 14142      ┆ 544  ┆ 0.147 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price third within cel… ┆ 0   ┆ 11614      ┆ 336  ┆ 0.126 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price third within cel… ┆ 1   ┆ 10914      ┆ 340  ┆ 0.130 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price third within cel… ┆ 2   ┆ 10018      ┆ 335  ┆ 0.128 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price fifth overall     ┆ 0   ┆ 6528       ┆ 260  ┆ 0.121 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price fifth overall     ┆ 1   ┆ 6526       ┆ 316  ┆ 0.112 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price fifth overall     ┆ 2   ┆ 6530       ┆ 331  ┆ 0.121 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price fifth overall     ┆ 3   ┆ 6528       ┆ 331  ┆ 0.128 │
+│ c2_d4_null solar labels ┆ c2_d4_null system price fifth overall     ┆ 4   ┆ 6528       ┆ 301  ┆ 0.160 │
+│ c2_d4_null solar labels ┆ c2_d4_null spark spread fifth             ┆ 0   ┆ 6502       ┆ 267  ┆ 0.119 │
+│ c2_d4_null solar labels ┆ c2_d4_null spark spread fifth             ┆ 1   ┆ 6514       ┆ 322  ┆ 0.119 │
+│ c2_d4_null solar labels ┆ c2_d4_null spark spread fifth             ┆ 2   ┆ 6510       ┆ 331  ┆ 0.109 │
+│ c2_d4_null solar labels ┆ c2_d4_null spark spread fifth             ┆ 3   ┆ 6504       ┆ 333  ┆ 0.132 │
+│ c2_d4_null solar labels ┆ c2_d4_null spark spread fifth             ┆ 4   ┆ 6514       ┆ 318  ┆ 0.160 │
+│ c2_d4_null solar labels ┆ c2_d4_null gas price fifth                ┆ 0   ┆ 6432       ┆ 81   ┆ 0.122 │
+│ c2_d4_null solar labels ┆ c2_d4_null gas price fifth                ┆ 1   ┆ 6508       ┆ 95   ┆ 0.139 │
+│ c2_d4_null solar labels ┆ c2_d4_null gas price fifth                ┆ 2   ┆ 6548       ┆ 98   ┆ 0.126 │
+│ c2_d4_null solar labels ┆ c2_d4_null gas price fifth                ┆ 3   ┆ 6506       ┆ 91   ┆ 0.128 │
+│ c2_d4_null solar labels ┆ c2_d4_null gas price fifth                ┆ 4   ┆ 6550       ┆ 78   ┆ 0.125 │
+│ c2_d4_null solar labels ┆ c2_d4_null day-ahead price third          ┆ 0   ┆ 5756       ┆ 157  ┆ 0.112 │
+│ c2_d4_null solar labels ┆ c2_d4_null day-ahead price third          ┆ 1   ┆ 5756       ┆ 170  ┆ 0.119 │
+│ c2_d4_null solar labels ┆ c2_d4_null day-ahead price third          ┆ 2   ┆ 5762       ┆ 170  ┆ 0.168 │
+│ c2_d4_null solar labels ┆ c2_d4_null national wind third            ┆ 0   ┆ 10880      ┆ 190  ┆ 0.119 │
+│ c2_d4_null solar labels ┆ c2_d4_null national wind third            ┆ 1   ┆ 10880      ┆ 245  ┆ 0.124 │
+│ c2_d4_null solar labels ┆ c2_d4_null national wind third            ┆ 2   ┆ 10880      ┆ 192  ┆ 0.141 │
+│ c2_d4_null solar labels ┆ c2_d4_null price rank in day quarter      ┆ 0   ┆ 7482       ┆ 341  ┆ 0.108 │
+│ c2_d4_null solar labels ┆ c2_d4_null price rank in day quarter      ┆ 1   ┆ 8160       ┆ 340  ┆ 0.117 │
+│ c2_d4_null solar labels ┆ c2_d4_null price rank in day quarter      ┆ 2   ┆ 8160       ┆ 340  ┆ 0.127 │
+│ c2_d4_null solar labels ┆ c2_d4_null price rank in day quarter      ┆ 3   ┆ 8838       ┆ 340  ┆ 0.157 │
+└─────────────────────────┴───────────────────────────────────────────┴─────┴────────────┴──────┴───────┘
+
+T6 holidays, clock changes, and drops: evening share (no share under 20 days)
+shape: (18, 5)
+┌───────┬───────────────────────────────────────────┬──────┬───────┬───────┐
+│ era   ┆ group                                     ┆ days ┆ share ┆ shown │
+│ ---   ┆ ---                                       ┆ ---  ┆ ---   ┆ ---   │
+│ str   ┆ str                                       ┆ i64  ┆ f64   ┆ bool  │
+╞═══════╪═══════════════════════════════════════════╪══════╪═══════╪═══════╡
+│ net   ┆ ordinary weekday evenings                 ┆ 373  ┆ 0.841 ┆ true  │
+│ net   ┆ bank-holiday weekday evenings (pooled)    ┆ 5    ┆ null  ┆ false │
+│ net   ┆ christmas week evenings (24 December to … ┆ 18   ┆ null  ┆ false │
+│ net   ┆ six clock-change days, evenings (pooled)  ┆ 3    ┆ null  ┆ false │
+│ net   ┆ inside experiment 159's multi-day drops,… ┆ 40   ┆ 0.740 ┆ true  │
+│ net   ┆ outside the drops, evenings               ┆ 510  ┆ 0.721 ┆ true  │
+│ solar ┆ ordinary weekday evenings                 ┆ 233  ┆ 0.806 ┆ true  │
+│ solar ┆ bank-holiday weekday evenings (pooled)    ┆ 5    ┆ null  ┆ false │
+│ solar ┆ christmas week evenings (24 December to … ┆ 9    ┆ null  ┆ false │
+│ solar ┆ six clock-change days, evenings (pooled)  ┆ 2    ┆ null  ┆ false │
+│ solar ┆ inside experiment 159's multi-day drops,… ┆ 96   ┆ 0.651 ┆ true  │
+│ solar ┆ outside the drops, evenings               ┆ 248  ┆ 0.754 ┆ true  │
+│ fade  ┆ ordinary weekday evenings                 ┆ 83   ┆ 0.600 ┆ true  │
+│ fade  ┆ bank-holiday weekday evenings (pooled)    ┆ 4    ┆ null  ┆ false │
+│ fade  ┆ christmas week evenings (24 December to … ┆ 0    ┆ null  ┆ false │
+│ fade  ┆ six clock-change days, evenings (pooled)  ┆ 1    ┆ null  ┆ false │
+│ fade  ┆ inside experiment 159's multi-day drops,… ┆ 0    ┆ null  ┆ false │
+│ fade  ┆ outside the drops, evenings               ┆ 122  ┆ 0.473 ┆ true  │
+└───────┴───────────────────────────────────────────┴──────┴───────┴───────┘
+
+T6 night share by month: written to 00697-gas-engine-state-tracker-part-4-running-patterns/night_monthly.txt, not printed
+
+About 30 exploratory intervals are shown, at 95% and without a correction.
