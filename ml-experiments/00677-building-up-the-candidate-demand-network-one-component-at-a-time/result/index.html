@@ -1,0 +1,6690 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>How much does each component of the Candidate demand network contribute to its one-year backtest score, when the network is built up from the date-time encoder alone, one component per step? - NGED ML research</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#take-home" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED ML research" class="md-header__button md-logo" aria-label="NGED ML research" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED ML research
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How much does each component of the Candidate demand network contribute to its one-year backtest score, when the network is built up from the date-time encoder alone, one component per step?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED ML research" class="md-nav__button md-logo" aria-label="NGED ML research" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED ML research
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/embedded-pv-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How much solar sits behind each Primary substation, and how far can the number be trusted?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_11" id="__nav_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/wind-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wind component storage measurement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/wind-interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How should we interpolate wind components?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ifs-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which IFS forecast variables, or which second forecast, help a solar power forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/lag-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a same-hour power lag improve a day-ahead solar forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/effective-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Is a daily capacity estimate worth building for day-ahead solar forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/quick-wins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which cheap changes lower the production XGBoost forecast's error?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/production-feature-faults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production feature faults: diagnosis and forecast effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/llm-capacity-labeller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a language model label a solar plant's capacity changes?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experiments
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experiments
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-power-telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED power telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-inputs-by-product/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather inputs by product
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/row-sets-and-scoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Row sets and scoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/what-is-on-disk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What is on disk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/substation-information-fields/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Substation information fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/metered-generators-and-anonymisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metered generators and anonymisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/market-and-other-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market and other data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/problems-and-current-best-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Problems and the current best forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/adopted-and-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adopted and open questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research default
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Research default
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research-default/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation-protocol-demand/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, demand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scoreboard-demand/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoreboard, demand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation-protocol-solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, solar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation-protocol-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, wind
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research-default-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Log of versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../final-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Final models for the production port
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../data-processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kalman-gam-explainer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kalman filter explainer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration and uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Calibration and uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/delivery-recommendation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery recommendation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curtailment cost
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Curtailment cost
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demand inputs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Demand inputs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Differentiable physics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-literature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Literature scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-economy-7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Economy 7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_4" id="__nav_3_11_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demand, calendar, and weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Demand, calendar, and weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_5" id="__nav_3_11_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedded generation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Embedded generation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_6" id="__nav_3_11_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long history and drift
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Long history and drift
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-long-history-and-drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-long-history-and-drift/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-long-history-and-drift/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_7" id="__nav_3_11_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pooling across substations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pooling across substations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_8" id="__nav_3_11_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast engine
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecast engine
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_9" id="__nav_3_11_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Network
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-network/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-network/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12" id="__nav_3_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator forecasting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Generator forecasting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_13" id="__nav_3_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gross-demand simulation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Gross-demand simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/asset-inventory-simulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Asset-inventory simulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/simulator-discussion-2026-11-09/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulator discussion of 2026-11-09
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/proposal-to-nged-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options for proposing the simulator to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_14" id="__nav_3_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hierarchy and pooling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hierarchy and pooling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_15" id="__nav_3_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lagged power and error correction
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Lagged power and error correction
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_16" id="__nav_3_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production reference and best guess
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Production reference and best guess
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/neural-simplification-series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural simplification series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_17" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_17" id="__nav_3_17_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Retraining and training history
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_17">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Retraining and training history
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_18" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_18" id="__nav_3_18_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metered solar farms
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_18_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_18">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Metered solar farms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_19" id="__nav_3_19_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solar disaggregation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_19">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Solar disaggregation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/unmetered-pv-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unmetered PV capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_20" id="__nav_3_20_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LSC detectors
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    LSC detectors
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/event-table-summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event-table summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/state-at-january-pause/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State at the January pause
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_21" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_21" id="__nav_3_21_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load-shift labels in the forecast
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_21_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_21">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Load-shift labels in the forecast
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_22" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_22" id="__nav_3_22_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products and blending
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_22_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_22">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Weather products and blending
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#take-home" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Take-home
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skill-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skill by step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whether-the-later-steps-ride-through-load-shifts-better" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whether the later steps ride through load shifts better
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-candidates-prevailing-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Candidate's prevailing output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#time-series-of-the-forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time series of the forecasts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tails-crps-and-curtailment-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tails, CRPS, and curtailment cost
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standard-methods-beside-the-ladder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard methods beside the ladder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predictions-that-could-fail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Predictions that could fail
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caveats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caveats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#components-of-the-candidate-and-where-each-sits-on-the-ladder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components of the Candidate and where each sits on the ladder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schedule-and-frozen-parts-of-each-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schedule and frozen parts of each step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-without-injected-events-removes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "without injected events" removes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refit-cadence-window-and-seeds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refit cadence, window, and seeds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reference-arms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference arms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prevailing-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prevailing output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>How much does each component of the Candidate demand network contribute to its one-year backtest score, when the network is built up from the date-time encoder alone, one component per step?</h1>
+
+<p><strong>This page builds the Candidate demand neural network up one component at a time.</strong> The Candidate
+is the neural network that forecasts demand at 16 Primary substations (substations that step 33 kV
+or 66 kV down to 11 kV). Step 1 has the date-time encoder alone, each later step adds one component,
+and step 8 is the Candidate. The sequence of steps is the ladder. Steps 9a and 9b refit step 5 and
+step 8 monthly instead of quarterly. Scores are the normalised mean absolute error (MAE) of the
+median forecast, in points of capacity, over 12 months of daily forecasts up to 14 days ahead.</p>
+<p><strong>The earliest step in this ladder to score below the manual heuristic is step 3b, the date-time and
+weather encoders pre-trained on ERA5 and CAMS.</strong> (ERA5 and CAMS are two reanalyses, which are
+estimates of past weather.) Step 3b scores 8.30 against 8.73 for the manual heuristic. Step 5, the
+first step with both lags, scores 7.88.</p>
+<p><img alt="Normalised MAE of the median by horizon, steps 1 to 5 and reference arms" src="../ladder_horizon_early.svg" /></p>
+<p><strong>Steps 6 to 8 add no skill over step 5 on the annual mean.</strong> Step 8 is the Candidate. It scores
+7.99, which is 0.105 worse than step 5 (95% interval 0.078 to 0.132). Monthly refits improve both
+step 5 and step 8 by about 0.47 points, which is a larger gain than any component added after step
+3b.</p>
+<p>Colours are assigned within each figure, not across the page. In the second figure the lines of
+steps 7 and 8 nearly coincide.</p>
+<p><img alt="Normalised MAE of the median by forecast horizon, steps 5 to 8 and the monthly refits" src="../ladder_horizon_late.svg" /></p>
+<p><strong>Steps 6 to 8 make the median forecast copy less of an injected shift, and they raise error on rows
+away from logged events.</strong> An injected shift is a simulated step added to the lag inputs. The copied
+share is the fraction of the shift's depth that the median forecast reproduces, so 0 means the
+forecast ignores the shift. On a held-out bank of such shifts, the median of step 5 copies 5.9% of
+the shift and the Candidate copies 2.8%. Steps 6 and 7 copy 4.7% and 3.3%. Away from the logged
+events, the same steps raise MAE by 0.05 (step 6) and 0.12 (steps 7 and 8) against step 5. Gap
+columns, which step 6 adds, hold the difference between the observed power at the lag time and the
+forecast made with both lags masked. Step 7 adds exponentially weighted averages of that gap, and
+step 8 adds the same columns from neighbouring substations.</p>
+<h2 id="take-home">Take-home</h2>
+<ul>
+<li><strong>Order of importance.</strong> Pre-training the encoders (step 3b, −0.59 against step 3a) and the
+  24-hour lag (step 4, −0.28) account for most of the gain over the manual heuristic. The 1-week lag
+  adds −0.13. Steps 6 to 8 add +0.04, +0.06, and +0.005.</li>
+<li><strong>Steps 1 and 2 are worse than the manual heuristic</strong> (9.73 and 9.61 against 8.73), and step 3a is
+  too (8.89). Climatology scores 11.79.</li>
+<li><strong>Training with injected events raises MAE by 0.07 to 0.10 points on every row and cuts the copied
+  share by about half to two-thirds.</strong> Step 5 trained without injected events copies 11.0% of a
+  shift, and the Candidate trained without them copies 8.1%.</li>
+<li><strong>Monthly refits (step 9) improve skill more than any component added after step 3b.</strong> Monthly
+  refits lower MAE by 0.47 (interval 0.31 to 0.64) for step 5 and 0.47 (0.32 to 0.64) for step 8 on
+  matched seeds. The Candidate at monthly refits (step 9b) scores 7.48, against 7.53 for the monthly
+  file of experiment 667.</li>
+<li><strong>On the six MW Primaries the GAM is level with the best monthly arm and ahead of every quarterly
+  step; the networks win on the seven MVA-only Primaries.</strong> See <a href="#standard-methods-beside-the-ladder">Standard methods beside the
+  ladder</a>.</li>
+<li><strong>The ladder describes one order of adding components, on 12 months that overlap the Candidate's
+  development months.</strong> It ranks nothing for production.</li>
+</ul>
+<h2 id="results">Results</h2>
+<h3 id="skill-by-step">Skill by step</h3>
+<p><strong>Skill rises steeply to step 3b, then flattens.</strong> The figure below shows steps 1 to 5. Each is a
+separate network trained with the Candidate's settings and the components named in its label.</p>
+<p><img alt="Normalised MAE of the median by forecast horizon, steps 1 to 5" src="../ladder_horizon_early.svg" /></p>
+<p>The table lists the annual scores in points of capacity. CRPS is the continuous ranked probability
+score, which scores the whole forecast distribution. The 95% intervals come from resampling 7-day
+blocks of origin days, and every step is scored on the same 3,879,313 rows, which are the rows that
+all the steps share.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>MAE of the median</th>
+<th>95% interval</th>
+<th>CRPS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1: date-time only</td>
+<td>9.73</td>
+<td></td>
+<td>5.50</td>
+</tr>
+<tr>
+<td>2: weather only</td>
+<td>9.61</td>
+<td></td>
+<td>5.47</td>
+</tr>
+<tr>
+<td>3a: date-time + weather (ENS only)</td>
+<td>8.89</td>
+<td></td>
+<td>5.12</td>
+</tr>
+<tr>
+<td>3b: date-time + weather (pre-trained)</td>
+<td>8.30</td>
+<td>7.99 to 8.61</td>
+<td>4.74</td>
+</tr>
+<tr>
+<td>4: + 24 h lag</td>
+<td>8.01</td>
+<td></td>
+<td>4.56</td>
+</tr>
+<tr>
+<td>5: + 24 h and 1-week lags</td>
+<td>7.88</td>
+<td>7.56 to 8.21</td>
+<td>4.49</td>
+</tr>
+<tr>
+<td>6: + gap columns</td>
+<td>7.93</td>
+<td></td>
+<td>4.52</td>
+</tr>
+<tr>
+<td>7: + weighted averages of the gap</td>
+<td>7.98</td>
+<td></td>
+<td>4.56</td>
+</tr>
+<tr>
+<td>8: + neighbour columns (Candidate)</td>
+<td>7.99</td>
+<td>7.66 to 8.33</td>
+<td>4.57</td>
+</tr>
+<tr>
+<td>9a: step 5, monthly refits</td>
+<td>7.39</td>
+<td>7.14 to 7.67</td>
+<td>4.19</td>
+</tr>
+<tr>
+<td>9b: step 8, monthly refits</td>
+<td>7.48</td>
+<td>7.21 to 7.77</td>
+<td>4.26</td>
+</tr>
+<tr>
+<td>Manual heuristic</td>
+<td>8.73</td>
+<td>8.41 to 9.07</td>
+<td>4.98</td>
+</tr>
+<tr>
+<td>Climatology</td>
+<td>11.79</td>
+<td></td>
+<td>6.60</td>
+</tr>
+<tr>
+<td>Experiment 667, monthly refits (a)</td>
+<td>7.53</td>
+<td></td>
+<td>4.29</td>
+</tr>
+</tbody>
+</table>
+<p>(a) Experiment 667's file scored on the same rows with the scoring code of experiment 668; the
+private table is <code>scores_668/primaries_NRA/scores.csv</code>.</p>
+<p>The contrast between adjacent steps carries intervals that are tighter than the intervals of the
+scores themselves, because the two steps are scored on the same rows.</p>
+<p><img alt="Change in score from each added component" src="../ladder_contrasts.svg" /></p>
+<h3 id="whether-the-later-steps-ride-through-load-shifts-better">Whether the later steps ride through load shifts better</h3>
+<p><strong>The logged events cannot show which step handles a load shift better, because every step's error
+jumps at the event start.</strong> The figure pools 12 logged events (10 at days −7 to 3 after the start,
+because two began before the backtest) (10 shifts that lasted more than 7 days and involved two
+units or more, plus the verified transfer at D5 and D16). NGED's event labels are an incomplete
+dump, so these counts are lower bounds. The normal-running output is meant to carry on as if the
+shift had not happened, so a jump in error is expected at every step.</p>
+<p><img alt="Error of the median forecast by whole days since the event start" src="../event_aligned_start.svg" /></p>
+<p>The cell of long events with a deep shift (more than 7 days, 8 or more noise units) holds no rows.
+No logged shift fell in it.</p>
+<p><strong>An injected shift measures the same question without the label problem.</strong> The bank holds
+simulated shifts of known depth, injected into the lag inputs only, on rows the networks never
+trained on. The share of the shift that the median copies is the headline measure here: 0 means the
+forecast ignores the shift, and smaller is better for the normal-running output.</p>
+<p><img alt="Share of an injected shift that the median forecast copies, by depth, per step" src="../bank_follow_by_depth.svg" /></p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Copied share, trained with injected events</th>
+<th>Copied share, trained without</th>
+<th>Copied share, monthly refits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>0.059</td>
+<td>0.110</td>
+<td>0.071</td>
+</tr>
+<tr>
+<td>6</td>
+<td>0.047</td>
+<td>0.103</td>
+<td>0.059</td>
+</tr>
+<tr>
+<td>7</td>
+<td>0.033</td>
+<td>0.082</td>
+<td>0.042</td>
+</tr>
+<tr>
+<td>8</td>
+<td>0.028</td>
+<td>0.081</td>
+<td>0.030</td>
+</tr>
+</tbody>
+</table>
+<p>Each cell is the mean over seeds 0 to 2 of the pooled share over days 0 to 14, and the standard
+deviation over seeds is 0.002 to 0.008. The monthly column is the "trained with" version. Steps 7
+and 8 copy similar shares (0.033 and 0.028), so their lines overlap in the figure and the neighbour
+columns add little here.</p>
+<p><strong>Away from the logged events, the later steps have a higher MAE.</strong> On rows more than 14 days from
+any logged event of the same series, MAE rises against step 5 by 0.049 (interval 0.037 to 0.061) at
+step 6, 0.120 (0.084 to 0.156) at step 7, and 0.119 (0.082 to 0.155) at step 8.</p>
+<p><strong>In the 7 days after an event the monthly refits score worse on these 10 logged shifts.</strong> The
+slice holds 34,706 half-hours from 102 origin days, and no interval was computed, so the result is
+descriptive. With seeds 0 to 2 on both sides, step 9a scores 5.77 against 5.23 for step 5 at
+quarterly refits, and step 9b scores 5.69 against 5.15 for step 8. Inside the events and on all
+other rows, the monthly arms score better.</p>
+<h3 id="the-candidates-prevailing-output">The Candidate's prevailing output</h3>
+<p><strong>Only experiment 667's Candidate has a prevailing output.</strong> The normal-running output (NRA) is the
+forecast made as if no shift had happened. The prevailing output is the forecast that follows a
+detected shift. It comes from a survival head (R-haz), and it needs the lag-free table's signals, so
+the ladder's steps have none. The rows of experiment 667 used here are the extra-lag head of
+<a href="../../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result/">experiment
+681</a>
+(the folds 2025-11 and 2025-12 keep the older head). Over the 8 logged events where the shift could
+be timed, the prevailing output recovered half of the shift after a median of 4 days (range 2 to 6
+days). The two figures below show the NRA and prevailing outputs of experiment 667 over the verified
+transfer.</p>
+<p><img alt="D16, verified transfer: NRA and prevailing outputs of experiment 667, 1 to 2 days ahead" src="../prevailing_verified_transfer_D16_lead1.svg" /></p>
+<p><img alt="D5, verified transfer: NRA and prevailing outputs of experiment 667, 1 to 2 days ahead" src="../prevailing_verified_transfer_D5_lead1.svg" /></p>
+<h3 id="time-series-of-the-forecasts">Time series of the forecasts</h3>
+<p><strong>At D16 both step 5 and step 8 follow the daily shape but stay well below the observed peaks during
+the confirmed shift, and at D5 they stay above the observed power.</strong> D5 and D16 are the two
+Primaries between which load was transferred. Each figure has one arm per panel, where an arm is
+one step. The line is the median, the dark band is q25 to q75, the light band is q05 to q95, and
+each is the mean over seeds. The orange line is the observed power. The grey rectangle marks the
+confirmed load shift from 2025-12-30 to 2026-01-15, with 14 days either side. The scored
+"verified transfer" window starts and ends one day earlier, on 2025-12-29 and 2026-01-14. At D16 the
+observed peaks reach about 13 MW, and the medians of both steps stay near 9 to 10 MW through the
+shift. At D5, which gave up load, the observed power falls and the medians stay above it. The
+normal-running output is meant to carry on as if the shift had not happened.</p>
+<p><img alt="D16, verified transfer, steps 5 and 8, forecasts made 1 to 2 days ahead" src="../bands_verified_transfer_D16_lead1.svg" /></p>
+<p><img alt="D5, verified transfer, steps 5 and 8, forecasts made 1 to 2 days ahead" src="../bands_verified_transfer_D5_lead1.svg" /></p>
+<p><img alt="D16, verified transfer, steps 5 and 8, forecasts made 5 to 6 days ahead" src="../bands_verified_transfer_D16_lead5.svg" /></p>
+<p>A warm week at D16 shows the same arms away from the event.</p>
+<p><img alt="D16, warm week, steps 5 and 8, forecasts made 1 to 2 days ahead" src="../bands_warm_week_D16_lead1.svg" /></p>
+<h3 id="tails-crps-and-curtailment-cost">Tails, CRPS, and curtailment cost</h3>
+<p><strong>The forecasts are under-dispersed at both ends.</strong> For steps 5 to 8, 3.4% to 3.8% of observations
+fall at or below the q01 forecast and 3.6% to 3.9% fall above q99, against a nominal 1%. Step 3b has
+4.4% below q01 and 4.0% above q99. Monthly refits move the observed shares about half a point closer
+to the nominal 1%.</p>
+<p><strong>Curtailment cost mostly follows the CRPS ranking of the arms, with the GAM lowest.</strong> XGBoost is
+the exception: its CRPS equals step 8's, but its cost is lower than every network's. The
+curtailment-cost scale is set by a stress limit of 50% (and 90%) of each series' earlier maximum, so
+the amounts in pounds are an index of ranking and not a forecast of spend. Each cell is relative to
+the manual heuristic (1.00) on the six MW Primaries, summed:</p>
+<table>
+<thead>
+<tr>
+<th>Arm</th>
+<th>Cost at the 50% limit</th>
+<th>Cost at the 90% limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GAM</td>
+<td>0.54</td>
+<td>0.41</td>
+</tr>
+<tr>
+<td>XGBoost</td>
+<td>0.68</td>
+<td>0.70</td>
+</tr>
+<tr>
+<td>Experiment 667</td>
+<td>0.74</td>
+<td>0.83</td>
+</tr>
+<tr>
+<td>3b</td>
+<td>0.90</td>
+<td>1.00</td>
+</tr>
+<tr>
+<td>5</td>
+<td>0.76</td>
+<td>0.89</td>
+</tr>
+<tr>
+<td>8</td>
+<td>0.81</td>
+<td>0.92</td>
+</tr>
+<tr>
+<td>9a</td>
+<td>0.70</td>
+<td>0.80</td>
+</tr>
+<tr>
+<td>9b</td>
+<td>0.74</td>
+<td>0.83</td>
+</tr>
+</tbody>
+</table>
+<h3 id="standard-methods-beside-the-ladder">Standard methods beside the ladder</h3>
+<p><strong>Both stored arms cover a different row set than the ladder, so this section is scored on the rows
+that the stored arms and the ladder both cover.</strong> The GAM (Primary demand research default 3) and
+XGBoost (arm <code>p_s6_bg2</code> of experiment 87) are stored with 09:00 UTC origins, and the rows the arms
+share run from origin 2025-11-01 to 2026-06-29 at lead times of 0 to 10 days (1,365,447 half-hours
+over the 16 Primaries). The six MW Primaries are scored separately from the seven MVA-only
+Primaries, because the MVA meters hide reverse flow.</p>
+<table>
+<thead>
+<tr>
+<th>Group, slice</th>
+<th>GAM</th>
+<th>XGBoost</th>
+<th>Manual heuristic</th>
+<th>667</th>
+<th>3b</th>
+<th>5</th>
+<th>8</th>
+<th>9a</th>
+<th>9b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Six MW Primaries, all rows</td>
+<td>5.36</td>
+<td>5.62</td>
+<td>6.88</td>
+<td>5.41</td>
+<td>5.81</td>
+<td>5.53</td>
+<td>5.64</td>
+<td>5.35</td>
+<td>5.42</td>
+</tr>
+<tr>
+<td>Six MW Primaries, all rows, CRPS</td>
+<td>3.11</td>
+<td>3.27</td>
+<td>3.97</td>
+<td>3.14</td>
+<td>3.39</td>
+<td>3.20</td>
+<td>3.27</td>
+<td>3.09</td>
+<td>3.14</td>
+</tr>
+<tr>
+<td>Six MW Primaries, all rows, twCRPS</td>
+<td>0.480</td>
+<td>0.525</td>
+<td>0.611</td>
+<td>0.506</td>
+<td>0.543</td>
+<td>0.506</td>
+<td>0.516</td>
+<td>0.497</td>
+<td>0.507</td>
+</tr>
+<tr>
+<td>Six MW Primaries, cold nights</td>
+<td>6.24</td>
+<td>6.93</td>
+<td>10.00</td>
+<td>6.94</td>
+<td>7.54</td>
+<td>7.03</td>
+<td>7.22</td>
+<td>6.77</td>
+<td>6.93</td>
+</tr>
+<tr>
+<td>Six MW Primaries, Christmas</td>
+<td>6.94</td>
+<td>6.11</td>
+<td>10.71</td>
+<td>6.22</td>
+<td>6.40</td>
+<td>6.49</td>
+<td>7.01</td>
+<td>6.13</td>
+<td>6.35</td>
+</tr>
+<tr>
+<td>Seven MVA-only Primaries, all rows</td>
+<td>6.08</td>
+<td>5.92</td>
+<td>7.03</td>
+<td>5.62</td>
+<td>6.11</td>
+<td>5.57</td>
+<td>5.60</td>
+<td>5.54</td>
+<td>5.58</td>
+</tr>
+<tr>
+<td>Seven MVA-only Primaries, all rows, CRPS</td>
+<td>3.49</td>
+<td>3.35</td>
+<td>3.99</td>
+<td>3.14</td>
+<td>3.40</td>
+<td>3.12</td>
+<td>3.14</td>
+<td>3.10</td>
+<td>3.12</td>
+</tr>
+<tr>
+<td>Seven MVA-only Primaries, all rows, twCRPS</td>
+<td>0.279</td>
+<td>0.278</td>
+<td>0.344</td>
+<td>0.249</td>
+<td>0.251</td>
+<td>0.248</td>
+<td>0.250</td>
+<td>0.247</td>
+<td>0.250</td>
+</tr>
+<tr>
+<td>Seven MVA-only Primaries, cold nights</td>
+<td>4.11</td>
+<td>5.13</td>
+<td>7.58</td>
+<td>4.67</td>
+<td>5.53</td>
+<td>4.64</td>
+<td>4.79</td>
+<td>4.43</td>
+<td>4.60</td>
+</tr>
+<tr>
+<td>Seven MVA-only Primaries, Christmas</td>
+<td>4.95</td>
+<td>5.83</td>
+<td>7.90</td>
+<td>4.51</td>
+<td>5.44</td>
+<td>4.55</td>
+<td>4.62</td>
+<td>4.41</td>
+<td>4.49</td>
+</tr>
+</tbody>
+</table>
+<p>The seven MVA-only Primaries are those whose meters record apparent power in megavolt-amperes, which
+hides the direction of flow; the six MW Primaries record real power in megawatts. twCRPS is the
+threshold-weighted CRPS, which weights errors at high demand more heavily. Each cell is in points of
+capacity, and the MAE rows are for the median. The three Primaries in neither group are left out. On
+the six MW Primaries the GAM is level with the best monthly arm (5.36 against 5.35) and ahead of
+every quarterly arm; on the cold nights the GAM leads steps 5 and above by 0.5 to 1.0 points. On the
+seven MVA-only Primaries the networks at step 5 and above beat the GAM and XGBoost on all rows, and
+the GAM leads on cold nights. The Christmas rows hold 20,448 and 23,856 half-hours, so those columns
+are descriptive. The all-rows cells use 537,136 half-hours for the six MW Primaries and 628,272 for
+the seven MVA-only Primaries.</p>
+<h2 id="predictions-that-could-fail">Predictions that could fail</h2>
+<ul>
+<li><strong>P1 (step 8 matches experiment 667 within 0.10 CRPS on the pilot fold): met.</strong> At the annual
+  scale, step 9b scores 4.26 CRPS against 4.29 for the monthly file of experiment 667.</li>
+<li><strong>P2 (the drop from step 3b to 5 exceeds every other adjacent drop over days 0 to 3): not met.</strong>
+  The drops from step 2 to 3a and from 3a to 3b are larger over the same days.</li>
+<li><strong>P3 (step 8 lowers the copied share by at least 0.03 against step 5): met by a small margin.</strong>
+  The drop is 0.031, from 0.059 to 0.028, and the standard deviation over seeds is 0.007.</li>
+<li><strong>P4 (no step before step 4 beats the manual heuristic over days 0 to 14): refuted.</strong> Step 3b
+  scores below the heuristic in all four lead bands, 8.30 against 8.73 over all rows. The intervals
+  of the two scores overlap, and the paired contrast was not computed.</li>
+</ul>
+<p>The decision rule counts a contrast separable only when its interval excludes zero and it exceeds
+the standard deviation of the CRPS across seeds 0 to 2 of the same step. Every contrast in the
+contrast figure has an interval that excludes zero except step 1 to step 2 and, on MAE, step 7 to
+step 8 (+0.005, interval −0.003 to 0.012). The per-seed standard deviation of the CRPS was not
+tabulated, so the second half of the rule and the minimum detectable effect beside each contrast are
+not reported; the only seed spread reported is that of the injected-shift measure.</p>
+<h2 id="caveats">Caveats</h2>
+<ul>
+<li><strong>The step-8 network does not reproduce the monthly file of experiment 667 at the quarterly
+  cadence</strong> (7.99 against 7.53). The monthly step 9b (7.48) is level with it. The two
+  ladders differ from experiment 667 by seed count (5 or 3 against 2) and by the per-fold reference
+  month of the signal noise.</li>
+<li><strong>The Candidate's settings were tuned on 5 of the 12 months</strong>, which favours the later steps. The
+  year overlaps the development months and the final-test window of experiment 620 (2026-07 to
+  2026-10), and no model-selection choice was made from it.</li>
+<li><strong>Steps 1, 2, and 3a differ from step 3b in three ways:</strong> no pre-training, no frozen encoders, and
+  only the newest D5 knot.</li>
+<li><strong>The ladder is one order of adding components.</strong> It says what each component adds given those
+  already present, not what removing it from the Candidate would cost.</li>
+<li><strong>NGED's event labels are incomplete,</strong> so every event count is a lower bound and the "none and at
+  least 7 days after" slice can hold unlabelled events. The long-and-deep cell is empty.</li>
+<li><strong>The stored GAM and XGBoost forecasts end on 2026-06-30,</strong> so the comparison with them covers 8
+  months at lead times of 0 to 10 days. The stored Candidate of experiment 620 is one fit for
+  2026-07 only and is not scored, because experiment 667's file covers the whole year.</li>
+<li><strong>The curtailment-cost amounts depend on a stress limit</strong> and are read as a ranking.</li>
+<li><strong>Seeds:</strong> steps 1 to 4 use seeds 0 to 2, steps 5 to 8 use seeds 0 to 4 at quarterly refits and
+  seeds 0 to 2 at monthly refits. Contrasts that cross cadences use seeds 0 to 2 on both sides.</li>
+<li><strong>One fit was killed for lack of memory.</strong> The 8 GB cap on the GPU wrapper script stopped three
+  Candidate-type fits when three streams ran at once; the cap was raised to 14 GB and the three fits
+  were re-run unchanged.</li>
+</ul>
+<h2 id="method">Method</h2>
+<p><strong>Each step adds one component to the previous step, and every step keeps the Candidate's other
+settings.</strong> The Candidate is the class 2 neural network of experiment 620 (arm P7 with D50 of
+experiment 610). Each step adds one component to the previous step. The order matters: a reverse
+ablation gives each component's gain given the components already present, and says nothing about
+what removing the component from the full Candidate would cost.</p>
+<h3 id="components-of-the-candidate-and-where-each-sits-on-the-ladder">Components of the Candidate and where each sits on the ladder</h3>
+<p>These settings are the same in every step that contains the part the setting belongs to:</p>
+<ul>
+<li>Loss and output: a three-component Gaussian mixture, negative log-likelihood, 11 quantiles from
+  the mixture CDF, sorted (so no step has crossing quantiles).</li>
+<li>Widths (8-wide Primary embedding, encoders 64 to 32, mixer 64), dropout 0.1, AdamW with weight
+  decay 1e-3, batch 8192, 20% of rows per epoch, patience 8, gradient-norm clip 1.0.</li>
+<li>The 730-day window, the 90-day recency half-life, the E3 refit rule (7-day embargo), and the slow
+  per-Primary output offset D5. ENS-only fits (steps 1, 2, and 3a) have no pre-trained D5 knots: the
+  offset keeps only the newest knot, which departs from the Candidate and is named as a caveat.</li>
+<li>The 7 weather means, the 7 spread columns, the 2 lead columns, the 21 date-time columns, and the
+  14 B1 columns (thermal lag and solar gain) read by the weather encoder.</li>
+<li>The cut of D15 and D18 before 2025-03-01.</li>
+<li>No band-width factor at any step. The Candidate's factor 1.0934 is post-processing; step 8 is
+  reported without it, and with it as one extra row if 667 applies it.</li>
+</ul>
+<p>Added where:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Components added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Date-time encoder, Primary embedding, and mixer. The weather, spread, and lead inputs are removed, so the mixer sees only the date-time embedding.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Weather encoder alone (B1 columns included); the date-time and lead inputs are removed. The mixer sees the weather embedding and the Primary embedding.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Both encoders into the mixer; the lead columns enter here (the spread columns enter with the weather encoder at step 2). Version a: trained on ENS only, no pre-training, nothing frozen. Version b: ERA5 and CAMS pre-training, then fine-tuning on ENS with both encoders frozen (the chain of experiment 620).</td>
+</tr>
+<tr>
+<td>4</td>
+<td>One lag encoder at 24 hours, with its expected-weather and expected-date-time embeddings at the lag's own time, the lag-ID embedding, and block dropout of lags (30% of days).</td>
+</tr>
+<tr>
+<td>5</td>
+<td>A second lag at one week through the shared lag encoder. Two versions: with and without injected events.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>The gap columns: power at the lag time minus the lag-free table, plus the <code>exp_missing</code> flags (arm P3 of experiment 606). Signal dropout D50 applies from here on, because the Candidate applies it whenever signal columns exist.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>The exponentially weighted averages of the gap, half-lives 1, 3, and 7 days (arm P5 of experiment 606).</td>
+</tr>
+<tr>
+<td>8</td>
+<td>The 42 neighbour columns (arm P7 of experiment 606). Step 8 with injected events is the Candidate.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="schedule-and-frozen-parts-of-each-step">Schedule and frozen parts of each step</h3>
+<p>All steps use the Candidate's three-stage schedule where it applies: stage 1 pre-training, stage 2
+(encoders frozen, fresh mixer), stage 3 fine-tuning (recency weights, E3). "Stage" below never
+means a ladder step.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Stage 1 (pre-training)</th>
+<th>Stage 2</th>
+<th>Stage 3</th>
+<th>Frozen after stage 1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1, 2, 3a</td>
+<td>None; random initialisation</td>
+<td>Same as other steps, learning rate 5e-4 throughout</td>
+<td>Same as other steps</td>
+<td>Nothing</td>
+</tr>
+<tr>
+<td>3b</td>
+<td>ERA5 and CAMS, lag-free</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Both encoders</td>
+</tr>
+<tr>
+<td>4</td>
+<td>ERA5 and CAMS, one lag</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Both encoders</td>
+</tr>
+<tr>
+<td>5 (with, without)</td>
+<td>ERA5 and CAMS, two lags (shared)</td>
+<td>Yes, shared by the two versions</td>
+<td>Yes; "with" adds the 581 shifts to the lag inputs</td>
+<td>Both encoders</td>
+</tr>
+<tr>
+<td>6, 7, 8</td>
+<td>The step-5 chain</td>
+<td>The step-5 stage-2 checkpoint</td>
+<td>Starts from it with the signal columns zero-initialised</td>
+<td>Both encoders</td>
+</tr>
+</tbody>
+</table>
+<p>Steps 3b, 4, and 5 each have their own pre-training, because the lag encoder is trained in stage 1,
+so the contrast between adjacent steps includes a re-pre-trained encoder. Steps 4 and onward do not
+start from the step-3b checkpoint. Only stage 3 of the Candidate sees the 581 shifts.</p>
+<p><strong>The lag-free table T</strong> is the median of the step-5 stage-2 checkpoint of the same version and seed
+with both lags masked, taken at the freshest origin with lead at most 24 hours. This is the
+Candidate's own construction (its stage-2 network), not a fine-tuned network. Steps 6 to 8 build T
+once per fold, version, and seed and share it (in-fold, as the Candidate does). The lag-free table
+uses the stage-2 lag network because the Candidate does, and step 8 reproduces the Candidate. The
+606 reference month for the signal noise is the latest month before each fold's cutoff, not the
+Candidate's fixed 2026-06, which is future data for earlier folds.</p>
+<h3 id="what-without-injected-events-removes">What "without injected events" removes</h3>
+<p>The Candidate trains on the lag-only synthetic shifts of experiment 581 (5% of each Primary's row
+span, depths 0.15, 0.30, 0.50 of capacity, lengths 3, 7, 15, 30 days). From step 8, each shift is
+also mirrored into one neighbour's summaries; at steps 4 to 7 the shifts reach only the own lag
+inputs. Steps 4 and below have no injected-event version (step 4 trains with the 581 shifts, as in
+the Candidate, in both ladders). Decisions:</p>
+<ul>
+<li>The <strong>with</strong> version is the Candidate recipe as it stands (581 shifts), so step 8 with injection
+  can reproduce 667.</li>
+<li>The <strong>without</strong> version removes the 581 shifts from the lag inputs of stage 3 and the neighbour
+  mirror at step 8; nothing else changes. The contrast therefore means different things at different
+  steps (own lags only before step 8, own lags plus neighbours at step 8).</li>
+<li>The <strong>held-out scoring bank</strong> is built by experiment 581's own generator with seeds disjoint from
+  every training seed, so the bank matches the "with" arm's training distribution, which favours the
+  "with" version by design. A second bank from experiment 660's generator (<code>e00660_generator.py</code>,
+  the shared generator its page tells readers to import) is scored as a check on that bias. Both
+  inject into lag inputs only. Each bank also mirrors the shift into one neighbour's summaries, so
+  step 8's neighbour columns can show their effect. The injection reaches lag inputs only, never the
+  targets.</li>
+<li><strong>Follow</strong> is the share of an injected shift's depth that the median forecast copies (0 means the
+  forecast ignores the shift, 1 means it copies all of it); lower is better for an NRA forecast.
+  <strong>Absorption</strong> is the share of the shift that the network's fitted values take up in its training
+  power (experiment 595's definition). Absorption was not scored on this page.</li>
+</ul>
+<p>The real long-and-deep cell is nearly empty (experiment 665 found none of NGED's 77 logged shifts
+lasting more than a day in the long-and-deep type), so the real-record slices are descriptive and
+every slice reports its rows and events first.</p>
+<h3 id="refit-cadence-window-and-seeds">Refit cadence, window, and seeds</h3>
+<ul>
+<li>Window: the 12 months of experiment 667 (daily 12:00 UTC origins, 2025-11-01 to 2026-10-31, 14-day
+  horizon). Origins after about 2026-10-26 have valid times beyond the stored data, so each lead
+  band reports its row count. The native origin of the networks is 09:00 UTC; the 12:00 contract
+  origin follows 667's convention (<code>power_fcst_init_time</code> carries the 12:00 origin). The window
+  overlaps the development months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06) and the final-test
+  window of experiment 620 (2026-07 to 2026-10); the Candidate's settings were tuned on 5 of the 12
+  months, which favours the later steps. The year is descriptive, and no model-selection choice is
+  made from it.</li>
+<li>The ladder refits <strong>quarterly</strong>, at the starts of 2025-11, 2026-02, 2026-05, and 2026-08, each
+  fold scoring three months. Step 9 refits steps 5 to 8 <strong>monthly</strong> (12 folds). Experiment 667's own
+  file is the monthly reference; the quarterly step 8 differs from it by cadence, seed count (5
+  against 2), and the per-fold reference month.</li>
+<li><strong>Pilot fold.</strong> Before the other folds ran, the 2026-05 fold ran step 8 with injection at the
+  monthly cadence and 2 seeds, and was compared with the file of experiment 667 on the same rows. P1
+  was read there.</li>
+<li>Seeds: steps 1 to 4 use seeds 0 to 2. Steps 5 to 8 use seeds 0 to 4 at quarterly refits and seeds
+  0 to 2 at monthly refits. A contrast across cadences, and every contrast on the contrast figure
+  that involves the monthly arms, uses seeds 0 to 2 on both sides, which the <code>!</code> (quarterly, seeds
+  0 to 2) and <code>@1</code> (monthly) names mark in the private tables.</li>
+<li>Intervals: block bootstrap over 7-day blocks of origin days, 2,000 draws.</li>
+<li>Lags follow the Candidate's rule, which keeps every lag at least 24 hours before the 09:00 UTC
+  native origin. The plan's second per-row check, that every lag was observed before 06:00 UTC on
+  the origin day, was not added as a separate assertion.</li>
+</ul>
+<h3 id="reference-arms">Reference arms</h3>
+<ul>
+<li>The manual heuristic and climatology, from <code>baseline_forecasters</code>, as in 620 and 668.</li>
+<li>The monthly file of experiment 667. The stored Candidate of experiment 620 (one fit, 2026-07 fold
+  only) is not scored.</li>
+<li><strong>GAM</strong>: the Primary demand research default 3 (experiments 251 below 168 h and 322 above), refit
+  weekly on the whole history, as stored. <strong>XGBoost</strong>: BG2, arm <code>p_s6_bg2</code> of experiment 87, refit
+  weekly, as stored.</li>
+<li>Both stored arms have 09:00 UTC origins and end on 2026-06-29. The ladder is scored on the rows it
+  shares with them, joined on series and valid time (each arm with its own lead). The shared rows
+  cover 16 Primaries, 2025-11-01 to 2026-06-29, and leads of 0 to 10 days. A CPU re-run to cover the
+  full year was not run.</li>
+</ul>
+<h3 id="prevailing-output">Prevailing output</h3>
+<p>The survival head (R-haz) is trained on the frozen Candidate's quantiles with a bank of injected
+shifts and needs the signal columns, so no step before step 8 can have one. Every ladder file
+holds <code>NRA_or_prevailing</code> equal to <code>"NRA"</code>. The prevailing rows shown on this page are those of
+experiment 667's own file.</p>
+<h2 id="files">Files</h2>
+<p><strong>All files are private and live under
+<code>data/ml-experiments/00677-building-up-the-candidate-demand-network-one-component-at-a-time/backtests/</code>.</strong>
+Each holds 16 Primaries with the columns <code>time_series_id</code>, <code>valid_time</code>, <code>nwp_init_time</code>,
+<code>power_fcst_init_time</code> (the 12:00 UTC contract origin), the 11 quantile columns <code>q01</code> to <code>q99</code>,
+<code>seed</code>, <code>step</code>, <code>version</code>, and <code>NRA_or_prevailing</code>. Files named <code>_sp3</code> refit quarterly and <code>_sp1</code>
+refit monthly. The rows are 365 origins × 16 Primaries × 672 half-hours × the number of seeds.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Seeds</th>
+<th>Rows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>step1_ens_only_sp3</code>, <code>step2_ens_only_sp3</code>, <code>step3a_ens_only_sp3</code>, <code>step3b_pretrained_sp3</code>, <code>step4_pretrained_sp3</code></td>
+<td>3</td>
+<td>11,773,440 each</td>
+</tr>
+<tr>
+<td><code>step{5,6,7,8}w_with_injected_sp3</code>, <code>step{5,6,7,8}wo_without_injected_sp3</code></td>
+<td>5</td>
+<td>19,622,400 each</td>
+</tr>
+<tr>
+<td><code>step{5,6,7,8}w_with_injected_sp1</code>, <code>step{5,6,7,8}wo_without_injected_sp1</code></td>
+<td>3</td>
+<td>11,773,440 each</td>
+</tr>
+</tbody>
+</table>
+<p>The checks run on every one of the 21 files were: no duplicate key over <code>seed</code>, <code>time_series_id</code>,
+<code>power_fcst_init_time</code>, and <code>valid_time</code>; no null quantile; no crossing quantile (each <code>q</code> column is
+at most the next); and UTC timestamps. All 21 files passed with 0 duplicates, 0 nulls, and 0
+crossings. The weights that the fold scripts wrote are in each fold folder's <code>work/models/</code> (682
+<code>.pt</code> files, 131 MB in total). The settings and seeds are in the experiment folder, and its
+<code>e00677_*.py</code> files re-run every fit.</p>
+<p>The score tables behind every number on this page are in <code>scores/</code> of the same private folder, and
+the banks of injected shifts are in each fold folder's <code>work/bank/</code>. The figures are in this page's
+folder.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

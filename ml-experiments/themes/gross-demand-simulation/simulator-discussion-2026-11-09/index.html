@@ -1,0 +1,7661 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../asset-inventory-simulator/">
+      
+      
+        <link rel="next" href="../proposal-to-nged-options/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Simulator discussion of 2026-11-09 - NGED ML research</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-simulator-discussion-of-2026-11-09" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="NGED ML research" class="md-header__button md-logo" aria-label="NGED ML research" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED ML research
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Simulator discussion of 2026-11-09
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="NGED ML research" class="md-nav__button md-logo" aria-label="NGED ML research" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED ML research
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/embedded-pv-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How much solar sits behind each Primary substation, and how far can the number be trusted?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_11" id="__nav_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/wind-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wind component storage measurement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/wind-interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How should we interpolate wind components?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/ifs-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which IFS forecast variables, or which second forecast, help a solar power forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/lag-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a same-hour power lag improve a day-ahead solar forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/effective-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Is a daily capacity estimate worth building for day-ahead solar forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/quick-wins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which cheap changes lower the production XGBoost forecast's error?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/production-feature-faults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production feature faults: diagnosis and forecast effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../studies/forecasts/llm-capacity-labeller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a language model label a solar plant's capacity changes?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experiments
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experiments
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/nged-power-telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED power telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-inputs-by-product/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather inputs by product
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/row-sets-and-scoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Row sets and scoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/what-is-on-disk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What is on disk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/substation-information-fields/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Substation information fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/metered-generators-and-anonymisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metered generators and anonymisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/market-and-other-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market and other data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/problems-and-current-best-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Problems and the current best forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/adopted-and-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adopted and open questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research default
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Research default
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../research-default/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../evaluation-protocol-demand/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, demand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../scoreboard-demand/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoreboard, demand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../evaluation-protocol-solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, solar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../evaluation-protocol-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, wind
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../research-default-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Log of versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../final-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Final models for the production port
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../data-processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kalman-gam-explainer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kalman filter explainer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration and uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Calibration and uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../calibration-and-uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../calibration-and-uncertainty/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../calibration-and-uncertainty/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../calibration-and-uncertainty/delivery-recommendation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery recommendation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curtailment cost
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Curtailment cost
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../curtailment-cost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../curtailment-cost/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../curtailment-cost/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../curtailment-cost/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demand inputs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Demand inputs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demand-inputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demand-inputs/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demand-inputs/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../demand-inputs/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Differentiable physics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-literature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Literature scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-economy-7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Economy 7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_4" id="__nav_3_11_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demand, calendar, and weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Demand, calendar, and weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-demand-calendar-and-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-demand-calendar-and-weather/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-demand-calendar-and-weather/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-demand-calendar-and-weather/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_5" id="__nav_3_11_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedded generation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Embedded generation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-embedded-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-embedded-generation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-embedded-generation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-embedded-generation/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_6" id="__nav_3_11_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long history and drift
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Long history and drift
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-long-history-and-drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-long-history-and-drift/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-long-history-and-drift/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_7" id="__nav_3_11_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pooling across substations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pooling across substations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-pooling-across-substations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-pooling-across-substations/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-pooling-across-substations/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-pooling-across-substations/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_8" id="__nav_3_11_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast engine
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecast engine
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-forecast-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-forecast-engine/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-forecast-engine/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-forecast-engine/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11_9" id="__nav_3_11_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_11_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Network
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-network/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../differentiable-physics-network/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12" id="__nav_3_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator forecasting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Generator forecasting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../generator-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../generator-forecasting/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../generator-forecasting/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../generator-forecasting/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_13" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_13" id="__nav_3_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gross-demand simulation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_13_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Gross-demand simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../asset-inventory-simulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Asset-inventory simulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulator discussion of 2026-11-09
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulator discussion of 2026-11-09
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#take-home-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Take-home message
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numbers-checked-against-merged-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numbers checked against merged pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-record-was-made" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the record was made
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The record
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The record">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-launch-instruction-2026-11-09-1427-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Launch instruction, 2026-11-09 14:27 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-session-reply-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Session reply, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-finding-from-a-tool-result-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Finding from a tool result, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-finding-from-a-tool-result-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Finding from a tool result, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-session-reply-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Session reply, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-maintainer-2026-11-09-1435-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Maintainer, 2026-11-09 14:35 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-session-reply-2026-11-09-1435-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Session reply, 2026-11-09 14:35 UTC
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Session reply, 2026-11-09 14:35 UTC">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q1-would-a-perfect-simulator-be-useful" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q1: Would a perfect simulator be useful?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q2-is-it-buildable-and-with-what" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q2: Is it buildable, and with what?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q3-could-the-simulator-also-be-the-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q3: Could the simulator also be the forecast?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#candidate-uses-ranked-from-my-earlier-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate uses ranked, from my earlier answer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-cheap-first-experiments-none-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three cheap first experiments (none started)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#argument-against-building-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Argument against building one
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#questions-for-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Questions for you
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-maintainer-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Maintainer, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-session-reply-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Session reply, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Session reply, 2026-11-09 14:51 UTC">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-labelling-wins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where labelling wins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-labelling-falls-short" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where labelling falls short
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-two-compare" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the two compare
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-they-combine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How they combine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#my-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        My recommendation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-maintainer-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Maintainer, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11-session-reply-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Session reply, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-maintainer-2026-11-09-1455-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Maintainer, 2026-11-09 14:55 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-message-sent-to-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1455-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Message sent to a peer session (Discuss: Graph approach to switching events), 2026-11-09 14:55 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-session-reply-2026-11-09-1455-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Session reply, 2026-11-09 14:55 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-message-from-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1456-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Message from a peer session (Discuss: Graph approach to switching events), 2026-11-09 14:56 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-session-reply-2026-11-09-1456-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Session reply, 2026-11-09 14:56 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-session-reply-2026-11-09-1456-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Session reply, 2026-11-09 14:56 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-message-from-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1803-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Message from a peer session (Discuss: Graph approach to switching events), 2026-11-09 18:03 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-finding-from-a-tool-result-2026-11-09-1803-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Finding from a tool result, 2026-11-09 18:03 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#20-message-sent-to-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1804-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20. Message sent to a peer session (Discuss: Graph approach to switching events), 2026-11-09 18:04 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#21-session-reply-2026-11-09-1804-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        21. Session reply, 2026-11-09 18:04 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-maintainer-2026-11-10-1218-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        22. Maintainer, 2026-11-10 12:18 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proposal-to-nged-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options for proposing the simulator to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_14" id="__nav_3_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hierarchy and pooling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hierarchy and pooling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hierarchy-and-pooling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hierarchy-and-pooling/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hierarchy-and-pooling/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hierarchy-and-pooling/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_15" id="__nav_3_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lagged power and error correction
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Lagged power and error correction
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lagged-power-and-error-correction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lagged-power-and-error-correction/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lagged-power-and-error-correction/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lagged-power-and-error-correction/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_16" id="__nav_3_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production reference and best guess
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Production reference and best guess
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../production-reference-and-best-guess/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../production-reference-and-best-guess/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../production-reference-and-best-guess/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../production-reference-and-best-guess/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../production-reference-and-best-guess/neural-simplification-series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural simplification series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_17" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_17" id="__nav_3_17_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Retraining and training history
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_17">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Retraining and training history
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../retraining-and-training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../retraining-and-training-history/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../retraining-and-training-history/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../retraining-and-training-history/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_18" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_18" id="__nav_3_18_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metered solar farms
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_18_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_18">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Metered solar farms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../metered-solar-farms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../metered-solar-farms/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../metered-solar-farms/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../metered-solar-farms/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_19" id="__nav_3_19_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solar disaggregation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_19">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Solar disaggregation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-disaggregation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-disaggregation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-disaggregation/unmetered-pv-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unmetered PV capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_20" id="__nav_3_20_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LSC detectors
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    LSC detectors
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lsc-detectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lsc-detectors/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lsc-detectors/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lsc-detectors/event-table-summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event-table summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lsc-detectors/state-at-january-pause/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State at the January pause
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_21" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_21" id="__nav_3_21_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load-shift labels in the forecast
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_21_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_21">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Load-shift labels in the forecast
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../switching-labels-in-the-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../switching-labels-in-the-forecast/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../switching-labels-in-the-forecast/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../switching-labels-in-the-forecast/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_22" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_22" id="__nav_3_22_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products and blending
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_22_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_22">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Weather products and blending
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../weather-products-and-blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../weather-products-and-blending/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../weather-products-and-blending/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../weather-products-and-blending/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#take-home-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Take-home message
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numbers-checked-against-merged-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numbers checked against merged pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-record-was-made" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the record was made
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The record
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The record">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-launch-instruction-2026-11-09-1427-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Launch instruction, 2026-11-09 14:27 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-session-reply-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Session reply, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-finding-from-a-tool-result-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Finding from a tool result, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-finding-from-a-tool-result-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Finding from a tool result, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-session-reply-2026-11-09-1428-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Session reply, 2026-11-09 14:28 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-maintainer-2026-11-09-1435-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Maintainer, 2026-11-09 14:35 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-session-reply-2026-11-09-1435-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Session reply, 2026-11-09 14:35 UTC
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Session reply, 2026-11-09 14:35 UTC">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#q1-would-a-perfect-simulator-be-useful" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q1: Would a perfect simulator be useful?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q2-is-it-buildable-and-with-what" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q2: Is it buildable, and with what?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#q3-could-the-simulator-also-be-the-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Q3: Could the simulator also be the forecast?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#candidate-uses-ranked-from-my-earlier-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate uses ranked, from my earlier answer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-cheap-first-experiments-none-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three cheap first experiments (none started)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#argument-against-building-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Argument against building one
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#questions-for-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Questions for you
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-maintainer-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Maintainer, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-session-reply-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Session reply, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Session reply, 2026-11-09 14:51 UTC">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-labelling-wins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where labelling wins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-labelling-falls-short" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where labelling falls short
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-two-compare" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the two compare
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-they-combine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How they combine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#my-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        My recommendation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-maintainer-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Maintainer, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11-session-reply-2026-11-09-1451-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Session reply, 2026-11-09 14:51 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-maintainer-2026-11-09-1455-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Maintainer, 2026-11-09 14:55 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-message-sent-to-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1455-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Message sent to a peer session (Discuss: Graph approach to switching events), 2026-11-09 14:55 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-session-reply-2026-11-09-1455-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Session reply, 2026-11-09 14:55 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-message-from-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1456-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Message from a peer session (Discuss: Graph approach to switching events), 2026-11-09 14:56 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-session-reply-2026-11-09-1456-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Session reply, 2026-11-09 14:56 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-session-reply-2026-11-09-1456-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Session reply, 2026-11-09 14:56 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-message-from-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1803-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Message from a peer session (Discuss: Graph approach to switching events), 2026-11-09 18:03 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-finding-from-a-tool-result-2026-11-09-1803-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Finding from a tool result, 2026-11-09 18:03 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#20-message-sent-to-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1804-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20. Message sent to a peer session (Discuss: Graph approach to switching events), 2026-11-09 18:04 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#21-session-reply-2026-11-09-1804-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        21. Session reply, 2026-11-09 18:04 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-maintainer-2026-11-10-1218-utc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        22. Maintainer, 2026-11-10 12:18 UTC
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="the-simulator-discussion-of-2026-11-09">The simulator discussion of 2026-11-09</h1>
+<p><strong>This page is a lightly edited transcript of a discussion session, not a reviewed result.</strong> Gross
+demand is demand before the embedded generation behind a substation is netted off. On 2026-11-09 the
+maintainer asked a Discuss session (an interactive Claude Code session used for discussion, which
+runs no experiments) whether a simulator of gross demand at substations would be useful, whether it
+could be built, and whether the simulator could itself be used as a forecast. The session answered
+from merged pages and stored outputs and ran no fits. The numbers in the record were not re-checked
+when the discussion took place. The <a href="#numbers-checked-against-merged-pages">table of checked numbers</a>
+below says which ones were checked against merged pages on 2026-11-10.</p>
+<h2 id="take-home-message">Take-home message</h2>
+<p><strong>The session judged that a simulator with exact labels would be most useful for evaluating
+forecasts.</strong> It judged labelling real data the cheaper first step. It also concluded that labelling
+alone cannot give the exact truth needed to score a forecast under two sets of rules. Those two sets
+of rules are the normal running arrangement (the electricity network as configured when no load has
+been transferred between substations) and the prevailing arrangement (the configuration in force on
+the day). The maintainer's starting point was that a forecast's score, and even the ranking of
+forecasting methods, depends on which set of rules is used, and the telemetry is not always in the
+normal running arrangement. A simulator that puts in every load transfer and every generator itself
+would know the correct labels for both sets of rules.</p>
+<p><strong>What was asked.</strong></p>
+<ul>
+<li>Would a perfect simulator of net demand at substations, with controls for every input, be useful?</li>
+<li>Is a good-enough simulator buildable, and with what methods?</li>
+<li>Could the simulator, with its parameters inferred from real substation data, be used as an
+  explainable forecast that can look months ahead and add a generator it has never seen?</li>
+<li>How does heavy labelling of real data (load transfers, solar capacity, large generators, with
+  hindsight and past weather) compare with building a simulator?</li>
+</ul>
+<p><strong>What the session concluded.</strong></p>
+<ul>
+<li><strong>Evaluation is the strongest use.</strong> Exact labels would let a forecast of the normal running
+  arrangement and a forecast of the prevailing arrangement each be scored against its own truth.</li>
+<li><strong>Training data is the weakest use.</strong> In experiment 486, training with more artificial load-shift
+  events raised forecast error on ordinary rows.</li>
+<li><strong>A first simulator would be assembled from parts the repository already has:</strong> the demand
+  generalised additive model (GAM) with its calendar, temperature, heating, holiday, and clock-change
+  terms; the physics solar and wind plant models; the injected-event generator; and the fitted
+  per-substation properties of the substation cards. A generative model of the residual, a model of
+  how often load transfers happen, and a fixed rule for when each battery charges and each engine
+  runs would be new.</li>
+<li><strong>A bottom-up model of customers and appliances is not worth building first</strong>, because the
+  session found no appliance, tariff, or behaviour data per substation in the project's files.</li>
+<li><strong>A simulator fitted to the metered record is circular</strong> when it is used to test methods that
+  share its assumptions: the test then checks the simulator's own assumptions. The session proposed
+  two defences: take the truth from independent sources (real metered farm output injected into a
+  Primary), and judge the simulator by whether the existing forecasting methods keep their ranking
+  on simulated series.</li>
+<li><strong>The simulator and a forward-model forecast would be the same code</strong>, run with chosen parameters
+  or with inferred parameters. Its forecast skill is bounded by how well the hidden components can
+  be separated from net power, and it would probably be less skilful than the current forecasts at
+  short leads.</li>
+<li><strong>Labelling first, simulator later.</strong> Labelling has no realism gap and improves every score the
+  project already computes. A peer session on graph approaches to load-transfer detection reported
+  that its detectors find about two thirds of the megawatts in injected long load shifts, and name
+  both substations for under a fifth of transfer ends. Those labels would therefore be biased
+  towards large, long, one-sided events, and could not score forecasts under both sets of rules.</li>
+</ul>
+<p><strong>What was left open.</strong></p>
+<ul>
+<li>The session did not establish which use the maintainer has in mind. Known-answer testing and
+  scenario testing need different simulators.</li>
+<li>The session proposed three cheap first experiments: a realness classifier on a first simulator,
+  rank transfer of existing forecasting methods, and known-answer recovery of an injected farm. None
+  was started. Their thresholds were the session's first guesses.</li>
+<li>Which labels beyond load transfers a labeller should produce first. The session's view was
+  reverse flow (power flowing from the Primary back up to the 33 kV network) at the eight MVA
+  Primaries, which are metered in apparent power without a sign, then large-generator steps, then
+  solar capacity.</li>
+</ul>
+<p><strong>The maintainer then asked for an alternative to strict disaggregation to be assessed.</strong> Strict
+disaggregation splits every half-hour into the contribution of each asset. The alternative fits a
+list of assets and a few parameters per asset, and is assessed on <a href="../asset-inventory-simulator/">An asset-inventory
+simulator</a>.</p>
+<h2 id="numbers-checked-against-merged-pages">Numbers checked against merged pages</h2>
+<p><strong>Most numbers in the record match the merged pages; three need a correction.</strong> "Checked" means the
+number was found on the merged page named, on 2026-11-10. "Not re-checked" means no merged page was
+found that states it.</p>
+<table>
+<thead>
+<tr>
+<th>Claim in the record</th>
+<th>Source</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Injected-event recall of about 6% (1 to 2 noise units) and 23% (2 to 4 noise units); 0 of 5 and 0 of 3 real events found</td>
+<td>Stored output of <a href="../../../00660-shared-generator-of-injected-load-transfer-events/result/">experiment 660</a></td>
+<td>Checked against the stored file. The result page has since merged: its classifier cannot tell injected from real event windows (area under the curve 0.55)</td>
+</tr>
+<tr>
+<td>The capacity fit recovers 0.75 to 0.88 of an injected farm</td>
+<td><a href="../../../00129-differentiable-physics-pv-capacity-known-answer-test/result/">Experiment 129</a>, <a href="../../../00157-differentiable-physics-joint-pv-capacity-known-answer/result/">experiment 157</a></td>
+<td>Checked, with a correction: experiment 129 reports a median real-farm recovery of 0.78 to 0.86. The 0.88 is experiment 157's quote of experiment 129, and 0.75 to 0.87 is experiment 157's refit on its own rows</td>
+</tr>
+<tr>
+<td>About 0.17 of the recovery is lost to the demand terms and to the fixed solar shape</td>
+<td><a href="../../../00231-pv-capacity-audit-where-recovery-goes/result/">Experiment 231</a></td>
+<td>Checked (0.173)</td>
+</tr>
+<tr>
+<td>The plant shape, not the sunshine, explains the gain from a nearby farm's output</td>
+<td><a href="../../../00269-pv-capacity-gain-decomposition/result/">Experiment 269</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>No candidate solar shape passes the placebo test; a cloud-load term makes the intervals honest</td>
+<td><a href="../../../00474-pv-capacity-placebo-gated-ladder-and-per-primary-intervals/result/">Experiment 474</a></td>
+<td>Checked against the page's interim take-home</td>
+</tr>
+<tr>
+<td>Neighbour lag encoders trained on synthetic shifts raise CRPS by 0.21 points of capacity</td>
+<td><a href="../../../00567-neighbour-lag-encoders-synthetic-load-shifts-in-pretraining-and-fine-tuning/result/">Experiment 567</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>Experiments 486 and 567 show that injected events raise error on ordinary rows</td>
+<td><a href="../../../00486-lagged-network-injection-rate-and-schedule/result/">Experiment 486</a>, experiment 567</td>
+<td>Checked, with a correction: experiment 486 finds the harm as the share of injected training rows rises, and its 5% arm scores better than its reference on rows with no labelled event; experiment 567 reports that the harm on rows with no labelled event is not shown (+0.14, interval -0.04 to +0.27)</td>
+</tr>
+<tr>
+<td>The sum over a donor and its recipients still steps by about half the donor's step; 15 events at the six Primaries</td>
+<td><a href="../../../00459-load-shift-conservation-check-donor-and-recipient-sum/result/">Experiment 459</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>About half the worst unlabelled days are sharp-edged blocks, and neighbours do not explain them</td>
+<td><a href="../../../00175-dp-unlabelled-day-shapes/result/">Experiment 175</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>At D8 the XGBoost model's lead comes from origin lags</td>
+<td>None found</td>
+<td>Not re-checked</td>
+</tr>
+<tr>
+<td>The penalised segmentation finds 0.64 of injected megawatts and pairs 0.18 of transfer ends; it matched 8 of 77 logged shifts; 246 real events</td>
+<td><a href="../../../00653-edge-state-event-table-penalised-segmentation/result/">Experiment 653</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>The recurrent neural network finds 0.48 to 0.52 of injected megawatts; a classifier separates its injected events from real ones at area under the curve 0.91</td>
+<td><a href="../../../00658-edge-state-event-table-neural-network/result/">Experiment 658</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>Of 27 mirrored sustained pairs in the telemetry, 1 matches a label</td>
+<td><a href="../../../00580-verified-load-shift-event-set-and-label-audit/result/">Experiment 580</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>A rewired graph scored the same as the real graph in the graph layer</td>
+<td><a href="../../../00651-graph-layer-over-electrical-neighbours-in-the-demand-network-part-1/result/">Experiment 651</a></td>
+<td>Checked (2.452 for the rewired graph and for the real-graph arms)</td>
+</tr>
+<tr>
+<td>The shoulder-hour dip tells the sign change up to export about 3 times the night import; D12 exports about 5 times</td>
+<td><a href="../../../00508-mva-shoulder-hours-and-d8-d22-dips-solar-or-load-shift/result/">Experiment 508</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>A metered farm's meter outage does not reappear in D10's power; a known solar step is found in size and to within a month, with invented steps at D10 and D11</td>
+<td><a href="../../../00206-dp-meter-regime-steps-e1-farm-outages-in-primary/result/">Experiment 206</a>, <a href="../../../00207-dp-meter-regime-steps-e2-step-capacity-known-answer/result/">experiment 207</a></td>
+<td>Checked</td>
+</tr>
+<tr>
+<td>The gas-engine bands of experiment 264 are a component a simulator could reuse</td>
+<td><a href="../../../00264-dp-gas-engine-asymmetric-bands-at-d8/result/">Experiment 264</a></td>
+<td>Checked, with a correction: the page's verdict is not supported for the engine model, because its engine mixture also fits a running engine at two substations that have none</td>
+</tr>
+<tr>
+<td>Experiments 618, 624, 649, 656, 660, and 662 had no merged page</td>
+<td>The merged pages on 2026-11-09</td>
+<td>Correct when said; all six pages have merged since</td>
+</tr>
+<tr>
+<td>The cost estimates (CPU-hours and GPU-hours) and the thresholds of the proposed experiments</td>
+<td>The session's own guesses</td>
+<td>Not re-checked</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-the-record-was-made">How the record was made</h2>
+<p><strong>The record below was produced by a script and edited only where the script says.</strong>
+<code>scripts/transcript_to_record.py</code>, beside this page, reads the session's transcript and keeps, in
+order, the maintainer's messages, the session's replies, and the messages exchanged with the peer
+session. Tool calls and tool results are dropped. The three tool results that carry findings the
+replies rely on are each replaced by one line naming the page or file they came from. The script
+removes paths under the home directory, socket addresses, and session identifiers. It replaces the
+older anonymous labels of NGED's metered generators with the current ones (Wind A to C, Solar A to
+F, Battery A, and Gas A), and stops with an error if an older label or an email address survives.
+Headings inside a reply are pushed down below the entry headings, a bold-only line gains a colon,
+and lists gain the blank lines and indents the docs renderer needs; the text is then rewrapped to
+100 characters with <code>scripts/lint/reflow_docs.py</code>. The first entry is the instruction that launched
+the session. The maintainer's messages were dictated and are kept as spoken. The record uses
+"switching event" where the session did; elsewhere the project now writes "load shift".</p>
+<h2 id="the-record">The record</h2>
+<!-- record-start -->
+
+<h3 id="1-launch-instruction-2026-11-09-1427-utc">1. Launch instruction, 2026-11-09 14:27 UTC</h3>
+<p>You are a top-level Discuss session talking directly with the maintainer. Read
+data/ml-experiments/briefs/gross_demand_simulator_discuss_brief.md and follow it: do its first task,
+then stop for the maintainer's reaction.</p>
+<h3 id="2-session-reply-2026-11-09-1428-utc">2. Session reply, 2026-11-09 14:28 UTC</h3>
+<p>Status: I have the experiment list and front matter, and I'm now reading the results of the
+known-answer, injection and unmetered-PV pages.</p>
+<h3 id="3-finding-from-a-tool-result-2026-11-09-1428-utc">3. Finding from a tool result, 2026-11-09 14:28 UTC</h3>
+<p>The session read the opening paragraphs of experiments 31, 129, 157, 175, 231, 269, 459, 474, 482,
+486, and 567 (their <code>result.md</code> pages); the recoveries of 0.75 to 0.88, the 0.17 shortfall, the
+failed placebo test, the +0.21 CRPS, the half-sized leak, and the share of sharp-edged blocks quoted
+below come from those pages.</p>
+<h3 id="4-finding-from-a-tool-result-2026-11-09-1428-utc">4. Finding from a tool result, 2026-11-09 14:28 UTC</h3>
+<p>The session read experiment 660's stored file <code>ev4_recall_by_size.json</code> (no result page was merged
+then): injected-event recall 0.06 in the 1-to-2 size bin (77 events) and 0.23 in the 2-to-4 bin (140
+events); 0 of 5 and 0 of 3 real events found in those bins.</p>
+<h3 id="5-session-reply-2026-11-09-1428-utc">5. Session reply, 2026-11-09 14:28 UTC</h3>
+<p><strong>Answer: build a small, narrow simulator for known-answer tests only, and do not build a general
+one yet.</strong> A full simulator is worth it only if the first experiments below show that decomposition
+and forecast scores on simulated series track their scores on real series.</p>
+<p><strong>What exists that a simulator could reuse</strong>:</p>
+<ul>
+<li><strong>Injected-event generator:</strong> experiment 660 (shared generator of injected load-transfer events)
+  has no merged <code>result.md</code>. I found only its stored outputs: <code>ev1</code> to <code>ev4</code> JSON and parquet files
+  in <code>data/ml-experiments/00660-*</code>. I found no realness-classifier result there. I did not read
+  those outputs for this review.</li>
+<li><strong>Injected recall in those outputs:</strong> by event size, recall of injected events is about 6% for the
+  1 to 2 size bin and 23% for the 2 to 4 bin. On the real events in those bins the detector found 0
+  of 5 and 0 of 3.</li>
+<li><strong>Real-data injection harness:</strong> experiments 129, 157, 231, 238, 269 and 474 add a metered solar
+  farm's recorded output to a Primary's reading and test whether the capacity fit finds it again.
+  This is the nearest thing to a known-answer test we have, and it uses real farm shapes rather than
+  a simulator.</li>
+<li><strong>Physics PV and wind plant models:</strong> the physics PV model (<code>pv_physics</code>) and the wind plant of
+  experiment 347 already map weather to MW. They would be the generation half of a simulator.</li>
+<li><strong>Demand GAM terms:</strong> the convex demand model (<code>dp_gam</code>) has explicit heating, holiday,
+  clock-change and Economy 7 terms, so it can generate a demand series from weather and calendar.</li>
+<li><strong>Demand networks and cards:</strong> the BG2 and K1 networks, the DP series and the substation cards
+  give fitted per-substation properties to seed simulated substations.</li>
+</ul>
+<p><strong>What the evidence says about the hardest parts</strong>:</p>
+<ul>
+<li><strong>Gross demand is not observed at the Primaries.</strong> The capacity fit recovers 0.75 to 0.88 of an
+  injected farm (<a href="https://openclimatefix.github.io/nged-ml-research/ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/result/">experiment
+  129</a>).</li>
+<li><strong>Where the shortfall goes.</strong> Experiment 231 traced about 0.17 of the loss to the demand terms
+  absorbing part of the solar signal and to the fixed solar shape not matching a farm's flat top.
+  Experiment 269 found the plant shape explains the gain from using a nearby farm, and the sunshine
+  does not.</li>
+<li><strong>Capacity estimates are not yet calibrated.</strong> Experiment 474 found no candidate shape passes its
+  placebo test. The intervals are only honest with a cloud-load term, and experiment 129's coverage
+  test was close to circular.</li>
+<li><strong>Neighbours do not help.</strong> Experiment 567 (neighbour lag encoders trained on synthetic shifts)
+  was not supported: CRPS rose by 0.21 points of capacity. Experiment 459 found a
+  donor-plus-recipient sum is not conserved.</li>
+<li><strong>Event labels are incomplete.</strong> Every count of real events is a lower bound, and "clean" rows may
+  hold unlabelled shifts. Experiment 175 found about half of the worst unlabelled days are
+  sharp-edged blocks that look like transfers.</li>
+<li><strong>Real data has features a simulator would need to reproduce.</strong> Examples are cloud-following load,
+  soiling and meter-regime steps.</li>
+</ul>
+<p><strong>Fitted model versus bottom-up simulator</strong>:</p>
+<ul>
+<li><strong>A fitted model of gross demand</strong> (GAM plus a residual model fitted to the metered record) is
+  cheap and uses the tools we have. It is circular: a decomposition tested on it passes if it shares
+  the GAM's assumptions. It is fit for testing code and for injection harnesses, and unfit for
+  judging whether a method works on real data.</li>
+<li><strong>A bottom-up simulator</strong> (customers, appliances, heat pumps, electric vehicles, weather response)
+  is not circular with our models. It needs data we do not hold: appliance stock, behaviour and
+  tariff mix per substation. It costs months, and its realism cannot be checked against metered data
+  it was not fitted to.</li>
+<li><strong>Recommendation:</strong> fitted for the first version, with truth injected from independent sources
+  (real metered farm outputs, as experiments 129 to 474 already do). Bottom-up only for the scenario
+  use.</li>
+</ul>
+<p><strong>Candidate uses, ranked</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Must reproduce</th>
+<th>How to measure</th>
+<th>Build cost</th>
+<th>Worth it?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Known-answer tests with PV, heating and transfer terms all known</td>
+<td>Residual spread and autocorrelation, cloud-following load, weather response</td>
+<td>Realness classifier (as in 660), residual distribution match</td>
+<td>Low (about 1 to 2 weeks of CPU work on existing modules)</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td>Checking unmetered-PV and disaggregation work</td>
+<td>The demand terms that absorb solar</td>
+<td>Recovery on simulated versus injected-real series</td>
+<td>Low</td>
+<td><strong>Yes, same simulator</strong></td>
+</tr>
+<tr>
+<td>Training data or augmentation</td>
+<td>Everything, including rare events</td>
+<td>Held-out real-data score gain</td>
+<td>Medium to high</td>
+<td>Doubtful. Experiments 486 and 567 show injected events cost accuracy on ordinary rows</td>
+</tr>
+<tr>
+<td>Counterfactual forecasts</td>
+<td>Causal structure, not only fit</td>
+<td>None available without truth</td>
+<td>High</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Scenario testing (EVs, heat pumps, PV)</td>
+<td>Appliance-level behaviour</td>
+<td>No metered ground truth</td>
+<td>Very high</td>
+<td>Not at this stage</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Three cheap first experiments (none started)</strong>:</p>
+<ol>
+<li><strong>Realness classifier on a fitted-GAM simulator at three Primaries.</strong><ul>
+<li>Prediction that could fail: a gradient-boosted classifier cannot tell simulated from real
+  7-day windows better than AUC 0.60.</li>
+<li>Cost: about 2 CPU-hours. Stop if AUC is above 0.75; the simulator is then not real enough for
+  any use.</li>
+</ul>
+</li>
+<li><strong>Does a known-answer test on the simulator predict the real injection result?</strong><ul>
+<li>Prediction that could fail: the capacity fit's recovery on simulated demand plus an injected
+  farm is within 0.05 of its real-data recovery (0.75 to 0.88, experiment 129).</li>
+<li>Cost: about 4 CPU-hours (reuse of experiment 129's fit). Stop if the gap is over 0.10, because
+  the simulator would then make the test too easy or too hard.</li>
+</ul>
+</li>
+<li><strong>Transfer-event recall: simulator versus experiment 660's generator.</strong><ul>
+<li>Prediction that could fail: the detector's recall by event size on simulator transfers matches
+  experiment 660's injected recall (6%, 23%, and so on) within 0.10 in every size bin.</li>
+<li>Cost: about 2 CPU-hours (rerun of experiment 660's detector). Stop if one bin differs by more
+  than 0.20.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Argument against building one</strong>:</p>
+<ul>
+<li><strong>We already have partial known-answer tests.</strong> Injecting real metered-farm output into a Primary
+  and re-finding it (experiments 129 to 474) gives truth without a simulator. Adding injected
+  transfers (660) covers the second event class.</li>
+<li><strong>Cheaper first step.</strong> Add heating and load-shift injection to that harness, using the existing
+  GAM terms, instead of generating whole series.</li>
+<li><strong>Training use is the weakest.</strong> Injected events have repeatedly cost accuracy on ordinary rows.</li>
+<li><strong>The binding limit is label quality, not data quantity.</strong> A simulator does not fix incomplete
+  event labels, and it would inherit the GAM's blind spots.</li>
+</ul>
+<p><strong>Questions for you</strong>:</p>
+<ul>
+<li>Which use do you have in mind? Known-answer testing and scenario testing need quite different
+  simulators.</li>
+<li>Should I draft the plan for experiment 1 above? It needs your yes before the ML MANAGER session
+  creates a worker.</li>
+</ul>
+<h3 id="6-maintainer-2026-11-09-1435-utc">6. Maintainer, 2026-11-09 14:35 UTC</h3>
+<p>So I haven't read your responses up above, but I'll just give you what's on my mind, because I want
+to get this onto paper, so to speak, while it's fresh in my mind, because if I read your response,
+I'll get myself confused. So, simulator. So I suppose the motivation for thinking about a simulator
+started with this frustration that when we're training and evaluating our demand forecast, our net
+demand forecast for primary substations, the score that you get and even the ranking that you get
+between different algorithms depends very much on what you might call the rules of the game, where
+the rules might be, hey, I want a forecast that is always in a normal running arrangement. But then
+the problem with that is, how do you evaluate that? Because the ground truth data isn't always in a
+normal running arrangement. So you might say, well, okay, well, let's also produce a forecast that
+is in this kind of prevailing conditions. And that might also be useful for NGED, but that has
+problems. So it occurred to me that, you can imagine a world in which you have a perfect simulator,
+which runs on a computer, and you can say, you can tell it exactly how many switching events you
+want, and it will give you perfect labels for those switching events, and you can tell it exactly
+how many gas generators you want, and everything you could imagine could go into this simulator. And
+this would be certainly useful for evaluating forecasts, and it might also be useful for training
+forecasts of the type of forecasts that we're currently working on. But it also occurred to me that
+you could also imagine using this simulator to forecast as well, right? So you could try and, once
+you have this forwards model that knows how all the component things that make up net demand work,
+so it has models for sort of typical houses and typical factories, and how batteries might schedule
+themselves given price and all this sort of thing. You could imagine inferring the parameters of
+that model from real substation data, and then basically using this simulator as a type of very
+explainable forecast. I imagine you'd actually lose a little bit of skill if you're just measuring
+it on like CRPS over the forecast horizon, but you would gain massively in terms of explainability
+and that's it really. Explainability, and also the ability to use this as a way to forecast months
+into the future, when there might be a new gas generator plugging in that you've never seen before,
+or all these sort of things. And when I say simulator, I'm not really talking about like actually
+trying to, do a really detailed job of the power flow modelling, but rather it's maybe a bit more
+like sort of using a sampler in music production, where you would take many samples of different
+household loads and different types of factory and that sort of thing, their power out.
+Requirements, and the simulator would basically stitch these together in clever ways, and actually
+probably wouldn't literally stitch them together. It'd be more like a sort of generative AI thing,
+where a generative model tries to learn the behavior of these things. So yeah, so I guess there's
+several questions. One is, if we could click our fingers and magically create a simulator like this
+that has perfectly faithful output of net demand at various substations in GB, and you can twiddle
+knobs to control everything that influences it, and you can drive it with like ERA 5 weather and
+cams and this sort of thing. Would that be useful? And the second question is it buildable? Like,
+obviously it's not going to be perfect. The question is, can we make it good enough, and what sort
+of technologies might we consider to build it? And the third question is, once we have built it,
+could we then use it as a kind of a different approach to forecasting, where we would kind of use
+this as a forwards model, and we would try and infer the parameters, and of course, that inference
+isn't going to be perfect, but using real substation data and any other data we can get hands on
+about embedded generators and land use and that sort of thing, we could actually try and create a
+forecast using this forwards model. Would that be possible, and would that be useful? And then in
+your response, please combine your response to what I've just asked with your previous response, so
+that I only have to read one of your responses and I don't have to read the response that you've
+already written above.</p>
+<h3 id="7-session-reply-2026-11-09-1435-utc">7. Session reply, 2026-11-09 14:35 UTC</h3>
+<p><strong>Short answer:</strong> yes to all three questions, in different degrees. A perfect simulator would be
+very useful for evaluation. A good-enough one is buildable in stages from parts we already have. A
+forecast built on it as a forward model is possible, but it is bounded by how well the hidden
+components can be inferred from net power.</p>
+<h4 id="q1-would-a-perfect-simulator-be-useful">Q1: Would a perfect simulator be useful?</h4>
+<ul>
+<li><strong>Evaluation is the strongest use.</strong> It fixes your "rules of the game" problem.<ul>
+<li>With perfect labels you can score a normal-running-arrangement forecast and a
+  prevailing-conditions forecast against their own truths.</li>
+<li>You can also see whether the ranking of algorithms changes between the two rule sets.</li>
+<li>Real data cannot do this, because its event labels are incomplete and every real event count
+  is a lower bound.</li>
+</ul>
+</li>
+<li><strong>Known-answer tests come with it.</strong> Truth for PV, heating, load transfers, gas engines and
+  batteries is known, so decompositions can be scored directly. Today we only have injected metered
+  farms (experiments 129 to 474) and injected transfers (experiment 660).</li>
+<li><strong>Counterfactuals and scenarios</strong> (more EVs, heat pumps, PV) become possible, but only as far as
+  the simulator's causal structure is right.</li>
+<li><strong>Training data is the weakest use.</strong> Artificial events have repeatedly cost accuracy on ordinary
+  rows (experiments 486 and 567, the neighbour-lag encoders trained on synthetic load shifts).
+  Realism, not volume, is the limit.</li>
+</ul>
+<h4 id="q2-is-it-buildable-and-with-what">Q2: Is it buildable, and with what?</h4>
+<ul>
+<li><strong>The hard limit is that gross demand is never observed.</strong> Only the net is. At the Primaries the
+  capacity fit recovers 0.75 to 0.88 of an injected farm (<a href="https://openclimatefix.github.io/nged-ml-research/ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/result/">experiment
+  129</a>).
+  Part of the loss is demand terms absorbing solar; part is shape mismatch (experiment 231).</li>
+<li><strong>Components that exist now:</strong><ul>
+<li>physics PV model and wind plant (experiment 347)</li>
+<li>the demand GAM with heating, holiday, clock-change and Economy 7 terms</li>
+<li>the gas-engine bands of experiment 264</li>
+<li>per-substation fitted properties from the substation cards</li>
+<li>the real-event injection generator (experiment 660, no merged page yet)</li>
+</ul>
+</li>
+<li><strong>Components that do not exist:</strong><ul>
+<li>a generative model of what is left over (the residual) that reproduces its size,
+  autocorrelation and cloud-following load</li>
+<li>an event process (how often transfers happen, how long, how large), learnt from labels that
+  are incomplete</li>
+<li>price-driven battery and generator dispatch</li>
+</ul>
+</li>
+<li><strong>Technology I would consider, in this order:</strong><ul>
+<li>GAM plus physics for the mean.</li>
+<li>A conditional generative model (a neural network with a mixture-density output, or a flow or
+  diffusion model) for the residual and for "samples" of real load blocks, as in your sampler
+  idea. The samples would come from metered generators and from the cleanest Primary windows.</li>
+<li>A hazard model for events.</li>
+<li>Rule-based dispatch for batteries and gas engines.</li>
+</ul>
+</li>
+<li><strong>Bottom-up customer and appliance modelling is not worth it first.</strong> We hold no appliance, tariff
+  or behaviour data per substation, and it cannot be checked against metered data.</li>
+<li><strong>The circularity risk is real.</strong> A simulator built from our fitted models passes any test that
+  shares their assumptions. Two defences:<ul>
+<li>Take truth from independent sources: real metered farm and wind output, injected.</li>
+<li>Judge the simulator by rank transfer rather than realism alone. The question is whether our
+  many existing arms (the GAM stack, BG2, XGBoost, lagged and lagless networks) keep their
+  ranking and gaps on simulated series. The experiment log gives a large set of real rankings to
+  compare against.</li>
+</ul>
+</li>
+<li><strong>Other measures of realness:</strong> a realness classifier (as in experiment 660), the distribution of
+  residuals, and the weather response.</li>
+</ul>
+<h4 id="q3-could-the-simulator-also-be-the-forecast">Q3: Could the simulator also be the forecast?</h4>
+<ul>
+<li><strong>Possible, and the demand GAM stack already is a partial version.</strong> The research default is a
+  physics-plus-GAM model with explicit terms. Extending it with generators, batteries and a learnt
+  residual is a continuation.</li>
+<li><strong>What you would gain:</strong> explanation, forecasts months ahead, and a way to add a generator the
+  model has never seen by giving it a plant type and capacity.</li>
+<li><strong>What you would likely lose:</strong> skill at short leads. At D8 the XGBoost model's lead comes from
+  origin lags, and the GAM fixes did not close it.</li>
+<li><strong>Main obstacle: identifiability.</strong> Gross demand and unmetered PV cannot be fully separated from
+  net power. The capacity placebo tests (experiment 474) failed for every candidate shape, and
+  interval coverage needs a cloud-load term to be honest. Priors from the PV register and from
+  metered shapes would have to carry the inference.</li>
+<li><strong>Useful for NGED?</strong> For new connections and long-range scenarios, yes. For day-ahead skill, only
+  if it matches the best forecast on the tail and curtailment measures.</li>
+<li><strong>One object serves both uses.</strong> The simulator and the forward-model forecaster are the same
+  model: run with chosen parameters it simulates, and run with inferred parameters it forecasts.
+  Building it once for evaluation therefore does not waste the forecasting use.</li>
+</ul>
+<h4 id="candidate-uses-ranked-from-my-earlier-answer">Candidate uses ranked, from my earlier answer</h4>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Must reproduce</th>
+<th>How to measure</th>
+<th>Build cost</th>
+<th>Worth it?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Evaluation with known labels (rules-of-the-game)</td>
+<td>Residual spread and autocorrelation, event sizes, weather response</td>
+<td>Rank transfer vs real, realness classifier</td>
+<td>Medium</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td>Known-answer tests for PV and disaggregation</td>
+<td>Demand terms that absorb solar</td>
+<td>Recovery on simulated vs injected-real</td>
+<td>Low</td>
+<td><strong>Yes</strong></td>
+</tr>
+<tr>
+<td>Forward-model forecasting</td>
+<td>Everything, and identifiability</td>
+<td>CRPS, tails, curtailment cost, explanation</td>
+<td>High</td>
+<td>Maybe, after the first two</td>
+</tr>
+<tr>
+<td>Training data</td>
+<td>Rare events and tails</td>
+<td>Held-out real score</td>
+<td>Medium to high</td>
+<td>Doubtful</td>
+</tr>
+<tr>
+<td>Counterfactuals and scenarios</td>
+<td>Causal structure</td>
+<td>No truth available</td>
+<td>High</td>
+<td>Later</td>
+</tr>
+</tbody>
+</table>
+<h4 id="three-cheap-first-experiments-none-started">Three cheap first experiments (none started)</h4>
+<ol>
+<li><strong>Realness classifier on a first simulator.</strong><ul>
+<li>Setup: GAM plus physics plus an empirical residual, at 3 Primaries.</li>
+<li>Prediction that could fail: a gradient-boosted classifier cannot tell simulated from real
+  7-day windows better than AUC 0.60.</li>
+<li>Cost: about 2 CPU-hours. Stop if AUC is above 0.75.</li>
+</ul>
+</li>
+<li><strong>Rank transfer.</strong><ul>
+<li>Setup: run 6 or more stored arms on simulated series at the same 3 Primaries.</li>
+<li>Prediction that could fail: the rank correlation (Kendall) with their real-data scores is at
+  least 0.8.</li>
+<li>Cost: about 4 GPU-hours. Stop if it is below 0.6.</li>
+</ul>
+</li>
+<li><strong>Known-answer recovery.</strong><ul>
+<li>Setup: simulated gross demand plus an injected real farm, run through experiment 129's
+  capacity fit.</li>
+<li>Prediction that could fail: recovery lies within 0.05 of the real-data 0.75 to 0.88.</li>
+<li>Cost: about 4 CPU-hours. Stop if the gap exceeds 0.10 in either direction.</li>
+</ul>
+</li>
+</ol>
+<h4 id="argument-against-building-one">Argument against building one</h4>
+<ul>
+<li><strong>Injection into real series already gives truth</strong> for solar and for transfers, without a
+  simulator.</li>
+<li><strong>Cheaper first step:</strong> add heating and load-shift injection to that harness, not whole-series
+  generation.</li>
+<li><strong>A simulator does not fix label quality</strong> or the net-only observation, and it inherits the GAM's
+  blind spots.</li>
+<li><strong>My numbers</strong> (AUC thresholds, hour estimates, rank threshold) are first guesses for you to
+  adjust. I did not read the stored outputs of experiment 660 closely, so its numbers are not quoted
+  here.</li>
+</ul>
+<h4 id="questions-for-you">Questions for you</h4>
+<ul>
+<li>Which experiment should I plan first? I would pick experiment 2 (rank transfer), because it tests
+  your original frustration directly.</li>
+<li>Do you want the forward-model forecasting use held until the evaluation use has passed? I
+  recommend yes.</li>
+</ul>
+<h3 id="8-maintainer-2026-11-09-1451-utc">8. Maintainer, 2026-11-09 14:51 UTC</h3>
+<p>I'm not planning to actively explore this just yet. I'm just bouncing ideas around. I suppose an
+alternative to consider is almost the opposite, which is that we would just take real substation
+data, but throw lots of effort into labeling it. So trying to detect switching events and label
+those using just historical weather and not worrying about forecasting. Maybe even trying to, you
+know, infer the amount of PV capacity there is and that sort of thing, and maybe try and infer big
+gas generators and that sort of thing. How would that approach compare to building a simulator?</p>
+<h3 id="9-session-reply-2026-11-09-1451-utc">9. Session reply, 2026-11-09 14:51 UTC</h3>
+<p><strong>Short answer:</strong> heavy labelling of real data is cheaper and has no realism gap, but it cannot give
+true labels or control of the rules, so it solves evaluation only in part. I would do it first. It
+is also most of the work a simulator would need anyway.</p>
+<h4 id="where-labelling-wins">Where labelling wins</h4>
+<ul>
+<li><strong>No realism gap.</strong> The series is real, so a score on it needs no argument that a simulator
+  resembles the substation.</li>
+<li><strong>Cheaper and incremental.</strong> We already have detectors (the load-shift detectors, the
+  <code>lsc-detectors</code> theme), the PV capacity table (experiment 474) and the gas-engine work (experiment
+  264). Each label set improves the evaluation by itself.</li>
+<li><strong>Hindsight helps.</strong> Labelling can use data from after the event, historical weather and
+  neighbouring Primaries, which a forecast cannot.</li>
+</ul>
+<h4 id="where-labelling-falls-short">Where labelling falls short</h4>
+<ul>
+<li><strong>The labels are estimates, not truth.</strong> Today's event labels are incomplete, and detector recall
+  on real events is low in the bins I saw. Scoring a forecast against estimated labels bakes the
+  detector's errors into the score.</li>
+<li><strong>It cannot twiddle the knobs.</strong> You cannot ask for twice as many transfers or a new generator.
+  Scenario testing and counterfactuals stay out of reach.</li>
+<li><strong>Net power limits it.</strong> Gross demand and unmetered PV are not separable from net, so PV and
+  demand labels carry the 0.75 to 0.88 recovery shortfall and the failed placebo tests.</li>
+<li><strong>Circularity moves, it does not vanish.</strong> Evaluating against labels made by a model scores a
+  forecast partly against that model.</li>
+<li><strong>Rare events stay rare.</strong> Real data holds few labelled events (experiment 459 had 15 across the
+  six), so event-level scores stay noisy.</li>
+</ul>
+<h4 id="how-the-two-compare">How the two compare</h4>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Heavy labelling</th>
+<th>Simulator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ground truth for scoring</td>
+<td>Estimated, with detector error</td>
+<td>Exact, if the simulator is realistic</td>
+</tr>
+<tr>
+<td>Realism risk</td>
+<td>None</td>
+<td>Main risk</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>Lower, builds on existing work</td>
+<td>Higher</td>
+</tr>
+<tr>
+<td>Control of event counts and new generators</td>
+<td>None</td>
+<td>Full</td>
+</tr>
+<tr>
+<td>Fixes the rules-of-the-game problem</td>
+<td>Partly: labels let you define normal arrangement, but scores depend on label quality</td>
+<td>Fully, within the simulator's world</td>
+</tr>
+<tr>
+<td>Supports forecasting months ahead</td>
+<td>No</td>
+<td>Yes, as a forward model</td>
+</tr>
+</tbody>
+</table>
+<h4 id="how-they-combine">How they combine</h4>
+<ul>
+<li><strong>Labelling is the first stage of a simulator.</strong> The event process, PV capacities, gas-engine
+  behaviour and residual shapes the simulator needs are exactly what labelling estimates. Do the
+  labelling, and the simulator becomes an assembly step.</li>
+<li><strong>A labelled series gives a cheap check on the simulator.</strong> Real labels give event rates and sizes
+  for the simulator, and the classifier-style tests then compare the two.</li>
+<li><strong>A middle option: semi-synthetic evaluation.</strong> Keep the real series and inject known events and
+  farms into it, as experiments 129 to 474 and 660 do. This gives exact truth for the injected part
+  at no realism cost, and unlabelled real events stay as noise.</li>
+</ul>
+<h4 id="my-recommendation">My recommendation</h4>
+<ul>
+<li><strong>Now:</strong> continue the labelling and injection route. It improves every score we already compute.</li>
+<li><strong>Later:</strong> build the simulator only if a question needs knobs, such as new connections or scenario
+  months, which labels cannot answer.</li>
+<li><strong>Main risk of labelling alone:</strong> a score that depends on detector quality, so report label
+  coverage beside every score.</li>
+</ul>
+<h3 id="10-maintainer-2026-11-09-1451-utc">10. Maintainer, 2026-11-09 14:51 UTC</h3>
+<p>So I should have said maybe also ask the discuss agent on using graph approaches to detect switching
+events, because actually one of its aims is to try and label switching events in historical data.</p>
+<h3 id="11-session-reply-2026-11-09-1451-utc">11. Session reply, 2026-11-09 14:51 UTC</h3>
+<p><strong>Short answer:</strong> a graph approach is plausible for labelling transfers, but the merged evidence is
+mixed. The graph experiments 651, 653 and 658 have no merged page yet, so I have not read their
+results.</p>
+<p><strong>What the merged evidence says about the electricity network's structure</strong>:</p>
+<ul>
+<li><strong>Conservation fails as a hard constraint.</strong> In <a href="https://openclimatefix.github.io/nged-ml-research/ml-experiments/00459-load-shift-conservation-check-donor-and-recipient-sum/result/">experiment
+  459</a>,
+  the sum over a donor and its labelled recipients still steps by about half of the donor's step. A
+  detector that demands a zero-sum step across neighbours would miss or reject real events.</li>
+<li><strong>Neighbour values did not help a forecaster.</strong> In experiment 567, a neural network given its
+  neighbours' lags and trained on synthetic transfers scored CRPS 0.21 points of capacity worse.
+  Removing the neighbour lags at forecast time left its score unchanged, so it ignored them.</li>
+<li><strong>Neighbours do not explain unlabelled blocks.</strong> Experiment 175 found interconnected neighbours do
+  not explain the sharp-edged blocks among the worst unlabelled days. Those blocks may be transfers
+  to substations outside the 16 Primaries, which would hide the recipient.</li>
+</ul>
+<p><strong>Why labelling is a better fit for a graph than forecasting</strong>:</p>
+<ul>
+<li><strong>Hindsight is allowed.</strong> A labeller can read neighbour data from both sides of the step, which a
+  forecast cannot.</li>
+<li><strong>A step in one node and an opposite step in a neighbour is the signature.</strong> A graph model can
+  test this directly, using NGED's interconnection table to say which pairs to compare.</li>
+<li><strong>Soft hints, not hard sums.</strong> This matches your earlier hierarchy aim: topology as a soft input,
+  with a learnt tolerance for the half-sized leak seen in experiment 459.</li>
+</ul>
+<p><strong>Limits to expect</strong>:</p>
+<ul>
+<li><strong>Recipients outside the 16 Primaries.</strong> The graph then shows a one-sided step. The detector must
+  still call that a transfer, not a level change, using timing, shape and weather.</li>
+<li><strong>Incomplete labels as training truth.</strong> A graph model trained on them learns the labelling team's
+  habits and misses the unlabelled events. Semi-supervised or injected-event training (as in
+  experiment 660) would reduce this.</li>
+<li><strong>Few labelled events.</strong> With 15 real events across six Primaries in experiment 459, a flexible
+  graph model could overfit. Injection helps, but injected events cost accuracy elsewhere in
+  experiments 486 and 567.</li>
+</ul>
+<p><strong>What I would ask the Design session</strong>:</p>
+<ul>
+<li>Does experiment 651 (graph layer over electrical neighbours) show any gain for detection, and if
+  so, in which size bins?</li>
+<li>Does the event table of experiments 653 and 658 (edge-state segmentation) reach better recall than
+  the earlier detectors, at what false-alarm rate?</li>
+<li>Can the detector report its own recall by event size, so a score can carry a label-coverage
+  caveat?</li>
+</ul>
+<p><strong>Not started.</strong> I ran no fits and edited nothing. If you want a design review of a graph-based
+labeller, I would write a brief under <code>briefs/</code>, and it would need your yes.</p>
+<h3 id="12-maintainer-2026-11-09-1455-utc">12. Maintainer, 2026-11-09 14:55 UTC</h3>
+<p>You can go ahead and ask the graph discuss session. It's running on the same as machine as you. You
+should be able to list the other agents running in parallel to you.</p>
+<h3 id="13-message-sent-to-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1455-utc">13. Message sent to a peer session (Discuss: Graph approach to switching events), 2026-11-09 14:55 UTC</h3>
+<p>Question from the Discuss session on a gross-demand simulator, passed on at the maintainer's
+request: how well do graph approaches label historical load-transfer events?</p>
+<p>Context: the maintainer is weighing heavy labelling of real substation data (detecting transfers
+from history and weather, with hindsight, no forecasting) against building a simulator. They want to
+know how far a graph approach can take the labelling.</p>
+<p>Please answer briefly, from merged pages and stored outputs, with numbers where you have them:</p>
+<ol>
+<li>Does a graph layer over the electrical neighbours (experiment 651) improve detection or labelling
+   of transfers, and in which event-size bins?</li>
+<li>Does the event table of experiments 653 and 658 (edge-state segmentation) reach better recall
+   than earlier detectors, at what false-alarm rate, and with what recall on the real labelled
+   events?</li>
+<li>How do you handle recipients outside the 16 Primaries (one-sided steps), and the half-sized leak
+   in the donor-plus-recipient sum found in experiment 459?</li>
+<li>How much does the incompleteness of NGED's event labels limit the labeller, and can the labeller
+   report its own recall by event size so a score can carry a label-coverage caveat?</li>
+<li>In your view, could a graph labeller supply enough event labels to evaluate forecasts under both
+   the normal-running-arrangement and prevailing rules, or is a simulator with exact truth still
+   needed for that?</li>
+</ol>
+<p>Please reply to me by cross-session message in short bullets. Run no new fits for this.</p>
+<h3 id="14-session-reply-2026-11-09-1455-utc">14. Session reply, 2026-11-09 14:55 UTC</h3>
+<p>I've sent your question to the graph Discuss session, Discuss: Graph approach to switching events
+[edd07c]. Its reply will arrive here as a cross-session message.</p>
+<p>I asked it five things, answered from merged pages and stored outputs with no new fits:</p>
+<ul>
+<li><strong>Graph layer:</strong> whether the graph layer over electrical neighbours (experiment 651) improves
+  labelling of load transfers, and in which size bins.</li>
+<li><strong>Event table:</strong> the recall and false-alarm rate of the edge-state event table (experiments 653
+  and 658) on real labelled events.</li>
+<li><strong>Hard cases:</strong> how it handles recipients outside the 16 Primaries and the half-sized leak in the
+  donor-plus-recipient sum (experiment 459).</li>
+<li><strong>Label gaps:</strong> how far NGED's incomplete event labels limit the labeller, and whether it can
+  report its own recall by event size.</li>
+<li><strong>Simulator question:</strong> whether a graph labeller could supply enough labels to evaluate forecasts
+  under both the normal-running-arrangement and prevailing rules, or whether a simulator with exact
+  truth is still needed.</li>
+</ul>
+<p>I'll stop here until the reply arrives.</p>
+<h3 id="15-message-from-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1456-utc">15. Message from a peer session (Discuss: Graph approach to switching events), 2026-11-09 14:56 UTC</h3>
+<p>Answer from Discuss edd07c, from the merged pages of experiments 651, 653 and 658 (no new fits).
+Numbers are the pages' own.</p>
+<ol>
+<li>Experiment 651 (graph layer): it was a forecast experiment, not a labeller. It reports follow of
+   injected shifts and CRPS, not detection by size bin. The graph layers barely used neighbours
+   (moving from a mirrored to an unmirrored shift changed the median by under 1% of the shift), and
+   a degree-preserving rewired graph scored the same as the real graph. FLOW-E's correction was
+   never scored as a detector. So no evidence that a graph layer improves detection.</li>
+<li>Event tables:<ul>
+<li>Experiment 653 (penalised segmentation, 15 Primaries, CPU): 0.64 of injected MW found (0.58 to
+  0.70) for events of 4 noise units or more lasting a day or more; paired correctly only 0.18 of
+  injected transfer ends. By duration, MW-weighted recall: 3 h to 1 d 0.24; 1 to 7 d 0.63; 7 to
+  21 d 0.70; 21 to 60 d 0.78; over 60 d 0.60; permanent 0.40. Pulses under 6 h never found. Real
+  record 2024-01 to 2026-06: 246 events (6.6 per Primary-year; 211 solo shifts, 4 edge transfers
+  = 2 pairs) and it matched 8 of 77 logged shifts under the strict rule, where LR_b20's 78
+  alarms matched 19. So it does worse than earlier detectors on real labels and raises about 3
+  times the alarms. Verdict not supported.</li>
+<li>Experiment 658 (bidirectional recurrent neural network on the same panel and injector, 1.5
+  years of training): worse again, 0.48 to 0.52 of injected MW found, 0.16 to 0.17 paired, 0.4
+  to 0.8 real events per Primary-year. A classifier separated injected from verified real events
+  with an area under the curve of 0.91, so the injector is unlike real events and may be
+  limiting the result. Neural line closed on this panel; a larger history or a more realistic
+  injector is untested.</li>
+</ul>
+</li>
+<li>Recipients outside the 16 Primaries: an unseen partner shows as a "shift without a partner", a
+   separate class. Of 231 injected edge transfers in 653, 148 decoded as nothing, 51 as a solo
+   shift, 31 as an edge event (all 31 with the right partner, so pairing is precise but recall is
+   low). Conservation is loose by design: recipient share window 0.3 to 1.5 of the donor's step,
+   following experiment 459's half-sized leak. Widening the window to 0.1 to 3 recovers at most 7
+   points of pairing (0.22), so the leak is not what limits pairing; half of the ends are simply not
+   found.</li>
+<li>Label incompleteness: it limits validation heavily. The recall by size above is on injected
+   events, not on real ones; the only real-recall figure is 8 of 77 logged shifts, and experiment
+   580 found that of 27 mirrored sustained pairs in the telemetry only 1 matches a label, so
+   unlabelled real events make precision unmeasurable and real recall a loose lower bound. The
+   labeller can report its own recall by duration band and size (653 does, on injected events), so a
+   score can carry a coverage caveat, but only as good as the injector's realism (AUC 0.91 says it
+   is not yet realistic). A shared generator with realness checks is being built now (a worker on
+   the shared injected-event module).</li>
+<li>My view (judgement, not a result): not yet. At 15 Primaries the labeller finds about two thirds
+   of injected MW for events of a day or longer, almost none of the short ones, and pairs under a
+   fifth of transfers, so its labels would miss most short events and most partners, and would be
+   biased towards large, long, solo events. That is enough for descriptive tables per Primary
+   (start, end, amount), not for scoring forecasts under both the NRA and prevailing rules. A
+   simulator with exact truth is still needed for that evaluation. The labeller could still supply
+   real durations and a stratum of event-free rows (more than 14 days from any detected event).</li>
+</ol>
+<h3 id="16-session-reply-2026-11-09-1456-utc">16. Session reply, 2026-11-09 14:56 UTC</h3>
+<p><strong>Short answer:</strong> the graph session found no evidence that a graph approach labels transfers well,
+so heavy labelling of real data cannot yet replace a simulator for evaluation. The numbers below are
+its own, from the merged pages of experiments 651, 653 and 658.</p>
+<p><strong>What it found</strong>:</p>
+<ul>
+<li><strong>No evidence for the graph layer.</strong><ul>
+<li>Experiment 651 was a forecast experiment, not a labeller, and it never scored detection.</li>
+<li>Its graph layers barely used neighbours: a mirrored versus an unmirrored shift moved the
+  median by under 1% of the shift.</li>
+<li>A degree-preserving rewired graph scored the same as the real graph.</li>
+</ul>
+</li>
+<li><strong>Penalised segmentation (experiment 653, not supported).</strong><ul>
+<li>It found 0.64 of injected MW for events of 4 noise units or more lasting a day or more.</li>
+<li>MW-weighted recall by duration was 0.24 for 3 hours to 1 day, 0.63 for 1 to 7 days, 0.70 for 7
+  to 21 days, 0.78 for 21 to 60 days, and 0.60 above 60 days. Pulses under 6 hours were never
+  found.</li>
+<li>It paired only 0.18 of injected transfer ends.</li>
+<li>On the real record it matched 8 of 77 logged shifts and raised about three times the alarms of
+  the earlier detector, which matched 19.</li>
+</ul>
+</li>
+<li><strong>Recurrent neural network (experiment 658).</strong><ul>
+<li>It was worse again: 0.48 to 0.52 of injected MW found, and 0.16 to 0.17 paired.</li>
+<li>A classifier told injected events from verified real events with area under the curve 0.91, so
+  the injector is unlike real events and may be limiting the result.</li>
+<li>That neural line is closed on this panel.</li>
+</ul>
+</li>
+<li><strong>Recipients outside the 16 Primaries.</strong><ul>
+<li>An unseen partner shows as a shift without a partner.</li>
+<li>Of 231 injected transfers, 148 decoded as nothing, 51 as a solo shift, and 31 as a paired
+  event, all with the right partner.</li>
+<li>The half-sized leak is not what limits pairing: widening the share window recovers at most 7
+  points.</li>
+</ul>
+</li>
+<li><strong>Label incompleteness.</strong><ul>
+<li>The only real-recall figure is 8 of 77 logged shifts.</li>
+<li>Experiment 580 found that of 27 mirrored sustained pairs in the telemetry, only 1 matches a
+  label. Precision is therefore unmeasurable and real recall is a loose lower bound.</li>
+</ul>
+</li>
+</ul>
+<p><strong>What this means for your question</strong>:</p>
+<ul>
+<li><strong>Labelling is biased towards large, long, solo events.</strong> It misses most short events and most
+  partners, so it cannot score forecasts under both the normal-running-arrangement and prevailing
+  rules.</li>
+<li><strong>It still gives useful descriptive output.</strong> That means per-Primary event tables (start, end,
+  amount), real event durations, and a stratum of rows more than 14 days from any detected event.</li>
+<li><strong>The injector's realism is now the shared weak point.</strong><ul>
+<li>A simulator would need an event generator that passes a realness test, and the AUC of 0.91
+  says the current one does not.</li>
+<li>A worker is building a shared injected-event module with realness checks.</li>
+<li>Any simulator would reuse that module, so waiting for it costs nothing.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Revised view</strong>:</p>
+<ul>
+<li><strong>Do the labelling and the realistic injector first.</strong> Both feed a simulator later.</li>
+<li><strong>Exact truth for evaluation still needs a simulator or a realistic injector.</strong> Labels alone will
+  not do it at present.</li>
+<li><strong>My earlier estimates stand:</strong> the first experiments I proposed are unchanged, and none has
+  started.</li>
+</ul>
+<h3 id="17-session-reply-2026-11-09-1456-utc">17. Session reply, 2026-11-09 14:56 UTC</h3>
+<p>The graph session has finished its turn, and its answer is the one I summarised above. Nothing
+further is pending from it, and I've started nothing.</p>
+<h3 id="18-message-from-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1803-utc">18. Message from a peer session (Discuss: Graph approach to switching events), 2026-11-09 18:03 UTC</h3>
+<p>From Discuss edd07c, at the maintainer's request. The maintainer hopes the graph labelling work
+(experiments 653, 658, 665, and the X1 and X2 line now running) can label historical NGED data
+beyond load transfers: (1) MVA reverse flow at the eight MVA Primaries (MVA has no sign, so a
+Primary exporting at midday shows as a magnitude that dips and rises), (2) later, refined estimates
+of PV capacity at substations, and (3) detection of large generators. Please reply in a few bullets
+with what your session knows that bears on this: which labels or estimates you would want the graph
+labeller to produce first; what evidence exists for each (for example experiments 474, 618, 624, 649
+on PV capacity; the MVA reverse-flow question of the PV line); the known-answer tests you would use
+(metered solar and wind farms are the exact-truth cases, anonymised); and how each would fit as a
+state in an edge-state model (for example a per-Primary midday-export state at MVA Primaries, a slow
+capacity step, a large-generator solo-step state). State what is evidence and what is your view. No
+new fits.</p>
+<h3 id="19-finding-from-a-tool-result-2026-11-09-1803-utc">19. Finding from a tool result, 2026-11-09 18:03 UTC</h3>
+<p>The session found no merged pages for experiments 618, 624, 649, 656, and 662 at the time, and read
+the opening paragraphs of experiments 206, 207, 451, and 508.</p>
+<h3 id="20-message-sent-to-a-peer-session-discuss-graph-approach-to-switching-events-2026-11-09-1804-utc">20. Message sent to a peer session (Discuss: Graph approach to switching events), 2026-11-09 18:04 UTC</h3>
+<p>Reply from the gross-demand-simulator Discuss session on labelling MVA reverse flow, PV capacity and
+large generators. No new fits. "Evidence" means a merged page I read; "view" is my judgement. I have
+NOT read experiments 618, 624 or 649 (no merged page found), so they are not used.</p>
+<p>Order I would want (view): (1) MVA reverse flow, (2) large-generator steps, (3) PV capacity. Reason:
+(1) has a measurable label and a known-answer route; (3) has the weakest evidence.</p>
+<ol>
+<li>
+<p>MVA reverse flow at the eight MVA Primaries</p>
+<ul>
+<li>Evidence, experiment 508: a dip of apparent power at the sun's edges (shoulder hours) tells
+  the sign change much better than a midday dip, but only up to export about 3 times the night
+  import. D12 (about 5 times) is beyond what was calibrated. At D12 the shoulder dips are as
+  common on cloudy days and in the dark as on sunny days, so there they show low demand, not
+  export. Verdict partly supported.</li>
+<li>Known-answer test (view): inject a metered solar farm's output into a signed MW Primary, take
+  the magnitude, and check the label recovers the sign. The six MW Primaries give exact truth,
+  and experiment 508's calibration limit sets the size range to test.</li>
+<li>Edge-state fit (view): a per-Primary, per-day state "exporting at midday", with a prior tied
+  to clear-sky hours. Emit a "sign unknown" class beyond roughly 3 times night import instead of
+  forcing a call.</li>
+</ul>
+</li>
+<li>
+<p>Large generators (gas engines, farms) as solo steps</p>
+<ul>
+<li>Evidence, experiment 264 (gas-engine bands, promising), and experiments 206 and 207: in 206 a
+  metered farm's meter outage did NOT reappear in its Primary's power at D10 (not supported), so
+  farm outages are not a usable label. In 207 a known step in solar capacity was found in size
+  and within a month, but at the pre-registered penalty the fit invented steps at 2 of 5
+  Primaries (D10 and D11), so the gate failed.</li>
+<li>Known-answer test (view): inject metered wind, solar and battery series as solo steps of known
+  start, end and size, anonymised (Wind A to C, Solar A to F, Battery A, Gas A). Report recall
+  by size and duration as experiment 653 does.</li>
+<li>Edge-state fit (view): a solo-step state with a longer minimum duration than transfers, plus a
+  "generator" class for steps that repeat with the generator's schedule. Expect false steps at
+  D10 and D11 first, per experiment 207.</li>
+</ul>
+</li>
+<li>
+<p>PV capacity (slow steps)</p>
+<ul>
+<li>Evidence, experiments 129, 157, 231, 269, 474: recovery of an injected farm is 0.75 to 0.88
+  for the season-year fit and 0.67 to 0.78 for the monthly fit; the monthly fit did not beat the
+  yearly one (157, not supported). Experiment 231 traced about 0.17 of the loss to demand terms
+  absorbing solar and to the fixed shape; 269 found the plant shape, not the sunshine, explains
+  the nearest-farm gain (0.892 raw recovery with the pooled empirical shape). Experiment 474
+  found no candidate shape passes its placebo test, and intervals were honest only with a
+  cloud-load term; experiment 129's coverage was close to circular.</li>
+<li>Known-answer test (view): reuse the injection harness of 129 to 474 (a real metered solar farm
+  added to a Primary) and judge a graph labeller's capacity steps against the same placebo gate,
+  with step size, timing and invented-step rate reported.</li>
+<li>Edge-state fit (view): a slow, monotone capacity-step state, penalised hard, since experiment
+  207 shows the penalty trades missed steps against invented ones.</li>
+</ul>
+</li>
+</ol>
+<p>Caveats for all three (evidence):</p>
+<ul>
+<li>NGED's event labels are incomplete, so recall on real data is a lower bound and precision cannot
+  be measured. Report coverage beside every result.</li>
+<li>Injected-event realism is already a limit (your AUC 0.91 in experiment 658).</li>
+</ul>
+<p>My view on sequencing: build the MVA sign label first and prove it on injected metered farms at the
+six MW Primaries before running it at the eight MVA Primaries, where there is no truth.</p>
+<h3 id="21-session-reply-2026-11-09-1804-utc">21. Session reply, 2026-11-09 18:04 UTC</h3>
+<p>I've replied to the graph Discuss session with what the merged pages say about the three label
+types, and I ran no fits.</p>
+<ul>
+<li><strong>Priority order (my view):</strong> MVA reverse flow first, then large-generator steps, then PV
+  capacity.</li>
+<li><strong>MVA reverse flow:</strong> experiment 508 found the dip at the sun's edges tells the sign change well,
+  but only up to export of about 3 times the night import. D12 lies beyond that limit. The proposed
+  known-answer test injects a metered farm into a signed MW Primary and checks that the label
+  recovers the sign.</li>
+<li><strong>Large generators:</strong> experiment 206 found a metered farm's meter outage does not reappear in its
+  Primary's power, so outages are not a usable label. Experiment 207 found a known solar-capacity
+  step was found in size and to within a month, but the fit invented steps at D10 and D11.</li>
+<li><strong>PV capacity:</strong> recovery of an injected farm was 0.75 to 0.88, and no candidate shape passed the
+  placebo test (experiment 474). I judge it the weakest case for a labeller.</li>
+<li><strong>Not covered:</strong> I found no merged pages for experiments 618, 624 and 649, so I did not use them
+  and said so.</li>
+</ul>
+<h3 id="22-maintainer-2026-11-10-1218-utc">22. Maintainer, 2026-11-10 12:18 UTC</h3>
+<p>Can we archive this session?</p>
+<!-- record-end -->
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["content.code.copy"], "search": "../../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
