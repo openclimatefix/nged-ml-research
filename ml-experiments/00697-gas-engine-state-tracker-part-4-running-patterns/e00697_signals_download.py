@@ -31,6 +31,7 @@ import argparse
 import json
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
@@ -46,6 +47,8 @@ LAST_DAY: Final[date] = date(2026, 7, 1)
 """The day after the last day to fetch."""
 FUELHH_LAST_DAY: Final[date] = date(2024, 7, 1)
 """FUELHH is fetched only up to the start of the held national wind table (2024-07)."""
+WORKERS: Final[int] = 4
+"""Requests in flight at once; each also sleeps `SLEEP_SECONDS` after its reply."""
 SLEEP_SECONDS: Final[float] = 1.0
 TIMEOUT_SECONDS: Final[int] = 60
 MAX_TRIES: Final[int] = 4
@@ -155,14 +158,20 @@ def chunked(
     max_chunks: int | None,
 ) -> pl.DataFrame:
     """Fetch every window of a signal through the cache and return the stacked table."""
-    parts = []
-    for i, (start, end) in enumerate(windows):
-        if max_chunks is not None and i >= max_chunks:
-            break
-        parts.append(
-            cached_chunk(name=name, key=f"{start}_{end}", fetch=lambda s=start, e=end: fetch(s, e))
+    todo = windows if max_chunks is None else windows[:max_chunks]
+
+    def one(window: tuple[date, date]) -> pl.DataFrame:
+        start, end = window
+        return cached_chunk(
+            name=name, key=f"{start}_{end}", fetch=lambda s=start, e=end: fetch(s, e)
         )
-        print(f"{name}: {start} to {end} done ({i + 1} of {len(windows)})", flush=True)
+
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        parts = []
+        for i, part in enumerate(pool.map(one, todo)):
+            parts.append(part)
+            if (i + 1) % 20 == 0 or i + 1 == len(todo):
+                print(f"{name}: {i + 1} of {len(windows)} chunks done", flush=True)
     return pl.concat([p for p in parts if p.height], how="vertical_relaxed")
 
 

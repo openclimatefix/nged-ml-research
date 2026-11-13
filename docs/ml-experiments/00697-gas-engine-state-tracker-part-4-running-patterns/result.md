@@ -154,16 +154,46 @@ date of Gas A. No time series of D8's tracked engine state is published, and the
 raster and example weeks stay in the private data folder. Every driver plot uses bins that hold
 20 or more days, and every mark sets `aria=False`.
 
+## Signals added after the design
+
+**Nine open signals were added after the design was written and were not pre-registered as separate
+questions.** They are descriptive panels in the gallery (G9 and G10). None changes the Q1 verdict
+rule. The engine is described only as a gas engine with a long-term capacity contract, and no
+evidence of combined heat and power was found.
+
+- **Day-ahead price.** Elexon's Market Index Data from the APX provider only, from 2023-06. The
+  N2EX provider returns 0.00 in 2023 and is not used. The index is compared with the held
+  day-ahead price where the two overlap.
+- **Short Term Operating Reserve (STOR).** NESO's committed windows. Whether the engine holds a STOR
+  agreement is unknown, so a match with a STOR window is a coincidence of timing and not a cause.
+  The auction results are downloaded without unit or company names.
+- **System stress.** Elexon's system warnings (margin, capacity market, and demand flexibility
+  notices). There are only 7 capacity market notices in 3 years, so the panel's intervals are wide.
+- **Forecasts at the time of decision.** Elexon's indicated imbalance forecast (one vintage a day,
+  published at about 09:45 UTC) and NESO's day-ahead demand forecast.
+- **Demand and weather.** NESO's historic demand files for 2023 to 2026 (national demand, embedded
+  wind, and embedded solar), Elexon's FUELHH transmission wind for the first year, and the
+  national Carbon Intensity API.
+- **Calendar.** The gov.uk list of bank holidays, checked against the `holidays` package.
+
+Each panel shows the running share in the top third of the signal minus the bottom third, within a
+cell, with the week-block interval, for D8's net and solar eras and for the null control. A signal
+that the injected control engine cannot respond to should show no pattern in the control. A
+reserve-and-response lookup (the NESO EAC results at post codes near the substation's supply area)
+prints counts only, and its rows stay in the private data folder.
+
 ## Standing practices
 
 The experiment uses cleaned data, reads stored tracker states, and scores no forecast, so the
 practices for forecasts do not apply. The calendar is the subject, so the "no calendar
 memorisation" rule is departed from on purpose. No valid time on or after 2026-07-01 is read.
-Compute is CPU only, 8 workers of one thread each, under 2 hours in all, with no download and no
+Compute is CPU only, 8 workers of one thread each, under 2 hours in all. The only downloads are
+the small open tables of the section on signals added after the design, with no login and no
 spend.
 
 ## Files
 
 - `ml-experiments/00697-gas-engine-state-tracker-part-4-running-patterns/e00697_*.py`: the scripts
   that the finished write-up describes (common helpers, self-test, audit, engine draw, controls,
-  frame, statistics, figures, private figures, verdict).
+  frame, statistics, figures, private figures, verdict) and the extra-signal scripts
+  (`e00697_signals_download.py`, `e00697_signals.py`, `e00697_lookups.py`).
