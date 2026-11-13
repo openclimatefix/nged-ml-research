@@ -183,6 +183,19 @@ def group_within(
     return ((rank - 1) * n_groups // count).cast(pl.Int8)
 
 
+def quantile_bins(*, values: np.ndarray, n_bins: int) -> np.ndarray:
+    """Return the equal-count bin (0 to `n_bins - 1`) of each value, NaN-safe, from value quantiles.
+
+    Edges are the `1/n_bins, 2/n_bins, ...` quantiles of the finite values, and a value equal to an
+    edge goes to the upper bin. A NaN gets -1. Experiment 194's price fifths are these bins.
+    """
+    values = np.asarray(values, dtype=float)
+    finite = np.isfinite(values)
+    edges = np.quantile(values[finite], np.arange(1, n_bins) / n_bins)
+    bins = np.searchsorted(edges, values, side="right")
+    return np.where(finite, bins, -1)
+
+
 def day_block(*, half_hour: np.ndarray) -> np.ndarray:
     """Return the index into `BLOCK_NAMES` of each local half-hour (0 to 47)."""
     return np.digitize(np.asarray(half_hour), BLOCK_EDGES[1:-1])
