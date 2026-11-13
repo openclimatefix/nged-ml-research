@@ -1,0 +1,3 @@
+APX within-day index against the held N2EX day-ahead price, 14540 overlapping half-hours: median absolute difference 7.42, share within 0.05 GBP per MWh 0.004. The held table is NESO's N2EX hourly day-ahead price, not the APX half-hourly index, so the two are not expected to match.
+bank holidays in the frame's dates: package 23, gov.uk 23, in both 23
+weekday evening half-hours inside STOR window 2 for the frame: 0.179 of all half-hours

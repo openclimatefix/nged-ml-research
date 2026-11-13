@@ -245,7 +245,9 @@ def figures(*, series: dict[str, pl.DataFrame]) -> None:
     domain = list(SERIES.values())
     base = alt.Chart(data)  # ty: ignore[unresolved-attribute]
     color = alt.Color(
-        "series:N", scale=alt.Scale(domain=domain, range=COLOURS), legend=alt.Legend(title=None)
+        "series:N",
+        scale=alt.Scale(domain=domain, range=COLOURS),
+        legend=alt.Legend(title=None, labelLimit=300),
     )
     chart = (
         base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
@@ -277,7 +279,7 @@ def figures(*, series: dict[str, pl.DataFrame]) -> None:
             color=alt.Color(
                 "series:N",
                 scale=alt.Scale(domain=domain, range=COLOURS),
-                legend=alt.Legend(title=None),
+                legend=alt.Legend(title=None, labelLimit=300),
             ),
         )
         .properties(width=260, height=200)

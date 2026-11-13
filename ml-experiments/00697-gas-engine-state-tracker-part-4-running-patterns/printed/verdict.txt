@@ -1,0 +1,31 @@
+Q1 verdict: SUPPORTED
+D8's own Q1 in the net era: +0.392 [+0.323, +0.464]
+D8's own Q1 in the solar era: +0.256 [+0.156, +0.365]
+D against c1_null, net era: +0.376 [+0.297, +0.454]
+D against c1s_net_null, net era: +0.375 [+0.293, +0.454]
+D against c1s_solar_null, net era: +0.337 [+0.260, +0.416]
+D against c2_d2_null, net era: +0.426 [+0.348, +0.503]
+D against c2_d3_null, net era: +0.399 [+0.310, +0.481]
+D against c2_d4_null, net era: +0.447 [+0.364, +0.532]
+D against c1_null, solar era: +0.241 [+0.138, +0.349]
+D against c1s_net_null, solar era: +0.240 [+0.131, +0.352]
+D against c1s_solar_null, solar era: +0.202 [+0.097, +0.311]
+D against c2_d2_null, solar era: +0.289 [+0.182, +0.403]
+D against c2_d3_null, solar era: +0.235 [+0.119, +0.352]
+D against c2_d4_null, solar era: +0.240 [+0.125, +0.360]
+
+P1b: the C1 and C1s null controls' labels show (largest) Q1 +0.054, which is below 0.1
+
+Exploratory readings (post hoc status: none of these changes the verdict word):
+  q2: reading 1 (not explained by the controls); Gas A at 2 or more units: same direction
+    q2 is passed on to the plant-equations experiment.
+  q2q: reading 1 (not explained by the controls); Gas A at 2 or more units: same direction
+    q2q is passed on to the plant-equations experiment.
+  q3: reading 3 (no pattern found); Gas A at 2 or more units: same direction
+  q3a: reading 2 (tracker error not excluded); Gas A at 2 or more units: same direction
+  q6: reading 3 (no pattern found); Gas A at 2 or more units: not available
+  q7: reading 3 (no pattern found); Gas A at 2 or more units: same direction
+
+Q1 passed on to the plant-equations experiment: True
+Gas A at 2 or more units against D8's net era for Q1: same direction
+Q5 (night share, 6 months after the solar start against a year earlier), D8 labels: {'point': 0.07431693989071038, 'lo': 0.030577805293576163, 'hi': 0.123086463918774, 'n_weeks': 128}
