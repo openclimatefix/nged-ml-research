@@ -76,7 +76,7 @@ def distinct_days(*, frame: pl.DataFrame, mask: np.ndarray) -> int:
     return int(frame.filter(pl.Series(mask))["local_date"].n_unique()) if mask.any() else 0
 
 
-def _two_group_share(
+def two_group_share(
     *,
     rows: pl.DataFrame,
     mask_a: np.ndarray,
@@ -104,9 +104,7 @@ def q1(*, view: pl.DataFrame, seed: int, min_days: int = MIN_DAYS_PER_BIN) -> Es
         pl.col("local_half_hour").is_between(EVENING_FIRST, EVENING_LAST)
     )
     weekend = rows["weekend"].to_numpy()
-    return _two_group_share(
-        rows=rows, mask_a=~weekend, mask_b=weekend, seed=seed, min_days=min_days
-    )
+    return two_group_share(rows=rows, mask_a=~weekend, mask_b=weekend, seed=seed, min_days=min_days)
 
 
 def add_price_thirds(*, view: pl.DataFrame, by_quarter: bool = False) -> pl.DataFrame:
@@ -131,7 +129,7 @@ def q2(
     """Q2: share in the dearest price third minus the cheapest, within cell."""
     rows = add_price_thirds(view=view, by_quarter=by_quarter)
     third = rows["third"].to_numpy()
-    return _two_group_share(
+    return two_group_share(
         rows=rows, mask_a=third == 2, mask_b=third == 0, seed=seed, min_days=min_days
     )
 
@@ -194,7 +192,7 @@ def q5(*, view: pl.DataFrame, seed: int, min_days: int = MIN_DAYS_PER_BIN) -> Es
     dates = rows["local_date"].cast(pl.String)
     post = ((dates >= POST_WINDOW[0]) & (dates <= POST_WINDOW[1])).to_numpy()
     pre = ((dates >= PRE_WINDOW[0]) & (dates <= PRE_WINDOW[1])).to_numpy()
-    return _two_group_share(rows=rows, mask_a=post, mask_b=pre, seed=seed, min_days=min_days)
+    return two_group_share(rows=rows, mask_a=post, mask_b=pre, seed=seed, min_days=min_days)
 
 
 def q6(*, view: pl.DataFrame, seed: int, min_days: int = MIN_DAYS_PER_BIN) -> Estimate | None:
@@ -203,7 +201,7 @@ def q6(*, view: pl.DataFrame, seed: int, min_days: int = MIN_DAYS_PER_BIN) -> Es
         ~pl.col("weekend"), pl.col("local_half_hour").is_between(EVENING_FIRST, EVENING_LAST)
     )
     summer = rows["summer_half"].to_numpy()
-    return _two_group_share(rows=rows, mask_a=~summer, mask_b=summer, seed=seed, min_days=min_days)
+    return two_group_share(rows=rows, mask_a=~summer, mask_b=summer, seed=seed, min_days=min_days)
 
 
 def day_table(*, view: pl.DataFrame) -> pl.DataFrame:
@@ -248,7 +246,7 @@ def q7(*, view: pl.DataFrame, seed: int, min_days: int = MIN_DAYS_PER_BIN) -> Es
         return None
     previous = pairs["previous"].to_numpy().astype(bool)
     rows = pairs.with_columns(state=pl.col("running_day").cast(pl.Float64))
-    return _two_group_share(
+    return two_group_share(
         rows=rows, mask_a=previous, mask_b=~previous, seed=seed, min_days=min_days
     )
 

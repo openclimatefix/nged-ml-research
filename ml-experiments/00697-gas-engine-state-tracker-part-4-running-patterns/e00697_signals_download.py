@@ -20,6 +20,8 @@ The signals, added after the experiment's design and not pre-registered as separ
 - `demand_forecast`: NESO day-ahead demand forecast archive (cardinal points), from 2023-06.
 - `historic_demand`: NESO half-hourly national demand, embedded wind, and embedded solar, 2023 to
   2026.
+- `fuelhh_wind`: Elexon FUELHH transmission wind, 2023-06 to 2024-06, filling the gap before the
+  held wind table.
 - `bank_holidays`: gov.uk bank holidays for England and Wales.
 - `syswarn`: Elexon system warnings (margin, capacity market, and demand flexibility notices).
 - `carbon_intensity`: the national Carbon Intensity API, forecast and actual.
@@ -42,6 +44,8 @@ CACHE_DIR: Final[Path] = SIGNALS_DIR / "_cache"
 FIRST_DAY: Final[date] = date(2023, 6, 1)
 LAST_DAY: Final[date] = date(2026, 7, 1)
 """The day after the last day to fetch."""
+FUELHH_LAST_DAY: Final[date] = date(2024, 7, 1)
+"""FUELHH is fetched only up to the start of the held national wind table (2024-07)."""
 SLEEP_SECONDS: Final[float] = 1.0
 TIMEOUT_SECONDS: Final[int] = 60
 MAX_TRIES: Final[int] = 4
@@ -361,6 +365,39 @@ def historic_demand(*, max_chunks: int | None) -> pl.DataFrame:
     )
 
 
+def fuelhh_wind(*, max_chunks: int | None) -> pl.DataFrame:
+    """Return transmission-connected wind generation (MW) by half-hour start, 2023-06 to 2024-06."""
+
+    def fetch(start: date, end: date) -> pl.DataFrame:
+        reply = get_json(
+            url=f"{ELEXON}/datasets/FUELHH/stream",
+            params={
+                "settlementDateFrom": str(start),
+                "settlementDateTo": str(end - timedelta(days=1)),
+                "fuelType": "WIND",
+            },
+        )
+        rows = reply if isinstance(reply, list) else reply["data"]  # ty: ignore[invalid-argument-type]
+        return pl.DataFrame(
+            {
+                "startTime": [r["startTime"] for r in rows],
+                "generation": [r["generation"] for r in rows],
+            },
+            schema={"startTime": pl.String, "generation": pl.Float64},
+        )
+
+    windows = day_windows(first=FIRST_DAY, last=FUELHH_LAST_DAY, days=31)
+    frame = chunked(name="fuelhh_wind", windows=windows, fetch=fetch, max_chunks=max_chunks)
+    return (
+        frame.select(
+            start=pl.col("startTime").str.to_datetime(time_zone="UTC", time_unit="us"),
+            fuelhh_wind_mw=pl.col("generation"),
+        )
+        .unique(subset="start", keep="first", maintain_order=True)
+        .sort("start")
+    )
+
+
 def bank_holidays(*, max_chunks: int | None) -> pl.DataFrame:
     """Return England and Wales bank holiday dates from gov.uk."""
     del max_chunks
@@ -447,11 +484,17 @@ SIGNALS: Final = {
     "imbalngc": imbalngc,
     "demand_forecast": demand_forecast,
     "historic_demand": historic_demand,
+    "fuelhh_wind": fuelhh_wind,
     "bank_holidays": bank_holidays,
     "syswarn": syswarn,
     "carbon_intensity": carbon_intensity,
 }
-HALF_HOURLY: Final[tuple[str, ...]] = ("apx_mid", "historic_demand", "carbon_intensity")
+HALF_HOURLY: Final[tuple[str, ...]] = (
+    "apx_mid",
+    "historic_demand",
+    "fuelhh_wind",
+    "carbon_intensity",
+)
 """Signals that should hold a row for every half-hour start."""
 SOURCES: Final[dict[str, str]] = {
     "apx_mid": "Elexon BMRS Market Index Data, https://bmrs.elexon.co.uk/market-index-data",
@@ -460,6 +503,7 @@ SOURCES: Final[dict[str, str]] = {
     "imbalngc": "Elexon BMRS dataset IMBALNGC (indicated imbalance), https://bmrs.elexon.co.uk",
     "demand_forecast": "NESO Data Portal, day-ahead demand forecast archive",
     "historic_demand": "NESO Data Portal, Historic Demand Data (one resource per year)",
+    "fuelhh_wind": "Elexon BMRS dataset FUELHH, fuel type WIND",
     "bank_holidays": "https://www.gov.uk/bank-holidays (Open Government Licence)",
     "syswarn": "Elexon BMRS dataset SYSWARN (system warnings)",
     "carbon_intensity": "https://carbonintensity.org.uk (CC BY 4.0)",
