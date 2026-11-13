@@ -33,7 +33,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import polars as pl
 import requests
@@ -78,7 +78,7 @@ def utc_text(*, moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%MZ")
 
 
-def get_json(*, url: str, params: dict[str, object] | None = None) -> object:
+def get_json(*, url: str, params: dict[str, Any] | None = None) -> Any:
     """Return the JSON reply of a GET, retrying a failure a few times, then sleeping politely."""
     last: Exception | None = None
     for attempt in range(MAX_TRIES):
@@ -182,7 +182,7 @@ def apx_mid(*, max_chunks: int | None) -> pl.DataFrame:
                 "format": "json",
             },
         )
-        rows = reply["data"]  # ty: ignore[invalid-argument-type]
+        rows = reply["data"]
         return pl.DataFrame(
             rows,
             schema={"startTime": pl.String, "price": pl.Float64, "volume": pl.Float64},
@@ -207,14 +207,14 @@ def neso_records(*, resource_id: str, filters: str | None = None) -> list[dict]:
     out: list[dict] = []
     offset = 0
     while True:
-        params: dict[str, object] = {
+        params: dict[str, Any] = {
             "resource_id": resource_id,
             "limit": PAGE_SIZE,
             "offset": offset,
         }
         if filters:
             params["filters"] = filters
-        result = get_json(url=f"{NESO}/datastore_search", params=params)["result"]  # ty: ignore[not-subscriptable]
+        result = get_json(url=f"{NESO}/datastore_search", params=params)["result"]
         rows = result["records"]
         out.extend(rows)
         offset += len(rows)
@@ -268,7 +268,7 @@ def imbalngc(*, max_chunks: int | None) -> pl.DataFrame:
                 "format": "json",
             },
         )
-        rows = reply["data"] if isinstance(reply, dict) else reply  # ty: ignore[invalid-argument-type]
+        rows = reply["data"] if isinstance(reply, dict) else reply
         schema = {
             "imbalance": pl.Float64,
             "publishTime": pl.String,
@@ -318,7 +318,7 @@ def demand_forecast(*, max_chunks: int | None) -> pl.DataFrame:
 
 def historic_demand(*, max_chunks: int | None) -> pl.DataFrame:
     """Return national demand, embedded wind, and embedded solar by half-hour start."""
-    package = get_json(url=f"{NESO}/package_show", params={"id": DEMAND_PACKAGE})["result"]  # ty: ignore[not-subscriptable]
+    package = get_json(url=f"{NESO}/package_show", params={"id": DEMAND_PACKAGE})["result"]
     ids = {
         int(r["name"].split()[-1]): r["id"]
         for r in package["resources"]
@@ -377,7 +377,7 @@ def fuelhh_wind(*, max_chunks: int | None) -> pl.DataFrame:
                 "fuelType": "WIND",
             },
         )
-        rows = reply if isinstance(reply, list) else reply["data"]  # ty: ignore[invalid-argument-type]
+        rows = reply if isinstance(reply, list) else reply["data"]
         return pl.DataFrame(
             {
                 "startTime": [r["startTime"] for r in rows],
@@ -404,7 +404,7 @@ def bank_holidays(*, max_chunks: int | None) -> pl.DataFrame:
 
     def fetch() -> pl.DataFrame:
         reply = get_json(url=BANK_HOLIDAY_URL)
-        events = reply["england-and-wales"]["events"]  # ty: ignore[invalid-argument-type]
+        events = reply["england-and-wales"]["events"]
         return pl.DataFrame(
             {"date": [e["date"] for e in events], "title": [e["title"] for e in events]}
         )
@@ -426,7 +426,7 @@ def syswarn(*, max_chunks: int | None) -> pl.DataFrame:
                 "format": "json",
             },
         )
-        rows = reply["data"] if isinstance(reply, dict) else reply  # ty: ignore[invalid-argument-type]
+        rows = reply["data"] if isinstance(reply, dict) else reply
         return pl.DataFrame(
             {
                 "published": [r.get("publishTime") for r in rows],
@@ -454,7 +454,7 @@ def carbon_intensity(*, max_chunks: int | None) -> pl.DataFrame:
         reply = get_json(
             url=f"{CARBON_URL}/{start}T00:00Z/{end}T00:00Z",
         )
-        rows = reply["data"]  # ty: ignore[invalid-argument-type]
+        rows = reply["data"]
         return pl.DataFrame(
             {
                 "start": [r["from"] for r in rows],
@@ -533,7 +533,7 @@ def validate(*, name: str, frame: pl.DataFrame, partial: bool) -> dict[str, obje
             ).height
         )
         if name in HALF_HOURLY and not partial:
-            expected = int((starts.max() - starts.min()) / HALF_HOUR) + 1
+            expected = int((starts.max() - starts.min()) / HALF_HOUR) + 1  # ty: ignore[unsupported-operator]
             facts["expected_rows"] = expected
             facts["missing_half_hours"] = expected - int(starts.n_unique())
     numeric = [c for c, t in frame.schema.items() if t.is_float() or t.is_integer()]

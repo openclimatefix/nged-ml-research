@@ -119,7 +119,7 @@ def coverage(
     span = (ordered[-1] - ordered[0]).total_seconds() / 60 / step_minutes
     expected = round(span) + 1
     gaps = ordered.diff().drop_nulls().dt.total_minutes() / step_minutes - 1
-    longest = int(gaps.max()) if len(gaps) and gaps.max() is not None else 0
+    longest = int(gaps.max()) if len(gaps) and gaps.max() is not None else 0  # ty: ignore[invalid-argument-type]
     first_last = (
         f"{ordered[0]:%Y-%m-%d %H:%M} to {ordered[-1]:%Y-%m-%d %H:%M}, " if show_dates else ""
     )
@@ -142,7 +142,7 @@ def step_1_gas_a() -> pl.DataFrame:
         detail=str(counts),
     )
     coverage(name="Gas A start stamps", starts=frame["start"], show_dates=False)
-    end_stamp_last = frame["start"].max() + timedelta(minutes=30)
+    end_stamp_last = frame["start"].max() + timedelta(minutes=30)  # ty: ignore[unsupported-operator]
     check(name="last end stamp is the expected one", ok=end_stamp_last == GAS_A_LAST_END)
     ends = frame["start"] + timedelta(minutes=30)
     overlap_ta = int((ends >= ERA1_START).sum())
@@ -279,9 +279,9 @@ def step_3_labels() -> pl.DataFrame:
         )
         evening = profile.filter((pl.col("era") == era) & (pl.col("local_half_hour") >= 30))
         peak = evening.filter(pl.col("local_half_hour") <= 39)["share"].max()
-        first = evening.filter(pl.col("share") >= BLOCK_START_FRACTION * peak)
+        first = evening.filter(pl.col("share") >= BLOCK_START_FRACTION * peak)  # ty: ignore[unsupported-operator]
         start = first["local_half_hour"].min()
-        label = f"{start // 2:02d}:{30 * (start % 2):02d}" if start is not None else "none"
+        label = f"{start // 2:02d}:{30 * (start % 2):02d}" if start is not None else "none"  # ty: ignore[unsupported-operator]
         say(f"  {era}: block starts at {label} local; {shares}")
     say(
         f"  The evening window of Q1 is local half-hours {EVENING_FIRST} to {EVENING_LAST} "
@@ -344,7 +344,7 @@ def step_4_system_price(*, record: pl.DataFrame) -> None:
         detail=str(shares_by_shift[30]),
     )
     equal_at_end = float(
-        record.with_columns(key=pl.col("start") + pl.duration(minutes=30))
+        record.with_columns(key=pl.col("start") + pl.duration(minutes=30))  # ty: ignore[invalid-argument-type]
         .join(prices.rename({"start": "key"}), on="key", how="left", maintain_order="left")
         .select(same=pl.col("system_price") == pl.col("file_price"))["same"]
         .mean()
@@ -370,8 +370,8 @@ def step_5_gas() -> None:
     )
     say(
         f"  dropped values (pence per kWh): {GAS_BAD_VALUES}; "
-        f"kept range {gas['gas_price_gbp_mwh'].min() / 10:.2f} "
-        f"to {gas['gas_price_gbp_mwh'].max() / 10:.2f}"
+        f"kept range {gas['gas_price_gbp_mwh'].min() / 10:.2f} "  # ty: ignore[unsupported-operator]
+        f"to {gas['gas_price_gbp_mwh'].max() / 10:.2f}"  # ty: ignore[unsupported-operator]
     )
     say(
         "  The gas day for date D covers 05:00 on D to 05:00 on D + 1, "

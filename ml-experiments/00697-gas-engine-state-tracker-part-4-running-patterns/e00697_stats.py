@@ -351,8 +351,8 @@ def c4_reproduction() -> dict[str, float | bool]:
     This repeats `run_g1` of `e00695_checks.py` without its imports of the network code. The
     observed half-hours come from the panel's reading of the host, which is the same cleaned series.
     """
-    from e00695_common import FOLD_MONTHS, HOLDOUT, fold_refit, grid_index
-    from e00695_engine import drive_series
+    from e00695_common import FOLD_MONTHS, HOLDOUT, fold_refit, grid_index  # ty: ignore[unresolved-import]
+    from e00695_engine import drive_series  # ty: ignore[unresolved-import]
 
     host = json.loads((E695_DIR / "host.json").read_text())["host"]
     reading = panel_array(panel=load_panel(), label=host, key="power")
@@ -656,9 +656,7 @@ def t6_drivers(*, frames: dict[str, pl.DataFrame]) -> None:
     )
     with pl.Config(tbl_rows=-1, float_precision=3):
         (DATA_DIR / "night_monthly.txt").write_text(str(monthly) + "\n")
-    say(
-        say(f"\nT6 night share by month: written to {DATA_DIR.name}/night_monthly.txt, not printed")
-    )
+    say(f"\nT6 night share by month: written to {DATA_DIR.name}/night_monthly.txt, not printed")
 
 
 def main() -> None:

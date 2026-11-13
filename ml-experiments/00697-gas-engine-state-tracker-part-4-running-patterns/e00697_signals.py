@@ -240,14 +240,14 @@ def figures(*, series: dict[str, pl.DataFrame]) -> None:
         "series:N", scale=alt.Scale(domain=domain, range=COLOURS), legend=alt.Legend(title=None)
     )
     chart = (
-        base.mark_rule(aria=False).encode(
+        base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("signal:N", title=None, sort=None),
             yOffset="series:N",
             x=alt.X("lo:Q", title="Running share, top third minus bottom third (95% interval)"),
             x2="hi:Q",
             color=color,
         )
-        + base.mark_point(aria=False, filled=True, size=40).encode(
+        + base.mark_point(aria=False, filled=True, size=40).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("signal:N", sort=None),
             yOffset="series:N",
             x="difference:Q",

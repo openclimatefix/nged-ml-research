@@ -135,7 +135,7 @@ def figure_1(*, frames: dict[str, pl.DataFrame]) -> None:
             rows.append(
                 heat_map(view=part).with_columns(panel=pl.lit(f"D8 {era}, {HALF_TITLES[half]}"))
             )
-    top = max(float(r["share"].max()) for r in rows if r.height)
+    top = max(float(r["share"].max()) for r in rows if r.height)  # ty: ignore[invalid-argument-type]
     charts = [
         heat_chart(data=r.drop("panel"), title=r["panel"][0], top=top) for r in rows if r.height
     ]
@@ -338,9 +338,9 @@ def figure_4(*, frames: dict[str, pl.DataFrame]) -> None:
     offsets = edges["offsets"]
     ramp = pl.DataFrame(
         {
-            "offset": offsets * 2,
-            "share": list(edges["start_profile"]) + list(edges["stop_profile"]),
-            "edge": ["Spell start"] * len(offsets) + ["Spell stop"] * len(offsets),
+            "offset": offsets * 2,  # ty: ignore[unsupported-operator]
+            "share": list(edges["start_profile"]) + list(edges["stop_profile"]),  # ty: ignore[invalid-argument-type]
+            "edge": ["Spell start"] * len(offsets) + ["Spell stop"] * len(offsets),  # ty: ignore[invalid-argument-type]
         }
     )
     ramp_chart = (
@@ -362,7 +362,7 @@ def figure_4(*, frames: dict[str, pl.DataFrame]) -> None:
         {
             "start": np.tile(np.arange(48) / 2, 2),
             "stop": np.tile((np.arange(48) + 1) / 2, 2),
-            "n": list(edges["start_half_hours"]) + list(edges["stop_half_hours"]),
+            "n": list(edges["start_half_hours"]) + list(edges["stop_half_hours"]),  # ty: ignore[invalid-argument-type]
             "edge": ["Spell start"] * 48 + ["Spell stop"] * 48,
         }
     )
@@ -546,7 +546,7 @@ def gallery_3(*, frames: dict[str, pl.DataFrame]) -> None:
         title="By price rank in the day",
     )
     right = (
-        alt.Chart(
+        alt.Chart(  # ty: ignore[unresolved-attribute]
             pl.DataFrame(band_rows).filter(pl.col("share").is_not_null()),
             title="Red band and dearest six",
         )  # ty: ignore[unresolved-attribute]
