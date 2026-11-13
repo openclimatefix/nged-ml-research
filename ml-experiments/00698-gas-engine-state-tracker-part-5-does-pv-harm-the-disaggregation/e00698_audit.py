@@ -22,8 +22,8 @@ without a passing `audit.json` that is newer than the audit's inputs. The checks
    with one set of fifth edges (D8's solar-era edges). A shape runs only if its curve lies within
    1 MVA of D8's in each of the first four fifths. The farm's twin `smooth_farm` runs when the farm
    passes, and the CAMS twin `smooth` runs when the farm or the CAMS shape passes.
-3. The night-matched constant of D8's reading before the engine, and D8's monthly midday-minus-night
-   gap by era.
+3. The constant that matches D8's midday reading to its night reading, for D8's reading before the
+   engine, and D8's monthly midday-minus-night gap by era.
 4. The false-flag share of experiment 697's level-matched control under both definitions
    (`truth_mw` = 0 and "under 1 unit"), and the midday F1 of that control and of control C1.
 5. The spread of half-hourly changes of D8's reading on engine-off, no-drop midday half-hours, by
@@ -32,7 +32,7 @@ without a passing `audit.json` that is newer than the audit's inputs. The checks
 6. Timestamps: the correlation of the changes of the reading and of the farm series with the changes
    of the CAMS shape at lags of -4 to +4 half-hours, on half-hourly changes and on hourly sums, with
    the strongest absolute value asserted at lag 0.
-7. The three label-only checks of the plan and D8's statistics with and without experiment 159's
+7. The three label-only checks and D8's statistics with and without experiment 159's
    drops, in `e00698_labels.py`'s functions.
 8. Step 4's selection: the off-spells, the selected days, their calendar months, and their share
    inside a drop.

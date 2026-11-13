@@ -6,12 +6,12 @@ r"""Known-answer tests for experiment 698's helpers, on small synthetic inputs.
 
 The tests read no stored data (one test reads the stored panel and the farm file when they exist)
 and write nothing outside a temporary folder. They cover the farm's grid and gap handling, the
-smooth
-twin, the fold rule applied once on the summed output (and how it differs from two applications),
-the fold states, the curve gate, fifth edges, the paired week-block interval and the direction of
-each criterion, off-spell and whole-day selection, the job lists and seed recipe, the verdict rule
-on synthetic statistics (every branch and step 4's one-way adjustment), the SVG year guard, and that
-no committed file of this folder names a path under the maintainer's home folder.
+smooth twin, the fold rule applied once on the summed output (and how it differs from two
+applications), the fold states, the curve gate, fifth edges, the paired week-block interval and
+the direction of each criterion, off-spell and whole-day selection, the job lists and seed recipe,
+the verdict rule on synthetic statistics (every branch and step 4's one-way adjustment), the SVG
+year guard, and that no committed file of this folder names a path under the maintainer's home
+folder.
 """
 
 import sys

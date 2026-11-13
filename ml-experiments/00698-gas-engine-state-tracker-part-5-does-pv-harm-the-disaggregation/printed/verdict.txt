@@ -1,4 +1,4 @@
-Verdict (the plan's rule): INCONCLUSIVE
+Verdict (the rule of the front matter): INCONCLUSIVE
   branch 1: the paired half-width of the F1 farm weather contrast at D8-pre reaches 0.051, above 0.05
   branch 1: the farm series covers 0.859 of the daylight half-hours of the host with the smallest coverage, under 0.9
 Farm coverage of daylight half-hours, smallest over the hosts that run: 0.859

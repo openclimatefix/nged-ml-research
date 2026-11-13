@@ -2,7 +2,8 @@
 
 The checks read only the stored frame of D8 (`frame_d8.parquet` of experiment 697): the tracker's
 smoothed labels `ts`, CAMS irradiance `ghi`, the spark spread, the bank-holiday flag, and the
-multi-day drops. **None of them shows that solar generation is the cause of a change between eras.**
+multi-day drops of experiment 159's switching log. **None of them shows that solar generation is
+the cause of a change between eras.**
 
 - `weekend_cheap`: the flagged share on weekends and bank holidays, 09:00 to 15:00 local, with a
   negative spark spread.

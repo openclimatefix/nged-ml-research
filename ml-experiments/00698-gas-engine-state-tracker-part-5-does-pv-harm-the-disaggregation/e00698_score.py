@@ -445,8 +445,8 @@ def score_step4(*, panel: dict[int, dict]) -> dict:
 def twin_f1_unmasked(*, panel: dict[int, dict]) -> float | None:
     """Return the midday F1 of D8-pre's solar-free twin on every observed half-hour (3 seeds).
 
-    This is the figure that the plan compares with experiment 697's control C1 (0.767). It uses
-    every half-hour with a reading that is not on a clock-change day, whatever the farm's gaps.
+    This is the figure that the decision rule compares with experiment 697's control C1 (0.767). It
+    uses every half-hour with a reading that is not on a clock-change day, whatever the farm's gaps.
     """
     first, last = host_bounds(host="d8pre")
     y = panel_series(panel=panel, label="D8", key="power")

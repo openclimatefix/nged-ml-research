@@ -6,10 +6,10 @@ over a whole run, never with a date and never as a series.
 
 **Lineage.** This module imports experiment 694's injection and trackers, experiment 695's grid
 index, and experiment 697's local-time helpers, week-block intervals, span bounds, seed offsets, and
-`track_span`. `farm_norm_series` is copied from `e00405_prep.py` (experiment 405), which experiments
-649 and 662 used to inject their farms, because importing that module imports `torch` through
-experiment 397. The copy changes nothing but its docstring and the use of one constant for the
-frame's path.
+`track_span`. `farm_norm_series` is copied from `e00405_prep.py` (experiment 405). Experiments 649
+and 662 used that function to inject their farms. The copy exists because importing `e00405_prep`
+imports `torch` through experiment 397. The copy changes nothing but its docstring and the use of
+one constant for the frame's path.
 
 **Time conventions.** A power stamp marks the end of its half-hour, and so do the stamps of the
 farm series and of CAMS irradiance (the end of the hour). Panel-grid index `i` has the end stamp
@@ -71,7 +71,7 @@ E697_FRAME_C1_NULL: Final[Path] = E697_FRAMES_DIR / "frame_c1_null.parquet"
 E697_FRAME_C1S_SOLAR: Final[Path] = E697_FRAMES_DIR / "frame_c1s_solar_null.parquet"
 D8_STATES_PATH: Final[Path] = E694_DIR / "d8.pkl"
 
-# --------------------------------------------------------------------------- the plan's numbers
+# ----------------------------------------------------------------------- the experiment's numbers
 
 HOST_KEYS: Final[tuple[str, ...]] = ("d8pre", "d3solar")
 HOST_SERIES: Final[dict[str, str]] = {"d8pre": "D8", "d3solar": "D3"}
@@ -206,8 +206,8 @@ def host_jobs(*, gate: dict | None) -> list[Job]:
     """Return the host jobs that the gate lets run, with the solar-free twins.
 
     Args:
-        gate: The parsed `gate.json` (its `run` table), or None to list every job the plan allows
-            (56 at most).
+        gate: The parsed `gate.json` (its `run` table), or None to list every job that the host,
+            capacity, and shape lists allow (72 at most).
 
     Returns:
         For each host: the solar-free twin (3 seeds and no engine) when any shape passes at any
@@ -437,7 +437,7 @@ def farm_on_grid(*, series: tuple[np.ndarray, np.ndarray], n_grid: int) -> np.nd
     """Return a farm's normalised power on the panel grid, NaN in a gap or a dropout.
 
     A grid half-hour that the farm's file lacks is 0 at night (UTC hours before 05:00 and after
-    20:00, as `farm_at` of experiment 405 decides) and NaN otherwise.
+    20:00, as `farm_at` of experiment 405 does) and NaN otherwise.
 
     Args:
         series: The output of `farm_norm_series`.

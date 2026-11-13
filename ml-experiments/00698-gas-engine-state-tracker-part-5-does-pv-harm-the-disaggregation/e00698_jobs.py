@@ -107,8 +107,8 @@ def run_host_job(*, job: Job) -> dict[str, np.ndarray | float | int | str]:
 
     Returns:
         The arrays of the job's file: `farm` (the farm's letter), `shape`, `capacity_mw`, `y` (the
-        reading), `g` (the engine's output, MW), `pv` (the
-        solar output, MW), `signed` (the signed real power), `farm_ok`, the labels, and the fit.
+        reading), `g` (the engine's output, MW), `pv` (the solar output, MW), `signed` (the signed
+        real power), `farm_ok`, the labels, and the fit.
     """
     series = HOST_SERIES[job.host]
     y = SERIES[series]
@@ -268,7 +268,7 @@ def main() -> None:
     parser.add_argument(
         "--ignore-gate",
         action="store_true",
-        help="with --list or --time-one only: list every job the plan allows, with farm A",
+        help="with --list or --time-one only: list every job the lists allow, with farm A",
     )
     args = parser.parse_args()
     if args.ignore_gate and not (args.list or args.time_one):

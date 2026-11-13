@@ -1,4 +1,4 @@
-r"""Experiment 698's verdict, by the rule in the plan, in the order the plan states.
+r"""Experiment 698's verdict, by the rule in the result page's front matter, in the order it states.
 
     uv run --no-sync python $E/00698-*/e00698_verdict.py
 
@@ -249,8 +249,8 @@ def level_sentence(*, scores: dict) -> str:
 def strong_statement(*, scores: dict, name: str) -> str:
     """Return whether the weather contrast `name` reaches D8's swing: criterion 3 at 0.125.
 
-    The farm's weather comes from another site, so its brightness has only a weak link to the
-    thirds of the host's CAMS shape, and the farm contrast understates the effect. The CAMS
+    The farm's weather comes from another site, so its brightness has only a partial link
+    (within-cell correlation 0.765 at D8) to the thirds of the host's CAMS shape. The CAMS
     contrast has the matching thirds and is reported beside it.
     """
     hits = []
@@ -285,7 +285,7 @@ def main() -> None:
     scores = read_json(path=SCORES_PATH)
     coverage = running_coverage(gate=gate, audit=audit)
     word, notes = decide(gate=gate, scores=scores, coverage=coverage)
-    lines = [f"Verdict (the plan's rule): {word.upper()}", *[f"  {n}" for n in notes]]
+    lines = [f"Verdict (the rule of the front matter): {word.upper()}", *[f"  {n}" for n in notes]]
     lines.append(
         f"Farm coverage of daylight half-hours, smallest over the hosts that run: {coverage:.3f}"
     )
