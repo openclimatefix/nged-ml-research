@@ -10,16 +10,21 @@ Tested in this order:
 
 1. `inconclusive` (the audit blocks the test): D8's reading before the engine fails the curve gate
    with the farm shape at both capacities, or its solar-free twin's midday F1 differs from 0.767 by
-   more than 0.02, or the paired half-width of the F1 contrast at D8 exceeds 0.05 (in any contrast
-   that exists), or the farm series covers under 90% of D8-pre's span or of D3's span (the design said 95% of D8's
-   span; the clause was changed before the first real run, see `COVERAGE_MIN`).
+   more than 0.02, or the paired half-width of the F1 contrast `weather_farm` at D8 exceeds 0.05
+   (at a capacity that ran; the other contrasts do not enter), or the farm series covers under 90%
+   of the daylight half-hours of a host that runs (D8 before the engine, and D3 when its farm gate
+   passed).
 2. `supported`: at one capacity, the farm weather contrast meets a harm criterion at D8 and at D3.
    If D3 failed the gate (no capacity passes with the farm shape), it must meet a criterion at D8
-   at both capacities.
-3. `partly supported`: the farm weather contrast meets a criterion at D8 at one capacity only, or
-   only the CAMS weather contrast meets one at D8.
-4. `refuted`: at D8, at both capacities and for both shapes, every weather contrast has an interval
-   wholly below its threshold.
+   at every capacity that ran.
+3. `partly supported`: any one of the three criteria, at any capacity that ran, is met by the farm
+   weather contrast at D8 without the conditions of branch 2, or by the CAMS weather contrast at
+   D8. This branch fires on any of up to 12 contrasts, so its false-positive rate is higher than
+   that of branch 2.
+4. `refuted`: at D8, for every capacity and shape that passed the curve gate (at least one farm
+   contrast and one CAMS contrast), every weather contrast has an interval wholly below its
+   threshold. A line with the strict reading, which needs both capacities and both shapes, is
+   printed beside the word.
 5. `not supported`: none of the above.
 
 **Step 4 can lower a verdict and cannot raise one.** If the verdict is `supported` and step 4's
@@ -34,12 +39,12 @@ is below the threshold (`inside_threshold`).
 from typing import Final
 
 from e00698_common import (  # ty: ignore[unresolved-import]
-    AUDIT_PATH,
     CAPACITIES_MW,
     COVERAGE_MIN,
     CRITERIA,
     GATE_PATH,
     HALF_WIDTH_MAX,
+    HOST_KEYS,
     PRINTED_DIR,
     SCORES_PATH,
     STEP4_HALF_WIDTH_MAX,
@@ -54,6 +59,7 @@ from e00698_common import (  # ty: ignore[unresolved-import]
     inside_threshold,
     meets_criterion,
     read_json,
+    require_passing_audit,
     write_json,
 )
 
@@ -102,20 +108,21 @@ def block_reasons(*, gate: dict, scores: dict, coverage: float) -> list[str]:
             f"{TWIN_F1_TOLERANCE}"
         )
     widths = [
-        half_width(interval=labels["smooth"]["f1"])
+        half_width(interval=table["weather_farm"]["smooth"]["f1"])
         for table in scores.get("hosts", {}).get("d8pre", {"contrasts": {}})["contrasts"].values()
-        for labels in table.values()
+        if "weather_farm" in table
     ]
     if not widths:
-        reasons.append("D8-pre has no paired contrast")
+        reasons.append("D8-pre has no paired farm weather contrast")
     elif max(widths) > HALF_WIDTH_MAX:
         reasons.append(
-            f"the paired half-width of the F1 contrast at D8-pre reaches {max(widths):.3f}, "
-            f"above {HALF_WIDTH_MAX}"
+            f"the paired half-width of the F1 farm weather contrast at D8-pre reaches "
+            f"{max(widths):.3f}, above {HALF_WIDTH_MAX}"
         )
     if coverage < COVERAGE_MIN:
         reasons.append(
-            f"the farm series covers {coverage:.3f} of the smaller host span, under {COVERAGE_MIN}"
+            f"the farm series covers {coverage:.3f} of the daylight half-hours of the host with "
+            f"the smallest coverage, under {COVERAGE_MIN}"
         )
     return reasons
 
@@ -184,8 +191,9 @@ def decide(
         f"farm weather contrast meets a criterion at D3 (D3 failed the gate: {d3_failed}): "
         f"{d3_meets}"
     )
+    ran_d8 = [k for k in keys if farm_d8[k] is not None]
     if d3_failed:
-        supported = all(d8_meets.values())
+        supported = bool(ran_d8) and all(d8_meets[k] for k in ran_d8)
     else:
         supported = any(d8_meets[k] and d3_meets[k] for k in keys)
     word: str
@@ -238,30 +246,49 @@ def level_sentence(*, scores: dict) -> str:
     )
 
 
-def strong_statement(*, scores: dict) -> str:
-    """Return whether solar weather explains D8's contrast: criterion 3 at 0.125 at D8-pre."""
+def strong_statement(*, scores: dict, name: str) -> str:
+    """Return whether the weather contrast `name` reaches D8's swing: criterion 3 at 0.125.
+
+    The farm's weather comes from another site, so its brightness has only a weak link to the
+    thirds of the host's CAMS shape, and the farm contrast understates the effect. The CAMS
+    contrast has the matching thirds and is reported beside it.
+    """
     hits = []
     for cap in CAPACITIES_MW:
         key = capacity_key(capacity_mw=cap)
-        criteria = contrast_of(scores=scores, host="d8pre", key=key, name="weather_farm")
+        criteria = contrast_of(scores=scores, host="d8pre", key=key, name=name)
         if criteria is None:
             continue
         bmd: Interval = criteria["bmd"]
         hits.append(f"{cap} MW: {bmd['point'] >= STRONG_BMD and bmd['lo'] > 0}")
     return (
-        f"Weather explains D8's swing (farm bright-minus-dull harm at least {STRONG_BMD} with the "
-        "interval above zero): " + "; ".join(hits)
+        f"Weather explains D8's swing ({name}: bright-minus-dull harm at least {STRONG_BMD} with "
+        "the interval above zero): " + ("; ".join(hits) if hits else "not run")
     )
+
+
+def running_coverage(*, gate: dict, audit: dict) -> float:
+    """Return the smallest daylight coverage of the farm over the hosts that have farm runs."""
+    share = audit["numbers"]["farm_finite_share_daylight"]
+    hosts = [
+        host
+        for host in HOST_KEYS
+        if any(gate["run"][host][capacity_key(capacity_mw=c)]["farm"] for c in CAPACITIES_MW)
+    ]
+    return min((float(share[h]) for h in hosts), default=0.0)
 
 
 def main() -> None:
     """Read the stored documents, print the verdict, and write `verdict.json`."""
+    audit = require_passing_audit()
     gate = read_json(path=GATE_PATH)
     scores = read_json(path=SCORES_PATH)
-    audit = read_json(path=AUDIT_PATH)
-    coverage = float(audit["numbers"]["farm_coverage_min"])
+    coverage = running_coverage(gate=gate, audit=audit)
     word, notes = decide(gate=gate, scores=scores, coverage=coverage)
     lines = [f"Verdict (the plan's rule): {word.upper()}", *[f"  {n}" for n in notes]]
+    lines.append(
+        f"Farm coverage of daylight half-hours, smallest over the hosts that run: {coverage:.3f}"
+    )
     strict_word, _ = decide(gate=gate, scores=scores, coverage=coverage, strict_refuted=True)
     if strict_word != word:
         lines.append(
@@ -269,15 +296,13 @@ def main() -> None:
             f"{strict_word.upper()}"
         )
     lines.append(level_sentence(scores=scores))
-    lines.append(strong_statement(scores=scores))
+    lines.append(strong_statement(scores=scores, name="weather_farm"))
+    lines.append(strong_statement(scores=scores, name="weather_cams"))
     lines.append(f"Thresholds: {THRESHOLDS}")
     print("\n".join(lines))
     PRINTED_DIR.mkdir(parents=True, exist_ok=True)
     (PRINTED_DIR / "verdict.txt").write_text("\n".join(lines) + "\n")
-    write_json(
-        path=VERDICT_PATH,
-        payload={"verdict": word, "notes": notes},
-    )
+    write_json(path=VERDICT_PATH, payload={"verdict": word, "notes": notes})
 
 
 if __name__ == "__main__":

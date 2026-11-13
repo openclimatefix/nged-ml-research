@@ -21,7 +21,10 @@ experiment 694's smoothed labels call off, in one era. There are 5 seeds in each
 solar era. The tracker runs over the whole era.
 
 Each job writes `jobs/<name>.npz` atomically. A finished file is skipped, so a crashed run is rerun
-without touching the others. Nothing here is published: the files hold dated output of Gas A and a
+without touching the others. Each file records the farm's letter, the shape, and the capacity, and
+`e00698_score.py` refuses a file whose farm differs from the audit's. A real run needs a passing
+`audit.json` that is newer than the audit's inputs, and `--ignore-gate` works only with `--list` or
+`--time-one`. Nothing here is published: the files hold dated output of Gas A and a
 farm and stay in the private data folder.
 """
 
@@ -64,6 +67,7 @@ from e00698_common import (  # ty: ignore[unresolved-import]
     off_spell_rows,
     panel_series,
     read_json,
+    require_passing_audit,
     solar_curve,
     whole_day_rows,
 )
@@ -75,6 +79,7 @@ CALENDAR: list = []
 FIELDS: list = []
 DAYS: list[RecordDays] = []
 FARM: list[np.ndarray] = []
+FARM_LETTER: list[str] = []
 
 
 def init(*, farm: str) -> None:
@@ -94,13 +99,15 @@ def init(*, farm: str) -> None:
     FIELDS.append(grid_calendar_fields(n_grid=n_grid))
     DAYS.append(record_days())
     FARM.append(farm_on_grid(series=farm_norm_series(farm=farm), n_grid=n_grid))
+    FARM_LETTER.append(farm)
 
 
-def run_host_job(*, job: Job) -> dict[str, np.ndarray | float | int]:
+def run_host_job(*, job: Job) -> dict[str, np.ndarray | float | int | str]:
     """Inject solar and engine into a host's reading and track the span.
 
     Returns:
-        The arrays of the job's file: `y` (the reading), `g` (the engine's output, MW), `pv` (the
+        The arrays of the job's file: `farm` (the farm's letter), `shape`, `capacity_mw`, `y` (the
+        reading), `g` (the engine's output, MW), `pv` (the
         solar output, MW), `signed` (the signed real power), `farm_ok`, the labels, and the fit.
     """
     series = HOST_SERIES[job.host]
@@ -134,6 +141,9 @@ def run_host_job(*, job: Job) -> dict[str, np.ndarray | float | int]:
     reading, signed = fold_reading(y=y, total_mw=pv + g, first=inject_first, last=last)
     track = track_span(y_all=reading, first=first, last=last)
     return {
+        "farm": FARM_LETTER[0],
+        "shape": job.shape,
+        "capacity_mw": float("nan") if job.capacity_mw is None else job.capacity_mw,
         "first": first,
         "last": last,
         "y": reading[first:last],
@@ -166,7 +176,7 @@ def step4_days(*, era: str) -> np.ndarray:
     return whole_day_rows(rows=rows, local_date=CALENDAR[0][0][first:last], observed=observed)
 
 
-def run_step4_job(*, job: Job) -> dict[str, np.ndarray | float | int]:
+def run_step4_job(*, job: Job) -> dict[str, np.ndarray | float | int | str]:
     """Inject Gas A into the selected whole days of one era of D8's reading and track the era."""
     era = job.era
     if era is None or job.seed is None:
@@ -258,11 +268,19 @@ def main() -> None:
     parser.add_argument(
         "--ignore-gate",
         action="store_true",
-        help="list every job the design allows and use farm A (for listing and timing)",
+        help="with --list or --time-one only: list every job the plan allows, with farm A",
     )
     args = parser.parse_args()
-    gate = None if args.ignore_gate else read_json(path=GATE_PATH)
+    if args.ignore_gate and not (args.list or args.time_one):
+        parser.error("--ignore-gate is valid only with --list or --time-one, never for a real run")
+    if args.ignore_gate:
+        gate = None
+    else:
+        require_passing_audit()
+        gate = read_json(path=GATE_PATH)
     selected = [j for j in all_jobs(gate=gate) if args.only in j.name]
+    if not selected:
+        parser.error(f"no job's name has the text {args.only!r}")
     if args.list:
         for job in selected:
             print(job)

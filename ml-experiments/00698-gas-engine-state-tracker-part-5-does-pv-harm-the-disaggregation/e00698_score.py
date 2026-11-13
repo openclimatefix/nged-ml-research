@@ -18,8 +18,11 @@ cell of local half-hour, weekday class, and month, above 50 W/m2 of CAMS irradia
 **Contrasts.** For each host and capacity, with 3 seeds pooled (sums of the numerators and the
 denominators over the seeds), the harm is stated so that a positive number is worse:
 
-- `level`: the smooth twin against the solar-free twin (harm from the lower level and the fold);
-- `weather_farm` and `weather_cams`: the farm run, or the CAMS run, against the smooth twin;
+- `level`: the CAMS smooth twin against the solar-free twin (harm from the lower level and the
+  fold);
+- `weather_farm`: the farm run against its own twin, the smooth twin built from the farm's cell
+  means (same level and same daily and seasonal shape, no weather);
+- `weather_cams`: the CAMS run against the CAMS smooth twin;
 - `total_farm` and `total_cams`: the farm run, or the CAMS run, against the solar-free twin.
 
 The three criteria are F1 (falls), the false-flag share on half-hours whose injected output is zero
@@ -66,6 +69,8 @@ from e00698_common import (  # ty: ignore[unresolved-import]
     bright_dull_thirds,
     capacity_key,
     criterion_value,
+    farm_norm_series,
+    farm_on_grid,
     fold_state,
     grid_calendar_fields,
     half_width,
@@ -74,6 +79,7 @@ from e00698_common import (  # ty: ignore[unresolved-import]
     paired_contrast,
     panel_series,
     read_json,
+    require_passing_audit,
     score_columns,
     week_counts,
     week_table,
@@ -85,7 +91,7 @@ LABEL_KEYS: Final[dict[str, str]] = {"smooth": "flag", "filtered": "filtered"}
 """The stored array of each label type."""
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "level": ("smooth", PV_FREE),
-    "weather_farm": ("farm", "smooth"),
+    "weather_farm": ("farm", "smooth_farm"),
     "weather_cams": ("cams", "smooth"),
     "total_farm": ("farm", PV_FREE),
     "total_cams": ("cams", PV_FREE),
@@ -147,6 +153,20 @@ def host_context(*, host: str, panel: dict[int, dict], farm_ok: np.ndarray) -> H
         third=third,
         weeks=weeks,
     )
+
+
+def check_job_farms(*, farm: str) -> None:
+    """Stop if a stored host job was made with a farm other than `farm`, or records none."""
+    wrong = []
+    for path in sorted(JOBS_DIR.glob("*.npz")):
+        if path.name.startswith("step4_"):
+            continue
+        with np.load(path) as data:
+            if "farm" not in data.files or str(data["farm"]) != farm:
+                wrong.append(path.name)
+    if wrong:
+        msg = f"these job files were not made with farm {farm}: {wrong}; delete them and rerun jobs"
+        raise SystemExit(msg)
 
 
 def load_job(*, name: str) -> dict[str, np.ndarray]:
@@ -425,7 +445,7 @@ def score_step4(*, panel: dict[int, dict]) -> dict:
 def twin_f1_unmasked(*, panel: dict[int, dict]) -> float | None:
     """Return the midday F1 of D8-pre's solar-free twin on every observed half-hour (3 seeds).
 
-    This is the figure that the design compares with experiment 697's control C1 (0.767). It uses
+    This is the figure that the plan compares with experiment 697's control C1 (0.767). It uses
     every half-hour with a reading that is not on a clock-change day, whatever the farm's gaps.
     """
     first, last = host_bounds(host="d8pre")
@@ -526,9 +546,10 @@ def print_scores(*, scores: dict) -> None:  # noqa: PLR0912
 
 def main() -> None:
     """Score every host and step 4, then write `scores.json` and the printed report."""
+    require_passing_audit()
     gate = read_json(path=GATE_PATH)
+    check_job_farms(farm=str(gate["farm"]))
     panel = load_panel()
-    from e00698_common import farm_norm_series, farm_on_grid
 
     farm = farm_on_grid(
         series=farm_norm_series(farm=str(gate["farm"])),
@@ -548,9 +569,6 @@ def main() -> None:
     scores["step4"] = score_step4(panel=panel)
     twin = twin_f1_unmasked(panel=panel)
     scores["twin_f1_d8pre"] = twin
-    scores["farm_coverage_d8pre"] = float(
-        np.isfinite(farm[slice(*host_bounds(host="d8pre"))]).mean()
-    )
     print_scores(scores=scores)
     say()
     say(f"D8-pre solar-free twin midday F1 on every observed half-hour: {twin}")

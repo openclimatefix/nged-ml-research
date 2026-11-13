@@ -5,17 +5,23 @@ r"""Experiment 698's data audit and curve gate. It runs no tracker and scores no
     uv run --no-sync python $E/00698-*/e00698_audit.py
 
 The audit prints its report to `printed/audit.txt` (committed, with no date and no Gas A or farm
-series), writes its numbers to `audit.json` and the gate to `gate.json` in the private data folder,
-and exits with an error if a check that the design asserts fails. The checks are:
+series), writes its numbers and its failed checks to `audit.json` in the private data folder, and
+writes the gate to `gate.json` there only when every check passed. A failed audit deletes any
+earlier `gate.json` and exits with an error. `e00698_jobs.py` and `e00698_verdict.py` refuse to run
+without a passing `audit.json` that is newer than the audit's inputs. The checks are:
 
 1. Row counts, missing shares, and ranges of the reading, CAMS irradiance, and CAMS solar shape at
    D8 and D3, and of the farm series over both host spans. The farm is the one of experiment 662's
-   four farms with the highest finite share over both spans.
+   four farms with the highest finite share over both spans. The audit prints the farm's finite
+   share of all half-hours, of daylight half-hours (positive CAMS shape), of midday half-hours
+   (May to September separately), and the share of the dullest third that the farm's gaps mask, and
+   the correlation of the farm series with the host's CAMS shape within each cell of month and
+   local half-hour. The verdict's coverage clause reads the daylight share.
 2. The curve gate: D8's solar-era engine-free curve of median reading by fifth of the CAMS shape
    (May to September, 10:00 to 15:00 local), and each host's, capacity's, and shape's curve built
    with one set of fifth edges (D8's solar-era edges). A shape runs only if its curve lies within
-   1 MVA of D8's in each of the first four fifths. The smooth twin runs when the farm or the CAMS
-   shape passes.
+   1 MVA of D8's in each of the first four fifths. The farm's twin `smooth_farm` runs when the farm
+   passes, and the CAMS twin `smooth` runs when the farm or the CAMS shape passes.
 3. The night-matched constant of D8's reading before the engine, and D8's monthly midday-minus-night
    gap by era.
 4. The false-flag share of experiment 697's level-matched control under both definitions
@@ -26,7 +32,7 @@ and exits with an error if a check that the design asserts fails. The checks are
 6. Timestamps: the correlation of the changes of the reading and of the farm series with the changes
    of the CAMS shape at lags of -4 to +4 half-hours, on half-hourly changes and on hourly sums, with
    the strongest absolute value asserted at lag 0.
-7. The three label-only checks of the design and D8's statistics with and without experiment 159's
+7. The three label-only checks of the plan and D8's statistics with and without experiment 159's
    drops, in `e00698_labels.py`'s functions.
 8. Step 4's selection: the off-spells, the selected days, their calendar months, and their share
    inside a drop.
@@ -64,14 +70,19 @@ from e00698_common import (  # ty: ignore[unresolved-import]
     PRINTED_DIR,
     SHAPES,
     STEP4_MIN_SPELL,
+    SUMMER_MONTHS,
     TWIN_F1_EXPECTED,
     UNIT_THRESHOLD_MW,
+    bright_dull_thirds,
     capacity_key,
+    cell_mean,
     curve_medians,
+    farm_daylight_share,
     farm_finite_share,
     farm_norm_series,
     farm_on_grid,
     fifth_edges,
+    finite_cell_mean,
     fold_reading,
     gate_passes,
     grid_calendar_fields,
@@ -93,8 +104,10 @@ NUMBERS: dict[str, object] = {}
 LAGS: Final[tuple[int, ...]] = tuple(range(-4, 5))
 MIN_ROWS_PER_MONTH: Final[int] = 40
 """A month needs this many midday and night half-hours to give a gap."""
-DESIGN_SPELLS: Final[dict[str, tuple[int, int]]] = {"net": (52, 4913), "solar": (29, 2083)}
-"""The design's own counts of off-spells of 48 half-hours or more and their half-hours."""
+EXPECTED_SPELLS: Final[dict[str, tuple[int, int]]] = {"net": (52, 4913), "solar": (29, 2083)}
+"""Off-spells of 48 half-hours or more in D8's stored labels, and their half-hours, by era."""
+EXPECTED_STEP4_DAYS: Final[dict[str, int]] = {"net": 57, "solar": 16}
+"""Whole local days inside those off-spells, by era."""
 MONTH_NAMES: Final[tuple[str, ...]] = (
     "Jan",
     "Feb",
@@ -166,26 +179,89 @@ def step_1_data(*, panel: dict[int, dict]) -> dict[str, np.ndarray]:
     NUMBERS["farm"] = best
     NUMBERS["farm_pooled_finite"] = pooled
     first, last = spans["d8pre"]
-    coverage_by_host = {
+    shape_of = {
+        host: panel_series(panel=panel, label=HOST_SERIES[host], key="pv_shape")
+        for host in HOST_KEYS
+    }
+    all_share = {
         host: farm_finite_share(norm=farms[best], first=a, last=b) for host, (a, b) in spans.items()
     }
-    coverage = min(coverage_by_host.values())
-    NUMBERS["farm_coverage_d8pre"] = coverage_by_host["d8pre"]
-    NUMBERS["farm_coverage_min"] = coverage
-    say(f"chosen farm: {best} (highest pooled finite share); coverage by host {coverage_by_host}")
+    daylight = {
+        host: farm_daylight_share(norm=farms[best], pv_shape=shape_of[host], first=a, last=b)
+        for host, (a, b) in spans.items()
+    }
+    NUMBERS["farm_finite_share_all"] = all_share
+    NUMBERS["farm_finite_share_daylight"] = daylight
+    say(f"chosen farm: {best} (highest pooled finite share)")
+    say(f"finite share of all half-hours, by host (night counts as finite): {all_share}")
     say(
-        f"smallest coverage at least {COVERAGE_MIN}: {coverage >= COVERAGE_MIN}"
-        " (the verdict's branch 1 fires when either host's coverage is under)"
+        f"finite share of daylight half-hours, by host (the verdict's coverage clause, at least "
+        f"{COVERAGE_MIN}): {daylight}"
     )
-    pv = panel_series(panel=panel, label="D8", key="pv_shape")
+    farm_coverage_detail(panel=panel, farm=farms[best])
+    pv = shape_of["d8pre"]
     day = (pv[first:last] > 0) & np.isfinite(farms[best][first:last])
     ratio = float(np.mean(farms[best][first:last][day]) / np.mean(pv[first:last][day]))
     NUMBERS["farm_to_cams_shape_mean_ratio_d8pre"] = ratio
     say(
         f"mean of the farm's output per MW over the mean CAMS shape, daylight half-hours at "
-        f"D8-pre: {ratio:.3f}"
+        f"D8-pre: {ratio:.3f} (the twins `smooth` and `smooth_farm` each keep their own level)"
     )
     return farms
+
+
+def farm_coverage_detail(*, panel: dict[int, dict], farm: np.ndarray) -> None:
+    """Print what the farm's gaps leave: midday shares, the dullest third, and the within-cell link.
+
+    For each host: the finite share of midday half-hours (10:00 to 15:00 local) for May to September
+    and for the other months, the share of the dullest CAMS third of midday half-hours that the
+    gaps mask, and the correlation of the farm series with the host's CAMS shape on finite daylight
+    midday half-hours, raw and after each series' mean in its cell of month and local half-hour is
+    removed (the link that the bright-minus-dull criterion of the farm contrasts depends on).
+    """
+    n_grid = len(farm)
+    calendar = grid_calendar_fields(n_grid=n_grid)
+    midday_all = (calendar.half_hour >= MIDDAY_FIRST) & (calendar.half_hour <= MIDDAY_LAST)
+    summer = np.isin(calendar.month, SUMMER_MONTHS)
+    detail: dict[str, dict] = {}
+    for host in HOST_KEYS:
+        series = HOST_SERIES[host]
+        y = panel_series(panel=panel, label=series, key="power")
+        pv = panel_series(panel=panel, label=series, key="pv_shape")
+        ghi = panel_series(panel=panel, label=series, key="ghi")
+        first, last = host_bounds(host=host)
+        span = np.zeros(n_grid, dtype=bool)
+        span[first:last] = True
+        base = span & midday_all & (np.nan_to_num(pv) > 0)
+        usable = span & np.isfinite(y) & ~calendar.clock_change_day
+        thirds = bright_dull_thirds(ghi=ghi, value=pv, calendar=calendar, rows=usable & midday_all)
+        dull = thirds == 0
+        finite = np.isfinite(farm)
+        both = base & finite
+        raw = float(np.corrcoef(farm[both], pv[both])[0, 1])
+        cell_farm = finite_cell_mean(value=farm, calendar=calendar, first=first, last=last)
+        cell_pv = cell_mean(value=np.nan_to_num(pv), calendar=calendar, first=first, last=last)
+        within = float(np.corrcoef((farm - cell_farm)[both], (pv - cell_pv)[both])[0, 1])
+        detail[host] = {
+            "midday_daylight_finite_summer": float(finite[base & summer].mean()),
+            "midday_daylight_finite_other": float(finite[base & ~summer].mean()),
+            "dullest_third_masked": float((~finite[dull]).mean()),
+            "brightest_third_masked": float((~finite[thirds == 2]).mean()),
+            "corr_raw": raw,
+            "corr_within_cell": within,
+        }
+        say(
+            f"  {host}: finite share of midday daylight half-hours, May to September "
+            f"{detail[host]['midday_daylight_finite_summer']:.3f}, other months "
+            f"{detail[host]['midday_daylight_finite_other']:.3f}; masked share of "
+            f"the dullest third {detail[host]['dullest_third_masked']:.3f}, of the brightest third "
+            f"{detail[host]['brightest_third_masked']:.3f}"
+        )
+        say(
+            f"  {host}: correlation of the farm series with the host's CAMS shape on finite midday "
+            f"daylight half-hours: raw {raw:.3f}, within cells {within:.3f}"
+        )
+    NUMBERS["farm_coverage_detail"] = detail
 
 
 # --------------------------------------------------------------------------- step 2: the gate
@@ -269,7 +345,7 @@ def step_2_gate(
                     y=y, total_mw=curve.pv_mw, first=max(first - 48 * 28, 0), last=last
                 )
                 rows = midday & in_span & np.isfinite(reading)
-                if shape == "farm":
+                if shape in ("farm", "smooth_farm"):
                     rows &= np.isfinite(farms[farm])
                 medians, counts = curve_medians(
                     reading=reading, shape_value=pv_shape, edges=reference["edges"], rows=rows
@@ -296,6 +372,7 @@ def step_2_gate(
                 "farm": passes["farm"],
                 "cams": passes["cams"],
                 "smooth": passes["farm"] or passes["cams"],
+                "smooth_farm": passes["farm"],
             }
     document = {
         "farm": farm,
@@ -505,11 +582,20 @@ def step_8_step4(*, frame: pl.DataFrame, panel: dict[int, dict]) -> None:
         n_days = len(np.unique(calendar.local_date[first:last][days]))
         months = np.bincount(calendar.month[first:last][days], minlength=13)[1:]
         drop = float(part["in_drop"].to_numpy()[days].mean()) if days.any() else float("nan")
-        design = DESIGN_SPELLS[era]
+        spells = EXPECTED_SPELLS[era]
         say(
-            f"  {era}: {len(lengths)} off-spells with {sum(lengths)} half-hours "
-            f"(the design counted {design[0]} and {design[1]}); {n_days} whole local days, "
-            f"{int(days.sum())} half-hours; share inside a drop {drop:.3f}"
+            f"  {era}: {len(lengths)} off-spells with {sum(lengths)} half-hours; {n_days} whole "
+            f"local days, {int(days.sum())} half-hours; share inside a drop {drop:.3f}"
+        )
+        check(
+            name=f"step 4 {era}: off-spell and half-hour counts are {spells}",
+            ok=(len(lengths), sum(lengths)) == spells,
+            detail=f"{(len(lengths), sum(lengths))}",
+        )
+        check(
+            name=f"step 4 {era}: whole local days are {EXPECTED_STEP4_DAYS[era]}",
+            ok=n_days == EXPECTED_STEP4_DAYS[era],
+            detail=str(n_days),
         )
         say(
             "    selected half-hours by calendar month: "
@@ -588,7 +674,9 @@ def gas_a_private() -> None:
 
 
 def main() -> None:
-    """Run the audit and write the printed report, `audit.json`, and `gate.json`."""
+    """Run the audit and write the printed report, `audit.json`, and (if it passed) `gate.json`."""
+    GATE_PATH.unlink(missing_ok=True)
+    AUDIT_PATH.unlink(missing_ok=True)
     panel = load_panel()
     frame = pl.read_parquet(E697_FRAME_D8)
     farms = step_1_data(panel=panel)
@@ -608,10 +696,10 @@ def main() -> None:
     say(f"failed checks: {FAILED or 'none'}")
     PRINTED_DIR.mkdir(parents=True, exist_ok=True)
     (PRINTED_DIR / "audit.txt").write_text("\n".join(LINES) + "\n")
-    write_json(path=GATE_PATH, payload=gate)
     write_json(path=AUDIT_PATH, payload={"numbers": NUMBERS, "failed": FAILED})
     if FAILED:
         sys.exit(1)
+    write_json(path=GATE_PATH, payload=gate)
 
 
 if __name__ == "__main__":

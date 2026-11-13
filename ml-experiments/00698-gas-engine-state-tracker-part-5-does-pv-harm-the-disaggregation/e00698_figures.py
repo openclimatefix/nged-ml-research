@@ -3,10 +3,10 @@ r"""Draw experiment 698's four published figures as SVG.
     uv run --no-sync python $E/00698-*/e00698_figures.py
 
 1. D8's solar-era curve of median reading by fifth of CAMS solar output, beside each host's and
-   capacity's curve for the three solar shapes and for no solar.
+   capacity's curve for the farm, CAMS, and CAMS smooth shapes and for no solar.
 2. The level contrast and the weather contrasts for the three criteria, with 95% intervals.
-3. Precision, recall, and F1 by local hour for the solar-free twin, the smooth twin, and the
-   farm run.
+3. Precision, recall, and F1 by local hour for the solar-free twin, the farm's smooth twin, and
+   the farm run.
 4. The three label-only checks of D8's labels by era, with and without experiment 159's drops.
 
 Figures show pooled scores and shares only. **No date, no year, and no Gas A or farm series appears
@@ -16,12 +16,13 @@ in any SVG.** The script writes each SVG, runs `npx svgo@4 --multipass --precisi
 """
 
 import re
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Final
 
 import altair as alt
-import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 from e00698_common import (  # ty: ignore[unresolved-import]
@@ -58,7 +59,8 @@ HOST_TITLES: Final[dict[str, str]] = {"d8pre": "D8 before the engine", "d3solar"
 SHAPE_NAMES: Final[dict[str, str]] = {
     "farm": "Farm output",
     "cams": "CAMS output",
-    "smooth": "Smooth twin",
+    "smooth": "CAMS smooth twin",
+    "smooth_farm": "Farm smooth twin",
     PV_FREE: "No solar",
     "reference": "D8, solar era",
 }
@@ -68,11 +70,12 @@ SHAPE_COLOURS: Final[dict[str, str]] = {
     "farm": ORANGE,
     "cams": SKY,
     "smooth": PURPLE,
+    "smooth_farm": PURPLE,
 }
 CONTRAST_NAMES: Final[dict[str, str]] = {
-    "level": "Level (smooth twin minus no solar)",
-    "weather_farm": "Weather, farm (farm minus smooth twin)",
-    "weather_cams": "Weather, CAMS (CAMS minus smooth twin)",
+    "level": "Level (CAMS smooth twin minus no solar)",
+    "weather_farm": "Weather, farm (farm minus farm smooth twin)",
+    "weather_cams": "Weather, CAMS (CAMS minus CAMS smooth twin)",
 }
 CONTRAST_COLOURS: Final[dict[str, str]] = {
     "level": BLUE,
@@ -96,12 +99,19 @@ CHECK_TITLES: Final[dict[str, str]] = {
 
 
 def save(*, chart: alt.TopLevelMixin, name: str, directory: Path = DOCS_DIR) -> Path:
-    """Write an SVG, optimise it with svgo, and refuse it if its text holds a year."""
+    """Write an SVG, optimise it with svgo, and move it into `directory` only if no year is in it.
+
+    The SVG is drawn in a scratch folder, so a refused figure leaves nothing in `directory`.
+    """
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{name}.svg"
-    chart.save(path)
-    subprocess.run([*SVGO, str(path)], check=True, capture_output=True)
-    assert_no_year(text=path.read_text(), name=path.name)
+    with tempfile.TemporaryDirectory() as scratch:
+        draft = Path(scratch) / path.name
+        chart.save(draft)
+        subprocess.run([*SVGO, str(draft)], check=True, capture_output=True)
+        assert_no_year(text=draft.read_text(), name=path.name)
+        path.unlink(missing_ok=True)
+        shutil.move(draft, path)
     print(f"wrote {path.name}", flush=True)
     return path
 
@@ -134,6 +144,8 @@ def figure_1(*, gate: dict, directory: Path = DOCS_DIR) -> Path:
                 (PV_FREE, i + 1, v) for i, v in enumerate(gate["curves"][host]["none"]["free"])
             ]
             for shape, doc in curves.items():
+                if shape == "smooth_farm":
+                    continue
                 rows += [(shape, i + 1, v) for i, v in enumerate(doc["medians"])]
             data = pl.DataFrame(
                 {
@@ -250,7 +262,7 @@ def figure_2(*, scores: dict, directory: Path = DOCS_DIR) -> Path:
 
 
 def figure_3(*, scores: dict, directory: Path = DOCS_DIR) -> Path | None:
-    """F3: precision, recall, and F1 by local hour for the free twin, smooth twin, and farm run."""
+    """F3: precision, recall, and F1 by local hour for no solar, the farm twin, and the farm."""
     doc = scores["hosts"].get("d8pre")
     if doc is None:
         return None
@@ -264,7 +276,11 @@ def figure_3(*, scores: dict, directory: Path = DOCS_DIR) -> Path | None:
     )
     if key is None:
         return None
-    runs = {PV_FREE: f"none_{PV_FREE}", "smooth": f"{key}_smooth", "farm": f"{key}_farm"}
+    runs = {
+        PV_FREE: f"none_{PV_FREE}",
+        "smooth_farm": f"{key}_smooth_farm",
+        "farm": f"{key}_farm",
+    }
     rows = []
     for shape, cell in runs.items():
         groups = doc["cells"][cell]["smooth"]["groups"]["hour"]
@@ -307,7 +323,7 @@ def figure_3(*, scores: dict, directory: Path = DOCS_DIR) -> Path | None:
                 "Tracker scores by local hour at D8 before the engine",
                 subtitle=[
                     f"Smoothed labels, 3 seeds of the injected engine, {int(key[1:]) / 10:.1f} MW.",
-                    "Higher is better. Lines: no solar, the smooth twin, and the farm's output.",
+                    "Higher is better. Lines: no solar, the farm's smooth twin, the farm's output.",
                 ],
             )
         )
@@ -383,7 +399,6 @@ def main() -> None:
     figure_2(scores=scores)
     figure_3(scores=scores)
     figure_4(audit=audit)
-    _ = np  # numpy is imported for the figures' callers
 
 
 if __name__ == "__main__":

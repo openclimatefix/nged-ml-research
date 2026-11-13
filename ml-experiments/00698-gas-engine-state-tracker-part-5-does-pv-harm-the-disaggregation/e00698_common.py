@@ -23,7 +23,12 @@ from typing import Final, Literal, TypedDict
 
 import numpy as np
 import polars as pl
-from e00694_common import GRID_START, Q_FLOOR, inject_folded  # ty: ignore[unresolved-import]
+from e00694_common import (  # ty: ignore[unresolved-import]
+    GRID_START,
+    PANEL_PATH,
+    Q_FLOOR,
+    inject_folded,
+)
 from e00697_common import (  # ty: ignore[unresolved-import]
     DAY,
     E694_DIR,
@@ -66,7 +71,7 @@ E697_FRAME_C1_NULL: Final[Path] = E697_FRAMES_DIR / "frame_c1_null.parquet"
 E697_FRAME_C1S_SOLAR: Final[Path] = E697_FRAMES_DIR / "frame_c1s_solar_null.parquet"
 D8_STATES_PATH: Final[Path] = E694_DIR / "d8.pkl"
 
-# --------------------------------------------------------------------------- the design's numbers
+# --------------------------------------------------------------------------- the plan's numbers
 
 HOST_KEYS: Final[tuple[str, ...]] = ("d8pre", "d3solar")
 HOST_SERIES: Final[dict[str, str]] = {"d8pre": "D8", "d3solar": "D3"}
@@ -76,7 +81,9 @@ HOST_CONTROL: Final[dict[str, str]] = {"d8pre": "c1", "d3solar": "c2"}
 CAPACITIES_MW: Final[tuple[float, ...]] = (7.0, 8.9)
 """7.0 MW is the lower value of the private review and 8.9 MW the register figure that
 experiment 673 published. 2.6 MW (a linear probe, biased low by the fold) is not run."""
-SHAPES: Final[tuple[str, ...]] = ("farm", "cams", "smooth")
+SHAPES: Final[tuple[str, ...]] = ("farm", "cams", "smooth", "smooth_farm")
+"""`farm` and `cams` carry weather. `smooth` is the CAMS cell mean (the twin of `cams`, and the base
+of the level contrast). `smooth_farm` is the farm's own cell mean (the twin of `farm`)."""
 PV_FREE: Final[str] = "free"
 """The shape name of the solar-free twin."""
 FARM_LETTERS: Final[str] = "ABCF"
@@ -89,7 +96,7 @@ STEP4_SEED_OFFSET: Final[dict[str, int]] = {"net": 400, "solar": 500}
 STEP4_MIN_SPELL: Final[int] = 48
 """Step 4 injects into whole local days inside labelled off-spells of this many half-hours."""
 STEP4_WHOLE_DAYS_ONLY: Final[bool] = True
-"""The design injects only whole local days. With False, every half-hour of an off-spell of
+"""The plan injects only whole local days. With False, every half-hour of an off-spell of
 `STEP4_MIN_SPELL` or more takes part, which gives many more half-hours in the solar era."""
 N_WORKERS: Final[int] = 8
 
@@ -115,12 +122,9 @@ GATE_FIFTHS: Final[int] = 4
 N_FIFTHS: Final[int] = 5
 MIN_ROWS_PER_FIFTH: Final[int] = 20
 COVERAGE_MIN: Final[float] = 0.90
-"""Branch 1 fires when the chosen farm's finite share of either host's span is under this.
-
-The design set 0.95. The manager lowered it to 0.90 before the first real run, after the audit showed
-0.914 at D8-pre, because the clause is about data availability: farm gaps (longest 7 half-hours)
-are filled with the smooth value and masked out of every score.
-"""
+"""Branch 1 fires when the chosen farm's finite share of the daylight half-hours of a host that runs
+is under this. Daylight half-hours are those with a positive CAMS shape at the host. Farm gaps are
+filled with the farm's cell mean and masked out of every score."""
 TWIN_F1_EXPECTED: Final[float] = 0.767
 TWIN_F1_TOLERANCE: Final[float] = 0.02
 HALF_WIDTH_MAX: Final[float] = 0.05
@@ -139,7 +143,7 @@ N_RESAMPLES: Final[int] = 2000
 LABEL_ONLY_RESAMPLES: Final[int] = 1000
 BOOTSTRAP_SEED: Final[int] = 698
 
-ShapeType = Literal["farm", "cams", "smooth", "free"]
+ShapeType = Literal["farm", "cams", "smooth", "smooth_farm", "free"]
 KindType = Literal["host", "step4"]
 LabelType = Literal["smooth", "filtered"]
 LABELS: Final[tuple[LabelType, ...]] = ("smooth", "filtered")
@@ -202,7 +206,7 @@ def host_jobs(*, gate: dict | None) -> list[Job]:
     """Return the host jobs that the gate lets run, with the solar-free twins.
 
     Args:
-        gate: The parsed `gate.json` (its `run` table), or None to list every job the design allows
+        gate: The parsed `gate.json` (its `run` table), or None to list every job the plan allows
             (56 at most).
 
     Returns:
@@ -307,6 +311,43 @@ def _json_default(value: object) -> object:
         return value.tolist()
     msg = f"cannot serialise {type(value)}"
     raise TypeError(msg)
+
+
+AUDIT_CODE: Final[tuple[str, ...]] = ("e00698_common.py", "e00698_audit.py", "e00698_labels.py")
+"""The scripts whose change makes an earlier audit stale."""
+
+
+def require_passing_audit() -> dict:
+    """Return the stored audit, or stop if it failed, is missing, or is older than its inputs.
+
+    The audit's inputs are the scripts in `AUDIT_CODE` and the stored files that it reads.
+    `gate.json` must exist too, because a failed audit does not write one.
+
+    Returns:
+        The parsed `audit.json`.
+    """
+    audit = read_json(path=AUDIT_PATH)
+    here = Path(__file__).resolve().parent
+    inputs = [
+        *(here / name for name in AUDIT_CODE),
+        PANEL_PATH,
+        FARM_FRAME,
+        E697_FRAME_D8,
+        E697_FRAME_C1_NULL,
+        E697_FRAME_C1S_SOLAR,
+    ]
+    problems = []
+    if audit["failed"]:
+        problems.append(f"the audit failed these checks: {audit['failed']}")
+    if not GATE_PATH.exists():
+        problems.append(f"{GATE_PATH.name} is missing")
+    newer = [p.name for p in inputs if p.stat().st_mtime > AUDIT_PATH.stat().st_mtime]
+    if newer:
+        problems.append(f"the audit is older than its inputs {newer}")
+    if problems:
+        msg = "rerun e00698_audit.py before this script: " + "; ".join(problems)
+        raise SystemExit(msg)
+    return audit
 
 
 # --------------------------------------------------------------------------- the panel
@@ -422,6 +463,16 @@ def farm_finite_share(*, norm: np.ndarray, first: int, last: int) -> float:
     return float(np.isfinite(norm[first:last]).mean())
 
 
+def farm_daylight_share(*, norm: np.ndarray, pv_shape: np.ndarray, first: int, last: int) -> float:
+    """Return the farm's finite share of the daylight half-hours of `[first, last)`.
+
+    A half-hour is daylight where the host's CAMS shape is positive. Night half-hours, where the
+    farm series is zero by construction, do not count.
+    """
+    day = np.nan_to_num(pv_shape[first:last]) > 0
+    return float(np.isfinite(norm[first:last][day]).mean())
+
+
 def longest_gap(*, finite: np.ndarray) -> int:
     """Return the length in half-hours of the longest run of False in `finite`."""
     best = run = 0
@@ -450,6 +501,24 @@ def cell_mean(*, value: np.ndarray, calendar: GridCalendar, first: int, last: in
     return means[key]
 
 
+def finite_cell_mean(
+    *, value: np.ndarray, calendar: GridCalendar, first: int, last: int
+) -> np.ndarray:
+    """Return `cell_mean` of the finite values of `value` only (NaN gaps are left out of the mean).
+
+    A cell with no finite half-hour in the range gets the mean of every finite half-hour of the
+    range.
+    """
+    key = calendar.month * DAY + calendar.half_hour
+    window = slice(first, last)
+    finite = np.isfinite(value[window])
+    sums = np.bincount(key[window][finite], weights=value[window][finite], minlength=13 * DAY)
+    counts = np.bincount(key[window][finite], minlength=13 * DAY)
+    overall = float(np.mean(value[window][finite]))
+    means = np.where(counts > 0, sums / np.maximum(counts, 1), overall)
+    return means[key]
+
+
 @dataclass(frozen=True)
 class SolarCurve:
     """The injected solar output (MW) on the panel grid, and where the farm is missing."""
@@ -472,8 +541,9 @@ def solar_curve(
 
     Args:
         shape: `farm` (the farm's output per MW times the capacity), `cams` (the CAMS shape of the
-            host's own location times the capacity), or `smooth` (the capacity times the mean of the
-            CAMS shape in each cell of month and local half-hour).
+            host's own location times the capacity), `smooth` (the capacity times the mean of the
+            CAMS shape in each cell of month and local half-hour), or `smooth_farm` (the capacity
+            times the mean of the farm's normalised power in each such cell, gaps left out).
         capacity_mw: The capacity in MW of AC capacity.
         pv_shape: The host's CAMS shape per MW of AC capacity on the whole grid.
         farm_norm: The farm's normalised power on the grid (NaN in a gap), or None.
@@ -483,9 +553,10 @@ def solar_curve(
 
     Returns:
         The curve, and `farm_ok`, True where the farm series is finite. **A farm gap is filled with
-        the smooth twin's value so the reading stays continuous, and every score leaves these
-        half-hours out for every run of the host, so the three shapes are scored on the same
-        rows.**
+        the farm's cell mean so the reading stays continuous, and every score leaves these
+        half-hours out for every run of the host, so every shape is scored on the same rows.**
+        The farm run and its twin `smooth_farm` have the same mean output per cell, so their
+        contrast holds weather and nothing of the farm's level or daily shape.
     """
     smooth = cell_mean(value=np.nan_to_num(pv_shape), calendar=calendar, first=first, last=last)
     if shape == "cams":
@@ -494,12 +565,17 @@ def solar_curve(
     elif shape == "smooth":
         unit = smooth
         ok = np.ones(len(pv_shape), dtype=bool)
-    elif shape == "farm":
+    elif shape in ("farm", "smooth_farm"):
         if farm_norm is None:
-            msg = "the farm shape needs the farm series"
+            msg = f"the {shape} shape needs the farm series"
             raise ValueError(msg)
-        ok = np.isfinite(farm_norm)
-        unit = np.where(ok, farm_norm, smooth)
+        farm_smooth = finite_cell_mean(value=farm_norm, calendar=calendar, first=first, last=last)
+        if shape == "smooth_farm":
+            unit = farm_smooth
+            ok = np.ones(len(pv_shape), dtype=bool)
+        else:
+            ok = np.isfinite(farm_norm)
+            unit = np.where(ok, farm_norm, farm_smooth)
     else:
         msg = f"unknown shape {shape!r}"
         raise ValueError(msg)

@@ -14,6 +14,7 @@ on synthetic statistics (every branch and step 4's one-way adjustment), the SVG 
 no committed file of this folder names a path under the maintainer's home folder.
 """
 
+import sys
 import tempfile
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from e00698_common import (  # ty: ignore[unresolved-import]
     PV_FREE,
     SHAPES,
     THRESHOLDS,
+    GridCalendar,
     Interval,
     bright_dull_thirds,
     capacity_key,
@@ -58,7 +60,7 @@ from e00698_common import (  # ty: ignore[unresolved-import]
     whole_day_rows,
 )
 from e00698_figures import assert_no_year  # ty: ignore[unresolved-import]
-from e00698_verdict import block_reasons, decide  # ty: ignore[unresolved-import]
+from e00698_verdict import VERDICT_WORDS, block_reasons, decide, running_coverage  # ty: ignore[unresolved-import]
 
 N_GRID = 48 * 800
 HOME_PREFIX = "/home" + "/jack"
@@ -110,35 +112,60 @@ def test_smooth_twin_is_the_cell_mean_and_carries_no_weather() -> None:
     )
 
 
-def test_farm_shape_fills_its_gaps_with_the_smooth_value_and_flags_them() -> None:
-    """A farm gap is filled so the reading stays continuous, and `farm_ok` marks it."""
-    calendar = grid_calendar_fields(n_grid=N_GRID)
+def farm_fixture(*, calendar: GridCalendar) -> tuple[np.ndarray, np.ndarray]:
+    """Return a CAMS shape and a farm series with another level and a flatter daily shape."""
     pv_shape = np.maximum(0.0, np.sin((calendar.half_hour - 12) / 48 * 2 * np.pi))
-    farm = pv_shape * 0.9
+    farm = 0.7 * np.maximum(0.0, np.sin((calendar.half_hour - 12) / 48 * 2 * np.pi)) ** 0.5
+    return pv_shape, farm
+
+
+def test_farm_shape_fills_its_gaps_with_its_own_cell_mean_and_flags_them() -> None:
+    """A farm gap is filled with the farm's cell mean, and `farm_ok` marks it."""
+    calendar = grid_calendar_fields(n_grid=N_GRID)
+    pv_shape, farm = farm_fixture(calendar=calendar)
     farm[1000:1010] = np.nan
-    farm_curve = solar_curve(
-        shape="farm",
-        capacity_mw=8.9,
-        pv_shape=pv_shape,
-        farm_norm=farm,
-        calendar=calendar,
-        first=0,
-        last=N_GRID,
-    )
-    smooth = solar_curve(
-        shape="smooth",
-        capacity_mw=8.9,
-        pv_shape=pv_shape,
-        farm_norm=None,
-        calendar=calendar,
-        first=0,
-        last=N_GRID,
-    )
+    kwargs = {
+        "capacity_mw": 8.9,
+        "pv_shape": pv_shape,
+        "farm_norm": farm,
+        "calendar": calendar,
+        "first": 0,
+        "last": N_GRID,
+    }
+    farm_curve = solar_curve(shape="farm", **kwargs)  # ty: ignore[invalid-argument-type]
+    twin = solar_curve(shape="smooth_farm", **kwargs)  # ty: ignore[invalid-argument-type]
     assert not farm_curve.farm_ok[1000:1010].any()
     assert farm_curve.farm_ok[:1000].all()
     assert np.all(np.isfinite(farm_curve.pv_mw))
-    assert np.allclose(farm_curve.pv_mw[1000:1010], smooth.pv_mw[1000:1010])
+    assert np.allclose(farm_curve.pv_mw[1000:1010], twin.pv_mw[1000:1010])
     assert np.allclose(farm_curve.pv_mw[:1000], 8.9 * farm[:1000])
+
+
+def test_farm_twin_shares_the_farm_level_and_not_the_cams_level() -> None:
+    """The farm run and `smooth_farm` have one mean per cell, so their contrast holds no level."""
+    calendar = grid_calendar_fields(n_grid=N_GRID)
+    pv_shape, farm = farm_fixture(calendar=calendar)
+    rng = np.random.default_rng(1)
+    farm = farm * rng.uniform(0.3, 1.2, size=N_GRID)
+    kwargs = {
+        "capacity_mw": 7.0,
+        "pv_shape": pv_shape,
+        "farm_norm": farm,
+        "calendar": calendar,
+        "first": 0,
+        "last": N_GRID,
+    }
+    farm_curve = solar_curve(shape="farm", **kwargs)  # ty: ignore[invalid-argument-type]
+    twin = solar_curve(shape="smooth_farm", **kwargs)  # ty: ignore[invalid-argument-type]
+    cams_twin = solar_curve(shape="smooth", **kwargs)  # ty: ignore[invalid-argument-type]
+    assert np.isclose(farm_curve.pv_mw.sum(), twin.pv_mw.sum())
+    key = calendar.month * 48 + calendar.half_hour
+    for k in np.unique(key)[:30]:
+        cell = key == k
+        assert np.isclose(farm_curve.pv_mw[cell].mean(), twin.pv_mw[cell].mean())
+    # The CAMS twin has another level and shape, so a contrast against it would mix them in.
+    assert abs(farm_curve.pv_mw.sum() - cams_twin.pv_mw.sum()) > 0.1 * farm_curve.pv_mw.sum()
+    assert np.ptp(twin.pv_mw[key == key[500]]) < 1e-12
 
 
 def test_fold_is_applied_once_on_the_sum() -> None:
@@ -358,14 +385,14 @@ def test_off_spells_and_whole_days() -> None:
 
 
 def test_job_lists_and_seed_recipe() -> None:
-    """The design allows 56 host jobs and 10 step 4 jobs, and seeds follow experiment 697."""
+    """The plan allows 72 host jobs and 10 step 4 jobs, and seeds follow experiment 697."""
     every = host_jobs(gate=None)
-    assert len(every) == 56
-    assert len({j.name for j in every}) == 56
+    assert len(every) == 72
+    assert len({j.name for j in every}) == 72
     assert len(step4_jobs()) == 10
     twins = [j for j in every if j.shape == PV_FREE]
     assert len(twins) == 2 * (N_SEEDS + 1)
-    assert sum(j.seed is None for j in every) == 14
+    assert sum(j.seed is None for j in every) == 18
     assert (
         host_job_name(host="d8pre", capacity_mw=8.9, shape="farm", seed=None) == "d8pre_c89_farm_sn"
     )
@@ -377,22 +404,25 @@ def test_job_lists_and_seed_recipe() -> None:
     assert [engine_seed(host="d3solar", seed=s) for s in range(2)] == [200, 201]
     gate = {
         "run": {
-            host: {
-                capacity_key(capacity_mw=c): {"farm": False, "cams": False, "smooth": False}
-                for c in CAPACITIES_MW
-            }
+            host: {capacity_key(capacity_mw=c): dict.fromkeys(SHAPES, False) for c in CAPACITIES_MW}
             for host in HOST_KEYS
         }
     }
-    gate["run"]["d8pre"]["c70"] = {"farm": True, "cams": False, "smooth": True}
+    gate["run"]["d8pre"]["c70"] = {
+        "farm": True,
+        "cams": False,
+        "smooth": True,
+        "smooth_farm": True,
+    }
     listed = host_jobs(gate=gate)
     assert {j.host for j in listed} == {"d8pre"}
     assert {(j.capacity_mw, j.shape) for j in listed} == {
         (None, PV_FREE),
         (7.0, "farm"),
         (7.0, "smooth"),
+        (7.0, "smooth_farm"),
     }
-    assert len(listed) == 3 * (N_SEEDS + 1)
+    assert len(listed) == 4 * (N_SEEDS + 1)
 
 
 # --------------------------------------------------------------------------- the verdict
@@ -427,16 +457,11 @@ def synthetic_gate(
 ) -> dict:
     """Return a gate in which the farm and CAMS shapes pass as given for D8 and D3."""
     keys = [capacity_key(capacity_mw=c) for c in CAPACITIES_MW]
-    return {
-        "gate": {
-            "d8pre": {
-                k: {"farm": ok, "cams": ok, "smooth": ok} for k, ok in zip(keys, d8, strict=True)
-            },
-            "d3solar": {
-                k: {"farm": ok, "cams": ok, "smooth": ok} for k, ok in zip(keys, d3, strict=True)
-            },
-        }
+    table = {
+        "d8pre": {k: dict.fromkeys(SHAPES, ok) for k, ok in zip(keys, d8, strict=True)},
+        "d3solar": {k: dict.fromkeys(SHAPES, ok) for k, ok in zip(keys, d3, strict=True)},
     }
+    return {"gate": table, "run": table}
 
 
 def synthetic_scores(
@@ -488,6 +513,16 @@ def test_verdict_branch_1_blocks_the_test() -> None:
     reasons = block_reasons(gate=synthetic_gate(), scores=wide_scores, coverage=0.99)
     assert len(reasons) == 1
     assert "half-width" in reasons[0]
+    # Only the farm weather contrast's F1 width counts: wide CAMS and level contrasts do not block.
+    cams_wide = synthetic_scores(d8_farm=(HARM, HARM), d8_cams=(wide, wide), d3_farm=(HARM, HARM))
+    assert word(gate=synthetic_gate(), scores=cams_wide) == "supported"
+    cams_wide["hosts"]["d8pre"]["contrasts"]["c70"]["level"] = {"smooth": wide}
+    assert word(gate=synthetic_gate(), scores=cams_wide) == "supported"
+    # The coverage clause reads the hosts that run, on daylight half-hours.
+    gate = synthetic_gate(d3=(False, False))
+    audit = {"numbers": {"farm_finite_share_daylight": {"d8pre": 0.93, "d3solar": 0.5}}}
+    assert running_coverage(gate=gate, audit=audit) == 0.93
+    assert running_coverage(gate=synthetic_gate(), audit=audit) == 0.5
 
 
 def test_verdict_branches_2_to_5() -> None:
@@ -583,6 +618,45 @@ def test_svg_year_guard() -> None:
         raise AssertionError(msg)
 
 
+def test_score_refuses_a_job_made_with_another_farm() -> None:
+    """A stored host job that records another farm, or none, stops the scoring."""
+    import e00698_score as score
+
+    saved = score.JOBS_DIR
+    with tempfile.TemporaryDirectory() as folder:
+        score.JOBS_DIR = Path(folder)
+        np.savez_compressed(Path(folder) / "d8pre_none_free_s0.npz", farm="A", g=np.zeros(3))
+        np.savez_compressed(Path(folder) / "step4_net_s0.npz", g=np.zeros(3))
+        score.check_job_farms(farm="A")
+        for wrong in ("B", None):
+            if wrong is None:
+                np.savez_compressed(Path(folder) / "d8pre_none_free_s1.npz", g=np.zeros(3))
+            try:
+                score.check_job_farms(farm=wrong or "A")
+            except SystemExit:
+                continue
+            msg = "a job with the wrong farm was accepted"
+            raise AssertionError(msg)
+    score.JOBS_DIR = saved
+
+
+def test_jobs_script_refuses_ignore_gate_for_a_real_run() -> None:
+    """`--ignore-gate` without `--list` or `--time-one` is an error and writes nothing."""
+    import e00698_jobs as jobs
+
+    saved = sys.argv
+    sys.argv = ["e00698_jobs.py", "--ignore-gate"]
+    try:
+        jobs.main()
+    except SystemExit as error:
+        code = error.code
+    else:
+        code = None
+    finally:
+        sys.argv = saved
+    assert code == 2, "--ignore-gate alone must be refused"
+
+
 def test_no_committed_file_names_a_home_path() -> None:
     """No script of this folder names a path under the maintainer's home folder."""
     folder = Path(__file__).resolve().parent
@@ -644,17 +718,11 @@ def test_end_to_end_on_fake_runs_when_the_panel_is_stored() -> None:
     panel = load_panel()
     gate = {
         "run": {
-            host: {
-                capacity_key(capacity_mw=c): {"farm": True, "cams": True, "smooth": True}
-                for c in CAPACITIES_MW
-            }
+            host: {capacity_key(capacity_mw=c): dict.fromkeys(SHAPES, True) for c in CAPACITIES_MW}
             for host in HOST_KEYS
         },
         "gate": {
-            host: {
-                capacity_key(capacity_mw=c): {"farm": True, "cams": True, "smooth": True}
-                for c in CAPACITIES_MW
-            }
+            host: {capacity_key(capacity_mw=c): dict.fromkeys(SHAPES, True) for c in CAPACITIES_MW}
             for host in HOST_KEYS
         },
     }
@@ -697,13 +765,7 @@ def test_end_to_end_on_fake_runs_when_the_panel_is_stored() -> None:
         score.print_half_widths(scores=scores)
         score.print_scores(scores=scores)
         word_, notes = decide(gate=gate, scores=scores, coverage=0.99)
-        assert word_ in {
-            "inconclusive",
-            "supported",
-            "partly supported",
-            "refuted",
-            "not supported",
-        }
+        assert word_ in VERDICT_WORDS
         assert notes
         directory = Path(folder) / "figures"
         gate_doc = {
