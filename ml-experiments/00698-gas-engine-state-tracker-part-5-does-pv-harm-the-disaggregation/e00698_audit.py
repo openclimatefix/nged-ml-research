@@ -504,6 +504,9 @@ def lag_correlations(
         pv: The CAMS shape.
         valid: Where both series may be used.
         hourly: Whether to use hourly sums.
+
+    Returns:
+        The correlation at each lag in `LAGS`, in the order of `LAGS`.
     """
     xs = np.where(valid, x, np.nan)
     ps = np.where(valid, pv, np.nan)

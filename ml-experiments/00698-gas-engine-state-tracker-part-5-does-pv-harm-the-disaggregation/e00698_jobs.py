@@ -105,6 +105,9 @@ def init(*, farm: str) -> None:
 def run_host_job(*, job: Job) -> dict[str, np.ndarray | float | int | str]:
     """Inject solar and engine into a host's reading and track the span.
 
+    Args:
+        job: The host run to carry out: the host, the solar shape and capacity, and the engine.
+
     Returns:
         The arrays of the job's file: `farm` (the farm's letter), `shape`, `capacity_mw`, `y` (the
         reading), `g` (the engine's output, MW), `pv` (the solar output, MW), `signed` (the signed

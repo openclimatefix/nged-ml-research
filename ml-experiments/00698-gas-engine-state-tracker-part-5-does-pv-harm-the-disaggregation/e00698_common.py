@@ -734,6 +734,9 @@ def score_columns(
         flag: Whether the tracker's label says 1 or more units.
         zero: Whether the injected output is exactly zero (`truth_mw` = 0).
         third: The bright-or-dull third of each row (2 bright, 0 dull, -1 neither).
+
+    Returns:
+        The row-level columns, one row per input row and one column per entry of `SCORE_COLUMNS`.
     """
     t = np.asarray(truth1, dtype=bool)
     f = np.asarray(flag, dtype=bool)
@@ -751,6 +754,9 @@ def criterion_value(*, sums: np.ndarray, criterion: str) -> np.ndarray:
     Args:
         sums: Sums of `SCORE_COLUMNS` with the columns on the last axis (any leading axes).
         criterion: `f1`, `false_flag`, or `bmd`.
+
+    Returns:
+        The criterion's value for each leading-axis entry of `sums`.
     """
     if criterion == "f1":
         tp, fp, fn = sums[..., 0], sums[..., 1], sums[..., 2]
@@ -781,6 +787,9 @@ def week_table(*, week: np.ndarray, columns: np.ndarray, weeks: np.ndarray) -> n
         columns: Row-level quantities, shape (rows, columns).
         weeks: The sorted unique week numbers of the host's scored rows. A week with no row in this
             run gets zeros, so every run of a host shares one table layout.
+
+    Returns:
+        The per-week sums of each column, one row per week in `weeks`.
     """
     position = np.searchsorted(weeks, week)
     position = np.clip(position, 0, len(weeks) - 1)
@@ -896,6 +905,9 @@ def whole_day_rows(*, rows: np.ndarray, local_date: np.ndarray, observed: np.nda
         rows: A boolean mask, such as the rows inside off-spells.
         local_date: The local date of each row, as a number.
         observed: Whether each row's reading is present.
+
+    Returns:
+        A boolean mask over all rows that is true for the rows of those whole dates.
     """
     dates, inverse = np.unique(local_date, return_inverse=True)
     total = np.bincount(inverse, minlength=len(dates))
