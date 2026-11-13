@@ -12,7 +12,8 @@ r"""Draw experiment 698's four published figures as SVG.
 Figures show pooled scores and shares only. **No date, no year, and no Gas A or farm series appears
 in any SVG.** The script writes each SVG, runs `npx svgo@4 --multipass --precision=1
 --final-newline` over it, and stops if any SVG text holds a four-digit year. Every mark sets
-`aria=False`. Colours are the five main colours of `plotting.ocf_theme`, set explicitly.
+`aria=False`. Series colours are the five main colours of `plotting.ocf_theme`, set explicitly. The
+zero line and the threshold line use the theme's grey `ENSEMBLE_LINE`.
 """
 
 import re
@@ -48,6 +49,8 @@ ORANGE: Final[str] = ocf.BRAND_ORANGE
 SKY: Final[str] = ocf.DATA_SKY
 PURPLE: Final[str] = ocf.DATA_PURPLE
 GREEN: Final[str] = ocf.DATA_GREEN
+GREY: Final[str] = ocf.ENSEMBLE_LINE
+"""The theme's grey, for the zero line and the threshold line."""
 TEXT_NODE: Final = re.compile(r">([^<>]+)<")
 """The text between SVG tags: axis labels, titles, and legend entries."""
 ARIA_LABEL: Final = re.compile(r'aria-label="([^"]*)"')
@@ -235,13 +238,11 @@ def figure_2(*, scores: dict, directory: Path = DOCS_DIR) -> Path:
             color=alt.Color("contrast:N", scale=scale, legend=None),
         )
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}))
-            .mark_rule(aria=False, color="#888888")
-            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+            alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(aria=False, color=GREY).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         )
         threshold = (
             alt.Chart(pl.DataFrame({"x": [THRESHOLDS[criterion]]}))  # ty: ignore[unresolved-attribute]
-            .mark_rule(aria=False, strokeDash=[4, 3], color="#888888")
+            .mark_rule(aria=False, strokeDash=[4, 3], color=GREY)
             .encode(x="x:Q")
         )
         panels.append((marks + points + zero + threshold).properties(width=WIDTH - 220, height=110))

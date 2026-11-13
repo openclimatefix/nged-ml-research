@@ -1,8 +1,7 @@
 # Gross-demand simulation: research plan
 
-**One experiment in this theme is planned (experiment 698, a diagnostic of solar generation behind
-D8's meter), and the options below are queued for the maintainer to choose.** The project is not
-starting further experiments unprompted. The reasoning is on
+**No experiment in this theme is planned, and the options below are queued for the maintainer to
+choose.** The project is not starting further experiments unprompted. The reasoning is on
 [the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how to
 propose the simulator to NGED, with phases as options, is on
 [Options for proposing the simulator to NGED](proposal-to-nged-options.md). The latest finished
@@ -31,7 +30,6 @@ pre-training, tested at the host first.
 | 4. Long-horizon scenario calibration | Issued a month ahead, are the scenarios' tail quantiles calibrated, and narrower than a block bootstrap of the Primary's own history? | Medium to high | Options 1 to 3 |
 | 5. Days-1-to-10 what-if for a dormant generator | Does a simulated turn-on reproduce a known start or stop within 30% (a proposed threshold)? | Medium | Option 3 |
 | 6. Language-model loop on the register match and the simulator (an idea) | Does a large language model (LLM) that matches Primary signals to the registers and edits the simulator's assets, parameters, and operating profiles recover the known answers better than the plain register-constrained fit? | Unknown; the loop would add LLM calls to the CPU-only fits of option 1 | Option 1 first: the plain fit and its known-answer test must exist before the loop has anything to be compared against |
-| 7. Solar behind D8 and the tracker (planned as [experiment 698](../../00698-gas-engine-state-tracker-part-5-does-pv-harm-the-disaggregation/result.md)) | Does the weather-driven variation of solar output behind D8's meter make the tracker's labels of the gas engine worse, beyond the lower level of the reading and the fold? | CPU only; about 1 hour | Experiment 697's controls and the stored panel |
 
 ## Option 6 in detail: a language-model loop
 
