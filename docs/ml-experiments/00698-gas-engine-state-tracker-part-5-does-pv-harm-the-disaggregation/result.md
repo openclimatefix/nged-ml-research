@@ -48,7 +48,8 @@ decision_rule: >-
   applies, because no forecast is scored and no production code changes.
 benchmark: none (no forecast is scored)
 row_set_id: none
-metric: F1, precision, recall, false-flag share, and bright-minus-dull flagged share, from 10:00 to 15:00 local time
+metric: >-
+  F1, precision, recall, false-flag share, and bright-minus-dull flagged share, 10:00 to 15:00 local
 code: ml-experiments/00698-gas-engine-state-tracker-part-5-does-pv-harm-the-disaggregation/
 ---
 

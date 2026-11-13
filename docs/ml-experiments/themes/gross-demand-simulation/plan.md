@@ -1,7 +1,8 @@
 # Gross-demand simulation: research plan
 
-**One experiment in this theme is planned (experiment 698, a diagnostic of solar generation behind D8's
-meter), and the options below are queued for the maintainer to choose.** The project is not starting further experiments unprompted. The reasoning is on
+**One experiment in this theme is planned (experiment 698, a diagnostic of solar generation behind
+D8's meter), and the options below are queued for the maintainer to choose.** The project is not
+starting further experiments unprompted. The reasoning is on
 [the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how to
 propose the simulator to NGED, with phases as options, is on
 [Options for proposing the simulator to NGED](proposal-to-nged-options.md). The latest finished
