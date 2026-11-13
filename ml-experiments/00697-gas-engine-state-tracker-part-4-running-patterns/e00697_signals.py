@@ -13,9 +13,9 @@ that the control lacks is a coincidence of timing and is not read as a cause. In
 engine's holding of a STOR or Capacity Market agreement is unknown, so a match with a STOR window is
 only a coincidence of timing.
 
-Capacity Market notices and system warnings are a descriptive panel with only a handful of
-notice days, so its intervals are wide. The page describes the engine only as a gas engine with a
-long-term capacity contract, and says that no evidence of combined heat and power was found.
+Capacity Market notices and system warnings form a descriptive panel with few notice days, so
+the panel's intervals are wide, and groups under 20 days are not drawn. The page describes the
+engine only as a gas engine with a long-term capacity contract.
 
 The figure holds no date, no unit name, and no series. Numbers go to `printed/signals_checks.txt`.
 """
@@ -23,7 +23,6 @@ The figure holds no date, no unit name, and no series. Numbers go to `printed/si
 from typing import Final
 
 import altair as alt
-import numpy as np
 import polars as pl
 from e00697_analysis import (  # ty: ignore[unresolved-import]
     cell_bins,
@@ -175,7 +174,10 @@ def third_rows(*, series: dict[str, pl.DataFrame]) -> pl.DataFrame:
 
 
 def event_rows(*, series: dict[str, pl.DataFrame]) -> pl.DataFrame:
-    """Return weekday evening running shares by STOR window, warning day, and holiday source."""
+    """Return weekday evening running shares by STOR window, warning day, and bank holiday.
+
+    The warning-day and bank-holiday groups hold under 20 days, so the floor drops them.
+    """
     rows = []
     for key, view in series.items():
         evening = usable(frame=view).filter(
@@ -189,9 +191,7 @@ def event_rows(*, series: dict[str, pl.DataFrame]) -> pl.DataFrame:
                 ~pl.col("in_stor_window_2").fill_null(value=True)
             ),
             "System warning day": evening.filter(pl.col("warned_day")),
-            "No warning": evening.filter(~pl.col("warned_day")),
             "Bank holiday (gov.uk)": evening.filter(pl.col("gov_bank_holiday")),
-            "Not a bank holiday": evening.filter(~pl.col("gov_bank_holiday")),
         }
         rows.extend(
             {
@@ -201,8 +201,7 @@ def event_rows(*, series: dict[str, pl.DataFrame]) -> pl.DataFrame:
                 "days": group["local_date"].n_unique(),
             }
             for name, group in groups.items()
-            if group.height
-            and (name == "System warning day" or group["local_date"].n_unique() >= MIN_DAYS_PER_BIN)
+            if group.height and group["local_date"].n_unique() >= MIN_DAYS_PER_BIN
         )
     return pl.DataFrame(rows)
 
@@ -233,9 +232,23 @@ def checks(*, frames: dict[str, pl.DataFrame]) -> list[str]:
         f"in both {len(ours & gov & window)}"
     )
     lines.append(
-        f"weekday evening half-hours inside STOR window 2 for the frame: "
-        f"{frames['d8']['in_stor_window_2'].fill_null(value=False).mean():.3f} of all half-hours"
+        "share of all D8 half-hours inside STOR window 2: "
+        f"{frames['d8']['in_stor_window_2'].fill_null(value=False).mean():.3f}"
     )
+    for era in ("net", "solar"):
+        evening = frames["d8"].filter(
+            pl.col("era") == era,
+            ~pl.col("weekend"),
+            pl.col("local_half_hour").is_between(EVENING_FIRST, EVENING_LAST),
+            pl.col("observed"),
+        )
+        lines.append(
+            f"{era} era weekday evenings: "
+            f"{evening.filter(pl.col('warned_day'))['local_date'].n_unique()} system warning days "
+            f"({evening.filter(pl.col('warned_day')).height} half-hours), "
+            f"{evening.filter(pl.col('gov_bank_holiday'))['local_date'].n_unique()} gov.uk bank "
+            "holidays; groups under 20 days are not drawn in G10"
+        )
     return lines
 
 
@@ -295,13 +308,16 @@ def main() -> None:
     }
     lines = checks(frames=frames)
     series = views(frames=frames)
+    lines.append("G9 values: running share in the top third minus the bottom third of each signal")
+    lines.extend(
+        f"  {row['signal']}, {row['series']}: {row['difference']:+.3f} "
+        f"[{row['lo']:+.3f}, {row['hi']:+.3f}]"
+        for row in third_rows(series=series).iter_rows(named=True)
+    )
     PRINTED_DIR.mkdir(parents=True, exist_ok=True)
     (PRINTED_DIR / "signals_checks.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     figures(series=series)
-    print(
-        f"{np.count_nonzero(frames['d8']['warned_day'].to_numpy())} half-hours fall on warning days"
-    )
 
 
 if __name__ == "__main__":

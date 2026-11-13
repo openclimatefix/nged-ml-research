@@ -9,8 +9,8 @@ This module copies `drive_series` of `e00695_engine.py` and changes it to cut an
 Experiment 695 cut whole UTC days of the end stamps, which puts the same half-hour of the day in
 two different local days across a clock change. Here a target half-hour takes the record's output
 at the same clock reading, so the injected engine keeps one local-time profile all year. A local
-day with 46 or 50 half-hours reads the record's 48 clock readings and repeats or skips the hour
-that the clock change repeats or skips.
+day with 46 or 50 half-hours reads the record's 48 clock readings and skips or repeats the hour
+that the clock change skips or repeats.
 
 **Two kinds of truth.** The `null` truth draws days ignoring the weekday, so the injected engine
 has no weekday pattern, no season, no link between days, and no link to weather or price except

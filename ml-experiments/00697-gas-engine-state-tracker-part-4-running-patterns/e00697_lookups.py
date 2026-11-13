@@ -1,8 +1,8 @@
-r"""A small open lookup near D8: EAC reserve and response auction results by post code.
+r"""A small open lookup near D8: NESO Enduring Auction Capability (EAC) results by post code.
 
     uv run --no-sync python $E/00697-*/e00697_lookups.py
 
-Both are descriptive context. **A match is a match on location and technology, never a confirmed
+The lookup is descriptive context. **A match is on location and technology, never a confirmed
 identity**, and the matching rows are written only into the private data folder
 (`lookups/`), never printed in full and never put in `result.md` with a name, an exact post code,
 or a unit identifier. The script prints counts only.
@@ -13,12 +13,11 @@ script sends only public post codes (those listed in the EAC results) to `postco
 their coordinates, then measures the distance to D8 on this machine.
 
 The steps are: (1) read D8's area centre from `NGED/metadata.parquet` through the panel key, which
-is the `time_series_id`; (2) ask NESO's SQL endpoint for the row count per post code and service
-of the gas reciprocating
-engines in the EAC results, a query that names only the technology; (3) geocode the post codes
-here; (4) keep those within `RADIUS_KM`; (5) write the matching counts to the private folder and
-print their total. A Capacity Market register
-lookup is not made, because a private dossier already answers it.
+is the `time_series_id`; (2) ask NESO's SQL endpoint for the row count per post code and service of
+the gas reciprocating engines in the EAC results, a query that names only the technology; (3)
+geocode the post codes here; (4) keep those within `RADIUS_KM`; (5) write the matching counts to the
+private folder and print their total. A Capacity Market register lookup is not made, because a
+private dossier already answers it.
 """
 
 from math import asin, cos, radians, sin, sqrt

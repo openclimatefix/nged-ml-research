@@ -2,8 +2,9 @@
 
 Every loader returns a table keyed on the **start** of its period, so a join with a power-derived
 half-hour start needs no further shift. The system-price, wind, and gas loaders copy the private
-`predictability_work/data.py` of the engine-state follow-on, with the changes the design asks for.
-Nothing here reads a power stamp.
+`predictability_work/data.py` of the engine-state follow-on (a private file), with the changes that
+the design specifies. The drops are experiment 159's multi-day demand drops. Nothing here reads a
+power stamp.
 """
 
 from datetime import date

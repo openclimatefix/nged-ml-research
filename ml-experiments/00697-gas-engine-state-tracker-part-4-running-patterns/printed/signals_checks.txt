@@ -1,3 +1,29 @@
 APX within-day index against the held N2EX day-ahead price, 14540 overlapping half-hours: median absolute difference 7.42, share within 0.05 GBP per MWh 0.004. The held table is NESO's N2EX hourly day-ahead price, not the APX half-hourly index, so the two are not expected to match.
 bank holidays in the frame's dates: package 23, gov.uk 23, in both 23
-weekday evening half-hours inside STOR window 2 for the frame: 0.179 of all half-hours
+share of all D8 half-hours inside STOR window 2: 0.179
+net era weekday evenings: 5 system warning days (30 half-hours), 11 gov.uk bank holidays; groups under 20 days are not drawn in G10
+solar era weekday evenings: 0 system warning days (0 half-hours), 8 gov.uk bank holidays; groups under 20 days are not drawn in G10
+G9 values: running share in the top third minus the bottom third of each signal
+  Within-day price (APX index), D8 net era: +0.352 [+0.317, +0.387]
+  Within-day price (APX index), D8 solar era: +0.278 [+0.219, +0.335]
+  Within-day price (APX index), Null control on host series: -0.009 [-0.018, +0.001]
+  Forecast imbalance (same-day vintage), D8 net era: -0.096 [-0.131, -0.061]
+  Forecast imbalance (same-day vintage), D8 solar era: -0.082 [-0.134, -0.026]
+  Forecast imbalance (same-day vintage), Null control on host series: +0.005 [-0.004, +0.014]
+  National demand, D8 net era: +0.149 [+0.115, +0.183]
+  National demand, D8 solar era: +0.156 [+0.080, +0.228]
+  National demand, Null control on host series: -0.004 [-0.014, +0.006]
+  Embedded wind, D8 net era: -0.140 [-0.179, -0.098]
+  Embedded wind, D8 solar era: -0.154 [-0.211, -0.094]
+  Embedded wind, Null control on host series: +0.010 [-0.001, +0.021]
+  Embedded solar, D8 net era: -0.154 [-0.205, -0.101]
+  Embedded solar, D8 solar era: -0.019 [-0.099, +0.056]
+  Embedded solar, Null control on host series: -0.001 [-0.011, +0.010]
+  Transmission wind (first year), D8 net era: -0.135 [-0.192, -0.076]
+  Transmission wind (first year), Null control on host series: -0.000 [-0.019, +0.019]
+  Carbon intensity, D8 net era: +0.189 [+0.151, +0.224]
+  Carbon intensity, D8 solar era: +0.188 [+0.125, +0.248]
+  Carbon intensity, Null control on host series: -0.007 [-0.017, +0.004]
+  Day-ahead forecast peak demand, D8 net era: +0.113 [+0.074, +0.152]
+  Day-ahead forecast peak demand, D8 solar era: +0.102 [+0.029, +0.176]
+  Day-ahead forecast peak demand, Null control on host series: -0.007 [-0.019, +0.005]

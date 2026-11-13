@@ -6,8 +6,9 @@ Every question takes a view and a seed and returns an `Estimate` (or None when a
 than `MIN_DAYS_PER_BIN` distinct local days). Intervals resample whole ISO weeks of local dates, and
 a spell belongs to the week in which it starts.
 
-Gas A's frame is passed through the same functions with `min_days=0`: its intervals are rough, they
-decide nothing, and a bin of 12 weekend days is below the 20-day floor that tests need.
+Gas A's frame is passed through the same functions with `min_days=0`: its intervals are rough
+and decide nothing. A bin of 12 weekend days is below the 20-day floor that the verdict's
+statistical tests need.
 """
 
 import zlib

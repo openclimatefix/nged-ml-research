@@ -398,10 +398,10 @@ def step_6_to_9(*, tables: DriverTables) -> None:
     say(f"  {len([d for d in found if d.year in (2024, 2025)])} bank holidays in 2024 and 2025")
     say("9. Red band")
     say(
-        "  Weekdays 16:00 to 19:00 local, from the private note `predictability.md` of the "
-        "engine-state follow-on. No charging statement is stored and no download is allowed, "
-        "so whether the band "
-        "applies on bank holidays is not checked."
+        "  Weekdays 16:00 to 19:00 local, from NGED's Statements of Use of System Charges for "
+        "2023-24, 2024-25, and 2025-26 (D8's licence area is EMids). The 2025-26 statement counts "
+        "bank holidays as weekdays, and the two earlier statements do not mention them. The "
+        "statements are not stored with the code, so the hours are not checked against them here."
     )
     d8_probe = add_drivers(
         frame=add_local_fields(

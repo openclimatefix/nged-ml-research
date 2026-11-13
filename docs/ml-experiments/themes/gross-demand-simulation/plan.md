@@ -8,11 +8,11 @@ propose the simulator to NGED, with phases as options, is on
 experiment,
 [experiment 697 (running patterns of the D8 gas engine)](../../00697-gas-engine-state-tracker-part-4-running-patterns/result.md),
 found that the tracker's labels of D8's gas engine show a higher running share on weekday evenings
-than on weekends (+0.392 in the net era and +0.256 in the solar era), by more than six null
-controls with an injected engine produce, and that the running share rises with the half-hourly
-price. The evidence comes from the tracker and not from a meter on the engine, so option 3 below
-treats both as targets to test against the one metered engine record. The experiment before it,
-[experiment 696 (engine state in the pre-training mixer)](../../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md),
+than on weekends (+0.392 in the net era and +0.256 in the solar era). Six null controls, each a real
+reading with a patternless engine injected, produce a smaller difference. The running share also
+rises with the half-hourly system price. The evidence comes from the tracker and not from a meter on
+the engine, so option 3 below could test both findings against the one metered engine record.
+[Experiment 696 (engine state in the pre-training mixer)](../../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md),
 found that telling the neural network about D8's gas-engine state during pre-training only did not
 change the forecast error (+0.009 means no change, in points of capacity; positive is worse). A
 post hoc split at a host substation with a recorded engine added showed a gain when the engine was

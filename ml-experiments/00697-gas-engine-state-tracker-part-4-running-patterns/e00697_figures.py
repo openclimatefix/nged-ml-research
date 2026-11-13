@@ -586,10 +586,6 @@ def gallery_3(*, frames: dict[str, pl.DataFrame]) -> None:
             "In the red band": weekday.filter(red),
             "Six dearest, not in band": weekday.filter(pl.col("dearest_six"), ~red),
             "Other weekday half-hours": weekday.filter(~pl.col("dearest_six"), ~red),
-            "Bank holiday, red band": weekday.filter(red, pl.col("bank_holiday")),
-            "Ordinary day, red band": weekday.filter(
-                red, ~pl.col("bank_holiday"), ~pl.col("christmas_week")
-            ),
         }
         for name, group in groups.items():
             band_rows.append(
@@ -712,7 +708,11 @@ def gallery_5(*, frames: dict[str, pl.DataFrame]) -> None:
 
 
 def gallery_6(*, frames: dict[str, pl.DataFrame]) -> None:
-    """G6: evening share on bank holidays, in Christmas week, and on clock-change days."""
+    """G6: the number of days in each holiday and clock-change group, against the 20-day floor.
+
+    Every group but ordinary weekdays holds fewer than 20 days, so no share is drawn: a share from a
+    few days is not read. The figure shows the counts.
+    """
     rows = []
     for era in ("net", "solar"):
         view = view_of(frame=frames["d8"], column="ts", era=era)
@@ -730,30 +730,33 @@ def gallery_6(*, frames: dict[str, pl.DataFrame]) -> None:
             "Christmas week": evening.filter(pl.col("christmas_week")),
             "Clock-change days": evening.filter(pl.col("clock_change_day")),
         }
-        for name, group in groups.items():
-            rows.append(
-                {
-                    "series": SERIES_NAMES[era],
-                    "group": name,
-                    "share": group["state"].mean() if group.height else None,
-                    "days": group["local_date"].n_unique(),
-                }
-            )
-    data = pl.DataFrame(rows).filter(pl.col("share").is_not_null())
-    chart = (
+        rows.extend(
+            {
+                "series": SERIES_NAMES[era],
+                "group": name,
+                "days": group["local_date"].n_unique(),
+            }
+            for name, group in groups.items()
+        )
+    data = pl.DataFrame(rows)
+    bars = (
         alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
         .encode(
             y=alt.Y("group:N", title=None, sort=None),
             yOffset="series:N",
-            x=alt.X(
-                "share:Q", title="Running share, 16:00 to 19:00 local", axis=alt.Axis(format=".0%")
-            ),
+            x=alt.X("days:Q", title="Days in the group (the floor for a share is 20)"),
             color=series_colour(data=data),
         )
-        .properties(width=400, height=140)
     )
-    save(chart=chart, name="g6_holidays_and_clock_changes")
+    floor = (
+        alt.Chart(pl.DataFrame({"floor": [MIN_DAYS_PER_BIN]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(aria=False, strokeDash=[4, 3])
+        .encode(x="floor:Q")
+    )
+    save(
+        chart=(bars + floor).properties(width=400, height=140), name="g6_holidays_and_clock_changes"
+    )
 
 
 def gallery_8(*, frames: dict[str, pl.DataFrame]) -> None:

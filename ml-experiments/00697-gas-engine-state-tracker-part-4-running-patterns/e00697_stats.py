@@ -642,12 +642,14 @@ def t6_drivers(*, frames: dict[str, pl.DataFrame]) -> None:
                     "era": era,
                     "group": name,
                     "days": days,
-                    "share": group["state"].mean() if group.height else None,
-                    "shown": days >= MIN_DAYS_PER_BIN or "pooled" in name,
+                    "share": group["state"].mean()
+                    if group.height and days >= MIN_DAYS_PER_BIN
+                    else None,
+                    "shown": days >= MIN_DAYS_PER_BIN,
                 }
             )
     table(
-        title="T6 holidays, clock changes, and drops: evening share (no drop date shown)",
+        title="T6 holidays, clock changes, and drops: evening share (no share under 20 days)",
         frame=pl.DataFrame(holiday_rows, infer_schema_length=None),
     )
     night = with_state(frame=frames["d8"], column="ts")

@@ -10,13 +10,14 @@ r"""Experiment 697's controls: a real reading with a known engine injected, then
 
 - **C1:** D8 before the engine (the panel's first 28 days are the pre-roll), null and weekday
   truth, seeds 0 to 2.
-- **C1s:** C1 with one constant subtracted from the reading before the injection, null truth,
-  seeds 0 to 2. The design expects D8's weekday daytime demand to be about 9 MW before the engine
-  and about 3 MW in the net era, so that a 5 MW engine pushes the reading through the MVA fold (the
+- **C1s:** C1 with one constant subtracted from the reading before the injection, null truth, seeds
+  0 to 2. The design expects D8's weekday daytime demand to be about 9 MW before the engine and
+  about 3 MW in the solar era, so that a 5 MW engine pushes the reading through the MVA fold (the
   reading is apparent power and never negative). The constant is C1's weekday 09:00 to 16:00 median
   reading minus the same median of the demand level (`lmean`) that experiment 695 fitted for a
   target era, and the scaled reading is floored at 0.3 MVA. A constant keeps the size of C1's
   evening peak in MW, so it does not reproduce the target era's smaller demand swing or noise.
+
   **The stored data give two constants, and the script prints both.** For the net era the median
   level is within 0.1 MVA of C1's, so `c1s_net` is nearly C1. For the solar era the level is about
   3 MVA lower, so `c1s_solar` is the control that tests the fold. Both are run and both are
@@ -43,6 +44,7 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     CONTROLS_DIR,
     DAY,
     PIPELINE_OFFSET,
+    PRINTED_DIR,
     PROBABILITY_PATH,
     TruthKindType,
     add_local_fields,
@@ -275,10 +277,19 @@ def main() -> None:
         print(run_job(selected[0], write=False))
         return
     started = datetime.now(UTC)
+    log = [f"C1s constants (MVA): {SHIFT}"]
     with get_context("fork").Pool(args.workers) as pool:
         for line in pool.imap_unordered(_worker, selected, chunksize=1):
             print(line, flush=True)
-    print(f"done in {(datetime.now(UTC) - started).total_seconds():.0f} s")
+            log.append(line)
+    log.append(
+        f"{len(selected)} jobs, {args.workers} workers, "
+        f"done in {(datetime.now(UTC) - started).total_seconds():.0f} s"
+    )
+    print(log[-1])
+    if not args.only:
+        PRINTED_DIR.mkdir(parents=True, exist_ok=True)
+        (PRINTED_DIR / "controls.txt").write_text("\n".join(sorted(log)) + "\n")
 
 
 if __name__ == "__main__":

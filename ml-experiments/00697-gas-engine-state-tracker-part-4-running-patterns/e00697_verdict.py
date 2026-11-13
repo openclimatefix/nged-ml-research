@@ -2,10 +2,10 @@ r"""Apply experiment 697's decision rule to the stored statistics and print the 
 
     uv run --no-sync python $E/00697-*/e00697_verdict.py
 
-The rule was written before the run (sections 2 and 9 of the design). It reads `stats.json`, which
-`e00697_stats.py` wrote, and writes `printed/verdict.txt`. **Q1 gets one of four words, tested in
-this order: not supported, supported, partly supported, inconclusive. Inconclusive is the default.**
-Every other question gets a reading, and none changes the verdict word.
+The rule was written before the run (sections 2 and 9 of the experiment's plan). It reads
+`stats.json`, which `e00697_stats.py` wrote, and writes `printed/verdict.txt`. **Q1 gets one of four
+words, tested in this order: not supported, supported, partly supported, inconclusive. Inconclusive
+is the default.** Every other question gets a reading, and none changes the verdict word.
 
 - Not supported: D8's own weekday-minus-weekend difference has an interval that includes zero in
   both eras.
@@ -18,9 +18,9 @@ Every other question gets a reading, and none changes the verdict word.
 
 Exploratory readings: 1 is "not explained by the controls", 2 is "tracker error not excluded", 3 is
 "no pattern found". A case that fits none (D8's interval excludes zero in one era only) is called
-"one era only". A pattern is passed on to the planned gas-engine plant-equations experiment only if
-Q1 is supported or the question has reading 1, and Gas A at 2 or more units does not point the
-other way. A result chosen after the tables are seen is labelled post hoc.
+"one era only". A pattern could be passed on to a possible gas-engine plant-equations experiment
+only if Q1 is supported or the question has reading 1, and Gas A at 2 or more units does not point
+the other way. A result chosen after the tables are seen is labelled post hoc.
 """
 
 import json
@@ -127,30 +127,42 @@ def r_agrees(*, stats: dict, question: str) -> str:
     return "same direction" if (record["point"] > 0) == (d8["point"] > 0) else "OPPOSITE direction"
 
 
-def p1b(*, stats: dict) -> str:
-    """Return the P1b check: the null control's labels show a Q1 below the limit."""
-    values = [
-        stats[name][era]["ts"]["q1"]
-        for name in ("c1_null", "c1s_net_null", "c1s_solar_null")
-        for era in VERDICT_ERAS
-        if era in stats.get(name, {})
-    ]
-    if not values or any(v is None for v in values):
-        return "P1b: not available"
-    point = max(v["point"] for v in values)
-    ok = point < P1B_LIMIT
-    side = "below" if ok else "NOT below"
-    return (
-        f"P1b: the C1 and C1s null controls' labels show (largest) Q1 {point:+.3f}, "
-        f"which is {side} {P1B_LIMIT}"
+def p1b(*, stats: dict) -> list[str]:
+    """Return the P1b lines: each D8-history control's Q1 in the labels, and the largest.
+
+    P1b is a check that the controls built on D8's history show a Q1 under the limit. It does not
+    change the verdict word.
+    """
+    lines: list[str] = []
+    points: list[float] = []
+    for name in ("c1_null", "c1s_net_null", "c1s_solar_null"):
+        for era in VERDICT_ERAS:
+            estimate = stats.get(name, {}).get(era, {}).get("ts", {}).get("q1")
+            if estimate is None:
+                lines.append(f"  {name}, {era} era: not estimable")
+                continue
+            points.append(estimate["point"])
+            lines.append(f"  {name}, {era} era: Q1 in the labels {fmt(estimate)}")
+    if not points:
+        return ["P1b: not available"]
+    point = max(points)
+    side = "below" if point < P1B_LIMIT else "NOT below"
+    heading = (
+        "P1b (a check that does not change the verdict word), Q1 in the labels of the three "
+        "controls built on D8's history:"
     )
+    return [
+        heading,
+        *lines,
+        f"P1b: the largest Q1 is {point:+.3f}, which is {side} {P1B_LIMIT}",
+    ]
 
 
 def main() -> None:
     """Print and write the verdict, the P1b check, the readings, and the pass-on rule."""
     stats = json.loads(STATS_PATH.read_text())["questions"]
     word, justification = q1_verdict(stats=stats)
-    lines = [f"Q1 verdict: {word}", *justification, "", p1b(stats=stats), ""]
+    lines = [f"Q1 verdict: {word}", *justification, "", *p1b(stats=stats), ""]
     lines.append("Exploratory readings (post hoc status: none of these changes the verdict word):")
     passed_on = word == "SUPPORTED"
     for question in EXPLORATORY:
@@ -158,11 +170,13 @@ def main() -> None:
         agree = r_agrees(stats=stats, question=question)
         lines.append(f"  {question}: reading {read}; Gas A at 2 or more units: {agree}")
         if read.startswith("1") and agree != "OPPOSITE direction":
-            lines.append(f"    {question} is passed on to the plant-equations experiment.")
+            lines.append(
+                f"    {question} could be passed on to a possible plant-equations experiment."
+            )
     lines.append("")
     q1_r = r_agrees(stats=stats, question="q1")
     lines.append(
-        "Q1 passed on to the plant-equations experiment: "
+        "Q1 could be passed on to a possible plant-equations experiment: "
         f"{passed_on and q1_r != 'OPPOSITE direction'}"
     )
     lines.append(f"Gas A at 2 or more units against D8's net era for Q1: {q1_r}")

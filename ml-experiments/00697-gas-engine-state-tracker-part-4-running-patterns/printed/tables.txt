@@ -1361,7 +1361,7 @@ shape: (366, 6)
 │ c2_d4_null solar labels ┆ c2_d4_null price rank in day quarter      ┆ 3   ┆ 8838       ┆ 340  ┆ 0.157 │
 └─────────────────────────┴───────────────────────────────────────────┴─────┴────────────┴──────┴───────┘
 
-T6 holidays, clock changes, and drops: evening share (no drop date shown)
+T6 holidays, clock changes, and drops: evening share (no share under 20 days)
 shape: (18, 5)
 ┌───────┬───────────────────────────────────────────┬──────┬───────┬───────┐
 │ era   ┆ group                                     ┆ days ┆ share ┆ shown │
@@ -1369,21 +1369,21 @@ shape: (18, 5)
 │ str   ┆ str                                       ┆ i64  ┆ f64   ┆ bool  │
 ╞═══════╪═══════════════════════════════════════════╪══════╪═══════╪═══════╡
 │ net   ┆ ordinary weekday evenings                 ┆ 373  ┆ 0.841 ┆ true  │
-│ net   ┆ bank-holiday weekday evenings (pooled)    ┆ 5    ┆ 0.533 ┆ true  │
-│ net   ┆ christmas week evenings (24 December to … ┆ 18   ┆ 0.611 ┆ false │
-│ net   ┆ six clock-change days, evenings (pooled)  ┆ 3    ┆ 0.611 ┆ true  │
+│ net   ┆ bank-holiday weekday evenings (pooled)    ┆ 5    ┆ null  ┆ false │
+│ net   ┆ christmas week evenings (24 December to … ┆ 18   ┆ null  ┆ false │
+│ net   ┆ six clock-change days, evenings (pooled)  ┆ 3    ┆ null  ┆ false │
 │ net   ┆ inside experiment 159's multi-day drops,… ┆ 40   ┆ 0.740 ┆ true  │
 │ net   ┆ outside the drops, evenings               ┆ 510  ┆ 0.721 ┆ true  │
 │ solar ┆ ordinary weekday evenings                 ┆ 233  ┆ 0.806 ┆ true  │
-│ solar ┆ bank-holiday weekday evenings (pooled)    ┆ 5    ┆ 0.867 ┆ true  │
-│ solar ┆ christmas week evenings (24 December to … ┆ 9    ┆ 0.556 ┆ false │
-│ solar ┆ six clock-change days, evenings (pooled)  ┆ 2    ┆ 0.167 ┆ true  │
+│ solar ┆ bank-holiday weekday evenings (pooled)    ┆ 5    ┆ null  ┆ false │
+│ solar ┆ christmas week evenings (24 December to … ┆ 9    ┆ null  ┆ false │
+│ solar ┆ six clock-change days, evenings (pooled)  ┆ 2    ┆ null  ┆ false │
 │ solar ┆ inside experiment 159's multi-day drops,… ┆ 96   ┆ 0.651 ┆ true  │
 │ solar ┆ outside the drops, evenings               ┆ 248  ┆ 0.754 ┆ true  │
 │ fade  ┆ ordinary weekday evenings                 ┆ 83   ┆ 0.600 ┆ true  │
-│ fade  ┆ bank-holiday weekday evenings (pooled)    ┆ 4    ┆ 0.250 ┆ true  │
+│ fade  ┆ bank-holiday weekday evenings (pooled)    ┆ 4    ┆ null  ┆ false │
 │ fade  ┆ christmas week evenings (24 December to … ┆ 0    ┆ null  ┆ false │
-│ fade  ┆ six clock-change days, evenings (pooled)  ┆ 1    ┆ 0.000 ┆ true  │
+│ fade  ┆ six clock-change days, evenings (pooled)  ┆ 1    ┆ null  ┆ false │
 │ fade  ┆ inside experiment 159's multi-day drops,… ┆ 0    ┆ null  ┆ false │
 │ fade  ┆ outside the drops, evenings               ┆ 122  ┆ 0.473 ┆ true  │
 └───────┴───────────────────────────────────────────┴──────┴───────┴───────┘

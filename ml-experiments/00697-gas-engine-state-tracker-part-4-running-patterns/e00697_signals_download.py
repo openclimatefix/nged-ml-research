@@ -18,7 +18,8 @@ The signals, added after the experiment's design and not pre-registered as separ
   and the day-ahead auction results with the unit identifier and company name dropped.
 - `imbalngc`: Elexon indicated imbalance forecast, national boundary, one vintage per day (the
   publication nearest 09:45 UTC), covering that day's later half-hours and the early hours after.
-- `demand_forecast`: NESO day-ahead demand forecast archive (cardinal points), from 2023-06.
+- `demand_forecast`: National Energy System Operator (NESO) day-ahead demand forecast archive
+  (its cardinal points), from 2023-06.
 - `historic_demand`: NESO half-hourly national demand, embedded wind, and embedded solar, 2023 to
   2026.
 - `fuelhh_wind`: Elexon FUELHH transmission wind, 2023-06 to 2024-06, filling the gap before the
@@ -39,7 +40,7 @@ from typing import Any, Final
 
 import polars as pl
 import requests
-from e00697_common import DATA_DIR, LOCAL_TZ  # ty: ignore[unresolved-import]
+from e00697_common import DATA_DIR, LOCAL_TZ, PRINTED_DIR  # ty: ignore[unresolved-import]
 
 SIGNALS_DIR: Final[Path] = DATA_DIR / "signals"
 CACHE_DIR: Final[Path] = SIGNALS_DIR / "_cache"
@@ -592,6 +593,10 @@ def write_readme(*, facts: dict[str, dict], partial: bool) -> None:
         lines += [f"- {key}: {value}" for key, value in fact.items()]
         lines.append("")
     (SIGNALS_DIR / "README.md").write_text("\n".join(lines))
+    PRINTED_DIR.mkdir(parents=True, exist_ok=True)
+    printed = ["Coverage of each downloaded signal (rows, nulls, first and last start, duplicates)"]
+    printed += [f"{name}: {fact}" for name, fact in facts.items()]
+    (PRINTED_DIR / "signals_download.txt").write_text("\n".join(printed) + "\n")
 
 
 def main() -> None:

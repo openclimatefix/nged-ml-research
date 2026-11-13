@@ -78,9 +78,11 @@ docs).
   (exp 10, 15; Primaries; provisional).
 
 - **The Elexon APX Market Index Data is the within-day half-hourly price, not the day-ahead auction.**
-  The N2EX provider returns 0.00 in 2023, and 20 half-hours carry price 0 with volume 0 (exp 697; 2023-06
-  to 2026-06; provisional, [data processing](../data-processing.md#timestamps-and-availability)).
-- **Weekday evenings, the half-hourly price, and D8's own demand peak coincide, so a link between the
-  engine's running and the price does not separate them** (exp 697; D8 and 3 host Primaries; provisional).
+  The N2EX provider returns 0.00 in 2023, so use the APX provider only. Of the APX index's
+  half-hours, 20 carry price 0 with volume 0 and are treated as missing (exp 697; 2023-06 to
+  2026-06; provisional; the rule is in [data processing, timestamps and
+  availability](../data-processing.md#timestamps-and-availability)).
+- **Weekday evenings, high half-hourly prices, and D8's own demand peak coincide, so the engine's
+  running cannot be tied to the price alone** (exp 697; D8 and 3 host Primaries; provisional).
 
 Last checked against experiment 697.
