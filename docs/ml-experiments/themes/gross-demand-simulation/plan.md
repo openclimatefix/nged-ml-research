@@ -6,11 +6,13 @@ choose.** The project is not starting further experiments unprompted. The reason
 to propose the simulator to NGED, with phases as options, is on
 [Options for proposing the simulator to NGED](proposal-to-nged-options.md). The latest finished
 experiment,
-[696](../../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md),
-found that giving the pre-training mixer D8's gas-engine state did not improve the forecast. At a
-host substation with an engine added, the true state helped when the engine was off and hurt by
-more when it ran. One option from it is to combine a pre-training state with a way of putting the
-engine back after pre-training, tested at the host first.
+[experiment 696 (engine state in the pre-training mixer)](../../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md),
+found that telling the neural network about D8's gas-engine state during pre-training only did not
+change the forecast error (+0.009 means no change, in points of capacity; positive is worse). A
+post hoc split at a host substation with a recorded engine added showed a gain when the engine was
+off and a loss when it ran, which cancel when weighted by how often the engine runs. One option
+from the split is to combine a pre-training state with a way of putting the engine back after
+pre-training, tested at the host first.
 
 ## Options
 

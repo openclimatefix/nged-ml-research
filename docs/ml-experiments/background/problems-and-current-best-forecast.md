@@ -51,11 +51,13 @@ heuristic](https://openclimatefix.github.io/nged-substation-forecast/background/
   against the raw arm A0.** No forecast has that state, so the limit shows where a gain could lie
   ([experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md))
   (exp 695; D8, 8 monthly refits, a bound and not a forecast; provisional).
-- **Giving the pre-training mixer D8's engine state, and then fine-tuning without it, changed the
-  forecast by +0.009 points of capacity.** The 98.75% intervals end at -0.074 at the lowest, and at
-  a host with an engine added the true state helped by 0.059 when the engine was off and hurt by
-  0.225 when it ran
-  ([experiment 696](../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md))
+- **Giving the pre-training mixer D8's engine state, and then fine-tuning without it, did not
+  improve the forecast: the change in CRPS was +0.009 points of capacity, and +0.009 means no
+  change.** The lower ends of the 98.75% intervals are -0.055 to -0.074, so no net gain above about
+  0.07 points is likely. A post hoc split (not planned, 95% intervals) at a host substation with a
+  recorded engine's output added showed that the true state lowered CRPS by 0.059 when the engine
+  was off and raised it by 0.225 when the engine ran, on about 19% of half-hours
+  ([experiment 696 (engine state in the pre-training mixer)](../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md))
   (exp 696; D8 and one host, 8 monthly refits, 10 seeds; provisional).
 
 ## Problem 2: generator output

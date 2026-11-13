@@ -1,0 +1,13 @@
+A0: 3.30 job-hours
+G0: 0.10 job-hours
+G0W: 0.10 job-hours
+S1: 5.04 job-hours
+S1d: 1.51 job-hours
+SP: 4.71 job-hours
+SZ: 0.15 job-hours
+W0: 3.36 job-hours
+W0p: 0.18 job-hours
+WS1: 4.82 job-hours
+WST: 4.80 job-hours
+total: 28.1 job-hours
+resource log: 19:21:17 to 23:52:39 UTC, peak GPU memory 33244 MiB

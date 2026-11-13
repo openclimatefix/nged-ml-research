@@ -160,8 +160,8 @@ def figure_2(*, out: Path) -> None:
         rows.append({"label": label, "kind": "Host Primary", "est": est, "lo": lo, "hi": hi})
     months = pl.col("valid_time").dt.month()
     for label, mask in (
-        ("D8, Nov to Feb: S1 minus A0", months.is_in([11, 12, 1, 2])),
-        ("D8, Mar to Jun: S1 minus A0", ~months.is_in([11, 12, 1, 2])),
+        ("D8, first 4 refit months: S1 minus A0", months.is_in([11, 12, 1, 2])),
+        ("D8, last 4 refit months: S1 minus A0", ~months.is_in([11, 12, 1, 2])),
     ):
         est, lo, hi = seed_t(
             df=losses.filter(pl.col("arm").is_in(["S1", "A0"]), mask), test="S1", ref="A0"
@@ -171,9 +171,9 @@ def figure_2(*, out: Path) -> None:
         frame=pl.DataFrame(rows),
         title="At the host, the true state helps when the engine is off and hurts when it runs",
         subtitle=[
-            "Change in CRPS, mean of 10 seeds, 8 refit months. Dot: estimate. Line: 95% interval over",
-            "seeds. Host rows are split by whether the injected engine runs at the valid time.",
-            "At D8 the rows are split by season, because the real engine fades from March.",
+            "Post hoc split, not a planned contrast: 95% intervals over 10 seeds, not Bonferroni-adjusted.",
+            "Dot: estimate. Line: 95% interval. Host rows are split by whether the injected engine runs",
+            "at the valid time. D8 rows are split by the first and last 4 of the 8 refit months.",
         ],
         height=200,
     )
