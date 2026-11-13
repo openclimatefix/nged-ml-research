@@ -657,7 +657,7 @@ def t6_drivers(*, frames: dict[str, pl.DataFrame]) -> None:
     with pl.Config(tbl_rows=-1, float_precision=3):
         (DATA_DIR / "night_monthly.txt").write_text(str(monthly) + "\n")
     say(
-    say(f"\nT6 night share by month: written to {DATA_DIR.name}/night_monthly.txt, not printed")
+        say(f"\nT6 night share by month: written to {DATA_DIR.name}/night_monthly.txt, not printed")
     )
 
 
