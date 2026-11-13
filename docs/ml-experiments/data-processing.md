@@ -947,6 +947,17 @@ clips nothing. The evidence is one substation and one scored year, with the ceil
 tuning months ([experiment 180](00180-dp-sunny-daylight-fix-d5-solar-shape/result.md); applies to
 experiments and production).
 
+**Count a solar farm's coverage over daylight half-hours only (medium confidence, provisional).**
+The farm loader of experiment 405 sets every night half-hour to 0, and the stored farm file lacks
+many night rows, so the share of half-hours with a reading overstates coverage. Experiment 698's
+farm (letter A) had a reading (not NaN) in 0.914 of all half-hours at D8 before the engine and 0.916
+at D3 in its solar era. It had a reading in only 0.859 of the daylight half-hours at both hosts. In
+May to September, from 10:00 to 15:00, the share was 0.984 at D8 and 0.992 at D3. Applies to
+experiments that inject or compare a farm's output. Evidence: [experiment
+698](00698-gas-engine-state-tracker-part-5-does-pv-harm-the-disaggregation/result.md), from
+`e00698_audit.py`, one farm of four, two spans. Fill the gap with the farm's own average for that
+month and half-hour, and leave the filled half-hours out of every score.
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers

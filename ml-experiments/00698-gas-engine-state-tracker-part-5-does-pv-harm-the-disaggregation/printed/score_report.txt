@@ -1,0 +1,99 @@
+## Paired half-widths of the smoothed-label contrasts (95%, weeks resampled together)
+host, capacity, contrast: F1, false-flag share, bright-minus-dull flagged share
+d8pre, c89, level: 0.058, 0.011, 0.022
+d8pre, c89, weather_farm: 0.051, 0.048, 0.084
+d8pre, c89, weather_cams: 0.040, 0.010, 0.020
+d8pre, c89, total_farm: 0.053, 0.051, 0.090
+d8pre, c89, total_cams: 0.055, 0.011, 0.026
+d3solar, c70, level: 0.077, 0.011, 0.025
+d3solar, c70, weather_farm: 0.059, 0.025, 0.056
+d3solar, c70, total_farm: 0.068, 0.024, 0.055
+d3solar, c89, level: 0.084, 0.014, 0.027
+d3solar, c89, weather_farm: 0.054, 0.029, 0.075
+d3solar, c89, total_farm: 0.076, 0.029, 0.073
+
+## Contrasts, harm positive (F1 falls, false-flag share rises, bright-minus-dull rises)
+thresholds: F1 0.05, false-flag 0.02, bright-minus-dull 0.05; smoothed labels first
+### d8pre: 73 weeks, 4911 midday half-hours
+d8pre, c89, level, smooth: f1 +0.358 (+0.298 to +0.415); false_flag +0.052 (+0.041 to +0.063); bmd +0.005 (-0.016 to +0.028)
+d8pre, c89, level, filtered: f1 +0.311 (+0.240 to +0.381); false_flag +0.029 (+0.022 to +0.036); bmd -0.012 (-0.031 to +0.007)
+d8pre, c89, weather_farm, smooth: f1 +0.140 (+0.089 to +0.192); false_flag +0.139 (+0.094 to +0.190); bmd +0.183 (+0.100 to +0.268)
+d8pre, c89, weather_farm, filtered: f1 +0.091 (+0.036 to +0.145); false_flag +0.102 (+0.066 to +0.140); bmd +0.142 (+0.078 to +0.214)
+d8pre, c89, weather_cams, smooth: f1 +0.043 (+0.002 to +0.082); false_flag +0.006 (-0.004 to +0.016); bmd +0.034 (+0.015 to +0.054)
+d8pre, c89, weather_cams, filtered: f1 +0.123 (+0.066 to +0.176); false_flag +0.003 (-0.004 to +0.011); bmd +0.038 (+0.017 to +0.063)
+d8pre, c89, total_farm, smooth: f1 +0.495 (+0.441 to +0.547); false_flag +0.180 (+0.131 to +0.233); bmd +0.181 (+0.093 to +0.272)
+d8pre, c89, total_farm, filtered: f1 +0.440 (+0.381 to +0.497); false_flag +0.122 (+0.085 to +0.164); bmd +0.140 (+0.071 to +0.214)
+d8pre, c89, total_cams, smooth: f1 +0.401 (+0.343 to +0.454); false_flag +0.058 (+0.047 to +0.069); bmd +0.039 (+0.013 to +0.065)
+d8pre, c89, total_cams, filtered: f1 +0.434 (+0.378 to +0.484); false_flag +0.032 (+0.025 to +0.040); bmd +0.026 (+0.005 to +0.051)
+d8pre, c89, level, no engine, smooth: false_flag +0.000 (+0.000 to +0.000); bmd +0.000 (+0.000 to +0.000)
+d8pre, c89, weather_farm, no engine, smooth: false_flag +0.146 (+0.098 to +0.198); bmd +0.178 (+0.092 to +0.267)
+d8pre, c89, weather_cams, no engine, smooth: false_flag +0.000 (+0.000 to +0.000); bmd +0.000 (+0.000 to +0.000)
+d8pre, c89, total_farm, no engine, smooth: false_flag +0.146 (+0.098 to +0.198); bmd +0.178 (+0.092 to +0.267)
+d8pre, c89, total_cams, no engine, smooth: false_flag +0.000 (+0.000 to +0.000); bmd +0.000 (+0.000 to +0.000)
+### d3solar: 49 weeks, 3376 midday half-hours
+d3solar, c70, level, smooth: f1 +0.297 (+0.224 to +0.377); false_flag +0.034 (+0.023 to +0.045); bmd +0.013 (-0.012 to +0.038)
+d3solar, c70, level, filtered: f1 +0.226 (+0.151 to +0.300); false_flag +0.021 (+0.013 to +0.029); bmd +0.012 (-0.005 to +0.030)
+d3solar, c70, weather_farm, smooth: f1 +0.189 (+0.132 to +0.250); false_flag +0.070 (+0.045 to +0.096); bmd +0.148 (+0.094 to +0.206)
+d3solar, c70, weather_farm, filtered: f1 +0.194 (+0.135 to +0.257); false_flag +0.040 (+0.022 to +0.058); bmd +0.082 (+0.039 to +0.130)
+d3solar, c70, total_farm, smooth: f1 +0.465 (+0.396 to +0.533); false_flag +0.094 (+0.071 to +0.119); bmd +0.142 (+0.091 to +0.200)
+d3solar, c70, total_farm, filtered: f1 +0.411 (+0.347 to +0.484); false_flag +0.051 (+0.033 to +0.071); bmd +0.092 (+0.052 to +0.140)
+d3solar, c89, level, smooth: f1 +0.377 (+0.295 to +0.463); false_flag +0.046 (+0.033 to +0.060); bmd +0.023 (-0.004 to +0.049)
+d3solar, c89, level, filtered: f1 +0.332 (+0.253 to +0.413); false_flag +0.035 (+0.023 to +0.047); bmd +0.020 (-0.001 to +0.043)
+d3solar, c89, weather_farm, smooth: f1 +0.138 (+0.087 to +0.195); false_flag +0.070 (+0.043 to +0.100); bmd +0.103 (+0.033 to +0.183)
+d3solar, c89, weather_farm, filtered: f1 +0.149 (+0.097 to +0.207); false_flag +0.045 (+0.026 to +0.067); bmd +0.074 (+0.029 to +0.125)
+d3solar, c89, total_farm, smooth: f1 +0.518 (+0.444 to +0.595); false_flag +0.110 (+0.082 to +0.140); bmd +0.122 (+0.053 to +0.199)
+d3solar, c89, total_farm, filtered: f1 +0.460 (+0.390 to +0.537); false_flag +0.062 (+0.042 to +0.083); bmd +0.094 (+0.051 to +0.142)
+d3solar, c70, level, no engine, smooth: false_flag +0.000 (+0.000 to +0.000); bmd +0.000 (+0.000 to +0.000)
+d3solar, c70, weather_farm, no engine, smooth: false_flag +0.051 (+0.028 to +0.078); bmd +0.091 (+0.034 to +0.163)
+d3solar, c70, total_farm, no engine, smooth: false_flag +0.051 (+0.028 to +0.078); bmd +0.091 (+0.034 to +0.163)
+d3solar, c89, level, no engine, smooth: false_flag +0.000 (+0.000 to +0.000); bmd +0.000 (+0.000 to +0.000)
+d3solar, c89, weather_farm, no engine, smooth: false_flag +0.062 (+0.039 to +0.086); bmd +0.059 (-0.002 to +0.126)
+d3solar, c89, total_farm, no engine, smooth: false_flag +0.062 (+0.039 to +0.086); bmd +0.059 (-0.002 to +0.126)
+
+## Pooled midday scores by run (3 seeds), smoothed labels
+d8pre, none_free: P 0.987, R 0.626, F1 0.766, false-flag 0.000; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d8pre, c89_farm: P 0.210, R 0.380, F1 0.270, false-flag 0.180; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d8pre, c89_cams: P 0.391, R 0.342, F1 0.365, false-flag 0.058; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d8pre, c89_smooth: P 0.446, R 0.376, F1 0.408, false-flag 0.052; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d8pre, c89_smooth_farm: P 0.482, R 0.357, F1 0.410, false-flag 0.041; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d3solar, none_free: P 0.969, R 0.763, F1 0.854, false-flag 0.000; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d3solar, c70_farm: P 0.351, R 0.436, F1 0.389, false-flag 0.095; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d3solar, c70_smooth: P 0.609, R 0.513, F1 0.557, false-flag 0.034; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d3solar, c70_smooth_farm: P 0.680, R 0.503, F1 0.578, false-flag 0.025; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d3solar, c89_farm: P 0.297, R 0.387, F1 0.336, false-flag 0.111; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d3solar, c89_smooth: P 0.495, R 0.460, F1 0.477, false-flag 0.046; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d3solar, c89_smooth_farm: P 0.513, R 0.441, F1 0.474, false-flag 0.040; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+
+## Fold census of scorable midday half-hours (shares of signed real power)
+d8pre, none_free, seed 0: forward 0.992, near_zero 0.006, reverse 0.001
+d8pre, c89_farm, seed 0: forward 0.681, near_zero 0.150, reverse 0.169
+d8pre, c89_cams, seed 0: forward 0.678, near_zero 0.135, reverse 0.187
+d8pre, c89_smooth, seed 0: forward 0.741, near_zero 0.184, reverse 0.075
+d8pre, c89_smooth_farm, seed 0: forward 0.749, near_zero 0.179, reverse 0.071
+d3solar, none_free, seed 0: forward 0.998, near_zero 0.002, reverse 0.000
+d3solar, c70_farm, seed 0: forward 0.826, near_zero 0.148, reverse 0.026
+d3solar, c70_smooth, seed 0: forward 0.883, near_zero 0.096, reverse 0.021
+d3solar, c70_smooth_farm, seed 0: forward 0.950, near_zero 0.034, reverse 0.015
+d3solar, c89_farm, seed 0: forward 0.716, near_zero 0.158, reverse 0.127
+d3solar, c89_smooth, seed 0: forward 0.725, near_zero 0.209, reverse 0.066
+d3solar, c89_smooth_farm, seed 0: forward 0.812, near_zero 0.161, reverse 0.026
+
+## Spread of half-hourly changes at midday, runs with no engine (MVA)
+d8pre, none_free: 0.276; less the solar-free twin's +0.000
+d8pre, c89_farm: 0.758; less the solar-free twin's +0.482
+d8pre, c89_cams: 0.520; less the solar-free twin's +0.245
+d8pre, c89_smooth: 0.427; less the solar-free twin's +0.151
+d8pre, c89_smooth_farm: 0.461; less the solar-free twin's +0.185
+d3solar, none_free: 0.221; less the solar-free twin's +0.000
+d3solar, c70_farm: 0.501; less the solar-free twin's +0.280
+d3solar, c70_smooth: 0.331; less the solar-free twin's +0.110
+d3solar, c70_smooth_farm: 0.354; less the solar-free twin's +0.133
+d3solar, c89_farm: 0.575; less the solar-free twin's +0.354
+d3solar, c89_smooth: 0.350; less the solar-free twin's +0.129
+d3solar, c89_smooth_farm: 0.385; less the solar-free twin's +0.164
+
+D8-pre solar-free twin midday F1 on every observed half-hour: 0.7672413793103449
+## Step 4: recall of injected running half-hours, bright minus dull third, 10:00 to 15:00
+  net: +0.104 (-0.170 to +0.392)
+  solar: +0.379 (-0.472 to +0.796)
+  solar minus net: +0.275 (-0.617 to +0.754)
