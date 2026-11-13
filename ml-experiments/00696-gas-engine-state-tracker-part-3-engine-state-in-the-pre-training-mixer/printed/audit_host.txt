@@ -1,0 +1,29 @@
+1 no truth
+2 no truth
+3 12.863 share |diff|<1e-3: 0.000 min -13.180 mean -2.159
+4 no truth
+5 no truth
+6 no truth
+7 7.104 share |diff|<1e-3: 0.000 min -7.594 mean -1.600
+8 10.777 share |diff|<1e-3: 0.000 min -11.799 mean -2.773
+9 5.431 share |diff|<1e-3: 0.000 min -5.024 mean -0.897
+10 5.398 share |diff|<1e-3: 0.000 min -6.105 mean -0.307
+11 12.138 share |diff|<1e-3: 0.807 min -5.922 mean -0.522
+12 3.011 share |diff|<1e-3: 0.000 min -1.981 mean 1.673
+13 4.697 share |diff|<1e-3: 0.000 min -4.966 mean -0.864
+14 4.681 share |diff|<1e-3: 0.001 min -4.922 mean 0.298
+15 3.208 share |diff|<1e-3: 0.000 min -3.377 mean -0.686
+16 11.706 share |diff|<1e-3: 0.000 min -12.833 mean -2.515
+17 5.723 share |diff|<1e-3: 0.000 min -6.159 mean -0.885
+18 9.115 share |diff|<1e-3: 0.000 min -12.377 mean -2.685
+21 no truth
+22 no truth
+23 no truth
+24 5.591 share |diff|<1e-3: 0.000 min -5.891 mean -1.200
+25 18.205 share |diff|<1e-3: 0.000 min -19.463 mean -4.188
+26 10.379 share |diff|<1e-3: 0.000 min -8.724 mean 0.149
+27 no truth
+28 no truth
+29 no truth
+30 no truth
+31 no truth

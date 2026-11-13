@@ -1,19 +1,16 @@
 # Gross-demand simulation: research plan
 
-**One experiment in this theme is planned, and the options below are queued for the maintainer to
-choose.** The planned experiment,
-[696](../../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md),
-was asked for by the maintainer by name: it tests whether giving the pre-training mixer of the demand
-neural network the inferred state of D8's gas engine lowers the forecast error. It is priority 1,
-waits for the code review, and is `planned`. The project is not starting further experiments
-unprompted. The reasoning is on
+**No experiment in this theme is planned, and the options below are queued for the maintainer to
+choose.** The project is not starting further experiments unprompted. The reasoning is on
 [the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how
 to propose the simulator to NGED, with phases as options, is on
 [Options for proposing the simulator to NGED](proposal-to-nged-options.md). The latest finished
-experiment, [695](../../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md),
-found that cleaning D8's engine out of the training target and adding a calendar average back did
-not improve the forecast; its next step is to forecast the engine's state from origin-time
-information.
+experiment,
+[696](../../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md),
+found that giving the pre-training mixer D8's gas-engine state did not improve the forecast. At a
+host substation with an engine added, the true state helped when the engine was off and hurt by
+more when it ran. One option from it is to combine a pre-training state with a way of putting the
+engine back after pre-training, tested at the host first.
 
 ## Options
 
