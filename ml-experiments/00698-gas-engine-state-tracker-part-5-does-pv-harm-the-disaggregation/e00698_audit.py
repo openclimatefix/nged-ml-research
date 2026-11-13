@@ -166,15 +166,16 @@ def step_1_data(*, panel: dict[int, dict]) -> dict[str, np.ndarray]:
     NUMBERS["farm"] = best
     NUMBERS["farm_pooled_finite"] = pooled
     first, last = spans["d8pre"]
-    coverage = farm_finite_share(norm=farms[best], first=first, last=last)
-    NUMBERS["farm_coverage_d8pre"] = coverage
+    coverage_by_host = {
+        host: farm_finite_share(norm=farms[best], first=a, last=b) for host, (a, b) in spans.items()
+    }
+    coverage = min(coverage_by_host.values())
+    NUMBERS["farm_coverage_d8pre"] = coverage_by_host["d8pre"]
+    NUMBERS["farm_coverage_min"] = coverage
+    say(f"chosen farm: {best} (highest pooled finite share); coverage by host {coverage_by_host}")
     say(
-        f"chosen farm: {best} (highest pooled finite share); "
-        f"coverage of D8-pre's span {coverage:.4f}"
-    )
-    say(
-        f"coverage at least {COVERAGE_MIN}: {coverage >= COVERAGE_MIN}"
-        " (the verdict's branch 1 fires when it is under, as the design states)"
+        f"smallest coverage at least {COVERAGE_MIN}: {coverage >= COVERAGE_MIN}"
+        " (the verdict's branch 1 fires when either host's coverage is under)"
     )
     pv = panel_series(panel=panel, label="D8", key="pv_shape")
     day = (pv[first:last] > 0) & np.isfinite(farms[best][first:last])

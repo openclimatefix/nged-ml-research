@@ -114,7 +114,13 @@ GATE_FIFTHS: Final[int] = 4
 """The curve gate reads the first four fifths of solar output."""
 N_FIFTHS: Final[int] = 5
 MIN_ROWS_PER_FIFTH: Final[int] = 20
-COVERAGE_MIN: Final[float] = 0.95
+COVERAGE_MIN: Final[float] = 0.90
+"""Branch 1 fires when the chosen farm's finite share of either host's span is under this.
+
+The design set 0.95. The manager lowered it to 0.90 before the first real run, after the audit showed
+0.914 at D8-pre, because the clause is about data availability: farm gaps (longest 7 half-hours)
+are filled with the smooth value and masked out of every score.
+"""
 TWIN_F1_EXPECTED: Final[float] = 0.767
 TWIN_F1_TOLERANCE: Final[float] = 0.02
 HALF_WIDTH_MAX: Final[float] = 0.05

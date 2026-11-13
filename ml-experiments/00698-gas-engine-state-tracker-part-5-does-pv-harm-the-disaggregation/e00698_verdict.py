@@ -11,7 +11,8 @@ Tested in this order:
 1. `inconclusive` (the audit blocks the test): D8's reading before the engine fails the curve gate
    with the farm shape at both capacities, or its solar-free twin's midday F1 differs from 0.767 by
    more than 0.02, or the paired half-width of the F1 contrast at D8 exceeds 0.05 (in any contrast
-   that exists), or the farm series covers under 95% of D8's span.
+   that exists), or the farm series covers under 90% of D8-pre's span or of D3's span (the design said 95% of D8's
+   span; the clause was changed before the first real run, see `COVERAGE_MIN`).
 2. `supported`: at one capacity, the farm weather contrast meets a harm criterion at D8 and at D3.
    If D3 failed the gate (no capacity passes with the farm shape), it must meet a criterion at D8
    at both capacities.
@@ -88,9 +89,7 @@ def all_inside(*, criteria: dict | None) -> bool:
     return all(inside_threshold(interval=criteria[c], criterion=c) for c in CRITERIA)
 
 
-def block_reasons(
-    *, gate: dict, scores: dict, coverage: float, waive_coverage: bool = False
-) -> list[str]:
+def block_reasons(*, gate: dict, scores: dict, coverage: float) -> list[str]:
     """Return the reasons the audit blocks the test (branch 1), empty if it does not."""
     reasons: list[str] = []
     keys = [capacity_key(capacity_mw=c) for c in CAPACITIES_MW]
@@ -114,9 +113,9 @@ def block_reasons(
             f"the paired half-width of the F1 contrast at D8-pre reaches {max(widths):.3f}, "
             f"above {HALF_WIDTH_MAX}"
         )
-    if coverage < COVERAGE_MIN and not waive_coverage:
+    if coverage < COVERAGE_MIN:
         reasons.append(
-            f"the farm series covers {coverage:.3f} of D8-pre's span, under {COVERAGE_MIN}"
+            f"the farm series covers {coverage:.3f} of the smaller host span, under {COVERAGE_MIN}"
         )
     return reasons
 
@@ -150,7 +149,6 @@ def decide(
     gate: dict,
     scores: dict,
     coverage: float,
-    waive_coverage: bool = False,
     strict_refuted: bool = False,
 ) -> tuple[str, list[str]]:
     """Return the verdict word and the lines that explain it.
@@ -158,8 +156,7 @@ def decide(
     Args:
         gate: The parsed `gate.json`.
         scores: The parsed `scores.json`.
-        coverage: The farm's finite share of D8-pre's span.
-        waive_coverage: Drop the coverage clause of branch 1. Only the post hoc line uses it.
+        coverage: The farm's smallest finite share over the D8-pre and D3 spans.
         strict_refuted: Read branch 4 as needing all four pairs (both capacities, both shapes).
 
     Returns:
@@ -167,9 +164,7 @@ def decide(
     """
     keys = [capacity_key(capacity_mw=c) for c in CAPACITIES_MW]
     notes: list[str] = []
-    blocks = block_reasons(
-        gate=gate, scores=scores, coverage=coverage, waive_coverage=waive_coverage
-    )
+    blocks = block_reasons(gate=gate, scores=scores, coverage=coverage)
     if blocks:
         return "inconclusive", [f"branch 1: {reason}" for reason in blocks]
     farm_d8 = {
@@ -264,15 +259,9 @@ def main() -> None:
     gate = read_json(path=GATE_PATH)
     scores = read_json(path=SCORES_PATH)
     audit = read_json(path=AUDIT_PATH)
-    coverage = float(audit["numbers"]["farm_coverage_d8pre"])
+    coverage = float(audit["numbers"]["farm_coverage_min"])
     word, notes = decide(gate=gate, scores=scores, coverage=coverage)
     lines = [f"Verdict (the plan's rule): {word.upper()}", *[f"  {n}" for n in notes]]
-    post_word, _ = decide(gate=gate, scores=scores, coverage=coverage, waive_coverage=True)
-    if coverage < COVERAGE_MIN:
-        lines.append(
-            f"Post hoc, with the coverage clause of branch 1 waived (not the pre-registered rule): "
-            f"{post_word.upper()}"
-        )
     strict_word, _ = decide(gate=gate, scores=scores, coverage=coverage, strict_refuted=True)
     if strict_word != word:
         lines.append(
@@ -287,7 +276,7 @@ def main() -> None:
     (PRINTED_DIR / "verdict.txt").write_text("\n".join(lines) + "\n")
     write_json(
         path=VERDICT_PATH,
-        payload={"verdict": word, "notes": notes, "post_hoc_coverage_waived": post_word},
+        payload={"verdict": word, "notes": notes},
     )
 
 

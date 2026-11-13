@@ -480,8 +480,8 @@ def test_verdict_branch_1_blocks_the_test() -> None:
         d8_farm=(HARM, HARM), d8_cams=(HARM, HARM), d3_farm=(HARM, HARM), twin=0.73
     )
     assert word(gate=synthetic_gate(), scores=bad_twin) == "inconclusive"
-    assert word(gate=synthetic_gate(), scores=good, coverage=0.94) == "inconclusive"
-    assert word(gate=synthetic_gate(), scores=good, coverage=0.95) == "supported"
+    assert word(gate=synthetic_gate(), scores=good, coverage=0.89) == "inconclusive"
+    assert word(gate=synthetic_gate(), scores=good, coverage=0.90) == "supported"
     wide = contrast_criteria(f1=0.10, false_flag=0.05, bmd=0.10, half=0.06)
     wide_scores = synthetic_scores(d8_farm=(wide, wide), d8_cams=(wide, wide), d3_farm=(HARM, HARM))
     assert word(gate=synthetic_gate(), scores=wide_scores) == "inconclusive"
