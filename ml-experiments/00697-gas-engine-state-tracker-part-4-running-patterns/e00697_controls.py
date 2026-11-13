@@ -26,7 +26,7 @@ r"""Experiment 697's controls: a real reading with a known engine injected, then
 Each job injects Gas A's days over the span and the 28 days before it, tracks the span with
 experiment 694's M2 (`track_span`), and writes `controls/<job>.npz` atomically. A finished file is
 skipped, so a crashed run is rerun without touching the others. The seed of the day draw is the
-job's seed plus a per-series offset, so two hosts of one span do not share a truth.
+job's seed plus a per-series and a per-control offset, so no two controls share a truth.
 """
 
 import argparse
@@ -64,6 +64,8 @@ N_WORKERS: Final[int] = 8
 HOSTS: Final[tuple[str, ...]] = ("D2", "D3", "D4")
 """MVA-only Primaries that experiment 695 used as hosts."""
 SERIES_SEED_OFFSET: Final[dict[str, int]] = {"D8": 0, "D2": 100, "D3": 200, "D4": 300}
+CONTROL_SEED_OFFSET: Final[dict[str, int]] = {"c1": 0, "c1s_net": 10, "c1s_solar": 20, "c2": 0}
+"""Each control kind draws its own truth, so the three C1 null controls are independent."""
 SCALED_FLOOR_MVA: Final[float] = 0.3
 """C1s floors the scaled reading here, so the reading stays positive."""
 DAYTIME_FIRST: Final[int] = 18
@@ -92,13 +94,29 @@ def jobs() -> list[Job]:
     """Return every job: 6 for C1, 6 for C1s (3 scaled to each era), and 24 for C2."""
     out: list[Job] = []
     out.extend(
-        Job(f"c1_{truth}_s{seed}", "c1", "D8", "pre", truth, seed, scale_to=None)
+        Job(
+            name=f"c1_{truth}_s{seed}",
+            control="c1",
+            series="D8",
+            span="pre",
+            truth=truth,
+            seed=seed,
+            scale_to=None,
+        )
         for truth in ("null", "weekday")
         for seed in range(3)
     )
     for era in ("net", "solar"):
         out.extend(
-            Job(f"c1s_{era}_null_s{seed}", f"c1s_{era}", "D8", "pre", "null", seed, scale_to=era)
+            Job(
+                name=f"c1s_{era}_null_s{seed}",
+                control=f"c1s_{era}",
+                series="D8",
+                span="pre",
+                truth="null",
+                seed=seed,
+                scale_to=era,
+            )
             for seed in range(3)
         )
     for host in HOSTS:
@@ -106,7 +124,17 @@ def jobs() -> list[Job]:
             for truth in ("null", "weekday"):
                 for seed in range(2):
                     name = f"c2_{host.lower()}_{span}_{truth}_s{seed}"
-                    out.append(Job(name, "c2", host, span, truth, seed, scale_to=None))
+                    out.append(
+                        Job(
+                            name=name,
+                            control="c2",
+                            series=host,
+                            span=span,
+                            truth=truth,
+                            seed=seed,
+                            scale_to=None,
+                        )
+                    )
     return out
 
 
@@ -184,7 +212,10 @@ def run_job(job: Job, *, write: bool = True) -> str:
         first=inject_first,
         last=last,
         kind=job.truth,
-        seed=DRAW_SEED + job.seed + SERIES_SEED_OFFSET[job.series],
+        seed=DRAW_SEED
+        + job.seed
+        + SERIES_SEED_OFFSET[job.series]
+        + CONTROL_SEED_OFFSET[job.control],
         days=DAYS[0],
     )
     injected = inject_span(y_all=y, g=g, first=inject_first, last=last)

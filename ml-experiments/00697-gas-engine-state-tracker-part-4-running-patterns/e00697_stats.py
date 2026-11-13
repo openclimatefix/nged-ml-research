@@ -80,6 +80,8 @@ WEEKDAY_FRAMES: Final[tuple[str, ...]] = (
     "c2_d4_weekday",
 )
 """Controls whose truth is drawn within the weekday class: they give the attenuation."""
+PRICE_QUESTIONS: Final[tuple[str, ...]] = ("q2", "q2q")
+"""Questions that need the half-hourly system price (from 2023-06), so only C2 hosts carry them."""
 CONTROL_LABELS: Final[tuple[str, ...]] = ("ts", "tf", "truth1", "truth2")
 D8_LABELS: Final[tuple[str, ...]] = ("ts", "tf", "p_any_a")
 RECORD_LABELS: Final[tuple[str, ...]] = ("r1", "r2")
@@ -224,6 +226,17 @@ def cross_era_questions(*, frames: dict[str, pl.DataFrame]) -> dict[str, object]
     return out
 
 
+def controls_for(*, question: str) -> tuple[str, ...]:
+    """Return the null controls that a question's D is computed against.
+
+    The price questions use the C2 hosts only, because C1 and C1s end before the price starts. Every
+    other question uses all six null controls.
+    """
+    if question in PRICE_QUESTIONS:
+        return tuple(name for name in NULL_FRAMES if name.startswith("c2"))
+    return NULL_FRAMES
+
+
 def differences(*, results: dict[str, dict]) -> dict[str, dict]:
     """Return D, D8's estimate minus each null control's, for each question and era (Ts labels)."""
     out: dict[str, dict] = {}
@@ -234,7 +247,7 @@ def differences(*, results: dict[str, dict]) -> dict[str, dict]:
                 continue
             first = results["d8"][era]["ts"].get(question)
             row = {}
-            for name in NULL_FRAMES:
+            for name in controls_for(question=question):
                 second = results[name].get(era, {}).get("ts", {}).get(question)
                 if isinstance(first, Estimate) and isinstance(second, Estimate):
                     row[name] = difference_estimate(first=first, second=second)

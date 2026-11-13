@@ -179,14 +179,15 @@ def group_within(*, value: str, n_groups: int, within: tuple[str, ...] = ()) -> 
     """Return an expression for the group (0 to `n_groups - 1`) of `value` among its peers.
 
     Peers are the rows that share the `within` columns, and a group is a rank interval of equal
-    size, so 3 groups are thirds and 5 are fifths. Null values stay null. Ties are broken by row
-    order, which matters little for a continuous driver.
+    size, so 3 groups are thirds and 5 are fifths. Null values stay null. **Tied values take their
+    average rank, so a driver that is exactly 0 for a whole cell (irradiance at night) lands in one
+    middle group and never fills the bottom or the top group by row order.**
     """
-    rank = pl.col(value).rank(method="ordinal")
+    rank = pl.col(value).rank(method="average")
     count = pl.col(value).count()
     if within:
         rank, count = rank.over(*within), count.over(*within)
-    return ((rank - 1) * n_groups // count).cast(pl.Int8)
+    return ((rank - 1) * n_groups / count).floor().cast(pl.Int8)
 
 
 def quantile_bins(*, values: np.ndarray, n_bins: int) -> np.ndarray:
@@ -215,10 +216,11 @@ def gas_day_expression() -> pl.Expr:
     """Return the gas day (a date) of each half-hour, from its UTC `start`.
 
     The gas price for gas day D covers 05:00 on D to 05:00 on D + 1, so a half-hour belongs to the
-    gas day of its local start time minus 5 hours. Joining on the local date instead would give 10
-    of the 48 half-hours of each day the wrong day's gas price.
+    gas day of its local clock time minus 5 hours. The subtraction is on the wall clock, so a
+    clock-change day is not shifted. Joining on the local date instead would give 10 of the 48
+    half-hours of each day the wrong day's gas price.
     """
-    local = pl.col("start").dt.convert_time_zone(LOCAL_TZ)
+    local = pl.col("start").dt.convert_time_zone(LOCAL_TZ).dt.replace_time_zone(None)
     return (local - pl.duration(hours=GAS_DAY_START_HOUR)).dt.date()
 
 

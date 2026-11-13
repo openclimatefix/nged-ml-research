@@ -40,12 +40,12 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     Estimate,
 )
 from e00697_drivers import bank_holiday_dates  # ty: ignore[unresolved-import]
-from e00697_figures import BLUE, ORANGE, PURPLE, save  # ty: ignore[unresolved-import]
+from e00697_figures import BLUE, ORANGE, SKY, host_null_frame, save  # ty: ignore[unresolved-import]
 from e00697_frame import load_frame  # ty: ignore[unresolved-import]
 from e00697_signals_download import SIGNALS_DIR  # ty: ignore[unresolved-import]
 
 HALF_HOURLY_SIGNALS: Final[dict[str, tuple[str, str]]] = {
-    "apx_price": ("apx_mid", "Day-ahead price (APX index)"),
+    "apx_price": ("apx_mid", "Within-day price (APX index)"),
     "imbalance_mw": ("imbalngc", "Forecast imbalance (same-day vintage)"),
     "national_demand_mw": ("historic_demand", "National demand"),
     "embedded_wind_mw": ("historic_demand", "Embedded wind"),
@@ -59,9 +59,9 @@ WARNING_TYPES: Final[tuple[str, ...]] = ("MARGIN", "CAPACITY MARKET")
 SERIES: Final[dict[str, str]] = {
     "net": "D8 net era",
     "solar": "D8 solar era",
-    "null": "Null control",
+    "null": "Null control on host series",
 }
-COLOURS: Final[list[str]] = [BLUE, ORANGE, PURPLE]
+COLOURS: Final[list[str]] = [BLUE, SKY, ORANGE]
 
 
 def read_signal(*, name: str) -> pl.DataFrame:
@@ -126,7 +126,11 @@ def top_minus_bottom(*, view: pl.DataFrame, column: str, seed: int) -> Estimate 
 
 
 def views(*, frames: dict[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
-    """Return the three views the panels compare: D8's net and solar flags, and the null control."""
+    """Return the three views the panels compare: D8's net and solar flags, and the host controls.
+
+    The key `c1_null` holds the stacked null controls of the C2 hosts, which cover the period of
+    every signal (the C1 controls end before 2023-06-12).
+    """
     d8 = frames["d8"]
     return {
         "net": with_state(frame=d8.filter(pl.col("era") == "net"), column="ts"),
@@ -198,6 +202,7 @@ def event_rows(*, series: dict[str, pl.DataFrame]) -> pl.DataFrame:
             }
             for name, group in groups.items()
             if group.height
+            and (name == "System warning day" or group["local_date"].n_unique() >= MIN_DAYS_PER_BIN)
         )
     return pl.DataFrame(rows)
 
@@ -211,7 +216,8 @@ def checks(*, frames: dict[str, pl.DataFrame]) -> list[str]:
     if both.height:
         difference = (both["apx_price"] - both["day_ahead_price"]).abs()
         lines.append(
-            f"APX index against the held day-ahead price, {both.height} overlapping half-hours: "
+            "APX within-day index against the held N2EX day-ahead price, "
+            f"{both.height} overlapping half-hours: "
             f"median absolute difference {difference.median():.2f}, "
             f"share within 0.05 GBP per MWh {(difference <= 0.05).mean():.3f}. "
             "The held table is NESO's N2EX hourly day-ahead price, not the APX "
@@ -281,9 +287,13 @@ def figures(*, series: dict[str, pl.DataFrame]) -> None:
 
 def main() -> None:
     """Attach the signals to the frames, write the checks, and draw the panels."""
-    frames = {name: attach(frame=load_frame(name=name)) for name in ("d8", "c1_null")}
+    frames = {
+        "d8": attach(frame=load_frame(name="d8")),
+        "c1_null": attach(frame=host_null_frame()),
+    }
     lines = checks(frames=frames)
     series = views(frames=frames)
+    PRINTED_DIR.mkdir(parents=True, exist_ok=True)
     (PRINTED_DIR / "signals_checks.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     figures(series=series)

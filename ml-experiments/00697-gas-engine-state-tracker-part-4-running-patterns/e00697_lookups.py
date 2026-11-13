@@ -13,9 +13,11 @@ script sends only public post codes (those listed in the EAC results) to `postco
 their coordinates, then measures the distance to D8 on this machine.
 
 The steps are: (1) read D8's area centre from `NGED/metadata.parquet` through the panel key, which
-is the `time_series_id`; (2) read the distinct post codes of the EAC results by SQL (not the 1.7
-million rows); (3) geocode the post codes; (4) keep those within `RADIUS_KM`; (5) pull the EAC rows
-at those post codes into the private folder and print their count. A Capacity Market register
+is the `time_series_id`; (2) ask NESO's SQL endpoint for the row count per post code and service
+of the gas reciprocating
+engines in the EAC results, a query that names only the technology; (3) geocode the post codes
+here; (4) keep those within `RADIUS_KM`; (5) write the matching counts to the private folder and
+print their total. A Capacity Market register
 lookup is not made, because a private dossier already answers it.
 """
 
@@ -36,6 +38,8 @@ RADIUS_KM: Final[float] = 5.0
 """The distance from the centre of D8's supply area within which a post code counts as near."""
 EARTH_RADIUS_KM: Final[float] = 6371.0
 EAC_RESOURCE_ID: Final[str] = "a63ab354-7e68-44c2-ad96-c6f920c30e85"
+EAC_TECHNOLOGY: Final[str] = "Gas Reciprocating Engines"
+"""The only filter sent to NESO: the technology of a gas engine."""
 POSTCODE_API: Final[str] = "https://api.postcodes.io/postcodes"
 POSTCODE_BATCH: Final[int] = 100
 
@@ -77,28 +81,28 @@ def near_postcodes(*, postcodes: list[str], centre: tuple[float, float]) -> set[
 
 
 def eac(*, centre: tuple[float, float]) -> tuple[int, int]:
-    """Write EAC rows at post codes near D8 to a private file; return (post codes, rows)."""
+    """Write EAC aggregates near D8 to a private file; return (post codes, half-hourly rows).
+
+    The query names only a technology and asks the server to count rows per post code and service,
+    so the server receives nothing about D8's position. The distance filter runs here.
+    """
     reply = get_json(
-        url=f"{NESO}/datastore_search_sql",
-        params={"sql": f'SELECT DISTINCT "postCode" FROM "{EAC_RESOURCE_ID}"'},
-    )
-    codes = [r["postCode"] for r in reply["result"]["records"] if r["postCode"]]  # ty: ignore[not-subscriptable]
-    near = sorted(near_postcodes(postcodes=codes, centre=centre))
-    if not near:
-        return 0, 0
-    quoted = ", ".join("'" + p.replace("'", "") + "'" for p in near)
-    rows = get_json(
         url=f"{NESO}/datastore_search_sql",
         params={
             "sql": (
-                'SELECT "serviceType", "technologyType", "postCode", '
-                '"deliveryStart", "executedQuantity", "clearingPrice" '
-                f'FROM "{EAC_RESOURCE_ID}" WHERE "postCode" IN ({quoted})'
+                'SELECT "postCode", "serviceType", COUNT(*) AS n_rows, '
+                'AVG("executedQuantity") AS mean_executed_mw '
+                f'FROM "{EAC_RESOURCE_ID}" WHERE "technologyType" = \'{EAC_TECHNOLOGY}\' '
+                'GROUP BY "postCode", "serviceType"'
             )
         },
-    )["result"]["records"]  # ty: ignore[not-subscriptable]
-    pl.DataFrame(rows, infer_schema_length=None).write_csv(LOOKUPS_DIR / "eac_near_d8_PRIVATE.csv")
-    return len(near), len(rows)
+    )
+    table = pl.DataFrame(reply["result"]["records"], infer_schema_length=None)
+    table = table.filter(pl.col("postCode").is_not_null())
+    near = near_postcodes(postcodes=table["postCode"].to_list(), centre=centre)
+    hits = table.filter(pl.col("postCode").is_in(sorted(near)))
+    hits.write_csv(LOOKUPS_DIR / "eac_near_d8_PRIVATE.csv")
+    return hits["postCode"].n_unique(), int(hits["n_rows"].cast(pl.Int64).sum() or 0)
 
 
 def main() -> None:

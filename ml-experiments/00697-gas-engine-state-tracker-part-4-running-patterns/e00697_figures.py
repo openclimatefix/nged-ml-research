@@ -53,7 +53,6 @@ WEEKDAY_NAMES: Final[tuple[str, ...]] = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat
 BLUE: Final[str] = ocf.DATA_BLUE
 ORANGE: Final[str] = ocf.BRAND_ORANGE
 SKY: Final[str] = ocf.DATA_SKY
-PURPLE: Final[str] = ocf.DATA_PURPLE
 GREEN: Final[str] = ocf.DATA_GREEN
 TEXT_NODE: Final = re.compile(r">([^<>]+)<")
 """The text between SVG tags: axis labels, titles, and legend entries."""
@@ -66,8 +65,25 @@ SVGO: Final[tuple[str, ...]] = (
     "--precision=1",
     "--final-newline",
 )
+SERIES_COLOURS: Final[dict[str, str]] = {
+    "D8, net era": BLUE,
+    "D8, solar era": SKY,
+    "Null control": ORANGE,
+}
+"""One colour per group in the charts that compare D8's eras with the null control."""
+SERIES_NAMES: Final[dict[str, str]] = {"net": "D8, net era", "solar": "D8, solar era"}
 ERA_TITLES: Final[dict[str, str]] = {"net": "Net era", "solar": "Solar era", "fade": "Fade era"}
 HALF_TITLES: Final[dict[bool, str]] = {True: "summer half", False: "winter half"}
+
+
+def series_colour(*, data: pl.DataFrame, column: str = "series", legend: bool = True) -> alt.Color:
+    """Return the colour encoding of the series present in `data`, in the group colours."""
+    present = list(dict.fromkeys(data[column].to_list()))
+    return alt.Color(
+        f"{column}:N",
+        scale=alt.Scale(domain=present, range=[SERIES_COLOURS[p] for p in present]),
+        legend=alt.Legend(title=None) if legend else None,
+    )
 
 
 def hour_axis(*, title: str = "Local time of day (hours)") -> alt.Axis:
@@ -146,7 +162,7 @@ def figure_1(*, frames: dict[str, pl.DataFrame]) -> None:
                 data=heat_map(view=part),
                 title=f"Null control, {HALF_TITLES[half]}",
                 top=top,
-                colour=PURPLE,
+                colour=ORANGE,
             )
         )
     record = view_of(frame=frames["record"], column="r1")
@@ -233,8 +249,9 @@ def figure_2(*, frames: dict[str, pl.DataFrame]) -> None:
     ]
     tables = [dwell_table(view=v, name=n, kind=k) for n, v in sets for k in (True, False)]
     data = pl.concat([t for t in tables if t.height])
-    colours = [ocf.BLACK_1, BLUE, SKY, PURPLE, ORANGE]
-    scale = alt.Scale(domain=[n for n, _ in sets], range=colours)
+    names = [n for n, _ in sets]
+    scale = alt.Scale(domain=names, range=[GREEN, BLUE, SKY, ORANGE, ORANGE])
+    dash = alt.Scale(domain=names, range=[[1, 0], [1, 0], [1, 0], [1, 0], [4, 3]])
     panels = []
     for measure, title in (
         ("survival", "Share of spells that last n half-hours or more"),
@@ -249,6 +266,7 @@ def figure_2(*, frames: dict[str, pl.DataFrame]) -> None:
                 ),
                 y=alt.Y(f"{measure}:Q", title=title, scale=alt.Scale(domain=[0, 1])),
                 color=alt.Color("series:N", scale=scale, legend=alt.Legend(title=None, columns=1)),
+                strokeDash=alt.StrokeDash("series:N", scale=dash, legend=None),
             )
             .properties(width=150, height=150)
             .facet(row=alt.Row("kind:N", title=None))
@@ -282,31 +300,53 @@ def price_rows(*, view: pl.DataFrame, name: str) -> list[dict]:
 
 def figure_3(*, frames: dict[str, pl.DataFrame]) -> None:
     """F3: running share against system price, within cell and overall."""
+    host = frames["host_null"]
     sets = [
-        ("Gas A, 1 or more units", view_of(frame=frames["record"], column="r1")),
-        ("Gas A, 2 or more units", view_of(frame=frames["record"], column="r2")),
-        ("D8 smoothed flags, net era", view_of(frame=frames["d8"], column="ts", era="net")),
-        ("D8 smoothed flags, solar era", view_of(frame=frames["d8"], column="ts", era="solar")),
-        ("D8 mean probability, net era", view_of(frame=frames["d8"], column="p_any_a", era="net")),
+        ("Gas A, 1 or more units", view_of(frame=frames["record"], column="r1"), GREEN, [1, 0]),
+        ("Gas A, 2 or more units", view_of(frame=frames["record"], column="r2"), GREEN, [4, 3]),
+        (
+            "D8 flags, net era",
+            view_of(frame=frames["d8"], column="ts", era="net"),
+            BLUE,
+            [1, 0],
+        ),
+        (
+            "D8 flags, solar era",
+            view_of(frame=frames["d8"], column="ts", era="solar"),
+            SKY,
+            [1, 0],
+        ),
+        (
+            "D8 mean probability, net era",
+            view_of(frame=frames["d8"], column="p_any_a", era="net"),
+            BLUE,
+            [4, 3],
+        ),
         (
             "D8 mean probability, solar era",
             view_of(frame=frames["d8"], column="p_any_a", era="solar"),
+            SKY,
+            [4, 3],
         ),
-        ("Null control, labels", view_of(frame=frames["c1_null"], column="ts")),
-        ("Scaled null control, net level", view_of(frame=frames["c1s_net_null"], column="ts")),
+        ("Null control on host series, labels", view_of(frame=host, column="ts"), ORANGE, [1, 0]),
     ]
-    data = pl.DataFrame([r for name, view in sets for r in price_rows(view=view, name=name)])
-    colours = [ocf.BLACK_1, ocf.BLACK_2, BLUE, SKY, ORANGE, ocf.DATA_AMBER, PURPLE, GREEN]
+    data = pl.DataFrame([r for name, view, _, _ in sets for r in price_rows(view=view, name=name)])
+    names = [n for n, _, _, _ in sets]
     chart = (
         alt.Chart(data)  # ty: ignore[unresolved-attribute]
-        .mark_line(aria=False, point=alt.OverlayMarkDef(filled=True, size=40))
+        .mark_line(aria=False, point=alt.OverlayMarkDef(aria=False, filled=True, size=40))
         .encode(
             x=alt.X("bin:O", title="Price bin (1 cheapest)", axis=alt.Axis(labelAngle=0)),
             y=alt.Y("share:Q", title="Running share", axis=alt.Axis(format=".0%")),
             color=alt.Color(
                 "series:N",
-                scale=alt.Scale(domain=[n for n, _ in sets], range=colours),
+                scale=alt.Scale(domain=names, range=[c for _, _, c, _ in sets]),
                 legend=alt.Legend(title=None, columns=1),
+            ),
+            strokeDash=alt.StrokeDash(
+                "series:N",
+                scale=alt.Scale(domain=names, range=[d for _, _, _, d in sets]),
+                legend=None,
             ),
         )
         .properties(width=170, height=180)
@@ -345,7 +385,7 @@ def figure_4(*, frames: dict[str, pl.DataFrame]) -> None:
     )
     ramp_chart = (
         alt.Chart(ramp, title="Output as a share of the level reached")  # ty: ignore[unresolved-attribute]
-        .mark_line(aria=False, point=alt.OverlayMarkDef(filled=True, size=40))
+        .mark_line(aria=False, point=alt.OverlayMarkDef(aria=False, filled=True, size=40))
         .encode(
             x=alt.X(
                 "offset:Q",
@@ -392,11 +432,11 @@ def bar(
     """Return a grouped line-with-points chart of `y` by `x`, coloured by `color`."""
     return (
         alt.Chart(data, title=title)  # ty: ignore[unresolved-attribute]
-        .mark_line(aria=False, point=alt.OverlayMarkDef(filled=True, size=40))
+        .mark_line(aria=False, point=alt.OverlayMarkDef(aria=False, filled=True, size=40))
         .encode(
             x=alt.X(f"{x}:O", title=None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y(f"{y}:Q", title="Running share", axis=alt.Axis(format=".0%")),
-            color=alt.Color(f"{color}:N", legend=alt.Legend(title=None)),
+            color=series_colour(data=data, column=color),
         )
         .properties(width=width, height=150)
     )
@@ -448,14 +488,15 @@ def gallery_1(*, frames: dict[str, pl.DataFrame]) -> None:
         color="series",
         title="Days with 4+ running half-hours",
     )
+    persistence_data = pl.concat(persistence)
     right = (
-        alt.Chart(pl.concat(persistence), title="Next weekday, by previous")  # ty: ignore[unresolved-attribute]
+        alt.Chart(persistence_data, title="Next weekday, by previous")  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
         .encode(
             x=alt.X("previous_day:N", title=None, axis=alt.Axis(labelAngle=0)),
             xOffset="series:N",
             y=alt.Y("share:Q", title="Share running", axis=alt.Axis(format=".0%")),
-            color=alt.Color("series:N", legend=None),
+            color=series_colour(data=persistence_data, legend=False),
         )
         .properties(width=110, height=150)
     )
@@ -515,7 +556,7 @@ def gallery_3(*, frames: dict[str, pl.DataFrame]) -> None:
             view.with_columns(group=(pl.col("price_rank_in_day") // 6))
             .group_by("group")
             .agg(share=pl.col("state").mean())
-            .with_columns(series=pl.lit(ERA_TITLES[era]), rank=pl.col("group") * 6 + 1)
+            .with_columns(series=pl.lit(SERIES_NAMES[era]), rank=pl.col("group") * 6 + 1)
         )
         rows.append(by_rank)
         weekday = view.filter(~pl.col("weekend"))
@@ -532,7 +573,7 @@ def gallery_3(*, frames: dict[str, pl.DataFrame]) -> None:
         for name, group in groups.items():
             band_rows.append(
                 {
-                    "series": ERA_TITLES[era],
+                    "series": SERIES_NAMES[era],
                     "group": name,
                     "share": group["state"].mean() if group.height else None,
                     "days": group["local_date"].n_unique(),
@@ -545,9 +586,10 @@ def gallery_3(*, frames: dict[str, pl.DataFrame]) -> None:
         color="series",
         title="By price rank in the day",
     )
+    band_data = pl.DataFrame(band_rows).filter(pl.col("share").is_not_null())
     right = (
         alt.Chart(  # ty: ignore[unresolved-attribute]
-            pl.DataFrame(band_rows).filter(pl.col("share").is_not_null()),
+            band_data,
             title="Red band and dearest six",
         )  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
@@ -555,7 +597,7 @@ def gallery_3(*, frames: dict[str, pl.DataFrame]) -> None:
             y=alt.Y("group:N", title=None, sort=None),
             yOffset="series:N",
             x=alt.X("share:Q", title="Running share", axis=alt.Axis(format=".0%")),
-            color=alt.Color("series:N", legend=None),
+            color=series_colour(data=band_data, legend=False),
         )
         .properties(width=100, height=170)
     )
@@ -582,16 +624,17 @@ def gallery_4(*, frames: dict[str, pl.DataFrame]) -> None:
                 min_days=MIN_DAYS_PER_BIN,
             )
             rows.extend(
-                {"panel": title, "series": ERA_TITLES[era], "bin": b.bin + 1, "share": b.share}
+                {"panel": title, "series": SERIES_NAMES[era], "bin": b.bin + 1, "share": b.share}
                 for b in binned
             )
+    data = pl.DataFrame(rows)
     chart = (
-        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
-        .mark_line(aria=False, point=alt.OverlayMarkDef(filled=True, size=40))
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
+        .mark_line(aria=False, point=alt.OverlayMarkDef(aria=False, filled=True, size=40))
         .encode(
             x=alt.X("bin:O", title="Bin (1 lowest)", axis=alt.Axis(labelAngle=0)),
             y=alt.Y("share:Q", title="Running share", axis=alt.Axis(format=".0%")),
-            color=alt.Color("series:N", legend=alt.Legend(title=None)),
+            color=series_colour(data=data),
         )
         .properties(width=150, height=150)
         .facet(column=alt.Column("panel:N", title=None))
@@ -663,14 +706,15 @@ def gallery_6(*, frames: dict[str, pl.DataFrame]) -> None:
         for name, group in groups.items():
             rows.append(
                 {
-                    "series": ERA_TITLES[era],
+                    "series": SERIES_NAMES[era],
                     "group": name,
                     "share": group["state"].mean() if group.height else None,
                     "days": group["local_date"].n_unique(),
                 }
             )
+    data = pl.DataFrame(rows).filter(pl.col("share").is_not_null())
     chart = (
-        alt.Chart(pl.DataFrame(rows).filter(pl.col("share").is_not_null()))  # ty: ignore[unresolved-attribute]
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
         .encode(
             y=alt.Y("group:N", title=None, sort=None),
@@ -678,7 +722,7 @@ def gallery_6(*, frames: dict[str, pl.DataFrame]) -> None:
             x=alt.X(
                 "share:Q", title="Running share, 16:00 to 19:00 local", axis=alt.Axis(format=".0%")
             ),
-            color=alt.Color("series:N", legend=alt.Legend(title=None)),
+            color=series_colour(data=data),
         )
         .properties(width=400, height=140)
     )
@@ -706,7 +750,7 @@ def gallery_8(*, frames: dict[str, pl.DataFrame]) -> None:
         )
         for column, colour, title in (
             ("share", BLUE, "Running share"),
-            ("block", PURPLE, "Mean fitted block size (MW) when flagged"),
+            ("block", GREEN, "Mean fitted block size (MW) when flagged"),
         ):
             charts.append(
                 alt.Chart(grid, title=f"{ERA_TITLES[era]}, weekdays")  # ty: ignore[unresolved-attribute]
@@ -735,10 +779,17 @@ def gallery_8(*, frames: dict[str, pl.DataFrame]) -> None:
     )
 
 
+def host_null_frame() -> pl.DataFrame:
+    """Return the stacked null-control frames of the C2 hosts, which cover the price period."""
+    names = ("c2_d2_null", "c2_d3_null", "c2_d4_null")
+    return pl.concat([load_frame(name=name) for name in names], how="diagonal_relaxed")
+
+
 def main() -> None:
     """Load the frames the figures need and draw every published figure."""
-    names = ("d8", "record", "c1_null", "c1_weekday", "c1s_net_null")
+    names = ("d8", "record", "c1_null", "c1_weekday")
     frames = {name: load_frame(name=name) for name in names}
+    frames["host_null"] = host_null_frame()
     for step in (
         figure_1,
         figure_2,

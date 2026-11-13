@@ -12,7 +12,7 @@ status: planned
 kind: other
 size: >-
   Anything else (no forecast, no new data, new analysis code). Stored: one private half-hour table
-  per series, tracker labels for about 33 control runs, six tables, and private dated figures. More
+  per series, tracker labels for 36 control jobs, six tables, and private dated figures. More
   than one design is defensible (which labels, which control, which bins), so the choices are fixed
   below. Callers: this folder's scripts, which import experiment 694's trackers and loaders and
   experiment 695's states and engine module.
@@ -36,7 +36,7 @@ decision_rule: >-
   era only, or in both eras with a point estimate under 0.10. Inconclusive: D8's own difference
   excludes zero but the interval of D includes zero against a null control in both eras, so
   tracker error is not excluded. No smallest worthwhile gain applies, because the experiment
-  ports no change. Every other question is exploratory and does not change the verdict word.
+  changes no production code. Every other question is exploratory and does not change the verdict word.
 benchmark: none (no forecast is scored)
 row_set_id: none
 metric: running share of half-hours, differences of shares, spell lengths in half-hours
@@ -51,11 +51,11 @@ aggregates over the whole record.
 
 ## What earlier experiments left open
 
-**Only profiles by hour and monthly totals of the tracker's labels have been printed, and no
-figure shows them by weekday, season, price, or spell length.**
-[Experiment 694](../00694-gas-engine-state-tracker-part-1/result.md) built the tracker (a grid
-filter on the demand level and the number of engine units running) and labelled D8's whole history.
-[Experiment 695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md)
+**Only profiles by hour and monthly totals of the tracker's labels have been printed, and no figure
+shows them by weekday, season, price, or spell length.** [Experiment
+694](../00694-gas-engine-state-tracker-part-1/result.md) built the tracker (a grid filter on the
+demand level and the number of engine units running) and labelled D8's whole history. [Experiment
+695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md)
 stored the tracker's probabilities and its causal version. Neither experiment checked a pattern in
 the labels against what the tracker would produce on a series with a known engine and no such
 pattern.
@@ -64,8 +64,8 @@ pattern.
 
 - **Power stamps mark the end of a half-hour and price stamps mark the start.** Every stamp that
   comes from a power series is moved to the start of its half-hour (`time` minus 30 minutes) before
-  the price join, the gas-day join, and the conversion to local time. The authority is
-  [the data-processing page](../data-processing.md). Every hour-of-day axis therefore sits 30 minutes
+  the price join, the gas-day join, and the conversion to local time. The authority is [the
+  data-processing page](../data-processing.md). Every hour-of-day axis therefore sits 30 minutes
   earlier than in experiment 194.
 - **The record of Gas A and the tracker's labels share almost no time.** The tracker's F1 score
   comes from injecting the record into other Primaries. The record is used as aggregates and as
@@ -90,19 +90,18 @@ pattern.
 - **Local time.** A half-hour start becomes `Europe/London` time. The axis is the local half-hour
   (0 to 47) and the weekday is that of the local date. The six clock-change days are left out of
   hour-of-day plots. A **cell** is one local half-hour in one weekday class in one calendar month.
-
-- **Red band.** The red band of NGED's Distribution Use of System (DUoS) charges for
-  half-hourly metered low-voltage and high-voltage customers in East Midlands is 16:00 to 19:00
-  local time, Monday to Friday, and weekends are never red. The charging statements for 2023-24,
-  2024-25, and 2025-26 give the same hours. D8's substation is in the East Midlands licence area: D8's
-  panel key is the `time_series_id` of a primary substation in the stored metadata
+- **Red band.** The red band of NGED's Distribution Use of System (DUoS) charges for half-hourly
+  metered low-voltage and high-voltage customers in East Midlands is 16:00 to 19:00 local time,
+  Monday to Friday, and weekends are never red. NGED's Statements of Use of System Charges for
+  2023-24, 2024-25, and 2025-26 give the same hours. D8's substation is in the East Midlands licence
+  area: D8's panel key is the `time_series_id` of a primary substation in the stored metadata
   (`NGED/metadata.parquet`), and that row's `licence_area` is `EMids`. The match of panel key to
   `time_series_id` is inferred from the key type and one matching row, and is not documented in the
   panel. The band is the evening block, local half-hours 32 to 37. The 2025-26 statement says
   "Monday to Friday (Including Bank Holidays)", and the 2023-24 and 2024-25 statements do not state
   whether bank holidays are charged as weekdays. T6 therefore splits weekday evenings into ordinary
   days and bank holidays as a descriptive check, and does not change Q1's weekday class. The
-  statements are in the coordinator's briefs folder (`red_band_rules.md`).
+  statements are the source for the hours and for the wording on bank holidays.
 
 ## Controls
 
@@ -117,10 +116,11 @@ of Gas A's record are drawn at random with replacement for every local day of th
   of the labels' Q1 to the truth's Q1 gives the attenuation.
 - **C1:** D8 before the engine, null and weekday-class truth, seeds 0 to 2 (6 runs). **C1s:** C1
   with one constant subtracted from the reading so that its weekday daytime level matches the net
-  era's, null truth, seeds 0 to 2 (3 runs). **C2:** hosts D2, D3, and D4, net and solar spans, null
-  and weekday-class truth, seeds 0 and 1 (24 runs). **C3:** experiment 694's stored false-alarm
-  pass, read and not rerun. **C4:** experiment 695's stored host states, read to reproduce its F1
-  score of 0.785 and precision of 0.998.
+  era's, null truth, net and solar levels, seeds 0 to 2 (6 runs). **C2:** hosts D2, D3, and D4, net
+  and solar spans, null and weekday-class truth, seeds 0 and 1 (24 runs), which together make 36
+  control jobs. **C3:** experiment 694's stored false-alarm pass, read and not rerun. **C4:**
+  experiment 695's stored host states, read to reproduce its F1 score of 0.785 and precision of
+  0.998.
 - **What the controls cannot show:** no control has D8's 11 kV solar or the rise in noise at D8
   after 2025-03-24, and the injected engine has Gas A's mix of levels, not the block the tracker
   fits at D8. A reading of "not explained by tracker error" holds only for the demand shapes the
@@ -128,9 +128,10 @@ of Gas A's record are drawn at random with replacement for every local day of th
 
 ## Figures, tables, and questions
 
-- **Four figures on the page.** F1 is a calendar heat map (local half-hour by weekday, running
-  share). F2 is dwell: survival curves and hazards of on-spells and off-spells. F3 is running share
-  against system price within cell. F4 is Gas A's output levels and ramp shape. Each caption states
+- **Four figures on the page.** Figure 1 is a calendar heat map (local half-hour by weekday,
+  running share). Figure 2 is dwell: survival curves and hazards of on-spells and off-spells.
+  Figure 3 is running share against system price within cell. Figure 4 is Gas A's output levels and
+  ramp shape. Each caption states
   which pattern a tracker artefact could produce.
 - **Eight exploratory figures in a gallery** (G1 to G8): running days, start and stop clock times,
   daily price shape and the red band, spark spread and gas price, weather through the null control,
@@ -156,20 +157,22 @@ raster and example weeks stay in the private data folder. Every driver plot uses
 
 ## Signals added after the design
 
-**Nine open signals were added after the design was written and were not pre-registered as separate
-questions.** They are descriptive panels in the gallery (G9 and G10). None changes the Q1 verdict
-rule. The engine is described only as a gas engine with a long-term capacity contract, and no
-evidence of combined heat and power was found.
+**Ten open data tables, from nine groups of signals, were added after the design was written and
+were not pre-registered as separate questions.** The descriptive panels in the gallery (G9 and G10)
+show them. No panel changes the Q1 verdict rule. The engine is described only as a gas engine with a
+long-term capacity contract, and no evidence of combined heat and power was found.
 
-- **Day-ahead price.** Elexon's Market Index Data from the APX provider only, from 2023-06. The
-  N2EX provider returns 0.00 in 2023 and is not used. The held day-ahead price is NESO's N2EX
-  hourly price, a different auction, so the two are compared where they overlap and are not
-  expected to match.
+- **Within-day price.** Elexon's Market Index Data from the APX provider only, from 2023-06. The
+  index is the half-hourly price of the within-day market and is not the day-ahead auction. The
+  half-hours with price 0 and volume 0 are treated as missing. The N2EX provider returns 0.00 in
+  2023 and is not used. The held day-ahead price is NESO's N2EX hourly price, so the two series are
+  compared where they overlap and are not expected to match.
 - **Short Term Operating Reserve (STOR).** NESO's committed windows. Whether the engine holds a STOR
   agreement is unknown, so a match with a STOR window is a coincidence of timing and not a cause.
   The auction results are downloaded without unit or company names.
 - **System stress.** Elexon's system warnings (margin, capacity market, and demand flexibility
-  notices). There are only 7 capacity market notices in 3 years, so the panel's intervals are wide.
+  notices). There are only seven capacity market notices in 3 years, so the panel's intervals are
+  wide.
 - **Forecasts at the time of decision.** Elexon's indicated imbalance forecast (one vintage a day,
   published at about 09:45 UTC) and NESO's day-ahead demand forecast.
 - **Demand and weather.** NESO's historic demand files for 2023 to 2026 (national demand, embedded
@@ -180,11 +183,12 @@ evidence of combined heat and power was found.
 Each panel shows the running share in the top third of the signal minus the bottom third, within a
 cell, with the week-block interval, for D8's net and solar eras and for the null control. A signal
 that the injected control engine cannot respond to should show no pattern in the control. A
-reserve-and-response lookup (the NESO EAC results at post codes near the substation's supply area)
-prints counts only, and its rows stay in the private data folder. In the current file, post codes
-within 5 km of the supply area's centre list gas reciprocating engines selling Slow Reserve and
-batteries selling Response. That is a match on place and technology and does not confirm that the
-engine sells reserve.
+lookup of the NESO Enduring Auction Capability (EAC) results asks only for the technology "Gas
+Reciprocating Engines", counts rows per post code and service, and filters to post codes within 5
+km of the supply area's centre on this machine, so NESO is never sent a location. It prints counts
+only, and its rows stay in the private data folder. In the current file, one post code within 5 km
+of the supply area's centre lists gas reciprocating engines. The match is on place and technology
+only and does not confirm the identity of the engine.
 
 ## Standing practices
 

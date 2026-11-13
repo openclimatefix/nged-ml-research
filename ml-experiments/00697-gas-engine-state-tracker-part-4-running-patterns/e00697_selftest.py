@@ -8,20 +8,23 @@ The tests read no stored data and write nothing. They cover the stamp shift at l
 local time across both clock changes, the gas-day join, the day-grouping helper, spell and hazard
 extraction, the week-block interval's coverage on a planted difference, a null draw whose Q1 is
 zero, the questions on a planted weekday effect, the placement of a record day across a clock
-change, and the folded injection's span.
+change, the folded injection's span, tied ranks in the day-grouping helper, the verdict rule on
+synthetic statistics, and (when the stored panel is present) the level-shift constants of C1s.
 """
 
 from datetime import UTC, date, datetime
 
 import numpy as np
 import polars as pl
-from e00694_common import GRID_START  # ty: ignore[unresolved-import]
+from e00694_common import GRID_START, PANEL_PATH, load_panel  # ty: ignore[unresolved-import]
 from e00697_analysis import block_shares, q1, q2, q3, q6, q7, q8  # ty: ignore[unresolved-import]
 from e00697_common import (  # ty: ignore[unresolved-import]
     BLOCK_NAMES,
     CLOCK_CHANGE_DATES,
     EVENING_FIRST,
     EVENING_LAST,
+    PROBABILITY_PATH,
+    VERDICT_ERAS,
     add_local_fields,
     add_segments,
     day_block,
@@ -39,7 +42,10 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     share_difference_statistic,
     week_estimate,
 )
+from e00697_controls import level_shift_constant  # ty: ignore[unresolved-import]
 from e00697_engine import RecordDays, drive_series, grid_calendar  # ty: ignore[unresolved-import]
+from e00697_stats import controls_for  # ty: ignore[unresolved-import]
+from e00697_verdict import q1_verdict  # ty: ignore[unresolved-import]
 
 
 def index_of_end_stamp(*, end: datetime) -> int:
@@ -314,6 +320,73 @@ def test_questions_on_a_planted_weekday_effect() -> None:
     assert q7(view=view, seed=5) is not None
     assert q8(view=view, seed=6) is not None
     assert block_shares(view=view).height == 2 * len(BLOCK_NAMES)
+
+
+def interval(*, point: float, lo: float, hi: float) -> dict:
+    """Return a synthetic interval in the layout of `stats.json`."""
+    return {"point": point, "lo": lo, "hi": hi, "n_weeks": 30}
+
+
+def synthetic_stats(*, own: dict[str, dict], difference: dict[str, dict]) -> dict:
+    """Return a minimal `stats.json` with D8's own Q1 and D against every null control."""
+    names = controls_for(question="q1")
+    return {
+        "d8": {era: {"ts": {"q1": own[era]}} for era in VERDICT_ERAS},
+        "difference": {"q1": {era: dict.fromkeys(names, difference[era]) for era in VERDICT_ERAS}},
+    }
+
+
+def test_verdict_rule_on_synthetic_statistics() -> None:
+    """Each of the four verdict words comes out of the case built for it."""
+    zero = interval(point=0.0, lo=-0.05, hi=0.05)
+    clear = interval(point=0.3, lo=0.2, hi=0.4)
+    small = interval(point=0.05, lo=0.01, hi=0.09)
+    nothing = interval(point=0.01, lo=-0.1, hi=0.1)
+    own_pos = {"net": clear, "solar": clear}
+
+    def word(*, own: dict, net: dict, solar: dict) -> str:
+        stats = synthetic_stats(own=own, difference={"net": net, "solar": solar})
+        return q1_verdict(stats=stats)[0]
+
+    assert word(own={"net": zero, "solar": zero}, net=clear, solar=clear) == "NOT SUPPORTED"
+    assert word(own=own_pos, net=clear, solar=clear) == "SUPPORTED"
+    assert word(own=own_pos, net=clear, solar=nothing) == "PARTLY SUPPORTED"
+    assert word(own=own_pos, net=small, solar=small) == "PARTLY SUPPORTED"
+    assert word(own=own_pos, net=nothing, solar=nothing) == "INCONCLUSIVE"
+    assert word(own={"net": clear, "solar": zero}, net=clear, solar=clear) == "SUPPORTED"
+    missing = synthetic_stats(own=own_pos, difference={"net": clear, "solar": clear})
+    missing["difference"]["q1"]["net"].pop(controls_for(question="q1")[0])
+    assert (
+        q1_verdict(stats=missing)[0] == "PARTLY SUPPORTED"
+    )  # a missing D never counts as above zero
+
+
+def test_price_questions_use_only_the_c2_hosts() -> None:
+    """Q2 and Q2q are compared with the C2 controls alone, and Q1 with all six."""
+    assert len(controls_for(question="q1")) == 6
+    for question in ("q2", "q2q"):
+        names = controls_for(question=question)
+        assert names
+        assert all(name.startswith("c2") for name in names)
+
+
+def test_ranks_in_a_tied_cell_do_not_depend_on_row_order() -> None:
+    """An all-zero day group lands in the middle third, whichever way its rows are ordered."""
+    frame = pl.DataFrame({"day": [1] * 6, "value": [0.0] * 6, "order": list(range(6))})
+    expression = group_within(value="value", n_groups=3, within=("day",)).alias("g")
+    first = frame.with_columns(expression)
+    flipped = frame.reverse().with_columns(expression)
+    assert first["g"].to_list() == [1] * 6
+    assert flipped["g"].to_list() == [1] * 6
+
+
+def test_level_shift_constants_when_the_panel_is_stored() -> None:
+    """C1s subtracts about 0.093 MVA for the net era and 3.019 MVA for the solar era."""
+    if not PANEL_PATH.exists() or not PROBABILITY_PATH.exists():
+        return
+    panel = load_panel()
+    assert abs(level_shift_constant(panel=panel, era="net") - 0.093) < 0.01
+    assert abs(level_shift_constant(panel=panel, era="solar") - 3.019) < 0.01
 
 
 def main() -> None:

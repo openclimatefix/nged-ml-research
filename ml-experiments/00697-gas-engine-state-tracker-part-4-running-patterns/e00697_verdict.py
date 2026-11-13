@@ -24,7 +24,7 @@ other way. A result chosen after the tables are seen is labelled post hoc.
 """
 
 import json
-from typing import Final
+from typing import Final, TypedDict
 
 from e00697_common import (  # ty: ignore[unresolved-import]
     PRINTED_DIR,
@@ -32,12 +32,20 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     STATS_PATH,
     VERDICT_ERAS,
 )
-from e00697_stats import NULL_FRAMES  # ty: ignore[unresolved-import]
+from e00697_stats import controls_for  # ty: ignore[unresolved-import]
 
 EXPLORATORY: Final[tuple[str, ...]] = ("q2", "q2q", "q3", "q3a", "q6", "q7")
 P1B_LIMIT: Final[float] = 0.10
 """The labels of a patternless injected engine must show a difference below this."""
-Interval = dict[str, float]
+
+
+class Interval(TypedDict):
+    """A point estimate with its percentile interval and the number of weeks resampled."""
+
+    point: float
+    lo: float
+    hi: float
+    n_weeks: int
 
 
 def excludes_zero(*, estimate: Interval | None) -> bool:
@@ -53,7 +61,7 @@ def above_zero(*, estimate: Interval | None) -> bool:
 def differences_for(*, stats: dict, question: str, era: str) -> dict[str, Interval | None]:
     """Return D against every null control for a question and era; missing means not estimable."""
     row = stats["difference"].get(question, {}).get(era, {})
-    return {name: row.get(name) for name in NULL_FRAMES}
+    return {name: row.get(name) for name in controls_for(question=question)}
 
 
 def q1_verdict(*, stats: dict) -> tuple[str, list[str]]:
@@ -101,7 +109,9 @@ def reading(*, stats: dict, question: str) -> tuple[str, str]:
     explained = True
     for era in eras:
         diffs = differences_for(stats=stats, question=question, era=era)
-        if any(d is None or not excludes_zero(estimate=d) for d in diffs.values()):
+        if any(d is None for d in diffs.values()):
+            return "not estimable (a control gave no estimate, so no reading is made)", ""
+        if any(not excludes_zero(estimate=d) for d in diffs.values()):
             explained = False
     if explained:
         return "1 (not explained by the controls)", ""
@@ -120,14 +130,20 @@ def r_agrees(*, stats: dict, question: str) -> str:
 def p1b(*, stats: dict) -> str:
     """Return the P1b check: the null control's labels show a Q1 below the limit."""
     values = [
-        stats["c1_null"][era]["ts"]["q1"] for era in VERDICT_ERAS if era in stats.get("c1_null", {})
+        stats[name][era]["ts"]["q1"]
+        for name in ("c1_null", "c1s_net_null", "c1s_solar_null")
+        for era in VERDICT_ERAS
+        if era in stats.get(name, {})
     ]
     if not values or any(v is None for v in values):
         return "P1b: not available"
     point = max(v["point"] for v in values)
     ok = point < P1B_LIMIT
     side = "below" if ok else "NOT below"
-    return f"P1b: C1 null control's labels show Q1 {point:+.3f}, which is {side} {P1B_LIMIT}"
+    return (
+        f"P1b: the C1 and C1s null controls' labels show (largest) Q1 {point:+.3f}, "
+        f"which is {side} {P1B_LIMIT}"
+    )
 
 
 def main() -> None:

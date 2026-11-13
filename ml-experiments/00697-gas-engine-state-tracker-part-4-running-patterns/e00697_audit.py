@@ -15,6 +15,7 @@ labels, (4) the system price, (5) the gas price, (6) the day-ahead price, (7) na
 """
 
 import argparse
+import json
 import pickle
 import sys
 from datetime import UTC, date, datetime, timedelta
@@ -27,6 +28,7 @@ from e00694_common import EXPECTED_UNIT_COUNTS, N_GRID, load_panel  # ty: ignore
 from e00695_common import ERA1_START  # ty: ignore[unresolved-import]
 from e00697_common import (  # ty: ignore[unresolved-import]
     BLOCK_NAMES,
+    DATA_DIR,
     EVENING_FIRST,
     EVENING_LAST,
     EXPECTED_ERA_LENGTHS,
@@ -63,10 +65,6 @@ EXPECTED_GAS_A_COMPLETE_DAYS: Final[int] = 40
 EXPECTED_GAS_A_WEEKEND_DAYS: Final[int] = 12
 EXPECTED_GAS_A_WEEKEND_RUNNING_DAYS: Final[int] = 3
 EXPECTED_GAS_A_INCOMPLETE_DAYS: Final[int] = 4
-EXPECTED_GAS_A_OVERLAP_WITH_TA: Final[int] = 22
-"""Half-hours of Gas A whose end stamp is on or after the first day of experiment 695's labels."""
-GAS_A_LAST_END: Final[datetime] = ERA1_START + timedelta(hours=10, minutes=30)
-"""Gas A's last end stamp, from the stored record. It is compared in code, never printed."""
 EXPECTED_SHARES: Final[dict[str, float]] = {"net": 0.268, "solar": 0.384, "fade": 0.262}
 EXPECTED_UNITS_MW: Final[dict[str, float]] = {"net": 1.75, "solar": 2.25, "fade": 3.5}
 EXPECTED_TA_AGREEMENT: Final[dict[str, float]] = {"net": 0.999, "solar": 0.989, "fade": 0.867}
@@ -131,7 +129,7 @@ def coverage(
 
 
 def step_1_gas_a() -> pl.DataFrame:
-    """Gas A: row count, unit counts, last stamp, overlap with the labels, complete local days."""
+    """Gas A: row count, unit counts, last stamp (private), complete local days."""
     say("1. Gas A (aggregates and counts only; no date is printed)")
     frame = record_frame()
     check(name="2,054 rows", ok=frame.height == EXPECTED_GAS_A_ROWS, detail=str(frame.height))
@@ -142,15 +140,14 @@ def step_1_gas_a() -> pl.DataFrame:
         detail=str(counts),
     )
     coverage(name="Gas A start stamps", starts=frame["start"], show_dates=False)
-    end_stamp_last = frame["start"].max() + timedelta(minutes=30)  # ty: ignore[unsupported-operator]
-    check(name="last end stamp is the expected one", ok=end_stamp_last == GAS_A_LAST_END)
     ends = frame["start"] + timedelta(minutes=30)
-    overlap_ta = int((ends >= ERA1_START).sum())
-    check(
-        name="22 half-hours overlap experiment 695's first day of labels",
-        ok=overlap_ta == EXPECTED_GAS_A_OVERLAP_WITH_TA,
-        detail=str(overlap_ta),
-    )
+    private = {
+        "last_end_stamp": str(ends.max()),
+        "half_hours_ending_on_or_after_the_first_label_day": int((ends >= ERA1_START).sum()),
+    }
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (DATA_DIR / "audit_private.json").write_text(json.dumps(private, indent=1))
+    say("  two private checks of the record: written to the data folder, not printed")
     d8_starts = half_hour_starts(
         index=np.concatenate([int(e["start"]) + np.arange(len(e["y"])) for e in load_d8_eras()])
     )

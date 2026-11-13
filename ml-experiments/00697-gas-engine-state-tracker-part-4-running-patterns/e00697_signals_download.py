@@ -11,7 +11,8 @@ start in UTC (`start`)**, the convention of the experiment's frames.
 
 The signals, added after the experiment's design and not pre-registered as separate questions:
 
-- `apx_mid`: Elexon Market Index Data, APX provider only (`APXMIDP`), from 2023-06. The N2EX
+- `apx_mid`: Elexon Market Index Data, APX provider only (`APXMIDP`), from 2023-06. It is the
+  within-day half-hourly market index, not the day-ahead auction. The N2EX
   provider (`N2EXMIDP`) returns 0.00 in 2023 and is not used.
 - `stor_windows` and `stor_auction`: NESO Short Term Operating Reserve (STOR) committed windows,
   and the day-ahead auction results with the unit identifier and company name dropped.
@@ -179,7 +180,11 @@ def chunked(
 
 
 def apx_mid(*, max_chunks: int | None) -> pl.DataFrame:
-    """Return the APX day-ahead price index (GBP per MWh) and volume (MWh) by half-hour start."""
+    """Return the APX within-day market index (GBP per MWh) and volume (MWh) by half-hour start.
+
+    This is the EPEX short-term half-hourly index and not the day-ahead auction price. A row with
+    price 0 and volume 0 is a placeholder and its price is set to null.
+    """
 
     def fetch(start: date, end: date) -> pl.DataFrame:
         reply = get_json(
@@ -203,7 +208,9 @@ def apx_mid(*, max_chunks: int | None) -> pl.DataFrame:
     return (
         frame.select(
             start=pl.col("startTime").str.to_datetime(time_zone="UTC", time_unit="us"),
-            apx_price=pl.col("price"),
+            apx_price=pl.when((pl.col("price") == 0) & (pl.col("volume") == 0))
+            .then(None)
+            .otherwise(pl.col("price")),
             apx_volume=pl.col("volume"),
         )
         .unique(subset="start", keep="first", maintain_order=True)
@@ -294,11 +301,12 @@ def imbalngc(*, max_chunks: int | None) -> pl.DataFrame:
         for d in (FIRST_DAY + timedelta(days=i) for i in range((LAST_DAY - FIRST_DAY).days))
     ]
     frame = chunked(name="imbalngc", windows=windows, fetch=fetch, max_chunks=max_chunks)
-    return frame.select(
+    frame = frame.select(
         start=pl.col("startTime").str.to_datetime(time_zone="UTC", time_unit="us"),
         published=pl.col("publishTime").str.to_datetime(time_zone="UTC", time_unit="us"),
         imbalance_mw=pl.col("imbalance"),
-    ).sort("start")
+    )
+    return frame.sort("start", "published").unique(subset="start", keep="last", maintain_order=True)
 
 
 def demand_forecast(*, max_chunks: int | None) -> pl.DataFrame:
