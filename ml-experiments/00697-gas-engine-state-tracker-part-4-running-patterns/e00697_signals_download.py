@@ -467,8 +467,8 @@ def carbon_intensity(*, max_chunks: int | None) -> pl.DataFrame:
         return pl.DataFrame(
             {
                 "start": [r["from"] for r in rows],
-                "forecast": [r["intensity"]["forecast"] for r in rows],
-                "actual": [r["intensity"]["actual"] for r in rows],
+                "forecast": [r["intensity"].get("forecast") for r in rows],
+                "actual": [r["intensity"].get("actual") for r in rows],
             },
             schema={"start": pl.String, "forecast": pl.Float64, "actual": pl.Float64},
         )

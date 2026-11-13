@@ -213,7 +213,9 @@ def checks(*, frames: dict[str, pl.DataFrame]) -> list[str]:
         lines.append(
             f"APX index against the held day-ahead price, {both.height} overlapping half-hours: "
             f"median absolute difference {difference.median():.2f}, "
-            f"share within 0.05 GBP per MWh {(difference <= 0.05).mean():.3f}"
+            f"share within 0.05 GBP per MWh {(difference <= 0.05).mean():.3f}. "
+            "The held table is NESO's N2EX hourly day-ahead price, not the APX "
+            "half-hourly index, so the two are not expected to match."
         )
     local = frames["d8"].select("local_date").unique()
     ours = bank_holiday_dates()
@@ -241,7 +243,7 @@ def figures(*, series: dict[str, pl.DataFrame]) -> None:
     )
     chart = (
         base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("signal:N", title=None, sort=None),
+            y=alt.Y("signal:N", title=None, sort=None, axis=alt.Axis(labelLimit=240)),
             yOffset="series:N",
             x=alt.X("lo:Q", title="Running share, top third minus bottom third (95% interval)"),
             x2="hi:Q",

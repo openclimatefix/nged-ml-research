@@ -162,8 +162,9 @@ rule. The engine is described only as a gas engine with a long-term capacity con
 evidence of combined heat and power was found.
 
 - **Day-ahead price.** Elexon's Market Index Data from the APX provider only, from 2023-06. The
-  N2EX provider returns 0.00 in 2023 and is not used. The index is compared with the held
-  day-ahead price where the two overlap.
+  N2EX provider returns 0.00 in 2023 and is not used. The held day-ahead price is NESO's N2EX
+  hourly price, a different auction, so the two are compared where they overlap and are not
+  expected to match.
 - **Short Term Operating Reserve (STOR).** NESO's committed windows. Whether the engine holds a STOR
   agreement is unknown, so a match with a STOR window is a coincidence of timing and not a cause.
   The auction results are downloaded without unit or company names.
@@ -180,7 +181,10 @@ Each panel shows the running share in the top third of the signal minus the bott
 cell, with the week-block interval, for D8's net and solar eras and for the null control. A signal
 that the injected control engine cannot respond to should show no pattern in the control. A
 reserve-and-response lookup (the NESO EAC results at post codes near the substation's supply area)
-prints counts only, and its rows stay in the private data folder.
+prints counts only, and its rows stay in the private data folder. In the current file, post codes
+within 5 km of the supply area's centre list gas reciprocating engines selling Slow Reserve and
+batteries selling Response. That is a match on place and technology and does not confirm that the
+engine sells reserve.
 
 ## Standing practices
 
