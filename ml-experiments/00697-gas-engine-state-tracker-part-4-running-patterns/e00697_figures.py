@@ -584,8 +584,8 @@ def gallery_3(*, frames: dict[str, pl.DataFrame]) -> None:
         red = pl.col("local_half_hour").is_between(EVENING_FIRST, EVENING_LAST)
         groups = {
             "In the red band": weekday.filter(red),
-            "Dearest 6, outside band": weekday.filter(pl.col("dearest_six"), ~red),
-            "Other weekday": weekday.filter(~pl.col("dearest_six"), ~red),
+            "Six dearest, not in band": weekday.filter(pl.col("dearest_six"), ~red),
+            "Other weekday half-hours": weekday.filter(~pl.col("dearest_six"), ~red),
             "Bank holiday, red band": weekday.filter(red, pl.col("bank_holiday")),
             "Ordinary day, red band": weekday.filter(
                 red, ~pl.col("bank_holiday"), ~pl.col("christmas_week")

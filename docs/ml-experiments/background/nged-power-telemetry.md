@@ -67,6 +67,9 @@ count
 - **Before that instant, the ingest moves NGED's stamp 30 minutes earlier**
   (`PowerTimeSeries.correct_late_timestamps`). A study must not shift the stamp a second time
   (code).
+- **Move a power stamp 30 minutes earlier before joining a half-hourly price, because the price stamp
+  marks the start of the half-hour** (exp 697; one engine record of 44 days; provisional,
+  [data processing](../data-processing.md#timestamps-and-availability)).
 - **Join hourly power to a weather product that stamps the end of its hour on
   `(time - 1 µs).truncate("1h") + 1h`.** The evidence is on the
   [data-processing page](../data-processing.md#timestamps-and-availability) (exp 103; CAMS and 6
@@ -137,4 +140,4 @@ page](https://openclimatefix.github.io/nged-substation-forecast/background/netwo
   over the series' whole observed history.** One point is 1% of that value. See the
   [glossary](../glossary.md#capacity-and-points-of-capacity) (code).
 
-Last checked against experiment 321.
+Last checked against experiment 697.

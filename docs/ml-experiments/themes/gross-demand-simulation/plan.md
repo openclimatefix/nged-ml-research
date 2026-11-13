@@ -1,16 +1,17 @@
 # Gross-demand simulation: research plan
 
-**One experiment in this theme is planned, and the options below are queued for the maintainer to
-choose.** The planned experiment,
-[697](../../00697-gas-engine-state-tracker-part-4-running-patterns/result.md), is a data analysis
-with no model training. It tests whether D8's gas engine runs to a schedule that follows the
-working week, against controls that carry an injected engine with no weekday pattern. It is
-priority 1, waits for the code review, and is `planned`. The project is not starting further
-experiments unprompted. The reasoning is on
-[the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how
-to propose the simulator to NGED, with phases as options, is on
+**No experiment in this theme is planned, and the options below are queued for the maintainer to
+choose.** The project is not starting further experiments unprompted. The reasoning is on
+[the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how to
+propose the simulator to NGED, with phases as options, is on
 [Options for proposing the simulator to NGED](proposal-to-nged-options.md). The latest finished
 experiment,
+[experiment 697 (running patterns of the D8 gas engine)](../../00697-gas-engine-state-tracker-part-4-running-patterns/result.md),
+found that the tracker's labels of D8's gas engine show a higher running share on weekday evenings
+than on weekends (+0.392 in the net era and +0.256 in the solar era), by more than six null
+controls with an injected engine produce, and that the running share rises with the half-hourly
+price. The evidence comes from the tracker and not from a meter on the engine, so option 3 below
+treats both as targets to test against the one metered engine record. The experiment before it,
 [experiment 696 (engine state in the pre-training mixer)](../../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md),
 found that telling the neural network about D8's gas-engine state during pre-training only did not
 change the forecast error (+0.009 means no change, in points of capacity; positive is worse). A

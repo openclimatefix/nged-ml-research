@@ -263,7 +263,7 @@ def figures(*, series: dict[str, pl.DataFrame]) -> None:
             x="difference:Q",
             color=color,
         )
-    ).properties(width=300, height=200)
+    ).properties(width=240, height=200)
     save(chart=chart, name="g9_other_signals_by_third")
     events = (
         alt.Chart(event_rows(series=series))  # ty: ignore[unresolved-attribute]
