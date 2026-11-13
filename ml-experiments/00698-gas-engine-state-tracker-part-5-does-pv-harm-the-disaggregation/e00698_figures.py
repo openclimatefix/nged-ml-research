@@ -73,9 +73,9 @@ SHAPE_COLOURS: Final[dict[str, str]] = {
     "smooth_farm": PURPLE,
 }
 CONTRAST_NAMES: Final[dict[str, str]] = {
-    "level": "Level (CAMS smooth twin minus no solar)",
-    "weather_farm": "Weather, farm (farm minus farm smooth twin)",
-    "weather_cams": "Weather, CAMS (CAMS minus CAMS smooth twin)",
+    "level": "Level",
+    "weather_farm": "Weather, farm",
+    "weather_cams": "Weather, CAMS",
 }
 CONTRAST_COLOURS: Final[dict[str, str]] = {
     "level": BLUE,
@@ -254,6 +254,7 @@ def figure_2(*, scores: dict, directory: Path = DOCS_DIR) -> Path:
                 subtitle=[
                     "Dot: estimate. Line: 95% interval, whole weeks resampled. Solid grey: zero.",
                     "Dashed grey: harm threshold. Scores at 10:00 to 15:00, 3 seeds pooled.",
+                    "Level: CAMS smooth twin minus no solar. Weather: a run minus its smooth twin.",
                 ],
             )
         )

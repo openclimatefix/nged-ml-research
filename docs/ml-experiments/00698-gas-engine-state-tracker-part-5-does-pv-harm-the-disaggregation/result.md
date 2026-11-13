@@ -12,7 +12,7 @@ status: planned
 kind: other
 size: >-
   Anything else (no forecast; new analysis code; no new data). Stored: one file per tracker run
-  (at most 72 runs on injected readings, of which the curve gate removes some, and 10 runs on D8's
+  (at most 72 runs on injected readings, of which the curve gate leaves 48, and 10 runs on D8's
   own readings), the audit tables, and the score tables, all private. More than one design is
   defensible (which capacities, which solar curves, which hosts), so the choices are fixed below.
   Imports: this folder's scripts import experiment 694's trackers and loaders, experiment 695's grid

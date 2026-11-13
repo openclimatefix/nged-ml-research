@@ -1,0 +1,116 @@
+## 1. Data: counts, missing shares, and ranges
+series, span, rows, missing share, min, median, max
+D8 power (d8pre): 24000, 0.0002, 3.366, 6.963, 11.598
+D8 ghi (d8pre): 24000, 0.0000, 0.000, 7.776, 904.822
+D8 pv_shape (d8pre): 24000, 0.0000, 0.000, 0.005, 1.000
+D3 power (d3solar): 16416, 0.0000, 4.387, 6.948, 13.992
+D3 ghi (d3solar): 16416, 0.0000, 0.000, 4.665, 894.489
+D3 pv_shape (d3solar): 16416, 0.0000, 0.000, 0.003, 1.000
+farm series: finite share of all half-hours, by span, and the longest gap (half-hours)
+farm A: {'d8pre': 0.9141666666666667, 'd3solar': 0.9161184210526315}, pooled 0.9150, longest gap {'d8pre': 7, 'd3solar': 6}
+farm B: {'d8pre': 0.9110833333333334, 'd3solar': 0.9166666666666666}, pooled 0.9134, longest gap {'d8pre': 23, 'd3solar': 6}
+farm C: {'d8pre': 0.890375, 'd3solar': 0.9164230019493177}, pooled 0.9010, longest gap {'d8pre': 26, 'd3solar': 6}
+farm F: {'d8pre': 0.91, 'd3solar': 0.9114278752436648}, pooled 0.9106, longest gap {'d8pre': 22, 'd3solar': 18}
+chosen farm: A (highest pooled finite share)
+finite share of all half-hours, by host (night counts as finite): {'d8pre': 0.9141666666666667, 'd3solar': 0.9161184210526315}
+finite share of daylight half-hours, by host (the verdict's coverage clause, at least 0.9): {'d8pre': 0.8594776478128505, 'd3solar': 0.8592186755597904}
+  d8pre: finite share of midday daylight half-hours, May to September 0.984, other months 0.991; masked share of the dullest third 0.008, of the brightest third 0.018
+  d8pre: correlation of the farm series with the host's CAMS shape on finite midday daylight half-hours: raw 0.819, within cells 0.765
+  d3solar: finite share of midday daylight half-hours, May to September 0.992, other months 0.994; masked share of the dullest third 0.004, of the brightest third 0.013
+  d3solar: correlation of the farm series with the host's CAMS shape on finite midday daylight half-hours: raw 0.838, within cells 0.724
+mean of the farm's output per MW over the mean CAMS shape, daylight half-hours at D8-pre: 0.907 (the twins `smooth` and `smooth_farm` each keep their own level)
+
+## 2. The curve gate (one set of fifth edges, D8's solar-era edges)
+D8 solar-era edges of the CAMS shape: [0.297, 0.494, 0.657, 0.891]
+D8 solar-era median reading by fifth (MVA): [6.02, 3.80, 2.24, 1.97, 2.20]
+rows per fifth: [99, 99, 98, 99, 99]
+host, capacity, shape: median reading by fifth (MVA); largest gap to D8 in fifths 1 to 4; share under 1 MVA; share of reverse flow; passes
+d8pre, no solar: [7.73, 7.63, 7.48, 7.15, 6.70]
+d8pre, 7.0 MW, farm: [5.76, 4.51, 3.41, 2.36, 1.58]; gap 1.17; under 1 MVA 0.16; reverse 0.08; passes False
+d8pre, 7.0 MW, cams: [6.32, 4.91, 3.43, 1.86, 1.24]; gap 1.19; under 1 MVA 0.17; reverse 0.09; passes False
+d8pre, 7.0 MW, smooth: [3.74, 3.28, 2.91, 2.64, 1.97]; gap 2.29; under 1 MVA 0.14; reverse 0.01; passes False
+d8pre, 7.0 MW, smooth_farm: [3.69, 3.38, 3.12, 2.74, 2.23]; gap 2.33; under 1 MVA 0.14; reverse 0.01; passes False
+d8pre, 8.9 MW, farm: [5.32, 3.63, 2.47, 1.66, 1.66]; gap 0.70; under 1 MVA 0.20; reverse 0.20; passes True
+d8pre, 8.9 MW, cams: [5.96, 4.18, 2.33, 1.23, 2.12]; gap 0.74; under 1 MVA 0.19; reverse 0.23; passes True
+d8pre, 8.9 MW, smooth: [2.66, 2.12, 1.73, 1.61, 1.46]; gap 3.36; under 1 MVA 0.27; reverse 0.08; passes False
+d8pre, 8.9 MW, smooth_farm: [2.68, 2.20, 1.91, 1.64, 1.50]; gap 3.34; under 1 MVA 0.26; reverse 0.07; passes False
+d3solar, no solar: [7.66, 7.02, 6.60, 6.29, 5.96]
+d3solar, 7.0 MW, farm: [6.08, 4.30, 2.85, 1.77, 0.70]; gap 0.61; under 1 MVA 0.23; reverse 0.01; passes True
+d3solar, 7.0 MW, cams: [6.06, 4.35, 2.53, 0.90, 0.95]; gap 1.07; under 1 MVA 0.24; reverse 0.11; passes False
+d3solar, 7.0 MW, smooth: [3.66, 2.95, 2.41, 2.03, 1.38]; gap 2.37; under 1 MVA 0.11; reverse 0.00; passes False
+d3solar, 7.0 MW, smooth_farm: [4.00, 3.37, 2.86, 2.48, 1.93]; gap 2.02; under 1 MVA 0.01; reverse 0.00; passes False
+d3solar, 8.9 MW, farm: [5.64, 3.55, 1.82, 0.98, 1.39]; gap 1.00; under 1 MVA 0.26; reverse 0.17; passes True
+d3solar, 8.9 MW, cams: [5.63, 3.59, 1.44, 0.70, 2.84]; gap 1.28; under 1 MVA 0.18; reverse 0.31; passes False
+d3solar, 8.9 MW, smooth: [2.57, 1.89, 1.31, 1.01, 0.75]; gap 3.45; under 1 MVA 0.35; reverse 0.05; passes False
+d3solar, 8.9 MW, smooth_farm: [2.99, 2.38, 1.88, 1.44, 0.82]; gap 3.03; under 1 MVA 0.22; reverse 0.00; passes False
+D8-pre fails the farm gate at both capacities (branch 1): False
+
+## 3. Night level and the monthly midday-minus-night gap of D8
+night median, D8-pre 5.95 MVA, solar era engine-off 5.87 MVA, night-matched constant 0.08 MVA
+month, era: median midday reading minus median night reading (MVA), engine-off, no drop
+net: Jan +2.14, Feb +2.01, Mar +1.41, Apr +1.32, May +0.46, Jun +1.43, Jul +0.98, Aug +1.14, Sep +1.01, Oct +1.90, Nov +2.00, Dec +1.89
+solar: Jan +1.07, Feb +0.39, Mar +0.56, Apr -0.25, May -2.20, Jun -3.60, Jul -1.74, Aug n/a, Sep -2.37, Oct -0.97, Nov +0.37, Dec +0.04
+fade: Jan n/a, Feb n/a, Mar -2.32, Apr -3.06, May -2.01, Jun -3.02, Jul n/a, Aug n/a, Sep n/a, Oct n/a, Nov n/a, Dec n/a
+
+## 4. Stored controls of experiment 697: midday F1 and the false-flag share
+ok   C1 (no constant) midday F1 is 0.767: 0.767
+  C1 (no constant): false-flag share with truth_mw = 0 is 0.000, with under 1 unit 0.001; 698 uses truth_mw = 0 throughout
+ok   C1s solar (level-matched) midday F1 is 0.56: 0.559
+  C1s solar (level-matched): false-flag share with truth_mw = 0 is 0.020, with under 1 unit 0.027; 698 uses truth_mw = 0 throughout
+ok   false-flag share (truth_mw = 0) is about 0.020
+
+## 5. Spread of half-hourly changes of D8's reading (engine-off, no drop, midday)
+  net: 3921 changes, robust spread 0.332 MVA
+  solar: 1347 changes, robust spread 0.565 MVA
+  solar minus net: +0.233 MVA
+
+## 6. Timestamps: correlation of changes with the CAMS shape at lags -4 to +4 half-hours
+lags: [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+  D8 reading, engine-off and no-drop, half-hourly changes: [-0.003, -0.009, -0.037, -0.117, -0.175, -0.106, -0.057, -0.033, -0.050]
+ok   strongest |correlation| at lag 0: D8 reading, engine-off and no-drop, half-hourly changes: best lag 0
+  D8 reading, engine-off and no-drop, hourly sums: [-0.029, -0.060, -0.150, -0.270, -0.318, -0.271, -0.175, -0.117, -0.093]
+ok   strongest |correlation| at lag 0: D8 reading, engine-off and no-drop, hourly sums: best lag 0
+  farm, D8-pre span, half-hourly changes: [0.154, 0.190, 0.223, 0.281, 0.359, 0.309, 0.215, 0.185, 0.145]
+ok   strongest |correlation| at lag 0: farm, D8-pre span, half-hourly changes: best lag 0
+  farm, D8-pre span, hourly sums: [0.314, 0.381, 0.470, 0.581, 0.648, 0.609, 0.503, 0.408, 0.334]
+ok   strongest |correlation| at lag 0: farm, D8-pre span, hourly sums: best lag 0
+
+## 7. Label-only checks of D8 (with and without experiment 159's drops)
+  Flagged share, weekends and bank holidays, 09:00 to 15:00, negative spark spread
+    net, with drops: +0.020 (+0.011 to +0.030)
+    solar, with drops: +0.188 (+0.118 to +0.262)
+    swing (solar minus net), with drops: +0.168 (+0.097 to +0.243)
+    net, without drops: +0.018 (+0.010 to +0.028)
+    solar, without drops: +0.192 (+0.114 to +0.276)
+    swing (solar minus net), without drops: +0.174 (+0.095 to +0.258)
+  Flagged share at night, 00:00 to 05:00
+    net, with drops: +0.036 (+0.024 to +0.048)
+    solar, with drops: +0.121 (+0.083 to +0.159)
+    swing (solar minus net), with drops: +0.086 (+0.043 to +0.127)
+    net, without drops: +0.030 (+0.020 to +0.041)
+    solar, without drops: +0.066 (+0.037 to +0.096)
+    swing (solar minus net), without drops: +0.036 (+0.007 to +0.067)
+  Bright-minus-dull flagged share, 10:00 to 15:00
+    net, with drops: -0.170 (-0.225 to -0.113)
+    solar, with drops: +0.086 (-0.017 to +0.191)
+    swing (solar minus net), with drops: +0.256 (+0.149 to +0.383)
+    net, without drops: -0.159 (-0.213 to -0.100)
+    solar, without drops: +0.139 (+0.016 to +0.267)
+    swing (solar minus net), without drops: +0.298 (+0.163 to +0.436)
+
+## 8. Step 4: whole local days inside off-spells of 48 half-hours or more
+  net: 52 off-spells with 4913 half-hours; 57 whole local days, 2736 half-hours; share inside a drop 0.050
+ok   step 4 net: off-spell and half-hour counts are (52, 4913): (52, 4913)
+ok   step 4 net: whole local days are 57: 57
+    selected half-hours by calendar month: Jan 144, Feb 576, Mar 144, Apr 240, May 48, Jun 96, Jul 48, Aug 288, Sep 48, Oct 288, Nov 192, Dec 624
+    if partial days were allowed (`STEP4_WHOLE_DAYS_ONLY` False): 4904 half-hours
+  solar: 29 off-spells with 2083 half-hours; 16 whole local days, 768 half-hours; share inside a drop 0.238
+ok   step 4 solar: off-spell and half-hour counts are (29, 2083): (29, 2083)
+ok   step 4 solar: whole local days are 16: 16
+    selected half-hours by calendar month: Jan 192, Apr 48, May 96, Jun 48, Jul 48, Aug 144, Sep 48, Nov 96, Dec 48
+    if partial days were allowed (`STEP4_WHOLE_DAYS_ONLY` False): 2080 half-hours
+
+## 9. CAMS irradiance against ERA5 at the nearest stored cell
+  39408 hours; correlation 0.943; mean CAMS minus ERA5 +2.8 W/m2
+
+failed checks: none
