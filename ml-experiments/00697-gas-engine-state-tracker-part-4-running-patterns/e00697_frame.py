@@ -21,9 +21,10 @@ from typing import Final
 
 import numpy as np
 import polars as pl
+from e00694_common import load_panel  # ty: ignore[unresolved-import]
 from e00695_common import (  # ty: ignore[unresolved-import]
-    FADE_MONTHS,
     ENGINE_MONTHS,
+    FADE_MONTHS,
     fold_refit,
     grid_index,
 )
@@ -38,7 +39,6 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     gas_day_expression,
     half_hour_starts,
     load_d8_eras,
-    load_panel,
     panel_array,
 )
 from e00697_controls import Job, jobs, load_control  # ty: ignore[unresolved-import]
@@ -55,7 +55,7 @@ from e00697_drivers import (  # ty: ignore[unresolved-import]
 from e00697_engine import record_frame, units_of  # ty: ignore[unresolved-import]
 
 WEATHER_KEYS: Final[tuple[str, ...]] = ("temp", "wind100", "ghi", "expected")
-"""D8's panel columns, carried by grid index: 2 m temperature, 100 m wind, irradiance, expected power."""
+"""D8's panel columns, by grid index: 2 m temperature, 100 m wind, irradiance, expected power."""
 N_PRICE_PERIODS: Final[int] = DAY
 """A local day has a price rank only when all 48 settlement periods have a price."""
 
@@ -120,13 +120,15 @@ def add_drivers(*, frame: pl.DataFrame, tables: DriverTables) -> pl.DataFrame:
 
 
 def fixed_lag_probability() -> np.ndarray:
-    """Return experiment 695's fixed-lag P(1 or more units) on the pipeline grid, NaN where unstored."""
+    """Return experiment 695's fixed-lag P(1 or more units) on the pipeline grid (NaN if none)."""
     out = np.full(len(np.load(PROBABILITY_PATH)["lmean"]), np.nan)
     months = (*ENGINE_MONTHS, *FADE_MONTHS)
     for i, month in enumerate(months):
         first = grid_index(when=fold_refit(month=month))
         last = (
-            grid_index(when=fold_refit(month=months[i + 1])) if i + 1 < len(months) else first + 30 * DAY
+            grid_index(when=fold_refit(month=months[i + 1]))
+            if i + 1 < len(months)
+            else first + 30 * DAY
         )
         with np.load(E695_DIR / "states" / "A1" / f"{month}.npz") as data:
             out[first:last] = 1.0 - data["pk"][first:last, 0].astype(float)
@@ -168,7 +170,9 @@ def d8_frame(*, tables: DriverTables) -> pl.DataFrame:
             **{key: pl.col(key).fill_nan(None) for key in WEATHER_KEYS},
         )
         parts.append(part)
-    frame = pl.concat(parts).with_columns(start=half_hour_starts(index=np.concatenate([p["index"].to_numpy() for p in parts])))
+    frame = pl.concat(parts).with_columns(
+        start=half_hour_starts(index=np.concatenate([p["index"].to_numpy() for p in parts]))
+    )
     frame = add_segments(frame=add_local_fields(frame=frame), group_columns=("era",))
     in_drop = np.zeros(len(panel_array(panel=panel, label="D8", key="power")), dtype=bool)
     for row in drop_table.iter_rows(named=True):
@@ -190,7 +194,9 @@ def record_with_drivers(*, tables: DriverTables) -> pl.DataFrame:
     return add_drivers(frame=frame, tables=tables)
 
 
-def control_frame(*, group: list[Job], tables: DriverTables, panel: dict[int, dict]) -> pl.DataFrame:
+def control_frame(
+    *, group: list[Job], tables: DriverTables, panel: dict[int, dict]
+) -> pl.DataFrame:
     """Return the frame of one control series and kind of truth, stacking its stored runs."""
     parts = []
     for job in group:
@@ -224,17 +230,24 @@ def control_frame(*, group: list[Job], tables: DriverTables, panel: dict[int, di
     if group[0].series == "D8":
         weather = {key: panel_array(panel=panel, label="D8", key=key) for key in WEATHER_KEYS}
         frame = frame.with_columns(
-            **{key: pl.Series(weather[key][frame["index"].to_numpy()]).fill_nan(None) for key in WEATHER_KEYS}
+            **{
+                key: pl.Series(weather[key][frame["index"].to_numpy()]).fill_nan(None)
+                for key in WEATHER_KEYS
+            }
         )
     frame = add_segments(frame=add_local_fields(frame=frame), group_columns=("seed", "era"))
     return add_drivers(frame=frame, tables=tables)
 
 
 def control_groups() -> dict[str, list[Job]]:
-    """Return the control jobs grouped by series and kind of truth: the name of a frame to its jobs."""
+    """Return the control jobs grouped by series and kind of truth, keyed by frame name."""
     groups: dict[str, list[Job]] = {}
     for job in jobs():
-        key = f"{job.control}_{job.truth}" if job.control != "c2" else f"c2_{job.series.lower()}_{job.truth}"
+        key = (
+            f"{job.control}_{job.truth}"
+            if job.control != "c2"
+            else f"c2_{job.series.lower()}_{job.truth}"
+        )
         if job.control.startswith("c1s"):
             key = f"{job.control}_{job.truth}"
         groups.setdefault(key, []).append(job)

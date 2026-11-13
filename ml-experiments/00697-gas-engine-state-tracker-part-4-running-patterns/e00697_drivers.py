@@ -61,7 +61,11 @@ def system_prices() -> pl.DataFrame:
 
 def national_wind() -> pl.DataFrame:
     """Return national transmission wind generation (MW) at the start of each half-hour."""
-    files = [f for d in sorted(ML_EXPERIMENTS_DATA_DIR.glob(WIND_DIR)) for f in sorted(d.glob("*.parquet"))]
+    files = [
+        f
+        for d in sorted(ML_EXPERIMENTS_DATA_DIR.glob(WIND_DIR))
+        for f in sorted(d.glob("*.parquet"))
+    ]
     frame = pl.concat([pl.read_parquet(f) for f in files])
     return (
         frame.select(
@@ -126,8 +130,10 @@ def drops() -> pl.DataFrame:
     Columns: `first_stamp` and `last_stamp` (panel-grid indices), `start_date`, `end_date`.
     """
     path = next(ML_EXPERIMENTS_DATA_DIR.glob(DROPS_GLOB))
-    return pl.read_parquet(path).filter(pl.col("start_date") >= DROPS_FROM).select(
-        "first_stamp", "last_stamp", "start_date", "end_date"
+    return (
+        pl.read_parquet(path)
+        .filter(pl.col("start_date") >= DROPS_FROM)
+        .select("first_stamp", "last_stamp", "start_date", "end_date")
     )
 
 

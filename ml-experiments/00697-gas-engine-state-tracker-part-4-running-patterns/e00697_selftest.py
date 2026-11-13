@@ -1,13 +1,14 @@
 r"""Known-answer tests for experiment 697's helpers, on small synthetic inputs.
 
     E=ml-experiments
-    export PYTHONPATH=$E/00697-gas-engine-state-tracker-part-4-running-patterns:$E/00694-gas-engine-state-tracker-part-1:$E/00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back
+    export PYTHONPATH=$(ls -d $E/00697-* $E/00694-* $E/00695-* | paste -sd:)
     uv run --no-sync python $E/00697-*/e00697_selftest.py
 
 The tests read no stored data and write nothing. They cover the stamp shift at local midnight,
 local time across both clock changes, the gas-day join, the day-grouping helper, spell and hazard
 extraction, the week-block interval's coverage on a planted difference, a null draw whose Q1 is
-zero, the placement of a record day across a clock change, and the folded injection's span.
+zero, the questions on a planted weekday effect, the placement of a record day across a clock
+change, and the folded injection's span.
 """
 
 from datetime import UTC, date, datetime
@@ -15,7 +16,9 @@ from datetime import UTC, date, datetime
 import numpy as np
 import polars as pl
 from e00694_common import GRID_START  # ty: ignore[unresolved-import]
+from e00697_analysis import block_shares, q1, q2, q3, q6, q7, q8  # ty: ignore[unresolved-import]
 from e00697_common import (  # ty: ignore[unresolved-import]
+    BLOCK_NAMES,
     CLOCK_CHANGE_DATES,
     EVENING_FIRST,
     EVENING_LAST,
@@ -79,12 +82,17 @@ def test_local_time_across_both_clock_changes() -> None:
     assert len(CLOCK_CHANGE_DATES) == 14
     full = add_local_fields(
         frame=pl.DataFrame(
-            {"start": half_hour_starts(index=np.arange(index_of_end_stamp(end=datetime(2024, 3, 1, tzinfo=UTC)), index_of_end_stamp(end=datetime(2024, 12, 1, tzinfo=UTC))))}
+            {
+                "start": half_hour_starts(
+                    index=np.arange(
+                        index_of_end_stamp(end=datetime(2024, 3, 1, tzinfo=UTC)),
+                        index_of_end_stamp(end=datetime(2024, 12, 1, tzinfo=UTC)),
+                    )
+                )
+            }
         )
     )
-    counts = dict(
-        full.filter(pl.col("clock_change_day")).group_by("local_date").len().iter_rows()
-    )
+    counts = dict(full.filter(pl.col("clock_change_day")).group_by("local_date").len().iter_rows())
     assert counts[date(2024, 3, 31)] == 46
     assert counts[date(2024, 10, 27)] == 50
     assert date(2024, 4, 1) not in counts
@@ -180,10 +188,16 @@ def test_difference_of_independent_estimates() -> None:
     """The difference of two independent estimates has the difference of the points."""
     week = np.repeat(np.arange(20), 5)
     cols = share_columns(
-        state=np.tile([1, 0, 1, 1, 0], 20), mask_a=np.tile([1, 1, 0, 0, 0], 20), mask_b=np.tile([0, 0, 1, 1, 1], 20)
+        state=np.tile([1, 0, 1, 1, 0], 20),
+        mask_a=np.tile([1, 1, 0, 0, 0], 20),
+        mask_b=np.tile([0, 0, 1, 1, 1], 20),
     )
-    a = week_estimate(week=week, columns=cols, statistic=share_difference_statistic, seed=1, n_resamples=100)
-    b = week_estimate(week=week, columns=cols, statistic=share_difference_statistic, seed=2, n_resamples=100)
+    a = week_estimate(
+        week=week, columns=cols, statistic=share_difference_statistic, seed=1, n_resamples=100
+    )
+    b = week_estimate(
+        week=week, columns=cols, statistic=share_difference_statistic, seed=2, n_resamples=100
+    )
     assert a is not None
     assert b is not None
     d = difference_estimate(first=a, second=b)
@@ -202,7 +216,9 @@ def synthetic_days() -> RecordDays:
     return RecordDays(output=output, weekend=weekend)
 
 
-def evening_difference(*, g: np.ndarray, calendar: tuple[np.ndarray, np.ndarray, np.ndarray], lo: int, hi: int) -> float:
+def evening_difference(
+    *, g: np.ndarray, calendar: tuple[np.ndarray, np.ndarray, np.ndarray], lo: int, hi: int
+) -> float:
     """Return the weekday-minus-weekend running share of 16:00 to 19:00 on `[lo, hi)`."""
     _, half_hour, weekend = calendar
     evening = (half_hour[lo:hi] >= EVENING_FIRST) & (half_hour[lo:hi] <= EVENING_LAST)
@@ -216,7 +232,9 @@ def test_null_draw_has_no_weekday_pattern() -> None:
     calendar = grid_calendar(n_grid=48 * 800)
     days = synthetic_days()
     null = drive_series(calendar=calendar, first=0, last=48 * 800, kind="null", seed=0, days=days)
-    within = drive_series(calendar=calendar, first=0, last=48 * 800, kind="weekday", seed=0, days=days)
+    within = drive_series(
+        calendar=calendar, first=0, last=48 * 800, kind="weekday", seed=0, days=days
+    )
     # Weekday running days are 2 in 3 of the null draw's days, on weekdays and weekends alike.
     assert abs(evening_difference(g=null, calendar=calendar, lo=0, hi=48 * 800)) < 0.12
     assert evening_difference(g=within, calendar=calendar, lo=0, hi=48 * 800) > 0.95
@@ -232,9 +250,13 @@ def test_record_day_keeps_one_local_profile_across_a_clock_change() -> None:
     profile = np.arange(48, dtype=float)
     days = RecordDays(output=np.tile(profile, (3, 1)), weekend=np.array([False, False, True]))
     g = drive_series(calendar=calendar, first=first, last=n_grid, kind="null", seed=0, days=days)
-    local = add_local_fields(frame=pl.DataFrame({"start": half_hour_starts(index=np.arange(n_grid))}))
+    local = add_local_fields(
+        frame=pl.DataFrame({"start": half_hour_starts(index=np.arange(n_grid))})
+    )
     window = local.with_columns(g=pl.Series(g)).slice(first, 48 * 4)
-    assert np.array_equal(window["g"].to_numpy(), window["local_half_hour"].to_numpy().astype(float))
+    assert np.array_equal(
+        window["g"].to_numpy(), window["local_half_hour"].to_numpy().astype(float)
+    )
     day = window.filter(pl.col("local_date") == date(2024, 10, 27))
     assert day.height == 50
     # The repeated clock reading 01:00 (half-hour 2) gets the same output twice.
@@ -253,6 +275,45 @@ def test_injection_changes_only_the_span() -> None:
     assert np.array_equal(out[70:], y[70:])
     assert np.isclose(out[40], np.sqrt((np.sqrt(25 - 0.14**2) - 2.0) ** 2 + 0.14**2))
     assert np.isclose(out[25], 5.0)
+
+
+def synthetic_view(*, effect: float) -> pl.DataFrame:
+    """Return a 2-year synthetic view whose weekday evenings run more often by `effect`."""
+    rng = np.random.default_rng(5)
+    n = 2 * 365 * 48
+    frame = add_segments(
+        frame=add_local_fields(frame=pl.DataFrame({"start": half_hour_starts(index=np.arange(n))})),
+        group_columns=(),
+    )
+    evening = frame["local_half_hour"].is_between(32, 37).to_numpy() & ~frame["weekend"].to_numpy()
+    p = 0.06 + effect * evening
+    return frame.with_columns(
+        observed=pl.lit(value=True),
+        era=pl.lit("net"),
+        state=pl.Series(rng.random(n) < p).cast(pl.Float64),
+        system_price=pl.Series(rng.normal(size=n)),
+        reading=pl.Series(rng.normal(size=n)),
+    )
+
+
+def test_questions_on_a_planted_weekday_effect() -> None:
+    """Q1 recovers a planted effect and finds none in a null view; Q2 to Q8 run."""
+    planted = q1(view=synthetic_view(effect=0.3), seed=1)
+    null = q1(view=synthetic_view(effect=0.0), seed=1)
+    assert planted is not None
+    assert null is not None
+    assert planted.lo > 0.2
+    assert planted.excludes_zero
+    assert not null.excludes_zero
+    view = synthetic_view(effect=0.0)
+    assert q2(view=view, seed=2) is not None
+    contrast, single = q3(view=view, seed=3)
+    assert contrast is not None
+    assert single is not None
+    assert q6(view=view, seed=4) is not None
+    assert q7(view=view, seed=5) is not None
+    assert q8(view=view, seed=6) is not None
+    assert block_shares(view=view).height == 2 * len(BLOCK_NAMES)
 
 
 def main() -> None:

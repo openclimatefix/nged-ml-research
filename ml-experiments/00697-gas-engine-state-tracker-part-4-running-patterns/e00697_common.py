@@ -25,9 +25,6 @@ from e00694_common import (  # ty: ignore[unresolved-import]
     Q_FLOOR,
     causal_spread,
     inject_folded,
-    load_panel,
-    load_record,
-    panel_power,
     quantise_spread,
 )
 from e00694_trackers import grid_track  # ty: ignore[unresolved-import]
@@ -39,7 +36,9 @@ SLUG: Final[str] = "gas-engine-state-tracker-part-4-running-patterns"
 FOLDER_NAME: Final[str] = f"{EXPERIMENT_ID:05d}-{SLUG}"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / FOLDER_NAME
 """The experiment's private data folder: frames, control runs, statistics, private figures."""
-DOCS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / FOLDER_NAME
+DOCS_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / FOLDER_NAME
+)
 """Where the published figures and the pages are written."""
 PRINTED_DIR: Final[Path] = Path(__file__).resolve().parent / "printed"
 """Printed reports, committed with the scripts. They hold no Gas A date and no Gas A series."""
@@ -50,7 +49,8 @@ STATS_PATH: Final[Path] = DATA_DIR / "stats.json"
 
 E694_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00694-gas-engine-state-tracker-part-1"
 E695_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back"
 )
 D8_STATES_PATH: Final[Path] = E694_DIR / "d8.pkl"
 """Experiment 694's M2 labels of D8, three eras, on the panel grid."""
@@ -144,16 +144,20 @@ def add_local_fields(*, frame: pl.DataFrame) -> pl.DataFrame:
         `week` (the ISO week number counted from `WEEK_ORIGIN`).
     """
     local = pl.col("start").dt.convert_time_zone(LOCAL_TZ)
-    return frame.with_columns(
-        local_date=local.dt.date(),
-        local_half_hour=(local.dt.hour() * 2 + local.dt.minute() // 30).cast(pl.Int16),
-        summer_half=local.dt.dst_offset().dt.total_minutes() > 0,
-    ).with_columns(
-        weekday=pl.col("local_date").dt.weekday().cast(pl.Int8),
-        month=pl.col("local_date").dt.month().cast(pl.Int8),
-        clock_change_day=pl.col("local_date").is_in(pl.Series(list(CLOCK_CHANGE_DATES))),
-        week=((pl.col("local_date") - pl.lit(WEEK_ORIGIN)).dt.total_days() // 7).cast(pl.Int32),
-    ).with_columns(weekend=pl.col("weekday") >= 6)
+    return (
+        frame.with_columns(
+            local_date=local.dt.date(),
+            local_half_hour=(local.dt.hour() * 2 + local.dt.minute() // 30).cast(pl.Int16),
+            summer_half=local.dt.dst_offset().dt.total_minutes() > 0,
+        )
+        .with_columns(
+            weekday=pl.col("local_date").dt.weekday().cast(pl.Int8),
+            month=pl.col("local_date").dt.month().cast(pl.Int8),
+            clock_change_day=pl.col("local_date").is_in(pl.Series(list(CLOCK_CHANGE_DATES))),
+            week=((pl.col("local_date") - pl.lit(WEEK_ORIGIN)).dt.total_days() // 7).cast(pl.Int32),
+        )
+        .with_columns(weekend=pl.col("weekday") >= 6)
+    )
 
 
 def add_segments(*, frame: pl.DataFrame, group_columns: tuple[str, ...] = ()) -> pl.DataFrame:
@@ -167,9 +171,7 @@ def add_segments(*, frame: pl.DataFrame, group_columns: tuple[str, ...] = ()) ->
     return frame.with_columns(segment=new_run.cum_sum().cast(pl.Int32))
 
 
-def group_within(
-    *, value: str, n_groups: int, within: tuple[str, ...] = ()
-) -> pl.Expr:
+def group_within(*, value: str, n_groups: int, within: tuple[str, ...] = ()) -> pl.Expr:
     """Return an expression for the group (0 to `n_groups - 1`) of `value` among its peers.
 
     Peers are the rows that share the `within` columns, and a group is a rank interval of equal
@@ -231,7 +233,10 @@ def load_d8_eras() -> list[dict]:
 
 def era_bounds() -> dict[str, tuple[int, int]]:
     """Return each era's (first panel index, one past the last) as stored by experiment 694."""
-    return {era["label"]: (int(era["start"]), int(era["start"]) + len(era["y"])) for era in load_d8_eras()}
+    return {
+        era["label"]: (int(era["start"]), int(era["start"]) + len(era["y"]))
+        for era in load_d8_eras()
+    }
 
 
 def panel_array(*, panel: dict[int, dict], label: str, key: str) -> np.ndarray:
@@ -395,7 +400,7 @@ def week_estimate(
         point=float(statistic(point)),
         lo=lo,
         hi=hi,
-        n_weeks=int(len(np.unique(week))),
+        n_weeks=len(np.unique(week)),
         draws=stat_draws,
     )
 
@@ -480,8 +485,10 @@ def hazard_columns(*, lengths: np.ndarray, max_length: int = MAX_SPELL_LENGTH) -
     return np.concatenate([(lengths == ns).astype(float), (lengths >= ns).astype(float)], axis=1)
 
 
-def pooled_hazard(*, sums: np.ndarray, first: int, last: int, max_length: int = MAX_SPELL_LENGTH) -> np.ndarray:
-    """Return the hazard over lengths `first` to `last`: spells that end there per spell-step at risk."""
+def pooled_hazard(
+    *, sums: np.ndarray, first: int, last: int, max_length: int = MAX_SPELL_LENGTH
+) -> np.ndarray:
+    """Return the hazard over lengths `first` to `last`: spells ending there per step at risk."""
     ends = sums[..., first - 1 : last].sum(axis=-1)
     risk = sums[..., max_length + first - 1 : max_length + last].sum(axis=-1)
     return ratio(numerator=ends, denominator=risk)
@@ -493,7 +500,7 @@ def spell_quantiles(*, lengths: np.ndarray) -> dict[str, float]:
         return {"n": 0}
     q = np.percentile(lengths, [10, 25, 50, 75, 90])
     return {
-        "n": int(len(lengths)),
+        "n": len(lengths),
         "mean": float(np.mean(lengths)),
         "p10": float(q[0]),
         "p25": float(q[1]),

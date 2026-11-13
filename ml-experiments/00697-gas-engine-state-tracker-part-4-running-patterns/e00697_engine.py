@@ -23,6 +23,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
+from e00694_common import load_record  # ty: ignore[unresolved-import]
 from e00697_common import (  # ty: ignore[unresolved-import]
     DAY,
     START_SHIFT,
@@ -31,7 +32,6 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     add_local_fields,
     add_segments,
     half_hour_starts,
-    load_record,
 )
 
 DRAW_SEED: Final[int] = 0
@@ -40,7 +40,7 @@ DRAW_SEED: Final[int] = 0
 
 @dataclass(frozen=True)
 class RecordDays:
-    """Gas A's complete local days: output in MW by local half-hour, and whether each is a weekend."""
+    """Gas A's complete local days: output in MW by local half-hour, and weekend flags."""
 
     output: np.ndarray
     weekend: np.ndarray
@@ -54,8 +54,8 @@ def record_frame() -> pl.DataFrame:
 
     Returns:
         One row per half-hour, sorted by `start`, with `start`, `power` (MW), `units` (experiment
-        194's derived count), `file_price` (the price column of the stored file, which experiment 194
-        joined at the end stamp), the local fields of `add_local_fields`, and `segment`.
+        194's derived count), `file_price` (the stored file's price column, joined by experiment
+        194 at the end stamp), the local fields of `add_local_fields`, and `segment`.
     """
     raw = load_record().sort("time")
     frame = raw.select(
@@ -95,7 +95,9 @@ def grid_calendar(*, n_grid: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     Returns:
         Three arrays of length `n_grid`, for the half-hour that ends at each index's end stamp.
     """
-    frame = add_local_fields(frame=pl.DataFrame({"start": half_hour_starts(index=np.arange(n_grid))}))
+    frame = add_local_fields(
+        frame=pl.DataFrame({"start": half_hour_starts(index=np.arange(n_grid))})
+    )
     return (
         frame["local_date"].dt.epoch("d").to_numpy(),
         frame["local_half_hour"].to_numpy().astype(int),

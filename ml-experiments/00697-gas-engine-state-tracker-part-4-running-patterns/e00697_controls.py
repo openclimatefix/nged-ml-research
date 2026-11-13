@@ -1,7 +1,7 @@
 r"""Experiment 697's controls: a real reading with a known engine injected, then tracked.
 
     E=ml-experiments
-    export PYTHONPATH=$E/00697-gas-engine-state-tracker-part-4-running-patterns:$E/00694-gas-engine-state-tracker-part-1:$E/00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back
+    export PYTHONPATH=$(ls -d $E/00697-* $E/00694-* $E/00695-* | paste -sd:)
     uv run --no-sync python $E/00697-*/e00697_controls.py --list
     uv run --no-sync python $E/00697-*/e00697_controls.py --time-one   # one run, nothing written
     uv run --no-sync python $E/00697-*/e00697_controls.py              # every job, 8 workers
@@ -38,7 +38,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from e00694_common import ENGINE_CONNECTED, PRE_ROLL, stamp  # ty: ignore[unresolved-import]
+from e00694_common import ENGINE_CONNECTED, PRE_ROLL, load_panel, stamp  # ty: ignore[unresolved-import]
 from e00697_common import (  # ty: ignore[unresolved-import]
     CONTROLS_DIR,
     DAY,
@@ -49,7 +49,6 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     era_bounds,
     half_hour_starts,
     inject_span,
-    load_panel,
     panel_array,
     track_span,
 )
@@ -92,9 +91,11 @@ class Job:
 def jobs() -> list[Job]:
     """Return every job: 6 for C1, 6 for C1s (3 scaled to each era), and 24 for C2."""
     out: list[Job] = []
-    for truth in ("null", "weekday"):
-        for seed in range(3):
-            out.append(Job(f"c1_{truth}_s{seed}", "c1", "D8", "pre", truth, seed, scale_to=None))
+    out.extend(
+        Job(f"c1_{truth}_s{seed}", "c1", "D8", "pre", truth, seed, scale_to=None)
+        for truth in ("null", "weekday")
+        for seed in range(3)
+    )
     for era in ("net", "solar"):
         out.extend(
             Job(f"c1s_{era}_null_s{seed}", f"c1s_{era}", "D8", "pre", "null", seed, scale_to=era)
