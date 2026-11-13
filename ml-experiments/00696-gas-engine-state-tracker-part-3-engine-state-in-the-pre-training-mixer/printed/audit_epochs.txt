@@ -1,0 +1,36 @@
+('695', 'A0', 'pre') n 24 epochs mean 57.5 at cap60 13 nll 0.2117 s0-2 57.5 -
+('695', 'A0', 'st2') n 24 epochs mean 21.2  nll 0.3490 s0-2 21.2 -
+('695', 'A0', 'st3') n 24 epochs mean 10.0  nll nan s0-2 10.0 -
+('695', 'W0', 'pre') n 24 epochs mean 56.5 at cap60 9 nll 0.2061 s0-2 56.5 -
+('695', 'W0', 'st2') n 24 epochs mean 23.5  nll 0.3620 s0-2 23.5 -
+('695', 'W0', 'st3') n 24 epochs mean 9.8  nll nan s0-2 9.8 -
+('696', 'A0', 'pre') n 56 epochs mean 56.8 at cap60 33 nll 0.2071 - s3-9 56.8
+('696', 'A0', 'st2') n 56 epochs mean 21.2  nll 0.3513 - s3-9 21.2
+('696', 'A0', 'st3') n 56 epochs mean 10.4  nll nan - s3-9 10.4
+('696', 'G0', 'pre') n 1 epochs mean 60.0 at cap60 1 nll 0.2473 s0-2 60.0 -
+('696', 'G0', 'st2') n 1 epochs mean 25.0  nll 0.3707 s0-2 25.0 -
+('696', 'G0', 'st3') n 1 epochs mean 9.0  nll nan s0-2 9.0 -
+('696', 'G0W', 'pre') n 1 epochs mean 53.0 at cap60 0 nll 0.2552 s0-2 53.0 -
+('696', 'G0W', 'st2') n 1 epochs mean 16.0  nll 0.4010 s0-2 16.0 -
+('696', 'G0W', 'st3') n 1 epochs mean 17.0  nll nan s0-2 17.0 -
+('696', 'S1', 'pre') n 80 epochs mean 56.8 at cap60 41 nll 0.1930 s0-2 56.0 s3-9 57.1
+('696', 'S1', 'st2') n 80 epochs mean 21.3  nll 0.3516 s0-2 20.5 s3-9 21.7
+('696', 'S1', 'st3') n 80 epochs mean 10.3  nll nan s0-2 10.3 s3-9 10.3
+('696', 'S1d', 'pre') n 24 epochs mean 58.2 at cap60 14 nll 0.2043 s0-2 58.2 -
+('696', 'S1d', 'st2') n 24 epochs mean 20.7  nll 0.3484 s0-2 20.7 -
+('696', 'S1d', 'st3') n 24 epochs mean 9.6  nll nan s0-2 9.6 -
+('696', 'SP', 'pre') n 80 epochs mean 56.9 at cap60 45 nll 0.2054 s0-2 57.5 s3-9 56.7
+('696', 'SP', 'st2') n 80 epochs mean 21.5  nll 0.3502 s0-2 20.2 s3-9 22.0
+('696', 'SP', 'st3') n 80 epochs mean 9.9  nll nan s0-2 9.8 s3-9 9.9
+('696', 'SZ', 'pre') n 3 epochs mean 60.0 at cap60 3 nll 0.2501 s0-2 60.0 -
+('696', 'SZ', 'st2') n 3 epochs mean 19.3  nll 0.3789 s0-2 19.3 -
+('696', 'SZ', 'st3') n 3 epochs mean 12.3  nll nan s0-2 12.3 -
+('696', 'W0', 'pre') n 56 epochs mean 57.6 at cap60 36 nll 0.2032 - s3-9 57.6
+('696', 'W0', 'st2') n 56 epochs mean 22.7  nll 0.3661 - s3-9 22.7
+('696', 'W0', 'st3') n 56 epochs mean 10.2  nll nan - s3-9 10.2
+('696', 'WS1', 'pre') n 80 epochs mean 57.5 at cap60 50 nll 0.1901 s0-2 56.8 s3-9 57.8
+('696', 'WS1', 'st2') n 80 epochs mean 22.6  nll 0.3640 s0-2 23.2 s3-9 22.4
+('696', 'WS1', 'st3') n 80 epochs mean 10.0  nll nan s0-2 9.8 s3-9 10.0
+('696', 'WST', 'pre') n 80 epochs mean 57.3 at cap60 51 nll 0.1882 s0-2 56.8 s3-9 57.6
+('696', 'WST', 'st2') n 80 epochs mean 23.0  nll 0.3646 s0-2 23.6 s3-9 22.7
+('696', 'WST', 'st3') n 80 epochs mean 9.8  nll nan s0-2 9.5 s3-9 9.9

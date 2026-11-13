@@ -1,0 +1,15 @@
+[('mixer_pre.0.weight', (64, 136)), ('mixer_pre.0.bias', (64,)), ('mixer_ft.0.weight', (64, 145)), ('mixer_ft.0.bias', (64,))]
+S1 mixer_pre.0 weight shape (64, 139)
+weather S1s4 vs A0s4 0.484 SPs4 vs A0s4 0.281 A0s5 vs A0s4 1.397 S1s0 vs A0(695)s0 0.397
+datetime S1s4 vs A0s4 0.396 SPs4 vs A0s4 0.223 A0s5 vs A0s4 1.420 S1s0 vs A0(695)s0 0.316
+embedding S1s4 vs A0s4 0.094 SPs4 vs A0s4 0.036 A0s5 vs A0s4 1.395 S1s0 vs A0(695)s0 0.082
+S1 mixer_pre.0 |w| mean, original cols 0.1011, state cols tensor([1.0986, 0.7131, 0.0000])
+SP state cols tensor([0.4406, 0.4261, 0.0000])
+S1 step2/P5/2026-01_s0.pt {'mixer_pre.0.weight': (64, 139), 'mixer_ft.0.weight': (64, 145)}
+  weather equal to pretrained: False  datetime equal: False
+S1 models/P5/2026-01_d0_s4.pt {'mixer_pre.0.weight': (64, 139), 'mixer_ft.0.weight': (64, 145)}
+  weather equal to pretrained: True  datetime equal: True
+A0 step2/P5/2026-01_s3.pt {'mixer_pre.0.weight': (64, 136), 'mixer_ft.0.weight': (64, 145)}
+  weather equal to pretrained: False  datetime equal: False
+A0 models/P5/2026-01_d0_s4.pt {'mixer_pre.0.weight': (64, 136), 'mixer_ft.0.weight': (64, 145)}
+  weather equal to pretrained: True  datetime equal: True

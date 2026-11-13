@@ -1,0 +1,220 @@
+{
+ "synthetic": {
+  "cut_at_train_end": 0.0,
+  "origin_cut": 0.0,
+  "state_cut": 0.0,
+  "widening_identity": 0.0,
+  "state_reaches_mixer": 14.959737777709961,
+  "liveness_synthetic": {
+   "state_dependent": 0.18329109251499176,
+   "zero_state": 0.0
+  },
+  "probe": {
+   "probe_mae": 2.1969839025576903,
+   "mean_baseline_mae": 4.888228416442871
+  },
+  "hooks": {
+   "tracked": {
+    "alignment": {
+     "sampled_rows": 3000,
+     "rows_of_the_series": 1032,
+     "rows_with_a_nonzero_state": 1032,
+     "largest_gap": 0.0,
+     "latest_target_idx": 3897,
+     "refit_minus_delay": 3992
+    },
+    "liveness": [
+     0.13155321776866913,
+     0.13071896135807037,
+     0.0
+    ]
+   },
+   "zero": {
+    "alignment": {
+     "sampled_rows": 3000,
+     "rows_of_the_series": 1032,
+     "rows_with_a_nonzero_state": 0,
+     "largest_gap": 0.0,
+     "latest_target_idx": 3897,
+     "refit_minus_delay": 3992
+    },
+    "liveness": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "hidden": {
+    "alignment": {
+     "sampled_rows": 3000,
+     "rows_of_the_series": 1032,
+     "rows_with_a_nonzero_state": 495,
+     "largest_gap": 0.0,
+     "latest_target_idx": 3897,
+     "refit_minus_delay": 3992
+    },
+    "liveness": [
+     0.18376804888248444,
+     0.1820152997970581,
+     0.17292910814285278
+    ]
+   }
+  },
+  "hooks_with_probe": {
+   "tracked": {
+    "alignment": {
+     "sampled_rows": 3000,
+     "rows_of_the_series": 1032,
+     "rows_with_a_nonzero_state": 1032,
+     "largest_gap": 0.0,
+     "latest_target_idx": 3897,
+     "refit_minus_delay": 3992
+    },
+    "liveness": [
+     0.13155321776866913,
+     0.13071896135807037,
+     0.0
+    ]
+   },
+   "zero": {
+    "alignment": {
+     "sampled_rows": 3000,
+     "rows_of_the_series": 1032,
+     "rows_with_a_nonzero_state": 0,
+     "largest_gap": 0.0,
+     "latest_target_idx": 3897,
+     "refit_minus_delay": 3992
+    },
+    "liveness": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "hidden": {
+    "alignment": {
+     "sampled_rows": 3000,
+     "rows_of_the_series": 1032,
+     "rows_with_a_nonzero_state": 495,
+     "largest_gap": 0.0,
+     "latest_target_idx": 3897,
+     "refit_minus_delay": 3992
+    },
+    "liveness": [
+     0.18376804888248444,
+     0.1820152997970581,
+     0.17292910814285278
+    ]
+   }
+  }
+ },
+ "synthetic_passed": true,
+ "identity_sz": {
+  "s0": 1.3709068298339844e-05,
+  "s1": 1.9431114196777344e-05,
+  "s2": 1.6033649444580078e-05
+ },
+ "g0": {
+  "s0": 1.9222497940063477e-05
+ },
+ "identity_passed": true,
+ "g0w": {
+  "s0": 5.602836608886719e-06
+ },
+ "g0_passed": true,
+ "pretrain_records": {
+  "G0W": {
+   "runs": 1,
+   "alignment_folds": [],
+   "smallest_state_weight": Infinity
+  },
+  "S1": {
+   "runs": 80,
+   "alignment_folds": [
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+   ],
+   "smallest_state_weight": 1.5048667192459106
+  },
+  "S1d": {
+   "runs": 24,
+   "alignment_folds": [
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+   ],
+   "smallest_state_weight": 1.7179348468780518
+  },
+  "SP": {
+   "runs": 80,
+   "alignment_folds": [
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+   ],
+   "smallest_state_weight": 1.064074158668518
+  },
+  "SZ": {
+   "runs": 3,
+   "alignment_folds": [
+    "2025-11"
+   ],
+   "smallest_state_weight": Infinity
+  },
+  "W0": {
+   "runs": 56,
+   "alignment_folds": [],
+   "smallest_state_weight": Infinity
+  },
+  "W0p": {
+   "runs": 24,
+   "alignment_folds": [],
+   "smallest_state_weight": Infinity
+  },
+  "WS1": {
+   "runs": 80,
+   "alignment_folds": [
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+   ],
+   "smallest_state_weight": 1.2317780256271362
+  },
+  "WST": {
+   "runs": 80,
+   "alignment_folds": [
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+   ],
+   "smallest_state_weight": 0.7883881330490112
+  }
+ },
+ "gate_failed": false
+}
