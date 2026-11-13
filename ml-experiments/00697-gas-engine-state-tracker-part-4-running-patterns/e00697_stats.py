@@ -44,6 +44,7 @@ from e00697_analysis import (  # ty: ignore[unresolved-import]
 )
 from e00697_common import (  # ty: ignore[unresolved-import]
     BLOCK_NAMES,
+    DATA_DIR,
     E695_DIR,
     ERA_NAMES,
     EVENING_FIRST,
@@ -82,7 +83,7 @@ WEEKDAY_FRAMES: Final[tuple[str, ...]] = (
 CONTROL_LABELS: Final[tuple[str, ...]] = ("ts", "tf", "truth1", "truth2")
 D8_LABELS: Final[tuple[str, ...]] = ("ts", "tf", "p_any_a")
 RECORD_LABELS: Final[tuple[str, ...]] = ("r1", "r2")
-QUESTION_NAMES: Final[tuple[str, ...]] = ("q1", "q2", "q2q", "q3", "q3a", "q5", "q6", "q7", "q8")
+QUESTION_NAMES: Final[tuple[str, ...]] = ("q1", "q2", "q2q", "q3", "q3a", "q6", "q7", "q8")
 C4_EXPECTED_F1: Final[float] = 0.785
 C4_EXPECTED_PRECISION: Final[float] = 0.998
 C4_TOLERANCE: Final[float] = 0.01
@@ -653,7 +654,11 @@ def t6_drivers(*, frames: dict[str, pl.DataFrame]) -> None:
         )
         .sort("year_month")
     )
-    table(title="T6 night share (00:00 to 05:00 local) by calendar month, D8", frame=monthly)
+    with pl.Config(tbl_rows=-1, float_precision=3):
+        (DATA_DIR / "night_monthly.txt").write_text(str(monthly) + "\n")
+    say(
+    say(f"\nT6 night share by month: written to {DATA_DIR.name}/night_monthly.txt, not printed")
+    )
 
 
 def main() -> None:

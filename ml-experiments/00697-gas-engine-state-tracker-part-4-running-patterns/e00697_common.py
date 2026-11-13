@@ -74,7 +74,11 @@ EXPECTED_ERA_LENGTHS: Final[dict[str, int]] = {"net": 26256, "solar": 16416, "fa
 
 EVENING_FIRST: Final[int] = 32
 EVENING_LAST: Final[int] = 37
-"""Local half-hours 32 to 37 start at 16:00 to 18:30, so they cover 16:00 to 19:00 local time."""
+"""Local half-hours 32 to 37 start at 16:00 to 18:30, so they cover 16:00 to 19:00 local time.
+
+This is the red band of NGED's East Midlands half-hourly DUoS charges, Monday to Friday, in the
+2023-24, 2024-25, and 2025-26 charging statements (D8's `licence_area` is `EMids`). Weekends are
+never red. Only the 2025-26 statement says that weekday bank holidays are included."""
 BLOCK_EDGES: Final[tuple[int, ...]] = (0, 10, 18, 32, 38, 48)
 BLOCK_NAMES: Final[tuple[str, ...]] = ("night", "morning", "day", "evening", "late")
 """Blocks of the local day: night 00:00 to 05:00, morning to 09:00, day to 16:00, evening to 19:00,

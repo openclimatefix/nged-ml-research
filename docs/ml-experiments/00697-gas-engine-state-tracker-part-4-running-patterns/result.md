@@ -91,6 +91,19 @@ pattern.
   (0 to 47) and the weekday is that of the local date. The six clock-change days are left out of
   hour-of-day plots. A **cell** is one local half-hour in one weekday class in one calendar month.
 
+- **Red band.** The red band of NGED's Distribution Use of System (DUoS) charges for
+  half-hourly metered low-voltage and high-voltage customers in East Midlands is 16:00 to 19:00
+  local time, Monday to Friday, and weekends are never red. The charging statements for 2023-24,
+  2024-25, and 2025-26 give the same hours. D8's substation is in the East Midlands licence area: D8's
+  panel key is the `time_series_id` of a primary substation in the stored metadata
+  (`NGED/metadata.parquet`), and that row's `licence_area` is `EMids`. The match of panel key to
+  `time_series_id` is inferred from the key type and one matching row, and is not documented in the
+  panel. The band is the evening block, local half-hours 32 to 37. The 2025-26 statement says
+  "Monday to Friday (Including Bank Holidays)", and the 2023-24 and 2024-25 statements do not state
+  whether bank holidays are charged as weekdays. T6 therefore splits weekday evenings into ordinary
+  days and bank holidays as a descriptive check, and does not change Q1's weekday class. The
+  statements are in the coordinator's briefs folder (`red_band_rules.md`).
+
 ## Controls
 
 **A control is a real reading with a known engine injected by experiment 694's folded rule.** Days
