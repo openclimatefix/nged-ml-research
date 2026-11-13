@@ -1,7 +1,12 @@
 # Gross-demand simulation: research plan
 
-**No experiment in this theme is planned, and the options below are queued for the maintainer to
-choose.** The project is not starting further experiments unprompted. The reasoning is on
+**One experiment in this theme is planned, and the options below are queued for the maintainer to
+choose.** The planned experiment,
+[697](../../00697-gas-engine-state-tracker-part-4-running-patterns/result.md), is a data analysis
+with no model training. It tests whether D8's gas engine runs to a schedule that follows the
+working week, against controls that carry an injected engine with no weekday pattern. It is
+priority 1, waits for the code review, and is `planned`. The project is not starting further
+experiments unprompted. The reasoning is on
 [the asset-inventory simulator page](asset-inventory-simulator.md). An advisor's analysis of how
 to propose the simulator to NGED, with phases as options, is on
 [Options for proposing the simulator to NGED](proposal-to-nged-options.md). The latest finished
