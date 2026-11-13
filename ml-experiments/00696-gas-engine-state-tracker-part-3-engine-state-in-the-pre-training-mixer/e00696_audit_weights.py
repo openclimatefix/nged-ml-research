@@ -3,7 +3,7 @@
 
 import glob
 
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00696_audit_common import *  # noqa: F403
 
 E5 = str(E5)
