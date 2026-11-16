@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 700: write the forecasts of origin months 2025-11 to 2026-06 of the GAM (default 3) in experiment 677's file layout.
+"""Experiment 700: write the forecasts of origin months 2025-11 to 2026-06 in experiment 677's layout.
+
+The GAM is Primary demand research default 3.
 
     PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility \
         uv run --no-sync python ml-experiments/00700-*/e00700_export.py gam
@@ -200,7 +202,9 @@ if __name__ == "__main__":
             ("p_a3_monthly_in_weekly_slot", "xgb_monthly_year_sp1"),
         ):
             write(
-                frame=to_contract(frame=xgb_rows(arm=arm, root=ML_EXPERIMENTS_DATA_DIR), unit="fraction"),
+                frame=to_contract(
+                    frame=xgb_rows(arm=arm, root=ML_EXPERIMENTS_DATA_DIR), unit="fraction"
+                ),
                 name=name,
                 step=arm,
             )

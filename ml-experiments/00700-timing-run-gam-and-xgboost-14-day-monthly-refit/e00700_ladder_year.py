@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 700: cut the stored ladder files of experiment 677 down to the origins of 2025-11 to 2026-06.
 
     uv run --no-sync python ml-experiments/00700-*/e00700_ladder_year.py

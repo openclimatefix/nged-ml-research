@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 700: charts of the provisional scores for origin months 2025-11 to 2026-06.
 
     uv run --no-sync python ml-experiments/00700-*/e00700_plots.py
@@ -13,12 +14,12 @@ import altair as alt
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-ROOT: Path = (
-    ML_EXPERIMENTS_DATA_DIR / "00700-timing-run-gam-and-xgboost-14-day-monthly-refit"
-)
+ROOT: Path = ML_EXPERIMENTS_DATA_DIR / "00700-timing-run-gam-and-xgboost-14-day-monthly-refit"
 SCORES: Path = ROOT / "scores" / "protocol_year"
 OUT: Path = ROOT / "plots"
-CAPACITY: Path = ML_EXPERIMENTS_DATA_DIR / "backtest_year_2025-11_to_2026-10" / "series_capacity.parquet"
+CAPACITY: Path = (
+    ML_EXPERIMENTS_DATA_DIR / "backtest_year_2025-11_to_2026-10" / "series_capacity.parquet"
+)
 
 ARMS = {
     "GAM": "GAM",
@@ -48,7 +49,10 @@ CONDITION_SLICES = {
     "bank_holidays": "Bank holidays",
 }
 METRICS = {"mae_median": "MAE", "crps": "CRPS", "twcrps": "twCRPS"}
-GROUPS = {"signed-MW six": "the 6 Primaries with signed MW", "MVA-only seven": "the 7 MVA-only Primaries"}
+GROUPS = {
+    "signed-MW six": "the 6 Primaries with signed MW",
+    "MVA-only seven": "the 7 MVA-only Primaries",
+}
 SUBTITLE = (
     "Provisional: 8 monthly refits, origins at 12:00 UTC from 2025-11-01 to 2026-06-30, rows that all "
     "five systems share. Points of capacity; smaller is better."
@@ -84,12 +88,19 @@ def pooled_scores() -> pl.DataFrame:
         parts.append(part)
     return (
         pl.concat(parts)
-        .unpivot(index=["arm", "slice", "half_hours"], on=list(METRICS), variable_name="metric", value_name="mean")
+        .unpivot(
+            index=["arm", "slice", "half_hours"],
+            on=list(METRICS),
+            variable_name="metric",
+            value_name="mean",
+        )
         .with_columns(group=pl.lit(ALL_GROUP))
     )
 
 
-def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = False) -> alt.VConcatChart:
+def dot_chart(
+    *, group: str, group_text: str, bars: bool = False, lanes: bool = False
+) -> alt.VConcatChart:
     """Return the two-section chart (by lead time, by condition) of one group of Primaries.
 
     Each system is a dot, or with `lanes` a dot at its own height within the row, or with `bars` a
@@ -106,7 +117,10 @@ def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = 
         )
     scores = scores.with_columns(arm=pl.col("arm").replace(ARMS))
     sections = []
-    for title, slices in (("By forecast horizon (lead time)", LEAD_SLICES), ("By condition", CONDITION_SLICES)):
+    for title, slices in (
+        ("By forecast horizon (lead time)", LEAD_SLICES),
+        ("By condition", CONDITION_SLICES),
+    ):
         names = list(slices.values())
         position = {name: i for i, name in enumerate(names)}
         lane = {arm: (i - (len(NAMES) - 1) / 2) * LANE_STEP for i, arm in enumerate(NAMES)}
@@ -115,10 +129,14 @@ def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = 
         )
         data = data.with_columns(
             row=pl.col("label").replace_strict(position, return_dtype=pl.Int32),
-            offset=pl.col("arm").replace_strict(lane, return_dtype=pl.Float64) if spread else pl.lit(0.0),
+            offset=pl.col("arm").replace_strict(lane, return_dtype=pl.Float64)
+            if spread
+            else pl.lit(0.0),
         ).with_columns(y=pl.col("row") + pl.col("offset"))
         y_scale = alt.Scale(domain=[len(names) - 0.5, -0.5])
-        label_expr = "{" + ", ".join(f"{i}: '{name}'" for i, name in enumerate(names)) + "}[datum.value]"
+        label_expr = (
+            "{" + ", ".join(f"{i}: '{name}'" for i, name in enumerate(names)) + "}[datum.value]"
+        )
         shaded = pl.DataFrame({"top": [i - 0.5 for i in range(1, len(names), 2)]}).with_columns(
             bottom=pl.col("top") + 1
         )
@@ -147,13 +165,19 @@ def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = 
             if metric == "half_hours":
                 counts = (
                     data.filter((pl.col("metric") == "mae_median") & (pl.col("arm") == "GAM"))
-                    .with_columns(text=pl.col("half_hours").map_elements(lambda n: f"{n:,}", return_dtype=pl.String))
+                    .with_columns(
+                        text=pl.col("half_hours").map_elements(
+                            lambda n: f"{n:,}", return_dtype=pl.String
+                        )
+                    )
                     .to_pandas()
                 )
                 front = (
                     alt.Chart(counts)
                     .mark_text(align="left", dx=4)
-                    .encode(y=alt.Y("row:Q", scale=y_scale, axis=None), x=alt.value(0), text="text:N")
+                    .encode(
+                        y=alt.Y("row:Q", scale=y_scale, axis=None), x=alt.value(0), text="text:N"
+                    )
                 )
             else:
                 frame = data.filter(pl.col("metric") == metric).to_pandas()
@@ -175,12 +199,18 @@ def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = 
                         .mark_circle(size=80, opacity=0.9)
                         .encode(
                             y=alt.Y("y:Q", scale=y_scale, axis=axis),
-                            x=alt.X("mean:Q", title=f"{metric_name} (points of capacity)", scale=alt.Scale(zero=True)),
+                            x=alt.X(
+                                "mean:Q",
+                                title=f"{metric_name} (points of capacity)",
+                                scale=alt.Scale(zero=True),
+                            ),
                             color=COLOUR,
                         )
                     )
             panels.append(
-                alt.layer(stripes, front).properties(width=width, height=row_px * len(names), title=metric_name)
+                alt.layer(stripes, front).properties(
+                    width=width, height=row_px * len(names), title=metric_name
+                )
             )
         sections.append(
             alt.hconcat(*panels)
@@ -200,11 +230,14 @@ def per_day_rows() -> pl.DataFrame:
     return (
         pl.scan_parquet(SCORES / "rows.parquet")
         .filter(pl.col("arm").is_in(list(ARMS)))
-        .select("time_series_id", "label", "arm", "power_fcst_init_time", "valid_time", "mae_median")
+        .select(
+            "time_series_id", "label", "arm", "power_fcst_init_time", "valid_time", "mae_median"
+        )
         .with_columns(
             arm=pl.col("arm").replace(ARMS),
-            day=((pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours() // 24)
-            .cast(pl.Int32)
+            day=(
+                (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours() // 24
+            ).cast(pl.Int32)
             + 0.5,
         )
         .collect()
@@ -230,15 +263,23 @@ def encode(*, domain: list[float] | None = None) -> dict:
             "arm:N",
             title=None,
             scale=alt.Scale(domain=NAMES, range=COLOURS),
-            legend=alt.Legend(orient="top", columns=3, symbolType="stroke", symbolStrokeWidth=3, labelLimit=400),
+            legend=alt.Legend(
+                orient="top", columns=3, symbolType="stroke", symbolStrokeWidth=3, labelLimit=400
+            ),
         ),
-        "strokeDash": alt.StrokeDash("arm:N", legend=None, scale=alt.Scale(domain=NAMES, range=DASH)),
+        "strokeDash": alt.StrokeDash(
+            "arm:N", legend=None, scale=alt.Scale(domain=NAMES, range=DASH)
+        ),
     }
 
 
 def by_day(frame: pl.DataFrame, by: list[str]) -> pl.DataFrame:
     """Return the mean absolute error of the median forecast by horizon day (and `by`)."""
-    return frame.group_by(*by, "arm", "day").agg(mae=pl.col("mae_median").mean()).sort(*by, "arm", "day")
+    return (
+        frame.group_by(*by, "arm", "day")
+        .agg(mae=pl.col("mae_median").mean())
+        .sort(*by, "arm", "day")
+    )
 
 
 def save(chart: alt.TopLevelMixin, name: str) -> None:
@@ -261,7 +302,10 @@ def main() -> None:
     groups = {
         "all": (f"All {frame['label'].n_unique()} Primaries with a GAM forecast", frame),
         "mva": (f"The {mva['label'].n_unique()} Primaries that report in MVA", mva),
-        "mw": (f"The {mw['label'].n_unique()} Primaries that report in MW (D15 has no GAM forecast yet)", mw),
+        "mw": (
+            f"The {mw['label'].n_unique()} Primaries that report in MW (D15 has no GAM forecast yet)",
+            mw,
+        ),
     }
     for key, (title, part) in groups.items():
         chart = (
@@ -271,7 +315,11 @@ def main() -> None:
             .properties(
                 width=620,
                 height=320,
-                title=alt.TitleParams([title + ".", SUBTITLE.replace(" Points of capacity; smaller is better.", "")], anchor="start", fontSize=12),
+                title=alt.TitleParams(
+                    [title + ".", SUBTITLE.replace(" Points of capacity; smaller is better.", "")],
+                    anchor="start",
+                    fontSize=12,
+                ),
             )
         )
         save(chart, f"mae_by_day_{key}")
@@ -283,7 +331,16 @@ def main() -> None:
         alt.Chart(per.to_pandas())
         .mark_line(strokeWidth=1.6, clip=True)
         .encode(
-            **{**encode(), "x": alt.X("day:Q", title=None, axis=alt.Axis(values=[0, 7, 14]), scale=alt.Scale(domain=[0, 14])), "y": alt.Y("mae:Q", title=None, scale=alt.Scale(zero=False))},
+            **{
+                **encode(),
+                "x": alt.X(
+                    "day:Q",
+                    title=None,
+                    axis=alt.Axis(values=[0, 7, 14]),
+                    scale=alt.Scale(domain=[0, 14]),
+                ),
+                "y": alt.Y("mae:Q", title=None, scale=alt.Scale(zero=False)),
+            },
             facet=alt.Facet("name:N", columns=5, sort=order, title=None),
         )
         .resolve_scale(y="independent")
