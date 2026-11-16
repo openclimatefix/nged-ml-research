@@ -226,7 +226,8 @@ def panel(
         )
     )
     return alt.layer(  # ty: ignore[invalid-return-type]
-        event_rect(start=event[0], stop=event[1], label="logged event"), lines
+        event_rect(start=max(event[0], start), stop=min(event[1], stop), label="logged event"),
+        lines,
     ).properties(width=WIDTH, height=240, title=alt.TitleParams(title, anchor="start", fontSize=12))
 
 
@@ -234,56 +235,42 @@ def event_figure(
     *, name: str, series: int, event: tuple[datetime, datetime], path: Path, note: str
 ) -> None:
     """Write a figure of one event with a day-ahead panel and a full 14-day-ahead forecast panel."""
-    start, stop = event[0] - timedelta(days=14), event[1] + timedelta(days=14)
+    start = max(event[0] - timedelta(days=14), datetime(2025, 11, 1, tzinfo=UTC))
+    stop = min(event[1] + timedelta(days=14), datetime(2026, 7, 1, tzinfo=UTC))
     top = panel(
         series=series, start=start, stop=stop, event=event, lead_day=1,
         title=f"{name}: median forecast 1 to 2 days ahead, seed mean, from 14 days before to 14 days after the event",
     )  # fmt: skip
-    mid = event[0] + (event[1] - event[0]) / 2 - timedelta(days=7)
+    mid = event[0] + (event[1] - event[0]) / 2 - timedelta(days=1)
     bottom = panel(
-        series=series, start=mid, stop=mid + timedelta(days=14), event=event, lead_day=None,
+        series=series, start=mid, stop=mid + timedelta(days=15), event=event, lead_day=None,
         title=f"{name}: one full 14-day median forecast, issued at 12:00 UTC in the middle of the event. {note}",
     )  # fmt: skip
     alt.vconcat(top, bottom).resolve_scale(color="shared").save(path)
 
 
 def pick_events(*, site: pl.DataFrame) -> list[tuple[str, int, tuple[datetime, datetime]]]:
-    """Return the four longest logged events that need no data beyond the scored folds, outside D5 and D16."""
+    """Return the four longest logged events outside D5 and D16 that overlap the scored folds.
+
+    The set holds 10 events. The six that are not at D5 or D16 are at D18, D4, D12, D9, and D3, and
+    the event at D9 ends 2 days into the scored period, so the four events are those at D18, D4, D12,
+    and D3. No signed-MW Primary other than D5 and D16 has a logged event in the set.
+    """
     sets = s668.event_sets(site=site)
     table = sets["event table, over 7 days, 2 units or more"]
     first = datetime(2025, 11, 15, tzinfo=UTC)
     last = datetime(2026, 6, 15, tzinfo=UTC)
-    group_of = dict(zip(site["label"].to_list(), site["group"].to_list(), strict=True))
     id_of = dict(zip(site["label"].to_list(), site["time_series_id"].to_list(), strict=True))
     rows = []
     for e in table.iter_rows(named=True):
         a = lib.GRID_START + timedelta(minutes=30 * e["start"])
         b = lib.GRID_START + timedelta(minutes=30 * e["end"])
-        if e["label"] in {"D5", "D16"} or a < first or b > last:
+        if e["label"] in {"D5", "D16"} or b < first or a > last:
             continue
-        rows.append(
-            {
-                "label": e["label"],
-                "group": group_of[e["label"]],
-                "a": a,
-                "b": b,
-                "days": (b - a).days,
-            }
-        )
+        rows.append({"label": e["label"], "a": a, "b": b, "days": (b - a).days})
     rows.sort(key=lambda r: -r["days"])
-    chosen: list[dict] = []
-    for g in sorted(
-        {r["group"] for r in rows}
-    ):  # at least two from each metering group where the set allows
-        chosen += [r for r in rows if r["group"] == g][:2]
-    for r in rows:
-        if len(chosen) >= 4:
-            break
-        if r not in chosen:
-            chosen.append(r)
-    chosen = sorted(chosen, key=lambda r: -r["days"])[:4]
     return [
-        (f"{r['label']}, {r['days']} days", id_of[r["label"]], (r["a"], r["b"])) for r in chosen
+        (f"{r['label']}, {r['days']} days", id_of[r["label"]], (r["a"], r["b"])) for r in rows[:4]
     ]
 
 
