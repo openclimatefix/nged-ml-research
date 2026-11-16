@@ -43,7 +43,7 @@ PYEOF
       if [ "$cmd" = fit ]; then  # the fit's own logs (rows, epochs); the pfit that follows overwrites them
         mkdir -p "$BASE/checks/$C/$step/logs"
         for f in "$E00677_ROOT"/arms/k1_${step}_sp1/work/logs/P5/${M}_d0_s*.json; do
-          grep -q '"epochs"' "$f" && cp "$f" "$BASE/checks/$C/$step/logs/"  # not the "reused" stubs
+          if grep -q '"epochs"' "$f"; then cp "$f" "$BASE/checks/$C/$step/logs/"; fi  # not the "reused" stubs
         done
       fi ;;
   esac
