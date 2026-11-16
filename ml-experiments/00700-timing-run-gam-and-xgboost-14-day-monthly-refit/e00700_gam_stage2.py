@@ -1,4 +1,4 @@
-"""Experiment 700: stage 2 of the GAM for origin month 2026-01, timed.
+"""Experiment 700: stage 2 of the GAM for origin months 2025-11 to 2026-06, timed.
 
     E00377_SOURCE=control E00377_ARM=a0 \
     PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility \
@@ -24,8 +24,9 @@ import e00377s3_stack as stack  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 
-MONTH = datetime(2026, 1, 1, tzinfo=UTC)
-NEXT = datetime(2026, 2, 1, tzinfo=UTC)
+MONTHS = [datetime(2025 + (10 + i) // 12, (10 + i) % 12 + 1, 1, tzinfo=UTC) for i in range(8)]
+MONTH = MONTHS[0]
+NEXT = datetime(2026, 7, 1, tzinfo=UTC)
 OUT = Path(os.environ["DATA_PATH_INTERNAL"]).resolve().parent / "timing"
 
 
@@ -46,7 +47,7 @@ def main() -> None:
             )
         else:
             pools, arm, name = [frame], stack.OWN_ARM, f"stack_d_{site}"
-        month = stack.with_fold_spread(frame=frame, pools=pools, months=[MONTH], arm=arm)
+        month = stack.with_fold_spread(frame=frame, pools=pools, months=MONTHS, arm=arm)
         wall, cpu = time.monotonic() - t0, time.process_time() - c0
         assert month["lead_hours"].max() <= 339.0
         path = common.OUT_DIR / f"{name}.parquet"

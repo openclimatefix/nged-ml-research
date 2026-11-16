@@ -1,12 +1,12 @@
 # ruff: noqa: E501
-"""Experiment 700: write the January 2026 forecasts of the GAM (default 3) in experiment 677's file layout.
+"""Experiment 700: write the forecasts of origin months 2025-11 to 2026-06 of the GAM (default 3) in experiment 677's file layout.
 
     PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility \
         uv run --no-sync python ml-experiments/00700-*/e00700_export.py gam
 
 Run with `DATA_PATH_INTERNAL` set to the real data folder. Reads the sandbox outputs of
 `e00700_gam_*.py` and experiment 378's `e00378_arms*.py` run in the sandbox, and writes
-`backtests/gam_jan_sp1.parquet` under this experiment's private folder (point `E00677_ROOT` at it
+`backtests/gam_year_sp1.parquet` under this experiment's private folder (point `E00677_ROOT` at it
 when scoring).
 
 **The forecast is Primary demand research default 3 as experiment 378 assembles it**, with the
@@ -39,8 +39,8 @@ NAME = "00700-timing-run-gam-and-xgboost-14-day-monthly-refit"
 ROOT: Path = ML_EXPERIMENTS_DATA_DIR / NAME
 SANDBOX: Path = ROOT / "sandbox" / "ml-experiments"
 Q = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
-START = datetime(2026, 1, 1, tzinfo=UTC)
-END = datetime(2026, 2, 1, tzinfo=UTC)
+START = datetime(2025, 11, 1, tzinfo=UTC)
+END = datetime(2026, 7, 1, tzinfo=UTC)
 SOURCE_OF = {
     **dict.fromkeys(("D5", "D9", "D10", "D11", "D14", "D16", "D18"), "control"),
     **dict.fromkeys(("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22"), "mva"),
@@ -56,8 +56,26 @@ def gam_rows() -> pl.DataFrame:
     for site, source in SOURCE_OF.items():
         name = "stack_d_donor_D8" if site == "D8" else f"stack_d_{site}"
         base = pl.read_parquet(w377 / source / "arms" / "a0" / "dp_preds_s2" / f"{name}.parquet")
+        # A Primary has no forecast before its first month in experiment 377's stored file (12 months
+        # of history are required), and experiment 378's solar summary files stop there too.
+        first = (
+            pl.read_parquet(
+                ML_EXPERIMENTS_DATA_DIR
+                / w377.relative_to(SANDBOX).parts[0]
+                / "work"
+                / source
+                / "arms"
+                / "a0"
+                / "dp_preds_s2"
+                / f"{name}.parquet",
+                columns=["power_fcst_init_time"],
+            )["power_fcst_init_time"]
+            .min()
+            .replace(day=1, hour=0, minute=0)
+        )
         base = base.filter(
-            (pl.col("seed") == 0)
+            (pl.col("power_fcst_init_time") >= first)
+            & (pl.col("seed") == 0)
             & (pl.col("power_fcst_init_time") >= START)
             & (pl.col("power_fcst_init_time") < END)
         )
@@ -175,17 +193,14 @@ def compare_with_stored(*, arm: str) -> float:
 if __name__ == "__main__":
     which = sys.argv[1]
     if which == "gam":
-        write(frame=to_contract(frame=gam_rows(), unit="points"), name="gam_jan_sp1", step="gam")
+        write(frame=to_contract(frame=gam_rows(), unit="points"), name="gam_year_sp1", step="gam")
     elif which == "xgb":
         for arm, name in (
-            ("p_s6_bg2", "xgb_bg2_jan_sp1"),
-            ("p_a3_monthly_in_weekly_slot", "xgb_monthly_jan_sp1"),
+            ("p_s6_bg2", "xgb_bg2_year_sp1"),
+            ("p_a3_monthly_in_weekly_slot", "xgb_monthly_year_sp1"),
         ):
-            print(
-                arm, "max |q50 - stored q50| (fraction of capacity):", compare_with_stored(arm=arm)
-            )
             write(
-                frame=to_contract(frame=xgb_rows(arm=arm, root=SANDBOX), unit="fraction"),
+                frame=to_contract(frame=xgb_rows(arm=arm, root=ML_EXPERIMENTS_DATA_DIR), unit="fraction"),
                 name=name,
                 step=arm,
             )

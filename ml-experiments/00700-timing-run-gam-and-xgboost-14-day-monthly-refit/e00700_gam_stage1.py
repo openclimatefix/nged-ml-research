@@ -1,5 +1,5 @@
 # ruff: noqa: I001
-"""Experiment 700: forecast origin month 2026-01 with the GAM stage 1 (experiment 377) and time it.
+"""Experiment 700: forecast origin months 2025-11 to 2026-06 with the GAM stage 1 (experiment 377) and time it.
 
     E00377_SOURCE=control PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility \
         uv run --no-sync python ml-experiments/00700-*/e00700_gam_stage1.py --sites D5
@@ -26,8 +26,8 @@ import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 
-START = datetime(2026, 1, 1, tzinfo=UTC)
-END = datetime(2026, 2, 1, tzinfo=UTC)
+START = datetime(2025, 11, 1, tzinfo=UTC)
+END = datetime(2026, 7, 1, tzinfo=UTC)
 OUT = Path(os.environ["DATA_PATH_INTERNAL"]).resolve().parent / "timing"
 
 

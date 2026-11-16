@@ -1,5 +1,5 @@
 # ruff: noqa: D103, E501
-"""Experiment 700: score the January 2026 month of the GAM and XGBoost beside steps 5 and 8, by the protocol.
+"""Experiment 700: score the origin months 2025-11 to 2026-06 of the GAM and XGBoost beside steps 5 and 8, by the protocol.
 
     PYTHONPATH=<folders of experiments 377, 378, 668, 677> E00677_ROOT=<this experiment's private folder> \
         uv run --no-sync python ml-experiments/00700-*/e00700_protocol.py
@@ -9,7 +9,7 @@ origin, 672 half-hours, megawatts), and the arms are scored on the rows that all
 `studies.eval_protocol.metrics` (MAE of the median, CRPS, twCRPS, by the slices of the protocol),
 for the six signed-MW and the seven MVA-only Primaries. The manual heuristic and climatology are the
 stored arms of experiment 87 (`work/arms/ref_*`, all 365 daily runs), relabelled from the 09:00 to the
-12:00 origin. Writes `scores/protocol_jan/{rows.parquet,scores.csv}` and `curtailment_cost.csv`.
+12:00 origin. Writes `scores/protocol_year/{rows.parquet,scores.csv}` and `curtailment_cost.csv`.
 """
 
 from datetime import UTC, datetime
@@ -24,17 +24,17 @@ from studies.dp_features import default_input_paths, load_or_build_feature_cache
 from studies.eval_protocol import metrics
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-START = datetime(2026, 1, 1, tzinfo=UTC)
-END = datetime(2026, 2, 1, tzinfo=UTC)
-FIRST_VALID = datetime(2026, 1, 1, 12, tzinfo=UTC)
+START = datetime(2025, 11, 1, tzinfo=UTC)
+END = datetime(2026, 7, 1, tzinfo=UTC)
+FIRST_VALID = datetime(2025, 11, 1, 12, tzinfo=UTC)
 FILES = {
-    "GAM": ("gam_jan_sp1", (0,)),
-    "XGBoost BG2 (weekly W member)": ("xgb_bg2_jan_sp1", (0,)),
-    "XGBoost with monthly refits only": ("xgb_monthly_jan_sp1", (0,)),
-    "Step 5 (quarterly refits)": ("step5_jan_sp3", (0, 1, 2)),
-    "Step 8 (quarterly refits)": ("step8_jan_sp3", (0, 1, 2)),
-    "Step 5 monthly (9a)": ("step5_jan_sp1", (0, 1, 2)),
-    "Step 8 monthly (9b)": ("step8_jan_sp1", (0, 1, 2)),
+    "GAM": ("gam_year_sp1", (0,)),
+    "XGBoost BG2 (weekly W member)": ("xgb_bg2_year_sp1", (0,)),
+    "XGBoost with monthly refits only": ("xgb_monthly_year_sp1", (0,)),
+    "Step 5 (quarterly refits)": ("step5_year_sp3", (0, 1, 2)),
+    "Step 8 (quarterly refits)": ("step8_year_sp3", (0, 1, 2)),
+    "Step 5 monthly (9a)": ("step5_year_sp1", (0, 1, 2)),
+    "Step 8 monthly (9b)": ("step8_year_sp1", (0, 1, 2)),
 }
 REFERENCES = {"Manual heuristic": "ref_manual_heuristic", "Climatology": "ref_climatology"}
 
@@ -92,7 +92,7 @@ def main() -> None:
         first_readings=first_readings,
     )
     print("arms", list(forecasts), "shared half-hours", table.height, flush=True)
-    out = sc.ROOT / "scores" / "protocol_jan"
+    out = sc.ROOT / "scores" / "protocol_year"
     out.mkdir(parents=True, exist_ok=True)
     rows_out = []
     for name, frame in forecasts.items():

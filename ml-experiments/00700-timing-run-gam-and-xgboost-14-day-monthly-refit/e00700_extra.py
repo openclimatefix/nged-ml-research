@@ -1,15 +1,15 @@
 # ruff: noqa: D103, E501, PLR0912
-"""Experiment 700: January 2026 scores that the protocol slices lack, on the rows all arms share.
+"""Experiment 700: Scores of the origin months 2025-11 to 2026-06 that the protocol slices lack, on the rows all arms share.
 
     PYTHONPATH=<folders of experiments 377, 378, 668, 677> E00677_ROOT=<this experiment's private folder> \
         uv run --no-sync python ml-experiments/00700-*/e00700_extra.py
 
-Reads the per-row keys of `scores/protocol_jan/rows.parquet` (the rows every arm shares) and the
+Reads the per-row keys of `scores/protocol_year/rows.parquet` (the rows every arm shares) and the
 same forecast files as `e00700_protocol.py`, and prints, for the 13 Primaries of the two protocol
 groups (six signed-MW, seven MVA-only), in points of capacity: the MAE of the median by forecast day
 (days 0 to 13, so days 10 to 14 are covered), the pinball loss by quantile level, the coverage of
 q05 to q95 and q01 to q99, and the verified D5 and D16 load transfer (inside, the 7 days after, and
-outside it). Writes `scores/protocol_jan/extra_*.csv`.
+outside it). Writes `scores/protocol_year/extra_*.csv`.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -37,7 +37,7 @@ def main() -> None:
         first=datetime(2024, 4, 1, tzinfo=UTC),
         last=metrics.HOLDOUT_START,
     )
-    keep = pl.read_parquet(sc.ROOT / "scores" / "protocol_jan" / "rows.parquet").filter(
+    keep = pl.read_parquet(sc.ROOT / "scores" / "protocol_year" / "rows.parquet").filter(
         pl.col("label").is_in(cp.GROUPS["signed-MW six"] + cp.GROUPS["MVA-only seven"])
     )
     keys = keep.filter(pl.col("arm") == "GAM").select(*cp.KEYS, "label")
@@ -148,7 +148,7 @@ def main() -> None:
                             "crps": float((2 * pb[mm].mean(axis=1)).mean()),
                         }
                     )
-    out = sc.ROOT / "scores" / "protocol_jan"
+    out = sc.ROOT / "scores" / "protocol_year"
     for name, rows in (
         ("by_day", by_day),
         ("pinball", pin),
