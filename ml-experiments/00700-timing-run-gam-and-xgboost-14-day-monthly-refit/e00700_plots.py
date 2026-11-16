@@ -62,6 +62,31 @@ COLOUR = alt.Color(
 
 
 LANE_STEP = 0.11
+ALL_GROUP = "all 15"
+
+
+def pooled_scores() -> pl.DataFrame:
+    """Return `scores.csv`'s columns for every Primary that all five systems share, pooled.
+
+    D15 has no GAM forecast before 2026-03, so the pool holds 15 Primaries. The mean is over all
+    their half-hours, so a Primary with more scored rows weighs more, as in `scores.csv`.
+    """
+    rows = pl.scan_parquet(SCORES / "rows.parquet").filter(pl.col("arm").is_in(list(ARMS)))
+    parts = []
+    for slice_name in [*LEAD_SLICES, *CONDITION_SLICES]:
+        part = (
+            rows.filter(pl.col(slice_name))
+            .group_by("arm")
+            .agg(*[pl.col(m).mean() for m in METRICS], half_hours=pl.len())
+            .with_columns(slice=pl.lit(slice_name))
+            .collect()
+        )
+        parts.append(part)
+    return (
+        pl.concat(parts)
+        .unpivot(index=["arm", "slice", "half_hours"], on=list(METRICS), variable_name="metric", value_name="mean")
+        .with_columns(group=pl.lit(ALL_GROUP))
+    )
 
 
 def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = False) -> alt.VConcatChart:
@@ -73,9 +98,12 @@ def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = 
     """
     row_px = 50 if bars else (40 if lanes else 22)
     spread = bars or lanes
-    scores = pl.read_csv(SCORES / "scores.csv").filter(
-        (pl.col("group") == group) & pl.col("arm").is_in(list(ARMS))
-    )
+    if group == ALL_GROUP:
+        scores = pooled_scores()
+    else:
+        scores = pl.read_csv(SCORES / "scores.csv").filter(
+            (pl.col("group") == group) & pl.col("arm").is_in(list(ARMS))
+        )
     scores = scores.with_columns(arm=pl.col("arm").replace(ARMS))
     sections = []
     for title, slices in (("By forecast horizon (lead time)", LEAD_SLICES), ("By condition", CONDITION_SLICES)):
@@ -222,7 +250,7 @@ def save(chart: alt.TopLevelMixin, name: str) -> None:
 
 def main() -> None:
     """Draw every chart."""
-    for group, text in GROUPS.items():
+    for group, text in {**GROUPS, ALL_GROUP: "all 15 Primaries with a GAM forecast"}.items():
         stem = f"{group.split()[0].lower()}_{group.split()[1]}"
         save(dot_chart(group=group, group_text=text), f"dots_{stem}")
         save(dot_chart(group=group, group_text=text, bars=True), f"bars_{stem}")
