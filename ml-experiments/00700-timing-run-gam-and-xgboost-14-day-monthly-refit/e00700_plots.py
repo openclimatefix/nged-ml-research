@@ -61,58 +61,103 @@ COLOUR = alt.Color(
 )
 
 
+LANE_STEP = 0.16
+
+
 def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = False) -> alt.VConcatChart:
     """Return the two-section chart (by lead time, by condition) of one group of Primaries.
 
-    Each system is a dot, or with `bars` a thin horizontal bar, or with `lanes` a dot at its own
-    height within the row.
+    Each system is a dot, or with `lanes` a dot at its own height within the row, or with `bars` a
+    thin horizontal bar in its own lane. Every second row has a light grey background. Rows sit on
+    a numeric axis (row `i` spans `i - 0.5` to `i + 0.5`), so the stripes and the lanes line up.
     """
     row_px = 50 if (bars or lanes) else 22
+    spread = bars or lanes
     scores = pl.read_csv(SCORES / "scores.csv").filter(
         (pl.col("group") == group) & pl.col("arm").is_in(list(ARMS))
     )
     scores = scores.with_columns(arm=pl.col("arm").replace(ARMS))
     sections = []
     for title, slices in (("By forecast horizon (lead time)", LEAD_SLICES), ("By condition", CONDITION_SLICES)):
+        names = list(slices.values())
+        position = {name: i for i, name in enumerate(names)}
+        lane = {arm: (i - (len(NAMES) - 1) / 2) * LANE_STEP for i, arm in enumerate(NAMES)}
         data = scores.filter(pl.col("slice").is_in(list(slices))).with_columns(
             label=pl.col("slice").replace(slices)
         )
-        order = list(slices.values())
+        data = data.with_columns(
+            row=pl.col("label").replace_strict(position, return_dtype=pl.Int32),
+            offset=pl.col("arm").replace_strict(lane, return_dtype=pl.Float64) if spread else pl.lit(0.0),
+        ).with_columns(y=pl.col("row") + pl.col("offset"))
+        y_scale = alt.Scale(domain=[len(names) - 0.5, -0.5])
+        label_expr = "{" + ", ".join(f"{i}: '{name}'" for i, name in enumerate(names)) + "}[datum.value]"
+        shaded = pl.DataFrame({"top": [i - 0.5 for i in range(1, len(names), 2)]}).with_columns(
+            bottom=pl.col("top") + 1
+        )
         panels = []
-        for metric, metric_name in METRICS.items():
-            frame = data.filter(pl.col("metric") == metric).to_pandas()
-            mark = alt.Chart(frame).mark_bar(height=7) if bars else alt.Chart(frame).mark_circle(size=80, opacity=0.9)
-            lane = {"yOffset": alt.YOffset("arm:N", sort=NAMES)} if (bars or lanes) else {}
-            panels.append(
-                mark.encode(
-                    **lane,
-                    y=alt.Y(
-                        "label:N",
-                        sort=order,
-                        title=None,
-                        axis=alt.Axis(labels=metric == "mae_median", ticks=False, domain=False),
-                    ),
-                    x=alt.X("mean:Q", title=f"{metric_name} (points of capacity)", scale=alt.Scale(zero=True)),
-                    color=COLOUR,
+        for metric, metric_name in [*METRICS.items(), ("half_hours", "Half-hours")]:
+            width = 60 if metric == "half_hours" else 170
+            axis = alt.Axis(
+                values=list(range(len(names))),
+                labelExpr=label_expr,
+                labels=metric == "mae_median",
+                ticks=False,
+                domain=False,
+                grid=False,
+                title=None,
+            )
+            stripes = (
+                alt.Chart(shaded.to_pandas())
+                .mark_rect(color="#EDEDED")
+                .encode(
+                    y=alt.Y("top:Q", scale=y_scale, axis=axis),
+                    y2="bottom:Q",
+                    x=alt.value(0),
+                    x2=alt.value(width),
                 )
-                .properties(width=170, height=row_px * len(slices), title=metric_name)
             )
-        counts = (
-            data.filter((pl.col("metric") == "mae_median") & (pl.col("arm") == "GAM"))
-            .with_columns(text=pl.col("half_hours").map_elements(lambda n: f"{n:,}", return_dtype=pl.String))
-            .to_pandas()
-        )
-        panels.append(
-            alt.Chart(counts)
-            .mark_text(align="left")
-            .encode(
-                y=alt.Y("label:N", sort=order, title=None, axis=None),
-                text="text:N",
+            if metric == "half_hours":
+                counts = (
+                    data.filter((pl.col("metric") == "mae_median") & (pl.col("arm") == "GAM"))
+                    .with_columns(text=pl.col("half_hours").map_elements(lambda n: f"{n:,}", return_dtype=pl.String))
+                    .to_pandas()
+                )
+                front = (
+                    alt.Chart(counts)
+                    .mark_text(align="left", dx=4)
+                    .encode(y=alt.Y("row:Q", scale=y_scale, axis=None), x=alt.value(0), text="text:N")
+                )
+            else:
+                frame = data.filter(pl.col("metric") == metric).to_pandas()
+                if bars:
+                    front = (
+                        alt.Chart(frame)
+                        .mark_rect(height=7)
+                        .encode(
+                            y=alt.Y("y:Q", scale=y_scale, axis=axis),
+                            x=alt.X("zero:Q", title=f"{metric_name} (points of capacity)"),
+                            x2="mean:Q",
+                            color=COLOUR,
+                        )
+                        .transform_calculate(zero="0")
+                    )
+                else:
+                    front = (
+                        alt.Chart(frame)
+                        .mark_circle(size=80, opacity=0.9)
+                        .encode(
+                            y=alt.Y("y:Q", scale=y_scale, axis=axis),
+                            x=alt.X("mean:Q", title=f"{metric_name} (points of capacity)", scale=alt.Scale(zero=True)),
+                            color=COLOUR,
+                        )
+                    )
+            panels.append(
+                alt.layer(stripes, front).properties(width=width, height=row_px * len(names), title=metric_name)
             )
-            .properties(width=60, height=row_px * len(slices), title="Half-hours")
-        )
         sections.append(
-            alt.hconcat(*panels).resolve_scale(x="independent").properties(title=alt.TitleParams(title, anchor="start", fontSize=14))
+            alt.hconcat(*panels)
+            .resolve_scale(x="independent")
+            .properties(title=alt.TitleParams(title, anchor="start", fontSize=14))
         )
     return alt.vconcat(*sections).properties(
         title=alt.TitleParams(
