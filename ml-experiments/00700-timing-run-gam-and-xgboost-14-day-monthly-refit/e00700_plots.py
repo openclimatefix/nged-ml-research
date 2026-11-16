@@ -61,7 +61,7 @@ COLOUR = alt.Color(
 )
 
 
-LANE_STEP = 0.16
+LANE_STEP = 0.11
 
 
 def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = False) -> alt.VConcatChart:
@@ -71,7 +71,7 @@ def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = 
     thin horizontal bar in its own lane. Every second row has a light grey background. Rows sit on
     a numeric axis (row `i` spans `i - 0.5` to `i + 0.5`), so the stripes and the lanes line up.
     """
-    row_px = 50 if (bars or lanes) else 22
+    row_px = 50 if bars else (40 if lanes else 22)
     spread = bars or lanes
     scores = pl.read_csv(SCORES / "scores.csv").filter(
         (pl.col("group") == group) & pl.col("arm").is_in(list(ARMS))
