@@ -69,7 +69,8 @@ def sums(*, arm_key: str, bank: str) -> pl.DataFrame:
                     rows=pl.len(),
                 ).with_columns(arm=pl.lit(arm_key), bank=pl.lit(bank), month=pl.lit(month), seed=pl.lit(seed))
             )  # fmt: skip
-    assert parts, (arm_key, bank)
+    if not parts:
+        raise FileNotFoundError(f"no bank files for {arm_key} on bank {bank}")
     return pl.concat(parts)
 
 
