@@ -87,7 +87,13 @@ def arrays(*, arm_key: str, bank: str, months: tuple[str, ...]) -> tuple[np.ndar
         if row["month"] in months:
             i, j = months.index(row["month"]), list(seeds_of(arm=arm)).index(row["seed"])
             num[i, j], den[i, j] = row["num"], row["den"]
-    assert (den > 0).all(), (arm_key, bank, "a fold or seed has no shifted rows")
+    empty = np.argwhere(den <= 0)
+    assert not empty.size, (
+        arm_key,
+        bank,
+        "no shifted rows in",
+        [(months[i], list(seeds_of(arm=arm))[j]) for i, j in empty],
+    )
     return num, den
 
 
@@ -149,7 +155,7 @@ def main() -> None:
                     .agg(s=pl.col("num").sum() / pl.col("den").sum())
                 )
                 print(f"    lead {name}: mean over seeds {t['s'].mean():.4f}")
-            for depth in DEPTHS:
+            for depth in DEPTHS if bank == "581" else ():  # 660's shifts are not at these depths
                 t = (
                     table.filter(pl.col("depth") == round(depth * 100))
                     .group_by("seed")

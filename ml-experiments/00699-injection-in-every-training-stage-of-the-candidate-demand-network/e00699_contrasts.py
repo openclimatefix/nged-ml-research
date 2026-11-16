@@ -36,6 +36,7 @@ from e00699_common import (
     HOLDOUT,
     LEVEL_FAMILY,
     PHASE_A_FOLDS,
+    ROOT,
     ROOT_677,
     SEEDS,
     STORED_SEEDS,
@@ -43,6 +44,7 @@ from e00699_common import (
 )
 from e00699_stats import Interval, Term, bootstrap_combination, contrast, t_combination
 from scipy import stats
+from studies.bootstrap import bootstrap_month_totals
 
 GRID_START = np.datetime64("2019-09-01T00:00")
 SIZE_MAE = -0.022
@@ -218,6 +220,32 @@ def skill(
 # ----------------------------------------------------------------------------- known answer
 
 
+def month_only(
+    *, num_a: np.ndarray, den_a: np.ndarray, num_b: np.ndarray, den_b: np.ndarray, level: float
+) -> tuple[float, float, float]:
+    """Return the pooled difference and its month-only interval from `studies.bootstrap`.
+
+    The arrays have shape (months, seeds). Whole months are resampled and one seed is drawn per resample,
+    with the random stream that produced the plan's reference numbers. Both arms must hold the same
+    denominator in each month and seed, which holds because they score the same rows.
+    """
+    assert np.allclose(den_a, den_b), "the arms' denominators differ"
+    assert np.allclose(den_a, den_a[:, :1]), "the denominator differs between seeds"
+    point = float((num_b - num_a).sum() / den_a.sum())
+    lo, hi = bootstrap_month_totals(
+        month_sums=(num_b - num_a).T, month_counts=den_a[:, 0], level=level
+    )
+    return point, lo, hi
+
+
+KNOWN: dict[str, tuple[float, float, float, float, float]] = {
+    "mae": (7.169, 7.213, 0.045, 0.024, 0.066),
+    "crps": (4.021, 4.049, 0.028, 0.014, 0.043),
+    "share": (0.123, 0.075, -0.047, -0.061, -0.036),
+}
+"""Experiment 677's stored table: no injection, stage 3 only, difference, and the interval around it."""
+
+
 def known() -> None:
     """Print the known-answer table from the cut copies of the stored arms."""
     hdr("known-answer table: stored arms, seed-mean forecast of seeds 0 to 2")
@@ -232,28 +260,38 @@ def known() -> None:
         num_a = np.bincount(frame.month_idx, weights=a.astype(np.float64))[:, None]
         num_b = np.bincount(frame.month_idx, weights=b.astype(np.float64))[:, None]
         den = frame.counts()[:, None]
-        iv = contrast(
-            num_a=num_a,
-            den_a=den,
-            num_b=num_b,
-            den_b=den,
-            level=level,
-            paired_seeds=True,
-            resample_seeds=False,
-        )
+        point, lo, hi = month_only(num_a=num_a, den_a=den, num_b=num_b, den_b=den, level=level)
         print(
             f"{label}: no injection {num_a.sum() / den.sum():.3f}; stage 3 only {num_b.sum() / den.sum():.3f}; "
-            f"difference {iv.point:+.3f}; month bootstrap {iv.boot_lo:+.3f} to {iv.boot_hi:+.3f} at {level:.2f}%"
+            f"difference {point:+.3f}; month bootstrap {lo:+.3f} to {hi:+.3f} at {level:.2f}%"
         )
+        want = KNOWN[_metric]
+        for what, got, ref in zip(
+            ("no injection", "stage 3 only", "difference"),
+            (num_a.sum() / den.sum(), num_b.sum() / den.sum(), point),
+            want[:3],
+            strict=True,
+        ):
+            assert abs(got - ref) <= 0.0005, (label, what, got, ref)
+        assert abs(lo - want[3]) <= 0.0015, (label, lo, want)
+        assert abs(hi - want[4]) <= 0.0015, (label, hi, want)
     na, da = arrays(arm_key="none_stored", bank="581", months=FOLDS)
     nb, db = arrays(arm_key="s3_stored", bank="581", months=FOLDS)
-    iv = contrast(
-        num_a=na, den_a=da, num_b=nb, den_b=db, level=level, paired_seeds=True, resample_seeds=False
-    )
+    point, lo, hi = month_only(num_a=na, den_a=da, num_b=nb, den_b=db, level=level)
     print(
         f"Copied share, days 0 to 14: no injection {na.sum() / da.sum():.3f}; stage 3 only {nb.sum() / db.sum():.3f}; "
-        f"difference {iv.point:+.3f}; month bootstrap {iv.boot_lo:+.3f} to {iv.boot_hi:+.3f} at {level:.2f}%"
+        f"difference {point:+.3f}; month bootstrap {lo:+.3f} to {hi:+.3f} at {level:.2f}%"
     )
+    for what, got, ref in zip(
+        ("no injection", "stage 3 only", "difference"),
+        (na.sum() / da.sum(), nb.sum() / db.sum(), point),
+        KNOWN["share"][:3],
+        strict=True,
+    ):
+        assert abs(got - ref) <= 0.0005, ("copied share", what, got, ref)
+    assert abs(lo - KNOWN["share"][3]) <= 0.0015, (lo, KNOWN["share"])
+    assert abs(hi - KNOWN["share"][4]) <= 0.0015, (hi, KNOWN["share"])
+    print("known-answer table reproduced within 0.0005 (points) and 0.0015 (interval ends)")
     for name, arr in frame.baselines.items():
         print(f"{name} on the shared rows: {arr.astype(np.float64).mean():.3f}")
     print(
@@ -356,12 +394,11 @@ def noise(*, frame: Frame) -> dict[str, np.ndarray]:
                     if abs(z) > 3:
                         flagged += 1
                         log = (
-                            ARMS[arm].folder
-                            / "arms"
-                            / f"k1_{ARMS[arm].step}_sp1"
-                            / "work"
+                            ROOT
+                            / "checks"
+                            / ARMS[arm].folder.name
+                            / ARMS[arm].step
                             / "logs"
-                            / "P5"
                             / f"{month}_d0_s{s}.json"
                         )
                         extra = log.read_text()[:300] if log.exists() else "no log"
@@ -384,9 +421,10 @@ def sizing(*, frame: Frame, variances: dict[str, np.ndarray]) -> None:
         var = variances[metric]
         median_var = float(np.median(var))
         full_var = np.full(len(FOLDS), median_var)
-        full_var[: len(var)] = var
         full_n = np.full(len(FOLDS), mean_count)
-        full_n[: len(counts)] = counts
+        for k, month in enumerate(frame.months):  # key the measured folds by name, not by slot
+            full_var[FOLDS.index(month)] = var[k]
+            full_n[FOLDS.index(month)] = counts[k]
         w = full_n / full_n.sum()
         for n_seeds in (8, 12, 16):
             se = float(np.sqrt((w**2 * 2.0 * full_var / n_seeds).sum()))
@@ -445,7 +483,7 @@ def families(*, frame: Frame) -> dict:
                 "| non-inferior:",
                 non_inferior(interval=share660),
             )
-        except (AssertionError, FileNotFoundError, KeyError, ValueError) as exc:
+        except FileNotFoundError as exc:
             print("  copied share, 660 bank: not run", type(exc).__name__)
         out[name.split(" ")[0]] = {
             "mae": mae,
@@ -483,17 +521,11 @@ def descriptive_h(*, frame: Frame) -> None:
         sa = np.bincount(frame.month_idx, weights=seed_mean[a].astype(np.float64))[:, None]
         sb = np.bincount(frame.month_idx, weights=seed_mean[b].astype(np.float64))[:, None]
         den = frame.counts()[:, None]
-        month_only = contrast(
-            num_a=sa,
-            den_a=den,
-            num_b=sb,
-            den_b=den,
-            level=LEVEL_FAMILY,
-            paired_seeds=True,
-            resample_seeds=False,
+        mo_point, mo_lo, mo_hi = month_only(
+            num_a=sa, den_a=den, num_b=sb, den_b=den, level=LEVEL_FAMILY
         )
         print(
-            f"{metric}: seed-mean forecast, months only (bootstrap {month_only.boot_lo:+.4f} to {month_only.boot_hi:+.4f}), point {month_only.point:+.4f}; scores {sa.sum() / den.sum():.3f} and {sb.sum() / den.sum():.3f}"
+            f"{metric}: seed-mean forecast, months only (bootstrap {mo_lo:+.4f} to {mo_hi:+.4f}), point {mo_point:+.4f}; scores {sa.sum() / den.sum():.3f} and {sb.sum() / den.sum():.3f}"
         )
         keep = months_without(frame=frame, drop="2025-11")
         if len(keep) < len(frame.months):

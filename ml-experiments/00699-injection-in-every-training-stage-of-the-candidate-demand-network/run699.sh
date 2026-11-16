@@ -1,25 +1,28 @@
 #!/bin/bash
 # usage: run699.sh PHASE
-#   PHASE is stored, a0, a1, a2, b, bank660, or score-only:CHAIN. Each phase runs its fits through chain699.sh,
+#   PHASE is stored, a0, a1, a2, b, bank660, or bank660. Each phase runs its fits through chain699.sh,
 #   then exports each arm with experiment 677's e00677_export.py, cuts the exported files at the holdout with
 #   e00699_filter.py, and only then calls experiment 677's e00677_score.py once per seed and once for all seeds.
 #   stored   cut copies of experiment 677's stored forecast and bank files, scored (the known-answer rows)
 #   a0       clean chain, fold 2026-01, seeds 0 to 2, stage-3-only arm: the reproduction check
+#            (run `e00699_contrasts.py a0` by hand afterwards)
 #   a1       clean chain, the four phase-A folds, seeds 0 to 7
 #   a2       early chain and stage-2 arm, the four phase-A folds
 #   b        all three chains, the four other folds
 #   bank660  the second bank for every new arm, every fold that the chains have fitted
-# Two folds run side by side (14 GB of host memory each). FOLDS_PARALLEL=1 runs one at a time.
+# Folds of one chain run one at a time (677 keeps one checks_fit.json per arm folder). Chains run side by side
+# (14 GB of host memory each); the stage2 chain starts after the clean chain of the same month.
 D="$(cd "$(dirname "$0")" && pwd)"
 R=$(cd "$D/../.." && pwd)
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}"
 BASE=$DATA_PATH_INTERNAL/ml-experiments/00699-injection-in-every-training-stage-of-the-candidate-demand-network
 D677=$(echo "$D"/../00677-*/)
+cd "$R"
 source "$R"/ml-experiments/00524*/env.sh
 export PYTHONPATH="$D:$PYTHONPATH"
 PY=$R/.venv/bin/python
 PHASE=$1
-PARALLEL=${FOLDS_PARALLEL:-2}
+PARALLEL=1
 A_FOLDS="2025-11 2026-01 2026-04 2026-06"
 B_FOLDS="2025-12 2026-02 2026-03 2026-05"
 ALL_SEEDS="0 1 2 3 4 5 6 7"
@@ -65,22 +68,30 @@ case $PHASE in
     export_score clean 5wo "$A_FOLDS" "$ALL_SEEDS"
     run_banks clean "$A_FOLDS" ;;
   a2)
-    run_folds early "$A_FOLDS" fits
+    run_folds early "$A_FOLDS" fits &
     run_folds stage2 "$A_FOLDS" fits
+    wait
     export_score early 5w "$A_FOLDS" "$ALL_SEEDS"
     export_score early 5wo "$A_FOLDS" "$ALL_SEEDS"
     export_score stage2 5w "$A_FOLDS" "$ALL_SEEDS"
-    run_banks early "$A_FOLDS"
-    run_banks stage2 "$A_FOLDS" ;;
+    run_banks early "$A_FOLDS" &
+    run_banks stage2 "$A_FOLDS"
+    wait ;;
   b)
-    for chain in clean early stage2; do run_folds "$chain" "$B_FOLDS" fits; done
+    run_folds early "$B_FOLDS" fits &
+    run_folds clean "$B_FOLDS" fits
+    wait
+    run_folds stage2 "$B_FOLDS" fits
     ALL="2025-11 2025-12 2026-01 2026-02 2026-03 2026-04 2026-05 2026-06"
     export_score clean 5w "$ALL" "$ALL_SEEDS"
     export_score clean 5wo "$ALL" "$ALL_SEEDS"
     export_score early 5w "$ALL" "$ALL_SEEDS"
     export_score early 5wo "$ALL" "$ALL_SEEDS"
     export_score stage2 5w "$ALL" "$ALL_SEEDS"
-    for chain in clean early stage2; do run_banks "$chain" "$B_FOLDS"; done ;;
+    run_banks early "$B_FOLDS" &
+    run_banks clean "$B_FOLDS"
+    wait
+    run_banks stage2 "$B_FOLDS" ;;
   bank660)
     FOLDS_DONE=${BANK660_FOLDS:-"$A_FOLDS $B_FOLDS"}
     for chain in clean early stage2; do

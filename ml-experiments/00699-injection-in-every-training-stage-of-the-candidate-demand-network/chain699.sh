@@ -5,6 +5,7 @@
 #   bank581 (the bank of experiment 677), or bank660 (the second bank).
 # One fold of one chain, one command of experiment 677's chain.sh at a time. After each fit and pfit the arm's
 # checks_fit.json is copied to checks/<chain>/<arm>/<month>_<command>.json, because the next call overwrites it.
+# Never run two folds of one chain at once: 677's checks_fit.json is one file per arm folder.
 # Seeds: SEEDS="0 1 2 3 4 5 6 7" by default.
 D="$(cd "$(dirname "$0")" && pwd)"
 R=$(cd "$D/../.." && pwd)
@@ -30,10 +31,20 @@ run677() {  # STEP COMMAND: one command of experiment 677's chain.sh, then keep 
       local src=$E00677_ROOT/arms/k1_${step}_sp1/checks_fit.json
       [ -f "$src" ] && [ "$(stat -c %Y "$src")" -ge "$start" ] || { echo "no fresh $src"; exit 1; }
       mkdir -p "$BASE/checks/$C/$step"
+      "$PY" -I - "$src" "$M" <<'PYEOF'
+import json
+import sys
+
+months = set(json.load(open(sys.argv[1])).get("months", {}))
+if months != {sys.argv[2]}:
+    sys.exit(f"{sys.argv[1]} holds months {sorted(months)}, not {sys.argv[2]}: another fold wrote it")
+PYEOF
       cp "$src" "$BASE/checks/$C/$step/${M}_$cmd.json"
       if [ "$cmd" = fit ]; then  # the fit's own logs (rows, epochs); the pfit that follows overwrites them
         mkdir -p "$BASE/checks/$C/$step/logs"
-        cp "$E00677_ROOT"/arms/k1_${step}_sp1/work/logs/P5/${M}_d0_s*.json "$BASE/checks/$C/$step/logs/"
+        for f in "$E00677_ROOT"/arms/k1_${step}_sp1/work/logs/P5/${M}_d0_s*.json; do
+          grep -q '"epochs"' "$f" && cp "$f" "$BASE/checks/$C/$step/logs/"  # not the "reused" stubs
+        done
       fi ;;
   esac
 }

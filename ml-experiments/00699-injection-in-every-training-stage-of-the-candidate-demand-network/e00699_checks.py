@@ -43,8 +43,8 @@ EXPERIMENTS = Path(__file__).resolve().parent.parent
 GRID_START_US = 1_567_296_000_000_000
 HOLDOUT_US = int(HOLDOUT.timestamp() * 1e6)
 HOLDOUT_IDX = (HOLDOUT_US - GRID_START_US) // 1_800_000_000
-EXPERIMENT_START = "2026-11-16"
-"""Experiment 677 finished on 2026-11-10: any file under its data folder newer than this date is a write."""
+INPUTS_HASH_FILE = ROOT / "inputs.sha256"
+"""Written before the first fit: any file under experiment 677's data folder newer than it is a write."""
 INPUT_FILES = {
     "series_capacity": ROOT_677.parent
     / "backtest_year_2025-11_to_2026-10"
@@ -155,6 +155,25 @@ def stage3_log(*, sub: str, month: str) -> tuple[float, int] | None:
     return (float(found[-1][1]), int(found[-1][0])) if found else None
 
 
+def stage3_time_guard(*, number: int, cutoff: int, first: int) -> None:
+    """Assert that stage 3's world (seed YYYYMM) changes no half-hour at or after the cutoff.
+
+    Stage 3 runs in experiment 677's own process, which hides power from the cutoff on, and the generator
+    leaves a missing value missing. This re-runs the generator with stage 3's seed on a clean grid whose
+    power is missing from the cutoff on, and finds the last half-hour that it changed.
+    """
+    import e00581_bank as bank  # ty: ignore[unresolved-import]
+
+    clean = np.ones((15, cutoff + 2000))
+    clean[:, cutoff:] = np.nan
+    fixed, _ = bank.synthetic_clean(clean=clean, first=first, last=cutoff, seed=number)
+    changed = np.flatnonzero(
+        (np.nan_to_num(fixed, nan=-9) != np.nan_to_num(clean, nan=-9)).any(axis=0)
+    )
+    assert changed.size > 0, (number, "stage 3 world changed nothing")
+    assert changed.max() < cutoff, (number, "stage 3 world reaches the cutoff")
+
+
 def check_worlds() -> None:
     """Assert the seed ranges, the share of rows with a shifted lag, and the time and target guards."""
     source = next(EXPERIMENTS.glob("00591-*/e00591_arm.py")).read_text()
@@ -186,9 +205,12 @@ def check_worlds() -> None:
                 stage,
                 "a world changed power at or after the cutoff",
             )
-            assert world["target_unchanged"], (sub, month, stage)
-            assert world["lag_times_unchanged"], (sub, month, stage)
+            assert world["asserted_in_process"], (sub, month, stage)
             seen += 1
+        if sub != "clean" and "stage2" in info:
+            stage3_time_guard(
+                number=number, cutoff=info["stage2"]["cutoff_idx"], first=info["stage2"]["first"]
+            )
         log = stage3_log(sub=sub, month=month)
         if log is not None and sub in {"clean", "stage2", "early"}:
             share, n_events = log
@@ -240,16 +262,17 @@ def check_banks() -> None:
                     n_files += 1
             if reference is not None and suffix == "":
                 first_valid = reference.filter(pl.col("lag_shift") != 0)["valid_time"].min()
-                chain_cut = [read_injection(sub=s, month=month) for s in ("early",)]
-                for info in chain_cut:
+                idx = (
+                    int(first_valid.timestamp() * 1e6)  # ty: ignore[unresolved-attribute]
+                    - GRID_START_US
+                ) // 1_800_000_000
+                for chain in ("early", "stage2"):
+                    info = read_injection(sub=chain, month=month)
                     for stage in ("stage1", "stage2"):
                         if stage in info:
-                            idx = (
-                                int(first_valid.timestamp() * 1e6)  # ty: ignore[unresolved-attribute]
-                                - GRID_START_US
-                            ) // 1_800_000_000
                             assert info[stage]["last_changed_idx"] < idx, (
                                 month,
+                                chain,
                                 stage,
                                 "a training world reaches the bank's first shift",
                             )
@@ -358,11 +381,25 @@ def check_budget() -> None:  # noqa: PLR0912
     for path in sorted((ROOT / "checks").glob("*/*/logs/20??-??_d0_s*.json")):
         month = path.name[:7]
         data = json.loads(path.read_text())
-        if "rows" in data:
-            stage3.setdefault(month, {}).setdefault(path.parts[-4], set()).add(int(data["rows"]))
+        assert "rows" in data, (path, "a stage-3 fit log without `rows`: a stub was copied")
+        stage3.setdefault(month, {}).setdefault(path.parts[-4], set()).add(int(data["rows"]))
     for month, by_chain in stage3.items():
         values = {v for s in by_chain.values() for v in s}
         assert len(values) == 1, (month, "stage-3 rows differ between chains", by_chain)
+        assert "clean" in by_chain, (month, "no clean chain logs")
+        assert len(by_chain) >= 2, (
+            month,
+            "chains with logs",
+            list(by_chain),
+        )
+        for chain in by_chain:
+            for folder in sorted((ROOT / "checks" / chain).glob("*/logs")):
+                n_logs = len(list(folder.glob(f"{month}_d0_s*.json")))
+                assert n_logs in (0, len(SEEDS)), (chain, folder, month, n_logs, "seeds with rows")
+    print(
+        "  stage-3 row counts are compared between chains only: experiment 677's stored stage-3 logs are"
+        " 'reused' stubs without `rows`, so stage-3 rows cannot be compared with 677"
+    )
     epochs: dict[tuple[str, str], list[int]] = {}
     for sub, month in chains():
         epochs.setdefault((sub, "stage1"), []).extend(
@@ -433,13 +470,13 @@ def check_init_weights() -> None:
 def check_no_write_to_677() -> None:
     """Assert that no file under experiment 677's data folder is newer than this experiment's start."""
     result = subprocess.run(
-        ["find", str(ROOT_677), "-type", "f", "-newermt", EXPERIMENT_START, "-print", "-quit"],
+        ["find", str(ROOT_677), "-type", "f", "-newer", str(INPUTS_HASH_FILE), "-print", "-quit"],
         capture_output=True, text=True, check=True,
     )  # fmt: skip
     assert not result.stdout.strip(), (
         f"written under experiment 677's folder: {result.stdout.strip()}"
     )
-    ok("experiment 677's data folder", f"no file newer than {EXPERIMENT_START}")
+    ok("experiment 677's data folder", f"no file newer than {INPUTS_HASH_FILE.name}")
 
 
 def main() -> None:

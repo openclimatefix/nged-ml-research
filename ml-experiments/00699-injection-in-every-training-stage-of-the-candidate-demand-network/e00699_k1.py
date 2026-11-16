@@ -166,8 +166,7 @@ if MINE.command == "pretrain":
             key="stage1",
             info={
                 "seed": seed, "n_events": n_events, "share": share, "rows": len(blk), "first": first,
-                "last": last, "cutoff_idx": GRID_CUT, **extent, "target_unchanged": True,
-                "lag_times_unchanged": True,
+                "last": last, "cutoff_idx": GRID_CUT, **extent, "asserted_in_process": True,
             },
         )  # fmt: skip
         del base
@@ -207,6 +206,9 @@ else:
             labels = arm.AUX[id(mr)]
             STAGE2["share"] = float((np.nan_to_num(labels) != 0).any(axis=1).mean())
             STAGE2["rows_built"] = len(mr.y)
+            assert SHARE_RANGE[0] <= STAGE2["share"] <= SHARE_RANGE[1], (
+                STAGE2
+            )  # before any training
             return mr
 
         e.row_nll = arm.row_nll
@@ -214,7 +216,6 @@ else:
         e.k.GpuMonth = arm.AuxGpuMonth
     e.step2(months=e.ARGS.months, seeds=e.ARGS.seeds, device="cuda")
     if MINE.inject_stage2 and STAGE2:  # empty when every seed's stage-2 file already existed
-        assert SHARE_RANGE[0] <= STAGE2["share"] <= SHARE_RANGE[1], STAGE2
-        record(key="stage2", info={**STAGE2, "target_unchanged": True, "lag_times_unchanged": True})
+        record(key="stage2", info={**STAGE2, "asserted_in_process": True})
         print(f"{MONTH}: stage 2 world {STAGE2}", flush=True)
 torch.cuda.empty_cache()
