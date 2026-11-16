@@ -60,21 +60,19 @@ def gam_rows() -> pl.DataFrame:
         base = pl.read_parquet(w377 / source / "arms" / "a0" / "dp_preds_s2" / f"{name}.parquet")
         # A Primary has no forecast before its first month in experiment 377's stored file (12 months
         # of history are required), and experiment 378's solar summary files stop there too.
-        first = (
-            pl.read_parquet(
-                ML_EXPERIMENTS_DATA_DIR
-                / w377.relative_to(SANDBOX).parts[0]
-                / "work"
-                / source
-                / "arms"
-                / "a0"
-                / "dp_preds_s2"
-                / f"{name}.parquet",
-                columns=["power_fcst_init_time"],
-            )["power_fcst_init_time"]
-            .min()
-            .replace(day=1, hour=0, minute=0)
-        )
+        first_init = pl.read_parquet(
+            ML_EXPERIMENTS_DATA_DIR
+            / w377.relative_to(SANDBOX).parts[0]
+            / "work"
+            / source
+            / "arms"
+            / "a0"
+            / "dp_preds_s2"
+            / f"{name}.parquet",
+            columns=["power_fcst_init_time"],
+        )["power_fcst_init_time"].min()
+        assert isinstance(first_init, datetime), name
+        first = first_init.replace(day=1, hour=0, minute=0)
         base = base.filter(
             (pl.col("power_fcst_init_time") >= first)
             & (pl.col("seed") == 0)

@@ -80,7 +80,12 @@ def january_timing() -> None:
 
 def projection() -> None:
     """Print the time for one origin month and the projection for 12 months, from the January timing."""
-    wall = lambda name: float(re.search(r"wall=([\d.]+)", (TIMING / name).read_text()).group(1))  # noqa: E731
+
+    def wall(name: str) -> float:
+        match = re.search(r"wall=([\d.]+)", (TIMING / name).read_text())
+        assert match is not None, name
+        return float(match.group(1))
+
     refit = np.mean(
         [
             v["wall_s"]
@@ -170,6 +175,7 @@ def year_timing() -> None:
         walls = []
         for path in TIMING.glob(f"year_e00700_gam_{stage}.py_D*.log"):
             match = re.search(r"wall=([\d.]+) user=([\d.]+) maxrss_kb=(\d+)", path.read_text())
+            assert match is not None, path
             walls.append([float(g) for g in match.groups()])
         a = np.array(walls)
         if stage == "stage2":

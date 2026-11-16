@@ -155,7 +155,7 @@ def dot_chart(
             stripes = (
                 alt.Chart(shaded.to_pandas())
                 .mark_rect(color="#EDEDED")
-                .encode(
+                .encode(  # ty: ignore[unresolved-attribute]
                     y=alt.Y("top:Q", scale=y_scale, axis=axis),
                     y2="bottom:Q",
                     x=alt.value(0),
@@ -175,7 +175,7 @@ def dot_chart(
                 front = (
                     alt.Chart(counts)
                     .mark_text(align="left", dx=4)
-                    .encode(
+                    .encode(  # ty: ignore[unresolved-attribute]
                         y=alt.Y("row:Q", scale=y_scale, axis=None), x=alt.value(0), text="text:N"
                     )
                 )
@@ -185,7 +185,7 @@ def dot_chart(
                     front = (
                         alt.Chart(frame)
                         .mark_rect(height=7)
-                        .encode(
+                        .encode(  # ty: ignore[unresolved-attribute]
                             y=alt.Y("y:Q", scale=y_scale, axis=axis),
                             x=alt.X("zero:Q", title=f"{metric_name} (points of capacity)"),
                             x2="mean:Q",
@@ -197,7 +197,7 @@ def dot_chart(
                     front = (
                         alt.Chart(frame)
                         .mark_circle(size=80, opacity=0.9)
-                        .encode(
+                        .encode(  # ty: ignore[unresolved-attribute]
                             y=alt.Y("y:Q", scale=y_scale, axis=axis),
                             x=alt.X(
                                 "mean:Q",
@@ -311,7 +311,7 @@ def main() -> None:
         chart = (
             alt.Chart(by_day(part, []).to_pandas())
             .mark_line(point=True, strokeWidth=2.5, clip=True)
-            .encode(**encode())
+            .encode(**encode())  # ty: ignore[unresolved-attribute]
             .properties(
                 width=620,
                 height=320,
@@ -330,7 +330,7 @@ def main() -> None:
     chart = (
         alt.Chart(per.to_pandas())
         .mark_line(strokeWidth=1.6, clip=True)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             **{
                 **encode(),
                 "x": alt.X(
