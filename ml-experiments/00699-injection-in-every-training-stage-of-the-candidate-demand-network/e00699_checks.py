@@ -91,6 +91,34 @@ def input_tables() -> dict[str, Path]:
     return tables
 
 
+def cleaned_power_fingerprint() -> tuple[int, str]:
+    """Return the version of the cleaned-power Delta table and a hash of its dropped half-hours.
+
+    The scorers read this live table, which a scheduled job rewrites about every 6 hours. The hash covers
+    every row with a `drop_reason` from 2025-11-01 on (time series, time, reason), so a change in which
+    half-hours are dropped changes the scored rows and the hash. Time travel is not used.
+    """
+    import e00668_score_lib as lib  # ty: ignore[unresolved-import]
+    from deltalake import DeltaTable
+
+    path = lib.REPO_DATA_DIR / "NGED" / "cleaned_power_time_series.delta"
+    dropped = (
+        pl.scan_delta(str(path))
+        .filter(
+            pl.col("drop_reason").is_not_null(),
+            pl.col("time") >= pl.datetime(2025, 11, 1, time_zone="UTC"),
+            pl.col("time") < HOLDOUT,
+        )
+        .select("time_series_id", "time", "drop_reason")
+        .sort("time_series_id", "time")
+        .collect()
+    )
+    digest = hashlib.sha256()
+    for column in dropped.columns:
+        digest.update(dropped[column].cast(pl.String).str.join("|").item().encode())
+    return DeltaTable(str(path)).version(), digest.hexdigest()
+
+
 def hash_inputs() -> None:
     """Write the hash of every input table (and of the ensemble-summary file listing)."""
     from e00677_extend import E607  # ty: ignore[unresolved-import]
@@ -100,6 +128,9 @@ def hash_inputs() -> None:
     for path in sorted((E607 / "ens_summary").glob("init=*.parquet")):
         listing.update(f"{path.name} {path.stat().st_size}\n".encode())
     lines.append(f"{listing.hexdigest()}  ens_summary_listing")
+    version, dropped_hash = cleaned_power_fingerprint()
+    lines.append(f"{dropped_hash}  cleaned_power_dropped_rows")
+    lines.append(f"{version}  cleaned_power_delta_version_when_hashed")
     target = ROOT / "inputs.sha256"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("\n".join(lines) + "\n")
@@ -115,7 +146,14 @@ def check_input_hashes() -> None:
     }
     for name, path in input_tables().items():
         assert sha256_of(path=path) == want[name], f"input table changed: {name}"
-    ok("input hashes", f"{len(want)} tables unchanged")
+    version, dropped_hash = cleaned_power_fingerprint()
+    assert dropped_hash == want["cleaned_power_dropped_rows"], (
+        "the cleaned-power table drops other half-hours than when the inputs were hashed"
+    )
+    ok(
+        "input hashes",
+        f"{len(want) - 1} tables unchanged; cleaned-power drops unchanged (Delta version {version}, hashed at {want['cleaned_power_delta_version_when_hashed']})",
+    )
 
 
 def check_holdout() -> None:

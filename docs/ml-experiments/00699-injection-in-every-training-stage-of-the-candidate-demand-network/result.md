@@ -301,21 +301,38 @@ step 5 at 7.39 with monthly refits and 7.88 with quarterly refits over its full 
 
 ## Reference numbers from the stored arms
 
-**These numbers come from experiment 677's stored per-row scores and injected-bank files, on the
-rows of this plan, for the seed-mean forecast of seeds 0 to 2.** `e00699_contrasts.py` must print
-the same numbers from the cut copies of the stored files before any new arm is scored, as a
-known-answer test of the scoring path.
+**These numbers come from experiment 677's stored per-row scores and injected-bank files, for the
+seed-mean forecast of seeds 0 to 2, on the rows that every arm of this experiment is scored on.**
+`e00699_contrasts.py` must print the same numbers from the cut copies of the stored files before any
+new arm is scored, as a known-answer test of the scoring path.
 
 | Quantity | No injection | Stage 3 only | Difference | 99.17% month-bootstrap interval, seeds fixed |
 |---|---|---|---|---|
-| All-rows MAE of the median, points of capacity | 7.169 | 7.213 | +0.045 | +0.024 to +0.066 |
-| All-rows CRPS, points of capacity | 4.021 | 4.049 | +0.028 | +0.014 to +0.043 |
+| All-rows MAE of the median, points of capacity | 7.124 | 7.165 | +0.042 | +0.020 to +0.065 |
+| All-rows CRPS, points of capacity | 3.994 | 4.020 | +0.027 | +0.014 to +0.043 |
 | Copied share, days 0 to 14 | 0.123 | 0.075 | −0.047 | −0.061 to −0.036 |
+
+**Departure after the plan was locked: the reference rows changed, nothing else.** The locked plan
+printed 7.169, 7.213, and +0.045 for MAE (interval +0.024 to +0.066), and 4.021, 4.049, and +0.028
+for CRPS (interval +0.014 to +0.043); the copied-share row was already as above. Those numbers
+count 24,060 more scored forecast rows than the table above does. The extra rows belong to 2 time
+series (ids 12 and 13) and have valid times from 2025-12-01 to 2026-03-14. The cleaned-power
+Delta table, which the scorers read live, now marks 13 half-hours of those 2 series as dropped
+(`substation_zero`, a reading of exactly zero), which gives 24,060 forecast rows once each half-hour is
+counted over every origin that forecasts it. The training cache `observed.parquet` was built on
+2026-11-06, before the first fit of this experiment, and already lacks those half-hours, so
+the training inputs are unchanged. On the old rows the manual heuristic scored an MAE of 8.88, and it scores 8.40
+on the rows below. The scoring path is the same as experiment 677's: our re-scored per-row MAE
+equals 677's stored per-row MAE on the 2,492,233 shared rows with a maximum absolute difference of 0. The three seeds of the stage-3-only arm score
+7.445, 7.310, and 7.282 on both row sets. Every contrast is between arms that are
+refitted and scored here on the same rows, so no contrast changes; the stored arms are references only.
+`inputs.sha256` records the Delta table's version and a hash of its dropped half-hours, and the
+checks fail if the dropped half-hours change before the experiment ends.
 
 **The maintainer's 5.9% and this plan's 7.5% are the same recipe on different rows.** The 5.9% is
 the stored step 5 at quarterly refits over experiment 677's 12 months. At monthly refits over the 8
 months of this plan, the same recipe copies 7.5%, and the three seeds give 7.6%, 6.9%, and 8.2%, an
-SD of 0.007. The manual heuristic scores an MAE of 8.88 on the same rows.
+SD of 0.007. The manual heuristic scores an MAE of 8.40 on the same rows (8.88 on the rows of the locked plan, see above).
 
 ## Predictions that could fail
 

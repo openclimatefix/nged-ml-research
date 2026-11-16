@@ -239,11 +239,11 @@ def month_only(
 
 
 KNOWN: dict[str, tuple[float, float, float, float, float]] = {
-    "mae": (7.169, 7.213, 0.045, 0.024, 0.066),
-    "crps": (4.021, 4.049, 0.028, 0.014, 0.043),
+    "mae": (7.124, 7.165, 0.042, 0.020, 0.065),
+    "crps": (3.994, 4.020, 0.027, 0.014, 0.043),
     "share": (0.123, 0.075, -0.047, -0.061, -0.036),
 }
-"""Experiment 677's stored table: no injection, stage 3 only, difference, and the interval around it."""
+"""Today's stored table (the plan's first table is in result.md): no injection, stage 3 only, difference, and the interval around it."""
 
 
 def known() -> None:
@@ -277,7 +277,14 @@ def known() -> None:
         assert abs(hi - want[4]) <= 0.0015, (label, hi, want)
     na, da = arrays(arm_key="none_stored", bank="581", months=FOLDS)
     nb, db = arrays(arm_key="s3_stored", bank="581", months=FOLDS)
-    point, lo, hi = month_only(num_a=na, den_a=da, num_b=nb, den_b=db, level=level)
+    # seeds fixed, as in the plan's reference: average the seeds' sums, so every resample uses the seed mean
+    point, lo, hi = month_only(
+        num_a=na.mean(axis=1, keepdims=True),
+        den_a=da.mean(axis=1, keepdims=True),
+        num_b=nb.mean(axis=1, keepdims=True),
+        den_b=db.mean(axis=1, keepdims=True),
+        level=level,
+    )
     print(
         f"Copied share, days 0 to 14: no injection {na.sum() / da.sum():.3f}; stage 3 only {nb.sum() / db.sum():.3f}; "
         f"difference {point:+.3f}; month bootstrap {lo:+.3f} to {hi:+.3f} at {level:.2f}%"
