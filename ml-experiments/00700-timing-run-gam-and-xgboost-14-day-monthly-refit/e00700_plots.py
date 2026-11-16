@@ -61,12 +61,13 @@ COLOUR = alt.Color(
 )
 
 
-def dot_chart(*, group: str, group_text: str, bars: bool = False) -> alt.VConcatChart:
+def dot_chart(*, group: str, group_text: str, bars: bool = False, lanes: bool = False) -> alt.VConcatChart:
     """Return the two-section chart (by lead time, by condition) of one group of Primaries.
 
-    Each system is a dot, or with `bars` a thin horizontal bar in its own lane of the row.
+    Each system is a dot, or with `bars` a thin horizontal bar, or with `lanes` a dot at its own
+    height within the row.
     """
-    row_px = 50 if bars else 22
+    row_px = 50 if (bars or lanes) else 22
     scores = pl.read_csv(SCORES / "scores.csv").filter(
         (pl.col("group") == group) & pl.col("arm").is_in(list(ARMS))
     )
@@ -81,7 +82,7 @@ def dot_chart(*, group: str, group_text: str, bars: bool = False) -> alt.VConcat
         for metric, metric_name in METRICS.items():
             frame = data.filter(pl.col("metric") == metric).to_pandas()
             mark = alt.Chart(frame).mark_bar(height=7) if bars else alt.Chart(frame).mark_circle(size=80, opacity=0.9)
-            lane = {"yOffset": alt.YOffset("arm:N", sort=NAMES)} if bars else {}
+            lane = {"yOffset": alt.YOffset("arm:N", sort=NAMES)} if (bars or lanes) else {}
             panels.append(
                 mark.encode(
                     **lane,
@@ -180,6 +181,7 @@ def main() -> None:
         stem = f"{group.split()[0].lower()}_{group.split()[1]}"
         save(dot_chart(group=group, group_text=text), f"dots_{stem}")
         save(dot_chart(group=group, group_text=text, bars=True), f"bars_{stem}")
+        save(dot_chart(group=group, group_text=text, lanes=True), f"lanes_{stem}")
     frame = per_day_rows()
     mva = frame.filter(pl.col("power_unit") == "MVA")
     mw = frame.filter(pl.col("power_unit") == "MW")
@@ -209,7 +211,7 @@ def main() -> None:
         .mark_line(strokeWidth=1.6, clip=True)
         .encode(
             **{**encode(), "x": alt.X("day:Q", title=None, axis=alt.Axis(values=[0, 7, 14]), scale=alt.Scale(domain=[0, 14])), "y": alt.Y("mae:Q", title=None, scale=alt.Scale(zero=False))},
-            facet=alt.Facet("name:N", columns=4, sort=order, title=None),
+            facet=alt.Facet("name:N", columns=5, sort=order, title=None),
         )
         .resolve_scale(y="independent")
         .properties(
