@@ -86,24 +86,27 @@ mark so nothing is drawn outside it, and say in the subtitle that daylight hours
 
 ## Comparing several systems across slices of the data
 
-**Compare a handful of systems over many slices with staggered dots on striped rows.** A table of
-scores by lead time or by condition needs one row per slice and one column per metric. Draw each
-system as a dot in its own colour. Where two systems score alike, the dots on one line hide each
-other. Give each system its own height within the row, which the chart calls a lane, and space the
-lanes about 4 pixels apart so that dots overlap a little but never completely. Rows then need about 40
-pixels each. Shade every second row light grey (`#EDEDED`) so that the eye can tell which dots
-belong to one row. Put the number of scored half-hours in a last column, where the same stripes run
-behind it. A script can copy `dot_chart` in
-`ml-experiments/00700-timing-run-gam-and-xgboost-14-day-monthly-refit/e00700_plots.py`, which
-draws it for five forecasting systems.
+**Compare up to about five systems over many slices with staggered dots on striped rows.** A slice
+is a subset of the scored rows, such as a lead-time band or a weather condition. A table of scores by
+slice needs one row per slice and one column per metric. Draw each system as a dot in its own
+colour. Where two systems score alike, the dots in one row hide each other. Give each system its own
+height within the row, which the chart calls a lane, and space the lanes about 4 pixels apart so
+that dots overlap a little but never completely. Rows then need about 40 pixels each. Shade every
+second row light grey (`#EDEDED`) so that the eye can tell which dots belong to one row. Put the
+number of scored half-hours in a last column, and run the same stripes behind that column.
+
+**Copy the function `dot_chart` for a first version.** It lives in
+`ml-experiments/00700-timing-run-gam-and-xgboost-14-day-monthly-refit/e00700_plots.py`. The function
+draws the chart for five forecasting systems, and `lanes=True` gives the 40-pixel rows and the lanes.
 
 **Place rows and lanes on a numeric axis, not on a nominal one.** In Altair, a nominal `y` with a
 `yOffset` encoding gives lanes, but a stripe layer on the same nominal axis comes out the wrong
-height and hides the row labels. Instead, give every row an integer `i`, plot each dot at
-`i + lane offset` on a quantitative `y` scale with the domain `[n - 0.5, -0.5]`, and draw each
-stripe as a `mark_rect` from `i - 0.5` to `i + 0.5`. Write the row names with `labelExpr` on the
-axis, and give the stripe layer the same axis as the dots, because a layer with `axis=None` removes
-the labels of the whole panel.
+height and hides the row labels. Give every row an integer `i`. Plot each dot at `i + lane offset` on
+a quantitative `y` scale with the domain `[n - 0.5, -0.5]`, where `n` is the number of rows and the
+reversed order puts row 0 at the top. Draw each stripe as a `mark_rect` from `i - 0.5` to `i + 0.5`.
+
+**Write the row names with `labelExpr`, and give the stripe layer the same axis as the dots.** A
+layer with `axis=None` removes the row labels of the whole panel.
 
 ## Self-contained charts
 
