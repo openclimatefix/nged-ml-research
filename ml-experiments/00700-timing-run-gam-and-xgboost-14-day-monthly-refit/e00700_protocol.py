@@ -1,5 +1,7 @@
 # ruff: noqa: D103, E501
-"""Experiment 700: score the origin months 2025-11 to 2026-06 of the GAM and XGBoost beside steps 5 and 8, by the protocol.
+"""Experiment 700: score the GAM and XGBoost beside steps 5 and 8, over 2025-11 to 2026-06.
+
+The scoring follows the protocol of experiment 677.
 
     PYTHONPATH=<folders of experiments 377, 378, 668, 677> E00677_ROOT=<this experiment's private folder> \
         uv run --no-sync python ml-experiments/00700-*/e00700_protocol.py

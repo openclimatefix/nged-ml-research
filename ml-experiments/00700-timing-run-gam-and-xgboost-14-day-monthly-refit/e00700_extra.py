@@ -1,5 +1,7 @@
 # ruff: noqa: D103, E501, PLR0912
-"""Experiment 700: Scores of the origin months 2025-11 to 2026-06 that the protocol slices lack, on the rows all arms share.
+"""Experiment 700: extra scores of the origin months 2025-11 to 2026-06, on the rows all arms share.
+
+The scores are those that the protocol slices lack.
 
     PYTHONPATH=<folders of experiments 377, 378, 668, 677> E00677_ROOT=<this experiment's private folder> \
         uv run --no-sync python ml-experiments/00700-*/e00700_extra.py
