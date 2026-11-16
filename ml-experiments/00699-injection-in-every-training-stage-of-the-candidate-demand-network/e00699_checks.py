@@ -169,8 +169,13 @@ def check_holdout() -> None:
             assert latest < HOLDOUT, f"{path} holds a valid time of {latest}"
             count += 1
         for path in base.glob("scores/*/rows.parquet"):
-            latest = pl.scan_parquet(path).select(pl.col("valid_idx").max()).collect().item()
-            assert latest < HOLDOUT_IDX, f"{path} holds a valid index of {latest}"
+            lazy = pl.scan_parquet(path)
+            if "valid_idx" in lazy.collect_schema().names():
+                latest_idx = lazy.select(pl.col("valid_idx").max()).collect().item()
+                assert latest_idx < HOLDOUT_IDX, f"{path} holds a valid index of {latest_idx}"
+            else:
+                latest = lazy.select(pl.col("valid_time").max()).collect().item()
+                assert latest < HOLDOUT, f"{path} holds a valid time of {latest}"
             count += 1
     ok("holdout cut", f"{count} files hold no valid time on or after {HOLDOUT:%Y-%m-%d}")
 
