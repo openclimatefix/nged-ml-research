@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: run699.sh PHASE
-#   PHASE is stored, a0, a1, a2, b, bank660, or bank660. Each phase runs its fits through chain699.sh,
+#   PHASE is stored, a0, a1, a2, b, or bank660. Each phase runs its fits through chain699.sh,
 #   then exports each arm with experiment 677's e00677_export.py, cuts the exported files at the holdout with
 #   e00699_filter.py, and only then calls experiment 677's e00677_score.py once per seed and once for all seeds.
 #   stored   cut copies of experiment 677's stored forecast and bank files, scored (the known-answer rows)
@@ -46,7 +46,7 @@ export_score() {  # ROOTNAME STEP "MONTHS" "SEEDS"
 
 run_folds() {  # CHAIN "MONTHS" [PART]: fit the folds, PARALLEL at a time
   local chain=$1 months=$2 part=${3:-fits}
-  for m in $months; do echo "$m"; done | xargs -P "$PARALLEL" -I{} "$D"/chain699.sh "$chain" {} "$part"
+  for m in $months; do echo "$m"; done | xargs -P "$PARALLEL" -I{} env -u PYTHONPATH "$D"/chain699.sh "$chain" {} "$part"
 }
 
 run_banks() {  # CHAIN "MONTHS": the bank of experiment 677 for the folds, then the cut at the holdout
@@ -60,7 +60,7 @@ case $PHASE in
     score_file stored step5w_with_injected_sp1 0 1 2
     score_file stored step5wo_without_injected_sp1 0 1 2 ;;
   a0)
-    SEEDS="0 1 2" "$D"/chain699.sh clean 2026-01 a0
+    SEEDS="0 1 2" env -u PYTHONPATH "$D"/chain699.sh clean 2026-01 a0
     export_score clean 5w 2026-01 "0 1 2" ;;
   a1)
     run_folds clean "$A_FOLDS" fits
