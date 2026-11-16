@@ -225,6 +225,19 @@ switched-out transformer. Evidence: [experiment
 132](00132-ro-nc-rescored-with-p12-and-p13-residuals-in-2025/result.md). Confidence: medium, from 5
 transfers at one Primary substation.
 
+**Record the version of the cleaned power table, and a hash of its dropped rows, when an experiment
+reads it live (provisional; low confidence).** The cleaned power Delta table is rewritten about
+every 6 hours. In experiment 699, the scorers of experiment 677 read the table live, and 24,060
+forecast rows at series 12 and 13 (valid times from 2025-12-01 to 2026-03-14) that a reference run
+had scored a few days earlier were no longer kept as scored rows, so the reference MAE of the no-injection
+arm fell from 7.169 to 7.124. The table flags only 14 half-hours of those 2 series as
+`substation_zero` since 2025-11-01, which cannot account for 24,060 rows, and the network's own
+error was finite on the dropped rows. The cause was not traced. This applies to experiments that
+score against the table after the plan states a reference number. Pin the table's Delta version and
+a hash of its dropped rows in `inputs.sha256`, and check both at the end of the run. Evidence:
+[experiment 699](00699-injection-in-every-training-stage-of-the-candidate-demand-network/result.md).
+Confidence: low, from one run.
+
 **Treat an isolated zero reading between readings of 43 to 59% of effective capacity as missing
 (provisional; low confidence).** The cached power readings hold 6 half-hours of exactly 0.0 MW at
 two Primary substations, D9 (5 half-hours) and D16 (1 half-hour). The zeros look like telemetry
