@@ -5,7 +5,7 @@
 
 Reads `scores/protocol_year/{rows.parquet,scores.csv}` under this experiment's private folder (from
 `e00700_protocol.py`) and writes SVG and PNG charts to `plots/` beside them. The Primaries are the 15
-that all arms share: D15 has no GAM forecast before 2026-03.
+that all arms share: D15 is not in the GAM file, and D18 enters from 2026-01.
 """
 
 from pathlib import Path
@@ -72,7 +72,7 @@ ALL_GROUP = "all 15"
 def pooled_scores() -> pl.DataFrame:
     """Return `scores.csv`'s columns for every Primary that all five systems share, pooled.
 
-    D15 has no GAM forecast before 2026-03, so the pool holds 15 Primaries. The mean is over all
+    D15 is not in the GAM file, and D18 enters from 2026-01, so the pool holds 15 Primaries. The mean is over all
     their half-hours, so a Primary with more scored rows weighs more, as in `scores.csv`.
     """
     rows = pl.scan_parquet(SCORES / "rows.parquet").filter(pl.col("arm").is_in(list(ARMS)))

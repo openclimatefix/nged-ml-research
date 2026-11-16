@@ -102,7 +102,9 @@ months of GAM forecasts come from re-running the GAM. The 8 months of XGBoost fo
 stored forecasts of experiment 87, with the origin relabelled to 12:00 UTC. The score is the
 normalised MAE of the median forecast, in points of capacity (percentage points of a Primary's
 capacity). BG2 covers 16 Primaries, and the GAM covers 15, because the Primary with identifier D15
-has no GAM forecast before 2026-03. Every table pools the 15 Primaries that all systems cover.
+is not in the GAM file. Every table pools the 15 Primaries that all systems cover, which include
+D8 and D18, the two Primaries outside experiment 677's groups. The GAM's pooled MAE is 6.56 with them
+and 6.07 without them, so the pooled figures do not compare with the 13-Primary group figures.
 
 **All numbers are provisional, because 4 of the 12 origin months of the backtest year of experiment
 677 are missing.** The inputs of those 4 months do not exist yet (see "Blockers for the full year").
@@ -113,7 +115,9 @@ hours for 12 months. One origin month of the XGBoost blend took 1,355 seconds of
 monthly refits and assembly, which projects to 4.5 hours for 12 months. Refitting the blend's weekly
 member weekly is projected to take about 50 minutes per month and 10.1 hours for 12 months, on the
 assumption that a weekly refit takes as long as the monthly refit of the same member. Only January
-was timed, so the projections are straight multiples of that month.
+was timed, so the projections are straight multiples of that month. The replay time per origin
+month divides the replay by 15 fold months, which averages early, light months with later, heavier
+ones, so a single new month in production probably takes longer than 516 seconds.
 
 ## Scores over 8 origin months
 
@@ -228,9 +232,10 @@ probably non-deterministic GPU summation, but the experiment did not test that.
   including an ERA5 extension that is a download. The archive of the ensemble from the European
   Centre for Medium-Range Weather Forecasts on the workstation reaches 2026-11-16, so the ensemble
   needs no download.
-- **D15 has no GAM forecast before 2026-03,** and D18 has 180 origins against 241 at each of the
-  other 14 Primaries, because a Primary's rows start at the first month of its stored stage 2 file.
-  The GAM file holds 3,554 Primary-origin pairs.
+- **D15 is not in the GAM file,** and D18 enters from 2026-01, with 180 origins against 241 at each
+  of the other 14 Primaries, because a Primary's rows start at the first month of its stored stage 2
+  file. The GAM file has no origin on 2026-06-30, because stage 1 skips runs near the end of the
+  data, and holds 3,554 Primary-origin pairs.
 - **The GAM file has fewer than 672 half-hours at 593 of those 3,554 pairs,** in the origin months
   2026-03 (216), 2026-04 (72), 2026-05 (83), and 2026-06 (222), where the stored ensemble arrays lack
   some half-hours. The scorer uses only the half-hours that every arm has.
@@ -298,6 +303,11 @@ an assessment from the code.
 - **References:** the manual heuristic and climatology are the stored arms `ref_manual_heuristic`
   and `ref_climatology` of experiment 87, relabelled from 09:00 to 12:00 UTC. Steps 5 and 8 come
   from experiment 677's files for the same origins, seeds 0 to 2.
+- **Seeds and references:** steps 5 and 8 are averages of the quantiles of 3 seeds, while the GAM
+  and the XGBoost arms have one seed each, so the neural networks' lead is slightly flattered. The
+  stored manual heuristic of experiment 87 limits its lags by the native lead, which is 3 hours
+  more conservative than the heuristic of experiment 677, so the heuristic and climatology scores
+  do not compare with experiment 677's own numbers.
 - **No intervals:** the experiment makes no contrast claim, so it computes none.
 - **Groups:** the 6 signed-MW and the 7 MVA-only Primaries are experiment 677's groups. The pooled
   figures cover 15 Primaries.
