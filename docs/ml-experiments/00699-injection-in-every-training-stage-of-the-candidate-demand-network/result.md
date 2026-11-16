@@ -471,6 +471,36 @@ resolve the predicted size.** The "Sizing" section then says, before any treatme
 which H verdicts are reachable. With the stored SD of 0.087, that outcome is the expected outcome,
 and the expected verdict is `inconclusive`, with findings S2 and S3 reported beside the verdict.
 
+## Sizing
+
+**With 8 seeds, family H cannot resolve the predicted size, and 16 seeds would not change that.**
+The runner measured the SD between the 8 seeds of the refitted clean chain (the "stage 3 only" and
+"no injection" arms) in the four phase-A folds, before any treatment arm was fitted. The expected
+half-width is the 98.33% t interval on the row-weighted monthly differences of family H under no
+effect. Each of the four unmeasured folds takes the median variance of the four measured folds.
+
+| Score | Seeds | Standard error | Expected half-width |
+|---|---|---|---|
+| MAE | 8 | 0.0353 | 0.110 |
+| MAE | 12 | 0.0288 | 0.090 |
+| MAE | 16 | 0.0250 | 0.078 |
+| CRPS | 8 | 0.0164 | 0.051 |
+| CRPS | 12 | 0.0134 | 0.042 |
+| CRPS | 16 | 0.0116 | 0.036 |
+
+**The seed count stays at 8, and only the verdicts `supported`, `refuted`, and `inconclusive` are
+reachable for family H.** No seed count up to 16 gets the MAE half-width to 0.022, so the fixed
+fallback applies. The verdicts `small gain` and `not supported` are unreachable, and the expected
+verdict is `inconclusive`, with findings S2 and S3 reported beside it. The resolution of family S2 is
+not known until phase A2, because its arms share stage-1 weights.
+
+**The SD between seeds in the four folds is larger than the stored seeds suggested.** The SD of
+all-rows MAE between the 8 seeds of the stage-3-only arm is 0.356 in fold 2025-11, 0.162 in fold
+2026-01, 0.167 in fold 2026-04, and 0.052 in fold 2026-06. One flagged fit, in fold 2025-11, is
+seed 0 of the stage-3-only arm (MAE 7.309, 3.4 SD from the other seven seeds); it stopped after 9
+epochs at a validation loss of 0.413. Fold 2025-11 is the first fold, with the shortest history,
+and the plan's descriptive reading without it applies.
+
 ## The injected bank and how leakage is excluded
 
 **The headline bank is experiment 677's held-out bank, rebuilt by the same code for the new
