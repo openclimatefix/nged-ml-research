@@ -84,27 +84,6 @@ the range of the plotted data out to human divisions, such as 6 to 18 for a few 
 0 to 24. Give the domain explicitly with `scale=alt.Scale(domain=[6, 18])`, set `clip=True` on the
 mark so nothing is drawn outside it, and say in the subtitle that daylight hours only are drawn.
 
-## Comparing several systems across slices of the data
-
-**Compare a handful of systems over many slices with staggered dots on striped rows.** A table of
-scores by lead time or by condition needs one row per slice and one column per metric. Draw each
-system as a dot in its own colour. Where two systems score alike, the dots on one line hide each
-other. Give each system its own height within the row, which the chart calls a lane, and space the
-lanes about 4 pixels apart so that dots overlap a little but never completely. Rows then need about 40
-pixels each. Shade every second row light grey (`#EDEDED`) so that the eye can tell which dots
-belong to one row. Put the number of scored half-hours in a last column, where the same stripes run
-behind it. A script can copy `dot_chart` in
-`ml-experiments/00700-timing-run-gam-and-xgboost-14-day-monthly-refit/e00700_plots.py`, which
-draws it for five forecasting systems.
-
-**Place rows and lanes on a numeric axis, not on a nominal one.** In Altair, a nominal `y` with a
-`yOffset` encoding gives lanes, but a stripe layer on the same nominal axis comes out the wrong
-height and hides the row labels. Instead, give every row an integer `i`, plot each dot at
-`i + lane offset` on a quantitative `y` scale with the domain `[n - 0.5, -0.5]`, and draw each
-stripe as a `mark_rect` from `i - 0.5` to `i + 0.5`. Write the row names with `labelExpr` on the
-axis, and give the stripe layer the same axis as the dots, because a layer with `axis=None` removes
-the labels of the whole panel.
-
 ## Self-contained charts
 
 **Put the basics in the chart's own text, because many readers see the chart and nothing else.** A
