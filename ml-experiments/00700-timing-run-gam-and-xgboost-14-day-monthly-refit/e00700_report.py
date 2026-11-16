@@ -58,7 +58,11 @@ def january_timing() -> None:
         f"mean {np.mean(s1):.1f}, max {max(s1):.1f}; forecast alone mean {np.mean(fc):.2f}",
     )
     s2 = [v["wall_s"] for v in stage2.values()]
-    print("stage 2:", f"mean {np.mean(s2):.1f}, max {max(s2):.1f}", f"({len(s2)} Primaries)")
+    print(
+        "stage 2:",
+        f"mean {np.mean(s2):.1f}, max {max(s2):.1f} at {max(stage2, key=lambda k: stage2[k]['wall_s'])}",
+        f"({len(s2)} Primaries)",
+    )
     m = [v["wall_s_low"] + v["wall_s_long"] for v in members.values()]
     print("member responses:", f"mean {np.mean(m):.1f}, max {max(m):.1f}", f"({len(m)} Primaries)")
     print(
@@ -168,6 +172,16 @@ def year_timing() -> None:
             match = re.search(r"wall=([\d.]+) user=([\d.]+) maxrss_kb=(\d+)", path.read_text())
             walls.append([float(g) for g in match.groups()])
         a = np.array(walls)
+        if stage == "stage2":
+            diffs = [
+                float(m)
+                for path in TIMING.glob("year_e00700_gam_stage2.py_D*.log")
+                for m in re.findall(r"max_abs_q95_diff_vs_stored': ([\d.]+)", path.read_text())
+            ]
+            print(
+                "stage 2: largest q95 difference from the stored rows (points of capacity):",
+                max(diffs),
+            )
         print(
             stage,
             f"{len(a)} Primaries; wall mean {a[:, 0].mean():.1f} s, max {a[:, 0].max():.1f} s; CPU mean {a[:, 1].mean():.1f} s; peak memory max {a[:, 2].max() / 1e6:.1f} GB",
@@ -231,11 +245,36 @@ def scores() -> None:
         .sort("arm")
     )
     print(wide.with_columns(pl.col(pl.Float64).round(2)))
+    print("MAE by lead day: lowest first, per day:")
+    for day in range(14):
+        col = by_day.filter(pl.col("day") == day).sort("mae_median")
+        print(
+            day,
+            [
+                (ARMS[r["arm"]], round(r["mae_median"], 2))
+                for r in col.head(3).iter_rows(named=True)
+            ],
+        )
     gam = pl.read_parquet(
         ROOT / "backtests" / "gam_year_sp1.parquet",
         columns=["time_series_id", "power_fcst_init_time"],
     )
     per = gam.group_by("time_series_id", "power_fcst_init_time").len()
+    short = per.filter(pl.col("len") < 672)
+    by_month = (
+        short.group_by(pl.col("power_fcst_init_time").dt.strftime("%Y-%m").alias("month"))
+        .len()
+        .sort("month")
+    )
+    print("\nGAM pairs with fewer than 672 half-hours, by origin month:", by_month.rows())
+    counts = per.group_by("time_series_id").len()["len"]
+    print(
+        "GAM Primaries:",
+        per["time_series_id"].n_unique(),
+        "; origins per Primary (min, max):",
+        counts.min(),
+        counts.max(),
+    )
     print(
         "\nGAM file:",
         gam.height,
@@ -250,6 +289,8 @@ def scores() -> None:
 
 
 if __name__ == "__main__":
+    pl.Config.set_tbl_cols(-1)
+    pl.Config.set_tbl_width_chars(250)
     january_timing()
     january_reproduction()
     projection()
