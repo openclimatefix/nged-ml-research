@@ -35,3 +35,4 @@ and XGBoost timing scripts with `DATA_PATH_INTERNAL` set to the sandbox, and run
   load transfer.
 - `e00700_report.py` prints every number in the write-up, and `e00700_plots.py` draws the dot,
   bar, lanes, and MAE-by-forecast-day charts.
+- `e00700_report.py` output is saved as `report.txt` in the experiment's data folder.
