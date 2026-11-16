@@ -157,12 +157,11 @@ def check_input_hashes() -> None:
 
 
 def check_holdout() -> None:
-    """Assert that no forecast, bank, or per-row score file holds a valid time at or after the holdout."""
+    """Assert that no exported forecast, bank, or per-row score file holds a valid time at or after the holdout."""
     count = 0
     for sub in ("clean", "stage2", "early", "stored"):
         base = ROOT / "roots" / sub
         for path in [
-            *base.glob("arms/*/work/fits/*/*.parquet"),
             *base.glob("backtests/*.parquet"),
             *base.glob("P0_D50_*/work/bank/*.parquet"),
         ]:

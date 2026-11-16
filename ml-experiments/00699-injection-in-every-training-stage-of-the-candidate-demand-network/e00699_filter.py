@@ -5,9 +5,10 @@ The forecasts of the 2026-06 fold run to mid-July, and the demand protocol keeps
 after 2026-07-01 out of every experiment that chooses between training recipes. This script removes
 every row whose valid time is on or after 2026-07-01.
 
-- `e00699_filter.py new SUBFOLDER`: cuts, in place, every forecast file (`arms/*/work/fits/*/*.parquet`
-  and `backtests/*.parquet`) and every bank file (`P0_D50_*/work/bank/*.parquet`) under
-  `roots/SUBFOLDER/`.
+- `e00699_filter.py new SUBFOLDER`: cuts, in place, every exported forecast file
+  (`backtests/*.parquet`) and every bank file (`P0_D50_*/work/bank/*.parquet`) under
+  `roots/SUBFOLDER/`. The raw fits under `arms/*/work/fits/` stay whole, because the export needs every
+  origin's full forecast, and no scorer reads them.
 - `e00699_filter.py stored`: writes cut copies of experiment 677's stored forecast files (seeds 0 to
   2, monthly refits) and of its stored bank files for the eight folds under `roots/stored/`. Nothing
   under experiment 677's data folder is written.
@@ -51,8 +52,7 @@ def cut_in_place(*, path: Path) -> int:
 def new_files(*, subfolder: str) -> list[Path]:
     """Return every forecast and bank file under `roots/<subfolder>`."""
     base = ROOT / "roots" / subfolder
-    found = sorted(base.glob("arms/*/work/fits/*/*.parquet"))
-    found += sorted(base.glob("backtests/*.parquet"))
+    found = sorted(base.glob("backtests/*.parquet"))
     found += sorted(base.glob("P0_D50_*/work/bank/*.parquet"))
     return found
 
