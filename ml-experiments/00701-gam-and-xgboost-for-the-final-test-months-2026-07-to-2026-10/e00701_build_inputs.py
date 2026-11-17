@@ -24,8 +24,8 @@ Subcommands, in the order to run them:
 - `lags-check` asserts, for every new frame and series, that every lag is no younger than the newest
   usable observation, and that the weather comes from the run issued at origin minus 9 hours.
 
-    PYTHONPATH=<folders of experiments 87, 33, 48, 701> \
-        uv run --no-sync python ml-experiments/00701-*/e00701_build_inputs.py frames-check
+    export PYTHONPATH=<folders of experiments 87, 33, 48, 701>
+    uv run --no-sync python ml-experiments/00701-*/e00701_build_inputs.py frames-check
 """
 
 import argparse

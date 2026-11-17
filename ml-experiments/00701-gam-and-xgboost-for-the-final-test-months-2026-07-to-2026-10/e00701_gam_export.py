@@ -1,23 +1,30 @@
-# ruff: noqa: E501, I001
-"""Experiment 701, GAM side: write default 3's forecasts of the origin months 2026-07 to 2026-10 in experiment 677's layout.
+# ruff: noqa: I001
+"""Experiment 701, GAM side: write default 3's forecasts of the final-test months.
 
-    PYTHONPATH=<folders of 377, 700, 701> DATA_PATH_INTERNAL=<real data folder> \
-        uv run --no-sync python ml-experiments/00701-*/e00701_gam_export.py
+The months are the origin months 2026-07 to 2026-10, and the file has experiment 677's layout.
 
-Reads the sandbox outputs of `e00701_gam_*.py` and experiment 378's arms (`e00701_gam_arms.py`), and writes
-`<ROOT>/backtests/gam_final_test_sp1.parquet` beside experiment 700's `gam_year_sp1.parquet`, in the same
-columns, units, and 12:00 UTC origin relabel (`e00700_export.to_contract`, imported unchanged).
+    export PYTHONPATH=FOLDERS_OF_377_700_701 DATA_PATH_INTERNAL=REAL_DATA_FOLDER
+    uv run --no-sync python ml-experiments/00701-*/e00701_gam_export.py
+
+Reads the sandbox outputs of `e00701_gam_*.py` and experiment 378's arms (`e00701_gam_arms.py`), and
+writes `<ROOT>/backtests/gam_final_test_sp1.parquet` beside experiment 700's
+`gam_year_sp1.parquet`, in the same columns, units, and 12:00 UTC origin relabel
+(`e00700_export.to_contract`, imported unchanged).
 Set `E00701_ROOT_BACKTESTS` to write elsewhere.
 
-**The forecast is Primary demand research default 3 as experiment 378 assembles it**, with the stage 2
-stack of experiment 377 beyond 240 hours, exactly as `e00700_export.gam_rows` does:
+**The forecast is Primary demand research default 3 as experiment 378 assembles it**, with the
+stage 2 stack of experiment 377 beyond 240 hours, exactly as `e00700_export.gam_rows` does:
 
-- up to 168 hours after the native 09:00 UTC origin: the solar summary S (`x1`, `low_lead_<source>.parquet`);
-- above 168 and up to 240 hours: S and the daylight heuristic blend (`d3`, `long_lead_<source>.parquet`);
+- up to 168 hours after the native 09:00 UTC origin: the solar summary S (`x1`,
+  `low_lead_<source>.parquet`);
+- above 168 and up to 240 hours: S and the daylight heuristic blend (`d3`,
+  `long_lead_<source>.parquet`);
 - above 240 hours: stage 2 without S (`stack_d_<site>.parquet`).
 
-Fifteen Primaries are written; D15 has no stage 2 file. The script asserts that no quantile is `null`,
-that every Primary has an origin on each of the 123 days (every day of the months), and that no origin
+Fifteen Primaries are written; D15 has no stage 2 file. The script asserts that no quantile is
+`null`,
+that every Primary has an origin on each of the 123 days (every day of the months), and that no
+origin
 is missing 672 half-hours beyond the gaps of the actual power readings.
 """
 

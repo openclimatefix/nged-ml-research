@@ -119,6 +119,13 @@ def chosen_refit(*, refits: tuple[datetime, ...], origin: datetime) -> datetime:
     A stored run (origin at or before 2026-06-30 09:00) ignores the refits from 2026-06-30 on, so
     that it keeps the refit that experiment 87 assigned to it.
 
+    Args:
+        refits: The refit times to choose from.
+        origin: The forecast origin.
+
+    Returns:
+        The latest refit time at or before the origin.
+
     Raises:
         ValueError: If every refit is later than the origin.
     """

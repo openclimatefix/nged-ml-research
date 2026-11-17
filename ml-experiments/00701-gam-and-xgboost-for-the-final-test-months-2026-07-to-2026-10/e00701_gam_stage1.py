@@ -1,8 +1,8 @@
 # ruff: noqa: E501, I001
 """Experiment 701, GAM side: stage 1 of the GAM (arm a2) for the origin months 2026-07 to 2026-10.
 
-    E00377_SOURCE=control PYTHONPATH=<folders of 377, 700, 701> DATA_PATH_INTERNAL=<sandbox> \
-        uv run --no-sync python ml-experiments/00701-*/e00701_gam_stage1.py --sites D5 [--first 2026-07] [--last 2026-10] [--dry-run]
+    export E00377_SOURCE=control PYTHONPATH=<folders of 377, 700, 701> DATA_PATH_INTERNAL=<sandbox>
+    uv run --no-sync python ml-experiments/00701-*/e00701_gam_stage1.py --sites D5 [--first 2026-07] [--last 2026-10] [--dry-run]
 
 This is `e00700_gam_stage1.py` with the origin months as arguments. Each daily 00:00 UTC ENS run of
 the months (native origin 09:00 UTC) is forecast 339 hours ahead (678 half-hours) from the monthly
@@ -12,7 +12,8 @@ The weather is the run's own 51 ensemble members, so nothing after the origin en
 
 The frame replaces the months' rows in the sandbox copy of `dp_preds/a2_scored_<site>.parquet`
 (rows of other months are kept; rewriting is atomic). Rows of the months already stored are compared
-with the stored rows (`max_abs_quantile_mean_actual_diff_vs_stored`, the largest difference over the 11 quantiles, the mean, and the actual; `null` for months with no stored rows).
+with the stored rows (`max_abs_quantile_mean_actual_diff_vs_stored`, the largest difference over the
+11 quantiles, the mean, and the actual; `null` for months with no stored rows).
 `--dry-run` computes and compares but writes nothing, for the smoke test on a stored month.
 Writes `timing/gam_stage1_<source>_<sites>.json`.
 """

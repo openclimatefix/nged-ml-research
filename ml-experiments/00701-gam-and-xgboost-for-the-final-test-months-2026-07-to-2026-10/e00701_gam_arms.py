@@ -1,23 +1,24 @@
 # ruff: noqa: E501, I001
-"""Experiment 701, GAM side: experiment 378's solar summary S and daylight blend, on the extended inputs.
+"""Experiment 701, GAM side: experiment 378's solar summary S and blend, on the extended inputs.
 
-    E00377_SOURCE=control OMP_NUM_THREADS=1 \
-    PYTHONPATH=<folders of 184, 202, 319, 320, 377, 378, 700, 701> DATA_PATH_INTERNAL=<sandbox> \
-        uv run --no-sync python ml-experiments/00701-*/e00701_gam_arms.py low|long [--smoke 2026-06]
+    export E00377_SOURCE=control OMP_NUM_THREADS=1 DATA_PATH_INTERNAL=SANDBOX
+    export PYTHONPATH=FOLDERS_OF_184_202_319_320_377_378_700_701
+    uv run --no-sync python ml-experiments/00701-*/e00701_gam_arms.py low|long [--smoke 2026-06]
 
-`low` is `e00378_arms_low.py` (S at 0.5 to 168 hours, column `x1_*`, file `low_lead_<source>.parquet`)
-and `long` is `e00378_arms.py` (S, the blend with the manual heuristic, and default 3 at 168 to 240
-hours, columns `x1_*`, `r319_*`, `d3_*`, file `long_lead_<source>.parquet`). **This wrapper imports
-`e00701_gam_extend377` first and then calls experiment 378's own `main`, so the arms read the
-extended feature cache (their daylight flag and the heuristic's lagged readings need grid rows after
-2026-06-30), and nothing else of experiment 378's code changes.** Both replay every fold month from the
-sandbox's stage 2 and member files, so the months to 2026-06 are recomputed, and
-`--check-old` (see `e00701_gam_run.sh`) compares them with the files that experiment 700 left.
+`low` is `e00378_arms_low.py` (S at 0.5 to 168 hours, column `x1_*`, file
+`low_lead_<source>.parquet`) and `long` is `e00378_arms.py` (S, the blend with the manual heuristic,
+and default 3 at 168 to 240 hours, columns `x1_*`, `r319_*`, `d3_*`, file
+`long_lead_<source>.parquet`). **This wrapper imports `e00701_gam_extend377` first and then calls
+experiment 378's own `main`, so the arms read the extended feature cache (their daylight flag and
+the heuristic's lagged readings need grid rows after 2026-06-30), and nothing else of experiment
+378's code changes.** Both replay every fold month from the sandbox's stage 2 and member files, so
+the months to 2026-06 are recomputed, and `--check-old` (see `e00701_gam_run.sh`) compares them with
+the files that experiment 700 left.
 
-`--smoke MONTH` replays only that month for the sites of `E00377_SOURCE` (the fit windows still read the
-earlier months), compares the result with the stored columns of the sandbox files, prints the largest
-differences, and writes nothing. For `low` this repeats the body of `e00378_arms_low.main` restricted to
-one month.
+`--smoke MONTH` replays only that month for the sites of `E00377_SOURCE` (the fit windows still read
+the earlier months), compares the result with the stored columns of the sandbox files, prints
+the largest differences, and writes nothing. For `low` this repeats the body of
+`e00378_arms_low.main` restricted to one month.
 """
 
 import json

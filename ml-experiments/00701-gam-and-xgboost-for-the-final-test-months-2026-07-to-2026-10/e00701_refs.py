@@ -21,7 +21,8 @@ native 09:00 UTC origin) through experiment 87's own `finalise` and `write_arm`.
 - **Climatology.** The production climatology is a lookup of 51 quantiles per series, Europe/London
   calendar month, half-hour of day, and weekday-or-weekend flag, fitted once on power before
   2025-07-01. (A lookup fitted on power from 2024-04-01 to 2025-07-01 comes closest to the stored
-  forecasts, but not exactly, so the first day of the fit is not known.) Its stored forecasts for the 365 stored runs are that lookup read off. The script
+  forecasts, but not exactly, so the first day of the fit is not known.) Its stored forecasts for
+the 365 stored runs are that lookup read off. The script
   recovers the lookup from those stored forecasts (it asserts that every cell holds one value
   throughout) and reads the new runs' forecasts from it, so the new months use the same fitted
   climatology as experiment 700's, with no refit. Every valid time of the stored runs lies on the
@@ -34,8 +35,8 @@ Subcommands, all writing under `<this experiment's private folder>/refs/`:
   compares the two arms with experiment 87's stored arms.
 - `build`: builds the 123 new runs into `refs/arms`.
 
-    PYTHONPATH=<experiment folders> POLARS_MAX_THREADS=4 \
-        uv run --no-sync python ml-experiments/00701-*/e00701_refs.py check|build
+    export PYTHONPATH=EXPERIMENT_FOLDERS POLARS_MAX_THREADS=4
+    uv run --no-sync python ml-experiments/00701-*/e00701_refs.py check|build
 """
 
 import argparse
@@ -167,7 +168,14 @@ def heuristic_members(*, cases: pl.DataFrame, power: pl.DataFrame) -> pl.DataFra
 
 
 def stored_climatology_cells(*, origins: list[datetime], ids: list[int]) -> pl.DataFrame:
-    """Return the production climatology's lookup (51 quantiles per cell), read off its stored forecasts.
+    """Return the production climatology's lookup, read off its stored forecasts.
+
+    Args:
+        origins: The forecast origins whose stored climatology rows are read.
+        ids: The time series ids to read.
+
+    Returns:
+        One row per series, local calendar cell, and ensemble member (51 quantiles per cell).
 
     Raises:
         ValueError: If one cell holds two different values for one member in the stored rows.

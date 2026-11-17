@@ -25,8 +25,8 @@ Subcommands:
   arms. `--stored-only` assembles the 365 stored runs alone, into `arms_stored_check`, which proves
   that the patched assembly reproduces experiment 87's arms before any new fit exists.
 
-    PYTHONPATH=<folders of experiments 87, 33, 48, 701> \
-        uv run --no-sync python ml-experiments/00701-*/e00701_assemble.py prepare
+    export PYTHONPATH=<folders of experiments 87, 33, 48, 701>
+    uv run --no-sync python ml-experiments/00701-*/e00701_assemble.py prepare
     ... build --arms p_a3_monthly_in_weekly_slot
 """
 

@@ -14,8 +14,8 @@ exported forecasts.
 
 ## Why the stored XGBoost files could not be reused
 
-**Experiment 87 stops at 2026-06-30 in four places.** Its fit reads (1) experiment 48's demand frames
-(`frames_demand`, 51 ensemble members of each run, 292 runs), (2) experiment 34's control-member
+**Experiment 87 cannot run past 2026-06-30 in four places.** Its fit reads (1) experiment 48's
+demand frames (`frames_demand`, 51 ensemble members of each run, 292 runs), (2) experiment 34's control-member
 rows (`ens_after_training`, the training rows of the refits, 364 runs), (3) the solar offset's
 ensemble-mean shape and anomaly, and (4) a power table that ends in October 2026 but a time grid
 that ends 2026-07-31. It also hard-codes the last run (2026-06-30), the holdout (2026-07-01), and the
@@ -67,10 +67,10 @@ m=ml-experiments
 export PYTHONPATH=$m/00087-bg2-best-guess-assembled-with-drop-one-ablations:$m/00033-best-guess-architecture-vs-production:$m/00048-weekly-retraining-confirmation-and-extension-demand-generators:$m/00700-timing-run-gam-and-xgboost-14-day-monthly-refit:$m/00377-demand-v1-first-run-feasibility:$m/00701-gam-and-xgboost-for-the-final-test-months-2026-07-to-2026-10
 ```
 
-1. **Inputs** (done; each is resumable, four worker processes, a minute or less):
+1. **Inputs** (each is resumable, four worker processes, a minute or less):
    `e00701_build_inputs.py` with `frames-check`, `after-check`, `frames`, `after`, `links`, `u-mean`,
    `anomaly`, and `lags-check`, in that order.
-2. **Smoke tests** (done): `e00701_smoke.py monthly` and `e00701_smoke.py frozen`.
+2. **Smoke tests:** `e00701_smoke.py monthly` and `e00701_smoke.py frozen`.
 3. **Monthly-only variant:** `ml-experiments/00701-*/e00701_xgb_run.sh monthly`.
 4. **BG2 in full:** `ml-experiments/00701-*/e00701_xgb_run.sh weekly`.
 
@@ -105,7 +105,7 @@ experiment's log is `work/gpu_hours.jsonl`.
 ## Limits
 
 - **The capacity vintage of the solar offset is held at its last value.** Experiment 78's table of
-  real-time capacities ends with the week of 2026-06-22, and extending it needs experiment 45's
+  real-time capacities ends with the week of 2026-06-22, and extending the table needs experiment 45's
   half-hourly inputs rebuilt to 2026-10. Experiment 87's own rule takes the last vintage for a run
   after the table's last week, so the offset at the 5 offset Primaries uses that value for July to
   September (the weight of the offset is zero from October). Over the last 8 weeks of the table the
@@ -115,7 +115,7 @@ experiment's log is `work/gpu_hours.jsonl`.
 - **The observed power ends at 2026-11-06 14:00 UTC in experiment 607's table.** Valid times of the
   last origins after that have no observation (the blend weights ignore them).
 
-# Experiment 701: the GAM side (Primary demand research default 3)
+## The GAM side (Primary demand research default 3)
 
 **The scripts `e00701_gam_*.py` forecast the 123 daily runs of 2026-07-01 to 2026-10-31 with
 Primary demand research default 3, the GAM, and write the forecasts in the layout of experiment 700's
@@ -173,10 +173,10 @@ DATA_PATH_INTERNAL=$DATA/ml-experiments/00701-gam-and-xgboost-for-the-final-test
   bash $D/e00701_gam_run.sh
 ```
 
-Steps 1 are already done when the folders of `gam/inputs`, `gam/cache`, and `gam/sandbox` exist.
+Step 1 can be skipped when the folders `gam/inputs`, `gam/cache`, and `gam/sandbox` exist.
 Each stage replaces its own months, so `e00701_gam_run.sh` can be run again after a failure.
 
-## What was checked
+## What was checked on the GAM side
 
 - **Rows:** the extended rows table equals the stored table on all 1,624,499 shared rows, in 13
   columns (0 differences).
@@ -189,7 +189,7 @@ Each stage replaces its own months, so `e00701_gam_run.sh` can be run again afte
 - **Stages and export:** stage 1, stage 2, the member responses, the long-horizon arm, and the
   export reproduce experiment 700's June 2026 rows with a largest absolute difference of 0.0.
 
-## Limits
+## Limits of the GAM side
 
 - **Missing actuals:** a power outage on 2026-11-04 from 08:30 to 14:00 UTC removes 128 half-hours
   from the windows of the 11 October origins that reach it, at every Primary. July and August have
@@ -200,11 +200,10 @@ Each stage replaces its own months, so `e00701_gam_run.sh` can be run again afte
 - **Weather:** the ERA5 of September and October is the preliminary ERA5T.
 - **Scoring:** a scorer must use the extended feature cache and the holdout dates of this
   experiment (the cache folder of `e00668_compare_primaries` and `eval_protocol.metrics.HOLDOUT_START`).
-- **The run of 2026-06-30:** the GAM now forecasts it, which experiment 700 did not, but the export
-  keeps origins from 2026-07-01 only.
-- **Runtime:** experiment 700 measured about 15 minutes of single-thread GAM time per origin month
-  (887 seconds), so the four months are expected to take 1 to 2 hours at 8 processes. The ensemble
-  build is separate and is not included in that estimate.
+- **The run of 2026-06-30:** the GAM also forecasts it, but the export keeps origins from
+  2026-07-01 only.
+- **Runtime:** the four months took 1.3 hours of wall-clock time at 4 processes (see "Timing of
+  the 4 months" in `result.md`). The ensemble build is not included.
 
 ## Scoring side
 
