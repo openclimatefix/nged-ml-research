@@ -231,6 +231,11 @@ workstation with 32 cores, so the times include some waiting for CPU.
   arm of 9.8e-5 of capacity.
 - **Audit triggers:** the reversal of the neural networks' lead is surprising, and no audit has run.
   Reviews of the code found no leakage, and the D14 table above does not explain the whole reversal.
+- **Review findings not applied:** the numbers review could not find the GPU-refit differences, the
+  row counts, and the heuristic difference in `report.txt`. Those figures come from the checking
+  scripts' printed output, so they stay. The prose review's requests to expand every acronym and to
+  change several counts to words were left for a later pass, because the page's meaning does not
+  depend on them.
 
 ## Limits
 
