@@ -75,12 +75,15 @@ look-back mean follows recipe R of [experiment 115](../00115-differentiable-phys
 
 - **Stage 1 (approved scope):** the residual table, the known-answer tests, the global-offset, driver-split,
   and prevailing arms on the stored forecasts (CPU only, 4 cores), and contrasts C1, C2, and C5.
-- **Stage 2 (needs the maintainer's approval under the stop rule; not started):** a learned share
-  that decides how much of a level shift the normal-running forecast applies, judged against the
-  electrical neighbours (C3 and C4). At least four earlier experiments failed on the neighbour-based
-  switching share (165, 175, 652, 663), so the brief's stop rule requires the maintainer's approval
-  to be recorded here before stage 2 starts. Stage 2 also runs only if stage 1's global or
-  driver-split arm improves event-free CRPS by a point estimate of 0.02 or more.
+- **Stage 2 (maintainer approved 2026-11-18, under the stop rule):** a learned gate decides how much
+  of each look-back offset the forecast applies. Four earlier experiments failed on the
+  neighbour-based switching share (165, 175, 652, 663), and the maintainer approved a fifth attempt
+  on the condition that the design drops the binary switching-event flag. Instead, the head learns
+  how far to trust each look-back offset (global, high-irradiance, cold, and the neighbours' offsets
+  at several window lengths), as the Candidate's lag encoder learns how far to trust each lagged
+  power input, and it trains on synthetic switching events with the CRPS loss only. Stage 2 also
+  runs only if stage 1's global or driver-split arm improves event-free CRPS by a point estimate of
+  0.02 or more. The stage 2 design is rewritten before any stage 2 script is written.
 
 ## Plan
 
@@ -89,7 +92,7 @@ The full design, with the Opus review and its triage, is the private file
 
 - **Arms.** G-lb (lead-band-matched look-back mean, factor 0.75, 14 days) is the primary global
   offset. D adds a ridge-regressed irradiance slope and cold-temperature slope. P-7d and P-cp are
-  prevailing arms. N and N-rule are the stage 2 arms. The stored normal-running and prevailing rows,
+  prevailing arms. N (the learned per-feature gate, no switching flag) and N-rule are the stage 2 arms. The stored normal-running and prevailing rows,
   recipe R, a 28-day median shift, hindsight ceilings, and a climatology row are references.
 - **Look-ahead.** The target weather comes from the ensemble run of 00:00 UTC on the origin's day,
   available at 09:00 UTC, and the script asserts this row by row. The look-back window ends 6 h
