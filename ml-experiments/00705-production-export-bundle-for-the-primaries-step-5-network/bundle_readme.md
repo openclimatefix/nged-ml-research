@@ -2,14 +2,17 @@
 
 **This directory holds everything that production needs to re-implement the inference of one monthly
 refit of the step-5 network at the 16 Primaries.** The network is arm `k1_5w_sp1` of research
-experiment 677, with three seeds (0, 1, 2). `manifest.json` names the arm of the
-CAMS-column experiment (`replay`, `proxy`, or `drop`), the refit month, the training cut-off, the
-research commit, and the SHA-256 of every other file.
+experiment 677, with three seeds (0, 1, 2). `manifest.json` names which arm of experiment 704 the
+weights come from (`replay`, `proxy`, or `drop`: how the two previous-day CAMS columns are filled),
+the refit month, the training cut-off, the research commit, and the SHA-256 of every other file.
 
 **Production re-implements every feature, so the fixtures are the defence against skew.** Each
 fixture origin holds the raw weather inputs, every input column before and after standardisation,
-the network outputs, and the quantiles, for all 16 Primaries. `reference_check.py` reproduces the
-quantiles from the raw columns with `torch`, `numpy`, and `polars` only. Run it with
+the network outputs, and the quantiles, for all 16 Primaries. `reference_check.py` rebuilds the
+standardised matrix from the `raw__` columns and reproduces the quantiles with `torch`, `numpy`, and
+`polars` only. The check does not rebuild the `raw__` columns themselves: the ENS summary, the solar
+and calendar columns, and the B1 columns are checked only against the fixture files, so production
+must compare its own values of those columns with `input_matrix.parquet`. Run it with
 `python -I reference_check.py` (inputs and raw outputs to 1e-5, quantiles to 2e-5 of capacity,
 because the stored forecasts come from a GPU pass).
 
@@ -19,8 +22,11 @@ because the stored forecasts come from a GPU pass).
    plus 9 hours (09:00 UTC). The contract origin is 12:00 UTC.
 2. **Interpolate each of the 51 members alone to half-hours, then take the member mean and the
    population standard deviation (`ddof=0`).** The interpolation is `_upsample_nwp_to_half_hourly` of
-   `ml_core` at the commit in `manifest.json` (`pinned_production_package_commit`). The 7 variables
-   are listed in `config.json`.
+   `ml_core` at the commit in `manifest.json` (`pinned_production_package_commit`), called with the
+   Primaries' latitude and longitude as `solar_coordinates`. Rename the archive columns to the
+   network's names, and derive `wind_speed_10m` as `sqrt(u² + v²)` of each interpolated member
+   before averaging; averaging u and v first gives up to 4.2 m/s of error.
+   `config.json` (`components.step5.ens_summary_recipe`) lists the names and the steps.
 3. **Build the 60 input columns** named in `components/step5/columns.json` for each (Primary,
    valid half-hour) with valid time up to 339 hours after the native origin, using
    `components/step5/standardisers.json`.

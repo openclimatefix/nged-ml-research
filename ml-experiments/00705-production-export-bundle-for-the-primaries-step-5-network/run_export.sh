@@ -9,14 +9,14 @@ D="$(cd "$(dirname "$0")" && pwd)"
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}"
 ARM=$1; M=$2
 B=$DATA_PATH_INTERNAL/ml-experiments
-X=$(echo $B/00705-*)
+X=$(echo $B/00705-*); [ -d "$X" ] || { echo "no 00705 data folder under $B"; exit 1; }
 case $ARM in
   replay)
-    R=$(echo $B/00677-*/)
+    R=$(echo $B/00677-*/); [ -d "$R" ] || { echo "no 00677 data folder"; exit 1; }
     CHAIN=${R}chains/5/$M/work; STATS=${R}chains/3b/$M/work
     BACKTEST="--backtest ${R}backtests/step5w_with_injected_sp1.parquet" ;;
   proxy|drop)
-    R=$(echo $B/00704-*/)arms/$ARM/
+    R=$(echo $B/00704-*/)arms/$ARM/; [ -d "$R" ] || { echo "no 00704 arm folder $R"; exit 1; }
     CHAIN=${R}chains/5/$M/work; STATS=$CHAIN; BACKTEST="" ;;
   *) echo "bad arm $ARM"; exit 1 ;;
 esac

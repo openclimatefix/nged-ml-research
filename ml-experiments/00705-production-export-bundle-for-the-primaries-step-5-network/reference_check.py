@@ -84,7 +84,8 @@ def lag_columns(
     config = bundle["config"]["components"]["step5"]["lags"]
     stats = bundle["standardisers"]["lag"]["day" if which == 0 else "week"]
     missing = ~np.isfinite(power) | (lag_index < 0)
-    mean, std = np.float64(stats["mean"]), np.float64(stats["std"])
+    mean = np.float64(stats["mean"])
+    std = max(np.float64(stats["std"]), np.float64(config["std_floor"]))
     z = np.clip((power.astype(np.float64) - mean) / std, -config["clip_sd"], config["clip_sd"])
     age = (target_index - lag_index) * 0.5 / config["age_scale_hours"]
     out = np.zeros((len(power), 3), dtype=np.float32)
@@ -117,7 +118,7 @@ def build_input_matrix(*, rows: pl.DataFrame, lag_power: dict, bundle: dict) -> 
     config = bundle["config"]["components"]["step5"]
     standardisers = bundle["standardisers"]
     n = rows.height
-    x = np.zeros((n, 60), dtype=np.float32)
+    x = np.zeros((n, config["n_columns"]), dtype=np.float32)
     raw37 = rows.select([f"raw__{name}" for name in names[:37]]).to_numpy().astype(np.float32)
     x[:, :37] = standardise_x37(
         raw=raw37, standardisers=standardisers, clip_sd=config["input_clip_sd"]
@@ -133,11 +134,14 @@ def build_input_matrix(*, rows: pl.DataFrame, lag_power: dict, bundle: dict) -> 
             ],
             dtype=np.float32,
         )
-        x[:, 37 + 3 * which : 40 + 3 * which] = lag_columns(
+        start, stop = config["column_slices"][("day_lag", "week_lag")[which]]
+        x[:, start:stop] = lag_columns(
             power=power, lag_index=idx, target_index=target, which=which, bundle=bundle
         )
-        x[:, 43 + which] = idx
-    x[:, 45] = knot_position(valid_us=rows["valid_time"].dt.epoch("us").to_numpy(), config=config)
+        x[:, config["lag_grid_index_columns"][which]] = idx
+    x[:, config["knot_position_column"]] = knot_position(
+        valid_us=rows["valid_time"].dt.epoch("us").to_numpy(), config=config
+    )
     b1 = rows.select([f"raw__{name}" for name in names[46:]]).to_numpy().astype(np.float32)
     mean = np.asarray(standardisers["b1"]["mean"], dtype=np.float32)
     std = np.asarray(standardisers["b1"]["std"], dtype=np.float32)
@@ -193,23 +197,34 @@ def forward(
             layers=(0, 3),
         )
     )
+    n_weather = cols["weather"][1] - cols["weather"][0]
+    width = len(config["expected_weather"]["x37_positions"])
     outs = []
     for j, name in enumerate(("day", "week")):
-        idx = x[:, 43 + j].long()
+        idx = x[:, config["lag_grid_index_columns"][j]].long()
+        # A missing lag (grid index < 0) reads a zero row; any other absent key is a bundle error.
         rows = torch.stack(
             [
-                table.get((int(p), int(i)), torch.zeros(28, dtype=torch.float16))
-                if i >= 0
-                else torch.zeros(28, dtype=torch.float16)
+                table[(int(p), int(i))] if i >= 0 else torch.zeros(width, dtype=torch.float16)
                 for p, i in zip(primary.tolist(), idx.tolist(), strict=True)
             ]
         ).float()
         pad = torch.zeros(n, config["n_b1"])
         ehw = F.gelu(
-            mlp(w=w, prefix="weather", x=torch.cat([rows[:, :7], emb, pad], dim=-1), layers=(0, 3))
+            mlp(
+                w=w,
+                prefix="weather",
+                x=torch.cat([rows[:, :n_weather], emb, pad], dim=-1),
+                layers=(0, 3),
+            )
         )
         ehd = F.gelu(
-            mlp(w=w, prefix="datetime", x=torch.cat([rows[:, 7:], emb], dim=-1), layers=(0, 3))
+            mlp(
+                w=w,
+                prefix="datetime",
+                x=torch.cat([rows[:, n_weather:], emb], dim=-1),
+                layers=(0, 3),
+            )
         )
         lag_id = w["lag_id.weight"][torch.full((n,), j, dtype=torch.long)]
         lag_cols = cols[f"{name}_lag"]

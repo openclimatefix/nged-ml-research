@@ -250,7 +250,10 @@ def main() -> None:
     )
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS_ALL))
     args = parser.parse_args()
-    out = Path(args.out)
+    out = Path(args.out).resolve()
+    assert out.parent.parent.parent.name.startswith("00705-"), (
+        f"--out must be <00705 folder>/bundles/<arm>/<month>: {out}"
+    )
     if out.exists():
         shutil.rmtree(out)
     step5 = out / "components" / "step5"
@@ -697,6 +700,26 @@ def main() -> None:
                 "n_primaries": 16,
                 "input_clip_sd": prep.INPUT_CLIP_SD,
                 "weather_variables": list(WEATHER_VARIABLES),
+                "ens_summary_recipe": {
+                    "source_names": {
+                        "temperature_2m": "temperature_2m",
+                        "dew_point_temperature_2m": "dew_point_temperature_2m",
+                        "shortwave": "downward_short_wave_radiation_flux_surface",
+                        "longwave": "downward_long_wave_radiation_flux_surface",
+                        "pressure_surface": "pressure_surface",
+                        "pressure_msl": "pressure_reduced_to_mean_sea_level",
+                        "precipitation": "precipitation_surface",
+                        "wind_speed_10m": "sqrt(wind_u_10m ** 2 + wind_v_10m ** 2)",
+                    },
+                    "steps": [
+                        "select each Primary's H3 resolution-5 cell from the run (all 51 members, native 3-hourly then 6-hourly steps)",
+                        "interpolate each member alone with ml_core.features._nwp._upsample_nwp_to_half_hourly, passing solar_coordinates = the Primaries' latitude and longitude (the shortwave interpolation needs them)",
+                        "rename the archive columns to the network's names with source_names",
+                        "derive wind_speed_10m from the interpolated u and v of each member, before any averaging",
+                        "take the mean and the population std (ddof=0) over the 51 members per (Primary, valid half-hour)",
+                    ],
+                    "wrong_order_error": "averaging u and v before the speed gives up to 4.2 m/s of error (finding 1)",
+                },
                 "precipitation_transform": "log1p(clip(value, 0)) on the 51-member mean and on the 51-member population std",
                 "member_std_ddof": 0,
                 "member_count": 51,
@@ -722,6 +745,8 @@ def main() -> None:
                     "week_lag": [40, 43],
                     "b1": [46, 60],
                 },
+                "n_columns": 60,
+                "lag_grid_index_columns": [43, 44],
                 "knot_position_column": 45,
                 "n_b1": 14,
                 "mixture_components": 3,
