@@ -44,7 +44,7 @@ decision_rule: >-
   signed-MW six and the MVA-only eight separately, and both groups must pass. The smallest worthwhile
   gain for C1 is 0.05 points, because the offset adds a serving step that keeps 14 days of issued
   forecasts and telemetry, and 0.05 equals what fresher lags bought in experiment 572. C1 passes when
-  the 99% interval lies wholly below -0.05. C2 passes at zero with an interval that excludes zero. A
+  the 99.17% interval lies wholly below -0.05. C2 passes at zero with an interval that excludes zero. A
   point estimate worse than +0.02 in either group blocks `supported`. The full verdict table covers
   every combination of C1, C2, and C3 and is in the design file. A failed known-answer gate caps the
   affected contrast at `inconclusive`.
