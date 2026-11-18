@@ -178,6 +178,11 @@ releases](https://openclimatefix.github.io/nged-substation-forecast/live_service
 - **The origin of the stored production-style table is unconfirmed**, so its scores may not match
   the deployed forecast ([glossary](../glossary.md#xgboost_baseline)) (exp 87; stored table;
   provisional).
+- **A 14-day look-back offset on the stored forecast gains only at lead days 1 and 2.** At 14
+  Primaries it scored 0.127 and 0.096 points of CRPS better on lead days 1 and 2, and 0.043 to 0.155
+  worse from lead day 5, so one offset at every lead time did not beat the stored forecast
+  ([experiment
+  706](../00706-inference-time-level-tracking-part-1-look-back-offsets-by-driver-on-stored-forecasts/result.md)).
 
 ## Which results are provisional
 
