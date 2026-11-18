@@ -198,8 +198,11 @@ def stored_668_losses(*, inputs: c.Inputs) -> Losses:
         "Climatology_crps",
         "Climatology_mae",
     ]
-    frame = pl.read_parquet(path, columns=columns).filter(
-        pl.col("ok"), pl.col("valid_idx") < c.LIB_OFFSET + c.N_STAMPS
+    frame = (
+        pl.scan_parquet(path)
+        .filter(pl.col("ok"), pl.col("valid_idx") < c.LIB_OFFSET + c.N_STAMPS)
+        .select(columns)
+        .collect()
     )
     position = {int(series): index for index, series in enumerate(inputs.ids)}
     k = (
@@ -268,6 +271,8 @@ def load_all(
         )
     sets = {spec.name: spec.row_set_id for spec in (*arms.LOOK_BACK_ARMS, *arms.PREVAILING_ARMS)}
     sets |= {name: c.ROW_SET_ID_FROM_JANUARY for name, _ in arms.CHANGEPOINT_ARMS}
+    if month is None and set_suffix is not None:
+        raise ValueError("--set-suffix needs --month")
     if month is not None and set_suffix is None:
         set_suffix = f"-t{month.replace('-', '')}"
     for name, row_set_id in sets.items():

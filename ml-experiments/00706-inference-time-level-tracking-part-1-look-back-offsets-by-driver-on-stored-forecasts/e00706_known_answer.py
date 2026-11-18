@@ -16,7 +16,7 @@ experiments 668, 683, and 688 on `PYTHONPATH` (the event spans come from experim
   event-free half-hours. Every injected size must be at least 5 times it.
 - `perturb`: changing power after 6 hours before the origin, or any weather run after the origin
   day, moves no coefficient and no correction of arms G and D; changing the 06:00 UTC reading moves
-  it. The same holds for the levels of P-cp (window ending 3 hours before the origin), RR, and M28.
+  it. The same holds for the levels of P-cp (window ending at 03:00 UTC, 9 hours before the 12:00 origin), RR, and M28.
 - `ka1a` (gate): a 10-point additive step in truth with the forecast held fixed. Arm G with factor 1.0
   must remove 100% plus or minus 5% at 14 days and 50% plus or minus 5% at 7 days after the onset.
   A failed gate stops the experiment after one fix pass.
@@ -224,7 +224,7 @@ def level_of(*, name: str, residuals: c.Residuals, series: int, origin: int) -> 
 def perturb_levels(*, inputs: c.Inputs) -> bool:
     """Return whether the perturbation test passes for the levels of P-cp, RR, and M28.
 
-    P-cp reads power up to 3 hours before the origin; RR and M28 read it up to 6 hours before. None
+    P-cp reads power up to 03:00 UTC, 9 hours before the 12:00 origin; RR and M28 read it up to 6 hours before. None
     of the three reads weather. Power after the last half-hour a level reads must move nothing, and
     shifting the last day up to and including that half-hour must move the level.
     """
@@ -241,6 +241,8 @@ def perturb_levels(*, inputs: c.Inputs) -> bool:
                 truth_late[series, last + 1 :] += 7.0
                 truth_edge = inputs.truth.copy()
                 truth_edge[series, last - c.PER_DAY + 1 : last + 1] += 20.0
+                truth_edge_down = inputs.truth.copy()
+                truth_edge_down[series, last - c.PER_DAY + 1 : last + 1] -= 20.0
                 weather_late = inputs.weather.copy()
                 weather_late[:, origin:] += 1.0
                 cases = {
@@ -265,6 +267,17 @@ def perturb_levels(*, inputs: c.Inputs) -> bool:
                         origin=origin,
                     )
                     moved = not np.isclose(value, reference, atol=1e-6)
+                    if should_move and not moved:
+                        # A median can stay put under a one-sided shift, so try the other sign.
+                        value_down = level_of(
+                            name=name,
+                            residuals=c.build_residuals(
+                                inputs=dataclasses.replace(inputs, truth=truth_edge_down)
+                            ),
+                            series=series,
+                            origin=origin,
+                        )
+                        moved = not np.isclose(value_down, reference, atol=1e-6)
                     passed = moved == should_move
                     ok &= passed
                     print(
