@@ -127,6 +127,10 @@ assert (
 arm.CHAIN = CHAIN_677
 fold.install(e, months=[MONTH])
 assert fold.FINAL_MONTH == MONTH
+FOLD_CUT_IDX: Final[int] = int(
+    (c.us(t=c.month_start(month=MONTH)) - c.prep422.GRID_START_US) // c.prep422.STEP_US
+)
+"""Grid index of the fold's cutoff: in the train phase `e00677_fold` hides the cleaned power from here on."""
 
 SPANS_FILE: Final[Path] = core.ROOT / "fold_spans" / f"{MONTH}.json"
 """The pooled rows' spans and shifted-row hashes of the fold, written by `split3 spans` (one file per fold, so that two folds' runs never write the same file)."""
@@ -631,16 +635,32 @@ def finish() -> None:
 
 
 def shifted_row_hashes(*, clean: np.ndarray, spans: dict, synthetic, labels: list[str]) -> dict:
-    """Hash each Primary's cleaned row and its shifted rows (the training schedule and the bank's) from a generator `synthetic`."""
+    """Hash each Primary's cleaned row and its shifted rows (the training schedule and the bank's) from a generator `synthetic`.
+
+    `clean_before` and `train_before` hash the grid before the fold's cutoff only, which the train
+    phase and the predict phase both see. `clean`, `train`, and `bank` hash the whole row, which only
+    the predict phase sees (the train phase hides the power from the cutoff on).
+    """
     seed = int(MONTH.replace("-", ""))
     train = synthetic(clean=clean, first=spans["train"][0], last=spans["train"][1], seed=seed)[0]
     scored = synthetic(
         clean=clean, first=spans["test"][0], last=spans["test"][1], seed=BANK_SEED_BASE + seed
     )[0]
+    kinds = {
+        "clean_before": clean[:, :FOLD_CUT_IDX], "train_before": train[:, :FOLD_CUT_IDX],
+        "clean": clean, "train": train, "bank": scored,
+    }  # fmt: skip
     return {
         kind: {label: core.array_hash(arrays={"row": rows[i]}) for i, label in enumerate(labels)}
-        for kind, rows in (("clean", clean), ("train", train), ("bank", scored))
+        for kind, rows in kinds.items()
     }
+
+
+PHASE_KINDS: Final[dict[str, tuple[str, ...]]] = {
+    "train": ("clean_before", "train_before"),
+    "predict": ("clean_before", "train_before", "clean", "train", "bank"),
+}
+"""The hashes that each phase can compare: the train phase sees no power from the fold's cutoff on."""
 
 
 def run_spans() -> None:
@@ -830,16 +850,23 @@ def check_one_site_world() -> None:
     """Assert that this process's cleaned row and shifted rows equal the Primary's rows in the pooled world (hashes from `split3 spans`)."""
     clean = c.clean_stack()
     assert clean.shape[0] == 1, clean.shape
+    if fold.PHASE == "train":
+        assert not np.isfinite(clean[:, FOLD_CUT_IDX:]).any(), "the train phase sees held-out power"
     mine = shifted_row_hashes(
         clean=clean, spans=POOLED_SPANS, synthetic=one_site_synthetic, labels=[MINE.primaries]
     )  # fmt: skip
-    for kind, by_label in mine.items():
+    kinds = PHASE_KINDS[fold.PHASE]
+    assert set(kinds) <= set(POOLED_SPANS["shift_hash"]), (
+        "fold_spans holds no before-cutoff hashes: re-run `split3 spans` for this month"
+    )
+    for kind in kinds:
+        by_label = mine[kind]
         stored = POOLED_SPANS["shift_hash"][kind][MINE.primaries]
         assert by_label[MINE.primaries] == stored, (
             f"the one-site {kind} row differs from the pooled world's row of {MINE.primaries}"
         )
     print(
-        f"ISOLATION OK {MINE.primaries} {MONTH}: cleaned, training-shift, and bank-shift rows equal the pooled world's",
+        f"ISOLATION OK {MINE.primaries} {MONTH} ({fold.PHASE} phase): {', '.join(kinds)} equal the pooled world's",
         flush=True,
     )
 
@@ -908,7 +935,13 @@ device = "cuda"
 if not POOLED and CMD in {"fit", "bank", "isolation"}:
     check_one_site_world()
 if CMD == "isolation":
-    check_extra_blocks()
+    if fold.PHASE == "predict":
+        check_extra_blocks()
+    else:
+        print(
+            "isolation (train phase): the extra-column blocks need the scored rows; run it in the predict phase too",
+            flush=True,
+        )
     write_opened_log()
 elif CMD == "spans":
     run_spans()
