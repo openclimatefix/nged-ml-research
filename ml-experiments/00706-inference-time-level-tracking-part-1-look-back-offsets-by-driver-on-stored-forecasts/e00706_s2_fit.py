@@ -13,7 +13,8 @@ Run it from the repository root with the environment of `CLAUDE.md` set, on a ma
 
 Steps:
 
-- `--prepare` builds the tables of `e00706_s2_data` (CPU, one process, tens of minutes). A table that
+- `--prepare` builds the tables of `e00706_s2_data` (CPU, one process, tens of minutes). A table
+  that
   exists is kept; `--only` limits it to `graphs`, `real`, `ramp`, or one bank month.
 - `--smoke` runs one fold (2026-03), one seed, a few epochs, for each arm on the real graph, writes
   to `s2/smoke/`, and prints the time and the peak memory of each fit and a projection of the full
@@ -150,7 +151,8 @@ def _device_table(
 
 
 class Rows:
-    """A set of rows on a device: their entries, positions, and (for the bank) their stored forecasts."""
+    """A set of rows on a device: their entries, positions, and (for the bank) their stored
+    forecasts."""
 
     def __init__(
         self,
@@ -222,7 +224,8 @@ def _load_dense(*, device: torch.device) -> tuple[dict[str, torch.Tensor], dict[
 
 
 def _split(*, stamp: np.ndarray, ok: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Return the training and validation positions among `ok`, grouped by the week of the valid time."""
+    """Return the training and validation positions among `ok`, grouped by the week of the valid
+    time."""
     week = stamp // (7 * c.PER_DAY)
     validation = week % VALIDATION_MODULO == VALIDATION_REMAINDER
     return np.flatnonzero(ok & ~validation), np.flatnonzero(ok & validation)
@@ -236,7 +239,8 @@ def _implicit_rows(
     limit: int,
     first_origin: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the (entry, h) of every row of `entries` that may train: finite, before `limit`, covered.
+    """Return the (entry, h) of every row of `entries` that may train: finite, before `limit`,
+    covered.
 
     A row is eligible when its target power and base median are finite, its valid time is before
     `limit`, its row is at least 1, its origin is at least `first_origin`, and its entry is covered.
@@ -262,7 +266,8 @@ type Source = tuple[Rows, np.ndarray, np.ndarray]
 
 
 class FitData:
-    """Everything one fit reads: the training and validation rows of the three sources and the test rows."""
+    """Everything one fit reads: the training and validation rows of the three sources and the test
+    rows."""
 
     def __init__(self, *, month: str, graph: str, device: torch.device) -> None:
         """Load the caches for fold `month` and move them to `device`."""
@@ -333,7 +338,8 @@ class FitData:
         limit: int,
         device: torch.device,
     ) -> Source:
-        """Return the bank rows of the months before `month` with their training and validation positions."""
+        """Return the bank rows of the months before `month` with their training and validation
+        positions."""
         months = [m for m in d.BANK_MONTHS if m < month]
         tables, rows, offset = [], [], 0
         for bank_month in months:
@@ -478,7 +484,8 @@ def predict_rows(
     zero_neighbours: bool,
     shift_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the correction of every row of `rows` as float32 and the mean gate over `shift_mask` rows.
+    """Return the correction of every row of `rows` as float32 and the mean gate over `shift_mask`
+    rows.
 
     Args:
         job: The job, for the arm.
@@ -673,7 +680,8 @@ def run_jobs(
     out_dir: Path,
     models_dir: Path,
 ) -> None:
-    """Run the jobs whose files do not exist, `n_jobs` at a time, and print each job's time and memory."""
+    """Run the jobs whose files do not exist, `n_jobs` at a time, and print each job's time and
+    memory."""
     todo = [job for job in jobs if not (out_dir / f"{job.key}.npz").exists()]
     print(f"JOBS {len(jobs)} requested, {len(todo)} to run, {n_jobs} at a time on {device_name}")
     print(VALIDATION_NOTE)
@@ -695,7 +703,8 @@ def run_jobs(
 
 
 def smoke(*, device_name: str) -> None:
-    """Fit one fold, one seed, a few epochs, per arm on the real graph; print the timings and a projection.
+    """Fit one fold, one seed, a few epochs, per arm on the real graph; print the timings and a
+    projection.
 
     The projection charges every one of the 240 jobs with its own load of `FitData` (measured
     separately from the training), a full-length training (`MAX_EPOCHS` epochs of

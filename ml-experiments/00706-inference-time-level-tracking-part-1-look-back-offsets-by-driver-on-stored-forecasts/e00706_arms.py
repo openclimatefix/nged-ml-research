@@ -16,7 +16,8 @@ observed gives an offset of zero. Nothing newer than the origin's 06:00 UTC powe
 
 Arms and set names (all in `data/ml-experiments/00706-*/predictions/`):
 
-- `g`: G-lb, the primary global offset: 0.75 times the 14-day mean of the lead-band-matched residual.
+- `g`: G-lb, the primary global offset: 0.75 times the 14-day mean of the lead-band-matched
+  residual.
 - `g-sl`: G with the smallest-lead residual. `g-refit`: the smallest-lead residual from forecasts of
   the origin's own month only. `g-w7`, `g-w28`: windows of 7 and 28 days (28 from 2026-01).
 - `d`: G-lb plus ridge slopes on the irradiance driver and the cold driver. `d-pv`, `d-cold`: one
@@ -25,7 +26,8 @@ Arms and set names (all in `data/ml-experiments/00706-*/predictions/`):
   point in a 28-day window of daily mean residuals), window ending 03:00 UTC. `p-7d`: factor 1.0
   and a 7-day window of arm D's form. `p-cp06`, `p-7d06`: the same with the window ending at 06:00.
 
-Row sets: `g`, `d`, and their variants cover origins 2025-12-01 to 2026-06-30; the prevailing arms and
+Row sets: `g`, `d`, and their variants cover origins 2025-12-01 to 2026-06-30; the prevailing arms
+and
 the 28-day arms cover 2026-01-01 to 2026-06-30. `--month YYYY-MM` restricts the origins to one month
 and adds `-t<YYYYMM>` to the set names. It is a smoke test of the writing code: every arm is still
 computed for all origins, so it does not measure the memory of one month. `--dry-run` computes and
@@ -141,9 +143,11 @@ def print_fit_summary(*, name: str, fits: list[c.WindowFit], origins: np.ndarray
 def print_origins_by_day_of_month(
     *, name: str, fits: list[c.WindowFit], origins: np.ndarray
 ) -> None:
-    """Print, per day of the month, how many origins there are and how many of their windows are covered.
+    """Print, per day of the month, how many origins there are and how many of their windows are
+    covered.
 
-    The refit window holds only forecasts of the origin's own month, so it is short in the first days
+    The refit window holds only forecasts of the origin's own month, so it is short in the first
+    days
     of a month.
     """
     day = np.array([c.origin_to_utc(origin=int(o)).day for o in origins])

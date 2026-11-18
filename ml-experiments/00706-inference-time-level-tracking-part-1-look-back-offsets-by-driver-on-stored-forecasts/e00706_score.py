@@ -1,5 +1,6 @@
 # ruff: noqa: E501
-"""Experiment 706, stage 1: scores and contrasts C1, C2, and C5 of the look-back offset arms (CPU only).
+"""Experiment 706, stage 1: scores and contrasts C1, C2, and C5 of the look-back offset arms (CPU
+only).
 
 Run it from the repository root with the environment of `CLAUDE.md` set and the folders of
 experiments 668, 683, and 688 on `PYTHONPATH`:
@@ -16,12 +17,14 @@ Contrasts, each paired on (series, origin, valid time) and read at the Bonferron
 contrasts (a 99.17% interval, 20,000 month-block resamples) with the t test on the monthly paired
 differences:
 
-- C1: G-lb minus the stored normal-running rows (S-NRA), event-free rows, origins 2025-12 to 2026-06.
+- C1: G-lb minus the stored normal-running rows (S-NRA), event-free rows, origins 2025-12 to
+  2026-06.
 - C2: D minus G-lb, the same rows.
 - C5: P-cp minus the stored prevailing rows (S-PRV), all rows, origins 2026-01 to 2026-06.
 - G-lb minus recipe R (RR), with a 95% interval.
 
-C1, C2, and C5 are read in the signed-MW six and the MVA-only eight separately and for the 14 pooled;
+C1, C2, and C5 are read in the signed-MW six and the MVA-only eight separately and for the 14
+pooled;
 D15 and D18 are report-only. The script also prints, for every arm, the CRPS and the median error
 by group, by lead band, by half of the month, on cold winter nights, on sunny April to June
 half-hours, in the four load-shift scenarios, the coverage and pinball loss of q01, q05, q95, and
@@ -31,7 +34,8 @@ also written as CSV under the experiment's data folder.
 References computed here from the stored rows (nothing is fitted): `R0-168` (the mean of the
 day-ahead residual over the valid days 8 to 2 before the origin, decayed by exp(-lead / 168 h), as
 `e00647_r0.py` does), `RR` (recipe R: 0.75 times the 14-day mean error per half-hour of day, every
-lead), and `M28` (the 28-day median residual as one shift of every quantile). The climatology and the
+lead), and `M28` (the 28-day median residual as one shift of every quantile). The climatology and
+the
 manual heuristic are read from the per-row scores of experiment 668.
 """
 
@@ -147,7 +151,8 @@ def r0_168_correction(*, residuals: c.Residuals) -> np.ndarray:
 
 
 def recipe_r_correction(*, residuals: c.Residuals) -> np.ndarray:
-    """Return recipe R's correction: 0.75 times the 14-day mean error per half-hour of day, every lead."""
+    """Return recipe R's correction: 0.75 times the 14-day mean error per half-hour of day, every
+    lead."""
     n_series = residuals.smallest.shape[0]
     slots = np.zeros((n_series, c.N_ORIGINS, c.PER_DAY))
     for origin in range(c.N_ORIGINS):
@@ -245,6 +250,9 @@ def load_all(
         month: The month of `arms --month`, whose row-set ids end in `_<month>`, or None.
         set_suffix: The suffix of the set names that `arms --month` wrote, such as `-t202603`; it
             defaults to `-t<YYYYMM>` of `month`.
+
+    Returns:
+        The per-row losses, and the quantiles of S-NRA, S-PRV, and P-cp by name.
     """
     truth = c.target_truth(inputs=inputs)
     losses: Losses = {}
@@ -299,7 +307,8 @@ def load_all(
 def load_events(*, inputs: c.Inputs) -> Events:
     """Return the in-event and 7-days-after masks (K, N_STAMPS) of three event sets.
 
-    `primary` is the labelled events and the verified transfers of experiment 688's step 1, `verified`
+    `primary` is the labelled events and the verified transfers of experiment 688's step 1,
+    `verified`
     is the verified transfers alone, and `wide` adds the fitted spans of experiment 580 and the
     candidate events of experiment 685.
     """
@@ -413,7 +422,8 @@ def common_rows(*, losses: Losses, labels: tuple[str, ...], base: np.ndarray) ->
 def group_table(
     *, inputs: c.Inputs, losses: Losses, labels: tuple[str, ...], rows: np.ndarray, name: str
 ) -> None:
-    """Print CRPS and median error per group, and the tail pinball and coverage for the 14 pooled."""
+    """Print CRPS and median error per group, and the tail pinball and coverage for the 14
+    pooled."""
     masks = c.group_masks(inputs=inputs)
     table = []
     for label in labels:
@@ -469,7 +479,8 @@ def slice_table(
     base: np.ndarray,
     name: str,
 ) -> None:
-    """Print CRPS and median error of each arm in each slice, for the 14 pooled and the signed six."""
+    """Print CRPS and median error of each arm in each slice, for the 14 pooled and the signed
+    six."""
     masks = c.group_masks(inputs=inputs)
     table = []
     for label in labels:
@@ -528,7 +539,8 @@ def scenario_table(
 def departure_table(
     *, inputs: c.Inputs, kept: dict[str, np.ndarray], base: np.ndarray, name: str
 ) -> None:
-    """Print how often prevailing arms depart from S-NRA's median by 3 points, and equal-width scores."""
+    """Print how often prevailing arms depart from S-NRA's median by 3 points, and equal-width
+    scores."""
     if "S-PRV" not in kept or "P-cp" not in kept:
         return
     median = kept["S-NRA"][..., MEDIAN_INDEX]
