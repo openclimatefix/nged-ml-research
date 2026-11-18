@@ -1,7 +1,9 @@
 # ruff: noqa: ANN001, ANN202, C408, PT018
 """Tests of the pure helpers of experiment 702 (the fixed-epoch rule, the blend, the bootstrap)."""
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Final
 
 import e00702_core as core
 import numpy as np
@@ -243,3 +245,43 @@ def test_block_bootstrap_interval_excludes_zero_for_a_clear_gain_and_covers_it_f
 def test_verdict_follows_the_decision_rule(kwargs, expected):
     """Each row of the plan's decision rule gives its verdict."""
     assert core.verdict(**{"lo_without_d15": -1.0, "lo_without_d18": -1.0, **kwargs}) == expected  # ty: ignore[invalid-argument-type]
+
+
+def _purged_cycle() -> np.ndarray:
+    """Return experiment 422's purge flags of one 84-day cycle: days 0 to 8 and 62 to 76."""
+    day = np.arange(84)
+    return (day < 9) | ((day >= 62) & (day < 77))
+
+
+FIRST_ORIGIN_IDX: Final[int] = 80_370
+"""2024-04-01 09:00 UTC on the grid that starts on 2019-09-01."""
+
+
+def test_first_target_is_half_an_hour_after_the_first_unpurged_origin():
+    """Days 0 to 8 are purged, so the first target is 2024-04-10 09:30 UTC (index 80,803)."""
+    first = core.first_target_idx(first_origin_idx=FIRST_ORIGIN_IDX, purged_day=_purged_cycle())
+    assert first == 80_803
+
+
+@pytest.mark.parametrize(
+    ("month", "expected"),
+    [
+        ("2025-11", (80_803, 108_137)),
+        ("2026-01", (80_803, 111_065)),
+        ("2026-04", None),
+        ("2026-05", None),
+        ("2026-07", None),
+    ],
+)
+def test_fold_span_starts_at_the_floor_or_the_window(month, expected):
+    """The three early folds start at the floor; 2026-05 and 2026-07 start 730 days before."""
+    refit = datetime.fromisoformat(f"{month}-01").replace(tzinfo=UTC)
+    cutoff = int((refit - datetime(2019, 9, 1, tzinfo=UTC)) / timedelta(minutes=30))
+    floor = core.first_target_idx(first_origin_idx=FIRST_ORIGIN_IDX, purged_day=_purged_cycle())
+    first, last = core.fold_span(cutoff_idx=cutoff, first_idx=floor)
+    assert last == cutoff - 7
+    window = cutoff - 730 * 48 + 1
+    assert first == max(window, floor)
+    if expected is not None:
+        assert (first, last) == expected
+    assert (first == floor) == (month in {"2025-11", "2026-01", "2026-04"})

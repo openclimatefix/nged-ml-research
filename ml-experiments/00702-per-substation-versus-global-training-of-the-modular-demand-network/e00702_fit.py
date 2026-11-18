@@ -142,6 +142,14 @@ BANK_SEED_BASE: Final[int] = 9_000_000
 """Experiment 677's seed base for the held-out bank (`e00677_cand.BANK_SEED_BASE`)."""
 
 
+def first_idx() -> int:
+    """Return the earliest training target's grid index, from experiment 397's first run and experiment 422's purge."""
+    origin = e.prep.FIRST_RUN + e.common.PUBLICATION_DELAY
+    origin_idx = int((c.us(t=origin) - c.prep422.GRID_START_US) // c.prep422.STEP_US)
+    _, purged = c.prep422.purge_masks(origin_day=np.arange(c.prep422.CYCLE_DAYS))
+    return core.first_target_idx(first_origin_idx=origin_idx, purged_day=purged)
+
+
 def origin_day_of(*, origin_us: np.ndarray) -> np.ndarray:
     """Return the origin day of each origin time, as `e00428_data.build_fold` counts it."""
     return ((np.asarray(origin_us) - FIRST_RUN_US) // DAY_US).astype(np.int64)
@@ -161,7 +169,7 @@ if not POOLED:
     CUTOFF_IDX = int(
         (c.us(t=c.month_start(month=MONTH)) - c.prep422.GRID_START_US) // c.prep422.STEP_US
     )
-    SPAN = core.fold_span(cutoff_idx=CUTOFF_IDX)
+    SPAN = core.fold_span(cutoff_idx=CUTOFF_IDX, first_idx=first_idx())
     assert SPANS_FILE.exists(), (
         "run `e00702_fit.py split3 spans` first: it records the pooled rows' spans"
     )
@@ -652,7 +660,7 @@ def run_spans() -> None:
     cutoff_idx = int(
         (c.us(t=c.month_start(month=MONTH)) - c.prep422.GRID_START_US) // c.prep422.STEP_US
     )
-    formula = list(core.fold_span(cutoff_idx=cutoff_idx))
+    formula = list(core.fold_span(cutoff_idx=cutoff_idx, first_idx=first_idx()))
     record = {
         **spans, "formula": formula,
         "shift_hash": shifted_row_hashes(

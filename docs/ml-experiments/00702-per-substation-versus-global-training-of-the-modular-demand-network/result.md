@@ -91,8 +91,10 @@ per-substation network has one sixteenth of those pre-training rows.
   million rows per fold), with AdamW, learning rate 0.0005, batch 8,192, 20% of the rows per epoch,
   up to 60 epochs, and patience 8.
 - **Step 2** discards the pre-training mixer, draws a fresh mixer with seed 12345, freezes the
-  weather and date-time encoders, and trains on 730 days of ENS rows with uniform weights and a
-  3-day embargo. The lag encoder, the lag-identity embedding, the Primary embedding, and the newest
+  weather and date-time encoders, and trains on up to 730 days of ENS rows with uniform weights and
+  a 3-day embargo. The first ENS rows that the folds keep are from the run of 2024-04-10, because
+  the first 9 days of runs fall in a purge, so the 2025-11, 2026-01, and 2026-04 folds hold 570,
+  631, and 721 days. The lag encoder, the lag-identity embedding, the Primary embedding, and the newest
   offset knot stay trainable at learning rate 0.0002, and the fresh mixer trains at 0.0005.
 - **Step 3** fine-tunes from the step-2 weights with the same frozen encoders, a 90-day half-life,
   a 7-day embargo, half weight on the next 7 days, and the synthetic lag-only load shifts of
@@ -190,10 +192,11 @@ arm:**
 - **The synthetic load shifts of step 3 are the same in every arm.** `synthetic_clean` in
   `e00581_bank.py` draws the schedule from the seed and from the first and last grid index of the
   training span, for all 16 Primaries in order. The global arm takes that span from its pooled
-  rows. Every per-substation arm instead computes the span from the fold's constants (the cut-off
-  and the 730-day window), asserts that the span equals the global arm's, calls `synthetic_clean`
-  with the 16-row power array, and keeps the one Primary's row. The schedule then depends on no
-  other Primary's data, and a Primary's shifted lags are equal across arms. A check asserts both.
+  rows. Every per-substation arm instead computes the span from the fold's constants (the cut-off,
+  the 730-day window, and the first kept ENS target, 2024-04-10 09:30 UTC), asserts that the span
+  equals the global arm's, calls `synthetic_clean` with the 16-row power array, and keeps the one
+  Primary's row. The schedule then depends on no other Primary's data, and a Primary's shifted
+  lags are equal across arms. A check asserts both.
 
 **The blend rule is fixed here: the mean of the two forecasts, quantile by quantile, sorted.** The
 blend averages each of the 11 quantiles of the global forecast and the split-at-1 forecast with
@@ -463,7 +466,8 @@ the time per network is about the pooled time or less.
 
 - **Followed:** monthly refits; cleaned data with the `substation_zero` half-hours dropped; the cut
   of D15 and D18 before 2025-03-01; every fitted network saved; stored predictions reused as the
-  control; a 24-month (730-day) training window; a screen on four months, one per season, with
+  control; a training window of up to 24 months (730 days), shorter in the three folds before
+  2026-05 because the ENS rows start on 2024-04-10; a screen on four months, one per season, with
   every number interim; the tails and the example forecasts; a climatology row; the normalised MAE
   of the median in every table.
 - **Followed from earlier advice:** check the sign of a contrast in every month before reading its

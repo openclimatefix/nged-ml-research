@@ -88,23 +88,51 @@ def needs_fixed_epochs(*, origin_day: np.ndarray, is_val: np.ndarray) -> bool:
     return int((counts >= MIN_ROWS_PER_WEEK).sum()) < MIN_HELD_WEEKS
 
 
-def fold_span(*, cutoff_idx: int) -> tuple[int, int]:
+def first_target_idx(*, first_origin_idx: int, purged_day: np.ndarray) -> int:
+    """Return the grid index of the earliest training target that any fold's rows can hold.
+
+    `e00428_data.build_fold` drops every row whose origin day (days since the first ENS run) is
+    purged by `e00422_prep.purge_masks`, and the first days of the 84-day cycle are purged
+    (`PURGE_AFTER_DAYS`, 9 days). The earliest kept origin is therefore the first unpurged day of
+    the cycle at the run's origin time, and its first target is one half-hour later (lead 0.5 h).
+
+    Args:
+        first_origin_idx: Grid index of the first ENS run's origin (`FIRST_RUN` plus the 9-hour
+            publication delay).
+        purged_day: The purge flag of each day of one cycle, from `purge_masks` on days 0 to 83.
+
+    Returns:
+        The grid index of the first target of the first unpurged origin.
+    """
+    kept = np.flatnonzero(~np.asarray(purged_day, dtype=bool))
+    assert len(kept), "every day of the cycle is purged"
+    return first_origin_idx + int(kept[0]) * STEPS_PER_DAY + 1
+
+
+def fold_span(*, cutoff_idx: int, first_idx: int) -> tuple[int, int]:
     """Return the first and last grid index of a fold's training targets from the fold's constants.
 
     The rows of `e00428_data.build_fold` keep `valid > refit - 730 days` and
-    `valid <= refit - 3.5 hours`, so on the half-hourly grid the first target is
-    `cutoff_idx - 730 * 48 + 1` and the last is `cutoff_idx - 7`. A per-substation arm passes this
-    span to `synthetic_clean`, so that the schedule of shifts depends on the fold and not on a
-    Primary's own first and last reading. `e00702_fit.py split3 spans` compares the result with the
-    span of the pooled rows.
+    `valid <= refit - 3.5 hours`, so on the half-hourly grid the window starts at
+    `cutoff_idx - 730 * 48 + 1` and ends at `cutoff_idx - 7`. No row starts before `first_idx`
+    (`first_target_idx`), which is 2024-04-10 09:30 UTC, so a fold whose window reaches back past
+    that time starts there instead: 2025-11, 2026-01, and 2026-04 do. A window that starts inside a
+    purged stretch of origin days still starts on time when an earlier unpurged origin reaches it at
+    a longer lead. The longest lead is 351 hours and the longest purged stretch is 15 days, so a
+    window starting in the last hours of that stretch would start later than this formula says; the
+    assertion in `split3 spans` catches that case. A per-substation arm passes this span to `synthetic_clean`, so that the schedule
+    of shifts depends on the fold and not on a Primary's own first and last reading.
+    `e00702_fit.py split3 spans` asserts that the result equals the span of the pooled rows.
 
     Args:
         cutoff_idx: Grid index of the refit time.
+        first_idx: Grid index of the earliest target that any fold can hold (`first_target_idx`).
 
     Returns:
         The pair `(first, last)`.
     """
-    return cutoff_idx - WINDOW_DAYS * STEPS_PER_DAY + 1, cutoff_idx - CUTOFF_AGE_STEPS
+    window_first = cutoff_idx - WINDOW_DAYS * STEPS_PER_DAY + 1
+    return max(window_first, first_idx), cutoff_idx - CUTOFF_AGE_STEPS
 
 
 def blend_quantiles(*, first: np.ndarray, second: np.ndarray) -> np.ndarray:
