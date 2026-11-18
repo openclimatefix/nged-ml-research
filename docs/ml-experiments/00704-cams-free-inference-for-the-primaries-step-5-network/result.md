@@ -13,12 +13,12 @@ status: finished
 kind: other
 size: >-
   Complex. (1) It stores refitted step-5 networks and per-seed quantile forecasts for two arms on
-  four test months, plus one replay of the unchanged chain; (2) two replacements for the CAMS
-  columns are defensible, and the plan fixes both; (3) it patches the input columns of a pipeline
-  that spans experiments 397, 418, 437, 510, 560, 562, 569, 574, 591, 613, 667, and 677, whose
-  callers cannot be named without searching; (4) it touches no serving path and no degradation
-  rule; (5) it changes no contract. Reviews: plan, code, write-up against the printed report, and
-  prose.
+  four test months, plus a refit of the unchanged chain in all four months as the control; (2) two
+  replacements for the CAMS columns are defensible, and the plan fixes both; (3) it patches the
+  input columns of a pipeline that spans experiments 397, 418, 437, 510, 560, 562, 569, 574, 591,
+  613, 667, and 677, whose callers cannot be named without searching; (4) it touches no serving path
+  and no degradation rule; (5) it changes no contract. Reviews: plan, code, write-up against the
+  printed report, and prose.
 hypothesis: >-
   The step-5 network of experiment 677 at monthly refits, refitted from pre-training onwards
   without the previous day's CAMS irradiance at fine-tune and inference time, forecasts the 16
@@ -47,7 +47,9 @@ decision_rule: >-
 benchmark: >-
   The stored per-seed forecasts of experiment 677's step 5 at monthly refits (step 9a, arm
   `k1_5w_sp1`), refits 2025-11, 2026-02, 2026-04, and 2026-06, seeds 0, 1, and 2, which read the
-  CAMS columns; climatology and the manual heuristic as stored for experiment 668.
+  CAMS columns; climatology and the manual heuristic as stored for experiment 668. As run, the
+  comparison is a refit of the same chain in the same four months, and the stored forecasts are
+  the reference row `stored`.
 row_set_id: backtest_year_2025_11_to_2026_10_daily_12utc
 metric: >-
   CRPS (twice the mean pinball loss over the 11 levels, divided by effective capacity, times 100)
@@ -76,7 +78,7 @@ take_home_message: >-
   Removing the two inputs that describe yesterday's sunshine from satellite data made no detectable
   difference to the first production demand forecast for the Primaries, over four test months, so
   production can drop them. Rebuilding the two inputs from the weather forecast instead gave no gain.
-  The test cannot rule out a loss of up to about 1% of the forecast error.
+  The test cannot rule out a loss of up to about 1.3% of the forecast error.
 advice:
   - >-
     Drop the two previous-day CAMS columns (`cams_prev_day_mean`, `cams_prev_day_csi`) from the
@@ -96,85 +98,120 @@ adopted_in: none
 
 **We asked whether the first production demand forecast for the 16 Primaries (primary
 substations) gets worse when two inputs that production cannot supply are removed.** The two inputs
-describe yesterday's sunshine, taken from the CAMS satellite-based irradiance product, which
-production will not read when it makes a forecast. We retrained the step-5 neural network three
-times on four test months: once unchanged, once with yesterday's sunshine taken from the ECMWF
-ensemble weather forecast instead (arm A), and once with the two inputs set to zero (arm B). The
-forecast got no detectably worse without the two inputs: arm B scored 0.045 points of capacity
-better than the unchanged network, an amount well inside the run-to-run noise between random
-seeds, and the interval allows at most a 0.05-point loss. Arm A did not beat arm B, so production
-can drop the two inputs and needs no code for them.
+describe yesterday's sunshine, taken from the Copernicus Atmosphere Monitoring Service (CAMS)
+satellite-based irradiance product, which production will not read when it makes a forecast. We
+retrained the step-5 neural network three times on four test months: once unchanged (the control),
+once with yesterday's sunshine taken from the ensemble weather forecast of the European Centre for
+Medium-Range Weather Forecasts (ECMWF ENS) instead (arm A), and once with the two inputs set to zero
+(arm B). The forecast got no detectably worse without the two inputs, so production can drop them
+and needs no code for them.
 
-**Verdict: supported; arm B (the two columns dropped) is chosen by the pre-registered rule.** The
-decision contrast C1, arm A minus arm B in CRPS, is +0.031 points of capacity, with a 98.33%
-interval of −0.056 to +0.110 (interim: four months). The rule needed an interval wholly below zero
-and a point of at most −0.01 to choose arm A, so arm A does not advance to the other four months.
-No loss against the refitted control was detected for either arm: C2 (arm A minus control) is
-−0.014 [−0.196, +0.073] and C3 (arm B minus control) is −0.045 [−0.272, +0.050]. The pooled MAE of
-the median moves the same way as the pooled CRPS in every contrast (C1 +0.103, C2 −0.015, C3
-−0.118).
+**Verdict: supported; arm B (the two columns dropped) is chosen by the pre-registered rule.** Scores
+are the continuous ranked probability score (CRPS) and the mean absolute error (MAE) of the median,
+each as a percentage of the Primary's effective capacity ("points of capacity"). The decision
+contrast C1, arm A minus arm B in CRPS, is +0.031 points, with a 98.33% interval of −0.056 to
++0.110 (interim: four months). To choose arm A, the rule needed an interval wholly below zero, a
+point estimate of at most −0.01, and every seed's C1 below zero in every month, so arm A does not
+advance to the other four months. C2 (arm A minus control) is −0.014 [−0.196, +0.073] and C3 (arm B
+minus control) is −0.045 [−0.272, +0.050]. The 98.33% interval of C3 allows a loss of at most 0.05
+points, about 1.3% of the control's CRPS. The pooled MAE moves the same way as the pooled CRPS in
+every contrast (C1 +0.103, C2 −0.015, C3 −0.118).
 
-**Predictions.**
+**Two of the four predictions failed (P2 and P4), and P1 held on the point estimates only.**
 
-- P1 (each arm changes CRPS by less than +0.03 against the control) held on the points (−0.014 and
-  −0.045), but not at the interval level: the upper bounds are +0.073 and +0.050.
-- P2 (|C1| below 0.01 with an interval including zero) failed: the point is +0.031. The predicted
-  outcome of the rule, arm B, held.
+- P1 (each arm changes CRPS by less than +0.03 against the control) held on the point estimates
+  (−0.014 and −0.045), but not at the interval level: the upper bounds are +0.073 and +0.050.
+- P2 (|C1| below 0.01 with an interval including zero) failed on the point estimate (+0.031); the
+  interval did include zero, and the predicted outcome of the rule, arm B, held.
 - P3 (MAE moves with CRPS) held for the pooled contrasts, and failed in some splits (see Checks).
-- P4 (replay within 1e-5 of capacity) failed, as below.  ## Results  **CRPS and normalised MAE of
-  the median, points of capacity, seed average of scores, four months (interim).** Lower is better.
-  | Lead band | Control | Arm A (proxy) | Arm B (drop) | Climatology | Heuristic |
-  |---|---|---|---|---|---| | CRPS, all leads | 3.769 | 3.755 | **3.724** | 5.338 | 4.582 | | CRPS,
-  days 0 to 1 | 3.319 | 3.283 | **3.237** | 5.320 | 4.508 | | CRPS, days 1 to 3 | 3.379 | 3.351 |
-  **3.304** | 5.324 | 4.508 | | CRPS, days 3 to 7 | 3.638 | 3.624 | **3.590** | 5.295 | 4.510 | |
-  CRPS, days 7 to 10 | 3.924 | 3.920 | **3.896** | 5.316 | 4.648 | | CRPS, days 10 to 14 | 4.133 |
-  4.127 | **4.108** | 5.413 | 4.670 | | MAE, all leads | 6.792 | 6.777 | **6.675** | 9.779 | 8.160 |
-  | q05–q95 coverage (%) | 85.4 | 85.7 | 85.3 | 90.1 | 80.7 | | q05–q95 band width | 26.30 | 26.56 |
-  26.28 | 40.03 | 28.09 |  **The control is a refit, not experiment 677's stored forecasts.** The
-  replay of experiment 677's unchanged chain did not reproduce its stored forecasts to 1e-5 of
-  capacity (prediction P4): the largest difference per month was 8.1e-5 (2025-11), 1.1e-4 (2026-02),
-  5.0e-4 (2026-04), and 1.6e-5 (2026-06), because pre-training on the GPU is not bit-deterministic.
-  As the plan pre-registered, the control was refitted in all four months. The refit and the stored
-  forecasts score the same to 1e-6 points (N1), so the replay difference is far below every
-  contrast.  **The seeds disagree more than the arms do.** The control's pooled CRPS is 3.828,
-  3.737, and 3.741 for seeds 0, 1, and 2. C1 per month and seed ranges from −0.084 to +0.133 points
-  of CRPS, and its sign changes between seeds in three of the four months. C3 ranges from −0.347
-  (2025-11, seed 0) to +0.066, so about 70% of arm B's pooled gain comes from one month of one seed,
-  where the control's seed 0 did badly. By metering group, C3 is −0.343 [−1.929, +0.514] at D15 and
-  D18, −0.020 at the eight MVA-only Primaries, and +0.013 at the six signed-MW Primaries. The group
-  figure is D15 alone: D15's CRPS is 10.545 for the control and 9.826 for arm B, while D18 is
-  unchanged (2.317 and 2.325). The pooled point favours arm B, but the four-month screen cannot tell
-  arm B from the control.  | C1 (arm A − arm B), CRPS | Seed 0 | Seed 1 | Seed 2 | |---|---|---|---|
-  | 2025-11 | +0.088 | −0.029 | +0.133 | | 2026-02 | +0.040 | +0.020 | −0.025 | | 2026-04 | +0.023 |
-  +0.097 | −0.084 | | 2026-06 | +0.020 | +0.005 | +0.081 |  | Scenario | Control | Arm A | Arm B |
-  C1 (A − B) | C3 (B − control) | |---|---|---|---|---|---| | All rows | 3.769 | 3.755 | 3.724 |
-  +0.031 [−0.056, +0.110] | −0.045 [−0.272, +0.050] | | Outside events, 7+ days after | 3.751 |
-  3.743 | 3.683 | +0.060 [−0.097, +0.222] | −0.068 [−0.343, +0.114] | | Inside a logged event |
-  4.153 | 4.138 | 4.171 | −0.033 [−0.181, +0.063] | +0.017 [−0.238, +0.269] | | 7 days after an
-  event ends | 3.077 | 3.030 | 3.055 | −0.025 [−0.159, +0.106] | −0.021 [−0.073, +0.065] |
+- P4 (the replay reproduces the stored forecasts to within 1e-5 of capacity) failed, as below.
+
+## Results
+
+**Arm B has the lowest CRPS and MAE at every lead, by margins inside the seed noise.** CRPS and
+normalised MAE of the median, points of capacity, mean over seeds of each seed's score, four months
+(interim); lower is better.
+
+| Lead band | Control | Arm A (proxy) | Arm B (drop) | Climatology | Manual heuristic |
+|---|---|---|---|---|---|
+| CRPS, all leads | 3.769 | 3.755 | **3.724** | 5.338 | 4.582 |
+| CRPS, days 0 to 1 | 3.319 | 3.283 | **3.237** | 5.320 | 4.508 |
+| CRPS, days 1 to 3 | 3.379 | 3.351 | **3.304** | 5.324 | 4.508 |
+| CRPS, days 3 to 7 | 3.638 | 3.624 | **3.590** | 5.295 | 4.510 |
+| CRPS, days 7 to 10 | 3.924 | 3.920 | **3.896** | 5.316 | 4.648 |
+| CRPS, days 10 to 14 | 4.133 | 4.127 | **4.108** | 5.413 | 4.670 |
+| MAE, all leads | 6.792 | 6.777 | **6.675** | 9.779 | 8.160 |
+| q05–q95 coverage (%) | 85.4 | 85.7 | 85.3 | 90.1 | 80.7 |
+| q05–q95 band width | 26.30 | 26.56 | 26.28 | 40.03 | 28.09 |
+
+**The control is a refit of experiment 677's unchanged chain, not experiment 677's stored
+forecasts.** The refit did not reproduce the stored forecasts to 1e-5 of capacity (prediction P4).
+The largest difference per month, as a fraction of capacity, was 8.1e-5 (2025-11), 1.1e-4
+(2026-02), 5.0e-4 (2026-04), and 1.6e-5 (2026-06), because pre-training on the GPU is not
+bit-deterministic. As the plan pre-registered, the control was therefore refitted in all four
+months. N1, the refit's CRPS minus the stored forecasts' CRPS, is about 1e-6 points, far below
+every contrast.
+
+**The seeds disagree more than the arms do.** The control's pooled CRPS is 3.828, 3.737, and 3.741
+for seeds 0, 1, and 2. C1 per month and seed ranges from −0.084 to +0.133 points, and its sign
+changes between seeds in three of the four months (table below). C3 per month and seed ranges from
+−0.347 (2025-11, seed 0) to +0.066. Weighted by rows, the 2025-11 seed-0 cell gives about 70% of
+arm B's pooled gain over the control; the control had its worst seed score there.
+
+**C1 by month and seed, CRPS in points of capacity.**
+
+| Month | Seed 0 | Seed 1 | Seed 2 |
+|---|---|---|---|
+| 2025-11 | +0.088 | −0.029 | +0.133 |
+| 2026-02 | +0.040 | +0.020 | −0.025 |
+| 2026-04 | +0.023 | +0.097 | −0.084 |
+| 2026-06 | +0.020 | +0.005 | +0.081 |
+
+**One Primary, D15, produces arm B's lead over the control.** The Primaries fall into three
+metering groups: D15 and D18 (short histories), eight metered only as apparent power in MVA
+("MVA-only"), and six metered as signed active power in MW ("signed-MW"). C3 is −0.343 [−1.929,
++0.514] for D15 and D18, −0.020 for the MVA-only eight, and +0.013 for the signed-MW six. The
+figure for D15 and D18 is D15 alone: D15's CRPS is 10.545 for the control and 9.826 for arm B,
+while D18's is unchanged (2.317 and 2.325). The audit found that C3 is −0.005 without D15.
+
+**Scenario scores, CRPS in points of capacity.** The arms differ little in or after load-shift
+events.
+
+| Scenario | Control | Arm A | Arm B | C1 (A − B) | C3 (B − control) |
+|---|---|---|---|---|---|
+| All rows | 3.769 | 3.755 | 3.724 | +0.031 [−0.056, +0.110] | −0.045 [−0.272, +0.050] |
+| Outside events, 7+ days after | 3.751 | 3.743 | 3.683 | +0.060 [−0.097, +0.222] | −0.068 [−0.343, +0.114] |
+| Inside a logged event | 4.153 | 4.138 | 4.171 | −0.033 [−0.181, +0.063] | +0.017 [−0.238, +0.269] |
+| 7 days after an event ends | 3.077 | 3.030 | 3.055 | −0.025 [−0.159, +0.106] | −0.021 [−0.073, +0.065] |
 | Cold winter nights | 3.409 | 3.390 | 3.342 | +0.047 [−0.151, +0.231] | −0.067 [−0.379, +0.117] |
 
 **The tails and the curtailment cost do not separate the arms beyond seed noise.** The q01, q05,
 q95, and q99 coverages of all three networks agree to within about 0.003 (control 0.020, 0.076,
-0.930, and 0.981). The avoidable-curtailment cost at the 90% limit, summed over the six signed-MW
-Primaries, is £582,000 for the control, £488,000 for arm A, and £540,000 for arm B (seed-averaged
-forecast), against £916,000 for climatology. Arm A is £94,000 below the control, but the three
-seeds of the control alone range from £581,000 to £715,000. At the 50% limit the costs are £23.16
-million, £22.58 million, and £22.38 million.
+0.930, and 0.981). The avoidable-curtailment cost is summed over the six signed-MW Primaries, with
+each Primary's limit at 90% of its largest flow before the scored period, using the seed-averaged
+forecast. The cost is £582,000 for the control, £488,000 for arm A, and £540,000 for arm B, against
+£916,000 for climatology. Arm A is £94,000 below the control, but the three seeds of the control
+alone range from £581,000 to £715,000. With the limit at 50%, the costs are £23.16 million, £22.58
+million, and £22.38 million.
+
+**The C1 and C3 intervals span zero at every lead band.**
 
 ![Contrasts by lead band](contrasts_by_lead_band.svg)
 
 ![CRPS by lead band](crps_by_lead_band.svg)
 
+**The three step-5 variants give near-identical day-ahead and 14-day forecasts, and the bands widen
+with lead in all three.**
+
 ![Day-ahead forecast](day_ahead.svg)
 
 ![Fourteen-day forecast](fourteen_day.svg)
 
-**Load-shift events.** The six plots below show the day-ahead median of each network around six
-logged load-shift events, across both metering groups, with each event's start and end marked. The
-three networks respond to each event in the same way. NGED's logs may miss events, so the rows
-"outside every logged event" may hold events no label covers, the harm shown there is optimistic,
-and the real-event sets undercount.
+**The three step-5 variants respond to each of six logged load-shift events in the same way.** The
+six plots show the day-ahead median of each variant around six logged events, across both metering
+groups, with each event's start and end marked. NGED's logs may miss events. The rows "outside
+every logged event" may therefore hold events that no label covers, so the harm measured in those
+rows may be understated, and the sets of real events are undercounts.
 
 ![Event at D10](event_1_D10.svg)
 
@@ -191,38 +228,53 @@ and the real-event sets undercount.
 ## Checks
 
 - **Median minus mean forecast per Primary:** within ±0.5 points of capacity at 12 of the 16
-  Primaries in every network. The four others are D15 (control −5.50, arm A −5.49, arm B −6.37),
-  D12, D8, and D10, where the three networks agree to within 1 point.
+  Primaries in every variant. The four others are D15 (control −5.50, arm A −5.49, arm B −6.37),
+  D12, D8, and D10, where the three variants agree to within 1 point.
 - **MAE beside CRPS:** the pooled contrasts agree in direction, but some splits do not, so audit
-  trigger 3 fired. C2 at days 7 to 10 (CRPS −0.004, MAE +0.011) and days 10 to 14 (−0.007,
-  +0.005), C2 at D15 and D18 (−0.005, +0.073), C1 at the signed-MW six (−0.004, +0.007), and C3
-  inside a logged event (+0.017, −0.006). Every disagreement is smaller than 0.08 points and sits
-  inside intervals that span zero. The per-lead-band and per-Primary contrasts are in
-  `score/contrasts.csv`.
-- **Arm B's standardiser** holds mean 0 and standard deviation 1e-6 for both columns in all four
-  months; arm A's standardiser is finite; the control's statistics equal experiment 677's exactly in
-  all four months; arm A's pre-training mean column equals CAMS exactly on 20,000 rows at each of
-  D2, D3, and D4.
-- **No arm wrote under experiment 677's or experiment 667's data folders** (the runner warns on any
-  such write, and none appeared).
-- **Audit triggers that fired:** 1 (the replay control failed), 2 (prediction P2, |C1| < 0.01,
-  failed with a point of +0.031), 3 (splits above), 5 (arm B, with less input, scores better than
-  the control), and 7 (experiment 703 and production depend on the verdict). Trigger 4 fired in the
-  audit (below).
-- **Audit** (a fresh agent, its own code; report in
-  `data/ml-experiments/briefs/e704_audit/report.md`). Every printed number reproduces. Triage:
-    - Accepted: D15 alone produces the gap. On D15's rows C1 is +0.685 and C3 is −0.719; without
-      D15, C1 is −0.007 [−0.061, +0.069] and C3 is −0.005 [−0.086, +0.049]. Leaving out any other
-      Primary keeps C1 between +0.030 and +0.036. The verdict stands, because C1 is never at most
-      −0.01, but arm B's lead over the control is D15 and seed noise, not a gain.
-    - Accepted: arm B beating the control (trigger 5) is within seed noise. The control's seed
-      spread (standard deviation 0.051 points) is much wider than arm A's (0.009) or arm B's (0.016).
-    - Accepted: the scorer drops 14,112 rows where climatology is missing (D15 and D18) for every
-      system. On all 1,191,391 rows with truth, C1 is +0.044 and C3 is −0.054 (CRPS 3.839, 3.828,
-      and 3.784): same direction and verdict.
-    - Confirmed: arm B's columns are exactly 0 in every table and standardise to 0; arm A's columns
-      are finite on 99.79% of rows and causal; the replay difference cannot bias a contrast (the
-      stored files as control give the same C3); the 2026-07-01 cut and capacities are right.
+  trigger 3 fired. The splits that disagree are C2 at days 7 to 10 (CRPS −0.004, MAE +0.011) and
+  days 10 to 14 (−0.007, +0.005), C2 at D15 and D18 (−0.005, +0.073), C1 at the signed-MW six
+  (−0.004, +0.007), and C3 inside a logged event (+0.017, −0.006). Every disagreement is smaller
+  than 0.08 points and sits inside intervals that span zero. The per-lead-band and per-Primary
+  contrasts are in `score/contrasts.csv`.
+- **Standardisers:** arm B's standardiser holds mean 0 and standard deviation 1e-6 for both columns
+  in all four months. Arm A's standardiser is finite. The control's statistics equal experiment
+  677's exactly in all four months. Arm A's pre-training mean column equals CAMS exactly on 20,000
+  rows at each of D2, D3, and D4.
+- **No arm wrote under experiment 677's or experiment 667's data folders.** The runner warns on any
+  such write, and none appeared.
+- **Audit triggers that fired:**
+    - 1: a control failed (the replay differed from the stored forecasts by more than 1e-5 of
+      capacity).
+    - 2: a result contradicted its prediction (P2).
+    - 3: CRPS and MAE disagree in direction (the splits above).
+    - 4: leaving one Primary out flips a sign (D15, in the audit below).
+    - 5: a nested arm beats the arm that contains it (arm B, with less input, scores better than
+      the control).
+    - 7: later work depends on the result (experiment 703 and production).
+
+### Audit
+
+**A fresh Claude agent, which wrote its own code, reproduced every printed number, and the verdict
+stands.** The report is `data/ml-experiments/briefs/e704_audit/report.md`. All of its findings are
+accepted.
+
+**D15 alone produces the gap between the arms.** On D15's rows, C1 is +0.685 and C3 is −0.719.
+Without D15, C1 is −0.007 [−0.061, +0.069] and C3 is −0.005 [−0.086, +0.049], so C3 changes sign
+(trigger 4). Leaving out any other Primary keeps C1 between +0.030 and +0.036. In no split the audit
+checked is C1 at most −0.01, so the rule still chooses arm B.
+
+**Arm B beating the control is seed noise (trigger 5).** The control's seed-to-seed standard
+deviation of pooled CRPS is 0.051 points, against 0.009 for arm A and 0.016 for arm B.
+
+**The headline row set leaves out 13,889 rows that have truth.** A row is one Primary, origin, and
+half-hour of lead, for one seed. The scorer drops rows where the climatology is missing (at D15 and
+D18) for every system. On all 1,191,391 rows with truth, C1 is +0.044 and C3 is −0.054 (CRPS 3.839,
+3.828, and 3.784), with the same direction and verdict.
+
+**The arm inputs are as specified.** Arm B's two columns are exactly 0 in every table and
+standardise to 0. Arm A's columns are finite on 99.79% of rows and causal. Using the stored files
+as the control gives the same C3, so the replay difference cannot bias a contrast. The 2026-07-01
+cut and the capacities are right.
 
 ## Method
 
@@ -257,8 +309,8 @@ and the real-event sets undercount.
   load shifts (experiment 581). One week in 12 is held out of the fine-tune, purged 15 days before and
   9 after.
 - Monthly refits with the cut-off at 00:00 UTC on the first day of each test month; seeds 0, 1, and
-  2; 12 chains (three networks on four months) at about 10 minutes each on one RTX A6000, about 2
-  GPU-hours in total.
+  2; 12 chains (three variants on four months, each chain fitting seeds 0, 1, and 2) at about 10
+  minutes each on one RTX A6000, about 2 GPU-hours in total.
 
 **Measurement.**
 
@@ -308,7 +360,7 @@ is training-only, so the two columns of the pre-training rows may still come fro
   5, monthly refits, injected lag-only load shifts in the fine-tune). As run: the replay refit in
   all four months, because the replay check below failed; the stored forecasts are the reference
   row `stored`.
-- **Replay (check only).** The unchanged step-5 chain of experiment 677, refitted from pre-training
+- **Replay (check, then the control).** The unchanged step-5 chain of experiment 677, refitted from pre-training
   onwards for the 2026-04 fold, into this experiment's data folder. [Experiment
   684](../00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)
   found the Candidate's chain from step 2 onwards deterministic, but no experiment has replayed the
@@ -316,8 +368,8 @@ is training-only, so the two columns of the pre-training rows may still come fro
   stored forecast by more than 1e-5 of capacity, the control is refitted on all four months and the
   refit replaces the stored forecasts as the control, because the arms would otherwise carry a
   re-run difference the control does not. The replay-against-stored difference is reported as the
-  noise floor whether or not P4 holds. As run, P4 failed in 2026-04, so the replay ran in all four
-  months. The plan's fallback text: a pass in 2026-04 is assumed to hold in the other three
+  noise floor whether or not P4 holds. As run, P4 failed in 2026-04, so the control was refitted in
+  all four months. Had P4 held in 2026-04, the plan would have assumed it held in the other three
   months.
 - **Arm A, the analysis-proxy columns.** The same two columns, computed from shortwave instead of
   CAMS. `cams_prev_day_mean` becomes the mean shortwave over the 48 half-hours of the last complete
@@ -435,16 +487,17 @@ page.
 ### Standing practices
 
 - **Followed:** monthly refits; cleaned data everywhere, with the dropped half-hours per fold; the
-  D15 and D18 cut; every fitted network saved under this experiment's data folder; the stored
-  predictions of experiment 677 as the control; a four-month screen with a pre-registered advance
-  rule, every number labelled interim; tails, cold winter nights, and the avoidable-curtailment
-  cost from `e00677_tails.py` and `e00677_protocol.py`; example forecasts and load-shift plots with
-  the unlogged-event caveat; a draft pull request.
+  D15 and D18 cut; every fitted network saved under this experiment's data folder; the refitted
+  step-5 chain as the control (experiment 677's stored forecasts as the reference row `stored`); a
+  four-month screen with a pre-registered advance rule, every number labelled interim; tails, cold
+  winter nights, and the avoidable-curtailment cost from `e00677_tails.py` and `e00677_protocol.py`;
+  example forecasts and load-shift plots with the unlogged-event caveat; a draft pull request.
 - **Not applicable:** no XGBoost model is fitted. The calendar control is not needed, because the
   date-time encoder is the network's own and identical in every arm.
 - **Advice followed:** experiment 677's monthly refit and its advice to judge a lag change on
   event-free error as well as on all rows (the four scenarios); experiment 684's use of a
-  deterministic replay in place of a re-run noise floor, extended here to the pre-training step;
+  deterministic replay in place of a re-run noise floor, extended here to the pre-training step,
+  where the replay did not hold;
   experiment 699's reporting of band width beside CRPS. None of the `advice` items of experiments
   437, 569, 667, 668, 677, 684, and 699 argues against this design.
 
