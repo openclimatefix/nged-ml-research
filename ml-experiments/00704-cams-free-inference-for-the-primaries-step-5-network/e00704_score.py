@@ -4,12 +4,17 @@
 Usage: python e00704_score.py [--experiment 704|703] [--months 2025-11 ...] [--arms control proxy drop]
 [--fake-arm] [--exact] [--no-protocol]
 
-`--experiment 704` scores experiment 677's step 5 (K1-type network, monthly refits, seeds 0 to 2)
-as the control. `--experiment 703` scores experiment 667's Candidate (seeds 0 and 1) as the control.
-The arms are `proxy` (columns rebuilt from the ENS analysis proxy), `drop` (columns set to zero),
-and `replay` (the unchanged chain, refitted, as a determinism check). An arm whose fits are missing
-for a month is skipped with a message, except `replay`, which is compared on the months it holds.
-`--fake-arm` aliases every missing arm to the control, so every contrast must then be exactly 0.
+`--experiment 704` scores experiment 677's step 5 (K1-type network, monthly refits, seeds 0 to 2),
+and `--experiment 703` scores experiment 667's Candidate (seeds 0 and 1). The stored forecasts of
+that experiment are the files `control`. The arms are `proxy` (columns rebuilt from the ENS analysis
+proxy), `drop` (columns set to zero), and `replay` (the unchanged chain, refitted).
+
+`--control replay` (the default) makes the replay refit the control, so C2 and C3 are an arm minus the
+replay, and the stored forecasts become the reference row `stored`. The contrast N1, replay minus
+stored, is the noise floor. `--control stored` makes the stored forecasts the control, and the replay
+may then cover only some months. A proxy or drop arm whose fits are missing for a month is skipped
+with a message. `--fake-arm` aliases every missing arm to the stored forecasts, so every contrast
+must then be exactly 0.
 
 Each seed's native forecast (09:00 UTC origin) becomes the contract's 12:00 UTC forecast through
 `e00667_export.contract_rows`, and every row with a valid time on or after 2026-07-01 is dropped.
@@ -214,7 +219,10 @@ def build_rows(*, frame: pl.DataFrame, cut_short_history: bool) -> tuple[Rows, n
         .to_numpy()
         .astype(np.float64)
     )
-    print("max relative difference of the two capacity tables:", np.abs(cap / cap_mw - 1).max())
+    assert len(cap) == len(ids) == len(cap_mw), (len(cap), len(ids), len(cap_mw))
+    worst = float(np.abs(cap / cap_mw - 1).max())
+    print("max relative difference of the two capacity tables:", worst)
+    assert worst < 1e-6, worst
     grid = lib.cleaned_grid(ids=ids)
     if cut_short_history:
         for label in SHORT_HISTORY:
@@ -379,11 +387,19 @@ def verify_bootstrap(*, store: Store) -> None:
     assert np.allclose(want, got, atol=1e-9), (want, got)
 
 
-def exact_contrasts(*, store: Store, pairs: dict[str, tuple[str, str]]) -> None:
-    """Run the pooled contrasts through `bootstrap_difference_at_level` on every row (slow)."""
+def exact_contrasts(
+    *, store: Store, pairs: dict[str, tuple[str, str]]
+) -> dict[tuple[str, str], tuple[float, float]]:
+    """Run the pooled contrasts through `bootstrap_difference_at_level` on every row (slow).
+
+    Asserts that each bound equals the month-totals bootstrap's bound on the all-rows scope within
+    1e-6, and returns the official bounds keyed by contrast name and metric.
+    """
     from studies.bootstrap import bootstrap_difference_at_level
     from studies.experiment_store import losses_for_bootstrap
 
+    found: dict[tuple[str, str], tuple[float, float]] = {}
+    everything = np.ones(len(store.rows.row), dtype=bool)
     for metric in ("crps", "mae"):
         systems = sorted({s for pair in pairs.values() for s in pair})
         arms = {
@@ -412,9 +428,15 @@ def exact_contrasts(*, store: Store, pairs: dict[str, tuple[str, str]]) -> None:
                 level=LEVEL,
                 n_resamples=N_RESAMPLES,
             )
+            mine = store.contrast(a=a, b=b, metric=metric, mask=everything)
             print(
-                f"exact {name} {metric}: [{lo:+.5f}, {hi:+.5f}] (official function, 20,000 draws)"
+                f"exact {name} {metric}: [{lo:+.5f}, {hi:+.5f}] (official function, 20,000 draws);"
+                f" month-totals bootstrap [{mine['lo']:+.5f}, {mine['hi']:+.5f}]"
             )
+            assert abs(lo - mine["lo"]) < 1e-6, (name, metric, "lower", lo, mine["lo"])
+            assert abs(hi - mine["hi"]) < 1e-6, (name, metric, "upper", hi, mine["hi"])
+            found[(name, metric)] = (float(lo), float(hi))
+    return found
 
 
 # ----------------------------------------------------------------------------- events and masks
@@ -500,6 +522,7 @@ def cold_night_mask(*, rows: Rows) -> np.ndarray:
         how="left",
         maintain_order="left",
     )
+    assert keyed.height == rows.keys.height, (keyed.height, rows.keys.height)
     elevation = np.nan_to_num(keyed["elevation_deg"].to_numpy().astype(np.float64), nan=90.0)
     temperature = np.nan_to_num(keyed["temperature_c"].to_numpy().astype(np.float64), nan=np.inf)
     return (elevation < slices.NIGHT_ELEVATION_DEG) & (
@@ -655,6 +678,12 @@ def main() -> None:  # noqa: PLR0915
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment", default="704", choices=("704", "703"))
     parser.add_argument("--months", nargs="+", default=list(MONTHS))
+    parser.add_argument(
+        "--control",
+        choices=("replay", "stored"),
+        default="replay",
+        help="the control: the refit of the unchanged chain (replay) or the stored forecasts",
+    )
     parser.add_argument("--arms", nargs="+", default=["control", "proxy", "drop", "replay"])
     parser.add_argument("--fake-arm", action="store_true")
     parser.add_argument("--exact", action="store_true", help="also run the official bootstrap")
@@ -675,7 +704,8 @@ def main() -> None:  # noqa: PLR0915
         if arm not in args.arms:
             continue
         have = available(spec=spec, arm=arm, months=months)
-        if (arm != "replay" and have != months) or (arm == "replay" and not have):
+        partial_ok = arm == "replay" and args.control == "stored"
+        if (have != months and not partial_ok) or not have:
             if args.fake_arm:
                 print(f"FAKE: {arm} aliased to the control")
                 arms[arm], covered[arm] = control, months
@@ -687,11 +717,21 @@ def main() -> None:  # noqa: PLR0915
         covered[arm] = have
         print(f"arm {arm}: months {have}")
 
+    if args.control == "replay":
+        if "replay" not in arms or covered["replay"] != months:
+            msg = f"--control replay needs the replay fits for every month; have {covered.get('replay')}"
+            raise SystemExit(msg)
+        rename = {"control": "stored", "replay": "control"}
+        arms = {rename.get(k, k): v for k, v in arms.items()}
+        covered = {rename.get(k, k): v for k, v in covered.items()}
+        print("control = the replay refit; the stored forecasts are the reference row `stored`")
+    else:
+        print("control = the stored forecasts")
     rows, grid = build_rows(frame=control["s0"], cut_short_history=not args.no_cut)
     store_data: dict[tuple[str, str], dict[str, np.ndarray]] = {}
     for system, frames in arms.items():
         for tag, frame in frames.items():
-            if system == "replay" and covered[system] != months:
+            if covered[system] != months:
                 keep = np.isin(rows.month, covered[system])
                 part = metrics_of_frame(frame=frame, rows=_subset_rows(rows=rows, keep=keep))
                 store_data[(system, tag)] = {k: _scatter(v, keep) for k, v in part.items()}
@@ -708,11 +748,21 @@ def main() -> None:  # noqa: PLR0915
 
     ok = np.isfinite(rows.y)
     ok_truth = ok.copy()
+    for name, q in base.items():
+        print(
+            f"rows dropped because the {name} has a NaN quantile (with a finite truth): "
+            f"{int((ok & ~np.isfinite(q).all(axis=1)).sum()):,}"
+        )
     for (system, _tag), met in store_data.items():
-        if system != "replay":
+        if covered.get(system, months) == months:
             ok &= np.isfinite(met["crps"])
     print(
         f"rows {len(ok):,}; scored {int(ok.sum()):,}; without truth or a baseline {int((~ok).sum()):,}"
+    )
+    print(
+        "QUOTE: the page's absolute scores are the tag `seed_average_of_scores` (mean over seeds of each"
+        " seed's score, which the contrasts use); the tag `mean` is the seed-averaged forecast"
+        " (experiment 667's published forecast), quoted only where stated."
     )
     drops = truth_checks(rows=rows, ok_truth=ok_truth, months=months)
     drops.write_csv(out_dir / "dropped_half_hours.csv")
@@ -741,7 +791,9 @@ def main() -> None:  # noqa: PLR0915
         covered=covered,
         month_idx=np.searchsorted(months, sub.month),
     )
-    systems = [s for s in ("control", "proxy", "drop", "replay", *BASELINES) if (s, "s0") in data]
+    systems = [
+        s for s in ("control", "stored", "proxy", "drop", "replay", *BASELINES) if (s, "s0") in data
+    ]
     run(
         store=store,
         spec=spec,
@@ -751,6 +803,7 @@ def main() -> None:  # noqa: PLR0915
         frames=arms,
         ok=ok,
         rows=rows,
+        base=base,
     )
 
 
@@ -787,6 +840,7 @@ def run(  # noqa: PLR0915
     frames: dict[str, dict[str, pl.DataFrame]],
     ok: np.ndarray,
     rows: Rows,
+    base: dict[str, np.ndarray],
 ) -> None:
     """Build the tables, the contrasts, and the verdict from the scored rows."""
     sub = store.rows
@@ -831,7 +885,7 @@ def run(  # noqa: PLR0915
         for scope, mask in group.items():
             for system in systems:
                 msk = mask
-                if system == "replay":
+                if system in store.covered and store.covered[system] != store.months:
                     msk = mask & np.isfinite(store.value(system=system, tag="s0", metric="crps"))
                 for metric in METRICS:
                     for tag in [*(f"s{s}" for s in store.seeds), "mean"]:
@@ -942,7 +996,19 @@ def run(  # noqa: PLR0915
         "C2 proxy minus control": ("proxy", "control"),
         "C3 drop minus control": ("drop", "control"),
     }
+    pairs["N1 replay minus stored (noise floor)"] = (
+        ("control", "stored") if args.control == "replay" else ("replay", "control")
+    )
     pairs = {k: v for k, v in pairs.items() if all((s, "s0") in store.data for s in v)}
+
+    def adjusted(mask: np.ndarray, pair: tuple[str, str]) -> np.ndarray:
+        """Return the mask without the rows that a partly covered system lacks."""
+        for system in pair:
+            if system in store.covered and store.covered[system] != store.months:
+                mask = mask & np.isfinite(store.value(system=system, tag="s0", metric="crps"))
+        return mask
+
+    full_pairs = {k: v for k, v in pairs.items() if adjusted(bands["all"], v).all()}
     verify_bootstrap(store=store)
     results = []
     if pairs:
@@ -954,7 +1020,7 @@ def run(  # noqa: PLR0915
             for kind, group in contrast_scopes.items():
                 for scope, mask in group.items():
                     for metric in ("crps", "mae"):
-                        r = store.contrast(a=a, b=b, metric=metric, mask=mask)
+                        r = store.contrast(a=a, b=b, metric=metric, mask=adjusted(mask, (a, b)))
                         results.append(
                             {
                                 "contrast": name,
@@ -978,13 +1044,14 @@ def run(  # noqa: PLR0915
             f"\n=== contrasts (treatment minus reference, points of capacity; {LEVEL:.2f}% month-block interval, {N_RESAMPLES:,} resamples; interim: {len(store.months)} months)"
         )
         print(con.with_columns(pl.col("point", "lo", "hi").round(4)))
-        if args.exact:
-            exact_contrasts(store=store, pairs=pairs)
+        exact = exact_contrasts(store=store, pairs=full_pairs) if args.exact else None
         # per month and seed for every contrast
         mrec = []
         for name, (a, b) in pairs.items():
             for metric in ("crps", "mae"):
-                sums, cnt = store.month_sums(a=a, b=b, metric=metric, mask=bands["all"])
+                sums, cnt = store.month_sums(
+                    a=a, b=b, metric=metric, mask=adjusted(bands["all"], (a, b))
+                )
                 for j, s in enumerate(store.seeds):
                     for i, m in enumerate(store.months):
                         mrec.append(
@@ -1005,22 +1072,34 @@ def run(  # noqa: PLR0915
                 on="seed", index=["metric", "month"], values="difference"
             )
         )
-        verdict = decide(store=store, con=con, mtab=mtab)
+        verdict = decide(store=store, con=con, mtab=mtab, exact=exact)
         (out_dir / "summary.json").write_text(json.dumps(verdict, indent=2))
     else:
         print("\nno contrasts: proxy and drop are both needed")
 
     # ---- replay
-    if "replay" in frames:
-        replay_check(spec=spec, store=store, frames=frames)
+    replay_sys, stored_sys = (
+        ("control", "stored") if args.control == "replay" else ("replay", "control")
+    )
+    if (replay_sys, "s0") in store.data and (stored_sys, "s0") in store.data:
+        replay_check(spec=spec, store=store, replay_sys=replay_sys, stored_sys=stored_sys)
 
     # ---- curtailment cost
     if not args.no_protocol:
         named = {}
-        for system in ("control", "proxy", "drop"):
+        for system in ("control", "stored", "proxy", "drop"):
             if system in frames:
                 for tag, fr in frames[system].items():
                     named[f"{system} {tag}"] = fr
+        template = frames["control"]["mean"]
+        for name, q in base.items():
+            mw = q / rows.scale[:, None]
+            named[f"{name} (no seed)"] = template.with_columns(
+                [
+                    pl.Series(c, np.nan_to_num(mw[:, i], nan=0.0)).cast(pl.Float32)
+                    for i, c in enumerate(x667.QCOLS)
+                ]
+            )
         cost = curtailment_costs(spec=spec, frames=named, rows=rows, ok=ok)
         cost.write_csv(out_dir / "curtailment_cost.csv")
         pooled = (
@@ -1036,12 +1115,12 @@ def run(  # noqa: PLR0915
         pooled.write_csv(out_dir / "curtailment_cost_pooled.csv")
 
 
-def replay_check(*, spec: Spec, store: Store, frames: dict[str, dict[str, pl.DataFrame]]) -> None:
+def replay_check(*, spec: Spec, store: Store, replay_sys: str, stored_sys: str) -> None:
     """Report the replay's largest difference to the control and its CRPS on the replayed months."""
     print(
         "\n=== replay of the unchanged chain against the stored control (native fraction of capacity)"
     )
-    for month in store.covered["replay"]:
+    for month in store.covered[replay_sys]:
         worst = np.zeros(len(x667.QCOLS))
         for s in spec.seeds:
             a = read_native(path=spec.fit_path(arm="replay", month=month, seed=s))
@@ -1055,20 +1134,39 @@ def replay_check(*, spec: Spec, store: Store, frames: dict[str, dict[str, pl.Dat
         print(
             f"{month}: max abs difference per quantile {np.round(worst, 8).tolist()}; overall {worst.max():.3g}"
         )
-    mask = np.isfinite(store.value(system="replay", tag="s0", metric="crps"))
+    mask = np.isfinite(store.value(system=replay_sys, tag="s0", metric="crps"))
     for metric in ("crps", "mae"):
-        r = store.seed_mean_of_means(system="replay", metric=metric, mask=mask)
-        c = store.seed_mean_of_means(system="control", metric=metric, mask=mask)
+        r = store.seed_mean_of_means(system=replay_sys, metric=metric, mask=mask)
+        c = store.seed_mean_of_means(system=stored_sys, metric=metric, mask=mask)
         print(f"replay {metric} {r:.5f}; control on the same rows {c:.5f}; difference {r - c:+.6f}")
 
 
-def decide(*, store: Store, con: pl.DataFrame, mtab: pl.DataFrame) -> dict:
-    """Apply the pre-registered rule of the plan of experiment 703 to C1 and print the verdict."""
+def decide(
+    *,
+    store: Store,
+    con: pl.DataFrame,
+    mtab: pl.DataFrame,
+    exact: dict[tuple[str, str], tuple[float, float]] | None,
+) -> dict:
+    """Apply the pre-registered decision rule to C1 and print the verdict.
+
+    The rule: the C1 interval lies wholly below zero, the C1 point is at most -0.01, and every
+    seed's C1 is below zero in every month. With `exact`, the interval is the official function's.
+    """
     c1 = con.filter(
         pl.col("contrast").str.starts_with("C1")
         & (pl.col("scope") == "all")
         & (pl.col("metric") == "crps")
     ).row(0, named=True)
+    if exact is not None:
+        c1 = {
+            **c1,
+            "lo": exact[(c1["contrast"], "crps")][0],
+            "hi": exact[(c1["contrast"], "crps")][1],
+        }
+    print(
+        f"decision interval from the {'official function' if exact else 'month-totals bootstrap'}"
+    )
     month = mtab.filter(pl.col("contrast").str.starts_with("C1") & (pl.col("metric") == "crps"))
     negative = bool((month["difference"] < 0).all())
     agree = bool(

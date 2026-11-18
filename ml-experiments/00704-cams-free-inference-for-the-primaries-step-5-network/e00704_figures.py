@@ -35,6 +35,7 @@ from studies.charts import CONTENT_WIDTH_PX
 REPO: Final = Path(__file__).resolve().parents[2]
 COLOURS: Final = {
     "control": ocf.DATA_BLUE,
+    "stored": ocf.DATA_SKY,
     "proxy": ocf.BRAND_ORANGE,
     "drop": ocf.DATA_PURPLE,
     "climatology": "#555555",
@@ -42,6 +43,7 @@ COLOURS: Final = {
 }
 LABELS: Final = {
     "control": "Control (with CAMS)",
+    "stored": "Stored forecasts (with CAMS)",
     "proxy": "Arm A (analysis proxy)",
     "drop": "Arm B (columns dropped)",
     "climatology": "Climatology",
@@ -51,6 +53,7 @@ CONTRAST_COLOURS: Final = {
     "C1 proxy minus drop": ocf.BRAND_ORANGE,
     "C2 proxy minus control": ocf.DATA_BLUE,
     "C3 drop minus control": ocf.DATA_PURPLE,
+    "N1 replay minus stored (noise floor)": "#555555",
 }
 BAND_ORDER: Final = ["all", *lib.LEAD_BANDS]
 BAND_LABEL: Final = {"all": "All leads"} | {b: b.capitalize() for b in lib.LEAD_BANDS}
@@ -208,10 +211,17 @@ def contrasts_by_band(*, contrasts: pl.DataFrame, spec: sc.Spec, out: Path) -> N
 # ----------------------------------------------------------------------------- forecasts
 
 
-def seed_mean_frames(*, spec: sc.Spec, months: list[str], fake: bool) -> dict[str, pl.DataFrame]:
-    """Return each available arm's seed-mean contract rows (MW), with a `lead_h` column."""
+def seed_mean_frames(
+    *, spec: sc.Spec, months: list[str], fake: bool, control: str
+) -> dict[str, pl.DataFrame]:
+    """Return each available arm's seed-mean contract rows (MW), with a `lead_h` column.
+
+    `control` is `replay` or `stored`, as in `e00704_score.py`: the key `control` holds the refit of
+    the unchanged chain (the files `replay`) or the stored forecasts (the files `control`).
+    """
     out: dict[str, pl.DataFrame] = {}
-    for arm in ("control", "proxy", "drop"):
+    for key in ("control", "proxy", "drop"):
+        arm = "replay" if key == "control" and control == "replay" else key
         have = sc.available(spec=spec, arm=arm, months=months)
         if have != months:
             if not fake:
@@ -221,7 +231,7 @@ def seed_mean_frames(*, spec: sc.Spec, months: list[str], fake: bool) -> dict[st
         else:
             local = spec
         frame = sc.load_arm(spec=local, arm=arm, months=months)["mean"]
-        out[arm] = frame.with_columns(
+        out[key] = frame.with_columns(
             lead_h=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
         )
     return out
@@ -234,6 +244,7 @@ def observed(*, series: int, start: datetime, stop: datetime) -> pl.DataFrame:
         .filter(
             (pl.col("time_series_id") == series)
             & pl.col("valid_time").is_between(start, stop, closed="left")
+            & pl.col("drop_reason").is_null()
         )
         .select("valid_time", power=pl.col("power"))
     )
@@ -252,8 +263,10 @@ def pick_typical(*, frames: dict[str, pl.DataFrame], rows_month: str) -> tuple[i
         & pl.col("time_series_id").cast(pl.Int64).is_in(signed)
         & (pl.col("power_fcst_init_time").dt.strftime("%Y-%m") == rows_month)
     )
-    truth = pl.read_parquet(lib.FOLDER / "ground_truth_primaries.parquet").select(
-        pl.col("time_series_id").cast(pl.Int64), "valid_time", "power"
+    truth = (
+        pl.read_parquet(lib.FOLDER / "ground_truth_primaries.parquet")
+        .filter(pl.col("drop_reason").is_null())
+        .select(pl.col("time_series_id").cast(pl.Int64), "valid_time", "power")
     )
     cap = pl.read_parquet(lib.FOLDER / "series_capacity.parquet").select(
         pl.col("time_series_id").cast(pl.Int64), "capacity"
@@ -345,6 +358,9 @@ def pick_events(*, scored_rows: pl.DataFrame) -> list[dict]:
     """
     site = sc.site_map()
     group = dict(zip(site["label"].to_list(), site["group"].to_list(), strict=True))
+    assert set(scored_rows["label"].unique().to_list()) == set(group), (
+        "labels differ from the site map"
+    )
     in_699 = s668.event_sets(site=site)["event table, over 7 days, 2 units or more"]
     in_699_keys = {(r["label"], r["start"]) for r in in_699.iter_rows(named=True)}
     counts = scored_rows.group_by("label", "vidx").len().select("label", "vidx")
@@ -490,6 +506,7 @@ def main() -> None:
     parser.add_argument("--experiment", default="704", choices=("704", "703"))
     parser.add_argument("--months", nargs="+", default=list(sc.MONTHS))
     parser.add_argument("--fake-arm", action="store_true")
+    parser.add_argument("--control", choices=("replay", "stored"), default="replay")
     args = parser.parse_args()
     spec = sc.spec_of(key=args.experiment)
     months = sorted(args.months)
@@ -497,7 +514,7 @@ def main() -> None:
     scores, contrasts = score_tables(spec=spec)
     crps_by_band(scores=scores, spec=spec, out=out)
     contrasts_by_band(contrasts=contrasts, spec=spec, out=out)
-    frames = seed_mean_frames(spec=spec, months=months, fake=args.fake_arm)
+    frames = seed_mean_frames(spec=spec, months=months, fake=args.fake_arm, control=args.control)
     typical_month = "2026-04" if "2026-04" in months else months[-1]
     series, origin = pick_typical(frames=frames, rows_month=typical_month)
     label = sc.site_map().filter(pl.col("time_series_id") == series)["label"][0]
