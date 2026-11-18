@@ -400,21 +400,43 @@ shares of 0.123 and 0.075 (−0.047, −0.061 to −0.036). The plan's first ref
 - **The MAE contrast beside every CRPS contrast** has the same sign in every family and on both
   banks (H +0.066 and +0.033, S2 +0.030 and +0.013, S3 +0.016 and +0.011, clean chain +0.026 and
   +0.022), so trigger 3 did not fire.
-- **Trigger 1 (a control fails) fired,** because P6 failed at the four-fold screen. The reproduction
-  and the known-answer table passed, which points to noise, and the runner cannot run the audit.
+- **Trigger 1 (a control fails) fired,** because P6 failed at the four-fold screen. The audit found
+  that the cause is the five added seeds. Seeds 0 to 2 reproduce experiment 677's stored forecasts in
+  all 8 folds, and the clean-chain MAE contrast is +0.0451 on seeds 0 to 2, +0.0138 on seeds 3 to 7,
+  and +0.0255 on all 8 seeds. Experiment 677's +0.045 was a high three-seed draw.
 - **Trigger 2 (a result contradicts its own prediction) fired.** The point estimates of P1, P2, and
   P4 have the opposite sign to the predictions. The plan predicted that P1 and P2 would not be
   resolved. The descriptive readings above test the noise explanation and do not settle it.
 - **Trigger 4 (leaving one site out flips a contrast) did not fire.** The sign of family H never
   flips.
-- **Trigger 5 (a nested arm beats the arm that contains it) did not fire.** The arms differ in the
-  stages that see shifts and not in their inputs, so no arm is nested in another.
-- **Trigger 6 (an interval more than twice or under half a sister experiment's) was not assessed.**
-  Experiment 677's stored interval is a months-only bootstrap with the seeds fixed, which is not a
-  comparable interval.
+- **Trigger 5 (a nested arm beats the arm that contains it) did not fire on the plan's reading.** The
+  arms differ in the stages that see shifts and not in their inputs, so no arm is nested in another.
+  The audit notes that the no-injection arm has the lowest all-rows MAE of the five arms, which is
+  the same finding as the positive point estimates above.
+- **Trigger 6 (an interval more than twice or under half a sister experiment's) did not fire.** The
+  audit compared the interval with the sister interval and found a ratio of about 1.1.
 - **Trigger 7 (a later design depends on this result) is not applicable now.**
-- **No audit was run.** The runner cannot start one, and the manager decides whether trigger 1 or 2
-  calls for one.
+- **An audit was run** by a Sonnet agent that did not write the experiment. The report is
+  `briefs/699_audit.md` in the private `data/ml-experiments/` folder. It rebuilt MAE and CRPS from the
+  stored quantiles, matched every headline contrast, found no sign flip when leaving out one Primary,
+  and confirmed that the weather is taken at the forecast origin. Nothing blocked the merge. The
+  audit's findings and their triage:
+    - **Accepted, the 24,060 dropped reference rows.** The climatology is non-finite on exactly the
+      rows of series 12 and 13 that every arm drops, because both series have cleaned data only from
+      2025-05-07 and 2025-03-30, so no winter climatology cell exists before each fold's cutoff. The
+      manual heuristic is finite on all of them. No contrast changes.
+    - **Accepted, series 12 carries half of the H contrast.** Series 12, 5.5% of the rows, supplies
+      +0.031 of the +0.066 MAE. Without it the H contrast is +0.037, still positive. Five Primaries
+      have negative H point estimates.
+    - **Accepted, the flagged seed-0 fit.** The fit has a high error, so keeping it makes H less
+      positive. Replacing it gives +0.0785, and dropping seed 0 gives +0.0852. Seed 0 is also poor in
+      fold 2025-11 in every arm, which suggests a bad shared stage-1 initialisation.
+    - **Accepted, the margin on the verdict.** The lower CRPS bound that keeps the verdict at
+      `inconclusive` is −0.0157 against a threshold of −0.014. The nested bootstrap counts seed
+      variance twice and is about 1.7 times wider than a months-only bootstrap, which gives H MAE
+      +0.013 to +0.122 and H CRPS +0.008 to +0.054. The verdict does not move on either interval.
+    - **Not re-run by the audit:** the lag-age and weather-at-origin assertions, and the curtailment,
+      cold-night, and event sections.
 
 **The experiment's own checks passed.** `e00699_checks.py all` prints:
 
