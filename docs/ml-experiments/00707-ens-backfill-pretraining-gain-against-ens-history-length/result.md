@@ -79,8 +79,7 @@ Bonferroni level:
 - **Cannot tell:** the interval straddles both -0.02 and 0 and is wider than 0.04. Verdict `inconclusive`.
 - **Harmful:** the interval lies wholly above 0. Verdict `refuted`.
 
-The maintainer decides whether "no longer worth porting" is enough to drop pre-training from the
-candidate network. The experiment makes no adoption.
+The experiment reports the verdict and the interval, and makes no adoption.
 
 ## Arms
 
