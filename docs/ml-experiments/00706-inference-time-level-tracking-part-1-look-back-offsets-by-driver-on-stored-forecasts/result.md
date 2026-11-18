@@ -131,7 +131,6 @@ advice:
     unreachable (KA3).
 ---
 
-
 **We asked whether the slow drift in a substation's net demand can be corrected at forecast time,
 with no new fitted network.** At each forecast origin we took the errors the stored forecast made
 over the last 14 days, averaged them, and added a share of that average to the forecast. We also
