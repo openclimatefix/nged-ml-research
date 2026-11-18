@@ -3,11 +3,14 @@
 
 Usage: python e00699_figures.py OUTPUT_FOLDER
 
-- `contrasts.svg`: the planned contrasts of families H, S2, and S3 and of the clean chain on MAE and CRPS,
-  with both intervals.
-- `copied_share.svg`: the copied-share contrast of the same families on the 581 bank (and on the 660 bank when run).
-- `transfer_<D5|D16>.svg`: the verified transfer between D5 and D16, with a day-ahead and a 14-day-ahead panel.
-- `event_<n>.svg`: the four longest logged events of the set "over 7 days, 2 units or more" outside D5 and D16.
+- `contrasts.svg`: the planned contrasts of families H, S2, and S3 and of the clean chain on MAE and
+  CRPS, with both intervals.
+- `copied_share.svg`: the copied-share contrast of the same families on the 581 bank (and on the 660
+  bank when run).
+- `transfer_<D5|D16>.svg`: the verified transfer between D5 and D16, with a day-ahead and a
+  14-day-ahead panel.
+- `event_<n>.svg`: the four longest logged events of the set "over 7 days, 2 units or more" outside
+  D5 and D16.
 
 The Primaries are substations, so their labels are shown; no NGED metered generator appears.
 Run with the environment of `run699.sh`.

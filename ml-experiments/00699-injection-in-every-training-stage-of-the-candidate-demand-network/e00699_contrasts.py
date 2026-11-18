@@ -10,8 +10,8 @@ Usage: python e00699_contrasts.py COMMAND [FOLD ...]
 - `sizing`: the expected half-width of family H on all-rows MAE from the noise of the measured folds.
 - `families`: the two intervals of families H, S2, and S3, the descriptive readings, the predictions
   P1 to P6, and the verdict.
-- `tables`: the scores by metering group, lead band, and the four load-shift scenarios, with the band width and
-  the median minus the mean forecast per Primary.
+- `tables`: the scores by metering group, lead band, and the four load-shift scenarios, with the band
+  width and the median minus the mean forecast per Primary.
 - `all`: `families` and `tables`.
 
 The folds default to those that every arm has scored. Reads the `rows.parquet` files that

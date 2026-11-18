@@ -1,5 +1,7 @@
 # ruff: noqa: ANN001, ANN003, ANN201, ANN202, D103, E402, E501, I001, PT018
-"""Experiment 699: pre-train (stage 1) and train step 2 (stage 2) of the step-5 network with shifted lags (GPU).
+"""Experiment 699: pre-train (stage 1) and train step 2 (stage 2) of the step-5 network (GPU).
+
+Both stages see shifted lags.
 
 A copy of experiment 677's `e00677_k1.py`, restricted to the commands `pretrain` and `step2` of
 ladder step 5, with two options:

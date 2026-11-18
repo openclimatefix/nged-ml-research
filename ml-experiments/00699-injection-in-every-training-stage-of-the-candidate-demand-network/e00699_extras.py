@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 699: print the tail coverage, the cold-night scores, and the avoidable-curtailment cost of every arm.
+"""Experiment 699: print the tail coverage, cold-night scores, and avoidable-curtailment cost per arm.
 
 Usage: python e00699_extras.py
 
