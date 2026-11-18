@@ -194,8 +194,16 @@ page.
   arm's table are bit-equal to experiment 667's stored table on every key (experiment 677 reads
   experiment 667's tables).
 - **The replay**, as under "Arms".
-- **Arm B's standardiser**, stored with the chain's B1 statistics, holds mean 0 and standard
-  deviation 1e-6 for the two columns.
+- **Each arm derives its own B1 standardiser.** Experiment 677's `chain.sh` points `STATS677` at
+  step 3b's chain folder, so step 5's fine-tune and prediction read the statistics stored there.
+  Each arm's runner points `STATS677` at the arm's own chain folder, so the arm's pre-training
+  writes the statistics its later steps read. The replay's statistics must equal experiment 677's
+  `chains/3b/<month>/work/stats/B1/<month>.npz` exactly, which the runner checks, because
+  `check_stats` is disabled for the fold month.
+- **Arm B's standardiser** holds mean 0 and standard deviation 1e-6 for the two columns.
+- **Arm A's pre-training mean column** equals the control's on a sample of pre-training rows.
+- **No arm writes under experiment 677's or experiment 667's data folders.** Every output root is
+  `arms/<arm>/` under this experiment's data folder.
 - **The arm tables are the ones read.** `e00677_fold.redirect_to_extended_inputs` sets
   `f437.TRAILING_DIR` to experiment 667's tables, so the arm patch wraps that function and points
   `f437.TRAILING_DIR` at the arm's tables after it runs. A printed example row proves the switch.
