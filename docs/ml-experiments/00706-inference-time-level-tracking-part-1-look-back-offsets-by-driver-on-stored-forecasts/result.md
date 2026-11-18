@@ -44,7 +44,8 @@ prediction: >-
 decision_rule: >-
   Contrasts are paired on series, origin, and valid time and read at 99.17% (Bonferroni over six
   contrasts). A real-row contrast counts when its month-block bootstrap interval and the t test on
-  the monthly paired differences both exclude zero (critical value 3.71 for 6 degrees of freedom),
+  the monthly paired differences both exclude zero (critical value 3.863 for 6 degrees of freedom,
+  4.219 for 5),
   and each interval's half-width and minimum detectable effect is printed. C1 and C2 are read in the
   signed-MW six and the MVA-only eight separately, and both groups must pass. The smallest
   worthwhile
@@ -70,11 +71,11 @@ verdict: inconclusive
 production_status: not-for-production
 adopted_in: none
 best_arm: >-
-  None. The stored normal-running forecast (CRPS 3.235 points of capacity, pooled over 14 Primaries)
-  was not beaten by any look-back arm. The best look-back arm, the offset computed per lead band
-  (G-lb),
-  scored
-  +0.026 worse (99.17% interval -0.070 to +0.179).
+  None. The stored normal-running forecast scored CRPS 3.235 points of capacity, pooled over 14
+  Primaries. The pre-registered look-back arm, the offset computed per lead band (G-lb), scored
+  +0.026 worse (99.17% interval -0.070 to +0.179). Four arms without a pre-registered interval
+  scored lower than the stored forecast: the smallest-lead offset (-0.015), the month-refitted
+  offset (-0.011), recipe R (-0.019), and the decayed offset R0-168 (-0.041).
 headline: >-
   A 14-day look-back offset gains 0.13 points of capacity on lead day 1 and 0.10 on lead day 2 and
   loses more than that from lead day 5, so over all lead days it scores 0.026 worse than the stored
@@ -83,12 +84,14 @@ headline: >-
   post hoc, do not beat a fixed rule on real rows.
 lessons: >-
   The recent forecast error carries level information for the next 1 to 2 days only, and applying
-  offset at every lead time gives that gain up on lead days 5 to 10. The gain also depends on the
-  look-back
-  window being free of an event: windows that contain a load shift gave +0.337 (audit), while clean
-  windows gave -0.026 (interval -0.079 to +0.020). The learned gate used its neighbour inputs
+  offset at every lead time gives that gain up on lead days 5 to 10. Windows that contain a load
+  shift gave
+  +0.337 for G-lb minus the stored forecast (audit, interval -0.317 to +1.622), and clean windows
+  gave -0.026 (interval -0.079 to +0.020). Both intervals include zero, and the MVA-only eight
+  showed
+  no gain in clean windows (+0.032). The learned gate used its neighbour inputs
   on injected shifts, where the injection code puts the mirrored step on the real neighbours, but on
-  real rows the real graph and a rewired graph scored within 0.015.
+  real rows the real graph and a rewired graph scored within 0.015 pooled over 14 Primaries.
 take_home_message: >-
   Correcting the forecast with the last 14 days of its own errors helps for the first one to two
   days
@@ -105,13 +108,12 @@ advice:
     14 Primaries it lost from lead day 5 (stage 1 lead bands, figure 1).
   - >-
     Take the look-back window from the smallest-lead residual, not one residual per lead band: the
-    smallest-lead offset beat the lead-band offset by 0.041 (interval -0.083 to -0.001) (stage 1
-    sensitivities).
+    smallest-lead offset beat the lead-band offset by 0.041 (interval -0.083 to -0.001) (audit).
   - >-
     Test any inference-time level offset on windows with no load shift inside them, and report the
-    windows that contain one separately, because the shift is copied forward for a week
-    (clean-window
-    check, scenarios table).
+    windows that contain one separately, because in this experiment the rows after an event scored
+    worse
+    (clean-window check, scenarios table).
   - >-
     Do not score a level correction on seven month blocks and expect to resolve 0.05 points: the
     minimum detectable effect was 0.16 (C1).
@@ -173,9 +175,11 @@ to the real series) to decide how much of each offset to apply.
 
 ## Results
 
-**Stage 1: the global offset and the driver split do not beat the stored forecast.** CRPS is in
-points of capacity, event-free rows, origins 2025-12 to 2026-06, and a negative difference favours
-the first arm.
+**Stage 1: the pre-registered global offset and driver split do not beat the stored forecast.** CRPS
+is in points of capacity, origins 2025-12 to 2026-06, and a negative difference favours the first
+arm. "Event-free" rows are rows whose valid time lies outside every labelled or verified event. They
+include the 7 days after an event and rows whose 14-day look-back window overlaps an event (14.2% of
+rows). C5 uses all rows, from 2026-01.
 
 | Contrast | Pooled 14 | Signed-MW six | MVA-only eight |
 |---|---|---|---|
@@ -193,13 +197,17 @@ the first arm.
 - **Recipe R beat G-lb.** Recipe R (0.75 times the 14-day mean error by half-hour of day) scored
   0.044 better than G-lb (interval +0.011 to +0.077 on G-lb minus recipe R).
 - **C5 (faithful prevailing arm minus stored prevailing rows)** is +0.150 (+0.026 to +0.417, pooled
-  14), so the 7-day look-back is no better than the stored prevailing forecast.
+  14), so the 7-day look-back is no better than the stored prevailing forecast. The prediction was 0
+  to
+  +0.1, so the result is worse than predicted. The bootstrap interval excludes zero, and the t test
+  on monthly differences does not.
 
 ![CRPS of each arm minus the stored forecast by lead band](fig1_lead_bands.svg)
 
 ![A day-ahead forecast and a 14-day forecast](fig3_examples.svg)
 
-**The offset copies a load shift forward.** On rows that follow a labelled event by up to 7 days,
+**The offset appears to copy a load shift forward.** These are point estimates without intervals. On
+rows that follow a labelled event by up to 7 days (97,840 rows),
 G-lb scored 4.20 against 3.49 for the stored forecast. On the 7 days after the 4 verified
 transfers G-lb scored 6.21 against 4.07. Inside a labelled event itself, G-lb scored slightly
 better,
@@ -227,7 +235,10 @@ better,
   zeroed N-gate copied 25.3%. [Figure 4](fig4_copied_share.svg) shows the shares.
 - **This is a mechanism check, not evidence for neighbours.** The generator puts the mirrored step
   on the real-graph neighbours only, so the neighbour inputs hold the answer by construction. On
-  real rows the real and rewired graphs differ by 0.015 or less (C4).
+  real rows the real and rewired graphs differ by 0.015 or less (C4) pooled over 14 Primaries. In
+  the MVA-only
+  eight, N-gate on the real graph scored 0.033 better than on the rewired graph (interval -0.050 to
+  -0.008), which the bootstrap counts but the monthly t test does not.
 - **The switching probability separates injected steps only weakly.** The switching probability of
   N-flag had an area under the receiver operating characteristic (ROC) curve of 0.60 on real rows
   and
@@ -239,9 +250,11 @@ better,
 
 ## Checks
 
-- **Median minus mean forecast, per site:** the offsets shift all 11 quantiles by one amount, so no
+- **Median minus mean forecast, pooled over 14 Primaries:** the offsets shift all 11 quantiles by
+  one amount, so no
   arm changes the shape of the forecast distribution. The audit found the median-minus-mean gap of
-  -0.64 for both the stored forecast and G-lb.
+  -0.64 for both the stored forecast and G-lb (-0.51 at the signed-MW six and -0.72 at the MVA-only
+  eight).
 - **Error of the median beside every CRPS contrast:** the mean absolute error of the median points
   the same way as CRPS for G-lb (+0.024), D minus G-lb (+0.025), and every stage 2 arm, so trigger 3
   did not fire.
@@ -273,7 +286,7 @@ better,
   PV-shaped injected error at midday and leaves 0.3 points at night). The injection sizes were
   raised from 10
   to 30 points (step), 20 points (PV), and 3 points per unit (cold) after the readability check
-  showed them under 5 times the noise, and before any contrast was read.
+  showed most of them under 5 times the noise, and before any contrast was read.
 - **Placebo (PL) tests.** PL1 (a non-neighbour Primary's window) scored +0.453 worse than the stored
   forecast,
   so a wrong-series offset hurts. PL2 (shuffled drivers within each 14-day window) scored +0.048,
@@ -328,7 +341,7 @@ Training regime:
   2026-06, and early stopping on valid-time weeks inside the training period. Half the steps use
   own-only additive ramps of 10 points over 60 days.
 - **Compute:** 240 fits (2 arms, 2 graphs, 6 folds, 10 seeds) took 37 minutes on 2 CPU cores and one
-  GPU share at about 1 GB; stage 1 needed under 5 minutes on CPU.
+  GPU share at 0.7 to 1.5 GB; stage 1 needed about 5 minutes on CPU.
 
 Measurement:
 
