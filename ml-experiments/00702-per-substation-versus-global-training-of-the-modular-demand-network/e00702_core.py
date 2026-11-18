@@ -40,6 +40,12 @@ ARM_LABEL: Final[dict[str, str]] = {
 TEST_MONTHS: Final[tuple[str, ...]] = ("2025-11", "2026-01", "2026-04", "2026-07")
 PILOT_MONTH: Final[str] = "2026-05"
 """The first run's fold, which is not a test month."""
+EXTRA_MONTHS: Final[tuple[str, ...]] = ("2025-12", "2026-02", "2026-03", "2026-05", "2026-06")
+"""The five folds the maintainer approved after the four-month screen. 2026-08 to 2026-10 lie in the final-test window and are not approved."""
+EXTRA_FOLDER: Final[str] = "extra_months"
+"""The subfolder of `backtests/` that holds the final exports of `EXTRA_MONTHS`, one `<arm>.parquet` per arm."""
+SCORABLE_MONTHS: Final[tuple[str, ...]] = tuple(sorted((*TEST_MONTHS, *EXTRA_MONTHS)))
+"""The nine months that `e00702_score.py` may score."""
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 GLOBAL_PAIR_SEEDS: Final[tuple[int, ...]] = (3, 4, 5)
 ROW_SET_ID: Final[str] = "backtest_four_weather_months_2025_11_2026_01_2026_04_2026_07_daily_12utc"

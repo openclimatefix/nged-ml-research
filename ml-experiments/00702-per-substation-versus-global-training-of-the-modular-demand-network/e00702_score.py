@@ -1,16 +1,20 @@
-# ruff: noqa: D103, E501, PLR0915, PLR0912, D107, PTH123, SIM115
+# ruff: noqa: D103, E501, PLR0915, D107, PTH123, SIM115
 """Experiment 702: score the arms, the five planned contrasts, and the match checks of the control.
 
 Usage (after `e00702_export.py` has written the arms' backtest files):
 
-    python e00702_score.py score [--months 2025-11 2026-01 2026-04 2026-07]
+    python e00702_score.py score [--months 2025-11 2026-01 2026-04 2026-07] [--out four_months]
+    python e00702_score.py score --months <the nine months> --out nine_months \
+        --also extra_months=2025-12,2026-02,2026-03,2026-05,2026-06   # one observed-power snapshot for every set
+    python e00702_score.py bank --months <the nine months> --out nine_months
     python e00702_score.py match-stored      # rescore experiment 677's file; compare with its stored monthly scores
     python e00702_score.py match-refit       # the pilot fold's refit of the global arm against the stored seeds
     python e00702_score.py bank              # copied share of the held-out injected shifts
     python e00702_score.py pilot --files NAME [NAME ...]   # first run: scores of backtest files on 2026-05, at the three Primaries
     python e00702_score.py match-bank --months 2026-05 --seed 0   # this experiment's bank on the stored global models against experiment 677's bank file
 
-`score` writes CSV tables to `scores/four_months/` in this experiment's data folder: `arms.csv`,
+`score` writes CSV tables to `scores/<out>/` (default `four_months`) in this experiment's data
+folder, and to `scores/<name>/` for each `--also` set: `arms.csv`, `arms_by_month.csv`,
 `contrasts.csv`, `per_primary.csv`, `leave_one_out.csv`, `lead_bands.csv`, `groups.csv`,
 `tails.csv`, and `row_counts.csv`. One function (`lib.losses`, experiment 668's scoring library, as
 experiment 677 used) scores every arm on the same rows.
@@ -55,13 +59,33 @@ def sites() -> pl.DataFrame:
 def read_backtest(
     *, name: str, seeds: tuple[int, ...], months: tuple[str, ...]
 ) -> dict[int, pl.DataFrame]:
-    """Return one sorted frame per seed of the arm's contract rows whose origin lies in `months`."""
-    raw = pl.read_parquet(core.ROOT / "backtests" / f"{name}.parquet")
-    raw = raw.filter(pl.col("power_fcst_init_time").dt.strftime("%Y-%m").is_in(list(months)))
+    """Return one sorted frame per seed of the arm's contract rows whose origin lies in `months`.
+
+    The four test months come from `backtests/<name>.parquet` and the approved extra months from
+    `backtests/extra_months/<name>.parquet`; no other file is read, and each file must hold only
+    its own months.
+    """
+    assert set(months) <= set(core.SCORABLE_MONTHS), months
+    month = pl.col("power_fcst_init_time").dt.strftime("%Y-%m")
+    parts = []
+    for folder, allowed in (
+        (core.ROOT / "backtests", core.TEST_MONTHS),
+        (core.ROOT / "backtests" / core.EXTRA_FOLDER, core.EXTRA_MONTHS),
+    ):
+        wanted = [m for m in months if m in allowed]
+        if not wanted:
+            continue
+        raw = pl.read_parquet(folder / f"{name}.parquet")
+        held = set(raw.select(month.unique()).to_series().to_list())
+        assert held <= set(allowed), f"{folder / name}.parquet holds {sorted(held - set(allowed))}"
+        assert set(wanted) <= held, f"{folder / name}.parquet lacks {sorted(set(wanted) - held)}"
+        parts.append(raw.filter(month.is_in(wanted)))
+    raw = pl.concat(parts)
     out = {}
     for s in seeds:
         part = raw.filter(pl.col("seed") == s).sort(KEYS)
         assert part.height, (name, s)
+        assert set(part.select(month.unique()).to_series().to_list()) == set(months), (name, s)
         out[s] = part
     return out
 
@@ -170,7 +194,13 @@ def seed_forecast(*, q: dict[tuple[str, int], np.ndarray], name: str, seed: int)
     return q[(name, seed)]
 
 
-def run_score(*, months: tuple[str, ...]) -> None:
+def run_score(*, sets: dict[str, tuple[str, ...]]) -> None:
+    """Score each set of months into `scores/<name>/`, all from one read of the observed power.
+
+    The rows of every set come from one alignment and one `Rows` object, so every set shares one
+    snapshot of the cleaned-power table, which is rewritten every 6 hours.
+    """
+    months = tuple(sorted({m for ms in sets.values() for m in ms}))
     arms = ("split1", "split2", "split3", "hybrid3")
     frames: dict[tuple[str, int], pl.DataFrame] = {}
     for s, fr in read_stored_677(seeds=core.SEEDS, months=months).items():
@@ -183,26 +213,24 @@ def run_score(*, months: tuple[str, ...]) -> None:
         for s, fr in read_backtest(name=arm, seeds=core.SEEDS, months=months).items():
             frames[(arm, s)] = fr
     keys, aligned = align(frames=frames)
+    for n, f in frames.items():
+        assert f.height == keys.height, f"{n} holds rows that another arm lacks"
     rows = Rows(keys=keys)
     q = {n: rows.quantiles(frame=f) for n, f in aligned.items()}
-    ok = rows.ok.copy()
+    del frames, aligned
+    ok_all = rows.ok.copy()
     for arr in q.values():
-        ok &= np.isfinite(arr).all(axis=1)
-    headline = ok & (rows.lead_h < core.HEADLINE_LEAD_HOURS)
-    out = SCORES / "four_months"
-    out.mkdir(parents=True, exist_ok=True)
-    pl.DataFrame({"month": rows.month, "scored": ok, "headline": headline}).group_by("month").agg(
-        rows=pl.len(), scored=pl.col("scored").sum(), headline=pl.col("headline").sum()
-    ).sort("month").write_csv(out / "row_counts.csv")
-
-    # per-seed row losses of every name the contrasts use
+        ok_all &= np.isfinite(arr).all(axis=1)
     names = ("global", *arms, "blend", "pair")
     loss: dict[tuple[str, int], dict[str, np.ndarray]] = {}
     for name in names:
         for s in core.SEEDS:
-            loss[(name, s)] = row_losses(
-                y=rows.y, q=np.where(ok[:, None], seed_forecast(q=q, name=name, seed=s), 0.0)
-            )
+            loss[(name, s)] = {
+                "crps": row_losses(
+                    y=rows.y,
+                    q=np.where(ok_all[:, None], seed_forecast(q=q, name=name, seed=s), 0.0),
+                )["crps"]
+            }
     # arm-level scores use the seed-mean forecast, as the plan states
     mean_q = {
         name: mean_sorted(parts=[seed_forecast(q=q, name=name, seed=s) for s in core.SEEDS])
@@ -210,16 +238,53 @@ def run_score(*, months: tuple[str, ...]) -> None:
     }
     mean_q["global six seeds"] = mean_sorted(parts=[q[("global", s)] for s in range(6)])
     mean_q["manual heuristic"], mean_q["climatology"] = rows.q_heur, rows.q_clim
+    mean_loss = {
+        name: row_losses(y=rows.y, q=np.where(ok_all[:, None], arr, 0.0))
+        for name, arr in mean_q.items()
+    }
+    del q, mean_q
+    for out_name, set_months in sets.items():
+        score_set(
+            rows=rows, loss=loss, mean_loss=mean_loss,
+            ok=ok_all & np.isin(rows.month, list(set_months)), months=set_months,
+            out=SCORES / out_name,
+        )  # fmt: skip
+
+
+def score_set(
+    *,
+    rows: Rows,
+    loss: dict[tuple[str, int], dict[str, np.ndarray]],
+    mean_loss: dict[str, dict[str, np.ndarray]],
+    ok: np.ndarray,
+    months: tuple[str, ...],
+    out: Path,
+) -> None:
+    """Write the tables of one set of months (`ok` holds only that set's scored rows)."""
+    headline = ok & (rows.lead_h < core.HEADLINE_LEAD_HOURS)
+    in_set = np.isin(rows.month, list(months))
+    out.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({"month": rows.month, "scored": ok, "headline": headline}).filter(
+        pl.Series(in_set)
+    ).group_by("month").agg(
+        rows=pl.len(), scored=pl.col("scored").sum(), headline=pl.col("headline").sum()
+    ).sort("month").write_csv(out / "row_counts.csv")
+
     block = core.block_ids(origin_day=rows.origin_day, month=rows.month)
     table, tails = [], []
-    for name, arr in mean_q.items():
-        ls = row_losses(y=rows.y, q=np.where(ok[:, None], arr, 0.0))
+    arm_months = []
+    for name, ls in mean_loss.items():
+        for m in months:
+            sel = headline & (rows.month == m)
+            arm_months.append({"arm": core.ARM_LABEL.get(name, name), "month": m, "rows": int(sel.sum()),
+                             "crps": float(ls["crps"][sel].mean()), "nmae_median": float(ls["mae"][sel].mean())})  # fmt: skip
         table.append({"arm": core.ARM_LABEL.get(name, name), "rows": int(headline.sum()),
                       "crps": float(ls["crps"][headline].mean()), "nmae_median": float(ls["mae"][headline].mean())})  # fmt: skip
         tails.append({"arm": core.ARM_LABEL.get(name, name), **{
             f"{kind}_{t}": float(ls[f"{kind}_{t}"][headline].mean()) for t in TAILS for kind in ("cov", "pin")
         }})  # fmt: skip
     pl.DataFrame(table).write_csv(out / "arms.csv")
+    pl.DataFrame(arm_months).write_csv(out / "arms_by_month.csv")
     pl.DataFrame(tails).write_csv(out / "tails.csv")
 
     def contrast(*, a: str, b: str, mask: np.ndarray, metric: str = "crps") -> dict[str, float]:
@@ -304,8 +369,8 @@ def run_score(*, months: tuple[str, ...]) -> None:
     for b, mask in band_of.items():
         for title, (a, b2) in CONTRASTS.items():
             bands.append({"band": b, "contrast": title, "mean": float(np.mean([(loss[(a, s)]["crps"][mask] - loss[(b2, s)]["crps"][mask]).mean() for s in core.SEEDS]))})  # fmt: skip
-        for name, arr in mean_q.items():
-            bands.append({"band": b, "contrast": f"CRPS of {core.ARM_LABEL.get(name, name)}", "mean": float(row_losses(y=rows.y, q=np.where(ok[:, None], arr, 0.0))["crps"][mask].mean())})  # fmt: skip
+        for name, ls in mean_loss.items():
+            bands.append({"band": b, "contrast": f"CRPS of {core.ARM_LABEL.get(name, name)}", "mean": float(ls["crps"][mask].mean())})  # fmt: skip
     pl.DataFrame(bands).write_csv(out / "lead_bands.csv")
     history = {
         r["label"]: r for r in csv.DictReader(open(core.ROOT / "history_first_clean_reading.csv"))
@@ -566,10 +631,10 @@ def run_match_refit() -> None:
     print("MATCH OK")
 
 
-def run_bank(*, months: tuple[str, ...]) -> None:
+def run_bank(*, months: tuple[str, ...], out: Path) -> None:
     """Return each arm's copied share of the held-out injected shifts (least-squares slope of the median's change on the shift)."""
     labels = [r["label"] for r in sites().iter_rows(named=True)]
-    out = []
+    records = []
     for arm in (*core.ARMS, "global"):
         for month in months:
             for seed in core.SEEDS:
@@ -614,10 +679,10 @@ def run_bank(*, months: tuple[str, ...]) -> None:
                 )
                 for lo, hi in ((0, 336), (0, 24), (24, 72), (72, 168), (168, 336)):
                     part = frame.filter((pl.col("lead_h") >= lo) & (pl.col("lead_h") < hi))
-                    out.append({"arm": arm, "month": month, "seed": seed, "band_h": f"{lo}-{hi}", "rows": part.height,
+                    records.append({"arm": arm, "month": month, "seed": seed, "band_h": f"{lo}-{hi}", "rows": part.height,
                                 "num": float((part["change"] * part["lag_shift"]).sum()), "den": float((part["lag_shift"] ** 2).sum())})  # fmt: skip
     table = (
-        pl.DataFrame(out)
+        pl.DataFrame(records)
         .group_by("arm", "seed", "band_h")
         .agg(num=pl.col("num").sum(), den=pl.col("den").sum(), rows=pl.col("rows").sum())
     )
@@ -631,8 +696,8 @@ def run_bank(*, months: tuple[str, ...]) -> None:
         )
         .sort("band_h", "arm")
     )
-    SCORES.mkdir(parents=True, exist_ok=True)
-    table.write_csv(SCORES / "bank_follow.csv")
+    out.mkdir(parents=True, exist_ok=True)
+    table.write_csv(out / "bank_follow.csv")
     print(table)
 
 
@@ -642,12 +707,25 @@ def main() -> None:
         "mode", choices=("score", "match-stored", "match-refit", "bank", "pilot", "match-bank")
     )
     parser.add_argument("--months", nargs="+", default=list(core.TEST_MONTHS))
+    parser.add_argument(
+        "--out", default="four_months", help="the folder under scores/ for `score` and `bank`"
+    )
+    parser.add_argument(
+        "--also",
+        nargs="+",
+        default=[],
+        help="for `score`: extra sets NAME=MONTH,MONTH scored from the same observed-power snapshot",
+    )
     parser.add_argument("--files", nargs="+", default=[])
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
     months = tuple(args.months)
     if args.mode == "score":
-        run_score(months=months)
+        sets = {args.out: months}
+        for item in args.also:
+            name, listed = item.split("=")
+            sets[name] = tuple(listed.split(","))
+        run_score(sets=sets)
     elif args.mode == "match-stored":
         run_match_stored(months=months)
     elif args.mode == "match-refit":
@@ -658,7 +736,8 @@ def main() -> None:
     elif args.mode == "match-bank":
         run_match_bank(month=months[0], seed=args.seed)
     else:
-        run_bank(months=months)
+        # the four-month run wrote `scores/bank_follow.csv`, before `--out` existed
+        run_bank(months=months, out=SCORES if args.out == "four_months" else SCORES / args.out)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,15 @@ under `arms/global/<month>/pooled/work/fits/P5/`, and `global_pilot` the first r
 `arms/global_pilot/<month>/pooled/work/fits/P5/`. Run `e00702_export.py global_pilot 2026-05
 --seeds 0 --name global_pilot` to write `backtests/global_pilot.parquet`, which `e00702_score.py
 match-refit` reads.
+
+The four test months go to `backtests/<arm>.parquet`. The five extra months that the maintainer
+approved after the four-month screen (`core.EXTRA_MONTHS`) go, with `--extra`, to
+`backtests/extra_months/<arm>.parquet`, after a check that every seed and month holds the keys of
+experiment 677's stored control (16 Primaries x origins x 672 half-hours). `e00702_score.py` reads
+only these two places, so the sanity exports (`backtests/sanity_exports/san_*`) and the first run's
+files (`pilot_2026-05/`) cannot enter a score. No month after 2026-07 is accepted.
+
+    python e00702_export.py split1 2025-12 2026-02 2026-03 2026-05 2026-06 --extra
 """
 
 import argparse
@@ -146,6 +155,28 @@ def arm_rows(
     return frame
 
 
+def check_against_stored(*, frame: pl.DataFrame, months: list[str], seeds: list[int]) -> None:
+    """Assert that each month and seed holds 16 Primaries x origins x 672 half-hours, on the keys of experiment 677's stored control."""
+    stored = (
+        score702.read_stored_677(seeds=(core.SEEDS[0],), months=tuple(months))[core.SEEDS[0]]
+        .select(score702.KEYS)
+        .sort(score702.KEYS)
+    )
+    month = pl.col("power_fcst_init_time").dt.strftime("%Y-%m")
+    for m in months:
+        want = stored.filter(month == m)
+        n_origins = want["power_fcst_init_time"].n_unique()
+        assert want.height == len(LABELS) * n_origins * x667.HALF_HOURS, (m, want.height)
+        for s in seeds:
+            got = (
+                frame.filter((pl.col("seed") == s) & (month == m))
+                .select(score702.KEYS)
+                .sort(score702.KEYS)
+            )
+            assert got.equals(want), f"seed {s} {m}: keys differ from experiment 677's control"
+        print(m, n_origins, "origins,", want.height, "rows per seed: keys equal 677's control")
+
+
 def main() -> None:
     """Write `backtests/<arm><suffix>.parquet`."""
     parser = argparse.ArgumentParser()
@@ -157,14 +188,34 @@ def main() -> None:
     parser.add_argument(
         "--name", default=None, help="output file stem (default: the arm plus the suffix)"
     )
+    parser.add_argument(
+        "--extra",
+        action="store_true",
+        help=f"write the final export of the approved extra months to backtests/{core.EXTRA_FOLDER}/",
+    )
     args = parser.parse_args()
     seeds = args.seeds or list(core.GLOBAL_PAIR_SEEDS if args.arm == "global_pair" else core.SEEDS)
     labels = LABELS if args.primaries == "all" else tuple(args.primaries.split(","))
     assert set(labels) <= set(LABELS), labels
+    assert set(args.months) <= set(core.SCORABLE_MONTHS), (
+        f"only {core.SCORABLE_MONTHS} are approved: {args.months}"
+    )
+    folder = core.ROOT / "backtests"
+    if args.extra:
+        assert set(args.months) == set(core.EXTRA_MONTHS), "an extra-months export holds all five"
+        assert labels == LABELS, "an extra-months export holds all 16 Primaries"
+        assert not args.suffix, "an extra-months export has no suffix"
+        assert args.name is None, "an extra-months export is named after its arm"
+        folder = folder / core.EXTRA_FOLDER
+    elif labels == LABELS and args.name is None:
+        # `e00702_score.py` reads `backtests/<arm>.parquet` for the four test months only
+        assert not set(args.months) & set(core.EXTRA_MONTHS), "export the extra months with --extra"
     frame = arm_rows(
         arm=args.arm, suffix=args.suffix, months=args.months, seeds=seeds, labels=labels
     )
-    target = core.ROOT / "backtests" / f"{args.name or args.arm + args.suffix}.parquet"
+    if args.extra:
+        check_against_stored(frame=frame, months=args.months, seeds=seeds)
+    target = folder / f"{args.name or args.arm + args.suffix}.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(".tmp")
     frame.write_parquet(tmp)

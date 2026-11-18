@@ -285,3 +285,11 @@ def test_fold_span_starts_at_the_floor_or_the_window(month, expected):
     if expected is not None:
         assert (first, last) == expected
     assert (first == floor) == (month in {"2025-11", "2026-01", "2026-04"})
+
+
+def test_scorable_months_are_the_four_test_months_and_the_five_approved_folds():
+    """No month of the final-test window (2026-08 to 2026-10) can be exported or scored."""
+    assert not set(core.TEST_MONTHS) & set(core.EXTRA_MONTHS)
+    assert set(core.SCORABLE_MONTHS) == {*core.TEST_MONTHS, *core.EXTRA_MONTHS}
+    assert len(core.SCORABLE_MONTHS) == 9
+    assert max(core.SCORABLE_MONTHS) == "2026-07"
