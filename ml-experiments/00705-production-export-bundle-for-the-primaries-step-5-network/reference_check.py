@@ -151,7 +151,10 @@ def build_input_matrix(*, rows: pl.DataFrame, lag_power: dict, bundle: dict) -> 
 
 
 def expected_table(*, bundle: dict) -> dict[tuple[int, int], torch.Tensor]:
-    """Return the standardised expected-weather rows, float16 as in the research network, by (primary, grid index)."""
+    """Return the standardised expected-weather rows by (primary, grid index).
+
+    The rows are float16, as in the research network.
+    """
     config = bundle["config"]["components"]["step5"]
     positions = config["expected_weather"]["x37_positions"]
     mean = np.asarray(bundle["standardisers"]["x37"]["mean"], dtype=np.float32)[positions]

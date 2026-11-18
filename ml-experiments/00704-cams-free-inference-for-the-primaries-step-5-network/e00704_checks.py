@@ -2,6 +2,7 @@
 """Experiments 703 and 704: checks that the chain scripts run after the pre-training step.
 
 Usage (with `E00704_ARM` set for `proxy-mean`):
+
 - `python e00704_checks.py stats ARM STATS_NPZ [REFERENCE_NPZ]`: the stored B1 standardiser.
   `drop`: mean exactly 0 and std 1e-6 for the two CAMS columns (positions from
   `c562.TABLE_ARMS["B1"]`). `replay`: the file equals REFERENCE_NPZ (the original experiment's
