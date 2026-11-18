@@ -247,16 +247,16 @@ def needed_variants(*, months: tuple[str, ...]) -> tuple[list[Variant], dict[str
     variants: dict[str, Variant] = {}
     for name, seeds in have.items():
         if seeds:
-            variants[Variant(name, seeds).name] = Variant(name, seeds)
+            variants[Variant(arm=name, seeds=seeds).name] = Variant(arm=name, seeds=seeds)
     for treatment, reference in CONTRASTS.values():
         shared = tuple(sorted(set(have[treatment]) & set(have[reference])))
         if shared:
             for name in (treatment, reference):
-                variants[Variant(name, shared).name] = Variant(name, shared)
+                variants[Variant(arm=name, seeds=shared).name] = Variant(arm=name, seeds=shared)
     for name in (MDE_ARM, "R_24"):
         for part in MDE_HALVES:
             if all(s in have[name] for s in part):
-                variants[Variant(name, part).name] = Variant(name, part)
+                variants[Variant(arm=name, seeds=part).name] = Variant(arm=name, seeds=part)
     return list(variants.values()), have
 
 
@@ -368,7 +368,7 @@ def minimum_detectable_effect(*, rows: dict[str, pl.DataFrame]) -> float | None:
     """
     print("\n== minimum detectable effect, signed-MW six, days 1 to 10 (before any contrast) ==")
     for arm in (MDE_ARM, "R_24"):
-        first, second = (Variant(arm, half).name for half in MDE_HALVES)
+        first, second = (Variant(arm=arm, seeds=half).name for half in MDE_HALVES)
         if first in rows and second in rows:
             a = per_label_fold(rows=rows[first], members=SIGNED)
             b = per_label_fold(rows=rows[second], members=SIGNED)
@@ -721,7 +721,7 @@ def variant_names(
 ) -> tuple[str, str] | None:
     """Return the scored names of a contrast's two arms on their shared seeds, or None."""
     shared = tuple(sorted(set(have[treatment]) & set(have[reference])))
-    first, second = (Variant(a, shared).name for a in (treatment, reference))
+    first, second = (Variant(arm=a, seeds=shared).name for a in (treatment, reference))
     return (first, second) if shared and first in rows and second in rows else None
 
 
@@ -1098,7 +1098,7 @@ def figure_example_forecasts(
     median. The x axis counts hours after the origin.
     """
     print("\n== figure: example forecasts ==")
-    names = {a: Variant(a, have[a]).name for a in EXAMPLE_ARMS if have.get(a)}
+    names = {a: Variant(arm=a, seeds=have[a]).name for a in EXAMPLE_ARMS if have.get(a)}
     if len(names) != len(EXAMPLE_ARMS) or any(n not in frames for n in names.values()):
         print(f"figure not drawn: {EXAMPLE_ARMS} are not both scored")
         return
@@ -1199,7 +1199,7 @@ def main() -> None:
     assert_before_holdout(name="the shared slice table", frame=table)
     print(f"shared half-hours across every arm and reference: {table.height}")
     mde = minimum_detectable_effect(rows=rows)
-    display = [Variant(a, seeds).name for a, seeds in have.items() if seeds]
+    display = [Variant(arm=a, seeds=seeds).name for a, seeds in have.items() if seeds]
     shown = {n: rows[n] for n in (*display, "S0M_w115", *REFERENCE_NAMES) if n in rows}
     metric_tables(rows=shown)
     slice_tables(scored={n: scored[n] for n in shown})

@@ -170,11 +170,6 @@ class Arm:
         parts.append("FT")
         return "→".join(parts)
 
-    @property
-    def pretrained(self) -> bool:
-        """Return whether the fine-tune follows an earlier stage (so it uses the lower rate)."""
-        return self.era or self.ens is not None
-
     def stage_key(self, *, stage: str) -> str:
         """Return the file-name key of the network state after a stage.
 
@@ -209,18 +204,18 @@ class Arm:
 ARMS: Final[dict[str, Arm]] = {
     a.name: a
     for a in (
-        Arm("A_24", era=True, ens=None, ft=W24_STORED, in_full_run=False, stored_folder="A"),
-        Arm("R_24", era=False, ens=None, ft=W24_STORED, in_full_run=False, stored_folder="R"),
-        Arm("A_E24", era=True, ens=W24, ft=W24),
-        Arm("R_E24", era=False, ens=W24, ft=W24),
-        Arm("A_F", era=True, ens=W_F, ft=W24),
-        Arm("R_F", era=False, ens=W_F, ft=W24),
-        Arm("A_12", era=True, ens=None, ft=W12, seeds=THREE_SEEDS),
-        Arm("R_12", era=False, ens=None, ft=W12, seeds=THREE_SEEDS),
-        Arm("A_C", era=True, ens=W_C, ft=W24, seeds=THREE_SEEDS),
-        Arm("R_C", era=False, ens=W_C, ft=W24, seeds=THREE_SEEDS),
-        Arm("A1x_24", era=True, ens=None, ft=W24_STORED, placebo=True, seeds=THREE_SEEDS),
-        Arm("R_F+flags", era=False, ens=W_F, ft=W24, flags=True, seeds=THREE_SEEDS),
+        Arm(name="A_24", era=True, ens=None, ft=W24_STORED, in_full_run=False, stored_folder="A"),
+        Arm(name="R_24", era=False, ens=None, ft=W24_STORED, in_full_run=False, stored_folder="R"),
+        Arm(name="A_E24", era=True, ens=W24, ft=W24),
+        Arm(name="R_E24", era=False, ens=W24, ft=W24),
+        Arm(name="A_F", era=True, ens=W_F, ft=W24),
+        Arm(name="R_F", era=False, ens=W_F, ft=W24),
+        Arm(name="A_12", era=True, ens=None, ft=W12, seeds=THREE_SEEDS),
+        Arm(name="R_12", era=False, ens=None, ft=W12, seeds=THREE_SEEDS),
+        Arm(name="A_C", era=True, ens=W_C, ft=W24, seeds=THREE_SEEDS),
+        Arm(name="R_C", era=False, ens=W_C, ft=W24, seeds=THREE_SEEDS),
+        Arm(name="A1x_24", era=True, ens=None, ft=W24_STORED, placebo=True, seeds=THREE_SEEDS),
+        Arm(name="R_F+flags", era=False, ens=W_F, ft=W24, flags=True, seeds=THREE_SEEDS),
     )
 }
 """Every arm, keyed by name. Seeds and windows follow the plan's arm table.
@@ -230,10 +225,6 @@ its rows); they are fitted on the two gate folds for the refit gate, and the sco
 stored `A` and `R` as `A_24` and `R_24`. `A1x_24` shares `A_24`'s window so that contrast C5
 differs from it by the weather shuffle alone.
 """
-LONG_WINDOW_ARMS: Final[tuple[str, ...]] = tuple(
-    name for name, arm in ARMS.items() if arm.ens is not None and arm.ens.floor_lags
-)
-"""The arms whose `S_ens` window reaches into the back-filled runs before 2024-04-01."""
 
 
 def seeds_for(*, arm: Arm, screen: bool) -> tuple[int, ...]:

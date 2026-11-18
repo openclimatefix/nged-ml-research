@@ -48,7 +48,7 @@ class Setting:
     token: int = 32
 
 
-G09: Final[Setting] = Setting("g09", dropout=0.1)
+G09: Final[Setting] = Setting(name="g09", dropout=0.1)
 """Experiment 397's setting `g09`, which experiment 425 uses: 64 wide, 2 layers, 3 components."""
 FINE_TUNE_LR: Final[float] = 2e-4
 """The learning rate of every fine-tune that follows an earlier stage (experiment 418's arm P1)."""
@@ -96,10 +96,12 @@ def train_network(
     primary: torch.Tensor,
     is_val: torch.Tensor,
     seed: int,
+    max_epochs: int = MAX_EPOCHS,
 ) -> tuple[int, float]:
     """Train in place with weighted negative log-likelihood and early stopping; return the result.
 
-    The best network on the held-out rows is loaded back into `model`.
+    The best network on the held-out rows is loaded back into `model`. Training runs at most
+    `max_epochs` epochs (`MAX_EPOCHS` unless the smoke run lowers it).
 
     Returns:
         The number of epochs run and the best held-out mean negative log-likelihood.
@@ -111,7 +113,7 @@ def train_network(
         model.parameters(), lr=setting.lr, weight_decay=setting.weight_decay
     )
     best, best_state, stale, epochs = float("inf"), None, 0, 0
-    for epoch in range(MAX_EPOCHS):
+    for epoch in range(max_epochs):
         model.train()
         order = train_idx[torch.randperm(len(train_idx), device=x.device)]
         for start in range(0, len(order), BATCH):

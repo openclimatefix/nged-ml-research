@@ -207,7 +207,12 @@ def tensors(
 
 
 def train(
-    *, model: torch.nn.Module, setting: net.Setting, t: dict[str, torch.Tensor], seed: int
+    *,
+    model: torch.nn.Module,
+    setting: net.Setting,
+    t: dict[str, torch.Tensor],
+    seed: int,
+    max_epochs: int,
 ) -> tuple[int, float]:
     """Train a network in place with experiment 397's loop; return epochs and the best loss."""
     return net.train_network(
@@ -219,6 +224,7 @@ def train(
         primary=t["p"],
         is_val=t["v"],
         seed=seed,
+        max_epochs=max_epochs,
     )
 
 
@@ -268,7 +274,13 @@ def era_inputs(
 
 
 def train_era_stage(
-    *, todo: list[Job], fold: folds.Fold, refit: datetime, out_dir: Path, device: str
+    *,
+    todo: list[Job],
+    fold: folds.Fold,
+    refit: datetime,
+    out_dir: Path,
+    device: str,
+    max_epochs: int,
 ) -> None:
     """Train and store the `S_era` state of every (chain, seed) that a pending job needs.
 
@@ -300,7 +312,7 @@ def train_era_stage(
         torch.manual_seed(seed)
         model = net.new_model(n_inputs=width_of(arm=arm), n_primaries=len(fold.target_mean))
         model = model.to(device)
-        epochs, best = train(model=model, setting=net.G09, t=t, seed=seed)
+        epochs, best = train(model=model, setting=net.G09, t=t, seed=seed, max_epochs=max_epochs)
         target = state_path(out_dir=out_dir, key=key, month=f"{refit:%Y-%m}", seed=seed)
         net.atomic_save(state=model.state_dict(), target=target)
         seconds = round(time.monotonic() - started)
@@ -334,6 +346,7 @@ def train_ens_stage(
     out_dir: Path,
     device: str,
     allow_partial: bool,
+    max_epochs: int,
 ) -> dict[str, dict]:
     """Train and store the `S_ens` state of every (chain, seed) that a pending job needs.
 
@@ -396,7 +409,13 @@ def train_ens_stage(
                 )
                 model.load_state_dict(torch.load(era_state))
             model = model.to(device)
-            epochs, best = train(model=model, setting=net.G09, t=cache[arm.flags], seed=job.seed)
+            epochs, best = train(
+                model=model,
+                setting=net.G09,
+                t=cache[arm.flags],
+                seed=job.seed,
+                max_epochs=max_epochs,
+            )
             net.atomic_save(state=model.state_dict(), target=target)
             write_json(
                 payload={
@@ -423,7 +442,13 @@ def train_ens_stage(
 
 
 def fine_tune_stage(
-    *, todo: list[Job], fold: folds.Fold, out_dir: Path, device: str, coverage: dict[str, dict]
+    *,
+    todo: list[Job],
+    fold: folds.Fold,
+    out_dir: Path,
+    device: str,
+    coverage: dict[str, dict],
+    max_epochs: int,
 ) -> None:
     """Fine-tune, forecast, and store every pending job; the forecast file is written last."""
     scale = net.Scale(
@@ -458,7 +483,13 @@ def fine_tune_stage(
             )
             setting = replace(net.G09, lr=net.FINE_TUNE_LR)
         model = model.to(device)
-        epochs, best = train(model=model, setting=setting, t=cache[arm.flags], seed=job.seed)
+        epochs, best = train(
+            model=model,
+            setting=setting,
+            t=cache[arm.flags],
+            seed=job.seed,
+            max_epochs=max_epochs,
+        )
         fitted = net.Fitted(
             model=model, setting=setting, seed=job.seed, epochs=epochs, val_nll=best
         )
@@ -509,8 +540,17 @@ def fine_tune_stage(
     torch.cuda.empty_cache()
 
 
-def run_group(*, group: Group, out_dir: Path, device: str, allow_partial: bool) -> str:
+def run_group(
+    *, group: Group, out_dir: Path, device: str, allow_partial: bool, max_epochs: int
+) -> str:
     """Fit every pending job of a group: the `S_era` states, the `S_ens` states, the fine-tunes.
+
+    Args:
+        group: The jobs of one fold and one fine-tune window.
+        out_dir: Where the outputs go.
+        device: The torch device.
+        allow_partial: Whether a window with missing back-filled runs may be fitted.
+        max_epochs: The most epochs of any stage (`net.MAX_EPOCHS`, or 1 in the smoke run).
 
     Returns:
         A progress line.
@@ -529,7 +569,9 @@ def run_group(*, group: Group, out_dir: Path, device: str, allow_partial: bool) 
         f"{len(todo)} jobs to fit",
         flush=True,
     )
-    train_era_stage(todo=todo, fold=fold, refit=refit, out_dir=out_dir, device=device)
+    train_era_stage(
+        todo=todo, fold=fold, refit=refit, out_dir=out_dir, device=device, max_epochs=max_epochs
+    )
     coverage = train_ens_stage(
         todo=todo,
         fold=fold,
@@ -537,24 +579,36 @@ def run_group(*, group: Group, out_dir: Path, device: str, allow_partial: bool) 
         out_dir=out_dir,
         device=device,
         allow_partial=allow_partial,
+        max_epochs=max_epochs,
     )
-    fine_tune_stage(todo=todo, fold=fold, out_dir=out_dir, device=device, coverage=coverage)
+    fine_tune_stage(
+        todo=todo,
+        fold=fold,
+        out_dir=out_dir,
+        device=device,
+        coverage=coverage,
+        max_epochs=max_epochs,
+    )
     return (
         f"{group.month} {group.ft_window}: {len(todo)} jobs in {time.monotonic() - started:.0f} s"
     )
 
 
-def _initialise_worker(threads: int, max_epochs: int | None) -> None:
-    """Set the thread counts and, for the smoke run, the epoch limit, in a worker process."""
+def _initialise_worker(threads: int) -> None:
+    """Set the torch thread count in a worker process."""
     torch.set_num_threads(threads)
-    if max_epochs is not None:
-        net.MAX_EPOCHS = max_epochs
 
 
-def _run_group_kw(args: tuple[Group, Path, str, bool]) -> str:
+def _run_group_kw(args: tuple[Group, Path, str, bool, int]) -> str:
     """Return `run_group` for a tuple of its arguments, as a picklable function of one argument."""
-    group, out_dir, device, allow_partial = args
-    return run_group(group=group, out_dir=out_dir, device=device, allow_partial=allow_partial)
+    group, out_dir, device, allow_partial, max_epochs = args
+    return run_group(
+        group=group,
+        out_dir=out_dir,
+        device=device,
+        allow_partial=allow_partial,
+        max_epochs=max_epochs,
+    )
 
 
 def refuse_without_gate_marker(*, arm_names: list[str], allowed: bool) -> None:
@@ -624,13 +678,13 @@ def main() -> None:
     refuse_without_gate_marker(arm_names=arm_names, allowed=args.no_gate_marker)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ[var] = str(args.threads)
-    max_epochs = 1 if args.smoke else None
-    work = [(g, out_dir, args.device, args.allow_partial_window) for g in groups]
+    max_epochs = 1 if args.smoke else net.MAX_EPOCHS
+    work = [(g, out_dir, args.device, args.allow_partial_window, max_epochs) for g in groups]
     with ProcessPoolExecutor(
         max_workers=args.workers,
         mp_context=multiprocessing.get_context("spawn"),
         initializer=_initialise_worker,
-        initargs=(args.threads, max_epochs),
+        initargs=(args.threads,),
     ) as pool:
         for line in pool.map(_run_group_kw, work):
             print(line, flush=True)

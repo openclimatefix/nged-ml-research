@@ -237,7 +237,16 @@ def refit_reading(*, arm: str, month: str, seeds: tuple[int, ...], out_dir: Path
         f"{STANDARD_ERRORS * se:.4f}: {'ok' if passed else 'FAIL'}",
         flush=True,
     )
-    return RefitResult(arm, month, refit_score, stored_score, refit_sd, stored_sd, se, passed)
+    return RefitResult(
+        arm=arm,
+        month=month,
+        refit_score=refit_score,
+        stored_score=stored_score,
+        refit_sd=refit_sd,
+        stored_sd=stored_sd,
+        standard_error=se,
+        passed=passed,
+    )
 
 
 def refit_gate(*, months: list[str], seeds: tuple[int, ...], out_dir: Path) -> bool:
