@@ -37,12 +37,17 @@ refit matches a stored fit only to the seed-to-seed noise (`e00707_gate`).
 window, which share the fold's rows and standardiser. `--workers` groups run at once, each with
 `--threads` threads, and share one GPU.
 
+**Set `POLARS_MAX_THREADS` on the command line, as below.** Polars reads it when `polars` is
+imported, and every module here imports `polars` before any code can set it, so an assignment in
+the script would come too late. Spawned workers inherit it.
+
 ```bash
 export PYTHONPATH=$PWD/ml-experiments/00707-ens-backfill-pretraining-gain-against-ens-history-length
 export DATA_PATH_INTERNAL=<path to the private data folder>
 export NGED_S3_BUCKET_URL=https://example.com NGED_S3_BUCKET_ACCESS_KEY=dummy
 export NGED_S3_BUCKET_SECRET=dummy
-OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 systemd-run --user --scope \
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 POLARS_MAX_THREADS=1 \
+    systemd-run --user --scope \
     -p MemoryMax=14G -p MemorySwapMax=0 \
     uv run --no-sync python ml-experiments/00707-*/e00707_fit.py --screen --workers 1 --threads 1
 ```
@@ -619,7 +624,6 @@ def main() -> None:
     refuse_without_gate_marker(arm_names=arm_names, allowed=args.no_gate_marker)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ[var] = str(args.threads)
-    os.environ["POLARS_MAX_THREADS"] = str(args.threads)
     max_epochs = 1 if args.smoke else None
     work = [(g, out_dir, args.device, args.allow_partial_window) for g in groups]
     with ProcessPoolExecutor(

@@ -18,7 +18,15 @@ negative origin days, and `//` floors them, so every week keeps its phase.
 
 The copied parts are experiment 397's `e00397_prep.py` (feature matrix, standardiser, held-out
 weeks, run inputs), experiment 418's `e00418_prep.py` (`dense_weather`), and experiment 48's
-`e00048_build_frames.py` (the archive read). Commands (the environment of `e00707_fit.py` applies):
+`e00048_build_frames.py` (the archive read). The environment of `e00707_fit.py` applies to every
+command.
+
+**Set `POLARS_MAX_THREADS` on the command line**, for example `POLARS_MAX_THREADS=1 uv run
+--no-sync python ml-experiments/00707-*/e00707_prep.py summaries --workers 2`. Polars reads the
+variable when `polars` is imported, which happens before any code in this file can set it, and each
+worker of `summaries` inherits it.
+
+Commands:
 
 - `coverage`: list the back-fill runs that the table holds and those it lacks, and write nothing.
 - `scan`: print the query plan of one run, to confirm that the read prunes to one partition.
@@ -39,7 +47,6 @@ weeks, run inputs), experiment 418's `e00418_prep.py` (`dense_weather`), and exp
 import argparse
 import json
 import multiprocessing
-import os
 import re
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -999,11 +1006,9 @@ def main() -> None:
     )
     parser.add_argument("--run", default="2024-03-31", help="the run for `scan`")
     parser.add_argument("--workers", type=int, default=2)
-    parser.add_argument("--threads", type=int, default=1, help="Polars threads per worker")
     parser.add_argument("--limit", type=int, default=None, help="write at most this many summaries")
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
-    os.environ["POLARS_MAX_THREADS"] = str(args.threads)
     if args.command == "coverage":
         _, missing = coverage()
         if args.require_complete and missing:
