@@ -303,7 +303,7 @@ wheels = [
 [[package]]
 name = "baseline-forecasters"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fbaseline_forecasters&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fbaseline_forecasters&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "contracts" },
     { name = "ml-core" },
@@ -609,7 +609,7 @@ wheels = [
 [[package]]
 name = "contracts"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fcontracts&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fcontracts&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "deltalake" },
     { name = "obstore" },
@@ -795,7 +795,7 @@ wheels = [
 [[package]]
 name = "delta-store"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdelta_store&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdelta_store&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "contracts" },
     { name = "deltalake" },
@@ -888,7 +888,7 @@ wheels = [
 [[package]]
 name = "dynamical-data"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdynamical_data&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdynamical_data&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "contracts" },
     { name = "dynamical-catalog" },
@@ -1089,7 +1089,7 @@ wheels = [
 [[package]]
 name = "geo"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fgeo&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fgeo&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "contracts" },
     { name = "h3" },
@@ -2038,7 +2038,7 @@ wheels = [
 [[package]]
 name = "ml-core"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fml_core&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fml_core&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "contracts" },
     { name = "deltalake" },
@@ -2305,7 +2305,7 @@ wheels = [
 [[package]]
 name = "nged-data"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fnged_data&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fnged_data&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "contracts" },
     { name = "obstore" },
@@ -2372,20 +2372,20 @@ gpu = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
-    { name = "baseline-forecasters", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fbaseline_forecasters&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
-    { name = "contracts", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fcontracts&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
-    { name = "delta-store", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdelta_store&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
+    { name = "baseline-forecasters", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fbaseline_forecasters&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
+    { name = "contracts", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fcontracts&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
+    { name = "delta-store", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdelta_store&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
     { name = "deltalake" },
-    { name = "dynamical-data", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdynamical_data&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
-    { name = "geo", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fgeo&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
+    { name = "dynamical-data", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fdynamical_data&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
+    { name = "geo", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fgeo&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
     { name = "holidays", specifier = ">=0.106" },
     { name = "httpx" },
-    { name = "ml-core", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fml_core&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
-    { name = "nged-data", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fnged_data&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
+    { name = "ml-core", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fml_core&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
+    { name = "nged-data", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fnged_data&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "openpyxl" },
     { name = "patito" },
-    { name = "plotting", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fplotting&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
+    { name = "plotting", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fplotting&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
     { name = "polars", specifier = ">=1.38.1" },
     { name = "pvlib", specifier = ">=0.11.0" },
     { name = "pyarrow" },
@@ -2394,10 +2394,10 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "scipy", specifier = ">=1.18.1" },
     { name = "vl-convert-python", specifier = ">=1.8.0" },
-    { name = "weather-utils", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fweather_utils&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
+    { name = "weather-utils", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fweather_utils&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
     { name = "xarray", specifier = ">=2026.1.0" },
     { name = "xgboost", specifier = ">=2.1.0" },
-    { name = "xgboost-forecaster", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fxgboost_forecaster&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" },
+    { name = "xgboost-forecaster", git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fxgboost_forecaster&rev=f9dcd2277974ffcffd9f7175530660068e5273f4" },
 ]
 
 [package.metadata.requires-dev]
@@ -2919,7 +2919,7 @@ wheels = [
 [[package]]
 name = "plotting"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fplotting&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fplotting&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "altair" },
     { name = "polars" },
@@ -4254,7 +4254,7 @@ wheels = [
 [[package]]
 name = "weather-utils"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fweather_utils&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fweather_utils&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "polars" },
 ]
@@ -4360,7 +4360,7 @@ wheels = [
 [[package]]
 name = "xgboost-forecaster"
 version = "0.2.1"
-source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fxgboost_forecaster&rev=2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff#2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+source = { git = "https://github.com/openclimatefix/nged-substation-forecast?subdirectory=packages%2Fxgboost_forecaster&rev=f9dcd2277974ffcffd9f7175530660068e5273f4#f9dcd2277974ffcffd9f7175530660068e5273f4" }
 dependencies = [
     { name = "contracts" },
     { name = "ml-core" },

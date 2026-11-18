@@ -82,16 +82,16 @@ repository = "https://github.com/openclimatefix/nged-ml-research"
 # listed here, each at the same commit.
 
 [tool.uv.sources]
-baseline_forecasters = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/baseline_forecasters", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-contracts = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/contracts", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-delta_store = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/delta_store", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-dynamical_data = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/dynamical_data", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-geo = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/geo", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-ml_core = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/ml_core", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-nged_data = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/nged_data", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-plotting = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/plotting", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-weather_utils = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/weather_utils", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
-xgboost_forecaster = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/xgboost_forecaster", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+baseline_forecasters = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/baseline_forecasters", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+contracts = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/contracts", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+delta_store = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/delta_store", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+dynamical_data = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/dynamical_data", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+geo = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/geo", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+ml_core = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/ml_core", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+nged_data = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/nged_data", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+plotting = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/plotting", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+weather_utils = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/weather_utils", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
+xgboost_forecaster = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/xgboost_forecaster", rev = "f9dcd2277974ffcffd9f7175530660068e5273f4" }
 
 # --- LINTING AND TYPING CONFIGURATION --- #
 
