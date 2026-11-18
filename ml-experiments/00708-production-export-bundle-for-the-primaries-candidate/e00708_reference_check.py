@@ -23,19 +23,26 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Final
 
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 import torch.nn.functional as F  # noqa: N812  # ty: ignore[unresolved-import]
 
-LEVEL_NAMES = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
-K1_QUANTILE_COLUMNS = (1, 5, 9)
+LEVEL_NAMES: Final = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
+K1_QUANTILE_COLUMNS: Final = (1, 5, 9)
 """Positions of q05, q50, and q95 among the 11 levels: what K1's lags-masked read-out keeps."""
-BASES = ("gap", "ew1", "ew3", "ew7")
-LAGS = ("day", "week")
-SCALE = 10.0
-CLIP = 10.0
+BASES: Final = ("gap", "ew1", "ew3", "ew7")
+LAGS: Final = ("day", "week")
+SCALE: Final = 10.0
+CLIP: Final = 10.0
+
+
+def require(condition: object, message: str) -> None:
+    """Raise `ValueError` with `message` unless `condition` holds (`assert` is skipped under `python -O`)."""
+    if not condition:
+        raise ValueError(message)
 
 
 def read_json(path: Path) -> dict:
@@ -46,7 +53,10 @@ def read_json(path: Path) -> dict:
 def load_bundle(root: Path) -> dict:
     """Load every non-fixture file of the bundle into one dict."""
     manifest = read_json(root / "manifest.json")
-    assert manifest["bundle_format_version"] == "1", manifest["bundle_format_version"]
+    require(
+        manifest["bundle_format_version"] == "1",
+        f"unknown bundle format {manifest['bundle_format_version']}",
+    )
     k1, cand = root / "components" / "k1", root / "components" / "candidate"
     bundle = {
         "manifest": manifest,
@@ -406,7 +416,7 @@ def signal_block(
     for lag, idx, miss in lag_info:
         absent = miss | (idx < 0)
         i = np.clip(idx, 0, None) - first_idx
-        assert (i[~absent] >= 0).all(), "a lag lies before the history window"
+        require((i[~absent] >= 0).all(), "a lag lies before the history window")
         for base, arr in arrays.items():
             val = np.where(absent, np.nan, arr[primary, i])
             own[f"{base}_{lag}"] = val
@@ -504,6 +514,21 @@ def contract_rows(
 
 # --- check --------------------------------------------------------------------------------------
 
+STAGE_TOLERANCE: Final = {
+    "k1_lags_masked_median": "tolerance",
+    "k1_lags_masked_q05_q95": "tolerance",
+    "table_t_entries": "tolerance",
+    "input_matrix_base": "tolerance",
+    "input_matrix_signals": "tolerance",
+    "raw_output": "tolerance",
+    "native_seed_stored_matrix": "quantile_tolerance",
+    "native_seed": "quantile_tolerance",
+    "native_seed_mean": "quantile_tolerance",
+    "contract_seed_mw_over_capacity": "quantile_tolerance",
+    "contract_mean_mw_over_capacity": "quantile_tolerance",
+}
+"""Each checked stage and the tolerance it is held to."""
+
 
 def lag_power_of(*, frame: pl.DataFrame) -> dict[tuple[int, int], float]:
     """Return the fixture's lag power by (primary, grid index)."""
@@ -515,92 +540,218 @@ def lag_power_of(*, frame: pl.DataFrame) -> dict[tuple[int, int], float]:
     }
 
 
-def check_origin(
-    *, root: Path, origin_dir: str, bundle: dict, table: dict, present: dict, worst: dict
-) -> None:
-    """Reproduce one fixture origin and update the largest errors in `worst`."""
+def table_t_arrays(
+    *, primary: np.ndarray, origin_idx: np.ndarray, target_idx: np.ndarray, median: np.ndarray,
+    first_idx: int, width: int, config: dict,
+) -> tuple[np.ndarray, np.ndarray]:  # fmt: skip
+    """Return table T as (16, width) median and source-origin arrays whose column 0 is `first_idx`.
+
+    Entries with no forecast are NaN with source origin -1. The rule is that of `rebuild_table_t`.
+    """
+    entries = rebuild_table_t(
+        primary=primary, origin_idx=origin_idx, target_idx=target_idx, median=median, config=config
+    )
+    t_median = np.full((16, width), np.nan, np.float32)
+    t_origin = np.full((16, width), -1, np.int64)
+    for (p, g), (m, o) in entries.items():
+        t_median[p, g - first_idx] = m
+        t_origin[p, g - first_idx] = o
+    return t_median, t_origin
+
+
+def check_k1_history(*, root: Path, bundle: dict, table: dict, worst: dict) -> dict:
+    """Run K1 on every history row, compare with the stored forecasts, and rebuild the dense table T.
+
+    Returns, per seed, the rebuilt table (median, source origin) and the grid index of its first column.
+    """
     config = bundle["config"]["components"]["candidate"]
-    k1_config = bundle["config"]["components"]["k1"]
-    seeds = bundle["manifest"]["components"]["candidate"]["seeds"]
     names = [c["name"] for c in bundle["columns"]]
-    signal_names = bundle["signal_columns"]["names"]
-    cand = root / "fixtures" / "candidate" / origin_dir
-    k1 = root / "fixtures" / "k1" / origin_dir
-    rows = pl.read_parquet(cand / "input_matrix.parquet")
-    lags = pl.read_parquet(cand / "lag_and_expected_rows.parquet")
-    history = pl.read_parquet(cand / "signal_history.parquet")
-    hist_rows = pl.read_parquet(k1 / "history_rows.parquet")
-    entries = pl.read_parquet(k1 / "table_t_entries.parquet")
-    out = pl.read_parquet(cand / "outputs_native.parquet")
-    primary = rows["primary_index"].to_numpy().astype(np.int64)
-    pt = torch.from_numpy(primary)
-
-    base = build_base_matrix(rows=rows, lag_power=lag_power_of(frame=lags), bundle=bundle)
-    stored_base = rows.select([f"std__{n}" for n in names]).to_numpy().astype(np.float32)
-    worst["input_matrix_base"] = max(
-        worst["input_matrix_base"], float(np.abs(base - stored_base).max())
-    )
-
-    # K1 on the history rows, and table T by the freshest-origin rule
-    h_prim = hist_rows["primary_index"].to_numpy().astype(np.int64)
-    h_x = hist_rows.select([f"std__{n}" for n in names]).to_numpy().astype(np.float32)
-    g_first = int(history["grid_index"].to_numpy().min())
-    g_last = int(history["grid_index"].to_numpy().max())
-    width = g_last - g_first + 1
-    power = np.full((16, width), np.nan, np.float32)
-    power[history["primary_index"].to_numpy(), history["grid_index"].to_numpy() - g_first] = (
-        history["power_fraction"].to_numpy()
-    )
-    e_prim = entries["primary_index"].to_numpy()
-    e_idx = entries["grid_index"].to_numpy()
-    per_seed_rebuilt = []
-    for seed in seeds:
-        q = k1_lags_masked(
-            x=h_x, primary=h_prim, weights=bundle["weights_k1"][seed], table=table, bundle=bundle
-        )
-        want = hist_rows.select([f"k1_{lv}_s{seed}" for lv in ("q05", "q50", "q95")]).to_numpy()
+    hist = pl.read_parquet(root / "fixtures" / "k1" / "history_rows.parquet")
+    h_prim = hist["primary_index"].to_numpy().astype(np.int64)
+    h_x = hist.select([f"std__{n}" for n in names]).to_numpy().astype(np.float32)
+    h_origin = hist["origin_grid_index"].to_numpy()
+    h_target = hist["target_grid_index"].to_numpy()
+    first_idx = int(h_target.min())
+    width = int(h_target.max()) - first_idx + 1
+    out = {}
+    for seed in bundle["manifest"]["components"]["candidate"]["seeds"]:
+        q = np.concatenate(
+            [
+                k1_lags_masked(
+                    x=h_x[a : a + 20_000], primary=h_prim[a : a + 20_000],
+                    weights=bundle["weights_k1"][seed], table=table, bundle=bundle,
+                )
+                for a in range(0, len(h_x), 20_000)
+            ]
+        )  # fmt: skip
+        want = hist.select([f"k1_{lv}_s{seed}" for lv in ("q05", "q50", "q95")]).to_numpy()
         worst["k1_lags_masked_median"] = max(
             worst["k1_lags_masked_median"], float(np.abs(q[:, 1] - want[:, 1]).max())
         )
         worst["k1_lags_masked_q05_q95"] = max(
             worst["k1_lags_masked_q05_q95"], float(np.abs(q[:, [0, 2]] - want[:, [0, 2]]).max())
         )
-        rebuilt = rebuild_table_t(
-            primary=h_prim,
-            origin_idx=hist_rows["origin_grid_index"].to_numpy(),
-            target_idx=hist_rows["target_grid_index"].to_numpy(),
-            median=q[:, 1],
-            config=config,
+        t_median, t_origin = table_t_arrays(
+            primary=h_prim, origin_idx=h_origin, target_idx=h_target, median=q[:, 1],
+            first_idx=first_idx, width=width, config=config,
+        )  # fmt: skip
+        out[seed] = (t_median, t_origin)
+    print(
+        f"K1 history rows checked: {hist.height} rows, {len(np.unique(h_origin))} daily origins",
+        flush=True,
+    )
+    return {"first_idx": first_idx, "tables": out}
+
+
+def check_contract(
+    *,
+    contract: pl.DataFrame,
+    bundle: dict,
+    primary: np.ndarray,
+    valid: np.ndarray,
+    origin: np.ndarray,
+    per_seed: list[np.ndarray],
+    seeds: list[int],
+    worst: dict,
+) -> None:
+    """Compare the contract file's columns, dtypes, keys, and megawatts with the reference's."""
+    shared = bundle["config"]["shared"]
+    schema = {c: str(t) for c, t in contract.schema.items()}
+    require(schema == shared["contract_schema"], f"contract dtypes differ: {schema}")
+    mask, mw, mw_mean = contract_rows(
+        per_seed=per_seed, primary=primary, valid=valid, origin=origin, bundle=bundle
+    )
+    require(
+        contract.height == int(mask.sum()),
+        f"contract has {contract.height} rows, expected {int(mask.sum())}",
+    )
+    ts_ids = np.array([p["time_series_id"] for p in bundle["primaries"]["primaries"]])
+    require(
+        np.array_equal(contract["time_series_id"].to_numpy(), ts_ids[primary[mask]]),
+        "contract time_series_id differs",
+    )
+    require(
+        np.array_equal(
+            contract["valid_time"].dt.epoch("us").to_numpy().astype("datetime64[us]"), valid[mask]
+        ),
+        "contract valid_time differs",
+    )
+    shift = np.timedelta64(
+        shared["contract_origin_hour_utc"] - shared["native_origin_hour_utc"], "h"
+    )
+    contract_origin = (origin + shift)[mask]
+    got_init = contract["power_fcst_init_time"].dt.epoch("us").to_numpy().astype("datetime64[us]")
+    require(
+        np.array_equal(got_init, contract_origin),
+        "contract power_fcst_init_time is not the native origin plus 3 h",
+    )
+    got_nwp = contract["nwp_init_time"].dt.epoch("us").to_numpy().astype("datetime64[us]")
+    require(
+        np.array_equal(got_nwp, contract_origin.astype("datetime64[D]").astype("datetime64[us]")),
+        "contract nwp_init_time is not 00:00 UTC of the origin day",
+    )
+    capacity = np.array([p["capacity_mw"] for p in bundle["primaries"]["primaries"]])[primary[mask]]
+    for k, seed in enumerate(seeds):
+        want = contract.select([f"{lv}_s{seed}_mw" for lv in LEVEL_NAMES]).to_numpy()
+        worst["contract_seed_mw_over_capacity"] = max(
+            worst["contract_seed_mw_over_capacity"],
+            float((np.abs(mw[k][mask] - want) / capacity[:, None]).max()),
         )
-        stored_t = entries[f"t_median_s{seed}"].to_numpy()
-        stored_o = entries[f"t_origin_grid_index_s{seed}"].to_numpy()
-        got = np.array([rebuilt[(int(p), int(i))][0] for p, i in zip(e_prim, e_idx, strict=True)])
-        got_o = np.array([rebuilt[(int(p), int(i))][1] for p, i in zip(e_prim, e_idx, strict=True)])
+    want_mean = contract.select([f"{lv}_mw" for lv in LEVEL_NAMES]).to_numpy()
+    worst["contract_mean_mw_over_capacity"] = max(
+        worst["contract_mean_mw_over_capacity"],
+        float((np.abs(mw_mean[mask] - want_mean) / capacity[:, None]).max()),
+    )
+
+
+def check_origin(
+    *, root: Path, origin_dir: str, bundle: dict, table: dict, present: dict, dense: dict
+) -> dict:
+    """Reproduce one fixture folder and return the largest error per stage."""
+    worst = dict.fromkeys(STAGE_TOLERANCE, 0.0)
+    config = bundle["config"]["components"]["candidate"]
+    seeds = bundle["manifest"]["components"]["candidate"]["seeds"]
+    names = [c["name"] for c in bundle["columns"]]
+    signal_names = bundle["signal_columns"]["names"]
+    cand = root / "fixtures" / "candidate" / origin_dir
+    rows = pl.read_parquet(cand / "input_matrix.parquet")
+    lags = pl.read_parquet(cand / "lag_and_expected_rows.parquet")
+    history = pl.read_parquet(cand / "signal_history.parquet")
+    out = pl.read_parquet(cand / "outputs_native.parquet")
+    primary = rows["primary_index"].to_numpy().astype(np.int64)
+    pt = torch.from_numpy(primary)
+    if (
+        cand / "expected_rows_override.parquet"
+    ).exists():  # a missing weather run in the synthetic case
+        override = pl.read_parquet(cand / "expected_rows_override.parquet")
+        table = dict(table)
+        present = dict(present)
+        positions = config["expected_weather"]["x37_positions"]
+        o_names = [bundle["columns"][i]["name"] for i in positions]
+        z16 = override.select([f"std_f16__{n}" for n in o_names]).to_numpy().astype(np.float16)
+        o_origin = override["run_origin_time"].dt.epoch("us").to_numpy()
+        for i, key in enumerate(
+            zip(override["primary_index"].to_list(), override["grid_index"].to_list(), strict=True)
+        ):
+            table[key] = torch.from_numpy(z16[i])
+            present[key] = bool(o_origin[i] > 0)
+
+    base = build_base_matrix(rows=rows, lag_power=lag_power_of(frame=lags), bundle=bundle)
+    stored_base = rows.select([f"std__{n}" for n in names]).to_numpy().astype(np.float32)
+    worst["input_matrix_base"] = float(np.abs(base - stored_base).max())
+
+    # the power history, and table T rebuilt from K1's forecasts (the dense table a daily store holds)
+    g_first = int(history["grid_index"].to_numpy().min())
+    g_last = int(history["grid_index"].to_numpy().max())
+    width = g_last - g_first + 1
+    power = np.full((16, width), np.nan, np.float32)
+    h_prim = history["primary_index"].to_numpy()
+    h_col = history["grid_index"].to_numpy() - g_first
+    power[h_prim, h_col] = history["power_fraction"].to_numpy()
+    require(g_first >= dense["first_idx"], "the history window starts before the K1 history rows")
+    lo = g_first - dense["first_idx"]
+    blanks = (
+        pl.read_parquet(cand / "t_blank.parquet") if (cand / "t_blank.parquet").exists() else None
+    )
+    t_by_seed = {}
+    for seed in seeds:
+        t_median = dense["tables"][seed][0][:, lo : lo + width].copy()
+        t_origin = dense["tables"][seed][1][:, lo : lo + width].copy()
+        if blanks is not None:  # an emptied table T span of the synthetic case
+            for p, a, b in zip(
+                blanks["primary_index"],
+                blanks["first_grid_index"],
+                blanks["end_grid_index"],
+                strict=True,
+            ):
+                t_median[p, a - g_first : b - g_first] = np.nan
+                t_origin[p, a - g_first : b - g_first] = -1
+        stored = np.full((16, width), np.nan, np.float32)
+        stored[h_prim, h_col] = history[f"t_dense_median_s{seed}"].to_numpy()
+        stored_origin = np.full((16, width), -1, np.int64)
+        stored_origin[h_prim, h_col] = history[f"t_dense_origin_grid_index_s{seed}"].to_numpy()
+        require(
+            np.array_equal(np.isfinite(stored), np.isfinite(t_median)),
+            "table T has different empty entries",
+        )
+        require(
+            np.array_equal(stored_origin, t_origin), "a table T entry has a different source origin"
+        )
+        both = np.isfinite(stored)
         worst["table_t_entries"] = max(
-            worst["table_t_entries"], float(np.abs(got - stored_t).max())
+            worst["table_t_entries"], float(np.abs(stored[both] - t_median[both]).max())
         )
-        assert np.array_equal(got_o, stored_o), "a table T entry has a different source origin"
-        t_median = np.full((16, width), np.nan, np.float32)
-        t_median[
-            history["primary_index"].to_numpy(), history["grid_index"].to_numpy() - g_first
-        ] = history[f"t_median_s{seed}"].to_numpy()
-        stored_median = t_median.copy()
-        t_median[e_prim, e_idx - g_first] = got.astype(
-            np.float32
-        )  # the rebuilt entries replace the stored ones
-        per_seed_rebuilt.append((t_median, stored_median))
+        t_by_seed[seed] = t_median
     day_idx = rows["raw__day_lag_grid_index"].to_numpy().astype(np.int64)
     week_idx = rows["raw__week_lag_grid_index"].to_numpy().astype(np.int64)
     day_miss, week_miss = base[:, 38] > 0.5, base[:, 41] > 0.5
     n_extra = config["n_extra"]
-    start = config["n_base_columns"]
     per_seed_q = []
-    for k, seed in enumerate(seeds):
+    for seed in seeds:
         weights = bundle["weights_candidate"][seed]
-        t_rebuilt, _ = per_seed_rebuilt[k]
         extras = signal_block(
             primary=primary, day_idx=day_idx, week_idx=week_idx, day_miss=day_miss, week_miss=week_miss,
-            power=power, table_median=t_rebuilt, first_idx=g_first, present=present,
+            power=power, table_median=t_by_seed[seed], first_idx=g_first, present=present,
             neighbours=bundle["neighbours"], names=signal_names, config=config,
         )  # fmt: skip
         stored_extras = (
@@ -611,7 +762,10 @@ def check_origin(
         )
         stored_x = np.concatenate([stored_base, stored_extras], axis=1)
         rebuilt_x = np.concatenate([base, extras], axis=1)
-        assert stored_x.shape[1] == start + n_extra
+        require(
+            stored_x.shape[1] == config["n_base_columns"] + n_extra,
+            "fixture matrix has the wrong width",
+        )
         with torch.no_grad():
             raw = forward(
                 w=weights,
@@ -641,38 +795,15 @@ def check_origin(
         per_seed_q.append(q_end)
     mean = np.sort(np.mean(np.stack(per_seed_q), axis=0, dtype=np.float32), axis=1)
     want_mean = out.select([f"{lv}_mean" for lv in LEVEL_NAMES]).to_numpy()
-    worst["native_seed_mean"] = max(
-        worst["native_seed_mean"], float(np.abs(mean - want_mean).max())
-    )
+    worst["native_seed_mean"] = float(np.abs(mean - want_mean).max())
     valid = rows["valid_time"].dt.epoch("us").to_numpy().astype("datetime64[us]")
     origin = rows["origin_time"].dt.epoch("us").to_numpy().astype("datetime64[us]")
-    mask, _, mw_mean = contract_rows(
-        per_seed=per_seed_q, primary=primary, valid=valid, origin=origin, bundle=bundle
-    )
-    contract = pl.read_parquet(cand / "outputs_contract.parquet")
-    assert contract.height == int(mask.sum()), (contract.height, int(mask.sum()))
-    want_mw = contract.select([f"{lv}_mw" for lv in LEVEL_NAMES]).to_numpy()
-    capacity = np.array([p["capacity_mw"] for p in bundle["primaries"]["primaries"]])[primary[mask]]
-    worst["contract_mw_over_capacity"] = max(
-        worst["contract_mw_over_capacity"],
-        float((np.abs(mw_mean[mask] - want_mw) / capacity[:, None]).max()),
-    )
-    assert k1_config["n_extra"] == 0
-    print(f"{origin_dir}: rows {rows.height}, history rows {hist_rows.height}", flush=True)
-
-
-STAGE_TOLERANCE = {
-    "k1_lags_masked_median": "tolerance",
-    "k1_lags_masked_q05_q95": "tolerance",
-    "table_t_entries": "tolerance",
-    "input_matrix_base": "tolerance",
-    "input_matrix_signals": "tolerance",
-    "raw_output": "tolerance",
-    "native_seed_stored_matrix": "quantile_tolerance",
-    "native_seed": "quantile_tolerance",
-    "native_seed_mean": "quantile_tolerance",
-    "contract_mw_over_capacity": "quantile_tolerance",
-}
+    check_contract(
+        contract=pl.read_parquet(cand / "outputs_contract.parquet"), bundle=bundle, primary=primary,
+        valid=valid, origin=origin, per_seed=per_seed_q, seeds=seeds, worst=worst,
+    )  # fmt: skip
+    print(f"{origin_dir}: rows {rows.height}", flush=True)
+    return worst
 
 
 def check(*, root: Path, tolerance: float, quantile_tolerance: float) -> bool:
@@ -680,24 +811,31 @@ def check(*, root: Path, tolerance: float, quantile_tolerance: float) -> bool:
     bundle = load_bundle(root)
     table = expected_table(bundle=bundle)
     present = weather_present(bundle=bundle)
-    worst = dict.fromkeys(STAGE_TOLERANCE, 0.0)
+    overall = dict.fromkeys(STAGE_TOLERANCE, 0.0)
+    dense = check_k1_history(root=root, bundle=bundle, table=table, worst=overall)
+    per_origin = {}
     for origin_dir in sorted((root / "fixtures" / "candidate").glob("origin=*")):
-        check_origin(
+        per_origin[origin_dir.name] = check_origin(
             root=root,
             origin_dir=origin_dir.name,
             bundle=bundle,
             table=table,
             present=present,
-            worst=worst,
+            dense=dense,
         )
+        for name, value in per_origin[origin_dir.name].items():
+            overall[name] = max(overall[name], value)
     limits = {"tolerance": tolerance, "quantile_tolerance": quantile_tolerance}
     ok = True
-    for name, value in worst.items():
+    for name, value in overall.items():
         limit = limits[STAGE_TOLERANCE[name]]
         ok &= value <= limit
         print(
             f"max error {name}: {value:.3e} ({'ok' if value <= limit else 'FAIL'}, tolerance {limit:g})"
         )
+    for origin_dir, worst in per_origin.items():
+        if "synthetic" in origin_dir:
+            print(f"{origin_dir}:", {k: float(f"{v:.3e}") for k, v in worst.items()})
     return ok
 
 

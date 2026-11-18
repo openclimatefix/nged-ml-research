@@ -311,58 +311,283 @@ signal_names = [sig.ALL_NAMES[c] for c in columns]
 n_extra = len(columns)
 assert first["x"].shape[1] == 60 + n_extra, first["x"].shape
 
-# K1 history rows: the rows of the three origins before each fixture origin, from the test rows and the previous month's
-hist_parts = []
-for o_us in ORIGINS_US:
-    o_idx = int((o_us - GRID_START_US) // STEP_US)
-    for k in HISTORY_ORIGINS:
-        for month, t in ((ARGS.month, test), (cand_globals["fold"].PREVIOUS_MONTH, ref)):
-            lead = t.target_idx - t.origin_idx
-            sel = np.nonzero((t.origin_idx == o_idx - 48 * k) & (lead >= 1) & (lead <= 48))[0]
-            if len(sel):
-                hist_parts.append((o_idx, k, month, t, sel))
-hist = {
-    k: []
-    for k in (
-        "fixture_origin_idx",
-        "k",
-        "source",
-        "x",
-        "primary",
-        "origin_idx",
-        "target_idx",
-        "origin",
-        "valid",
+# --- the dense table T: K1's lags-masked forecast at every daily origin of the history window -------
+# The research table has whole-day holes (purge windows around held-out weeks), so a production
+# store of K1's daily forecasts is denser than the table the Candidate trained on. The history rows
+# are every daily origin's first 48 half-hours, built by experiment 574's `build_test` (the code that
+# built the fold month's test rows) with the fold's standardiser, for the months the window touches.
+HISTORY_DAYS = 180
+ORIGIN_IDX = np.array([int((o - GRID_START_US) // STEP_US) for o in ORIGINS_US])
+LAST_T_IDX = int(ORIGIN_IDX.max()) - 48  # the newest grid index that any fixture origin reads
+ORIGIN_LO = int(ORIGIN_IDX.min()) - 48 - HISTORY_DAYS * 48 - 96
+ORIGIN_HI = (
+    LAST_T_IDX - 48
+)  # the freshest origin that table T entries up to LAST_T_IDX can come from
+months = []
+cursor = datetime.fromtimestamp((GRID_START_US + ORIGIN_LO * STEP_US) / 1e6, UTC).replace(
+    day=1, hour=0
+)
+stop = datetime.fromtimestamp((GRID_START_US + ORIGIN_HI * STEP_US) / 1e6, UTC)
+while cursor <= stop:
+    months.append(f"{cursor:%Y-%m}")
+    cursor = cursor.replace(year=cursor.year + (cursor.month == 12), month=cursor.month % 12 + 1)
+dense: dict[str, list] = {k: [] for k in ("x", "primary", "origin_idx", "target_idx")}
+for month in months:
+    t = STATE["tests"].get(month)
+    owned = t is None
+    if owned:
+        fit.CHECK["months"].setdefault(month, {})
+        t = _final_build_test(month=month, standardiser=std)
+    lead = t.target_idx - t.origin_idx
+    keep = np.nonzero(
+        (lead >= 1) & (lead <= 48) & (t.origin_idx >= ORIGIN_LO) & (t.origin_idx <= ORIGIN_HI)
+    )[0]
+    for k, v in (
+        ("x", t.x),
+        ("primary", t.primary),
+        ("origin_idx", t.origin_idx),
+        ("target_idx", t.target_idx),
+    ):
+        dense[k].append(np.array(v[keep]))
+    STATE.get("raw37_of", {}).pop(month, None)
+    print("dense history rows", month, len(keep), flush=True)
+    del t
+dense_np = {k: np.concatenate(v) for k, v in dense.items()}
+n_days = (ORIGIN_HI - ORIGIN_LO) // 48 + 1
+assert len(dense_np["x"]) == n_days * 16 * 48, (len(dense_np["x"]), n_days)
+assert len(
+    np.unique(
+        key_of(
+            primary=dense_np["primary"],
+            origin_idx=dense_np["origin_idx"],
+            target_idx=dense_np["target_idx"],
+        )
     )
-}
-hist_q = {s: [] for s in ARGS.seeds}
-for o_idx, k, month, t, sel in hist_parts:
-    hist["fixture_origin_idx"].append(np.full(len(sel), o_idx))
-    hist["k"].append(np.full(len(sel), k))
-    hist["source"].append(np.full(len(sel), int(month == ARGS.month)))
-    hist["x"].append(np.array(t.x[sel]))
-    hist["primary"].append(np.array(t.primary[sel]))
-    hist["origin_idx"].append(np.array(t.origin_idx[sel]))
-    hist["target_idx"].append(np.array(t.target_idx[sel]))
-    hist["origin"].append(np.array(t.origin[sel]))
-    hist["valid"].append(np.array(t.valid[sel]))
-    for s in ARGS.seeds:
-        hist_q[s].append(STATE["k1"][(month, s)][sel])
-hist = {k: np.concatenate(v) for k, v in hist.items()}
+) == len(dense_np["x"])
+
+aux = cand_globals["aux"]
+step2_dir = Path(ARGS.chain_work) / "step2" / "P5"
+device = "cuda"
+tm, ts = rows.target_mean, rows.target_std
+dense_q: dict[int, np.ndarray] = {}
+dense_table: dict = {}
+sparse_table: dict = {}
 for s in ARGS.seeds:
-    hist[f"k1_q_s{s}"] = np.concatenate(hist_q[s])
-# every (fixture origin, history origin) pair has all 16 Primaries and 48 leads
-assert len(hist["x"]) == len(ORIGINS_US) * len(HISTORY_ORIGINS) * 16 * 48, len(hist["x"])
+    k1 = aux.AuxLagMdn(
+        n_primaries=16, stage="ft", n_knots=fit.KNOTS, n_b1=fit.N_B1, kind="shared"
+    ).to(device)
+    k1.load_state_dict(_orig_load(step2_dir / f"{ARGS.month}_s{s}.pt", map_location=device))
+    k1.table = ctx["table_ft"]
+    dense_q[s] = _orig_masked(
+        model=k1,
+        x=dense_np["x"],
+        primary=dense_np["primary"],
+        target_mean=tm,
+        target_std=ts,
+        device=device,
+    )
+    dense_table[s] = s598.build_lag_free_table(
+        prim=dense_np["primary"], origin_idx=dense_np["origin_idx"], target_idx=dense_np["target_idx"],
+        median=dense_q[s][:, 1], n_primaries=16, n_grid=cand_globals["GRID_SHAPE"][1],
+    )  # fmt: skip
+    z_sparse = np.load(Path(ARGS.scratch) / "tables" / "predict" / f"T_{ARGS.month}_s{s}.npz")
+    sparse_table[s] = s598.LagFreeTable(
+        median=z_sparse["median"], origin_idx=z_sparse["origin_idx"]
+    )
+    del k1
+torch.cuda.empty_cache()
+
+# the Candidate's forecasts with the dense table, through the research code path
+cand_models = {}
+for s in ARGS.seeds:
+    model = cand_globals["new_model"](n_primaries=16).to(device)
+    model.load_state_dict(
+        _orig_load(
+            SOURCE / "work" / "models" / "P5" / f"{ARGS.month}_d0_s{s}.pt", map_location=device
+        )
+    )
+    model.eval()
+    cand_models[s] = model
+origin_ft = np.asarray(ctx["origin_ft"])
+NB_READ = cand_globals["NB_READ"]
+
+
+def extras_of(*, x_rows, prim, origin_idx_rows, power, table, weather_origin) -> np.ndarray:
+    """Return the Candidate's signal columns for rows, through experiment 613's `signal_columns`."""
+    return sig.signal_columns(
+        prim=prim, origin_idx=origin_idx_rows, day_idx=x_rows[:, 43].astype(np.int64),
+        week_idx=x_rows[:, 44].astype(np.int64), day_missing=x_rows[:, 38] > 0.5,
+        week_missing=x_rows[:, 41] > 0.5, power_lag=power, power_sig=power, table=table,
+        nb=NB_READ, weather_origin=weather_origin, columns=columns,
+    )  # fmt: skip
+
+
+def outputs_of(*, model, x_rows, prim, expected_table) -> tuple[np.ndarray, np.ndarray]:
+    """Return the raw outputs and sorted quantiles (fraction of capacity), as experiment 510 does."""
+    model.table = expected_table
+    xt = torch.from_numpy(x_rows).to(device)
+    p = torch.from_numpy(prim).to(device)
+    with torch.no_grad():
+        raw = model(xt, p).float().cpu().numpy()
+    q = c510.serving_quantiles(model=model, x=xt, p=p, outlier=False)
+    mu = torch.from_numpy(tm).to(device)[p][:, None]
+    sd = torch.from_numpy(ts).to(device)[p][:, None]
+    return raw, torch.sort(q * sd + mu, dim=1).values.float().cpu().numpy()
+
+
+fix_x = test.x[pos][:, :60]
+fix_prim, fix_oidx = test.primary[pos], test.origin_idx[pos]
+dense_out: dict[str, np.ndarray] = {}
+sparse_replication = {}
+for s in ARGS.seeds:
+    # the research table reproduces the stored extras and the stored quantiles (a check of this function)
+    again = extras_of(
+        x_rows=fix_x,
+        prim=fix_prim,
+        origin_idx_rows=fix_oidx,
+        power=ctx["clean"],
+        table=sparse_table[s],
+        weather_origin=origin_ft,
+    )
+    raw_s, q_s = outputs_of(
+        model=cand_models[s],
+        x_rows=np.concatenate([fix_x, again], axis=1),
+        prim=fix_prim,
+        expected_table=ctx["table_ft"],
+    )
+    call = next(c for c in STATE["calls"] if c["seed"] == s)
+    sparse_replication[s] = {
+        "extras_max_abs_diff": float(np.abs(again - call["x"][:, 60:]).max()),
+        "quantiles_max_abs_diff": float(np.abs(q_s - call["q_fix"]).max()),
+        "raw_out_max_abs_diff": float(np.abs(raw_s - call["raw_out"]).max()),
+    }
+    extras_d = extras_of(
+        x_rows=fix_x,
+        prim=fix_prim,
+        origin_idx_rows=fix_oidx,
+        power=ctx["clean"],
+        table=dense_table[s],
+        weather_origin=origin_ft,
+    )
+    raw_d, q_d = outputs_of(
+        model=cand_models[s],
+        x_rows=np.concatenate([fix_x, extras_d], axis=1),
+        prim=fix_prim,
+        expected_table=ctx["table_ft"],
+    )
+    (
+        dense_out[f"extras_dense_s{s}"],
+        dense_out[f"raw_out_dense_s{s}"],
+        dense_out[f"q_fix_dense_s{s}"],
+    ) = extras_d, raw_d, q_d
+print("sparse-table replication", sparse_replication, flush=True)
+
+# dense table against the research table where the research table is filled by test rows of the same origin
+overlap = {}
+for s in ARGS.seeds:
+    both = (
+        np.isfinite(dense_table[s].median)
+        & np.isfinite(sparse_table[s].median)
+        & (dense_table[s].origin_idx == sparse_table[s].origin_idx)
+    )
+    overlap[s] = {
+        "entries_with_equal_source_origin": int(both.sum()),
+        "max_abs_diff": float(
+            np.abs(dense_table[s].median[both] - sparse_table[s].median[both]).max()
+        ),
+        "research_entries_filled": int(np.isfinite(sparse_table[s].median).sum()),
+        "dense_entries_filled": int(np.isfinite(dense_table[s].median).sum()),
+    }
+print("dense vs research table", overlap, flush=True)
+
+# --- the synthetic case: one fixture origin with absent power, an emptied table T span, and a missing weather run ---
+V_US = ORIGINS_US[1]
+V_IDX = int((V_US - GRID_START_US) // STEP_US)
+v_sel = np.nonzero(test.origin[pos] == V_US)[0]
+v_prim = fix_prim[v_sel]
+clean_mod = np.array(ctx["clean"], dtype=np.float32)
+nb_of = cand_globals["NB"].of
+with_nb = [p for p in range(16) if nb_of.get(p)]
+without_nb = [p for p in range(16) if not nb_of.get(p)]
+last = V_IDX - 48
+case = {
+    "own_day_lag_absent": 3,
+    "own_week_lag_absent": 5,
+    "long_gap_before_day_lag": 6,
+    "own_and_neighbours_absent": next(p for p in with_nb if p > 6),
+    "neighbours_absent_at_day_lag": next(p for p in with_nb if p > 8),
+    "table_t_empty_long": 2,
+    "table_t_empty_at_day_lag": 11,
+    "weather_run_missing_day": 4,
+    "weather_run_missing_week": 8,
+    "primary_without_neighbours": without_nb[0] if without_nb else None,
+}
+clean_mod[case["own_day_lag_absent"], V_IDX - 120 : V_IDX - 47] = np.nan
+clean_mod[case["own_week_lag_absent"], last - 335 : last - 299] = np.nan
+p_c = case["own_and_neighbours_absent"]
+clean_mod[[p_c, *nb_of[p_c]], last - 1700 : last - 299] = (
+    np.nan
+)  # long enough for the 7-day average to lose its weight
+clean_mod[case["long_gap_before_day_lag"], last - 1700 : last - 59] = np.nan
+p_d = case["neighbours_absent_at_day_lag"]
+clean_mod[nb_of[p_d], V_IDX - 120 : V_IDX - 47] = np.nan
+t_blank = [  # (Primary, first grid index, one past the last)
+    (case["table_t_empty_long"], last - 200, last - 99),
+    (case["table_t_empty_at_day_lag"], last - 19, last + 1),
+]
+weather_blank = [
+    (case["weather_run_missing_day"], V_IDX - 60, V_IDX - 29),
+    (case["weather_run_missing_week"], last - 335, last - 305),
+]
+v_oft = origin_ft.copy()
+v_table = ctx["table_ft"].clone()
+for p, a, b in weather_blank:
+    v_oft[p, a:b] = 0
+    v_table[p, a:b] = 0
+v_x = np.array(fix_x[v_sel])
+v_x[:, 37:45] = fit.block_of(
+    clean=clean_mod, primary=v_prim, target_idx=test.target_idx[pos][v_sel],
+    origin_idx=fix_oidx[v_sel],
+)  # fmt: skip
+v_out: dict[str, np.ndarray] = {"v_x": v_x, "v_clean": clean_mod}
+v_branches = {}
+for s in ARGS.seeds:
+    t_med, t_org = dense_table[s].median.copy(), dense_table[s].origin_idx.copy()
+    for p, a, b in t_blank:
+        t_med[p, a:b] = np.nan
+        t_org[p, a:b] = -1
+    table_mod = s598.LagFreeTable(median=t_med, origin_idx=t_org)
+    ex = extras_of(
+        x_rows=v_x,
+        prim=v_prim,
+        origin_idx_rows=fix_oidx[v_sel],
+        power=clean_mod,
+        table=table_mod,
+        weather_origin=v_oft,
+    )
+    raw_v, q_v = outputs_of(
+        model=cand_models[s],
+        x_rows=np.concatenate([v_x, ex], axis=1),
+        prim=v_prim,
+        expected_table=v_table,
+    )
+    v_out[f"v_extras_s{s}"], v_out[f"v_raw_out_s{s}"], v_out[f"v_q_s{s}"] = ex, raw_v, q_v
+    if s == ARGS.seeds[0]:
+        v_branches = {
+            n: int((ex[:, signal_names.index(n)] > 0.5).sum())
+            for n in signal_names
+            if n.endswith(("_missing", "_none")) or n.startswith("exp_missing")
+        }
+print("synthetic case rows with each flag set", v_branches, flush=True)
 
 # expected-weather rows read by the fixtures: the lag windows of each fixture origin and every lag index of the history rows
 need_parts = []
-for o_us in ORIGINS_US:
-    o_idx = int((o_us - GRID_START_US) // STEP_US)
+for o_idx in ORIGIN_IDX:
     window = np.arange(o_idx - 48 - 335, o_idx - 48 + 1)
     need_parts.append(
         np.stack([np.repeat(np.arange(16), len(window)), np.tile(window, 16)], axis=1)
     )
-for xs, ps in ((hist["x"], hist["primary"]), (first["x"], first["primary"])):
+for xs, ps in ((dense_np["x"], dense_np["primary"]), (first["x"], first["primary"])):
     for col in (43, 44):
         idx = xs[:, col].astype(np.int64)
         need_parts.append(np.stack([ps[idx >= 0], idx[idx >= 0]], axis=1))
@@ -394,15 +619,24 @@ out: dict[str, np.ndarray] = {
     "knots": np.array(fit.KNOTS),
     "table_need": need,
     "table_std_f16": table_rows,
-    "table_origin": np.asarray(ctx["origin_ft"])[need[:, 0], need[:, 1]],
+    "table_origin": origin_ft[need[:, 0], need[:, 1]],
     "clean": np.asarray(ctx["clean"], dtype=np.float32),
     "n_test": np.array(len(test.x)),
     "nb_capacity": np.asarray(nb.capacity, dtype=np.float64),
     "nb_of_flat": np.array([[p, q] for p, qs in nb.of.items() for q in qs], dtype=np.int64),
     "signal_columns": np.array(columns),
     "signal_names": np.array(signal_names),
-    **{f"hist_{k}": v for k, v in hist.items()},
+    "t_blank": np.array(t_blank, dtype=np.int64),
+    "weather_blank": np.array(weather_blank, dtype=np.int64),
+    "v_sel": v_sel,
+    **{f"dense_{k}": v for k, v in dense_np.items()},
+    **dense_out,
+    **v_out,
 }
+for s in ARGS.seeds:
+    out[f"dense_k1_q_s{s}"] = dense_q[s]
+    out[f"dense_t_median_s{s}"] = dense_table[s].median
+    out[f"dense_t_origin_idx_s{s}"] = dense_table[s].origin_idx
 for call in STATE["calls"]:
     tag = f"s{call['seed']}"
     out[f"raw_out_{tag}"] = call["raw_out"]
@@ -414,6 +648,19 @@ for call in STATE["calls"]:
     out[f"key_valid_{tag}"] = call["key_valid"]
 Path(ARGS.out).parent.mkdir(parents=True, exist_ok=True)
 np.savez(ARGS.out, **out)
-meta = {"seeds": ARGS.seeds, "month": ARGS.month, "n_extra": n_extra, "signal_names": signal_names}
-Path(ARGS.out).with_suffix(".json").write_text(json.dumps(meta))
+meta = {
+    "seeds": ARGS.seeds,
+    "month": ARGS.month,
+    "n_extra": n_extra,
+    "signal_names": signal_names,
+    "history_days": HISTORY_DAYS,
+    "dense_origin_range_idx": [ORIGIN_LO, ORIGIN_HI],
+    "dense_months": months,
+    "sparse_replication": {str(k): v for k, v in sparse_replication.items()},
+    "dense_vs_research_table": {str(k): v for k, v in overlap.items()},
+    "synthetic_case": case,
+    "synthetic_flag_counts": v_branches,
+    "synthetic_origin": f"{datetime.fromtimestamp(int(V_US) / 1e6, UTC):%Y-%m-%d}",
+}
+Path(ARGS.out).with_suffix(".json").write_text(json.dumps(meta, indent=1))
 print("E00708 capture written", ARGS.out, flush=True)

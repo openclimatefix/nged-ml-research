@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: run_export.sh MONTH   (experiment 704's arm `drop`, refitted by `chain667.sh drop MONTH`)
-# Env: DATA_PATH_INTERNAL (required), ORIGINS (fixture origin dates; default is the set used for 2026-10).
+# Env: DATA_PATH_INTERNAL (required), ALLOW_DIRTY (set for a test bundle from uncommitted code), ORIGINS (fixture origin dates; default is the set used for 2026-10).
 # 1. e00708_capture.py reruns the prediction pass of the stored Candidate (K1's lags-masked table T, then the
 #    Candidate) on the GPU (one process, through experiment 667's gpu.sh, 8 GB host cap) in a scratch root;
 #    nothing under another experiment's folder is written.
@@ -26,5 +26,5 @@ nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader
 cd "$D/../.."
 source ml-experiments/00524*/env.sh
 systemd-run --user --scope -q -p MemoryMax=16G -p MemorySwapMax=0 -p OOMPolicy=continue env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$D"/e00708_export.py --month $M --dump $S/dump.npz --out $X/bundles/drop/$M \
-  --source-root $SRC --chain-work $CHAIN --scratch $S
+  --source-root $SRC --chain-work $CHAIN --scratch $S ${ALLOW_DIRTY:+--allow-dirty}
 systemd-run --user --scope -q -p MemoryMax=8G -p MemorySwapMax=0 -p OOMPolicy=continue env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$D"/e00708_check.py $X/bundles/drop/$M

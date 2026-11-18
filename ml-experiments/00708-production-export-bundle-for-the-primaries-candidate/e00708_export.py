@@ -34,6 +34,7 @@ import e00708_reference_check as ref  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
+from contracts.power_schemas import PowerForecast
 
 HERE: Final = Path(__file__).resolve().parent
 QCOLS: Final = ref.LEVEL_NAMES
@@ -48,8 +49,10 @@ LAG_NAMES: Final = (
 )  # fmt: skip
 WEATHER_VARIABLES: Final = prep.WEATHER
 CAMS_COLUMNS: Final = ("cams_prev_day_mean", "cams_prev_day_csi")
-HISTORY_DAYS_CANDIDATES: Final = (30, 60, 90, 120, 150, 180)
-"""Window lengths tried for the power and table T history; the shortest whose truncation error is under `TRUNCATION_LIMIT` is used."""
+HISTORY_DAYS: Final = 180
+"""Length of the power and table T history in each fixture; the capture builds the dense table over the same length."""
+HISTORY_DAYS_CANDIDATES: Final = (30, 60, 90, 120, 150, HISTORY_DAYS)
+"""Window lengths whose truncation error is reported; `HISTORY_DAYS` must be under `TRUNCATION_LIMIT`."""
 TRUNCATION_LIMIT: Final = 2e-6
 """Largest tolerated difference between a signal column built from the window and from the whole history (columns carry a factor of 10)."""
 MAX_LEAD: Final = 48
@@ -80,7 +83,9 @@ def git_state() -> dict:
         for line in run("status", "--porcelain", "--untracked-files=all").splitlines()
         if line.startswith("??")
     ]
+    here = run("status", "--porcelain", "--untracked-files=all", "--", str(HERE))
     return {
+        "dirty_files_under_this_experiment": len(here.splitlines()),
         "commit": run("rev-parse", "HEAD"),
         "dirty_tracked_files": len(tracked.splitlines()),
         "untracked_files": len(untracked),
@@ -187,6 +192,11 @@ def main() -> None:
     parser.add_argument("--chain-work", required=True)
     parser.add_argument("--scratch", required=True)
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS_ALL))
+    parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="write a bundle although files of this experiment are uncommitted",
+    )
     args = parser.parse_args()
     out = Path(args.out).resolve()
     assert out.parent.parent.parent.name.startswith("00708-"), (
@@ -197,6 +207,10 @@ def main() -> None:
     k1_dir, cand_dir = out / "components" / "k1", out / "components" / "candidate"
     for sub in (k1_dir, cand_dir, out / "fixtures" / "k1", out / "fixtures" / "candidate"):
         sub.mkdir(parents=True)
+    git = git_state()
+    if git["dirty_files_under_this_experiment"] and not args.allow_dirty:
+        msg = f"{git['dirty_files_under_this_experiment']} files of experiment 708 are uncommitted: commit them, or pass --allow-dirty for a test bundle"
+        raise SystemExit(msg)
     z = np.load(args.dump)
     source = Path(args.source_root)
     chain = Path(args.chain_work)
@@ -419,7 +433,7 @@ def main() -> None:
         )
         tables[seed] = mine_t
 
-    # --- signal-window length --------------------------------------------------------------------------
+    # --- dense table T, and the signal-window length ----------------------------------------------------
     signal_names = [str(n) for n in z["signal_names"]]
     n_extra = len(signal_names)
     nb_of: dict[int, list[int]] = {p: [] for p in range(16)}
@@ -432,27 +446,36 @@ def main() -> None:
         "of": {str(p): qs for p, qs in nb_of.items()},
         "capacity_mw": [float(c) for c in cap],
     }
-    signal_config = {
-        "ew_min_weight": 0.2,
-    }
-    cfg_probe = {"signals": signal_config}
+    cfg_probe = {"signals": {"ew_min_weight": 0.2}}
     origins_us = np.unique(origin)
-    extras = {s: z[f"x_s{s}"][:, 60:] for s in seeds}
+    dense_median = {s: z[f"dense_t_median_s{s}"] for s in seeds}
+    dense_origin = {s: z[f"dense_t_origin_idx_s{s}"] for s in seeds}
+    extras = {s: z[f"extras_dense_s{s}"] for s in seeds}
     for s in seeds:
         assert z[f"x_s{s}"].shape[1] == 60 + n_extra
+    meta = json.loads(Path(args.dump).with_suffix(".json").read_text())
+    checks["capture"] = {
+        k: meta[k]
+        for k in (
+            "sparse_replication",
+            "dense_vs_research_table",
+            "dense_months",
+            "dense_origin_range_idx",
+            "synthetic_case",
+            "synthetic_flag_counts",
+        )
+    }
+    assert meta["history_days"] == HISTORY_DAYS
 
     def window_signals(*, sel: np.ndarray, seed: int, days: int) -> np.ndarray:
-        o_idx = int(z["origin_idx"][sel][0])
-        last = o_idx - 48
+        last = int(z["origin_idx"][sel][0]) - 48
         first = last - days * 48 + 1
-        cols_idx = np.arange(first, last + 1)
-        t_med = tables[seed]["median"][:, first : last + 1]
-        pw = clean[:, first : last + 1]
         return ref.signal_block(
             primary=primary[sel], day_idx=lag_idx[sel, 0], week_idx=lag_idx[sel, 1],
             day_miss=x[sel][:, 38] > 0.5, week_miss=x[sel][:, 41] > 0.5,
-            power=pw, table_median=t_med, first_idx=int(cols_idx[0]), present=present,
-            neighbours=neighbours, names=signal_names, config=cfg_probe,
+            power=clean[:, first : last + 1], table_median=dense_median[seed][:, first : last + 1],
+            first_idx=first, present=present, neighbours=neighbours, names=signal_names,
+            config=cfg_probe,
         )  # fmt: skip
 
     truncation = {}
@@ -461,44 +484,84 @@ def main() -> None:
         for o_us in origins_us:
             sel = np.nonzero(origin == o_us)[0]
             for seed in seeds:
-                err = max(
-                    err,
-                    float(
-                        np.abs(
-                            window_signals(sel=sel, seed=seed, days=days) - extras[seed][sel]
-                        ).max()
-                    ),
-                )
+                diff = window_signals(sel=sel, seed=seed, days=days) - extras[seed][sel]
+                err = max(err, float(np.abs(diff).max()))
         truncation[str(days)] = err
         print("history days", days, "max abs error of the signal columns", err, flush=True)
-    history_days = next(
-        (d for d in HISTORY_DAYS_CANDIDATES if truncation[str(d)] <= TRUNCATION_LIMIT),
-        HISTORY_DAYS_CANDIDATES[-1],
-    )
+    history_days = HISTORY_DAYS
+    assert truncation[str(history_days)] <= TRUNCATION_LIMIT, truncation
     checks["signal_history_truncation_max_abs_error"] = truncation
     checks["signal_history_days_used"] = history_days
 
+    names60 = [c["name"] for c in column_table(names37=names37)]
+    # --- K1 history rows: every daily origin of the window, shared by the fixtures ------------------------
+    d_k = out / "fixtures" / "k1"
+    d_prim = z["dense_primary"]
+    d_x = z["dense_x"]
+    assert d_x.shape[1] == 60
+    k1_frame = pl.DataFrame(
+        {
+            "primary_index": d_prim.astype(np.int8),
+            "origin_grid_index": z["dense_origin_idx"],
+            "target_grid_index": z["dense_target_idx"],
+        }
+    ).with_columns(
+        origin_time=(GRID_START_US + pl.col("origin_grid_index") * STEP_US).cast(
+            pl.Datetime("us", "UTC")
+        ),
+        valid_time=(GRID_START_US + pl.col("target_grid_index") * STEP_US).cast(
+            pl.Datetime("us", "UTC")
+        ),
+    )
+    k1_frame = k1_frame.hstack(
+        pl.DataFrame({f"std__{n}": d_x[:, i] for i, n in enumerate(names60)})
+    )
+    for s in seeds:
+        qh = z[f"dense_k1_q_s{s}"]
+        k1_frame = k1_frame.hstack(
+            pl.DataFrame({f"k1_{lv}_s{s}": qh[:, i] for i, lv in enumerate(("q05", "q50", "q95"))})
+        )
+    k1_frame.write_parquet(d_k / "history_rows.parquet", compression="zstd")
+    checks["k1_history_rows"] = {
+        "rows": k1_frame.height,
+        "daily_origins": len(np.unique(z["dense_origin_idx"])),
+        "first_origin_utc": f"{k1_frame['origin_time'].min():%Y-%m-%d %H:%M}",
+        "last_origin_utc": f"{k1_frame['origin_time'].max():%Y-%m-%d %H:%M}",
+        "inside_the_fit_period": "every origin before the refit month is inside K1's training period (in-sample, except in held-out weeks)",
+    }
+
     # --- fixtures -----------------------------------------------------------------------------------
     ts_of = np.array([p["time_series_id"] for p in primaries])
-    names60 = [c["name"] for c in column_table(names37=names37)]
-    fixture_origins = []
-    h_fix = z["hist_fixture_origin_idx"]
-    for o_us in origins_us:
-        sel = np.nonzero(origin == o_us)[0]
-        o_dt = datetime.fromtimestamp(int(o_us) / 1e6, UTC)
-        name = f"{o_dt:%Y-%m-%d}"
-        fixture_origins.append(name)
+    contract_schema = {
+        "time_series_id": str(PowerForecast.dtypes["time_series_id"]),
+        "valid_time": str(PowerForecast.dtypes["valid_time"]),
+        "nwp_init_time": str(PowerForecast.dtypes["nwp_init_time"]),
+        "power_fcst_init_time": str(PowerForecast.dtypes["power_fcst_init_time"]),
+        **{f"{lv}_mw": "Float32" for lv in QCOLS},
+        **{f"{lv}_s{seed}_mw": "Float32" for seed in seeds for lv in QCOLS},
+    }
+    v_sel = z["v_sel"]
+    t_blank = z["t_blank"]
+    weather_blank = z["weather_blank"]
+
+    def write_candidate(
+        *, name: str, sel: np.ndarray, x_rows: np.ndarray, clean_arr: np.ndarray,
+        extras_rows: dict[int, np.ndarray], raw_out: dict[int, np.ndarray],
+        q_rows: dict[int, np.ndarray], blanks: bool,
+    ) -> dict:  # fmt: skip
+        """Write one candidate fixture folder (a fixture origin, or the synthetic case) and return its summary."""
+        o_us = int(origin[sel][0])
+        o_dt = datetime.fromtimestamp(o_us / 1e6, UTC)
         d_c = out / "fixtures" / "candidate" / f"origin={name}"
-        d_k = out / "fixtures" / "k1" / f"origin={name}"
         d_c.mkdir(parents=True)
-        d_k.mkdir(parents=True)
         o_idx = int(z["origin_idx"][sel][0])
+        prim_rows = primary[sel]
         run = o_dt - common.PUBLICATION_DELAY
         stored_summary = pl.read_parquet(
             ext.E607 / "ens_summary" / f"init={run:%Y-%m-%d}.parquet"
         ).sort("time_series_id", "valid_time")
         key = pl.DataFrame(
-            {"time_series_id": ts_of[primary[sel]], "valid_time": valid[sel]}
+            {"time_series_id": ts_of[prim_rows], "valid_time": valid[sel]}
         ).with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
         joined = key.join(
             stored_summary, on=["time_series_id", "valid_time"], how="left", maintain_order="left"
@@ -513,19 +576,34 @@ def main() -> None:
                 )
         ens_diff = float(np.abs(expected14 - raw37[sel][:, :14].astype(np.float64)).max())
         stored_summary.write_parquet(d_c / "ens_summary.parquet", compression="zstd")
-        # candidate input matrix: keys, raw columns, standardised columns, per-seed signal columns
+        # the lag columns reproduce from the (possibly modified) power
+        lag_i = np.stack([x_rows[:, 43], x_rows[:, 44]], axis=1).astype(np.int64)
+        lag_vals = np.full((len(sel), 2), np.nan, dtype=np.float32)
+        rebuilt_lag_rows = np.zeros((len(sel), 8), dtype=np.float32)
+        for j in range(2):
+            idx = lag_i[:, j]
+            raw = np.where(idx >= 0, clean_arr[prim_rows, np.clip(idx, 0, None)], np.nan)
+            lag_vals[:, j] = raw
+            miss = ~np.isfinite(raw)
+            zz = np.clip((raw - lag_stats[j, 0]) / lag_stats[j, 1], -5.0, 5.0)
+            rebuilt_lag_rows[:, 3 * j] = np.where(miss, 0.0, zz)
+            rebuilt_lag_rows[:, 3 * j + 1] = miss
+            rebuilt_lag_rows[:, 3 * j + 2] = np.where(
+                miss, amax[j], (target_idx[sel] - idx) * 0.5 / 336.0
+            )
+            rebuilt_lag_rows[:, 6 + j] = idx
+        assert np.array_equal(rebuilt_lag_rows, x_rows[:, 37:45]), f"{name}: lag columns differ"
         raw60 = np.concatenate(
-            [raw37[sel], lag_raw[sel][:, [0]], np.zeros((len(sel), 2), np.float32), lag_raw[sel][:, [1]],
-             np.zeros((len(sel), 2), np.float32), x[sel][:, 43:46], z["b1_raw"][sel]],
+            [raw37[sel], lag_vals[:, [0]], np.zeros((len(sel), 2), np.float32), lag_vals[:, [1]],
+             np.zeros((len(sel), 2), np.float32), x_rows[:, 43:46], z["b1_raw"][sel]],
             axis=1,
         )  # fmt: skip
-        raw60[:, 38], raw60[:, 39] = x[sel][:, 38], x[sel][:, 39]
-        raw60[:, 41], raw60[:, 42] = x[sel][:, 41], x[sel][:, 42]
-        assert raw60.shape[1] == 60
+        raw60[:, 38], raw60[:, 39] = x_rows[:, 38], x_rows[:, 39]
+        raw60[:, 41], raw60[:, 42] = x_rows[:, 41], x_rows[:, 42]
         keys = pl.DataFrame(
             {
-                "primary_index": primary[sel].astype(np.int8),
-                "time_series_id": ts_of[primary[sel]].astype(np.int32),
+                "primary_index": prim_rows.astype(np.int8),
+                "time_series_id": ts_of[prim_rows].astype(np.int32),
                 "origin_time": origin[sel],
                 "valid_time": valid[sel],
                 "lead_hours": z["lead"][sel].astype(np.float64),
@@ -538,11 +616,11 @@ def main() -> None:
         )
         matrix = (
             keys.hstack(pl.DataFrame({f"raw__{n}": raw60[:, i] for i, n in enumerate(names60)}))
-            .hstack(pl.DataFrame({f"std__{n}": x[sel][:, i] for i, n in enumerate(names60)}))
+            .hstack(pl.DataFrame({f"std__{n}": x_rows[:, i] for i, n in enumerate(names60)}))
             .hstack(
                 pl.DataFrame(
                     {
-                        f"extra_s{s}__{n}": extras[s][sel][:, i]
+                        f"extra_s{s}__{n}": extras_rows[s][:, i]
                         for s in seeds
                         for i, n in enumerate(signal_names)
                     }
@@ -552,7 +630,7 @@ def main() -> None:
         matrix.write_parquet(d_c / "input_matrix.parquet", compression="zstd")
         # lag power and expected-weather rows of the 336-half-hour lag window
         window = np.arange(o_idx - 48 - 335, o_idx - 48 + 1)
-        used = np.unique(np.concatenate([lag_idx[sel, 0], lag_idx[sel, 1]]))
+        used = np.unique(lag_i)
         assert set(used[used >= 0]) <= set(window.tolist()), (
             "a lag lies outside the 336-half-hour window"
         )
@@ -562,7 +640,7 @@ def main() -> None:
                 "grid_index": np.tile(window, 16),
             }
         )
-        power = clean[
+        power = clean_arr[
             grid["primary_index"].to_numpy().astype(np.int64), grid["grid_index"].to_numpy()
         ]
         grid = grid.with_columns(
@@ -578,119 +656,87 @@ def main() -> None:
         )
         assert grid["run_origin_time"].is_not_null().all()
         grid.write_parquet(d_c / "lag_and_expected_rows.parquet", compression="zstd")
-        # power and table T over the history window
+        # power and the dense table T over the history window
         last = o_idx - 48
         first = last - history_days * 48 + 1
         hist_grid = np.arange(first, last + 1)
+        t_med = {s: dense_median[s].copy() for s in seeds}
+        t_org = {s: dense_origin[s].copy() for s in seeds}
+        if blanks:
+            for s in seeds:
+                for p, a, b in t_blank:
+                    t_med[s][p, a:b] = np.nan
+                    t_org[s][p, a:b] = -1
         history = pl.DataFrame(
             {
                 "primary_index": np.repeat(np.arange(16, dtype=np.int8), len(hist_grid)),
                 "grid_index": np.tile(hist_grid, 16),
             }
         ).with_columns(
-            pl.Series("power_fraction", clean[:, first : last + 1].reshape(-1)),
+            pl.Series("power_fraction", clean_arr[:, first : last + 1].reshape(-1)),
             *[
-                pl.Series(f"t_median_s{s}", tables[s]["median"][:, first : last + 1].reshape(-1))
+                pl.Series(f"t_dense_median_s{s}", t_med[s][:, first : last + 1].reshape(-1))
+                for s in seeds
+            ],
+            *[
+                pl.Series(
+                    f"t_dense_origin_grid_index_s{s}", t_org[s][:, first : last + 1].reshape(-1)
+                )
                 for s in seeds
             ],
         )
         history.write_parquet(d_c / "signal_history.parquet", compression="zstd")
-        # K1: the rows behind the newest table T entries, and the entries
-        hs = np.nonzero(h_fix == o_idx)[0]
-        assert len(hs) == 3 * 16 * MAX_LEAD, len(hs)
-        h_prim = z["hist_primary"][hs]
-        hist_frame = pl.DataFrame(
-            {
-                "primary_index": h_prim.astype(np.int8),
-                "history_k_days_before": z["hist_k"][hs].astype(np.int8),
-                "source": np.where(
-                    z["hist_source"][hs] == 1, "fold_month_test_rows", "previous_month_test_rows"
-                ),
-                "origin_time": z["hist_origin"][hs],
-                "valid_time": z["hist_valid"][hs],
-                "target_grid_index": z["hist_target_idx"][hs],
-                "origin_grid_index": z["hist_origin_idx"][hs],
-            }
-        ).with_columns(
-            pl.col("origin_time").cast(pl.Datetime("us", "UTC")),
-            pl.col("valid_time").cast(pl.Datetime("us", "UTC")),
-        )
-        hist_frame = hist_frame.hstack(
-            pl.DataFrame({f"std__{n}": z["hist_x"][hs][:, i] for i, n in enumerate(names60)})
-        )
-        for s in seeds:
-            qh = z[f"hist_k1_q_s{s}"][hs]
-            hist_frame = hist_frame.hstack(
-                pl.DataFrame(
-                    {f"k1_{lv}_s{s}": qh[:, i] for i, lv in enumerate(("q05", "q50", "q95"))}
-                )
+        if blanks:
+            pl.DataFrame(
+                {
+                    "primary_index": [int(p) for p, _, _ in t_blank],
+                    "first_grid_index": [int(a) for _, a, _ in t_blank],
+                    "end_grid_index": [int(b) for _, _, b in t_blank],
+                }
+            ).write_parquet(d_c / "t_blank.parquet")
+            blank_keys = [(int(p), i) for p, a, b in weather_blank for i in range(int(a), int(b))]
+            pl.DataFrame(
+                {
+                    "primary_index": [p for p, _ in blank_keys],
+                    "grid_index": [i for _, i in blank_keys],
+                    "run_origin_time": [datetime(1970, 1, 1, tzinfo=UTC)] * len(blank_keys),
+                    **{f"std_f16__{n}": np.zeros(len(blank_keys), np.float32) for n in exp_names},
+                }
+            ).with_columns(pl.col("run_origin_time").cast(pl.Datetime("us", "UTC"))).write_parquet(
+                d_c / "expected_rows_override.parquet"
             )
-            # the stored k1 median is table T's input: the table entry equals it where this origin is the freshest
-        hist_frame.write_parquet(d_k / "history_rows.parquet", compression="zstd")
-        e_grid = np.arange(o_idx - 191, o_idx - 47)
-        entries = pl.DataFrame(
-            {
-                "primary_index": np.repeat(np.arange(16, dtype=np.int8), len(e_grid)),
-                "grid_index": np.tile(e_grid, 16),
-            }
-        )
-        for s in seeds:
-            entries = entries.with_columns(
-                pl.Series(
-                    f"t_median_s{s}", tables[s]["median"][:, e_grid[0] : e_grid[-1] + 1].reshape(-1)
-                ),
-                pl.Series(
-                    f"t_origin_grid_index_s{s}",
-                    tables[s]["origin_idx"][:, e_grid[0] : e_grid[-1] + 1].reshape(-1),
-                ),
-            )
-        assert entries[[f"t_median_s{s}" for s in seeds]].to_numpy().size == 16 * len(e_grid) * len(
-            seeds
-        )
-        assert np.isfinite(entries[[f"t_median_s{s}" for s in seeds]].to_numpy()).all(), (
-            "a newest table T entry is empty"
-        )
-        entries.write_parquet(d_k / "table_t_entries.parquet", compression="zstd")
         # outputs: native per seed, seed mean, contract
-        cols = {"primary_index": primary[sel].astype(np.int8), "valid_time": valid[sel]}
-        out_native = pl.DataFrame(cols).with_columns(
-            pl.col("valid_time").cast(pl.Datetime("us", "UTC"))
-        )
-        per_seed = []
+        out_native = pl.DataFrame(
+            {"primary_index": prim_rows.astype(np.int8), "valid_time": valid[sel]}
+        ).with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
+        per_seed = [q_rows[s] for s in seeds]
         for seed in seeds:
-            q = z[f"q_fix_s{seed}"][sel]
-            per_seed.append(q)
             out_native = out_native.hstack(
-                pl.DataFrame({f"{lv}_s{seed}": q[:, i] for i, lv in enumerate(QCOLS)})
-            ).hstack(
-                pl.DataFrame(
-                    {f"raw_out_{k}_s{seed}": z[f"raw_out_s{seed}"][sel][:, k] for k in range(9)}
-                )
-            )
+                pl.DataFrame({f"{lv}_s{seed}": q_rows[seed][:, i] for i, lv in enumerate(QCOLS)})
+            ).hstack(pl.DataFrame({f"raw_out_{k}_s{seed}": raw_out[seed][:, k] for k in range(9)}))
         mean_q = np.sort(np.mean(np.stack(per_seed), axis=0, dtype=np.float32), axis=1)
         out_native = out_native.hstack(
             pl.DataFrame({f"{lv}_mean": mean_q[:, i] for i, lv in enumerate(QCOLS)})
         )
         out_native.write_parquet(d_c / "outputs_native.parquet", compression="zstd")
-        contract_origin = int(o_us) + 3 * 3_600_000_000
+        contract_origin = o_us + 3 * 3_600_000_000
         cmask = (valid[sel] >= contract_origin) & (
             valid[sel] < contract_origin + 14 * 86_400_000_000
         )
         assert int(cmask.sum()) == 16 * 672
-        mw = [
-            (q.astype(np.float64) * cap[primary[sel]][:, None]).astype(np.float32) for q in per_seed
-        ]
+        mw = [(q.astype(np.float64) * cap[prim_rows][:, None]).astype(np.float32) for q in per_seed]
         mw_mean = np.sort(np.mean(np.stack(mw), axis=0, dtype=np.float32), axis=1)
         contract = (
             pl.DataFrame(
                 {
-                    "time_series_id": ts_of[primary[sel]][cmask].astype(np.int8),
+                    "time_series_id": ts_of[prim_rows][cmask],
                     "valid_time": valid[sel][cmask],
                     "nwp_init_time": (contract_origin // 86_400_000_000) * 86_400_000_000,
                     "power_fcst_init_time": contract_origin,
                 }
             )
             .with_columns(
+                pl.col("time_series_id").cast(PowerForecast.dtypes["time_series_id"]),
                 pl.col("valid_time").cast(pl.Datetime("us", "UTC")),
                 pl.col("nwp_init_time").cast(pl.Datetime("us", "UTC")),
                 pl.col("power_fcst_init_time").cast(pl.Datetime("us", "UTC")),
@@ -706,21 +752,85 @@ def main() -> None:
                 )
             )
         )
+        assert {c: str(t) for c, t in contract.schema.items()} == contract_schema, contract.schema
         contract.write_parquet(d_c / "outputs_contract.parquet", compression="zstd")
-        info = {
+        return {
             "origin": name,
             "weekday": o_dt.strftime("%A"),
             "rows": len(sel),
-            "week_lag_missing_rows": int((x[sel][:, 41] > 0.5).sum()),
-            "day_lag_missing_rows": int((x[sel][:, 38] > 0.5).sum()),
-            "history_rows_from_previous_month": int((z["hist_source"][hs] == 0).sum()),
+            "week_lag_missing_rows": int((x_rows[:, 41] > 0.5).sum()),
+            "day_lag_missing_rows": int((x_rows[:, 38] > 0.5).sum()),
             "ens_summary_vs_network_raw_columns_max_abs_diff": ens_diff,
-            "table_t_entries_in_history_window_empty_share": float(
+            "dense_table_t_empty_share_in_history_window": float(
+                np.mean([np.isnan(t_med[s][:, first : last + 1]).mean() for s in seeds])
+            ),
+            "research_table_t_empty_share_in_history_window": float(
                 np.mean([np.isnan(tables[s]["median"][:, first : last + 1]).mean() for s in seeds])
             ),
         }
+
+    fixture_origins = []
+    for o_us in origins_us:
+        sel = np.nonzero(origin == o_us)[0]
+        name = f"{datetime.fromtimestamp(int(o_us) / 1e6, UTC):%Y-%m-%d}"
+        fixture_origins.append(name)
+        info = write_candidate(
+            name=name, sel=sel, x_rows=x[sel], clean_arr=clean, blanks=False,
+            extras_rows={s: extras[s][sel] for s in seeds},
+            raw_out={s: z[f"raw_out_dense_s{s}"][sel] for s in seeds},
+            q_rows={s: z[f"q_fix_dense_s{s}"][sel] for s in seeds},
+        )  # fmt: skip
+        # what the Candidate does with the research table (the table it trained on) instead of the dense one
+        sparse_q = [z[f"q_fix_s{s}"][sel] for s in seeds]
+        dense_q = [z[f"q_fix_dense_s{s}"][sel] for s in seeds]
+        sparse_mean = np.sort(np.mean(np.stack(sparse_q), axis=0, dtype=np.float32), axis=1)
+        dense_mean = np.sort(np.mean(np.stack(dense_q), axis=0, dtype=np.float32), axis=1)
+        info["sparse_vs_dense_table_t"] = {
+            "per_seed_max_abs_diff_fraction_of_capacity": [
+                float(np.abs(a - b).max()) for a, b in zip(sparse_q, dense_q, strict=True)
+            ],
+            "per_seed_mean_abs_diff_fraction_of_capacity": [
+                float(np.abs(a - b).mean()) for a, b in zip(sparse_q, dense_q, strict=True)
+            ],
+            "seed_mean_max_abs_diff_fraction_of_capacity": float(
+                np.abs(sparse_mean - dense_mean).max()
+            ),
+            "seed_mean_mean_abs_diff_fraction_of_capacity": float(
+                np.abs(sparse_mean - dense_mean).mean()
+            ),
+            "signal_columns_max_abs_diff": [
+                float(np.abs(extras[s][sel] - z[f"x_s{s}"][sel][:, 60:]).max()) for s in seeds
+            ],
+        }
+        sp = pl.DataFrame({"primary_index": primary[sel].astype(np.int8), "valid_time": valid[sel]})
+        sp = sp.with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
+        for s, q in zip(seeds, sparse_q, strict=True):
+            sp = sp.hstack(pl.DataFrame({f"{lv}_s{s}": q[:, i] for i, lv in enumerate(QCOLS)}))
+        sp = sp.hstack(
+            pl.DataFrame({f"{lv}_mean": sparse_mean[:, i] for i, lv in enumerate(QCOLS)})
+        )
+        sp.write_parquet(
+            out
+            / "fixtures"
+            / "candidate"
+            / f"origin={name}"
+            / "outputs_with_research_table_t.parquet",
+            compression="zstd",
+        )
         checks[f"fixture_{name}"] = info
         print(info, flush=True)
+    synthetic_name = f"{fixture_origins[1]}_synthetic_missing_inputs"
+    clean_mod = z["v_clean"]
+    info = write_candidate(
+        name=synthetic_name, sel=v_sel, x_rows=z["v_x"], clean_arr=clean_mod, blanks=True,
+        extras_rows={s: z[f"v_extras_s{s}"] for s in seeds},
+        raw_out={s: z[f"v_raw_out_s{s}"] for s in seeds},
+        q_rows={s: z[f"v_q_s{s}"] for s in seeds},
+    )  # fmt: skip
+    info["case"] = meta["synthetic_case"]
+    info["flag_counts_seed0"] = meta["synthetic_flag_counts"]
+    checks[f"fixture_{synthetic_name}"] = info
+    print(info, flush=True)
 
     # --- config ---------------------------------------------------------------------------------------
     f = f437
@@ -817,7 +927,8 @@ def main() -> None:
             "rule": "T[primary, g] = the median (q50) of K1's lags-masked forecast with the largest origin index o for which 0 < g - o <= max_lead_half_hours, over every K1 forecast ever issued; lags-masked = day and week lag columns set to value 0, flag 1, largest age code, lag grid-index columns unchanged",
             "k1_quantile_columns": ["q05", "q50", "q95"],
             "read_by_candidate": "only entries with g <= origin - 48 half-hours, whose source origin is therefore at least 24 h before the Candidate's origin",
-            "research_construction": "e00598_signals.build_lag_free_table over the fold's training rows, the fold month's test rows, and the previous month's test rows",
+            "research_construction": "e00598_signals.build_lag_free_table over the fold's training rows, the fold month's test rows, and the previous month's test rows. That table has whole-day holes (purge windows around held-out weeks), and the Candidate was TRAINED on it",
+            "dense_table_in_this_bundle": "the fixtures use the dense table that a daily store would hold: this refit's K1, lags masked, run at every daily 09:00 origin of the history window (fixtures/k1/history_rows.parquet). The Candidate's forecasts with the research table instead are in each fixture's outputs_with_research_table_t.parquet; export_checks.fixture_<origin>.sparse_vs_dense_table_t gives the difference, which is the train/serve skew a port inherits",
         },
     }
     k1_config = network_config(name="k1", extra=0) | {
@@ -837,6 +948,7 @@ def main() -> None:
             "contract_relabel": "origin + 3 h; keep valid_time in [contract origin, contract origin + 14 days); 672 half-hours; no clamp, no calibration",
             "horizon_days": 14,
             "contract_half_hours": 672,
+            "contract_schema": contract_schema,
             "contract_columns": "time_series_id, valid_time, nwp_init_time, power_fcst_init_time, then q01_mw .. q99_mw (seed mean, sorted) and q01_s<seed>_mw .. per seed; one quantile forecast per series and half-hour, no ensemble_member column",
             "max_lead_hours_trained_and_stored": 339.0,
             "max_lead_hours_ens_summaries": 351.0,
@@ -856,13 +968,16 @@ def main() -> None:
         },
         "components": {"k1": k1_config, "candidate": candidate_config},
         "state_between_daily_runs": {
-            "summary": "production must keep, per Primary and half-hour: the cleaned power; and K1's lags-masked median (q50) of every forecast it issued with a lead of 1 to 48 half-hours, together with each forecast's origin, so that table T can be rebuilt. Both histories must reach back history_window_days days before each Candidate origin, plus 2 days.",
+            "summary": "production must keep four stores: the cleaned power, K1's lags-masked medians, the expected-weather rows, and (to rebuild them after a gap) nothing else. Each reaches back history_window_days days before the Candidate's origin, except the expected-weather rows, which reach back 8 days.",
             "history_window_days": history_days,
-            "k1_forecasts_to_store_per_origin": "q50 of K1's lags-masked forecast for the 48 half-hours after the 09:00 origin, per Primary and seed (16 x 48 x 2 numbers per day)",
+            "cleaned_power": "per Primary and half-hour, as a fraction of effective capacity, missing half-hours kept missing; the lags read the 336 half-hours ending 24 h before the origin (the oldest lag is up to 8 days before the origin) and the signal columns read the whole window",
+            "k1_forecasts_to_store_per_origin": "q50 of K1's lags-masked forecast for the 48 half-hours after each daily 09:00 origin, per Primary and seed (16 x 48 x 2 numbers per day), with the origin",
+            "expected_weather_rows": "per Primary and half-hour g from 8 days before the origin to 24 h before it: the 28 expected-weather columns of the freshest ENS run issued before g (smallest lead for valid time g), with that run's origin time. Both networks' lag encoders read the row at each lag's own half-hour, and the Candidate's expected-missing flag is 1 where the table has no run for that half-hour. Rows are built once, when the half-hour passes, and never change afterwards",
             "k1_must_run_every_day": "K1 runs with its lags masked at every daily origin, on the same input columns as the Candidate (the 60 base columns), even though only its first 48 half-hours are stored",
             "freshness": "the Candidate at origin o reads table T only at half-hours up to o - 48 half-hours, so it needs K1 forecasts from origins at least 2 days old; yesterday's K1 forecast is stored but not read until the day after tomorrow",
-            "cold_start": "after a refit or a gap in the store, rebuild the missing days by running K1 over the days' origins with that day's inputs, as the research does; entries with no forecast are NaN and the Candidate then sees missing-gap flags",
-            "refit_changes_k1": "table T entries come from whichever K1 version issued them; the research rebuilds the whole window with the current K1 (in-sample for the training days)",
+            "cold_start": "after a refit or a gap in the store, rebuild the missing days by running K1 over the days' origins with that day's inputs, as fixtures/k1/history_rows.parquet does; entries with no forecast are NaN and the Candidate then sees missing-gap flags",
+            "training_saw_a_different_table": "the Candidate was trained on the research table, which has whole-day holes; a daily store is dense. The Candidate's quantiles differ between the two tables by the amounts in export_checks.fixture_<origin>.sparse_vs_dense_table_t",
+            "refit_changes_k1": "table T entries come from whichever K1 version issued them; the research rebuilds the whole window with the current K1 (in-sample for the training days), and so does the dense table in this bundle",
         },
     }
     write_json(obj=config, path=out / "config.json")
@@ -905,7 +1020,8 @@ def main() -> None:
         "training_cutoff_utc": (refit - timedelta(hours=3.5)).isoformat(),
         "training_cutoff_rule": f"training targets with valid time <= refit time - 3.5 h and origin <= refit time; the {month} refit uses data before {month}-01 00:00 UTC",
         "created_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-        "research_git": git_state(),
+        "research_git": git,
+        "allow_dirty": bool(args.allow_dirty),
         "pinned_production_package_commit": direct["vcs_info"]["commit_id"],
         "library_versions": pins,
         "source_chain_paths": {

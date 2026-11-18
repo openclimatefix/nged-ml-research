@@ -14,7 +14,8 @@ and `fixtures/` layout), with `components/k1/`, `components/candidate/`, `fixtur
 
 **Production re-implements every feature, so the fixtures are the defence against skew.**
 `reference_check.py` reproduces, with `torch`, `numpy`, and `polars` only: K1's lags-masked
-medians, the newest table T entries, the Candidate's 60 base columns (from the raw columns) and its
+medians at every daily origin of the history window, the whole dense table T, the Candidate's 60
+base columns (from the raw columns) and its
 signal columns (from the power history and table T), the raw network outputs, and the quantiles
 per seed, as a seed mean, and at the 12:00 contract origin in megawatts. It does not rebuild the
 `raw__` columns themselves (ENS summary, solar and calendar columns, B1 columns): production must
@@ -33,7 +34,13 @@ stored forecasts come from a GPU pass).
    half-hours** after the origin, per Primary and seed. Table T needs nothing else of K1.
 3. **Rebuild table T.** `T[primary, g]` is the stored K1 median with the largest origin index `o`
    for which `0 < g - o <= 48`. Seed 0 of the Candidate reads the table of K1 seed 0, and seed 1
-   reads the table of K1 seed 1.
+   reads the table of K1 seed 1. **The Candidate was trained on a sparser table than a daily store
+   holds.** The research table has whole-day holes (purge windows around the held-out weeks), so
+   15% to 27% of the entries in the 180-day window before each fixture origin are empty. The
+   fixtures here use the dense table that production would hold, and each fixture folder also has
+   `outputs_with_research_table_t.parquet`, the quantiles from the table the Candidate trained on.
+   `manifest.json` (`export_checks.fixture_<origin>.sparse_vs_dense_table_t`) gives the difference
+   between the two sets of quantiles, which is the train/serve skew that a port inherits.
 4. **Build the signal columns** (`components/candidate/signal_columns.json` gives the 60 names in
    order; `reference_check.py:signal_block` is the reference). The gap at a grid index is the cleaned
    power minus `T`. Each row reads, at its day lag and at its week lag, the gap, its exponentially
@@ -53,12 +60,17 @@ before the Candidate's origin (see `config.json`, `state_between_daily_runs`, an
 `components.candidate.signals.history_window_rule`).
 
 - **The cleaned power of every Primary, every half-hour, as a fraction of effective capacity**, with
-  missing half-hours kept as missing. The lags already need the last 14 days of it; the signal
-  columns need the longer window because the 7-day exponentially weighted average has a memory of
-  weeks.
+  missing half-hours kept as missing. The lags need the 336 half-hours that end 24 h before the
+  origin (the oldest lag is up to 8 days before the origin). The signal columns need the 180-day
+  window because the 7-day exponentially weighted average has a memory of weeks.
 - **K1's lags-masked median for the 48 half-hours after each daily origin**, per Primary and seed,
   with the origin of each forecast. The Candidate reads table T only up to 24 h before its own
   origin, so it reads forecasts that are at least 2 days old.
+- **The expected-weather rows of the last 8 days**: for each Primary and half-hour `g` from 8 days
+  before the origin to 24 h before it, the 28 expected-weather columns of the freshest ENS run
+  issued before `g`, with that run's origin time. Both networks' lag encoders read the row at each
+  lag's own half-hour, and the Candidate's expected-missing flag is 1 where the table has no run for
+  that half-hour. Each row is built once, when its half-hour passes, and never changes afterwards.
 - **K1 must therefore run every day**, with the same 60 base columns as the Candidate, even though
   the Candidate's output does not use K1's output on the day.
 - **After a refit, or when the store has gaps,** the research rebuilds the whole table by running
@@ -81,14 +93,24 @@ before the Candidate's origin (see `config.json`, `state_between_daily_runs`, an
 - `fixtures/candidate/origin=<date>/`: `input_matrix.parquet` (keys; `raw__` and `std__` for the 60
   base columns; `extra_s<seed>__<name>` signal columns per seed), `lag_and_expected_rows.parquet` (the
   336-half-hour lag window: power and expected-weather rows), `signal_history.parquet` (power and
-  table T's median per seed over the history window), `ens_summary.parquet` (the member mean and
+  the dense table T's median and source origin per seed over the 180-day history window),
+  `ens_summary.parquet` (the member mean and
   standard deviation that the research run read), `outputs_native.parquet`, and
   `outputs_contract.parquet` (one quantile forecast per Primary and half-hour: `q01_mw` .. `q99_mw`
   for the seed mean, and `q01_s<seed>_mw` .. per seed; there is no ensemble-member column).
-- `fixtures/k1/origin=<date>/`: `history_rows.parquet` (the standardised K1 input rows of the three
-  origins that fill the newest table T entries, and K1's stored lags-masked q05, q50, and q95 per
-  seed) and `table_t_entries.parquet` (table T entries and their source origins for the 144
-  half-hours up to 24 h before the fixture origin).
+- `fixtures/k1/history_rows.parquet`: the standardised K1 input rows (60 columns) of the first 48
+  half-hours after every daily 09:00 origin from 2026-04-01 to 2026-10-29, and K1's stored
+  lags-masked q05, q50, and q95 per seed. The origins before 2026-10-01 are inside K1's training
+  period. The reference check runs K1 on every row and rebuilds the whole dense table T from the
+  medians.
+- `fixtures/candidate/origin=<date>_synthetic_missing_inputs/`: a variant of the 2026-10-03 origin
+  that exercises the missing-input branches. Its expected values come from experiment 613's signal
+  code and the network, not from `reference_check.py`. It removes the cleaned power of single
+  Primaries at their day lag and at their week lag, removes the power of a Primary and its
+  neighbours for 25 days, removes the power of a Primary's neighbours at its day lag, empties two
+  spans of table T (`t_blank.parquet`), and replaces expected-weather rows by zero rows with no run
+  (`expected_rows_override.parquet`). Every missing flag, the no-neighbour flag, and the
+  expected-missing flags are 1 in some rows.
 
 ## What the bundle does not check
 
