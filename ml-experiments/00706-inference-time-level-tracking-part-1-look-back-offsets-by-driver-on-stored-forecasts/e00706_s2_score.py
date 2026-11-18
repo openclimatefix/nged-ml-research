@@ -387,7 +387,9 @@ def deep_events(*, meta: pl.DataFrame) -> np.ndarray:
 def event_bootstrap(
     *, difference: np.ndarray, cluster: np.ndarray, level: float, n_resamples: int
 ) -> tuple[float, float, float]:
-    """Return the interval of the mean over events of a paired difference, resampling clusters and, inside events, seeds.
+    """Return the interval of the mean over events of a paired difference.
+
+    The bootstrap resamples clusters and, inside events, seeds.
 
     Each resample draws the clusters with replacement, takes every event of a drawn cluster, and
     replaces each event's seed values by a draw of seeds with replacement. The statistic is the mean
@@ -494,7 +496,10 @@ def print_family() -> None:
 
 
 def share_table(*, stats_in: EventStats, meta: pl.DataFrame) -> None:
-    """Print the mean copied share and CRPS of every variant on the bank events of depth at least 3% and on KA3's transfers."""
+    """Print the mean copied share and CRPS of every variant on the deep bank events.
+
+    The events are the bank events of depth at least 3% and KA3's transfers.
+    """
     big = ((meta["depth"] >= KA3_MIN_DEPTH) & (meta["n_receivers"] >= 1)).to_numpy()
     everything = deep_events(meta=meta)
     table = []

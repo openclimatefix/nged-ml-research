@@ -18,8 +18,8 @@ under the experiment's data folder and prints:
   the page quotes;
 - the peak memory of the process.
 
-`--month YYYY-MM` writes only that month's valid times and a table with the month in its name. It is a
-smoke test of the writing code: it still builds every residual, so it does not measure the memory
+`--month YYYY-MM` writes only that month's valid times and a table with the month in its name.
+It is a smoke test of the writing code: it still builds every residual, so it does not measure the memory
 of one month.
 """
 

@@ -16,7 +16,8 @@ experiments 668, 683, and 688 on `PYTHONPATH` (the event spans come from experim
   event-free half-hours. Every injected size must be at least 5 times it.
 - `perturb`: changing power after 6 hours before the origin, or any weather run after the origin
   day, moves no coefficient and no correction of arms G and D; changing the 06:00 UTC reading moves
-  it. The same holds for the levels of P-cp (window ending at 03:00 UTC, 9 hours before the 12:00 origin), RR, and M28.
+  it. The same holds for the levels of P-cp (window ending at 03:00 UTC, 9 hours before the 12:00 origin), RR, and
+  M28.
 - `ka1a` (gate): a 10-point additive step in truth with the forecast held fixed. Arm G with factor 1.0
   must remove 100% plus or minus 5% at 14 days and 50% plus or minus 5% at 7 days after the onset.
   A failed gate stops the experiment after one fix pass.
@@ -226,7 +227,8 @@ def level_of(*, name: str, residuals: c.Residuals, series: int, origin: int) -> 
 def perturb_levels(*, inputs: c.Inputs) -> bool:
     """Return whether the perturbation test passes for the levels of P-cp, RR, and M28.
 
-    P-cp reads power up to 03:00 UTC, 9 hours before the 12:00 origin; RR and M28 read it up to 6 hours before. None
+    P-cp reads power up to 03:00 UTC, 9 hours before the 12:00 origin; RR and M28 read it up to 6 hours
+    before. None
     of the three reads weather. Power after the last half-hour a level reads must move nothing, and
     shifting the last day up to and including that half-hour must move the level.
     """

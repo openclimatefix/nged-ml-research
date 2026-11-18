@@ -59,8 +59,8 @@ Approximations (each is printed by the builder where it can be measured):
   half-hours only), so that one forecaster supplies the whole series. The stored-NRA residuals of
   stage 1 are never mixed into a bank series. Every residual of a bank world is on
   even half-hours only, and its coverage thresholds are halved.
-- The neighbours' residuals in a bank world are the stored-NRA residuals of stage 1 plus the shifts that the generator
-  of experiment 650 added to those Primaries in that pass (their own event and the mirrored step of
+- The neighbours' residuals in a bank world are the stored-NRA residuals of stage 1 plus the shifts
+  that the generator of experiment 650 added to those Primaries in that pass (their own event and the mirrored step of
   a transfer), with the forecast held fixed (no re-run). The bank stores no re-run forecast for a
   Primary outside its own event window.
 - Own-only ramps are additive worlds on the real rows: the truth is the real power plus a ramp of
@@ -189,7 +189,9 @@ def concat_tables(*, tables: list[Table]) -> Table:
 
 
 def neighbour_lists(*, inputs: c.Inputs) -> list[list[int]]:
-    """Return each Primary's metered neighbours from NGED's interconnection list, in the order of experiment 400.
+    """Return each Primary's metered neighbours, in the order of experiment 400.
+
+    The neighbours come from the interconnection list of NGED.
 
     The logic of `nged_neighbours` in `e00400_blend.py`, with the neighbours of a Primary sorted by
     the number in the label, which is the order that the generator of experiment 650 draws receivers
@@ -406,7 +408,9 @@ def ew_mean(
 def box_mean(
     *, residual: np.ndarray, origins: np.ndarray, window_half_hours: int, density: float
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the box-window mean of `residual` (…, N_STAMPS) and whether each window is covered, shape (…, n).
+    """Return the box-window mean of `residual` and whether each window is covered.
+
+    `residual` has shape (…, N_STAMPS), and the results have shape (…, n).
 
     The window of an origin ends 6 hours before it. It is covered when at least `c.MIN_COVERAGE` x
     `density` of its stamps hold a residual and it spans at least one day, as in `c.fit_window`.
@@ -645,7 +649,10 @@ class Neighbourhood(NamedTuple):
 
 
 def neighbourhood(*, banded: np.ndarray, origins: np.ndarray, density: float) -> Neighbourhood:
-    """Return every series' window means and daily means at `origins` for the band residuals `banded` (K, 6, N_STAMPS)."""
+    """Return every series' window means and daily means at `origins`.
+
+    The band residuals `banded` have shape (K, 6, N_STAMPS).
+    """
     means = np.stack(
         [
             ew_mean(residual=banded, tau_days=tau, origins=origins, density=density)
@@ -982,7 +989,10 @@ def load_real_bank(*, month: str, n_series: int) -> RealBank:
 def real_median_of(
     *, real: RealBank, prim: np.ndarray, oi: np.ndarray, vi: np.ndarray
 ) -> np.ndarray:
-    """Return the Candidate's real-world median (fraction of capacity) of each (Primary, origin, valid time); NaN if absent."""
+    """Return the Candidate's real-world median of each (Primary, origin, valid time).
+
+    The median is a fraction of capacity, and NaN where the real file lacks the row.
+    """
     key = _row_key(prim=prim, oi=oi, vi=vi)
     position = np.minimum(np.searchsorted(real.key, key), len(real.key) - 1)
     return np.where(real.key[position] == key, real.median[position], np.nan)
@@ -991,7 +1001,9 @@ def real_median_of(
 def generator_world(
     *, world: RealWorld, month: str, events: pl.DataFrame, lists: list[list[int]]
 ) -> dict[int, tuple[np.ndarray, np.ndarray]]:
-    """Return the generator's (own, mirror) shifts, as shares of capacity on the library grid, for each pass of `month`.
+    """Return the generator's (own, mirror) shifts for each pass of `month`.
+
+    The shifts are shares of capacity on the library grid.
 
     The generator is experiment 650's `build`, fed the cleaned power of stage 1 (the real power
     before the month after `month`, as the bank was built) and the neighbour lists in the order of
