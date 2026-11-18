@@ -34,9 +34,10 @@ prediction: >-
   with one predicted gain of -0.05 on sunny daylight half-hours from April to June at the signed-MW
   six. C3 (stage 2): the learned share cuts the copied share of an injected shift by a third to a half
   against the no-network rule. C4 (stage 2): the real neighbour graph and a rewired graph differ by
-  under 0.1 points. C5: the faithful prevailing arm minus the stored prevailing rows is 0 to +0.1.
+  under 0.1 points, for each of N-flag and N-gate. C6 (stage 2): N-gate minus N-flag on the copied share
+  and on event-free CRPS is within 0.1 points, and we expect N-gate to be no worse. C5: the faithful prevailing arm minus the stored prevailing rows is 0 to +0.1.
 decision_rule: >-
-  Contrasts are paired on series, origin, and valid time and read at 99% (Bonferroni over five
+  Contrasts are paired on series, origin, and valid time and read at 99.17% (Bonferroni over six
   contrasts). A real-row contrast counts when its month-block bootstrap interval and the t test on
   the monthly paired differences both exclude zero (critical value 3.71 for 6 degrees of freedom),
   and each interval's half-width and minimum detectable effect is printed. C1 and C2 are read in the
@@ -78,7 +79,9 @@ look-back mean follows recipe R of [experiment 115](../00115-differentiable-phys
 - **Stage 2 (maintainer approved 2026-11-18, under the stop rule):** a learned gate decides how much
   of each look-back offset the forecast applies. Four earlier experiments failed on the
   neighbour-based switching share (165, 175, 652, 663), and the maintainer approved a fifth attempt
-  on the condition that the design drops the binary switching-event flag. Instead, the head learns
+  with a second design that has no binary switching-event flag. Two stage 2 arms run side by side:
+  N-flag, the earlier design (a switching probability trained with a binary cross-entropy term and a
+  change-point split of the offset), and N-gate, in which the head learns
   how far to trust each look-back offset (global, high-irradiance, cold, and the neighbours' offsets
   at several window lengths), as the Candidate's lag encoder learns how far to trust each lagged
   power input, and it trains on synthetic switching events with the CRPS loss only. Stage 2 also
@@ -92,7 +95,7 @@ The full design, with the Opus review and its triage, is the private file
 
 - **Arms.** G-lb (lead-band-matched look-back mean, factor 0.75, 14 days) is the primary global
   offset. D adds a ridge-regressed irradiance slope and cold-temperature slope. P-7d and P-cp are
-  prevailing arms. N (the learned per-feature gate, no switching flag) and N-rule are the stage 2 arms. The stored normal-running and prevailing rows,
+  prevailing arms. N-flag (switching probability), N-gate (learned per-feature gate, no flag), and N-rule are the stage 2 arms. The stored normal-running and prevailing rows,
   recipe R, a 28-day median shift, hindsight ceilings, and a climatology row are references.
 - **Look-ahead.** The target weather comes from the ensemble run of 00:00 UTC on the origin's day,
   available at 09:00 UTC, and the script asserts this row by row. The look-back window ends 6 h
