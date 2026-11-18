@@ -36,7 +36,7 @@ decision_rule: >-
   month-block bootstrap interval at the Bonferroni level for three contrasts (98.33%, conservative
   towards arm B because only C1 decides). Arm A is provisionally chosen only if the C1 interval lies
   wholly below zero, the point estimate is at least 0.01 points of capacity below zero, and all
-  three seeds agree in sign in every month. The 0.01-point threshold covers arm A's porting cost:
+  each seed's C1 is below zero in every month. The 0.01-point threshold covers arm A's porting cost:
   production must keep the first day of the two previous ENS runs per Primary and compute a Haurwitz
   clear-sky ratio, where arm B needs no code at all. If arm A is provisionally chosen, both arms are
   refitted on the other four pre-July months (2025-12, 2026-01, 2026-03, and 2026-05), and the same
@@ -166,9 +166,9 @@ are zero. Each arm runs seeds 0, 1, and 2, as experiment 677's monthly refits di
   audit trigger 3.
 - **Per month and per seed**, the page tables C1, because with four months an interval wholly below
   zero means in practice that arm A wins in every month.
-- **Climatology** is the month, half-hour, and weekend-flag quantiles of `ClimatologyForecaster` as
-  stored for experiment 668, trained on the history before each fold, with its rows repeated once
-  per seed.
+- **Climatology** is the month, half-hour, and weekend-flag quantiles of `ClimatologyForecaster`,
+  recomputed from the cleaned power with the D15 and D18 cut and trained on the history before each
+  fold, with its rows repeated once per seed. The manual heuristic is recomputed the same way.
 - **Absolute scores** of every arm, of the control, of climatology, and of the manual heuristic, by
   lead band, on the same rows.
 
@@ -177,7 +177,7 @@ are zero. Each arm runs seeds 0, 1, and 2, as experiment 677's monthly refits di
 **Every arm and both baselines are scored on four sets of rows:** all rows; rows outside every
 logged event and at least 7 days after one; rows inside a logged event; and the 7 days after a
 logged event ends. The events are those `e00668_slices_primaries.py` uses (the table of experiment
-653, plus the verified transfer between D5 and D16 from 2025-12-30 to 2026-01-15) that overlap the
+653, plus the verified transfer between D5 and D16 from 2025-12-29 to 2026-01-14) that overlap the
 four months. The page plots one day-ahead forecast and one full 14-day forecast against the
 observed power, and at least six time series around logged events across both metering groups,
 from 14 days before each event to at least 7 days after it, with its start and end marked. NGED's
