@@ -24,6 +24,7 @@ set, as `CLAUDE.md` says.
 
 import datetime as dt
 import resource
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +69,8 @@ GRID_START_US: Final[int] = int(GRID_START.timestamp() * 1_000_000)
 ORIGIN0_US: Final[int] = GRID_START_US + ORIGIN_STAMP * STEP_US
 LIB_OFFSET: Final[int] = int((GRID_START - LIB_GRID_START).total_seconds() // 1800)
 """Half-hours from the library grid start to stamp 0."""
+LIB_HOLDOUT_INDEX: Final[int] = int((HOLDOUT_START - LIB_GRID_START).total_seconds() // 1800)
+"""The first half-hour of the holdout on the library grid; a bank row at or after it is never read."""
 
 FIRST_ORIGIN_DEC: Final[int] = 30
 """Origin index of 2025-12-01, the first scored origin of C1 and C2."""
@@ -208,7 +211,7 @@ class Inputs:
     driver_var: np.ndarray
     """Variance of each driver per series over 2024-11 to 2025-10, shape (K, 2)."""
     null_counts: pl.DataFrame
-    """Half-hours with no cleaned power per series and month (the `substation_zero` rows)."""
+    """Half-hours with no cleaned power per series, month, and drop reason (a reason may be null)."""
 
 
 def read_site_map() -> pl.DataFrame:
@@ -341,7 +344,10 @@ def read_run(*, day: dt.date, ids: np.ndarray) -> pl.DataFrame:
     path = E607_WORK / "ens_summary" / f"init={day:%Y-%m-%d}.parquet"
     return (
         pl.scan_parquet(path)
-        .filter(pl.col("time_series_id").is_in([int(value) for value in ids]))
+        .filter(
+            pl.col("time_series_id").is_in([int(value) for value in ids]),
+            pl.col("valid_time") < HOLDOUT_START,
+        )
         .select(
             "time_series_id",
             "power_fcst_init_time",
@@ -442,8 +448,15 @@ def driver_variances(*, ids: np.ndarray) -> np.ndarray:
     """
     path = OUT_DIR / "driver_variances.parquet"
     if path.exists():
-        table = pl.read_parquet(path)
-        return np.stack([table["var_pv"].to_numpy(), table["var_cold"].to_numpy()], axis=1)
+        table = pl.read_parquet(path).filter(pl.col("time_series_id").is_in(ids.tolist()))
+        if table.height != len(ids):
+            msg = f"{path} lacks some of the {len(ids)} series; delete it so it is rebuilt"
+            raise ValueError(msg)
+        position = _positions(ids=ids, series=table["time_series_id"])
+        cached = np.full((len(ids), 2), np.nan)
+        cached[position, 0] = table["var_pv"].to_numpy()
+        cached[position, 1] = table["var_cold"].to_numpy()
+        return cached
     totals = np.zeros((len(ids), 2, 3))
     day = dt.date(2024, 11, 1)
     while day <= dt.date(2025, 10, 31):
@@ -536,7 +549,7 @@ def era5_grid(*, ids: np.ndarray) -> np.ndarray:
         .filter(
             pl.col("time_series_id").is_in([int(value) for value in ids]),
             pl.col("valid_time") >= GRID_START - dt.timedelta(hours=3),
-            pl.col("valid_time") < HOLDOUT_START + dt.timedelta(hours=3),
+            pl.col("valid_time") < HOLDOUT_START,
         )
         .select("time_series_id", "valid_time", "shortwave", "temperature_2m")
         .sort("time_series_id", "valid_time")
@@ -608,10 +621,10 @@ def build_residuals(*, inputs: Inputs) -> Residuals:
 
 
 def calendar_columns() -> np.ndarray:
-    """Return the weekend flag and three time-of-day block flags of every stamp, shape (N_STAMPS, 4).
+    """Return the weekend flag and two time-of-day block flags of every stamp, shape (N_STAMPS, 3).
 
-    Times are Europe/London local times of the stamp. The blocks are hours 0 to 7, 8 to 15, and 16
-    to 23.
+    Times are Europe/London local times of the stamp. The blocks are hours 0 to 7 and 8 to 15; the
+    block of hours 16 to 23 is left out, because the three blocks sum to the intercept.
     """
     stamps = pl.datetime_range(
         GRID_START,
@@ -622,7 +635,7 @@ def calendar_columns() -> np.ndarray:
     ).dt.convert_time_zone("Europe/London")
     weekend = (stamps.dt.weekday() >= 6).to_numpy().astype(np.float64)
     block = (stamps.dt.hour() // 8).to_numpy()
-    return np.stack([weekend, *[(block == index).astype(np.float64) for index in range(3)]], axis=1)
+    return np.stack([weekend, *[(block == index).astype(np.float64) for index in range(2)]], axis=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -633,7 +646,7 @@ class ArmSpec:
     drivers: tuple[int, ...] = ()
     """Driver slopes in the ridge regression: 0 for `x_pv`, 1 for `x_cold`; empty for G."""
     calendar: bool = False
-    """Whether the regression adds the weekend flag and three time-of-day blocks (D+)."""
+    """Whether the regression adds the weekend flag and two time-of-day blocks (D+)."""
     window_days: int = 14
     lag_half_hours: int = LAG_6H
     factor: float = FACTOR_LOOK_BACK
@@ -642,7 +655,9 @@ class ArmSpec:
     truncate_to_month: bool = False
     """Use only residuals of forecasts issued in the origin's own month (the refit month)."""
     permute_days: bool = False
-    """Permute the look-back drivers in whole days against the residuals (placebo PL2)."""
+    """Permute the look-back drivers in whole days inside each origin's own window (placebo PL2)."""
+    min_window_days: int = 1
+    """A window needs at least this many days of stamps to be covered."""
     first_origin: int = FIRST_ORIGIN_DEC
     row_set_id: str = ROW_SET_ID
 
@@ -673,6 +688,7 @@ def fit_window(
     window_half_hours: int,
     lag_half_hours: int,
     truncate_stamps: np.ndarray | None = None,
+    min_window_days: int = 1,
 ) -> WindowFit:
     """Fit the ridge regression of the residual on the design in every origin's look-back window.
 
@@ -688,6 +704,7 @@ def fit_window(
         window_half_hours: The window's length.
         lag_half_hours: Half-hours between the origin and the newest residual.
         truncate_stamps: If given, the first stamp the window may hold at each origin.
+        min_window_days: The fewest days of stamps a covered window holds.
 
     Returns:
         The coefficients, their standard errors, and whether each window was covered.
@@ -727,7 +744,9 @@ def fit_window(
     stop = last + 1
     span = stop - first
     n_window = count[:, stop] - count[:, first]
-    covered = (n_window >= MIN_COVERAGE * span[None, :]) & (span[None, :] >= PER_DAY)
+    covered = (n_window >= MIN_COVERAGE * span[None, :]) & (
+        span[None, :] >= min_window_days * PER_DAY
+    )
     normal = np.moveaxis(gram[..., stop] - gram[..., first], -1, 1)
     rhs = np.moveaxis(cross[..., stop] - cross[..., first], -1, 1)
     n_active = np.moveaxis(active[..., stop] - active[..., first], -1, 1)
@@ -757,11 +776,44 @@ def fit_window(
     return WindowFit(coef=np.swapaxes(coef, 0, 1), se=np.swapaxes(se, 0, 1), covered=covered.T)
 
 
-def lookback_design(*, inputs: Inputs, series: int, spec: ArmSpec) -> np.ndarray:
+def permuted_window_driver(
+    *, inputs: Inputs, series: int, driver: int, spec: ArmSpec, origin: int
+) -> np.ndarray:
+    """Return one driver on the stamp grid with the whole days of origin `origin`'s window permuted.
+
+    The window holds the stamps from `origin` minus the lag and the window length. Each stamp of the
+    window gets the weather of the same row of another day of the same window, so the permutation
+    reads only runs of 00:00 UTC on days before the origin's day. The permutation is fixed by the
+    experiment id and the origin. Stamps outside the window stay NaN.
+
+    Raises:
+        ValueError: If a permuted day is not before the origin's day.
+    """
+    last = ORIGIN_STAMP + PER_DAY * origin - spec.lag_half_hours
+    first = max(last - spec.window_days * PER_DAY + 1, 0)
+    stamps = np.arange(first, last + 1)
+    day, row = np.divmod(stamps - ORIGIN_STAMP, PER_DAY)
+    usable = day >= 0
+    days = np.unique(day[usable])
+    shuffled = np.random.default_rng([EXPERIMENT_ID, origin]).permutation(days)
+    source = shuffled[np.searchsorted(days, day[usable])]
+    if (source >= origin).any() or (source < 0).any():
+        msg = f"origin {origin}: a permuted day lies outside the days before the origin"
+        raise ValueError(msg)
+    values = np.full(N_STAMPS, np.nan)
+    values[stamps[usable]] = inputs.weather[series, source, row[usable], driver]
+    return values
+
+
+def lookback_design(
+    *, inputs: Inputs, series: int, spec: ArmSpec, origin_of_window: int | None = None
+) -> np.ndarray:
     """Return the look-back regressors of one series on the stamp grid, shape (N_STAMPS, p).
 
     The driver of stamp `i` is the ensemble-mean weather of the 00:00 UTC run of the origin whose
     forecast has the smallest lead for `i`, so it is weather the origin of that forecast already had.
+    With `spec.permute_days`, the design is valid only inside the window of `origin_of_window`, whose
+    whole days are permuted among themselves.
     """
     stamps = np.arange(N_STAMPS)
     offset = stamps - ORIGIN_STAMP
@@ -770,15 +822,16 @@ def lookback_design(*, inputs: Inputs, series: int, spec: ArmSpec) -> np.ndarray
     usable = (origin >= 0) & (origin < N_ORIGINS)
     columns: list[np.ndarray] = []
     for driver in spec.drivers:
-        values = np.full(N_STAMPS, np.nan)
-        values[usable] = inputs.weather[series, origin[usable], row[usable], driver]
         if spec.permute_days:
-            permutation = np.random.default_rng(EXPERIMENT_ID).permutation(N_ORIGINS)
-            shuffled = np.full(N_STAMPS, np.nan)
-            shuffled[usable] = values[
-                ORIGIN_STAMP + PER_DAY * permutation[origin[usable]] + row[usable]
-            ]
-            values = shuffled
+            if origin_of_window is None:
+                msg = "a permuted design needs the origin of its window"
+                raise ValueError(msg)
+            values = permuted_window_driver(
+                inputs=inputs, series=series, driver=driver, spec=spec, origin=origin_of_window
+            )
+        else:
+            values = np.full(N_STAMPS, np.nan)
+            values[usable] = inputs.weather[series, origin[usable], row[usable], driver]
         columns.append(values)
     if spec.calendar:
         columns.extend(calendar_columns().T)
@@ -818,6 +871,23 @@ def month_start_stamps() -> np.ndarray:
     )
 
 
+def _fit_permuted(
+    *, inputs: Inputs, series: int, spec: ArmSpec, window_fit: Callable[[np.ndarray], WindowFit]
+) -> WindowFit:
+    """Return the window fits of a permuted-day arm, solving each origin with its own permutation."""
+    parts = [
+        window_fit(
+            lookback_design(inputs=inputs, series=series, spec=spec, origin_of_window=origin)
+        )
+        for origin in range(N_ORIGINS)
+    ]
+    return WindowFit(
+        coef=np.stack([part.coef[origin] for origin, part in enumerate(parts)]),
+        se=np.stack([part.se[origin] for origin, part in enumerate(parts)]),
+        covered=np.stack([part.covered[origin] for origin, part in enumerate(parts)]),
+    )
+
+
 def series_corrections(
     *, inputs: Inputs, residuals: Residuals, series: int, spec: ArmSpec
 ) -> tuple[np.ndarray, WindowFit]:
@@ -829,14 +899,24 @@ def series_corrections(
     residual = (
         residuals.banded[series] if spec.band_matched else residuals.smallest[series][None, :]
     )
-    fit = fit_window(
-        residual=residual,
-        design=lookback_design(inputs=inputs, series=series, spec=spec),
-        penalty=penalties(inputs=inputs, series=series, spec=spec),
-        window_half_hours=spec.window_days * PER_DAY,
-        lag_half_hours=spec.lag_half_hours,
-        truncate_stamps=month_start_stamps() if spec.truncate_to_month else None,
-    )
+    truncate = month_start_stamps() if spec.truncate_to_month else None
+    penalty = penalties(inputs=inputs, series=series, spec=spec)
+
+    def window_fit(design: np.ndarray) -> WindowFit:
+        return fit_window(
+            residual=residual,
+            design=design,
+            penalty=penalty,
+            window_half_hours=spec.window_days * PER_DAY,
+            lag_half_hours=spec.lag_half_hours,
+            truncate_stamps=truncate,
+            min_window_days=spec.min_window_days,
+        )
+
+    if spec.permute_days:
+        fit = _fit_permuted(inputs=inputs, series=series, spec=spec, window_fit=window_fit)
+    else:
+        fit = window_fit(lookback_design(inputs=inputs, series=series, spec=spec))
     band = BAND_OF_H if spec.band_matched else np.zeros(N_H, dtype=np.int64)
     coef = fit.coef[:, band, :]
     slopes = np.nan_to_num(target_design(inputs=inputs, series=series, spec=spec))

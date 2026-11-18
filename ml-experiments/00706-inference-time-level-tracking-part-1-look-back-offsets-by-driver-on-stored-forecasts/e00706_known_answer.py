@@ -8,14 +8,15 @@ experiments 668, 683, and 688 on `PYTHONPATH` (the event spans come from experim
     PYTHONPATH=$PP uv run --no-sync python ml-experiments/00706-*/e00706_known_answer.py --n-jobs 4
 
 `--test` picks one test (`counts`, `readability`, `perturb`, `ka1a`, `ka1b`, `ka2`, `pl`), or `all`.
-`--month YYYY-MM` restricts the origins that the placebo scores read.
+`--month YYYY-MM` restricts the origins that the placebo scores read (a smoke test).
 
 - `counts`: the number of bank events with depth of at least 10% of capacity and at least 21 days
   (the design says 337 of 1,152 in the six folds) and with no metered receiver (165).
 - `readability`: the standard deviation over origins of the 14-day window mean of the residual on
   event-free half-hours. Every injected size must be at least 5 times it.
 - `perturb`: changing power after 6 hours before the origin, or any weather run after the origin
-  day, moves no coefficient and no correction; changing the 06:00 UTC reading moves it.
+  day, moves no coefficient and no correction of arms G and D; changing the 06:00 UTC reading moves
+  it. The same holds for the levels of P-cp (window ending 3 hours before the origin), RR, and M28.
 - `ka1a` (gate): a 10-point additive step in truth with the forecast held fixed. Arm G with factor 1.0
   must remove 100% plus or minus 5% at 14 days and 50% plus or minus 5% at 7 days after the onset.
   A failed gate stops the experiment after one fix pass.
@@ -24,35 +25,46 @@ experiments 668, 683, and 688 on `PYTHONPATH` (the event spans come from experim
 - `ka2`: a PV-shaped injection and a cold-night injection into real half-hours, with the weather that
   happened, read by an estimator that sees ensemble weather. The forecast is not re-run.
 - `pl`: PL1 (arm G with the window of another Primary of the same metering group that is no
-  electrical neighbour) and PL2 (arm D with the drivers permuted in whole days).
+  electrical neighbour) and PL2 (arm D with the drivers permuted in whole days inside each
+  origin's own window, solved per origin).
 """
 
 import argparse
 import csv
 import dataclasses
 from pathlib import Path
+from typing import Final
 
 import e00706_common as c  # ty: ignore[unresolved-import]
+import e00706_score as score  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from studies.eval_protocol.metrics import MEDIAN_INDEX
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-BOTH: tuple[int, int] = (c.PV_DRIVER, c.COLD_DRIVER)
-STEP_POINTS: float = 10.0
+BOTH: Final[tuple[int, int]] = (c.PV_DRIVER, c.COLD_DRIVER)
+STEP_POINTS: Final[float] = 10.0
 """The additive step of KA1a, in points of capacity (the bank's events start at 10% of capacity)."""
-PV_POINTS: float = 10.0
+PV_POINTS: Final[float] = 10.0
 """KA2's PV-shaped injection: this many points of capacity at an irradiance of 1,000 W/m2."""
-COLD_POINTS_PER_K: float = 1.0
+COLD_POINTS_PER_K: Final[float] = 1.0
 """KA2's cold injection: this many points per kelvin below 5 degrees Celsius."""
-TEST_DAYS: tuple[int, int] = (14, 7)
+TEST_DAYS: Final[tuple[int, int]] = (14, 7)
 """Days after the onset at which KA1 reads the removal."""
-MIN_SIZE_OVER_NOISE: float = 5.0
-HEAD_DATA: Path = next(ML_EXPERIMENTS_DATA_DIR.glob("00667-*")) / "prevailing" / "head_data"
-BANK_MONTHS: tuple[str, ...] = ("2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06")
-MIN_DEPTH: float = 0.10
-MIN_LENGTH_DAYS: float = 21.0
-NGED_DIR: Path = ML_EXPERIMENTS_DATA_DIR.parent / "NGED" / "substation_hierarchy_2026-10-15"
-GROUPS: tuple[str, ...] = (c.GROUP_SIGNED, c.GROUP_MVA, c.GROUP_SHORT)
+MIN_SIZE_OVER_NOISE: Final[float] = 5.0
+HEAD_DATA: Final[Path] = next(ML_EXPERIMENTS_DATA_DIR.glob("00667-*")) / "prevailing" / "head_data"
+BANK_MONTHS: Final[tuple[str, ...]] = (
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06",
+)
+MIN_DEPTH: Final[float] = 0.10
+MIN_LENGTH_DAYS: Final[float] = 21.0
+NGED_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR.parent / "NGED" / "substation_hierarchy_2026-10-15"
+GROUPS: Final[tuple[str, ...]] = (c.GROUP_SIGNED, c.GROUP_MVA, c.GROUP_SHORT)
 """The metering groups of `demand-v2`; a placebo partner stays inside one."""
 
 
@@ -77,7 +89,7 @@ def scored_rows(*, inputs: c.Inputs, inside: np.ndarray, first_origin: int) -> n
         & event_free
         & origins[None, :, None]
         & c.lead_mask()[None, None, :]
-        & np.isfinite(inputs.q_nra[..., 5])
+        & np.isfinite(inputs.q_nra[..., MEDIAN_INDEX])
     )
 
 
@@ -192,7 +204,73 @@ def perturb(*, inputs: c.Inputs) -> bool:
                         f"coefficient moved {coefficient_moved}, correction moved {correction_moved} "
                         f"-> {'ok' if passed else 'FAIL'}"
                     )
+    ok &= perturb_levels(inputs=inputs)
     print(f"PERTURB overall {'PASS' if ok else 'FAIL'}")
+    return ok
+
+
+def level_of(*, name: str, residuals: c.Residuals, series: int, origin: int) -> float:
+    """Return the level that the reference arm `name` adds at `origin` for one series."""
+    if name == "P-cp":
+        levels = c.changepoint_levels(
+            residual=residuals.smallest[series], lag_half_hours=c.LAG_3H_CAP
+        )
+        return float(levels[origin])
+    if name == "RR":
+        return float(score.recipe_r_correction(residuals=residuals)[series, origin].sum())
+    return float(score.m28_correction(residuals=residuals)[series, origin, 0])
+
+
+def perturb_levels(*, inputs: c.Inputs) -> bool:
+    """Return whether the perturbation test passes for the levels of P-cp, RR, and M28.
+
+    P-cp reads power up to 3 hours before the origin; RR and M28 read it up to 6 hours before. None
+    of the three reads weather. Power after the last half-hour a level reads must move nothing, and
+    shifting the last day up to and including that half-hour must move the level.
+    """
+    ok = True
+    base_residuals = c.build_residuals(inputs=inputs)
+    for name, lag in (("P-cp", c.LAG_3H_CAP), ("RR", c.LAG_6H), ("M28", c.LAG_6H)):
+        for series in (0, 3):
+            for origin in (40, 100, 160, 220):
+                last = c.ORIGIN_STAMP + c.PER_DAY * origin - lag
+                reference = level_of(
+                    name=name, residuals=base_residuals, series=series, origin=origin
+                )
+                truth_late = inputs.truth.copy()
+                truth_late[series, last + 1 :] += 7.0
+                truth_edge = inputs.truth.copy()
+                truth_edge[series, last - c.PER_DAY + 1 : last + 1] += 20.0
+                weather_late = inputs.weather.copy()
+                weather_late[:, origin:] += 1.0
+                cases = {
+                    "power after the last half-hour read": (
+                        dataclasses.replace(inputs, truth=truth_late),
+                        False,
+                    ),
+                    "last day up to the last half-hour": (
+                        dataclasses.replace(inputs, truth=truth_edge),
+                        True,
+                    ),
+                    "weather runs from the origin day on": (
+                        dataclasses.replace(inputs, weather=weather_late),
+                        False,
+                    ),
+                }
+                for case, (changed, should_move) in cases.items():
+                    value = level_of(
+                        name=name,
+                        residuals=c.build_residuals(inputs=changed),
+                        series=series,
+                        origin=origin,
+                    )
+                    moved = not np.isclose(value, reference, atol=1e-6)
+                    passed = moved == should_move
+                    ok &= passed
+                    print(
+                        f"PERTURB series {series} origin {origin} {case} level {name}: moved "
+                        f"{moved} -> {'ok' if passed else 'FAIL'}"
+                    )
     return ok
 
 
@@ -224,10 +302,13 @@ def ka1a(*, inputs: c.Inputs) -> bool:
         values = np.array(removal[days])
         passed = abs(values.mean() - target) <= 0.05
         ok &= passed
+        step_half_hours = days * c.PER_DAY - c.LAG_6H + 1
+        exact = step_half_hours / (14 * c.PER_DAY)
         print(
             f"KA1a at {days} days after onset: removal {values.mean():.3f} (range {values.min():.3f} "
-            f"to {values.max():.3f}, {len(values)} series-onsets); need {target:.2f} +- 0.05 -> "
-            f"{'PASS' if passed else 'FAIL'}"
+            f"to {values.max():.3f}, {len(values)} series-onsets); exact expected {exact:.4f} "
+            f"({step_half_hours} of the window's {14 * c.PER_DAY} half-hours are after the onset); "
+            f"need {target:.2f} +- 0.05 -> {'PASS' if passed else 'FAIL'}"
         )
     print(f"KA1a overall {'PASS' if ok else 'FAIL'}")
     return ok
@@ -245,8 +326,12 @@ def ka1b() -> None:
             pl.col("depth") >= MIN_DEPTH, pl.col("length_days") >= MIN_LENGTH_DAYS
         )
         bank = np.load(HEAD_DATA / f"bank_{month}.npz")
-        keys = {name: bank[name] for name in ("prim", "oi", "vi", "lead", "y", "shift", "pass_")}
-        median = bank["q"][:, 5]
+        before_holdout = bank["vi"] < c.LIB_HOLDOUT_INDEX
+        keys = {
+            name: bank[name][before_holdout]
+            for name in ("prim", "oi", "vi", "lead", "y", "shift", "pass_")
+        }
+        median = bank["q"][before_holdout][:, MEDIAN_INDEX]
         residual = (keys["y"] + keys["shift"] - median) * 100.0
         for event in events.iter_rows(named=True):
             mine = (keys["pass_"] == event["pass"]) & (keys["prim"] == event["primary"])
@@ -333,25 +418,45 @@ def ka2(*, inputs: c.Inputs, inside: np.ndarray) -> None:
                     f"arm D removes {share_d:.3f} (left {size - gain_d:+.3f}); arm G leaves "
                     f"{size - gain_g:+.3f} (removes {gain_g / size if abs(size) > 1e-9 else float('nan'):.3f})"
                 )
-        verdict_set = (rows & c.group_masks(inputs=inputs)[c.POOLED][:, None, None]) & sets[
-            "midday (shortwave >= 300 W/m2)"
-        ]
-        night_set = (rows & c.group_masks(inputs=inputs)[c.POOLED][:, None, None]) & sets[
-            "night (shortwave < 1 W/m2)"
-        ]
         if name == "PV-shaped":
-            size = float(injected_target[verdict_set].mean())
-            share = float((corr_d - base_d)[verdict_set].mean()) / size
-            night_error = float((corr_d - base_d)[night_set].mean())
-            night_g = float((corr_g - base_g)[night_set].mean())
-            print(
-                f"KA2 GATE (PV-shaped, pooled 14): arm D removes {share:.3f} of the midday error "
-                f"(need >= 0.5 at factor 1.0) -> {'PASS' if share >= 0.5 else 'FAIL'}; night error of arm D "
-                f"{-night_error:+.3f} points (need within 1) -> {'PASS' if abs(night_error) <= 1.0 else 'FAIL'}; "
-                f"night error of arm G {-night_g:+.3f} points (sign opposite to the injection: "
-                f"{'yes' if night_g * size > 0 else 'NO'}, a sanity print)"
-            )
+            for group, series_mask in c.group_masks(inputs=inputs).items():
+                print_ka2_gate(
+                    group=group,
+                    selected=rows & series_mask[:, None, None],
+                    sets=sets,
+                    injected_target=injected_target,
+                    gain_d=corr_d - base_d,
+                    gain_g=corr_g - base_g,
+                )
     print("KA2 note: the injection is added to truth only; the stored forecast is not re-run.")
+
+
+def print_ka2_gate(
+    *,
+    group: str,
+    selected: np.ndarray,
+    sets: dict[str, np.ndarray],
+    injected_target: np.ndarray,
+    gain_d: np.ndarray,
+    gain_g: np.ndarray,
+) -> None:
+    """Print KA2's gate on the PV-shaped injection for one metering group (the gate reads the pooled 14)."""
+    verdict_set = selected & sets["midday (shortwave >= 300 W/m2)"]
+    night_set = selected & sets["night (shortwave < 1 W/m2)"]
+    if not verdict_set.any() or not night_set.any():
+        print(f"KA2 GATE (PV-shaped, {group}): no rows")
+        return
+    size = float(injected_target[verdict_set].mean())
+    share = float(gain_d[verdict_set].mean()) / size
+    night_error = float(gain_d[night_set].mean())
+    night_g = float(gain_g[night_set].mean())
+    print(
+        f"KA2 GATE (PV-shaped, {group}): arm D removes {share:.3f} of the midday error "
+        f"(need >= 0.5 at factor 1.0) -> {'PASS' if share >= 0.5 else 'FAIL'}; night error of arm D "
+        f"{-night_error:+.3f} points (need within 1) -> {'PASS' if abs(night_error) <= 1.0 else 'FAIL'}; "
+        f"night error of arm G {-night_g:+.3f} points (sign opposite to the injection: "
+        f"{'yes' if night_g * size > 0 else 'NO'}, a sanity print)"
+    )
 
 
 def print_slope_errors(*, inputs: c.Inputs, fits: list[c.WindowFit]) -> None:
@@ -418,7 +523,9 @@ def derangement(*, inputs: c.Inputs) -> np.ndarray:
         members = [i for i, g in enumerate(inputs.groups) if g == group]
         chosen: list[int] = []
 
-        def place(position: int, members: list[int] = members, chosen: list[int] = chosen) -> bool:
+        def place(
+            *, position: int, members: list[int] = members, chosen: list[int] = chosen
+        ) -> bool:
             if position == len(members):
                 return True
             here = members[position]
@@ -429,12 +536,12 @@ def derangement(*, inputs: c.Inputs) -> np.ndarray:
                     and inputs.labels[candidate] not in neighbours[inputs.labels[here]]
                 ):
                     chosen.append(candidate)
-                    if place(position + 1):
+                    if place(position=position + 1):
                         return True
                     chosen.pop()
             return False
 
-        if place(0):
+        if place(position=0):
             partner[members] = chosen
     return partner
 
@@ -447,6 +554,25 @@ def mean_by_group(*, inputs: c.Inputs, values: np.ndarray, rows: np.ndarray) -> 
     }
 
 
+def print_nesting_check(*, fits_g: list[c.WindowFit], fits_d: list[c.WindowFit]) -> None:
+    """Print the largest gap between D's and G's intercepts where both of D's slopes are zero by rule.
+
+    With no slope, D's regression is G's window mean, so the intercepts must agree.
+    """
+    gaps = []
+    for fit_g, fit_d in zip(fits_g, fits_d, strict=True):
+        both_zero = np.isnan(fit_d.se[..., 1:]).all(axis=-1) & fit_d.covered
+        if both_zero.any():
+            gaps.append(np.abs(fit_d.coef[..., 0] - fit_g.coef[..., 0])[both_zero].max())
+    if gaps:
+        print(
+            f"NESTING max |D intercept - G intercept| over windows where both slopes are zero by "
+            f"rule: {max(gaps):.2e} points"
+        )
+    else:
+        print("NESTING no window has both D slopes zero by rule")
+
+
 def placebos(
     *, inputs: c.Inputs, residuals: c.Residuals, inside: np.ndarray, month: str | None
 ) -> None:
@@ -454,9 +580,10 @@ def placebos(
     spec_g = c.ArmSpec(name="g")
     spec_d = c.ArmSpec(name="d", drivers=BOTH)
     spec_permuted = c.ArmSpec(name="pl2", drivers=BOTH, permute_days=True)
-    corr_g, _ = all_corrections(inputs=inputs, residuals=residuals, spec=spec_g)
-    corr_d, _ = all_corrections(inputs=inputs, residuals=residuals, spec=spec_d)
+    corr_g, fits_g = all_corrections(inputs=inputs, residuals=residuals, spec=spec_g)
+    corr_d, fits_d = all_corrections(inputs=inputs, residuals=residuals, spec=spec_d)
     corr_permuted, _ = all_corrections(inputs=inputs, residuals=residuals, spec=spec_permuted)
+    print_nesting_check(fits_g=fits_g, fits_d=fits_d)
     partner = derangement(inputs=inputs)
     print(
         "PL1 partners (series -> window of):",
@@ -467,7 +594,7 @@ def placebos(
     if month is not None:
         rows &= np.isin(np.arange(c.N_ORIGINS), c.origin_of_month(month=month))[None, :, None]
     truth = c.target_truth(inputs=inputs)
-    scores = {}
+    crps = {}
     for name, correction in (
         ("S-NRA", np.zeros_like(corr_g)),
         ("G", corr_g),
@@ -478,13 +605,13 @@ def placebos(
         quantiles = c.apply_correction(
             inputs=inputs, quantiles=inputs.q_nra, correction=correction.astype(np.float32)
         )
-        scores[name] = c.loss_arrays(truth=truth, quantiles=quantiles)["crps"]
+        crps[name] = c.loss_arrays(truth=truth, quantiles=quantiles)["crps"]
     common = rows
-    for values in scores.values():
+    for values in crps.values():
         common = common & np.isfinite(values)
     table = {
         name: mean_by_group(inputs=inputs, values=values, rows=common)
-        for name, values in scores.items()
+        for name, values in crps.items()
     }
     for group in c.group_masks(inputs=inputs):
         base = table["S-NRA"][group]
@@ -501,6 +628,24 @@ def placebos(
             else "FAIL (report the gain as a common bias of the Candidate)"
         )
         print(f"  PL1 gain {gain_pl1:+.3f} vs a third of G's gain {gain_g / 3.0:+.3f} -> {verdict}")
+        selection = common & c.group_masks(inputs=inputs)[group][:, None, None]
+        if month is not None or not selection.any():
+            print("  PL1 minus S-NRA interval: n/a (one month or no rows)")
+        else:
+            lower, upper = score.interval_job(
+                ids=inputs.ids,
+                rows=np.nonzero(selection),
+                values={"PL1": crps["PL1"][selection], "S-NRA": crps["S-NRA"][selection]},
+                treatment="PL1",
+                reference="S-NRA",
+                level=score.REPORTED_LEVEL,
+                n_resamples=score.REPORTED_RESAMPLES,
+            )
+            print(
+                f"  PL1 minus S-NRA: {table['PL1'][group] - base:+.3f} points, "
+                f"{score.REPORTED_LEVEL:.0f}% month-block interval [{lower:+.3f}, {upper:+.3f}] "
+                "(a gain would show as an interval below 0)"
+            )
         excess = table["G"][group] - table["PL2"][group]
         print(
             f"  PL2: D with permuted drivers minus G {-excess:+.3f} points "

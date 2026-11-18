@@ -11,29 +11,32 @@ Reads the stored one-year backtest (`primaries.parquet`, `ground_truth_primaries
 dropped before any table is built. Writes `residuals.parquet` (one row per Primary and half-hour)
 under the experiment's data folder and prints:
 
-- the count of half-hours per month with no cleaned power (`substation_zero`), which no look-back or
-  score reads;
+- the count of half-hours with no cleaned power, by drop reason (some rows have no recorded reason),
+  which no look-back or score reads;
 - the weather look-ahead assertions, row by row;
 - the printed example of Primary 17, origin 2026-03-10 12:00 UTC, valid 2026-03-15 13:00 UTC, which
   the page quotes;
 - the peak memory of the process.
 
-`--month YYYY-MM` writes only that month's valid times and a table with the month in its name, so one
-month can be run first to measure memory.
+`--month YYYY-MM` writes only that month's valid times and a table with the month in its name. It is a
+smoke test of the writing code: it still builds every residual, so it does not measure the memory
+of one month.
 """
 
 import argparse
 import datetime as dt
+from typing import Final
 
 import e00706_common as c  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from studies.eval_protocol.metrics import MEDIAN_INDEX
 from studies.experiment_store import HOLDOUT_START
 
-EXAMPLE_SERIES: int = 17
-EXAMPLE_ORIGIN: dt.datetime = dt.datetime(2026, 3, 10, 12, tzinfo=dt.UTC)
-EXAMPLE_VALID: dt.datetime = dt.datetime(2026, 3, 15, 13, tzinfo=dt.UTC)
-EXAMPLE_FACTS: dict[str, str] = {
+EXAMPLE_SERIES: Final[int] = 17
+EXAMPLE_ORIGIN: Final[dt.datetime] = dt.datetime(2026, 3, 10, 12, tzinfo=dt.UTC)
+EXAMPLE_VALID: Final[dt.datetime] = dt.datetime(2026, 3, 15, 13, tzinfo=dt.UTC)
+EXAMPLE_FACTS: Final[dict[str, str]] = {
     "window_first": "2026-02-24 06:30",
     "window_last": "2026-03-10 06:00",
     "newest_forecast_origin": "2026-03-09 12:00",
@@ -75,52 +78,84 @@ def assert_backtest_look_ahead() -> None:
 
 
 def assert_look_back_look_ahead() -> None:
-    """Assert, for every origin, that every look-back half-hour and forecast was known at the origin.
+    """Assert, for every origin and lead band, that every look-back input was known at the origin.
 
-    For origin `t` and a half-hour `s` of its window, `s <= t - 6 h`; the smallest-lead forecast of
-    `s` was issued at an origin not after `s`; its weather run (00:00 UTC) plus 9 hours is not after
-    that origin; and every lead-band forecast of `s` was issued before the smallest-lead one.
+    For origin `t` and a half-hour `s` of its window, the forecast of lead band `j` is issued at
+    origin day `(s - 24) // 48 - j`, the same arithmetic as `build_residuals` and `lookback_design`.
+    The assertions are that the run day is before the origin's day, that the issue time is at or
+    before `s`, that `s` is at or before `t` minus 6 hours, and that the run of 00:00 UTC plus 9
+    hours is not after the issue time.
     """
     checked = 0
     for origin in range(c.N_ORIGINS):
-        last = c.ORIGIN_STAMP + c.PER_DAY * origin - c.LAG_6H
+        origin_stamp = c.ORIGIN_STAMP + c.PER_DAY * origin
+        last = origin_stamp - c.LAG_6H
         first = max(last - 14 * c.PER_DAY + 1, 0)
         stamps = np.arange(first, last + 1)
-        assert (stamps <= c.ORIGIN_STAMP + c.PER_DAY * origin - c.LAG_6H).all()
-        usable = stamps >= c.ORIGIN_STAMP
-        issued = c.ORIGIN_STAMP + c.PER_DAY * ((stamps[usable] - c.ORIGIN_STAMP) // c.PER_DAY)
-        assert (issued <= stamps[usable]).all(), (
-            "a look-back forecast was issued after its half-hour"
-        )
-        assert (issued - 12 * 2 + 9 * 2 <= issued).all()
-        assert (issued < c.ORIGIN_STAMP + c.PER_DAY * origin).all()
+        assert (stamps <= origin_stamp - c.LAG_6H).all(), "a window half-hour is after t - 6 h"
         for lead_day in range(c.LOOK_BACK_LEADS):
-            assert (issued - c.PER_DAY * lead_day <= issued).all()
-        checked += len(stamps)
+            run_day = (stamps - c.ORIGIN_STAMP) // c.PER_DAY - lead_day
+            usable = (run_day >= 0) & (run_day < c.N_ORIGINS)
+            run_day, used = run_day[usable], stamps[usable]
+            issued_stamp = c.ORIGIN_STAMP + c.PER_DAY * run_day
+            run_stamp = issued_stamp - 12 * 2
+            assert (run_day < origin).all(), (
+                f"origin {origin}: a run day is not before the origin day"
+            )
+            assert (issued_stamp <= used).all(), (
+                f"origin {origin}, lead day {lead_day}: a forecast was issued after its half-hour"
+            )
+            assert (used <= origin_stamp - c.LAG_6H).all()
+            assert (run_stamp + 9 * 2 <= issued_stamp).all(), "a run is later than 09:00 UTC"
+            checked += len(used)
     print(
-        f"ASSERT look-back: {checked:,} (origin, half-hour) pairs over {c.N_ORIGINS} origins: "
-        "valid time <= origin - 6 h; the forecast was issued at or before its half-hour and before "
-        "the origin; weather run + 9 h <= issue time"
+        f"ASSERT look-back: {checked:,} (origin, half-hour, lead band) triples over {c.N_ORIGINS} "
+        "origins: run day before the origin day; issue time <= half-hour <= origin - 6 h; "
+        "weather run + 9 h <= issue time"
     )
+
+
+def assert_run_files_issue_at_nine() -> None:
+    """Assert that every ensemble-summary file of an origin day issues its forecast at 09:00 UTC."""
+    for origin in range(c.N_ORIGINS):
+        day = c.GRID_START.date() + dt.timedelta(days=origin)
+        times = (
+            pl.scan_parquet(c.E607_WORK / "ens_summary" / f"init={day:%Y-%m-%d}.parquet")
+            .filter(pl.col("valid_time") < HOLDOUT_START)
+            .select(pl.col("power_fcst_init_time").unique())
+            .collect()["power_fcst_init_time"]
+            .to_list()
+        )
+        expected = dt.datetime(day.year, day.month, day.day, 9, tzinfo=dt.UTC)
+        assert times == [expected], f"run {day}: power_fcst_init_time is {times}, not {expected}"
+    print(f"ASSERT {c.N_ORIGINS} ensemble-summary files each issue at 09:00 UTC on their own day")
 
 
 def print_null_counts(*, inputs: c.Inputs) -> None:
-    """Print the half-hours with no cleaned power per month, which no look-back or score reads."""
+    """Print the half-hours with no cleaned power by drop reason and month; no look-back reads them."""
     table = (
-        inputs.null_counts.group_by("month", "drop_reason")
+        inputs.null_counts.with_columns(
+            pl.col("drop_reason").cast(pl.String).fill_null("(no reason recorded)")
+        )
+        .group_by("month", "drop_reason")
         .agg(half_hours=pl.col("half_hours").sum())
         .sort("month", "drop_reason")
     )
+    by_reason = (
+        table.group_by("drop_reason").agg(half_hours=pl.col("half_hours").sum()).sort("drop_reason")
+    )
     with pl.Config(tbl_rows=60):
+        print("Half-hours with no cleaned power, 16 Primaries, by drop reason:")
+        print(by_reason)
         print("Half-hours with no cleaned power, 16 Primaries, by month and drop reason:")
         print(table)
     total = int(inputs.null_counts["half_hours"].sum())
-    print(f"TOTAL half-hours dropped as null power: {total:,} of {len(inputs.ids) * c.N_STAMPS:,}")
+    print(f"TOTAL half-hours with null power: {total:,} of {len(inputs.ids) * c.N_STAMPS:,}")
 
 
 def print_weather_coverage(*, inputs: c.Inputs) -> None:
     """Print how many target rows lack ensemble weather, and the ranges of the two drivers."""
-    finite_forecast = np.isfinite(inputs.q_nra[..., 5])
+    finite_forecast = np.isfinite(inputs.q_nra[..., MEDIAN_INDEX])
     missing = int((finite_forecast & ~np.isfinite(inputs.weather[..., 0])).sum())
     print(
         f"WEATHER rows with a stored forecast but no x_pv: {missing:,} of {int(finite_forecast.sum()):,}; "
@@ -185,7 +220,7 @@ def print_example(*, inputs: c.Inputs, residuals: c.Residuals) -> None:
     print(
         f"  target drivers from the run's file: x_pv {x_pv_file[0]:.3f}, x_cold {x_cold_file[0]:.3f}"
     )
-    median = float(inputs.q_nra[series, origin, row, 5])
+    median = float(inputs.q_nra[series, origin, row, MEDIAN_INDEX])
     print(
         f"  stored normal-running median {median:.2f} points ({median * inputs.capacity[series] / 100:.2f} MW)"
     )
@@ -244,10 +279,13 @@ def main() -> None:
     """Build the residual table, run the assertions, and print the example."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-jobs", type=int, default=4, help="threads that read ensemble runs")
-    parser.add_argument("--month", default=None, help="write only this valid-time month, YYYY-MM")
+    parser.add_argument(
+        "--month", default=None, help="smoke test: write only this valid-time month, YYYY-MM"
+    )
     arguments = parser.parse_args()
     assert_backtest_look_ahead()
     assert_look_back_look_ahead()
+    assert_run_files_issue_at_nine()
     inputs = c.load_inputs(load_prevailing=False, n_jobs=arguments.n_jobs)
     print_null_counts(inputs=inputs)
     print_weather_coverage(inputs=inputs)

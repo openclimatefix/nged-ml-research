@@ -20,32 +20,34 @@ Arms and set names (all in `data/ml-experiments/00706-*/predictions/`):
 - `g-sl`: G with the smallest-lead residual. `g-refit`: the smallest-lead residual from forecasts of
   the origin's own month only. `g-w7`, `g-w28`: windows of 7 and 28 days (28 from 2026-01).
 - `d`: G-lb plus ridge slopes on the irradiance driver and the cold driver. `d-pv`, `d-cold`: one
-  slope each. `d-plus`: also a weekend offset and three time-of-day blocks. `d-w7`, `d-w28`.
+  slope each. `d-plus`: also a weekend offset and two time-of-day blocks. `d-w7`, `d-w28`.
 - `p`: P-cp, the prevailing arm (factor 1.0, level of the last segment of the best single change
   point in a 28-day window of daily mean residuals), window ending 03:00 UTC. `p-7d`: factor 1.0
   and a 7-day window of arm D's form. `p-cp06`, `p-7d06`: the same with the window ending at 06:00.
 
 Row sets: `g`, `d`, and their variants cover origins 2025-12-01 to 2026-06-30; the prevailing arms and
-the 28-day arms cover 2026-01-01 to 2026-06-30. `--month YYYY-MM` restricts the origins to one month,
-adds `-t<YYYYMM>` to the set names, and so measures memory first. `--dry-run` computes and prints but
-writes nothing.
+the 28-day arms cover 2026-01-01 to 2026-06-30. `--month YYYY-MM` restricts the origins to one month
+and adds `-t<YYYYMM>` to the set names. It is a smoke test of the writing code: every arm is still
+computed for all origins, so it does not measure the memory of one month. `--dry-run` computes and
+prints but writes nothing.
 """
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from typing import Final
 
 import e00706_common as c  # ty: ignore[unresolved-import]
 import numpy as np
 from studies.experiment_store import write_predictions
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-BOTH: tuple[int, ...] = (c.PV_DRIVER, c.COLD_DRIVER)
-PREVAILING_FACTOR: float = 1.0
+BOTH: Final[tuple[int, ...]] = (c.PV_DRIVER, c.COLD_DRIVER)
+PREVAILING_FACTOR: Final[float] = 1.0
 
-LOOK_BACK_ARMS: tuple[c.ArmSpec, ...] = (
+LOOK_BACK_ARMS: Final[tuple[c.ArmSpec, ...]] = (
     c.ArmSpec(name="g"),
     c.ArmSpec(name="g-sl", band_matched=False),
-    c.ArmSpec(name="g-refit", band_matched=False, truncate_to_month=True),
+    c.ArmSpec(name="g-refit", band_matched=False, truncate_to_month=True, min_window_days=3),
     c.ArmSpec(name="g-w7", window_days=7),
     c.ArmSpec(
         name="g-w28",
@@ -66,7 +68,7 @@ LOOK_BACK_ARMS: tuple[c.ArmSpec, ...] = (
         row_set_id=c.ROW_SET_ID_FROM_JANUARY,
     ),
 )
-PREVAILING_ARMS: tuple[c.ArmSpec, ...] = (
+PREVAILING_ARMS: Final[tuple[c.ArmSpec, ...]] = (
     c.ArmSpec(
         name="p-7d",
         drivers=BOTH,
@@ -86,7 +88,7 @@ PREVAILING_ARMS: tuple[c.ArmSpec, ...] = (
         row_set_id=c.ROW_SET_ID_FROM_JANUARY,
     ),
 )
-CHANGEPOINT_ARMS: tuple[tuple[str, int], ...] = (("p", c.LAG_3H_CAP), ("p-cp06", c.LAG_6H))
+CHANGEPOINT_ARMS: Final[tuple[tuple[str, int], ...]] = (("p", c.LAG_3H_CAP), ("p-cp06", c.LAG_6H))
 """P-cp arms: set name and the half-hours between the origin and the newest residual."""
 
 
@@ -136,6 +138,26 @@ def print_fit_summary(*, name: str, fits: list[c.WindowFit], origins: np.ndarray
         )
 
 
+def print_origins_by_day_of_month(
+    *, name: str, fits: list[c.WindowFit], origins: np.ndarray
+) -> None:
+    """Print, per day of the month, how many origins there are and how many of their windows are covered.
+
+    The refit window holds only forecasts of the origin's own month, so it is short in the first days
+    of a month.
+    """
+    day = np.array([c.origin_to_utc(origin=int(o)).day for o in origins])
+    covered = np.stack([fit.covered[origins, 0] for fit in fits])
+    print(f"  {name}: origins and covered (series, origin) windows by day of the month")
+    for value in range(1, 32):
+        chosen = day == value
+        if chosen.any():
+            print(
+                f"    day {value:2d}: {int(chosen.sum())} origins, "
+                f"{covered[:, chosen].mean():.3f} of (series, origin) covered"
+            )
+
+
 def write_arm(
     *,
     inputs: c.Inputs,
@@ -177,7 +199,9 @@ def main() -> None:
     """Compute the arms and write one prediction set per arm."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-jobs", type=int, default=4, help="threads: one series per thread")
-    parser.add_argument("--month", default=None, help="restrict origins to this month, YYYY-MM")
+    parser.add_argument(
+        "--month", default=None, help="smoke test: write only this month's origins, YYYY-MM"
+    )
     parser.add_argument("--only", default=None, help="comma-separated set names to compute")
     parser.add_argument("--dry-run", action="store_true", help="compute and print, write nothing")
     arguments = parser.parse_args()
@@ -195,6 +219,10 @@ def main() -> None:
         print_fit_summary(
             name=spec.name, fits=fits, origins=np.arange(spec.first_origin, c.N_ORIGINS)
         )
+        if spec.truncate_to_month:
+            print_origins_by_day_of_month(
+                name=spec.name, fits=fits, origins=np.arange(spec.first_origin, c.N_ORIGINS)
+            )
         write_arm(
             inputs=inputs,
             name=spec.name,

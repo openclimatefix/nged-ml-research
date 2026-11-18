@@ -46,6 +46,7 @@ import numpy as np
 import polars as pl
 from scipy import stats
 from studies.bootstrap import bootstrap_difference_at_level
+from studies.eval_protocol.metrics import MEDIAN_INDEX
 from studies.experiment_store import losses_for_bootstrap, read_predictions
 
 BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 6.0)
@@ -102,6 +103,10 @@ PREVAILING_ARM_LABELS: Final[tuple[str, ...]] = (
     "P-7d 06:00",
 )
 
+POINT_ESTIMATE_NOTE: Final[str] = (
+    "POINT ESTIMATE: means over the selected rows with no bootstrap interval; read them as "
+    "descriptions, not as tests."
+)
 type Losses = dict[str, dict[str, np.ndarray]]
 type Events = dict[str, tuple[np.ndarray, np.ndarray]]
 
@@ -224,49 +229,62 @@ def stored_668_losses(*, inputs: c.Inputs) -> Losses:
 # --------------------------------------------------------------------------- loading arms
 
 
-def load_all(*, inputs: c.Inputs, residuals: c.Residuals) -> tuple[Losses, dict[str, np.ndarray]]:
+def load_all(
+    *, inputs: c.Inputs, residuals: c.Residuals, month: str | None, set_suffix: str | None
+) -> tuple[Losses, dict[str, np.ndarray]]:
     """Return the per-row losses of every arm, and the quantiles of S-NRA, S-PRV, and P-cp.
 
     Missing prediction sets are reported and skipped.
+
+    Args:
+        inputs: The loaded inputs.
+        residuals: The look-back residuals, for the reference arms.
+        month: The month of `arms --month`, whose row-set ids end in `_<month>`, or None.
+        set_suffix: The suffix of the set names that `arms --month` wrote, such as `-t202603`; it
+            defaults to `-t<YYYYMM>` of `month`.
     """
     truth = c.target_truth(inputs=inputs)
     losses: Losses = {}
     kept: dict[str, np.ndarray] = {}
 
-    def add(label: str, quantiles: np.ndarray) -> None:
+    def add(*, label: str, quantiles: np.ndarray) -> None:
         losses[label] = c.loss_arrays(truth=truth, quantiles=quantiles)
         if label in ("S-NRA", "S-PRV", "P-cp"):
             kept[label] = quantiles
 
-    add("S-NRA", inputs.q_nra)
+    add(label="S-NRA", quantiles=inputs.q_nra)
     assert inputs.q_prv is not None
-    add("S-PRV", inputs.q_prv)
+    add(label="S-PRV", quantiles=inputs.q_prv)
     for label, correction in (
         ("R0-168", r0_168_correction(residuals=residuals)),
         ("RR", recipe_r_correction(residuals=residuals)),
         ("M28", m28_correction(residuals=residuals)),
     ):
         add(
-            label,
-            c.apply_correction(
+            label=label,
+            quantiles=c.apply_correction(
                 inputs=inputs, quantiles=inputs.q_nra, correction=correction.astype(np.float32)
             ),
         )
     sets = {spec.name: spec.row_set_id for spec in (*arms.LOOK_BACK_ARMS, *arms.PREVAILING_ARMS)}
     sets |= {name: c.ROW_SET_ID_FROM_JANUARY for name, _ in arms.CHANGEPOINT_ARMS}
+    if month is not None and set_suffix is None:
+        set_suffix = f"-t{month.replace('-', '')}"
     for name, row_set_id in sets.items():
+        stored_name = name if month is None else f"{name}{set_suffix or ''}"
+        stored_row_set = row_set_id if month is None else f"{row_set_id}_{month}"
         try:
             frame = read_predictions(
-                experiment_id=c.EXPERIMENT_ID, name=name, row_set_id=row_set_id
+                experiment_id=c.EXPERIMENT_ID, name=stored_name, row_set_id=stored_row_set
             )
         except FileNotFoundError:
-            print(f"MISSING prediction set {name}; its rows are skipped")
+            print(f"MISSING prediction set {stored_name}; its rows are skipped")
             continue
         add(
-            SET_LABELS[name],
-            c.dense_from_frame(frame=frame, ids=inputs.ids, capacity=inputs.capacity),
+            label=SET_LABELS[name],
+            quantiles=c.dense_from_frame(frame=frame, ids=inputs.ids, capacity=inputs.capacity),
         )
-        print(f"LOADED {name} as {SET_LABELS[name]}: {frame.height:,} rows")
+        print(f"LOADED {stored_name} as {SET_LABELS[name]}: {frame.height:,} rows")
     return losses, kept
 
 
@@ -307,7 +325,7 @@ def build_masks(
         np.isfinite(truth)
         & origins[None, :, None]
         & c.lead_mask()[None, None, :]
-        & np.isfinite(inputs.q_nra[..., 5])
+        & np.isfinite(inputs.q_nra[..., MEDIAN_INDEX])
     )
     masks: dict[str, np.ndarray] = {"scored": scored}
     for kind, (inside, after) in events.items():
@@ -364,9 +382,11 @@ def slice_masks(*, inputs: c.Inputs, scored: np.ndarray) -> dict[str, np.ndarray
 # --------------------------------------------------------------------------- tables
 
 
-def show(*, name: str, frame: pl.DataFrame) -> None:
+def show(*, name: str, frame: pl.DataFrame, note: str | None = None) -> None:
     """Print a table and write it as CSV (through a temporary file) under the data folder."""
     print(f"\nTABLE {name}")
+    if note is not None:
+        print(note)
     with pl.Config(tbl_rows=200, tbl_cols=40, fmt_float="mixed", tbl_width_chars=250):
         print(frame)
     path = c.OUT_DIR / "tables" / f"{name}.csv"
@@ -432,7 +452,7 @@ def band_table(
                         values=losses["S-NRA"]["crps"], rows=chosen
                     )
             table.append(entry)
-    show(name=name, frame=pl.DataFrame(table))
+    show(name=name, frame=pl.DataFrame(table), note=POINT_ESTIMATE_NOTE)
 
 
 def slice_table(
@@ -463,7 +483,7 @@ def slice_table(
                         "mae": mean_over(values=losses[label]["mae"], rows=chosen),
                     }
                 )
-    show(name=name, frame=pl.DataFrame(table))
+    show(name=name, frame=pl.DataFrame(table), note=POINT_ESTIMATE_NOTE)
 
 
 def scenario_table(
@@ -506,13 +526,13 @@ def departure_table(
     """Print how often prevailing arms depart from S-NRA's median by 3 points, and equal-width scores."""
     if "S-PRV" not in kept or "P-cp" not in kept:
         return
-    median = kept["S-NRA"][..., 5]
+    median = kept["S-NRA"][..., MEDIAN_INDEX]
     truth = c.target_truth(inputs=inputs)
     table = []
     for label, quantiles in (("S-PRV", kept["S-PRV"]), ("P-cp", kept["P-cp"])):
-        departs = np.abs(quantiles[..., 5] - median) >= DEPARTURE_POINTS
+        departs = np.abs(quantiles[..., MEDIAN_INDEX] - median) >= DEPARTURE_POINTS
         for group, mask in c.group_masks(inputs=inputs).items():
-            chosen = base & mask[:, None, None] & np.isfinite(quantiles[..., 5])
+            chosen = base & mask[:, None, None] & np.isfinite(quantiles[..., MEDIAN_INDEX])
             table.append(
                 {
                     "arm": label,
@@ -535,7 +555,7 @@ def departure_table(
         factor = mean_over(values=reference_width, rows=chosen) / mean_over(
             values=arm_width, rows=chosen
         )
-        median_p = kept["P-cp"][..., 5:6]
+        median_p = kept["P-cp"][..., MEDIAN_INDEX : MEDIAN_INDEX + 1]
         scaled = median_p + factor * (kept["P-cp"] - median_p)
         crps_scaled = c.loss_arrays(truth=truth, quantiles=scaled)["crps"]
         scaled_table.append(
@@ -623,6 +643,17 @@ def monthly_t_test(
     months = sorted(set(origin_month.tolist()))
     means = np.array([difference[origin_month == month].mean() for month in months])
     n = len(means)
+    if n < 2:
+        print("  monthly t test: n/a with one month")
+        return {
+            "months": n,
+            "monthly mean": float(means.mean()),
+            "t": float("nan"),
+            "p": float("nan"),
+            "t critical": float("nan"),
+            "t half-width": float("nan"),
+            "months with negative difference": int((means < 0).sum()),
+        }
     standard_error = float(means.std(ddof=1) / np.sqrt(n))
     t_value = float(means.mean() / standard_error) if standard_error > 0 else float("inf")
     critical = float(stats.t.ppf(1.0 - (1.0 - level / 100.0) / 2.0, df=n - 1))
@@ -732,7 +763,7 @@ def run_contrasts(
                         "bootstrap excludes zero": bool(lower > 0 or upper < 0),
                         "t test excludes zero": bool(
                             abs(test["monthly mean"]) > test["t half-width"]
-                        ),
+                        ),  # False when the half-width is NaN (one month)
                     }
                 )
     table = pl.DataFrame(results)
@@ -743,6 +774,12 @@ def run_contrasts(
 def print_decisions(*, table: pl.DataFrame) -> None:
     """Print the pass or fail reading of C1, C2, and C5 under the pre-registered rule."""
     print("\nDECISIONS (both the bootstrap interval and the monthly t test must exclude zero)")
+    critical = table.select("level", "months", "t critical").unique().sort("level", "months")
+    for row in critical.iter_rows(named=True):
+        print(
+            f"  t critical value at the {row['level']}% level with {row['months']} months "
+            f"(scipy, two-sided): {row['t critical']:.3f}"
+        )
     for name in ("C1", "C2", "C5"):
         for group in (c.GROUP_SIGNED, c.GROUP_MVA, c.POOLED, c.GROUP_SHORT):
             rows = table.filter(pl.col("contrast") == name, pl.col("group") == group)
@@ -753,7 +790,8 @@ def print_decisions(*, table: pl.DataFrame) -> None:
             line = (
                 f"  {name} {group}: difference {row['difference']:+.3f} "
                 f"[{row['lower']:+.3f}, {row['upper']:+.3f}], half-width {row['half-width']:.3f}, "
-                f"MDE {row['minimum detectable effect']:.3f}, t {row['t']:+.2f} vs "
+                f"MDE {row['minimum detectable effect']:.3f}, t "
+                f"{'n/a with one month' if row['months'] < 2 else format(row['t'], '+.2f')} vs "
                 f"{row['t critical']:.2f}; excludes zero in both: {both}"
             )
             if name == "C1":
@@ -829,11 +867,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-jobs", type=int, default=4, help="processes for the bootstrap")
     parser.add_argument("--n-resamples", type=int, default=N_RESAMPLES)
-    parser.add_argument("--month", default=None, help="score only origins of this month, YYYY-MM")
+    parser.add_argument(
+        "--month",
+        default=None,
+        help="smoke test: read the sets that `arms --month` wrote and score only this month, YYYY-MM",
+    )
+    parser.add_argument(
+        "--set-suffix",
+        default=None,
+        help="suffix of the set names that `arms --month` wrote; defaults to -t<YYYYMM> of --month",
+    )
     arguments = parser.parse_args()
     inputs = c.load_inputs(load_prevailing=True, n_jobs=arguments.n_jobs)
     residuals = c.build_residuals(inputs=inputs)
-    losses, kept = load_all(inputs=inputs, residuals=residuals)
+    losses, kept = load_all(
+        inputs=inputs, residuals=residuals, month=arguments.month, set_suffix=arguments.set_suffix
+    )
     losses |= stored_668_losses(inputs=inputs)
     print(f"LOADED peak memory {c.peak_memory_gb():.2f} GB")
     events = load_events(inputs=inputs)
@@ -879,6 +928,10 @@ def main() -> None:
     group_table(
         inputs=inputs, losses=losses, labels=context, rows=context_rows, name="context_rows"
     )
+    print(
+        "NOTE the 'Climatology' row is experiment 668's own `lib.climatology` scored in its per-row "
+        "table, not `ClimatologyForecaster` of the production service."
+    )
     band_labels = ("S-NRA", "G-lb", "D", "G smallest-lead", "RR", "R0-168", "M28")
     band_table(
         inputs=inputs,
@@ -897,6 +950,9 @@ def main() -> None:
         base=common_rows(losses=losses, labels=slice_labels, base=dec["primary: event-free"]),
         name="slices_event_free",
     )
+    # TODO(stage 2): C5 on the re-run bank rows only (the rows where experiment 667's re-run
+    # forecasts exist) belongs with the stage 2 bank scoring, because the bank's forecasts are
+    # re-run at each origin and cannot be scored from the stored rows read here.
     scenario_labels = ("S-NRA", "G-lb", "D", "RR", "M28", "R0-168")
     scenario_table(
         inputs=inputs, losses=losses, labels=scenario_labels, masks=dec, name="load_shift_scenarios"
