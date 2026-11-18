@@ -25,7 +25,8 @@ weeks, run inputs), experiment 418's `e00418_prep.py` (`dense_weather`), and exp
 - `summaries`: write the 51-member mean and standard deviation of each run that the table holds
   and that has no summary file yet.
 - `raw`: write each Primary's raw input matrix from the summaries and a manifest of the runs used.
-- `check`: assert the origin rule on every cached row and print one example row.
+- `check`: assert the origin rule on every cached row, that every file was built from the
+  manifest's runs, and print one example row.
 - `ens-months`: print each Primary's first origin and its months of ENS rows.
 - `flagged-keys`: write this experiment's own list of flagged `substation_zero` half-hours from the
   cleaned power table, 2019-09-01 to 2026-07-01, under `work/flagged_keys.parquet`.
@@ -106,7 +107,9 @@ BACKFILL_FIRST_RUN: Final[datetime] = datetime(2020, 10, 15, tzinfo=UTC)
 BACKFILL_LAST_RUN: Final[datetime] = datetime(2024, 3, 31, tzinfo=UTC)
 N_MEMBERS: Final[int] = 51
 MAX_LEAD_HOURS: Final[float] = 351.0
-"""A 00Z run reaches 360 hours; its origin is 9 hours after the run."""
+"""A 00Z run reaches 360 hours; its origin is 9 hours after the run, so the longest lead is 351."""
+VALID_TIMES_PER_RUN: Final[int] = 702
+"""Half-hours from 0.5 to 351 hours after the origin: every series holds this many per run."""
 INPUT_CLIP_SD: Final[float] = 5.0
 HELD_WEEK_PERIOD: Final[int] = 12
 """One week in every 12 is held out for early stopping."""
@@ -281,8 +284,9 @@ def run_summary(*, run: datetime, targets: pl.DataFrame) -> pl.DataFrame:
         with `mean_<w>` and `std_<w>` (float32) for each weather variable of `common.WEATHER`.
 
     Raises:
-        ValueError: If the table holds no rows for the run, a valid time lacks a member, or a row
-            reads a run issued less than 9 hours before its origin.
+        ValueError: If the table holds no rows for the run, a valid time lacks a member, the longest
+            lead is not exactly 351 hours, a series does not hold 702 valid times, or a row reads a
+            run issued less than 9 hours before its origin.
     """
     cells = targets["h3_res_5"].unique().to_list()
     native = (
@@ -324,8 +328,15 @@ def run_summary(*, run: datetime, targets: pl.DataFrame) -> pl.DataFrame:
         msg = f"run {run:%Y-%m-%d}: a valid time holds fewer than {N_MEMBERS} members"
         raise ValueError(msg)
     lead = (summary["valid_time"] - summary["power_fcst_init_time"]).dt.total_minutes() / 60.0
-    if float(lead.max()) > MAX_LEAD_HOURS:  # ty: ignore[invalid-argument-type]
-        msg = f"run {run:%Y-%m-%d}: a lead exceeds {MAX_LEAD_HOURS} hours"
+    if float(lead.max()) != MAX_LEAD_HOURS:  # ty: ignore[invalid-argument-type]
+        msg = f"run {run:%Y-%m-%d}: the longest lead is {lead.max()} hours, not {MAX_LEAD_HOURS}"
+        raise ValueError(msg)
+    counts = summary.group_by("time_series_id").agg(n=pl.col("valid_time").n_unique())["n"]
+    if (counts != VALID_TIMES_PER_RUN).any():
+        msg = (
+            f"run {run:%Y-%m-%d}: a series holds {counts.min()} to {counts.max()} valid times, "
+            f"not {VALID_TIMES_PER_RUN}"
+        )
         raise ValueError(msg)
     assert_origin_after_run(
         nwp_init=summary["nwp_init_time"].dt.epoch("us").to_numpy(),
@@ -336,25 +347,36 @@ def run_summary(*, run: datetime, targets: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def write_summary(*, run: datetime) -> str:
-    """Write one run's summary file if absent; return a progress line."""
+def write_summary(*, run: datetime) -> tuple[str, bool]:
+    """Write one run's summary file if absent; return a progress line and whether the run failed.
+
+    A run whose summary fails its checks (a `ValueError`) is skipped, so the runs after it in the
+    pool still run; the caller prints the skipped runs.
+    """
     target = NEW_SUMMARY_DIR / f"init={run:%Y-%m-%d}.parquet"
     if target.exists():
-        return f"{run:%Y-%m-%d}: exists"
+        return f"{run:%Y-%m-%d}: exists", False
     started = time.monotonic()
     targets = primaries().select("time_series_id", "h3_res_5", "latitude", "longitude")
-    table = run_summary(run=run, targets=targets)
+    try:
+        table = run_summary(run=run, targets=targets)
+    except ValueError as error:
+        return f"{run:%Y-%m-%d}: SKIPPED, {error}", True
     common.atomic_write(frame=table, target=target)
-    return f"{run:%Y-%m-%d}: {table.height:,} rows, {time.monotonic() - started:.0f} s"
+    return f"{run:%Y-%m-%d}: {table.height:,} rows, {time.monotonic() - started:.0f} s", False
 
 
-def _write_summary_kw(run: datetime) -> str:
+def _write_summary_kw(run: datetime) -> tuple[str, bool]:
     """Return `write_summary` for a run, as a picklable function of one argument."""
     return write_summary(run=run)
 
 
 def build_summaries(*, workers: int, limit: int | None) -> None:
-    """Write the summary of every run that the table holds and that lacks a file."""
+    """Write the summary of every run that the table holds and that lacks a file.
+
+    A run that fails its checks is skipped and listed at the end. The exit status is 1 if any run
+    was skipped.
+    """
     present, _ = coverage()
     todo = [r for r in present if not (NEW_SUMMARY_DIR / f"init={r:%Y-%m-%d}.parquet").exists()]
     if limit is not None:
@@ -362,11 +384,19 @@ def build_summaries(*, workers: int, limit: int | None) -> None:
     print(f"{len(todo)} summaries to write")
     if not todo:
         return
+    skipped: list[str] = []
     with ProcessPoolExecutor(
         max_workers=workers, mp_context=multiprocessing.get_context("spawn")
     ) as pool:
-        for line in pool.map(_write_summary_kw, todo):
+        for line, failed in pool.map(_write_summary_kw, todo):
             print(line, flush=True)
+            if failed:
+                skipped.append(line)
+    if skipped:
+        print(f"{len(skipped)} runs skipped:")
+        for line in skipped:
+            print(f"  {line}")
+        raise SystemExit(1)
 
 
 # --- feature matrix (experiment 397) --------------------------------------------------------
@@ -578,18 +608,22 @@ def primary_rows(
     return kept, rows.height - kept.height
 
 
+def stored_runs(*, path: Path) -> list[str] | None:
+    """Return the run list that a raw file was built from, or `None` if the file lacks one."""
+    with np.load(path) as z:
+        return [str(r) for r in z["runs"]] if "runs" in z.files else None
+
+
 def write_raw(*, site: str, run_list: list[str]) -> str:
     """Write a Primary's raw matrix, target, and keys for the back-filled runs; return a line.
 
-    The file is skipped only if the manifest of runs it was built from equals `run_list`.
+    Each file holds the list of runs it was built from (`runs`), and is renamed into place whole.
+    The file is skipped only if its own list equals `run_list`. A crashed rebuild can therefore
+    leave files of two run sets, and `load_site` refuses to read them (it compares each file's list
+    with the manifest, which `build_raw` writes last).
     """
     target = NEW_RAW_DIR / f"{site}.npz"
-    manifest = NEW_RAW_DIR / "manifest.json"
-    if (
-        target.exists()
-        and manifest.exists()
-        and json.loads(manifest.read_text())["runs"] == run_list
-    ):
+    if target.exists() and stored_runs(path=target) == run_list:
         return f"{site}: exists for the same {len(run_list)} runs"
     started = time.monotonic()
     table = primaries()
@@ -612,6 +646,7 @@ def write_raw(*, site: str, run_list: list[str]) -> str:
         origin=origin,
         lead=rows["lead_hours"].to_numpy().astype(np.float32),
         nwp_init=nwp_init,
+        runs=np.array(run_list),
     )
     temporary.rename(target)
     return (
@@ -662,12 +697,16 @@ def load_site(*, site: str) -> dict[str, np.ndarray]:
 
     Raises:
         ValueError: If experiment 397's rows hold a run that is not a 00:00 UTC run from
-            `FIRST_RUN`, or a back-filled row reads a run issued less than 9 hours before its
-            origin.
+            `FIRST_RUN`, a back-filled row reads a run issued less than 9 hours before its origin,
+            or the back-filled file was built from a different set of runs than the manifest.
     """
     parts = []
     new = NEW_RAW_DIR / f"{site}.npz"
     if new.exists():
+        manifest = json.loads((NEW_RAW_DIR / "manifest.json").read_text())["runs"]
+        if stored_runs(path=new) != manifest:
+            msg = f"{new} was built from a different set of runs than the manifest: rebuild `raw`"
+            raise ValueError(msg)
         z = np.load(new)
         assert_origin_after_run(nwp_init=z["nwp_init"], origin=z["origin"])
         parts.append({k: z[k] for k in ("x", "y", "valid", "origin", "lead")})
@@ -782,14 +821,22 @@ def run_inputs(
 
 
 def check_raw() -> None:
-    """Assert the origin rule on every back-filled row and print one example row."""
-    files = sorted(NEW_RAW_DIR.glob("*.npz"))
+    """Assert the origin rule on every back-filled row and print one example row.
+
+    Files named `*.tmp.npz` (an interrupted write) are ignored. Every file must hold the run list
+    of the manifest.
+    """
+    files = sorted(p for p in NEW_RAW_DIR.glob("*.npz") if not p.name.endswith(".tmp.npz"))
     if not files:
         print("no back-filled raw files yet: nothing to check")
         return
     names, _, _ = feature_names()
+    manifest = json.loads((NEW_RAW_DIR / "manifest.json").read_text())["runs"]
     example_printed = False
     for path in files:
+        if stored_runs(path=path) != manifest:
+            msg = f"{path.name} was built from a different set of runs than the manifest"
+            raise ValueError(msg)
         z = np.load(path)
         assert_origin_after_run(nwp_init=z["nwp_init"], origin=z["origin"])
         lead = (z["valid"] - z["origin"]) / US_PER_HOUR
