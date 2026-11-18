@@ -328,6 +328,14 @@ therefore also reported with January left out.
   valid time by up to 10 days, so the blocks are not independent and the block interval is narrower
   than an interval over independent weather episodes would be. The four-month sign condition is
   the guard against that.
+- **Departure from the plan in the interval code.** The scoring script pairs the per-seed losses
+  with its own `align` function and draws both intervals with `block_seed_bootstrap` in
+  `e00702_core.py`, not with `experiment_store.losses_for_bootstrap` and
+  `studies.bootstrap.bootstrap_difference_at_level`. The library functions resample the groups
+  named in a `month` column and pair two arms on the same seed. The decision interval needs 7-day
+  blocks of origin days, and contrast C4 pairs each seed of the blend with two seeds of the global
+  arm. `block_seed_bootstrap` resamples 7-day blocks for the decision interval and calendar months
+  for the second interval, and draws one seed in each resample.
 - **Per-Primary reporting.** Every Primary has its own row for every arm, with the difference from
   the global arm and its interval. The write-up also gives the count of Primaries each arm improves,
   the pooled contrast with each Primary left out in turn, and three groups: the six signed-MW
