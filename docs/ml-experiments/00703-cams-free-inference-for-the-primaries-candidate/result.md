@@ -33,13 +33,17 @@ prediction: >-
   stored forecasts of experiment 667 to within 1e-5 of capacity at every quantile.
 decision_rule: >-
   The decision contrast is C1, arm A minus arm B in CRPS, pooled over all scored rows, with a
-  month-block bootstrap interval at the Bonferroni level for three contrasts (98.33%). If the C1
-  interval lies wholly below zero (arm A better), arm A is provisionally chosen and both arms are
-  refitted on the other four pre-July months (2025-12, 2026-01, 2026-03, and 2026-05), and the rule
-  is applied again to all eight months, whose result is final. Otherwise arm B, the simpler arm, is
-  chosen. No threshold of gain is set: the decision to drop CAMS at inference is already made, and
-  the experiment only chooses between the two replacements and measures the loss. C2 (arm A minus
-  the control) and C3 (arm B minus the control) quantify that loss and decide nothing.
+  month-block bootstrap interval at the Bonferroni level for three contrasts (98.33%, conservative
+  towards arm B because only C1 decides). Arm A is provisionally chosen only if the C1 interval lies
+  wholly below zero, the point estimate is at least 0.01 points of capacity below zero, and both
+  seeds agree in sign in every month. The 0.01-point threshold covers arm A's porting cost:
+  production must keep the first day of the two previous ENS runs per Primary and compute a Haurwitz
+  clear-sky ratio, where arm B needs no code at all. If arm A is provisionally chosen, both arms are
+  refitted on the other four pre-July months (2025-12, 2026-01, 2026-03, and 2026-05), and the same
+  rule is applied again to all eight months, whose result is final. Otherwise arm B, the simpler
+  arm, is chosen. The decision to drop CAMS at inference is already made, so the experiment only
+  chooses between the two replacements and measures the loss. C2 (arm A minus the control) and C3
+  (arm B minus the control) quantify that loss and decide nothing.
 benchmark: >-
   The stored per-seed normal-running (NRA) forecasts of experiment 667, refits 2025-11, 2026-02,
   2026-04, and 2026-06, seeds 0 and 1, which are the Candidate with the CAMS columns; climatology
@@ -81,34 +85,43 @@ is training-only, so the two columns of the pre-training rows may still come fro
 
 - **Control.** The stored per-seed NRA forecasts of experiment 667 (the Candidate as backtested),
   reused and not refitted.
-- **Replay (check only).** The unchanged chain of experiment 667, refitted from pre-training
-  onwards for the 2026-04 fold, into this experiment's data folder. [Experiment
+- **Replay (check only).** The unchanged chain of experiment 667, refitted from pre-training onwards
+  for the 2026-04 fold, into this experiment's data folder. [Experiment
   684](../00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)
-  found the chain from step 2 onwards deterministic, but no experiment has replayed the
-  pre-training step. The replay tests prediction P4. If any quantile of the replay differs from the
-  stored forecast by more than 1e-5 of capacity, the control is refitted on all four months and the
-  refit replaces the stored forecasts as the control, because the arms would otherwise carry a
-  re-run difference the control does not.
+  found the chain from step 2 onwards deterministic, but no experiment has replayed the pre-training
+  step. The replay tests prediction P4. If any quantile of the replay differs from the stored
+  forecast by more than 1e-5 of capacity, the control is refitted on all four months and the refit
+  replaces the stored forecasts as the control, because the arms would otherwise carry a re-run
+  difference the control does not. The replay-against-stored difference is reported as the noise
+  floor whether or not P4 holds. A pass in 2026-04 is assumed to hold in the other three months.
 - **Arm A, the analysis-proxy columns.** The same two columns, computed from shortwave instead of
   CAMS. `cams_prev_day_mean` becomes the mean shortwave over the 48 half-hours of the last complete
   UTC day before the origin (half-hour stamps from 00:30 of that day to 00:00 of the origin day, as
   period ends). `cams_prev_day_csi` becomes that day's summed shortwave over its summed Haurwitz
   clear-sky irradiance, evaluated at the middle of each half-hour at the Primary's coordinates
-  (`studies.baselines.haurwitz_w_m2`, as experiment 437's clear-sky index already uses). At
-  fine-tune and inference time the shortwave is experiment 437's analysis proxy: for each half-hour
-  before the origin, the ensemble mean of the freshest run published by the origin that covers the
-  half-hour, which is the first day of an earlier 00Z run. Every half-hour of the previous UTC day
-  lies before the 09:00 UTC native origin, so the column reads no weather published after the
-  origin. In pre-training the shortwave is the dense CAMS stand-in that every other pre-training
-  shortwave column already uses, so the two columns have one definition in every stage. A day with
-  fewer than 48 finite half-hours gives a missing value, which the standardiser sets to 0, as a
-  missing CAMS day does in the control.
+  (`f437.clear_sky_on_grid`, as experiment 437's clear-sky index already uses). At fine-tune and
+  inference time the shortwave is experiment 437's analysis proxy: for each half-hour before the
+  origin, the ensemble mean of the freshest run with a positive lead that covers the half-hour. A
+  run's rows start at its 09:00 UTC native origin, so the proxy holds leads of 0.5 to 24 hours after
+  that origin, which are 9.5 to 33 hours after the 00Z initialisation. The previous UTC day
+  therefore comes from the run of the day before the origin (09:30 to 00:00) and the run two days
+  before (00:30 to 09:00), both published before the origin. The plan review found all 48 half-hours
+  finite for every run and every Primary from 2024-04-01 to 2026-06-30, except the first two origins
+  of the archive. In pre-training the shortwave is the dense CAMS stand-in that every other
+  pre-training shortwave column already uses, so the two columns have one definition in every stage.
+  That stand-in is CAMS hourly irradiance copied onto both half-hours of each hour, so arm A's mean
+  column equals the control's in pre-training, and only the clear-sky ratio changes there. The
+  ensemble mean is smoother than CAMS (on one Primary, April to June 2025, the daily proxy mean
+  correlates 0.80 with the CAMS day mean, with a standard deviation of 53 against 60 W/m2), so the
+  frozen weather encoder sees compressed values at fine-tune time, which is a reason arm A may
+  under-deliver. A day with fewer than 48 finite half-hours gives a missing value, which the
+  standardiser sets to 0, as a missing CAMS day does in the control.
 - **Arm B, the columns dropped.** Both columns are set to the constant 0 in every stage, in
   pre-training rows and in fine-tune, table, and scoring rows. The standardiser then maps them to 0
   as well, so the weights that read them never see a non-zero input and the forecast cannot depend
-  on them. The network keeps its 29-input weather encoder and draws the same random initial
-  weights. The arm is therefore the same function class as a network with the two columns removed,
-  and a port may drop the two columns and their weights.
+  on them. The network keeps its 29-input weather encoder and uses the same seeds. The arm is
+  therefore the same function class as a network with the two columns removed, and a port may drop
+  the two columns and their weights.
 
 **Both arms refit the whole chain from pre-training onwards.** The chain is experiment 667's
 `chain.sh` (steps `pretrain`, `step2`, `table`, `fit`, `ptable`, and `pfit`): K1 pre-trained on
@@ -146,6 +159,13 @@ and 1, as experiment 667 did.
 - **Beside every CRPS contrast** the page gives the same contrast in normalised MAE of the median,
   by lead band, and per Primary. A contrast whose CRPS and MAE point in different directions fires
   audit trigger 3.
+- **Per month and per seed**, the page tables C1, because with four months an interval wholly below
+  zero means in practice that arm A wins in every month.
+- **Climatology** is the month, half-hour, and weekend-flag quantiles of `ClimatologyForecaster` as
+  stored for experiment 668, trained on the history before each fold, with its rows repeated once
+  per seed.
+- **The predict phase reads actuals after 2026-07-01** when it rebuilds table T for the June fold,
+  and the scorer drops every row with a valid time on or after 2026-07-01.
 - **Absolute scores** of every arm, of the control, of climatology, and of the manual heuristic, by
   lead band, on the same rows.
 
@@ -171,15 +191,23 @@ page.
   arm's table are bit-equal to experiment 667's stored table on every key.
 - **Arm B's columns are zero** in the standardised pre-training, fine-tune, and scoring matrices.
 - **The replay**, as under "Arms".
+- **Arm B's standardiser**, stored in `chains/<month>/work/stats/B1/`, holds mean 0 and standard
+  deviation 1e-6 for the two columns.
+- **The arm tables are the ones read.** `e00667_fold.redirect_to_extended_inputs` sets
+  `f437.TRAILING_DIR` to experiment 667's tables, so the arm patch wraps that function and points
+  `f437.TRAILING_DIR` at the arm's tables after it runs. A printed example row proves the switch.
+- **Arm A's table builder** relaxes the no-missing assertion of `e00667_tables.build` for the two
+  new columns only.
 - **The held-out power stays hidden** in the train phase, as experiment 667's `e00667_fold.py`
   enforces.
 
 ## Compute
 
-**Nine chains: two arms on four months, and the replay.** A fold of experiment 667's chain took
-about 35 minutes on the workstation's RTX A6000, as one GPU process capped at 8 GB of host memory.
-The runner checks `nvidia-smi`, `uptime`, and the running processes first, runs at most three
-chains at once inside the free GPU memory and cores, and never stops another session's process.
+**Nine to 20 chains: two arms on four months and the replay, plus 8 more if arm A advances to eight
+months and 3 more if the replay fails.** A fold of experiment 667's chain took about 35 minutes on
+the workstation's RTX A6000, as one GPU process capped at 8 GB of host memory. The runner checks
+`nvidia-smi`, `uptime`, and the running processes first, runs at most three chains at once inside
+the free GPU memory and cores, and never stops another session's process.
 
 ## Standing practices
 
@@ -191,13 +219,27 @@ chains at once inside the free GPU memory and cores, and never stops another ses
   the unlogged-event caveat; a draft pull request.
 - **Not applicable:** no XGBoost model is fitted. The calendar control is not needed, because the
   date-time encoder is the Candidate's own and identical in every arm.
-- **Advice followed:** experiment 677's monthly refit; experiment 684's use of a deterministic
-  replay in place of a re-run noise floor, extended here to the pre-training step.
+- **Advice followed:** experiment 677's monthly refit and its advice to judge a lag change on
+  event-free error as well as on all rows (the four scenarios); experiment 684's use of a
+  deterministic replay in place of a re-run noise floor, extended here to the pre-training step;
+  experiment 699's reporting of band width beside CRPS. None of the `advice` items of experiments
+  437, 569, 667, 668, 677, 684, and 699 argues against this design.
+
+## Checks list for the write-up
+
+The write-up carries the median minus the mean forecast per Primary, the MAE contrast beside every
+CRPS contrast, the band width of every arm, and which audit triggers fired.
+
+## Method
+
+The Method section is written with the results: the architecture, the training regime, and the
+measurement of the chosen arm, then the differences of the other arm.
 
 ## Files
 
 - `ml-experiments/00703-cams-free-inference-for-the-primaries-candidate/` will hold the table
-  builder for the two arms, the patch that installs an arm into experiment 667's pipeline, the
-  chain runner, and the scorer.
+  builder for the two arms (copies of experiment 667's `inputs/trailing437/` tables with the two
+  columns replaced, which `c562.TableLookup` reads through `f437.table_path`), the patch that
+  installs an arm into experiment 667's pipeline, the chain runner, and the scorer.
 - `data/ml-experiments/00703-cams-free-inference-for-the-primaries-candidate/` will hold each arm's
   tables, chains, weights, and forecasts.
