@@ -357,9 +357,12 @@ def train_ens_stage(
             flush=True,
         )
         cache: dict[bool, dict[str, torch.Tensor]] = {}
-        for job in sorted(jobs, key=lambda j: (j.seed, j.arm)):
+        for job in sorted(jobs, key=lambda j: (arms.ARMS[j.arm].flags, j.seed, j.arm)):
             arm = arms.ARMS[job.arm]
             if arm.flags not in cache:
+                # Sorted by flags, so the other width's tensors are never needed again.
+                cache.clear()
+                torch.cuda.empty_cache()
                 cache[arm.flags] = tensors(
                     x=rows.x,
                     y=rows.y,
@@ -418,9 +421,12 @@ def fine_tune_stage(
         standardiser=fold.standardiser, target_mean=fold.target_mean, target_std=fold.target_std
     )
     cache: dict[bool, dict[str, torch.Tensor]] = {}
-    for job in sorted(todo, key=lambda j: (j.seed, j.arm)):
+    for job in sorted(todo, key=lambda j: (arms.ARMS[j.arm].flags, j.seed, j.arm)):
         arm = arms.ARMS[job.arm]
         if arm.flags not in cache:
+            # Sorted by flags, so the other width's tensors are never needed again.
+            cache.clear()
+            torch.cuda.empty_cache()
             cache[arm.flags] = tensors(
                 x=fold.x,
                 y=fold.y,
