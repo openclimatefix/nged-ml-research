@@ -116,6 +116,15 @@ STEP_DATES: Final[tuple[datetime, ...]] = arms.FLAG_DATES
 STEP_SD_LIMIT: Final[float] = 3.0
 STEP_LEADS_HOURS: Final[tuple[float, float]] = (12.0, 36.0)
 PRETRAIN_START: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
+FIRST_USABLE: Final[dict[str, datetime]] = {
+    "D11": datetime(2019, 9, 17, tzinfo=UTC),
+    "D10": datetime(2019, 12, 1, tzinfo=UTC),
+    "D5": datetime(2020, 2, 1, tzinfo=UTC),
+    "D14": datetime(2020, 7, 1, tzinfo=UTC),
+    "D16": datetime(2021, 2, 1, tzinfo=UTC),
+}
+"""First usable date per Primary after experiment 103's early-calibration cuts (experiment 418's
+`FIRST_USABLE`). `e00707_folds.apply_cuts` applies it to a row's valid time and weekly-lag time."""
 
 
 def _us(*, t: datetime) -> int:

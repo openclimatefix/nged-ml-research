@@ -9,11 +9,13 @@ rows with experiment 407's cuts), and the ERA5-and-CAMS rows follow experiment 4
 - `ens_rows` returns the unweighted rows of the `S_ens` stage, standardised on the fold's scale;
 - `fold_pretrain` accepts a function that replaces the ERA5 weather of each row, for the placebo.
 
-Two cuts apply to every set of rows, as in experiment 425: a D15 or D18 row is dropped if its valid
-time or its weekly lag is before 2025-03-01, and a row is dropped if its own half-hour or any of its
-three origin lags is a flagged exact zero. Every set of rows asserts that its valid times are at
-least 3.5 hours before the fold's cut. The fold's standardiser and per-Primary target statistics
-are fitted on the fine-tuning rows, and every stage uses them.
+Three cuts apply to every set of rows. As in experiment 425, a D15 or D18 row is dropped if its
+valid time or its weekly lag is before 2025-03-01, and a row is dropped if its own half-hour or any
+of its three origin lags is a flagged exact zero. In addition, a row of a Primary in
+`prep.FIRST_USABLE` is dropped if its valid time or its weekly lag is before the Primary's first
+usable date (experiment 418 applied it to the valid time only). Every set of rows asserts that its
+valid times are at least 3.5 hours before the fold's cut. The fold's standardiser and per-Primary
+target statistics are fitted on the fine-tuning rows, and every stage uses them.
 """
 
 from collections.abc import Callable
@@ -57,12 +59,14 @@ class DroppedRows:
     """How many rows (otherwise kept by the window) each cut removed."""
 
     short_history_start: int = 0
+    before_first_usable: int = 0
     flagged_zero: int = 0
 
     def __add__(self, other: DroppedRows) -> DroppedRows:
         """Return the sum of two counts."""
         return DroppedRows(
             short_history_start=self.short_history_start + other.short_history_start,
+            before_first_usable=self.before_first_usable + other.before_first_usable,
             flagged_zero=self.flagged_zero + other.flagged_zero,
         )
 
@@ -70,6 +74,7 @@ class DroppedRows:
         """Return the counts as a JSON-ready mapping."""
         return {
             "short_history_start": self.short_history_start,
+            "before_first_usable": self.before_first_usable,
             "flagged_zero": self.flagged_zero,
         }
 
@@ -155,7 +160,12 @@ def apply_cuts(
     series_id: int,
     flagged: dict[int, np.ndarray],
 ) -> tuple[np.ndarray, DroppedRows]:
-    """Return `keep` with the short-history start cut and the flagged-zero drop applied.
+    """Return `keep` with the start cuts and the flagged-zero drop applied.
+
+    Three cuts apply in this order. A D15 or D18 row is dropped if its valid time or weekly-lag
+    time is before 2025-03-01. A row of a Primary in `prep.FIRST_USABLE` is dropped if its valid
+    time or its weekly-lag time is before that Primary's first usable date. A row is dropped if its
+    own half-hour or one of its three origin lags is a flagged exact zero.
 
     Args:
         keep: Rows the window already keeps (not modified).
@@ -166,8 +176,8 @@ def apply_cuts(
         flagged: Each series' flagged exact-zero half-hours, from `flagged_times`.
 
     Returns:
-        The reduced mask, and how many of the rows in `keep` each cut removed (the start cut
-        first, the flagged-zero drop among the rows that remain).
+        The reduced mask, and how many of the rows in `keep` each cut removed (each cut among the
+        rows that the earlier cuts left).
     """
     keep = keep.copy()
     lag_us = (prep.lag_ages_hours(lead_hours=lead) * prep.US_PER_HOUR).astype(np.int64)
@@ -176,6 +186,13 @@ def apply_cuts(
         too_early = (valid - lag_us[:, 2]) < _us(t=CUT)
         start_cut = int((keep & too_early).sum())
         keep &= ~too_early
+    first_usable = 0
+    usable_from = prep.FIRST_USABLE.get(site)
+    if usable_from is not None:
+        before = _us(t=usable_from)
+        unusable = (valid < before) | ((valid - lag_us[:, 2]) < before)
+        first_usable = int((keep & unusable).sum())
+        keep &= ~unusable
     flagged_zero = 0
     bad = flagged.get(series_id)
     if bad is not None:
@@ -184,7 +201,11 @@ def apply_cuts(
             hit |= np.isin(valid - lag_us[:, j], bad)
         flagged_zero = int((keep & hit).sum())
         keep &= ~hit
-    return keep, DroppedRows(short_history_start=start_cut, flagged_zero=flagged_zero)
+    return keep, DroppedRows(
+        short_history_start=start_cut,
+        before_first_usable=first_usable,
+        flagged_zero=flagged_zero,
+    )
 
 
 def build_fold(*, refit: datetime, window: arms.Window, cut: bool = True) -> Fold:
