@@ -25,8 +25,8 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
-import torch
-import torch.nn.functional as F  # noqa: N812
+import torch  # ty: ignore[unresolved-import]
+import torch.nn.functional as F  # noqa: N812  # ty: ignore[unresolved-import]
 
 LEVEL_NAMES = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
 
