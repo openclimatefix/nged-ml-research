@@ -274,8 +274,8 @@ def load_frames(
     frames["S0M_w115"] = references["xgb_monthly_e389_widened"]
     for name in REFERENCE_NAMES:
         frames[name] = references[name]
-    for name, frame in frames.items():
-        assert_before_holdout(name=name, frame=frame)
+    # The stored forecasts of the last month run past 2026-07-01 (10-day horizons), so the check on
+    # the scored rows is the one on the shared slice table in `main`, not one on these frames.
     print("scored:", ", ".join(frames))
     missing = [a for a in arms.ARMS if not available_seeds(arm=a, months=months)]
     if missing:
