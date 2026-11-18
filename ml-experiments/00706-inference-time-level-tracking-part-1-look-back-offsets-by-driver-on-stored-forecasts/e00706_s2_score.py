@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 706, stage 2: scores, contrasts C3, C4, and C6, and the known-answer test KA3 (CPU
-only).
+"""Experiment 706, stage 2: scores, contrasts C3, C4, and C6, and the known-answer test KA3 (CPU only).
 
 Run it after `e00706_s2_fit.py --assemble`, from the repository root with the environment of
 `CLAUDE.md` set and the folders of experiments 668, 683, and 688 on `PYTHONPATH` (the event spans):
@@ -36,26 +35,22 @@ printed line per contrast resamples single events instead.
   arm's correction, and the real-world median is the Candidate's own, from the bank's
   `real_<month>.npz` files (never the stored NRA median). A share of 1 means the forecast copied the
   shift in full.
-- CRPS on bank rows is against clean power (the truth without the shift), as the NRA arms are
-  scored.
+- CRPS on bank rows is against clean power (the truth without the shift), as the NRA arms are scored.
 - C3: N-gate minus N-rule and N-flag minus N-rule (each on the real graph), on the copied share and
   on event-free real CRPS.
-- C4: real graph minus rewired graph for each of N-flag and N-gate. The verdict reading is
-  event-free
+- C4: real graph minus rewired graph for each of N-flag and N-gate. The verdict reading is event-free
   real CRPS. The bank readings are labelled "mechanism check, not the neighbour test": the generator
   puts the mirrored step of a transfer on the real graph's neighbours only, so a network that reads
   the real graph's neighbours can detect the transfer by construction.
 - C6: N-gate minus N-flag, on the copied share and on event-free real CRPS.
 - KA3: on held-out bank transfers of at least 10% of capacity with a mirrored neighbour step, the
-  copied share of N-gate and of N-flag must be at most 0.25; on the held-out own-only 60-day ramps
-  it
+  copied share of N-gate and of N-flag must be at most 0.25; on the held-out own-only 60-day ramps it
   must be at least 0.6; both are also read with the neighbour inputs zeroed.
 - The mean gates, the switching probability, and the area under the curve of the switching
   probability on real rows (against the labelled-event mask) and on bank entries (against the
   generator's transfer flag) are printed.
 
-Three caveats apply to the readings. Arm N-flag has no lead input, so C6 on real CRPS partly
-measures
+Three caveats apply to the readings. Arm N-flag has no lead input, so C6 on real CRPS partly measures
 the fading with lead that only N-gate can learn. The transfer flag that N-flag is trained on is 1
 for every injected event, own-only events included. The lead input of N-gate, with every forecast
 issued at 12:00 UTC, also encodes the hour of day of the target (allowed, but a caveat).
@@ -131,8 +126,7 @@ type Losses = dict[str, dict[str, np.ndarray]]
 
 
 def load_real_losses(*, inputs: c.Inputs) -> Losses:
-    """Return the per-row losses of S-NRA, G-lb, N-rule, and the four learned arms on the stage 1
-    grid."""
+    """Return the per-row losses of S-NRA, G-lb, N-rule, and the four learned arms on the stage 1 grid."""
     truth = c.target_truth(inputs=inputs)
     losses: Losses = {"S-NRA": c.loss_arrays(truth=truth, quantiles=inputs.q_nra)}
     sets = {"G-lb": ("g", c.ROW_SET_ID)} | {
@@ -157,8 +151,7 @@ def real_contrast_rows(
     n_resamples: int,
     plan: tuple[tuple[str, str, str], ...],
 ) -> pl.DataFrame:
-    """Return the real-row contrasts of `plan` (name, treatment, reference) by group, with
-    intervals."""
+    """Return the real-row contrasts of `plan` (name, treatment, reference) by group, with intervals."""
     series_masks = c.group_masks(inputs=inputs)
     origin_month_label = c.origin_months()
     jobs, prepared = [], []
@@ -314,11 +307,9 @@ def _variant_stats(
 
 
 def bank_event_stats(*, n_seeds: int) -> tuple[EventStats, pl.DataFrame]:
-    """Return the per-event stats of every bank variant over the six fold months, and the events'
-    table.
+    """Return the per-event stats of every bank variant over the six fold months, and the events' table.
 
-    A variant is S-NRA in the injected world (no correction), N-rule, and each learned arm and
-    graph,
+    A variant is S-NRA in the injected world (no correction), N-rule, and each learned arm and graph,
     each also with the neighbour inputs zeroed. Rows are those of the fold month's bank with a shift
     of at least 3 points of capacity and a lead of at most 240 hours. The table has one row per
     event, with its depth and a `cluster` number for its (month, Primary).
@@ -396,8 +387,7 @@ def deep_events(*, meta: pl.DataFrame) -> np.ndarray:
 def event_bootstrap(
     *, difference: np.ndarray, cluster: np.ndarray, level: float, n_resamples: int
 ) -> tuple[float, float, float]:
-    """Return the interval of the mean over events of a paired difference, resampling clusters and,
-    inside events, seeds.
+    """Return the interval of the mean over events of a paired difference, resampling clusters and, inside events, seeds.
 
     Each resample draws the clusters with replacement, takes every event of a drawn cluster, and
     replaces each event's seed values by a draw of seeds with replacement. The statistic is the mean
@@ -446,8 +436,7 @@ def event_contrasts(
     cluster: np.ndarray,
     n_resamples: int,
 ) -> pl.DataFrame:
-    """Return the bank contrasts of `plan` (contrast, metric, treatment, reference) over the events
-    in `mask`.
+    """Return the bank contrasts of `plan` (contrast, metric, treatment, reference) over the events in `mask`.
 
     Each contrast has two rows: the first resamples the (month, Primary) clusters named by `cluster`
     (the reading to use), and the second resamples single events.
@@ -490,8 +479,7 @@ def event_contrasts(
 
 
 def print_family() -> None:
-    """Print the six readings that carry the Bonferroni count, the family size, and the level
-    used."""
+    """Print the six readings that carry the Bonferroni count, the family size, and the level used."""
     print("\nBONFERRONI FAMILY of stage 2:")
     for index, reading in enumerate(FAMILY, start=1):
         print(f"  {index}. {reading}")
@@ -506,8 +494,7 @@ def print_family() -> None:
 
 
 def share_table(*, stats_in: EventStats, meta: pl.DataFrame) -> None:
-    """Print the mean copied share and CRPS of every variant on the bank events of depth at least 3%
-    and on KA3's transfers."""
+    """Print the mean copied share and CRPS of every variant on the bank events of depth at least 3% and on KA3's transfers."""
     big = ((meta["depth"] >= KA3_MIN_DEPTH) & (meta["n_receivers"] >= 1)).to_numpy()
     everything = deep_events(meta=meta)
     table = []
@@ -530,8 +517,7 @@ def share_table(*, stats_in: EventStats, meta: pl.DataFrame) -> None:
 
 
 def ramp_shares(*, inputs: c.Inputs, n_seeds: int) -> dict[str, np.ndarray]:
-    """Return each variant's copied share on the own-only ramp worlds, shape (seeds, worlds), over
-    six folds.
+    """Return each variant's copied share on the own-only ramp worlds, shape (seeds, worlds), over six folds.
 
     A world's share is the sum over its rows with a ramp of at least 3 points and a lead of at most
     240 hours of the sign of the ramp times the correction, divided by the sum of the absolute ramp
@@ -582,8 +568,7 @@ def ramp_shares(*, inputs: c.Inputs, n_seeds: int) -> dict[str, np.ndarray]:
 
 
 def ka3_table(*, stats_in: EventStats, meta: pl.DataFrame, ramps: dict[str, np.ndarray]) -> None:
-    """Print KA3: copied share on bank transfers (at most 0.25) and on own-only ramps (at least
-    0.6)."""
+    """Print KA3: copied share on bank transfers (at most 0.25) and on own-only ramps (at least 0.6)."""
     big = ((meta["depth"] >= KA3_MIN_DEPTH) & (meta["n_receivers"] >= 1)).to_numpy()
     table = []
     for name, ramp_values in ramps.items():
@@ -610,8 +595,7 @@ def ka3_table(*, stats_in: EventStats, meta: pl.DataFrame, ramps: dict[str, np.n
 
 
 def gate_table(*, n_seeds: int) -> None:
-    """Print the mean gate of every look-back offset of arm N-gate, over folds and seeds, on three
-    row sets."""
+    """Print the mean gate of every look-back offset of arm N-gate, over folds and seeds, on three row sets."""
     table = []
     for graph in d.GRAPH_NAMES:
         accumulated: dict[str, list[np.ndarray]] = {
@@ -642,8 +626,7 @@ def gate_table(*, n_seeds: int) -> None:
 
 
 def _auc(*, scores: np.ndarray, labels: np.ndarray) -> float:
-    """Return the area under the ROC curve of `scores` for the boolean `labels` (rank form, ties
-    averaged)."""
+    """Return the area under the ROC curve of `scores` for the boolean `labels` (rank form, ties averaged)."""
     positives = int(labels.sum())
     negatives = len(labels) - positives
     if positives == 0 or negatives == 0:
@@ -655,13 +638,10 @@ def _auc(*, scores: np.ndarray, labels: np.ndarray) -> float:
 
 
 def flag_auc_table(*, inputs: c.Inputs, n_seeds: int) -> None:
-    """Print the area under the ROC curve of N-flag's switching probability on real rows and on bank
-    entries.
+    """Print the area under the ROC curve of N-flag's switching probability on real rows and on bank entries.
 
-    Real entries are (series, origin) pairs of the fold months labelled 1 when the 28-day window
-    ends
-    inside or holds a labelled event of the primary mask (events of experiment 688). Bank entries
-    are
+    Real entries are (series, origin) pairs of the fold months labelled 1 when the 28-day window ends
+    inside or holds a labelled event of the primary mask (events of experiment 688). Bank entries are
     labelled by the generator's transfer flag, among entries with a covered window.
     """
     inside, _, _ = c.load_event_masks(inputs=inputs, kind="primary")

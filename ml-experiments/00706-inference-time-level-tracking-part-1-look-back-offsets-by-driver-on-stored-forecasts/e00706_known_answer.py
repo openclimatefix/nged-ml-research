@@ -16,16 +16,13 @@ experiments 668, 683, and 688 on `PYTHONPATH` (the event spans come from experim
   event-free half-hours. Every injected size must be at least 5 times it.
 - `perturb`: changing power after 6 hours before the origin, or any weather run after the origin
   day, moves no coefficient and no correction of arms G and D; changing the 06:00 UTC reading moves
-  it. The same holds for the levels of P-cp (window ending at 03:00 UTC, 9 hours before the 12:00
-  origin), RR, and M28.
-- `ka1a` (gate): a 10-point additive step in truth with the forecast held fixed. Arm G with factor
-  1.0
+  it. The same holds for the levels of P-cp (window ending at 03:00 UTC, 9 hours before the 12:00 origin), RR, and M28.
+- `ka1a` (gate): a 10-point additive step in truth with the forecast held fixed. Arm G with factor 1.0
   must remove 100% plus or minus 5% at 14 days and 50% plus or minus 5% at 7 days after the onset.
   A failed gate stops the experiment after one fix pass.
 - `ka1b` (reported, no gate): the same removal on the re-run bank of experiment 667, with arm G on
   the smallest-lead residual of the bank's re-run forecasts.
-- `ka2`: a PV-shaped injection and a cold-night injection into real half-hours, with the weather
-  that
+- `ka2`: a PV-shaped injection and a cold-night injection into real half-hours, with the weather that
   happened, read by an estimator that sees ensemble weather. The forecast is not re-run.
 - `pl`: PL1 (arm G with the window of another Primary of the same metering group that is no
   electrical neighbour) and PL2 (arm D with the drivers permuted in whole days inside each
@@ -229,8 +226,7 @@ def level_of(*, name: str, residuals: c.Residuals, series: int, origin: int) -> 
 def perturb_levels(*, inputs: c.Inputs) -> bool:
     """Return whether the perturbation test passes for the levels of P-cp, RR, and M28.
 
-    P-cp reads power up to 03:00 UTC, 9 hours before the 12:00 origin; RR and M28 read it up to 6
-    hours before. None
+    P-cp reads power up to 03:00 UTC, 9 hours before the 12:00 origin; RR and M28 read it up to 6 hours before. None
     of the three reads weather. Power after the last half-hour a level reads must move nothing, and
     shifting the last day up to and including that half-hour must move the level.
     """
@@ -459,8 +455,7 @@ def print_ka2_gate(
     gain_d: np.ndarray,
     gain_g: np.ndarray,
 ) -> None:
-    """Print KA2's gate on the PV-shaped injection for one metering group (the gate reads the pooled
-    14)."""
+    """Print KA2's gate on the PV-shaped injection for one metering group (the gate reads the pooled 14)."""
     verdict_set = selected & sets["midday (shortwave >= 300 W/m2)"]
     night_set = selected & sets["night (shortwave < 1 W/m2)"]
     if not verdict_set.any() or not night_set.any():
@@ -508,8 +503,7 @@ def print_slope_errors(*, inputs: c.Inputs, fits: list[c.WindowFit]) -> None:
 def neighbours_of(*, inputs: c.Inputs) -> dict[str, set[str]]:
     """Return each Primary's metered electrical neighbours from NGED's interconnection list.
 
-    The logic of `nged_neighbours` in `e00400_blend.py` of experiment 400, copied so that this
-    script
+    The logic of `nged_neighbours` in `e00400_blend.py` of experiment 400, copied so that this script
     does not import that file's chain of dependencies.
     """
     label_of = dict(zip(inputs.ids.tolist(), inputs.labels, strict=True))
@@ -576,8 +570,7 @@ def mean_by_group(*, inputs: c.Inputs, values: np.ndarray, rows: np.ndarray) -> 
 
 
 def print_nesting_check(*, fits_g: list[c.WindowFit], fits_d: list[c.WindowFit]) -> None:
-    """Print the largest gap between D's and G's intercepts where both of D's slopes are zero by
-    rule.
+    """Print the largest gap between D's and G's intercepts where both of D's slopes are zero by rule.
 
     With no slope, D's regression is G's window mean, so the intercepts must agree.
     """

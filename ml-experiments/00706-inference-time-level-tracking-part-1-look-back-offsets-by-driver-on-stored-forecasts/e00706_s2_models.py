@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 706, stage 2: the two learned arms as small neural networks, and their loss (needs
-`torch`).
+"""Experiment 706, stage 2: the two learned arms as small neural networks, and their loss (needs `torch`).
 
 Both arms add one correction, in points of capacity, to all 11 stored quantiles of a row. Both read
 the look-back features of the row's entry (`e00706_s2_data`) and train on the CRPS of the corrected

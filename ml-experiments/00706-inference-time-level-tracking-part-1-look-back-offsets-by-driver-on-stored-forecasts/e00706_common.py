@@ -18,8 +18,7 @@ ensemble weather out on dense arrays and implements the look-back offsets of the
   power at 12:00 UTC is known to 06:00 UTC), over a window of 7, 14, or 28 days, and the weather
   of the ensemble run of 00:00 UTC on the day of each forecast that produced a residual.
 
-Run any script from the repository root with `DATA_PATH_INTERNAL` and the dummy `NGED_S3_*`
-variables
+Run any script from the repository root with `DATA_PATH_INTERNAL` and the dummy `NGED_S3_*` variables
 set, as `CLAUDE.md` says.
 """
 
@@ -176,14 +175,12 @@ def origin_of_month(*, month: str) -> np.ndarray:
 
 
 def target_stamps() -> np.ndarray:
-    """Return the stamp of every (origin, row) pair, shape (N_ORIGINS, N_H); it may exceed the
-    grid."""
+    """Return the stamp of every (origin, row) pair, shape (N_ORIGINS, N_H); it may exceed the grid."""
     return ORIGIN_STAMP + PER_DAY * np.arange(N_ORIGINS)[:, None] + np.arange(N_H)[None, :]
 
 
 def stamp_to_target(*, per_stamp: np.ndarray) -> np.ndarray:
-    """Map an array over stamps (last axis N_STAMPS) onto (…, N_ORIGINS, N_H), NaN or False
-    beyond."""
+    """Map an array over stamps (last axis N_STAMPS) onto (…, N_ORIGINS, N_H), NaN or False beyond."""
     index = target_stamps()
     inside = index < N_STAMPS
     taken = per_stamp[..., np.minimum(index, N_STAMPS - 1)]
@@ -218,8 +215,7 @@ class Inputs:
 
 
 def read_site_map() -> pl.DataFrame:
-    """Return the site map of the 16 Primaries: primary, label, time_series_id, capacity_mw,
-    group."""
+    """Return the site map of the 16 Primaries: primary, label, time_series_id, capacity_mw, group."""
     return pl.read_csv(next(ML_EXPERIMENTS_DATA_DIR.glob(SITE_MAP_GLOB)))
 
 
@@ -316,8 +312,7 @@ def _read_forecast_kind(*, kind: str, ids: np.ndarray, capacity: np.ndarray) -> 
 
 
 def _read_truth(*, ids: np.ndarray, capacity: np.ndarray) -> tuple[np.ndarray, pl.DataFrame]:
-    """Return cleaned power in points on the stamp grid, and the null-power count per series and
-    month."""
+    """Return cleaned power in points on the stamp grid, and the null-power count per series and month."""
     frame = (
         pl.scan_parquet(BACKTEST_DIR / "ground_truth_primaries.parquet")
         .filter(pl.col("valid_time") >= GRID_START, pl.col("valid_time") < HOLDOUT_START)
@@ -367,8 +362,7 @@ def read_run(*, day: dt.date, ids: np.ndarray) -> pl.DataFrame:
 def drivers_from(
     *, shortwave: np.ndarray, temperature: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return `x_pv` and `x_cold` from the ensemble-mean shortwave (W/m2) and 2 m temperature (deg
-    C)."""
+    """Return `x_pv` and `x_cold` from the ensemble-mean shortwave (W/m2) and 2 m temperature (deg C)."""
     x_pv = shortwave.astype(np.float64) / SHORTWAVE_SCALE
     x_cold = np.maximum(0.0, COLD_THRESHOLD_C - temperature.astype(np.float64)) / COLD_SCALE_K
     return x_pv, x_cold
@@ -596,8 +590,7 @@ class Residuals(NamedTuple):
 def build_residuals(*, inputs: Inputs) -> Residuals:
     """Return the residuals of every stamp against the stored normal-running median.
 
-    A stamp `i` has a forecast from origin `o = (i - 24) // 48 - j` at row `h = (i - 24) % 48 + 48
-    j`
+    A stamp `i` has a forecast from origin `o = (i - 24) // 48 - j` at row `h = (i - 24) % 48 + 48 j`
     for each `j` from 0 to 13. The smallest-lead forecast is `j = 0`; the band residual averages the
     forecasts whose lead lies in the band. Every such forecast was issued at or before the stamp.
     """
@@ -833,10 +826,8 @@ def lookback_design(
     """Return the look-back regressors of one series on the stamp grid, shape (N_STAMPS, p).
 
     The driver of stamp `i` is the ensemble-mean weather of the 00:00 UTC run of the origin whose
-    forecast has the smallest lead for `i`, so it is weather the origin of that forecast already
-    had.
-    With `spec.permute_days`, the design is valid only inside the window of `origin_of_window`,
-    whose
+    forecast has the smallest lead for `i`, so it is weather the origin of that forecast already had.
+    With `spec.permute_days`, the design is valid only inside the window of `origin_of_window`, whose
     whole days are permuted among themselves.
     """
     stamps = np.arange(N_STAMPS)
@@ -887,8 +878,7 @@ def penalties(*, inputs: Inputs, series: int, spec: ArmSpec) -> np.ndarray:
 
 
 def month_start_stamps() -> np.ndarray:
-    """Return, per origin, the first stamp whose smallest-lead forecast is from the origin's
-    month."""
+    """Return, per origin, the first stamp whose smallest-lead forecast is from the origin's month."""
     months = origin_months()
     first_of_month = {month: int(np.flatnonzero(months == month)[0]) for month in set(months)}
     return np.array(
@@ -899,8 +889,7 @@ def month_start_stamps() -> np.ndarray:
 def _fit_permuted(
     *, inputs: Inputs, series: int, spec: ArmSpec, window_fit: Callable[[np.ndarray], WindowFit]
 ) -> WindowFit:
-    """Return the window fits of a permuted-day arm, solving each origin with its own
-    permutation."""
+    """Return the window fits of a permuted-day arm, solving each origin with its own permutation."""
     parts = [
         window_fit(
             lookback_design(inputs=inputs, series=series, spec=spec, origin_of_window=origin)
@@ -917,8 +906,7 @@ def _fit_permuted(
 def series_corrections(
     *, inputs: Inputs, residuals: Residuals, series: int, spec: ArmSpec
 ) -> tuple[np.ndarray, WindowFit]:
-    """Return the correction added to every quantile of one series, shape (N_ORIGINS, N_H), and the
-    fit.
+    """Return the correction added to every quantile of one series, shape (N_ORIGINS, N_H), and the fit.
 
     The correction at target row `(o, h)` is the factor times `a + b . x`, where `a` and `b` come
     from the window ending `lag` half-hours before origin `o` and `x` is the row's own drivers.
@@ -954,8 +942,7 @@ def series_corrections(
 def apply_correction(
     *, inputs: Inputs, quantiles: np.ndarray, correction: np.ndarray
 ) -> np.ndarray:
-    """Add `correction` (K, N_ORIGINS, N_H) to every quantile, keeping apparent power
-    non-negative."""
+    """Add `correction` (K, N_ORIGINS, N_H) to every quantile, keeping apparent power non-negative."""
     shifted = quantiles + correction[..., None].astype(np.float32)
     return np.where(inputs.is_mva[:, None, None, None], np.maximum(shifted, 0.0), shifted)
 
@@ -1032,8 +1019,7 @@ def _segment_level(
 
 
 def target_truth(*, inputs: Inputs) -> np.ndarray:
-    """Return the cleaned power at every target row, shape (K, N_ORIGINS, N_H); NaN beyond the
-    grid."""
+    """Return the cleaned power at every target row, shape (K, N_ORIGINS, N_H); NaN beyond the grid."""
     return stamp_to_target(per_stamp=inputs.truth.astype(np.float32))
 
 

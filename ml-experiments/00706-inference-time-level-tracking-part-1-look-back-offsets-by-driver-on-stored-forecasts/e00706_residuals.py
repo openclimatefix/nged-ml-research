@@ -18,8 +18,7 @@ under the experiment's data folder and prints:
   the page quotes;
 - the peak memory of the process.
 
-`--month YYYY-MM` writes only that month's valid times and a table with the month in its name. It is
-a
+`--month YYYY-MM` writes only that month's valid times and a table with the month in its name. It is a
 smoke test of the writing code: it still builds every residual, so it does not measure the memory
 of one month.
 """
@@ -133,8 +132,7 @@ def assert_run_files_issue_at_nine() -> None:
 
 
 def print_null_counts(*, inputs: c.Inputs) -> None:
-    """Print the half-hours with no cleaned power by drop reason and month; no look-back reads
-    them."""
+    """Print the half-hours with no cleaned power by drop reason and month; no look-back reads them."""
     table = (
         inputs.null_counts.with_columns(
             pl.col("drop_reason").cast(pl.String).fill_null("(no reason recorded)")

@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 706, stage 2: the training and scoring tables of the learned look-back arms (CPU
-only).
+"""Experiment 706, stage 2: the training and scoring tables of the learned look-back arms (CPU only).
 
 Stage 2 trains two small neural networks that decide how much of the look-back offset of stage 1 to
 apply. This module builds everything the networks read, once, so that each of the 240 fits only
@@ -30,8 +29,7 @@ before the origin:
 - `nb_gate` (2, E, 4, 6): per graph (0 real, 1 rewired), the mean over the series' neighbours of
   the neighbours' exponentially weighted window mean residual, whose newest residual is 6 hours
   older than the origin.
-- `box` (E, 6): arm G-lb's offset per lead band, 0.75 times the 14-day box mean of the band
-  residual.
+- `box` (E, 6): arm G-lb's offset per lead band, 0.75 times the 14-day box mean of the band residual.
 - `slow` (E, 6): the part of `box` that the change-point split of arm N-flag applies in full; the
   step part is `box - slow`.
 - `flag_own` (E, 6) and `flag_nb` (2, E, 5): the 11 inputs of arm N-flag, from the series' own
@@ -61,8 +59,7 @@ Approximations (each is printed by the builder where it can be measured):
   half-hours only), so that one forecaster supplies the whole series. The stored-NRA residuals of
   stage 1 are never mixed into a bank series. Every residual of a bank world is on
   even half-hours only, and its coverage thresholds are halved.
-- The neighbours' residuals in a bank world are the stored-NRA residuals of stage 1 plus the shifts
-  that the generator
+- The neighbours' residuals in a bank world are the stored-NRA residuals of stage 1 plus the shifts that the generator
   of experiment 650 added to those Primaries in that pass (their own event and the mirrored step of
   a transfer), with the forecast held fixed (no re-run). The bank stores no re-run forecast for a
   Primary outside its own event window.
@@ -192,8 +189,7 @@ def concat_tables(*, tables: list[Table]) -> Table:
 
 
 def neighbour_lists(*, inputs: c.Inputs) -> list[list[int]]:
-    """Return each Primary's metered neighbours from NGED's interconnection list, in the order of
-    experiment 400.
+    """Return each Primary's metered neighbours from NGED's interconnection list, in the order of experiment 400.
 
     The logic of `nged_neighbours` in `e00400_blend.py`, with the neighbours of a Primary sorted by
     the number in the label, which is the order that the generator of experiment 650 draws receivers
@@ -310,14 +306,12 @@ def ew_fit(
     origins: np.ndarray,
     density: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Fit the ridge regression of arm D on an exponentially weighted window ending 6 hours before
-    each origin.
+    """Fit the ridge regression of arm D on an exponentially weighted window ending 6 hours before each origin.
 
     The weight of a half-hour is `exp(-age / (tau_days x 48))`. The intercept is not penalised, and
     the penalty of a slope is the stage 1 penalty. A slope is zero when the weighted count of
     half-hours with its driver above `c.ACTIVE_THRESHOLD` is under `c.MIN_ACTIVE` scaled by
-    `tau_days / 14` (the share of a 14-day window that the weighting keeps). A window is covered
-    when
+    `tau_days / 14` (the share of a 14-day window that the weighting keeps). A window is covered when
     its weighted count of residuals reaches `c.MIN_COVERAGE` of the weighted count of a complete
     window of the same density; an uncovered window gives zero coefficients.
 
@@ -331,8 +325,7 @@ def ew_fit(
             even-half-hour bank worlds).
 
     Returns:
-        The coefficients (intercept, irradiance slope, cold slope), shape (B, n, 3), and whether
-        each
+        The coefficients (intercept, irradiance slope, cold slope), shape (B, n, 3), and whether each
         window is covered, shape (B, n).
     """
     n_bands = residual.shape[0]
@@ -393,8 +386,7 @@ def ew_fit(
 def ew_mean(
     *, residual: np.ndarray, tau_days: float, origins: np.ndarray, density: float
 ) -> np.ndarray:
-    """Return the exponentially weighted mean of `residual` (…, N_STAMPS) at each origin, shape (…,
-    n).
+    """Return the exponentially weighted mean of `residual` (…, N_STAMPS) at each origin, shape (…, n).
 
     The window ends 6 hours before the origin, and the coverage rule is the one of `ew_fit`; an
     uncovered window gives 0.
@@ -414,8 +406,7 @@ def ew_mean(
 def box_mean(
     *, residual: np.ndarray, origins: np.ndarray, window_half_hours: int, density: float
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the box-window mean of `residual` (…, N_STAMPS) and whether each window is covered,
-    shape (…, n).
+    """Return the box-window mean of `residual` (…, N_STAMPS) and whether each window is covered, shape (…, n).
 
     The window of an origin ends 6 hours before it. It is covered when at least `c.MIN_COVERAGE` x
     `density` of its stamps hold a residual and it spans at least one day, as in `c.fit_window`.
@@ -436,8 +427,7 @@ def box_mean(
 
 
 def daily_means(*, residual: np.ndarray, origins: np.ndarray, density: float) -> np.ndarray:
-    """Return the 28 daily mean residuals of each origin's window, shape (…, n, 28); NaN for a thin
-    day.
+    """Return the 28 daily mean residuals of each origin's window, shape (…, n, 28); NaN for a thin day.
 
     The window of an origin ends 6 hours before it, and day `d` covers its stamps `48 d` to
     `48 d + 47` from the window start. A day needs half the half-hours of a complete day (scaled by
@@ -655,8 +645,7 @@ class Neighbourhood(NamedTuple):
 
 
 def neighbourhood(*, banded: np.ndarray, origins: np.ndarray, density: float) -> Neighbourhood:
-    """Return every series' window means and daily means at `origins` for the band residuals
-    `banded` (K, 6, N_STAMPS)."""
+    """Return every series' window means and daily means at `origins` for the band residuals `banded` (K, 6, N_STAMPS)."""
     means = np.stack(
         [
             ew_mean(residual=banded, tau_days=tau, origins=origins, density=density)
@@ -669,8 +658,7 @@ def neighbourhood(*, banded: np.ndarray, origins: np.ndarray, density: float) ->
 
 
 def _mean_where(*, values: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """Return the mean over the finite entries of each row of `values` (n, 28) inside `mask`; NaN if
-    none."""
+    """Return the mean over the finite entries of each row of `values` (n, 28) inside `mask`; NaN if none."""
     chosen = mask & np.isfinite(values)
     count = chosen.sum(axis=1)
     return np.where(
@@ -817,8 +805,7 @@ def build_real_table(*, world: RealWorld, adjacencies: np.ndarray, around: Neigh
 
 
 def ramp_shift(*, stamp: np.ndarray, start: np.ndarray | int, sign: np.ndarray | int) -> np.ndarray:
-    """Return an own-only ramp in points at `stamp`: a linear rise over 60 days from `start`, then
-    held."""
+    """Return an own-only ramp in points at `stamp`: a linear rise over 60 days from `start`, then held."""
     rise = np.clip((stamp - start) / RAMP_HALF_HOURS, 0.0, 1.0)
     return sign * RAMP_POINTS * rise
 
@@ -894,8 +881,7 @@ def _ramp_block(
     start: int,
     origins: np.ndarray,
 ) -> Table:
-    """Return the entries of one own-only ramp world: the real residuals plus a ramp in every
-    band."""
+    """Return the entries of one own-only ramp world: the real residuals plus a ramp in every band."""
     stamps = np.arange(c.N_STAMPS)
     shift = ramp_shift(stamp=stamps, start=start, sign=sign)
     table = block_tables(
@@ -996,8 +982,7 @@ def load_real_bank(*, month: str, n_series: int) -> RealBank:
 def real_median_of(
     *, real: RealBank, prim: np.ndarray, oi: np.ndarray, vi: np.ndarray
 ) -> np.ndarray:
-    """Return the Candidate's real-world median (fraction of capacity) of each (Primary, origin,
-    valid time); NaN if absent."""
+    """Return the Candidate's real-world median (fraction of capacity) of each (Primary, origin, valid time); NaN if absent."""
     key = _row_key(prim=prim, oi=oi, vi=vi)
     position = np.minimum(np.searchsorted(real.key, key), len(real.key) - 1)
     return np.where(real.key[position] == key, real.median[position], np.nan)
@@ -1006,8 +991,7 @@ def real_median_of(
 def generator_world(
     *, world: RealWorld, month: str, events: pl.DataFrame, lists: list[list[int]]
 ) -> dict[int, tuple[np.ndarray, np.ndarray]]:
-    """Return the generator's (own, mirror) shifts, as shares of capacity on the library grid, for
-    each pass of `month`.
+    """Return the generator's (own, mirror) shifts, as shares of capacity on the library grid, for each pass of `month`.
 
     The generator is experiment 650's `build`, fed the cleaned power of stage 1 (the real power
     before the month after `month`, as the bank was built) and the neighbour lists in the order of
@@ -1294,8 +1278,7 @@ def build_bank_month(  # noqa: PLR0915
 
 
 def real_dense_arrays(*, inputs: c.Inputs) -> dict[str, np.ndarray]:
-    """Return the dense arrays that every fit reads: base quantiles, target power, target
-    weather."""
+    """Return the dense arrays that every fit reads: base quantiles, target power, target weather."""
     return {
         "q_nra": inputs.q_nra.astype(np.float32),
         "truth": c.target_truth(inputs=inputs).astype(np.float32),
@@ -1306,8 +1289,7 @@ def real_dense_arrays(*, inputs: c.Inputs) -> dict[str, np.ndarray]:
 
 
 def check_rule_matches_stage_one(*, inputs: c.Inputs, table: Table) -> None:
-    """Raise unless `box` equals the correction of stage 1's stored arm G-lb wherever N-rule's
-    weight is 1.
+    """Raise unless `box` equals the correction of stage 1's stored arm G-lb wherever N-rule's weight is 1.
 
     The stored `g` predictions are read through `read_predictions` and compared on the median, on
     the rows where the stored forecast exists, the correction is finite, and an apparent-power

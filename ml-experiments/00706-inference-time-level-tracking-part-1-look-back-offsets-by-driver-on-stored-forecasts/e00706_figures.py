@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 706: the four figures of the write-up, as SVG files under
-`docs/ml-experiments/00706-*/`.
+"""Experiment 706: the four figures of the write-up, as SVG files under `docs/ml-experiments/00706-*/`.
 
 Run it after `e00706_score.py` and `e00706_s2_score.py`, from the repository root with the
 environment of `CLAUDE.md` set:
@@ -10,8 +9,7 @@ environment of `CLAUDE.md` set:
 The script reads the score tables and the stored predictions under the experiment's private folder
 and writes nothing there. Figure 2 needs the event spans of experiment 688, so the folders of
 experiments 668, 683, and 688 are put on `sys.path` when that figure is drawn. The script prints
-every number a figure shows, and the `svgo` command to run on each SVG before committing it. It
-never
+every number a figure shows, and the `svgo` command to run on each SVG before committing it. It never
 runs `npx`.
 
 Every figure covers the 14 Primary substations only, which are not NGED metered generators, so
@@ -218,8 +216,7 @@ def preview_dir() -> Path:
 
 
 def finish(*, chart: alt.TopLevelMixin, name: str) -> Path:
-    """Write the chart as SVG, write a PNG preview to a scratch folder, and print the `svgo`
-    command."""
+    """Write the chart as SVG, write a PNG preview to a scratch folder, and print the `svgo` command."""
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     path = FIGURE_DIR / f"{name}.svg"
     configured = chart.configure_view(stroke=None).configure_legend(  # ty: ignore[unresolved-attribute]
@@ -465,8 +462,7 @@ def event_windows(*, spans: pl.DataFrame, count: int) -> pl.DataFrame:
 
 
 def half_hour_grid(*, after: dt.datetime, until: dt.datetime) -> pl.DataFrame:
-    """Return every half-hour valid time in `(after, until]`, so a line breaks where telemetry is
-    missing."""
+    """Return every half-hour valid time in `(after, until]`, so a line breaks where telemetry is missing."""
     return pl.DataFrame(
         {
             "valid_time": pl.datetime_range(
@@ -525,8 +521,7 @@ def stored_lazy(*, name: str) -> pl.LazyFrame:
 def window_rows(
     *, series: int, start: dt.datetime, end: dt.datetime, capacity: float
 ) -> pl.DataFrame:
-    """Return observed power and the three forecasts of one Primary over a window, in percent of
-    capacity.
+    """Return observed power and the three forecasts of one Primary over a window, in percent of capacity.
 
     Each forecast is stitched over daily origins: the row at each valid time comes from the latest
     origin before it, so its lead is 0 to 24 hours (day-ahead rows). Every curve sits on the
@@ -749,8 +744,7 @@ def check_origin(*, origin: dt.datetime) -> None:
 
 
 def example_rows(*, series: int, origin: dt.datetime, capacity: float) -> pl.DataFrame:
-    """Return the one forecast issued at `origin` of four kinds, and the observed power, in % of
-    capacity.
+    """Return the one forecast issued at `origin` of four kinds, and the observed power, in % of capacity.
 
     Every curve sits on the half-hour grid of the 14 days with nulls at missing rows.
     """
@@ -811,8 +805,7 @@ def example_rows(*, series: int, origin: dt.datetime, capacity: float) -> pl.Dat
 
 
 def correction_share(*, data: pl.DataFrame, hours: float) -> float:
-    """Return mean |G-lb q50 - stored q50| divided by mean (q95 - q05), over the rows up to
-    `hours`."""
+    """Return mean |G-lb q50 - stored q50| divided by mean (q95 - q05), over the rows up to `hours`."""
     wide = (
         data.filter(pl.col("hours") <= hours)
         .pivot(on="forecast", index="valid_time", values="value", aggregate_function="first")
