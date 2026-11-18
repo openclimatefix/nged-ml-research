@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN202
+# ruff: noqa: E501
 """Experiment 706, stage 2: build the tables, fit the learned arms, and write their predictions.
 
 Run it from the repository root with the environment of `CLAUDE.md` set, on a machine where
@@ -36,6 +36,12 @@ rows against the observed power. Adam, learning rate 2e-3, batches of 4096 rows,
 epoch, at most 40 epochs, early stopping on the mean validation loss with patience 6, and the
 weights of the best epoch are kept. The validation loss averages the real, bank, and ramp rows
 with equal weight.
+
+Validation is week mod 4 inside the training period, and not the last training month: the first
+fold (2026-01) has only about 24 days of training rows, so holding out a month would leave it none.
+The validation weeks lie between training weeks, so the validation loss is a little optimistic and
+early stopping may run later than a held-out month would allow. The test month and the 7-day
+embargo before it are never used for training or validation.
 """
 
 import argparse
@@ -44,13 +50,17 @@ import multiprocessing
 import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import e00706_common as c  # ty: ignore[unresolved-import]
 import e00706_s2_data as d  # ty: ignore[unresolved-import]
 import numpy as np
 from studies.eval_protocol.metrics import MEDIAN_INDEX
 from studies.experiment_store import write_predictions
+
+if TYPE_CHECKING:
+    import torch  # ty: ignore[unresolved-import]
+    from e00706_s2_models import Batch  # ty: ignore[unresolved-import]
 
 JOBS_DIR: Final[Path] = d.S2_DIR / "jobs"
 MODELS_DIR: Final[Path] = d.S2_DIR / "models"
@@ -71,6 +81,10 @@ SMOKE_STEPS: Final[int] = 40
 SHIFT_FLOOR_POINTS: Final[float] = 3.0
 """Rows with a shift of at least this many points (3% of capacity) are the rows of the shift-in-force tables."""
 CHUNK: Final[int] = 262_144
+VALIDATION_NOTE: Final[str] = (
+    "VALIDATION: week mod 4 inside the training period (not the last training month, which the "
+    "first fold lacks), so early stopping is slightly optimistic; the test month is never used."
+)
 SET_NAMES: Final[dict[tuple[str, str], str]] = {
     ("n-flag", "real"): "n-flag-real",
     ("n-flag", "rewired"): "n-flag-rewired",
@@ -114,7 +128,9 @@ def all_jobs(
 # --------------------------------------------------------------------------- tensors for one fit
 
 
-def _device_table(*, table: dict[str, np.ndarray], graph: int, device) -> dict:
+def _device_table(
+    *, table: dict[str, np.ndarray], graph: int, device: torch.device
+) -> dict[str, torch.Tensor]:
     """Return an entry table's tensors on `device`, with the arrays of one graph selected."""
     import torch  # ty: ignore[unresolved-import]
 
@@ -139,13 +155,13 @@ class Rows:
     def __init__(
         self,
         *,
-        table: dict,
-        dense: dict,
+        table: dict[str, torch.Tensor],
+        dense: dict[str, torch.Tensor],
         entry: np.ndarray,
         k: np.ndarray,
         o: np.ndarray,
         h: np.ndarray,
-        device,
+        device: torch.device,
         q: np.ndarray | None = None,
         y: np.ndarray | None = None,
     ) -> None:
@@ -163,7 +179,7 @@ class Rows:
         self.q = None if q is None else torch.as_tensor(q.astype(np.float32), device=device)
         self.y = None if y is None else torch.as_tensor(y.astype(np.float32), device=device)
 
-    def batch(self, *, index):  # noqa: ANN201
+    def batch(self, *, index: torch.Tensor) -> Batch:
         """Return the rows `index` (a long tensor on the device) as a `Batch`."""
         import e00706_s2_models as m  # ty: ignore[unresolved-import]
         import torch  # ty: ignore[unresolved-import]
@@ -191,7 +207,7 @@ class Rows:
         )
 
 
-def _load_dense(*, device) -> tuple[dict, dict[str, np.ndarray]]:
+def _load_dense(*, device: torch.device) -> tuple[dict[str, torch.Tensor], dict[str, np.ndarray]]:
     """Return the dense tensors on `device` and the dense arrays in memory."""
     import torch  # ty: ignore[unresolved-import]
 
@@ -241,10 +257,14 @@ def _implicit_rows(
     return entries[entry_index], row
 
 
+type Source = tuple[Rows, np.ndarray, np.ndarray]
+"""A row set with the positions of its training rows and of its validation rows."""
+
+
 class FitData:
     """Everything one fit reads: the training and validation rows of the three sources and the test rows."""
 
-    def __init__(self, *, month: str, graph: str, device) -> None:
+    def __init__(self, *, month: str, graph: str, device: torch.device) -> None:
         """Load the caches for fold `month` and move them to `device`."""
         self.month = month
         graph_index = d.GRAPH_NAMES.index(graph)
@@ -290,13 +310,13 @@ class FitData:
     def _source(
         self,
         *,
-        table: dict,
+        table: dict[str, torch.Tensor],
         table_np: dict[str, np.ndarray],
         entry: np.ndarray,
         row: np.ndarray,
         limit: int,
-        device,
-    ) -> tuple[Rows, np.ndarray, np.ndarray]:
+        device: torch.device,
+    ) -> Source:
         """Return an implicit row set with its training and validation positions."""
         k = table_np["series"][entry].astype(np.int64)
         o = table_np["origin"][entry].astype(np.int64)
@@ -311,8 +331,8 @@ class FitData:
         month: str,
         graph_index: int,
         limit: int,
-        device,
-    ) -> tuple[Rows, np.ndarray, np.ndarray]:
+        device: torch.device,
+    ) -> Source:
         """Return the bank rows of the months before `month` with their training and validation positions."""
         months = [m for m in d.BANK_MONTHS if m < month]
         tables, rows, offset = [], [], 0
@@ -351,7 +371,14 @@ class FitData:
 # --------------------------------------------------------------------------- fitting
 
 
-def _evaluate(*, arm, network, sources, validation_index, levels) -> float:
+def _evaluate(
+    *,
+    arm: str,
+    network: torch.nn.Module,
+    sources: dict[str, Source],
+    validation_index: dict[str, torch.Tensor],
+    levels: torch.Tensor,
+) -> float:
     """Return the mean validation loss over the three sources, each with equal weight."""
     import e00706_s2_models as m  # ty: ignore[unresolved-import]
     import torch  # ty: ignore[unresolved-import]
@@ -373,8 +400,8 @@ def _evaluate(*, arm, network, sources, validation_index, levels) -> float:
 
 
 def train_network(
-    *, job: Job, data: FitData, epochs: int, steps: int, device
-) -> tuple[Any, list[float]]:
+    *, job: Job, data: FitData, epochs: int, steps: int, device: torch.device
+) -> tuple[torch.nn.Module, list[float]]:
     """Train one network and return it with the best weights loaded, and its validation curve."""
     import e00706_s2_models as m  # ty: ignore[unresolved-import]
     import torch  # ty: ignore[unresolved-import]
@@ -384,11 +411,11 @@ def train_network(
     graph_index = d.GRAPH_NAMES.index(job.graph)
     rng = np.random.default_rng([c.EXPERIMENT_ID, 4, fold, job.seed, arm_index, graph_index])
     torch.manual_seed(int(rng.integers(2**31 - 1)))
-    network = m.new_network(arm=job.arm).to(device)  # ty: ignore[invalid-argument-type]
+    network = m.new_network(arm=job.arm).to(device)
     optimiser = torch.optim.Adam(network.parameters(), lr=LEARNING_RATE)
     levels = m.levels_tensor(device=device)
-    sources = {"real": data.real, "bank": data.bank, "ramp": data.ramp}
-    validation_index = {}
+    sources: dict[str, Source] = {"real": data.real, "bank": data.bank, "ramp": data.ramp}
+    validation_index: dict[str, torch.Tensor] = {}
     for name, (_, train, validation) in sources.items():
         if len(train) == 0 and name != "ramp":
             msg = f"{job.key}: no training rows in the {name} source"
@@ -396,7 +423,7 @@ def train_network(
         chosen = np.sort(rng.permutation(validation)[:VALIDATION_ROWS])
         validation_index[name] = torch.as_tensor(chosen.astype(np.int64), device=device)
 
-    def draw(name: str, count: int):
+    def draw(*, name: str, count: int) -> tuple[Rows, Batch]:
         rows, train, _ = sources[name]
         position = train[rng.integers(len(train), size=count)]
         return rows, rows.batch(index=torch.as_tensor(position.astype(np.int64), device=device))
@@ -404,6 +431,7 @@ def train_network(
     best, best_state, stale, curve = np.inf, None, 0, []
     for _epoch in range(epochs):
         for _ in range(steps):
+            parts: list[tuple[str, int]]
             if len(sources["ramp"][1]) > 0 and rng.random() < 0.5:
                 parts = [("ramp", BATCH_SIZE)]
             else:
@@ -412,10 +440,10 @@ def train_network(
             for name, count in parts:
                 if len(sources[name][1]) == 0:
                     continue
-                rows, batch = draw(name, count)
+                rows, batch = draw(name=name, count=count)
                 part, _ = m.training_loss(
                     arm=job.arm, network=network, table=rows.table, batch=batch, levels=levels
-                )  # ty: ignore[invalid-argument-type]
+                )
                 loss = loss + part / len(parts)
             optimiser.zero_grad()
             loss.backward()
@@ -443,7 +471,12 @@ def train_network(
 
 
 def predict_rows(
-    *, job: Job, network, rows: Rows, zero_neighbours: bool, shift_mask: np.ndarray | None = None
+    *,
+    job: Job,
+    network: torch.nn.Module,
+    rows: Rows,
+    zero_neighbours: bool,
+    shift_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the correction of every row of `rows` as float32 and the mean gate over `shift_mask` rows.
 
@@ -474,7 +507,7 @@ def predict_rows(
                 table=rows.table,
                 batch=batch,
                 zero_neighbours=zero_neighbours,
-            )  # ty: ignore[invalid-argument-type]
+            )
             out[start : start + len(index)] = result.correction.cpu().numpy()
             if result.gates is not None:
                 chosen = (
@@ -490,12 +523,20 @@ def predict_rows(
     return out, mean_gate
 
 
-def _entry_probabilities(*, network, table: dict) -> np.ndarray:
+def _entry_probabilities(*, network: torch.nn.Module, table: dict[str, torch.Tensor]) -> np.ndarray:
     """Return arm N-flag's switching probability of every entry of `table`."""
     import torch  # ty: ignore[unresolved-import]
 
     with torch.no_grad():
         return torch.sigmoid(network(flags=table["flag"])).cpu().numpy()
+
+
+def _synchronise(*, device: torch.device) -> None:
+    """Wait for the queued work on a CUDA device, so that a timer reads the finished work."""
+    import torch  # ty: ignore[unresolved-import]
+
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
 
 
 def run_job(  # noqa: PLR0915
@@ -507,8 +548,12 @@ def run_job(  # noqa: PLR0915
     started = time.time()
     device = torch.device(device_name)
     data = FitData(month=job.month, graph=job.graph, device=device)
+    _synchronise(device=device)
+    load_seconds = time.time() - started
+    train_started = time.time()
     network, curve = train_network(job=job, data=data, epochs=epochs, steps=steps, device=device)
-    fit_seconds = time.time() - started
+    _synchronise(device=device)
+    train_seconds = time.time() - train_started
     month = job.month
     graph_index = d.GRAPH_NAMES.index(job.graph)
     arrays = data.arrays
@@ -590,7 +635,9 @@ def run_job(  # noqa: PLR0915
     d.save_arrays(path=out_dir / f"{job.key}.npz", arrays=result)
     peak_cuda = torch.cuda.max_memory_allocated() / 1e9 if device.type == "cuda" else 0.0
     return {
-        "fit_seconds": fit_seconds,
+        "load_seconds": load_seconds,
+        "train_seconds": train_seconds,
+        "predict_seconds": total_seconds - load_seconds - train_seconds,
         "total_seconds": total_seconds,
         "epochs": float(len(curve)),
         "peak_host_gb": c.peak_memory_gb(),
@@ -629,6 +676,7 @@ def run_jobs(
     """Run the jobs whose files do not exist, `n_jobs` at a time, and print each job's time and memory."""
     todo = [job for job in jobs if not (out_dir / f"{job.key}.npz").exists()]
     print(f"JOBS {len(jobs)} requested, {len(todo)} to run, {n_jobs} at a time on {device_name}")
+    print(VALIDATION_NOTE)
     arguments = [(job, device_name, epochs, steps, out_dir, models_dir) for job in todo]
     failed = []
     context = multiprocessing.get_context("spawn")
@@ -647,9 +695,18 @@ def run_jobs(
 
 
 def smoke(*, device_name: str) -> None:
-    """Fit one fold, one seed, a few epochs, per arm on the real graph; print time, memory, and a projection."""
+    """Fit one fold, one seed, a few epochs, per arm on the real graph; print the timings and a projection.
+
+    The projection charges every one of the 240 jobs with its own load of `FitData` (measured
+    separately from the training), a full-length training (`MAX_EPOCHS` epochs of
+    `STEPS_PER_EPOCH` steps, at the per-step time of the smoke fit, validation passes included, so
+    it ignores early stopping and is an upper bound), and its prediction time.
+    """
     jobs = all_jobs(folds=(SMOKE_MONTH,), seeds=(0,), arms=ARMS, graphs=("real",))
     SMOKE_DIR.mkdir(parents=True, exist_ok=True)
+    print(VALIDATION_NOTE)
+    total_seconds = 0.0
+    jobs_per_arm = len(d.GRAPH_NAMES) * len(d.FOLD_MONTHS) * N_SEEDS
     for job in jobs:
         stats = run_job(
             job=job,
@@ -659,15 +716,23 @@ def smoke(*, device_name: str) -> None:
             out_dir=SMOKE_DIR / "jobs",
             models_dir=SMOKE_DIR / "models",
         )
-        per_step = stats["fit_seconds"] / (SMOKE_EPOCHS * SMOKE_STEPS)
-        full_fit = per_step * MAX_EPOCHS * STEPS_PER_EPOCH
+        per_step = stats["train_seconds"] / (SMOKE_EPOCHS * SMOKE_STEPS)
+        full_train = per_step * MAX_EPOCHS * STEPS_PER_EPOCH
+        per_job = stats["load_seconds"] + full_train + stats["predict_seconds"]
+        total_seconds += jobs_per_arm * per_job
         print(
-            f"SMOKE {job.key}: {stats['total_seconds']:.1f} s in total (loading and predicting included), "
-            f"{stats['fit_seconds']:.1f} s to fit {SMOKE_EPOCHS * SMOKE_STEPS} steps, host peak "
-            f"{stats['peak_host_gb']:.2f} GB, GPU peak {stats['peak_cuda_gb']:.2f} GB; a full fit of "
-            f"{MAX_EPOCHS * STEPS_PER_EPOCH} steps would take at most {full_fit / 60:.1f} min; 240 fits "
-            f"at that rate: {240 * full_fit / 3600:.1f} h of fitting divided by the number of jobs run at once"
+            f"SMOKE {job.key}: FitData load {stats['load_seconds']:.1f} s; train_network alone "
+            f"{stats['train_seconds']:.1f} s for {SMOKE_EPOCHS * SMOKE_STEPS} steps "
+            f"({1000 * per_step:.0f} ms a step); predicting {stats['predict_seconds']:.1f} s; host peak "
+            f"{stats['peak_host_gb']:.2f} GB, GPU peak {stats['peak_cuda_gb']:.2f} GB; one job of "
+            f"{MAX_EPOCHS * STEPS_PER_EPOCH} steps would take at most {per_job / 60:.1f} min "
+            f"({stats['load_seconds']:.0f} s of loading, {full_train / 60:.1f} min of training)"
         )
+    print(
+        f"SMOKE PROJECTION: {jobs_per_arm * len(ARMS)} jobs, each loading its own FitData, take at most "
+        f"{total_seconds / 3600:.1f} h run one at a time; divide by the number of jobs run at once "
+        "only to the extent that the device is not already saturated"
+    )
 
 
 # --------------------------------------------------------------------------- assembling

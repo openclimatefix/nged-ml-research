@@ -16,8 +16,15 @@ quantiles, which is twice the pinball loss averaged over the 11 levels, against 
   offset plus `1 - p` times the step part. The loss is the CRPS plus 0.05 times the binary
   cross-entropy of `p` against the generator's transfer flag, on the rows whose flag is known.
 
-Each network has two hidden layers of 32 units. The gate network starts with gates near 0.73, close
-to the 0.75 that stage 1 applies, and the flag network starts with `p` near 0.12.
+Each network has two hidden layers of 32 units. The gate network starts with the gate of the 14-day
+global offset at 0.75, the factor that stage 1 applies, and the other 15 gates near 0.02. The flag
+network starts with `p` near 0.12.
+
+Two caveats limit the reading of the contrasts. Arm N-flag has no lead input, so a contrast of
+N-gate with N-flag on real-row CRPS partly measures the fading with lead that only N-gate can
+learn. And the lead input of arm N-gate, with every forecast issued at 12:00 UTC, also encodes the
+hour of day of the target; that is allowed, and the fading with lead cannot be separated from a
+daily profile of the gates.
 """
 
 from typing import Final, NamedTuple
@@ -39,7 +46,12 @@ OFFSET_SCALE: Final[float] = 5.0
 """Offsets are divided by this many points before the gate network reads them."""
 LEAD_SCALE: Final[float] = 672.0
 BCE_WEIGHT: Final[float] = 0.05
-GATE_BIAS_START: Final[float] = 1.0
+GATE_BIAS_START: Final[float] = -4.0
+"""The starting bias of the 15 gates other than the 14-day global gate (a gate of about 0.02)."""
+GATE_14D_GLOBAL_INDEX: Final[int] = 12
+"""Position of the 14-day global offset among the 16 offsets (window 3 of 4, offset type 0 of 4)."""
+GATE_14D_GLOBAL_START: Final[float] = 0.75
+"""The starting gate of the 14-day global offset, the factor of stage 1's arm G-lb."""
 FLAG_BIAS_START: Final[float] = -2.0
 
 
@@ -89,6 +101,9 @@ class GateNet(nn.Module):
         with torch.no_grad():
             self.head.weight.mul_(0.1)
             self.head.bias.fill_(GATE_BIAS_START)
+            self.head.bias[GATE_14D_GLOBAL_INDEX] = float(
+                np.log(GATE_14D_GLOBAL_START / (1.0 - GATE_14D_GLOBAL_START))
+            )
 
     def forward(self, *, offsets: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         """Return the gates, (B, 16), from the offsets (B, 16) in points and the context (B, 4)."""
@@ -153,8 +168,9 @@ def apply_network(
         table: The entries' tensors: `gate` (E, 4, 6, 3), `nb_gate` (E, 4, 6), `box` (E, 6),
             `slow` (E, 6), and `flag` (E, 11), with the neighbour arrays of one graph.
         batch: The rows.
-        zero_neighbours: Set every neighbour input to zero (the neighbours' offsets and the
-            neighbour switching features, the no-neighbour flag included).
+        zero_neighbours: Remove the neighbours: the neighbours' offsets and the neighbour switching
+            features (the neighbour count included) are set to zero, and the no-neighbour flag is
+            set to 1, as for a series without neighbours.
 
     Returns:
         The correction, and the gates or the logit.
@@ -165,7 +181,7 @@ def apply_network(
         no_neighbour = table["flag"][batch.entry, NO_NEIGHBOUR_COLUMN]
         if zero_neighbours:
             neighbours = torch.zeros_like(neighbours)
-            no_neighbour = torch.zeros_like(no_neighbour)
+            no_neighbour = torch.ones_like(no_neighbour)
         offsets = torch.stack(
             [own[..., 0], own[..., 1] * batch.x[:, 0:1], own[..., 2] * batch.x[:, 1:2], neighbours],
             dim=2,
@@ -178,6 +194,7 @@ def apply_network(
     flags = table["flag"][batch.entry]
     if zero_neighbours:
         flags = torch.cat([flags[:, :N_FLAG_OWN], torch.zeros_like(flags[:, N_FLAG_OWN:])], dim=1)
+        flags[:, NO_NEIGHBOUR_COLUMN] = 1.0
     slow = table["slow"][batch.entry, batch.band]
     box = table["box"][batch.entry, batch.band]
     logit = network(flags=flags)

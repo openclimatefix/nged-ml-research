@@ -38,9 +38,10 @@ before the origin:
   at least half of it arrives within one day, else 1.
 - `covered` (E,): whether the 14-day window holds at least half the half-hours of residual that a
   complete window would hold; an uncovered entry has `box` of zero, as in stage 1.
-- `flag_y` (E,): the generator's transfer flag, 1 when an injected transfer switched on or off
-  inside the 28-day window, 0 when none did or the world is an own-only ramp, and -1 in the real
-  world, where it is unknown.
+- `flag_y` (E,): the generator's event flag, 1 when the series' own injected event switched on or
+  off inside the 28-day window, 0 when none did or the world is an own-only ramp, and -1 in the
+  real world, where it is unknown. The flag is 1 for every kind of event, own-only events included,
+  so arm N-flag's probability is trained to detect any injected step and not a transfer alone.
 
 Look-ahead rules, unchanged from stage 1. The residuals of a window end 6 hours before the origin,
 the weather of the regressors in a window is the 00:00 UTC run of the origin day of each forecast
@@ -52,10 +53,13 @@ Approximations (each is printed by the builder where it can be measured):
 - The smallest-lead residual of a world is the residual of the lead-band-0 forecasts (leads up to
   24 hours), where stage 1's `smallest` takes the forecast of the newest origin only.
 - A bank world holds the re-run Candidate forecasts of the Primary that carries the event, on even
-  half-hours from 7 days before the onset to 14 days after the end. Before that window the real
-  world's residuals fill the series (even half-hours only). Every residual of a bank world is on
+  half-hours from 7 days before the onset to 14 days after the end. Before that window the series
+  is filled with the residuals of the Candidate forecasts in the bank's own `real_<month>.npz`
+  files (clean power minus the Candidate median, joined on Primary, origin, and valid time; even
+  half-hours only), so that one forecaster supplies the whole series. The stored-NRA residuals of
+  stage 1 are never mixed into a bank series. Every residual of a bank world is on
   even half-hours only, and its coverage thresholds are halved.
-- The neighbours' residuals in a bank world are the real residuals plus the shifts that the generator
+- The neighbours' residuals in a bank world are the stored-NRA residuals of stage 1 plus the shifts that the generator
   of experiment 650 added to those Primaries in that pass (their own event and the mirrored step of
   a transfer), with the forecast held fixed (no re-run). The bank stores no re-run forecast for a
   Primary outside its own event window.
@@ -77,6 +81,7 @@ import numpy as np
 import polars as pl
 from scipy.signal import lfilter
 from studies.eval_protocol.metrics import MEDIAN_INDEX
+from studies.experiment_store import read_predictions
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 S2_DIR: Final[Path] = c.OUT_DIR / "s2"
@@ -136,6 +141,8 @@ GRAPH_SEED: Final[int] = 706_002
 GRAPH_KEYS: Final[frozenset[str]] = frozenset({"nb_gate", "flag_nb"})
 """Table arrays whose first axis is the graph, not the entry."""
 FLAG_TRANSFER_DAYS: Final[int] = 28
+RULE_CHECK_TOLERANCE_POINTS: Final[float] = 1e-3
+"""The largest difference between arm N-rule at weight 1 and stage 1's stored `g` correction."""
 
 type Table = dict[str, np.ndarray]
 
@@ -232,8 +239,8 @@ def rewire(*, adjacency: np.ndarray, seed: int) -> np.ndarray:
     already and neither is a self-loop. The swaps are fixed by `seed`.
 
     Raises:
-        ValueError: If the rewired graph has another degree sequence than the input, or is equal to
-            the input.
+        ValueError: If the rewired graph has another degree sequence than the input, is equal to
+            the input, or shares more than half of its edges with the input.
     """
     size = adjacency.shape[0]
     edges = [(i, j) for i in range(size) for j in range(i + 1, size) if adjacency[i, j]]
@@ -262,6 +269,10 @@ def rewire(*, adjacency: np.ndarray, seed: int) -> np.ndarray:
         raise ValueError(msg)
     if np.array_equal(out, adjacency):
         msg = "the rewired graph equals the real graph"
+        raise ValueError(msg)
+    shared = int((out & adjacency).sum()) // 2
+    if shared > len(edges) / 2:
+        msg = f"the rewired graph shares {shared} of its {len(edges)} edges with the real graph"
         raise ValueError(msg)
     return out
 
@@ -882,6 +893,84 @@ def _ramp_block(
 # --------------------------------------------------------------------------- the bank
 
 
+class RealBank(NamedTuple):
+    """The Candidate's forecasts of the real world, from the bank's own `real_<month>.npz` files."""
+
+    key: np.ndarray
+    """Sorted join keys of (Primary, origin index, valid-time index), shape (n,)."""
+    median: np.ndarray
+    """The Candidate's median in fractions of capacity, aligned with `key`, shape (n,)."""
+    residual: np.ndarray
+    """Clean power minus the Candidate median in points, per Primary and lead band, (K, 6, N_STAMPS); NaN where absent."""
+
+
+_KEY_LIMIT: Final[int] = 2**20
+
+
+def _row_key(*, prim: np.ndarray, oi: np.ndarray, vi: np.ndarray) -> np.ndarray:
+    """Return the join key of (Primary, origin index, valid-time index) rows."""
+    return (prim.astype(np.int64) << 40) | (oi.astype(np.int64) << 20) | vi.astype(np.int64)
+
+
+def load_real_bank(*, month: str, n_series: int) -> RealBank:
+    """Return the Candidate's real-world rows of the bank months up to `month`, before the holdout.
+
+    Raises:
+        ValueError: If an index exceeds the key width or a join key occurs twice.
+    """
+    keys: list[np.ndarray] = []
+    medians: list[np.ndarray] = []
+    total = np.zeros(n_series * c.N_BANDS * c.N_STAMPS)
+    count = np.zeros_like(total)
+    for real_month in (m for m in BANK_MONTHS if m <= month):
+        with np.load(HEAD_DATA / f"real_{real_month}.npz") as real:
+            keep = real["vi"] < c.LIB_HOLDOUT_INDEX
+            prim = real["prim"][keep].astype(np.int64)
+            oi = real["oi"][keep].astype(np.int64)
+            vi = real["vi"][keep].astype(np.int64)
+            median = real["q"][keep][:, MEDIAN_INDEX].astype(np.float64)
+            y = real["y"][keep].astype(np.float64)
+        if (oi >= _KEY_LIMIT).any() or (vi >= _KEY_LIMIT).any():
+            msg = f"real_{real_month}: an index does not fit the join key"
+            raise ValueError(msg)
+        keys.append(_row_key(prim=prim, oi=oi, vi=vi))
+        medians.append(median)
+        row_h = vi - oi - BANK_ORIGIN_LAG_HALF_HOURS
+        stamp = vi - c.LIB_OFFSET
+        ok = (
+            (row_h >= 0)
+            & (row_h < c.N_H)
+            & (stamp >= 0)
+            & (stamp < c.N_STAMPS)
+            & np.isfinite(y)
+            & np.isfinite(median)
+        )
+        flat = (prim[ok] * c.N_BANDS + c.BAND_OF_H[row_h[ok]]) * c.N_STAMPS + stamp[ok]
+        total += np.bincount(flat, weights=(y[ok] - median[ok]) * 100.0, minlength=len(total))
+        count += np.bincount(flat, minlength=len(total))
+    key = np.concatenate(keys)
+    order = np.argsort(key)
+    key = key[order]
+    if (key[1:] == key[:-1]).any():
+        msg = f"{month}: a (Primary, origin, valid time) key occurs twice in the real bank rows"
+        raise ValueError(msg)
+    residual = np.where(count > 0, total / np.maximum(count, 1), np.nan)
+    return RealBank(
+        key=key,
+        median=np.concatenate(medians)[order],
+        residual=residual.reshape(n_series, c.N_BANDS, c.N_STAMPS),
+    )
+
+
+def real_median_of(
+    *, real: RealBank, prim: np.ndarray, oi: np.ndarray, vi: np.ndarray
+) -> np.ndarray:
+    """Return the Candidate's real-world median (fraction of capacity) of each (Primary, origin, valid time); NaN if absent."""
+    key = _row_key(prim=prim, oi=oi, vi=vi)
+    position = np.minimum(np.searchsorted(real.key, key), len(real.key) - 1)
+    return np.where(real.key[position] == key, real.median[position], np.nan)
+
+
 def generator_world(
     *, world: RealWorld, month: str, events: pl.DataFrame, lists: list[list[int]]
 ) -> dict[int, tuple[np.ndarray, np.ndarray]]:
@@ -1008,14 +1097,16 @@ def build_bank_month(  # noqa: PLR0915
     """Return the rows and the entry table of one bank month.
 
     A row is one (series, origin, row, pass) of the bank: its entry, its series, origin, and row of
-    stage 1, its base forecast and clean power and its shift, all in points of capacity. See the
-    module docstring for how a bank world's residuals are built.
+    stage 1, its base forecast and clean power and its shift, all in points of capacity, and
+    `q_real`, the Candidate's real-world median of the same row (NaN where the real file lacks it).
+    See the module docstring for how a bank world's residuals are built.
 
     Raises:
         ValueError: If the bank has an origin that is not 09:00 UTC or a row outside 3 hours to 14
             days after it.
     """
     events = pl.read_parquet(HEAD_DATA / f"events_{month}.parquet")
+    real_bank = load_real_bank(month=month, n_series=len(world.inputs.ids))
     with np.load(HEAD_DATA / f"bank_{month}.npz") as bank:
         keep = bank["vi"] < c.LIB_HOLDOUT_INDEX
         prim = bank["prim"][keep].astype(np.int64)
@@ -1038,6 +1129,9 @@ def build_bank_month(  # noqa: PLR0915
     in_grid = (stamp >= 0) & (stamp < c.N_STAMPS)
     usable = in_grid & (origin >= 0) & (origin < c.N_ORIGINS)
     residual_points = (y + shift - q[:, MEDIAN_INDEX]) * 100.0
+    real_median = real_median_of(real=real_bank, prim=prim, oi=oi, vi=vi)
+    gap_sum = np.zeros(2)
+    gap_count = np.zeros(2)
     band_of_row = c.BAND_OF_H[np.clip(row_h, 0, c.N_H - 1)]
     drawn = generator_world(world=world, month=month, events=events, lists=lists)
     even = (np.arange(c.N_STAMPS) % 2) == 0
@@ -1082,7 +1176,16 @@ def build_bank_month(  # noqa: PLR0915
                 c.N_BANDS, c.N_STAMPS
             )
             splice = (np.arange(c.N_STAMPS) < low) & even
-            own = np.where(splice[None, :] & ~np.isfinite(own), world.banded[series], own)
+            own = np.where(splice[None, :] & ~np.isfinite(own), real_bank.residual[series], own)
+            before = mine & usable & (stamp < onset)
+            bank_median = q[before, MEDIAN_INDEX].astype(np.float64) * 100.0
+            nra_median = world.inputs.q_nra[
+                prim[before], origin[before], row_h[before], MEDIAN_INDEX
+            ].astype(np.float64)
+            gap_real = np.abs(bank_median - real_median[before] * 100.0)
+            gap_nra = bank_median - nra_median
+            gap_sum += (float(np.nansum(gap_real)), float(np.nansum(gap_nra)))
+            gap_count += (int(np.isfinite(gap_real).sum()), int(np.isfinite(gap_nra).sum()))
             chosen = mine & usable
             origins = np.unique(origin[chosen])
             if len(origins) == 0:
@@ -1110,6 +1213,7 @@ def build_bank_month(  # noqa: PLR0915
                     "o": origin[index].astype(np.int16),
                     "h": row_h[index].astype(np.int16),
                     "q": (q[index] * 100.0).astype(np.float32),
+                    "q_real": (real_median[index] * 100.0).astype(np.float32),
                     "y": (y[index] * 100.0).astype(np.float32),
                     "shift": (shift[index] * 100.0).astype(np.float32),
                     "stamp": stamp[index].astype(np.int32),
@@ -1118,6 +1222,12 @@ def build_bank_month(  # noqa: PLR0915
             )
             n_entries += len(origins)
         print(f"  {month} pass {pass_id}: {n_entries:,} entries so far", flush=True)
+    print(
+        f"  CHECK {month}: on bank rows before the onset, mean |bank q - real q| (should be about 0) "
+        f"{gap_sum[0] / max(gap_count[0], 1):.5f} points over {int(gap_count[0]):,} rows; "
+        f"mean (Candidate median - NRA median) {gap_sum[1] / max(gap_count[1], 1):.4f} points "
+        f"over {int(gap_count[1]):,} rows"
+    )
     return concat_tables(tables=rows), concat_tables(tables=tables)
 
 
@@ -1133,6 +1243,43 @@ def real_dense_arrays(*, inputs: c.Inputs) -> dict[str, np.ndarray]:
         "capacity": inputs.capacity.astype(np.float64),
         "is_mva": inputs.is_mva,
     }
+
+
+def check_rule_matches_stage_one(*, inputs: c.Inputs, table: Table) -> None:
+    """Raise unless `box` equals the correction of stage 1's stored arm G-lb wherever N-rule's weight is 1.
+
+    The stored `g` predictions are read through `read_predictions` and compared on the median, on
+    the rows where the stored forecast exists, the correction is finite, and an apparent-power
+    series was not clipped at zero.
+
+    Raises:
+        ValueError: If no row can be compared, or the largest difference exceeds
+            `RULE_CHECK_TOLERANCE_POINTS`.
+    """
+    frame = read_predictions(experiment_id=c.EXPERIMENT_ID, name="g", row_set_id=c.ROW_SET_ID)
+    stored = c.dense_from_frame(frame=frame, ids=inputs.ids, capacity=inputs.capacity)[
+        ..., MEDIAN_INDEX
+    ]
+    correction = stored - inputs.q_nra[..., MEDIAN_INDEX]
+    n_series = len(inputs.ids)
+    box = table["box"].reshape(n_series, c.N_ORIGINS, c.N_BANDS)[:, :, c.BAND_OF_H]
+    weight = table["w_rule"].reshape(n_series, c.N_ORIGINS)
+    comparable = (
+        (weight == 1.0)[..., None]
+        & np.isfinite(correction)
+        & (~inputs.is_mva[:, None, None] | (stored > 0.0))
+    )
+    if not comparable.any():
+        msg = "no row can be used to compare N-rule with stage 1's stored g correction"
+        raise ValueError(msg)
+    worst = float(np.abs(correction[comparable] - box[comparable]).max())
+    print(
+        f"CHECK N-rule at weight 1 vs the stored g correction: largest difference {worst:.6f} points "
+        f"over {int(comparable.sum()):,} rows"
+    )
+    if worst > RULE_CHECK_TOLERANCE_POINTS:
+        msg = f"N-rule at weight 1 differs from stage 1's stored g by up to {worst:.5f} points"
+        raise ValueError(msg)
 
 
 def prepare_all(*, inputs: c.Inputs, only: str | None = None) -> None:
@@ -1176,6 +1323,8 @@ def prepare_all(*, inputs: c.Inputs, only: str | None = None) -> None:
             f"{float(table['accepted'].mean()):.3f}, N-rule weight 0 in "
             f"{float((table['w_rule'] == 0).mean()):.3f}, covered {float(table['covered'].mean()):.3f}"
         )
+    if wanted("real"):
+        check_rule_matches_stage_one(inputs=inputs, table=load_arrays(path=real_path))
     if wanted("ramp"):
         for month in FOLD_MONTHS:
             train_path = CACHE_DIR / f"ramp_train_{month}_entries.npz"
