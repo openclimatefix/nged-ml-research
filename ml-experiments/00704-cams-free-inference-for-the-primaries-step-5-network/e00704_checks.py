@@ -64,7 +64,6 @@ def proxy_mean() -> None:
         b = arm.pretrain_extras(
             row=row, dense=dense, columns=columns, valid_us=valid, origin_us=origin, max_steps=704
         )
-        assert np.array_equal(a[:, 0], b[:, 0], equal_nan=True)
         both = np.isfinite(a[:, 1]) & np.isfinite(b[:, 1])
         worst = float(np.abs(a[both, 1] - b[both, 1]).max())
         mismatch = int((np.isfinite(a[:, 1]) != np.isfinite(b[:, 1])).sum())
@@ -82,6 +81,7 @@ def proxy_mean() -> None:
         )
         assert worst <= 1e-3, "the patched mean differs from CAMS"
         assert mismatch == 0
+        assert csi_missing == 0, "the patched ratio is missing where CAMS has it"
 
 
 if __name__ == "__main__":

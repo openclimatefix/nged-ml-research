@@ -16,10 +16,19 @@ export E00704_ARM=$ARM E00667_ROOT=$R E00667_MONTH=$M CHAIN667=$R/chains/$M/work
 STEPS=${*:-pretrain step2 table fit ptable pfit}
 A="--months $M --seeds 0 1"
 PY=$D/../../.venv/bin/python
+set -e
 mkdir -p $R/logs $CHAIN667
 run() { "$D667"/gpu.sh ../$(basename "$D")/e00704_run.py "$@"; }
 touch $R/logs/.start_${M}_$$
-set -e
+checks() {  # the checks of e00704_checks.py; any failure ends the chain
+  (cd "$D/../.." && source ml-experiments/00524*/env.sh && "$PY" "$D/e00704_checks.py" "$@")
+}
+stats_check() { checks stats $ARM $CHAIN667/stats/B1/$M.npz $(echo $DATA_PATH_INTERNAL/ml-experiments/00667-*/chains/$M/work/stats/B1/$M.npz); }
+if [ "$ARM" = proxy ]; then checks proxy-mean; fi  # before the first step
+case " $STEPS " in
+  " pretrain "*) ;;
+  *) stats_check ;;  # the chain starts after pretrain: the stored standardiser must already be right
+esac
 for s in $STEPS; do
   case $s in
     pretrain|step2) E00667_PHASE=train run "00667-*/e00667_k1.py" k1 $s $A > $R/logs/${M}_$s.log 2>&1 ;;
@@ -29,10 +38,7 @@ for s in $STEPS; do
       E00667_PHASE=predict run "00667-*/e00667_cand.py" P7+D50 fit --work-suffix _$M $A > $R/logs/${M}_c$s.log 2>&1 ;;
     *) echo "bad step $s"; exit 1 ;;
   esac
-  if [ "$s" = pretrain ]; then  # after pre-training: the stored standardiser, and for proxy the pre-training columns
-    (cd "$D/../.." && source ml-experiments/00524*/env.sh && "$PY" "$D/e00704_checks.py" stats $ARM $CHAIN667/stats/B1/$M.npz $(echo $DATA_PATH_INTERNAL/ml-experiments/00667-*/chains/$M/work/stats/B1/$M.npz))
-    if [ "$ARM" = proxy ]; then (cd "$D/../.." && source ml-experiments/00524*/env.sh && "$PY" "$D/e00704_checks.py" proxy-mean); fi
-  fi
+  if [ "$s" = pretrain ]; then stats_check; fi
   echo "$ARM $M $s done $(date -u +%T)"
 done
 # nothing may be written under the original experiments' data folders (other sessions may also write there: a warning, not a failure)

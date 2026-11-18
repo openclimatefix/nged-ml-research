@@ -20,17 +20,18 @@ that function in each fold module and re-points `f437.TRAILING_DIR` at the arm's
 
 import importlib
 import os
+from pathlib import Path
 from typing import Final
 
 import e00437_features as f437  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from e00704_common import previous_day_columns  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 ARM: Final = os.environ.get("E00704_ARM", "")
 assert ARM in {"replay", "proxy", "drop"}, f"set E00704_ARM to replay, proxy, or drop, not {ARM!r}"
 CAMS_COLUMNS: Final = ("cams_prev_day_mean", "cams_prev_day_csi")
-DAY_US: Final = 86_400 * 1_000_000
 TABLES: Final = (
     ML_EXPERIMENTS_DATA_DIR
     / "00704-cams-free-inference-for-the-primaries-step-5-network"
@@ -50,20 +51,9 @@ def proxy_columns(*, row: dict, dense: dict[str, np.ndarray], origin_us: np.ndar
             latitude=float(row["latitude"]), longitude=float(row["longitude"])
         )
     clear = _clear_cache[site]
-    shortwave = dense["valid_shortwave"]
-    finite = np.isfinite(shortwave)
-    count = np.concatenate([[0], np.cumsum(finite)])
-    total = np.concatenate([[0.0], np.cumsum(np.where(finite, shortwave, 0.0))])
-    clear_total = np.concatenate([[0.0], np.cumsum(clear)])
-    day = origin_us // DAY_US - 1
-    first = f437.grid_of(us=day * DAY_US) + 1  # stamp 00:30 of that day
-    stop = first + f437.STEPS_PER_DAY
-    inside = (first >= 0) & (stop <= len(shortwave))
-    lo, hi = np.where(inside, first, 0), np.where(inside, stop, 0)
-    complete = inside & ((count[hi] - count[lo]) == f437.STEPS_PER_DAY)
-    s_sum, c_sum = total[hi] - total[lo], clear_total[hi] - clear_total[lo]
-    mean = np.where(complete, s_sum / f437.STEPS_PER_DAY, np.nan)
-    csi = np.where(complete & (c_sum > 0), s_sum / np.where(c_sum > 0, c_sum, 1.0), np.nan)
+    mean, csi = previous_day_columns(
+        shortwave=dense["valid_shortwave"], clear=clear, origin_us=origin_us
+    )
     return np.stack([mean, csi], axis=1)
 
 
@@ -129,10 +119,7 @@ def point_at_arm_tables() -> None:
 
 
 def wrap_fold(*, module_name: str) -> None:
-    try:
-        fold = importlib.import_module(module_name)
-    except ImportError:
-        return
+    fold = importlib.import_module(module_name)
     original = fold.redirect_to_extended_inputs  # ty: ignore[unresolved-attribute]
 
     def redirect_to_extended_inputs(e) -> None:
@@ -142,8 +129,18 @@ def wrap_fold(*, module_name: str) -> None:
     fold.redirect_to_extended_inputs = redirect_to_extended_inputs  # ty: ignore[unresolved-attribute]
 
 
+_orig_table_path = f437.table_path
+
+
+def table_path(*, site: str) -> Path:
+    """Return a Primary's table path, refusing any folder but the arm's."""
+    assert f437.TRAILING_DIR == TABLES, f"table read from {f437.TRAILING_DIR}, not {TABLES}"
+    return _orig_table_path(site=site)
+
+
 if ARM != "replay":
     f437.pretrain_extras = pretrain_extras
+    f437.table_path = table_path
     for _name in FOLD_MODULES:
         wrap_fold(module_name=_name)
 else:

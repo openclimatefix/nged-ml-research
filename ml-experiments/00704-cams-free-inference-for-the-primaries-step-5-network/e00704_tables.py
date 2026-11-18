@@ -27,6 +27,7 @@ import e00437_features as f437  # ty: ignore[unresolved-import]
 import e00667_tables as t667  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from e00704_common import previous_day_columns  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME: Final = "00704-cams-free-inference-for-the-primaries-step-5-network"
@@ -34,7 +35,6 @@ ROOT: Final = ML_EXPERIMENTS_DATA_DIR / NAME
 SOURCE: Final = t667.OUT
 """Experiment 667's tables (read only)."""
 CAMS_COLUMNS: Final = ("cams_prev_day_mean", "cams_prev_day_csi")
-DAY_US: Final = 86_400 * 1_000_000
 
 
 def arm_dir(*, arm: str):
@@ -67,21 +67,8 @@ def proxy_by_origin(*, row: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     clear = f437.clear_sky_on_grid(
         latitude=float(row["latitude"]), longitude=float(row["longitude"])
     )
-    finite = np.isfinite(history)
-    count = np.concatenate([[0], np.cumsum(finite)])
-    total = np.concatenate([[0.0], np.cumsum(np.where(finite, history, 0.0))])
-    clear_total = np.concatenate([[0.0], np.cumsum(clear)])
     origins = np.unique(origin_us)
-    first = (
-        f437.grid_of(us=(origins // DAY_US - 1) * DAY_US) + 1
-    )  # stamp 00:30 of the previous UTC day
-    stop = first + f437.STEPS_PER_DAY
-    inside = (first >= 0) & (stop <= len(history))
-    lo, hi = np.where(inside, first, 0), np.where(inside, stop, 0)
-    complete = inside & ((count[hi] - count[lo]) == f437.STEPS_PER_DAY)
-    s_sum, c_sum = total[hi] - total[lo], clear_total[hi] - clear_total[lo]
-    mean = np.where(complete, s_sum / f437.STEPS_PER_DAY, np.nan)
-    csi = np.where(complete & (c_sum > 0), s_sum / np.where(c_sum > 0, c_sum, 1.0), np.nan)
+    mean, csi = previous_day_columns(shortwave=history, clear=clear, origin_us=origins)
     return origins, mean, csi
 
 
@@ -90,10 +77,9 @@ def arm_table(*, arm: str, row: dict, source: pl.DataFrame) -> pl.DataFrame:
     if arm == "drop":
         return source.with_columns(*(pl.lit(0.0, dtype=pl.Float32).alias(c) for c in CAMS_COLUMNS))
     origins, mean, csi = proxy_by_origin(row=row)
-    at = np.searchsorted(origins, source["origin_us"].to_numpy())
-    assert (origins[at] == source["origin_us"].to_numpy()).all(), (
-        "a table origin has no summary run"
-    )
+    wanted = source["origin_us"].to_numpy()
+    at = np.clip(np.searchsorted(origins, wanted), 0, len(origins) - 1)
+    assert (origins[at] == wanted).all(), "a table origin has no summary run"
     return source.with_columns(
         pl.Series(CAMS_COLUMNS[0], mean[at].astype(np.float32)),
         pl.Series(CAMS_COLUMNS[1], csi[at].astype(np.float32)),
