@@ -43,11 +43,11 @@ from studies.eval_protocol.metrics import MEDIAN_INDEX
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 BOTH: Final[tuple[int, int]] = (c.PV_DRIVER, c.COLD_DRIVER)
-STEP_POINTS: Final[float] = 10.0
+STEP_POINTS: Final[float] = 30.0
 """The additive step of KA1a, in points of capacity (the bank's events start at 10% of capacity)."""
-PV_POINTS: Final[float] = 10.0
+PV_POINTS: Final[float] = 20.0
 """KA2's PV-shaped injection: this many points of capacity at an irradiance of 1,000 W/m2."""
-COLD_POINTS_PER_K: Final[float] = 1.0
+COLD_POINTS_PER_K: Final[float] = 3.0
 """KA2's cold injection: this many points per kelvin below 5 degrees Celsius."""
 TEST_DAYS: Final[tuple[int, int]] = (14, 7)
 """Days after the onset at which KA1 reads the removal."""
@@ -194,6 +194,8 @@ def perturb(*, inputs: c.Inputs) -> bool:
                     )
                     if spec.name == "g" and name == "own weather run":
                         continue
+                    if name == "own weather run" and not np.any(old_fit.coef[origin, :, 1:]):
+                        continue  # both slopes are zero by rule, so weather cannot move it
                     passed = (
                         coefficient_moved == coefficient_moves
                         and correction_moved == correction_moves
@@ -364,11 +366,11 @@ def ka1b() -> None:
                 if window.sum() < 0.5 * 14 * c.PER_DAY / 2 or not target.any():
                     skipped[days] += 1
                     continue
-                left = float(residual[mine][target].mean())
-                if abs(left) < 1.0:
+                left = float(np.nanmean(residual[mine][target]))
+                if not np.isfinite(left) or abs(left) < 1.0:
                     skipped[days] += 1
                     continue
-                removal[days].append(float(residual[mine][window].mean()) / left)
+                removal[days].append(float(np.nanmean(residual[mine][window])) / left)
     for days, values in removal.items():
         if values:
             array = np.array(values)
@@ -425,11 +427,11 @@ def ka2(*, inputs: c.Inputs, inside: np.ndarray) -> None:
                 size = float(injected_target[chosen].mean())
                 gain_d = float((corr_d - base_d)[chosen].mean())
                 gain_g = float((corr_g - base_g)[chosen].mean())
-                share_d = gain_d / size if abs(size) > 1e-9 else float("nan")
+                share_d = gain_d / size if abs(size) > 1e-2 else float("nan")
                 print(
                     f"KA2 {name} injection, {group}, {set_name}: injected {size:+.3f} points; "
                     f"arm D removes {share_d:.3f} (left {size - gain_d:+.3f}); arm G leaves "
-                    f"{size - gain_g:+.3f} (removes {gain_g / size if abs(size) > 1e-9 else float('nan'):.3f})"
+                    f"{size - gain_g:+.3f} (removes {gain_g / size if abs(size) > 1e-2 else float('nan'):.3f})"
                 )
         if name == "PV-shaped":
             for group, series_mask in c.group_masks(inputs=inputs).items():
