@@ -106,30 +106,42 @@ is in `bundle_readme.md`, which the exporter copies into each bundle as `README.
   origin and at the 12:00 contract origin in megawatts.
 - `reference_check.py`: the standalone forward pass and check.
 
-**The format is laid out so that a later bundle could carry the K1 neural network and the Candidate
-without a format change.** Each network
-gets its own `components/<name>/`, its own `fixtures/<name>/`, and its own sections in
-`manifest.json` and `config.json`. The Candidate's table T, neighbour list, and K1 step-2 weights
-become further files in its component folder.
+**Two bundles exist: the production bundle and a test bundle.** The production bundle is arm B of
+[experiment 704](../00704-cams-free-inference-for-the-primaries-step-5-network/result.md) (the two
+previous-day CAMS columns set to zero in every stage, the arm that experiment 704 chose), refitted
+at 2026-10-01 00:00 UTC with training targets up to 2026-09-30 20:30 UTC (`bundles/drop/2026-10/`,
+92 MB). The 2026-10 refit is the latest that the research inputs support, because the cached inputs
+of experiment 607 (ENS summaries for runs up to 2026-10-31) end in October 2026. The test bundle is
+experiment 677's own step-5 chain at refit 2026-04 (`bundles/replay/2026-04/`, 102 MB), whose
+fixtures can be compared with experiment 677's stored backtest.
 
-**The fixture origins include a missing week lag, a bank holiday, and a Saturday.** The 2026-04 test
-bundle has five origins: 2026-04-01 (week lag missing at some Primaries), 2026-04-03 (Good Friday),
-2026-04-04 (a Saturday), 2026-04-17, and 2026-04-30 (week lag missing at 140 Primary-and-half-hour
-rows). No fixture origin has a missing day lag, so the bundle also stores the quantiles of
-2026-04-30 with both lags set to the missing encoding, which the check reproduces.
+**The format is laid out so that a later bundle could carry the K1 neural network and the Candidate
+without a format change.** Each network gets its own `components/<name>/`, its own
+`fixtures/<name>/`, and its own sections in `manifest.json` and `config.json`. The Candidate's table
+T, neighbour list, and K1 step-2 weights become further files in its component folder.
+
+**The fixture origins include a missing week lag, a bank holiday, Saturdays, and a clock change.**
+The production bundle has five origins: 2026-10-01 (a Thursday), 2026-10-03 and 2026-10-24
+(Saturdays), 2026-10-25 (the Sunday on which UK clocks go back), and 2026-10-31 (a Saturday). No lag
+is missing at any of the five, so the bundle's lags-removed quantiles are the only missing-lag case
+there. The test bundle has five origins: 2026-04-01 (week lag missing at some Primaries), 2026-04-03
+(Good Friday), 2026-04-04 (a Saturday), 2026-04-17, and 2026-04-30 (week lag missing at 140
+Primary-and-half-hour rows). No fixture origin has a missing day lag, so the bundle also stores the
+quantiles of 2026-04-30 with both lags set to the missing encoding, which the check reproduces.
 
 ## Checks
 
-| Stage | Largest absolute error | Tolerance |
-|---|---|---|
-| Input matrix (60 standardised columns) | 0.0 | 1e-5 |
-| Raw neural-network outputs | 3.3e-6 | 1e-5 |
-| Quantiles per seed (fraction of capacity) | 1.1e-5 | 2e-5 |
-| Seed-mean quantiles | 3.7e-6 | 2e-5 |
-| Contract-origin megawatts divided by capacity | 3.7e-6 | 2e-5 |
-| Quantiles with both lags missing | 2.6e-6 | 2e-5 |
+| Stage | Production bundle (arm B, 2026-10) | Test bundle (677, 2026-04) | Tolerance |
+|---|---|---|---|
+| Input matrix (60 standardised columns) | 0.0 | 0.0 | 1e-5 |
+| Raw neural-network outputs | 2.6e-6 | 3.3e-6 | 1e-5 |
+| Quantiles per seed (fraction of capacity) | 2.3e-6 | 1.1e-5 | 2e-5 |
+| Seed-mean quantiles | 7.2e-7 | 3.7e-6 | 2e-5 |
+| Contract-origin megawatts divided by capacity | 8.3e-7 | 3.7e-6 | 2e-5 |
+| Quantiles with both lags missing | 1.4e-6 | 2.6e-6 | 2e-5 |
 
-**The reference check passes at all five origins and three seeds, in 7 seconds on a CPU.** The
+**The reference check passes for both bundles at all five origins and three seeds, in 7 seconds on
+a CPU.** The
 check runs as `python -I reference_check.py <bundle>`, which keeps the research folders off the
 import path, and it imports only the standard library, torch, numpy, and polars. The differences
 are consistent with float32 rounding in the stored forecasts' GPU pass against the check's CPU
@@ -188,12 +200,14 @@ here, no production constant records the NGED delay, and the run time of the cha
   `e00705_check.py` reloads the bundle and runs `reference_check.py` in a clean interpreter.
 - `ARM` is `replay` (experiment 677's own chain) or one of experiment 704's arms, `proxy` or `drop`.
 - `e00705_findings.py` computes the evidence for findings 1 and 2.
-- The test bundle is `replay`, refit 2026-04, exported at commit `8e797d8` with a clean tree.
+- Both bundles were exported at commit `246984d` with a clean tree. The production bundle's
+  capture pass reproduces arm B's stored forecasts of the 2026-10 refit exactly (largest difference
+  0.0 at every seed).
 
 ## Files
 
 - Code: `ml-experiments/00705-production-export-bundle-for-the-primaries-step-5-network/`. The
-  scripts import experiments 48, 87, 397, 428, 437, 510, 558, 560, 562, 572, 578, 677, and 704, and
-  load experiment 574's fit module through experiment 677's stored chain. - Bundles:
-  `data/ml-experiments/00705-production-export-bundle-for-the-primaries-step-5-network/bundles/<arm>/<month>/`.
+scripts import experiments 48, 87, 397, 428, 437, 510, 558, 560, 562, 572, 578, 677, and 704, and
+load experiment 574's fit module through experiment 677's stored chain. - Bundles:
+`data/ml-experiments/00705-production-export-bundle-for-the-primaries-step-5-network/bundles/<arm>/<month>/`.
 - Findings: `findings.txt` and `findings_evidence.json` in the same data folder.
