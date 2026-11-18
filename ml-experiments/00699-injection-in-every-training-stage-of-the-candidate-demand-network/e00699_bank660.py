@@ -4,7 +4,8 @@
 Runs experiment 677's `e00677_cand.py bank` unchanged, after replacing `e00581_bank.synthetic_clean`
 for the bank's seeds (9,000,000 or more) by a function that returns the cleaned power plus the
 change that experiment 660's generator makes to the real power panel. A training seed (below
-9,000,000) still gets experiment 581's generator, which the bank command never calls with one.
+9,000,000) still gets experiment 581's generator. The bank command never calls with a training
+seed.
 
 The generator injects into the 15 Primaries of experiment 660's panel (D15 is missing, so D15 gets
 no shift). The panel ends on 2026-06-30, and the wrapper sets every reading from 2026-07-01 on to
