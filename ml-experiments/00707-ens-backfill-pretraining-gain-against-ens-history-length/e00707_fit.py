@@ -29,6 +29,10 @@ network's initial weights and the order of each epoch; the placebo's draw is fix
 Primary, and the fold. Like experiment 425, the code does not force deterministic GPU kernels, so a
 refit matches a stored fit only to the seed-to-seed noise (`e00707_gate`).
 
+**The arms with an `S_ens` stage need the gates.** `A_E24`, `R_E24`, `A_F`, `R_F`, `A_C`, `R_C`, and
+`R_F+flags` are refused unless `e00707_gate.py` has written a passing marker for both gates
+(`arms.GATE_MARKER`) or `--no-gate-marker` is passed.
+
 **Jobs that share a fold run in one worker.** A group is the jobs of one fold and one fine-tune
 window, which share the fold's rows and standardiser. `--workers` groups run at once, each with
 `--threads` threads, and share one GPU.
@@ -548,6 +552,31 @@ def _run_group_kw(args: tuple[Group, Path, str, bool]) -> str:
     return run_group(group=group, out_dir=out_dir, device=device, allow_partial=allow_partial)
 
 
+def refuse_without_gate_marker(*, arm_names: list[str], allowed: bool) -> None:
+    """Exit with status 1 if an arm with an `S_ens` stage is named and the gates have not passed.
+
+    The arms with an `S_ens` stage are `A_E24`, `R_E24`, `A_F`, `R_F`, `A_C`, `R_C`, and
+    `R_F+flags`. They read the back-filled runs, which the two gates have not yet cleared unless
+    `arms.GATE_MARKER` holds both gate names.
+
+    Args:
+        arm_names: The arms to fit.
+        allowed: Whether `--no-gate-marker` was passed.
+    """
+    long_arms = [n for n in arm_names if arms.ARMS[n].ens is not None]
+    if not long_arms or allowed:
+        return
+    marker = json.loads(arms.GATE_MARKER.read_text()) if arms.GATE_MARKER.exists() else {}
+    missing = [g for g in arms.GATE_NAMES if g not in marker]
+    if missing:
+        print(
+            f"refusing to fit {long_arms}: gate marker {arms.GATE_MARKER} lacks {missing}; run "
+            f"`e00707_gate.py` or pass --no-gate-marker",
+            flush=True,
+        )
+        raise SystemExit(1)
+
+
 def main() -> None:
     """Plan the jobs from the arguments and run the groups."""
     parser = argparse.ArgumentParser(
@@ -563,6 +592,11 @@ def main() -> None:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--smoke", action="store_true", help="one epoch, outputs under work/smoke")
     parser.add_argument("--allow-partial-window", action="store_true")
+    parser.add_argument(
+        "--no-gate-marker",
+        action="store_true",
+        help="fit arms with an S_ens stage although the gates have not both passed",
+    )
     parser.add_argument("--dry-run", action="store_true", help="print the groups and fit nothing")
     args = parser.parse_args()
     if args.gate:
@@ -582,6 +616,7 @@ def main() -> None:
             names = sorted({f"{j.arm}" for j in g.jobs})
             print(f"  {g.month} window {g.ft_window}: {len(g.jobs)} jobs, arms {names}")
         return
+    refuse_without_gate_marker(arm_names=arm_names, allowed=args.no_gate_marker)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ[var] = str(args.threads)
     os.environ["POLARS_MAX_THREADS"] = str(args.threads)

@@ -31,7 +31,8 @@ weeks, run inputs), experiment 418's `e00418_prep.py` (`dense_weather`), and exp
   cleaned power table, 2019-09-01 to 2026-07-01, under `work/flagged_keys.parquet`.
 - `check-flagged-keys`: compare that list with experiment 398's from 2024-05-01 on, and print the
   number of half-hours that only one list holds. It writes nothing.
-- `step-check`: monthly ENS minus ERA5 and the ENS spread around 2023-06-27 and 2024-04-01.
+- `step-check`: monthly ENS minus ERA5 and the ENS spread around 2023-06-27 and 2024-04-01; the
+  exit status is 1 if a step fails.
 """
 
 import argparse
@@ -882,6 +883,7 @@ def step_check() -> None:
                 )
     if failed:
         print("STEP CHECK FAILED: stop and report to the manager")
+        raise SystemExit(1)
 
 
 def build_flagged_keys() -> None:

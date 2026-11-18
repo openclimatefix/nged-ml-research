@@ -24,6 +24,11 @@ stored seed-mean difference has a standard deviation of 0.052 points per fold). 
 
 The exit status is 1 if a check fails, so a script can chain the gate before a fit.
 
+**A passing run leaves a marker.** A gate that passes on every gate fold (and is not a smoke run)
+writes its name and the time to `arms.GATE_MARKER`; a gate that fails removes its own entry.
+`e00707_fit.py` refuses every arm with an `S_ens` stage unless the marker holds both gates, or
+`--no-gate-marker` is passed.
+
 ```bash
 # environment as in e00707_fit.py
 uv run --no-sync python ml-experiments/00707-*/e00707_gate.py predict --device cuda
@@ -33,7 +38,9 @@ uv run --no-sync python ml-experiments/00707-*/e00707_gate.py refit
 """
 
 import argparse
+import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -255,6 +262,21 @@ def refit_gate(*, months: list[str], seeds: tuple[int, ...], out_dir: Path) -> b
     return not failed
 
 
+def record_gate(*, gate: str, passed: bool) -> None:
+    """Record a gate's result in `arms.GATE_MARKER`: its time if it passed, else no entry."""
+    marker: dict[str, str] = {}
+    if arms.GATE_MARKER.exists():
+        marker = json.loads(arms.GATE_MARKER.read_text())
+    if passed:
+        marker[gate] = datetime.now(UTC).isoformat(timespec="seconds")
+    else:
+        marker.pop(gate, None)
+    arms.GATE_MARKER.parent.mkdir(parents=True, exist_ok=True)
+    temporary = arms.GATE_MARKER.with_name(arms.GATE_MARKER.name + ".tmp")
+    temporary.write_text(json.dumps(marker, indent=1))
+    temporary.replace(arms.GATE_MARKER)
+
+
 def main() -> None:
     """Run gate 1, gate 2, or both."""
     parser = argparse.ArgumentParser(
@@ -267,12 +289,19 @@ def main() -> None:
     parser.add_argument("--smoke", action="store_true", help="read the refits from work/smoke")
     args = parser.parse_args()
     ok = True
+    on_gate_folds = set(arms.GATE_MONTHS) <= set(args.months) and not args.smoke
     if args.gate in ("predict", "all"):
-        ok &= predict_gate(months=args.months, seeds=args.seeds or [0], device=args.device)
+        passed = predict_gate(months=args.months, seeds=args.seeds or [0], device=args.device)
+        ok &= passed
+        if on_gate_folds:
+            record_gate(gate="predict", passed=passed)
     if args.gate in ("refit", "all"):
         out_dir = arms.WORK_DIR / "work" / ("smoke" if args.smoke else "")
         seeds = tuple(args.seeds) if args.seeds else arms.FIVE_SEEDS
-        ok &= refit_gate(months=args.months, seeds=seeds, out_dir=out_dir)
+        passed = refit_gate(months=args.months, seeds=seeds, out_dir=out_dir)
+        ok &= passed
+        if on_gate_folds:
+            record_gate(gate="refit", passed=passed)
     print("GATE PASSED" if ok else "GATE FAILED")
     if not ok:
         raise SystemExit(1)

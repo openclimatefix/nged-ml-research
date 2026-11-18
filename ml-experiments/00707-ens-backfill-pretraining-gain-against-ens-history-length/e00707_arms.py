@@ -34,6 +34,11 @@ STORED_425_DIR: Final[Path] = (
 )
 """Experiment 425's work folder, read only: its fitted states and per-seed raw forecasts."""
 
+GATE_MARKER: Final[Path] = WORK_DIR / "work" / "gate_passed.json"
+"""Written by `e00707_gate.py`: the time each gate last passed on every gate fold, by gate name."""
+GATE_NAMES: Final[tuple[str, ...]] = ("predict", "refit")
+"""The gates that `GATE_MARKER` must hold before `e00707_fit.py` fits an `S_ens` arm."""
+
 STORED_ENS_START: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
 """The first run of the ENS rows that experiment 425 trained on (the table's old start)."""
 LONG_WINDOW_FLOOR: Final[datetime] = datetime(2021, 7, 20, tzinfo=UTC)
