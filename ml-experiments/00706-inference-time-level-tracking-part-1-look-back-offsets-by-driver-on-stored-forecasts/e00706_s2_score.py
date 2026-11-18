@@ -404,6 +404,10 @@ def event_bootstrap(
         The lower and upper bounds, and the point estimate (the mean over events of the seed mean).
     """
     n_seeds, n_events = difference.shape
+    if n_events == 0:
+        return float("nan"), float("nan"), float("nan")
+    if not np.isfinite(difference).all():
+        raise ValueError("a paired difference is not finite; a job file holds a NaN correction")
     order = np.argsort(cluster, kind="stable")
     difference = difference[:, order]
     _, sizes = np.unique(cluster[order], return_counts=True)
