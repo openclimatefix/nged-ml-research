@@ -89,10 +89,17 @@ class Spec:
         """Return the experiment's private data folder."""
         return ML_EXPERIMENTS_DATA_DIR / self.name
 
+    @property
+    def arms_root(self) -> Path:
+        """Return the folder holding the arms' fits; `chain667.sh` writes experiment 703's there too."""
+        return (
+            ML_EXPERIMENTS_DATA_DIR / "00704-cams-free-inference-for-the-primaries-step-5-network"
+        )
+
     def fit_path(self, *, arm: str, month: str, seed: int) -> Path:
         """Return the native forecast file of one arm, month, and seed."""
         arm = "control" if arm in self.fake else arm
-        base = self.control_root if arm == "control" else self.root / "arms" / arm
+        base = self.control_root if arm == "control" else self.arms_root / "arms" / arm
         sub = self.sub if arm == "control" else self.arm_sub
         return (
             base
