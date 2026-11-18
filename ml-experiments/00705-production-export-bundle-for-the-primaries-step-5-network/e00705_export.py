@@ -813,7 +813,7 @@ def main() -> None:
         "refit_month": month,
         "refit_time_utc": refit.isoformat(),
         "training_cutoff_utc": (refit - timedelta(hours=3.5)).isoformat(),
-        "training_cutoff_rule": "training targets with valid time <= refit time - 3.5 h and origin <= refit time; the 2026-04 refit uses data before 2026-04-01 00:00 UTC",
+        "training_cutoff_rule": f"training targets with valid time <= refit time - 3.5 h and origin <= refit time; the {args.month} refit uses data before {args.month}-01 00:00 UTC",
         "created_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "research_git": git_state(),
         "pinned_production_package_commit": direct["vcs_info"]["commit_id"],
