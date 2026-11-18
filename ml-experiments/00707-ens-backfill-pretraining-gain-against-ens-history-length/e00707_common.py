@@ -134,7 +134,6 @@ N1_EXTRA_COLUMNS: Final[tuple[str, ...]] = ("lead_hours",)
 
 
 @dataclass(frozen=True)
-
 class SeriesArrays:
     """One series' arrays on the dense half-hourly grid.
 
@@ -203,7 +202,6 @@ def demand_frame_path(*, run: datetime) -> Path:
     if run in set(run_dates(subset="every5d")):
         return VALIDATION_DIR / name
     return FRAMES_DEMAND_DIR / name
-
 
 
 def series_table() -> pl.DataFrame:
@@ -366,7 +364,6 @@ def with_derived(*, frame: pl.DataFrame, latitude: float, longitude: float) -> p
     )
 
 
-
 def pinball_quantile_score(
     *,
     quantiles: np.ndarray,
@@ -431,14 +428,12 @@ def origin_lags(*, power: np.ndarray, target: np.ndarray, origin: np.ndarray) ->
     )
 
 
-
 def atomic_write(*, frame: pl.DataFrame, target: Path) -> None:
     """Write a parquet file through a temporary name so an interrupted write leaves no file."""
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp")
     frame.write_parquet(temporary)
     temporary.rename(target)
-
 
 
 def load_power_arrays(*, series: pl.DataFrame) -> dict[str, SeriesArrays]:
@@ -468,7 +463,6 @@ def load_power_arrays(*, series: pl.DataFrame) -> dict[str, SeriesArrays]:
             features=np.empty((0, 0), dtype=np.float32), power=power, valid_time=grid
         )
     return out
-
 
 
 def add_lags(*, frame: pl.DataFrame, power: np.ndarray) -> pl.DataFrame:
