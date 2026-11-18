@@ -704,6 +704,53 @@ class IdentityStandardiser:
         return x
 
 
+def has_member_frame(*, run: datetime) -> bool:
+    """Return whether the run has a control-member demand frame, not experiment 677's two-column stand-in.
+
+    The control member's frames stop at the run of 2026-06-29. For later runs
+    `common.demand_frame_path` returns a stand-in that holds only `power_fcst_init_time` and
+    `nwp_init_time`, and the stored test rows come from the ensemble summary alone
+    (`e00677_extend.build_site`).
+    """
+    path = e.common.demand_frame_path(run=run)
+    return "time_series_id" in pl.read_parquet_schema(path)
+
+
+def summary_run_inputs(*, origin: datetime) -> list[tuple[dict, pl.DataFrame, np.ndarray]]:
+    """Return what `prep.run_inputs` returns for the summary scheme, built from the run's summary file alone.
+
+    A run with no control-member frame needs this path. The rows are built as
+    `e00677_extend.build_site` builds them, from the one summary file of the run in
+    `prep.SUMMARY_DIR`, so a summary file issued later cannot reach them. The summary scheme's
+    weather columns come from the summary in both paths; the control member supplies only the keys.
+    """
+    prep, common, fd = e.prep, e.common, e.prep.fd
+    run = origin - common.PUBLICATION_DELAY
+    _series, arrays = fd._series_and_arrays()
+    summary = pl.read_parquet(prep.SUMMARY_DIR / f"init={run:%Y-%m-%d}.parquet")
+    assert (summary["power_fcst_init_time"] == origin).all(), (
+        f"the summary file of run {run} holds another origin"
+    )
+    out = []
+    for row in prep.primaries().iter_rows(named=True):
+        rows = summary.filter(pl.col("time_series_id") == row["time_series_id"])
+        rows = rows.filter(pl.col("valid_time") > pl.col("power_fcst_init_time")).sort("valid_time")
+        assert rows.height > 0, f"run {run} has no summary rows for {row['site']}"
+        rows = common.with_derived(frame=rows, latitude=row["latitude"], longitude=row["longitude"])
+        rows = rows.with_columns(
+            lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
+            / 60.0
+        )
+        rows = fd.add_lags(frame=rows, power=arrays[row["site"]].power, a7=False)
+        rows = rows.with_columns(capacity=pl.lit(float(row["effective_capacity_mw"])))
+        keys = rows.select(*common.KEYS, "lead_hours").unique(
+            subset=list(common.KEYS), maintain_order=True
+        )
+        assert keys.height == rows.height, f"run {run} {row['site']}: duplicate valid times"
+        out.append((row, keys, prep.feature_matrix(frame=rows, scheme="summary")))
+    return out
+
+
 def truncated_summary_dir(*, label: str, run: datetime) -> Path:
     """Return a folder of symbolic links to the ensemble summary files issued at or before `run`, and to none issued later."""
     folder = core.ROOT / "scratch" / f"truncated_{ARM}_{MONTH}_{label}"
@@ -724,7 +771,9 @@ def run_weather_test(*, n_origins: int = 20) -> None:  # noqa: PLR0915
     calendar columns of the stored test rows equal a rebuild by `prep.run_inputs` from a summary
     folder that holds no file issued after the origin's run. `run_inputs` reads only the origin's own
     summary file, so this is a check that the stored rows equal a rebuild from the origin's own
-    summary, and removing later files cannot change the rebuild. (2) The thermal-lag, solar-gain,
+    summary, and removing later files cannot change the rebuild. A run after 2026-06-29 has no
+    control-member frame, so `summary_run_inputs` rebuilds its rows from the run's summary file
+    alone, which also asserts that the file's origin is the test origin. (2) The thermal-lag, solar-gain,
     and other B1 columns that experiment 437 stores for the origin equal a rebuild from a summary
     that holds no later run (experiment 437's own causality check, run for the sampled origins).
     This rebuild reads the whole summary, so removing later runs does test it. (3) Every
@@ -753,6 +802,7 @@ def run_weather_test(*, n_origins: int = 20) -> None:  # noqa: PLR0915
     )
     report = []
     rebuilt_runs: dict[int, list] = {}
+    stand_in_origins: set[int] = set()  # runs with no control-member frame (after 2026-06-29)
     for label in LABELS:
         row = next(r for r in prep.primaries().iter_rows(named=True) if r["site"] == label)
         index = int(row["primary"])
@@ -777,9 +827,13 @@ def run_weather_test(*, n_origins: int = 20) -> None:  # noqa: PLR0915
                 saved = prep.SUMMARY_DIR
                 prep.SUMMARY_DIR = folder
                 try:
-                    rebuilt_runs[int(o)] = prep.run_inputs(
-                        origin=origin_dt, scheme="summary", standardiser=IdentityStandardiser()
-                    )
+                    if has_member_frame(run=run_dt):
+                        rebuilt_runs[int(o)] = prep.run_inputs(
+                            origin=origin_dt, scheme="summary", standardiser=IdentityStandardiser()
+                        )
+                    else:
+                        rebuilt_runs[int(o)] = summary_run_inputs(origin=origin_dt)
+                        stand_in_origins.add(int(o))
                 finally:
                     prep.SUMMARY_DIR = saved
             items = rebuilt_runs[int(o)]
@@ -826,6 +880,9 @@ def run_weather_test(*, n_origins: int = 20) -> None:  # noqa: PLR0915
                     "weather_max_diff": diff,
                     "b1_max_diff": worst,
                     "rows": len(sel),
+                    "rebuilt_from": "summary file only"
+                    if int(o) in stand_in_origins
+                    else "control-member frame and summary file",
                 }
             )
         print("WEATHER OK", label, message, flush=True)
