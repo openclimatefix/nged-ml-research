@@ -63,7 +63,6 @@ BONFERRONI_LEVEL_PERCENT: Final[float] = 100.0 - 5.0 / N_READINGS
 N_RESAMPLES: Final[int] = 50_000
 GAIN_THRESHOLD: Final[float] = -0.02
 """Points of CRPS: the protocol's minimum for a new fitted step, a new input, or a new source."""
-INCONCLUSIVE_WIDTH: Final[float] = 0.04
 CURTAILMENT_FRACTIONS: Final[tuple[float, ...]] = (0.9, 0.75, 0.5)
 LEAD_BIN_HOURS: Final[int] = 6
 EARLY_LEAD_HOURS: Final[float] = 144.0
@@ -513,28 +512,40 @@ def contrast_line(
 def c1_verdict(*, lower: float, upper: float) -> str:
     """Return the decision rule's verdict for C1 from its interval, in points of CRPS.
 
-    The rule (plan page): `supported` if the interval is wholly below -0.02; `small gain` if it is
-    below 0 and straddles -0.02; `not supported` if it is wholly above -0.02 and straddles 0;
-    `inconclusive` if it straddles both -0.02 and 0 and is wider than 0.04; `refuted` if it is
-    wholly above 0. An interval that straddles both and is not wider than 0.04 matches no rule, and
-    the function says so.
+    The rule (plan page), applied in this order to the interval [lower, upper]: `refuted` if the
+    lower limit is above 0; `supported` if the upper limit is below -0.02; `not supported` if the
+    lower limit is at or above -0.02; `small gain` if the upper limit is below 0 (so the interval
+    straddles -0.02); otherwise `inconclusive` (the interval straddles both -0.02 and 0), with its
+    width printed.
     """
-    verdict = "NO RULE MATCHES: an interval limit sits exactly on a threshold; read by hand"
     if lower > 0:
-        verdict = "refuted (interval wholly above 0)"
-    elif upper < GAIN_THRESHOLD:
-        verdict = "supported (interval wholly below -0.02)"
-    elif upper < 0 and lower < GAIN_THRESHOLD:
-        verdict = "small gain (interval below 0 and straddling -0.02)"
-    elif lower > GAIN_THRESHOLD and upper > 0:
-        verdict = "not supported (interval wholly above -0.02 and straddling 0)"
-    elif lower < GAIN_THRESHOLD and upper > 0:
-        verdict = (
-            "inconclusive (straddles -0.02 and 0, wider than 0.04)"
-            if upper - lower > INCONCLUSIVE_WIDTH
-            else "NO RULE MATCHES: straddles -0.02 and 0 but is not wider than 0.04; read by hand"
-        )
-    return verdict
+        return "refuted (interval wholly above 0)"
+    if upper < GAIN_THRESHOLD:
+        return "supported (interval wholly below -0.02)"
+    if lower >= GAIN_THRESHOLD:
+        return "not supported (interval at or above -0.02)"
+    if upper < 0:
+        return "small gain (interval below 0 and straddling -0.02)"
+    return f"inconclusive (straddles -0.02 and 0; width {upper - lower:.3f})"
+
+
+def check_c1_verdict_branches() -> None:
+    """Check, on synthetic intervals, that `c1_verdict` reaches each of its five branches.
+
+    Raises:
+        AssertionError: If an interval gives a verdict other than its branch's.
+    """
+    cases = {
+        "refuted": (0.01, 0.05),
+        "supported": (-0.10, -0.03),
+        "not supported": (-0.02, 0.03),
+        "small gain": (-0.05, -0.01),
+        "inconclusive": (-0.08, 0.02),
+    }
+    for expected, (lower, upper) in cases.items():
+        verdict = c1_verdict(lower=lower, upper=upper)
+        assert verdict.startswith(expected), (expected, lower, upper, verdict)
+    print("c1_verdict: all five branches pass on synthetic intervals")
 
 
 def tested_contrasts(
@@ -780,6 +791,7 @@ def main() -> None:
     if args.smoke:
         OUT_DIR = arms.WORK_DIR / "work" / "smoke"
         FIGURE_TABLE_DIR = OUT_DIR / "figure_tables"
+    check_c1_verdict_branches()
     months = tuple(args.months or (arms.SCREEN_MONTHS if args.screen else arms.ALL_MONTHS))
     if args.screen:
         print("SCREEN: all numbers are interim")

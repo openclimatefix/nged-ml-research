@@ -26,10 +26,11 @@ prediction: >-
   MVA-only Primaries, against -0.050 and -0.124 in experiment 425. The placebo contrast C5 is below
   zero at the 24-month window.
 decision_rule: >-
-  C1 is read per group at 99.69% (16 readings, month-block bootstrap on seed-averaged forecasts).
-  Wholly below -0.02: supported. Below 0 and straddling -0.02: small gain. Wholly above -0.02 and
-  straddling 0: not supported (no longer worth porting). Straddling both and wider than 0.04:
-  inconclusive. Wholly above 0: refuted. The threshold of 0.02 is the protocol's minimum for a new
+  C1 is read per group at 99.69% (16 readings, month-block bootstrap on seed-averaged forecasts),
+  on its interval [lower, upper], applying these tests in order. Lower limit above 0: refuted.
+  Upper limit below -0.02: supported. Lower limit at or above -0.02: not supported (no longer worth
+  porting). Upper limit below 0: small gain. Otherwise the interval straddles both -0.02 and 0:
+  inconclusive, and the width is printed. The threshold of 0.02 is the protocol's minimum for a new
   fitted step, because pre-training adds one stage and two weather sources. C1 minus C2 is
   descriptive. The gate and the stop rule are in the Gate and Stop rule paragraphs.
 benchmark: >-
@@ -72,12 +73,16 @@ fitted step, a new input, or a new data source" (`evaluation-protocol-demand.md`
 pre-training adds one fitted stage and two weather sources to maintain. C1 is read per group at the
 Bonferroni level:
 
-- **Still worth porting:** the interval lies wholly below -0.02. Verdict `supported`.
-- **Small gain:** the interval lies below 0 and straddles -0.02. Verdict `small gain`.
-- **No longer worth porting:** the interval lies wholly above -0.02 and straddles 0.
-  Verdict `not supported`.
-- **Cannot tell:** the interval straddles both -0.02 and 0 and is wider than 0.04. Verdict `inconclusive`.
-- **Harmful:** the interval lies wholly above 0. Verdict `refuted`.
+The tests apply in this order to the interval [lower, upper]. The first test that holds gives the
+verdict.
+
+- **Harmful:** the lower limit is above 0. Verdict `refuted`.
+- **Still worth porting:** the upper limit is below -0.02. Verdict `supported`.
+- **No longer worth porting:** the lower limit is at or above -0.02. Verdict `not supported`.
+- **Small gain:** the upper limit is below 0. The lower limit is then below -0.02, so the interval
+  straddles -0.02. Verdict `small gain`.
+- **Cannot tell:** none of the above holds, so the interval straddles both -0.02 and 0. Verdict
+  `inconclusive`, and the scorer prints the interval's width.
 
 The experiment reports the verdict and the interval, and makes no adoption.
 
