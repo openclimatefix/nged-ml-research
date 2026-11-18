@@ -4,7 +4,7 @@
 Every statistic of the experiment is a ratio of two sums, taken over the origin months and seeds
 that a draw selects. A per-row loss has the same denominator for every seed (the number of shared
 rows in the month). The copied share of a shifted lag has the shift's sum of squares as the
-denominator. Both are therefore a pair of arrays of shape (months, seeds): `num` and `den`.
+denominator. Each statistic is therefore a pair of arrays of shape (months, seeds): `num` and `den`.
 
 - `bootstrap_combination`: 50,000 draws. Each draw resamples the months with replacement (the same
   months for both arms), then inside each drawn month resamples the seeds with replacement, afresh

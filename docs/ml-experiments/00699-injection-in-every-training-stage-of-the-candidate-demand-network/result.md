@@ -35,8 +35,9 @@ prediction: >-
   refitted "stage 3 only" at a margin of 0.012. P4: "stages 2 and 3" minus the refitted "stage 3
   only", which share stage-1 weights, is below zero on MAE and CRPS. P5: the copied share of "stages
   1 to 3" minus "stages 1 and 2" is at most -0.012. The plan states in advance that P1 and P2 are
-  unlikely to be resolved: the three stored seeds have an SD of 0.087 in all-rows MAE, about four
-  times the P1 size.
+  unlikely to be resolved: the three stored seeds have a standard deviation of 0.087 in all-rows
+  MAE, about four times the P1 size. P6 is a stop rule: the refitted "stage 3 only" minus "no
+  injection" lies between +0.015 and +0.075 on MAE.
 decision_rule: >-
   The verdict rests on family H alone: "stages 1 to 3" minus the refitted "stage 3 only" on MAE,
   CRPS, and the copied share, read at 98.33%. A contrast counts only if two intervals both exclude
@@ -51,7 +52,7 @@ decision_rule: >-
   in opposite directions, which also triggers an audit. Families S2 and S3, which compare arms that
   share weights, are reported as labelled findings and never change the verdict. The smallest gain
   worth porting is zero with intervals that exclude zero, because the change adds no input, no
-  model, and no serving step.
+  neural network, and no serving step.
 benchmark: >-
   Refitted by this experiment, seeds 0 to 7: step 5 of experiment 677 at monthly refits with the
   shifts in stage 3 only, and with no shifts. The stored forecasts of experiment 677 (files
@@ -73,31 +74,38 @@ best_arm: >-
   points of capacity, and the present recipe (shifts in stage 3 only) scores 7.348. Shifts in all
   three stages score 7.414.
 headline: >-
-  Injecting the synthetic shifts in every training stage did not regain skill: MAE rose by 0.066
-  points of capacity (98.33% interval -0.019 to +0.164), and the data could not tell a small gain
-  from a small loss.
+  Injecting the synthetic shifts in every training stage did not regain skill: the MAE point
+  estimate rose by 0.066 points of capacity (98.33% bootstrap interval -0.019 to +0.164), and the
+  data could not tell a small gain from a small loss.
 lessons: >-
   Eight seeds leave an expected interval half-width of 0.110 on MAE, five times the predicted regain
-  of 0.022, and 16 seeds would leave 0.078. Stage 3 alone lowers the copied share on the training
-  generator's bank from 0.127 to 0.075, and the other stages lower it a further 0.035 there and not
-  at all on a different generator (-0.002). Every MAE and CRPS contrast between arms that inject in
-  more stages has a positive point estimate.
+  of 0.022, and 16 seeds would leave 0.078. The realised half-widths were 0.077 (t) and 0.092
+  (bootstrap). Stage 3 alone lowers the copied share on the training generator's bank from 0.127 to
+  0.075, and the other stages lower it a further 0.035 there and by -0.002 (98.33% bootstrap
+  interval -0.021 to +0.015) on a different generator. Every MAE and CRPS contrast between arms that
+  inject in more stages has a positive point estimate.
 take_home_message: >-
-  Do not spend more experiments on moving the synthetic shifts earlier in training to regain skill.
-  The data show no regain: all three MAE contrasts and all three CRPS contrasts have positive point
-  estimates, family H (shifts in all three stages minus stage 3 only) is +0.066 on MAE with an
-  interval from -0.019 to +0.164, and the stage-3 injection on top of injection in stages 1 and 2
-  raises CRPS by 0.011 with both intervals above zero. Stage 3 alone already captures most of the
-  reduction in the copied share, and the other stages add nothing on a second generator of shifts.
-  The verdict is inconclusive because eight seeds cannot resolve a difference of 0.022 points. The
-  refitted clean chain failed the pre-registered reproduction check at its four-fold screen (+0.0141
-  against a floor of +0.015), which lowers confidence in treating it as a replica of experiment 677's
-  stage-3-only arm.
+  Moving the synthetic shifts earlier in training did not regain skill, and the experiment excludes
+  the planned regain on MAE, so another experiment on that change alone is not worth running. The
+  data show no regain: all three MAE contrasts and all three CRPS contrasts have positive point
+  estimates (a loss), family H (shifts in all three stages minus stage 3 only) is +0.066 on MAE with
+  a 98.33% bootstrap interval from -0.019 to +0.164, every MAE interval of family H includes zero,
+  and the stage-3 injection on top of injection in stages 1 and 2 raises CRPS by 0.011 with both
+  intervals above zero. Stage 3 alone already captures most of the reduction in the copied share on
+  the training generator's bank, and the other stages add no resolved reduction on a second
+  generator of shifts. The verdict is inconclusive because eight seeds cannot resolve a difference
+  of 0.022 points. The refitted clean chain missed the four-fold reproduction screen (+0.0141
+  against a floor of +0.015) because of the five seeds added to the three stored seeds, and it
+  reproduces experiment 677's stored forecasts at seeds 0 to 2. Its stage-3-only minus no-injection
+  contrast is +0.0255 on 8 seeds against the stored +0.045 on 3 seeds, so the loss that stage-3
+  injection was thought to cost was about 1.8 times too large, and the planned regain of 0.022 was
+  86% of the whole measured loss.
 advice:
   - >-
-    Keep the synthetic shifts in stage 3 only, because injecting in stages 1 and 2 as well raised
-    MAE by 0.066 and CRPS by 0.033 in point estimate and lowered the copied share by only 0.002 on a
-    second generator (contrast figures).
+    Do not move the synthetic shifts into stages 1 and 2 to regain skill: no regain was found, and
+    the point estimate is a loss of 0.066 points of MAE (98.33% bootstrap interval -0.019 to +0.164)
+    and 0.033 of CRPS (-0.016 to +0.077), so a small gain or a small loss remains possible (contrast
+    figures).
   - >-
     Size the seeds before a contrast of about 0.02 points of MAE, because eight seeds leave an
     expected half-width of 0.110 and 16 seeds leave 0.078 (Sizing section).
@@ -127,30 +135,34 @@ simulated shift the median forecast copies.
 
 **Showing the shifts in every stage did not give back forecast skill, and the data could not say
 whether the change helps or harms.** Against the present recipe (shifts in stage 3 only), the
-variant with shifts in all three stages had a higher MAE by 0.066 points (interval −0.019 to
-+0.164) and a higher CRPS by 0.033 (interval −0.016 to +0.077). The plan predicted a fall of at
-least 0.022 points of MAE, and the plan said in advance that the noise between seeds would probably
-hide an effect of that size. It did. On a held-out bank of simulated shifts, the same variant copied
-3.9% of a shift where the present recipe copies 7.5%. On a second bank of shifts from a different
-generator, the copied share did not change (−0.002, interval −0.021 to +0.015).
+variant with shifts in all three stages had a higher MAE by 0.066 points (98.33% bootstrap interval
+−0.019 to +0.164) and a higher CRPS by 0.033 (98.33% bootstrap interval −0.016 to +0.077). The plan
+predicted a fall of at least 0.022 points of MAE, and the plan said in advance that the noise
+between seeds would probably hide an effect of that size. The noise did. On a held-out bank of
+simulated shifts, the same variant copied 3.9% of a shift where the present recipe copies 7.5%. On a
+second bank of shifts from a different generator, the copied share changed by −0.002 (98.33%
+bootstrap interval −0.021 to +0.015).
 
 ## Verdict: inconclusive
 
 **The verdict is `inconclusive`, as the plan predicted.** The verdict rests on one contrast, the
-variant with shifts in all three stages minus the present recipe (family H). Its MAE and CRPS
+variant with shifts in all three stages minus the present recipe (family H). Family H's MAE and CRPS
 intervals include zero. Both MAE intervals exclude the predicted regain of 0.022, but the CRPS
 bootstrap interval reaches −0.0159, which is below the predicted −0.014. The data therefore cannot
 rule out the predicted CRPS regain, so the rule gives `inconclusive` and not `not supported`. Two
-further contrasts (families S2 and S3) are labelled findings and never decide the verdict.
+further contrasts (families S2 and S3) are labelled findings and never decide the verdict. The
+predicted regain of 0.022 was 86% of the clean chain's eight-seed loss (+0.0255), so P1 was close to
+unreachable by design.
 
-**Take-home message: do not spend more experiments on moving the injection earlier in training to
-regain skill.** The data do not show that earlier injection helps. All three MAE contrasts that
-bear on earlier injection have positive point estimates (the treatment is not better), and so do
-all three CRPS contrasts. Stage 3 alone already lowers the copied share on the training generator's
-bank from 12.7% to 7.5%, and the remaining stages lower it a further 3.5 points on that bank and
-not at all on the second bank. The experiment could not rule out a small gain or a small loss in
-skill: family H's MAE interval runs from −0.019 to +0.164. The sizing of the noise shows that no
-seed count up to 16 would have resolved the predicted size.
+**Take-home message: moving the injection earlier in training did not regain skill, and the planned
+regain on MAE is excluded.** The data do not show that earlier injection helps. All three MAE
+contrasts that bear on earlier injection have positive point estimates (the treatment is not
+better), and so do all three CRPS contrasts. Stage 3 alone already lowers the copied share on the
+training generator's bank from 12.7% to 7.5%, and the remaining stages lower it a further 3.5 points
+on that bank, and the data do not resolve any further reduction on the second bank. The experiment
+could not rule out a small gain or a small loss in skill: family H's MAE interval runs from −0.019
+to +0.164. The sizing of the noise shows that no seed count up to 16 would have resolved the
+predicted size.
 
 **Eight seeds cannot resolve a difference of 0.022 points of MAE.** The standard deviation of
 all-rows MAE between the 8 seeds of one arm is 0.07 to 0.09 points, and between the seeds of the
@@ -161,10 +173,10 @@ above 0.07 at 16 seeds.
 
 ### Skill and copied share
 
-**All-rows skill gets slightly worse as shifts reach more stages, but every difference is within
-the noise.** The table gives the mean over 8 seeds and 8 folds of each seed's MAE and CRPS on the
-2,492,233 forecast rows that every arm shares. The manual heuristic and climatology are the two
-reference forecasts.
+**All-rows skill has a worse point estimate as shifts reach more stages, and only the CRPS
+differences of S3 and of the clean chain are clearly above zero.** The table gives the mean over 8
+seeds and 8 folds of each seed's MAE and CRPS on the 2,492,233 forecast rows that every arm shares.
+The manual heuristic and climatology are the two reference forecasts.
 
 | Arm (stages that see shifts) | MAE | CRPS | Copied share, 581 bank | Copied share, 660 bank |
 |---|---|---|---|---|
@@ -176,11 +188,13 @@ reference forecasts.
 | Manual heuristic | 8.401 | 4.807 | | |
 | Climatology | 10.157 | 5.671 | | |
 
-**The copied share is the slope of the median forecast's change on an injected shift.** A share of
-1 is a full copy and 0 means the forecast ignores the shift. The 581 bank holds shifts from
-experiment 581's generator, which every training stage used. The 660 bank holds shifts from
-experiment 660's generator, a different one that no stage saw, with shifts drawn for each Primary's
-scored window.
+**The copied share is the slope of the median forecast's change on an injected shift.** A share of 1
+is a full copy and 0 means the forecast ignores the shift. The 581 bank holds shifts from experiment
+581's generator, which every training stage used. The 660 bank holds shifts from experiment 660's
+generator, a different generator that no stage saw, with shifts drawn for each Primary's scored
+window. The 660 bank holds 2,223,363 shifted rows per seed over the eight folds (the 581 bank holds
+857,028), and its rows include the generator's hard negatives, which are small steps, ramps, and
+pulses that are not load transfers.
 
 ![Change in MAE and CRPS between arms, with 98.33% intervals](contrasts.svg)
 
@@ -211,28 +225,31 @@ contrasts shares a 5% error rate.
 
 **Two contrasts have CRPS intervals wholly above zero, on the harm side: S3 and the clean chain.**
 Adding the stage-3 injection on top of injection in stages 1 and 2 raises CRPS by 0.0113 (both
-intervals above zero) and lowers the copied share on both banks. This is a labelled finding from the
-eight-fold read and not verdict material. It means that, once stages 1 and 2 have seen shifts, the
-stage-3 injection does not add skill. The clean-chain contrast, stage 3 only minus no injection, has
-the same sign (+0.0224 on CRPS, both intervals above zero), which agrees with experiment 677's
-stored +0.027.
+intervals above zero) and lowers the copied share on both banks. The S3 contrast is a labelled
+finding from the eight-fold read and not verdict material. The finding means that, once stages 1 and
+2 have seen shifts, the stage-3 injection does not add skill. The clean-chain contrast, stage 3 only
+minus no injection, has the same sign (+0.0224 on CRPS, both intervals above zero), which agrees
+with experiment 677's stored +0.027.
 
 ![Change in copied share between arms](copied_share.svg)
 
-**Injecting at every stage adds little copied-share reduction beyond stage 3.** On the 581 bank the
-copied share falls from 0.127 (none) to 0.075 (stage 3 only) and to 0.039 (stages 1 to 3). On the
-660 bank the copied share falls from 0.082 to 0.024 with stage-3 injection, and the remaining
-stages change it by −0.002. Training on the generator's own shifts earlier makes the network
-better at that generator's shifts, and it does not carry over to a different generator.
+**Injecting in every stage lowers the copied share further on the 581 bank, and the data cannot say
+whether it does on the 660 bank.** On the 581 bank the copied share falls from 0.127 (none) to 0.075
+(stage 3 only) and to 0.039 (stages 1 to 3), a change of −0.035 from stage 3 only (bootstrap −0.048
+to −0.021). On the 660 bank the copied share falls from 0.082 to 0.024 with stage-3 injection, and
+the remaining stages change it by −0.002 (bootstrap −0.021 to +0.015), so a reduction of up to 0.021
+or a rise of up to 0.015 cannot be excluded. The reduction from earlier injection is resolved on the
+training generator's bank and unresolved on the second generator's bank.
 
 ### Where the extra error sits
 
 **The point estimate of family H is positive in every lead band, every metering group, and every
-load-shift scenario.** The table gives the contrast of stages 1 to 3 minus stage 3 only on MAE,
-read at 95% and not at the family level. Only the two shortest lead bands have both intervals above
-zero. The rows are the half-hours that every arm and both baselines have a forecast for. The
-point estimates for the three metering groups are +0.2753 (the two Primaries D15 and D18, 285,287
-rows), +0.0494 (the eight MVA-only Primaries), and +0.0249 (the six signed-MW Primaries).
+load-shift scenario.** The table gives the contrast of stages 1 to 3 minus stage 3 only on MAE, read
+at 95% and not at the family level. Only the two shortest lead bands have both intervals above zero.
+The rows are the half-hours that every arm and both baselines have a forecast for. The point
+estimates for the three metering groups are +0.2753 (the two Primaries D15 and D18, 285,287 rows),
++0.0494 (the eight Primaries with MVA-only meters, which report apparent power in megavolt-amperes),
+and +0.0249 (the six signed-MW Primaries).
 
 | Rows | Half-hours | MAE contrast | Bootstrap interval | t interval |
 |---|---|---|---|---|
@@ -250,8 +267,9 @@ rows), +0.0494 (the eight MVA-only Primaries), and +0.0249 (the six signed-MW Pr
 that no label covers, so the harm shown there may be understated and the rows "inside" may be
 undercounted. The events are the logged events that overlap the 8 months (the table of [experiment
 653](../00653-edge-state-event-table-penalised-segmentation/result.md)) plus the verified transfer
-between two Primaries from 2025-12-30 to 2026-01-15. The harm is largest inside a logged event
-(+0.1046), which is the opposite of what the treatment is for.
+between two Primaries from 2025-12-30 to 2026-01-15. The point estimate is largest inside a logged
+event (+0.1046), but that interval includes zero and overlaps every other scenario's interval, so
+the page does not claim that the harm concentrates there.
 
 **The mean forecast is an approximation from the 11 stored quantiles.** The median minus the mean
 forecast is −0.709 points for no injection and −0.720 for stages 1 to 3, so no arm's spread shifts
@@ -278,7 +296,8 @@ injection), 25.601 (stage 3 only), 25.511 (stages 2 and 3), 25.430 (stages 1 and
 experiment finds a band 0.15 points narrower (0.6%) for stages 1 to 3 than for stage 3 only,
 against a CRPS that is 0.033 higher.
 
-**Cold nights and the cost of avoidable curtailment follow the order of the arms on all rows.**
+**Cold nights and the cost of avoidable curtailment are higher in every injected arm than with no
+injection.**
 The protocol rows are the half-hours that the arms of experiment 668's comparison share, at 13
 Primaries (6 with signed-MW meters and 7 with MVA-only meters), not the 16 Primaries of the main
 scores. A cold night is a half-hour at 3 °C or below, as defined in `studies.eval_protocol`. MAE of
@@ -291,13 +310,14 @@ the median, in points of capacity:
 | MVA-only seven, all rows | 5.474 | 5.508 | 5.540 | 5.553 | 5.565 |
 | MVA-only seven, cold nights | 4.291 | 4.300 | 4.390 | 4.434 | 4.421 |
 
-**Injection raises the avoidable-curtailment cost, and more injected stages raise it more.** At the
-limit fraction of 0.5 the cost is 4.4% higher for stage 3 only and 8.8% higher for stages 1 to 3
-than for no injection, and at 0.9 it is 5.9% and 13.9% higher. The GAM costs less than every
-network arm. The measure is
-`avoidable_curtailment_cost` of `studies.eval_protocol`, summed over the six signed-MW Primaries,
-in pounds, at limit fractions of 0.5 and 0.9. It is read only at those Primaries because unsigned
-MVA meters hide reverse flow.
+**Injection raises the avoidable-curtailment cost, and the three arms that inject in more than one
+stage raise it by 7.7% to 9.0% at a limit of 0.5.** At the limit fraction of 0.5 the cost is 4.4%
+higher for stage 3 only and 8.8% higher for stages 1 to 3 than for no injection, and at 0.9 it is
+5.9% and 13.9% higher (12.6% to 14.6% for the three multi-stage arms). The generalised additive
+model (GAM) costs less than every neural-network arm. The measure is `avoidable_curtailment_cost` of
+`studies.eval_protocol`, summed over the six signed-MW Primaries, in pounds, at limit fractions of
+0.5 and 0.9. The cost is read only at those Primaries because unsigned MVA meters hide reverse flow.
+No interval was computed for the cold-night table or the cost table.
 
 | Forecast | Cost at limit 0.5 | Cost at limit 0.9 |
 |---|---|---|
@@ -316,9 +336,9 @@ MVA meters hide reverse flow.
 transfer at the two Primaries D5 and D16, and the four longest other events in the plan's set (at
 D18, D4, D12, and D3). Each figure has two panels: the median forecast 1 to 2 days ahead, averaged
 over the 8 seeds, from 14 days before to 14 days after the event, and one full 14-day forecast
-issued in the middle of the event. Grey marks the event. The arms drawn are the present recipe, the
-treatment, and the observed power. The plan's event-free fortnight panels were not drawn (see
-"Departures").
+issued in the middle of the event. Grey marks the event. The arms drawn are no injection, the
+present recipe, the treatment, and the observed power. The plan's event-free fortnight panels were
+not drawn (see "Departures").
 
 ![D5, the verified transfer](transfer_D5.svg)
 
@@ -342,8 +362,8 @@ fold 2025-11 the contrast is +0.0480 (bootstrap −0.0299 to +0.1207; t −0.016
 +0.122, +0.048, +0.051, +0.095, +0.056).
 
 **The flagged fit is seed 0 of the stage-3-only arm in fold 2025-11.** The fit scores an MAE of
-7.309 in that fold, 3.4 standard deviations from the other seven seeds. It stopped after 9 epochs
-at a validation loss of 0.413. The fit is kept in every contrast, as the plan fixed.
+7.309 in that fold, 3.4 standard deviations from the other seven seeds. The fit stopped after 9
+epochs at a validation loss of 0.413. The fit is kept in every contrast, as the plan fixed.
 
 **Leaving one Primary out never changes the sign of family H.** The point estimate of the MAE
 contrast stays between +0.037 and +0.075 over the 16 leave-one-out contrasts, and the 95%
@@ -354,13 +374,15 @@ stays between +0.023 and +0.038, and no leave-one-out interval excludes zero.
 MAE of the present recipe is 7.139 and of stages 1 to 3 is 7.225, a contrast of +0.0858
 (bootstrap over months only, +0.0231 to +0.1511); the CRPS is 4.009 and 4.048.
 
-**The S3 contrast and the clean-chain contrast do not differ.** The S3 contrast minus the
-clean-chain contrast is −0.0095 on MAE (bootstrap −0.0361 to +0.0200, at 95%), so stage-3 injection
-adds the same MAE whether or not stages 1 and 2 saw shifts.
+**The data cannot tell the S3 contrast from the clean-chain contrast.** The S3 contrast minus the
+clean-chain contrast is −0.0095 on MAE (bootstrap −0.0361 to +0.0200, at 95%), so the data are
+compatible with stage-3 injection adding the same MAE whether or not stages 1 and 2 saw shifts, and
+also with a difference of up to about 0.03 either way.
 
 ## Predictions
 
-**Two of the six predictions held (P3 and P5), and four failed (P6 at the four-fold screen, P1, P2,
+**Two of the six predictions held (P3 on the 581 bank only, and P5, which passes on the 660 bank by
+0.00003: −0.01203 against −0.012), and four failed (P6 at the four-fold screen, P1, P2,
 and P4).** P6 is listed first because the plan made it a stop rule.
 
 | Prediction | Result |
@@ -370,89 +392,96 @@ and P4).** P6 is listed first because the plan made it a stop rule.
 | P2: H, CRPS at most −0.014, both intervals below zero | Failed: +0.0329, both intervals include zero |
 | P3: H, copied share non-inferior at 0.012 on both intervals | Held on the 581 bank (upper ends −0.0209 and −0.0191). Not shown on the 660 bank (upper ends +0.0145 and +0.0134), so the claim is "on the training generator's distribution" |
 | P4: S2, MAE and CRPS below zero with both intervals below zero, copied share non-inferior | Failed: MAE +0.0295, CRPS +0.0133 |
-| P5: S3, copied share at most −0.012, both intervals below zero | Held: −0.0140 (581 bank) and −0.0120 (660 bank) |
+| P5: S3, copied share at most −0.012, both intervals below zero | Held: −0.0140 (581 bank) and −0.0120 (660 bank; −0.01203, borderline) |
 
 ## Checks
 
-**P6 failed at the four-fold screen, and this lowers confidence in treating the refitted clean chain
-as a replica of experiment 677's stage-3-only arm.** The plan made P6 a stop rule: the screen
-reads it on the four phase-A folds (2025-11, 2026-01, 2026-04, and 2026-06), and the run stopped
-for the manager's decision. The stage-3-only arm minus the no-injection arm was +0.0141 on MAE
-there, 0.0009 below the lower edge of +0.015. The bootstrap interval of that four-fold contrast is
-−0.0295 to +0.0439 and the t interval is −0.0342 to +0.0623, so the t interval includes the stored
-+0.045 and the bootstrap interval ends 0.001 below it. The reproduction of fold 2026-01 at seeds 0
-to 2 (phase A0) matched experiment 677's stored per-seed scores, and the known-answer table (below)
-matched on the scoring path, so the code and the data are unchanged. The miss is therefore noise in
-a four-fold, within-seed contrast. The manager decided that the experiment continues. This page does
-not relabel the failure. The eight-fold reading is +0.0255, inside the range, and is reported beside
-the failed screen and not instead of it.
+**P6 failed at the four-fold screen, and the audit traced the miss to the five seeds added to the
+three stored seeds.** The plan made P6 a stop rule: the screen reads it on the four phase-A folds
+(2025-11, 2026-01, 2026-04, and 2026-06), and the run stopped for the manager's decision. The
+stage-3-only arm minus the no-injection arm was +0.0141 on MAE there, 0.0009 below the lower edge of
++0.015. The bootstrap interval of that four-fold contrast is −0.0295 to +0.0439 and the t interval
+is −0.0342 to +0.0623, so the t interval includes the stored +0.045 and the bootstrap interval ends
+0.001 below the stored +0.045. The reproduction of fold 2026-01 at seeds 0 to 2 (phase A0) matched
+experiment 677's stored per-seed scores, and the known-answer table (below) matched on the scoring
+path, so the code and the data are unchanged. The miss is therefore noise in a four-fold,
+within-seed contrast. The manager decided that the experiment continues. This page does not relabel
+the failure. The eight-fold reading is +0.0255, inside the range, and is reported beside the failed
+screen and not instead of it.
 
 **The known-answer table reproduces experiment 677's stored contrast on the stored forecasts.** The
 stored seeds 0 to 2 give a MAE of 7.124 (no injection) and 7.165 (stage 3 only), a contrast of
 +0.042 (interval +0.020 to +0.065), CRPS of 3.994 and 4.020 (+0.027, +0.014 to +0.043), and copied
 shares of 0.123 and 0.075 (−0.047, −0.061 to −0.036). The plan's first reference table was 7.169,
-7.213, and +0.045; the "Departures" section explains the change.
+7.213, and +0.045; the "Departures" section explains the change. The stored +0.042 contrasts the
+seed-mean forecasts of seeds 0 to 2, and the refit's +0.0451 on the same seeds averages each
+seed's own score contrast, so the two differ.
 
 **Median minus mean, MAE beside CRPS, and the audit triggers.**
 
 - **The median forecast minus the mean forecast, per Primary,** is −0.709 to −0.720 on average in
   every arm, and one Primary (time_series_id 12) has −5.4 to −5.9. No arm shifts its median.
-- **The MAE contrast beside every CRPS contrast** has the same sign in every family and on both
-  banks (H +0.066 and +0.033, S2 +0.030 and +0.013, S3 +0.016 and +0.011, clean chain +0.026 and
-  +0.022), so trigger 3 did not fire.
+- **The MAE contrast beside every CRPS contrast** has the same sign in every family (H +0.066 and
+  +0.033, S2 +0.030 and +0.013, S3 +0.016 and +0.011, clean chain +0.026 and +0.022), so trigger 3
+  did not fire.
 - **Trigger 1 (a control fails) fired,** because P6 failed at the four-fold screen. The audit found
-  that the cause is the five added seeds. Seeds 0 to 2 reproduce experiment 677's stored forecasts in
-  all 8 folds, and the clean-chain MAE contrast is +0.0451 on seeds 0 to 2, +0.0138 on seeds 3 to 7,
-  and +0.0255 on all 8 seeds. Experiment 677's +0.045 was a high three-seed draw.
+  that the cause is the five added seeds. Seeds 0 to 2 reproduce experiment 677's stored forecasts
+  in all 8 folds, and the clean-chain MAE contrast is +0.0451 on seeds 0 to 2, +0.0138 on seeds 3 to
+  7, and +0.0255 on all 8 seeds. Experiment 677's +0.045 was a high three-seed draw.
 - **Trigger 2 (a result contradicts its own prediction) fired.** The point estimates of P1, P2, and
   P4 have the opposite sign to the predictions. The plan predicted that P1 and P2 would not be
   resolved. The descriptive readings above test the noise explanation and do not settle it.
 - **Trigger 4 (leaving one site out flips a contrast) did not fire.** The sign of family H never
   flips.
-- **Trigger 5 (a nested arm beats the arm that contains it) did not fire on the plan's reading.** The
-  arms differ in the stages that see shifts and not in their inputs, so no arm is nested in another.
-  The audit notes that the no-injection arm has the lowest all-rows MAE of the five arms, which is
-  the same finding as the positive point estimates above.
+- **Trigger 5 (a nested arm beats the arm that contains it) did not fire on the plan's reading.**
+  The arms differ in the stages that see shifts and not in their inputs, so no arm is nested in
+  another. The audit considered a firing: the no-injection arm has the lowest all-rows MAE of the
+  five arms, and the arm with shifts in all three stages has the highest. That is the finding under
+  test and not a nested-arm failure.
 - **Trigger 6 (an interval more than twice or under half a sister experiment's) did not fire.** The
   audit compared the interval with the sister interval and found a ratio of about 1.1.
 - **Trigger 7 (a later design depends on this result) is not applicable now.**
 - **An audit was run** by a Sonnet agent that did not write the experiment. The report is
-  `briefs/699_audit.md` in the private `data/ml-experiments/` folder. It rebuilt MAE and CRPS from the
-  stored quantiles, matched every headline contrast, found no sign flip when leaving out one Primary,
-  and confirmed that the weather is taken at the forecast origin. Nothing blocked the merge. The
-  audit's findings and their triage:
+  `briefs/699_audit.md` in the private `data/ml-experiments/` folder. It rebuilt MAE and CRPS from
+  the stored quantiles, matched every headline contrast, found no sign flip when leaving out one
+  Primary, and confirmed that the weather is taken at the forecast origin. Nothing blocked the
+  merge. The audit's findings and their triage:
     - **Accepted, the 24,060 dropped reference rows.** The climatology is non-finite on exactly the
       rows of series 12 and 13 that every arm drops, because both series have cleaned data only from
       2025-05-07 and 2025-03-30, so no winter climatology cell exists before each fold's cutoff. The
       manual heuristic is finite on all of them. No contrast changes.
     - **Accepted, series 12 carries half of the H contrast.** Series 12, 5.5% of the rows, supplies
-      +0.031 of the +0.066 MAE. Without it the H contrast is +0.037, still positive. Five Primaries
-      have negative H point estimates.
+      +0.031 of the +0.066 MAE. Without series 12 the H contrast is +0.037, still positive. Five
+      Primaries have negative H point estimates.
     - **Accepted, the flagged seed-0 fit.** The fit has a high error, so keeping it makes H less
-      positive. Replacing it gives +0.0785, and dropping seed 0 gives +0.0852. Seed 0 is also poor in
-      fold 2025-11 in every arm, which suggests a bad shared stage-1 initialisation.
+      positive. Replacing it gives +0.0785, and dropping seed 0 gives +0.0852. Seed 0 is also poor
+      in fold 2025-11 in every arm, which suggests a bad shared stage-1 initialisation.
     - **Accepted, the margin on the verdict.** The lower CRPS bound that keeps the verdict at
-      `inconclusive` is −0.0157 against a threshold of −0.014. The nested bootstrap counts seed
-      variance twice and is about 1.7 times wider than a months-only bootstrap, which gives H MAE
-      +0.013 to +0.122 and H CRPS +0.008 to +0.054. The verdict does not move on either interval.
-    - **Not re-run by the audit:** the lag-age and weather-at-origin assertions, and the curtailment,
-      cold-night, and event sections.
+      `inconclusive` is −0.0159 on the page and −0.0150 to −0.0157 in the audit's re-runs, against a
+      threshold of −0.014. The nested bootstrap counts seed variance twice and is about 1.7 times
+      wider than a months-only bootstrap, which gives H MAE +0.013 to +0.122 and H CRPS +0.008 to
+      +0.054. Both months-only intervals lie above zero, so under that bootstrap the data would show
+      a harm. The verdict stays `inconclusive` because the t interval on the eight months includes
+      zero for both scores (MAE −0.0105 to +0.1424, CRPS −0.0001 to +0.0659).
+    - **Not re-run by the audit:** the lag-age and weather-at-origin assertions, and the
+      curtailment, cold-night, and event sections.
 
 **The experiment's own checks passed.** `e00699_checks.py all` prints:
 
-- 21 input tables unchanged, and the cleaned-power table's dropped rows unchanged (Delta version 493,
-  hashed at version 490);
+- 21 input tables unchanged, and the cleaned-power table's dropped rows unchanged (Delta version
+  493, hashed at version 490);
 - no valid time on or after 2026-07-01 in 748 forecast, score, and bank files;
 - world seed ranges, injection shares in 0.04 to 0.10, the time guard, and the target guard on 48
   stage records;
 - 688 bank files with identical lag shifts per fold, and training worlds that end before the bank's
   first shift;
 - the weather of each forecast taken at or before its origin (40 predict-phase files, and 7 exported
-  files with an NWP initialisation time at or before the native origin);
+  files with a numerical weather prediction (NWP) initialisation time at or before the native
+  origin);
 - equal training budgets: the stage-1, stage-2, and stage-3 counts agree across chains in all 8
   folds;
 - the B1 statistics of 24 files equal experiment 677's;
-- 64 recorded initial-weight hashes equal a fresh network built with the same seed;
+- 64 recorded initial-weight hashes equal a fresh neural network built with the same seed;
 - no file in experiment 677's data folder is newer than the input hashes.
 
 **The exported forecast files are valid.** The seven files hold 20,213,760 rows each for the new
@@ -477,7 +506,7 @@ UTC from 2025-11-01 12:00 to 2026-06-30 23:30.
   shifts: 5% of each Primary's half-hours, depth 0.15, 0.30, or 0.50 of capacity, length 3, 7, 15,
   or 30 days, random sign and start, added to the lag columns and never to the training target.
   Each stage draws its own world (seeds YYYYMM for stage 3, 2,000,000 + YYYYMM for stage 2, and
-  5,000,000 + YYYYMM for stage 1), shared by the 8 network seeds of a fold. Seeds are 0 to 7,
+  5,000,000 + YYYYMM for stage 1), shared by the 8 neural-network seeds of a fold. Seeds are 0 to 7,
   folds are the 8 monthly refits 2025-11 to 2026-06, and the GPU time was about 7 hours of
   wall-clock time on the shared workstation GPU (phase A0 about 0.2, phase A1 about 2.1, phase A2
   about 1.6, phase B about 2.5, the 660 banks about 0.3, and smoke tests about 0.1), against a
@@ -487,12 +516,15 @@ UTC from 2025-11-01 12:00 to 2026-06-30 23:30.
   script reads it. All arms and both baselines are scored on the same 2,492,233 half-hours. Capacity
   is the production effective-capacity table (`series_capacity.parquet` in
   `data/ml-experiments/backtest_year_2025-11_to_2026-10/`). The headline scores are the mean over
-  seeds of each seed's own MAE and CRPS. The two intervals are a bootstrap that resamples months and
-  then seeds within each month (50,000 draws), and a row-weighted t interval on the eight monthly
-  differences. The copied share is the sum of (change in the median forecast × shift) over the
-  sum of shift², on two banks of held-out shifts: the 581 bank (seed 9,000,000 + YYYYMM) and the 660
-  bank (seed 660,000 + YYYYMM). Non-inferiority uses a margin of 0.012. The families are H, S2, S3,
-  and the clean chain, each read at 98.33%.
+  seeds of each seed's own MAE and CRPS. The "GAM" row of the curtailment table is the stored
+  forecast of the Primary demand research default 3 (experiment 668's comparison, labelled in
+  `e00677_protocol.py`). This experiment does not refit it, and it is scored on the protocol rows
+  only. The two intervals are a bootstrap that resamples months and then seeds within each month
+  (50,000 draws), and a row-weighted t interval on the eight monthly differences. The copied share
+  is the sum of (change in the median forecast × shift) over the sum of shift², on two banks of
+  held-out shifts: the 581 bank (seed 9,000,000 + YYYYMM) and the 660 bank (seed 660,000 + YYYYMM).
+  Non-inferiority uses a margin of 0.012. The families are H, S2, S3, and the clean chain, each read
+  at 98.33%.
 
 ### Departures from the plan
 
@@ -500,6 +532,14 @@ UTC from 2025-11-01 12:00 to 2026-06-30 23:30.
   "Reference numbers from the stored arms" below. The experiment's arms, seeds, thresholds, and
   decision rule are as locked. `inputs.sha256` also records the cleaned-power Delta table's version
   and a hash of its dropped rows, which the plan did not ask for.
+- **The audit corrected the cause of the 24,060 extra rows.** The scorers drop the rows because the
+  climatology baseline is not finite on exactly those rows of series 12 and 13. Both series have
+  cleaned data only from 2025-05-07 and 2025-03-30, so no winter climatology cell exists before
+  each fold's cutoff. The manual heuristic and the neural network's own MAE are finite there, and
+  the drop would be the same on any version of the cleaned-power table with these start dates. This
+  replaces the explanation in "Reference numbers from the stored arms" below. Why the plan-time
+  printout still scored these rows is not known, because the table version that the plan read has
+  been vacuumed.
 - **The 660 bank is built on a panel sliced to the scored window.** The plan did not say how to
   build the bank's panel. `e00699_bank660.py` slices the panel to the scored window before
   `gen660.inject` (24 events per Primary and year, D15 unshifted), so the 660 bank's shifts fall in
@@ -508,7 +548,7 @@ UTC from 2025-11-01 12:00 to 2026-06-30 23:30.
   asserts that every forecast has 672 half-hours, so the filter cuts only the exported backtests
   and the bank files.
 - **The known-answer table's interval uses fixed seeds.** The copied-share interval of the
-  known-answer table fixes the network seeds and resamples months only, which reproduces
+  known-answer table fixes the neural-network seeds and resamples months only, which reproduces
   experiment 677's stored interval (−0.061 to −0.036).
 - **The folds of one chain run one after the other.** Experiment 677's `checks_fit.json` is one
   file for each arm folder, so two folds of one chain cannot run at once. The `early` and `clean`
@@ -524,11 +564,11 @@ UTC from 2025-11-01 12:00 to 2026-06-30 23:30.
 - **The mean forecast is an approximation.** It is the quantile function integrated over the 11
   stored levels.
 - **The bank runs write no `checks_fit.json`.** The bank-run folders hold no fit log.
-- **The clean chain's stage-1 epoch mean is over 32 fit logs.** The mean is 55.8 epochs over 32 fits
-  in the clean chain, against 54.0 over 64 fits in the early chain. The equal-budget check compares
-  counts and not these means.
+- **Only 32 of the clean chain's 64 stage-1 fits wrote an epoch log (cause not traced).** The mean
+  is 55.8 epochs over 32 fits in the clean chain, against 54.0 over 64 fits in the early chain. The
+  equal-budget check compares counts and not these means.
 - **The initial-weights check covers the early chain.** The equality of the initial weights of the
-  clean chain with those of a fresh network holds by code and is not recorded.
+  clean chain with those of a fresh neural network holds by code and is not recorded.
 - **The eight seeds of an arm share the fold's world,** so the intervals do not include the
   variance between worlds.
 - **The folds are the months of the Candidate's own development,** so the scores are not a ranking
@@ -560,7 +600,11 @@ UTC from 2025-11-01 12:00 to 2026-06-30 23:30.
   (private) holds `roots/{clean,stage2,early,stored}` (fits, exported forecasts, scores, and bank
   files, with `E00677_ROOT` redirected into each), `checks/` (the copied `checks_fit.json` files),
   `logs/` (every printed table of this page, as `families_8folds.txt`, `tables_8folds.txt`,
-  `bank_8folds.txt`, `sizing_phaseA.txt`, `checks.txt`, and `extras.txt`), and `inputs.sha256`.
+  `bank_8folds.txt`, `sizing_phaseA.txt`, `families_phaseA.txt`, `curtailment_sum.txt`,
+  `checks.txt`, and `extras.txt`), and `inputs.sha256`.
+- Experiment 677's `e00677_protocol.py` scores the protocol rows. Its output, which holds the
+  cold-night and curtailment tables and the "GAM" row, is in `roots/*/scores/protocol_p699/` and
+  `logs/protocol_{clean,early,stage2}.log` (private).
 - Experiment 677's `backtests/step5w_with_injected_sp1.parquet` and
   `step5wo_without_injected_sp1.parquet` are the stored forecasts that the known-answer table reads.
   They are never written.
