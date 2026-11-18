@@ -12,9 +12,9 @@ kind: other
 size: >-
   Complex. (1) It stores one export bundle per refit and arm (weights, standardisers, a config, and
   golden fixtures); (2) the bundle format is a design choice with several defensible layouts; (3) it
-  reads code from experiments 48, 397, 437, 560, 562, 569, 572, 574, 591, 677, and 704; (4) it
-  touches no serving path and no degradation rule; (5) it changes no contract. Reviews: code,
-  write-up, and prose.
+  imports code from experiments 48, 87, 397, 428, 437, 510, 558, 560, 562, 572, 578, 677, and 704;
+  (4) it touches no serving path and no degradation rule; (5) it changes no contract. Reviews:
+  code, write-up, and prose.
 hypothesis: >-
   A directory holding the step-5 network's weights per seed, its standardisers, its column order,
   its expected-weather rows, and a config that names every constant is enough for a script that
@@ -38,18 +38,18 @@ verdict: supported
 best_arm: >-
   Format version 1; largest per-seed quantile error 1.1e-5 of capacity against a tolerance of 2e-5.
 headline: >-
-  A 103 MB bundle reproduces the step-5 network's quantiles from torch, numpy, and polars alone, to
+  A 102 MB bundle reproduces the step-5 network's quantiles from torch, numpy, and polars alone, to
   1.1e-5 of capacity.
 lessons: >-
-  Production must interpolate each ENS member before averaging, must change its analysis proxy to
-  the ensemble mean of each run's first day, and cannot run a refit with a 2026-12-01 cut-off before
-  about 2026-12-06.
+  A port must keep the research order of interpolating each ENS member before averaging, must change
+  production's analysis proxy to the ensemble mean of each run's first day, and, if ERA5 arrives 5
+  days late, cannot run a refit with a 2026-12-01 cut-off before about 2026-12-06.
 take_home_message: >-
   Production can now rebuild the first demand forecast for the Primaries from a folder of files and
-  check its own feature code against reference values for every input column. Two production
-  functions need small changes first: the weather summary must average the 51 ensemble members
-  after interpolating them, and the recent-weather history must use the ensemble mean of each run's
-  first day. The December refit can first run on about 6 December 2026.
+  check its own feature code against reference values for every input column. The port must
+  average the 51 ensemble members only after interpolating them, and production's recent-weather
+  history needs a small change to use the ensemble mean of each run's first day. If ERA5 arrives 5
+  days late, the December refit can first run on about 6 December 2026.
 advice:
   - >-
     Hand production a model as a bundle of plain files with golden fixtures per input column, not as
@@ -61,8 +61,8 @@ advice:
     Build any recent-weather column in production from the ensemble mean at ENS leads of 9.5 to 33
     hours, as research does, not from member 0 of the freshest run (Finding 2).
   - >-
-    Plan a monthly refit for about 5 days after its cut-off, because pre-training reads ERA5 up to
-    3.5 hours before the cut-off (Finding 3).
+    If ERA5 arrives 5 days late, plan a monthly refit for about 5 days after its cut-off, because
+    pre-training reads ERA5 up to 3.5 hours before the cut-off (Finding 3).
 production_status: candidate
 adopted_in: none
 ---
@@ -128,7 +128,9 @@ missing encoding, which the check reproduces.
 **The reference check passes at all five origins and three seeds, in 7 seconds on a CPU.** The
 check runs as `python -I reference_check.py <bundle>`, which keeps the research folders off the
 import path, and it imports only the standard library, torch, numpy, and polars. The differences
-come from the stored forecasts' GPU pass against the check's CPU pass.
+are consistent with float32 rounding in the stored forecasts' GPU pass against the check's CPU
+pass, which the quantile bisection amplifies. The raw-output tolerance of 1e-5 is an extra
+tolerance of `reference_check.py`, beyond the prediction above.
 
 **The exporter reproduces the stored forecasts exactly before it writes the fixtures.** Re-running
 the prediction pass of the stored weights gives per-seed contract forecasts equal to experiment
@@ -150,7 +152,8 @@ native 3-hourly and 6-hourly steps, derives wind speed from each member's interp
 only then takes the member mean and the population standard deviation. On run 2026-04-01, this
 order reproduces the stored summary exactly. Averaging the 51 members first and interpolating once
 differs by up to 5.75 W/m2 in shortwave, 2.56 W/m2 in longwave, and 4.24 m/s in wind speed.
-Production already interpolates with the same function, so a port has to keep the same order.
+Production already has the interpolation function, so a port has to apply the function to each
+member and average afterwards.
 
 **Finding 2: the research analysis proxy differs from production's `select_analysis_proxy` in three
 ways.** Research takes the ensemble mean, where production takes member 0. Research takes each
@@ -169,8 +172,10 @@ ERA5 rows of pre-training arrive about 5 days late, so ERA5 up to 2026-11-30 20:
 about 2026-12-05 evening. The other inputs are ready earlier: NGED power to 2026-11-30 20:30 by
 about 2026-12-01 02:30, assuming the 6-hour delay of the production contract, and the 00Z ENS run of
 2026-11-30 on that day. Forecasts for origins 2026-12-01 to 2026-12-05 would therefore use the
-November weights, whose offset is held flat past its newest knot. The ERA5 lag and the NGED delay
-are assumptions, not measured here, and the run time of the chain is not included.
+November weights, whose offset is held flat past its newest knot. The 5-day ERA5 lag comes from the
+port brief and the 6-hour NGED delay from the production contract's port notes; neither was
+measured here, no production constant records the NGED delay, and the run time of the chain is not
+included.
 
 ## Method
 
@@ -185,6 +190,7 @@ are assumptions, not measured here, and the run time of the chain is not include
 ## Files
 
 - Code: `ml-experiments/00705-production-export-bundle-for-the-primaries-step-5-network/`. The
-  scripts import experiments 48, 397, 437, 560, 562, 569, 572, 574, 591, 677, and 704.
+  scripts import experiments 48, 87, 397, 428, 437, 510, 558, 560, 562, 572, 578, 677, and 704,
+  and load experiment 574's fit module through experiment 677's stored chain.
 - Bundles: `data/ml-experiments/00705-production-export-bundle-for-the-primaries-step-5-network/bundles/<arm>/<month>/`.
 - Findings: `findings.txt` and `findings_evidence.json` in the same data folder.
