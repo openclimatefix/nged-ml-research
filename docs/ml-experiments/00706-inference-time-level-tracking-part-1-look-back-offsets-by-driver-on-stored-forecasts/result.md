@@ -88,6 +88,12 @@ look-back mean follows recipe R of [experiment 115](../00115-differentiable-phys
   runs only if stage 1's global or driver-split arm improves event-free CRPS by a point estimate of
   0.02 or more. The stage 2 design is rewritten before any stage 2 script is written.
 
+**Stage 2 gate override (2026-11-18, post hoc).** Stage 1 did not reach the pre-registered gate:
+the lead-band global offset was +0.026 CRPS points worse than the stored normal-running forecast on
+event-free rows (99.17% interval -0.070 to +0.179), although it gained 0.13 points on day 1 and 0.10 on
+day 2 and lost beyond day 5. The maintainer told the worker to run stage 2 anyway, so every stage 2
+result is labelled post hoc and outside the pre-registered gate.
+
 ## Plan
 
 The full design, with the Opus review and its triage, is the private file
