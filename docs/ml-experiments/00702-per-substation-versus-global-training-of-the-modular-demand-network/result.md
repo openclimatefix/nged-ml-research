@@ -8,16 +8,17 @@ theme: hierarchy-and-pooling
 also_relevant_to:
   - production-reference-and-best-guess
   - retraining-and-training-history
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
-  Anything else (not simple). (1) What gets stored: about 780 small neural networks (16 Primaries
-  times 4 folds times 3 seeds times 4 per-substation arms, plus 12 extra global fits), their
-  forecasts, and the scores, all private. (2) More than one defensible design: yes (where the
-  network is split, what replaces the pooled statistics, the batch size, the blend rule), so each
-  choice is fixed in this plan. (3) Spans code whose callers cannot be named without searching:
-  yes (experiments 397, 418, 448, 510, 511, 559, 560, 572, 574, 581, 591, 613, 667, and 677).
+  Anything else (not simple). (1) What gets stored: about 1,755 small neural networks (16 Primaries
+  times 9 folds times 3 seeds times 4 per-substation arms, plus 27 extra global fits; the plan
+  sized 4 folds and about 780 neural networks), their forecasts, and the scores, all private. (2)
+  More than one defensible design: yes (where the neural network is split, what replaces the
+  pooled statistics, the batch size, the blend rule), so each choice is fixed in this plan. (3)
+  Spans code whose callers cannot be named without searching: yes (experiments 397, 418, 448, 510,
+  511, 559, 560, 572, 574, 581, 591, 613, 667, and 677).
 hypothesis: >-
   A K1 demand neural network trained on one Primary's rows alone forecasts that Primary better
   than the one K1 neural network trained on the pooled rows of all 16 Primaries. The claim is
@@ -59,448 +60,529 @@ metric: >-
   over the 16 Primaries, with the normalised mean absolute error of the median forecast beside it.
   Also q01, q05, q95, and q99 coverage and pinball loss, every Primary on its own row, the lead
   bands of the demand protocol, and the copied share of a held-out injected load shift.
+verdict: inconclusive
+best_arm: >-
+  None. The global neural network scores a CRPS of 4.065 points of capacity on the four test
+  months. Split-at-3, the per-substation arm closest to the global arm, scores 4.048, and the
+  planned contrast C3 is -0.020 points with a 99% interval of -0.085 to +0.044.
+headline: >-
+  All five planned contrasts are `inconclusive` on the four test months. On nine months (five added
+  after the four were scored, post hoc), the fully separate arm is worse than the global arm by
+  0.177 points of CRPS (99% interval 0.066 to 0.303), and the arm that separates only the last
+  training step differs by +0.014 (-0.041 to +0.061).
+lessons: >-
+  The design could not resolve a difference of 0.05 points: the interval of the smallest contrast
+  is about 0.06 points either side of its mean on four months and 0.05 on nine. D15 and D18, the
+  two Primaries with the shortest history and an unlogged level step each, carry most of the spread
+  between Primaries. A per-substation neural network pre-trained on D15's rows alone stops early at
+  a poor validation loss, which is where the fully separate arm loses most.
+take_home_message: >-
+  Training one neural network per substation did not forecast demand better than one neural
+  network trained on all 16 substations together. Neural networks trained wholly apart were worse
+  on average, and neural networks that share the early training and separate only the last step
+  scored the same as the shared neural network to within the noise of the test. The test could not
+  rule out a small gain or loss, so the shared neural network stays the simpler choice.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Keep one K1 neural network across the Primaries as the default: no per-substation arm scored
+    clearly below the global arm on four or nine months, and the fully separate arm was worse by
+    0.18 points of CRPS on nine months (C1, post hoc set).
+  - >-
+    Do not pre-train a neural network on one short-history Primary alone: at D15 the per-substation
+    pre-training stopped after a median of 13 epochs at a validation loss of 0.9 to 1.2, and the
+    fully separate arm lost 0.9 to 1.2 points at D15 and 0.4 to 0.7 points at D18 (Per-Primary
+    pattern).
+  - >-
+    Size a screen for the smallest gain worth having before the screen runs: four months, 16
+    Primaries, and 3 seeds gave a 99% interval about 0.06 points either side of the smallest
+    contrast, wider than the 0.05-point threshold (C3).
+  - >-
+    Report every pooled Primary contrast with D15 left out and with D18 left out for origin months
+    from 2026-03 on, because each has an unlogged level step that moves the pooled CRPS by 0.7 to
+    1.7 points in the month of the step (What the steps at D15 and D18 do).
+  - >-
+    Do not blend a global forecast with a per-substation forecast at equal weights: the blend was
+    worse than the mean of two global seeds by 0.05 points on four months and 0.03 on nine, and no
+    weight from 0.1 to 0.5 on the per-substation forecast beat the second global seed (C4 and the
+    audit, post hoc).
+  - >-
+    When fitting one Primary of 16, consider a batch of about one sixteenth of the pooled batch, and
+    test the choice: on the first run (one seed, one fold, three Primaries) split-at-1 scored 7.57
+    at a batch of 512 against 8.79 at 8,192, but split-at-3 at D2 scored better at 8,192 (First run
+    and batch diagnostic).
 code: ml-experiments/00702-per-substation-versus-global-training-of-the-modular-demand-network/
 ---
-Planned. The write-up follows the run. The rest of this page is the plan.
+**We asked whether a demand forecast improves when each substation has its own neural network.**
+Today one neural network learns from the demand of all 16 Primary substations at once. We trained
+16 separate neural networks as a replacement, in three ways: wholly apart, apart after the first of
+three training steps, and apart for the last step only. We scored every version on the same daily
+14-day forecasts for four months chosen in advance, and later for five more months. The score is
+the continuous ranked probability score (CRPS), an error measure for a forecast that gives a range
+of outcomes, in points of capacity (percent of a substation's capacity; smaller is better).
 
-## The question
+**No version with separate neural networks beat the shared neural network.** Neural networks
+trained wholly apart were worse on average, by about 0.2 points on a score near 4.1. Neural
+networks that shared the first two training steps scored level with the shared neural network, to
+within about 0.06 points either way. The test was too noisy to say more than that: a gain or loss
+smaller than about 0.06 points would not have shown.
 
-**The Primaries are forecast today by one neural network that learns from all 16 Primaries at
-once, and this experiment asks whether 16 separate neural networks would forecast better.** The
-network is K1, the modular demand neural network of [experiment
-667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md), described
-on the [final models page](../final-models.md) under "Training regime". K1 has a weather encoder, a
-date-time encoder, one shared lag encoder, and a mixer. K1 has no neighbour columns and no gap
-signal columns, so no row of K1 reads another Primary's power. Every arm below uses K1 unchanged
-except for the difference the arm names.
+## Verdict
 
-**Earlier experiments point in both directions.** For XGBoost models, [experiment
-24](../00024-pooling-groupings-demand-xgboost/result.md) found that one model per Primary beat one
-model across all series by 0.29 points. For the neural network, [experiment
-677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md) found that
-pre-training on six years of ERA5 and CAMS weather lowered the error by 0.59 points, and a
-per-substation network has one sixteenth of those pre-training rows.
+**The verdict is `inconclusive` for all five planned contrasts, on the four test months and on the
+nine months.** The pre-registered rule needs an interval that excludes zero, the same sign in every
+month, and the same result with D15 left out and with D18 left out. No contrast meets all three
+conditions in either direction. The hypothesis that a per-substation neural network forecasts
+better is not supported, and the plan's rule does not refute the hypothesis.
 
-## What the global arm does, confirmed from the code
+**"Inconclusive" has a different meaning for each contrast.**
 
-**The maintainer's description of the training schedule matches the code, with one addition: step
-3 also injects synthetic load shifts into the lag inputs.** The schedule was read from
-`e00574_fit.py`, `e00591_arm.py`, `e00613_arm.py`, `e00667_k1.py`, and `e00677_k1.py`.
+- **Split-at-1 (every step per Primary) is worse on average, and on nine months misses `refuted`
+  by one condition.** On the four test months the contrast is positive in every month, and the
+  lower bound of the interval is -0.009 with all 16 Primaries and -0.056 with D18 left out. On nine
+  months the interval excludes zero (0.066 to 0.303) with any
+  one Primary left out, and the contrast is negative in one month, 2026-02 (-0.03).
+- **Split-at-3 (only the last step per Primary) is level with the global arm.** The contrast is
+  -0.020 on four months and +0.014 on nine, and both intervals span zero. The intervals reach
+  -0.085 and +0.061, so a difference of the plan's threshold size, 0.05 points, lies inside them.
+- **Split-at-2, the blend, and the two extra encoders all have positive means and intervals that
+  span zero.**
 
-- **Step 1** pre-trains every weight on ERA5 and CAMS pseudo-runs from 2019-09-01 (7.1 to 8.1
-  million rows per fold), with AdamW, learning rate 0.0005, batch 8,192, 20% of the rows per epoch,
-  up to 60 epochs, and patience 8.
-- **Step 2** discards the pre-training mixer, draws a fresh mixer with seed 12345, freezes the
-  weather and date-time encoders, and trains on up to 730 days of ENS rows with uniform weights and
-  a 3-day embargo. The first ENS rows that the folds keep are from the run of 2024-04-10, because
-  the first 9 days of runs fall in a purge, so the 2025-11, 2026-01, and 2026-04 folds hold 570,
-  631, and 721 days. The lag encoder, the lag-identity embedding, the Primary embedding, and the newest
-  offset knot stay trainable at learning rate 0.0002, and the fresh mixer trains at 0.0005.
-- **Step 3** fine-tunes from the step-2 weights with the same frozen encoders, a 90-day half-life,
-  a 7-day embargo, half weight on the next 7 days, and the synthetic lag-only load shifts of
-  [experiment 581](../00581-robust-multiweek-lag-encoder-x3/result.md). With monthly refits there is
-  one fine-tune per fold, at the first day of the test month.
-- **The Primary embedding** (8 wide) is read by the weather encoder, the date-time encoder, the lag
-  encoder, and the mixer. **The lag-identity embedding** (8 wide, 2 rows) tells the shared lag
-  encoder whether a row is the day lag or the week lag, and holds nothing about a substation.
-  **The offset** is one row of monthly knots per Primary, added to the three component means.
+**Three sources of evidence would narrow the answer.** The three unscored months of the backtest
+year, 2026-08 to 2026-10, lie in the final-test window and need the maintainer's approval. More
+seeds, or a second build of each arm, would narrow the intervals. The contrasts at D15 and D18
+would be easier to read once the level step at each Primary is logged or masked.
 
-**Four statistics of the global arm are pooled across the 16 Primaries, and a per-substation
-network must not use them.** They are the input standardiser (`Standardiser.fit` in
-`e00397_prep.py`), the lag mean and standard deviation (`lag_stats` in `e00572_lags.py`), the scale
-of the 14 thermal-lag and solar-gain columns (`pretrain_b1_columns` in `e00574_fit.py`), and the
-median ensemble spread per lead band that fills the spread columns in pre-training (`spread_table`
-in `e00448_run.py`). The early-stopping rows are pooled as well. The target mean and standard
-deviation are already per Primary.
+## Scores
 
-## Control arm
+**The global arm has the lowest or second-lowest CRPS in both sets of months, and every neural
+network beats the manual heuristic and climatology.** Each score is for the mean forecast of an
+arm's three seeds. `nMAE` is the mean absolute error of the median forecast, in points of capacity.
+The four months hold 926,549 scored rows and the nine months 2,075,166. A row is one Primary, one
+12:00 UTC forecast, and one half-hour at a lead under 240 hours.
 
-**The global arm is the stored forecast of experiment 677, and nothing is retrained for it.** Step
-5 of experiment 677 with injected events at monthly refits is K1 with all three steps. Experiment
-667 itself stores K1 only as far as step 2, because its step 3 is the Candidate's.
+| System | CRPS, four months | nMAE, four months | CRPS, nine months (post hoc) | nMAE, nine months (post hoc) |
+|---|---:|---:|---:|---:|
+| global (stored, experiment 677) | 4.065 | 7.04 | 4.035 | 7.11 |
+| split-at-3 | 4.048 | 7.01 | 4.049 | 7.13 |
+| split-at-2 | 4.115 | 7.14 | 4.087 | 7.20 |
+| split-at-2-plus-encoders | 4.176 | 7.25 | 4.146 | 7.31 |
+| split-at-1 | 4.347 | 7.59 | 4.254 | 7.54 |
+| blend of global and split-at-1 | 4.132 | 7.19 | 4.075 | 7.21 |
+| global, six seeds | 4.073 | 7.07 | 4.039 | 7.12 |
+| manual heuristic | 4.943 | 8.51 | 4.864 | 8.49 |
+| climatology | 5.864 | 10.47 | 5.797 | 10.45 |
 
-- **Forecasts:** `00677-*/backtests/step5w_with_injected_sp1.parquet`, 11 quantiles per (Primary,
-  12:00 UTC origin, valid half-hour), seeds 0, 1, and 2, origins 2025-11-01 to 2026-10-31.
-- **Weights:** `00677-*/chains/5/<month>/work/pretrained_P2/` and `step2/P5/` (steps 1 and 2), and
-  `00677-*/arms/k1_5w_sp1/work/models/P5/` (step 3), for the 12 folds and seeds 0 to 2.
-- **Match check before any new fit.** The scoring script of this experiment rescores the stored
-  file and must reproduce experiment 677's stored monthly scores to within 0.01 points. The
-  rescore uses the rows that experiment 677 scored, from its `rows.parquet`, because the
-  cleaned-power table that supplies the observed power has since dropped the readings of D15
-  before 2025-05-07 and of D18 before 2025-03-30. On the current table, 4,704 rows of D18 in
-  2025-11 and 5,244 rows of D15 and D18 in 2026-01 have no climatology, so every arm of this
-  experiment is scored without them. The first
-  run then refits the global arm once (seed 0, the pilot fold) through this experiment's code path
-  with the per-substation switch off. The refit must score within the largest pairwise difference
-  between the stored seeds 0 to 2 on that fold. If either check fails, the global arm is refitted
-  for the four test months with seeds 0 to 2 and the stored file is not used.
+**Every neural network's outer quantiles are too narrow, most of all at the lower tail.** On the
+four test months 3.6% to 4.6% of the rows fall at or below q01, against 1% nominal, and 9.9% to
+12.1% at or below q05, against 5%. At the upper tail 3.2% to 3.8% of the rows fall above q99,
+against 1%. On nine months the share at or below q01 is 2.4% to 3.2%. The per-substation arms
+cover the lower tail worse than the global arm, and the arms differ by less than 0.7 points of
+coverage at q99. In the table, coverage is the percentage of rows at or below the quantile, and
+the pinball loss is in points of capacity, both on the four test months.
 
-## Arms
+| System | q01 coverage | q05 coverage | q95 coverage | q99 coverage | q01 pinball | q05 pinball | q95 pinball | q99 pinball |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| global (stored, experiment 677) | 3.70 | 9.93 | 91.46 | 96.72 | 0.320 | 0.979 | 1.183 | 0.425 |
+| split-at-3 | 4.42 | 11.36 | 90.93 | 96.62 | 0.332 | 0.995 | 1.139 | 0.405 |
+| split-at-2 | 4.58 | 12.06 | 91.50 | 96.84 | 0.337 | 1.011 | 1.162 | 0.424 |
+| split-at-2-plus-encoders | 4.62 | 11.99 | 91.22 | 96.69 | 0.349 | 1.033 | 1.187 | 0.454 |
+| split-at-1 | 3.98 | 10.86 | 90.15 | 96.15 | 0.319 | 1.018 | 1.244 | 0.485 |
+| blend of global and split-at-1 | 3.61 | 10.03 | 91.19 | 96.64 | 0.310 | 0.981 | 1.193 | 0.446 |
+| global, six seeds | 3.61 | 9.87 | 91.57 | 96.84 | 0.320 | 0.977 | 1.175 | 0.420 |
+| manual heuristic | 6.08 | 8.36 | 86.28 | 89.70 | 0.395 | 1.060 | 1.489 | 0.765 |
+| climatology | 1.66 | 5.76 | 91.69 | 96.46 | 0.305 | 1.235 | 1.629 | 0.686 |
 
-**The arms are a ladder of split points, so each step down the ladder isolates one phase of
-training.** The maintainer's five proposals are all kept. One arm is added (split-at-3), and one
-reference is added so that the blend is compared at an equal number of fits.
+**The planned contrasts pair single seeds, so a contrast is not the difference of two rows of the
+table above.** Each cell below is the mean difference with its 99% interval. The interval comes
+from 20,000 resamples of 7-day blocks of forecast days and one seed.
 
-| Arm | Maintainer's name | Step 1 (ERA5 and CAMS) | Step 2 (fresh mixer) | Step 3 (fine-tune) | New fits per fold |
-|---|---|---|---|---|---|
-| global | Global | pooled | pooled | pooled | none (stored) |
-| split-at-3 | added | pooled (stored) | pooled (stored) | per Primary | 16 times 3 seeds, step 3 only |
-| split-at-2 | Hybrid 2 | pooled (stored) | per Primary | per Primary | 16 times 3 seeds, steps 2 and 3 |
-| split-at-1 | Per-substation | per Primary | per Primary | per Primary | 16 times 3 seeds, all steps |
-| split-at-2-plus-encoders | Hybrid 3 | pooled (stored) | per Primary, with two new encoders | per Primary | 16 times 3 seeds, steps 2 and 3 |
-| blend | Hybrid 1 | global and split-at-1 | | | none |
-| global-pair | added reference | pooled | pooled | pooled | 3 global seeds (3, 4, 5) |
+| Contrast, four test months | Mean [99% interval] | Months above zero | Interval without D15 | Interval without D18 | Mean without 2026-01 | Verdict |
+|---|---|---|---|---|---:|---|
+| C1 split-at-1 minus global | +0.220 [-0.009, +0.475] | 4 of 4 | [+0.041, +0.380] | [-0.056, +0.448] | +0.193 | inconclusive |
+| C2 split-at-2 minus global | +0.012 [-0.146, +0.155] | 3 of 4 | [-0.024, +0.178] | [-0.113, +0.169] | +0.010 | inconclusive |
+| C3 split-at-3 minus global | -0.020 [-0.085, +0.044] | 1 of 4 | [-0.083, +0.055] | [-0.060, +0.067] | -0.021 | inconclusive |
+| C4 blend minus two global seeds | +0.054 [-0.015, +0.161] | 4 of 4 | [-0.005, +0.139] | [-0.032, +0.143] | +0.061 | inconclusive |
+| C5 plus-encoders minus split-at-2 | +0.049 [-0.120, +0.224] | 2 of 4 | [-0.129, +0.196] | [-0.131, +0.188] | +0.001 | inconclusive |
 
-**Split-at-3 is added because it is the cheapest per-substation change and it completes the
-ladder.** Split-at-3 takes the stored global step-2 network and runs only the recency-weighted
-fine-tune on one Primary's rows. The three adjacent differences then each isolate one phase:
-split-at-3 minus global is the per-substation fine-tune, split-at-2 minus split-at-3 is the
-per-substation fresh mixer, and split-at-1 minus split-at-2 is pooled pre-training together with
-the Primary embedding and the pooled statistics. A fourth cell, per-substation pre-training
-followed by pooled fine-tuning, is left out, because 16 separately pre-trained encoder sets cannot
-feed one shared mixer without a new architecture.
+**The nine-month table is post hoc: the five extra months were fitted and scored after the
+four-month result was seen.** The plan's rule is applied unchanged, with "each month" read as each
+of the nine.
 
-**What happens to the embedding, the lag-identity embedding, the offset, and the statistics in each
-arm:**
+| Contrast, nine months (post hoc) | Mean [99% interval] | Months above zero | Interval without D15 | Interval without D18 | Mean without 2026-01 | Verdict |
+|---|---|---|---|---|---:|---|
+| C1 split-at-1 minus global | +0.177 [+0.066, +0.303] | 8 of 9 | [+0.039, +0.223] | [+0.046, +0.300] | +0.161 | inconclusive |
+| C2 split-at-2 minus global | +0.042 [-0.078, +0.172] | 8 of 9 | [+0.010, +0.159] | [-0.063, +0.185] | +0.045 | inconclusive |
+| C3 split-at-3 minus global | +0.014 [-0.041, +0.061] | 4 of 9 | [-0.026, +0.055] | [-0.027, +0.074] | +0.018 | inconclusive |
+| C4 blend minus two global seeds | +0.031 [-0.014, +0.087] | 7 of 9 | [-0.015, +0.076] | [-0.013, +0.082] | +0.030 | inconclusive |
+| C5 plus-encoders minus split-at-2 | +0.033 [-0.080, +0.142] | 4 of 9 | [-0.044, +0.155] | [-0.092, +0.129] | +0.013 | inconclusive |
 
-| Arm | Primary embedding | Lag-identity embedding | Offset knots | Input statistics | Frozen parts |
-|---|---|---|---|---|---|
-| global | 16 rows, learnt | learnt | 16 rows; only the newest knot trains in steps 2 and 3 | pooled | weather and date-time encoders in steps 2 and 3 |
-| split-at-3 | the Primary's stored row, still trainable | stored, trainable | the Primary's row; newest knot trains | the fold's pooled statistics (the stored encoders were trained on them) | as global |
-| split-at-2 | as split-at-3 | as split-at-3 | as split-at-3 | as split-at-3 | as global |
-| split-at-1 | set to zero and frozen, so every part reads zeros and the layer shapes stay those of K1 | learnt per network | one row, all knots learnt in step 1 | fitted on the Primary's own training rows only | as global, on the Primary's own encoders |
-| split-at-2-plus-encoders | as split-at-2 | as split-at-2 | as split-at-2 | as split-at-2 | the pre-trained encoders; the two new encoders train |
+![The five planned contrasts with their 99% intervals, on the four test months and on nine months.
+Only the nine-month interval of C1 excludes zero.](contrasts_four_and_nine_months.svg)
 
-- **Split-at-1 never reads another Primary's data in any phase.** The input standardiser, the lag
-  statistics, the scale of the thermal-lag and solar-gain columns, the spread fill of pre-training,
-  the early-stopping rows, and the gradient rows all come from the one Primary. The weather is that
-  of the Primary's own H3 resolution-5 cell (a hexagonal grid cell). Two Primaries in one cell read
-  the same weather, which is public weather and not substation data.
-- **Split-at-1 refits the four statistics with the functions the global arm uses, on one Primary's
-  rows.** `Standardiser.fit` runs on the Primary's training rows of the fold, `lag_stats` on its
-  lag values, the scale of the thermal-lag and solar-gain columns on its pre-training rows, and
-  `spread_table` on its ENS rows. Each set of statistics is stored per fold and Primary with a
-  hash, and the prediction phase checks the hash.
-- **Zeroing the embedding is how "no substation-ID embedding" is done.** With one Primary an
-  embedding row would be a constant input, which the first-layer biases already supply. Setting the
-  row to zero and freezing it removes the embedding exactly and keeps the stored code paths
-  (experiment 677's `LadderMdn` removes input groups the same way).
-- **Split-at-2 and split-at-3 keep the embedding row,** because the frozen pre-trained encoders
-  were trained with that row as an input.
-- **The new encoders of split-at-2-plus-encoders** are a second weather encoder (7 weather means
-  and the 14 thermal-lag and solar-gain columns, to 64 hidden units, to 32 outputs) and a second
-  date-time encoder (21 columns, to 64, to 32), with no embedding input. Their 64 outputs enter the
-  mixer beside the 145 existing inputs, so the mixer has 209 inputs. The new encoders start from a
-  random draw with the fit's seed, train in step 2 at 0.0005 and in step 3 at 0.0002, and never
-  pre-train. The lag encoder keeps reading the frozen pre-trained encoders only. C5 therefore
-  measures the two new encoders together with a mixer that is 64 inputs wider.
-- **The synthetic load shifts of step 3 are the same in every arm.** `synthetic_clean` in
-  `e00581_bank.py` draws the schedule from the seed and from the first and last grid index of the
-  training span, for all 16 Primaries in order. The global arm takes that span from its pooled
-  rows. Every per-substation arm instead computes the span from the fold's constants (the cut-off,
-  the 730-day window, and the first kept ENS target, 2024-04-10 09:30 UTC), asserts that the span
-  equals the global arm's, calls `synthetic_clean` with the 16-row power array, and keeps the one
-  Primary's row. The schedule then depends on no other Primary's data, and a Primary's shifted
-  lags are equal across arms. A check asserts both.
+**Three of the four predictions failed.** P1 held: split-at-1 is worse by 0.22 points, inside the
+predicted 0.05 to 0.30, and its largest losses on the four months are at D15 (+0.89), D18 (+0.67),
+and D8 (+0.55). P2 failed on the width of the intervals, not on their direction: neither interval
+of C2 or C3 lies inside plus or minus 0.05, and both intervals span zero. P3
+failed with the opposite sign: the blend is worse than the mean of two global seeds. P4 failed,
+because the interval of C5 is wider than plus or minus 0.03.
 
-**The blend rule is fixed here: the mean of the two forecasts, quantile by quantile, sorted.** The
-blend averages each of the 11 quantiles of the global forecast and the split-at-1 forecast with
-equal weights and sorts the result within the row, which is the rule that already averages seeds.
-The blend holds six fits (three global seeds and three split-at-1 seeds), so its planned contrast
-is against six global seeds (0 to 5), never against three. The seed-level pairs for the interval
-are the mean of global seed `s` and split-at-1 seed `s` against the mean of global seeds `s` and
-`s + 3`, for `s` of 0, 1, and 2. The global seeds 3, 4, and 5 are new fits of the unchanged global
-chain. They are fitted by a copy of experiment 677's `chain.sh` (step `5w`, span 1) in this
-experiment's folder, which reads the fold's stored statistics from experiment 677 and writes only
-to this experiment's data folder. The blend against the three-seed global arm is reported as
-exploratory.
+![The mean of each planned contrast in each of the nine scored months. No contrast has the same sign
+in all nine months.](contrasts_by_month.svg)
 
-**Every per-substation phase uses a batch of 512 rows, one sixteenth of the global batch, and the
-batch is fixed here.** A Primary has about one sixteenth of the pooled rows. With 20% of the rows
-per epoch, the global arm takes about 173 to 198 gradient steps per epoch in step 1 and about 114
-in steps 2 and 3. At the global batch of 8,192 a per-substation epoch would take about 11 to 12
-steps in step 1 and about 7 in steps 2 and 3, so the comparison would measure the step count. A
-batch of 512 gives a per-substation network about the same number of steps per epoch as the global
-network. Learning rates, the epoch limit, patience, dropout, weight decay, and the 20% row fraction
-are unchanged. The first run also fits split-at-1 and split-at-3 at a batch of 8,192, and those
-fits are a diagnostic that changes no setting.
+**The sign of each contrast changes from month to month, except for C1 and C4 on the four test
+months.** Among the four test months, C1 is largest in 2025-11 (+0.37), the fold with the least
+history at D15 and D18, and smallest in 2026-07 (+0.04). C3 is positive in 2025-11, 2025-12,
+2026-03, and 2026-06, and negative in the other five months.
 
-**Early stopping uses the Primary's own held-out weeks, and a phase with too few held rows trains
-for a fixed number of epochs.** The held weeks are the same absolute weeks as the global arm's (one
-week in 12). When a Primary has fewer than two held weeks with at least 1,000 rows each in a phase,
-that phase trains for 60 epochs in step 1, 20 epochs in step 2, and 10 epochs in step 3, and keeps
-the last epoch's weights. The three counts are constants of this plan, like the learning rates.
-They are near the stopping epochs in the stored logs of the global arm (53 to 60, 17 to 25, and 9
-to 19). A fixed count was chosen over a hold-out of the Primary's newest two weeks, because with a
-90-day half-life the newest rows carry the most weight in step 3 and a short history has few of
-them. No run-time quantity of another Primary enters the rule. D15 and D18 in the 2025-11 fold,
-with eight months of history, are the likely cases.
+## Per-Primary pattern
 
-## Test months
+**At no Primary does the interval of any contrast lie below zero, in either set of months.** For
+C1 the interval lies above zero at D18 and D19 on the four months, and at D9, D18, and D19 on the
+nine. For C3 the interval lies above zero at D19 on the four months only (0.00 to 0.26). Each
+per-Primary interval is a 99% interval, with no correction for reading 16 intervals.
 
-**The four test months are 2025-11, 2026-01, 2026-04, and 2026-07, selected by the rule below from
-stored weather.** The selection was fixed before any arm of this experiment was fitted or scored.
-`e00702_months.py` prints the table. The weather columns are ERA5 means over the grid cells of the
-16 Primaries. Each anomaly is the month's mean minus the mean of the same calendar month in 2019-09
-to 2025-10, in standard deviations of those earlier yearly means. Six earlier years set each
-standard deviation, so an anomaly ranks the 12 months and is not a climatological statistic. The
-last three columns are the CRPS of the stored control at leads of 0 to 240 hours, in points of
-capacity: over the 16 Primaries, at D15 alone, and at D18 alone. The script also writes, for each
-month, the largest fall in the control's pooled CRPS from leaving one Primary out, which rule 5
-reads.
+![Contrasts C1 and C3 for each of the 16 Primaries, on the four test months and on nine months. No
+interval lies below zero.](per_primary_c1_c3.svg)
 
-| Month | Temperature (°C) | Temperature anomaly | Shortwave (W m⁻²) | Shortwave anomaly | Wind (m s⁻¹) | Wind anomaly | Demand (share of capacity) | Control CRPS | D15 CRPS | D18 CRPS |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| **2025-11** | 8.74 | +0.64 | 34.9 | -0.46 | 6.22 | +2.46 | 0.58 | 3.32 | 8.8 | 2.1 |
-| 2025-12 | 7.38 | +1.08 | 22.5 | +0.27 | 6.22 | +0.71 | 0.61 | 4.02 | 9.3 | 3.1 |
-| **2026-01** | 4.18 | -0.52 | 27.1 | -2.01 | 5.88 | +0.51 | 0.65 | 3.98 | 8.0 | 2.1 |
-| 2026-02 | 6.59 | +0.13 | 44.5 | -2.21 | 5.61 | -0.53 | 0.61 | 3.50 | 9.1 | 2.1 |
-| 2026-03 | 7.97 | +1.13 | 114.7 | +0.12 | 5.22 | -0.04 | 0.55 | 5.13 | 30.5 | 2.6 |
-| **2026-04** | 9.91 | +0.69 | 196.5 | +0.46 | 5.22 | +0.55 | 0.48 | 4.01 | 11.3 | 2.3 |
-| 2026-05 | 13.46 | +0.91 | 229.3 | +0.74 | 4.42 | -0.08 | 0.43 | 3.97 | 15.8 | 2.3 |
-| 2026-06 | 17.39 | +1.36 | 225.1 | -0.32 | 4.82 | +0.62 | 0.42 | 3.45 | 10.7 | 3.5 |
-| **2026-07** | 19.01 | +1.65 | 245.6 | +3.54 | 4.71 | +0.72 | 0.44 | 4.95 | 15.4 | 15.4 |
-| 2026-08 | 18.42 | +0.96 | 203.7 | +1.85 | 4.21 | -0.81 | 0.43 | 4.67 | 12.8 | 12.7 |
-| 2026-09 | 16.57 | +1.42 | 125.3 | -0.39 | 4.93 | +0.48 | 0.46 | 4.06 | 12.9 | 8.9 |
-| 2026-10 | 12.39 | +0.59 | 73.4 | +0.72 | 5.59 | +0.80 | 0.52 | 4.01 | 9.3 | 6.8 |
+- **Split-at-1 gains at 4 Primaries and loses at 12 on the four months.** The four with a
+  negative mean are D2, D3, D5, and D21, each by 0.05 points or less. The largest losses are at D15
+  (+0.89), D18 (+0.67), D8 (+0.55), D10 (+0.37), and D19 (+0.31).
+- **Split-at-2 scores below the global arm at 4 of the 16 Primaries on the four months, and
+  split-at-3 at 8.** On nine months the counts are 3 and 6. The blend scores below the mean of two
+  global seeds (C4) at 5 Primaries on the four months and 7 on nine, and the extra encoders score
+  below split-at-2 (C5) at 5 and 7.
+- **Split-at-2 and split-at-3 have their largest gains at D15 and D18 on the four months, and both
+  intervals span zero.** Split-at-2 is -0.88 at D15 (-3.66 to +0.55) and -0.42 at D18. Split-at-3
+  is -0.25 at D15 and -0.31 at D18. On nine months split-at-3 is +0.02 at D15 and -0.13 at D18.
+- **The 12 Primaries with 6 years of history or more show a loss for split-at-2.** Their pooled
+  C2 is +0.105 (0.027 to 0.227) on four months and +0.100 (0.038 to 0.190) on nine. Their C3 is
+  +0.021 and +0.025, with intervals that span zero.
+- **Split-at-1 by metering group, four months:** +0.134 (0.029 to 0.248) at the 6 Primaries
+  metered in signed MW, +0.156 (-0.098 to 0.430) at the 8 metered in MVA only, and +0.777
+  (-0.323 to 1.955) at D15 with D18.
+- **By lead, C1 is about constant and C3 drifts upwards.** On the four months C1 is +0.26 at days 0
+  to 1 and +0.20 at days 7 to 10. C3 is -0.05 at days 0 to 1 and 0.00 at days 7 to 10.
 
-**The selection rule takes one month per season, each for a different weather scenario:**
+**Pre-training on D15's rows alone stops early.** In split-at-1, step 1 at D15 has 53,485 to
+106,168 training rows, about one ninth to one fifth of the 490,706 to 543,980 rows at D2. D15's
+step 1 stops after a median of 13 epochs at a validation loss of 0.9 to 1.2. D2's stops after a
+median of 42 epochs at a validation loss near -0.1. A short history does not explain the early
+stop by itself: D18's step 1, with 51,851 to 104,980 rows, runs for a median of 54 epochs. The
+fixed-epoch rule of the plan never applied: every phase of every Primary had enough held weeks to
+stop early, and no phase had fewer than three held weeks.
 
-1. **Winter (December to February), the cold scenario:** the month with the lowest temperature
-   anomaly. January 2026 is the only month of the 12 that was colder than normal, and has the
-   highest demand.
-2. **Summer (June to August), the sunny scenario:** the month with the highest shortwave anomaly,
-   which is July 2026.
-3. **Autumn (September to November), the dull and windy scenario:** the month with the highest wind
-   anomaly minus shortwave anomaly, which is November 2025 (+2.92, against +0.87 and +0.08).
-4. **Spring (March to May), the mild shoulder scenario:** the month with the highest temperature
-   anomaly. The first choice is March 2026 (+1.13), which rule 5 excludes, so April 2026 is
-   selected. April was named as the spring fallback before the plan review. May 2026 has the
-   next-highest anomaly (+0.91) and passes rule 5, but May carries a larger D15 excess than April:
-   leaving D15 out lowers the control's pooled CRPS by 0.79 points in May and by 0.48 in April.
-5. **A month is ineligible when leaving one Primary out lowers the control's pooled CRPS at 0 to
-   240 hours by more than 1.0 point.** The rule excludes only March 2026, where leaving D15 out
-   lowers the control's CRPS by 1.69 points, from 5.13 to 3.44. D15 has a level step from the week
-   of 2026-03-09, of about -0.8 MW to +0.5 MW, with no event in NGED's log, and March would have
-   measured how each arm follows that one step. The largest fall in any other month is 0.79 points
-   (D15 in May). In July 2026 leaving D18 out lowers the control's CRPS by 0.68 points, about the
-   same as leaving D15 out of July (0.67), which has no step at D15.
-6. **No two selected months may be adjacent,** so that no forecast of one month, with its 14-day
-   lead, is valid in another. November, January, April, and July satisfy the constraint.
+## What the steps at D15 and D18 do
 
-**Rule 5 was added after the control's scores were seen.** The plan review found D15's step in
-the control's March scores, and the threshold of 1.0 point was set with the 12 leave-one-out falls
-in view. Rules 1 to 4 and rule 6 read only weather and the calendar. No score of a new arm existed
-when any rule was written. The control's CRPS at 0 to 240 hours averages 4.06 points over the four
-months and 4.09 over the 12.
+**D15 and D18 each have a level step with no event in NGED's log, and the two steps carry much of
+the spread in every contrast.** D15 steps in the week of 2026-03-09 and D18 in the week of
+2026-07-06. Leaving D15 out of March lowers the stored control's pooled CRPS by 1.69 points, and
+leaving D18 out of July lowers the stored control's pooled CRPS by 0.68. NGED's log may miss other
+events, so months without a known step may hold steps that no label covers.
 
-**July 2026 is the maintainer's choice of months, and it carries two caveats.** The maintainer
-asked for four months from 2025-11 to 2026-10, and July 2026 lies in the final-test window (2026-07
-to 2026-10) that the `ml-experiment` skill reserves for a finalist. Experiments 620, 667, 677, and
-701 have already scored that window. D18 also has a level step in the week of 2026-07-06, from
-about 2.1 MW to about 3.4 MW, and its CRPS rises from 2.1 to 3.5 points in the earlier months to
-15.4 in July. No summer month avoids both problems: July and August both carry D18's step, and
-June, the only summer month before the step, is not sunny (shortwave anomaly -0.32). The decision
-rule therefore requires every verdict to hold with D18 left out, and with D15 left out, and the
-write-up states both caveats.
+- **March 2026 is the highest-scoring month for every arm.** The global arm scores 5.13, split-at-3
+  5.20, split-at-2 5.22, and split-at-1 5.41, against 3.3 to 4.3 in the other months before July.
+- **The manual heuristic beats one arm in one month.** In March the manual heuristic scores 5.27,
+  below split-at-1 (5.41) and above the other arms. The manual heuristic reads recent demand
+  directly, so the manual heuristic follows D15's step within days.
+- **The lower bound of C1 on the four months crosses zero when D15 or D22 is left out.** The lower
+  bound is -0.009 with all 16 Primaries, +0.041 without D15, and +0.065 without D22. The four test
+  months do not include March.
+- **The sign of C2 on the four months flips when D22 or D8 is left out.** C2 is +0.012 with all 16
+  Primaries, -0.031 without D22, -0.0004 without D8, and +0.066 without D15.
+- **July 2026 is the one month where split-at-2 and split-at-3 both score below the global arm by
+  more than 0.07 points** (-0.087 and -0.075). July holds D18's step and lies in the final-test
+  window.
 
-**The advance step needs the maintainer's explicit approval before it starts.** An arm that reaches
-`supported` or `small gain` would next be scored on the other eight months, and three of those
-months (2026-08, 2026-09, and 2026-10) are in the final-test window. This plan asks for July only.
+## Blend and extra encoders
 
-**The K1 design was tuned on five development months that include January 2026.** The tuning used
-the global configuration, which favours the global arm in that month. Each planned contrast is
-therefore also reported with January left out.
+**The equal-weight blend of the global and the split-at-1 forecasts is worse than averaging two
+global seeds.** C4 is +0.054 on four months and +0.031 on nine, with intervals that span zero. The
+blend also scores above the three-seed global arm (4.132 against 4.065 on four months), a
+comparison the plan marks as exploratory. The audit below splits C4 into two parts on the four
+months. Averaging the global and the split-at-1 forecasts lowers CRPS by 0.108 points against the
+mean of the two members' scores, and averaging two global seeds lowers it by 0.069. That extra gain
+of 0.039 points is smaller than the 0.093 points by which the blend's members score worse than the
+pair's members, so the blend loses.
 
-## Measurement
+**The two extra encoders of split-at-2-plus-encoders did not help.** C5 is +0.049 on four months
+and +0.033 on nine, with intervals of about 0.11 to 0.17 points either side, so the test cannot
+tell a small effect from none.
 
-- **Rows.** A row is a (Primary, 12:00 UTC origin, valid half-hour). A row is scored only if every
-  arm and every seed has a forecast, the manual heuristic and climatology have a forecast, and the
-  cleaned observed power exists. The origin days are the days of the four test months. The headline
-  leads are the half-hours from 0 to 239.5 hours after the origin (`lead_h < 240`, the filter in
-  `e00702_months.py`), which this page calls "0 to 240 hours". The leads of 240 hours and more
-  (days 11 to 14) are reported beside them.
-- **Forecast scored.** Each arm's forecast is the mean over its seeds, quantile by quantile, sorted
-  within the row. No band widening and no clamp is applied to any arm.
-- **Metrics.** CRPS as the quantile score over 11 levels and the absolute error of the median, both
-  in points of capacity (percent of the Primary's effective capacity), from
-  `studies.eval_protocol` where its functions accept the 11-quantile contract rows, and otherwise
-  from `e00668_score_lib.py` as experiment 677 used. One function scores every arm.
-- **Intervals.** Per-seed losses are paired on Primary, origin, and valid time with
-  `experiment_store.losses_for_bootstrap`. The decision interval resamples 7-day blocks of origin
-  days and one seed, as experiment 677 did, with 20,000 resamples so that each 0.5% tail holds 100
-  draws. A second interval resamples whole months and seeds with
-  `studies.bootstrap.bootstrap_difference_at_level`. Four months give that interval few distinct
-  values, so the decision rule uses the plain statement the interval approximates: the contrast has
-  the same sign in each of the four months. Forecasts from neighbouring 7-day blocks overlap in
-  valid time by up to 10 days, so the blocks are not independent and the block interval is narrower
-  than an interval over independent weather episodes would be. The four-month sign condition is
-  the guard against that.
-- **Departure from the plan in the interval code.** The scoring script pairs the per-seed losses
-  with its own `align` function and draws both intervals with `block_seed_bootstrap` in
-  `e00702_core.py`, not with `experiment_store.losses_for_bootstrap` and
-  `studies.bootstrap.bootstrap_difference_at_level`. The library functions resample the groups
-  named in a `month` column and pair two arms on the same seed. The decision interval needs 7-day
-  blocks of origin days, and contrast C4 pairs each seed of the blend with two seeds of the global
-  arm. `block_seed_bootstrap` resamples 7-day blocks for the decision interval and calendar months
-  for the second interval, and draws one seed in each resample.
-- **Per-Primary reporting.** Every Primary has its own row for every arm, with the difference from
-  the global arm and its interval. The write-up also gives the count of Primaries each arm improves,
-  the pooled contrast with each Primary left out in turn, and three groups: the six signed-MW
-  Primaries, the eight MVA-only Primaries, and D15 with D18.
-- **History groups.** `e00702_history.py` prints each Primary's first cleaned reading in the power
-  array that the fits train on, and writes the table to `history_first_clean_reading.csv` in the
-  experiment's data folder. The array is `e00422_prep.cleaned_arrays()`: `e00510_common.clean_stack`
-  returns it, `pretrain_wt`, `step2`, and `fit_arm` of `e00574_fit.py` read it through
-  `clean_stack`, and `e00667_fold.py` and `e00677_fold.py` patch `clean_stack` to hide the held-out
-  month. Eleven Primaries start on 2019-09-17 and D14 starts on 2019-10-21.
-  D16 starts on 2020-12-22 and D9 on 2023-08-23. D15 and D18 start on 2025-03-01, the cut of
-  experiment 399. The fit pipeline applies no other start cut: the 19-month cut that the
-  data-processing page lists for D4 is not in this array, and the later start dates on the final
-  models page for D11, D10, D5, and D14 do not match it. C1 is reported for the 12 Primaries with
-  six years of history or more, for D16 and D9, and for D15 with D18.
-- **Other reports.** The lead bands of the demand protocol, coverage and pinball loss at q01, q05,
-  q95, and q99, cold nights in January, and the median forecast minus the mean forecast per Primary.
-- **Injected load shifts.** A network fine-tuned on one Primary's recent rows may copy more of a
-  load shift. Each per-substation arm is therefore run on the held-out bank of injected shifts of
-  experiment 677 (`chain.sh ... 5wbank`), and the copied share is reported beside the global arm's
-  0.071. The four load-shift scenarios of the `ml-experiment` skill are reported from
-  `e00677_slices.py`, with the caveat that NGED's event log is incomplete.
-- **Figures.** A day-ahead forecast and one full 14-day forecast against observed power for two
-  Primaries, the per-Primary contrast chart, and the ladder of split points with paired intervals.
-  Six time series plots of load-shift events follow, three at signed-MW Primaries and three at
-  MVA-only Primaries. Each plot marks the start and end of the event and shows the global arm and
-  each per-substation arm from 14 days before to at least 7 days after. D18's step of July 2026 is
-  one of the six. The plots carry the caveat that NGED's log may miss events, so the event-free
-  rows may hold unlabelled events.
+**The per-substation arms copy slightly more of an injected load shift.** An injected shift is a
+simulated step added to the lag inputs only. The copied share is the fraction of the shift's depth
+that the median forecast reproduces, so 0 means the forecast ignores the shift and a lower share is
+better. On the held-out bank of injected shifts of experiment 677, the copied share over leads of
+0 to 336 hours is 0.074 for the global arm, 0.092 for split-at-3, 0.093 for split-at-2, 0.082 for
+split-at-2-plus-encoders, and 0.101 for split-at-1 on the four months. On nine months the shares
+are 0.075, 0.080, 0.081, 0.077, and 0.104. The standard deviation over seeds is 0.005 to 0.016.
 
-## Leakage and look-ahead checks
+## First run and batch diagnostic
 
-**Each check is an assertion in the fit scripts or a test in the first run, and the fit stops when
-one fails.**
+**Every number in this section is interim: one seed, the fold 2026-05, and three Primaries (D14,
+D2, and D15), on 44,520 rows.** The first run enters no contrast.
 
-- **Origin-time weather.** The fits keep the assertions of `e00574_fit.py`: every training origin
-  has an ensemble summary file issued 9 hours earlier, and every test origin satisfies
-  `nwp_init_time <= power_fcst_init_time`. A new truncated-archive test rebuilds the inputs of 20
-  sampled test origins with every ensemble summary file issued after the origin's own run removed,
-  and asserts that the weather, thermal-lag, solar-gain, and expected-weather inputs are unchanged.
-  Experiment 404 was voided by weather look-ahead, so this test runs before the first scored fit.
-- **ERA5 and CAMS are pre-training inputs only.** No fine-tuning or test row reads ERA5. The
-  pre-training rows end at least 3.5 hours before the refit time, and the script asserts it.
-- **Held-out power.** In the training phase the cleaned power is NaN from the first day of the test
-  month (`e00667_fold.py`), and the prediction phase checks the standardiser's hash.
-- **Isolation of split-at-1.** A test replaces every finite value of the power, the weather inputs,
-  and the CAMS inputs of the other 15 Primaries with random numbers and leaves every missing value
-  missing, so the pooled span of the rows is unchanged. The test rebuilds the one Primary's tensors
-  and statistics for all three steps and asserts that they are identical bit for bit. The test runs
-  on the first-run fold and on the 2025-11 fold for D15 and D18, where the fixed-epoch rule is most
-  likely to apply, and asserts there that the epoch count of each phase is unchanged.
-- **Lag age.** The newest lag is at least 24 hours before the 09:00 UTC native origin
-  (`check_lag_ages`).
-- **Columns.** The report prints each arm's input columns and trainable parameter names, so a
-  reviewer can check the two tables above.
+| System, first run | CRPS, three Primaries | D14 | D2 | D15 |
+|---|---:|---:|---:|---:|
+| global, refitted through this experiment's code | 6.54 | 2.08 | 2.35 | 15.25 |
+| split-at-3, batch 512 | 6.70 | 1.98 | 2.48 | 15.70 |
+| split-at-3, batch 8,192 | 6.83 | 1.98 | 2.19 | 16.40 |
+| split-at-2, batch 512 | 6.27 | 2.29 | 2.33 | 14.26 |
+| split-at-2-plus-encoders, batch 512 | 6.62 | 2.17 | 2.58 | 15.19 |
+| split-at-1, batch 512 | 7.57 | 2.03 | 2.18 | 18.57 |
+| split-at-1, batch 8,192 | 8.79 | 2.04 | 2.17 | 22.25 |
+| manual heuristic | 9.22 | 2.43 | 2.48 | 22.84 |
+| climatology | 11.06 | 3.17 | 2.72 | 27.43 |
 
-## First run
+- **The batch of 512 scored below the batch of 8,192 for both arms, and almost all of the
+  difference is at D15.** Split-at-1 scores 18.57 against 22.25 at D15, and within 0.01 points at
+  D14 and D2. Split-at-3 scores 15.70 against 16.40 at D15, but at D2 the batch of 8,192 scores
+  lower (2.19 against 2.48). No setting was changed by the diagnostic.
+- **The refit of the global arm reproduced the stored seed 0** to 0.00001 points of CRPS (6.5357
+  against 6.5357). The three stored seeds score 6.48 to 7.34 on these rows, a range of 0.87 points
+  that is mostly D15. `e00702_evidence.py` reruns this check and the bank check below, and writes
+  `checks/evidence.txt`.
 
-**The first run uses the fold 2026-05, which is not a test month, and three Primaries.** The three
-are chosen by rule: the full-history signed-MW Primary with the largest capacity, the full-history
-MVA-only Primary with the largest capacity, and D15. Every number from the first run is labelled
-interim and enters no contrast. The first run checks:
+## Checks
 
-1. the two match checks of the control arm;
-2. the truncated-archive test and the isolation test;
-3. that the synthetic shifts of a Primary are equal across arms;
-4. a diagnostic of the batch size: split-at-1 and split-at-3 are fitted with seed 0 at batches of
-   512 and 8,192, and the validation loss and the 2026-05 scores of both are reported, with no
-   setting changed by the result;
-5. that each arm's forecasts for the three Primaries beat climatology on 2026-05, as a guard
-   against a broken fit;
-6. the wall-clock time, the CPU time of refitting split-at-1's statistics, the peak host memory,
-   and the GPU memory of each phase, which size the full run;
-7. which Primaries and phases use the fixed epoch counts.
+- **Median forecast minus mean forecast, per Primary:** not computed. The stored forecasts hold 11
+  quantiles and no mean.
+- **Error of the median beside each CRPS contrast:** the nMAE of each arm's seed-mean forecast moves
+  in the same direction as its CRPS for all five contrasts in both sets of months (first table).
+  The per-seed contrast of the median error was not computed.
+- **Match of the stored control:** the rescore of experiment 677's stored forecasts on experiment
+  677's own scored rows agrees with its stored monthly CRPS to within 0.000001 points in each of
+  the four test months. The check was not run for the five added months. The bank run on
+  experiment 677's stored neural networks for 2026-05, seed 0, reproduces its bank file: the
+  largest difference in the medians and in the injected shifts over 336,288 rows is 0.0.
+- **Weather inputs at origin time:** for each of the nine folds, the inputs of 20 sampled test
+  origins were rebuilt for all 16 Primaries from files issued no later than the origin's own run,
+  in the pooled inputs and in each Primary's own inputs. The largest difference is 0.0.
+- **Isolation of split-at-1:** all 144 Primary-folds passed. Each Primary's cleaned power, shifted
+  lag rows, and extra input blocks hash to the same values as that Primary's rows in the pooled
+  inputs, and the log of files that each process opened is stored.
+- **Rescore:** a second scoring of the four test months gives the same eight tables as the first.
+- **Audit triggers:** trigger 2 is met (P3 predicted a gain for the blend and the blend lost) and
+  trigger 4 is met (leaving D22 or D8 out flips the sign of C2 on the four months). The audit below
+  covers both. Triggers 1, 3, and 5 are not met. Trigger 6 is not met on the nearest comparison,
+  which uses different rows and a different metric: experiment 677's 95% intervals of adjacent
+  steps on the MAE of the median have half-widths of 0.027 to 0.17 points, and C3's 99% interval
+  here, about 0.065 either side, is about 0.05 at 95%. Trigger 7 is not met: no planned experiment
+  or other write-up depends on this result.
 
-## Compute
+## Audit
 
-**The full run needs under 10 GPU-hours on the workstation's RTX A6000, and no download or
-spend.** The estimate rests on the logs of experiments 667 and 677: the pooled pre-training takes 67
-to 83 seconds per seed and fold, step 2 takes 11 to 20 seconds, and step 3 takes 7 to 13 seconds. At
-a batch of 512 a per-substation phase takes about as many gradient steps as the pooled phase, so
-the time per network is about the pooled time or less.
+**An independent re-derivation reproduces every planned contrast, and finds no error of method
+behind either trigger.** A reviewing agent that did not write the experiment wrote its own loss,
+pairing, and blend code (`data/ml-experiments/briefs/e702_audit.py`, with its output and findings
+beside it), read the stored forecasts, and scored the same 926,549 rows. The script gives C1
++0.220, C2 +0.012, C3 -0.020, C4 +0.054, and C5 +0.049 on the four test months, the same as the
+first table of contrasts.
 
-| Arm | Fits (4 folds) | Estimated GPU time, one after another |
-|---|---:|---:|
-| split-at-1 | 192 networks, 3 steps each | 4 to 5 hours |
-| split-at-2 | 192 networks, 2 steps each | 1.5 hours |
-| split-at-2-plus-encoders | 192 networks, 2 steps each | 2 hours |
-| split-at-3 | 192 networks, 1 step each | 0.6 hours |
-| global seeds 3 to 5 | 12 networks, 3 steps each | 0.3 hours |
-| held-out bank, 4 arms | inference only | 0.5 hours |
-| batch diagnostic (first run) | 6 networks at each batch | 0.1 hours |
+- **Trigger 4, the sign of C2: the pooled mean is a near-cancellation between Primaries.** Each
+  Primary adds its share of the rows times its own C2. D15 adds -0.050 and D18 -0.025, against
+  +0.041 from D22 and +0.012 from D8, so leaving D22 or D8 out turns +0.012 negative. D22's loss of
+  +0.66 is positive in all four months (+0.22 to +1.40) and for all three seeds (+0.49 to +0.75), so
+  split-at-2 is worse at D22 and the loss is not one bad fold. D8's loss comes mostly from 2025-11
+  (+1.01) and varies by seed (-0.05 to +0.44). Pooled C2 for single seeds ranges from -0.043 to
+  +0.084, so its sign lies inside the seed noise. Triage: the verdict stays `inconclusive`.
+- **Trigger 2, the blend loss: the explanation holds.** The blend's extra gain from averaging two
+  different forecasts (0.039 points) is smaller than its members' extra error (0.093 points: half of
+  C1, 0.110, less 0.017 because the new global seeds 3 to 5 score 0.034 worse on average than the
+  stored seeds 0 to 2). Post hoc, a blend with weight 0.1 to 0.5 on split-at-1 scores 4.151 at
+  best, at a weight of 0.2 to 0.3, against 4.125 for the mean of two global seeds, so no weight
+  beats a second global seed. Triage: P3 failed because split-at-1 is too weak a member, and the
+  verdict stays `inconclusive`.
+- **The new global seeds 3 to 5 score 0.034 worse on average than the stored seeds 0 to 2** (-0.009,
+  +0.064, and +0.047 for the three pairs). The pilot refit matches the stored seed 0 to 0.00001
+  points, so the gap is seed noise. The gap makes the global pair slightly weaker, which favours the
+  blend in C4 and does not change its sign.
 
-- **CPU time of split-at-1's statistics.** Refitting the standardiser, the lag statistics, and the
-  two scales takes an estimated 1 to 2 minutes on one core per Primary and fold, so about 1 to 2
-  CPU-hours for 64 Primary-folds. The first run measures the figure.
-- **Parallel work.** One process per fold builds the fold's rows once and loops over the 16
-  Primaries and 3 seeds. Each process needs up to 14 GB of host memory (the cap that experiment 677
-  needed) and under 3 GB of GPU memory. Three processes at a time fit in 3 CPU cores, 42 GB of host
-  memory, and 9 GB of the GPU. Four folds therefore run in two waves, three folds and then one, and
-  the run takes about 5 hours of wall-clock time. The session asks the manager for the slot before
-  starting.
-- **Storage.** Every fitted network is saved as a state file in the private data folder, about 780
-  files of under 1 MB each, with one forecast file per arm, fold, and seed.
+**A second, independent audit agrees.** An agent that had not read this page re-derived C2 and C4
+with its own code (`data/ml-experiments/briefs/e702_audit_fresh.md`) and gave C2 +0.0122 and C4
++0.0556, with the same explanations for both triggers. Its CRPS levels are 0.015 to 0.02 points
+higher than this page's, because it scored 934,016 rows without the mask that drops rows with a
+missing value, and read the cleaned-power table as it stood on the day of the audit.
 
-## Code to reuse
+- **Pairing single seeds makes split-at-2 look better than comparing ensembles does.** C2 between
+  the three-seed mean forecasts is +0.056, +0.014 without D22, and +0.046 without D8. C2 for the
+  single seeds is -0.040, -0.001, and +0.078. The global arm's three seeds score 11.2 to 12.4 at
+  D15, so split-at-2's gain at D15 ranges from -1.58 to -0.01 points across the seeds.
+- **C4 is positive against every global partner seed,** from +0.034 to +0.113. The month 2025-11
+  carries most of C4 (+0.148), and C4 is about 0 in 2026-07.
+- **C2 changes sign across leads:** -0.0005 at leads under 120 hours and +0.025 from 120 to 240
+  hours.
 
-- **`e00677_k1.py`, `e00677_fold.py`, `e00677_export.py`, `e00677_score.py`, `e00677_slices.py`,
-  `e00677_tails.py`, `chain.sh`, and `gpu.sh` of experiment 677:** the K1 chain for one fold, the
-  monthly fold with the held-out power hidden, the export to 12:00 UTC contract rows, and the
-  scoring. The new fit script is a copy of `e00677_k1.py` with a `--primary` argument.
-- **`e00574_fit.py`:** `pretrain_wt`, `step2`, `fit_arm`, `train`, and the weather assertions, run
-  unchanged with module state patched, as experiments 591, 613, 667, and 677 do.
-- **`e00591_arm.py` and `e00591_model.py`:** arm A1, the shared lag encoder with the lag-identity
-  embedding and the synthetic shifts.
-- **`e00559_model.py`, `e00560_model.py`, `e00572_model.py`, and `e00574_model.py`:** the encoders,
-  the mixer, and the offset. The second encoder pair of split-at-2-plus-encoders is a new subclass
-  in this experiment's folder.
-- **`e00677_model.py`:** the pattern for removing an input group by multiplying it by zero.
-- **`e00397_prep.py`, `e00448_run.py`, and `e00572_lags.py`:** the row builders that hold the four
-  pooled statistics. Split-at-1 patches `primaries()` and the statistics from this experiment's
-  folder, and edits no earlier experiment's script.
+## Departures from the plan
 
-## Standing practices and earlier advice
+- **Five folds were added after the four-month result was seen.** The maintainer approved the folds
+  2025-12, 2026-02, 2026-03, 2026-05, and 2026-06 because the four-month contrasts were noisy.
+  No arm met the plan's condition for advancing (`supported` or `small gain` on the four months).
+  Every nine-month number is post hoc. The months 2026-08 to 2026-10 are not fitted or scored.
+- **March 2026 is among the added folds, although rule 5 of the plan made March ineligible as a
+  test month.** March enters only the nine-month set.
+- **The stored control is checked on experiment 677's own row set.** The cleaned-power table has
+  since dropped D15's readings before 2025-05-07 and D18's before 2025-03-30, with the drop reason
+  `initial_analogue_noise` (`checks/evidence.txt`). On the current table
+  4,704 rows of D18 in 2025-11 and 5,244 rows of D15 and D18 in 2026-01 have no climatology, and
+  every arm of this experiment is scored without those rows.
+- **The training window is shorter than 730 days in six folds.** The first forecast run that the
+  folds keep has its first target at 2024-04-10 09:30 UTC (grid index 80803), because the first 9
+  days of runs are purged. The folds 2025-11, 2026-01, and 2026-04 therefore hold 570, 631, and 721
+  days of fine-tuning rows, and the added folds 2025-12, 2026-02, and 2026-03 hold 600, 662, and
+  690 days. The global arm has the same windows.
+- **The weather test for 2026-07 rebuilds the inputs from the ensemble summary file alone.** Runs
+  after 2026-06-29 have no control-member frame, so the rebuild for those origins takes its keys
+  from the summary file of the origin's run.
+- **A hash check replaces the planned random-values test of isolation.** The plan's test replaced
+  the other 15 Primaries' data with random numbers. The check that ran compares hashes of each
+  Primary's cleaned power, shifted lag rows, and extra input blocks with the pooled inputs, and
+  guards the file readers.
+- **The intervals come from this experiment's own function.** `block_seed_bootstrap` resamples
+  7-day blocks that do not cross a month, and one seed. The library functions that the plan named
+  resample the groups of a `month` column and pair two arms on one seed, which C4 cannot use. The
+  decision interval is the 7-day block interval in every set of months. An interval from
+  resampling whole calendar months is stored beside it and does not enter the verdict.
+- **Not done:** the four load-shift scenarios, the six load-shift event plots, the example
+  day-ahead and 14-day forecast plots, the cold-night scores, and the avoidable-curtailment cost.
 
-- **Followed:** monthly refits; cleaned data with the `substation_zero` half-hours dropped; the cut
-  of D15 and D18 before 2025-03-01; every fitted network saved; stored predictions reused as the
-  control; a training window of up to 24 months (730 days), shorter in the three folds before
-  2026-05 because the ENS rows start on 2024-04-10; a screen on four months, one per season, with
-  every number interim; the tails and the example forecasts; a climatology row; the normalised MAE
-  of the median in every table.
-- **Followed from earlier advice:** check the sign of a contrast in every month before reading its
-  pooled interval; months and not seeds set the interval width; judge a lag-reading network on
-  the copied share of an injected shift and on event-free error together (experiment 677); report
-  a pooled contrast with each series left out (the audit triggers of the `ml-experiment` skill).
-- **Departed from:** July 2026 is scored although it lies in the final-test window, because the
-  maintainer chose the range of months. XGBoost is not fitted. The avoidable-curtailment cost is
-  not reported, because the four months are a screen.
+## Limits
 
-## Open risks
+- **Each arm was built once, with three seeds.** The seeds share one build of the inputs, and the
+  per-substation arms were not tuned beyond the batch size. The global arm's settings were tuned
+  for pooled data, which favours the global arm.
+- **Blocks of forecast days overlap in valid time,** so the block interval is narrower than an
+  interval over independent weather episodes would be.
+- **July 2026 lies in the final-test window, and the window's other three months are unscored.**
+  Experiments 620, 667, 677, and 701 have already scored that window.
+- **The K1 design was tuned on development months that include 2026-01.** The contrasts without
+  January are in the tables.
+- **Split-at-1 minus split-at-2 bundles three differences:** pooled pre-training, the Primary
+  embedding, and the pooled input statistics. The experiment does not separate them.
+- **The headline leads are 0 to 240 hours.** Days 11 to 14 are scored in the lead bands only.
+- **NGED's event log is incomplete,** so the rows scored as ordinary may hold load shifts that no
+  label covers.
 
-- **Four months are four weather episodes.** A gain must hold in all four months, and a real gain
-  confined to one season would read as inconclusive.
-- **The batch of 512 changes the gradient noise** as well as the step count. The first run's
-  diagnostic at 8,192 covers one fold, one seed, and three Primaries.
-- **A fixed epoch count has no validation guard.** Where a Primary has fewer than two held weeks
-  of 1,000 rows or more, the phase runs for 60, 20, or 10 epochs with no early stopping. D15 in the
-  fold 2025-11 has about one ninth of the pre-training rows of a full-history Primary, so 60 epochs
-  give D15 about one ninth of the gradient steps. Step 1 can therefore under-fit D15 and D18, and
-  no held-out loss reports that. The first run lists which Primaries and phases use the fixed
-  counts.
-- **D15 and D18 each carry a level step,** D15 in March 2026 (not scored) and D18 in July 2026
-  (scored). The leave-one-out conditions guard the verdicts, and the pooled point estimates still
-  include D18's July.
-- **The global arm's hyperparameters were tuned for pooled data.** No per-substation arm is tuned
-  beyond the batch size, which favours the global arm.
-- **Split-at-1 minus split-at-2 bundles three differences:** pooled pre-training, the embedding, and
-  the pooled statistics. The experiment does not separate them.
-- **The stored control was fitted by experiment 677's code,** and the new arms by a patched copy.
-  The match checks bound the difference, and GPU fits are not bit-reproducible.
+## Method
+
+**The neural network is K1 of [experiment
+667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md), trained
+as step 5 of [experiment
+677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md) trains
+K1.** The bullets describe the global arm and then each arm's differences.
+
+### Architecture
+
+- **Inputs:** K1 reads ensemble weather for the Primary's own H3 resolution-5 cell, date-time
+  columns, 14 thermal-lag and solar-gain columns, and the Primary's own demand one day and one week
+  before. K1 reads no other Primary's demand.
+- **Parts:** a weather encoder, a date-time encoder, one lag encoder shared by the day lag and the
+  week lag (83 inputs, with a 2-row, 8-wide embedding that names the lag), and a mixer with 145
+  inputs.
+- **Primary embedding:** an 8-wide row per Primary, read by all four parts.
+- **Offset:** one row of monthly knots per Primary, added to the three component means.
+- **Output:** a mixture of three Gaussian components, read as 11 quantiles.
+- **Origin time:** every weather input comes from the ensemble run issued 9 hours before the
+  forecast origin or earlier, and the newest lag is at least 24 hours before the origin.
+- **Split-at-3:** the stored global neural network after step 2, with step 3 run on one Primary's
+  rows. The Primary's embedding row and offset row stay trainable, and the input statistics are the
+  fold's pooled statistics.
+- **Split-at-2:** the stored global neural network after step 1, with steps 2 and 3 run on one
+  Primary's rows. The embedding, the offset, and the statistics are as in split-at-3.
+- **Split-at-1:** every step on one Primary's rows. The Primary embedding is set to zero and
+  frozen. The input standardiser, the lag statistics, the scale of the thermal-lag and solar-gain
+  columns, and the spread fill of pre-training are fitted on the Primary's own rows.
+- **Split-at-2-plus-encoders:** split-at-2 with a second weather encoder (21 inputs, 64 hidden
+  units, 32 outputs) and a second date-time encoder (21 inputs, 64 hidden units, 32 outputs), with
+  no embedding input and no pre-training. The mixer has 209 inputs.
+- **Blend:** the mean of the global and the split-at-1 forecasts, quantile by quantile, sorted
+  within the row.
+
+### Training regime
+
+- **Step 1** pre-trains every weight on ERA5 and CAMS estimates of past weather from 2019-09-01
+  (7.1 to 8.1 million rows per fold for the global arm), with AdamW, learning rate 0.0005, 20% of
+  the rows per epoch, up to 60 epochs, and patience 8.
+- **Step 2** draws a fresh mixer, freezes the weather and date-time encoders, and trains on up to
+  730 days of ENS ensemble forecasts with uniform weights and a 3-day embargo, at learning rate
+  0.0002 (0.0005 for the fresh mixer).
+- **Step 3** fine-tunes from step 2 with a 90-day half-life, a 7-day embargo, half weight on the
+  next 7 days, and the synthetic lag-only load shifts of [experiment
+  581](../00581-robust-multiweek-lag-encoder-x3/result.md). The shifts of a Primary are the same in
+  every arm.
+- **Batch:** 8,192 rows for the global arm and 512 for every per-substation phase.
+- **Early stopping:** the Primary's own held weeks (one week in 12, the global arm's weeks). The
+  fixed epoch counts of the plan (60, 20, and 10) were never needed.
+- **Data:** the 16 Primaries' cleaned demand with the `substation_zero` half-hours dropped, and D15
+  and D18 from 2025-03-01.
+- **Folds and seeds:** one refit per month at the first day of the month, for nine months, with
+  seeds 0, 1, and 2 for each per-substation arm (432 fits per phase and arm). The global arm's
+  seeds 0 to 2 are experiment 677's stored forecasts, and seeds 3 to 5 are new fits of the same
+  chain.
+- **Compute:** the training phases took 12.8 GPU-hours on one RTX A6000 for the nine folds, of
+  which about 5.6 are the four test months. Split-at-1 took 6.3 of the 12.8 hours.
+
+### Measurement
+
+- **Rows:** daily 12:00 UTC forecasts of the 16 Primaries, scored at every half-hour where every
+  arm, every seed, the manual heuristic, and climatology have a forecast and the cleaned observed
+  power exists. The headline leads are the half-hours from 0 to 239.5 hours after the origin.
+- **Months:** 2025-11, 2026-01, 2026-04, and 2026-07, chosen before any fit by a rule on stored
+  weather (cold winter, sunny summer, dull and windy autumn, mild spring), with a month ineligible
+  when leaving one Primary out lowers the stored control's CRPS by more than 1.0 point. That
+  eligibility rule was added after the control's scores were seen. `e00702_months.py` prints the
+  evidence. The five added months are 2025-12, 2026-02, 2026-03, 2026-05, and 2026-06.
+- **Metrics:** CRPS as the quantile score over 11 levels, and the absolute error of the median,
+  both in points of capacity, from experiment 668's scoring library as experiment 677 used.
+- **Baselines:** the manual heuristic and the month-by-half-hour climatology of experiment 677, on
+  the same rows.
+- **Contrasts:** each seed of an arm is paired with the same seed of the global arm. C4 pairs the
+  blend of global seed `s` and split-at-1 seed `s` with the mean of global seeds `s` and `s + 3`.
+- **Intervals:** 99% (95% with a Bonferroni correction across five contrasts), from 20,000
+  resamples of 7-day blocks of origin days and one seed.
+- **Decision rule:** as in the front matter, unchanged.
+
+## Files
+
+- **`e00702_months.py`:** prints the weather, demand, and stored-control evidence for the choice of
+  test months, and writes `months_evidence.csv`.
+- **`e00702_history.py`:** writes each Primary's first cleaned reading to
+  `history_first_clean_reading.csv`.
+- **`e00702_core.py`:** the plan's constants, the fold span, the blend, the block bootstrap, and
+  the verdict rule.
+- **`e00702_world.py`, `e00702_model.py`, `e00702_train.py`, and `e00702_fit.py`:** restrict the
+  inputs to one Primary, define the extra encoders, train a phase, and run each arm's commands for
+  one fold, including the `isolation` and `weather` checks.
+- **`chain_arm.sh`, `chain_global.sh`, `chain_weather.sh`, `gpu.sh`, and `RUNBOOK.md`:** the order
+  of the stages for one fold.
+- **`e00702_export.py`:** writes each arm's forecasts as contract rows.
+- **`e00702_score.py`:** scores the arms and the contrasts, and runs the match checks.
+- **`e00702_report.py`:** prints every table on this page from the score files and draws the three
+  charts.
+- **`e00702_evidence.py`:** reruns the read-only refit and bank checks of the first run, and prints
+  the pre-training row counts of the global arm and the first kept reading of D15 and D18 in the
+  cleaned-power table, into `checks/evidence.txt`.
+- **Code reused:** the folders of experiments 87, 397, 422, 437, 448, 510, 559, 560, 572, 574,
+  581, 591, 613, 667, 668, and 677, imported and not edited. `gpu.sh` sources `env.sh` of
+  experiment 524 to put every experiment folder on `PYTHONPATH`.
+- **Read:** `data/ml-experiments/00677-*/backtests/step5w_with_injected_sp1.parquet` (the stored
+  global forecasts), the stored neural networks under `00677-*/chains/5/` and
+  `00677-*/arms/k1_5w_sp1/`, `00677-*/scores/step5w_with_injected_sp1_s012/` (experiment 677's
+  scored rows), `00521-*/site_map.csv` (each Primary's label, identifier, capacity, and metering
+  group), and `00607-*/work/` (the cached ERA5 features and observed power that
+  `e00702_months.py` reads).
+- **Written, all under `data/ml-experiments/00702-*/`:** `arms/` (every fitted neural network, its
+  statistics, and its phase logs), `backtests/` and `backtests/extra_months/` (11 quantiles per
+  Primary, origin, valid time, and seed), `scores/four_months/`, `scores/nine_months/`,
+  `scores/extra_months/`, and `scores/pilot/` (the tables this page quotes),
+  `scores/four_months_recheck/` (the second scoring of the four test months), `checks/` (the
+  weather test reports), `inputs/frames/` (the stand-in frames of the weather test for 2026-07),
+  `fold_spans/`, `logs/` (one log per command), `checks/evidence.txt` (the output of
+  `e00702_evidence.py`), and `pilot_2026-05/` (the first run).
+- **Audit, under `data/ml-experiments/briefs/`:** `e702_audit.py` (the independent re-derivation),
+  `e702_audit_output.txt` (its printed output), `e702_audit.md` (the findings and their triage),
+  and `e702_audit_fresh.md` (the second, independent audit).
+- **How to reproduce:** `RUNBOOK.md` gives the commands for the first run and the four test months,
+  the docstring of `e00702_score.py` gives the scoring commands for the nine months, and
+  `e00702_report.py` prints the tables and, with `--out`, redraws the charts.

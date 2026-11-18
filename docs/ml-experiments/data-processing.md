@@ -276,6 +276,16 @@ worth porting for D8. A point of capacity is one percentage point of D8's effect
 [experiment 695](00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md),
 D8 only, 8 monthly refits from 2025-11 to 2026-06.
 
+**Score every arm of a comparison against one read of the cleaned-power table, and check a stored
+forecast on the rows that its own experiment scored (medium confidence, provisional).** The
+production pipeline rewrites the cleaned-power table every 6 hours. The table now drops D15's
+readings before 2025-05-07 and D18's before 2025-03-30, with the drop reason
+`initial_analogue_noise`, and experiment 677's scoring still held those readings.
+The climatology of D15 and D18 then has no history for some calendar months: 4,704 rows of D18 in
+the origin month 2025-11 and 5,244 rows of D15 and D18 in 2026-01 that experiment 677 scored have
+no climatology on the current table. Applies to experiments. Evidence:
+[experiment 702](00702-per-substation-versus-global-training-of-the-modular-demand-network/result.md).
+
 ## Fixed windows
 
 **Use the fixed lockdown window, 2020-03-23 to 2021-07-19, and do not detect the window from the
@@ -306,11 +316,18 @@ that saw little or no winter. Applies to experiments and production.
 
 **Give the series that changed regime an individual start date or a flag (medium confidence).** D8
 weekday daytime demand falls from about 9 MW to about 3 MW between 2023-10 and 2025. D12 switches
-between a high-night and a low-night regime. D18 steps up about 1.1 MW at night around 2026-07-03 (a
-date after the experiment's window, not rechecked there), and D5 shows a flat midday floor since
-2022. Month-mean steps of over three monthly standard deviations occur at D6 (a drop of 218 MW in
-2023-07) and D11 (2020-04). Applies to experiments. Evidence: [experiment
-103](00103-differentiable-physics-1-data-look/result.md) for the step list and D8.
+between a high-night and a low-night regime. D5 shows a flat midday floor since 2022. Month-mean
+steps of over three monthly standard deviations occur at D6 (a drop of 218 MW in 2023-07) and D11
+(2020-04). D15 has a level step from the week of 2026-03-09, from about -0.8 MW to about +0.5 MW,
+and D18 has a level step from the week of 2026-07-06, from about 2.1 MW to about 3.4 MW.
+Experiment 103 found that D18 also steps up about 1.1 MW at night around 2026-07-03, a date after
+that experiment's window, which experiment 103 did not recheck. NGED's log
+holds no event for either step. Leaving D15 out lowers the pooled CRPS of experiment 677's stored
+neural-network forecast for March 2026 by 1.69 points of capacity, and leaving D18 out lowers the
+pooled CRPS for July 2026 by 0.68. Applies to experiments. Evidence: [experiment
+103](00103-differentiable-physics-1-data-look/result.md) for the step list and D8, and [experiment
+702](00702-per-substation-versus-global-training-of-the-modular-demand-network/result.md) for the
+steps at D15 and D18 (16 Primaries, origin months 2025-11 to 2026-10, provisional).
 
 **Treat D8's reading as including one gas engine's output until 2023-08-15, and as excluding it
 afterwards (provisional, medium confidence).** The engine connected on 2023-06-13 and its own
