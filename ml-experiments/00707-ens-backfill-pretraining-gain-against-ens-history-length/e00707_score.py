@@ -16,11 +16,10 @@ readings, and the checks. Every contrast is read per group at 1 - 0.05/16 = 99.6
 month-block bootstrap of `metrics.month_bootstrap_contrast` and 50,000 resamples. The group is the
 signed-MW six or the MVA-only eight; D15 and D18 are report-only.
 
-**Two figures need a design choice that the plan does not settle,** and
-`figure_gain_against_ens_months` and `figure_example_forecasts` raise `NotImplementedError` until
-the page's author decides them.
-`triggers_2_6_7` does the same for audit triggers 2, 6, and 7, which compare the result with
-experiments 418 and 425.
+The two figures (`figure_gain_against_ens_months` and `figure_example_forecasts`) are written as
+SVG under the experiment's docs folder, and audit triggers 2 and 6 are decided from a descriptive
+line (stored 425 `A` minus `R`) on the same rows, level, and resamples as C1. Trigger 7 prints a
+line saying that the page's author must judge it.
 
 ```bash
 # PYTHONPATH: this folder and the folders of experiments 377, 381, 397, 407 (their scorers' helpers)
@@ -31,10 +30,13 @@ uv run --no-sync python ml-experiments/00707-*/e00707_score.py --screen   # the 
 
 import argparse
 import json
+import subprocess
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
+import altair as alt
 import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00377_score as s377  # ty: ignore[unresolved-import]
 import e00381_score as s381  # ty: ignore[unresolved-import]
@@ -45,7 +47,9 @@ import e00707_common as common  # ty: ignore[unresolved-import]
 import e00707_prep as prep  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from plotting import ocf_theme
 from scipy import stats
+from studies.charts import CONTENT_WIDTH_PX, wrapped
 from studies.eval_protocol import metrics
 
 HEADLINE: Final[str] = s407.HEADLINE
@@ -99,6 +103,76 @@ MDE_HALVES: Final[tuple[tuple[int, ...], tuple[int, ...]]] = ((0, 1, 2), (3, 4))
 """The two seed sets whose scores the minimum detectable effect compares."""
 MDE_ARM: Final[str] = "R_F"
 """The arm whose seed halves give the minimum detectable effect; `R_24` (stored `R`) otherwise."""
+
+
+DOCS_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / arms.EXPERIMENT_DIR_NAME
+)
+"""The experiment's docs folder, where the two figures are written."""
+TRIGGER_6_FACTOR: Final[float] = 2.0
+"""Audit trigger 6 fires if C1's interval is wider than this multiple of the stored line's, or
+narrower than its reciprocal."""
+DAYS_PER_MONTH: Final[float] = 30.4375
+LEAD_BAND_DAY_HOURS: Final[int] = 24
+FIGURE_LEVEL_TEXT: Final[str] = f"{BONFERRONI_LEVEL_PERCENT:.2f}%"
+EXAMPLE_ORIGIN: Final[datetime] = datetime(2026, 1, 14, 9, tzinfo=UTC)
+"""The origin of the example forecasts: the 00Z run of 2026-01-14, issued 9 hours earlier."""
+EXAMPLE_PRIMARIES: Final[dict[str, str]] = {SIX: "D5", EIGHT: "D2"}
+"""The Primary drawn per group. Primaries are substations, so naming them is allowed."""
+EXAMPLE_ARMS: Final[tuple[str, str]] = ("A_F", "R_F")
+SVGO_COMMAND: Final[tuple[str, ...]] = ("npx", "svgo@4", "--multipass", "--precision=1")
+
+
+@dataclass(frozen=True)
+class GainWindow:
+    """One x position of the figure of gain against ENS months.
+
+    Attributes:
+        label: The legend text.
+        treatment: The pre-trained arm.
+        reference: The ENS-only arm.
+        window: The ENS window that both arms share.
+        colour: A main data colour of the OCF palette.
+    """
+
+    label: str
+    treatment: str
+    reference: str
+    window: arms.Window
+    colour: str
+
+
+GAIN_WINDOWS: Final[tuple[GainWindow, ...]] = (
+    GainWindow(
+        label="12 months (A_12 minus R_12, descriptive)",
+        treatment="A_12",
+        reference="R_12",
+        window=arms.W12,
+        colour=ocf_theme.DATA_SKY,
+    ),
+    GainWindow(
+        label="24 months (C2, A_E24 minus R_E24)",
+        treatment="A_E24",
+        reference="R_E24",
+        window=arms.W24,
+        colour=ocf_theme.DATA_BLUE,
+    ),
+    GainWindow(
+        label="Window F (C1, A_F minus R_F)",
+        treatment="A_F",
+        reference="R_F",
+        window=arms.W_F,
+        colour=ocf_theme.BRAND_ORANGE,
+    ),
+    GainWindow(
+        label="Window C (A_C minus R_C, descriptive)",
+        treatment="A_C",
+        reference="R_C",
+        window=arms.W_C,
+        colour=ocf_theme.DATA_PURPLE,
+    ),
+)
+"""The four windows of the figure of gain against ENS months."""
 
 
 @dataclass(frozen=True)
@@ -342,6 +416,39 @@ def metric_tables(*, rows: dict[str, pl.DataFrame]) -> None:
         )
     pl.concat(by_lead).write_parquet(FIGURE_TABLE_DIR / "metrics_by_lead.parquet")
     print(f"figure tables written to {FIGURE_TABLE_DIR}")
+    lead_band_tables(rows=rows)
+
+
+def lead_band_tables(*, rows: dict[str, pl.DataFrame]) -> None:
+    """Print each group's CRPS and MAE of the median per 24-hour lead band, one column per arm.
+
+    A cell is the equal-weight mean over the group's Primaries of each Primary's mean in the band.
+    Band 1 is the first 24 hours after the origin.
+    """
+    per_band = pl.concat(
+        [
+            frame.filter(pl.col("lead_hours") < 336.0)
+            .with_columns(lead_day=(pl.col("lead_hours") // LEAD_BAND_DAY_HOURS).cast(pl.Int32) + 1)
+            .group_by("label", "lead_day")
+            .agg(*[pl.col(m).mean() for m in SCALE_METRICS])
+            .with_columns(arm=pl.lit(name))
+            for name, frame in rows.items()
+        ]
+    )
+    for group, members in SUBSETS.items():
+        for metric in SCALE_METRICS:
+            print(
+                f"\n== {metric} per lead day (24-hour bands), {group} (equal weight per Primary) =="
+            )
+            table = (
+                per_band.filter(pl.col("label").is_in(list(members)))
+                .group_by("lead_day", "arm")
+                .agg(pl.col(metric).mean())
+                .pivot(on="arm", index="lead_day", values=metric)
+                .sort("lead_day")
+            )
+            with pl.Config(tbl_rows=20, tbl_cols=30):
+                print(table)
 
 
 def slice_tables(*, scored: dict[str, pl.DataFrame]) -> None:
@@ -728,54 +835,328 @@ def audit_triggers(*, found: dict[tuple[str, str, str], dict[str, float]]) -> No
                 f"TRIGGER 5: R_F beats A_24 at the {group} (C3 wholly below 0): "
                 f"an arm without pre-training beats the stored recipe"
             )
-    print("triggers 2, 6, and 7 need the page's comparison with experiments 418 and 425: see TODO")
 
 
-def triggers_2_6_7() -> None:
-    """TODO: decide audit triggers 2, 6, and 7 against experiments 418, 425, and the next design.
+def triggers_2_6_7(
+    *,
+    rows: dict[str, pl.DataFrame],
+    have: dict[str, tuple[int, ...]],
+    table: pl.DataFrame,
+    found: dict[tuple[str, str, str], dict[str, float]],
+) -> None:
+    """Print audit triggers 2, 6, and 7.
 
-    Trigger 2 asks whether C1 contradicts experiment 418's or 425's finding without a tested
-    explanation; trigger 6 asks whether a headline interval is more than twice or less than half
-    the same contrast's interval in experiment 425 (the experiments' stored intervals are in their
-    `result.md`, not in a file this script can read); trigger 7 asks whether a later design depends
-    on the headline. Each needs a figure or a judgement that only the page's author can state.
+    Both 2 and 6 compare C1 with the descriptive line "stored 425 `A` minus `R`" (`A_24` minus
+    `R_24`), computed on the same rows, at the same level, and with the same resamples as C1.
 
-    Raises:
-        NotImplementedError: Always.
+    - **Trigger 2** (C1 contradicts experiment 425) fires if C1 and the line have opposite signs, or
+      if their intervals do not overlap.
+    - **Trigger 6** (the headline interval is much wider or narrower than the line's) fires if C1's
+      interval width is more than twice or less than half the line's.
+    - **Trigger 7** (a later design depends on the headline) needs a judgement about later
+      designs, so a line says that the page's author must make it.
+
+    Args:
+        rows: The scored rows of every variant.
+        have: Each arm's available seeds.
+        table: The shared slice table.
+        found: The tested contrasts' figures, from `tested_contrasts`.
     """
-    msg = "triggers 2, 6, and 7 need figures from earlier pages and a judgement about later designs"
-    raise NotImplementedError(msg)
+    print("\n== audit triggers 2, 6, and 7 (C1 against the stored 425 A minus R) ==")
+    names = variant_names(treatment="A_24", reference="R_24", rows=rows, have=have)
+    if names is None:
+        print("triggers 2 and 6 not decided: A_24 or R_24 is not scored")
+    else:
+        for group in TESTED_GROUPS:
+            line = contrast_line(
+                label="A_24 minus R_24 (stored 425)",
+                group=group,
+                treatment=rows[names[0]],
+                reference=rows[names[1]],
+                table=table,
+                mde=None,
+                tag="(descriptive)",
+            )
+            c1 = found.get(("C1", group, "crps"))
+            if line is None or c1 is None:
+                print(f"triggers 2 and 6 not decided at the {group}: C1 or the line is missing")
+                continue
+            opposite = c1["difference"] * line["difference"] < 0
+            apart = c1["lower"] > line["upper"] or c1["upper"] < line["lower"]
+            if opposite or apart:
+                print(
+                    f"TRIGGER 2: C1 {c1['difference']:+.3f} ({c1['lower']:+.3f} to "
+                    f"{c1['upper']:+.3f}) contradicts the stored 425 line "
+                    f"{line['difference']:+.3f} ({line['lower']:+.3f} to {line['upper']:+.3f}) "
+                    f"at the {group}: "
+                    f"{'opposite signs' if opposite else 'intervals do not overlap'}"
+                )
+            width_c1, width_line = c1["upper"] - c1["lower"], line["upper"] - line["lower"]
+            ratio = width_c1 / width_line
+            print(
+                f"C1 interval width {width_c1:.3f}, stored line {width_line:.3f}, ratio {ratio:.2f}"
+            )
+            if ratio > TRIGGER_6_FACTOR or ratio < 1 / TRIGGER_6_FACTOR:
+                print(
+                    f"TRIGGER 6: at the {group} C1's interval is {ratio:.2f} times the width of "
+                    f"the stored 425 line's (limits: {1 / TRIGGER_6_FACTOR:.1f} and "
+                    f"{TRIGGER_6_FACTOR:.1f})"
+                )
+    print(
+        "TRIGGER 7 not decided by the scorer: the page's author must judge whether a later design "
+        "depends on the headline"
+    )
 
 
-def figure_gain_against_ens_months(*, rows: dict[str, pl.DataFrame]) -> None:
-    """TODO: draw the figure of the pre-training gain against the months of ENS history.
+def mean_ens_months(*, window: arms.Window, months: tuple[str, ...]) -> float:
+    """Return a window's months of ENS history before the cut, averaged over the folds.
 
-    The plan names the figure but not its design. The open choices are the x axis (the 12, 24, F,
-    and C windows, or each fold's own ENS months, which differ by Primary), the y axis (C1 per
-    group, or each window's A minus R, which exist only at 12 and 24 months and F), and the
-    interval to draw. Load the `dataviz` skill before choosing.
-
-    Raises:
-        NotImplementedError: Always.
+    A trailing window holds its length. A floored window holds the months from the floor to each
+    fold's cut.
     """
-    del rows
-    msg = "the figure of gain against ENS months needs a design"
-    raise NotImplementedError(msg)
+    if window.days is not None:
+        return window.days / DAYS_PER_MONTH
+    assert window.floor is not None
+    spans = [(prep.refit_of(month=m) - window.floor).days / DAYS_PER_MONTH for m in months]
+    return float(np.mean(spans))
 
 
-def figure_example_forecasts(*, frames: dict[str, pl.DataFrame]) -> None:
-    """TODO: draw a day-ahead and a 14-day example forecast.
+def optimise_svg(*, path: Path) -> None:
+    """Run `svgo` on an SVG in place, as the `check-added-large-files` hook needs."""
+    subprocess.run([*SVGO_COMMAND, "--final-newline", str(path)], check=True)
 
-    The plan asks for the two examples but names neither the Primary, the origin, nor the arms
-    shown. A metered generator's series may not be drawn with its name; the Primaries are
-    substations, which the rule does not cover.
 
-    Raises:
-        NotImplementedError: Always.
+def gain_panel(*, points: pl.DataFrame, group: str) -> alt.LayerChart | alt.FacetChart:
+    """Return one group's panel of the pre-trained minus ENS-only CRPS against ENS months."""
+    data = points.filter(pl.col("group") == group)
+    ticks = sorted({round(v) for v in data["x"].to_list()})
+    labels = [w.label for w in GAIN_WINDOWS]
+    colour = alt.Color(
+        "window:N",
+        scale=alt.Scale(domain=labels, range=[w.colour for w in GAIN_WINDOWS]),
+        legend=alt.Legend(orient="top", direction="vertical", title=None),
+    )
+    x = alt.X(
+        "x:Q",
+        title="Mean months of ENS history before the cut",
+        scale=alt.Scale(domain=[0, 75]),
+        axis=alt.Axis(values=ticks),
+    )
+    y_title = wrapped(
+        text="Pre-trained minus ENS-only CRPS (points of capacity; more negative is better)",
+        width=40,
+    )
+    zero = (
+        alt.Chart(pl.DataFrame({"zero": [0.0]}))
+        .mark_rule(color="#555555", strokeDash=[4, 3])
+        .encode(y=alt.Y("zero:Q", title=y_title))  # ty: ignore[unresolved-attribute]
+    )
+    zero_text = (
+        alt.Chart(pl.DataFrame({"zero": [0.0], "x": [75.0], "text": ["same as ENS-only"]}))
+        .mark_text(align="right", baseline="bottom", dy=-3, color="#555555")
+        .encode(x="x:Q", y="zero:Q", text="text:N")  # ty: ignore[unresolved-attribute]
+    )
+    interval = (
+        alt.Chart(data)
+        .mark_rule(strokeWidth=2.5)
+        .encode(x=x, y="lower:Q", y2="upper:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    estimate = (
+        alt.Chart(data)
+        .mark_point(filled=True, size=90, opacity=1)
+        .encode(x=x, y="difference:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    return alt.layer(zero, zero_text, interval, estimate).properties(
+        width=CONTENT_WIDTH_PX - 110,
+        height=190,
+        title=alt.TitleParams(text=group, anchor="start"),
+    )
+
+
+def figure_gain_against_ens_months(
+    *,
+    rows: dict[str, pl.DataFrame],
+    have: dict[str, tuple[int, ...]],
+    table: pl.DataFrame,
+    months: tuple[str, ...],
+) -> None:
+    """Write the figure of the pre-trained minus ENS-only CRPS against the months of ENS history.
+
+    The x axis is the mean months of ENS history before the cut for the windows 12 months, 24
+    months, F, and C. The y axis is the CRPS of the pre-trained arm minus the ENS-only arm of that
+    window, from `A_12` minus `R_12`, C2, C1, and `A_C` minus `R_C`, each with its interval at the
+    Bonferroni level (the 12-month and C points are descriptive). One panel per group.
     """
-    del frames
-    msg = "the example forecasts need a choice of Primary, origin, and arms"
-    raise NotImplementedError(msg)
+    print("\n== figure: gain against ENS months (each point is a contrast at the same level) ==")
+    points = []
+    for gain in GAIN_WINDOWS:
+        names = variant_names(
+            treatment=gain.treatment, reference=gain.reference, rows=rows, have=have
+        )
+        if names is None:
+            print(f"{gain.label}: not drawn, an arm is not scored")
+            continue
+        x = mean_ens_months(window=gain.window, months=months)
+        for group in TESTED_GROUPS:
+            figures = contrast_line(
+                label=f"{gain.treatment} minus {gain.reference}",
+                group=group,
+                treatment=rows[names[0]],
+                reference=rows[names[1]],
+                table=table,
+                mde=None,
+                tag=f"(figure point at {x:.1f} months)",
+            )
+            if figures is not None:
+                points.append({"group": group, "window": gain.label, "x": x, **figures})
+    if not points:
+        print("figure not drawn: no window has both arms scored")
+        return
+    data = pl.DataFrame(points)
+    title = alt.TitleParams(
+        text="Does the gain from pre-training shrink as the ENS history grows?",
+        subtitle=wrapped(
+            text=(
+                "Dot: difference of CRPS in days 1 to 10 (equal weight per Primary). Line: "
+                f"{FIGURE_LEVEL_TEXT} interval from resampling whole months. The 12-month and "
+                "window C points are descriptive. Rows that every arm shares."
+            ),
+            width=95,
+        ),
+        anchor="start",
+    )
+    chart = alt.vconcat(*[gain_panel(points=data, group=g) for g in TESTED_GROUPS]).properties(
+        title=title
+    )
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    path = DOCS_DIR / "gain_against_ens_months.svg"
+    chart.save(path)
+    optimise_svg(path=path)
+    print(f"figure written to {path}")
+
+
+def example_panel(
+    *, forecast: pl.DataFrame, actual: pl.DataFrame, title: str, ticks: list[int]
+) -> alt.LayerChart | alt.FacetChart:
+    """Return one panel: each arm's 5% to 95% band and median, and the actual, against the lead."""
+    names = [*EXAMPLE_ARMS, "Actual"]
+    colour = alt.Color(
+        "series:N",
+        scale=alt.Scale(
+            domain=names, range=[ocf_theme.DATA_BLUE, ocf_theme.BRAND_ORANGE, "#222222"]
+        ),
+        legend=alt.Legend(orient="top", title=None),
+    )
+    x = alt.X(
+        "lead_hours:Q",
+        title="Hours after the origin",
+        axis=alt.Axis(values=ticks),
+        scale=alt.Scale(domain=[min(ticks), max(ticks)]),
+    )
+    band = (
+        alt.Chart(forecast)
+        .mark_area(opacity=0.2)
+        .encode(x=x, y=alt.Y("q05:Q", title="Demand (MW)"), y2="q95:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    median = (
+        alt.Chart(forecast).mark_line().encode(x=x, y="q50:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    observed = (
+        alt.Chart(actual).mark_line(strokeWidth=2).encode(x=x, y="actual:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    return alt.layer(band, median, observed).properties(
+        width=CONTENT_WIDTH_PX - 110, height=170, title=alt.TitleParams(text=title, anchor="start")
+    )
+
+
+def figure_example_forecasts(
+    *,
+    frames: dict[str, pl.DataFrame],
+    have: dict[str, tuple[int, ...]],
+    series: pl.DataFrame,
+    ctx: dict,
+) -> None:
+    """Write a day-ahead and a full 14-day example forecast against the actual, per group.
+
+    The arms are `EXAMPLE_ARMS` (C1's two arms), the origin is `EXAMPLE_ORIGIN`, and the Primary of
+    each group is in `EXAMPLE_PRIMARIES`. Primaries are substations, so no NGED metered generator's
+    series is drawn. The band is the 5% to 95% interval of the widened forecast, and the line is the
+    median. The x axis counts hours after the origin.
+    """
+    print("\n== figure: example forecasts ==")
+    names = {a: Variant(a, have[a]).name for a in EXAMPLE_ARMS if have.get(a)}
+    if len(names) != len(EXAMPLE_ARMS) or any(n not in frames for n in names.values()):
+        print(f"figure not drawn: {EXAMPLE_ARMS} are not both scored")
+        return
+    lead = (
+        (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
+    ).alias("lead_hours")
+    day_start = (EXAMPLE_ORIGIN + timedelta(days=1)).replace(hour=0)
+    panels = []
+    for group, label in EXAMPLE_PRIMARIES.items():
+        series_id = int(series.filter(pl.col("label") == label)["time_series_id"][0])
+        pieces = [
+            frames[names[a]]
+            .filter(
+                pl.col("time_series_id") == series_id,
+                pl.col("power_fcst_init_time") == EXAMPLE_ORIGIN,
+            )
+            .with_columns(lead, series=pl.lit(a))
+            for a in EXAMPLE_ARMS
+        ]
+        forecast = pl.concat(pieces)
+        if forecast.is_empty():
+            print(f"{group}: no forecast of {label} from the origin {EXAMPLE_ORIGIN}; not drawn")
+            continue
+        actual = (
+            ctx["actuals"]
+            .filter(pl.col("time_series_id") == series_id)
+            .join(
+                forecast.select("valid_time", "lead_hours").unique(), on="valid_time", how="inner"
+            )
+            .with_columns(series=pl.lit("Actual"))
+        )
+        for horizon, ticks, keep in (
+            (
+                "day-ahead",
+                [12, 18, 24, 30, 36, 42],
+                (pl.col("valid_time") >= day_start)
+                & (pl.col("valid_time") < day_start + timedelta(days=1)),
+            ),
+            ("full 14-day", list(range(0, 361, 48)), pl.lit(True)),
+        ):
+            panels.append(
+                example_panel(
+                    forecast=forecast.filter(keep),
+                    actual=actual.filter(keep),
+                    title=(
+                        f"{group}: Primary {label}, {horizon} forecast from "
+                        f"{EXAMPLE_ORIGIN:%Y-%m-%d %H:%M} UTC"
+                    ),
+                    ticks=ticks,
+                )
+            )
+    if not panels:
+        print("figure not drawn: no panel has a forecast")
+        return
+    chart = alt.vconcat(*panels).properties(
+        title=alt.TitleParams(
+            text="Example forecasts of the two arms of C1 against the actual demand",
+            subtitle=wrapped(
+                text=(
+                    "Band: 5% to 95% of the widened forecast. Line: median. Each arm is the "
+                    "average of its seeds in quantile space. One Primary per group."
+                ),
+                width=95,
+            ),
+            anchor="start",
+        )
+    )
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    path = DOCS_DIR / "example_forecasts.svg"
+    chart.save(path)
+    optimise_svg(path=path)
+    print(f"figure written to {path}")
 
 
 def main() -> None:
@@ -814,6 +1195,9 @@ def main() -> None:
     found = tested_contrasts(rows=rows, have=have, table=table, mde=mde)
     descriptive_readings(rows=rows, have=have, table=table, mde=mde)
     audit_triggers(found=found)
+    triggers_2_6_7(rows=rows, have=have, table=table, found=found)
+    figure_gain_against_ens_months(rows=rows, have=have, table=table, months=months)
+    figure_example_forecasts(frames=frames, have=have, series=series, ctx=ctx)
 
 
 if __name__ == "__main__":
