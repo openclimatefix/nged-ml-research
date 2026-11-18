@@ -11,17 +11,19 @@ rows with experiment 407's cuts), and the ERA5-and-CAMS rows follow experiment 4
 
 Three cuts apply to every set of rows. As in experiment 425, a D15 or D18 row is dropped if its
 valid time or its weekly lag is before 2025-03-01, and a row is dropped if its own half-hour or any
-of its three origin lags is a flagged exact zero. In addition, a row of a Primary in
-`prep.FIRST_USABLE` is dropped if its valid time or its weekly lag is before the Primary's first
-usable date (experiment 418 applied it to the valid time only). Every set of rows asserts that its
-valid times are at least 3.5 hours before the fold's cut. The fold's standardiser and per-Primary
-target statistics are fitted on the fine-tuning rows, and every stage uses them.
+of its three origin lags is a flagged exact zero; the counts of target and lag drops are kept
+apart. In addition, a row of a Primary in `prep.FIRST_USABLE` is dropped if its valid time or its
+weekly lag is before the Primary's first usable date (experiment 418 applied it to the valid time
+only). The flagged half-hours come from this experiment's own list (`prep.FLAGGED_KEYS`, which
+covers 2019-09-01 to 2026-07-01), except in the reproduction of experiment 425 (window `w730s`),
+which reads experiment 398's list as 425 did. Every set of rows asserts that its valid times are
+at least 3.5 hours before the fold's cut. The fold's standardiser and per-Primary target statistics
+are fitted on the fine-tuning rows, and every stage uses them.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Final
 
 import e00707_arms as arms  # ty: ignore[unresolved-import]
@@ -30,17 +32,10 @@ import e00707_prep as prep  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from e00707_models import Layout  # ty: ignore[unresolved-import]
-from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 SHORT_HISTORY: Final[tuple[str, ...]] = ("D15", "D18")
 CUT: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
 """A D15 or D18 row whose valid time or weekly lag is before this date is dropped."""
-FLAGGED_KEYS: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00398-load-shift-event-rescore-without-flagged-zero-actuals"
-    / "flagged_keys.parquet"
-)
-"""The half-hours that the cleaned power table flags as `substation_zero` (experiment 398)."""
 SPREAD_BAND_HOURS: Final[float] = 24.0
 N_BANDS: Final[int] = 15
 CHUNK: Final[int] = 1_000_000
@@ -61,6 +56,7 @@ class DroppedRows:
     short_history_start: int = 0
     before_first_usable: int = 0
     flagged_zero: int = 0
+    flagged_zero_lag: int = 0
 
     def __add__(self, other: DroppedRows) -> DroppedRows:
         """Return the sum of two counts."""
@@ -68,6 +64,7 @@ class DroppedRows:
             short_history_start=self.short_history_start + other.short_history_start,
             before_first_usable=self.before_first_usable + other.before_first_usable,
             flagged_zero=self.flagged_zero + other.flagged_zero,
+            flagged_zero_lag=self.flagged_zero_lag + other.flagged_zero_lag,
         )
 
     def as_dict(self) -> dict[str, int]:
@@ -76,6 +73,7 @@ class DroppedRows:
             "short_history_start": self.short_history_start,
             "before_first_usable": self.before_first_usable,
             "flagged_zero": self.flagged_zero,
+            "flagged_zero_lag": self.flagged_zero_lag,
         }
 
 
@@ -99,6 +97,8 @@ class Fold:
     target_std: np.ndarray
     layout: Layout
     dropped: DroppedRows = field(default_factory=DroppedRows)
+    legacy_flags: bool = False
+    """Whether the rows use experiment 398's flagged keys (the reproduction of experiment 425)."""
 
 
 @dataclass
@@ -114,9 +114,22 @@ class Rows:
     valid: np.ndarray
 
 
-def flagged_times() -> dict[int, np.ndarray]:
-    """Return each series' flagged exact-zero half-hours, as microseconds since the epoch."""
-    flagged = pl.read_parquet(FLAGGED_KEYS)
+def flagged_times(*, legacy: bool = False) -> dict[int, np.ndarray]:
+    """Return each series' flagged exact-zero half-hours, as microseconds since the epoch.
+
+    Args:
+        legacy: Whether to read experiment 398's list (2024-05-01 to 2026-03-05), which the
+            reproduction of experiment 425's rows (window `w730s`) uses. Otherwise the list is
+            this experiment's own, which covers 2019-09-01 to 2026-07-01.
+
+    Raises:
+        FileNotFoundError: If this experiment's list has not been written.
+    """
+    path = prep.FLAGGED_KEYS_398 if legacy else prep.FLAGGED_KEYS
+    if not path.exists():
+        msg = f"{path} does not exist: run `e00707_prep.py flagged-keys`"
+        raise FileNotFoundError(msg)
+    flagged = pl.read_parquet(path)
     return {
         int(i): np.sort(g["valid_time"].dt.epoch("us").to_numpy())
         for (i,), g in flagged.group_by("time_series_id")
@@ -193,18 +206,21 @@ def apply_cuts(
         unusable = (valid < before) | ((valid - lag_us[:, 2]) < before)
         first_usable = int((keep & unusable).sum())
         keep &= ~unusable
-    flagged_zero = 0
+    flagged_zero = flagged_lag = 0
     bad = flagged.get(series_id)
     if bad is not None:
-        hit = np.isin(valid, bad)
+        target_hit = np.isin(valid, bad)
+        hit = target_hit.copy()
         for j in range(lag_us.shape[1]):
             hit |= np.isin(valid - lag_us[:, j], bad)
-        flagged_zero = int((keep & hit).sum())
+        flagged_zero = int((keep & target_hit).sum())
+        flagged_lag = int((keep & hit).sum()) - flagged_zero
         keep &= ~hit
     return keep, DroppedRows(
         short_history_start=start_cut,
         before_first_usable=first_usable,
         flagged_zero=flagged_zero,
+        flagged_zero_lag=flagged_lag,
     )
 
 
@@ -219,7 +235,8 @@ def build_fold(*, refit: datetime, window: arms.Window, cut: bool = True) -> Fol
         ValueError: If a row is not known at the cut, or the window keeps no row.
     """
     _, mask, layout = prep.feature_names()
-    flagged = flagged_times() if cut else {}
+    legacy = window == arms.W24_STORED
+    flagged = flagged_times(legacy=legacy) if cut else {}
     dropped = DroppedRows()
     parts = []
     for row in prep.primaries().iter_rows(named=True):
@@ -274,6 +291,7 @@ def build_fold(*, refit: datetime, window: arms.Window, cut: bool = True) -> Fol
         target_std=target_std,
         layout=layout,
         dropped=dropped,
+        legacy_flags=legacy,
     )
 
 
@@ -288,7 +306,7 @@ def ens_rows(
     Raises:
         ValueError: If the window keeps no row.
     """
-    flagged = flagged_times() if cut else {}
+    flagged = flagged_times(legacy=fold.legacy_flags) if cut else {}
     dropped = DroppedRows()
     parts: list[Rows] = []
     for row in prep.primaries().iter_rows(named=True):
@@ -387,7 +405,7 @@ def fold_pretrain(
     table = spread_table(fold=fold)
     _, std_cols = column_indices()
     cutoff_valid, cutoff_origin = _us(t=refit - common.REFIT_CUTOFF_AGE), _us(t=refit)
-    flagged = flagged_times() if cut else {}
+    flagged = flagged_times(legacy=fold.legacy_flags) if cut else {}
     dropped = DroppedRows()
     parts: list[Rows] = []
     for row in prep.primaries().iter_rows(named=True):

@@ -27,6 +27,10 @@ weeks, run inputs), experiment 418's `e00418_prep.py` (`dense_weather`), and exp
 - `raw`: write each Primary's raw input matrix from the summaries and a manifest of the runs used.
 - `check`: assert the origin rule on every cached row and print one example row.
 - `ens-months`: print each Primary's first origin and its months of ENS rows.
+- `flagged-keys`: write this experiment's own list of flagged `substation_zero` half-hours from the
+  cleaned power table, 2019-09-01 to 2026-07-01, under `work/flagged_keys.parquet`.
+- `check-flagged-keys`: compare that list with experiment 398's from 2024-05-01 on, and print the
+  number of half-hours that only one list holds. It writes nothing.
 - `step-check`: monthly ENS minus ERA5 and the ENS spread around 2023-06-27 and 2024-04-01.
 """
 
@@ -49,6 +53,7 @@ import polars as pl
 from contracts.weather_schemas import Nwp
 from e00707_models import GROUPS, Layout  # ty: ignore[unresolved-import]
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
+from studies.power import CLEANED_POWER_DELTA_URI
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR, STUDIES_DATA_DIR
 
 WORK_DIR: Final[Path] = arms.WORK_DIR
@@ -78,6 +83,21 @@ CAMS_PATH: Final[Path] = (
 NWP_TABLE_PATH: Final[Path] = REPO_DATA_DIR / "NWP"
 """The NWP Delta table, partitioned by `nwp_model_id` and `init_time`."""
 NWP_MODEL_ID: Final[str] = "ECMWF_ENS_0_25_degree"
+
+FLAGGED_KEYS: Final[Path] = WORK_DIR / "work" / "flagged_keys.parquet"
+"""This experiment's flagged `substation_zero` half-hours, 2019-09-01 to 2026-07-01."""
+FLAGGED_KEYS_398: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00398-load-shift-event-rescore-without-flagged-zero-actuals"
+    / "flagged_keys.parquet"
+)
+"""Experiment 398's list, which covers only 2024-05-01 to 2026-03-05; read only.
+
+Only the reproduction of experiment 425's rows (window `w730s`) uses it."""
+FLAGGED_LAST: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
+FLAGGED_COMPARE_FIRST: Final[datetime] = datetime(2024, 5, 1, tzinfo=UTC)
+FLAGGED_COMPARE_LAST: Final[datetime] = datetime(2026, 3, 5, tzinfo=UTC)
+"""The span in which both lists cover the cleaned power table."""
 
 FIRST_RUN: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
 """The anchor of the held-out validation weeks; do not move it (negative days floor-divide)."""
@@ -848,6 +868,48 @@ def step_check() -> None:
         print("STEP CHECK FAILED: stop and report to the manager")
 
 
+def build_flagged_keys() -> None:
+    """Write the half-hours that the cleaned power table flags as `substation_zero`.
+
+    The span is `PRETRAIN_START` to `FLAGGED_LAST`, so the list covers every row, lag, and target
+    of every training stage. The file is written through a temporary name.
+    """
+    flagged = (
+        pl.scan_delta(CLEANED_POWER_DELTA_URI)
+        .filter(
+            pl.col("drop_reason") == "substation_zero",
+            pl.col("time").is_between(PRETRAIN_START, FLAGGED_LAST),
+        )
+        .select("time_series_id", pl.col("time").alias("valid_time"), "power", "drop_reason")
+        .collect()
+        .sort("time_series_id", "valid_time")
+    )
+    common.atomic_write(frame=flagged, target=FLAGGED_KEYS)
+    print(
+        f"flagged substation_zero half-hours {PRETRAIN_START:%Y-%m-%d} to {FLAGGED_LAST:%Y-%m-%d}: "
+        f"{flagged.height:,}; written to {FLAGGED_KEYS}"
+    )
+
+
+def check_flagged_keys() -> None:
+    """Print how many half-hours only one of the two flagged lists holds, 2024-05-01 to 2026-03-05.
+
+    Reads both lists and writes nothing.
+    """
+    keys = ["time_series_id", "valid_time"]
+    span = pl.col("valid_time").is_between(FLAGGED_COMPARE_FIRST, FLAGGED_COMPARE_LAST)
+    mine = pl.read_parquet(FLAGGED_KEYS).select(keys).filter(span)
+    theirs = pl.read_parquet(FLAGGED_KEYS_398).select(keys).filter(span)
+    only_mine = mine.join(theirs, on=keys, how="anti").height
+    only_theirs = theirs.join(mine, on=keys, how="anti").height
+    print(
+        f"{FLAGGED_COMPARE_FIRST:%Y-%m-%d} to {FLAGGED_COMPARE_LAST:%Y-%m-%d}: "
+        f"{mine.height:,} half-hours in this experiment's list, {theirs.height:,} in experiment "
+        f"398's; {only_mine:,} only in this experiment's, {only_theirs:,} only in 398's; "
+        f"disagreements: {only_mine + only_theirs:,}"
+    )
+
+
 def scan_plan(*, run: datetime) -> None:
     """Print the query plan of one run's scan, to confirm that it prunes to one partition."""
     print(run_scan(run=run).explain())
@@ -858,7 +920,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=("coverage", "scan", "summaries", "raw", "check", "ens-months", "step-check"),
+        choices=(
+            "coverage",
+            "scan",
+            "summaries",
+            "raw",
+            "check",
+            "ens-months",
+            "flagged-keys",
+            "check-flagged-keys",
+            "step-check",
+        ),
     )
     parser.add_argument("--run", default="2024-03-31", help="the run for `scan`")
     parser.add_argument("--workers", type=int, default=2)
@@ -881,6 +953,10 @@ def main() -> None:
         check_raw()
     elif args.command == "ens-months":
         ens_months()
+    elif args.command == "flagged-keys":
+        build_flagged_keys()
+    elif args.command == "check-flagged-keys":
+        check_flagged_keys()
     else:
         step_check()
 

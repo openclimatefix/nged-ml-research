@@ -42,7 +42,7 @@ import e00397_score as s397  # ty: ignore[unresolved-import]
 import e00407_score as s407  # ty: ignore[unresolved-import]
 import e00707_arms as arms  # ty: ignore[unresolved-import]
 import e00707_common as common  # ty: ignore[unresolved-import]
-import e00707_folds as folds  # ty: ignore[unresolved-import]
+import e00707_prep as prep  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from scipy import stats
@@ -213,7 +213,7 @@ def cleaned_scoring_context(*, series: pl.DataFrame) -> dict:
     The flagged half-hours are the same ones the training rows drop (experiment 425's rule).
     """
     ctx = s381.build_context(series=series)
-    flagged = pl.read_parquet(folds.FLAGGED_KEYS).select("time_series_id", "valid_time")
+    flagged = pl.read_parquet(prep.FLAGGED_KEYS).select("time_series_id", "valid_time")
     before = ctx["actuals"].height
     ctx["actuals"] = ctx["actuals"].join(flagged, on=["time_series_id", "valid_time"], how="anti")
     print(f"scoring actuals dropped for a flagged exact zero: {before - ctx['actuals'].height}")
