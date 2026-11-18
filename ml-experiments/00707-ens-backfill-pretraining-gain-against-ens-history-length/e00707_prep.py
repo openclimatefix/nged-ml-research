@@ -655,14 +655,26 @@ def load_site(*, site: str) -> dict[str, np.ndarray]:
 
     The back-filled file is optional (it may not exist yet); its absence is printed once per call
     by the caller through `backfill_available`. Every array has the keys `x`, `y`, `valid`,
-    `origin`, `lead`.
+    `origin`, `lead`. The back-filled rows carry their run, which is asserted to be at least 9 hours
+    before the origin. Experiment 397's rows do not, so the run is recomputed as the origin minus 9
+    hours and asserted to be a 00:00 UTC run from `FIRST_RUN`.
+
+    Raises:
+        ValueError: If experiment 397's rows hold a run that is not a 00:00 UTC run from
+            `FIRST_RUN`, or a back-filled row reads a run issued less than 9 hours before its
+            origin.
     """
     parts = []
     new = NEW_RAW_DIR / f"{site}.npz"
     if new.exists():
         z = np.load(new)
+        assert_origin_after_run(nwp_init=z["nwp_init"], origin=z["origin"])
         parts.append({k: z[k] for k in ("x", "y", "valid", "origin", "lead")})
     z = np.load(OLD_RAW_DIR / f"{site}.npz")
+    old_run = z["origin"] - int(common.PUBLICATION_DELAY / timedelta(microseconds=1))
+    if (old_run % US_PER_DAY != 0).any() or (old_run < _us(t=FIRST_RUN)).any():
+        msg = f"{site}: experiment 397's rows hold a run that is not a 00Z run from {FIRST_RUN:%F}"
+        raise ValueError(msg)
     parts.append({k: z[k] for k in ("x", "y", "valid", "origin", "lead")})
     return {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
 
@@ -753,6 +765,10 @@ def run_inputs(
             how="inner",
             validate="1:1",
             maintain_order="left",
+        )
+        assert_origin_after_run(
+            nwp_init=prepared["nwp_init_time"].dt.epoch("us").to_numpy(),
+            origin=prepared["power_fcst_init_time"].dt.epoch("us").to_numpy(),
         )
         keys = prepared.select(*common.KEYS, "lead_hours").unique(
             subset=list(common.KEYS), maintain_order=True
