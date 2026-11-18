@@ -1,7 +1,7 @@
 # ruff: noqa: ANN001, E501, PT018
 """Tests of `e00702_export.py` and the pilot and bank-match modes of `e00702_score.py` on synthetic files."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import e00702_core as core
 import polars as pl
@@ -113,3 +113,50 @@ def test_pilot_primaries_follow_the_rule():
     site = score.sites()
     assert site.filter(pl.col("label") == chosen[0])["group"][0] == "signed-MW six"
     assert site.filter(pl.col("label") == chosen[1])["group"][0] == "MVA-only eight"
+
+
+def _native_frame(*, ids: list[int]) -> pl.DataFrame:
+    """Return 14 days and 2 hours of half-hourly native-origin rows (09:00 UTC) for each series."""
+    origin = datetime(2026, 5, 1, 9, tzinfo=UTC)
+    valid = pl.datetime_range(
+        origin + timedelta(minutes=30), origin + timedelta(days=14, hours=5), "30m", eager=True,
+        time_zone="UTC",
+    )  # fmt: skip
+    n = len(valid)
+    return pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "time_series_id": [ts] * n,
+                    "power_fcst_init_time": [origin] * n,
+                    "valid_time": valid,
+                    **{q: [0.01 * (i + 1) * (ts + 1)] * n for i, q in enumerate(x667.QCOLS)},
+                }
+            )
+            for ts in ids
+        ]
+    ).with_columns(
+        pl.col("power_fcst_init_time").cast(pl.Datetime("us", "UTC")),
+        pl.col("valid_time").cast(pl.Datetime("us", "UTC")),
+        pl.col(x667.QCOLS).cast(pl.Float32),
+    )
+
+
+def test_subset_contract_rows_equal_experiment_667s_rows_of_those_primaries(monkeypatch):
+    """The copy gives experiment 667's rows for a subset, and still refuses a wrong series count."""
+    ids = list(range(16))
+    monkeypatch.setattr(
+        x667,
+        "capacity_mw",
+        lambda: pl.DataFrame(
+            {"time_series_id": ids, "capacity_mw": [1.0 + i for i in ids], "group": ["g"] * 16}
+        ),
+    )
+    full = x667.contract_rows(mean=_native_frame(ids=ids))
+    pick = [2, 7, 11]
+    part = export.subset_contract_rows(mean=_native_frame(ids=pick), n_series=3)
+    assert part.equals(full.filter(pl.col("time_series_id").is_in(pick)))
+    with pytest.raises(AssertionError):
+        export.subset_contract_rows(mean=_native_frame(ids=pick), n_series=2)
+    with pytest.raises(AssertionError):
+        export.subset_contract_rows(mean=_native_frame(ids=ids), n_series=16)

@@ -459,20 +459,24 @@ def run_pilot(*, files: list[str]) -> None:
     keys, aligned = align(frames=frames)
     rows = Rows(keys=keys)
     mask = rows.ok & (rows.lead_h < core.HEADLINE_LEAD_HOURS)
+    systems = {name: rows.quantiles(frame=aligned[(name, 0)]) for name in files} | {
+        "climatology": rows.q_clim, "manual heuristic": rows.q_heur,
+    }  # fmt: skip
     table = []
-    for name in files:
-        frame = aligned[(name, 0)]
-        ls = row_losses(y=rows.y, q=np.where(rows.ok[:, None], rows.quantiles(frame=frame), 0.0))
-        table.append({"file": name, "crps": float(ls["crps"][mask].mean()), "nmae_median": float(ls["mae"][mask].mean())})  # fmt: skip
-    for name, arr in (("climatology", rows.q_clim), ("manual heuristic", rows.q_heur)):
+    for name, arr in systems.items():
         ls = row_losses(y=rows.y, q=np.where(rows.ok[:, None], arr, 0.0))
-        table.append({"file": name, "crps": float(ls["crps"][mask].mean()), "nmae_median": float(ls["mae"][mask].mean())})  # fmt: skip
-    result = pl.DataFrame(table)
+        for primary in ("all", *chosen):
+            sel = mask if primary == "all" else mask & (rows.label == primary)
+            table.append({"file": name, "primary": primary, "rows": int(sel.sum()), "crps": float(ls["crps"][sel].mean()), "nmae_median": float(ls["mae"][sel].mean())})  # fmt: skip
+    per_primary = pl.DataFrame(table)
+    result = per_primary.filter(pl.col("primary") == "all")
     out = SCORES / "pilot"
     out.mkdir(parents=True, exist_ok=True)
     result.write_csv(out / "pilot.csv")
+    per_primary.write_csv(out / "pilot_per_primary.csv")
     print("interim; fold", month, "Primaries", chosen, "rows", int(mask.sum()))
-    print(result)
+    with pl.Config(tbl_rows=100):
+        print(per_primary.sort("primary", "crps"))
     clim = float(result.filter(pl.col("file") == "climatology")["crps"][0])
     beaten = {n: bool(float(result.filter(pl.col("file") == n)["crps"][0]) < clim) for n in files}
     print("beats climatology:", beaten)

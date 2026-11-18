@@ -622,7 +622,7 @@ def finish() -> None:
         use_primary(label=label)
         mine = [p for p in STATE["phases"] if p["label"] == label]
         (e.W / "logs").mkdir(parents=True, exist_ok=True)
-        (e.W / "logs" / f"phases_{CMD}_s{'-'.join(map(str, MINE.seeds))}.json").write_text(
+        (e.W / "logs" / f"phases_{CMD}_{fold.PHASE}_s{'-'.join(map(str, MINE.seeds))}.json").write_text(
             json.dumps(
                 {
                     "phases": mine, "timings": STATE["timings"],

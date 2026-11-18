@@ -22,12 +22,14 @@ match-refit` reads.
 """
 
 import argparse
+from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
 import e00667_export as x667  # ty: ignore[unresolved-import]
 import e00702_core as core
 import e00702_score as score702
+import numpy as np
 import polars as pl
 
 LABELS: Final[tuple[str, ...]] = (
@@ -38,6 +40,55 @@ LABELS: Final[tuple[str, ...]] = (
 
 POOLED_FILE_ARMS: Final[dict[str, str]] = {"global_pair": "global", "global_pilot": "global_pilot"}
 """The export names whose fits sit in one file of all 16 Primaries, with the `e00702_fit.py` arm folder."""
+
+
+def subset_contract_rows(*, mean: pl.DataFrame, n_series: int) -> pl.DataFrame:
+    """Return experiment 667's `contract_rows` of a frame that holds `n_series` Primaries, fewer than 16.
+
+    Experiment 667's function asserts 16 series. This copy makes the same relabelling, window,
+    capacity scaling, and checks, and asserts `n_series` instead; `arm_rows` calls experiment 667's
+    own function whenever all 16 Primaries are exported, and the tests compare the two on 16 series.
+    """
+    assert n_series < len(LABELS), "use experiment 667's `contract_rows` for all 16 Primaries"
+    assert (mean["power_fcst_init_time"].dt.hour() == x667.NETWORK_ORIGIN_HOUR).all()
+    assert (mean["power_fcst_init_time"].dt.minute() == 0).all()
+    shift = timedelta(hours=x667.CONTRACT_HOUR - x667.NETWORK_ORIGIN_HOUR)
+    cap = x667.capacity_mw().select(pl.col("time_series_id").cast(pl.Int64), "capacity_mw")
+    out = (
+        mean.with_columns(
+            contract_origin=pl.col("power_fcst_init_time") + shift,
+            time_series_id=pl.col("time_series_id").cast(pl.Int64),
+        )
+        .filter(
+            (pl.col("valid_time") >= pl.col("contract_origin"))
+            & (pl.col("valid_time") < pl.col("contract_origin") + timedelta(days=14))
+        )
+        .join(cap, on="time_series_id", how="left")
+        .with_columns(
+            *[
+                (pl.col(q).cast(pl.Float64) * pl.col("capacity_mw")).cast(pl.Float32)
+                for q in x667.QCOLS
+            ]
+        )
+        .select(
+            pl.col("time_series_id").cast(pl.Int8),
+            pl.col("valid_time"),
+            pl.col("contract_origin").dt.truncate("1d").alias("nwp_init_time"),
+            pl.col("contract_origin").alias("power_fcst_init_time"),
+            *x667.QCOLS,
+        )
+        .sort("time_series_id", "power_fcst_init_time", "valid_time")
+    )
+    assert out.schema == pl.Schema(x667.CONTRACT_SCHEMA), out.schema
+    assert out["q99"].is_finite().all()
+    assert out.select(pl.all_horizontal(pl.col(x667.QCOLS).is_not_null())).to_series().all()
+    q = out.select(x667.QCOLS).to_numpy()
+    assert (np.diff(q, axis=1) >= 0).all(), "quantiles cross"
+    per = out.group_by("time_series_id", "power_fcst_init_time").len()["len"].unique().to_list()
+    assert per == [x667.HALF_HOURS], per
+    assert out.height == out.unique(["time_series_id", "power_fcst_init_time", "valid_time"]).height
+    assert out["time_series_id"].n_unique() == n_series
+    return out
 
 
 def fit_files(
@@ -84,7 +135,12 @@ def arm_rows(
             this = raw.select(x667.KEYS)
             keys = this if keys is None else keys
             assert this.equals(keys), f"seeds differ in keys: {arm} {month} s{seed}"
-            out.append(x667.contract_rows(mean=raw).with_columns(seed=pl.lit(seed, pl.Int8)))
+            rows = (
+                x667.contract_rows(mean=raw)
+                if len(labels) == len(LABELS)
+                else subset_contract_rows(mean=raw, n_series=len(labels))
+            )
+            out.append(rows.with_columns(seed=pl.lit(seed, pl.Int8)))
     frame = pl.concat(out).with_columns(arm=pl.lit(arm + suffix))
     assert frame.height == frame.unique(["seed", *x667.KEYS]).height
     return frame

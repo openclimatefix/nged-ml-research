@@ -8,6 +8,7 @@
 #   ARM split3 : fit pfit bank
 # The fold's `fold_spans/<MONTH>.json` is written first when missing; split1 also runs `isolation` (predict phase) per Primary.
 # EXTRA ARGS go to every e00702_fit.py call, for example `--batch 8192 --suffix _b8192` (the diagnostic).
+# FRESH=clean or FRESH=resume: what to do with a Primary's folder left by an earlier run (default: stop).
 # Seeds: SEEDS="0 1 2" (default). Output: $DATA_PATH_INTERNAL/ml-experiments/00702-*/arms/<ARM><suffix>/<MONTH>/<label>/.
 D="$(cd "$(dirname "$0")" && pwd)"
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
@@ -20,6 +21,18 @@ ALL="D2,D3,D4,D5,D8,D9,D10,D11,D12,D14,D15,D16,D18,D19,D21,D22"
 [ "$PRIM" = all ] && PRIM=$ALL
 set -e
 mkdir -p "$R/logs"
+# A Primary's folder left by an earlier run would be reused silently (existing pre-training, step-2, and fit files are
+# skipped), so a fresh run refuses it. FRESH=clean deletes the folder first; FRESH=resume reuses it on purpose.
+for P in ${PRIM//,/ }; do
+  F="$R/arms/${ARM}${SFX}/$M/$P"
+  if [ -e "$F" ]; then
+    case "${FRESH:-}" in
+      clean) rm -rf "$F"; echo "deleted $F" ;;
+      resume) echo "reusing $F" ;;
+      *) echo "outputs of an earlier run in $F: set FRESH=clean to delete them, or FRESH=resume to reuse them"; exit 1 ;;
+    esac
+  fi
+done
 # the pooled rows' spans and shifted-row hashes of the fold, which a per-substation arm checks itself against
 if [ ! -f "$R/fold_spans/$M.json" ]; then
   E00677_PHASE=predict "$D/gpu.sh" e00702_fit.py split3 spans --month "$M" > "$R/logs/spans_${M}.log" 2>&1

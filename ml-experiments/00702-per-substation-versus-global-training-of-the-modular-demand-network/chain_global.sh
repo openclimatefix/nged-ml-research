@@ -25,6 +25,19 @@ run() {  # PHASE COMMAND LOGNAME [EXTRA...]
   E00677_PHASE=$phase "$D/gpu.sh" e00702_fit.py global "$cmd" --month "$M" $SEEDARGS --suffix "$SFX" "$@" > "$R/logs/global${SFX}_${M}_$log.log" 2>&1
 }
 CMDS=${*:-pretrain step2 fit pfit bank}
+# A run that starts with pre-training refuses a folder left by an earlier run (its files would be skipped and reused).
+# FRESH=clean deletes the folder first; FRESH=resume reuses it on purpose.
+F="$R/arms/global${SFX}/$M/pooled"
+case " $CMDS " in
+  *" pretrain "*)
+    if [ -e "$F" ]; then
+      case "${FRESH:-}" in
+        clean) rm -rf "$F"; echo "deleted $F" ;;
+        resume) echo "reusing $F" ;;
+        *) echo "outputs of an earlier run in $F: set FRESH=clean to delete them, or FRESH=resume to reuse them"; exit 1 ;;
+      esac
+    fi ;;
+esac
 for c in $CMDS; do
   case $c in
     pretrain|step2|fit) run train "$c" "$c" ;;

@@ -91,9 +91,14 @@ done
 py $D/e00702_score.py pilot --files global_pilot pilot_split3 pilot_split2 pilot_split1 pilot_hybrid3 pilot_split1_b8192 pilot_split3_b8192
 ```
 
-The phase logs (`arms/<arm>/2026-05/<label>/work/logs/phases_*.json`) hold the fixed-epoch phases, the
-validation loss, the wall-clock time, the peak memory, and the floored columns. Every number from this
-step is interim.
+The phase logs (`arms/<arm>/2026-05/<label>/work/logs/phases_<command>_<phase>_s<seeds>.json`) hold
+the epochs, whether the fixed-epoch rule applied, the validation loss, the wall-clock time, the peak
+memory, and the floored columns. Every number from this step is interim.
+
+**`chain_arm.sh` and `chain_global.sh` stop when an arm's folder already exists**, because the
+pre-training, step-2, and fit commands skip any file that exists and would reuse an earlier run's
+networks without logging them. Set `FRESH=clean` to delete the folder first, or `FRESH=resume` to
+reuse it on purpose.
 
 **7. Test months, for each M in 2025-11 2026-01 2026-04 2026-07.**
 
