@@ -97,7 +97,8 @@ and the raw `.npz` files) are rebuilt for 2020-10-15 onwards. Three stages combi
 
 - `S_era`: ERA5 and CAMS pseudo-runs from 2019-09-01, unweighted (experiment 418's recipe, which
   sets the `covid` input and keeps lockdown rows).
-- `S_ens(W)`: an unweighted stage on the ENS rows in window W, with `S_era`'s optimiser.
+- `S_ens(W)`: an unweighted stage on the ENS rows in window W, with a fresh AdamW at a learning rate
+  of 5e-4 (see Method).
 - `FT(W)`: experiment 425's fine-tune on the last min(W, 730 days) of ENS, 0.5-year half-life.
 
 The half-life gives a 2021 row about 0.2% of a new row's weight, so windows above 24 months need
@@ -183,7 +184,7 @@ bound for the gate and names it as a caveat.
   at the 16 Primaries. A step at either date larger than three standard deviations of the adjacent 12
   monthly values fails the check. `R_F+flags` carries an indicator for each date.
 - **Cleaned data and cuts.** `substation_zero` half-hours are dropped everywhere and counted per
-  fold. D15 and D18 rows before 2025-03-01 are dropped. D9 (signed-MW six) starts in 2023-04, so long
+  fold. D15 and D18 rows before 2025-03-01 are dropped. D9 (signed-MW six) has its first observed power on 2023-08-23, so long
   windows add nothing there; the page reports ENS months per Primary.
 - **Precipitation type** is not among the network's seven weather variables, so the column is not
   read. **Shortwave** is a 6-hour mean after lead 144 hours; C1 is also read for days 1 to 6 and 7 to
@@ -199,6 +200,29 @@ estimate is about 9 GPU-hours for the screen and 35 for the full run (extrapolat
 held 4.98 million over about 21 months). Request three streams on 4 cores, a GPU share of about 5 GB
 per stream (unverified), and a memory cap near 14 GB per stream. Building run summaries for 1,264
 back-filled runs is unmeasured CPU work.
+
+## Method
+
+**Five choices depart from experiment 425 or from the design note, and each is recorded here so that
+a reader of the results can allow for it.**
+
+- **`S_ens` starts a fresh AdamW at a learning rate of 5e-4.** The design note says that `S_ens`
+  uses "`S_era`'s optimiser", and the code reads that as the same settings (AdamW, 5e-4, unweighted),
+  not as the optimiser state carried over from `S_era`.
+- **Every fine-tune that follows an earlier stage uses a learning rate of 2e-4.** The rule includes
+  `R_E24`, `R_F`, and `R_C`, whose earlier stage is `S_ens` alone. Experiment 425 used 2e-4 only for
+  `A`, which follows `S_era`. Only an arm with no earlier stage (`R_24`, `R_12`) fine-tunes from
+  scratch at 5e-4.
+- **The standardiser and the per-Primary target statistics come from the fine-tuning rows.**
+  Experiments 425 and 418 do the same, and every stage, `S_era` and `S_ens` included, applies them
+  unchanged. A stage with a longer window therefore sees inputs on the scale of the 24-month rows.
+- **The minimum detectable effect uses the seed halves of `R_F`.** The scorer compares the mean of
+  seeds 0 to 2 with the mean of seeds 3 and 4 of `R_F`. Experiment 425 took its minimum detectable
+  effect from the stored `R`, which has a 24-month window.
+- **The stored `A_24` and `R_24` saw less ENS than `A_E24` and `R_E24` do.** ENS in the old table
+  starts on 2024-04-01, so before fold 2026-04 the stored arms saw 15 to 24 months of ENS. `A_E24`
+  and `R_E24` read the back-filled runs and see a true 24 months in every fold. C2 and the stored
+  425 line therefore differ in window as well as in code path, and the scorer prints both.
 
 ## Reports
 
