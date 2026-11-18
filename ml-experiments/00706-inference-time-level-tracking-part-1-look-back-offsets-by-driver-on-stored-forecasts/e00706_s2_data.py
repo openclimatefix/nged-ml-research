@@ -60,9 +60,9 @@ Approximations (each is printed by the builder where it can be measured):
   stage 1 are never mixed into a bank series. Every residual of a bank world is on
   even half-hours only, and its coverage thresholds are halved.
 - The neighbours' residuals in a bank world are the stored-NRA residuals of stage 1 plus the shifts
-  that the generator of experiment 650 added to those Primaries in that pass (their own event and the mirrored step of
-  a transfer), with the forecast held fixed (no re-run). The bank stores no re-run forecast for a
-  Primary outside its own event window.
+  that the generator of experiment 650 added to those Primaries in that pass (their own event and
+  the mirrored step of a transfer), with the forecast held fixed (no re-run). The bank stores no
+  re-run forecast for a Primary outside its own event window.
 - Own-only ramps are additive worlds on the real rows: the truth is the real power plus a ramp of
   10 points of capacity over 60 days (held afterwards), the forecast is the stored normal-running
   forecast, the neighbours' residuals are the real ones. This is a no-re-run world, so it
