@@ -59,32 +59,34 @@ metric: >-
   scenarios.
 verdict: supported
 best_arm: >-
-  Arm B (the two CAMS columns dropped), chosen by the rule because arm A was worse: C1 (arm A minus
-  arm B) +0.048 [+0.013, +0.115] points of capacity; CRPS 3.738 against 3.816 for the refitted
-  control (interim, four months).
+  Arm B (the two CAMS columns dropped), chosen by the rule because arm A failed its criteria: C1
+  (arm A minus arm B) +0.048 [+0.013, +0.115] points of capacity, an interval that excludes zero only
+  because of D15; CRPS 3.738 against 3.816 for the refitted control (interim, four months).
 headline: >-
   No loss was detected when the two previous-day CAMS columns were dropped from the Candidate (arm
   B minus control -0.078 [-0.302, +0.020] points of CRPS, interim), and rebuilding them from the
-  ENS analysis proxy was worse than dropping them, at D15 only.
+  ENS analysis proxy was worse than dropping them, a difference that D15 drives.
 lessons: >-
   On four months, no skill from the two previous-day irradiance columns was detected above seed
-  noise in the Candidate; the interval allows a loss of at most 0.02 points (about 0.5%). The
-  analysis-proxy replacement was worse than dropping the columns, entirely because of D15, where
-  the proxy's clear-sky ratio runs higher than CAMS's and the weather encoder was frozen on CAMS.
-  The control's two seeds differ by 0.12 points of pooled CRPS, more than any arm contrast.
+  noise in the Candidate. The interval allows a loss of at most 0.02 points (about 0.5%) on all
+  rows and 0.04 points (about 1.0%) without D15. The analysis-proxy replacement was worse than
+  dropping the columns only at D15, where arm B scored unusually well and arm A matched the control;
+  the proxy's higher clear-sky ratio at D15 is not shown to cause the gap. The control's two seeds
+  differ by 0.12 points of pooled CRPS, more than any arm contrast.
 take_home_message: >-
   Removing the two inputs that describe yesterday's sunshine from satellite data made no detectable
-  difference to the Candidate, the fullest demand forecast for the Primaries, over four test
-  months, so production can drop them. Rebuilding the two inputs from the weather forecast instead
-  made the forecast worse at one Primary. The test cannot rule out a loss of up to about 0.5% of
-  the forecast error.
+  difference to the Candidate, the Primaries demand neural network with the most inputs, over four
+  test months, so production can drop them. Rebuilding the two inputs from the weather forecast
+  instead was no better than the unchanged network, and worse than dropping them at one Primary. The
+  test cannot rule out a loss of up to about 0.5% of the forecast error (about 1.0% without that
+  Primary).
 advice:
   - >-
     Drop the two previous-day CAMS columns (`cams_prev_day_mean`, `cams_prev_day_csi`) from the
     Candidate for production, as from the step-5 network (C1, C3; experiment 704).
   - >-
-    Do not replace a pre-training-only input with a forecast-based proxy at fine-tune time when the
-    encoder reading it is frozen: the proxy's clear-sky ratio ran high and hurt D15 (C1; audit).
+    In this experiment, a forecast-based proxy for a pre-training-only input was no better than
+    dropping the input, so prefer dropping it when the encoder reading it is frozen (C1, C2; audit).
   - >-
     Judge an input change to the Candidate on more than two seeds and with each Primary left out:
     the control's seeds differ by 0.12 points, and D15 alone made C1 significant (audit).
@@ -92,18 +94,19 @@ production_status: candidate
 adopted_in: none
 ---
 
-**We asked whether the Candidate, the fullest demand forecast for the 16 Primaries (primary
-substations), gets worse when two inputs that production cannot supply are removed.** The two
-inputs describe yesterday's sunshine, taken from the Copernicus Atmosphere Monitoring Service (CAMS)
-satellite-based irradiance product, which production will not read when it makes a forecast. We
-retrained the Candidate neural network three times on four test months: once unchanged (the
-control), once with yesterday's sunshine taken from the ensemble weather forecast of the European
-Centre for Medium-Range Weather Forecasts (ECMWF ENS) instead (arm A), and once with the two inputs
-set to zero (arm B). The forecast got no detectably worse without the two inputs. Rebuilding them
-from the weather forecast was worse than dropping them, but only at one Primary, D15. The question
-and the answer match those of
-[experiment 704](../00704-cams-free-inference-for-the-primaries-step-5-network/result.md), which
-asked it of the simpler step-5 neural network.
+**We asked whether the Candidate, the demand neural network with the most inputs for the 16
+Primaries (primary substations), gets worse when two inputs that production cannot supply are
+removed.** The two inputs describe yesterday's sunshine, taken from the Copernicus Atmosphere
+Monitoring Service (CAMS) satellite-based irradiance product, which production will not read when it
+makes a forecast. We retrained the Candidate neural network three times on four test months: once
+unchanged (the control), once with yesterday's sunshine taken from the ensemble weather forecast of
+the European Centre for Medium-Range Weather Forecasts (ECMWF ENS) instead (arm A), and once with
+the two inputs set to zero (arm B). The forecast was not detectably worse without the two inputs, so
+production can drop them. Rebuilding them from the weather forecast was worse than dropping them,
+but only at one Primary, D15. [Experiment
+704](../00704-cams-free-inference-for-the-primaries-step-5-network/result.md) asked the same
+question of the simpler step-5 neural network and also chose arm B, with a wider bound on the
+possible loss (about 1.3%).
 
 **Verdict: supported; arm B (the two columns dropped) is chosen by the pre-registered rule.** Scores
 are the continuous ranked probability score (CRPS) and the mean absolute error (MAE) of the median,
@@ -113,10 +116,15 @@ contrast C1, arm A minus arm B in CRPS, is +0.048 points, with a 98.33% interval
 wholly below zero, a point estimate of at most −0.01, and every seed's C1 below zero in every month.
 C2 (arm A minus control) is −0.030 [−0.252, +0.051] and C3 (arm B minus control) is −0.078 [−0.302,
 +0.020]. The 98.33% interval of C3 allows a loss of at most 0.02 points, about 0.5% of the
-control's CRPS. The pooled MAE moves the same way as the pooled CRPS in every contrast (C1 +0.143,
-C2 −0.059, C3 −0.202).
+control's CRPS. Without D15, C3 is −0.016 [−0.152, +0.039], a bound of about 1.0%. At the six
+signed-MW Primaries, arm B is not better than the control: C3 is +0.026 [−0.025, +0.100], about
+0.9% of their CRPS of 2.89, and its upper bound is about 3.5%. The pooled MAE moves the same way as
+the pooled CRPS in every contrast (C1 +0.143, C2 −0.059, C3 −0.202). Scored as the seed-averaged
+forecast that experiment 667 published, arm A is worse than the control (CRPS 3.735 against 3.720)
+and arm B scores 3.683, so the sign of C2 depends on how the seeds are combined.
 
-**Two of the four predictions failed (P2 and P4), and P1 held on the point estimates only.**
+**Two of the four predictions failed (P2 and P4). P1 held for both arms on the point estimates and
+for arm B at the interval level.**
 
 - P1 (each arm changes CRPS by less than +0.03 against the control) held on the point estimates
   (−0.030 and −0.078), but not for arm A at the interval level: the upper bounds are +0.051 and
@@ -129,7 +137,8 @@ C2 −0.059, C3 −0.202).
 
 ## Results
 
-**Arm B has the lowest CRPS and MAE at every lead, by margins inside the seed noise.** CRPS and
+**Arm B has the lowest CRPS at every lead band and the lowest MAE over all leads, by CRPS margins
+smaller than the gap between the control's two seeds (0.119).** CRPS and
 normalised MAE of the median, points of capacity, mean over seeds of each seed's score, four months
 (interim); lower is better.
 
@@ -148,17 +157,19 @@ normalised MAE of the median, points of capacity, mean over seeds of each seed's
 **The control is a refit of experiment 667's unchanged chain, not experiment 667's stored
 forecasts.** The refit did not reproduce the stored forecasts to 1e-5 of capacity (prediction P4).
 The largest difference per month, as a fraction of capacity, was 4.9e-5 (2025-11), 7.2e-5
-(2026-02), 2.8e-4 (2026-04), and 5.2e-5 (2026-06), because pre-training on the GPU is not
+(2026-02), 2.85e-4 (2026-04), and 5.2e-5 (2026-06), because pre-training on the GPU is not
 bit-deterministic. As the plan pre-registered, the control was therefore refitted in all four
 months. N1, the refit's CRPS minus the stored forecasts' CRPS, is about 1e-6 points, far below
 every contrast.
 
-**One Primary, D15, makes arm A worse than arm B and arm B better than the control.** The Primaries
-fall into three metering groups: D15 and D18 (short histories), eight metered only as apparent
-power in MVA ("MVA-only"), and six metered as signed active power in MW ("signed-MW"). C1 is +0.478
+**One Primary, D15, accounts for the whole difference between arm A and arm B, and for arm B's lead
+over the control, which the seeds can explain.** The Primaries fall into three metering groups: D15
+and D18 (short histories), eight metered only as apparent power in megavolt-amperes ("MVA-only"),
+and six metered as signed active power in megawatts ("signed-MW"). C1 is +0.478
 [+0.008, +1.327] for D15 and D18, −0.010 for the MVA-only eight, and −0.005 for the signed-MW six.
-D15's CRPS is 11.085 for the control, 10.888 for arm A, and 9.950 for arm B, while D18's moves by
-less than 0.05. The audit found that without D15, C1 is −0.004 [−0.044, +0.038] and C3 is −0.016
+D15's CRPS is 11.085 for the control, 10.888 for arm A, and 9.950 for arm B, so arm A is better
+than the control at D15 and C1 is positive there because arm B scores well. D18's CRPS moves by less
+than 0.05. The audit found that without D15, C1 is −0.004 [−0.044, +0.038] and C3 is −0.016
 [−0.152, +0.039].
 
 **C1 by month and seed, CRPS in points of capacity.** Arm A is worse than arm B in every cell.
@@ -170,10 +181,11 @@ less than 0.05. The audit found that without D15, C1 is −0.004 [−0.044, +0.0
 | 2026-04 | +0.019 | +0.141 |
 | 2026-06 | +0.010 | +0.006 |
 
-**The seeds disagree more than arm B and the control do.** The control's pooled CRPS is 3.875 and
-3.756 for seeds 0 and 1, a gap of 0.119, against gaps of 0.007 for arm A and 0.022 for arm B. C3
-per month and seed ranges from −0.377 (2025-11, seed 0) to +0.021, and the 2025-11 seed-0 cell
-gives most of arm B's pooled gain over the control.
+**The control's two seeds differ from each other by more than arm B differs from the control.** The
+control's pooled CRPS is 3.875 and 3.756 for seeds 0 and 1, a gap of 0.119, against gaps of 0.007
+for arm A and 0.022 for arm B. C3 per month and seed ranges from −0.377 (2025-11, seed 0) to +0.021.
+Weighting the eight cells equally, the 2025-11 seed-0 cell alone gives about 60% of arm B's pooled
+gain over the control.
 
 **Scenario scores, CRPS in points of capacity.** The arms differ little in or after load-shift
 events.
@@ -186,9 +198,16 @@ events.
 | 7 days after an event ends | 3.082 | 3.043 | 3.028 | +0.015 [−0.080, +0.088] | −0.054 [−0.287, +0.068] |
 | Cold winter nights | 3.463 | 3.371 | 3.379 | −0.008 [−0.136, +0.230] | −0.083 [−0.359, +0.135] |
 
-**The tails and the curtailment cost do not separate the arms beyond seed noise.** The q01, q05,
-q95, and q99 coverages of all three networks agree to within about 0.003 (control 0.021, 0.078,
-0.928, and 0.981). The avoidable-curtailment cost is summed over the six signed-MW Primaries, with
+C3's interval outside events lies just below zero (upper bound −0.003). That interval is one of
+five scenario intervals that were not pre-registered as decision contrasts, so it is not read as a
+gain.
+
+**The coverages agree, but arm B's upper tail is slightly worse, and the curtailment cost does not
+separate the arms beyond seed noise.** The q01, q05, q95, and q99 coverages of all three networks
+agree to within about 0.003 (control 0.021, 0.078, 0.928, and 0.981). Arm B's pinball loss is
+higher than the control's at every lead band, at q95 (0.996 against 0.969 over all leads, about
++3%) and at q99 (0.281 against 0.268, about +5%). Those two differences were not tested against the
+seed spread. The avoidable-curtailment cost is summed over the six signed-MW Primaries, with
 each Primary's limit at 90% of its largest flow before the scored period, using the seed-averaged
 forecast. The cost is £550,000 for the control, £527,000 for arm A, and £579,000 for arm B, against
 £916,000 for climatology. The two seeds of arm B alone give £523,000 and £663,000. With the limit
@@ -208,10 +227,11 @@ widen with lead in all three.**
 ![Fourteen-day forecast](fourteen_day.svg)
 
 **The three Candidate variants respond to each of six logged load-shift events in the same way.**
-The six plots show the day-ahead median of each variant around six logged events, across both
+The six plots show the day-ahead median of each variant around six logged events, across the
 metering groups, with each event's start and end marked. NGED's logs may miss events. The rows
-"outside every logged event" may therefore hold events that no label covers, so the harm measured
-in those rows may be understated, and the sets of real events are undercounts.
+"outside every logged event" may therefore hold events that no label covers, so the loss from
+dropping the columns measured in those rows may be understated, and some real events are missing
+from the sets.
 
 ![Event at D10](event_1_D10.svg)
 
@@ -231,14 +251,21 @@ in those rows may be understated, and the sets of real events are undercounts.
   Primaries in every variant. The four others are D15 (control −5.35, arm A −6.36, arm B −6.23),
   D12, D8, and D10, where the three variants agree to within 1.1 points.
 - **MAE beside CRPS:** C2 and C3 agree in direction on both metrics in every split, but C1 does not
-  in three, so audit trigger 3 fired. The splits that disagree are C1 inside a logged event (CRPS
-  −0.009, MAE +0.033), at the signed-MW six (−0.005, +0.004), and on cold winter nights (−0.008,
-  +0.103). Each sits inside an interval that spans zero. The per-lead-band and per-Primary contrasts
-  are in `score/contrasts.csv`.
-- **Standardisers and tables:** arm B's two columns are exactly 0 in every table, and its
-  standardiser holds mean 0 and standard deviation 1e-6 for both columns in all four months. The
-  control's statistics equal experiment 667's. Every Candidate step (table T, fine-tune, prediction)
-  logged the arm's own table folder, and each arm's table T came from the arm's own K1.
+  in three, so this page reads audit trigger 3 (CRPS and MAE disagree) as fired. The audit read the
+  trigger on the pooled contrasts, which agree, and found the trigger not fired. The splits that
+  disagree are C1 inside a logged event (CRPS −0.009, MAE +0.033), at the signed-MW six (−0.005,
+  +0.004), and on cold winter nights (−0.008, +0.103). Each sits inside an interval that spans zero.
+  The per-lead-band and per-group contrasts are in `score/contrasts.csv`, and the per-Primary scores
+  are in `score/scores_long.csv`.
+- **Standardisers and tables:** table T is K1's forecast with its lags masked, which the Candidate
+  reads as an input, and a standardiser is the stored per-column mean and standard deviation. Arm
+  B's two columns are exactly 0 in every table, and its standardiser holds mean 0 and standard
+  deviation 1e-6 for both columns in all four months. The control's statistics equal experiment
+  667's. Every Candidate step (table T, fine-tune, prediction) logged the arm's own table folder,
+  and each arm's table T came from the arm's own K1.
+- **Arm A's columns are finite on 99.79% of rows and causal**, as experiment 704 reports for the
+  arm tables the two experiments share (`e00704_tables.py`). Neither page reports the planned
+  bit-equality check of the other 12 columns or the printed example row.
 - **No arm wrote under experiment 667's data folder.** The runner warns on any such write, and none
   appeared.
 - **Audit triggers that fired:**
@@ -255,65 +282,74 @@ in those rows may be understated, and the sets of real events are undercounts.
 
 **A fresh Claude agent, which wrote its own code, reproduced every printed number, and the verdict
 stands.** The report is `data/ml-experiments/briefs/e703_audit/report.md`. All of its findings are
-accepted.
+accepted, except that the page keeps its split-level reading of trigger 3, above.
 
 **D15 alone makes C1's interval exclude zero.** On D15's rows, C1 is +0.939 and C3 is −1.136.
 Without D15, C1 is −0.004 [−0.044, +0.038], and C3 shrinks by 80% to −0.016 [−0.152, +0.039].
 Leaving out any other Primary keeps C1 between +0.048 and +0.058. In no split the audit checked is
 C1 at most −0.01, so the rule chooses arm B either way.
 
-**Arm A's proxy clear-sky ratio runs high, which plausibly hurts D15 most.** On D15, the proxy's
-clear-sky ratio averages 0.666 against 0.642 for CAMS, with a maximum of 1.08 against 1.00, so the
-weather encoder that was frozen after pre-training on CAMS sees shifted values at fine-tune and
-inference time. D15 has the shortest history (cut before 2025-03-01) and the noisiest fits. The
-audit found no missing proxy rows and no table-path leak at D15, so the effect is plausible rather
-than a bug. The same pattern, smaller, is in experiment 704.
+**Arm A's proxy clear-sky ratio runs high at D15, but arm A does not score worse than the control
+there.** On D15, the proxy's clear-sky ratio averages 0.666 against 0.642 for CAMS, with a maximum
+of 1.08 against 1.00, so the weather encoder that was frozen after pre-training on CAMS sees shifted
+values at fine-tune and inference time. D15 and D18 have the shortest histories (cut before
+2025-03-01), and D15 has the noisiest fits. The audit found no missing proxy rows and no table-path
+leak at D15, so the shifted ratio is not a bug, and the page does not show that the ratio causes the
+gap. At D15, experiment 704's C1 is +0.685.
 
-**Arm B beating the control is seed noise (trigger 5).** Per-seed C3 is −0.126 and −0.029, and −0.056
-and +0.027 without D15 and D18. On D15 in 2025-11, the control's two seeds score 14.65 and 9.84.
+**Arm B's lead over the control cannot be distinguished from seed noise (trigger 5).** Per-seed C3
+is −0.126 and −0.029, and −0.056 and +0.027 without D15 and D18. On D15 in 2025-11, the control's
+two seeds score 14.65 and 9.84.
 
 **The headline row set leaves out 13,889 rows that have truth.** A row is one Primary, origin, and
 half-hour of lead, for one seed. The scorer drops rows where the climatology is missing (at D15 and
-D18) for every system. On all 1,191,391 rows with truth, CRPS is 3.881, 3.852, and 3.797, C1 is
-+0.054 [+0.013, +0.119], and C3 is −0.083 [−0.308, +0.010], with the same direction and verdict.
+D18) for every system. On all 1,191,391 rows with truth, CRPS is 3.881, 3.852, and 3.797 for the
+control, arm A, and arm B, C1 is +0.054 [+0.013, +0.119], and C3 is −0.083 [−0.308, +0.010], with
+the same direction and verdict.
 
-**The replay difference cannot bias a contrast (trigger 1).** The largest difference from the
-stored forecasts is 2.85e-4 of capacity (2026-04, q25), and CRPS and MAE agree to 1e-6.
+**The replay difference is too small to move a contrast (trigger 1).** The largest difference from
+the stored forecasts is 2.85e-4 of capacity (2026-04, q25), and the CRPS and MAE of the refit and
+the stored forecasts differ by at most 1e-6 points.
 
 ## Method
 
 **Architecture (arm B, the chosen arm).** The Candidate is the network of
 [experiment 667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)
-(arm `P7+D50`), and this experiment scores only its normal-running (NRA) quantiles, not the
-prevailing output.
+(arm `P7+D50`), and this experiment scores only its normal-running (NRA) quantiles, one of its two
+outputs. The bullets on K1 and table T follow experiment 704 and `e00667_cand.py`.
 
-- K1 is the step-5 network of experiment 704: a weather encoder (29 inputs: the ENS ensemble means
-  of 7 weather variables, the 8-wide Primary embedding, and the 14 thermal-lag and solar-gain
-  columns, two of which are the CAMS columns), a date-time encoder, a shared lag encoder that reads
-  the day and week lags with the expected weather at each lag's time, and a mixer that outputs a
-  mixture of 3 Gaussians.
+- K1 is experiment 677's step-5 network, as refitted in experiment 704: a weather encoder (29
+  inputs: the ENS ensemble means of seven weather variables, the 8-wide Primary embedding, and the
+  14 thermal-lag and solar-gain columns, two of which are the CAMS columns), a date-time encoder, a
+  shared lag encoder that reads the day and week lags with the expected weather at each lag's time,
+  and a mixer that outputs a mixture of three Gaussians.
 - Table T is K1's forecast with its lags masked, which the Candidate reads as an input.
 - The Candidate's fine-tune is grafted onto K1 and adds neighbour power summaries with 50% signal
-  dropout; the 11 quantiles come from the mixture's distribution function, averaged over two seeds
-  and sorted.
+  dropout. The 11 quantiles come from the mixture's distribution function, averaged over the two
+  seeds and sorted.
 - Arm B's two CAMS columns are 0 in every row of every stage, including K1's pre-training, table T,
   and the Candidate.
-- The forecast reads no power newer than 24 hours before its 09:00 UTC native origin, and the
+- The forecast reads no power newer than 24 hours before its 09:00 UTC native origin, three hours
+  before the 12:00 UTC contract origin, and the
   expected weather comes only from runs issued before each lag's time.
 
 **Training regime.**
 
-- Pre-training on ERA5 reanalysis weather and CAMS pseudo-runs, K1's step 2 (a fresh mixer, 3-day
-  embargo), table T, then the Candidate's daily fine-tune on ENS forecasts (7-day embargo, 90-day
-  recency half-life), and the prediction pass with table T rebuilt.
+- The chain runs pre-training on ERA5 reanalysis weather and CAMS pseudo-runs, K1's step 2 (a fresh
+  mixer, encoders frozen, 3-day embargo), table T, then the Candidate's daily fine-tune on ENS
+  forecasts (7-day embargo, 90-day recency half-life), and the prediction pass with table T rebuilt.
 - Monthly refits with the cut-off at 00:00 UTC on the first day of each test month; seeds 0 and 1;
   12 chains (three variants on four months, each fitting both seeds) at about 12 minutes each on one
-  RTX A6000, about 2.4 GPU-hours in total.
+  RTX A6000, about 2.4 GPU-hours in total, against the 35 minutes per fold that the plan took from
+  experiment 667.
 
-**Measurement.** As in experiment 704: four test months (2025-11, 2026-02, 2026-04, 2026-06), one
-forecast per day at the 12:00 UTC contract origin over 672 half-hours of lead, 1,177,502 scored rows
-per seed, rows with a valid time on or after 2026-07-01 dropped, month-block and seed bootstrap
-intervals at 98.33% with 20,000 draws, and the climatology and manual-heuristic baselines.
+**Measurement.** The experiment measures as experiment 704 does: four test months (2025-11, 2026-02,
+2026-04, 2026-06), one forecast per day at the 12:00 UTC contract origin over 672 half-hours of
+lead, 1,177,502 scored rows per seed, rows with a valid time on or after 2026-07-01 dropped,
+month-block and seed bootstrap intervals at 98.33% with 20,000 draws, and the climatology and
+manual-heuristic baselines. CRPS is twice the mean pinball loss over the 11 levels, divided by
+effective capacity, times 100. The dropped half-hours per fold are 6, 11, 0, and 0 flagged by
+`substation_zero`, and 55, 0, 221, and 28 absent from the power file.
 
 ### Why the experiment was run
 
@@ -329,10 +365,9 @@ Two of those columns read CAMS (the Copernicus Atmosphere Monitoring Service) at
 inference time: `cams_prev_day_mean`, the mean CAMS global horizontal irradiance over the last
 complete UTC day before the origin, in W/m2, and `cams_prev_day_csi`, that day's summed irradiance
 over its summed CAMS clear-sky irradiance. The maintainer has decided that production reads no CAMS
-at inference, and that the production forecast runs once a day at the 12:00 UTC origin on that
-day's 00Z ENS run (the ECMWF 51-member ensemble), as the Candidate was trained. The experiment
-measures how much skill the Candidate loses without those two columns, and chooses between two
-replacements.
+at inference, and that the production forecast runs once a day at the 12:00 UTC origin on that day's
+00Z ENS run (the ECMWF 51-member ensemble), as the Candidate was trained. The experiment measures
+how much skill the Candidate loses without those two columns, and chooses between two replacements.
 
 **CAMS may stay in pre-training.** Pre-training on ERA5 (ECMWF's reanalysis) and CAMS pseudo-runs
 is training-only, so the two columns of the pre-training rows may still come from CAMS.
@@ -343,15 +378,16 @@ is training-only, so the two columns of the pre-training rows may still come fro
   backtested). As run: the replay refit in all four months, because the replay check below failed;
   the stored forecasts are the reference row `stored`.
 - **Replay (check, then the control).** The unchanged chain of experiment 667, refitted from
-  pre-training onwards for the 2026-04 fold, into this experiment's data folder. [Experiment
+  pre-training onwards for the 2026-04 fold, into experiment 704's data folder. [Experiment
   684](../00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)
   found the chain from step 2 onwards deterministic, but no experiment has replayed the pre-training
   step. The replay tests prediction P4. If any quantile of the replay differs from the stored
   forecast by more than 1e-5 of capacity, the control is refitted on all four months and the refit
   replaces the stored forecasts as the control, because the arms would otherwise carry a re-run
   difference the control does not. The replay-against-stored difference is reported as the noise
-  floor whether or not P4 holds. As run, P4 failed in 2026-04, so the control was refitted in all
-  four months.
+  floor whether or not P4 holds. As run, P4 failed in the 2026-04 replay, so the control was
+  refitted in all four months, and the refits differ from the stored forecasts by more than 1e-5 in
+  every month.
 - **Arm A, the analysis-proxy columns.** The same two columns, computed from shortwave instead of
   CAMS. `cams_prev_day_mean` becomes the mean shortwave over the 48 half-hours of the last complete
   UTC day before the origin (half-hour stamps from 00:30 of that day to 00:00 of the origin day, as
@@ -400,9 +436,10 @@ and 1, as experiment 667 did.
   are dropped, which shortens the leads of the last 14 origins of the 2026-06 fold. The actuals are
   the cleaned power with the `substation_zero` half-hours dropped, and D15 and D18 are cut before
   2025-03-01. The page reports the dropped half-hours per fold.
-- **Seeds:** 0 and 1, paired across arms by seed. The headline table also gives the seed-averaged
-  forecast (the mean of the two seeds' quantiles, sorted within the row), which is the forecast
-  experiment 667 published.
+- **Seeds:** 0 and 1, paired across arms by seed. The tables use the mean over seeds of each
+  seed's score. The seed-averaged forecast (the mean of the two seeds' quantiles, sorted within the
+  row), which experiment 667 published, gives the curtailment cost and one sentence under the
+  verdict.
 
 ### How the contrasts are read
 
@@ -433,12 +470,12 @@ and 1, as experiment 667 did.
 logged event and at least 7 days after one; rows inside a logged event; and the 7 days after a
 logged event ends. The events are those `e00668_slices_primaries.py` uses (the table of experiment
 653, plus the verified transfer between D5 and D16 from 2025-12-29 to 2026-01-14) that overlap the
-four months. The page plots one day-ahead forecast and one full 14-day forecast against the
-observed power, and at least six time series around logged events across both metering groups,
-from 14 days before each event to at least 7 days after it, with its start and end marked. NGED's
-logs may miss events, so the rows "outside every logged event" may hold events no label covers, the
-harm shown there is optimistic, and the real-event sets undercount. No generator appears on the
-page.
+four months. The page plots one day-ahead forecast and one full 14-day forecast against the observed
+power, and at least six time series around logged events across the metering groups, from 14 days
+before each event to at least 7 days after it, with its start and end marked. NGED's logs may miss
+events, so the rows "outside every logged event" may hold events no label covers, the loss shown
+there may be understated, and some real events are missing from the sets. No generator appears on
+the page.
 
 ### Checks planned before the first scored run
 
@@ -470,7 +507,7 @@ the free GPU memory and cores, and never stops another session's process.
 ### Standing practices
 
 - **Followed:** monthly refits; cleaned data everywhere, with the dropped half-hours per fold; the
-  D15 and D18 cut; every fitted network saved under this experiment's data folder; the stored
+  D15 and D18 cut; every fitted network saved under experiment 704's data folder; the stored
   predictions of experiment 667 as the control; a four-month screen with a pre-registered advance
   rule, every number labelled interim; tails, cold winter nights, and the avoidable-curtailment
   cost from `e00677_tails.py` and `e00677_protocol.py`; example forecasts and load-shift plots with
