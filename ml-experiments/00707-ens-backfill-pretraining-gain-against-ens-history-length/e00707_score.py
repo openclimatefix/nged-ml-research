@@ -274,11 +274,25 @@ def load_frames(
     frames["S0M_w115"] = references["xgb_monthly_e389_widened"]
     for name in REFERENCE_NAMES:
         frames[name] = references[name]
+    for name, frame in frames.items():
+        assert_before_holdout(name=name, frame=frame)
     print("scored:", ", ".join(frames))
     missing = [a for a in arms.ARMS if not available_seeds(arm=a, months=months)]
     if missing:
         print(f"arms with no complete seed over these folds, not scored: {missing}")
     return frames
+
+
+def assert_before_holdout(*, name: str, frame: pl.DataFrame) -> None:
+    """Assert that no valid time of a scored forecast is on or after 2026-07-01.
+
+    Raises:
+        ValueError: If a row is at or after `common.HOLDOUT`.
+    """
+    latest = frame.select(pl.col("valid_time").max()).item()
+    if latest is not None and latest >= common.HOLDOUT:
+        msg = f"{name}: a scored valid time ({latest}) is on or after {common.HOLDOUT:%Y-%m-%d}"
+        raise ValueError(msg)
 
 
 def cleaned_scoring_context(*, series: pl.DataFrame) -> dict:
@@ -1182,6 +1196,7 @@ def main() -> None:
     frames = load_frames(series=series, months=months, variants=variants)
     check_logs(months=months)
     table, scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
+    assert_before_holdout(name="the shared slice table", frame=table)
     print(f"shared half-hours across every arm and reference: {table.height}")
     mde = minimum_detectable_effect(rows=rows)
     display = [Variant(a, seeds).name for a, seeds in have.items() if seeds]

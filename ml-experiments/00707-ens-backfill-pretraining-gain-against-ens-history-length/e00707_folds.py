@@ -136,6 +136,23 @@ def flagged_times(*, legacy: bool = False) -> dict[int, np.ndarray]:
     }
 
 
+def assert_no_covid(*, x: np.ndarray, window: arms.Window, site: str) -> None:
+    """Assert that the `covid` input is 0 on every row, unless the window is window C.
+
+    Window C keeps the lockdown ENS rows with `covid` set. `x` is the raw (unstandardised) matrix.
+
+    Raises:
+        ValueError: If a row outside window C has `covid` set.
+    """
+    if window == arms.W_C:
+        return
+    column = prep.feature_names()[0].index("covid")
+    n_covid = int((x[:, column] != 0).sum())
+    if n_covid:
+        msg = f"{site}: {n_covid} rows of window {window.name} have covid set"
+        raise ValueError(msg)
+
+
 def window_mask(*, z: dict[str, np.ndarray], refit: datetime, window: arms.Window) -> np.ndarray:
     """Return the rows that a window keeps at a fold's cut.
 
@@ -232,7 +249,8 @@ def build_fold(*, refit: datetime, window: arms.Window, cut: bool = True) -> Fol
     weeks and their purge. Row weights halve every half-year of age at the refit.
 
     Raises:
-        ValueError: If a row is not known at the cut, or the window keeps no row.
+        ValueError: If a row is not known at the cut, the window keeps no row, or a row of a window
+            other than window C has `covid` set.
     """
     _, mask, layout = prep.feature_names()
     legacy = window == arms.W24_STORED
@@ -254,6 +272,7 @@ def build_fold(*, refit: datetime, window: arms.Window, cut: bool = True) -> Fol
             dropped += counts
         if not keep.any():
             continue
+        assert_no_covid(x=z["x"][keep], window=window, site=row["site"])
         parts.append(
             {k: z[k][keep] for k in ("x", "y", "origin", "valid", "lead")}
             | {"primary": np.full(int(keep.sum()), row["primary"], dtype=np.int64)}
@@ -304,7 +323,8 @@ def ens_rows(
     stopping rows, as in the fold. The standardiser and target statistics are the fold's.
 
     Raises:
-        ValueError: If the window keeps no row.
+        ValueError: If the window keeps no row, or a row of a window other than window C has
+            `covid` set.
     """
     flagged = flagged_times(legacy=fold.legacy_flags) if cut else {}
     dropped = DroppedRows()
@@ -327,6 +347,7 @@ def ens_rows(
         if not keep.any():
             continue
         n = int(keep.sum())
+        assert_no_covid(x=z["x"][keep], window=window, site=row["site"])
         prep.assert_known_at_cut(valid=z["valid"][keep], origin=z["origin"][keep], refit=refit)
         parts.append(
             Rows(
