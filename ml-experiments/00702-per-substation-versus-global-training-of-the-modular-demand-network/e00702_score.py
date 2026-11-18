@@ -338,26 +338,63 @@ def run_score(*, months: tuple[str, ...]) -> None:
     print("wrote", out, flush=True)
 
 
-def monthly_crps_all_leads(*, frames: dict[int, pl.DataFrame]) -> pl.DataFrame:
-    """Return the seed-mean forecast's CRPS by origin month over all leads, as experiment 677 stored it."""
+def run_match_stored(*, months: tuple[str, ...]) -> None:
+    """Rescore experiment 677's stored file on experiment 677's own scored rows; its stored monthly CRPS must be reproduced to within 0.01 points.
+
+    The observed power comes from the cleaned-power Delta table, which the production pipeline
+    overwrites every 6 hours. The current table drops, as `initial_analogue_noise`, the readings of
+    D15 before 2025-05-07 and of D18 before 2025-03-30, which experiment 677's scoring still had.
+    The climatology of those two Primaries therefore has no history for some calendar months, and
+    some rows that experiment 677 scored no longer have a climatology. The check therefore takes experiment 677's row set from its `rows.parquet` and
+    reports the rows whose status changed, which must all be D15 or D18 rows that lost their
+    climatology.
+    """
+    frames = read_stored_677(seeds=core.SEEDS, months=months)
     keys, aligned = align(frames={("m", s): f for s, f in frames.items()})
     rows = Rows(keys=keys)
     arr = mean_sorted(parts=[rows.quantiles(frame=f) for f in aligned.values()])
-    ok = rows.ok & np.isfinite(arr).all(axis=1)
-    crps = lib.losses(y=rows.y, q=np.where(ok[:, None], arr, 0.0))["crps"]
-    return (
-        pl.DataFrame({"month": rows.month[ok], "crps": crps[ok]})
-        .group_by("month")
-        .agg(crps=pl.col("crps").mean())
-        .sort("month")
+    finite = np.isfinite(rows.y) & np.isfinite(arr).all(axis=1)
+    crps = lib.losses(y=np.where(finite, rows.y, 0.0), q=np.where(finite[:, None], arr, 0.0))[
+        "crps"
+    ]
+    ours = pl.DataFrame(
+        {
+            "time_series_id": keys["time_series_id"].cast(pl.Int64),
+            "origin_idx": lib.grid_index(times=keys["power_fcst_init_time"]).astype(np.int64),
+            "valid_idx": lib.grid_index(times=keys["valid_time"]).astype(np.int64),
+            "month": rows.month, "label": rows.label, "crps": crps, "finite": finite,
+            "ok_now": rows.ok & finite,
+            "climatology_now": np.isfinite(rows.q_clim).all(axis=1),
+        }
+    )  # fmt: skip
+    folder = core.ROOT_677 / "scores" / "step5w_with_injected_sp1_s012"
+    theirs = pl.read_parquet(
+        folder / "rows.parquet", columns=["time_series_id", "origin_idx", "valid_idx", "ok"]
+    ).with_columns(pl.col("time_series_id", "origin_idx", "valid_idx").cast(pl.Int64))
+    joined = ours.join(
+        theirs, on=["time_series_id", "origin_idx", "valid_idx"], how="inner", validate="1:1"
     )
-
-
-def run_match_stored(*, months: tuple[str, ...]) -> None:
-    """Rescore experiment 677's stored file; its stored monthly CRPS must be reproduced to within 0.01 points."""
-    ours = monthly_crps_all_leads(frames=read_stored_677(seeds=core.SEEDS, months=months))
+    assert joined.height == ours.height, (
+        "a stored forecast row is missing from experiment 677's rows"
+    )
+    changed = joined.filter(pl.col("ok") != pl.col("ok_now"))
+    print("rows whose scored status changed since experiment 677 scored them:")
+    print(changed.group_by("month", "label", "ok", "climatology_now").len().sort("month", "label"))
+    explained = changed.filter(
+        pl.col("ok") & ~pl.col("ok_now") & pl.col("finite") & ~pl.col("climatology_now")
+        & pl.col("label").is_in(["D15", "D18"])
+    )  # fmt: skip
+    assert explained.height == changed.height, (
+        "a row changed status for a reason other than D15's or D18's lost climatology"
+    )
+    assert joined.filter(pl.col("ok"))["finite"].all(), (
+        "a row that experiment 677 scored has no truth now"
+    )
+    rescored = (
+        joined.filter(pl.col("ok")).group_by("month").agg(crps=pl.col("crps").mean()).sort("month")
+    )
     stored = (
-        pl.read_csv(core.ROOT_677 / "scores" / "step5w_with_injected_sp1_s012" / "scores.csv")
+        pl.read_csv(folder / "scores.csv")
         .filter(
             (pl.col("slice") == "origin month")
             & (pl.col("system") == "Model")
@@ -365,14 +402,22 @@ def run_match_stored(*, months: tuple[str, ...]) -> None:
         )
         .select(month=pl.col("group"), stored=pl.col("mean"))
     )
-    joined = ours.join(stored, on="month").with_columns(
+    result = rescored.join(stored, on="month").with_columns(
         difference=pl.col("crps") - pl.col("stored")
     )
-    print(joined)
-    assert joined.height == len(months), "a month is missing from the stored scores"
-    worst = float(joined["difference"].abs().max())  # ty: ignore[invalid-argument-type]
+    now = (
+        joined.filter(pl.col("ok_now"))
+        .group_by("month")
+        .agg(crps_on_current_rows=pl.col("crps").mean())
+    )
+    result = result.join(now, on="month").join(
+        changed.group_by("month").agg(rows_changed=pl.len()), on="month", how="left"
+    )
+    print(result)
+    assert result.height == len(months), "a month is missing from the stored scores"
+    worst = float(result["difference"].abs().max())  # ty: ignore[invalid-argument-type]
     SCORES.mkdir(parents=True, exist_ok=True)
-    joined.write_csv(SCORES / "match_stored.csv")
+    result.write_csv(SCORES / "match_stored.csv")
     assert worst <= 0.01, (
         f"the rescore differs from experiment 677's stored monthly scores by {worst:.4f} points"
     )

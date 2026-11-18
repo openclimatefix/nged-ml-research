@@ -124,7 +124,12 @@ deviation are already per Primary.
 - **Weights:** `00677-*/chains/5/<month>/work/pretrained_P2/` and `step2/P5/` (steps 1 and 2), and
   `00677-*/arms/k1_5w_sp1/work/models/P5/` (step 3), for the 12 folds and seeds 0 to 2.
 - **Match check before any new fit.** The scoring script of this experiment rescores the stored
-  file and must reproduce experiment 677's stored monthly scores to within 0.01 points. The first
+  file and must reproduce experiment 677's stored monthly scores to within 0.01 points. The
+  rescore uses the rows that experiment 677 scored, from its `rows.parquet`, because the
+  cleaned-power table that supplies the observed power has since dropped the readings of D15
+  before 2025-05-07 and of D18 before 2025-03-30. On the current table, 4,704 rows of D18 in
+  2025-11 and 5,244 rows of D15 and D18 in 2026-01 have no climatology, so every arm of this
+  experiment is scored without them. The first
   run then refits the global arm once (seed 0, the pilot fold) through this experiment's code path
   with the per-substation switch off. The refit must score within the largest pairwise difference
   between the stored seeds 0 to 2 on that fold. If either check fails, the global arm is refitted

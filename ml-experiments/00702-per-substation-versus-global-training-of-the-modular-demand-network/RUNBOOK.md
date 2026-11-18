@@ -41,7 +41,9 @@ for M in 2026-05 2025-11 2026-01 2026-04 2026-07; do
 done
 ```
 
-**2. Rescore experiment 677's stored forecasts** (CPU only). It must agree within 0.01 points.
+**2. Rescore experiment 677's stored forecasts on experiment 677's own scored rows** (CPU only). It
+must agree within 0.01 points. It also lists the rows that lost their climatology since experiment
+677 scored them, and fails if any is not a D15 or D18 row.
 
 ```bash
 py $D/e00702_score.py match-stored
