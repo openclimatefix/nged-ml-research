@@ -184,7 +184,11 @@ bound for the gate and names it as a caveat.
   at the 16 Primaries. A step at either date larger than three standard deviations of the adjacent 12
   monthly values fails the check. `R_F+flags` carries an indicator for each date.
 - **Cleaned data and cuts.** `substation_zero` half-hours are dropped everywhere and counted per
-  fold. D15 and D18 rows before 2025-03-01 are dropped. D9 (signed-MW six) has its first observed power on 2023-08-23, so long
+  fold, separately for a flagged target and a flagged lag. The flagged half-hours come from the
+  cleaned power table over 2019-09-01 to 2026-07-01, because experiment 398's list covers only
+  2024-05-01 to 2026-03-05. D15 and D18 rows before 2025-03-01 are dropped. A row of D5, D10, D11,
+  D14, or D16 is dropped if its valid time or its weekly lag is before the Primary's first usable
+  date (D16: 2021-02-01). D9 (signed-MW six) has its first observed power on 2023-08-23, so long
   windows add nothing there; the page reports ENS months per Primary.
 - **Precipitation type** is not among the network's seven weather variables, so the column is not
   read. **Shortwave** is a 6-hour mean after lead 144 hours; C1 is also read for days 1 to 6 and 7 to
