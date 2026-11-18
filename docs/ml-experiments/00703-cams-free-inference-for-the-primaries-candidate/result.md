@@ -237,9 +237,10 @@ measurement of the chosen arm, then the differences of the other arm.
 
 ## Files
 
-- `ml-experiments/00703-cams-free-inference-for-the-primaries-candidate/` will hold the table
-  builder for the two arms (copies of experiment 667's `inputs/trailing437/` tables with the two
-  columns replaced, which `c562.TableLookup` reads through `f437.table_path`), the patch that
-  installs an arm into experiment 667's pipeline, the chain runner, and the scorer.
+- The table builder, the arm patch, the chain runners, and the scorer live in the folder of
+  [experiment 704](../00704-cams-free-inference-for-the-primaries-step-5-network/result.md), which
+  asks the same question of the step-5 network and runs first. The arm tables (copies of experiment
+  667's `inputs/trailing437/` tables with the two columns replaced, which `c562.TableLookup` reads
+  through `f437.table_path`) are shared with experiment 704.
 - `data/ml-experiments/00703-cams-free-inference-for-the-primaries-candidate/` will hold each arm's
   tables, chains, weights, and forecasts.
