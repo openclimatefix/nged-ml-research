@@ -800,6 +800,30 @@ under 10% on steps of 10%, because at most about 13 of the 28 scored days follow
 - Phase B gains 20 stage 3 fits (about 2 GPU job-hours) and about 1 hour of bank inference, and
   loses L-R. An irregular-engine era kind exists in stage 0 only.
 
+## 22. Amendments made while running phase B (interim)
+
+**Phase B runs on 2 seeds, not the pre-registered 5.** Experiment 667 stores the stage 1 and stage 2
+weights for seeds 0 and 1 only, so seeds 2 to 4 would need new stage 1 and stage 2 chains. The
+manager accepted seeds 0 and 1 on 2026-11-19. The screen's intervals come from 2 seeds across
+4 folds, so the intervals over seeds are wide and every phase B number stays interim. The nine
+contrasts keep their Bonferroni level, and the write-up states the 2-seed caveat beside each
+interval.
+
+**The curriculum holds 4 eras per fold and seed, not the planned 8.** Each injected pass touches up
+to 6 of the 13 eligible Primaries, so at most 2 passes with disjoint touched Primaries fit. Their
+onsets lie 120 and 100 days before the cut, not 120 to 60 days. The one-fold pilot logged
+`alt_passes 2` and `alt_eras 4`. The curriculum arms therefore see fewer injected eras than
+designed, and the write-up counts that as a limitation of every curriculum arm.
+
+**The oracle's curriculum switch vectors are read with hindsight.** `hindsight_vector` averages up
+to 120 days from the onset, so a long injected switching event that starts 100 to 120 days before
+the cut can read telemetry from the scored month. Only the oracle arms are affected, and they are
+labelled non-causal.
+
+**The bank's oracle and placebo hold the injected events only.** The bank overlays each world at
+the touched Primaries, so the real record would have to be placed inside the 30-day bank window,
+which the separation rule forbids.
+
 ## Files
 
 - Code: `ml-experiments/00709-era-signal-in-the-candidate-part-1/` (to be written, each script
