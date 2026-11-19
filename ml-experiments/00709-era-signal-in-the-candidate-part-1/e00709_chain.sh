@@ -37,7 +37,7 @@ for a in $ARMS; do
   case $a in none|aug|oracle|placebo|oracle-enc|all|rule|soft|hmm|stat) ;; *) echo "bad arm $a"; exit 1 ;; esac
 done
 for f in $FOLDS; do
-  case $f in 2025-11|2025-12|2026-01|2026-02|2026-03|2026-04|2026-05|2026-06) ;; *) echo "bad fold $f"; exit 1 ;; esac
+  case $f in 2025-04|2025-05|2025-06|2025-11|2025-12|2026-01|2026-02|2026-03|2026-04|2026-05|2026-06) ;; *) echo "bad fold $f"; exit 1 ;; esac
 done
 for s in $SEEDS; do case $s in 0|1) ;; *) echo "bad seed $s (experiment 667 has seeds 0 and 1)"; exit 1 ;; esac; done
 if [ $PILOT = 1 ]; then
