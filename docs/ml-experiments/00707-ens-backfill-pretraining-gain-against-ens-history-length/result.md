@@ -179,6 +179,11 @@ bound for the gate and names it as a caveat.
   24-month windows exclude them. `A_C` and `R_C` keep them with the `covid` input. `S_era` rows
   already include lockdown rows with `covid = 1` in every pre-trained arm, as in stored `A`. The
   window floor applies to origin and lag times too.
+- **One missing run, 2024-01-03.** The back-fill holds 1,263 of the 1,264 daily runs from 2020-10-15
+  to 2024-03-31. Dynamical.org holds only 26 of the 51 ensemble members for the run of 2024-01-03,
+  so the ingest refuses it, and no experiment arm reads it. The code lists the run in its coverage
+  report and treats it as a documented gap. A window that lacks any other run still stops the fit
+  unless `--allow-partial-window` is passed.
 - **Resolution upgrade, 2023-06-27, and source change, 2024-04-01.** Before any fit, compute monthly
   ENS mean minus ERA5 (CAMS for shortwave) at leads 12 to 36 hours, and the ENS spread, per variable
   at the 16 Primaries. A step at either date larger than three standard deviations of the adjacent 12
