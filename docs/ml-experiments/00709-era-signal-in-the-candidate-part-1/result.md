@@ -913,6 +913,12 @@ and table chains (3 folds, 2 seeds) run through `e00709_e_chain.sh`, which write
 experiment's data folder and reads experiment 667's extended inputs only. Each changed or new script
 gets an Opus review before its first run. Phase E starts after phase B and B2 end.
 
+## 26. Open questions for the maintainer, and the `all` arm's D8 outlier (interim)
+
+**The maintainer has two open questions, and this plan does not decide either.** The first is whether phase E should use daily origins. The stored rows give about 6 origins per month, and rebuilding daily rows from experiment 607's daily summaries would change the recipe against the screen folds. The second is whether any learned arm is worth carrying on, given that only the oracle has helped D8 so far.
+
+**The `all` arm's D8 outlier in fold 2026-01 comes from a temporary excursion that `all` treated as an era.** The `all` arm turns every detected shift into an era. At D8 it flags an episode from 2026-01-19 to 2026-02-02, with the era starting on 2026-01-21. D8's daily mean power is about 7.5 MW from 2026-01-19 to 2026-01-25, against about 4 MW before and after. The summed daily mean of D8's three electrical neighbours (D3, D5, and D14) stays between 20 and 25 MW with no mirror-image change. The excursion is therefore temporary and is not conserved load moving between neighbours. D8 has no labelled switching event in 2026. `all` has no classifier to reject the shift, so it carries a temporary excursion forward as a persistent era, which is the failure the arm was designed to show.
+
 ## Files
 
 - Code: `ml-experiments/00709-era-signal-in-the-candidate-part-1/` (to be written, each script
