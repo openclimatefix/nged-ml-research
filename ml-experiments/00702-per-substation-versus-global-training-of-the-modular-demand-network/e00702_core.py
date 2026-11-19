@@ -158,6 +158,9 @@ def blend_quantiles(*, first: np.ndarray, second: np.ndarray) -> np.ndarray:
 def pair_seeds(*, seeds: tuple[int, ...] = SEEDS) -> list[tuple[tuple[int, int], tuple[int, int]]]:
     """Return the seed-level pairs of the blend contrast (C4).
 
+    Args:
+        seeds: The seeds of the global control (seeds 0 to 2).
+
     Returns:
         For each seed `s`, `((global s, split-at-1 s), (global s, global s + 3))`: the blend of
         global and split-at-1 seed `s` against the mean of global seeds `s` and `s + 3`.
@@ -313,6 +316,15 @@ def verdict(
     A contrast is a gain when `hi < 0`, every month's mean difference is negative, and `hi` stays
     below zero with D15 left out and with D18 left out. A loss is the mirror image. A gain is
     `supported` when `hi <= -0.05`, and `small gain` otherwise. A loss is `refuted`.
+
+    Args:
+        hi: Upper bound of the contrast's 99% interval.
+        lo: Lower bound of the contrast's 99% interval.
+        month_means: The contrast's mean in each scored month.
+        hi_without_d15: Upper bound with D15 left out.
+        hi_without_d18: Upper bound with D18 left out.
+        lo_without_d15: Lower bound with D15 left out.
+        lo_without_d18: Lower bound with D18 left out.
 
     Returns:
         One of `supported`, `small gain`, `refuted`, `inconclusive`.

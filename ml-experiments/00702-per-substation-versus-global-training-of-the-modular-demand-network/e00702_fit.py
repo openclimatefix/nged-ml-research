@@ -40,6 +40,7 @@ import resource
 import shutil
 import sys
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -352,13 +353,21 @@ def select_rows(**kwargs):
 c.select_rows = select_rows
 
 
-def memoised(*, key: str, build, by=lambda **kw: None):
+def memoised(
+    *,
+    key: str,
+    build: Callable[..., object],
+    by: Callable[..., object] = lambda **kw: None,
+) -> Callable[..., object]:
     """Return a wrapper that builds a fold-level object once per process (pooled arms loop over Primaries).
 
     Args:
         key: Names the kind of object.
         build: Builds the object from the keyword arguments of the call.
         by: Maps the keyword arguments to what distinguishes two objects of this kind.
+
+    Returns:
+        A function that takes the same keyword arguments and returns the memoised object.
     """
 
     def wrapper(**kwargs):

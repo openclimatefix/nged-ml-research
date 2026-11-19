@@ -178,6 +178,9 @@ def other_primary_in_path(*, path: str | Path, own: str, labels: Iterable[str]) 
         path: A file path or a URL.
         own: The label of the process's Primary.
         labels: All 16 labels.
+
+    Returns:
+        The label of the first other Primary that the path names, or None.
     """
     others = set(labels) - {own}
     for token in LABEL_TOKEN.findall(str(path)):
