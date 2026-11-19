@@ -877,6 +877,18 @@ folds and both seeds are scored.
 **Cost.** 4 arms on 4 folds and 2 seeds is 32 fits, about 9 to 10 minutes each at 2 concurrent jobs,
 so about 2.5 hours of wall-clock time after phase B finishes. Phase B's aug result is void.
 
+## 25. Open question: phase E (D8 folds 2025-04 to 2025-06) is parked
+
+**Phase E needs more than compute, and it waits for the maintainer.** Experiment 667 stores no
+stage 1, stage 2, or table weights for these folds, so 6 new chains are needed (3 folds, 2 seeds),
+about 2.7 hours at one job. Ensemble summaries start on 2024-04-01, so the history is about 12
+months, shorter than the screen folds'. The only demand frames found for the three months are the
+73 every-fifth-day frames of the frozen validation fold, because the daily frames of the gap runs
+start in 2025-07, and the row set id covers valid times from 2025-11. Two options remain: build the daily frames
+(new work outside this experiment's folder, at an unknown cost), or score on the every-fifth-day
+origins as a robustness check on one substation, with the shorter history stated beside each number.
+No phase E job runs until the maintainer chooses.
+
 ## Files
 
 - Code: `ml-experiments/00709-era-signal-in-the-candidate-part-1/` (to be written, each script
