@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0912, PLR0915
+# ruff: noqa: PLR0912, PLR0915
 """Experiment 702: experiment 574's training loop with a batch argument and a fixed-epoch option.
 
 A copy of `train` in `e00574_fit.py`. The loop, the optimiser, the early stopping, and the
@@ -70,7 +70,8 @@ def train(
         batch: Rows per gradient step.
         device: The torch device.
         row_nll: Maps `out, z, p` to each row's negative log-likelihood.
-        fixed_epochs: When given, train that many epochs on the non-held rows, validate nothing, and keep the last epoch.
+        fixed_epochs: When given, train that many epochs on the non-held rows, validate nothing,
+            and keep the last epoch.
         settings: Patience, row fraction, weight decay, gradient clip, and validation cap.
 
     Returns:

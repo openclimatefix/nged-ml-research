@@ -404,15 +404,17 @@ def score_set(
 
 
 def run_match_stored(*, months: tuple[str, ...]) -> None:
-    """Rescore experiment 677's stored file on experiment 677's own scored rows; its stored monthly CRPS must be reproduced to within 0.01 points.
+    """Rescore experiment 677's stored file on experiment 677's own scored rows.
+
+    The rescoring must reproduce experiment 677's stored monthly CRPS to within 0.01 points.
 
     The observed power comes from the cleaned-power Delta table, which the production pipeline
     overwrites every 6 hours. The current table drops, as `initial_analogue_noise`, the readings of
     D15 before 2025-05-07 and of D18 before 2025-03-30, which experiment 677's scoring still had.
     The climatology of those two Primaries therefore has no history for some calendar months, and
-    some rows that experiment 677 scored no longer have a climatology. The check therefore takes experiment 677's row set from its `rows.parquet` and
-    reports the rows whose status changed, which must all be D15 or D18 rows that lost their
-    climatology.
+    some rows that experiment 677 scored no longer have a climatology. The check therefore takes
+    experiment 677's row set from its `rows.parquet` and reports the rows whose status changed,
+    which must all be D15 or D18 rows that lost their climatology.
     """
     frames = read_stored_677(seeds=core.SEEDS, months=months)
     keys, aligned = align(frames={("m", s): f for s, f in frames.items()})
@@ -490,7 +492,10 @@ def run_match_stored(*, months: tuple[str, ...]) -> None:
 
 
 def pilot_primaries() -> list[str]:
-    """Return the first run's three Primaries by the plan's rule: the largest signed-MW Primary, the largest MVA-only Primary, and D15."""
+    """Return the first run's three Primaries by the plan's rule.
+
+    The three are the largest signed-MW Primary, the largest MVA-only Primary, and D15.
+    """
     site = sites()
     signed = site.filter(pl.col("group") == "signed-MW six").sort("capacity_mw", descending=True)[
         "label"
@@ -502,7 +507,9 @@ def pilot_primaries() -> list[str]:
 
 
 def run_pilot(*, files: list[str]) -> None:
-    """Score backtest files (seed 0) on the first run's fold and three Primaries, beside climatology and the manual heuristic.
+    """Score backtest files (seed 0) on the first run's fold and three Primaries.
+
+    Climatology and the manual heuristic are scored beside them.
 
     Checks that every file beats climatology (the plan's guard against a broken fit), and prints each
     file's CRPS and normalised MAE of the median, which the batch diagnostic compares. Every number
@@ -587,7 +594,10 @@ def run_match_bank(*, month: str, seed: int) -> None:
 
 
 def run_match_refit() -> None:
-    """Compare the pilot fold's refit of the global arm (seed 0) with the stored seeds 0 to 2 on the same fold and Primaries."""
+    """Compare the pilot fold's refit of the global arm (seed 0) with the stored seeds 0 to 2.
+
+    The comparison uses the same fold and the same Primaries.
+    """
     month = core.PILOT_MONTH
     site = sites()
     chosen = pilot_primaries()
@@ -632,7 +642,10 @@ def run_match_refit() -> None:
 
 
 def run_bank(*, months: tuple[str, ...], out: Path) -> None:
-    """Return each arm's copied share of the held-out injected shifts (least-squares slope of the median's change on the shift)."""
+    """Return each arm's copied share of the held-out injected shifts.
+
+    The share is the least-squares slope of the median's change on the shift.
+    """
     labels = [r["label"] for r in sites().iter_rows(named=True)]
     records = []
     for arm in (*core.ARMS, "global"):

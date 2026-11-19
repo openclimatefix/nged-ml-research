@@ -156,7 +156,10 @@ def arm_rows(
 
 
 def check_against_stored(*, frame: pl.DataFrame, months: list[str], seeds: list[int]) -> None:
-    """Assert that each month and seed holds 16 Primaries x origins x 672 half-hours, on the keys of experiment 677's stored control."""
+    """Assert that each month and seed holds 16 Primaries x origins x 672 half-hours.
+
+    The keys must equal those of experiment 677's stored control.
+    """
     stored = (
         score702.read_stored_677(seeds=(core.SEEDS[0],), months=tuple(months))[core.SEEDS[0]]
         .select(score702.KEYS)

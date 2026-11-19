@@ -192,7 +192,9 @@ def other_primary_in_path(*, path: str | Path, own: str, labels: Iterable[str]) 
 def guard_readers(
     *, own: str, labels: Iterable[str], modules: dict[str, tuple[object, str]]
 ) -> list[str]:
-    """Wrap file readers so that opening another Primary's per-site file raises, and return the log of every path opened.
+    """Wrap file readers so that opening another Primary's per-site file raises.
+
+    The function returns the log of every path opened.
 
     Args:
         own: The label of the process's Primary.

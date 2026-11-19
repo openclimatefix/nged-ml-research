@@ -148,7 +148,10 @@ BANK_SEED_BASE: Final[int] = 9_000_000
 
 
 def first_idx() -> int:
-    """Return the earliest training target's grid index, from experiment 397's first run and experiment 422's purge."""
+    """Return the earliest training target's grid index.
+
+    The index follows from experiment 397's first run and experiment 422's purge.
+    """
     origin = e.prep.FIRST_RUN + e.common.PUBLICATION_DELAY
     origin_idx = int((c.us(t=origin) - c.prep422.GRID_START_US) // c.prep422.STEP_US)
     _, purged = c.prep422.purge_masks(origin_day=np.arange(c.prep422.CYCLE_DAYS))
@@ -380,7 +383,10 @@ def memoised(
 
 
 def write_stats_record(*, mr) -> None:
-    """Store, or check against the stored copy, the fold's statistics (standardiser, lag stats, spread table, target scale)."""
+    """Store the fold's statistics, or check them against the stored copy.
+
+    The statistics are the standardiser, the lag statistics, the spread table, and the target scale.
+    """
     if CMD in CHECK_COMMANDS:  # a check's rows are not the record that fit and bank compare
         return
     arrays = {
@@ -429,7 +435,10 @@ def build_month(*, month, clean):
 
 
 class Gpu702(arm.AuxGpuMonth if SYNTHETIC else e.LagGpuMonth):
-    """The month on the GPU (with the aux labels when the rows are synthetic); also records the selected rows' origin days."""
+    """The month on the GPU, with the aux labels when the rows are synthetic.
+
+    The class also records the selected rows' origin days.
+    """
 
     def refit_tensors(self, *, refit, shift_z=None):
         t = super().refit_tensors(refit=refit, shift_z=shift_z)
@@ -513,7 +522,9 @@ e.window_frame = window_frame
 
 # ------------------------------------------------------------------ the held-out bank
 def run_bank(*, device: str) -> None:
-    """Forecast the scored window from the observed lags and from an injected bank of shifts (as experiment 677's `bank`).
+    """Forecast the scored window from the observed lags and from an injected bank of shifts.
+
+    The command works as experiment 677's `bank` does.
 
     The bank is experiment 581's generator at seed `BANK_SEED_BASE` plus the month number. It shifts
     the lag inputs only. For each scored row whose 1-day lag falls inside a shift, the file holds the
@@ -644,7 +655,9 @@ def finish() -> None:
 
 
 def shifted_row_hashes(*, clean: np.ndarray, spans: dict, synthetic, labels: list[str]) -> dict:
-    """Hash each Primary's cleaned row and its shifted rows (the training schedule and the bank's) from a generator `synthetic`.
+    """Hash each Primary's cleaned row and its shifted rows from a generator `synthetic`.
+
+    The shifted rows are those of the training schedule and those of the bank.
 
     `clean_before` and `train_before` hash the grid before the fold's cutoff only, which the train
     phase and the predict phase both see. `clean`, `train`, and `bank` hash the whole row, which only
@@ -673,7 +686,11 @@ PHASE_KINDS: Final[dict[str, tuple[str, ...]]] = {
 
 
 def run_spans() -> None:
-    """Write the pooled spans and the hashes of every Primary's cleaned and shifted rows to `fold_spans/<month>.json`, and check the formula."""
+    """Write the pooled spans and every Primary's row hashes to `fold_spans/<month>.json`.
+
+    The hashes cover each Primary's cleaned and shifted rows. The command also checks the span
+    formula.
+    """
     assert fold.PHASE == "predict", (
         "run `spans` with E00677_PHASE=predict: in the train phase `build_test` returns None"
     )
@@ -761,7 +778,10 @@ def summary_run_inputs(*, origin: datetime) -> list[tuple[dict, pl.DataFrame, np
 
 
 def truncated_summary_dir(*, label: str, run: datetime) -> Path:
-    """Return a folder of symbolic links to the ensemble summary files issued at or before `run`, and to none issued later."""
+    """Return a folder of symbolic links to the ensemble summary files issued at or before `run`.
+
+    The folder holds no link to a file issued later.
+    """
     folder = core.ROOT / "scratch" / f"truncated_{ARM}_{MONTH}_{label}"
     if folder.exists():
         shutil.rmtree(folder)
@@ -904,7 +924,10 @@ def run_weather_test(*, n_origins: int = 20) -> None:  # noqa: PLR0915
 
 
 def one_site_synthetic(*, clean, first, last, seed):
-    """Return this Primary's shifted row for a span, as the pooled draw gives it (the schedule depends on the span, so each call builds its trick)."""
+    """Return this Primary's shifted row for a span, as the pooled draw gives it.
+
+    The schedule depends on the span, so each call builds its own trick.
+    """
     trick = world.schedule_trick(
         original=ORIGINAL_SYNTHETIC, index=GLOBAL_INDEX, n_primaries=core.N_PRIMARIES,
         first=first, last=last,
@@ -913,7 +936,10 @@ def one_site_synthetic(*, clean, first, last, seed):
 
 
 def check_one_site_world() -> None:
-    """Assert that this process's cleaned row and shifted rows equal the Primary's rows in the pooled world (hashes from `split3 spans`)."""
+    """Assert that this process's cleaned and shifted rows equal the Primary's pooled rows.
+
+    The pooled rows are those of the pooled world, compared by the hashes from `split3 spans`.
+    """
     clean = c.clean_stack()
     assert clean.shape[0] == 1, clean.shape
     if fold.PHASE == "train":
@@ -942,8 +968,8 @@ def extra_column_hashes(*, mr, test, labels: list[str]) -> dict[str, dict[str, s
 
     The blocks are experiment 437's B1 columns (`FoldColumns._raw_real`), the drift and knot columns
     (`WT.rows`), the W-T columns (`WTC.rows`, only where `SPEC.wt`; P5 has none), and the
-    Primary's row of the expected-weather table with its run origins. In a pooled world the Primary is at its own index among the 16; in the one-site
-    world it is index 0.
+    Primary's row of the expected-weather table with its run origins. In a pooled world the Primary
+    is at its own index among the 16; in the one-site world it is index 0.
     """
     fc = e.c562.FoldColumns(fit_until_idx=e.fit_until(month=MONTH))
     cols, origin = e.d560.raw_table(source="ft", cache=e.W560 / "expected")

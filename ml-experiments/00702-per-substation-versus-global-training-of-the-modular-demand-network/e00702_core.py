@@ -126,8 +126,9 @@ def fold_span(*, cutoff_idx: int, first_idx: int) -> tuple[int, int]:
     purged stretch of origin days still starts on time when an earlier unpurged origin reaches it at
     a longer lead. The longest lead is 351 hours and the longest purged stretch is 15 days, so a
     window starting in the last hours of that stretch would start later than this formula says; the
-    assertion in `split3 spans` catches that case. A per-substation arm passes this span to `synthetic_clean`, so that the schedule
-    of shifts depends on the fold and not on a Primary's own first and last reading.
+    assertion in `split3 spans` catches that case. A per-substation arm passes this span to
+    `synthetic_clean`, so that the schedule of shifts depends on the fold and not on a Primary's own
+    first and last reading.
     `e00702_fit.py split3 spans` asserts that the result equals the span of the pooled rows.
 
     Args:
@@ -337,7 +338,9 @@ def verdict(
 
 
 def uses_synthetic_rows(*, command: str) -> bool:
-    """Return whether a command builds its rows with injected lag shifts: fit and bank do, pre-training and step 2 do not.
+    """Return whether a command builds its rows with injected lag shifts.
+
+    Fit and bank do, pre-training and step 2 do not.
 
     Experiment 677 installs the synthetic builder for the fine-tuning fit only, so the stage 1 and
     stage 2 networks see the observed lags.
