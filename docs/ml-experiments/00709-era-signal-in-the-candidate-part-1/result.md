@@ -840,30 +840,36 @@ points of effective capacity, over all rows, is 4.183 for A0, 4.178 for the orac
 against 7.546), and 4.264 for the placebo (+0.08, mostly on the other Primaries). Nothing here
 supports or refutes the hypothesis.
 
-## 24. Phase B2 (proposed): a selection rule that lets the curriculum survive
+## 24. Phase B2 (proposed): mix the curriculum into every batch
 
-**Phase B2 changes the stage 3 stopping rule, for five arms only.** The arms are A0, A0-aug, the
-oracle, the placebo, and L-stat. Each trains a fixed number of epochs and keeps the last state, so
-the odd epochs on the injected world shape the final network. Validation on plain rows no longer
-picks the state. The fixed count and the unchanged pairing against A0 under the same rule are
-pre-registered below, and an Opus review of the rule change comes before any B2 run.
+**Phase B2 keeps phase B's selection rule and mixes the injected world into every batch, for four
+arms.** A fixed number of epochs was rejected in the Opus review, because stage 3 fine-tunes the
+stage 2 weights at a low learning rate and every arm kept its first epoch. A fixed run of 4 epochs
+would give every arm, A0 included, a worse baseline than the production recipe, and the last update
+would be made on the injected world. The arms are A0-aug, the oracle, the placebo, and L-stat. A0
+never reads the injected world, so A0 under B2 is phase B's A0, and B2 reuses those fits.
 
-**Rule.** Each B2 fit runs exactly 4 epochs (two plain epochs, 0 and 2, and two epochs on the
-injected world, 1 and 3) with the learning rate and row fraction of phase B, and keeps the state
-after epoch 3. There is no early stop and no best-state restore. Validation loss is logged each
-epoch and never selects. The count of 4 comes from the first interim result: the best epoch was the
-first, so a longer run has no support, and 4 is the smallest count that gives the injected world
-two epochs.
+**Rule.** In every epoch, each training row in a batch reads the curriculum tensors with probability
+0.5, and its plain values otherwise. The coin comes from a separate CPU generator seeded with
+`seed * 1000 + epoch`, so the row order is phase B's. Selection is unchanged: patience 8, best state
+restored, loss on plain validation rows. The per-epoch validation loss is logged. The odd-epoch
+alternation of phase B is retired, and the curriculum acts from the first step, so selection cannot
+strip it out.
 
-**Arms and contrasts.** A0, A0-aug, oracle, placebo, and L-stat run under the fixed rule on the 4
-screen folds and seeds 0 and 1, which is 40 fits. Each contrast is paired against A0 under the same
-rule, never against phase B's A0. The contrasts are oracle minus A0 (value of a perfect signal),
-L-stat minus A0, placebo minus A0 (the cost of a wrong signal), and A0-aug minus A0 (the value of
-the curriculum alone). A0 under the fixed rule is also compared with A0 under the early-stopping
-rule, to show what the rule change costs the baseline.
+**Contrasts.** Each B2 arm is paired against A0 from phase B on the same rows: A0-aug minus A0 (lag-only
+learning from injected eras), oracle minus A0, placebo minus A0, and L-stat minus A0. The write-up
+also reports CRPS on the touched Primaries separately, as a harm check. It says that the selection
+rule changed after an interim look and why, gives the realised number of eras per fold, and says that
+for the signal arms the mixing is partly a noise augmentation, because the injected rows get a
+second noise draw.
 
-**Cost.** About 9 to 10 minutes per fit at 2 concurrent jobs, so about 3.5 hours of wall-clock time.
-B2 runs after phase B finishes, in slot A, with the same caps.
+**The curriculum world must hold more eras before B2 runs.** It held 2 eras in fold 2025-11, not
+the planned 8, because each pass touches up to 6 of 13 eligible Primaries and the passes must be
+disjoint. B2 logs the realised era count per fold, and a fold with fewer than 4 eras is reported as
+a weak test of the curriculum.
+
+**Cost.** 4 arms on 4 folds and 2 seeds is 32 fits, about 9 to 10 minutes each at 2 concurrent jobs,
+so about 2.5 hours of wall-clock time after phase B finishes. Phase B's aug result is void.
 
 ## Files
 
