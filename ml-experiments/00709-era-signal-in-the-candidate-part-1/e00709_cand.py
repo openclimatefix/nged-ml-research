@@ -662,14 +662,14 @@ def overlay(*, real: sg.Signal, world: sg.Signal, sites: list[int]) -> sg.Signal
 
 ALT: dict = {}
 """The curriculum's tensors of the current fine-tune: `lag` (rows, 2) for columns 37 and 40, `block`,
-`era`, and `z`. The odd epochs read these in place of the plain rows' columns."""
+`era`, and `z`. Under rule `es` the odd epochs read these in place of the plain rows' columns; under rule `b2` each row reads them with probability `MIX_P` in every epoch."""
 
 
 def train_curriculum(
     *, model: torch.nn.Module, x, z, w, p, is_val, seed: int, lr: float, max_epochs: int,
     fresh_lr: float | None, frozen: bool, anchor: dict | None, lam: float, device: str,
 ) -> tuple[int, float]:  # fmt: skip
-    """Experiment 574's `train` with the odd epochs reading the curriculum's tensors in `ALT`.
+    """Experiment 574's `train` with the curriculum's tensors in `ALT`: read by the odd epochs (rule `es`) or by half of the rows in every epoch (rule `b2`).
 
     Validation always reads the plain rows. The O-enc layers sit outside `model.weather` and
     `model.datetime`, so freezing the encoders leaves them trainable. The curriculum replaces only

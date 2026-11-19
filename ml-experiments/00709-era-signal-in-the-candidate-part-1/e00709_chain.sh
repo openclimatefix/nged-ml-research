@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: e00709_chain.sh --era "ARM ..." --folds "MONTH ..." [--seeds "0 1"] [--max-jobs N] [--mem-cap 16G]
-#                        [--bank] [--pilot]
+#                        [--bank] [--pilot] [--rule es|b2]
 # Experiment 709, phase B: stage 3 of the Candidate with an era signal, fold by fold. For each fold, seed,
 # and arm the chain runs `e00709_cand.py fit` in the train phase (the scored month is hidden; the network
 # is fitted and saved), then in the predict phase (the saved network forecasts the month and the forecasts
@@ -26,7 +26,7 @@ while [ $# -gt 0 ]; do
     --mem-cap) MEMCAP=$2; shift 2 ;;
     --bank) BANK=1; shift ;;
     --pilot) PILOT=1; shift ;;
-    --rule) RULE=$2; shift 2 ;;
+    --rule) [ $# -ge 2 ] || { echo "--rule needs a value"; exit 1; }; RULE=$2; shift 2 ;;
     *) echo "unknown argument $1"; exit 1 ;;
   esac
 done
