@@ -148,6 +148,14 @@ def seed_average(
 ) -> tuple[pl.DataFrame, list[pl.DataFrame]]:
     """Return the seed average in quantile space, keyed and sorted, and the per-seed frames.
 
+    Args:
+        folder: The folder of per-seed forecast files.
+        month: The fold.
+        seeds: The seeds to average.
+
+    Returns:
+        The seed-averaged forecast, and the forecast of each seed in the order of `seeds`.
+
     Raises:
         ValueError: If a seed's file is missing or its keys differ from the first seed's.
     """
@@ -210,6 +218,9 @@ def refit_reading(*, arm: str, month: str, seeds: tuple[int, ...], out_dir: Path
         month: The fold.
         seeds: The seeds both sets hold.
         out_dir: This experiment's `work` folder.
+
+    Returns:
+        The refit's reading, compared with the stored forecasts of experiment 425.
     """
     spec = arms.ARMS[arm]
     assert spec.stored_folder is not None

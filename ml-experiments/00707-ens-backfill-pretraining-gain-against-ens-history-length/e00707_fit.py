@@ -119,6 +119,9 @@ def plan_jobs(
         months: The folds.
         seeds: Seeds for every arm, or `None` for each arm's own (cut to three on the screen).
         screen: Whether this is the screen, which fits at most seeds 0 to 2.
+
+    Returns:
+        One job for each combination of arm, fold, and seed.
     """
     out = []
     for name in arm_names:
@@ -148,6 +151,15 @@ def check_window_coverage(*, window: arms.Window, refit: datetime, allow_partial
     A window needs every daily run from its start to 2024-03-31 (the runs from 2024-04-01 are
     experiment 397's rows). A floor starts at the floor; a trailing window starts at the refit
     minus `days`, less 16 days because a run reaches 15 days ahead.
+
+    Args:
+        window: The window whose runs are counted.
+        refit: The fold's refit time.
+        allow_partial: Whether to continue, with a warning, when runs are missing.
+
+    Returns:
+        The window's name, the number of runs wanted and missing, the missing ranges, and the known
+        upstream gaps inside the window.
 
     Raises:
         ValueError: If runs are missing from the back-filled cache and `allow_partial` is false.
@@ -364,6 +376,15 @@ def train_ens_stage(
     max_epochs: int,
 ) -> dict[str, dict]:
     """Train and store the `S_ens` state of every (chain, seed) that a pending job needs.
+
+    Args:
+        todo: The jobs that are not yet finished.
+        fold: The fold whose rows the stage trains on.
+        refit: The fold's refit time.
+        out_dir: This experiment's `work` folder, where the states are stored.
+        device: The torch device.
+        allow_partial: Whether to continue, with a warning, when back-filled runs are missing.
+        max_epochs: The most epochs a stage trains for.
 
     Returns:
         The window coverage of each `S_ens` window used, keyed by window name, for the job logs.

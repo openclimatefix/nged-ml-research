@@ -212,6 +212,13 @@ def available_seeds(*, arm: str, months: tuple[str, ...]) -> tuple[int, ...]:
 def seed_average(*, variant: Variant, months: tuple[str, ...]) -> pl.DataFrame:
     """Return a variant's forecast (fraction of capacity) averaged over its seeds in quantile space.
 
+    Args:
+        variant: The arm and the seeds to average.
+        months: The folds to read.
+
+    Returns:
+        The seed-averaged forecast of every fold in `months`.
+
     Raises:
         ValueError: If a seed differs in height or keys from the first.
     """
@@ -285,6 +292,10 @@ def load_frames(
 
 def assert_before_holdout(*, name: str, frame: pl.DataFrame) -> None:
     """Assert that no valid time of a scored forecast is on or after 2026-07-01.
+
+    Args:
+        name: The variant's name, for the error message.
+        frame: The scored forecast, with a `valid_time` column.
 
     Raises:
         ValueError: If a row is at or after `common.HOLDOUT`.
@@ -600,6 +611,9 @@ def contrast_line(
         where: An extra filter, such as a lead band or a dropped fold.
         level_percent: The interval's coverage.
         tag: A suffix for the printed label, such as `(descriptive)`.
+
+    Returns:
+        The difference and the lower and upper limits of its interval, or `None`.
     """
     members = SUBSETS[group]
     shown = f"{group} (report-only)" if group == REPORT_ONLY_GROUP else group
@@ -677,6 +691,12 @@ def tested_contrasts(
     mde: float | None,
 ) -> dict[tuple[str, str, str], dict[str, float]]:
     """Print the eight contrasts per group (CRPS, then the MAE of the median), and C1's verdicts.
+
+    Args:
+        rows: The scored rows of each variant, keyed by the variant's name.
+        have: The seeds that each arm has, keyed by the arm's name.
+        table: The shared slice table.
+        mde: The minimum detectable effect, or `None` if it is not known.
 
     Returns:
         The CRPS figures by (contrast number, group, metric).

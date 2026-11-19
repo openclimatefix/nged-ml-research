@@ -103,6 +103,18 @@ def train_network(
     The best network on the held-out rows is loaded back into `model`. Training runs at most
     `max_epochs` epochs (`MAX_EPOCHS` unless the smoke run lowers it).
 
+    Args:
+        model: The network to train, changed in place.
+        setting: The hyperparameter setting, which gives the learning rate, weight decay, and
+            number of mixture components.
+        x: The input matrix.
+        z: The target standardised for each Primary.
+        w: The weight of each row in the loss.
+        primary: The index of each row's Primary.
+        is_val: Whether each row is held out for early stopping.
+        seed: The seed for the torch random number generator.
+        max_epochs: The most epochs to train for.
+
     Returns:
         The number of epochs run and the best held-out mean negative log-likelihood.
     """
@@ -262,6 +274,9 @@ def load_fitted(*, folder: Path, device: str, n_inputs: int | None = None) -> Fi
         folder: A `<arm>/<month>/s<seed>` folder with `pooled.pt` and `meta.json`.
         device: The torch device.
         n_inputs: The input width; the 46 inputs of `prep.feature_names` if not given.
+
+    Returns:
+        The stored network with its setting, seed, standardiser, and target statistics.
     """
     meta = json.loads((folder / "meta.json").read_text())
     setting = Setting(**meta["setting"])

@@ -175,6 +175,10 @@ def primaries() -> pl.DataFrame:
 def assert_origin_after_run(*, nwp_init: np.ndarray, origin: np.ndarray) -> None:
     """Assert `nwp_init_time + 9 h <= origin` for every row (both in microseconds since the epoch).
 
+    Args:
+        nwp_init: The issue time of the run that each row reads.
+        origin: The origin of each row.
+
     Raises:
         ValueError: If a row reads a run issued less than 9 hours before its origin.
     """
@@ -477,6 +481,13 @@ def feature_matrix(*, frame: pl.DataFrame) -> np.ndarray:
     Weather precipitation goes through `log1p`. Lags that are missing are NaN and are flagged here
     and filled after standardisation. Every weather column must be finite.
 
+    Args:
+        frame: The rows, with the weather, solar position, and lag columns.
+
+    Returns:
+        The input matrix, with one row for each row of `frame` and one column for each name in
+        `feature_names`.
+
     Raises:
         ValueError: If a weather input is not finite.
     """
@@ -701,6 +712,12 @@ def load_site(*, site: str) -> dict[str, np.ndarray]:
     `origin`, `lead`. The back-filled rows carry their run, which is asserted to be at least 9 hours
     before the origin. Experiment 397's rows do not, so the run is recomputed as the origin minus 9
     hours and asserted to be a 00:00 UTC run from `FIRST_RUN`.
+
+    Args:
+        site: The Primary's name.
+
+    Returns:
+        The arrays `x`, `y`, `valid`, `origin`, and `lead`, in time order.
 
     Raises:
         ValueError: If experiment 397's rows hold a run that is not a 00:00 UTC run from

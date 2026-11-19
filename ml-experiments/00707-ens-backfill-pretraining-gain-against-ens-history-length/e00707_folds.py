@@ -122,6 +122,9 @@ def flagged_times(*, legacy: bool = False) -> dict[int, np.ndarray]:
             reproduction of experiment 425's rows (window `w730s`) uses. Otherwise the list is
             this experiment's own, which covers 2019-09-01 to 2026-07-01.
 
+    Returns:
+        The sorted flagged times, keyed by `time_series_id`.
+
     Raises:
         FileNotFoundError: If this experiment's list has not been written.
     """
@@ -139,7 +142,12 @@ def flagged_times(*, legacy: bool = False) -> dict[int, np.ndarray]:
 def assert_no_covid(*, x: np.ndarray, window: arms.Window, site: str) -> None:
     """Assert that the `covid` input is 0 on every row, unless the window is window C.
 
-    Window C keeps the lockdown ENS rows with `covid` set. `x` is the raw (unstandardised) matrix.
+    Window C keeps the lockdown ENS rows with `covid` set.
+
+    Args:
+        x: The raw (unstandardised) input matrix.
+        window: The window whose rows `x` holds.
+        site: The Primary's name, for the error message.
 
     Raises:
         ValueError: If a row outside window C has `covid` set.
@@ -248,6 +256,14 @@ def build_fold(*, refit: datetime, window: arms.Window, cut: bool = True) -> Fol
     and the per-Primary target statistics are fitted on the rows that remain, excluding the held-out
     weeks and their purge. Row weights halve every half-year of age at the refit.
 
+    Args:
+        refit: The fold's refit time.
+        window: The window whose rows are kept.
+        cut: Whether to apply the standing cuts, such as the flagged exact-zero half-hours.
+
+    Returns:
+        The fold's standardised rows, the standardiser, and the target statistics.
+
     Raises:
         ValueError: If a row is not known at the cut, the window keeps no row, or a row of a window
             other than window C has `covid` set.
@@ -321,6 +337,15 @@ def ens_rows(
 
     The rows are the window's rows without the purged weeks; the held-out weeks are the early-
     stopping rows, as in the fold. The standardiser and target statistics are the fold's.
+
+    Args:
+        fold: The fold whose standardiser and target statistics are used.
+        refit: The fold's refit time.
+        window: The window whose rows are kept.
+        cut: Whether to apply the standing cuts, such as the flagged exact-zero half-hours.
+
+    Returns:
+        The window's rows and the counts of rows the cuts dropped.
 
     Raises:
         ValueError: If the window keeps no row, or a row of a window other than window C has
