@@ -69,6 +69,31 @@ def row_losses(
     )
 
 
+POST_SHIFT_DAYS: Final = 14
+"""Origins within this many days after an alarm of the stat detector count as after a shift."""
+
+
+def post_shift_expression() -> pl.Expr:
+    """Return a row filter for origins within `POST_SHIFT_DAYS` days after a stat detector alarm.
+
+    The stat detector's alarms are the same for every arm, so every arm is scored on the same rows
+    and the paired bootstrap stays valid. The slice says nothing about which shifts are eras: the
+    detector also alarms on switching events.
+
+    Returns:
+        A Polars boolean expression over `primary` and `origin_day`.
+    """
+    episodes = pl.read_parquet(features.DATA_DIR / "signals" / "stat_episodes.parquet")
+    expr = pl.lit(False)
+    for site, alarm in zip(episodes["site"].to_list(), episodes["alarm"].to_list(), strict=True):
+        expr = expr | (
+            (pl.col("primary") == site)
+            & (pl.col("origin_day") >= alarm)
+            & (pl.col("origin_day") <= alarm + POST_SHIFT_DAYS)
+        )
+    return expr
+
+
 def read_arm(
     *,
     arm: str,
@@ -141,10 +166,23 @@ def main() -> None:
     }
     # every arm holds the same rows: the bootstrap helper checks this and raises when they differ
     both = losses_for_bootstrap(arm_losses=losses)
+    both = both.with_columns(
+        origin_day=(
+            (
+                pl.col("power_fcst_init_time").dt.replace_time_zone(None)
+                - pl.lit(features.GRID_START.replace(tzinfo=None))
+            ).dt.total_days()
+        )
+    )
+    post_shift = post_shift_expression()
     scopes = {
         "all rows": pl.lit(True),
         "D8": pl.col("primary") == d8,
         "other Primaries": pl.col("primary") != d8,
+        f"weeks after a stat alarm (<= {POST_SHIFT_DAYS} days), all Primaries": post_shift,
+        f"weeks after a stat alarm (<= {POST_SHIFT_DAYS} days), D8": post_shift
+        & (pl.col("primary") == d8),
+        "other rows": ~post_shift,
     }
     SCORES_DIR.mkdir(parents=True, exist_ok=True)
     out = []
