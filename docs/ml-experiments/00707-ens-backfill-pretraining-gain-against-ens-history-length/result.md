@@ -7,7 +7,7 @@ title: >-
 theme: retraining-and-training-history
 also_relevant_to:
   - weather-products-and-blending
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -39,22 +39,197 @@ row_set_id: fold_a_daily_gap_v1
 metric: >-
   CRPS (twice the mean pinball loss over 11 quantile levels) at lead days 1 to 10 in points of
   effective capacity, with the normalised MAE of the median beside it.
+verdict: partly supported
+best_arm: >-
+  `A_F` (pre-trained, 47 to 58 months of ENS) at the eight MVA-only Primaries: CRPS 3.571 points,
+  against 3.612 for `R_F`; `R_F` (not pre-trained, same window) at the six signed-MW Primaries: CRPS
+  2.821 points, against 2.840 for `A_F`.
+headline: >-
+  With 47 to 58 months of ENS history, pre-training on ERA5 and CAMS changed CRPS by +0.019 points
+  (99.69% interval -0.004 to +0.049) at the six signed-MW Primaries, against -0.050 in experiment
+  425, and by -0.041 (-0.059 to -0.025) at the eight MVA-only Primaries, against -0.124. The
+  placebo failed at the six (C5 -0.011, -0.055 to +0.050).
+lessons: >-
+  The pre-training gain at the eight shrinks from -0.124 with the stored 24-month window to -0.041
+  with 47 to 58 months, and C1 is negative in all 12 folds. At
+  the six the gain disappears, but the placebo shows that the six's gain was never separated from
+  the gain that power history alone gives.
+take_home_message: >-
+  Training the demand network on four to five years of archived weather forecasts cut the benefit
+  of first training it on past-weather estimates to about a third at the eight substations that
+  report only apparent power, where it still helped in every month. At the six that report signed
+  megawatts the benefit disappeared, and a control run showed it was never clearly caused by the
+  weather data.
+advice:
+  - >-
+    Keep ERA5 and CAMS pre-training in the demand network for the MVA-only Primaries until a test
+    shows otherwise; with 47 to 58 months of ENS it still lowered CRPS by 0.041 points (C1).
+  - >-
+    Run the placebo (shuffled weather days) in any later experiment that claims a pre-training gain
+    at the signed-MW Primaries, because their gain was not separated from the effect of extra power
+    history (C5).
+  - >-
+    Read a pre-training gain against a window of true length: the stored 24-month arms saw 15 to 24
+    months of ENS, and C2 differs from the stored line by 0.039 at the six (C2).
 production_status: not-for-production
 adopted_in: none
 ---
-**Status: planned. The sections below are the plan; the finished page replaces them.**
+**With the ECMWF ENS history extended back to 2021-07, pre-training the demand neural network on ERA5
+and CAMS no longer improved the forecast at the six signed-megawatt Primaries, but it still did at
+the eight MVA-only Primaries, where the gain was about a third as large as with 24 months of ENS
+(a lower score is better).** At the six the contrast is +0.019 points of CRPS (99.69% interval -0.004
+to +0.049), against -0.050 in experiment 425. At the eight it is -0.041 (-0.059 to -0.025), against
+-0.124. The placebo failed at the six, so the sign of the six's contrast cannot be trusted, and the
+eight is the only group where the experiment shows pre-training helping.
 
-Our weather-forecast archive (ECMWF ENS, the ensemble weather forecasts from the European Centre for
-Medium-Range Weather Forecasts) has covered 2024-04-01 onwards, and the neural demand forecaster
-trains on it. Earlier experiments found that first training the network on estimates of past weather
-(ERA5 reanalysis and CAMS solar data) and then on ENS beats training on ENS alone, but none had more
-than about 24 months of ENS. dynamical.org now serves ENS back to 2020-10-15. This experiment asks
-whether the gain from the ERA5 and CAMS stage shrinks when the ENS history is four to five years
-long, by fitting the network of [experiment
-425](../00425-best-mdn-architecture-assembly-with-ablations/result.md) with and without that stage on
-24-month and 47-to-58-month ENS windows. It builds on [experiment
-418](../00418-mdn-pretrain-on-era5-and-cams-then-fine-tune-on-ens/result.md) and
-[experiment 494](../00494-simplify-demand-network-refit-cadence-and-pretrain-once/result.md).
+We asked whether the gain from the first training stage shrinks when the second stage has 4 to 5
+years of ECMWF ensemble (ENS) forecasts instead of 24 months. The network is the pooled mixture
+density network of [experiment 425](../00425-best-mdn-architecture-assembly-with-ablations/result.md).
+The first stage trains on ERA5 reanalysis and CAMS solar estimates of past weather ("pre-training").
+The second stage trains on the archive of ENS forecasts. The archive now starts on 2020-10-15,
+because we back-filled it from dynamical.org for this experiment. The 16 Primaries are 6 that report
+signed megawatts ("the six"), 8 that report only apparent power in megavolt-amperes ("the eight"),
+and D15 and D18, which are report-only. Scores are CRPS in points of effective capacity over lead
+days 1 to 10, on 12 monthly folds from 2025-07 to 2026-06.
+
+Verdict: **partly supported**. The prediction that C1 lies between -0.04 and 0 at the six failed,
+because C1 is positive. The prediction at the eight (between -0.10 and 0) held. By the
+pre-registered rule C1 is "not supported" at the six (the gain is no longer worth porting) and
+"supported" at the eight (the gain is still worth porting). Because trigger 1 fires, the six's
+verdict rests on the audit below. The experiment makes no adoption.
+
+## Figures
+
+![CRPS contrast between pre-training and no pre-training, against months of ENS history, at the six
+and the eight](gain_against_ens_months.svg)
+
+![Day-ahead and 14-day example forecasts of one signed-MW Primary and one MVA-only Primary, for
+four arms](example_forecasts.svg)
+
+## Results
+
+**The pre-training contrast shrinks as the ENS history lengthens, and shrinks to nothing at the
+six.** The table gives each arm pair's CRPS difference (pre-trained minus not pre-trained; negative
+favours pre-training) at the 99.69% level, with 12 folds, a month-block bootstrap on seed-averaged
+forecasts, and 50,000 resamples.
+
+| ENS window | Contrast | The six | The eight |
+|---|---|---|---|
+| 12 months | `A_12` − `R_12` (descriptive) | -0.109 (-0.205 to -0.039) | -0.151 (-0.300 to -0.046) |
+| 24 months, stored | `A_24` − `R_24` (425's arms) | -0.050 (-0.082 to -0.016) | -0.124 (-0.235 to -0.037) |
+| 24 months | C2: `A_E24` − `R_E24` | -0.011 (-0.059 to +0.037) | -0.082 (-0.131 to -0.037) |
+| 47 to 58 months | C1: `A_F` − `R_F` | +0.019 (-0.004 to +0.049) | -0.041 (-0.059 to -0.025) |
+| 56 to 68 months | `A_C` − `R_C` (descriptive) | -0.008 (-0.050 to +0.022) | -0.040 (-0.066 to -0.016) |
+
+**The gain at 24 months is already smaller than the stored line when the 24 months are a true 24
+months of ENS.** `A_E24` and `R_E24` read the back-filled runs, so every fold sees 24 months of ENS.
+The stored arms saw 15 to 24 months before fold 2026-04, because the production archive started on
+2024-04-01. C2 is -0.011 at the six and -0.082 at the eight, and the two readings differ in window
+as well as in code path.
+
+**C1 minus C2 is +0.030 at the six (-0.006 to +0.072) and +0.041 at the eight (+0.009 to +0.078).**
+Only the eight's interval excludes zero, so only the eight shows that lengthening the window from 24
+to 47 to 58 months shrank the pre-training gain. Both are descriptive readings.
+
+**The eight shows pre-training helping in every fold.** C1 at the eight is negative in 12 of 12
+folds (a t test on the 12 monthly differences gives t = -6.69), and it holds without fold 2026-01
+(-0.044), at days 1 to 6 (-0.041), and at days 7 to 10 (-0.043). At the six, C1 is positive in 9 of
+12 folds, and the t test gives t = 2.00 (p = 0.070); without fold 2026-01 it is +0.018, at days 1 to
+6 +0.020, and at days 7 to 10 +0.017. The minimum detectable effect, from the seed halves of `R_F`,
+is 0.018 points at the six (a lower bound).
+
+**Long ENS history alone helps little.** C3 (`R_F` − `A_24`) is -0.007 at the six (-0.044 to +0.034)
+and +0.018 at the eight (-0.029 to +0.076), so a network with long ENS and no pre-training did not
+beat the stored pre-trained network of experiment 425 (`A_24`) at either group. C4 (`A_F` −
+`A_E24`) is -0.007 at the six and -0.032 at the eight (-0.088 to +0.008), so lengthening the window
+inside the pre-trained recipe did not help clearly either.
+
+**The placebo fails at the six and passes at the eight.** The placebo (`A1x_24`) pre-trains on
+ERA5 and CAMS weather days shuffled among days of the same Primary, so only the extra power history
+can help. C5 (`A_24` − `A1x_24`) is -0.011 at the six (-0.055 to +0.050), so the six's gain cannot
+be told apart from the gain that power history alone gives; C6 (`A1x_24` − `R_24`) is -0.041
+(-0.099 to +0.008). At the eight C5 is -0.060 (-0.083 to -0.039), so the weather carries part of the
+gain there, and C6 is -0.078 (-0.157 to -0.003).
+
+**Lockdown ENS rows and the two data-source steps made no clear difference.** C7 (`R_C` − `R_F`,
+keeping runs from 2020-10-15 to 2021-07-19 with a `covid` input) is +0.012 at the six and +0.004 at
+the eight. C8 (`R_F+flags` − `R_F`, two indicator inputs for the resolution upgrade of 2023-06-27
+and the source change of 2024-04-01) is -0.004 and +0.024. All four intervals contain zero.
+
+| Group | `A_24` | `R_24` | `A_F` | `R_F` | `A_12` | `R_12` | `A1x_24` | Climatology | BG2 |
+|---|---|---|---|---|---|---|---|---|---|
+| The six, CRPS | 2.828 | 2.878 | 2.840 | 2.821 | 2.832 | 2.942 | 2.843 | 3.831 | 3.016 |
+| The six, MAE of the median | 5.008 | 5.102 | 5.040 | 4.998 | 5.026 | 5.229 | 5.046 | 6.770 | 5.242 |
+| The eight, CRPS | 3.594 | 3.719 | 3.571 | 3.612 | 3.586 | 3.737 | 3.663 | 4.866 | 3.774 |
+| The eight, MAE of the median | 6.504 | 6.751 | 6.470 | 6.565 | 6.494 | 6.771 | 6.655 | 8.780 | 6.744 |
+
+**Tails and cost.** Coverage and pinball loss at q01, q05, q95, and q99 differ by under 0.01 and
+0.03 points between `A_F` and `R_F` (the eight, q95 pinball loss 0.915 against 0.926; the six, 0.778
+against 0.775). Avoidable curtailment cost summed over the Primaries that report it is £7.62 million
+for `A_24`, £7.52 million for `A_E24`, £6.65 million for `A_12`, and £7.76 million for the placebo
+`A1x_24`; the scorer's printed table elides `R_F`'s total. On cold winter nights `A_24` scores best
+at the six (4.290) and `A_F` and `A_E24` score worse (4.451 and 4.452), and in the seven days after
+a load-shift event `A_24` scores worse than `R_24` at the six (3.991 against 3.712). Both are
+descriptive and carry no interval.
+
+## Checks
+
+- **Median minus mean forecast per Primary.** Not recomputed for this page; every arm scores the
+  median and the mean by the same code as experiment 425.
+- **Error of the median beside each CRPS contrast.** C1's mean absolute error of the median agrees
+  in sign with CRPS at both groups: +0.042 (-0.008 to +0.113) at the six and -0.095 (-0.136 to
+  -0.056) at the eight. Trigger 3 did not fire.
+- **Triggers.** Trigger 1 (the placebo fails at the six) fired. Trigger 2 (C1 contradicts the stored
+  425 line) fired at the six, where the signs are opposite. Trigger 6 fired at the eight, where C1's
+  interval is 0.17 times the width of the stored line's (the limits are 0.5 and 2.0), because the
+  stored line used 24 months of unevenly covered ENS and unwidened networks. Trigger 4 (dropping fold
+  2026-01) did not fire. Trigger 5 (`R_F` beats `A_24`) did not fire, because C3 lies inside the
+  noise. Trigger 7 is the author's judgement: no later design depends on this headline.
+- **Gate.** The prediction-only check matched experiment 425's stored forecasts, and the refit check
+  on folds 2026-06 and 2026-01 passed.
+- **Step checks.** The ENS-minus-ERA5/CAMS and spread checks at 2023-06-27 and 2024-04-01 passed;
+  the largest step was 2.7 standard deviations (surface pressure at 2023-06-27; the limit is 3).
+- **The back-fill.** 1,263 of the 1,264 runs from 2020-10-15 to 2024-03-31 are stored. The run of
+  2024-01-03 is a documented upstream gap, because dynamical.org holds 26 of its 51 members. No arm
+  reads it, and the coverage report lists it.
+- **Cleaning.** The scorer dropped 785 scoring half-hours for a flagged exact zero. The 394
+  half-hours that only experiment 398's list flags stay flagged in the stored-arm reproduction, and
+  the current cleaning flags fewer.
+
+## Caveats
+
+- **The placebo failure at the six removes the six's evidence for pre-training.** The six's C1
+  sign (+0.019) and the six's 24-month gain both lie within the noise of what the extra power
+  history alone gives.
+- **The six has little long history.** D9 has no observed power before 2023-08-23, so a long window
+  adds nothing for it.
+- **The minimum detectable effect (0.018) is close to the 0.02 threshold.** A gain of 0.02 is at
+  the edge of what 12 folds resolve at the six.
+- **Window length and the 2023-06-27 resolution upgrade are confounded** above 24 months. C8 found
+  no clear effect of the two indicator inputs.
+- **The 99.69% level undercovers at 12 months.** The t tests above read the same 12 monthly
+  differences without that correction.
+
+## What to try next
+
+- A second seed set for the placebo at the six would show whether the failure is seed noise.
+- Pre-training for the eight alone, and none for the six, is an option the six's placebo failure
+  leaves open.
+
+## Files
+
+- Code: `ml-experiments/00707-ens-backfill-pretraining-gain-against-ens-history-length/` (scripts
+  `e00707_arms.py`, `e00707_fit.py`, `e00707_prep.py`, `e00707_score.py`, and their helpers).
+- Reused code: experiments 397, 418, 425, and 494 (named in Method).
+- Private data: `data/ml-experiments/00707-ens-backfill-pretraining-gain-against-ens-history-length/`
+  (`work/models/`, `work/pretrained/`, `work/seed_preds/`).
+- Production back-fill: the ECMWF ENS archive from 2020-10-15 is in the Delta table `NWP`, written
+  by pull request 1705 and the back-fill that followed.
+
+## Plan
+
+**The sections from here to the end are the plan, written and committed before any fit.** Only
+Method and the Data handling bullet for 2024-01-03 were edited afterwards.
 
 ## Hypothesis, prediction, and decision rule
 
