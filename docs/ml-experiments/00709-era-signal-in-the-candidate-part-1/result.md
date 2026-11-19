@@ -863,10 +863,16 @@ rule changed after an interim look and why, gives the realised number of eras pe
 for the signal arms the mixing is partly a noise augmentation, because the injected rows get a
 second noise draw.
 
-**The curriculum world must hold more eras before B2 runs.** It held 2 eras in fold 2025-11, not
-the planned 8, because each pass touches up to 6 of 13 eligible Primaries and the passes must be
-disjoint. B2 logs the realised era count per fold, and a fold with fewer than 4 eras is reported as
-a weak test of the curriculum.
+**B2 runs on phase B's cached curriculum worlds.** The world held 2 eras in fold 2025-11, not the
+planned 8, because each pass touches up to 6 of 13 eligible Primaries and the passes must be
+disjoint. The cache is keyed by fold and seed, so B2 reuses the same worlds, and `alt_eras` is logged
+for every fit. A fold with fewer than 4 eras is reported as a weak test of the curriculum.
+
+**Decision rule, fixed before the first B2 fit.** A B2 arm helps when its difference from A0 on all
+rows is below 0 with the bootstrap interval (blocks of fold month and Primary, 95%) excluding zero,
+and the difference on the touched Primaries is not above +0.05 points. An arm whose interval
+contains zero is reported as not distinguishable from A0. Every B2 number is interim until all 4
+folds and both seeds are scored.
 
 **Cost.** 4 arms on 4 folds and 2 seeds is 32 fits, about 9 to 10 minutes each at 2 concurrent jobs,
 so about 2.5 hours of wall-clock time after phase B finishes. Phase B's aug result is void.
