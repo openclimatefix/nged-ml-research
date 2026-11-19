@@ -911,7 +911,7 @@ def step_check() -> None:
                 pl.Series(f"spread_{w}", x[:, std_cols[c]]),
             )
         pieces.append(frame.group_by("month", "site").mean())
-    monthly = pl.concat(pieces).group_by("month").mean().sort("month")
+    monthly = pl.concat(pieces).drop("site").group_by("month").mean().sort("month")
     months = monthly["month"].to_list()
     failed = False
     for date in STEP_DATES:
