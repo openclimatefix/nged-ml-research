@@ -824,6 +824,47 @@ labelled non-causal.
 the touched Primaries, so the real record would have to be placed inside the 30-day bank window,
 which the separation rule forbids.
 
+## 23. First interim result: stage 3 keeps its first epoch, so the curriculum is void in phase B
+
+**Every contrast that involves the curriculum (the injection of eras) is void in phase B, and the
+arm A0-aug equals A0 by construction.** Stage 3 stops after 8 epochs without a gain in the
+validation loss and keeps the best state. In fold 2025-11, seed 0, every arm ran 9 epochs and kept
+the state of the first epoch, so the odd epochs, which read the injected world, never survive the
+selection. A0 and A0-aug have the same validation loss to 16 digits, and their forecasts differ by
+at most 4e-6 in the median. The curriculum world also held only 2 eras in this fold, not the 4 of
+the one-fold pilot and not the 8 planned. The signal arms learn the era path from one epoch on the
+real record, so phase B still tests the signal on the real record but not the curriculum.
+
+**The first numbers are interim, from one fold and one seed, and carry no interval.** The CRPS in
+points of effective capacity, over all rows, is 4.183 for A0, 4.178 for the oracle arm (D8: 7.440
+against 7.546), and 4.264 for the placebo (+0.08, mostly on the other Primaries). Nothing here
+supports or refutes the hypothesis.
+
+## 24. Phase B2 (proposed): a selection rule that lets the curriculum survive
+
+**Phase B2 changes the stage 3 stopping rule, for five arms only.** The arms are A0, A0-aug, the
+oracle, the placebo, and L-stat. Each trains a fixed number of epochs and keeps the last state, so
+the odd epochs on the injected world shape the final network. Validation on plain rows no longer
+picks the state. The fixed count and the unchanged pairing against A0 under the same rule are
+pre-registered below, and an Opus review of the rule change comes before any B2 run.
+
+**Rule.** Each B2 fit runs exactly 4 epochs (two plain epochs, 0 and 2, and two epochs on the
+injected world, 1 and 3) with the learning rate and row fraction of phase B, and keeps the state
+after epoch 3. There is no early stop and no best-state restore. Validation loss is logged each
+epoch and never selects. The count of 4 comes from the first interim result: the best epoch was the
+first, so a longer run has no support, and 4 is the smallest count that gives the injected world
+two epochs.
+
+**Arms and contrasts.** A0, A0-aug, oracle, placebo, and L-stat run under the fixed rule on the 4
+screen folds and seeds 0 and 1, which is 40 fits. Each contrast is paired against A0 under the same
+rule, never against phase B's A0. The contrasts are oracle minus A0 (value of a perfect signal),
+L-stat minus A0, placebo minus A0 (the cost of a wrong signal), and A0-aug minus A0 (the value of
+the curriculum alone). A0 under the fixed rule is also compared with A0 under the early-stopping
+rule, to show what the rule change costs the baseline.
+
+**Cost.** About 9 to 10 minutes per fit at 2 concurrent jobs, so about 3.5 hours of wall-clock time.
+B2 runs after phase B finishes, in slot A, with the same caps.
+
 ## Files
 
 - Code: `ml-experiments/00709-era-signal-in-the-candidate-part-1/` (to be written, each script
