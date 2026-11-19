@@ -4,7 +4,6 @@ Every output goes to `e_667/` in experiment 709's data folder (`E00667_ROOT`); t
 experiment 667 are read only. Nothing else differs from the original.
 """
 
-# ruff: noqa
 # ruff: noqa: ANN003, ANN201, ANN202, E402, E501, I001, PT018
 """Experiment 620: pre-train, step-2, and fit K1 (class 1) on the final-test fold 2026-07 (GPU).
 
@@ -68,7 +67,6 @@ sys.argv = [
 import e00591_arm as arm  # ty: ignore[unresolved-import]
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
-from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 import e00667_fold as fold
 

@@ -4,7 +4,6 @@ Every output goes to `e_667/` in experiment 709's data folder (`E00667_ROOT`); t
 experiment 667 are read only. Nothing else differs from the original.
 """
 
-# ruff: noqa
 # ruff: noqa: ANN001, ANN003, ANN201, ANN202, D102, D103, D107, D205, E402, E501, I001, PLR0915, PT018
 """Experiment 620 (copy of 613's `e00613_nbarm.py`): table and fit the class 2 candidate (GPU).
 
