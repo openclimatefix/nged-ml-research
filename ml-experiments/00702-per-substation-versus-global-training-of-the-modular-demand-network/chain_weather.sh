@@ -8,7 +8,7 @@ D="$(cd "$(dirname "$0")" && pwd)"
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
 R=$DATA_PATH_INTERNAL/ml-experiments/00702-per-substation-versus-global-training-of-the-modular-demand-network
 export E00677_ROOT=$R E00677_SPAN=1 E00677_MONTH=$1 E00677_PHASE=predict
-M=$1
+M=${1:?month required}
 ALL="D2,D3,D4,D5,D8,D9,D10,D11,D12,D14,D15,D16,D18,D19,D21,D22"
 PRIM=${2:-$ALL}; [ "$PRIM" = all ] && PRIM=$ALL
 set -e

@@ -14,7 +14,7 @@ D="$(cd "$(dirname "$0")" && pwd)"
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
 R=$DATA_PATH_INTERNAL/ml-experiments/00702-per-substation-versus-global-training-of-the-modular-demand-network
 export E00677_ROOT=$R E00677_SPAN=1
-M=$1; shift
+M=${1:?month required}; shift
 export E00677_MONTH=$M
 SFX=${SUFFIX:-}
 SEEDARGS="--seeds ${SEEDS:-3 4 5}"
