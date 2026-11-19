@@ -892,6 +892,19 @@ a week before the first test month, so the first fold's training rows hold almos
 connection, and the fold tests how an era signal behaves when the new era is a week old. The
 hidden-Markov models were fitted on days before 2025-01-01, so they read no day of these folds.
 
+**Phase E scores every fifth day's forecast, not every day's.** Experiment 667 keeps experiment 397's
+stored rows before 2025-07-01, which hold only every fifth day's run, so each E fold has about 6
+forecast origins in its month, against about 30 for a screen fold. The 7-day embargo and the 7-day
+down-weight window cover one or two runs in the training rows near the cut. The intervals are wider
+for that reason. Rebuilding the rows from experiment 607's daily summaries would give daily origins
+but change the recipe relative to the screen folds, so the plan keeps the stored rows. The daily
+frames rebuilt in `frames_e/` serve only the timing check, and the rebuild is optional.
+
+**The oracle in phase E reads the scored months.** The oracle's change vector for D8's solar farm
+averages up to 120 days after its onset (2025-04-05 in the era table), which reaches into the test
+months of the three E folds. The E oracle is reported as an arm that knows the scored months, and
+the placebo, which moves the same vector to other dates, carries part of the same information.
+
 **The extra work is outside the screen's pipeline, and every piece is a copy in this experiment's
 folder.** The daily demand frames of 2025-04-01 to 2025-06-30 are rebuilt by `e00709_e_frames.py`
 from the archive with experiment 48's `build_run`, into `frames_e/` of this experiment's data folder;
