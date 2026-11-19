@@ -60,7 +60,7 @@ if [ "$AVAIL" -lt "$NEED" ]; then
 fi
 
 # the GPU must hold every parallel job: each may use up to GPU_NEED_MIB (the pilot's peak_gpu_gib sets the real figure)
-GPU_NEED_MIB=${GPU_NEED_MIB:-6000}
+GPU_NEED_MIB=${GPU_NEED_MIB:-8000}
 if command -v nvidia-smi >/dev/null; then
   GPU_FREE=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1)
   if [ "$GPU_FREE" -lt $(( MAXJOBS * GPU_NEED_MIB )) ]; then

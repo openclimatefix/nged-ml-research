@@ -807,7 +807,12 @@ def hold_mask(*, signal: Signal, cut_day: int) -> np.ndarray:
             # the reversal rule: a wrong `era` class was withdrawn, so the whole span is dropped
             hold[site, row["onset"] : last_open + 1] = True
             continue
-        # the oracle entry of day d holds day d + 1: its event ends one entry earlier
+        if not signal.causal:
+            # an oracle episode is one event: an era (first_era == onset) has no unknown period,
+            # and a switching event is held over its own span, whatever else stands at the cut
+            if row["first_era"] != row["onset"]:
+                hold[site, row["onset"] : last_open + 1] = True
+            continue
         final = int(state[site, last_open if signal.causal else max(last_open - 1, 0)])
         first_era = row["first_era"]
         if final == STATE_ERA:

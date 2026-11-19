@@ -662,8 +662,11 @@ def run_weather(*, arms: list[str], month: str, seed: int) -> bool:
                 name=f"origin_weather[{arm}]", ok=False, detail=f"no stored forecast in {folder}"
             )
             continue
-        rows = exp.contract_rows(mean=pl.read_parquet(files[0]))
-        origins = rows["power_fcst_init_time"].dt.epoch("us").to_numpy()
+        raw = pl.read_parquet(
+            files[0]
+        )  # the network origins (09:00), before the contract relabel to 12:00
+        rows = exp.contract_rows(mean=raw)
+        origins = raw["power_fcst_init_time"].dt.epoch("us").to_numpy()
         good, example = check_weather_runs(origins_us=origins)
         good &= bool((rows["nwp_init_time"] <= rows["power_fcst_init_time"]).all())
         ok &= record(name=f"origin_weather[{arm}]", ok=good, detail=example)

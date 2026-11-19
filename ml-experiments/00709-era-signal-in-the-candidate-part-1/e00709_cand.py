@@ -477,7 +477,7 @@ def cached(*, path: Path, build):
             return pickle.load(handle)
     obj = build()
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
+    tmp = path.with_suffix(f".{os.getpid()}.tmp")  # unique, so parallel arms never share a file
     with tmp.open("wb") as handle:
         pickle.dump(obj, handle)
     tmp.rename(path)
@@ -495,6 +495,8 @@ class AltWorld:
     cut_site: np.ndarray
     n_passes: int
     n_eras: int
+    slots: dict | None = None
+    hold: np.ndarray | None = None
 
 
 CURRICULUM_PASSES: Final = 4
@@ -522,8 +524,15 @@ def stage0_context():
     return CONTEXT["ctx"], CONTEXT["models"], stage0
 
 
-def world_parts(*, passes: list, placebo_seed: int, placebo_window: tuple[int, int]) -> dict:
-    """Return the cacheable parts of a world: every arm's signal, the change to the panel, the touched Primaries."""
+def world_parts(
+    *, passes: list, placebo_seed: int, placebo_window: tuple[int, int], with_real: bool = True
+) -> dict:
+    """Return the cacheable parts of a world: every arm's signal, the change to the panel, the touched Primaries.
+
+    `with_real` False leaves the real record out of the oracle and the placebo. The bank needs that,
+    because it overlays the world only at the touched Primaries, and a placebo that had to place the
+    whole real record in the 30-day bank window would fail the separation rule.
+    """
     ctx, models, stage0 = stage0_context()
     n_hh = ctx.panel.power.shape[1]
     delta = np.zeros((len(ctx.panel.sites), n_hh), np.float32)
@@ -546,7 +555,7 @@ def world_parts(*, passes: list, placebo_seed: int, placebo_window: tuple[int, i
         for inj in passes
     ]
     pass_feats = [sg.pass_features(ctx_feats=ctx.feats, injected=inj) for inj in passes]
-    real_eras, real_switches = CONTEXT["real_events"]
+    real_eras, real_switches = CONTEXT["real_events"] if with_real else (None, None)
     world_sigs = sg.world_signals(
         injected=passes, ctx_feats=ctx.feats, panel=ctx.panel, results_of=results_of,
         pass_feats=pass_feats, n_days=ctx.panel.n_days, placebo_seed=placebo_seed,
@@ -614,9 +623,14 @@ def build_alt_world(*, fs: FoldSignals, clean: np.ndarray) -> AltWorld:
     REPORT["alt_passes"], REPORT["alt_eras"] = parts["n_passes"], parts["n_eras"]
     if parts["n_eras"] < CURRICULUM_ERAS:
         print(f"warning: the curriculum world holds {parts['n_eras']} eras", flush=True)
+    # real era ids keep their slots; the touched Primaries' ids first seen after the cut share slot 0
+    touched = set(parts["touched"])
+    slots = None if SLOTS is None else {k: v for k, v in SLOTS.items() if k[0] not in touched}
+    hold = None if signal is None else sg.hold_mask(signal=signal, cut_day=CUT_DAY)
     return AltWorld(
         lag_power=fs.fixed + lag_delta, sig_power=fs.power_sig + lag_delta, era_delta=era_delta,
         signal=signal, cut_site=cut_site, n_passes=parts["n_passes"], n_eras=parts["n_eras"],
+        slots=slots, hold=hold,
     )  # fmt: skip
 
 
@@ -689,8 +703,11 @@ def train_curriculum(
                 if ALT["era"] is not None:
                     xb[:, base + N_EXTRA :] = ALT["era"][b]
                 zb = ALT["z"][b]
+            wb = w[b] * ALT["w"][b] if use_alt else w[b]
+            if float(wb.sum()) <= 0:
+                continue
             nll = e.row_nll(out=model(xb, p[b]), z=zb, p=p[b])
-            loss = (w[b] * nll).sum() / w[b].sum()
+            loss = (wb * nll).sum() / wb.sum()
             if hasattr(model, "penalty"):
                 loss = loss + model.penalty()  # ty: ignore[call-non-callable]
             optimiser.zero_grad()
@@ -819,14 +836,21 @@ class SigGpuMonth(e.LagGpuMonth):
                 sig.add_training_noise(block=b_alt, prim=prim, plan=fs.plan, seed=fs.seed)
             era_alt = finish(
                 b=b_alt, lag=lag_alt, power_lag=aw.lag_power, power_sig=aw.sig_power,
-                signal=aw.signal, cut=aw.cut_site[prim], slots=None,
+                signal=aw.signal, cut=aw.cut_site[prim], slots=aw.slots,
             )  # fmt: skip
             ti = np.clip(mr.target_idx[idx], 0, n_hh - 1)
+            w_alt = np.ones(len(idx), np.float32)
+            if aw.signal is not None and aw.hold is not None:
+                valid_day = ti // PER_DAY
+                w_alt = (~aw.hold[prim, valid_day]).astype(np.float32) * sg.row_weight_factor(
+                    signal=aw.signal, cut_day=CUT_DAY, site=prim, valid_day=valid_day
+                )
             shift_z_alt = aw.era_delta[prim, ti] / np.asarray(mr.base.target_std)[prim]
             ALT.update(
                 lag=lag_alt,
                 block=torch.from_numpy(b_alt).to(self.device),
                 era=None if era_alt is None else torch.from_numpy(era_alt).to(self.device),
+                w=torch.from_numpy(w_alt).to(t["z"].device),
                 z=t["z"] + torch.from_numpy(shift_z_alt.astype(np.float32)).to(t["z"].device),
             )
         t["x"][:, LAG_FIRST] = lag_plain[:, 0]
@@ -971,7 +995,9 @@ def write_contract(*, frame: pl.DataFrame, name: str) -> None:
         )
         print(f"wrote prediction set {path}", flush=True)
     except FileExistsError:
-        print(f"prediction set {name} already exists; left unchanged", flush=True)
+        # a rerun after a code fix must not keep the old set without saying so
+        msg = f"prediction set {name} already exists: delete it deliberately or rename the arm"
+        raise SystemExit(msg) from None
 
 
 def build_fold(*, device: str):
@@ -1071,7 +1097,7 @@ def build_bank_pass(*, pass_index: int) -> dict:
     )  # fmt: skip
     parts = world_parts(
         passes=[injected], placebo_seed=sg.PLACEBO_SEED_BASE["bank"] + pass_index,
-        placebo_window=(CUT_DAY - 5, CUT_DAY + 25),
+        placebo_window=(CUT_DAY - 5, CUT_DAY + 25), with_real=False,
     )  # fmt: skip
     touched = {ev.host for ev in injected.eras} | {s.donor for s in injected.switches}
     touched |= {s.recipient for s in injected.switches if s.recipient is not None}
@@ -1158,6 +1184,8 @@ def run_bank(*, device: str = "cuda") -> None:
         joined = frame.with_columns(pl.col("time_series_id").cast(pl.Int64)).join(
             keys, on=["time_series_id", "power_fcst_init_time", "valid_time"], how="left"
         )
+        n_missing = int(joined.filter(pl.col("pass_index").is_null()).height)
+        assert n_missing == 0, f"{n_missing} forecast rows have no bank key: the join missed"
         path = out_dir / f"pass{j:02d}.parquet"
         joined.write_parquet(path.with_suffix(".tmp"))
         path.with_suffix(".tmp").rename(path)
