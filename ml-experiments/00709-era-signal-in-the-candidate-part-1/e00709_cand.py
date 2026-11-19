@@ -67,6 +67,10 @@ _p.add_argument("--seed", type=int, required=True, choices=(0, 1))
 _p.add_argument("--phase", choices=("train", "predict"), default="train")
 _p.add_argument("--pilot", action="store_true")
 _p.add_argument("--bank-passes", type=int, default=16)
+_p.add_argument(
+    "--rule", choices=("es", "b2"), default="es",
+    help="stage 3 rule: es = phase B's odd-epoch alternation, b2 = each row reads the injected world with probability 0.5 in every epoch",
+)  # fmt: skip
 MINE = _p.parse_args()
 # the fold module reads these at import, so set them before any experiment module is imported
 os.environ["E00667_MONTH"] = MINE.fold
@@ -103,7 +107,11 @@ ROOT = features.DATA_DIR
 assert ROOT != SRC667
 CHAIN = SRC667 / "chains" / MONTH / "work"
 TABLES = SRC667 / "tables"
-DIR = f"{ERA.replace('-', '_')}_{MONTH}_s{SEED}" + ("_pilot" if MINE.pilot else "")
+B2: Final = MINE.rule == "b2"
+"""Phase B2: the injected world is mixed into every batch. Its fits and predictions carry a `b2` prefix."""
+assert not B2 or ERA in ("aug", "oracle", "placebo", "stat"), "B2 runs four arms; A0 is phase B's"
+PREFIX = "b2_" if B2 else ""
+DIR = f"{PREFIX}{ERA.replace('-', '_')}_{MONTH}_s{SEED}" + ("_pilot" if MINE.pilot else "")
 ROW_SET_ID: Final = "experiment_677_monthly_refit_rows_valid_2025_11_to_2026_06"
 """Contract rows at 12:00 UTC on each day of a fold's month, 14 days of half-hours, 16 series, with
 `valid_time` before 2026-07-01 (the rows after that date are the held-out finalist rows)."""
@@ -118,6 +126,8 @@ PILOT_ROW_FRACTION: Final = 0.1
 
 USE_ERA = ERA not in ("none", "aug")
 CURRICULUM = ERA != "none"
+MIX_P: Final = 0.5
+"""Phase B2: the share of rows in a batch that read the injected world."""
 SIGNAL_NAME = "oracle" if ERA == "oracle-enc" else ERA
 SOFT = ERA == "soft"
 
@@ -668,6 +678,7 @@ def train_curriculum(
     """
     if MINE.pilot:
         max_epochs = min(max_epochs, PILOT_EPOCHS)
+    assert ALT or not CURRICULUM, "a curriculum arm reached stage 3 with no injected world"
     torch.manual_seed(seed)
     train_idx = torch.nonzero(~is_val).squeeze(1)
     val_idx = torch.nonzero(is_val).squeeze(1)
@@ -691,19 +702,36 @@ def train_curriculum(
         if frozen:
             model.weather.eval()  # ty: ignore[unresolved-attribute]
             model.datetime.eval()  # ty: ignore[unresolved-attribute]
-        use_alt = bool(ALT) and epoch % 2 == 1
+        use_alt = bool(ALT) and (B2 or epoch % 2 == 1)
+        coin = None
+        if B2:
+            # each row reads the injected world with probability 0.5; the coin never touches the row order
+            coin_gen = torch.Generator(device="cpu").manual_seed(seed * 1000 + epoch)
+            coin = (torch.rand(len(x), generator=coin_gen) < MIX_P).to(device)
         order = train_idx[torch.randperm(len(train_idx), device=device)]
         order = order[: int(fraction * len(order))]
         for start in range(0, len(order), e.c.BATCH):
             b = order[start : start + e.c.BATCH]
             xb, zb = x[b], z[b]
+            wb = w[b]
             if use_alt:
-                xb[:, 37], xb[:, 40] = ALT["lag"][b, 0], ALT["lag"][b, 1]
-                xb[:, base : base + N_EXTRA] = ALT["block"][b]
+                m = (
+                    coin[b]
+                    if coin is not None
+                    else torch.ones(len(b), dtype=torch.bool, device=device)
+                )
+                mc = m[:, None]
+                xb[:, 37] = torch.where(m, ALT["lag"][b, 0], xb[:, 37])
+                xb[:, 40] = torch.where(m, ALT["lag"][b, 1], xb[:, 40])
+                xb[:, base : base + N_EXTRA] = torch.where(
+                    mc, ALT["block"][b], xb[:, base : base + N_EXTRA]
+                )
                 if ALT["era"] is not None:
-                    xb[:, base + N_EXTRA :] = ALT["era"][b]
-                zb = ALT["z"][b]
-            wb = w[b] * ALT["w"][b] if use_alt else w[b]
+                    xb[:, base + N_EXTRA :] = torch.where(
+                        mc, ALT["era"][b], xb[:, base + N_EXTRA :]
+                    )
+                zb = torch.where(m, ALT["z"][b], zb)
+                wb = torch.where(m, w[b] * ALT["w"][b], w[b])
             if float(wb.sum()) <= 0:
                 continue
             nll = e.row_nll(out=model(xb, p[b]), z=zb, p=p[b])
@@ -725,6 +753,7 @@ def train_curriculum(
                 ).mean()
             )
         epochs = epoch + 1
+        REPORT.setdefault("val_curve", []).append(round(val, 6))
         if val < best - 1e-5:
             best, stale = val, 0
             best_state = {a: v.detach().clone() for a, v in model.state_dict().items()}
@@ -1061,7 +1090,7 @@ def run_fit(*, device: str = "cuda") -> None:
     assert frame is not None
     e.atomic_frame(frame=frame, target=out)
     if not MINE.pilot:
-        write_contract(frame=frame, name=f"{ERA}-{MONTH}-s{SEED}")
+        write_contract(frame=frame, name=f"{PREFIX.replace('_', '-')}{ERA}-{MONTH}-s{SEED}")
     e.c.write_json(
         obj={
             **log,

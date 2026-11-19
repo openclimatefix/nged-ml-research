@@ -16,7 +16,7 @@ R=$(cd "$D/../.." && pwd)
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
 NAME=00709-era-signal-in-the-candidate-part-1
 OUT=$DATA_PATH_INTERNAL/ml-experiments/$NAME
-ARMS=""; FOLDS=""; SEEDS="0 1"; MAXJOBS=1; MEMCAP=16G; BANK=0; PILOT=0
+ARMS=""; FOLDS=""; SEEDS="0 1"; MAXJOBS=1; MEMCAP=16G; BANK=0; PILOT=0; RULE=es
 while [ $# -gt 0 ]; do
   case $1 in
     --era) ARMS=$2; shift 2 ;;
@@ -26,11 +26,14 @@ while [ $# -gt 0 ]; do
     --mem-cap) MEMCAP=$2; shift 2 ;;
     --bank) BANK=1; shift ;;
     --pilot) PILOT=1; shift ;;
+    --rule) RULE=$2; shift 2 ;;
     *) echo "unknown argument $1"; exit 1 ;;
   esac
 done
 [ -n "$ARMS" ] && [ -n "$FOLDS" ] || { echo "give --era and --folds"; exit 1; }
+[ $RULE = es ] || [ $RULE = b2 ] || { echo "bad rule $RULE"; exit 1; }
 for a in $ARMS; do
+  [ $RULE = b2 ] && case $a in aug|oracle|placebo|stat) ;; *) echo "B2 runs aug, oracle, placebo, and stat only, not $a"; exit 1 ;; esac
   case $a in none|aug|oracle|placebo|oracle-enc|all|rule|soft|hmm|stat) ;; *) echo "bad arm $a"; exit 1 ;; esac
 done
 for f in $FOLDS; do
@@ -86,11 +89,12 @@ run_job() {  # run_job LOGNAME ARGS...
 
 one() {  # one FOLD SEED ARM
   local f=$1 s=$2 a=$3 t=${3//-/_}_${1}_s$2
+  [ $RULE = b2 ] && t=b2_$t
   [ $PILOT = 1 ] && t=${t}_pilot
-  run_job ${t}_train fit --era $a --fold $f --seed $s --phase train $PILOT_FLAG || return 1
-  run_job ${t}_predict fit --era $a --fold $f --seed $s --phase predict $PILOT_FLAG || return 1
+  run_job ${t}_train fit --era $a --fold $f --seed $s --phase train --rule $RULE $PILOT_FLAG || return 1
+  run_job ${t}_predict fit --era $a --fold $f --seed $s --phase predict --rule $RULE $PILOT_FLAG || return 1
   if [ $BANK = 1 ]; then
-    run_job ${t}_bank bank --era $a --fold $f --seed $s --phase predict $PILOT_FLAG || return 1
+    run_job ${t}_bank bank --era $a --fold $f --seed $s --phase predict --rule $RULE $PILOT_FLAG || return 1
   fi
   echo "$a $f s$s done $(date -u +%T)"
 }

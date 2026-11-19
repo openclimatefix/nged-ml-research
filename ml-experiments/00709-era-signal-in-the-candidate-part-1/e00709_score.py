@@ -145,7 +145,10 @@ def main() -> None:
     SCORES_DIR.mkdir(parents=True, exist_ok=True)
     out = []
     print(
-        "INTERIM: 2 seeds; CRPS in points of effective capacity; difference = arm minus reference\n"
+        f"INTERIM: seeds {args.seeds}, folds {args.folds} (an interval over fewer than 4 "
+        "fold months "
+        "is indicative only); CRPS in points of effective capacity; "
+        "difference = arm minus reference\n"
     )
     for scope, expr in scopes.items():
         scoped = both.filter(expr)
