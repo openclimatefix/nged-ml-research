@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 r"""Score experiment 709's stored forecasts on the real rows (interim table).
 
     source ml-experiments/00524*/env.sh; export PYTHONPATH=src:$PYTHONPATH
@@ -7,17 +6,19 @@ r"""Score experiment 709's stored forecasts on the real rows (interim table).
 
 Reads the prediction sets `<arm>-<month>-s<seed>` of experiment 709 (quantiles in MW at the
 contract's 12:00 UTC origin), divides them by each Primary's effective capacity, and scores them
-against the cleaned half-hourly power on the feature grid. The score is the quantile score (CRPS), in points of
-effective capacity. For each arm it prints the mean CRPS over all rows, at D8, and on the other
+against the cleaned half-hourly power (`clean_stack`, the series the neural network trains on, with
+flagged half-hours set to NaN). The score is the quantile score (CRPS), in points of effective
+capacity. For each arm it prints the mean CRPS over all rows, at D8, and on the other
 Primaries, and the paired difference against the reference arm with a bootstrap interval that
 resamples whole origin months. Every number is interim: the screen uses 2 seeds. Nothing here
-fits a network.
+fits a neural network.
 """
 
 import argparse
 from pathlib import Path
 from typing import Final
 
+import e00578_common as k578  # ty: ignore[unresolved-import]
 import e00709_features as features  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
@@ -33,27 +34,28 @@ SCORES_DIR: Final[Path] = features.DATA_DIR / "scores"
 
 def series_to_site() -> dict[int, int]:
     """Return the Primary index of each `time_series_id` (the site map's `primary` column)."""
-    import e00578_common as k578  # ty: ignore[unresolved-import]
-
     sites = k578.sites()
     assert tuple(sites["label"].to_list()) == features.PRIMARIES, (
         "site map and panel differ in order"
+    )
+    assert sites["primary"].to_list() == list(range(len(features.PRIMARIES))), (
+        "primary != row index"
     )
     return {int(t): int(p) for t, p in zip(sites["time_series_id"], sites["primary"], strict=True)}
 
 
 def row_losses(
-    *, forecast: pl.DataFrame, panel: features.Panel, to_site: dict[int, int]
+    *, forecast: pl.DataFrame, truth: np.ndarray, capacity_mw: np.ndarray, to_site: dict[int, int]
 ) -> pl.DataFrame:
     """Return each forecast row's CRPS in points of capacity, on the rows with a finite reading."""
     site = np.array([to_site[int(t)] for t in forecast["time_series_id"].to_list()])
     start = np.datetime64(features.GRID_START.replace(tzinfo=None), "us")
     valid = forecast["valid_time"].dt.replace_time_zone(None).to_numpy().astype("datetime64[us]")
     idx = ((valid - start) // np.timedelta64(1800, "s")).astype(np.int64)
-    inside = (idx >= 0) & (idx < panel.power.shape[1])
-    idx = np.clip(idx, 0, panel.power.shape[1] - 1)
-    actual = np.where(inside, panel.power[site, idx], np.nan) * 100.0
-    capacity = panel.capacity_mw[site]
+    inside = (idx >= 0) & (idx < truth.shape[1])
+    idx = np.clip(idx, 0, truth.shape[1] - 1)
+    actual = np.where(inside, truth[site, idx], np.nan) * 100.0
+    capacity = capacity_mw[site]
     q = forecast.select(list(QCOLS)).to_numpy().astype(np.float64) / capacity[:, None] * 100.0
     finite = np.isfinite(actual)
     crps = np.full(len(site), np.nan)
@@ -66,7 +68,13 @@ def row_losses(
 
 
 def read_arm(
-    *, arm: str, folds: list[str], seeds: list[int], panel: features.Panel, to_site: dict[int, int]
+    *,
+    arm: str,
+    folds: list[str],
+    seeds: list[int],
+    truth: np.ndarray,
+    capacity_mw: np.ndarray,
+    to_site: dict[int, int],
 ) -> pl.DataFrame:
     """Return one arm's per-row losses over every fold and seed."""
     parts = []
@@ -77,9 +85,9 @@ def read_arm(
                 experiment_id=features.EXPERIMENT_ID, name=name, row_set_id=ROW_SET_ID
             )
             parts.append(
-                row_losses(forecast=frame, panel=panel, to_site=to_site).with_columns(
-                    pl.lit(seed).alias("seed")
-                )
+                row_losses(
+                    forecast=frame, truth=truth, capacity_mw=capacity_mw, to_site=to_site
+                ).with_columns(pl.lit(seed).alias("seed"))
             )
     return pl.concat(parts)
 
@@ -96,10 +104,35 @@ def main() -> None:
     args = parser.parse_args()
     panel = features.load_panel()
     to_site = series_to_site()
+    sites = k578.sites()
+    assert np.allclose(sites["capacity_mw"].to_numpy(), panel.capacity_mw, rtol=1e-4), (
+        "capacities differ"
+    )
+    truth = k578.clean()[:, : panel.power.shape[1]].astype(
+        np.float64
+    )  # cleaned share, same start as the panel
+    # every set must exist before any is read
+    missing = [
+        f"{a}-{m}-s{sd}"
+        for a in dict.fromkeys([args.reference, *args.arms])
+        for m in args.folds
+        for sd in args.seeds
+        if not (features.DATA_DIR / "predictions" / f"{a}-{m}-s{sd}").exists()
+    ]
+    if missing:
+        msg = f"missing prediction sets: {missing}"
+        raise FileNotFoundError(msg)
     d8 = features.PRIMARIES.index(D8_LABEL)
     arms = list(dict.fromkeys([args.reference, *args.arms]))
     losses = {
-        a: read_arm(arm=a, folds=args.folds, seeds=args.seeds, panel=panel, to_site=to_site)
+        a: read_arm(
+            arm=a,
+            folds=args.folds,
+            seeds=args.seeds,
+            truth=truth,
+            capacity_mw=panel.capacity_mw,
+            to_site=to_site,
+        )
         for a in arms
     }
     # every arm holds the same rows: the bootstrap helper checks this and raises when they differ
