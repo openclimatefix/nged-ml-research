@@ -136,6 +136,12 @@ def group_jobs(*, jobs: list[Job]) -> list[Group]:
     return [Group(month=m, ft_window=w, jobs=tuple(js)) for (m, w), js in sorted(grouped.items())]
 
 
+KNOWN_UPSTREAM_GAPS: Final[frozenset[str]] = frozenset({"2024-01-03"})
+"""Back-filled runs that Dynamical.org itself lacks: it holds 26 of the 51 members for 2024-01-03,
+so the ingest refuses the run. A window that lacks only these runs is complete; any other missing
+run still stops the fit unless `--allow-partial-window` is passed."""
+
+
 def check_window_coverage(*, window: arms.Window, refit: datetime, allow_partial: bool) -> dict:
     """Return the back-fill coverage of a window; raise if it is incomplete and not allowed.
 
@@ -156,13 +162,22 @@ def check_window_coverage(*, window: arms.Window, refit: datetime, allow_partial
     wanted = [r for r in prep.backfill_runs() if r >= start]
     manifest = prep.NEW_RAW_DIR / "manifest.json"
     have = set(json.loads(manifest.read_text())["runs"]) if manifest.exists() else set()
-    missing = [r for r in wanted if f"{r:%Y-%m-%d}" not in have]
+    absent = [r for r in wanted if f"{r:%Y-%m-%d}" not in have]
+    known_gaps = [r for r in absent if f"{r:%Y-%m-%d}" in KNOWN_UPSTREAM_GAPS]
+    missing = [r for r in absent if f"{r:%Y-%m-%d}" not in KNOWN_UPSTREAM_GAPS]
     info = {
         "window": window.name,
         "runs_wanted_before_2024_04": len(wanted),
         "runs_missing": len(missing),
         "missing_ranges": prep.as_ranges(days=missing),
+        "known_upstream_gaps_in_window": prep.as_ranges(days=known_gaps),
     }
+    if known_gaps:
+        print(
+            f"window {window.name} at {refit:%Y-%m}: documented upstream gap, run(s) "
+            f"{prep.as_ranges(days=known_gaps)} absent (Dynamical.org holds 26 of 51 members)",
+            flush=True,
+        )
     if missing:
         text = (
             f"window {window.name} at {refit:%Y-%m}: "
