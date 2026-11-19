@@ -1,12 +1,15 @@
 #!/bin/bash
 # Phase E copy of experiment 667's chain.sh for the months 2025-04 to 2025-06.
-# usage: e00709_e_chain.sh MONTH [STEP...]: one backtest fold. Steps (default all, in order):
-# pretrain, step2 (K1's chain), table, fit (Candidate, train phase: held-out power hidden), then
+# usage: e00709_e_chain.sh MONTH [STEP...]: one backtest fold. Steps (default pretrain step2 table ptable):
+# pretrain, step2 (K1's chain), table, then
 # ptable, pfit (Candidate, predict phase: the month's window opened, forecasts written).
 D="$(cd "$(dirname "$0")" && pwd)"
+: "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
 R=$DATA_PATH_INTERNAL/ml-experiments/00709-era-signal-in-the-candidate-part-1/e_667  # phase E: nothing is written into experiment 667's folder
 export E00667_ROOT=$R
 M=$1; shift
+STUBS=$DATA_PATH_INTERNAL/ml-experiments/00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/inputs/frames
+STUBS_BEFORE=$(ls $STUBS | wc -l)  # a run with no demand frame makes fold.install write a stub here: that must not happen
 STEPS=${*:-pretrain step2 table ptable}
 export E00667_MONTH=$M CHAIN667=$R/chains/$M/work
 mkdir -p $R/logs $CHAIN667
@@ -22,3 +25,4 @@ for s in $STEPS; do
   esac
   echo "$M $s done $(date -u +%T)"
 done
+[ "$(ls $STUBS | wc -l)" = "$STUBS_BEFORE" ] || { echo "ERROR: stub frames were written into experiment 667 inputs/frames"; exit 1; }
