@@ -52,6 +52,9 @@ _p.add_argument(
     "--fold",
     required=True,
     choices=(
+        "2025-04",
+        "2025-05",
+        "2025-06",
         "2025-11",
         "2025-12",
         "2026-01",
@@ -67,6 +70,10 @@ _p.add_argument("--seed", type=int, required=True, choices=(0, 1))
 _p.add_argument("--phase", choices=("train", "predict"), default="train")
 _p.add_argument("--pilot", action="store_true")
 _p.add_argument("--bank-passes", type=int, default=16)
+_p.add_argument(
+    "--rule", choices=("es", "b2"), default="es",
+    help="stage 3 rule: es = phase B's odd-epoch alternation, b2 = each row reads the injected world with probability 0.5 in every epoch",
+)  # fmt: skip
 MINE = _p.parse_args()
 # the fold module reads these at import, so set them before any experiment module is imported
 os.environ["E00667_MONTH"] = MINE.fold
@@ -93,18 +100,33 @@ import e00667_fold as fold  # ty: ignore[unresolved-import]
 
 assert fold.FINAL_MONTH == MONTH
 
-SRC667 = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
-)
-"""Experiment 667's data folder: chains (stage 1 and 2 weights), tables, and inputs; read only."""
+E_MONTHS: Final = ("2025-04", "2025-05", "2025-06")
+IS_E: Final = MONTH in E_MONTHS
+"""Phase E: three folds before the screen's, scored on D8's 2025-03-24 solar connection. Reported apart."""
 ROOT = features.DATA_DIR
 """Everything this experiment writes."""
+SRC667 = (
+    ROOT / "e_667"
+    if IS_E
+    else ML_EXPERIMENTS_DATA_DIR
+    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
+)
+"""Experiment 667's data folder (phase E: the folder `e00709_e_chain.sh` fills): chains (stage 1 and 2
+weights) and tables; read only."""
 assert ROOT != SRC667
 CHAIN = SRC667 / "chains" / MONTH / "work"
 TABLES = SRC667 / "tables"
-DIR = f"{ERA.replace('-', '_')}_{MONTH}_s{SEED}" + ("_pilot" if MINE.pilot else "")
-ROW_SET_ID: Final = "experiment_677_monthly_refit_rows_valid_2025_11_to_2026_06"
+B2: Final = MINE.rule == "b2"
+"""Phase B2: the injected world is mixed into every batch. Its fits and predictions carry a `b2` prefix."""
+assert not B2 or ERA in ("aug", "oracle", "placebo", "stat"), "B2 runs four arms; A0 is phase B's"
+PREFIX = "b2_" if B2 else ""
+PREFIX = ("e_" if IS_E else "") + PREFIX
+DIR = f"{PREFIX}{ERA.replace('-', '_')}_{MONTH}_s{SEED}" + ("_pilot" if MINE.pilot else "")
+ROW_SET_ID: Final = (
+    "experiment_709_phase_e_monthly_refit_rows_valid_2025_04_to_2025_06"
+    if IS_E
+    else "experiment_677_monthly_refit_rows_valid_2025_11_to_2026_06"
+)
 """Contract rows at 12:00 UTC on each day of a fold's month, 14 days of half-hours, 16 series, with
 `valid_time` before 2026-07-01 (the rows after that date are the held-out finalist rows)."""
 HOLDOUT_START: Final = datetime(2026, 7, 1, tzinfo=UTC)
@@ -118,6 +140,8 @@ PILOT_ROW_FRACTION: Final = 0.1
 
 USE_ERA = ERA not in ("none", "aug")
 CURRICULUM = ERA != "none"
+MIX_P: Final = 0.5
+"""Phase B2: the share of rows in a batch that read the injected world."""
 SIGNAL_NAME = "oracle" if ERA == "oracle-enc" else ERA
 SOFT = ERA == "soft"
 
@@ -157,6 +181,14 @@ def _stats_file(*, month: str):
 
 
 e.step2_file, e.stats_file = _step2_file, _stats_file
+if IS_E:  # phase E reads its own daily frames, so fold.install adds no stub frames to experiment 667's folder
+    _frame_path = e.common.demand_frame_path
+
+    def _e_frame_path(*, run: datetime):
+        own = features.DATA_DIR / "frames_e" / f"init={run:%Y-%m-%d}.parquet"
+        return own if own.exists() else _frame_path(run=run)
+
+    e.common.demand_frame_path = _e_frame_path
 fold.install(e, months=[MONTH], reference_month=fold.PREVIOUS_MONTH)
 # experiment 667's install extends the grid to its own end (2026-11-20 23:30), so the grid is read after it
 _grid = e.common.grid_times()
@@ -506,7 +538,11 @@ ONSET_FIRST: Final = 120
 ONSET_STEP: Final = 20
 ONSET_MARGIN: Final = 14
 """An injected event's rows take the cut `onset - ONSET_MARGIN`, so the onset lies after the cut."""
-MONTH_INDEX: Final = (fold.FINAL_START.year - 2025) * 12 + fold.FINAL_START.month - 11
+MONTH_INDEX: Final = (
+    8 + fold.FINAL_START.month - 4  # phase E folds follow the screen folds 0 to 7
+    if IS_E
+    else (fold.FINAL_START.year - 2025) * 12 + fold.FINAL_START.month - 11
+)
 CONTEXT: dict = {}
 
 
@@ -652,14 +688,14 @@ def overlay(*, real: sg.Signal, world: sg.Signal, sites: list[int]) -> sg.Signal
 
 ALT: dict = {}
 """The curriculum's tensors of the current fine-tune: `lag` (rows, 2) for columns 37 and 40, `block`,
-`era`, and `z`. The odd epochs read these in place of the plain rows' columns."""
+`era`, and `z`. Under rule `es` the odd epochs read these in place of the plain rows' columns; under rule `b2` each row reads them with probability `MIX_P` in every epoch."""
 
 
 def train_curriculum(
     *, model: torch.nn.Module, x, z, w, p, is_val, seed: int, lr: float, max_epochs: int,
     fresh_lr: float | None, frozen: bool, anchor: dict | None, lam: float, device: str,
 ) -> tuple[int, float]:  # fmt: skip
-    """Experiment 574's `train` with the odd epochs reading the curriculum's tensors in `ALT`.
+    """Experiment 574's `train` with the curriculum's tensors in `ALT`: read by the odd epochs (rule `es`) or by half of the rows in every epoch (rule `b2`).
 
     Validation always reads the plain rows. The O-enc layers sit outside `model.weather` and
     `model.datetime`, so freezing the encoders leaves them trainable. The curriculum replaces only
@@ -668,6 +704,7 @@ def train_curriculum(
     """
     if MINE.pilot:
         max_epochs = min(max_epochs, PILOT_EPOCHS)
+    assert ALT or not CURRICULUM, "a curriculum arm reached stage 3 with no injected world"
     torch.manual_seed(seed)
     train_idx = torch.nonzero(~is_val).squeeze(1)
     val_idx = torch.nonzero(is_val).squeeze(1)
@@ -691,19 +728,36 @@ def train_curriculum(
         if frozen:
             model.weather.eval()  # ty: ignore[unresolved-attribute]
             model.datetime.eval()  # ty: ignore[unresolved-attribute]
-        use_alt = bool(ALT) and epoch % 2 == 1
+        use_alt = bool(ALT) and (B2 or epoch % 2 == 1)
+        coin = None
+        if B2:
+            # each row reads the injected world with probability 0.5; the coin never touches the row order
+            coin_gen = torch.Generator(device="cpu").manual_seed(seed * 1000 + epoch)
+            coin = (torch.rand(len(x), generator=coin_gen) < MIX_P).to(device)
         order = train_idx[torch.randperm(len(train_idx), device=device)]
         order = order[: int(fraction * len(order))]
         for start in range(0, len(order), e.c.BATCH):
             b = order[start : start + e.c.BATCH]
             xb, zb = x[b], z[b]
+            wb = w[b]
             if use_alt:
-                xb[:, 37], xb[:, 40] = ALT["lag"][b, 0], ALT["lag"][b, 1]
-                xb[:, base : base + N_EXTRA] = ALT["block"][b]
+                m = (
+                    coin[b]
+                    if coin is not None
+                    else torch.ones(len(b), dtype=torch.bool, device=device)
+                )
+                mc = m[:, None]
+                xb[:, 37] = torch.where(m, ALT["lag"][b, 0], xb[:, 37])
+                xb[:, 40] = torch.where(m, ALT["lag"][b, 1], xb[:, 40])
+                xb[:, base : base + N_EXTRA] = torch.where(
+                    mc, ALT["block"][b], xb[:, base : base + N_EXTRA]
+                )
                 if ALT["era"] is not None:
-                    xb[:, base + N_EXTRA :] = ALT["era"][b]
-                zb = ALT["z"][b]
-            wb = w[b] * ALT["w"][b] if use_alt else w[b]
+                    xb[:, base + N_EXTRA :] = torch.where(
+                        mc, ALT["era"][b], xb[:, base + N_EXTRA :]
+                    )
+                zb = torch.where(m, ALT["z"][b], zb)
+                wb = torch.where(m, w[b] * ALT["w"][b], w[b])
             if float(wb.sum()) <= 0:
                 continue
             nll = e.row_nll(out=model(xb, p[b]), z=zb, p=p[b])
@@ -725,6 +779,7 @@ def train_curriculum(
                 ).mean()
             )
         epochs = epoch + 1
+        REPORT.setdefault("val_curve", []).append(round(val, 6))
         if val < best - 1e-5:
             best, stale = val, 0
             best_state = {a: v.detach().clone() for a, v in model.state_dict().items()}
@@ -1061,7 +1116,7 @@ def run_fit(*, device: str = "cuda") -> None:
     assert frame is not None
     e.atomic_frame(frame=frame, target=out)
     if not MINE.pilot:
-        write_contract(frame=frame, name=f"{ERA}-{MONTH}-s{SEED}")
+        write_contract(frame=frame, name=f"{PREFIX.replace('_', '-')}{ERA}-{MONTH}-s{SEED}")
     e.c.write_json(
         obj={
             **log,

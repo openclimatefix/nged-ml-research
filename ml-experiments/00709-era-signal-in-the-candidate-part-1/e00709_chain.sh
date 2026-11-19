@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: e00709_chain.sh --era "ARM ..." --folds "MONTH ..." [--seeds "0 1"] [--max-jobs N] [--mem-cap 16G]
-#                        [--bank] [--pilot]
+#                        [--bank] [--pilot] [--rule es|b2]
 # Experiment 709, phase B: stage 3 of the Candidate with an era signal, fold by fold. For each fold, seed,
 # and arm the chain runs `e00709_cand.py fit` in the train phase (the scored month is hidden; the network
 # is fitted and saved), then in the predict phase (the saved network forecasts the month and the forecasts
@@ -16,7 +16,7 @@ R=$(cd "$D/../.." && pwd)
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
 NAME=00709-era-signal-in-the-candidate-part-1
 OUT=$DATA_PATH_INTERNAL/ml-experiments/$NAME
-ARMS=""; FOLDS=""; SEEDS="0 1"; MAXJOBS=1; MEMCAP=16G; BANK=0; PILOT=0
+ARMS=""; FOLDS=""; SEEDS="0 1"; MAXJOBS=1; MEMCAP=16G; BANK=0; PILOT=0; RULE=es
 while [ $# -gt 0 ]; do
   case $1 in
     --era) ARMS=$2; shift 2 ;;
@@ -26,15 +26,18 @@ while [ $# -gt 0 ]; do
     --mem-cap) MEMCAP=$2; shift 2 ;;
     --bank) BANK=1; shift ;;
     --pilot) PILOT=1; shift ;;
+    --rule) [ $# -ge 2 ] || { echo "--rule needs a value"; exit 1; }; RULE=$2; shift 2 ;;
     *) echo "unknown argument $1"; exit 1 ;;
   esac
 done
 [ -n "$ARMS" ] && [ -n "$FOLDS" ] || { echo "give --era and --folds"; exit 1; }
+[ $RULE = es ] || [ $RULE = b2 ] || { echo "bad rule $RULE"; exit 1; }
 for a in $ARMS; do
+  [ $RULE = b2 ] && case $a in aug|oracle|placebo|stat) ;; *) echo "B2 runs aug, oracle, placebo, and stat only, not $a"; exit 1 ;; esac
   case $a in none|aug|oracle|placebo|oracle-enc|all|rule|soft|hmm|stat) ;; *) echo "bad arm $a"; exit 1 ;; esac
 done
 for f in $FOLDS; do
-  case $f in 2025-11|2025-12|2026-01|2026-02|2026-03|2026-04|2026-05|2026-06) ;; *) echo "bad fold $f"; exit 1 ;; esac
+  case $f in 2025-04|2025-05|2025-06|2025-11|2025-12|2026-01|2026-02|2026-03|2026-04|2026-05|2026-06) ;; *) echo "bad fold $f"; exit 1 ;; esac
 done
 for s in $SEEDS; do case $s in 0|1) ;; *) echo "bad seed $s (experiment 667 has seeds 0 and 1)"; exit 1 ;; esac; done
 if [ $PILOT = 1 ]; then
@@ -86,11 +89,12 @@ run_job() {  # run_job LOGNAME ARGS...
 
 one() {  # one FOLD SEED ARM
   local f=$1 s=$2 a=$3 t=${3//-/_}_${1}_s$2
+  [ $RULE = b2 ] && t=b2_$t
   [ $PILOT = 1 ] && t=${t}_pilot
-  run_job ${t}_train fit --era $a --fold $f --seed $s --phase train $PILOT_FLAG || return 1
-  run_job ${t}_predict fit --era $a --fold $f --seed $s --phase predict $PILOT_FLAG || return 1
+  run_job ${t}_train fit --era $a --fold $f --seed $s --phase train --rule $RULE $PILOT_FLAG || return 1
+  run_job ${t}_predict fit --era $a --fold $f --seed $s --phase predict --rule $RULE $PILOT_FLAG || return 1
   if [ $BANK = 1 ]; then
-    run_job ${t}_bank bank --era $a --fold $f --seed $s --phase predict $PILOT_FLAG || return 1
+    run_job ${t}_bank bank --era $a --fold $f --seed $s --phase predict --rule $RULE $PILOT_FLAG || return 1
   fi
   echo "$a $f s$s done $(date -u +%T)"
 }

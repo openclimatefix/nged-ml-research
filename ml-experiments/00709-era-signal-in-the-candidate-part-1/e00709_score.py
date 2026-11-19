@@ -27,6 +27,8 @@ from studies.eval_protocol.metrics import quantile_score
 from studies.experiment_store import losses_for_bootstrap, read_predictions
 
 ROW_SET_ID: Final = "experiment_677_monthly_refit_rows_valid_2025_11_to_2026_06"
+E_ROW_SET_ID: Final = "experiment_709_phase_e_monthly_refit_rows_valid_2025_04_to_2025_06"
+"""Phase E arms are named `e-<arm>`; their sets carry this row set id, and they are scored apart."""
 QCOLS: Final = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
 D8_LABEL: Final = "D8"
 SCORES_DIR: Final[Path] = features.DATA_DIR / "scores"
@@ -82,7 +84,9 @@ def read_arm(
         for seed in seeds:
             name = f"{arm}-{month}-s{seed}"
             frame = read_predictions(
-                experiment_id=features.EXPERIMENT_ID, name=name, row_set_id=ROW_SET_ID
+                experiment_id=features.EXPERIMENT_ID,
+                name=name,
+                row_set_id=E_ROW_SET_ID if arm.startswith("e-") else ROW_SET_ID,
             )
             parts.append(
                 row_losses(
@@ -145,7 +149,10 @@ def main() -> None:
     SCORES_DIR.mkdir(parents=True, exist_ok=True)
     out = []
     print(
-        "INTERIM: 2 seeds; CRPS in points of effective capacity; difference = arm minus reference\n"
+        f"INTERIM: seeds {args.seeds}, folds {args.folds} (an interval over fewer than 4 "
+        "fold months "
+        "is indicative only); CRPS in points of effective capacity; "
+        "difference = arm minus reference\n"
     )
     for scope, expr in scopes.items():
         scoped = both.filter(expr)
