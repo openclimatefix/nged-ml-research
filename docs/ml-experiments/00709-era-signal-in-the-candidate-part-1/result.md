@@ -1,0 +1,754 @@
+---
+id: "00709"
+slug: era-signal-in-the-candidate-part-1
+title: >-
+  Does an era signal that tells the Candidate network when a Primary's behaviour changed for good
+  improve the forecast in the weeks after a permanent change, without carrying load shifts forward?
+theme: retraining-and-training-history
+also_relevant_to:
+  - lsc-detectors
+  - switching-labels-in-the-forecast
+  - lagged-power-and-error-correction
+status: planned
+kind: other
+protocol: demand-v2
+size: >-
+  Complex. (1) It stores per-row forecasts, network weights for each arm, fold, and seed, and
+  detector tables; (2) more than one design defensibly tests the hypothesis (the era signal's entry
+  point, the detector, and the era-or-switch classifier); (3) it spans the Candidate's training and
+  injection code from experiments 559, 572, 574, 591, 613, 660, 667, 687, and 696; (4) it touches
+  no serving path or degradation rule; (5) it changes no contract. Full set of reviews: plan, code,
+  results, write-up, prose.
+hypothesis: >-
+  A discrete era signal, computed only from data before the forecast origin and fed only for shifts
+  classed as eras, lowers the error of the normal-running-arrangement (NRA) forecast in the weeks
+  after a permanent change at a Primary, without carrying load shifts into the NRA forecast and
+  without raising the error where no shift happened.
+prediction: >-
+  Written before any fit. C1a (oracle O minus A0-aug, NRA output, injected era events, origins 0 to
+  28 days after the switch) is 5 to 15 points of capacity better for steps of 25% and 1 to 5 points
+  for steps of 10%. C1b (O's NRA output minus A0-prev, the prevailing output) is 0.2 to 1.5 points
+  better. The best learned arm keeps 30% to 60% of C1b. C7 (carrying a load shift forward as an era)
+  is within +-0.1 for the rule and soft classifiers and 1 point or more worse for the arm with no
+  classifier. C4 and C5 are within +-0.03, and C6 is under 0.3 points.
+decision_rule: >-
+  Supported: C1b and C2 pass their thresholds (0.5 points for C1b; a kept share of at least 0.5 of
+  the ceiling, with L-best's NRA output better than A0-prev by more than 0.25 points, for C2), with
+  intervals that exclude zero, and every veto holds. Partly supported: C1b passes and C2 does not.
+  Not supported: C1b's interval does not exclude zero in the gain direction. A failed C7 or
+  carried-depth veto gives "not supported for adoption" whatever C2 shows. Vetoes: C4 above 0.03,
+  C5 outside +-0.05, C7 above 0.1, carried depth and copied share above A0's by more than 0.02. The
+  machinery check stops the run if C1a is under 1 point for steps of 25%. Intervals use month-block
+  bootstrap at the Bonferroni level for nine contrasts.
+benchmark: >-
+  A0 (the Candidate refitted in the same batch), A0-aug, A0-prev (A0's prevailing output),
+  experiments 667, 668, and 677 as context, climatology, and the manual heuristic.
+row_set_id: experiment_677_monthly_refit_rows_valid_2025_11_to_2026_06
+metric: >-
+  CRPS in points of capacity, both outputs, sliced by distance from the switch, by the state of the
+  shift at the origin (undetected, unknown, classified correctly, classified wrongly), and on stable
+  rows; normalised MAE of the median; q05-q95 coverage; q01, q05, q95, and q99 pinball loss; the
+  four load-shift scenarios; cold winter nights; avoidable-curtailment cost; detection and
+  classification delay.
+production_status: not-for-production
+adopted_in: none
+---
+**Status: planned. The sections below are the plan; the finished page replaces them.**
+
+This experiment asks whether the Candidate network (the modular network of
+[the final models page](../final-models.md)) forecasts better after a permanent change at a Primary
+when it is told the Primary's era. The maintainer asked for it by name: "revisiting the idea that
+substations experience these eras" (2026-11-19). An era is a discrete, rare, sudden, and persistent
+regime, such as a large generator or solar farm connecting. A load shift is a temporary move of
+demand
+between neighbouring Primaries, and the NRA forecast must exclude it. The two look alike in recent
+data, so the plan includes arms that classify each shift.
+
+**Phase E costs compute only.** Phase E (three extra folds, 2025-04 to 2025-06, to score the network
+across D8's 2025-03-24 solar connection, and the conditional pre-training arm O-enc-pre) needs no
+purchase and no data fetch beyond what the workstation holds. It is excluded from the committed arms
+until the maintainer approves it through the manager.
+
+**Earlier advice.** The plan follows the advice that a step-capable offset cannot date a step
+(experiments 573, 575, and 577) by using an explicit detector and an explicit state input, and the
+advice to test the era signal with lags present (experiment 572) by building every arm on the full
+Candidate. It departs from experiment 565's advice to feed a drift embedding to the mixer only,
+because the design also tests an entry through the encoders (arm O-enc).
+
+**Terms.** NRA is the normal running arrangement: the electricity network's configuration without
+any load shift. The Candidate (class `PermLagMdn`,
+`ml-experiments/00613-nra-roster-contrasts-with-intervals-five-seeds/e00613_nbmodel.py`) outputs the
+NRA forecast. The prevailing output is a second forecast that keeps the conditions at the forecast
+origin: a survival head mixes the Candidate's quantiles with a shifted copy, weighted by the
+probability that a shift in progress persists (`docs/ml-experiments/final-models.md`). A switching
+event (a load shift) moves demand between electrical neighbours, usually for days to weeks. An era
+change is a permanent change in a substation's own net demand, such as a generator connecting. CRPS
+is the continuous ranked probability score in points of capacity, lower is better.
+
+## Summary of arms and contrasts
+
+| Arm | Kind | Shift dates and classes come from | What changes against the Candidate |
+|---|---|---|---|
+| A0 | Control | none | Nothing; refitted in the same batch |
+| A0-aug | Control | none | Stage 3 training rows also hold injected persistent steps, with no era input |
+| O | Cheating upper bound | True dates and true classes (era table, verified switching events, the injector) | Era encoder into `mixer_ft`, era anchor, lag translation, era row weights; switches removed from lags and from training rows |
+| P | Placebo | O's true era switches and true switch removals, each permuted to a random Primary and a random date in the same window, keeping the count and the class of each | O's recipe with uninformative dates; read O minus P as the value of the true dates |
+| O-enc | Where the signal enters | As O | O, plus the era vector into the weather encoder and the date-time encoder through zero-initialised first-layer columns |
+| L-all | Learned, no classifier | Online change-point detector; every detected shift is treated as an era | The era package of O, with detected dates |
+| L-rule | Learned, rule classifier | The same detector, then a three-state rule (`unknown`, `era`, `switch`) from the neighbour mirror, the weather response, and duration | Era package for class `era`; removal for class `switch`; no action while `unknown` |
+| L-soft | Learned, trained classifier | The same detector, then a small neural classifier that outputs a probability of `era` | The era vector and anchor scaled by the probability; removal scaled by one minus the probability |
+| L-hmm | Learned, recurrent states | Sticky hidden-Markov model, forward filter; duration and recurrence are the only evidence of class | Learned vector per (Primary, state); a state counts as an era after 28 days of dwell |
+| L-R | Learned, reset only | L-rule's dates and classes | Anchor and lag translation only; no era encoder and no new weights |
+
+All ten arms change stage 3 only and share stage 1 and stage 2 weights with A0, seed by seed.
+Reference rows, not arms: A0-prev (A0's prevailing output, 16 head refits), the stored Candidate
+forecasts of experiments 667 and 668, climatology, and NGED's manual heuristic.
+
+| Contrast | Arms and output | Rows and truth | Reads as |
+|---|---|---|---|
+| C1a | O minus A0-aug, NRA output | Injected era events, origins 0 to 28 days after the switch, observed power | Does a perfect signal make the NRA output adopt a new era? (machinery check) |
+| C1b | O's NRA output minus A0-prev | Same rows | Does the ceiling beat the existing forecast of current conditions? **The deciding ceiling.** |
+| C2a | L-best minus O, NRA output | Same rows, including the days when the shift is undetected or `unknown` | How much of the ceiling the learned signal gives up (shares weights with O, so precise). |
+| C2 | Share of the ceiling kept: 1 − C2a / (A0-prev − O) | Same rows | **The verdict.** Passes at a share of 0.5 or more with a bootstrap interval on the ratio that excludes zero, and L-best's NRA output minus A0-prev below −0.25 (head noise of A0-prev stated, with the seed pairing below) |
+| C3 | O-enc minus O | Same rows, split by step kind | Does the era vector help more inside the encoders than at the mixer? |
+| C4 | L-best minus A0, NRA output | Stable rows | Harm where no shift happened (veto) |
+| C5 | P minus A0-aug | Stable rows and post-switch rows | Placebo equivalence (veto) |
+| C6 | O minus A0-aug | Retrained worlds, origins 28 to 90 days after an era switch | Does the signal still help once a refit has seen the new era? |
+| C7 | L-best minus A0, NRA output | Injected switching events, inside the event and 7 days after its end, against the power without the injected shift | Does the era signal carry a switching event forward as an era? (veto) |
+| C8 | L-best minus L-all, NRA output | Same rows as C7 | What the classification is worth |
+
+## 1. Hypothesis and prediction
+
+**Hypothesis: a discrete era signal, computed only from data before the forecast origin and fed only
+for shifts classed as eras, lowers the error of the NRA forecast in the weeks after a permanent
+change at a Primary, without carrying switching events into the NRA forecast and without raising the
+error where no shift happened.**
+
+**Prediction, written before any fit.** The Candidate is trained to ignore a shifted lag, because a
+load shift is not part of the normal running arrangement: experiment 699 measured that the NRA
+output copies 0.075 to 0.127 of a lag-only shift. A new era is part of the normal running
+arrangement, so after an era switch the NRA output stays near the old level until refits learn the
+new level. C1a is therefore predicted large: 5 to 15 points for a step of 25% of capacity and 1 to 5
+points for a step of 10%. C1b is predicted between 0.2 and 1.5 points, because the prevailing output
+already follows the conditions at the origin. C2 is predicted to keep 30% to 60% of C1b, limited by
+the days a shift spends undetected or `unknown`. C7 is predicted inside ±0.1 for L-rule and L-soft,
+and C8 predicted as a gain of 1 point or more, because L-all carries every switching event forward.
+C3 is predicted inside its noise for level steps and as a gain only for the solar-shaped kind. C4
+and C5 are predicted inside ±0.03, and C6 under 0.3 points.
+
+## 2. Three states: the slow level, the era, and the switching event
+
+**The slow level is the Candidate's per-Primary output offset, and the offset stays as built.** The
+offset is piecewise-linear between monthly knots from 2019-09, is added to the three mixture means,
+and carries a penalty of 10 times the mean squared first difference of the knots
+(`LagOffsetMdn.penalty`, `e00572_model.py`). The offset models gradual change: demand growth, slow
+growth of rooftop solar, and efficiency. Experiments 573 and 575 found that an offset cannot date a
+step.
+
+**An era is a discrete index per Primary that almost never changes.** Each half-hour inherits the
+era of the half-hour before. A switch of era is sudden, large, and assumed permanent. Every learned
+arm encodes that prior: a constant hazard of one shift per 730 days in the change-point detector, a
+self-transition probability of 1 − 1/180 per day in the hidden-Markov model, and a minimum size
+below which a change is never an era.
+
+**A switching event is a temporary shift that belongs to neither state.** The event has an onset, a
+depth, and an end, and the NRA forecast must not contain the event.
+
+**What the forecast does in each state of a shift:**
+
+| State at the origin | NRA output | Prevailing output | Slow level and training rows |
+|---|---|---|---|
+| Undetected | Unchanged | The existing survival head follows the shift from its own lagged inputs | Unchanged |
+| `unknown` (alarm fired, class undecided) | Unchanged: the shift is not carried, and the era encoder reads an `unknown` flag and the shift's age | As above | Rows since the estimated onset are held out of stage 3 until the class is known |
+| `era` | Era vector on; era anchor added to the means; lags and gap signals from before the onset translated to the new level | Follows through the Candidate's quantiles | Penalty break at the onset; earlier-era rows weighted by 0.1 |
+| `switch` | The estimated depth is subtracted from lags and gap signals inside the event; no era vector and no anchor | The existing survival head carries the event | Rows whose valid time lies inside the event are dropped from stage 3; the era index and the offset are untouched |
+
+**A wrong `era` class is reversed.** If the level returns to within tolerance of the earlier era
+inside 120 days, the shift is re-classed as a switching event, the era vector and anchor are
+withdrawn, and the rows are dropped from the next refit.
+
+**The era anchor re-anchors the slow level without resetting the knots, and the anchor applies only
+where no stage-1 knot already carries the new level.** In the Candidate, stage 1 trains every knot,
+and in stages 2 and 3 the older knots are a frozen buffer (`knots_old`) while only the newest knot
+(`knot_new`) trains (`LagOffsetMdn`, `e00572_model.py`). An anchor added to stage-3 rows whose
+stage-1 knots already hold the new level would count the step twice. The rule is therefore: for a
+stage-3 row, the anchor of an era is added only when the era's onset lies after the stage-1 cut, or
+when the row's valid time lies after the newest knot (where `tau` is clamped to the newest knot).
+For an era whose onset lies inside the stage-1 history, as at D8's two register dates, the old knots
+after the onset already carry the level, the anchor is zero, and the era vector alone enters. A
+known-answer check injects an era into stage-1 rows, with its anchor, and asserts that the stage-3
+output does not shift by twice the step. The first-difference penalty is unchanged: dropping the
+pair of the last old knot and the new knot would remove the only constraint on `knot_new`. A
+detector restart whose change is under the minimum size leaves the era index unchanged and is left
+to the offset.
+
+## 3. What separates an era from a switching event
+
+**Both look like a sudden level shift in the recent data, and four kinds of evidence separate
+them.**
+
+- **The neighbours' mirror image.** A switching event moves load between electrical neighbours, so a
+  neighbour shows the opposite shift and the sum is conserved. An era changes the substation's own
+  net demand, and no neighbour moves. The classifier reuses the causal mirror statistic of
+  `ml-experiments/00687-causal-detector-features-for-the-prevailing-forecast-heads/e00687_features.py`,
+  which reads no input later than 6 hours before the origin. Two limits apply: a neighbour may be
+  unmetered, and experiment 456 found that a mirror test passed at shifted dates as often as at true
+  dates.
+- **Duration and reversal.** The verified events of experiment 580 last 7 to 60 days and revert. The
+  probability of `era` therefore rises with every day a shift persists, from a prior built on the
+  labelled durations. Duration alone decides slowly, and experiment 101 found that 80.5% of logged
+  half-hours lie in closures of more than 60 days.
+- **The weather response and the daily shape.** A new solar farm adds a term that follows radiation
+  and is zero at night. A transferred load has the daily shape of demand and follows temperature. A
+  gas engine follows neither. The classifier regresses the daily change in each hour band on the
+  day's radiation and temperature. The weather is the ensemble mean of the freshest run published by
+  the origin; ERA5 is used only for days at least 7 days before the origin, because ERA5 arrives
+  about 5 days late.
+- **Existing causal detectors of switching.** The lag gate G4 of experiment 592 (fires a median of 1
+  day after onset, with 0.20 false triggers per Primary-year) and the step statistics of experiment
+  687 are inputs. The labels of experiment 41 and the verified set of experiment 580 are built with
+  hindsight, so those labels score the classifier and never feed a forecast.
+
+**L-rule sums the evidence as log-odds and holds three states.** The class stays `unknown` until the
+summed log-odds pass a threshold in either direction. The weights and thresholds are set once on
+injected shifts in 2019-09 to 2024-12 at Primaries other than D8, and are then frozen.
+
+**L-soft trains a small neural classifier on the same evidence plus the outputs of gate G4 and of
+the features of experiment 687.** The classifier is a network with one hidden layer of 16 units,
+trained on injected eras and injected switching events in the same tuning period, and outputs a
+calibrated probability of `era` that is refreshed daily. The forecast uses the probability as a
+weight, so L-soft has no `unknown` state. For scoring, L-soft's shift counts as unclassified while
+the probability lies between 0.2 and 0.8.
+
+**L-hmm uses duration and recurrence only.** A state that the filter leaves within 28 days was a
+switching event, and a state held for 28 days becomes an era. L-hmm tests how far the cheapest
+evidence goes, at substations with no metered neighbour.
+
+## 4. The era table and the known cases (built before any fit)
+
+**The first script builds one table of known eras, and the experiment reads no era date from
+prose.** The file is `data/ml-experiments/<id>-<slug>/era_table.parquet`, written by a committed
+script that reads the Embedded Capacity Register with `studies.ecr_reader.read_sheet` (the pattern
+of `ml-experiments/00191-dp-price-sensitive-assets-in-the-history/e00191_ecr.py`, because `read_ecr`
+drops `Date Connected`). Columns: `primary`, `era_index`, `register_date`, `telemetry_date`,
+`technology`, `size_mw_register`, `size_mw_telemetry`, `size_mw_recollection`, `source`,
+`confidence`, and `note`. The table holds no customer name.
+
+**D8's rows use the register's dates.**
+
+| Era | Register row | Note |
+|---|---|---|
+| 1 | Gas engine, 6 MW, connected 2023-06-13, listed under D14's name | D8's reading stopped including the engine's output on 2023-08-15 (experiment 194), 63 days later. The table stores both dates. |
+| 2 | Solar farm, 8.91 MW, connected 2025-03-24 | Telemetry date to be measured in stage 0 |
+| not an era | Solar, 0.7 MW, no connection date | **Unknown.** The row cannot define an era until a date is found. |
+
+**The oracle switches on the telemetry date where the era table has one.** The reading that the
+network forecasts changes on 2023-08-15, so this design switches the oracle's era on
+`telemetry_date` where the table has one and on `register_date` otherwise, and reports the
+register-date version as a sensitivity. The classifier's score counts a detection within 30 days of
+either date as a match.
+
+**The maintainer recalls a solar farm of about 700 kW in 2025, and the register's dated 2025 row is
+8.91 MW.** The plan resolves the gap in three steps: re-read both solar rows from the workbook and
+print them; estimate the midday change on clear days in April to August 2025 against the same months
+of 2024 from D8's own reading, which separates sizes 13 times apart; and ask the maintainer through
+the manager. Every size the network reads is measured from telemetry, so the experiment does not
+wait for the answer.
+
+**Other known eras and known switching events.** Register connections of 1 MW or more since 2019-09
+at the other Primaries (for example D14 and D5) enter the table as `register only`. The fade at D8
+from 2026-03 (experiment 697) enters as `telemetry only, unresolved`. The known switching events are
+the labelled set of experiment 41 (`labelled_set.parquet`, loaded by `e00086_labels.py`) and the
+verified events of experiment 580 (`events_verified.parquet`).
+
+## 5. The signal, row by row
+
+**Every signal at a forecast row is a function of power readings up to the end of the UTC day before
+the origin day.** The Candidate forecasts at 09:00 UTC on origin day D and relabels the origin to
+12:00 UTC. The detector and classifier state used at origin D is the state after day D − 1, whose
+last reading ends 9 hours before 09:00. A training row with origin o carries the state after day o −
+1, never a hindsight label, so one function builds training rows and forecast rows. Arm O is the one
+exception and is labelled non-causal.
+
+**Detector input.** For each Primary and UTC day, six numbers: the mean residual in four hour bands
+(night, morning, midday, evening), and the day's 5th and 95th percentile of the half-hourly
+residual. The residual is power over capacity minus a month-by-half-hour climatology
+(`ClimatologyForecaster`), trained on the 730 days that end 28 days before the start of the day's
+month. Each feature is scaled by a robust spread from the first 365 days.
+
+**The detector is online Bayesian change-point detection** ([Adams and MacKay
+(2007)](https://arxiv.org/abs/0710.3742)): an independent Normal mean and variance per feature
+within a segment, a constant hazard of 1/730 per day, and a run length truncated at 730 days. An
+alarm fires on the first day when the posterior mass on run lengths under 28 days has exceeded a
+threshold on 3 consecutive days and the change in segment mean is at least 3 scaled units in one
+feature and at least 5% of capacity. The threshold is tuned to at most 0.5 false alarms per
+Primary-year on clean history.
+
+**The columns written for each (Primary, origin day):** the class state (`none`, `unknown`, `era`,
+`switch`, or L-soft's probability), the shift's age in days (log-scaled, capped at 365), the
+six-number change vector (mean of the features since the estimated onset minus the previous
+segment's mean), the anchor, and the estimated depth of a switching event. The change vector and the
+anchor update daily for 28 days after an `era` class and are then frozen until the next era switch,
+so the era signal is piecewise-constant after a settling window.
+
+**Two delays are printed for every known and injected shift: the detection delay (alarm day minus
+onset) and the classification delay (class day minus alarm day).** The printed example has this form
+(the values show the layout only and are not measurements):
+
+```text
+primary=D8 onset=2026-02-01 truth=era kind=level size=-0.25
+day_processed  p(run<28d)  alarm  log_odds_era  state     first_origin_with_this_state
+2026-02-04     0.93        no     -             none      -
+2026-02-06     0.99        yes    +0.4          unknown   2026-02-07 09:00 UTC
+2026-02-15     1.00        yes    +3.1          era       2026-02-16 09:00 UTC
+detection_delay_days=6  classification_delay_days=9
+origins 02-01..02-06 undetected | 02-07..02-15 unknown | 02-16 onwards era
+```
+
+**Arm L-hmm** follows the stickiness idea of [Fox et al.
+(2011)](https://doi.org/10.1214/10-AOAS395): three Gaussian states per Primary over the six
+features, fitted by expectation-maximisation on days before the fold's training cut, with the
+self-transition probability fixed at 1 − 1/180. The signal is the forward-filtered state
+probabilities after day D − 1, with no smoothing.
+
+**Arms O and P.** O reads the true onset, the true class, and the true size (for D8, the hindsight
+mean over the era). P draws the same number of era switches per Primary at uniform random dates at
+least 28 days from any true shift, each carrying a permuted true change vector, with a fixed seed.
+
+**A perturbation test proves the cut before any fit.** The check changes every reading at or after
+00:00 of day D, at the Primary and at its neighbours, and asserts that no signal value at origin D
+changes, for 200 random (Primary, origin) pairs per arm, in the style of `check_state_cut` in
+`e00696_checks.py`.
+
+## 6. Target weather comes from the run issued at or before the origin
+
+**Every stage 2, stage 3, and forecast row reads the ECMWF ensemble (ENS) 00Z run of the origin day,
+which the Candidate treats as available at 09:00 UTC.** On every row, `nwp_init_time` is 00:00 UTC
+of the origin day, 9 hours before the native origin of 09:00 UTC and 12 hours before the contract
+origin of 12:00 UTC. The weather columns before the origin use the ensemble mean of the freshest run
+published by the origin. Stage 1 trains on ERA5 and CAMS reanalysis rows, which never reach a
+forecast row.
+
+**Worked example.** Contract origin 2026-02-10 12:00 UTC, valid time 2026-02-13 17:30 UTC: the row's
+weather is the ENS run of 2026-02-10 00:00 UTC at step 89.5 hours, and the lead from the contract
+origin is 77.5 hours. The scoring script asserts `nwp_init_time <= power_fcst_init_time − 3 h` on
+every scored row and prints one row per arm, reusing `check_origin_time_weather` from
+`e00696_score.py`.
+
+**No reference uses experiment 404's lag-free scores above 24 hours, which are void.** Lag-free
+references come from experiment 541 (rebuilt K2-S1: 5.400 at the eight MVA-only Primaries and 3.936
+at the six signed-MW Primaries, at 120 to 240 hours). Experiment 531 has no merged result page, so
+its numbers are not quoted. Candidate references come from experiments 667, 668, and 677.
+
+## 7. How the signal enters the network, and the frozen encoders
+
+**The mixer-entry arms add columns to `mixer_ft` at stage 3 only, with zero initial weights.** A new
+class `EraPermLagMdn(PermLagMdn)` holds an era encoder (9 inputs: `unknown` flag, class weight, age,
+six changes; 16 hidden GELU units; 8 outputs) and widens `mixer_ft[0]` by 8 inputs with
+`widen_first_layer` from `e00696_model.py`. A zero era vector reproduces `PermLagMdn`, which a check
+asserts to 1e-6. The anchor is one more column read by index and added to the means, the pattern of
+`OutputOffsetDrift`.
+
+**Within a fold the encoders are trained once, in stage 1, on rows from 2019-09, and are frozen in
+stages 2 and 3; the chain repeats stage 1 at each monthly fold (`chain.sh` of experiment 667).** An
+era input learnt in stage 1 would need a label on every row back to 2019-09. The design handles the
+constraint in two steps.
+
+- **O-enc avoids stage 1.** The era vector enters the weather encoder and the date-time encoder
+  through a separate zero-initialised `nn.Linear(8, 64, bias=False)` per encoder, whose output is
+  added to that encoder's first-layer pre-activation. **The two layers are registered on the network
+  outside `model.weather` and `model.datetime`.** (`widen_first_layer` replaces the first layer's
+  weight with one `nn.Parameter`, and the `frozen` filter in `train()` of `e00559_fit.py` leaves
+  every parameter of those two modules out of the optimiser, so widened columns would stay zero and
+  O-enc would equal O.) A check asserts that the layers' weights move after one epoch of stage 3.
+  Every pre-trained encoder weight stays frozen. Labels are needed only on stage 3 rows, and O-enc
+  stays paired with A0. The lag-side calls of the two encoders pass a zero era vector, which is a
+  stated limit.
+- **A full pre-training arm (O-enc-pre) is conditional on C3.** Its historic labels are causal by
+  the as-of rule: the forward detector and classifier run once over the whole record, and a stage 1
+  row at time t reads the state after the day before t, which also lies before the fold's cut.
+  O-enc-pre shares no weights with A0, so its contrast carries the unpaired noise of section 11.
+
+**The curriculum teaches the two classes apart.** The Candidate's recipe already injects lag-only
+shifts into stage 3: the lag moves and the target does not, which is a switching event with the NRA
+target. The curriculum adds persistent steps to half of the training passes: the target and the lags
+both move, with sizes uniform in ±5% to ±30% of capacity and a flat, midday-weighted, or
+evening-weighted band profile. The detector and classifier run on each injected series, so the
+learned arms train on signals with real delays, real `unknown` periods, and real misclassifications.
+A0-aug has the persistent steps and no signal.
+
+## 8. Arms that were dropped, and why
+
+- **A piecewise-constant embedding trained end to end with a penalty on the number of switches.**
+  Experiments 573, 575, and 577 found that penalised step offsets date at most 23% to 32% of steps,
+  and a knot learnt in training cannot switch after the training cut.
+- **A soft latent state from recent residuals.** The Candidate's lag encoder already reads 60 gap
+  signals with half-lives of 1, 3, and 7 days, so A0 is that arm.
+- **Era row weights as an arm of their own, and training on the current era only.** The weights stay
+  inside the era package. Stage 3's 90-day half-life already discounts old rows, and C6 says whether
+  the package helps after a refit.
+- **Penalised offline segmentation (PELT, [Killick et al.
+  (2012)](https://doi.org/10.1080/01621459.2012.737745)).** Run daily on an expanding window, PELT
+  is the same kind of arm as the change-point detector. Stage 0 uses a penalised least-squares
+  segmentation in hindsight as a cross-check.
+- **The hindsight switching labels as a forecast input.** The labels are not available at the
+  origin, so the labels score the classifier only.
+- **The weather encoder and the date-time encoder as separate arms, and the gas-engine state.** The
+  split is worth a fit only if C3 shows a gain, and experiment 696 tested the engine state.
+
+## 9. Known-answer tests and the injected bank
+
+**Stage 0 scores the detector and the classifiers on CPU, before any fit.** The known eras are D8's
+two register connections and the other register rows of section 4. The known switching events are
+the experiment 41 labelled set and the experiment 580 verified set. The injected shifts have known
+dates, sizes, and classes. For each classifier the report prints the confusion table (era, switch,
+unknown, undetected) at 7, 14, 28, and 60 days after onset, the two delay distributions, and the
+share of switching events ever carried as an era with the days carried.
+
+**Stage 0 gates,** at no more than 0.5 false alarms per Primary-year:
+
+- **Detection:** median delay at most 7 days for era steps of 25%, and at most 21 days for steps of
+  10%; D8's 2023-08-15 change alarmed within 14 days. Earlier detectors alarmed at D8 65 and 113
+  days late (experiment 328).
+- **Classification of eras:** at least 70% of injected era steps of 25% classed `era` by day 28, and
+  both D8 connections classed `era` within 28 days of the alarm.
+- **Classification of switches:** at most 10% of injected switching events, and at most 15% of the
+  verified events of experiment 580, ever classed `era`.
+
+**Two cautions on the real switching labels.** The verified events were selected for a mirrored
+shift, so the mirror evidence is circular on that set and the score is optimistic. Experiment 565's
+erratum records that telemetry confirms few of the experiment 41 labels, so a miss on that set may
+be a wrong label. Experiment 295 labelled 42% of 14 to 60 day load shifts as states, which is the
+failure these gates guard against.
+
+**The injected bank holds both classes.** Each of 8 passes per fold injects shifts at 8 host
+Primaries on the first day of the scored month, so every event has 28 days before the next monthly
+refit. Four hosts get an era and four get a switching event.
+
+- **Era kinds:** a level step of −10% of capacity, a level step of −25%, a level step of +15% (a
+  load connects), and a solar-shaped reduction with a peak of 25% of capacity that follows the
+  reanalysis radiation at the valid time. The solar-shaped kind is absent from the curriculum.
+- **Switching kinds:** a transfer with the daily shape of the donor's demand, mirrored at an
+  electrical neighbour so the pair's sum is conserved, reverting after a duration drawn from the
+  durations of the verified events, built with the shared generator of experiment 660. One in four
+  has its mirror hidden (the neighbour is treated as unmetered), and one in four lasts 60 to 120
+  days. Those two are the hard cases, reported apart.
+- **Truth:** an era event is scored against the injected power for both outputs. A switching event
+  is scored against the power without the injected shift for the NRA output, and against the
+  injected power for the prevailing output.
+
+**The retrained worlds test days 28 to 90 and the refit's handling of a switching event.** Two
+worlds each inject 4 eras and 4 switching events on one date (2025-12-01 and 2026-02-01), and the
+three folds after each date are refitted on the world's data.
+
+**D8's real era switches are descriptive.** Both register connections fall before the first scored
+month, 2025-11, so stage 0 tests them on the detector and classifier alone. Scoring the network
+across 2025-03-24 needs three extra folds (2025-04 to 2025-06) on at most 14 months of ensemble
+history, because the stored ensemble summaries start on 2024-04-01. Those folds are an optional last
+phase.
+
+## 10. Placebo and stress readings
+
+**P is trained and scored with random-date era signals, and C5 tests that P equals A0-aug.** Two
+readings need no extra fit. The false-alarm stress feeds random-date era switches to the fitted
+networks of O and L-best and reports the harm per false era. The O-date reading feeds O's network
+the true date and class with the causal size, which splits O's lead over L-best into the part from
+delay and the part from size estimation.
+
+## 11. Scoring, noise, and the decision rule
+
+**Rows are sliced by the origin's distance from the onset, and by the state of the shift at the
+origin.** The distance slices are: the 14 days before the onset with a valid time after the onset
+(reported, in no contrast); days 0 to 7; days 7 to 28; days 28 to 90 (retrained worlds); and stable
+rows, 90 days or more after any shift and outside events. **The state slices are scored separately
+for every learned arm: undetected, `unknown`, classified correctly, and classified wrongly.** Every
+table reports both outputs, CRPS, the normalised mean absolute error of the median, coverage and
+pinball loss at q01, q05, q95, and q99, the four load-shift scenarios of the `ml-experiment` skill,
+cold winter nights, and the avoidable-curtailment cost. The row set is experiment 677's
+monthly-refit rows, valid times 2025-11-01 to 2026-06-30.
+
+**The minimum detectable effect comes from measured refit noise.** Nine contrasts at a family level
+of 95% give a two-sided z of 2.77, and 80% power adds 0.84, so the detectable effect is 3.61
+standard errors.
+
+| Case | Noise of one refit (source) | Refits per arm | Standard error | Detectable effect |
+|---|---|---|---|---|
+| Arms sharing stages 1 and 2, all rows | 0.014 (699, within-seed contrasts) | 10 | 0.0044 | 0.016 from seeds; about 0.03 with month sampling (699's shared-weights interval, −0.036 to +0.020) |
+| Arms sharing no weights, all rows | 0.087 (699) | 10 | 0.039 | 0.14 |
+| Arms sharing no weights, D8 alone | 0.233 per seed-month (696) | 10 seeds, 8 months | measured | about 0.10 (696) |
+| Prevailing heads on both sides, rows inside a shift | 0.395 (693) | 10 | 0.177 | 0.64 |
+| A network output against A0-prev (heads on one side) | 0.395 | 16 | 0.099 | 0.36 |
+| Arms sharing stages 1 and 2, post-shift rows | unknown, measured blind | 10 | noise / 3.16 | 1.14 times the noise |
+
+**A noise step runs before any contrast is read.** The step prints, per slice, the standard
+deviation over seeds of each paired contrast and no mean. If the post-shift noise is above 0.22,
+which would put the detectable effect above 0.25 points, the seeds rise from 10 to 16. Experiment
+706's interval on windows that contain a real shift (−0.317 to +1.622) shows that a few real events
+resolve nothing under about 1 point, which is why the confirmation bank holds 512 events.
+
+**Thresholds.** The demand protocol's minimum gain for a new fitted step or input is 0.02 points on
+the headline. At 0.5 era switches per Primary-year, the 28 days after a switch are about 3.8% of
+rows, so 0.02 points over all rows is 0.5 points in those rows. The threshold is 0.5 points for C1b
+and 0.25 points for C2.
+
+**Verdict.**
+
+- **Supported:** C1b and C2 pass their thresholds with intervals that exclude zero, and every veto
+  holds.
+- **Partly supported:** C1b passes and C2 does not (a perfect signal helps and detection or
+  classification is the limit), or C2 passes and a veto on switching events fails.
+- **Not supported:** C1b's interval does not exclude zero in the gain direction, which means the
+  prevailing output already does what an era signal would do.
+- **Vetoes:** C4 above 0.03, or its upper interval end above 0.05; C5 outside ±0.05 on stable rows;
+  C7 above 0.1, or its upper interval end above 0.2; the share of an injected switching event's
+  depth left in the NRA median 7 days after the event ends more than 0.02 above A0's share; the
+  copied share of a lag-only shift on experiment 581's bank more than 0.02 above A0's. A failed veto
+  on stable rows or the placebo makes the verdict `inconclusive` pending an audit.
+- **Machinery check:** if C1a is under 1 point for steps of 25%, the era signal is not reaching the
+  output, and the run stops for an audit.
+
+Intervals come from `losses_for_bootstrap` and `bootstrap_difference_at_level` with blocks of (fold
+month, Primary), at the Bonferroni level for nine contrasts, with the interval over seeds beside
+each.
+
+## 12. Phases and gates
+
+| Phase | Work | Gate to the next phase |
+|---|---|---|
+| A | Era table, detector, classifiers, stage 0 report (CPU, 2 cores) | Stage 0 gates; a learned arm whose gate fails is scored and labelled as failing the gate |
+| B | Screen: 4 folds (2025-11, 2026-01, 2026-04, 2026-06), 5 seeds, all 10 arms, bank only; numbers labelled interim | C1a machinery check; L-best is the learned arm with the lowest CRPS on era events among the arms that pass the screen's C7 veto |
+| C | Confirmation: 8 folds, 10 seeds, A0, A0-aug, O, P, L-best, L-all, and O-enc if the screen's C3 favours O-enc; 16 head refits for A0-prev | C1b decides whether phase D runs |
+| D | Retrained worlds for C6 and the refit-side vetoes | none |
+| E (optional) | D8 folds 2025-04 to 2025-06; O-enc-pre | Manager's agreement |
+
+## 13. The stop rule, and what is new against each counted experiment
+
+**The findings count 9 `not supported` or `refuted` verdicts on this idea in the seven named themes,
+and 11 with the two experiments of the gross-demand-simulation theme.** Both counts exceed three, so
+a further attempt needs the maintainer's approval. The manager states that the maintainer's named
+request stands as that approval, and the plan quotes the request: "revisiting the idea that
+substations experience these eras" (maintainer, 2026-11-19, via the manager's chat). If this
+experiment ends `not supported`, the write-up recommends that no further era-signal experiment runs
+without a new approval.
+
+| Id | Verdict | What that experiment tried | What is new here |
+|---|---|---|---|
+| 294 | not supported | An offset per half-hour that D8's gas engine runs, in the additive-model stack, from the last settled day's engine state | The signal is the era (the engine is installed), not the engine's running state; the model is the neural network; the signal is persistent, so a day-old value is still valid |
+| 295 | not supported | Hindsight segmentation of regimes, with no forecast scored against a model input; 42% of load shifts labelled as states | Forward-only detection with the delay scored at the origin; an explicit era-or-switch classifier with an `unknown` state; the signal feeds the network |
+| 328 | not supported | Detect a change, then add regime-specific effects to an additive model; both detectors alarmed too late | An oracle arm separates the value of the signal from the detector; a six-feature daily detector gated in stage 0 before any fit; scoring by state of the shift |
+| 361 | not supported | An as-of step detector for the engine's on/off spells at D8, with the steps removed from the training target | Eras, not spells; the target is untouched and the signal is an input; switching events are the only shifts removed |
+| 363 | not supported | One penalised level per stretch between detected steps, which absorbed the solar terms and harmed D2 and D4 | Few eras under a persistence prior and a minimum size, not many stretches; an anchor fitted with the offset present; a veto on stable rows at every Primary |
+| 571 | not supported | A smooth monthly drift embedding and the offset, in synthetic worlds, one fold, two seeds, no intervals | A piecewise-constant discrete signal; 10 seeds with intervals; rows after a switch scored apart; real D8 dates |
+| 573 | not supported | A daily-knot or gated-jump offset asked to find steps of 2% to 6% as a by-product of the fit | Dating is done by an explicit detector on telemetry, and the network is told the state |
+| 575 | not supported | The same offsets at label-sized steps; the offset moved about half the level | The explicit state input that experiment 575's own advice asks for; a persistent-step curriculum that teaches the network to move the whole level |
+| 577 | refuted | Offsets constant between sparse steps, scored on all real rows; widening for jump risk made the forecast worse | Scoring on the weeks after a shift, where the effect lives; an era input, not a new form of the offset |
+| 695 | not supported | The engine's inferred output removed from D8's target and lags, with a climatology added back | No target cleaning; the level of the era is the signal, not the engine's output |
+| 696 | not supported | The engine's state given to the pre-training mixer only, and dropped at fine-tuning and at forecast time | The signal is present in stage 3 and at forecast time, enters the encoders through stage 3 columns, and every arm is paired with the control |
+
+**The classification of a shift as era or switching event is new against all eleven.**
+
+## 14. Scaling to 2,500 substations without labels
+
+**No arm that would be ported needs a label, and the cost per substation is small.** The detector
+reads only the substation's own power and a climatology: one day's update costs 730 run lengths
+times 6 features, so 2,500 substations take well under a second per day in NumPy. The classifiers
+add a regression on a few weeks of daily values and, where a neighbour is metered, the mirror
+statistic. The era encoder is shared, so L-rule and L-soft add no parameter per substation, and
+L-hmm adds 12. The bank's hidden-mirror cases measure what is lost at a substation with no metered
+neighbour. The curriculum needs no real labels. The oracle arm and the era table do not scale and
+are not meant to.
+
+## 15. Compute
+
+**Slot A has 8 cores, and the GPU share is not yet set, so the figures below are estimates to
+replace with a one-fold timing pilot.** Experiment 667 records about 0.5 GPU-hours per fold for the
+Candidate chain at 2 seeds. The split assumed is 9 minutes per seed for stage 1, stage 2, and the
+table, and 6 minutes per stage 3 fit.
+
+| Phase | Stage 1 and 2 chains | Stage 3 fits | Head fits | GPU job-hours |
+|---|---|---|---|---|
+| B | 12 (seeds 2 to 4; seeds 0 and 1 are read from experiment 677's chains if stored) | 200 | 0 | about 22 |
+| C | 52 | 420 new (7 arms) | 128 | about 52 |
+| D | 60 | 300 (5 arms) | 0 | about 39 |
+| Bank inference, 8 passes per fold | | | | 15 to 25, to be measured |
+| Total | 124 | 920 | 128 | about 130 to 140 |
+
+**Each job needs about 14 GB of host memory (experiment 699) and about 5 GB of GPU memory
+(experiment 696 peaked at 33 GB with 6 to 7 jobs).** Four jobs at once need about 64 GB of host
+memory and 20 to 25 GB of GPU memory, and give about 35 hours of wall-clock time. The brief caps
+each command at 16 GB and asks for the manager's agreement before the first fit. The proposed
+ceiling is 150 GPU job-hours, and the run stops between folds at the ceiling. If the share is small,
+cut phase E first, then phase D, then L-R and L-hmm from phase B. Phase A needs 2 cores and no GPU.
+
+## 16. Data hygiene and anonymisation
+
+- **Cleaned data everywhere:** `substation_zero` half-hours are dropped from training rows, lags,
+  detector features, and scoring actuals, and D15 and D18 rows before 2025-03-01 are dropped.
+- **Every detector and classifier setting is fixed on data before 2025-01, at Primaries other than
+  D8,** before D8 or any scored month is examined.
+- **Whether stage 1 rows include D8 before 2023-08-15 is unknown.** The implementer reads
+  `e00667_k1.py` and prints the answer. Stage-3-only arms are unaffected.
+- **No metered generator's series is published, with or without its name or identifier.** The
+  solar-shaped injection is built from reanalysis radiation, and the engine's 44-day record is not
+  used. Charts of D8 show the substation's own reading, which may be named, and never overlay a
+  generator's output. Connection dates and sizes define eras and may be printed. The
+  pre-anonymisation engine label on older pages is not copied.
+- **Unlogged events:** NGED's logs may miss events, so stable rows may hold unlabelled shifts, and
+  the harm table is optimistic.
+
+## 17. Risks
+
+- **The prevailing output may already capture the gain,** in which case C1b fails and the result is
+  a clean `not supported`.
+- **A long or unmirrored switching event may be classed as an era.** C7, the carried-depth veto, and
+  the hard cases of the bank measure the harm, and the reversal rule limits the duration.
+- **A real era may be classed as a switching event and erased from training rows.** The state slices
+  report the cost of that error.
+- **The injected switching events come from the generator of experiment 660, and the curriculum's
+  lag-only shifts from the Candidate's recipe,** so a classifier may learn the generator. The real
+  labelled sets in stage 0 are the check.
+- **The curriculum may teach A0-aug to follow lags.** A0 and A0-aug are both reported.
+- **Injected steps are simpler than a real connection.** A gas engine runs on a price-driven pattern
+  that the four era kinds do not copy.
+- **Experiment 565 found that an embedding added to the offset removed the offset's gain.** The
+  anchor rule is the answer, and C4 would show the conflict.
+- **The noise figures come from experiment 677's step 5 network and from prevailing heads,** not
+  from the Candidate's stage 3, which is why the noise step comes first. A0 is refitted in the batch
+  for every seed, because a control fitted in another batch scored 0.083 points apart in experiment
+  696.
+
+## 18. Order of implementation
+
+**All code goes in `ml-experiments/<id>-era-signal-in-the-candidate-part-1/`, with the id from
+`reserve_experiment`.** The suggested theme is `retraining-and-training-history`, with
+`lsc-detectors`, `switching-labels-in-the-forecast`, and `lagged-power-and-error-correction` in
+`also_relevant_to`, and `kind: other`. Each script gets an Opus code review before its first run.
+
+1. `e<id>_era_table.py`: build and print the era table and the two sets of known switching events.
+2. `e<id>_features.py`: daily detector features with the as-of cut.
+3. `e<id>_bocpd.py` and `e<id>_hmm.py`: the two detectors, forward-only.
+4. `e<id>_classify.py`: the mirror, duration, and weather-response evidence (importing
+   `e00687_features.py` and the gate of experiment 592), the rule classifier, and the trained
+   classifier.
+5. `e<id>_inject.py`: the era injector, the switching injector built on
+   `ml-experiments/00660-shared-generator-of-injected-load-transfer-events/`, and separate seeds for
+   the tuning worlds, the curriculum, the bank, and the retrained worlds.
+6. `e<id>_stage0.py`: the detector and classifier report on known and injected cases, with the
+   gates.
+7. `e<id>_signal.py`: the columns per (Primary, origin day) for every arm, with lag translation,
+   switch removal, and the anchor.
+8. `e<id>_model.py`: `EraPermLagMdn(PermLagMdn)`, reusing `widen_first_layer` (`e00696_model.py`),
+   the read-by-index pattern of `OutputOffsetDrift` (`e00565_model_variants.py`), the mixer-only
+   pattern of `ModularMdnDrift` (`e00559_model_drift.py`), the zero-padding `load_state_dict` of
+   `PermLagMdn`, and an override of `LagOffsetMdn.penalty` that skips knot pairs around an era
+   switch.
+9. `e<id>_cand.py`: a copy of `e00693_cand.py` (the Candidate with extra columns and an injected
+   bank, reading experiment 677's chains without writing to them) with `--era
+   {none,aug,oracle,placebo,oracle-enc,all,rule,soft,hmm,reset}`.
+10. `e<id>_checks.py`: the identity check, the signal cut, the row alignment, the origin-time
+    weather assertion, and a synthetic test that a known anchor moves the output; no fit starts
+    until `checks.json` passes, as in `e00696_chain.sh`.
+11. `e<id>_noise.py`, `e<id>_score.py`, `e<id>_verdict.py`, and `e<id>_figures.py`, with the chain
+    and GPU shell scripts wrapped in `systemd-run`.
+
+## 19. What was verified, and what was not
+
+**Checked against source files (by the design sub-agent):** the definitions of NRA, the Candidate,
+the prevailing output, and a load shift in `final-models.md`, including that the prevailing
+quantiles are a mixture of the Candidate's quantiles and a shifted copy; the classes `PermLagMdn`,
+`StateAuxLagMdn`, `widen_first_layer`, `ModularMdnDrift`, `LagOffsetMdn` and its penalty,
+`mixer_pre`, and `mixer_ft`; that `chain.sh` of experiment 667 repeats pre-training per monthly
+fold; the origin and weather timing; the noise figures of experiments 693 (0.395), 696 (0.233, about
+0.10), and 699 (0.087, 0.014, copied shares 0.075 to 0.127); the title, hypothesis, verdict, and
+headline of each of the 11 counted experiments, read from each `result.md`; the 6 MW engine row
+dated 2023-06-13 under D14 in `printed_ecr.txt`; the 2023-08-15 entry in `data-processing.md`; the
+0.02 minimum gain in the demand protocol; experiment 667's 0.5 GPU-hours per fold; the ensemble
+summaries starting 2024-04-01; and the two DOIs, which resolve at doi.org to Fox, Sudderth, Jordan,
+and Willsky (2011), "A sticky HDP-HMM with application to speaker diarization", and Killick,
+Fearnhead, and Eckley (2012), "Optimal Detection of Changepoints With a Linear Computational Cost".
+
+**Not checked:** the workbook rows for the 8.91 MW and 0.7 MW solar entries (taken from the findings
+file); the feature names inside `e00687_features.py` beyond its constants, and the interface of gate
+G4 in experiment 592's folder; the interface of experiment 660's generator; whether experiment 677's
+chains store stage 2 weights for seeds 0 and 1 of the Candidate; the split of chain time between
+stages; whether stage 1 holds D8's rows before 2023-08-15; the figures quoted from experiments 101,
+456, 565, 580, and 592, which come from the findings file; the stop-rule count, which is the
+findings file's judgement. `e00693_cand.py`'s docstring names `e00693_bank`, and no such file exists
+in that folder: the bank code is inside `e00693_cand.py` and `e00581_bank`.
+
+## 20. Further design decisions (these refine earlier sections)
+
+The sections above state the arms and the two largest decisions (the encoder entry in section 7 and
+the anchor rule in section 2). The list below states the remaining decisions.
+
+1. **One cut everywhere.** Recompute the mirror statistic of experiment 687 and gate G4 of
+   experiment 592 at the end of day D − 1, so the perturbation test, which changes every reading
+   from 00:00 of day D, holds for all inputs.
+2. **Era encoder identity.** The encoder output is multiplied by an indicator that the state is not
+   `none`. The check asserts the identity after training, on rows whose state is `none`.
+3. **C7 rows.** The bank is inference-only on one fold's network, so C7 and the carried-depth veto
+   use only switching events that end within 21 days of the injection. Longer events are scored in
+   the retrained worlds.
+4. **Duration bands.** The gates and C7 are reported for events under 60, 60 to 120, and over 120
+   days. The bank gains transfers longer than 120 days.
+5. **Verified set size.** The verified set of experiment 580 holds 27 events, 4 with onsets in the
+   scored window. State n = 27 and a binomial interval for the 15% gate. The duration prior, the
+   injector's durations, and L-soft's training exclude those 4 events.
+6. **Signed power at MVA-only Primaries.** Injected steps and the solar shape are built in signed
+   power and then passed through an absolute value at MVA hosts. The telemetry estimate of D8's
+   solar size states how it handles reverse power flow (`Monitor Direction.csv` marks D8 "Yes").
+7. **D15 and D18.** Their state is `none` where the climatology and spread do not exist, and they
+   stay out of the host pool.
+8. **Winner's curse.** The phase C bank uses fresh injection seeds and hosts, and C2 is also
+   reported on the four folds the screen did not use.
+9. **Decision rule.** C1b or C2 with an interval that excludes zero below its threshold is `small
+   gain`. A failed C7 or carried-depth veto gives "not supported for adoption", whatever C2 shows.
+10. **Learning the injector.** The bank, the curriculum, and the classifier's training use different
+    generator settings and seeds, and C2 is also reported on the out-of-curriculum solar-shaped
+    kind. The claim is scoped to "injected level steps" unless the solar-shaped kind also passes.
+11. **Curriculum harm.** Add L-best minus A0-aug and A0-aug minus A0 beside C4 and C7.
+12. **D8 fade and network-level D8 test.** D8 from 2026-02-15 to 2026-05-31 leaves the stable rows,
+    and the fade is reported as a descriptive real case scored on the network. The network-level
+    test across D8's 2025-03-24 connection stays in optional phase E, and the plan says so plainly:
+    the stored ensemble summaries start on 2024-04-01, so three extra folds with 14 months of
+    history are possible, and the maintainer decides whether to fund them.
+13. **Bank hosts.** An era host is never the mirror partner of, or a neighbour of, a switching pair
+    in the same pass. A Primary with no metered neighbour hosts only the hidden-mirror kind.
+14. **Stop-rule table corrections.** Row 295: it scored a latest-regime offset after a step (2.2
+    points better), and a trailing 60-day mean residual did as well, so the trailing residual offset
+    and experiment 706's look-back offset become no-fit reference rows on the bank. Row 571: the
+    drift embedding recovered 96.5% of the oracle's gain on injected steps, the nearest earlier
+    evidence and positive but synthetic. The novelty claim reads: "a causal classifier whose classes
+    drive the forecast is new against all eleven" (experiment 295 classed persistent against
+    temporary shifts with hindsight).
+15. **Seeds and compute.** Raising seeds from 10 to 16 adds about 336 stage-3 fits and 40 GPU-hours.
+    The plan cuts L-hmm and L-R from phase C first, then phase D, to stay under the 150 GPU job-hour
+    ceiling.
+16. **Stored chains.** Seeds 0 and 1 of stage 1 and stage 2 are read from experiment 667's chains,
+    not 677's.
+17. **Era rate.** The register gives about 4 connections of 1 MW or more since 2019-09 across 16
+    Primaries, about 0.04 per Primary-year, so 0.5 points in the 28 days after a switch is about
+    0.002 points on the headline. The plan states the headline-equivalent gain from the era table's
+    rate and counts telemetry-only regime changes separately.
+18. **Seed pairing for C2.** A0-prev's 16 head refits pair with the 10 network seeds by seed index
+    (seeds 0 to 9), with the six extra head refits used only for the head-noise estimate. In folds
+    2025-11 and 2025-12 the prevailing rows come from the unfitted fallback head, so those folds
+    carry no head noise and are reported apart.
+19. **Minor.** The copied share of a lag-only shift is 0.075 on experiment 581's bank and 0.024 on
+    experiment 660's bank (0.127 is experiment 699's no-injection arm). The noise figures 0.087 and
+    0.014 are standard deviations of MAE, and 0.014 rests on 3 seeds. The weather assertion tightens
+    to `nwp_init_time` equal to 00:00 UTC of the origin day. "Clean history" for false-alarm tuning
+    means outside labelled events and on surrogate series. The solar-shaped injection uses CAMS or a
+    perturbed field rather than the ERA5 field the classifier reads. C5 passes when both interval
+    ends lie inside ±0.05. C6 states its minimum detectable effect from its 8 eras. Prose fixes:
+    conclusions in bold leads, no pronoun-opening sentences, no money metaphor, and expand ECMWF,
+    ERA5, CAMS, PELT, and GELU on first use.
+
+## Files
+
+- Code: `ml-experiments/00709-era-signal-in-the-candidate-part-1/` (to be written, each script
+  reviewed by Opus before its first run).
+- Data: `data/ml-experiments/00709-era-signal-in-the-candidate-part-1/` (private; holds the era
+  table, detector outputs, and stored forecasts).
+- Briefs and reviews: the findings file, the design, and the design review were written under
+  `data/ml-experiments/briefs/eras_embedding/` (private).
