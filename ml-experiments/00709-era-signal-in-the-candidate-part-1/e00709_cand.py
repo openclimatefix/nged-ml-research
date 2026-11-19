@@ -52,6 +52,9 @@ _p.add_argument(
     "--fold",
     required=True,
     choices=(
+        "2025-04",
+        "2025-05",
+        "2025-06",
         "2025-11",
         "2025-12",
         "2026-01",
@@ -97,13 +100,19 @@ import e00667_fold as fold  # ty: ignore[unresolved-import]
 
 assert fold.FINAL_MONTH == MONTH
 
-SRC667 = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
-)
-"""Experiment 667's data folder: chains (stage 1 and 2 weights), tables, and inputs; read only."""
+E_MONTHS: Final = ("2025-04", "2025-05", "2025-06")
+IS_E: Final = MONTH in E_MONTHS
+"""Phase E: three folds before the screen's, scored on D8's 2025-03-24 solar connection. Reported apart."""
 ROOT = features.DATA_DIR
 """Everything this experiment writes."""
+SRC667 = (
+    ROOT / "e_667"
+    if IS_E
+    else ML_EXPERIMENTS_DATA_DIR
+    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
+)
+"""Experiment 667's data folder (phase E: the folder `e00709_e_chain.sh` fills): chains (stage 1 and 2
+weights) and tables; read only."""
 assert ROOT != SRC667
 CHAIN = SRC667 / "chains" / MONTH / "work"
 TABLES = SRC667 / "tables"
@@ -111,8 +120,13 @@ B2: Final = MINE.rule == "b2"
 """Phase B2: the injected world is mixed into every batch. Its fits and predictions carry a `b2` prefix."""
 assert not B2 or ERA in ("aug", "oracle", "placebo", "stat"), "B2 runs four arms; A0 is phase B's"
 PREFIX = "b2_" if B2 else ""
+PREFIX = ("e_" if IS_E else "") + PREFIX
 DIR = f"{PREFIX}{ERA.replace('-', '_')}_{MONTH}_s{SEED}" + ("_pilot" if MINE.pilot else "")
-ROW_SET_ID: Final = "experiment_677_monthly_refit_rows_valid_2025_11_to_2026_06"
+ROW_SET_ID: Final = (
+    "experiment_709_phase_e_monthly_refit_rows_valid_2025_04_to_2025_06"
+    if IS_E
+    else "experiment_677_monthly_refit_rows_valid_2025_11_to_2026_06"
+)
 """Contract rows at 12:00 UTC on each day of a fold's month, 14 days of half-hours, 16 series, with
 `valid_time` before 2026-07-01 (the rows after that date are the held-out finalist rows)."""
 HOLDOUT_START: Final = datetime(2026, 7, 1, tzinfo=UTC)
@@ -167,6 +181,14 @@ def _stats_file(*, month: str):
 
 
 e.step2_file, e.stats_file = _step2_file, _stats_file
+if IS_E:  # phase E reads its own daily frames, so fold.install adds no stub frames to experiment 667's folder
+    _frame_path = e.common.demand_frame_path
+
+    def _e_frame_path(*, run: datetime):
+        own = features.DATA_DIR / "frames_e" / f"init={run:%Y-%m-%d}.parquet"
+        return own if own.exists() else _frame_path(run=run)
+
+    e.common.demand_frame_path = _e_frame_path
 fold.install(e, months=[MONTH], reference_month=fold.PREVIOUS_MONTH)
 # experiment 667's install extends the grid to its own end (2026-11-20 23:30), so the grid is read after it
 _grid = e.common.grid_times()
@@ -516,7 +538,11 @@ ONSET_FIRST: Final = 120
 ONSET_STEP: Final = 20
 ONSET_MARGIN: Final = 14
 """An injected event's rows take the cut `onset - ONSET_MARGIN`, so the onset lies after the cut."""
-MONTH_INDEX: Final = (fold.FINAL_START.year - 2025) * 12 + fold.FINAL_START.month - 11
+MONTH_INDEX: Final = (
+    8 + fold.FINAL_START.month - 4  # phase E folds follow the screen folds 0 to 7
+    if IS_E
+    else (fold.FINAL_START.year - 2025) * 12 + fold.FINAL_START.month - 11
+)
 CONTEXT: dict = {}
 
 

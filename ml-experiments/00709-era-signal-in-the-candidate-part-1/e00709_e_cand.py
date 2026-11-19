@@ -83,7 +83,7 @@ import numpy as np
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-import e00667_fold as fold
+import e00667_fold as fold  # ty: ignore[unresolved-import]
 
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00667_MONTH"
 

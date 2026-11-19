@@ -68,7 +68,7 @@ import e00591_arm as arm  # ty: ignore[unresolved-import]
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
 
-import e00667_fold as fold
+import e00667_fold as fold  # ty: ignore[unresolved-import]
 
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00667_MONTH"
 
