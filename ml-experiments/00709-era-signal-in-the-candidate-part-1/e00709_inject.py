@@ -10,7 +10,9 @@ negative:
   radiation field (each day multiplied by a log-normal factor), so the classifier, which reads the
   unperturbed ERA5 field, does not see the shape it is tested on;
 - `curriculum_step`: a persistent step of 5% to 30% of capacity with a flat, midday-weighted, or
-  evening-weighted daily profile, used by the training curriculum only.
+  evening-weighted daily profile, used by the training curriculum only;
+- `engine`: an embedded engine of -30% of capacity that runs irregularly (stage 0 only, in its own
+  `engine` world; the bank keeps the four kinds above).
 
 **Switching-event injector.** A transfer built on the shared generator of experiment 660
 (`e00660_generator`): a donor loses demand with a daily shape that follows its own demand, and the
@@ -36,9 +38,11 @@ import e00709_features as features
 import numpy as np
 import polars as pl
 
-EraKindType = Literal["level_m10", "level_m25", "level_p15", "solar_25", "curriculum_step"]
+EraKindType = Literal[
+    "level_m10", "level_m25", "level_p15", "solar_25", "curriculum_step", "engine"
+]
 SwitchKindType = Literal["transfer", "hidden_mirror", "long", "very_long"]
-WorldNameType = Literal["tuning", "curriculum", "bank", "retrained"]
+WorldNameType = Literal["tuning", "curriculum", "bank", "retrained", "engine"]
 ProfileType = Literal["flat", "midday", "evening"]
 DurationBandType = Literal["<60", "60-120", ">120"]
 
@@ -55,6 +59,8 @@ SWITCH_ROTATION: Final[tuple[tuple[int, int], ...]] = ((0, 2), (1, 3), (2, 3), (
 """Indices into a world's `switch_kinds` for the two switching pairs of pass `i % 4`.
 
 Four consecutive passes carry every kind of a world (plain transfer, hidden mirror, long)."""
+ENGINE_RUN_PROBABILITY: Final[float] = 0.5
+"""Chance that the irregular engine of stage 0 runs on a given day."""
 GENERATOR_NOISE: Final[float] = 0.01
 """Positive placeholder noise unit of the generator's panel; rows carry their own delta."""
 
@@ -63,6 +69,7 @@ WORLD_SEED_BASE: Final[dict[WorldNameType, int]] = {
     "curriculum": 709_200_000,
     "bank": 709_300_000,
     "retrained": 709_400_000,
+    "engine": 709_500_000,
 }
 """Disjoint seed ranges, 100,000 wide, so no two worlds can share a draw."""
 SEED_RANGE: Final[int] = 100_000
@@ -119,6 +126,15 @@ WORLD_SETTINGS: Final[dict[WorldNameType, WorldSettings]] = {
         onset="month_start",
         switch_kinds=("transfer", "transfer", "hidden_mirror", "long"),
     ),
+    "engine": WorldSettings(
+        era_kinds=("engine",) * 4,
+        era_size_range=(0.10, 0.25),
+        transfer_size_range=(0.08, 0.25),
+        duration_jitter=0.10,
+        solar_noise=0.20,
+        onset="month_start",
+        switch_kinds=("transfer", "transfer", "hidden_mirror", "long"),
+    ),
     "retrained": WorldSettings(
         era_kinds=("level_m10", "level_m25", "level_p15", "solar_25"),
         era_size_range=(0.10, 0.25),
@@ -136,6 +152,7 @@ ERA_SIZES: Final[dict[EraKindType, float]] = {
     "level_m25": -0.25,
     "level_p15": 0.15,
     "solar_25": -0.25,
+    "engine": -0.30,
 }
 """Signed size of each fixed era kind, as a share of capacity (the peak for `solar_25`)."""
 
@@ -266,6 +283,33 @@ def perturb_shortwave(
     return (shortwave.reshape(days, -1) * factor[:, None]).reshape(-1)
 
 
+def _engine_schedule(*, n_half_hours: int, first: int, seed: int) -> np.ndarray:
+    """Return an irregular on/off schedule of an embedded engine, 1 while it runs.
+
+    On each day after `first` the engine runs with probability 0.5, for 4 to 12 hours that start at
+    a random half-hour of the day, so no regular daily profile can absorb it. The runs of a day do
+    not cross midnight.
+
+    Args:
+        n_half_hours: Length of the grid.
+        first: First half-hour of the era.
+        seed: Seed of the schedule.
+
+    Returns:
+        An array of zeros and ones over the grid.
+    """
+    rng = np.random.default_rng(seed)
+    hh_day = features.HALF_HOURS_PER_DAY
+    schedule = np.zeros(n_half_hours)
+    for day in range(first // hh_day, n_half_hours // hh_day):
+        if rng.random() >= ENGINE_RUN_PROBABILITY:
+            continue
+        length = int(rng.integers(8, 25))
+        start = day * hh_day + int(rng.integers(0, hh_day - length + 1))
+        schedule[start : start + length] = 1.0
+    return schedule
+
+
 def era_delta(
     *, event: EraEvent, n_half_hours: int, shortwave: np.ndarray | None, sigma: float, seed: int
 ) -> np.ndarray:
@@ -289,6 +333,11 @@ def era_delta(
             raise ValueError(msg)
         field = perturb_shortwave(shortwave=shortwave, sigma=sigma, rng=np.random.default_rng(seed))
         delta[span] = event.size * np.clip(field[span] / SOLAR_PEAK_WM2, 0.0, 1.0)
+    elif event.kind == "engine":
+        delta[span] = (
+            event.size
+            * _engine_schedule(n_half_hours=n_half_hours, first=event.onset_hh, seed=seed)[span]
+        )
     elif event.kind == "curriculum_step":
         shape = np.tile(_profile_shape(profile=event.profile), n_half_hours // 48 + 1)
         delta[span] = event.size * shape[span]
@@ -607,7 +656,7 @@ def build_pass(
     for k, host in enumerate(era_hosts):
         kind = era_kinds[k]
         fixed = ERA_SIZES.get(kind)
-        if fixed is not None and world in ("bank", "retrained"):
+        if fixed is not None and world in ("bank", "retrained", "engine"):
             size = fixed
         else:
             sign = 1.0 if kind == "level_p15" else -1.0

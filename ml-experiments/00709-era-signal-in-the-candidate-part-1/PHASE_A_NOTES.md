@@ -232,3 +232,117 @@ at D8 and the 5% floor never binds. A 10% step (`level_m10`) clears 3 units only
 (2025-06-10, 2.75 MW = 26% of capacity = 2 units in the midday feature); lowering the probability
 threshold to 0.5 or 0.9 adds no onset in 2025 other than 2025-02-20, so the size test blocks it.
 The hidden-Markov arm detects 56/64 `level_m10` events because it has no size test.
+
+## Arm L-stat (stage 0 part)
+
+Design: `data/ml-experiments/briefs/eras_embedding/lstat_design.md`. New files `e00709_stats.py`
+(12 window statistics, 28-day change, year-on-year reference, expanding scale) and
+`e00709_statdetect.py` (alarm, onset, episodes, era ids, threshold tuning). Edited:
+`e00709_classify.py` (`shape_evidence`, arm `stat`, `SiteSignal.era_id`, `Models.stat_threshold`
+and `Models.stat_weights`, saved in `models.npz`/`models.json`), `e00709_inject.py` (the `engine`
+era kind in its own `engine` world; the bank keeps four kinds), `e00709_stage0.py`,
+`e00709_era_table.py`. Nothing in the stage 0 scripts has run; a read-only probe ran
+`window_statistics` and `detect_stat` on D8 and D12 only (about 3 s per Primary). With threshold 4
+the detector's D8 episodes include onsets on 2023-08-20, 2024-06-27, and 2025-03-21 (alarm
+2025-04-26), the dates in the design's section 1; at threshold 5 the 2023-08-15 onset appears and
+the 2025 alarm is on 2025-04-30.
+
+**Ambiguities and the reading chosen.**
+
+1. *Daily analogue for the onset split.* The design does not define it. Each statistic's daily
+   analogue is the same statistic of one day's 48 readings (level and profile statistics exactly;
+   residual statistics around the median profile of the 28-day window that ends that day; the
+   weekday-minus-weekend statistic as the day-mean residual on weekdays only, NaN at weekends). The
+   split needs 7 values before it and 3 after it.
+2. *Contamination mask.* The design says "inside an earlier alarm episode". An episode here
+   contaminates the 56 days from its onset (the span in which a 28-day change straddles the step)
+   and, if it closed by a return, the 56 days from 3 days before its end. Open episodes (eras) do
+   not contaminate forever. The same mask removes days from the scale.
+3. *Scale refresh.* The scale (median and 1.4826 MAD of `y`, floor 0.5% of capacity, at least 365
+   values for every statistic) is recomputed on every 7th day over days up to `t - 28`, not every
+   day. It reads only older days, so the cut holds.
+4. *Return closure and previous segment* use the six band features and the constants of
+   `e00709_bocpd` (3 days within 1.5 scaled units; previous segment up to 180 days). The statistic
+   detector has no size test (3 scaled units and 5% of capacity); its `z` threshold is the only gate.
+5. *Era id change vector.* The vector is the window ending 27 days after the onset minus the window
+   ending the day before it, over the scale on that day, readable on the later of that day and the
+   alarm day. An era is confirmed on the later of its first `era` day and that day. Recurrence
+   ignores withdrawn eras (an id of a withdrawn era may still be reused).
+6. *Dwell.* `era` needs 14 days of age from the estimated onset; `switch` has no minimum.
+7. *Shape evidence.* The post window is the days from the onset to the origin day minus 1, capped at
+   28 days; the pre window is the 28 days before the onset, at least 17 valid days. The profile
+   misfit is the RMS of the post median profile minus `a * pre profile + b`, over the scale of the
+   p50 statistic on the alarm day. The residual-shape change is the largest of the three
+   residual-shape changes over their scales. Both are clipped at 8 and are zero before 7 days after
+   the onset.
+8. *Tuning.* The threshold grid is 3 to 7. The false alarm rate counts alarms outside labelled
+   events on 2021-11 to 2024-12 without D8 (no surrogates, because shuffling days would destroy the
+   windows). The stat weights use the tuning-world rows at ages 7, 14, 21, 28, 45, and 60 days of
+   episodes of the statistics detector, so the tuning pass now also computes window statistics
+   (about 4 hosts per pass, 80 passes). The two-column ablation is printed as class-balanced
+   training accuracy.
+9. *Irregular engine.* -30% of capacity on half the days, for 4 to 12 hours starting at a random
+   half-hour, scored in 4 passes per scored month (stage 0 only; `--part engine`, included in
+   `all`). It is not in the bank.
+10. *D8 solar telemetry.* `e00709_era_table.py` now fits a ramp to the year-on-year change of the
+    28-day midday-minus-night level (2025-01-01 to 2025-08-31) and writes the first day and size
+    into the era table's solar row, so `e00709_era_table.py` must be re-run before stage 0. The
+    probe's fit puts the first day on 2025-04-05, between the register date (2025-03-24) and the
+    2025-04-26 alarm. The stage 0 clear-day estimate (2025-06-10) disagrees by about 9 weeks and is
+    still printed. The D8 solar gate accepts a detection within 30 days of either the register date
+    or the telemetry date and prints which date passed.
+11. *Start of the arm.* The detector starts when the scale exists (about 785 days after a Primary's
+    first reading, 2021-11-25 at D8). Events with an onset earlier than that are not scored for the
+    arm. The arm needs the Primary's raw power (`process_site(power=...)`), so the cut test passes
+    the perturbed power row.
+12. *`SiteSignal.era_id`* is 0 for every arm other than `stat`, and is part of `at_origin`, so
+    the cut test compares it.
+
+## Changes made after the Opus review of arm L-stat
+
+Applied after checking each finding against the code.
+
+- **B1 (supersession).** A 28-day change keeps `|z|` above the threshold for about 55 days after a
+  step, so a second alarm could supersede a real step about 30 days after its onset. An open
+  episode is now frozen for `CONTAMINATED_DAYS` (56) days from its onset, and on creating an
+  episode the alarm counter and the arming flag are reset. Probe on the real panel with a
+  synthetic step added to the power row (read-only): at D3, -25% on 2024-03-01 alarms on
+  2024-03-04 and stays open until 2024-06-14, where it is superseded by the genuine 2024-04-29
+  event that the unperturbed D3 also shows (alarm 2024-06-14); +15% alarms on 2024-03-10 with the
+  same ending. D12 with -25% on 2022-03-26 keeps the real episode (onset 2022-03-08, alarm
+  2022-03-26) open past the injected step instead of superseding it. D2 was not probed.
+- **B2 (tuning mask).** `tune_stat_detector` uses its own mask, 35 days before and 56 days after
+  a labelled event, and prints the false-alarm rates with the detector's 3/14-day margins too. The
+  threshold is chosen on the new mask.
+- **S1 (closure).** An episode closes by a return only if the six band features read back for 3
+  days and the alarming statistic has `|z|` below 1.5 for 3 days. The tuning step prints the share
+  of statistics episodes closed by a return within 14 days of the alarm. Closure now lags the
+  return by up to about 28 days (the window), and a reversal shows in the statistics for up to
+  about 90 days. The return step's contamination starts 31 days before the closure.
+- **S2 (onset and contamination).** The onset is split on the level statistic (percentiles 5, 50,
+  95, night, midday) with the largest `|z|`, and the contamination starts at the earlier of the
+  onset and the alarm minus 28 days.
+- **S3 (ablation).** Arm `stat_noshape` is the statistics detector with the seven rule columns
+  only. Its weights are the 7-column fit padded with zero shape weights (`stat_noshape_weights`,
+  saved and loaded). It goes through the same gates as every other arm.
+- **S4 (D8 solar).** The solar pass on the table's telemetry date is labelled as resting on a date
+  fitted to the same telemetry. A table date more than `D8_RELIABLE_DAYS` from the register date
+  is not used. The era table states that the size is a lower bound (D8 reports megavolt-amperes
+  only) and prints and stores the same sign (the fall, positive).
+- **S5.** `main` raises if `stat_weights` or `stat_noshape_weights` are zero after loading the
+  models (run `--part tune`).
+- **S6 (gaps).** The window row is computed with at least 17 valid days even if the last day is
+  invalid (the daily analogue still needs a valid day). A day without a finite statistic resets
+  the alarm counter. A gap of 7 or more days without readings suppresses alarms until both 28-day
+  windows are full again.
+- **Minor.** `Final[int]` on the percentile and time-of-day constants; the named constant
+  `ENGINE_WITHIN_DAYS`; `SiteResult.stat_evidence` is documented; "12" replaces "twelve".
+
+Rejected or left unchanged.
+
+- **S7 (vectorising `window_statistics`).** Left as a loop. A vectorised version would have to
+  reproduce the quantile interpolation and the validity rules exactly, and the loop runs once per
+  Primary (seconds), so the risk outweighs the saving.
+- **Era id 0.** Era id 0 means no era vector (its indicator is zero, so the model input is zero).
+  Ids of 1 or more index the shared new-era table of `e00709_model.py`, and an unseen id or a
+  curriculum id uses table index 0, as for every arm.

@@ -98,9 +98,10 @@ is the continuous ranked probability score in points of capacity, lower is bette
 | L-rule | Learned, rule classifier | The same detector, then a three-state rule (`unknown`, `era`, `switch`) from the neighbour mirror, the weather response, and duration | Era package for class `era`; removal for class `switch`; no action while `unknown` |
 | L-soft | Learned, trained classifier | The same detector, then a small neural classifier that outputs a probability of `era` | The era vector and anchor scaled by the probability; removal scaled by one minus the probability |
 | L-hmm | Learned, recurrent states | Sticky hidden-Markov model, forward filter; duration and recurrence are the only evidence of class | Learned vector per (Primary, state); a state counts as an era after 28 days of dwell |
-| L-R | Learned, reset only | L-rule's dates and classes | Anchor and lag translation only; no era encoder and no new weights |
+| L-stat | Learned, statistics detector | Step changes in 12 distribution statistics of the Primary's own raw power over trailing 28-day windows, each change compared with the same change one year earlier; then L-rule's three-state rule with two shape-evidence terms | The era package of O with detected dates, plus a learned vector per (Primary, era id), with one shared vector for an era id first confirmed after the training cut |
 
-All ten arms change stage 3 only and share stage 1 and stage 2 weights with A0, seed by seed.
+All ten arms (L-stat replaces L-R) change stage 3 only and share stage 1 and stage 2 weights with
+A0, seed by seed.
 Reference rows, not arms: A0-prev (A0's prevailing output, 16 head refits), the stored Candidate
 forecasts of experiments 667 and 668, climatology, and NGED's manual heuristic.
 
@@ -190,7 +191,7 @@ them.**
 - **The neighbours' mirror image.** A switching event moves load between electrical neighbours, so a
   neighbour shows the opposite shift and the sum is conserved. An era changes the substation's own
   net demand, and no neighbour moves. The classifier reuses the causal mirror statistic of
-  `ml-experiments/00687-causal-detector-features-for-the-prevailing-forecast-heads/e00687_features.py`,
+`ml-experiments/00687-causal-detector-features-for-the-prevailing-forecast-heads/e00687_features.py`,
   which reads no input later than 6 hours before the origin. Two limits apply: a neighbour may be
   unmetered, and experiment 456 found that a mirror test passed at shifted dates as often as at true
   dates.
@@ -391,6 +392,10 @@ A0-aug has the persistent steps and no signal.
   (2012)](https://doi.org/10.1080/01621459.2012.737745)).** Run daily on an expanding window, PELT
   is the same kind of arm as the change-point detector. Stage 0 uses a penalised least-squares
   segmentation in hindsight as a cross-check.
+- **L-R (reset only).** Stage 0 found that L-rule classed 3 of 64 steps of 25% as `era` by day 28,
+  so
+  an arm that acts only on L-rule's `era` class would differ from A0 on almost no row. L-stat takes
+  its place.
 - **The hindsight switching labels as a forecast input.** The labels are not available at the
   origin, so the labels score the classifier only.
 - **The weather encoder and the date-time encoder as separate arms, and the gas-engine state.** The
@@ -743,6 +748,57 @@ the anchor rule in section 2). The list below states the remaining decisions.
     ends lie inside ±0.05. C6 states its minimum detectable effect from its 8 eras. Prose fixes:
     conclusions in bold leads, no pronoun-opening sentences, no money metaphor, and expand ECMWF,
     ERA5, CAMS, PELT, and GELU on first use.
+
+## 21. Stage 0 results and the L-stat arm (interim)
+
+**Stage 0 ran on 2026-11-19 and the numbers below are interim.** The maintainer asked for arm
+L-stat:
+detect eras from 28-day summary statistics of raw power, find steps in those statistics, give each
+step an era id, and feed the id to the network. The design of L-stat is in this section and in the
+arm table. It replaces L-R, so the arm count and the compute budget stay level.
+
+**The perturbation test found one real leak, which is fixed.** Experiment 687's noise unit and the
+G4 threshold read past the origin for neighbours with an incomplete window. The rule and soft
+classifiers were refitted, and the cut test passes for 200 pairs and every arm.
+
+**The daily-feature change-point detector detects few small steps.** It needs a step of 3 noise
+units
+in one feature. At D8 one unit is 9% to 13% of capacity, so it detects 13 of 64 injected steps of
+10% and 14 of 64 solar-shaped steps, and misses D8's 2025 solar connection. It detects D8's gas
+change
+18 days after 2023-08-15 (gate: 14 days). Injected steps of 25% pass the detection gate (34 of 64
+within 7 days).
+
+**L-stat detects both D8 changes and rarely mistakes a load shift for an era.**
+
+- D8 gas change: alarm 10 days after 2023-08-15, classed `era` 9 days later (gate passed).
+- D8 solar change: alarm 33 days after the register date (2025-03-24) and 21 days after the
+  telemetry date fitted on the same statistic (2025-04-05). The gate passes on the telemetry date,
+  which rests on the same statistic as the alarm, so the pass is labelled as such. The earlier
+  telemetry estimate (2025-06-10) was 9 weeks later and is replaced.
+- Verified switching events (experiment 580, 15 transfers outside the scored window): 0 ever classed
+  `era` (Wilson 95% interval 0.00 to 0.20). Experiment 41 labelled events: 2 of 93 (0.02).
+- Injected bank, `era` class by day 28: L-stat 79 of 190 era events, against 13 for L-rule.
+  L-stat's `era` class on injected switching events is 5 of 211 at day 28.
+- False alarms: 0.31 per Primary-year on clean history at threshold 4.0 (limit 0.5).
+
+**Expectation, recorded before any fit:** L-stat keeps 10% to 30% of the ceiling on steps of 25% and
+under 10% on steps of 10%, because at most about 13 of the 28 scored days follow an `era` class
+(the state needs a dwell of 14 days). C7 is within +-0.1.
+
+**Plan changes from the L-stat design.**
+
+- L-stat is eligible as L-best. Two descriptive readings sit outside the nine contrasts: L-stat
+  minus L-rule on injected era events (NRA output), and L-stat with its era-id table zeroed at
+  inference, on stable rows and on rows after an era.
+- Era id 0 means "no era yet" and carries no vector. An id first confirmed after the training cut
+  uses one shared "new era" vector.
+- Anchor rule for every learned arm: the anchor equals the level change minus the offset's own
+  change between the knot before the onset and the newest knot, clipped between zero and the full
+  change. The known-answer check gains a case with an era confirmed after a refit. Phases B and C
+  never exercise that case, and phase D does.
+- Phase B gains 20 stage 3 fits (about 2 GPU job-hours) and about 1 hour of bank inference, and
+  loses L-R. An irregular-engine era kind exists in stage 0 only.
 
 ## Files
 

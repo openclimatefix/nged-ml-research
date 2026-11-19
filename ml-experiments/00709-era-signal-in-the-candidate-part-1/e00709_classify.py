@@ -34,10 +34,12 @@ import e00687_features as f687  # ty: ignore[unresolved-import]
 import e00709_bocpd as bocpd
 import e00709_features as features
 import e00709_hmm as hmm
+import e00709_statdetect as statdetect
+import e00709_stats as stats
 import numpy as np
 from e00709_hmm import STATE_ERA, STATE_SWITCH, STATE_UNKNOWN
 
-ArmType = Literal["all", "rule", "soft", "hmm"]
+ArmType = Literal["all", "rule", "soft", "hmm", "stat", "stat_noshape"]
 STATE_NAMES: Final[tuple[str, ...]] = ("none", "unknown", "era", "switch")
 
 EVIDENCE_NAMES: Final[tuple[str, ...]] = (
@@ -47,6 +49,13 @@ EVIDENCE_NAMES: Final[tuple[str, ...]] = (
 N_RULE_COLUMNS: Final[int] = 7
 """The first seven evidence columns feed the rule classifier."""
 N_EVIDENCE: Final[int] = len(EVIDENCE_NAMES)
+SHAPE_NAMES: Final[tuple[str, ...]] = ("profile_misfit", "residual_shape_change")
+N_STAT_COLUMNS: Final[int] = N_RULE_COLUMNS + len(SHAPE_NAMES)
+"""The `stat` arm's log-odds reads the seven rule columns and the two shape-evidence columns."""
+STAT_DWELL_DAYS: Final[int] = 14
+"""Age from the estimated onset before the `stat` arm may declare `era`; `switch` may be earlier."""
+SHAPE_MIN_DAYS: Final[int] = 7
+SHAPE_CLIP: Final[float] = 8.0
 LOG_ODDS_THRESHOLD: Final[float] = float(np.log(9.0))
 SOFT_LOW: Final[float] = 0.2
 SOFT_HIGH: Final[float] = 0.8
@@ -314,10 +323,13 @@ class EpisodeEvidence:
     Attributes:
         days: Days from the alarm day to the last day with evidence.
         x: Evidence matrix, shape (days, 13), columns in `EVIDENCE_NAMES`.
+        shape: The two shape-evidence columns (`SHAPE_NAMES`) of an episode of the `stat` arm,
+            shape (days, 2), or None.
     """
 
     days: np.ndarray
     x: np.ndarray
+    shape: np.ndarray | None = None
 
 
 def episode_evidence(
@@ -392,6 +404,117 @@ def episode_evidence(
     delta_share = np.abs(detector.delta_scaled[days]) * feat.spread[None, :]
     x[:, 12] = np.nan_to_num(np.nanmax(delta_share, axis=1))
     return EpisodeEvidence(days=days, x=x)
+
+
+def _valid_days(*, block: np.ndarray) -> int:
+    """Return the number of days of a (days, 48) block with at least 24 readings."""
+    return int((np.isfinite(block).sum(axis=1) >= features.MIN_READINGS_PER_DAY).sum())
+
+
+def shape_evidence(
+    *, power_site: np.ndarray, episode: bocpd.Episode, days: np.ndarray, scale: np.ndarray
+) -> np.ndarray:
+    """Return the two shape-evidence columns of an episode on each of its days.
+
+    Both columns compare the post-onset days (the first 28 days after the onset, or fewer up to the
+    day, and at least 7) with the 28 days before the onset, so no window straddles the step.
+
+    - *Profile misfit.* Fit the post-onset median half-hour profile as `a * pre-onset profile + b`.
+      A transfer scales or shifts the profile, so its misfit is small. An engine or a solar farm
+      adds a shape that the fit cannot reproduce. The root-mean-square misfit is divided by the
+      scale of the 50th-percentile statistic.
+    - *Residual-shape change.* The largest absolute change, over the 5th percentile, the 95th
+      percentile, and the interquartile range of the residual around each window's own median
+      profile, divided by that statistic's scale.
+
+    Args:
+        power_site: The Primary's power over capacity.
+        episode: The episode.
+        days: The days to evaluate (the evidence days of the episode).
+        scale: The statistics detector's scale on the alarm day, shape (12,).
+
+    Returns:
+        An array (days, 2), zero before 7 days after the onset or where the pre-onset window has
+        fewer than 17 valid days.
+    """
+    grid = power_site.reshape(-1, features.HALF_HOURS_PER_DAY)
+    onset = episode.onset_day
+    out = np.zeros((len(days), len(SHAPE_NAMES)))
+    pre = grid[max(onset - stats.WINDOW_DAYS, 0) : onset]
+    if pre.shape[0] == 0 or _valid_days(block=pre) < stats.MIN_VALID_DAYS:
+        return out
+    floor = stats.SCALE_FLOOR
+    level_scale = float(scale[stats.P50]) if np.isfinite(scale[stats.P50]) else floor
+    shape_scale = np.where(
+        np.isfinite(scale[stats.RESIDUAL_SHAPE]), scale[stats.RESIDUAL_SHAPE], floor
+    )
+    pre_profile = np.nanmedian(pre, axis=0)
+    pre_shape = np.array(stats.residual_shape(block=pre))
+    cache: dict[int, tuple[float, float]] = {}
+    for i, day in enumerate(days):
+        end = min(int(day), onset + stats.WINDOW_DAYS - 1)
+        if end - onset + 1 < SHAPE_MIN_DAYS:
+            continue
+        if end not in cache:
+            post = grid[onset : end + 1]
+            post_profile = np.nanmedian(post, axis=0)
+            ok = np.isfinite(pre_profile) & np.isfinite(post_profile)
+            misfit = shape_change = 0.0
+            if ok.sum() >= features.HALF_HOURS_PER_DAY // 2:
+                design = np.stack([pre_profile[ok], np.ones(int(ok.sum()))], axis=1)
+                coefficients, *_ = np.linalg.lstsq(design, post_profile[ok], rcond=None)
+                residual = post_profile[ok] - design @ coefficients
+                misfit = float(np.sqrt(np.mean(residual**2)) / level_scale)
+                post_shape = np.array(stats.residual_shape(block=post))
+                change = np.abs(post_shape - pre_shape) / shape_scale
+                shape_change = float(np.nanmax(change)) if np.isfinite(change).any() else 0.0
+            cache[end] = (min(misfit, SHAPE_CLIP), min(shape_change, SHAPE_CLIP))
+        out[i] = cache[end]
+    return out
+
+
+def stat_episode_evidence(
+    *,
+    output: statdetect.StatOutput,
+    power_site: np.ndarray,
+    feat: features.SiteFeatures,
+    mirror: np.ndarray,
+    g4: np.ndarray,
+    site: int,
+    neighbours: dict[int, list[int]],
+    all_features: Sequence[features.SiteFeatures],
+    weather: features.DailyWeather,
+    survival: SwitchSurvival,
+) -> dict[int, EpisodeEvidence]:
+    """Compute the evidence of every episode of the statistics detector, shape terms included.
+
+    Args:
+        output: The statistics detector's output.
+        power_site: The Primary's power over capacity.
+        feat: The Primary's features.
+        mirror: The Primary's experiment 687 features at the end of each day.
+        g4: Gate G4 of this Primary on each day.
+        site: Index of the Primary.
+        neighbours: Electrical neighbours of each site.
+        all_features: Features of every site.
+        weather: ERA5 summaries.
+        survival: Survival of the labelled switching durations.
+
+    Returns:
+        The evidence of each episode, with the `shape` columns set.
+    """
+    out = {}
+    for episode in output.detector.episodes:
+        base = episode_evidence(
+            episode=episode, detector=output.detector, feat=feat, mirror=mirror, g4=g4, site=site,
+            neighbours=neighbours, all_features=all_features, weather=weather, survival=survival,
+        )  # fmt: skip
+        shape = shape_evidence(
+            power_site=power_site, episode=episode, days=base.days,
+            scale=output.scale[episode.alarm_day],
+        )  # fmt: skip
+        out[episode.episode] = EpisodeEvidence(days=base.days, x=base.x, shape=shape)
+    return out
 
 
 # ---------------------------------------------------------------- the fitted classifiers
@@ -547,6 +670,13 @@ class Models:
         train_end_day: First day that the hidden-Markov fits did not read.
         soft: The soft classifier, or None before it is trained.
         hmm_parameters: The sticky hidden-Markov model of each site, by site index.
+        stat_threshold: The statistics detector's alarm threshold on the largest absolute scaled
+            change.
+        stat_weights: Weights of the `stat` arm's nine evidence columns (the seven rule columns and
+            the two shape-evidence columns).
+        stat_noshape_weights: Weights of the `stat_noshape` arm, which uses the statistics detector
+            and the seven rule columns only, with the same 9-column layout (the shape weights are
+            zero).
     """
 
     threshold: float
@@ -555,6 +685,9 @@ class Models:
     train_end_day: int
     soft: SoftClassifier | None = None
     hmm_parameters: dict[int, hmm.HmmParameters] = field(default_factory=dict)
+    stat_threshold: float = statdetect.DEFAULT_STAT_THRESHOLD
+    stat_weights: np.ndarray = field(default_factory=lambda: np.zeros(N_STAT_COLUMNS))
+    stat_noshape_weights: np.ndarray = field(default_factory=lambda: np.zeros(N_STAT_COLUMNS))
 
 
 # ---------------------------------------------------------------- classes per episode and site
@@ -577,7 +710,7 @@ class EpisodeClass:
     class_day: int
 
 
-def classify_episode(
+def classify_episode(  # noqa: PLR0912 - one branch per arm
     *, evidence: EpisodeEvidence, episode: bocpd.Episode, arm: ArmType, models: Models
 ) -> EpisodeClass:
     """Classify an episode day by day with one of the three detector-fed arms.
@@ -588,7 +721,9 @@ def classify_episode(
     Args:
         evidence: The episode's evidence.
         episode: The episode.
-        arm: `all`, `rule`, or `soft`.
+        arm: `all`, `rule`, `soft`, or `stat`. The `stat` arm reads the nine columns of
+            `N_STAT_COLUMNS` and may declare `era` only from `STAT_DWELL_DAYS` of age after the
+            estimated onset (`switch` may be declared earlier).
         models: The frozen weights and thresholds.
 
     Returns:
@@ -608,6 +743,21 @@ def classify_episode(
         for i in range(m):
             if locked == STATE_UNKNOWN and abs(log_odds[i]) >= LOG_ODDS_THRESHOLD:
                 locked = STATE_ERA if log_odds[i] > 0 else STATE_SWITCH
+            state[i] = locked
+        p_era = np.where(state == STATE_ERA, 1.0, np.where(state == STATE_UNKNOWN, 0.5, 0.0))
+    elif arm in ("stat", "stat_noshape"):
+        shape = evidence.shape if evidence.shape is not None else np.zeros((m, len(SHAPE_NAMES)))
+        weights = models.stat_weights if arm == "stat" else models.stat_noshape_weights
+        log_odds = np.hstack([evidence.x[:, :N_RULE_COLUMNS], shape]) @ weights
+        age = evidence.days - episode.onset_day + 1
+        state = np.full(m, STATE_UNKNOWN, dtype=np.int8)
+        locked = STATE_UNKNOWN
+        for i in range(m):
+            if locked == STATE_UNKNOWN:
+                if log_odds[i] <= -LOG_ODDS_THRESHOLD:
+                    locked = STATE_SWITCH
+                elif log_odds[i] >= LOG_ODDS_THRESHOLD and age[i] >= STAT_DWELL_DAYS:
+                    locked = STATE_ERA
             state[i] = locked
         p_era = np.where(state == STATE_ERA, 1.0, np.where(state == STATE_UNKNOWN, 0.5, 0.0))
     elif arm == "soft":
@@ -658,6 +808,8 @@ class SiteSignal:
         withdrawn: True on a day when an era was withdrawn (reversed, or its level returned), so
             the anchor falls back to the previous era's.
         episode_bounds: First day and last day (-1 while open) of each episode or excursion.
+        era_id: The id of the current era of the `stat` arm (0 before any era is confirmed, and for
+            every other arm). An id confirmed on day `T` appears from the entry of day `T`.
     """
 
     state: np.ndarray
@@ -672,6 +824,7 @@ class SiteSignal:
     persistent_episode: np.ndarray
     withdrawn: np.ndarray
     episode_bounds: list[tuple[int, int]]
+    era_id: np.ndarray
 
     def at_origin(self, *, origin_day: int) -> np.ndarray:
         """Return every column at the origin of a day, as one flat vector for comparison.
@@ -681,14 +834,14 @@ class SiteSignal:
 
         Returns:
             State, probability, log-odds, age, era index, anchor, depth, withdrawal flag,
-            persistent episode, and the change vector.
+            persistent episode, era id, and the change vector.
         """
         d = origin_day - 1
         return np.concatenate(
             [
                 [self.state[d], self.p_era[d], self.log_odds[d], self.age_days[d]],
                 [self.era_index[d], self.anchor[d], self.depth[d], self.withdrawn[d]],
-                [self.persistent_episode[d]],
+                [self.persistent_episode[d], self.era_id[d]],
                 self.change_vector[d],
             ]
         )
@@ -715,6 +868,7 @@ def compose_site_signal(
     classes: dict[int, EpisodeClass],
     spread: np.ndarray,
     n_days: int,
+    vectors: dict[int, tuple[int, np.ndarray]] | None = None,
 ) -> SiteSignal:
     """Combine the episodes' classes into one per-day signal of a Primary.
 
@@ -730,6 +884,8 @@ def compose_site_signal(
         classes: The class of each episode.
         spread: The robust spread of each feature, to express the change as a share of capacity.
         n_days: Number of days.
+        vectors: For the `stat` arm, each episode's change vector and the day it can be read
+            (`StatOutput.vectors`), from which the era ids are drawn. None for the other arms.
 
     Returns:
         The signal of the arm.
@@ -745,6 +901,7 @@ def compose_site_signal(
     withdrawn = np.zeros(n_days, dtype=bool)
     persistent_episode = np.full(n_days, -1, dtype=np.int64)
     persistent: list[int] = []
+    stacks: list[tuple[int, ...]] = []
     registered: set[int] = set()
     weights = features.BAND_WEIGHTS * spread
     for day in range(n_days):
@@ -778,6 +935,8 @@ def compose_site_signal(
             change[day], anchor[day] = vector, float(weights @ vector)
         era_index[day] = len(persistent)
         persistent_episode[day] = persistent[-1] if persistent else -1
+        stacks.append(tuple(persistent))
+    era_id = _era_ids(stacks=stacks, vectors=vectors, n_days=n_days)
     return SiteSignal(
         state=state,
         p_era=p_era,
@@ -791,7 +950,40 @@ def compose_site_signal(
         persistent_episode=persistent_episode,
         withdrawn=withdrawn,
         episode_bounds=[(e.alarm_day, e.end_day) for e in detector.episodes],
+        era_id=era_id,
     )
+
+
+def _era_ids(
+    *,
+    stacks: list[tuple[int, ...]],
+    vectors: dict[int, tuple[int, np.ndarray]] | None,
+    n_days: int,
+) -> np.ndarray:
+    """Return the era id on each day (zero unless `vectors` is given).
+
+    An era is confirmed on the later of the day it first stands as an era and the day its change
+    vector can be read. Days before that keep the earlier era's id and are never relabelled.
+    """
+    out = np.zeros(n_days, dtype=np.int64)
+    if vectors is None:
+        return out
+    first_seen: dict[int, int] = {}
+    for day, stack in enumerate(stacks):
+        for episode in stack:
+            first_seen.setdefault(episode, day)
+    confirmed_on = {
+        k: max(day, vectors[k][0]) for k, day in first_seen.items() if vectors[k][0] < n_days
+    }
+    ids = statdetect.assign_era_ids(
+        confirmed=[(k, day, vectors[k][1]) for k, day in confirmed_on.items()]
+    )
+    for day, stack in enumerate(stacks):
+        for episode in reversed(stack):
+            if episode in confirmed_on and confirmed_on[episode] <= day:
+                out[day] = ids[episode]
+                break
+    return out
 
 
 def hmm_signal(*, signal: hmm.HmmSignal, spread: np.ndarray) -> SiteSignal:
@@ -820,6 +1012,7 @@ def hmm_signal(*, signal: hmm.HmmSignal, spread: np.ndarray) -> SiteSignal:
         persistent_episode=signal.persistent_excursion,
         withdrawn=np.zeros(n_days, dtype=bool),
         episode_bounds=[(a, b) for a, b, _ in signal.excursions],
+        era_id=np.zeros(n_days, dtype=np.int64),
     )
 
 
@@ -831,11 +1024,15 @@ class SiteResult:
         detector: The detector output.
         evidence: The evidence of each episode.
         signals: The per-day signal of each arm.
+        stat: The statistics detector's output, or None if the `stat` arm was not computed.
+        stat_evidence: The evidence of each statistics-detector episode, by episode number.
     """
 
     detector: bocpd.DetectorOutput
     evidence: dict[int, EpisodeEvidence]
     signals: dict[ArmType, SiteSignal]
+    stat: statdetect.StatOutput | None = None
+    stat_evidence: dict[int, EpisodeEvidence] = field(default_factory=dict)
 
 
 def process_site(
@@ -847,7 +1044,9 @@ def process_site(
     neighbours: dict[int, list[int]],
     weather: features.DailyWeather,
     models: Models,
-    arms: Sequence[ArmType] = ("all", "rule", "soft", "hmm"),
+    arms: Sequence[ArmType] = ("all", "rule", "soft", "hmm", "stat"),
+    power: np.ndarray | None = None,
+    windows: stats.WindowStats | None = None,
 ) -> SiteResult:
     """Run the detector, the evidence, and the arms for one Primary.
 
@@ -862,9 +1061,14 @@ def process_site(
         weather: ERA5 summaries.
         models: The frozen detector threshold, weights, and classifiers.
         arms: The arms to compute.
+        power: This site's power over capacity, needed by the `stat` arm.
+        windows: This site's window statistics (computed from `power` if omitted).
 
     Returns:
         The site's result.
+
+    Raises:
+        ValueError: If the `stat` arm is requested without `power`.
     """
     feat = all_features[site]
     n_days = feat.raw.shape[0]
@@ -887,7 +1091,36 @@ def process_site(
         for e in detector.episodes
     }
     signals: dict[ArmType, SiteSignal] = {}
+    stat_output: statdetect.StatOutput | None = None
+    stat_evidence: dict[int, EpisodeEvidence] = {}
+    if ("stat" in arms or "stat_noshape" in arms) and feat.ready_day < n_days:
+        if power is None:
+            msg = "the stat arm needs the site's power"
+            raise ValueError(msg)
+        stat_output = statdetect.detect_stat(
+            windows=windows if windows is not None else stats.window_statistics(power_site=power),
+            scaled=feat.scaled,
+            threshold=models.stat_threshold,
+        )
+        stat_evidence = stat_episode_evidence(
+            output=stat_output, power_site=power, feat=feat, mirror=mirror, g4=g4, site=site,
+            neighbours=neighbours, all_features=all_features, weather=weather,
+            survival=models.survival,
+        )  # fmt: skip
     for arm in arms:
+        if arm in ("stat", "stat_noshape"):
+            if stat_output is not None:
+                classes = {
+                    e.episode: classify_episode(
+                        evidence=stat_evidence[e.episode], episode=e, arm=arm, models=models
+                    )
+                    for e in stat_output.detector.episodes
+                }
+                signals[arm] = compose_site_signal(
+                    detector=stat_output.detector, classes=classes, spread=feat.spread,
+                    n_days=n_days, vectors=stat_output.vectors,
+                )  # fmt: skip
+            continue
         if arm == "hmm":
             params = models.hmm_parameters.get(site)
             if params is None or feat.ready_day >= n_days:
@@ -910,7 +1143,13 @@ def process_site(
         signals[arm] = compose_site_signal(
             detector=detector, classes=classes, spread=feat.spread, n_days=n_days
         )
-    return SiteResult(detector=detector, evidence=evidence, signals=signals)
+    return SiteResult(
+        detector=detector,
+        evidence=evidence,
+        signals=signals,
+        stat=stat_output,
+        stat_evidence=stat_evidence,
+    )
 
 
 def fit_hmm_parameters(
@@ -947,12 +1186,15 @@ def save_models(*, models: Models, folder: Path) -> None:
     arrays: dict[str, np.ndarray] = {
         "rule_weights": models.rule_weights,
         "survival_durations": models.survival.durations,
+        "stat_weights": models.stat_weights,
+        "stat_noshape_weights": models.stat_noshape_weights,
     }
     scalars: dict[str, object] = {
         "threshold": models.threshold,
         "train_end_day": models.train_end_day,
         "hmm_sites": sorted(models.hmm_parameters),
         "soft": models.soft is not None,
+        "stat_threshold": models.stat_threshold,
     }
     if models.soft is not None:
         soft = models.soft
@@ -993,6 +1235,17 @@ def load_models(*, folder: Path) -> Models:
             survival=SwitchSurvival(durations=arrays["survival_durations"]),
             train_end_day=int(scalars["train_end_day"]),
             soft=soft,
+            stat_threshold=float(scalars.get("stat_threshold", statdetect.DEFAULT_STAT_THRESHOLD)),
+            stat_weights=(
+                arrays["stat_weights"]
+                if "stat_weights" in arrays.files
+                else np.zeros(N_STAT_COLUMNS)
+            ),
+            stat_noshape_weights=(
+                arrays["stat_noshape_weights"]
+                if "stat_noshape_weights" in arrays.files
+                else np.zeros(N_STAT_COLUMNS)
+            ),
             hmm_parameters={
                 int(site): hmm.HmmParameters(
                     means=arrays[f"hmm_{site}_means"],

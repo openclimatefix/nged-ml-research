@@ -45,12 +45,14 @@ import e00709_bocpd as bocpd
 import e00709_classify as classify
 import e00709_features as features
 import e00709_inject as inject
+import e00709_statdetect as statdetect
+import e00709_stats as stats
 import numpy as np
 import polars as pl
 from e00709_classify import STATE_NAMES, ArmType, Models, SiteResult, SiteSignal
 from e00709_hmm import STATE_ERA
 
-ARMS: Final[tuple[ArmType, ...]] = ("all", "rule", "soft", "hmm")
+ARMS: Final[tuple[ArmType, ...]] = ("all", "rule", "soft", "hmm", "stat", "stat_noshape")
 CHECK_DAYS: Final[tuple[int, ...]] = (7, 14, 28, 60)
 TUNING_WINDOW: Final[tuple[date, date]] = (date(2021, 11, 1), date(2024, 12, 31))
 HMM_TRAIN_END: Final[date] = date(2025, 1, 1)
@@ -69,15 +71,34 @@ ALARM_WINDOW: Final[tuple[int, int]] = (-2, 90)
 """Days relative to the onset in which an episode's start counts as the detection of the event."""
 EVENT_MARGIN_BEFORE: Final[int] = 3
 EVENT_MARGIN_AFTER: Final[int] = 14
+STAT_MARGIN_BEFORE: Final[int] = 35
+"""Days before a labelled event that the statistics tuning mask starts (a window plus 7)."""
+STAT_MARGIN_AFTER: Final[int] = 56
+"""Days after a labelled event that the statistics tuning mask ends (the contamination span)."""
+STAT_RETURN_CHECK_DAYS: Final[int] = 14
 D8: Final[str] = "D8"
 D8_RELIABLE_DAYS: Final[int] = 120
 """A measured telemetry date more than this many days from the register date is not used."""
 D8_DETECTION_GATE_DAYS: Final[int] = 14
+D8_SOLAR_GATE_DAYS: Final[int] = 30
+"""The solar gate accepts a detection within this many days of the register date or of the
+telemetry date."""
+D8_GAS_WINDOW_ENDS: Final[tuple[date, ...]] = (
+    date(2023, 8, 5), date(2023, 8, 19), date(2023, 9, 2), date(2023, 9, 30), date(2023, 10, 28),
+)  # fmt: skip
+D8_SOLAR_WINDOW_ENDS: Final[tuple[date, ...]] = (
+    date(2025, 3, 1), date(2025, 3, 29), date(2025, 4, 26), date(2025, 5, 24), date(2025, 6, 21),
+)  # fmt: skip
+ENGINE_PASSES_PER_MONTH: Final[int] = 4
+"""Passes per scored month of the irregular-engine world (two engines each, stage 0 only)."""
+STAT_ONSET_AGES: Final[tuple[int, ...]] = (7, 14, 21, 28, 45, 60)
 GATE_ERA_SHARE: Final[float] = 0.70
 GATE_SWITCH_INJECTED: Final[float] = 0.10
 GATE_SWITCH_VERIFIED: Final[float] = 0.15
 GATE_DETECTED_SHARE: Final[float] = 0.50
 DETECTION_LIMITS: Final[dict[str, int]] = {"level_m25": 7, "level_m10": 21}
+ENGINE_WITHIN_DAYS: Final[int] = 28
+"""Days within which an irregular-engine era should be alarmed (4 times the level_m25 limit)."""
 """Days within which the share of an era kind's events must be detected (item 5)."""
 CUT_PAIRS: Final[int] = 200
 CUT_SEED: Final[int] = 709_999
@@ -108,6 +129,7 @@ class Context:
         events: The known switching events table.
         era_table: The era table that `e00709_era_table.py` wrote.
         ready_days: First day with features of every site.
+        stat_windows: The window statistics of every site on the real panel.
     """
 
     panel: features.Panel
@@ -119,6 +141,7 @@ class Context:
     events: pl.DataFrame
     era_table: pl.DataFrame
     ready_days: np.ndarray
+    stat_windows: list[stats.WindowStats]
 
 
 @dataclass(frozen=True)
@@ -190,15 +213,28 @@ def build_context() -> Context:
         events=events,
         era_table=pl.read_parquet(ERA_TABLE_PATH),
         ready_days=np.array([f.ready_day for f in feats]),
+        stat_windows=[stats.window_statistics(power_site=row) for row in panel.power],
     )
 
 
-def _event_mask(*, ctx: Context, site: str) -> np.ndarray:
-    """Return the days inside a known event of the site, widened by the detector's margins."""
+def _event_mask(
+    *, ctx: Context, site: str, before: int = EVENT_MARGIN_BEFORE, after: int = EVENT_MARGIN_AFTER
+) -> np.ndarray:
+    """Return the days inside a known event of the site, widened by margins.
+
+    Args:
+        ctx: The context.
+        site: The site name.
+        before: Days before the event onset that the mask starts.
+        after: Days after the event end that the mask ends.
+
+    Returns:
+        A boolean mask over the panel's days.
+    """
     mask = np.zeros(ctx.panel.n_days, dtype=bool)
     for row in ctx.events.filter(pl.col("site") == site).iter_rows(named=True):
-        first = features.day_index(day=row["onset_utc"].date()) - EVENT_MARGIN_BEFORE
-        last = features.day_index(day=row["end_utc"].date()) + EVENT_MARGIN_AFTER
+        first = features.day_index(day=row["onset_utc"].date()) - before
+        last = features.day_index(day=row["end_utc"].date()) + after
         mask[max(first, 0) : last + 1] = True
     return mask
 
@@ -262,6 +298,60 @@ def tune_detector(*, ctx: Context) -> float:
     return max(choices)
 
 
+def tune_stat_detector(*, ctx: Context) -> float:
+    """Tune the statistics detector's threshold on clean real history, without D8.
+
+    A 28-day change reacts to a step for 28 days before it and 56 days after it, so the mask of
+    days that do not count as false alarms starts 35 days before a labelled event and ends 56 days
+    after it. The false-alarm rates with the detector's 3-day and 14-day margins are printed too.
+    The window is 2021-11 to 2024-12. The function also prints the share of the statistics
+    detector's episodes that close by a return within 14 days of the alarm.
+
+    Args:
+        ctx: The context.
+
+    Returns:
+        The chosen threshold.
+    """
+    window = tuple(features.day_index(day=d) for d in TUNING_WINDOW)
+    sites = [i for i, s in enumerate(ctx.panel.sites) if s != D8 and ctx.ready_days[i] < window[1]]
+    windows = [ctx.stat_windows[i] for i in sites]
+    scaled = [ctx.feats[i].scaled for i in sites]
+    _, old_rates = statdetect.tune_stat_threshold(
+        windows=windows, scaled=scaled, window=(window[0], window[1]),
+        excluded=[_event_mask(ctx=ctx, site=ctx.panel.sites[i]) for i in sites],
+    )  # fmt: skip
+    print(f"statistics detector, detector margins (3/14 days), per Primary-year: {old_rates}")
+    choice, rates = statdetect.tune_stat_threshold(
+        windows=windows, scaled=scaled, window=(window[0], window[1]),
+        excluded=[
+            _event_mask(
+                ctx=ctx, site=ctx.panel.sites[i], before=STAT_MARGIN_BEFORE, after=STAT_MARGIN_AFTER
+            )
+            for i in sites
+        ],
+    )  # fmt: skip
+    print(f"statistics detector: threshold {choice}, false alarms per Primary-year {rates}")
+    n_episodes = n_returned = 0
+    for w, x in zip(windows, scaled, strict=True):
+        episodes = statdetect.detect_stat(windows=w, scaled=x, threshold=choice).detector.episodes
+        n_episodes += len(episodes)
+        n_returned += sum(
+            e.ended_by == "return" and e.end_day - e.alarm_day <= STAT_RETURN_CHECK_DAYS
+            for e in episodes
+        )
+    print(
+        f"statistics episodes closed by a return within {STAT_RETURN_CHECK_DAYS} days of the "
+        f"alarm: {share_text(k=n_returned, n=n_episodes)}"
+    )
+    if rates[choice] > bocpd.FALSE_ALARM_TARGET:
+        print(
+            f"GATE FAILURE: no statistics threshold on the grid reaches {bocpd.FALSE_ALARM_TARGET} "
+            f"false alarms per Primary-year; the fallback {choice} gives {rates[choice]:.2f}"
+        )
+    return choice
+
+
 def _features_of_pass(
     *, ctx: Context, injected: inject.InjectedPass
 ) -> list[features.SiteFeatures]:
@@ -313,24 +403,42 @@ def process_hosts(
             site=host, all_features=feats,
             mirror=classify.mirror_features(grid=grid, site=host, neighbours=neighbours),
             g4=g4[host], neighbours=neighbours, weather=ctx.weather, models=models, arms=arms,
+            power=injected.power[host] if ("stat" in arms or "stat_noshape" in arms) else None,
         )  # fmt: skip
     return results
 
 
 def _evidence_rows(
-    *, result: SiteResult, truth: dict, onset_day: int
+    *, result: SiteResult, truth: dict, onset_day: int, stat: bool = False
 ) -> tuple[np.ndarray, np.ndarray] | None:
-    """Return the evidence rows of the episode that detects a tuning event, at ages 7 to 60 days."""
+    """Return the evidence rows of the episode that detects a tuning event, at ages 7 to 60 days.
+
+    Args:
+        result: The host's pipeline result.
+        truth: The event's truth row.
+        onset_day: Day of the onset.
+        stat: Read the statistics detector's episodes, and append its two shape columns.
+
+    Returns:
+        The rows and their labels (1 for an era), or None if no episode detects the event.
+    """
+    detector = result.stat.detector if stat and result.stat is not None else result.detector
+    evidence_of = result.stat_evidence if stat else result.evidence
     episodes = [
         e
-        for e in result.detector.episodes
+        for e in detector.episodes
         if ALARM_WINDOW[0] <= e.alarm_day - onset_day <= ALARM_WINDOW[1]
     ]
     if not episodes:
         return None
-    evidence = result.evidence[episodes[0].episode]
-    pick = [np.flatnonzero(evidence.days == onset_day + a) for a in (7, 14, 21, 28, 45, 60)]
-    rows = [evidence.x[p[0]] for p in pick if len(p)]
+    evidence = evidence_of[episodes[0].episode]
+    shape = evidence.shape if stat else None
+    pick = [np.flatnonzero(evidence.days == onset_day + a) for a in STAT_ONSET_AGES]
+    rows = [
+        np.concatenate([evidence.x[p[0]], shape[p[0]]]) if shape is not None else evidence.x[p[0]]
+        for p in pick
+        if len(p) and (shape is not None or not stat)
+    ]
     if not rows:
         return None
     return np.stack(rows), np.full(len(rows), 1 if truth["truth"] == "era" else 0)
@@ -346,6 +454,7 @@ def tune_classifiers(*, ctx: Context, models: Models) -> None:
     rng = np.random.default_rng(inject.world_seed(world="tuning", index=99_999))
     window = tuple(features.day_index(day=d) for d in TUNING_WINDOW)
     xs, ys, groups = [], [], []
+    stat_xs, stat_ys = [], []
     for index in range(TUNING_PASSES):
         injected = None
         for _ in range(TUNING_ONSET_TRIES):
@@ -371,15 +480,20 @@ def tune_classifiers(*, ctx: Context, models: Models) -> None:
         if injected is None:
             print(f"tuning pass {index}: no feasible onset day in {TUNING_ONSET_TRIES} draws")
             continue
-        results = process_hosts(ctx=ctx, models=models, injected=injected, arms=())
+        results = process_hosts(ctx=ctx, models=models, injected=injected, arms=("stat",))
         for truth in injected.truth.iter_rows(named=True):
-            rows = _evidence_rows(
-                result=results[truth["host"]], truth=truth, onset_day=truth["onset_day"]
-            )
+            result = results[truth["host"]]
+            rows = _evidence_rows(result=result, truth=truth, onset_day=truth["onset_day"])
             if rows is not None:
                 xs.append(rows[0])
                 ys.append(rows[1])
                 groups.append(np.full(len(rows[1]), index))
+            stat_rows = _evidence_rows(
+                result=result, truth=truth, onset_day=truth["onset_day"], stat=True
+            )
+            if stat_rows is not None:
+                stat_xs.append(stat_rows[0])
+                stat_ys.append(stat_rows[1])
     x, y, group = np.concatenate(xs), np.concatenate(ys), np.concatenate(groups)
     print(f"tuning rows: {len(y)} ({int(y.sum())} era, {int((1 - y).sum())} switch)")
     models.rule_weights = classify.fit_logistic(x=x[:, : classify.N_RULE_COLUMNS], y=y)
@@ -394,6 +508,42 @@ def tune_classifiers(*, ctx: Context, models: Models) -> None:
         ),
     )
     models.soft = classify.train_soft(x=x, y=y, groups=group, seed=709)
+    tune_stat_weights(models=models, xs=stat_xs, ys=stat_ys)
+
+
+def tune_stat_weights(*, models: Models, xs: list[np.ndarray], ys: list[np.ndarray]) -> None:
+    """Fit the `stat` arm's nine weights, and print the fit without the two shape columns.
+
+    The ablation costs no extra fit of a network: it is the logistic fit on the seven rule columns
+    of the same rows, and the printed figure is each fit's class-balanced training accuracy.
+
+    Args:
+        models: The models; `stat_weights` is set in place.
+        xs: Evidence rows of the statistics detector's episodes (13 columns and 2 shape columns).
+        ys: The labels (1 for an era).
+    """
+    if not xs:
+        print("statistics tuning rows: none; the stat weights stay at zero")
+        return
+    x, y = np.concatenate(xs), np.concatenate(ys)
+    columns = [*range(classify.N_RULE_COLUMNS), *range(classify.N_EVIDENCE, x.shape[1])]
+    with_shape = classify.fit_logistic(x=x[:, columns], y=y)
+    without = classify.fit_logistic(x=x[:, : classify.N_RULE_COLUMNS], y=y)
+    models.stat_weights = with_shape
+    models.stat_noshape_weights = np.concatenate([without, np.zeros(len(columns) - len(without))])
+
+    def balanced(*, weights: np.ndarray, cols: list[int]) -> float:
+        predicted = (x[:, cols] @ weights) > 0
+        return 0.5 * (float(predicted[y == 1].mean()) + float((~predicted)[y == 0].mean()))
+
+    print(
+        f"statistics tuning rows: {len(y)} ({int(y.sum())} era, {int((1 - y).sum())} switch); "
+        f"class-balanced training accuracy with the shape columns "
+        f"{balanced(weights=with_shape, cols=columns):.3f}, without "
+        f"{balanced(weights=without, cols=columns[: classify.N_RULE_COLUMNS]):.3f}"
+    )
+    names = [*classify.EVIDENCE_NAMES[: classify.N_RULE_COLUMNS], *classify.SHAPE_NAMES]
+    print("stat weights:", dict(zip(names, with_shape.round(3), strict=True)))
 
 
 def tune(*, ctx: Context) -> Models:
@@ -415,6 +565,7 @@ def tune(*, ctx: Context) -> Models:
         survival=classify.SwitchSurvival(durations=ctx.verified_days),
         train_end_day=train_end,
         hmm_parameters=classify.fit_hmm_parameters(all_features=ctx.feats, train_end_day=train_end),
+        stat_threshold=tune_stat_detector(ctx=ctx),
     )
     print(f"alarm threshold {models.threshold}; verified durations n={len(ctx.verified_days)}")
     tune_classifiers(ctx=ctx, models=models)
@@ -439,6 +590,7 @@ def real_results(*, ctx: Context, models: Models) -> dict[int, SiteResult]:
             site=site, all_features=ctx.feats,
             mirror=classify.mirror_features(grid=grid, site=site), g4=ctx.g4_real[site],
             neighbours=ctx.panel.neighbours, weather=ctx.weather, models=models,
+            power=ctx.panel.power[site], windows=ctx.stat_windows[site],
         )
         for site in range(len(ctx.panel.sites))
     }  # fmt: skip
@@ -507,6 +659,10 @@ def score_event(
     for arm, signal in result.signals.items():
         if arm == "hmm" and onset_day < train_end_day:
             continue
+        if arm in ("stat", "stat_noshape") and (
+            result.stat is None or onset_day < result.stat.start_day
+        ):
+            continue
         episode = _matched_episode(signal=signal, onset_day=onset_day)
         matched = _matched_state(signal=signal, episode=episode, n_days=n_days)
         start = signal.episode_bounds[episode][0] if episode >= 0 else -1
@@ -523,13 +679,20 @@ def score_event(
     return row
 
 
-def injected_events(*, ctx: Context, models: Models, passes_per_month: int) -> pl.DataFrame:
-    """Score the injected bank: sixteen passes per scored month, two eras and two switches each.
+def injected_events(
+    *,
+    ctx: Context,
+    models: Models,
+    passes_per_month: int,
+    world: inject.WorldNameType = "bank",
+) -> pl.DataFrame:
+    """Score an injected world: sixteen passes per scored month, two eras and two switches each.
 
     Args:
         ctx: The context.
         models: The frozen models.
         passes_per_month: Passes per scored month.
+        world: `bank`, or `engine` for the irregular-engine eras of stage 0.
 
     Returns:
         One row per injected event with the scores of `score_event`.
@@ -541,7 +704,7 @@ def injected_events(*, ctx: Context, models: Models, passes_per_month: int) -> p
             pass_index = month_index * passes_per_month + j
             injected = inject.build_pass(
                 panel=ctx.panel, weather_shortwave=ctx.weather.shortwave,
-                ready_days=ctx.ready_days, verified_days=ctx.verified_days, world="bank",
+                ready_days=ctx.ready_days, verified_days=ctx.verified_days, world=world,
                 pass_index=pass_index, onset_day=onset_day,
             )  # fmt: skip
             results = process_hosts(ctx=ctx, models=models, injected=injected, arms=ARMS)
@@ -690,6 +853,33 @@ def injected_report(*, events: pl.DataFrame) -> None:
             f"    switching events ever era: {share_text(k=ever, n=switches.height)}"
             f" (gate at most {GATE_SWITCH_INJECTED}): {ok}"
         )
+
+
+def engine_report(*, events: pl.DataFrame) -> None:
+    """Print how each arm handles the irregular-engine eras (stage 0 only, not in the bank).
+
+    Args:
+        events: The scored events of the `engine` world.
+    """
+    eras = events.filter(pl.col("truth") == "era")
+    print(f"Irregular-engine eras (-30% of capacity, runs on half the days), n={eras.height}:")
+    for arm in ARMS:
+        if f"{arm}_detection_delay" not in eras.columns:
+            continue
+        delays = eras[f"{arm}_detection_delay"]
+        within = int((delays.drop_nulls() <= ENGINE_WITHIN_DAYS).sum())
+        k28 = int((eras[f"{arm}_28"] == STATE_ERA).sum())
+        print(
+            f"  arm {arm}: alarmed {delays.drop_nulls().len()}/{eras.height}; within 28 days "
+            f"{share_text(k=within, n=eras.height)}; classed era by day 28 "
+            f"{share_text(k=k28, n=eras.height)}; median delay of alarmed "
+            f"{delays.drop_nulls().median()}"
+        )
+
+
+def _within(*, value: object, limit: int) -> bool:
+    """Return True if a detection delay is an integer of at most `limit` days."""
+    return isinstance(value, int) and value <= limit
 
 
 def _state_name(value: object) -> str:
@@ -968,10 +1158,15 @@ def segmentation_cross_check(*, ctx: Context, results: dict[int, SiteResult]) ->
 def d8_report(*, ctx: Context, results: dict[int, SiteResult], models: Models) -> None:
     """Print D8's known eras, read from the era table, with pass/fail gates.
 
-    Era 1 is scored from its telemetry date. Era 2 is scored from the measured telemetry date if
-    one was found within `D8_RELIABLE_DAYS` of the register date, and from the register date
-    otherwise. A pass needs the detection within `D8_DETECTION_GATE_DAYS` of that date and the
-    arm's state to be `era` 28 days after it.
+    Era 1 is scored from its telemetry date. Era 2 (the solar farm) is scored from both the
+    register date and the telemetry date of the era table (the year-on-year estimate; the clear-day
+    estimate if the table has none), and a detection within `D8_SOLAR_GATE_DAYS` of either date
+    passes, with the passing date printed. A pass on the solar telemetry date rests on a date
+    fitted to the same telemetry, so the printed label says so; only the register-date pass is
+    independent. A table date more than `D8_RELIABLE_DAYS` from the register date is not used. The
+    2025-04-26 alarm of the design is 33 days after the register date and before the stage 0
+    clear-day estimate of 2025-06-10, which the table's estimate replaces. A pass also needs the
+    arm's state to be `era` 28 days after the date.
 
     Args:
         ctx: The context.
@@ -981,47 +1176,94 @@ def d8_report(*, ctx: Context, results: dict[int, SiteResult], models: Models) -
     d8 = ctx.panel.sites.index(D8)
     eras = ctx.era_table.filter((pl.col("primary") == D8) & pl.col("era_index").is_not_null())
     cuts = segmentation_cross_check(ctx=ctx, results=results)
+    d8_stat_table(ctx=ctx)
     for row in eras.sort("era_index").iter_rows(named=True):
         register = features.day_index(day=row["register_date"])
+        solar = row["technology"] == "solar farm"
         telemetry = row["telemetry_date"]
-        estimate = None
-        if telemetry is None:
-            estimate = d8_solar_estimate(ctx=ctx, register_day=register)
-        reference = (
-            features.day_index(day=telemetry)
-            if telemetry is not None
-            else (estimate.day if estimate is not None else register)
-        )
-        basis = (
-            "telemetry date"
-            if telemetry is not None
-            else ("measured telemetry estimate" if estimate is not None else "register date")
-        )
-        score = score_event(
-            result=results[d8], onset_day=reference, end_day=-1, truth="era",
-            n_days=ctx.panel.n_days, train_end_day=models.train_end_day,
-        )  # fmt: skip
+        estimate = d8_solar_estimate(ctx=ctx, register_day=register) if solar else None
+        if telemetry is not None and solar:
+            telemetry_day = features.day_index(day=telemetry)
+            if abs(telemetry_day - register) > D8_RELIABLE_DAYS:
+                print(
+                    f"  the table's telemetry date {telemetry} is more than {D8_RELIABLE_DAYS} "
+                    "days from the register date: not used"
+                )
+                dates = []
+            else:
+                dates = [("telemetry date (fitted on the telemetry itself)", telemetry_day)]
+        elif telemetry is not None:
+            dates = [("telemetry date", features.day_index(day=telemetry))]
+        elif estimate is not None:
+            dates = [("clear-day estimate", estimate.day)]
+        else:
+            dates = []
+        if solar:
+            dates.insert(0, ("register date", register))
+        elif not dates:
+            dates = [("register date", register)]
+        gate_days = D8_SOLAR_GATE_DAYS if solar else D8_DETECTION_GATE_DAYS
+        scores = {
+            label: score_event(
+                result=results[d8], onset_day=day, end_day=-1, truth="era",
+                n_days=ctx.panel.n_days, train_end_day=models.train_end_day,
+            )
+            for label, day in dates
+        }  # fmt: skip
         print(
-            f"D8 era {row['era_index']} ({row['technology']}): register "
-            f"{row['register_date']}, scored from the {basis} {features.day_of(index=reference)}; "
-            f"least-squares change within 30 days: "
-            f"{any(abs(c - reference) <= 30 for c in cuts)}"
+            f"D8 era {row['era_index']} ({row['technology']}): scored from "
+            + ", ".join(f"the {label} {features.day_of(index=day)}" for label, day in dates)
+            + f"; least-squares change within 30 days of any: "
+            f"{any(abs(c - day) <= 30 for c in cuts for _, day in dates)}"
         )
         for arm in ARMS:
-            if f"{arm}_28" not in score:
-                print(f"    arm {arm}: not scored (onset before the hidden-Markov fit ended)")
+            passing = [
+                label
+                for label, score in scores.items()
+                if _within(value=score.get(f"{arm}_detection_delay"), limit=gate_days)
+            ]
+            reported = scores[passing[0]] if passing else next(iter(scores.values()))
+            if f"{arm}_28" not in reported:
+                print(f"    arm {arm}: not scored (onset before the arm's first readable day)")
                 continue
-            delay = score[f"{arm}_detection_delay"]
-            detected = isinstance(delay, int) and delay <= D8_DETECTION_GATE_DAYS
-            classed = score[f"{arm}_28"] == STATE_ERA
+            delays = {label: sc.get(f"{arm}_detection_delay") for label, sc in scores.items()}
+            classed = reported[f"{arm}_28"] == STATE_ERA
             print(
-                f"    arm {arm}: detection delay {delay} days (gate at most "
-                f"{D8_DETECTION_GATE_DAYS}): {'PASS' if detected else 'FAIL'}; state at day 28 "
-                f"{_state_name(score[f'{arm}_28'])} (gate era): "
-                f"{'PASS' if classed else 'FAIL'}; classification delay "
-                f"{score[f'{arm}_class_delay']}; state before the onset "
-                f"{_state_name(score[f'{arm}_pre_state'])}"
+                f"    arm {arm}: detection delays {delays} (gate at most {gate_days} days from "
+                f"{'either date' if solar else 'the date'}): "
+                f"{'PASS on the ' + ' and '.join(passing) if passing else 'FAIL'}; state at day 28 "
+                f"{_state_name(reported[f'{arm}_28'])} (gate era): "
+                f"{'PASS' if classed else 'FAIL'}; "
+                f"classification delay {reported[f'{arm}_class_delay']}; state before the onset "
+                f"{_state_name(reported[f'{arm}_pre_state'])}"
             )
+
+
+def d8_stat_table(*, ctx: Context) -> None:
+    """Print D8's window statistics around the two known changes, as in the L-stat design.
+
+    Args:
+        ctx: The context.
+    """
+    site = ctx.panel.sites.index(D8)
+    windows = ctx.stat_windows[site]
+    print("D8 window statistics, 28-day windows (share of capacity):")
+    print("  window ends   p50      p05      residual p05  residual IQR")
+    for end in D8_GAS_WINDOW_ENDS:
+        row = windows.stat[features.day_index(day=end)]
+        print(
+            f"  {end}   {row[stats.P50]:.3f}   {row[stats.P05]:.3f}   "
+            f"{row[stats.RESIDUAL_SHAPE.start]:+.3f}        "
+            f"{row[stats.RESIDUAL_SHAPE.start + 2]:.3f}"
+        )
+    print("D8 midday minus night, 28-day windows, against one year earlier:")
+    level = windows.stat[:, stats.MIDDAY] - windows.stat[:, stats.NIGHT]
+    for end in D8_SOLAR_WINDOW_ENDS:
+        day = features.day_index(day=end)
+        print(
+            f"  {end}   {level[day]:+.3f} vs {level[day - stats.YEAR_DAYS]:+.3f}   "
+            f"difference {level[day] - level[day - stats.YEAR_DAYS]:+.3f}"
+        )
 
 
 def register_rows_report(*, ctx: Context, results: dict[int, SiteResult], models: Models) -> None:
@@ -1214,6 +1456,7 @@ def cut_test(*, ctx: Context, models: Models, results: dict[int, SiteResult], pa
         redone = classify.process_site(
             site=site, all_features=feats, mirror=classify.mirror_features(grid=grid, site=site),
             g4=g4[site], neighbours=panel.neighbours, weather=weather, models=models,
+            power=panel.power[site],
         )  # fmt: skip
         for arm, signal in redone.signals.items():
             before = results[site].signals[arm].at_origin(origin_day=origin_day)
@@ -1242,7 +1485,9 @@ def _truncate(*, feat: features.SiteFeatures, n_days: int) -> features.SiteFeatu
 def main() -> None:
     """Run stage 0 from the command line."""
     parser = argparse.ArgumentParser(description="Experiment 709 stage 0 report")
-    parser.add_argument("--part", choices=("all", "tune", "real", "injected", "cut"), default="all")
+    parser.add_argument(
+        "--part", choices=("all", "tune", "real", "injected", "engine", "cut"), default="all"
+    )
     parser.add_argument("--passes-per-month", type=int, default=16)
     parser.add_argument("--pairs", type=int, default=CUT_PAIRS)
     parser.add_argument(
@@ -1254,6 +1499,9 @@ def main() -> None:
     models = classify.load_models(folder=MODELS_DIR) if args.load_models else tune(ctx=ctx)
     if args.part == "tune":
         return
+    if not np.any(models.stat_weights) or not np.any(models.stat_noshape_weights):
+        msg = "the stat arms' weights are missing or zero in the loaded models: run --part tune"
+        raise RuntimeError(msg)
     results = real_results(ctx=ctx, models=models)
     if args.part in ("all", "real"):
         scored = known_events_scores(ctx=ctx, results=results, train_end_day=models.train_end_day)
@@ -1264,6 +1512,11 @@ def main() -> None:
     if args.part in ("all", "injected"):
         events = injected_events(ctx=ctx, models=models, passes_per_month=args.passes_per_month)
         injected_report(events=events)
+    if args.part in ("all", "engine"):
+        engine = injected_events(
+            ctx=ctx, models=models, passes_per_month=ENGINE_PASSES_PER_MONTH, world="engine"
+        )
+        engine_report(events=engine)
     if args.part in ("all", "cut"):
         cut_test(ctx=ctx, models=models, results=results, pairs=args.pairs)
 

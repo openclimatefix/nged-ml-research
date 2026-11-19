@@ -28,6 +28,7 @@ from typing import Final
 import e00086_common as common86  # ty: ignore[unresolved-import]
 import e00086_labels as labels86  # ty: ignore[unresolved-import]
 import e00709_features as features
+import e00709_stats as stats
 import numpy as np
 import polars as pl
 from studies.ecr_reader import ECR_PATH, REGISTER_SHEETS, read_sheet
@@ -136,6 +137,39 @@ def _is_solar() -> pl.Expr:
     return pl.col("technology").str.to_lowercase().str.contains("solar|photovoltaic")
 
 
+def d8_solar_telemetry() -> tuple[date, float] | None:
+    """Estimate the telemetry date and size of D8's solar farm from the year-on-year level.
+
+    The statistic is the 28-day midday mean minus night mean of D8's power, compared with the same
+    window one year earlier, over 2025-01-01 to 2025-08-31. A step moves a 28-day window linearly,
+    so `fit_year_on_year_ramp` fits a ramp that starts on the step day. The size is the fitted
+    fall in megawatts of D8's capacity (positive for a fall in the midday-minus-night level).
+    D8 is a megavolt-ampere-only Primary, so a reverse flow folds under `abs` and the fall is a
+    lower bound on the solar farm's size.
+
+    Returns:
+        The estimated first day of the solar output and its size in megawatts, or None if the
+        series is too short.
+    """
+    panel = features.load_panel()
+    site = panel.sites.index("D8")
+    windows = stats.window_statistics(power_site=panel.power[site])
+    fit = stats.fit_year_on_year_ramp(
+        windows=windows,
+        first=features.day_index(day=date(2025, 1, 1)),
+        last=features.day_index(day=date(2025, 8, 31)),
+    )
+    if fit is None:
+        return None
+    onset, step = fit
+    print(
+        f"D8 solar telemetry (year-on-year midday-minus-night ramp): first day "
+        f"{features.day_of(index=onset)}, fall {-step * panel.capacity_mw[site]:+.2f} MW "
+        "(a lower bound: the Primary is megavolt-ampere-only)"
+    )
+    return features.day_of(index=onset), float(-step * panel.capacity_mw[site])
+
+
 def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
     """Build the era-table rows of D8 and print the register rows that support them.
 
@@ -166,6 +200,7 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         f"{D8_SOLAR_DATE} found: {found_solar}; undated 0.7 MW solar row found: {small.height > 0}"
     )
     source = "ECR workbook"
+    solar_telemetry = d8_solar_telemetry()
     return [
         {
             "primary": "D8", "era_index": 1, "register_date": D8_GAS_DATE,
@@ -178,12 +213,18 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         },
         {
             "primary": "D8", "era_index": 2, "register_date": D8_SOLAR_DATE,
-            "telemetry_date": None, "technology": "solar farm",
-            "size_mw_register": D8_SOLAR_MW, "size_mw_telemetry": None,
+            "telemetry_date": None if solar_telemetry is None else solar_telemetry[0],
+            "technology": "solar farm", "size_mw_register": D8_SOLAR_MW,
+            "size_mw_telemetry": None if solar_telemetry is None else solar_telemetry[1],
             "size_mw_recollection": D8_SOLAR_RECOLLECTION_MW, "source": source,
             "confidence": "register date confirmed" if found_solar else "plan value, not re-found",
-            "note": "Telemetry date and size are measured in stage 0. The maintainer recalls about "
-            "700 kW, the dated register row is 8.91 MW.",
+            "note": "Telemetry date and size come from a ramp fitted to the year-on-year change of "
+            "the 28-day midday-minus-night level (`fit_year_on_year_ramp`); the size is a lower "
+            "bound, because D8 reports megavolt-amperes only and a reverse flow folds. The "
+            "clear-day estimate "
+            "of stage 0 (2025-06-10) disagrees and is 6 to 8 weeks later than the first fall "
+            "of that level. The maintainer recalls about 700 kW, the dated register row is "
+            "8.91 MW.",
         },
         {
             "primary": "D8", "era_index": None, "register_date": None, "telemetry_date": None,
