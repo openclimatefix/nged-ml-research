@@ -34,7 +34,11 @@ ROOT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / (
 ROOT_677: Final[Path] = ML_EXPERIMENTS_DATA_DIR / (
     "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
 )
-SITE_MAP: Final[Path] = next(ML_EXPERIMENTS_DATA_DIR.glob("00521-*")) / "site_map.csv"
+SITE_MAP: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free"
+    / "site_map.csv"
+)
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time"]
 PILOT_MONTH: Final[str] = "2026-05"
 PILOT_LABELS: Final[tuple[str, ...]] = ("D14", "D2", "D15")

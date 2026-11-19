@@ -36,7 +36,7 @@ TAILS: Final[dict[str, int]] = {"q01": 0, "q05": 1, "q95": 9, "q99": 10}
 """Index of each tail quantile in the 11 levels."""
 SCORES: Final[Path] = core.ROOT / "scores"
 SITE_MAP: Final[Path] = (
-    next(core.ROOT.parent.glob("00521-*")) / "site_map.csv"
+    core.ROOT.parent / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free" / "site_map.csv"
 )  # one row per Primary: label, time_series_id, capacity_mw, group
 BANK_MATCH_TOLERANCE: Final[float] = 1e-3
 """Largest accepted difference between two runs' median forecasts on the same stored network (GPU arithmetic is not bit-exact)."""
