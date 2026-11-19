@@ -97,13 +97,16 @@ apparent power in megavolt-amperes ("the eight"), and D15 and D18, which are sco
 only and are not in the contrasts. Scores are CRPS in points of effective capacity over lead days 1
 to 10, on 12 monthly folds from 2025-07 to 2026-06.
 
-Verdict: **partly supported**. The prediction that C1 lies between -0.04 and 0 at the six failed,
-because C1 is positive. The prediction that the placebo contrast C5 is below zero also failed at the
-six. The prediction at the eight (between -0.10 and 0) held. By the pre-registered rule C1 is "not
-supported" at the six (the gain is no longer worth porting) and "supported" at the eight (the gain
-is still worth porting). Trigger 1 (the placebo fails at the six) fired, so the six's verdict rests
-on the Checks section. "Partly supported" combines the two group verdicts, and the support at the
-six rests on a failed control. The experiment makes no adoption.
+Verdict: **partly supported**. In the pre-registered rule, "supported" means the gain is still worth
+porting, which is the opposite direction to the hypothesis that the gain shrinks; the verdict
+therefore reads both against the shrinkage that C1 minus C2 shows (+0.041, +0.009 to +0.078, at the
+eight). The prediction that C1 lies between -0.04 and 0 at the six failed, because C1 is positive.
+The prediction that the placebo contrast C5 is below zero also failed at the six. The prediction at
+the eight (between -0.10 and 0) held. By the pre-registered rule C1 is "not supported" at the six
+(the gain is no longer worth porting) and "supported" at the eight (the gain is still worth
+porting). Trigger 1 (the placebo fails at the six) fired, so the six's verdict rests on the Checks
+section. "Partly supported" combines the two group verdicts, and the support at the six rests on a
+failed control. The experiment makes no adoption.
 
 ## Figures
 
@@ -153,11 +156,13 @@ is -0.007 at the six and -0.032 at the eight (-0.088 to +0.008). Lengthening the
 pre-trained recipe therefore did not help clearly at either group.
 
 **The placebo fails at the six and passes at the eight.** The placebo (`A1x_24`) pre-trains on ERA5
-and CAMS weather days shuffled among days of the same Primary, so only the extra power history can
-help. C5 (`A_24` − `A1x_24`) is -0.011 at the six (-0.055 to +0.050), so the six's gain cannot be
-told apart from the gain that power history alone gives; C6 (`A1x_24` − `R_24`) is -0.041 (-0.099 to
-+0.008). At the eight C5 is -0.060 (-0.083 to -0.039), so the weather carries part of the gain at
-the eight, and C6 is -0.078 (-0.157 to -0.003).
+and CAMS weather days shuffled among days of the same Primary within 15 days of the same day of the
+year. The shuffled weather keeps the seasonal and daily pattern (it correlates with the true weather
+at 0.71 to 0.77 for temperature and about 0.80 for shortwave), so the placebo removes the
+day-specific weather and leaves the extra power history. C5 (`A_24` − `A1x_24`) is -0.011 at the six
+(-0.055 to +0.050), so the six's gain cannot be told apart from the gain that power history alone
+gives; C6 (`A1x_24` − `R_24`) is -0.041 (-0.099 to +0.008). At the eight C5 is -0.060 (-0.083 to
+-0.039), so the weather carries part of the gain at the eight, and C6 is -0.078 (-0.157 to -0.003).
 
 **Keeping the lockdown ENS runs and flagging the two steps in the ENS data made no clear
 difference.** C7 (`R_C` − `R_F`, keeping runs from 2020-10-15 to 2021-07-19 with a `covid` input) is
@@ -184,17 +189,20 @@ six (3.991 against 3.712). These readings are descriptive and carry no interval.
 
 ## Checks
 
-- **Median minus mean forecast per Primary.** Not recomputed for this page; every arm scores the
-  median and the mean by the same code as experiment 425.
+- **Median minus mean forecast per Primary.** The scorer's report prints it for every arm; every
+  value is at or below 0.13 MW in magnitude.
 - **Error of the median beside each CRPS contrast.** C1's mean absolute error of the median agrees
   in sign with CRPS at both groups: +0.042 (-0.008 to +0.113) at the six and -0.095 (-0.136 to
   -0.056) at the eight. Trigger 3 did not fire.
 - **Triggers.** Trigger 1 (the placebo fails at the six) fired. Trigger 2 (C1 contradicts the stored
   425 line) fired at the six, where the signs are opposite. Trigger 6 fired at the eight, where C1's
   interval is 0.17 times the width of the stored line's (the limits are 0.5 and 2.0), because the
-  stored arms saw 15 to 24 months of ENS and used networks without the 1.15 widening. Trigger 4
-  (dropping fold 2026-01) did not fire. Trigger 5 (`R_F` beats `A_24`) did not fire, because C3 lies
-  inside the noise. Trigger 7 is the author's judgement: no later design depends on this headline.
+  stored line's per-fold spread at the eight is wide (-0.52 to +0.02) and C1's per-fold spread is
+  narrow. Trigger 4 fired on a reading the scorer did not make: the audit found that dropping one
+  Primary, D8 (or, borderline, D12), moves the upper limit of C1 at the eight above -0.02, so
+  "supported" becomes "small gain" there; no sign changes. Dropping fold 2026-01 changes nothing.
+  Trigger 5 (`R_F` beats `A_24`) did not fire, because C3 lies inside the noise. Trigger 7 is the
+  author's judgement: no later design depends on this headline.
 - **Gate.** The prediction-only check matched experiment 425's stored forecasts (largest difference
   7.9e-06). The refit check on folds 2026-06 and 2026-01 was run before the long-window fits; its
   comparison is not stored in a log.
@@ -208,6 +216,23 @@ six (3.991 against 3.712). These readings are descriptive and carry no interval.
   cleaning does not flag.
 
 ## Caveats
+
+- **Seed noise is not in the intervals.** The month-block bootstrap resamples months of
+  seed-averaged forecasts. In the audit, stored arm A's seeds 3 and 4 minus seeds 0 to 2 differ by
+  +0.024 (+0.004 to +0.063, in the auditor's units) at the six, as large as C1 there (+0.019). The
+  six's C1 is therefore inconclusive within seed noise, and "not supported" and "the gain
+  disappears" mean only that no gain was resolved.
+- **The placebo comparison is not a pure shuffle.** C5 compares experiment 425's stored `A` with a
+  fresh `A1x_24`, and experiment 707's code drops 15,061 `S_era` rows by a first-usable-date cut on
+  the weekly lag. On the two gate folds the same-code placebo averages -0.056 against -0.058 for the
+  stored arm, so no bias showed, and a refit of `A_24` on the other 10 folds was not run.
+- **The 24-month difference from the stored line is mostly window.** On folds 2026-04 to 2026-06,
+  where the stored arms saw a true 24 months, the gap between C2 and the stored line is +0.020 at
+  the six and -0.004 at the eight, against +0.062 and +0.073 on the earlier folds. The remainder is
+  the `S_ens` stage strengthening `R_E24` (-0.035 against the stored `R` at the six) and seed noise.
+  C1 and C2 measure the gain from `S_era` on top of an ENS stage.
+- **At the 47-to-58-month window, `S_ens` at a learning rate of 5e-4 erases most of `S_era`'s
+  lead.** The result holds for this `S_ens` recipe only.
 
 - **The placebo failure at the six removes the six's evidence for pre-training.** The six's C1 sign
   (+0.019) and the six's 24-month gain cannot be told apart from the gain that extra power history
