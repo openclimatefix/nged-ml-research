@@ -884,8 +884,8 @@ stage 1, stage 2, or table weights for these folds, so 6 new chains are needed (
 about 2.7 hours at one job. Ensemble summaries start on 2024-04-01, so the history is about 12
 months, shorter than the screen folds'. The only demand frames found for the three months are the
 73 every-fifth-day frames of the frozen validation fold, because the daily frames of the gap runs
-start in 2025-07, and the row set id covers valid times from 2025-11. Two options remain: build the daily frames
-(new work outside this experiment's folder, at an unknown cost), or score on the every-fifth-day
+start in 2025-07, and the row set id covers valid times from 2025-11. Two options remain: build
+the daily frames (new work outside this experiment's folder, at an unknown cost), or score on the every-fifth-day
 origins as a robustness check on one substation, with the shorter history stated beside each number.
 No phase E job runs until the maintainer chooses.
 
