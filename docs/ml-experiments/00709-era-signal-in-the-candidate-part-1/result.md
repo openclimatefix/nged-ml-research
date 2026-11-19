@@ -877,17 +877,28 @@ folds and both seeds are scored.
 **Cost.** 4 arms on 4 folds and 2 seeds is 32 fits, about 9 to 10 minutes each at 2 concurrent jobs,
 so about 2.5 hours of wall-clock time after phase B finishes. Phase B's aug result is void.
 
-## 25. Open question: phase E (D8 folds 2025-04 to 2025-06) is parked
+## 25. Phase E: a one-substation robustness check on D8, reported apart
 
-**Phase E needs more than compute, and it waits for the maintainer.** Experiment 667 stores no
-stage 1, stage 2, or table weights for these folds, so 6 new chains are needed (3 folds, 2 seeds),
-about 2.7 hours at one job. Ensemble summaries start on 2024-04-01, so the history is about 12
-months, shorter than the screen folds'. The only demand frames found for the three months are the
-73 every-fifth-day frames of the frozen validation fold, because the daily frames of the gap runs
-start in 2025-07, and the row set id covers valid times from 2025-11. Two options remain: build
-the daily frames (new work outside this experiment's folder, at an unknown cost), or score on the every-fifth-day
-origins as a robustness check on one substation, with the shorter history stated beside each number.
-No phase E job runs until the maintainer chooses.
+**Phase E is a robustness check on one substation, and its numbers are never pooled with the screen
+folds'.** The maintainer approved it after seeing the corrected scope. It runs the arms none, oracle,
+placebo, stat, and rule (5 arms) on the folds 2025-04, 2025-05, and 2025-06 with seeds 0 and 1, which
+is 30 fits, and it scores the rows against its own row set id,
+`experiment_709_phase_e_monthly_refit_rows_valid_2025_04_to_2025_06`. Its arms are named `e-<arm>`.
+
+**The history is shorter, and D8's solar connection sits at the start of the test months.** The
+ensemble summaries start on 2024-04-01, so the 2025-04 fold trains on about 12 months of ensemble
+history, against about 19 for the first screen fold. D8's 8.91 MW solar farm connected on 2025-03-24,
+a week before the first test month, so the first fold's training rows hold almost no days after the
+connection, and the fold tests how an era signal behaves when the new era is a week old. The
+hidden-Markov models were fitted on days before 2025-01-01, so they read no day of these folds.
+
+**The extra work is outside the screen's pipeline, and every piece is a copy in this experiment's
+folder.** The daily demand frames of 2025-04-01 to 2025-06-30 are rebuilt by `e00709_e_frames.py`
+from the archive with experiment 48's `build_run`, into `frames_e/` of this experiment's data folder;
+a rebuild of 2025-05-29 matched a stored snapshot frame on all its rows. Six new stage 1, stage 2,
+and table chains (3 folds, 2 seeds) run through `e00709_e_chain.sh`, which writes to `e_667/` of this
+experiment's data folder and reads experiment 667's extended inputs only. Each changed or new script
+gets an Opus review before its first run. Phase E starts after phase B and B2 end.
 
 ## Files
 
