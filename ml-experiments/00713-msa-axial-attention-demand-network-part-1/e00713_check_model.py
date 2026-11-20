@@ -204,6 +204,44 @@ def main() -> int:
     loss.backward()
     grads = [p.grad for p in net.parameters() if p.grad is not None]
     assert grads and all(torch.isfinite(g).all() for g in grads)
+    # the attention hook: off by default, the forecast is bit-identical with it on, weights sum to 1
+    net = build("M")
+    for q in net.parameters():
+        if float(q.detach().abs().sum()) == 0.0:
+            torch.nn.init.normal_(q, std=0.05)
+    with torch.no_grad():
+        plain = net(inp)
+        hooked = net(inp, return_attention=True)
+    assert plain.attention is None and plain.target_vector is None
+    assert torch.equal(plain.out, hooked.out), "return_attention changed the forecast"
+    att = hooked.attention
+    assert att is not None and sorted(att) == ["across_0", "across_1", "within_0", "within_1"]
+    b = len(inp.primary)
+    assert att["across_0"].shape == (b, 48, mdl.HEADS, 15)
+    assert att["within_0"].shape == (b, 15, mdl.HEADS, 48, 48)
+    assert hooked.target_vector is not None and hooked.target_vector.shape == (b, 48, 64)
+    assert torch.allclose(att["across_1"].sum(-1), torch.ones(b, 48, mdl.HEADS), atol=1e-5)
+    assert torch.allclose(att["within_1"].sum(-1), torch.ones(b, 15, mdl.HEADS, 48), atol=1e-5)
+    assert all(m.record is None for m in net.modules() if isinstance(m, mdl.Attention))
+    print(
+        "attention hook: forecast bit-identical, weights sum to 1, shapes",
+        {k: tuple(v.shape) for k, v in att.items()},
+    )
+    # the report-only bank read-outs
+    import e00713_variants as var
+
+    sh = var.apply_variant(inputs=inp, variant="shuffle")
+    assert not torch.equal(sh.hist_power, inp.hist_power)
+    assert torch.allclose(sh.hist_power.sort(dim=1).values, inp.hist_power.sort(dim=1).values)
+    assert torch.equal(sh.hist_visible.sum(1), inp.hist_visible.sum(1))
+    assert torch.equal(sh.top_weather, inp.top_weather) and torch.equal(sh.primary, inp.primary)
+    m9 = var.apply_variant(inputs=inp, variant="mask9")
+    assert not bool(m9.hist_visible[:, 7:].any()) and not bool(m9.row_exists[:, 7:].any())
+    assert torch.equal(m9.hist_visible[:, :7], inp.hist_visible[:, :7])
+    assert var.apply_variant(inputs=inp, variant="plain") is inp
+    with torch.no_grad():
+        assert net(sh).out.shape == net(m9).out.shape == plain.out.shape
+    print("bank read-outs: shuffle keeps each row's content, mask9 hides slots 7 to 13")
     print("model checks passed")
     return 0
 

@@ -111,6 +111,10 @@ class MsaOutput:
     spread: torch.Tensor  # (B, 48)
     no_history: torch.Tensor  # (B, 48)
     alpha: torch.Tensor  # (B, 14, 48) read-out weights (0 where not visible)
+    attention: dict[str, torch.Tensor] | None = None  # only with `return_attention`
+    target_vector: torch.Tensor | None = (
+        None  # (B, 48, 64) the head's input, only with `return_attention`
+    )
 
 
 def beta_day_start() -> torch.Tensor:
@@ -134,6 +138,8 @@ class Attention(nn.Module):
         self.qkv = nn.Linear(WIDTH, 3 * WIDTH)
         self.out = nn.Linear(WIDTH, WIDTH)
         self.key_bias = nn.Parameter(torch.zeros(HEADS, key_rows)) if key_rows else None
+        self.record: dict[str, torch.Tensor] | None = None
+        """When a dict, `forward` stores the softmax weights (N, heads, L, L) under `weights`."""
         nn.init.zeros_(self.out.weight)
         nn.init.zeros_(self.out.bias)
 
@@ -146,6 +152,10 @@ class Attention(nn.Module):
             bias = bias + self.key_bias[None, :, None, :length]
         if key_ok is not None:
             bias = bias.masked_fill(~key_ok[:, None, None, :], float("-inf"))
+        if self.record is not None:
+            with torch.no_grad():
+                logits = q @ k.transpose(-1, -2) / float(np.sqrt(WIDTH // HEADS)) + bias
+                self.record["weights"] = torch.softmax(logits, dim=-1)
         y = functional.scaled_dot_product_attention(
             q, k, v, attn_mask=bias, dropout_p=DROPOUT if self.training else 0.0
         )
@@ -383,9 +393,22 @@ class MsaNet(nn.Module):
         spread = torch.where(any_visible, torch.sqrt(var + 1e-6), torch.zeros_like(var))
         return h0, base, spread, (~any_visible).to(x.dtype), alpha
 
-    def forward(self, inp: MsaInputs) -> MsaOutput:
-        """Return the raw mixture outputs of the 48 target tokens of each sample."""
+    def forward(self, inp: MsaInputs, *, return_attention: bool = False) -> MsaOutput:
+        """Return the raw mixture outputs of the 48 target tokens of each sample.
+
+        With `return_attention` the output also holds the attention weights of every block and the
+        64-number vector that enters the head. The flag only records: the forecast is computed by the
+        same operations and is bit-identical, and training never sets it.
+        """
         x, row_exists = self._tokens(inp)
+        attention_modules: list[tuple[str, Attention]] = []
+        if return_attention:
+            for i, block in enumerate(self.blocks):
+                for kind in ("within", "across"):
+                    module = getattr(block, kind)
+                    if module is not None:
+                        module.record = {}
+                        attention_modules.append((f"{kind}_{i}", module))
         for block in self.blocks:
             x = block(x, row_exists=row_exists)
         h0, base, spread, no_history, alpha = self._readout(x, inp)
@@ -396,7 +419,22 @@ class MsaNet(nn.Module):
         out = torch.cat(
             [out[..., :k], out[..., k : 2 * k] + base[..., None], out[..., 2 * k :]], dim=-1
         )
-        return MsaOutput(out=out, base=base, spread=spread, no_history=no_history, alpha=alpha)
+        attention = None
+        if return_attention:
+            attention = {}
+            b = len(inp.primary)
+            for name, module in attention_modules:
+                assert module.record is not None
+                w = module.record.pop("weights")
+                module.record = None
+                if name.startswith("within"):  # (B*R, heads, 48, 48) -> (B, R, heads, 48, 48)
+                    attention[name] = w.view(b, -1, *w.shape[1:])
+                else:  # (B*48, heads, R, R): the target row's query -> (B, 48, heads, R)
+                    attention[name] = w[:, :, 0, :].view(b, N_COLS, *w.shape[1:2], w.shape[-1])
+        return MsaOutput(
+            out=out, base=base, spread=spread, no_history=no_history, alpha=alpha,
+            attention=attention, target_vector=h0.detach() if return_attention else None,
+        )  # fmt: skip
 
 
 def per_token_nll(*, out: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
