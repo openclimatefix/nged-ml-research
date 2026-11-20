@@ -87,7 +87,8 @@ each sudden shift in a substation's load as a flagged shift. A language model re
 the flagged shift, as shares of the substation's capacity, and labels the shift a permanent change,
 a temporary load move, or noise. The Candidate then trains and forecasts with those labels, each
 delayed until the first forecast time after the label could have been made. This page is the plan.
-No label has been made and no neural network has been trained for this experiment. The figures
+The only labelling run so far is an interim pilot on one Primary (see "D8 pilot of the labelling (interim)"
+below), and no neural network has been trained for this experiment. The figures
 taken from experiment 709 and from a small trial of the language-model calls (the cost trial,
 described under Cost, billing, and staging) are provisional, because experiment 667 stored only two
 random seeds.
@@ -202,10 +203,11 @@ changes only if a closure check answers `switch` or `noise` at confidence 0.8 or
 **Labelling bills to the maintainer's shared plan quota, so the dollar figures are prices, not
 charges.** The cost trial's init event showed `apiKeySource = none`, which means the calls ran on
 the subscription login. Every US$ figure below is the price the command-line tool reports, which is
-the API-equivalent price. The rate-limit events do carry an account-wide seven-day utilisation
-(`unifiedWindows.seven_day.utilization` = 0.32, constant across all 22 calls, shared by every
-session), so the trial's own share is below the resolution of that field and cannot be attributed.
-The labelling script counts calls and tokens, and the plan treats the quota as the limit.
+the application programming interface (API) equivalent price. The rate-limit events do carry an
+account-wide seven-day utilisation (`unifiedWindows.seven_day.utilization` = 0.32, constant across
+all 22 calls, shared by every session), so the trial's own share is below the resolution of that
+field and cannot be attributed. The labelling script counts calls and tokens, and the plan treats
+the quota as the limit.
 
 **The cost trial on a single Primary measured cost and nothing else.** It sent 22 calls (one probe
 and 21 check calls on 5 candidates) with 167,708 input tokens and 10,071 output tokens in 198.9 s,
@@ -241,6 +243,179 @@ US$15.
 substation-year and about 4.2 calls each, 2,500 substations with the same 7.2 years of record as
 the 16 Primaries would need about 480 million input tokens once to label the history and about 67
 million a year after that.
+
+## D8 pilot of the labelling (interim)
+
+**A pilot on the 19 candidates of Primary D8 ran the labelling script before the 16-Primary run.**
+Every figure in this section is interim. The pilot is not the write-up and sets no verdict. D8 is a
+substation, so its Embedded Capacity Register (ECR) dates are public facts. The pilot used the
+prompt as pinned after the year probe. No cell below holds more than 3 candidates, so we give no
+intervals.
+
+**The year probe passed.** The year probe sent the language model 10 prompts, built from 5
+candidates of Primary D10, and asked it for the calendar year of each. The 10 replies are not
+independent, because several prompts come from the same candidate. The language model named the
+exact year for 2 of the 10 prompts, and a year within 1 year of the true year for 3 of the 10
+(including the 2 exact years). The pin rule under "Gates before any score is read" allows at most 3
+exact years of 10, so the prompt passes. The year probe made 11 calls: the 10 prompts and 1 billing
+probe, which shows which key source bills the calls. The calls used 61,140 input tokens and 8,697
+output tokens, at a reported US$0.33 (price as reported by the command-line tool, the
+application-programming-interface (API) equivalent).
+
+**The labelling made 87 calls on D8, of which 65 were distinct checks.** A check is one request to
+label one candidate on one check day. The 19 candidates took 65 checks. A strict reply parser
+rejected the first reply to 20 of the checks, and the script retried each of those once, so the 65
+checks took 85 label calls. The other 2 calls were billing probes. The first run stopped at its
+80-call cap, and a second run resumed it. Together the 87 calls used 551,253 input tokens and 44,666
+output tokens, at a reported US$2.179 (API-equivalent). The summed call time was 830 s. The elapsed
+time was about 440 s, with 2 calls in parallel. The init event showed `apiKeySource = none`, so the
+calls ran on the subscription login. No call was limited by a rate-limit event. The account-wide
+seven-day utilisation was 0.36 before and after the run, so the pilot's own share of the quota
+cannot be attributed.
+
+**The strict reply parser left 10 of 65 checks without a valid reply, and a looser parser accepts
+all 65 on the first reply.** Of the 85 label replies, 55 were valid under the strict parser and 30
+were invalid. Of the 65 checks, 45 had a valid first reply, 10 more had a valid retry, and 10 never
+had a valid reply. Of the 30 invalid replies, 16 lacked the `register_row` key (the field that
+names the ECR row the language model cites, if any) and 14 had a `reason` (the language model's
+free-text justification) longer than 60 words. The looser parser makes `register_row` optional and
+cuts a longer `reason` to 60 words. The prompt is unchanged. We re-parsed the stored first replies
+offline with the `--reparse` option, with no new call, and all 65 checks are valid on the first
+reply. The 20 retries would not be needed. The looser parser is the parser to use for any later run,
+and the prompt pin stays.
+
+Attempt 2, which changed the reply format only, is in the next section.
+
+**Under the rule that a label counts only at confidence 0.8 or more, the labeller recovered none of
+D8's known eras or switching events.** The classes recorded for D8 come from its dated ECR
+connections and from switching events verified in the load. In the table, a state is one of the four
+states of the era signal (`unknown`, `era`, `switch`, and `none`), and `unknown` means no label has
+reached confidence 0.8. Under both parsers, all three known eras and both known switching events
+stayed `unknown`.
+
+| Known class | Candidates | Recovered | Notes |
+|---|---|---|---|
+| Era (dated ECR connection) | 3 | 0 | all three stayed `unknown` |
+| Verified switching event | 2 | 0 | neither candidate was labelled `switch` |
+| Unresolved | 1 | not applicable | the recorded classes do not settle this candidate |
+| No known class | 13 | not applicable | not scored |
+
+The 3, 2, 1, and 13 candidates sum to the 19 candidates. One of the 13 candidates with no known
+class was labelled `era` at the 21-day check, at confidence exactly 0.8, and only under the looser
+parser. Under the strict parser, no candidate reached state `era`.
+
+**The detectors alarmed late on two of the three known eras.** The alarms came 73 days and 33 days
+after the ECR dates, and 10 days and 21 days after the dates visible in the telemetry. No candidate
+with a known class reached state `era`, so the delay from alarm to a first `era` label cannot be
+measured.
+
+**The labeller is below the plan's pilot rule for this setting, so continuing to the 16 Primaries is
+the maintainer's choice.** The plan states no gate for moving from D8 to the other 15 Primaries. The
+nearest rule is the stage 2 pilot rule, which stops the run when fewer than 40% of detected eras
+are labelled `era` within 7 days of the alarm. That rule is written for the injected bank, so it
+does not bind this pilot, but 0 of 3 known eras is far below 40%. A change to the prompt would need
+a new pin and a new year probe. The change must not be tuned on D8's known classes, because tuning
+on them would leak them into the prompt.
+
+**Scaling D8's counts to the 16 Primaries gives a rough cost, on two bases.** D8 holds 19 of the 92
+candidates, and no other Primary holds more than 13. Counting every call the pilot made, including
+the 20 retries, the 16 Primaries would need about 412 calls (85 / 19 x 92), 2.7 million input
+tokens, a reported US$10.6 (API-equivalent), and about 35 minutes at 2 parallel calls. Counting
+only first replies under the looser parser, the 16 Primaries would need about 315 calls (65 / 19 x
+92). Tokens, price, and time on that basis are not measured, and scale to roughly 20 to 25% below
+the first basis. Both bases exceed the 245 to 386 calls for arm `llm` under "Cost, billing, and
+staging" because D8 needed 4.5 calls per candidate on the first basis and 3.4 on the second, against
+the cost trial's 4.2. Both figures are interim.
+
+## D8 attempt 2 of the labelling (interim)
+
+**The maintainer approved one more attempt on D8 alone.** The labeller again recovered none of D8's
+known eras or switching events. Every figure in this section is interim. The attempt is not the
+write-up and sets no verdict. No run was made on the 16 Primaries, and no label was injected into the
+bank. The attempt 1 numbers in the section above are unchanged, and attempt 1 is closed to spending.
+In this section, a known class counts as recovered when a check labels the candidate with that class
+at confidence 0.8 or more, as in the pilot section. A parser is the code that reads a reply and
+checks its format. The strict parser is attempt 1's original parser, and the looser parser is the
+parser described in the pilot section, which makes `register_row` optional and cuts a longer `reason`
+to 60 words.
+
+**Attempt 2 changed the reply format only.** The worker who designed the change says it was decided
+without reading D8's label content or its agreement with the known classes. The page holds no
+evidence for that claim, and the null result of attempt 1 on D8 was known when the change was
+designed. The attempt 2 prompt tells the language model to reply with raw JSON and nothing else. The
+`llm` arm has no `register_row` key. The `reason` (the language model's free-text justification) is
+limited to 40 words. When a reply fails to parse, the script retries the check once and counts the
+retry as a call. The prompt has a new hash and a new pin file. The hash is a fingerprint of the prompt
+text, the schema text, and the prompt-builder code, and the pin file records it, so a changed prompt
+cannot reuse an earlier approval. A go token is a single-use approval string that the manager writes
+before each paid step, and the script now refuses a token it has used. The scoring rule is the
+pre-registered rule, unchanged.
+
+**A code review of the changed scripts found 3 blockers and 4 should-fix items, and the fixes are
+recorded in `review_triage.md`.** The review was a fresh review by a larger language model (Opus),
+and the findings were verified before they were applied. A blocker is a finding that must be fixed
+before any call, and a should-fix item is a finding that is worth fixing but does not stop a run. The
+blockers were that the attempt 2 run could overwrite attempt 1's signal files, that a go token was
+not truly single-use, and that nothing stopped the run from continuing past D8 once the reported
+price reached about US$4. The should-fix items included two findings: the probe scorer could record
+the wrong prompt hash, and the script did not count reply formats (for example, how many replies were
+raw JSON) without reading the labels.
+
+**The year probe passed again.** The year probe tests whether the language model can recover the
+calendar year from the prompt. A pass means it cannot do so beyond chance: the pin rule allows at most
+3 exact years of 10. The probe used the same 10 prompts as attempt 1's year probe, rebuilt with the
+attempt 2 prompt builder. The language model named the exact year
+for 2 of the 10 prompts, and a year within 1 year for 4 of the 10 (including the 2 exact years). The
+10 answers are not independent, because they come from 5 candidates. The probe made 11 calls (10
+prompts and 1 billing probe) and used 61,384 input tokens and 10,432 output tokens, at a reported
+US$0.350 (the price the command-line tool reports, which is the price the same calls would cost
+through the pay-per-token application-programming-interface, API).
+
+**The D8 run made 68 calls: 65 checks, 1 billing probe, and 2 retries after unterminated JSON.** The
+19 candidates took the same 65 checks as attempt 1. The calls used 438,551 input tokens (a mean of
+6,449 per call) and 32,732 output tokens, at a reported US$2.033 (API-equivalent). The summed call
+time was 584 s, and the elapsed time was 301 s with 2 calls in parallel. The init event showed
+`apiKeySource = none`, so the calls ran on the subscription login. No call was limited by a
+rate-limit event. The account-wide seven-day utilisation was 0.39 before and after the run, so the
+run's own share cannot be attributed.
+
+**Under the looser parser, all 65 checks reached a valid reply, and the format change did not
+measurably improve on that.** Of the 65 checks, 63 were valid at the first reply, 2 were valid after
+the retry, and none lacked a valid reply. The looser parser alone had already accepted all 65 of
+attempt 1's first replies. Attempt 1 and attempt 2 are separate sets of calls, not the same replies.
+Attempt 1's strict parser accepted 55 of its 65 checks: 45 at the first reply, 10 only after a retry,
+and 10 never. Read by the structure of the 67 label replies of attempt 2 (65 first replies and 2
+retries), the 40-word limit was ignored in 30 replies, and 1 reply still carried `register_row`. The
+looser parser cuts a longer `reason` to 60 words, and the attempt 2 prompt asks for 40.
+
+**Under the 0.8 rule, the labeller again recovered none of D8's known eras or switching events.** The
+table states each check as `unknown` at the alarm, 7 days after it (+7 d), 21 days after it (+21 d),
+and at closure (the last check of the candidate). The +21 d check exists for only 1 of the 2
+switching-event candidates. The cells for the known eras, the verified switching events, and the
+unresolved candidate each hold at most 3 candidates, so we give no intervals.
+
+| Known class | Candidates | Recovered | Notes |
+|---|---|---|---|
+| Era (dated ECR connection) | 3 | 0 | `unknown` at every check |
+| Verified switching event | 2 | 0 | `unknown` at every check |
+| Unresolved | 1 | not applicable | the recorded classes do not settle this candidate |
+| No known class | 13 | not applicable | not scored |
+
+The 3, 2, 1, and 13 candidates sum to the 19 candidates. Every check of every candidate was `unknown`
+or `none`, so no candidate of any class reached state `era`, and the delay from alarm to a first
+`era` label cannot be measured. The detectors' own delays are the same as in attempt 1: the register
+date to the alarm was 73 days and 33 days, and the telemetry date to the alarm was 10 days and 21
+days.
+
+**After two attempts, the labeller at either prompt and the 0.8 rule recovers none of D8's known eras
+or switching events.** The reply-format change did not change the null. Whether to continue, to stop,
+or to try a different design is the maintainer's choice. A different prompt would need a new pin and
+a new year probe, and must not be tuned on D8's known classes.
+
+**Scaling attempt 2's D8 counts to the 16 Primaries gives about 329 calls, US$9.8, 2.1 million input
+tokens, and about 24 minutes at 2 parallel calls.** D8 holds 19 of the 92 candidates, and the
+estimate scales attempt 2's run by 92 / 19 (68 / 19 x 92 is about 329 calls). The estimate is
+interim, and no 16-Primary run was made.
 
 ## Compute
 
@@ -278,12 +453,50 @@ stored predictions reused, and fitted networks saved.
 ## Files
 
 - `ml-experiments/00712-clean-era-labels-part-1/e00712_trial.py`: the cost trial. The script sends
-  the probe and the 20 scheduled checks for the Primary, plus any retry, and writes the call log.
-  The script produces no label that is used. The `--summary` option reads the utilisation from
-  `unifiedWindows.<type>.utilization`, where the payloads hold it, as well as from
-  `rate_limit_info.utilization`, and prints that the figure is account-wide.
+  the billing probe and the 20 scheduled checks for the one Primary tried, plus any retry, and
+  writes the call log. The script produces no label that is used. The `--summary` option reads the
+  seven-day utilisation of the shared quota from `unifiedWindows.<type>.utilization` and from
+  `rate_limit_info.utilization`. The option also prints that the figure is account-wide.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_prompt.py`: lists the candidates and the
+  checks and builds the prompt. The prompt carries no calendar key (a field that reveals the date;
+  see `calendar_keys.md`), scales capacity using readings up to the check day only, and includes the
+  register table for arm `llm-ecr`. The module makes no call.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_asof.py`: builds the check schedule and, for
+  every arm, a table of the label known on each day (the as-of table), in the format of experiment
+  709's signals. The module makes no call.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_label.py`: the stage 1 labelling script.
+  The script runs as a dry run unless told otherwise. A call needs the manager's go token, a billing
+  probe that confirms which credential pays for the calls, the prompt pin, and explicit limits on
+  calls, tokens, and reported price. The script also builds the arms that need no call. The
+  `--reparse` option re-parses the stored replies with the looser parser (see the D8 pilot section)
+  and makes no call. The `--agreement` option compares the call log with the known classes of the
+  candidates and makes no call. The script ran the labelling of attempt 1 and of attempt 2.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_prompt_v2.py`: the attempt 2 prompt builder.
+  The module replaces the reply-format instructions of `e00712_prompt.py` with an instruction to
+  reply with raw JSON and nothing else, no `register_row` key for arm `llm`, and a 40-word `reason`.
+  The module reuses the rest of `e00712_prompt.py` and makes no call. The attempt 2 outputs sit beside
+  the attempt 1 outputs in the private folder:
+    - `stage1_v2/`: the call log and stored replies of the attempt 2 D8 run.
+    - `signals_v2/`: the label signals the run built.
+    - `prompt_pin_v2.json`: the hash of the approved attempt 2 prompt.
+    - `probe/prompts_v2/` and `probe/probe_result_v2.json`: the year probe's prompts and result.
+    - `stage1_go_token_v2.txt`: the go token, which a run renames to `<name>.used.<timestamp>` when
+      the run claims it.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_probe.py`: the year-guessing probe, whose
+  result decides whether the prompt is pinned. A probe reply is never used as a label.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_score.py`: the scorer for the planned
+  contrasts, vetoes, gates, and checks. It has been self-tested only, and no score has been read.
+- `ml-experiments/00712-clean-era-labels-part-1/test_e00712_label.py` and `test_e00712_probe.py`:
+  tests of the labelling script and the probe. No test makes a call, because each test replaces
+  the command-line tool that makes the calls with a stand-in.
+- `ml-experiments/00712-clean-era-labels-part-1/calendar_keys.md`: the calendar keys the pinned
+  prompt still carries and why the plan accepts them.
+- `ml-experiments/00712-clean-era-labels-part-1/review_triage.md`: what each review of the plan
+  found and what the plan did with each finding.
 - `data/ml-experiments/00712-clean-era-labels-part-1/`: the experiment's private folder (the call
   store, label tables, forecasts, and fitted networks). The folder is never committed.
-- `data/ml-experiments/briefs/clean_era_labels/design.md`: the design behind this plan.
+- `data/ml-experiments/briefs/clean_era_labels/design.md`: the private design that this plan
+  summarises. The file is not committed, so a reader of the published docs cannot open it; the
+  committed `review_triage.md` records what the reviews of the design changed.
 - [Experiment 709](../00709-era-signal-in-the-candidate-part-1/result.md): the stored signals,
   forecasts, and injected bank that the stored arms read.
