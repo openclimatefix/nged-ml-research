@@ -333,3 +333,10 @@ def test_the_replicate_fine_tune_window_keeps_nothing_before_2021_07_20():
     assert keep.any()
     assert (micro[keep] >= floor).all()
     assert ((micro[keep] - 7 * 24 * 3_600_000_000) >= floor).all()
+
+
+def test_take_with_no_channels_returns_an_empty_column_block():
+    """The no-cloud reference asks for no channels; the lookup must not fail on a float index."""
+    store = _store()
+    block = store.take(run_days=np.array([store.first_day]), steps=np.array([0]), channels=[])
+    assert block.shape == (1, 0)

@@ -106,7 +106,9 @@ class RunArrays:
         if ((index < 0) | (index >= self.n_runs)).any():
             msg = "a row's run lies outside the store"
             raise ValueError(msg)
-        return self.values[index[:, None], steps[:, None], np.array(channels)[None, :]]
+        return self.values[
+            index[:, None], steps[:, None], np.array(channels, dtype=np.int64)[None, :]
+        ]
 
 
 def row_run_days(*, nwp_init: np.ndarray) -> np.ndarray:
