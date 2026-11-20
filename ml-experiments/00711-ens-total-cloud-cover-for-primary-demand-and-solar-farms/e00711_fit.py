@@ -23,7 +23,12 @@ last), `work/logs/<arm>/<month>_s<seed>.json` (rows, epochs, validation loss, in
 time, peak resident memory, and peak GPU memory), and `work/states/<arm>/<month>/` (the fitted
 network).
 
-**The gate is not enforced here.** `e00711_score.py gate` compares `D0n` with the stored `R_F`.
+**The fit refuses every arm but `D0n` until the gate marker holds both gates.** `e00711_score.py
+gate` compares `D0n` with the stored `R_F` and `--gate-predict` reloads the stored state. Each
+writes `work/gate_passed.json` through `e00711_gate.py`. The one override is `--measure`, which
+skips the check and writes the set, log, and state under `measure-<arm>`.
+A set that already exists is reused only if its manifest is not `dirty` and its commit is an
+ancestor of HEAD.
 
 The environment as in `e00711_common.py`; run with the folders of experiments 707 and 666 on
 `PYTHONPATH`. The memory-measuring first fit (arm `D1`, fold 2026-06, seed 0):
@@ -37,8 +42,9 @@ export PYTHONPATH=$E/00707-ens-backfill-pretraining-gain-against-ens-history-len
 $E/00666-one-year-backtest-of-simple-wind-and-solar-networks:\
 $E/00711-ens-total-cloud-cover-for-primary-demand-and-solar-farms
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 POLARS_MAX_THREADS=1 \
-    systemd-run --user --scope -p MemoryMax=16G -p MemorySwapMax=0 -p OOMPolicy=continue \
-    uv run --no-sync python ml-experiments/00711-*/e00711_fit.py --arm D1 --fold 2026-06 --seed 0
+    systemd-run --user --scope -p MemoryMax=12G -p MemorySwapMax=0 -p OOMPolicy=continue \
+    uv run --no-sync python ml-experiments/00711-*/e00711_fit.py \
+        --arm D1 --fold 2026-06 --seed 0 --measure
 ```
 """
 
@@ -58,6 +64,7 @@ import e00707_prep as prep  # ty: ignore[unresolved-import]
 import e00711_arms as arms
 import e00711_common as common
 import e00711_folds as folds
+import e00711_gate as gate
 import e00711_solar as solar
 import numpy as np
 import polars as pl
@@ -72,12 +79,43 @@ STATE_DIR: Final[Path] = common.WORK_DIR / "work" / "states"
 PRIMARY_ENS_WINDOW: Final[arms707.Window] = arms707.W_F
 """The `S_ens` window of `R_F`: every ENS row from 2021-07-20 to the cut."""
 PRIMARY_FT_WINDOW: Final[arms707.Window] = arms707.W24
+REPLICATE_FT_WINDOW: Final[arms707.Window] = arms707.Window(
+    name="w730f",
+    days=730,
+    floor=arms707.LONG_WINDOW_FLOOR,
+    floor_lags=True,
+    note="24 months of valid time, but no row, origin, or weekly lag before 2021-07-20",
+)
+"""The replicate's fine-tuning window: `W24` with the 2021-07-20 floor."""
 SOLAR_EPOCHS: Final[int] = 20
+
+
+def fine_tune_window(*, arm: arms.Arm) -> arms707.Window:
+    """Return the fine-tuning window of a Primary demand arm.
+
+    The replicate folds refit in 2023, when a 730-day window reaches into the 2021 lockdown and
+    before the first placebo run, so the replicate arms take the window with the 2021-07-20 floor.
+    Every other arm takes `W24`.
+    """
+    return REPLICATE_FT_WINDOW if arm.folds == "replicate12" else PRIMARY_FT_WINDOW
+
+
+MEASURE_PREFIX: Final[str] = "measure-"
+_MEASURING: Final[dict[str, bool]] = {"on": False}
+
+
+def label(*, arm: str) -> str:
+    """Return the name of the arm's outputs: the arm's, or `measure-<arm>` in a measuring fit.
+
+    A measuring fit writes its set, log, and state under another name, so that the main run never
+    reuses it.
+    """
+    return f"{MEASURE_PREFIX}{arm}" if _MEASURING["on"] else arm
 
 
 def prediction_path(*, arm: str, month: str, seed: int) -> Path:
     """Return the folder of a job's prediction set, which is the job's completion marker."""
-    return PREDICTIONS_DIR / arms.set_name(arm=arm, month=month, seed=seed)
+    return PREDICTIONS_DIR / arms.set_name(arm=label(arm=arm), month=month, seed=seed)
 
 
 def peak_rss_gb() -> float:
@@ -94,7 +132,7 @@ def peak_gpu_gb() -> float | None:
 
 def write_log(*, payload: dict, arm: str, month: str, seed: int) -> None:
     """Write a job's log through a temporary name."""
-    fit707.write_json(payload=payload, target=LOG_DIR / arm / f"{month}_s{seed}.json")
+    fit707.write_json(payload=payload, target=LOG_DIR / label(arm=arm) / f"{month}_s{seed}.json")
 
 
 def write_set(*, arm: arms.Arm, month: str, seed: int, frame: pl.DataFrame) -> Path:
@@ -115,7 +153,7 @@ def write_set(*, arm: arms.Arm, month: str, seed: int, frame: pl.DataFrame) -> P
         raise ValueError(msg)
     return experiment_store.write_predictions(
         experiment_id=arms.EXPERIMENT_ID,
-        name=arms.set_name(arm=arm.name, month=month, seed=seed),
+        name=arms.set_name(arm=label(arm=arm.name), month=month, seed=seed),
         frame=kept,
         kind="quantiles",
         row_set_id=arm.row_set_id,
@@ -175,7 +213,7 @@ def fit_primary(*, arm: arms.Arm, month: str, seed: int, device: str, max_epochs
     """
     refit = prep.refit_of(month=month)
     started = time.monotonic()
-    fold = folds.build_fold(arm=arm, refit=refit, seed=seed, window=PRIMARY_FT_WINDOW)
+    fold = folds.build_fold(arm=arm, refit=refit, seed=seed, window=fine_tune_window(arm=arm))
     names, _, _ = folds.input_plan(arm=arm)
     n_inputs = fold.layout.n_inputs
     n_primaries = len(fold.target_mean)
@@ -229,7 +267,9 @@ def fit_primary(*, arm: arms.Arm, month: str, seed: int, device: str, max_epochs
         standardiser=fold.standardiser, target_mean=fold.target_mean, target_std=fold.target_std
     )
     fitted = net.Fitted(model=model, setting=setting, seed=seed, epochs=epochs, val_nll=best)
-    net.save_fit(fitted=fitted, scale=scale, target=STATE_DIR / arm.name / month / f"s{seed}")
+    net.save_fit(
+        fitted=fitted, scale=scale, target=STATE_DIR / label(arm=arm.name) / month / f"s{seed}"
+    )
     forecast = primary_forecast(
         arm=arm, month=month, seed=seed, fitted=fitted, scale=scale, device=device
     )
@@ -334,7 +374,7 @@ def fit_solar(*, arm: arms.Arm, month: str, seed: int) -> dict:
     forecast = solar.prediction_frame(
         target=sel.target, fraction=fraction, ratio=sel.target["ratio"], seed=seed
     )
-    target_path = STATE_DIR / arm.name / month / f"s{seed}.pt"
+    target_path = STATE_DIR / label(arm=arm.name) / month / f"s{seed}.pt"
     target_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = target_path.with_name(target_path.name + ".tmp")
     torch.save({"state": state, "mean": mean.tolist(), "std": std.tolist()}, temporary)
@@ -428,7 +468,10 @@ def run_job(*, arm: arms.Arm, month: str, seed: int, device: str, max_epochs: in
     if month not in arm.months or seed not in arm.seeds:
         msg = f"{arm.name} has folds {arm.months} and seeds {arm.seeds}, not {month} and {seed}"
         raise ValueError(msg)
-    if prediction_path(arm=arm.name, month=month, seed=seed).exists():
+    gate.refuse_without_gate(arm=arm.name, measure=_MEASURING["on"])
+    existing = prediction_path(arm=arm.name, month=month, seed=seed)
+    if existing.exists():
+        gate.check_existing_set(folder=existing)
         return f"{arm.name} {month} seed {seed}: prediction set exists, skipped"
     if arm.target == "primary":
         result = fit_primary(arm=arm, month=month, seed=seed, device=device, max_epochs=max_epochs)
@@ -461,6 +504,11 @@ def main() -> None:
     parser.add_argument("--seed", required=True, type=int)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument(
+        "--measure",
+        action="store_true",
+        help="the measuring fit: skip the gate check; write under the name measure-<arm>",
+    )
     parser.add_argument("--dry-run", action="store_true", help="validate the job; fit nothing")
     parser.add_argument(
         "--gate-predict",
@@ -469,8 +517,26 @@ def main() -> None:
     )
     args = parser.parse_args()
     arm = arms.ARMS[args.arm]
+    _MEASURING["on"] = args.measure
     if args.gate_predict:
-        worst = predict_gate(month=args.fold, seed=args.seed, device=args.device)
+        try:
+            worst = predict_gate(month=args.fold, seed=args.seed, device=args.device)
+        except ValueError as error:
+            gate.record(
+                kind="predict",
+                month=args.fold,
+                passed=False,
+                detail=str(error),
+                commit=gate.head_commit(),
+            )
+            raise
+        gate.record(
+            kind="predict",
+            month=args.fold,
+            passed=True,
+            detail=f"largest difference {worst:.2e}",
+            commit=gate.head_commit(),
+        )
         print(f"prediction gate {args.fold} seed {args.seed}: largest difference {worst:.2e}")
         return
     if args.dry_run:

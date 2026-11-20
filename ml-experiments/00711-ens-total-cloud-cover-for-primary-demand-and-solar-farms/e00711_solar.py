@@ -111,13 +111,20 @@ def load_farm(*, site: str) -> pl.DataFrame:
 def daylight_rows(*, table: pl.DataFrame) -> pl.DataFrame:
     """Return a farm's daylight half-hours with all 18 inputs and a lead below 348 hours.
 
+    The rows start at the run `ROW_FIRST_RUN` (2020-10-29). The earlier runs stay in the farm
+    table as placebo donors only.
+
     A daylight half-hour without its inputs is allowed only on run 2024-01-03, which is absent
     upstream. Any other run's daylight half-hour without a stamp is an error.
 
     Raises:
         ValueError: If a daylight half-hour of another run lacks an input.
     """
-    daylight = table.filter(pl.col("daylight") & (pl.col("lead_hours") < MAX_LEAD_HOURS))
+    daylight = table.filter(
+        pl.col("daylight")
+        & (pl.col("lead_hours") < MAX_LEAD_HOURS)
+        & (pl.col("init_time") >= ROW_FIRST_RUN)
+    )
     incomplete = daylight.filter(pl.any_horizontal(pl.col(*BASE_COLUMNS).is_null()))
     allowed = incomplete.filter(pl.col("init_time").dt.date() == common.UPSTREAM_GAP_RUN.date())
     if incomplete.height != allowed.height:

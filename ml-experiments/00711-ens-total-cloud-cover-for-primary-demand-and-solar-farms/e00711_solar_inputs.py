@@ -4,7 +4,9 @@ This is a copy of experiment 666's `e00666_solar_inputs.py` with four changes (p
 
 - **The runs start at 2020-10-15 and end at 2026-06-30**, so the training window can reach the
   first back-filled run. The 14 earliest runs are donors only, because the time-shifted placebo of
-  a run needs the run issued 14 days earlier; the rows start at `SOLAR_ROW_FIRST_RUN`.
+  a run needs the run issued 14 days earlier; the farm table keeps
+  them as donors, and `e00711_solar.daylight_rows` starts the rows at `SOLAR_ROW_FIRST_RUN`
+  (2020-10-29).
 - **The 51-member `total_cloud_cover_atmosphere` is read with the other members** and gets the
   linear interpolation that temperature gets (cloud is a continuous variable). The table holds
   `cloud_mean` and `cloud_spread` (percent divided by 100), `cloud_clear_share` and
@@ -444,14 +446,10 @@ def build_farm(*, site: str, version: int) -> None:
                 extras=extras,
             )
         )
-    first_origin = SOLAR_ROW_FIRST_RUN + timedelta(hours=SOLAR_FIRST_LEAD_HOURS)
     table = (
         pl.concat(pieces)
         .join(actual, on="time", how="left")
-        .filter(
-            (pl.col("init_time") >= SOLAR_ROW_FIRST_RUN)
-            & (pl.col("time") > pl.col("init_time") + pl.duration(hours=SOLAR_FIRST_LEAD_HOURS))
-        )
+        .filter(pl.col("time") > pl.col("init_time") + pl.duration(hours=SOLAR_FIRST_LEAD_HOURS))
         .with_columns(
             has_stamp=pl.col("idx").is_not_null(),
             cloud_missing=pl.col("init_time").dt.date().is_in([r.date() for r in missing_runs()]),
@@ -482,7 +480,8 @@ def build_farm(*, site: str, version: int) -> None:
     out_table.write_parquet(target.with_suffix(".tmp"))
     target.with_suffix(".tmp").rename(target)
     print(
-        f"{site}: {out_table.height:,} rows from the runs of {first_origin:%Y-%m-%d} on; "
+        f"{site}: {out_table.height:,} rows "
+        f"(runs before {SOLAR_ROW_FIRST_RUN:%Y-%m-%d} are donors); "
         f"origin rule asserted on every row",
         flush=True,
     )

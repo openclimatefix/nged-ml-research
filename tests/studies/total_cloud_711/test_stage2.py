@@ -193,57 +193,6 @@ def test_row_losses_for_a_median_that_hits_the_actual():
     assert losses["below_q99"].sum() == losses.height
 
 
-def test_contrast_runs_on_matching_arms_and_refuses_unequal_seeds():
-    a = _forecast(n_months=4, shift=0.0, seeds=(0, 1))
-    actual = np.full(a.height, 0.5)
-    base = score.row_losses(frame=a, actual=actual).with_columns(
-        fold=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"),
-        label=pl.lit("D5"),
-        lead_hours=pl.lit(10.0),
-    )
-    better_arm = base.with_columns(crps=pl.col("crps") - 0.5)
-    losses = {"real": better_arm, "fake": base}
-    reading = score.read_contrast(
-        losses=losses,
-        treatment="real",
-        reference="fake",
-        label="t",
-        scope="s",
-        where=None,
-        level=99.0,
-        n_resamples=200,
-    )
-    assert reading.difference == pytest.approx(-0.5)
-    assert reading.upper < 0
-    assert reading.seeds == (0, 1)
-    shortened = {"real": better_arm.filter(pl.col("seed") == 0), "fake": base}
-    reading_shared = score.read_contrast(
-        losses=shortened,
-        treatment="real",
-        reference="fake",
-        label="t",
-        scope="s",
-        where=None,
-        level=99.0,
-        n_resamples=200,
-    )
-    assert reading_shared.seeds == (0,)
-    with pytest.raises(ValueError, match="share no seed"):
-        score.read_contrast(
-            losses={
-                "real": better_arm.filter(pl.col("seed") == 0),
-                "fake": base.filter(pl.col("seed") == 1),
-            },
-            treatment="real",
-            reference="fake",
-            label="t",
-            scope="s",
-            where=None,
-            level=99.0,
-            n_resamples=50,
-        )
-
-
 def test_regime_expression_labels_half_hours():
     frame = pl.DataFrame(
         {"csi": [0.9, 0.2, 0.6, 0.9, 0.9], "elevation_deg": [30.0, 30.0, 30.0, 5.0, -3.0]}
@@ -252,13 +201,3 @@ def test_regime_expression_labels_half_hours():
         r=score.regime_expression(csi=pl.col("csi"), elevation=pl.col("elevation_deg"))
     )
     assert out["r"].to_list() == ["sunny", "overcast", "between", "low sun", "night"]
-
-
-def test_t_interval_needs_two_months():
-    diff = np.array([[0.1, 0.2, 0.3, 0.4]])
-    months = np.array(["a", "a", "b", "b"])
-    low, high = score.t_interval_of_months(differences=diff, months=months, level=95.0)
-    assert low < 0.25 < high
-    assert (
-        score.t_interval_of_months(differences=diff, months=np.array(["a"] * 4), level=95.0) is None
-    )

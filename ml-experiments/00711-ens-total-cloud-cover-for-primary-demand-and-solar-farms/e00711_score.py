@@ -37,6 +37,7 @@ uv run --no-sync python ml-experiments/00711-*/e00711_score.py score --resamples
 """
 
 import argparse
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -44,6 +45,8 @@ from typing import Final, Literal
 
 import e00711_arms as arms
 import e00711_common as common
+import e00711_gate as gate_marker
+import e00711_jobs as jobs
 import numpy as np
 import polars as pl
 from scipy import stats
@@ -52,6 +55,7 @@ from studies.eval_protocol import metrics
 
 from studies import bootstrap, experiment_store
 
+StageType = jobs.StageType
 VerdictType = Literal["refuted", "supported", "small gain", "not supported", "inconclusive"]
 TargetVerdictType = Literal[
     "supported",
@@ -65,8 +69,11 @@ TargetVerdictType = Literal[
 N_PLANNED_READINGS: Final[int] = 9
 PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / N_PLANNED_READINGS)
 """99.44%: each of the nine planned readings (C1, C2, and C3 at two groups, S1, S2, S3)."""
-CHECK_LEVEL: Final[float] = 99.0
-"""The common level of the five checks that the plan reads at 95%, corrected to 99%."""
+N_CHECKS: Final[int] = 8
+CHECK_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / N_CHECKS)
+"""99.375%: the eight checks (`D1p` and `D1t` minus `DF` and gap-scored `D1` minus `D1p`, each at
+the six and at the eight, and `P1p` and `P1t` minus `PF`). The positive control is read at the same
+level."""
 SLICE_LEVEL: Final[float] = 95.0
 N_RESAMPLES: Final[int] = 50_000
 N_SLICE_RESAMPLES: Final[int] = 2_000
@@ -178,18 +185,18 @@ class GroupReading:
 
     Attributes:
         c1: The verdict of C1 at the group.
-        c2: The verdict of C2 at the group.
+        c2: The verdict of C2 at the group, or `None` in Stage A, which does not fit C2's arms.
         c3: The verdict of C3 at the group, or `None` if the replicate has not been scored.
         c3_lower: The lower limit of C3's interval, for audit trigger 2.
         control_passed: Whether the positive control passed (it makes both groups `inconclusive`
-            when it fails).
+            when it fails), or `None` if it has not been run (Stage A).
     """
 
     c1: VerdictType
-    c2: VerdictType
+    c2: VerdictType | None
     c3: VerdictType | None
     c3_lower: float | None
-    control_passed: bool
+    control_passed: bool | None
 
 
 def group_verdict(*, reading: GroupReading) -> tuple[TargetVerdictType, list[str]]:
@@ -207,8 +214,9 @@ def group_verdict(*, reading: GroupReading) -> tuple[TargetVerdictType, list[str
         The group's verdict and the fired triggers (text).
     """
     fired: list[str] = []
-    base = better(first=reading.c1, second=reading.c2)
-    if not reading.control_passed:
+    seen = [v for v in (reading.c1, reading.c2) if v is not None]
+    base = better(first=seen[0], second=seen[-1])
+    if reading.control_passed is False:
         fired.append("positive control failed: both groups inconclusive")
         return "inconclusive", fired
     if (
@@ -218,11 +226,7 @@ def group_verdict(*, reading: GroupReading) -> tuple[TargetVerdictType, list[str
     ):
         fired.append("audit trigger 2: C1 or C2 supported and the replicate's lower limit above 0")
         return "inconclusive", fired
-    if (
-        reading.c1 in ("inconclusive", "not supported")
-        and reading.c2 in ("inconclusive", "not supported")
-        and reading.c3 == "supported"
-    ):
+    if all(v in ("inconclusive", "not supported") for v in seen) and reading.c3 == "supported":
         return "partly supported", fired
     return base, fired
 
@@ -387,10 +391,30 @@ def add_regime(*, losses: pl.DataFrame, sky: pl.DataFrame) -> pl.DataFrame:
 
 
 @dataclass(frozen=True)
+class Incomplete:
+    """A reading that cannot be made.
+
+    The reason is an absent arm, a missing fold or seed, or rows that differ between the two arms.
+
+    Attributes:
+        key: The reading's key, such as `C1 the six`.
+        reason: Why the reading is incomplete.
+    """
+
+    key: str
+    reason: str
+
+    def line(self) -> str:
+        """Return the reading as one printable line."""
+        return f"{self.key}: INCOMPLETE, {self.reason}"
+
+
+@dataclass(frozen=True)
 class Reading:
     """One contrast on one set of rows.
 
     Attributes:
+        key: The reading's key, such as `C1 the six`.
         label: The contrast's name, such as `C1 D1 minus D1p`.
         scope: The rows, such as `the six, days 1 to 10`.
         difference: The mean per-row difference, treatment minus reference, in points of CRPS.
@@ -403,8 +427,10 @@ class Reading:
         n_months: The number of calendar months.
         seeds: The seeds that both arms hold.
         level: The interval's coverage in percent.
+        label_rows: The number of rows of one seed per Primary or farm label.
     """
 
+    key: str
     label: str
     scope: str
     difference: float
@@ -417,6 +443,7 @@ class Reading:
     n_months: int
     seeds: tuple[int, ...]
     level: float
+    label_rows: dict[str, int]
 
     @property
     def verdict(self) -> VerdictType:
@@ -439,21 +466,130 @@ class Reading:
             f"{boot}{t_text}{averaged} -> {self.verdict}"
         )
 
+    def rows_line(self) -> str:
+        """Return the rows of one seed per label, which are the weights of the pooled mean."""
+        rows = ", ".join(f"{k} {v:,}" for k, v in sorted(self.label_rows.items()))
+        return f"    rows per label (one seed): {rows}"
 
-def t_interval_of_months(
-    *, differences: np.ndarray, months: np.ndarray, level: float
-) -> tuple[float, float] | None:
+
+Outcome = Reading | Incomplete
+
+
+@dataclass(frozen=True)
+class Paired:
+    """Per-seed, per-month totals of a paired difference.
+
+    Attributes:
+        sums: The sum of the per-row difference, shape (seeds, months).
+        counts: The number of rows in each month, shape (months,), the same for every seed.
+        months: The month labels, sorted.
+        seeds: The seeds, sorted.
+    """
+
+    sums: np.ndarray
+    counts: np.ndarray
+    months: tuple[str, ...]
+    seeds: tuple[int, ...]
+
+    @property
+    def mean(self) -> float:
+        """Return the mean per-row difference over all seeds and months."""
+        return float(self.sums.sum() / (self.sums.shape[0] * self.counts.sum()))
+
+
+def paired_month_sums(*, a: pl.DataFrame, b: pl.DataFrame, metric: str = "crps") -> Paired:
+    """Return the month totals of the difference `a` minus `b`, paired row by row.
+
+    The two frames must hold the same seeds and the same (series, run, valid time) keys. Totalling
+    each month once lets the bootstrap resample a few numbers instead of millions of rows.
+
+    Args:
+        a: The treatment's per-seed losses (columns `KEYS`, `seed`, `fold`, and the metric).
+        b: The reference's per-seed losses.
+        metric: The loss column.
+
+    Returns:
+        The totals.
+
+    Raises:
+        ValueError: If the seeds differ, the keys differ, or the months hold different counts in
+            two seeds.
+    """
+    order = [*KEYS, "seed"]
+    a_sorted, b_sorted = a.sort(order), b.sort(order)
+    if a_sorted.height != b_sorted.height or not a_sorted.select(order).equals(
+        b_sorted.select(order)
+    ):
+        msg = f"the two arms do not hold the same rows ({a.height:,} and {b.height:,})"
+        raise ValueError(msg)
+    frame = pl.DataFrame(
+        {
+            "seed": a_sorted["seed"],
+            "fold": a_sorted["fold"].cast(pl.String),
+            "diff": a_sorted[metric].cast(pl.Float64) - b_sorted[metric].cast(pl.Float64),
+        }
+    )
+    grouped = (
+        frame.group_by("seed", "fold")
+        .agg(total=pl.col("diff").sum(), n=pl.len())
+        .sort("seed", "fold")
+    )
+    seeds = tuple(sorted(grouped["seed"].unique().to_list()))
+    months = tuple(sorted(grouped["fold"].unique().to_list()))
+    sums = np.zeros((len(seeds), len(months)))
+    counts = np.zeros((len(seeds), len(months)), dtype=np.int64)
+    for seed, month, total, n in grouped.iter_rows():
+        sums[seeds.index(seed), months.index(month)] = total
+        counts[seeds.index(seed), months.index(month)] = n
+    if not (counts == counts[0]).all():
+        msg = "two seeds hold different numbers of rows in a month"
+        raise ValueError(msg)
+    return Paired(sums=sums, counts=counts[0], months=months, seeds=seeds)
+
+
+def month_total_interval(*, paired: Paired, level: float, n_resamples: int) -> tuple[float, float]:
+    """Return the month-block bootstrap interval of the mean from month totals.
+
+    This draws a fitting seed and then whole months in the order of
+    `studies.bootstrap.bootstrap_difference_at_level`, from the same random seed, so that its
+    interval equals that function's for the same rows (the tests check the equality). It takes
+    month totals, so a contrast of millions of rows costs the number of months per resample.
+
+    Args:
+        paired: The month totals.
+        level: The coverage in percent, above 1 and below 100.
+        n_resamples: The number of resamples.
+
+    Returns:
+        The lower and upper limits.
+
+    Raises:
+        ValueError: If `level` is not above 1 and below 100.
+    """
+    if not 1.0 < level < 100.0:
+        msg = f"level is a coverage in percent, above 1 and below 100: {level}"
+        raise ValueError(msg)
+    generator = np.random.default_rng(bootstrap.BOOTSTRAP_SEED)
+    n_seeds, n_months = paired.sums.shape
+    resampled = np.empty(n_resamples)
+    for resample in range(n_resamples):
+        seed_index = generator.integers(0, n_seeds)
+        drawn = generator.integers(0, n_months, size=n_months)
+        resampled[resample] = paired.sums[seed_index, drawn].sum() / paired.counts[drawn].sum()
+    tail = (100.0 - level) / 2.0
+    return float(np.percentile(resampled, tail)), float(np.percentile(resampled, 100.0 - tail))
+
+
+def t_interval_of_months(*, paired: Paired, level: float) -> tuple[float, float] | None:
     """Return the t interval on the monthly mean differences, or `None` with fewer than 2 months.
 
     Args:
-        differences: Per-seed, per-row differences, shape (seeds, rows).
-        months: The month label of each row.
+        paired: The month totals.
         level: The coverage in percent.
     """
-    labels = np.unique(months)
-    if len(labels) < 2:
+    if len(paired.months) < 2:
         return None
-    monthly = np.array([differences[:, months == m].mean() for m in labels])
+    monthly = paired.sums.sum(axis=0) / (paired.sums.shape[0] * paired.counts)
     half = float(
         stats.t.ppf(1.0 - (1.0 - level / 100.0) / 2.0, df=len(monthly) - 1)
         * monthly.std(ddof=1)
@@ -462,45 +598,118 @@ def t_interval_of_months(
     return float(monthly.mean()) - half, float(monthly.mean()) + half
 
 
-def contrast_losses(
-    *,
-    losses: dict[str, pl.DataFrame],
-    treatment: str,
-    reference: str,
-    where: pl.Expr | None,
-    seeds: tuple[int, ...] | None = None,
-) -> pl.DataFrame:
-    """Return `losses_for_bootstrap`'s frame for two arms on the rows and seeds they share.
+def wider(
+    *, boot: tuple[float, float] | None, t_int: tuple[float, float] | None
+) -> tuple[float, float]:
+    """Return the wider of the bootstrap interval and the t interval (the decisive interval).
 
-    Args:
-        losses: Each arm's per-row loss frame with `fold`, `label`, `lead_hours`, and `regime`.
-        treatment: The treatment arm's name.
-        reference: The reference arm's name.
-        where: A filter on the loss frames' columns, or `None`.
-        seeds: The seeds to use; the seeds that both arms hold if not given.
-
-    Returns:
-        The frame of both arms, built by `experiment_store.losses_for_bootstrap`, which raises if
-        the arms hold different rows or seeds.
+    The wider interval is the one with the larger upper minus lower. It is not their union.
 
     Raises:
-        ValueError: If the two arms share no seed.
+        ValueError: If neither interval exists.
     """
-    pair = {}
-    held = [set(losses[a]["seed"].unique().to_list()) for a in (treatment, reference)]
-    shared = tuple(sorted(held[0] & held[1])) if seeds is None else seeds
-    if not shared:
-        msg = f"{treatment} and {reference} share no seed"
+    candidates = [i for i in (boot, t_int) if i is not None]
+    if not candidates:
+        msg = "no interval can be computed"
         raise ValueError(msg)
-    for name in (treatment, reference):
-        frame = losses[name].filter(pl.col("seed").is_in(list(shared)))
-        pair[name] = frame if where is None else frame.filter(where)
-    return experiment_store.losses_for_bootstrap(arm_losses=pair)
+    return max(candidates, key=lambda i: i[1] - i[0])
+
+
+# --- the arms' losses -------------------------------------------------------------------------
+
+
+@dataclass
+class ArmLosses:
+    """One arm's per-row losses.
+
+    Attributes:
+        losses: Per-seed losses with `KEYS`, `seed`, `crps`, `mae_median`, `label`, `fold`,
+            `lead_hours`, and `regime`.
+        averaged: The same for the seed-averaged forecast (seed -1).
+        coverage: For each outer level, the share of actuals below that quantile.
+        cells: The (fold, seed) pairs the arm holds.
+    """
+
+    losses: pl.DataFrame
+    averaged: pl.DataFrame
+    coverage: dict[str, float]
+    cells: frozenset[tuple[str, int]]
+
+    @property
+    def seeds(self) -> tuple[int, ...]:
+        """Return the seeds that the arm holds in at least one fold."""
+        return tuple(sorted({s for _, s in self.cells}))
+
+
+class LossSource:
+    """Hands out arms' losses one at a time and forgets the oldest arms, to bound memory.
+
+    Args:
+        load: Returns an arm's losses, or `None` if the arm has no predictions.
+        keep: How many arms to hold at once.
+    """
+
+    def __init__(self, *, load: Callable[[str], ArmLosses | None], keep: int = 3) -> None:
+        """Hold the loader and an empty cache."""
+        self._load = load
+        self._keep = keep
+        self._cache: dict[str, ArmLosses | None] = {}
+        self.errors: dict[str, str] = {}
+
+    def get(self, name: str) -> ArmLosses | None:
+        """Return the arm's losses, or `None` if it has none or could not be read.
+
+        A stored arm whose file is absent gives `None`. Any other `ValueError` from the reader is
+        kept in `errors` and also gives `None`, so one unreadable arm cannot stop the scorer.
+        """
+        if name in self._cache:
+            self._cache[name] = self._cache.pop(name)
+            return self._cache[name]
+        try:
+            loaded = self._load(name)
+        except FileNotFoundError:
+            loaded = None
+        except ValueError as error:
+            self.errors[name] = str(error)
+            loaded = None
+        self._cache[name] = loaded
+        while len(self._cache) > self._keep:
+            self._cache.pop(next(iter(self._cache)))
+        return loaded
+
+
+def planned_seeds(*, arm: str, stage: StageType) -> tuple[int, ...]:
+    """Return the seeds that the arm needs when `stage` is complete."""
+    seeds = {s for _, s in jobs.expected_cells(arm=arm, stage=stage)}
+    return tuple(sorted(seeds))
+
+
+def missing_for(
+    *, source: LossSource, arm: str, months: tuple[str, ...], stage: StageType
+) -> list[str]:
+    """Return why an arm cannot serve a reading on `months`, or an empty list if it can.
+
+    A reading needs the arm's every planned seed on each of `months`. A stored arm is checked
+    against its stored seeds.
+    """
+    held = source.get(arm)
+    if held is None:
+        return [f"{arm} has no predictions{_error_text(source=source, arm=arm)}"]
+    needed = {(m, s) for m in months for s in planned_seeds(arm=arm, stage=stage)}
+    absent = sorted(needed - held.cells)
+    if absent:
+        return [f"{arm} lacks {len(absent)} of {len(needed)} (fold, seed) cells, e.g. {absent[:2]}"]
+    return []
+
+
+def _error_text(*, source: LossSource, arm: str) -> str:
+    """Return the reader's error for an arm as text to append to a message, or an empty string."""
+    return f" ({source.errors[arm]})" if arm in source.errors else ""
 
 
 def read_contrast(
     *,
-    losses: dict[str, pl.DataFrame],
+    source: LossSource,
     treatment: str,
     reference: str,
     label: str,
@@ -508,15 +717,18 @@ def read_contrast(
     where: pl.Expr | None,
     level: float,
     n_resamples: int,
+    key: str = "",
     metric: str = "crps",
-    averaged: dict[str, pl.DataFrame] | None = None,
     seeds: tuple[int, ...] | None = None,
     t_only: bool = False,
 ) -> Reading:
     """Return one contrast: its difference, the bootstrap and t intervals, and the decisive one.
 
+    The contrast reads the seeds that both arms hold (or `seeds`), totals the difference by seed
+    and month, and resamples the totals.
+
     Args:
-        losses: Each arm's per-row losses.
+        source: The arms' losses.
         treatment: The treatment arm.
         reference: The reference arm.
         label: The contrast's name.
@@ -524,86 +736,82 @@ def read_contrast(
         where: A filter on the loss frames' columns.
         level: The interval's coverage in percent.
         n_resamples: The number of bootstrap resamples.
+        key: The reading's key; the label if not given.
         metric: The loss column.
-        averaged: Each arm's seed-averaged losses, for the descriptive reading.
         seeds: The seeds, or `None` for the seeds that both arms hold.
         t_only: Read only the t interval (for a contrast on a few folds, where the bootstrap has
             few distinct resamples).
 
     Returns:
         The reading.
+
+    Raises:
+        ValueError: If an arm is absent, the arms share no seed, or the arms' rows differ.
     """
-    frame = contrast_losses(
-        losses=losses, treatment=treatment, reference=reference, where=where, seeds=seeds
-    )
-    differences, months = bootstrap.paired_differences(
-        losses=frame, treatment=treatment, reference=reference, metric=metric
-    )
+    a, b = source.get(treatment), source.get(reference)
+    for name, value in ((treatment, a), (reference, b)):
+        if value is None:
+            msg = f"{name} has no predictions{_error_text(source=source, arm=name)}"
+            raise ValueError(msg)
+    if a is None or b is None:
+        raise ValueError
+    shared = tuple(sorted(set(a.seeds) & set(b.seeds))) if seeds is None else seeds
+    if not shared:
+        msg = f"{treatment} and {reference} share no seed"
+        raise ValueError(msg)
+    frames = []
+    for value in (a, b):
+        frame = value.losses.filter(pl.col("seed").is_in(list(shared)))
+        frames.append(frame if where is None else frame.filter(where))
+    paired = paired_month_sums(a=frames[0], b=frames[1], metric=metric)
     boot = (
         None
         if t_only
-        else bootstrap.bootstrap_difference_at_level(
-            losses=frame,
-            treatment=treatment,
-            reference=reference,
-            metric=metric,
-            level=level,
-            n_resamples=n_resamples,
-        )
+        else month_total_interval(paired=paired, level=level, n_resamples=n_resamples)
     )
-    t_int = t_interval_of_months(differences=differences, months=months, level=level)
-    candidates = [i for i in (boot, t_int) if i is not None]
-    if not candidates:
-        msg = f"{label} {scope}: no interval can be computed"
-        raise ValueError(msg)
-    lower = min(i[0] for i in candidates)
-    upper = max(i[1] for i in candidates)
-    seed_averaged = None
-    if averaged is not None:
-        seed_averaged = _averaged_difference(
-            averaged=averaged, treatment=treatment, reference=reference, where=where, metric=metric
-        )
+    t_int = t_interval_of_months(paired=paired, level=level)
+    lower, upper = wider(boot=boot, t_int=t_int)
+    n_seeds = len(paired.seeds)
+    label_rows = {
+        str(k): int(n // n_seeds) for k, n in frames[0].group_by("label").len().iter_rows()
+    }
     return Reading(
+        key=key or label,
         label=label,
         scope=scope,
-        difference=float(differences.mean()),
+        difference=paired.mean,
         lower=lower,
         upper=upper,
         boot=boot,
         t_interval=t_int,
-        averaged=seed_averaged,
-        n_half_hours=int(differences.shape[1]),
-        n_months=len(np.unique(months)),
-        seeds=tuple(sorted(frame["seed"].unique().to_list())),
+        averaged=_averaged_difference(a=a, b=b, where=where, metric=metric),
+        n_half_hours=int(paired.counts.sum()),
+        n_months=len(paired.months),
+        seeds=paired.seeds,
         level=level,
+        label_rows=label_rows,
     )
 
 
 def _averaged_difference(
-    *,
-    averaged: dict[str, pl.DataFrame],
-    treatment: str,
-    reference: str,
-    where: pl.Expr | None,
-    metric: str,
+    *, a: ArmLosses, b: ArmLosses, where: pl.Expr | None, metric: str
 ) -> float | None:
     """Return the difference of two arms' seed-averaged losses on their shared rows, or `None`."""
-    pair = {}
-    for name in (treatment, reference):
-        frame = averaged[name]
-        pair[name] = frame if where is None else frame.filter(where)
+    frames = [v.averaged if where is None else v.averaged.filter(where) for v in (a, b)]
     keys = list(KEYS)
     joined = (
-        pair[treatment]
+        frames[0]
         .select(*keys, a=pl.col(metric))
-        .join(pair[reference].select(*keys, b=pl.col(metric)), on=keys, how="inner")
+        .join(frames[1].select(*keys, b=pl.col(metric)), on=keys, how="inner")
     )
-    return None if joined.is_empty() else float((joined["a"] - joined["b"]).mean())  # ty: ignore[invalid-argument-type]
+    if joined.is_empty():
+        return None
+    return float((joined["a"].cast(pl.Float64) - joined["b"].cast(pl.Float64)).mean())  # ty: ignore[invalid-argument-type]
 
 
 def minimum_detectable_effect(
     *,
-    losses: dict[str, pl.DataFrame],
+    source: LossSource,
     arm: str,
     target: Literal["primary", "solar"],
     where: pl.Expr | None,
@@ -618,24 +826,17 @@ def minimum_detectable_effect(
     hold all of both halves' seeds.
     """
     first, second = SEED_HALVES[target]
-    held = set(losses[arm]["seed"].unique().to_list())
-    if not (set(first) <= held and set(second) <= held):
+    held = source.get(arm)
+    if held is None or not (set(first) <= set(held.seeds) and set(second) <= set(held.seeds)):
         return None
     shift = dict(zip(second, first, strict=True))
-    base = losses[arm] if where is None else losses[arm].filter(where)
+    base = held.losses if where is None else held.losses.filter(where)
     one = base.filter(pl.col("seed").is_in(list(first)))
     two = base.filter(pl.col("seed").is_in(list(second))).with_columns(
-        seed=pl.col("seed").replace_strict(shift, return_dtype=pl.Int64)
+        seed=pl.col("seed").replace_strict(shift, return_dtype=base.schema["seed"])
     )
-    frame = experiment_store.losses_for_bootstrap(arm_losses={"half_a": one, "half_b": two})
-    lower, upper = bootstrap.bootstrap_difference_at_level(
-        losses=frame,
-        treatment="half_a",
-        reference="half_b",
-        metric="crps",
-        level=level,
-        n_resamples=n_resamples,
-    )
+    paired = paired_month_sums(a=one, b=two)
+    lower, upper = month_total_interval(paired=paired, level=level, n_resamples=n_resamples)
     return (upper - lower) / 2.0
 
 
@@ -648,25 +849,98 @@ def available(*, arm: str, month: str, seed: int) -> bool:
     return folder.exists()
 
 
-def complete_seeds(*, arm: arms.Arm, months: tuple[str, ...]) -> tuple[int, ...]:
-    """Return the arm's seeds whose set exists for every one of `months`."""
-    return tuple(
-        s for s in arm.seeds if all(available(arm=arm.name, month=m, seed=s) for m in months)
+def stored_d0_path(*, month: str, seed: int) -> Path:
+    """Return the stored forecast of `D0`: experiment 707's `R_F` raw quantiles."""
+    import e00707_arms as arms707  # ty: ignore[unresolved-import]
+
+    return arms707.WORK_DIR / "work" / "seed_preds" / "R_F" / f"{month}_s{seed}.parquet"
+
+
+def stored_p0_files(*, seed: int) -> list[Path]:
+    """Return experiment 666's solar PLP files of one seed (one file per quarterly refit)."""
+    from e00666_common import FIT_DIR  # ty: ignore[unresolved-import]
+
+    return sorted((FIT_DIR / "solar").glob(f"refit=*_seed={seed}.parquet"))
+
+
+def cell_exists(*, arm: arms.Arm, month: str, seed: int) -> bool:
+    """Return whether the arm has predictions for the fold and seed."""
+    if not arm.stored:
+        return available(arm=arm.name, month=month, seed=seed)
+    if arm.name == "D0":
+        return stored_d0_path(month=month, seed=seed).exists()
+    return bool(stored_p0_files(seed=seed))
+
+
+def month_bounds(*, month: str) -> tuple[datetime, datetime]:
+    """Return the first instant of a month `YYYY-MM` and of the next month, in UTC."""
+    year, number = (int(p) for p in month.split("-"))
+    start = datetime(year, number, 1, tzinfo=UTC)
+    end = datetime(year + number // 12, number % 12 + 1, 1, tzinfo=UTC)
+    return start, end
+
+
+def read_stored_solar(*, month: str, seed: int) -> pl.DataFrame:
+    """Return experiment 666's PLP forecast of the runs of one month, as 711's solar predictions.
+
+    The files hold megawatts of the refit's capacity. This divides by each farm's stored effective
+    capacity, which is the unit of `actual`, and sets the origin to 12:00 UTC on the run's day. It
+    drops the half-hour labelled at the origin (a 711 arm does not forecast it), the valid times
+    from 2026-07-01 on, and every run outside the month.
+
+    Raises:
+        ValueError: If no file covers the month.
+    """
+    from e00666_common import QUANTILES  # ty: ignore[unresolved-import]
+    from studies.pv_dataset import pv_sites
+
+    start, end = month_bounds(month=month)
+    capacity = pv_sites().select(pl.col("time_series_id").cast(pl.Int64), "effective_capacity_mw")
+    pieces = [
+        pl.read_parquet(path).filter((pl.col("init_time") >= start) & (pl.col("init_time") < end))
+        for path in stored_p0_files(seed=seed)
+    ]
+    frame = pl.concat([p for p in pieces if not p.is_empty()])
+    if frame.is_empty():
+        msg = f"no stored PLP row covers {month}"
+        raise ValueError(msg)
+    origin = pl.col("init_time") + pl.duration(hours=12)
+    return (
+        frame.with_columns(pl.col("time_series_id").cast(pl.Int64))
+        .join(capacity, on="time_series_id", how="left")
+        .select(
+            "time_series_id",
+            power_fcst_init_time=origin,
+            valid_time=pl.col("time"),
+            **{
+                level: pl.col(quantile) / pl.col("effective_capacity_mw")
+                for level, quantile in zip(LEVEL_COLUMNS, QUANTILES, strict=True)
+            },
+        )
+        .filter(
+            (pl.col("valid_time") > pl.col("power_fcst_init_time"))
+            & (pl.col("valid_time") < experiment_store.HOLDOUT_START)
+        )
+        .with_columns(seed=pl.lit(seed).cast(pl.Int64))
     )
 
 
 def read_arm(*, arm: arms.Arm, months: tuple[str, ...], seeds: tuple[int, ...]) -> pl.DataFrame:
     """Return an arm's predictions over folds and seeds, with the `seed` and `fold` columns.
 
-    The stored `D0` reads experiment 707's stored `R_F` raw quantiles.
+    The stored `D0` reads experiment 707's stored `R_F` raw quantiles and keeps the valid times
+    before 2026-07-01. The stored `P0` reads experiment 666's solar files.
     """
     pieces = []
     for month in months:
         for seed in seeds:
-            if arm.stored:
-                frame = pl.read_parquet(_stored_path(arm=arm, month=month, seed=seed)).with_columns(
+            if arm.stored and arm.name == "D0":
+                frame = pl.read_parquet(stored_d0_path(month=month, seed=seed)).with_columns(
                     seed=pl.lit(seed).cast(pl.Int64)
                 )
+                frame = frame.filter(pl.col("valid_time") < experiment_store.HOLDOUT_START)
+            elif arm.stored:
+                frame = read_stored_solar(month=month, seed=seed)
             else:
                 frame = experiment_store.read_predictions(
                     experiment_id=arms.EXPERIMENT_ID,
@@ -677,23 +951,10 @@ def read_arm(*, arm: arms.Arm, months: tuple[str, ...], seeds: tuple[int, ...]) 
     return pl.concat(pieces)
 
 
-def _stored_path(*, arm: arms.Arm, month: str, seed: int) -> Path:
-    """Return the stored forecast of a stored arm: experiment 707's `R_F`."""
-    if arm.name != "D0":
-        msg = (
-            f"only D0 (experiment 707's R_F) is a stored arm that the scorer reads, not {arm.name}"
-        )
-        raise ValueError(msg)
-    import e00707_arms as arms707  # ty: ignore[unresolved-import]
-
-    return arms707.WORK_DIR / "work" / "seed_preds" / "R_F" / f"{month}_s{seed}.parquet"
-
-
 def primary_actuals(*, frame: pl.DataFrame) -> np.ndarray:
     """Return each Primary row's observed power as a fraction of effective capacity.
 
-    The actual is read from experiment 707's dense half-hourly arrays. Rows whose actual is a
-    flagged exact-zero half-hour are marked NaN (and are dropped by the caller).
+    The actual is read from experiment 707's dense half-hourly arrays.
     """
     import e00707_common as base  # ty: ignore[unresolved-import]
 
@@ -721,7 +982,7 @@ def solar_actuals(*, frame: pl.DataFrame) -> np.ndarray:
             solar.load_farm(site=site)
             .select("time_series_id", "time", "actual")
             .unique(subset=["time_series_id", "time"])
-            for site in FARMS
+            for site in farm_sites()
         ]
     ).with_columns(pl.col("time_series_id").cast(pl.Int64))
     joined = frame.select("time_series_id", "valid_time").join(
@@ -731,6 +992,13 @@ def solar_actuals(*, frame: pl.DataFrame) -> np.ndarray:
         how="left",
     )
     return joined["actual"].cast(pl.Float64).fill_null(float("nan")).to_numpy()
+
+
+def farm_sites() -> list[str]:
+    """Return the farms' site keys, which are the letters A to F in the farm table."""
+    from studies.pv_dataset import pv_sites
+
+    return pv_sites()["site"].to_list()
 
 
 def drop_flagged_and_missing(
@@ -762,66 +1030,101 @@ def drop_flagged_and_missing(
     return out, kept_actual
 
 
-def prepare(
-    *,
-    arm: arms.Arm,
-    months: tuple[str, ...],
-    seeds: tuple[int, ...],
-    labels: dict[int, str],
-    sky: pl.DataFrame | None,
-    actual_cache: dict[tuple[str, tuple[str, ...]], tuple[pl.DataFrame, np.ndarray]],
-) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Return an arm's per-seed losses and seed-averaged losses on rows with an observed actual.
-
-    The loss frames carry `fold` (the month of the run), `label` (D-number or farm letter),
-    `lead_hours` (from the origin), `lead_from_run_hours` (solar), and `regime`.
-    """
-    frame = read_arm(arm=arm, months=months, seeds=seeds)
-    frame = frame.with_columns(
-        pl.col("time_series_id").cast(pl.Int64),
-        fold=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"),
+def compact(
+    *, frame: pl.DataFrame, labels: dict[int, str], sky: pl.DataFrame | None
+) -> pl.DataFrame:
+    """Return a loss frame with small dtypes and the `label`, `lead_hours`, and `regime` columns."""
+    out = frame.with_columns(
+        label=pl.col("time_series_id")
+        .replace_strict(labels, default="?", return_dtype=pl.String)
+        .cast(pl.Categorical),
+        lead_hours=(
+            (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
+        ).cast(pl.Float32),
+        fold=pl.col("power_fcst_init_time").dt.strftime("%Y-%m").cast(pl.Categorical),
+        seed=pl.col("seed").cast(pl.Int16),
+        crps=pl.col("crps").cast(pl.Float32),
+        mae_median=pl.col("mae_median").cast(pl.Float32),
     )
-    if arm.target == "primary":
-        frame = widen(frame=frame)
-    actual = primary_actuals(frame=frame) if arm.target == "primary" else solar_actuals(frame=frame)
-    frame, actual = drop_flagged_and_missing(frame=frame, actual=actual, target=arm.target)
-    averaged_frame = seed_average(frame=frame)
-    out = []
-    for kind, source in (("seed", frame), ("avg", averaged_frame)):
-        values = (
-            actual if kind == "seed" else _actuals_for(frame=source, reference=frame, actual=actual)
+    if sky is not None:
+        out = add_regime(losses=out, sky=sky)
+    else:
+        out = out.with_columns(regime=pl.lit("unknown"))
+    return out.with_columns(pl.col("regime").cast(pl.Categorical)).select(
+        *KEYS, "seed", "crps", "mae_median", "label", "fold", "lead_hours", "regime"
+    )
+
+
+def prepare(*, arm: arms.Arm, labels: dict[int, str], sky: pl.DataFrame | None) -> ArmLosses | None:
+    """Return an arm's per-seed and seed-averaged losses on rows with an observed actual.
+
+    The arm is read one fold at a time, so that only one fold's quantiles are in memory. The rows
+    without an observed actual, and the flagged exact-zero half-hours of Primary demand, are
+    dropped. Primary demand forecasts are widened by 1.15 about the median.
+
+    Returns:
+        The losses, or `None` if the arm has no predictions.
+    """
+    cells = [(m, s) for m in arm.months for s in arm.seeds if cell_exists(arm=arm, month=m, seed=s)]
+    if not cells:
+        return None
+    seed_chunks, average_chunks = [], []
+    below = dict.fromkeys(OUTER_LEVELS, 0.0)
+    total = 0
+    for month in arm.months:
+        seeds = tuple(s for m, s in cells if m == month)
+        if not seeds:
+            continue
+        frame = read_arm(arm=arm, months=(month,), seeds=seeds)
+        frame = frame.with_columns(pl.col("time_series_id").cast(pl.Int64))
+        if arm.target == "primary":
+            frame = widen(frame=frame)
+        actual = (
+            primary_actuals(frame=frame) if arm.target == "primary" else solar_actuals(frame=frame)
         )
-        loss = row_losses(frame=source, actual=values)
-        extra = loss.with_columns(
-            fold=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"),
-            label=pl.col("time_series_id").replace_strict(
-                labels, default="?", return_dtype=pl.String
-            ),
-            lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
-            / 60.0,
-        ).with_columns(lead_from_run_hours=pl.col("lead_hours") + SOLAR_RUN_OFFSET_HOURS)
-        out.append(extra if sky is None else add_regime(losses=extra, sky=sky))
-    _ = actual_cache
-    return out[0], out[1]
-
-
-def _actuals_for(*, frame: pl.DataFrame, reference: pl.DataFrame, actual: np.ndarray) -> np.ndarray:
-    """Return the actual of each row of the seed-averaged `frame`, looked up from `reference`."""
-    table = reference.select(*KEYS).with_columns(actual=pl.Series(actual)).unique(subset=list(KEYS))
-    return frame.select(*KEYS).join(table, on=list(KEYS), how="left")["actual"].to_numpy()
+        frame, actual = drop_flagged_and_missing(frame=frame, actual=actual, target=arm.target)
+        averaged = seed_average(frame=frame)
+        lookup = (
+            frame.select(*KEYS).with_columns(actual=pl.Series(actual)).unique(subset=list(KEYS))
+        )
+        avg_actual = averaged.select(*KEYS).join(lookup, on=list(KEYS), how="left")["actual"]
+        for kind, source_frame, values in (
+            ("seed", frame, actual),
+            ("avg", averaged, avg_actual.to_numpy()),
+        ):
+            loss = row_losses(frame=source_frame, actual=values)
+            if kind == "seed":
+                total += loss.height
+                for c in OUTER_LEVELS:
+                    below[c] += float(loss[f"below_{c}"].sum())
+            chunk = compact(
+                frame=loss.drop(*[f"below_{c}" for c in OUTER_LEVELS]), labels=labels, sky=sky
+            )
+            (seed_chunks if kind == "seed" else average_chunks).append(chunk)
+    if not seed_chunks:
+        return None
+    return ArmLosses(
+        losses=pl.concat(seed_chunks),
+        averaged=pl.concat(average_chunks),
+        coverage={c: below[c] / total for c in OUTER_LEVELS},
+        cells=frozenset(cells),
+    )
 
 
 # --- scope expressions ------------------------------------------------------------------------
 
 
 def primary_scope(
-    *, members: tuple[str, ...], months: tuple[str, ...], band: tuple[float, float] | None = None
+    *,
+    members: tuple[str, ...],
+    months: tuple[str, ...],
+    band: tuple[float, float] | None = None,
 ) -> pl.Expr:
     """Return the rows of Primaries `members` on folds `months` at the headline or a lead band."""
     low, high = (0.0, PRIMARY_HEADLINE_HOURS) if band is None else band
     return (
-        pl.col("label").is_in(list(members))
-        & pl.col("fold").is_in(list(months))
+        pl.col("label").cast(pl.String).is_in(list(members))
+        & pl.col("fold").cast(pl.String).is_in(list(months))
         & (pl.col("lead_hours") > low)
         & (pl.col("lead_hours") <= high)
     )
@@ -835,46 +1138,240 @@ def solar_scope(
 ) -> pl.Expr:
     """Return the solar rows with a lead from the run in `band` (days 1 to 10 by default)."""
     low, high = (12.0, 12.0 + SOLAR_HEADLINE_HOURS) if band is None else band
+    from_run = pl.col("lead_hours") + SOLAR_RUN_OFFSET_HOURS
     return (
-        pl.col("label").is_in(list(farms))
-        & pl.col("fold").is_in(list(months))
-        & (pl.col("lead_from_run_hours") >= low)
-        & (pl.col("lead_from_run_hours") < high)
+        pl.col("label").cast(pl.String).is_in(list(farms))
+        & pl.col("fold").cast(pl.String).is_in(list(months))
+        & (from_run >= low)
+        & (from_run < high)
     )
 
 
 # --- the scoring run --------------------------------------------------------------------------
 
 
-@dataclass
-class Store:
-    """The losses of every arm that the store holds, per seed and seed-averaged."""
+@dataclass(frozen=True)
+class Spec:
+    """One planned reading or check: the arms, the folds, the rows, and the level.
 
-    losses: dict[str, pl.DataFrame]
-    averaged: dict[str, pl.DataFrame]
+    Attributes:
+        key: The reading's name.
+        treatment: The treatment arm.
+        reference: The reference arm.
+        scope: The rows' description.
+        months: The folds that the reading needs.
+        where: The row filter.
+        level: The coverage in percent.
+        t_only: Whether only the t interval is read (four folds cannot support a bootstrap).
+    """
+
+    key: str
+    treatment: str
+    reference: str
+    scope: str
+    months: tuple[str, ...]
+    where: pl.Expr
+    level: float
+    t_only: bool = False
 
 
-def load_store(*, labels: dict[int, str], sky: pl.DataFrame | None) -> Store:
-    """Read every arm that has at least one complete seed on its folds."""
-    losses: dict[str, pl.DataFrame] = {}
-    averaged: dict[str, pl.DataFrame] = {}
+def run_spec(*, source: LossSource, spec: Spec, stage: StageType, n_resamples: int) -> Outcome:
+    """Return a reading, or `Incomplete` if an arm lacks a planned fold or seed, or the rows differ.
+
+    A reading never runs on the seeds that happen to be complete: it needs every planned cell of
+    both arms on the reading's folds in `stage`.
+    """
+    reasons = [
+        r
+        for name in (spec.treatment, spec.reference)
+        for r in missing_for(source=source, arm=name, months=spec.months, stage=stage)
+    ]
+    if reasons:
+        return Incomplete(key=spec.key, reason="; ".join(reasons))
+    seeds = tuple(
+        sorted(
+            set(planned_seeds(arm=spec.treatment, stage=stage))
+            & set(planned_seeds(arm=spec.reference, stage=stage))
+        )
+    )
+    try:
+        return read_contrast(
+            source=source,
+            treatment=spec.treatment,
+            reference=spec.reference,
+            key=spec.key,
+            label=f"{spec.key} {spec.treatment} minus {spec.reference}",
+            scope=spec.scope,
+            where=spec.where,
+            level=spec.level,
+            n_resamples=n_resamples,
+            seeds=seeds,
+            t_only=spec.t_only,
+        )
+    except ValueError as error:
+        return Incomplete(key=spec.key, reason=str(error))
+
+
+def _spec(
+    *,
+    key: str,
+    pair: tuple[str, str],
+    scope: str,
+    months: tuple[str, ...],
+    where: pl.Expr,
+    level: float,
+    t_only: bool = False,
+) -> Spec:
+    """Return a spec of the arms `pair` (treatment, reference)."""
+    return Spec(
+        key=key,
+        treatment=pair[0],
+        reference=pair[1],
+        scope=scope,
+        months=months,
+        where=where,
+        level=level,
+        t_only=t_only,
+    )
+
+
+def _primary_specs(
+    *,
+    prefix: str,
+    pair: tuple[str, str],
+    months: tuple[str, ...],
+    level: float,
+    t_only: bool = False,
+) -> list[Spec]:
+    """Return one spec of a Primary demand pair at the six and at the eight, never pooled."""
+    return [
+        _spec(
+            key=f"{prefix} {group}",
+            pair=pair,
+            scope=f"{group}, days 1 to 10, {len(months)} folds",
+            months=months,
+            where=primary_scope(members=members, months=months),
+            level=level,
+            t_only=t_only,
+        )
+        for group, members in PRIMARY_GROUPS.items()
+    ]
+
+
+def planned_specs(*, stage: StageType) -> list[Spec]:
+    """Return the planned readings of section 8 at 99.44% for `stage`.
+
+    Stage A reads C1 at the six and at the eight, and S1. Stage B (the whole plan) adds C2, C3, S2,
+    and S3, and reads all nine.
+    """
+    cloud, solar_months = arms.CLOUD_SCORED_MONTHS, arms.SOLAR_MONTHS
+    solar_all = solar_scope(months=solar_months)
+    specs = _primary_specs(prefix="C1", pair=("D1", "D1p"), months=cloud, level=PLANNED_LEVEL)
+    specs.append(
+        _spec(
+            key="S1",
+            pair=("P1", "P1p"),
+            scope="six farms, days 1 to 10",
+            months=solar_months,
+            where=solar_all,
+            level=PLANNED_LEVEL,
+        )
+    )
+    if stage == "A":
+        return specs
+    specs += _primary_specs(prefix="C2", pair=("D2", "D2p"), months=cloud, level=PLANNED_LEVEL)
+    specs += [
+        _spec(
+            key=f"C3 {group}",
+            pair=("R1", "R1p"),
+            scope=f"{group}, days 1 to 10, replicate",
+            months=arms.REPLICATE_MONTHS,
+            where=primary_scope(members=members, months=arms.REPLICATE_MONTHS),
+            level=PLANNED_LEVEL,
+        )
+        for group, members in REPLICATE_GROUPS.items()
+    ]
+    specs += [
+        _spec(
+            key="S2",
+            pair=("P2", "P2p"),
+            scope="six farms, days 1 to 10",
+            months=solar_months,
+            where=solar_all,
+            level=PLANNED_LEVEL,
+        ),
+        _spec(
+            key="S3",
+            pair=("P1", "P1p"),
+            scope="six farms, 12 to 36 hours",
+            months=solar_months,
+            where=solar_scope(months=solar_months, band=SOLAR_S3_BAND),
+            level=PLANNED_LEVEL,
+        ),
+    ]
+    return specs
+
+
+def check_specs(*, stage: StageType) -> list[Spec]:
+    """Return the checks at 99.375%: placebo carries nothing, and the gap-scored folds.
+
+    Every Primary demand check is read at the six and at the eight separately. Stage A reads `D1p`
+    minus `DF` and `P1p` minus `PF`. Stage B adds the time-shifted placebos and the gap-scored
+    check.
+    """
+    cloud, solar_months = arms.CLOUD_SCORED_MONTHS, arms.SOLAR_MONTHS
+    primary_pairs = [("D1p", "DF")] + ([("D1t", "DF")] if stage != "A" else [])
+    solar_pairs = [("P1p", "PF")] + ([("P1t", "PF")] if stage != "A" else [])
+    specs: list[Spec] = []
+    for pair in primary_pairs:
+        specs += _primary_specs(
+            prefix=f"{pair[0]} minus {pair[1]}", pair=pair, months=cloud, level=CHECK_LEVEL
+        )
+    specs += [
+        _spec(
+            key=f"{pair[0]} minus {pair[1]}",
+            pair=pair,
+            scope="six farms, days 1 to 10",
+            months=solar_months,
+            where=solar_scope(months=solar_months),
+            level=CHECK_LEVEL,
+        )
+        for pair in solar_pairs
+    ]
+    if stage != "A":
+        specs += _primary_specs(
+            prefix="gap-scored D1 minus D1p",
+            pair=("D1", "D1p"),
+            months=arms.GAP_SCORED_MONTHS,
+            level=CHECK_LEVEL,
+            t_only=True,
+        )
+    return specs
+
+
+def control_specs() -> list[Spec]:
+    """Return the positive control `K1` minus `K1p` at the six and at the eight (Stage B only)."""
+    return _primary_specs(
+        prefix="K1", pair=("K1", "K1p"), months=arms.CLOUD_SCORED_MONTHS, level=CHECK_LEVEL
+    )
+
+
+def print_arms(*, source: LossSource, stage: StageType) -> None:
+    """Print each arm's folds, seeds, and outer-level coverage, and the input columns it logged."""
+    print("== arms found in the store ==")
     for arm in arms.ARM_LIST:
-        seeds = complete_seeds(arm=arm, months=arm.months) if not arm.stored else arm.seeds
-        if not seeds:
+        held = source.get(arm.name)
+        if held is None:
+            note = _error_text(source=source, arm=arm.name)
+            print(f"{arm.name:4s} none{note}")
             continue
-        if arm.stored:
-            try:
-                losses[arm.name], averaged[arm.name] = prepare(
-                    arm=arm, months=arm.months, seeds=seeds, labels=labels, sky=sky, actual_cache={}
-                )
-            except FileNotFoundError:
-                continue
-        else:
-            losses[arm.name], averaged[arm.name] = prepare(
-                arm=arm, months=arm.months, seeds=seeds, labels=labels, sky=sky, actual_cache={}
-            )
-        print(f"{arm.name:4s} seeds {list(seeds)} folds {len(arm.months)}")
-    return Store(losses=losses, averaged=averaged)
+        needed = jobs.expected_cells(arm=arm.name, stage=stage) if not arm.stored else held.cells
+        coverage = " ".join(f"{k} {v:.3f}" for k, v in held.coverage.items())
+        print(
+            f"{arm.name:4s} {len(held.cells)} of {len(needed)} planned (fold, seed) cells; "
+            f"actual below: {coverage}"
+        )
+    print_input_columns(names=[a.name for a in arms.fitted_arms()])
 
 
 def print_input_columns(*, names: list[str]) -> None:
@@ -893,72 +1390,14 @@ def print_input_columns(*, names: list[str]) -> None:
                 break
 
 
-def planned_readings(*, store: Store, n_resamples: int) -> dict[str, Reading]:
-    """Compute the nine planned readings of section 8 at 99.44%.
-
-    Returns:
-        The readings keyed `C1 the six`, `C1 the eight`, `C2 ...`, `C3 the five`, `C3 the eight`,
-        `S1`, `S2`, and `S3`. A reading whose arms are not all in the store is absent.
-    """
-    losses, averaged = store.losses, store.averaged
-    cloud = arms.CLOUD_SCORED_MONTHS
-    out: dict[str, Reading] = {}
-
-    def add(key: str, treatment: str, reference: str, scope: str, where: pl.Expr) -> None:
-        if treatment not in losses or reference not in losses:
-            print(f"{key}: skipped, {treatment} or {reference} is not in the store")
-            return
-        reading = read_contrast(
-            losses=losses,
-            treatment=treatment,
-            reference=reference,
-            label=f"{key} {treatment} minus {reference}",
-            scope=scope,
-            where=where,
-            level=PLANNED_LEVEL,
-            n_resamples=n_resamples,
-            averaged=averaged,
-        )
-        out[key] = reading
-        print(reading.line(), flush=True)
-
-    for name, (real, fake) in {"C1": ("D1", "D1p"), "C2": ("D2", "D2p")}.items():
-        for group, members in PRIMARY_GROUPS.items():
-            add(
-                f"{name} {group}",
-                real,
-                fake,
-                f"{group}, days 1 to 10, 7 folds",
-                primary_scope(members=members, months=cloud),
-            )
-    for group, members in REPLICATE_GROUPS.items():
-        add(
-            f"C3 {group}",
-            "R1",
-            "R1p",
-            f"{group}, days 1 to 10, replicate",
-            primary_scope(members=members, months=arms.REPLICATE_MONTHS),
-        )
-    add("S1", "P1", "P1p", "six farms, days 1 to 10", solar_scope(months=arms.SOLAR_MONTHS))
-    add("S2", "P2", "P2p", "six farms, days 1 to 10", solar_scope(months=arms.SOLAR_MONTHS))
-    add(
-        "S3",
-        "P1",
-        "P1p",
-        "six farms, 12 to 36 hours",
-        solar_scope(months=arms.SOLAR_MONTHS, band=SOLAR_S3_BAND),
-    )
-    return out
-
-
-def print_mde(*, store: Store, n_resamples: int) -> dict[str, float | None]:
-    """Print the minimum detectable effect of each planned reading's group before any contrast."""
+def print_mde(*, source: LossSource, n_resamples: int) -> None:
+    """Print the minimum detectable effect of each planned reading's placebo (Stage B only)."""
     print("\n== minimum detectable effect (before any contrast; half-width at 99.44%) ==")
     cloud = arms.CLOUD_SCORED_MONTHS
-    result: dict[str, float | None] = {}
     cases = (
         [
-            ("D1p", "primary", f"{group}, 7 folds", primary_scope(members=members, months=cloud))
+            (n, "primary", f"{group}, 7 folds", primary_scope(members=members, months=cloud))
+            for n in ("D1p", "D2p")
             for group, members in PRIMARY_GROUPS.items()
         ]
         + [
@@ -970,167 +1409,134 @@ def print_mde(*, store: Store, n_resamples: int) -> dict[str, float | None]:
             )
             for group, members in REPLICATE_GROUPS.items()
         ]
-        + [("P1p", "solar", "six farms, days 1 to 10", solar_scope(months=arms.SOLAR_MONTHS))]
+        + [
+            (n, "solar", "six farms, days 1 to 10", solar_scope(months=arms.SOLAR_MONTHS))
+            for n in ("P1p", "P2p")
+        ]
     )
     for arm, target, scope, where in cases:
-        if arm not in store.losses:
-            print(f"{arm} {scope}: not computed, the arm is not in the store")
-            continue
         mde = minimum_detectable_effect(
-            losses=store.losses,
+            source=source,
             arm=arm,
             target=target,  # ty: ignore[invalid-argument-type]
             where=where,
             level=PLANNED_LEVEL,
             n_resamples=n_resamples,
         )
-        result[f"{arm} {scope}"] = mde
         text = (
             "not computed: the arm lacks both halves' seeds" if mde is None else f"{mde:.3f} points"
         )
         print(f"{arm} {scope}: {text}")
-    return result
 
 
-def checks(*, store: Store, n_resamples: int) -> dict[str, bool]:
-    """Print the controls and return which passed (an interval that contains zero, or below it).
+def print_outcomes(*, outcomes: list[Outcome], rows: bool = False) -> None:
+    """Print each reading's line, and with `rows` the rows per label beside it."""
+    for outcome in outcomes:
+        print(outcome.line(), flush=True)
+        if rows and isinstance(outcome, Reading):
+            print(outcome.rows_line())
 
-    Placebo carries nothing: `D1p` minus `DF`, `D1t` minus `DF`, `P1p` minus `PF`, `P1t` minus `PF`
-    each have a 99% interval that contains zero. Gap-scored folds: `D1` minus `D1p` on folds
-    2025-07 to 2025-10, read with the t interval over the four folds. Positive control: `K1` minus
-    `K1p` is wholly below zero at the six and at the eight.
-    """
-    print("\n== controls (99%) ==")
-    losses = store.losses
-    passed: dict[str, bool] = {}
-    cloud = arms.CLOUD_SCORED_MONTHS
-    pooled = (*SIX, *EIGHT)
-    for key, treatment, reference in (
-        ("D1p minus DF", "D1p", "DF"),
-        ("D1t minus DF", "D1t", "DF"),
-        ("P1p minus PF", "P1p", "PF"),
-        ("P1t minus PF", "P1t", "PF"),
-    ):
-        if treatment not in losses or reference not in losses:
-            print(f"{key}: skipped")
+
+def check_results(*, outcomes: list[Outcome]) -> dict[str, bool | None]:
+    """Return which checks passed: the interval contains zero. An incomplete check gives `None`."""
+    results: dict[str, bool | None] = {}
+    for outcome in outcomes:
+        if isinstance(outcome, Incomplete):
+            results[outcome.key] = None
             continue
-        solar_pair = treatment.startswith("P")
-        where = (
-            solar_scope(months=arms.SOLAR_MONTHS)
-            if solar_pair
-            else primary_scope(members=pooled, months=cloud)
-        )
-        reading = read_contrast(
-            losses=losses,
-            treatment=treatment,
-            reference=reference,
-            label=key,
-            scope="solar farms" if solar_pair else "the six and the eight",
-            where=where,
-            level=CHECK_LEVEL,
-            n_resamples=n_resamples,
-        )
-        passed[key] = reading.lower <= 0.0 <= reading.upper
-        print(
-            f"{reading.line()} placebo carries nothing: "
-            f"{'PASS' if passed[key] else 'FAIL (audit trigger 5)'}"
-        )
-    if "D1" in losses and "D1p" in losses:
-        reading = read_contrast(
-            losses=losses,
-            treatment="D1",
-            reference="D1p",
-            label="gap-scored D1 minus D1p",
-            scope="the six and the eight, 4 folds",
-            where=primary_scope(members=pooled, months=arms.GAP_SCORED_MONTHS),
-            level=CHECK_LEVEL,
-            n_resamples=n_resamples,
-            t_only=True,
-        )
-        passed["gap-scored"] = reading.lower <= 0.0 <= reading.upper
-        print(
-            f"{reading.line()} gap-scored: "
-            f"{'PASS' if passed['gap-scored'] else 'FAIL (audit trigger 5)'}"
-        )
-    for group, members in PRIMARY_GROUPS.items():
-        if "K1" in losses and "K1p" in losses:
-            reading = read_contrast(
-                losses=losses,
-                treatment="K1",
-                reference="K1p",
-                label="positive control K1 minus K1p",
-                scope=f"{group}, 7 folds",
-                where=primary_scope(members=members, months=cloud),
-                level=CHECK_LEVEL,
-                n_resamples=n_resamples,
-            )
-            passed[f"K1 {group}"] = reading.upper < 0.0
-            print(f"{reading.line()} wholly below 0: {'PASS' if passed[f'K1 {group}'] else 'FAIL'}")
-    return passed
+        results[outcome.key] = outcome.lower <= 0.0 <= outcome.upper
+    return results
 
 
-def verdicts(*, readings: dict[str, Reading], passed: dict[str, bool]) -> None:
-    """Print the verdict of each Primary demand group, the solar farms, and the front matter."""
-    print("\n== verdicts (decision rule, section 8) ==")
-    control_ok = (
-        all(v for k, v in passed.items() if k.startswith("K1"))
-        if any(k.startswith("K1") for k in passed)
-        else False
-    )
+def control_results(*, outcomes: list[Outcome]) -> dict[str, bool | None]:
+    """Return which positive controls passed: the interval lies wholly below zero."""
+    return {o.key: (None if isinstance(o, Incomplete) else o.upper < 0.0) for o in outcomes}
+
+
+def verdicts(
+    *,
+    readings: Mapping[str, Outcome],
+    controls: dict[str, bool | None],
+    stage: StageType,
+) -> dict[str, str]:
+    """Print the verdict of each Primary demand group, the solar farms, and the front matter.
+
+    Stage A reads C1 and S1 only: its verdict is decided by those contrasts, and it does not use
+    the positive control (Stage B's). Stage B reads the whole plan, and withholds a verdict if a
+    planned reading or the control is incomplete.
+
+    Returns:
+        The printed verdicts by name (for the tests).
+    """
+    print(f"\n== verdicts (decision rule, section 8; stage {stage}) ==")
+    out: dict[str, str] = {}
+    full = stage != "A"
     group_results: dict[str, TargetVerdictType] = {}
     for group in PRIMARY_GROUPS:
-        c1, c2 = readings.get(f"C1 {group}"), readings.get(f"C2 {group}")
-        c3_group = "the five" if group == "the six" else group
-        c3 = readings.get(f"C3 {c3_group}")
-        if c1 is None or c2 is None:
-            print(f"{group}: not read, C1 or C2 is missing")
+        c1 = readings.get(f"C1 {group}")
+        c2 = readings.get(f"C2 {group}") if full else None
+        c3 = readings.get(f"C3 {'the five' if group == 'the six' else group}") if full else None
+        needed = [c1, c2] if full else [c1]
+        if any(not isinstance(o, Reading) for o in needed) or (
+            full and not isinstance(c3, Reading)
+        ):
+            print(f"{group}: verdict withheld, a planned reading is incomplete")
             continue
+        control = controls.get(f"K1 {group}") if full else None
+        if full and control is None:
+            print(f"{group}: verdict withheld, the positive control has not run")
+            continue
+        assert isinstance(c1, Reading)
         result, fired = group_verdict(
             reading=GroupReading(
                 c1=c1.verdict,
-                c2=c2.verdict,
-                c3=None if c3 is None else c3.verdict,
-                c3_lower=None if c3 is None else c3.lower,
-                control_passed=control_ok,
+                c2=c2.verdict if isinstance(c2, Reading) else None,
+                c3=c3.verdict if isinstance(c3, Reading) else None,
+                c3_lower=c3.lower if isinstance(c3, Reading) else None,
+                control_passed=control,
             )
         )
         group_results[group] = result
-        print(
-            f"{group}: C1 {c1.verdict}, C2 {c2.verdict}, "
-            f"C3 {None if c3 is None else c3.verdict} -> {result}; {fired}"
-        )
-    s1, s2 = readings.get("S1"), readings.get("S2")
+        out[group] = result
+        c2_text = c2.verdict if isinstance(c2, Reading) else "not in this stage"
+        c3_text = c3.verdict if isinstance(c3, Reading) else "not in this stage"
+        print(f"{group}: C1 {c1.verdict}, C2 {c2_text}, C3 {c3_text} -> {result}; {fired}")
+    s1, s2 = readings.get("S1"), readings.get("S2") if full else None
     solar_result: TargetVerdictType | None = None
-    if s1 is not None and s2 is not None:
-        solar_result = better(first=s1.verdict, second=s2.verdict)
-        print(f"solar farms: S1 {s1.verdict}, S2 {s2.verdict} -> {solar_result}")
+    if isinstance(s1, Reading) and (not full or isinstance(s2, Reading)):
+        solar_result = s1.verdict
+        if full and isinstance(s2, Reading):
+            solar_result = better(first=s1.verdict, second=s2.verdict)
+        out["solar"] = solar_result
+        print(f"solar farms: S1 {s1.verdict} -> {solar_result}")
+    else:
+        print("solar farms: verdict withheld, a planned reading is incomplete")
     if len(group_results) == len(PRIMARY_GROUPS) and solar_result is not None:
-        print(
-            "front-matter verdict:",
-            front_matter_verdict(
-                six=group_results["the six"], eight=group_results["the eight"], solar=solar_result
-            ),
+        front = front_matter_verdict(
+            six=group_results["the six"], eight=group_results["the eight"], solar=solar_result
         )
+        out["front matter"] = front
+        label = "Stage A verdict" if stage == "A" else "front-matter verdict"
+        print(f"{label}: {front}")
+    return out
 
 
-def exploratory(*, store: Store) -> None:
+def exploratory(*, source: LossSource) -> None:
     """Print the exploratory readings at 95%: lead bands, sky regimes, labels, folds, totals."""
     print("\n== exploratory readings (95% interval; each with its half-hour count) ==")
-    losses, averaged = store.losses, store.averaged
     cloud = arms.CLOUD_SCORED_MONTHS
-    pairs = (("D1", "D1p", "primary"), ("P1", "P1p", "solar"))
-    for treatment, reference, target in pairs:
-        if treatment not in losses or reference not in losses:
+    for treatment, reference, target in (("D1", "D1p", "primary"), ("P1", "P1p", "solar")):
+        if source.get(treatment) is None or source.get(reference) is None:
             continue
         bands = PRIMARY_BANDS if target == "primary" else SOLAR_BANDS
-        members = SIX if target == "primary" else FARMS
+        groups = PRIMARY_GROUPS if target == "primary" else {"six farms": FARMS}
 
         def scope(
             *,
-            extra: pl.Expr | None = None,
-            band: tuple[float, float] | None = None,
-            labels: tuple[str, ...] = members,
+            labels: tuple[str, ...],
             months: tuple[str, ...] = cloud,
+            band: tuple[float, float] | None = None,
+            extra: pl.Expr | None = None,
             target: str = target,
         ) -> pl.Expr:
             base = (
@@ -1140,88 +1546,76 @@ def exploratory(*, store: Store) -> None:
             )
             return base if extra is None else base & extra
 
-        groups = PRIMARY_GROUPS if target == "primary" else {"six farms": FARMS}
         for group, labels in groups.items():
             for band_name, band in bands.items():
                 _print_slice(
-                    losses=losses,
-                    averaged=averaged,
+                    source=source,
                     treatment=treatment,
                     reference=reference,
                     name=f"{group}, {band_name}",
                     where=scope(labels=labels, band=band),
                 )
             for regime in REGIMES:
-                if "regime" in losses[treatment].columns:
-                    _print_slice(
-                        losses=losses,
-                        averaged=averaged,
-                        treatment=treatment,
-                        reference=reference,
-                        name=f"{group}, {regime} half-hours",
-                        where=scope(labels=labels, extra=pl.col("regime") == regime),
-                    )
-        for label in (*SIX, *EIGHT, *SHORT_HISTORY) if target == "primary" else FARMS:
+                _print_slice(
+                    source=source,
+                    treatment=treatment,
+                    reference=reference,
+                    name=f"{group}, {regime} half-hours",
+                    where=scope(labels=labels, extra=pl.col("regime").cast(pl.String) == regime),
+                )
+            for label in labels:
+                _print_slice(
+                    source=source,
+                    treatment=treatment,
+                    reference=reference,
+                    name=f"label {label}",
+                    where=scope(labels=(label,)),
+                )
+                _print_slice(
+                    source=source,
+                    treatment=treatment,
+                    reference=reference,
+                    name=f"{group} without {label}",
+                    where=scope(labels=tuple(m for m in labels if m != label)),
+                )
+            for month in cloud:
+                _print_slice(
+                    source=source,
+                    treatment=treatment,
+                    reference=reference,
+                    name=f"{group}, fold {month} ({cloud.index(month) + 1} months of recent cloud)",
+                    where=scope(labels=labels, months=(month,)),
+                )
+    print("\n-- total effect and date-proxy effect (95%; six and eight separately) --")
+    for group, members in PRIMARY_GROUPS.items():
+        where = primary_scope(members=members, months=cloud)
+        for treatment, reference in (("D1", "D0"), ("DF", "D0"), ("D1g", "D0g"), ("D3", "D1p")):
             _print_slice(
-                losses=losses,
-                averaged=averaged,
+                source=source,
                 treatment=treatment,
                 reference=reference,
-                name=f"label {label}",
-                where=scope(labels=(label,)),
-            )
-        for month in cloud:
-            _print_slice(
-                losses=losses,
-                averaged=averaged,
-                treatment=treatment,
-                reference=reference,
-                name=f"fold {month} (months of recent cloud {cloud.index(month) + 1})",
-                where=scope(months=(month,)),
-            )
-        for label in members:
-            _print_slice(
-                losses=losses,
-                averaged=averaged,
-                treatment=treatment,
-                reference=reference,
-                name=f"leave out {label}",
-                where=scope(labels=tuple(m for m in members if m != label)),
-            )
-    print("\n-- total effect and date-proxy effect (95%) --")
-    for treatment, reference, where in (
-        ("D1", "D0", primary_scope(members=(*SIX, *EIGHT), months=cloud)),
-        ("DF", "D0", primary_scope(members=(*SIX, *EIGHT), months=cloud)),
-        ("P1", "P0L", solar_scope(months=arms.SOLAR_MONTHS)),
-        ("PF", "P0L", solar_scope(months=arms.SOLAR_MONTHS)),
-        ("D1g", "D0g", primary_scope(members=(*SIX, *EIGHT), months=cloud)),
-        ("P1g", "P0g", solar_scope(months=arms.SOLAR_MONTHS)),
-        ("D3", "D1p", primary_scope(members=(*SIX, *EIGHT), months=cloud)),
-    ):
-        if treatment in losses and reference in losses:
-            _print_slice(
-                losses=losses,
-                averaged=averaged,
-                treatment=treatment,
-                reference=reference,
-                name="all in-scope rows",
+                name=f"{group}, all in-scope rows",
                 where=where,
             )
+    for treatment, reference in (("P1", "P0L"), ("PF", "P0L"), ("P1g", "P0g"), ("P1", "P0")):
+        _print_slice(
+            source=source,
+            treatment=treatment,
+            reference=reference,
+            name="six farms, all in-scope rows",
+            where=solar_scope(months=arms.SOLAR_MONTHS),
+        )
 
 
 def _print_slice(
-    *,
-    losses: dict[str, pl.DataFrame],
-    averaged: dict[str, pl.DataFrame],
-    treatment: str,
-    reference: str,
-    name: str,
-    where: pl.Expr,
+    *, source: LossSource, treatment: str, reference: str, name: str, where: pl.Expr
 ) -> None:
     """Print one exploratory reading, or say why it is unavailable."""
+    if source.get(treatment) is None or source.get(reference) is None:
+        return
     try:
         reading = read_contrast(
-            losses=losses,
+            source=source,
             treatment=treatment,
             reference=reference,
             label=f"{treatment} minus {reference}",
@@ -1229,7 +1623,6 @@ def _print_slice(
             where=where,
             level=SLICE_LEVEL,
             n_resamples=N_SLICE_RESAMPLES,
-            averaged=averaged,
         )
     except ValueError as error:
         print(f"{treatment} minus {reference} {name}: unavailable ({error})")
@@ -1237,32 +1630,41 @@ def _print_slice(
     print(reading.line())
 
 
-def gate(*, store: Store) -> bool:
-    """Print and return the gate: `D0n` matches stored `R_F` on folds 2026-01 and 2026-06.
+def gate(*, source: LossSource, record: bool) -> bool:
+    """Print and return the fit gate: `D0n` matches stored `R_F` on the gate folds.
 
-    The two arms' headline CRPS at the six and the eight (days 1 to 10, equal rows) must differ by
-    at most 2 standard errors of the seed-to-seed spread, per fold.
+    On each gate fold and each group, the two arms must hold the same rows, and their headline CRPS
+    (days 1 to 10) must differ by at most 2 standard errors of the seed-to-seed spread. With
+    `record`, each fold's result goes to the gate marker.
     """
-    print("\n== gate: D0n against stored R_F (D0), within 2 standard errors of the seed spread ==")
-    losses = store.losses
-    if "D0n" not in losses or "D0" not in losses:
+    print(
+        "\n== fit gate: D0n against stored R_F (D0), within 2 standard errors of the seed spread =="
+    )
+    new, stored = source.get("D0n"), source.get("D0")
+    if new is None or stored is None:
         print("not run: D0n or D0 is not in the store")
         return False
-    ok = True
+    ok_all = True
     for month in arms.GATE_MONTHS:
+        month_ok = True
+        details = []
         for group, members in PRIMARY_GROUPS.items():
-            where = primary_scope(members=(*members,), months=(month,))
+            where = primary_scope(members=members, months=(month,))
+            frames = {"D0n": new.losses.filter(where), "D0": stored.losses.filter(where)}
+            first = {
+                name: frame.filter(pl.col("seed") == frame["seed"].min()).select(*KEYS).sort(*KEYS)
+                for name, frame in frames.items()
+            }
+            if not first["D0n"].equals(first["D0"]):
+                text = f"{month} {group}: FAIL, D0n and D0 hold different rows"
+                print(text)
+                details.append(text)
+                month_ok = False
+                continue
             means = {}
-            for name in ("D0n", "D0"):
-                frame = losses[name].filter(where)
-                keys = frame.select(*KEYS).unique().height
+            for name, frame in frames.items():
                 per_seed = frame.group_by("seed").agg(pl.col("crps").mean())["crps"].to_numpy()
-                means[name] = (
-                    float(per_seed.mean()),
-                    float(per_seed.std(ddof=1)),
-                    len(per_seed),
-                    keys,
-                )
+                means[name] = (float(per_seed.mean()), float(per_seed.std(ddof=1)), len(per_seed))
             difference = means["D0n"][0] - means["D0"][0]
             error = float(
                 np.sqrt(
@@ -1270,13 +1672,24 @@ def gate(*, store: Store) -> bool:
                 )
             )
             passes = abs(difference) <= 2.0 * error
-            ok &= passes
-            print(
+            month_ok &= passes
+            text = (
                 f"{month} {group}: D0n {means['D0n'][0]:.3f}, D0 {means['D0'][0]:.3f}, "
                 f"difference {difference:+.3f}, 2 SE {2 * error:.3f} -> "
                 f"{'PASS' if passes else 'FAIL'}"
             )
-    return ok
+            print(text)
+            details.append(text)
+        ok_all &= month_ok
+        if record:
+            gate_marker.record(
+                kind="fit",
+                month=month,
+                passed=month_ok,
+                detail="; ".join(details),
+                commit=gate_marker.head_commit(),
+            )
+    return ok_all
 
 
 # --- commands ---------------------------------------------------------------------------------
@@ -1305,7 +1718,7 @@ def build_sky_index() -> None:
     """Write the realised clear-sky index and sun elevation of the Primaries and the farms.
 
     The valid times are every half-hour from 2025-07-01 to 2026-07-01 and, for the replicate, from
-    2023-04-01 to 2024-04-01.
+    2023-04-01 to 2024-04-11.
     """
     import e00707_common as base  # ty: ignore[unresolved-import]
     import e00707_prep as prep  # ty: ignore[unresolved-import]
@@ -1341,18 +1754,47 @@ def build_sky_index() -> None:
     print(f"wrote {SKY_INDEX_PATH.name}")
 
 
-def score(*, n_resamples: int) -> None:
-    """Print every number the page quotes, in the order of the module docstring."""
-    labels, sky = labels_and_sky(with_sky=True)
-    print("== arms found in the store ==")
-    store = load_store(labels=labels, sky=sky)
-    print_input_columns(names=[n for n in store.losses if not arms.ARMS[n].stored])
-    print_mde(store=store, n_resamples=n_resamples)
+def make_source(*, with_sky: bool) -> LossSource:
+    """Return a loss source over the experiment store."""
+    labels, sky = labels_and_sky(with_sky=with_sky)
+
+    def load(name: str) -> ArmLosses | None:
+        return prepare(arm=arms.ARMS[name], labels=labels, sky=sky)
+
+    return LossSource(load=load)
+
+
+def score(*, n_resamples: int, stage: StageType) -> None:
+    """Print every number the page quotes for `stage`, in the order of the module docstring."""
+    source = make_source(with_sky=True)
+    print_arms(source=source, stage=stage)
+    if stage != "A":
+        print_mde(source=source, n_resamples=n_resamples)
     print(f"\n== planned readings, level {PLANNED_LEVEL:.2f}%, {n_resamples:,} resamples ==")
-    readings = planned_readings(store=store, n_resamples=n_resamples)
-    passed = checks(store=store, n_resamples=n_resamples)
-    verdicts(readings=readings, passed=passed)
-    exploratory(store=store)
+    readings = [
+        run_spec(source=source, spec=s, stage=stage, n_resamples=n_resamples)
+        for s in planned_specs(stage=stage)
+    ]
+    print_outcomes(outcomes=readings, rows=True)
+    print(f"\n== checks, level {CHECK_LEVEL:.3f}% ==")
+    checks = [
+        run_spec(source=source, spec=s, stage=stage, n_resamples=n_resamples)
+        for s in check_specs(stage=stage)
+    ]
+    print_outcomes(outcomes=checks)
+    for key, passed in check_results(outcomes=checks).items():
+        text = "incomplete" if passed is None else ("PASS" if passed else "FAIL (audit trigger 5)")
+        print(f"  placebo or gap check {key}: {text}")
+    controls: dict[str, bool | None] = {}
+    if stage != "A":
+        control_outcomes = [
+            run_spec(source=source, spec=s, stage=stage, n_resamples=n_resamples)
+            for s in control_specs()
+        ]
+        print_outcomes(outcomes=control_outcomes)
+        controls = control_results(outcomes=control_outcomes)
+    verdicts(readings={r.key: r for r in readings}, controls=controls, stage=stage)
+    exploratory(source=source)
 
 
 def main() -> None:
@@ -1362,15 +1804,16 @@ def main() -> None:
     )
     parser.add_argument("command", choices=("score", "gate", "sky-index"))
     parser.add_argument("--resamples", type=int, default=N_RESAMPLES)
+    parser.add_argument("--stage", choices=("A", "B", "all"), default="A")
     args = parser.parse_args()
     arms.check_table()
     if args.command == "sky-index":
         build_sky_index()
     elif args.command == "gate":
-        labels, sky = labels_and_sky(with_sky=False)
-        print("gate:", "PASS" if gate(store=load_store(labels=labels, sky=sky)) else "FAIL")
+        passed = gate(source=make_source(with_sky=False), record=True)
+        print("gate:", "PASS" if passed else "FAIL")
     else:
-        score(n_resamples=args.resamples)
+        score(n_resamples=args.resamples, stage=args.stage)
     _ = timedelta
 
 

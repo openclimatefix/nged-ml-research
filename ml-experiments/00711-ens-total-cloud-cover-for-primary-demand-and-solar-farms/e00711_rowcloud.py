@@ -236,6 +236,10 @@ def assert_same_flag(*, real_flag: np.ndarray, placebo_flag: np.ndarray) -> None
 def assert_missing_is_nan(*, values: np.ndarray, flag: np.ndarray) -> None:
     """Assert that a row's values are all NaN if and only if the row is flagged.
 
+    A present run whose store slice holds a NaN (a series missing from a cache file, or a missing
+    seven-variable summary) would otherwise become 0 after standardisation with `cloud_missing` = 0,
+    so the network could not tell the hole from the mean.
+
     Raises:
         ValueError: If a flagged row holds a value, or an unflagged row holds a NaN.
     """
@@ -276,6 +280,8 @@ def row_extras(
     columns = arms.SUMMARY_COLUMNS[arm.summary]
     days, steps = row_run_days(nwp_init=nwp_init), row_steps(lead_hours=lead_hours)
     real, flag = real_extras(store=store, run_days=days, steps=steps, columns=columns)
+    if columns:
+        assert_missing_is_nan(values=real, flag=flag)
     if arm.placebo == "none":
         return real, flag
     if donors is None:
@@ -290,6 +296,7 @@ def row_extras(
         donors_first_day=donors_first_day,
     )
     assert_same_flag(real_flag=flag, placebo_flag=placebo_flag)
+    assert_missing_is_nan(values=values, flag=placebo_flag)
     return values, flag
 
 
@@ -515,9 +522,9 @@ def check() -> None:
         if (nan_run != expected).any():
             msg = f"{site}: cloud is NaN on other runs than the missing ones"
             raise ValueError(msg)
-        present = store.values[~nan_run, :, :5]
+        present = store.values[~nan_run]
         if np.isnan(present).any() or (present[..., [0, 2, 3, 4]] > 1.0).any():
-            msg = f"{site}: a present run holds NaN or an out-of-range cloud summary"
+            msg = f"{site}: a present run holds NaN (cloud or temperature) or an out-of-range cloud"
             raise ValueError(msg)
         print(f"{site}: {int((~nan_run).sum())} runs with cloud, {int(nan_run.sum())} missing")
 

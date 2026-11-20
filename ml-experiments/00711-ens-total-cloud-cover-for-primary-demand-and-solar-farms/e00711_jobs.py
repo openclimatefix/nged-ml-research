@@ -21,16 +21,34 @@ uv run --no-sync python ml-experiments/00711-*/e00711_jobs.py --pending         
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 import e00711_arms as arms
 
 STREAMS: Final[int] = 2
 SECONDS_PER_FIT: Final[dict[arms.TargetType, tuple[float, float]]] = {
-    "primary": (62.0, 124.0),
+    "primary": (124.0, 124.0),
     "solar": (125.0, 250.0),
 }
-"""The low and high estimates of a stream's seconds per fit, by target."""
+"""The low and high estimates of a stream's seconds per fit, by target.
+
+A Primary demand fit takes 124 s (2 min 4 s, measured). A solar fit takes 125 to 250 s (estimated).
+"""
+StageType = Literal["A", "B", "all"]
+STAGE_A_ARMS: Final[dict[str, tuple[str, ...]]] = {
+    "D0n": arms.GATE_MONTHS,
+    "DF": arms.CLOUD_SCORED_MONTHS,
+    "D1": arms.CLOUD_SCORED_MONTHS,
+    "D1p": arms.CLOUD_SCORED_MONTHS,
+    "PF": arms.SOLAR_MONTHS,
+    "P1": arms.SOLAR_MONTHS,
+    "P1p": arms.SOLAR_MONTHS,
+}
+"""The arms of Stage A and the folds each runs on. Every other fit is Stage B."""
+STAGE_A_SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
+"""The fitting seeds of Stage A."""
+STAGE_A_COUNT: Final[int] = 132
+"""Stage A's job count: 6 gate fits, 63 Primary demand fits, and 63 solar fits."""
 PLAN_TOTALS: Final[dict[str, int]] = {
     "primary_recent12": 423,
     "primary_pairs": 84,
@@ -53,12 +71,35 @@ class Job:
         """Return the name of the job's prediction set."""
         return arms.set_name(arm=self.arm, month=self.month, seed=self.seed)
 
+    @property
+    def stage(self) -> Literal["A", "B"]:
+        """Return the job's stage: `A` if the arm, fold, and seed are in Stage A, else `B`."""
+        in_a = self.month in STAGE_A_ARMS.get(self.arm, ()) and self.seed in STAGE_A_SEEDS
+        return "A" if in_a else "B"
+
     def command_arguments(self) -> str:
         """Return the arguments that `e00711_fit.py` takes for this job."""
         return f"--arm {self.arm} --fold {self.month} --seed {self.seed}"
 
 
-def plan_jobs(*, names: list[str] | None = None) -> list[Job]:
+def expected_cells(*, arm: str, stage: StageType) -> set[tuple[str, int]]:
+    """Return the (fold, seed) pairs that an arm holds when `stage` is complete.
+
+    Args:
+        arm: The arm's name.
+        stage: `A` for Stage A's cells, `B` or `all` for every cell of the arm's plan. A Stage A
+            arm has the Stage A cells only in `A`.
+
+    Returns:
+        The planned (fold, seed) pairs; an arm that is not in Stage A has none in `A`.
+    """
+    spec = arms.ARMS[arm]
+    if stage == "A":
+        return {(m, s) for m in STAGE_A_ARMS.get(arm, ()) for s in STAGE_A_SEEDS}
+    return {(m, s) for m in spec.months for s in spec.seeds}
+
+
+def plan_jobs(*, names: list[str] | None = None, stage: StageType = "all") -> list[Job]:
     """Return every job of the named arms (default: every arm that needs fits).
 
     Jobs are ordered by fold, then arm, then seed, so one stream reads one fold's rows while it
@@ -66,6 +107,7 @@ def plan_jobs(*, names: list[str] | None = None) -> list[Job]:
 
     Args:
         names: Arm names, or `None` for all of the fitted arms.
+        stage: `A` or `B` for one stage's jobs, `all` for every job.
 
     Returns:
         One job per fold and seed of each arm.
@@ -78,6 +120,8 @@ def plan_jobs(*, names: list[str] | None = None) -> list[Job]:
         msg = "a stored arm has no fit"
         raise ValueError(msg)
     jobs = [Job(arm=a.name, month=m, seed=s) for a in selected for m in a.months for s in a.seeds]
+    if stage != "all":
+        jobs = [j for j in jobs if j.stage == stage]
     return sorted(jobs, key=lambda j: (j.month, j.arm, j.seed))
 
 
@@ -131,19 +175,24 @@ def pending(*, jobs: list[Job], finished: set[str]) -> list[Job]:
     return [j for j in jobs if j.set_name not in finished]
 
 
-def summary_lines(*, jobs: list[Job]) -> list[str]:
+def summary_lines(*, jobs: list[Job], stage: StageType = "all") -> list[str]:
     """Return the report: the count per group and arm, and the two-stream wall-clock estimate."""
-    lines = [f"{len(jobs)} jobs (plan: {sum(PLAN_TOTALS.values())}): {counts_by_group(jobs=jobs)}"]
+    lines = [
+        (
+            f"stage {stage}: {len(jobs)} jobs (whole plan: {sum(PLAN_TOTALS.values())}): "
+            f"{counts_by_group(jobs=jobs)}"
+        )
+    ]
     for arm in arms.fitted_arms():
         n = sum(1 for j in jobs if j.arm == arm.name)
-        lines.append(
-            f"  {arm.name:4s} {n:4d} fits  {len(arm.months)} folds x {len(arm.seeds)} seeds"
-        )
+        if n:
+            lines.append(f"  {arm.name:4s} {n:4d} fits")
     low, high = stream_hours(jobs=jobs)
     wlow, whigh = wall_hours(jobs=jobs)
     lines.append(
-        f"estimate (not measured): {low:.1f} to {high:.1f} stream-hours; on {STREAMS} streams "
-        f"{wlow:.1f} to {whigh:.1f} hours of wall time"
+        f"estimate: {low:.1f} to {high:.1f} stream-hours; on {STREAMS} streams "
+        f"{wlow:.1f} to {whigh:.1f} hours of wall time (Primary 124 s a fit, measured; solar "
+        f"125 to 250 s a fit, estimated)"
     )
     return lines
 
@@ -157,20 +206,26 @@ def main() -> None:
     """Print the count and the estimate, and optionally write the job list."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arms", nargs="+", default=None)
+    parser.add_argument("--stage", choices=("A", "B", "all"), default="all")
     parser.add_argument("--write", type=Path, default=None, help="write one job per line")
     parser.add_argument("--pending", action="store_true", help="drop jobs whose set exists")
     args = parser.parse_args()
     arms.check_table()
     all_jobs = plan_jobs()
     check_counts(jobs=all_jobs)
-    jobs = plan_jobs(names=args.arms)
+    jobs = plan_jobs(names=args.arms, stage=args.stage)
+    if args.stage == "A" and args.arms is None and len(jobs) != STAGE_A_COUNT:
+        msg = f"Stage A holds {len(jobs)} jobs, not the pre-registered {STAGE_A_COUNT}"
+        raise ValueError(msg)
     if args.pending:
+        import e00711_gate as gate
         from e00711_common import WORK_DIR
 
         folder = WORK_DIR / "predictions"
-        done = {p.name for p in folder.iterdir()} if folder.exists() else set()
+        done, rejected = gate.usable_sets(names=[j.set_name for j in jobs], folder=folder)
         jobs = pending(jobs=jobs, finished=done)
-    print("\n".join(summary_lines(jobs=jobs)))
+        print("\n".join(rejected))
+    print("\n".join(summary_lines(jobs=jobs, stage=args.stage)))
     if args.write is not None:
         write_job_list(jobs=jobs, path=args.write)
         print(f"wrote {len(jobs)} jobs to {args.write}")

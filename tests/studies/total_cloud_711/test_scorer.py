@@ -1,0 +1,316 @@
+# ruff: noqa: ANN202, PERF401, PLW0108
+"""Tests of the scorer's contrasts, stages, and gate marker on synthetic losses (no torch)."""
+
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+
+import e00711_arms as arms
+import e00711_gate as gate
+import e00711_jobs as jobs
+import e00711_score as score
+import numpy as np
+import polars as pl
+import pytest
+
+from studies import bootstrap, experiment_store
+
+MONTHS = ("2025-12", "2026-01", "2026-02", "2026-03")
+
+
+def _losses(
+    *, seeds: tuple[int, ...], shift: float, months: tuple[str, ...] = MONTHS
+) -> pl.DataFrame:
+    """Return per-seed losses of one Primary demand arm on 3 runs a month."""
+    rng = np.random.default_rng(3)
+    rows = []
+    for month in months:
+        year, number = (int(p) for p in month.split("-"))
+        for day in (1, 2, 3):
+            origin = datetime(year, number, day, 9, tzinfo=UTC)
+            for step in range(1, 21):
+                base = float(rng.normal(1.0, 0.1))
+                for seed in seeds:
+                    rows.append(
+                        {
+                            "time_series_id": 1,
+                            "power_fcst_init_time": origin,
+                            "valid_time": datetime(
+                                year, number, day, 10 + step // 2, 30 * (step % 2), tzinfo=UTC
+                            ),
+                            "seed": seed,
+                            "crps": base + shift + 0.01 * seed,
+                            "mae_median": base,
+                            "label": "D5",
+                            "fold": month,
+                            "lead_hours": float(step),
+                            "regime": "sunny",
+                        }
+                    )
+    return pl.DataFrame(rows).with_columns(
+        pl.col("seed").cast(pl.Int16),
+        pl.col("crps").cast(pl.Float32),
+        pl.col("mae_median").cast(pl.Float32),
+        pl.col("lead_hours").cast(pl.Float32),
+        pl.col("label").cast(pl.Categorical),
+        pl.col("fold").cast(pl.Categorical),
+        pl.col("regime").cast(pl.Categorical),
+    )
+
+
+def _arm_losses(*, seeds: tuple[int, ...], shift: float, months: tuple[str, ...] = MONTHS):
+    frame = _losses(seeds=seeds, shift=shift, months=months)
+    return score.ArmLosses(
+        losses=frame,
+        averaged=frame.filter(pl.col("seed") == seeds[0]).with_columns(
+            seed=pl.lit(-1).cast(pl.Int16)
+        ),
+        coverage={},
+        cells=frozenset((m, s) for m in months for s in seeds),
+    )
+
+
+def _source(**held: score.ArmLosses | None) -> score.LossSource:
+    return score.LossSource(load=lambda name: held.get(name), keep=3)
+
+
+def test_contrast_reads_the_shared_seeds_and_the_difference():
+    source = _source(
+        real=_arm_losses(seeds=(0, 1), shift=-0.5), fake=_arm_losses(seeds=(0, 1, 2), shift=0.0)
+    )
+    reading = score.read_contrast(
+        source=source,
+        treatment="real",
+        reference="fake",
+        label="t",
+        scope="s",
+        where=None,
+        level=99.0,
+        n_resamples=300,
+    )
+    assert reading.seeds == (0, 1)
+    assert reading.difference == pytest.approx(-0.5, abs=1e-4)
+    assert reading.upper < 0
+    assert reading.n_months == 4
+    assert reading.label_rows == {"D5": 240}  # 3 runs x 20 half-hours x 4 months, one seed
+
+
+def test_month_totals_interval_equals_the_row_level_bootstrap():
+    real, fake = _losses(seeds=(0, 1), shift=-0.3), _losses(seeds=(0, 1), shift=0.0)
+    fake = fake.with_columns(
+        crps=pl.col("crps")
+        + pl.Series(np.random.default_rng(0).normal(0, 0.1, fake.height)).cast(pl.Float32)
+    )
+    paired = score.paired_month_sums(a=real, b=fake)
+    ours = score.month_total_interval(paired=paired, level=95.0, n_resamples=500)
+    frame = experiment_store.losses_for_bootstrap(arm_losses={"real": real, "fake": fake})
+    theirs = bootstrap.bootstrap_difference_at_level(
+        losses=frame, treatment="real", reference="fake", metric="crps", level=95.0, n_resamples=500
+    )
+    assert ours == pytest.approx(theirs, abs=1e-6)
+
+
+def test_rows_that_differ_make_the_reading_incomplete():
+    short = _arm_losses(seeds=(0,), shift=0.0)
+    short.losses = short.losses.head(short.losses.height - 1)
+    source = _source(real=_arm_losses(seeds=(0,), shift=0.0), fake=short)
+    with pytest.raises(ValueError, match="same rows"):
+        score.read_contrast(
+            source=source,
+            treatment="real",
+            reference="fake",
+            label="t",
+            scope="s",
+            where=None,
+            level=99.0,
+            n_resamples=50,
+        )
+
+
+def test_decisive_interval_is_the_wider_not_the_union():
+    boot, t_int = (-0.10, 0.02), (-0.01, 0.12)
+    assert score.wider(boot=boot, t_int=t_int) == t_int
+    assert score.wider(boot=boot, t_int=None) == boot
+    with pytest.raises(ValueError, match="no interval"):
+        score.wider(boot=None, t_int=None)
+
+
+def test_t_interval_needs_two_months():
+    one = _losses(seeds=(0,), shift=0.0, months=("2025-12",))
+    paired = score.paired_month_sums(a=one, b=one)
+    assert score.t_interval_of_months(paired=paired, level=95.0) is None
+    two = _losses(seeds=(0,), shift=0.0, months=MONTHS)
+    interval = score.t_interval_of_months(paired=score.paired_month_sums(a=two, b=two), level=95.0)
+    assert interval == pytest.approx((0.0, 0.0))
+
+
+def test_minimum_detectable_effect_needs_both_halves_of_the_seeds():
+    full = _arm_losses(seeds=(0, 1, 2, 3, 4, 5), shift=0.0)
+    source = _source(p=full, short=_arm_losses(seeds=(0, 1, 2), shift=0.0))
+    mde = score.minimum_detectable_effect(
+        source=source, arm="p", target="primary", where=None, level=99.0, n_resamples=300
+    )
+    assert mde is not None
+    assert mde >= 0
+    assert (
+        score.minimum_detectable_effect(
+            source=source, arm="short", target="primary", where=None, level=99.0, n_resamples=300
+        )
+        is None
+    )
+
+
+# --- stages, completeness, and the loader -----------------------------------------------------
+
+
+def test_stage_a_has_132_jobs_and_a_short_wall_clock():
+    stage_a = jobs.plan_jobs(stage="A")
+    assert len(stage_a) == jobs.STAGE_A_COUNT == 132
+    counts = {}
+    for job in stage_a:
+        counts[job.arm] = counts.get(job.arm, 0) + 1
+    assert counts == {"D0n": 6, "DF": 21, "D1": 21, "D1p": 21, "PF": 21, "P1": 21, "P1p": 21}
+    assert all(j.seed in jobs.STAGE_A_SEEDS for j in stage_a)
+    low, high = jobs.wall_hours(jobs=stage_a)
+    assert 2.0 < low < high < 4.0
+    stage_b = jobs.plan_jobs(stage="B")
+    assert len(stage_b) == 946 - 132
+    assert not {j.set_name for j in stage_a} & {j.set_name for j in stage_b}
+
+
+def test_a_reading_needs_every_planned_cell_of_both_arms():
+    held = _arm_losses(seeds=(0, 1, 2), shift=0.0, months=arms.CLOUD_SCORED_MONTHS)
+    source = _source(
+        D1=held, D1p=_arm_losses(seeds=(0, 1), shift=0.0, months=arms.CLOUD_SCORED_MONTHS), DF=None
+    )
+    spec = score.planned_specs(stage="A")[0]
+    assert spec.key == "C1 the six"
+    outcome = score.run_spec(source=source, spec=spec, stage="A", n_resamples=50)
+    assert isinstance(outcome, score.Incomplete)
+    assert "D1p lacks" in outcome.reason
+    absent = score.run_spec(source=_source(), spec=spec, stage="A", n_resamples=50)
+    assert isinstance(absent, score.Incomplete)
+    assert "no predictions" in absent.reason
+
+
+def test_stage_a_specs_are_c1_and_s1_and_the_checks_are_never_pooled():
+    keys = [s.key for s in score.planned_specs(stage="A")]
+    assert keys == ["C1 the six", "C1 the eight", "S1"]
+    assert len(score.planned_specs(stage="B")) == 9
+    checks = score.check_specs(stage="B")
+    assert len(checks) == score.N_CHECKS == 8
+    assert all("the six" in c.key or "the eight" in c.key or c.key.startswith("P") for c in checks)
+    assert pytest.approx(100 * (1 - 0.05 / 8)) == score.CHECK_LEVEL
+
+
+def test_loader_failure_of_one_arm_does_not_stop_the_others():
+    def load(name: str) -> score.ArmLosses | None:
+        if name == "P0":
+            msg = "no stored PLP row covers 2025-12"
+            raise ValueError(msg)
+        if name == "D0":
+            raise FileNotFoundError
+        return _arm_losses(seeds=(0,), shift=0.0)
+
+    source = score.LossSource(load=load, keep=2)
+    assert source.get("P0") is None
+    assert "no stored PLP row" in source.errors["P0"]
+    assert source.get("D0") is None
+    assert source.get("D1") is not None
+    reasons = score.missing_for(source=source, arm="P0", months=MONTHS, stage="B")
+    assert "no stored PLP row" in reasons[0]
+
+
+def test_loader_keeps_only_a_few_arms_in_memory():
+    calls = []
+
+    def load(name: str) -> score.ArmLosses | None:
+        calls.append(name)
+        return _arm_losses(seeds=(0,), shift=0.0, months=MONTHS[:1])
+
+    source = score.LossSource(load=load, keep=2)
+    for name in ("a", "b", "c", "a"):
+        source.get(name)
+    assert calls == ["a", "b", "c", "a"]
+
+
+def test_stage_a_verdicts_use_only_c1_and_s1(capsys: pytest.CaptureFixture[str]):
+    def reading(key: str, lower: float, upper: float) -> score.Reading:
+        return score.Reading(
+            key=key,
+            label=key,
+            scope="s",
+            difference=(lower + upper) / 2,
+            lower=lower,
+            upper=upper,
+            boot=None,
+            t_interval=None,
+            averaged=None,
+            n_half_hours=10,
+            n_months=7,
+            seeds=(0, 1, 2),
+            level=99.44,
+            label_rows={"D5": 10},
+        )
+
+    readings = {
+        "C1 the six": reading("C1 the six", -0.2, -0.1),
+        "C1 the eight": reading("C1 the eight", -0.01, 0.01),
+        "S1": reading("S1", -0.2, -0.05),
+    }
+    out = score.verdicts(readings=readings, controls={}, stage="A")
+    assert out["the six"] == "supported"
+    assert out["the eight"] == "not supported"
+    assert out["solar"] == "supported"
+    assert out["front matter"] == "partly supported"
+    assert "Stage A verdict" in capsys.readouterr().out
+    withheld = score.verdicts(
+        readings={**readings, "S1": score.Incomplete(key="S1", reason="x")}, controls={}, stage="A"
+    )
+    assert "front matter" not in withheld
+    full = score.verdicts(readings=readings, controls={}, stage="B")
+    assert full == {}
+
+
+# --- the gate marker and the manifest check ---------------------------------------------------
+
+
+def test_fits_refuse_without_both_gates_but_the_gate_arm_and_measuring_fit_run(tmp_path: Path):
+    marker = tmp_path / "gate.json"
+    gate.refuse_without_gate(arm="D0n", measure=False, path=marker)
+    gate.refuse_without_gate(arm="D1", measure=True, path=marker)
+    with pytest.raises(ValueError, match="fit gate at 2026-01: not run"):
+        gate.refuse_without_gate(arm="D1", measure=False, path=marker)
+    for kind in gate.GATE_KINDS:
+        for month in arms.GATE_MONTHS:
+            gate.record(kind=kind, month=month, passed=True, detail="ok", commit="abc", path=marker)
+    gate.refuse_without_gate(arm="D1", measure=False, path=marker)
+    gate.record(
+        kind="predict",
+        month=arms.GATE_MONTHS[0],
+        passed=False,
+        detail="1e-2",
+        commit="abc",
+        path=marker,
+    )
+    with pytest.raises(ValueError, match="failed"):
+        gate.refuse_without_gate(arm="P1", measure=False, path=marker)
+    assert set(json.loads(marker.read_text())) == {"fit", "predict"}
+
+
+def test_existing_set_is_refused_when_dirty_or_from_another_branch(tmp_path: Path):
+    folder = tmp_path / "d1-2026-06-s0"
+    folder.mkdir()
+    manifest = folder / experiment_store.MANIFEST_NAME
+    head = gate.head_commit()
+    manifest.write_text(json.dumps({"commit": head, "dirty": False}))
+    gate.check_existing_set(folder=folder, head=head)
+    manifest.write_text(json.dumps({"commit": head, "dirty": True}))
+    with pytest.raises(ValueError, match="uncommitted"):
+        gate.check_existing_set(folder=folder, head=head)
+    manifest.write_text(json.dumps({"commit": "0" * 40, "dirty": False}))
+    with pytest.raises(ValueError, match="not an ancestor"):
+        gate.check_existing_set(folder=folder, head=head)
+    usable, rejected = gate.usable_sets(names=[folder.name, "missing"], folder=tmp_path)
+    assert usable == set()
+    assert len(rejected) == 1

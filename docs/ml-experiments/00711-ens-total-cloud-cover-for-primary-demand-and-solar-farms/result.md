@@ -34,7 +34,8 @@ prediction: >-
 decision_rule: >-
   Each planned reading (C1, C2, C3, S1, S2, S3) is read at 1 - 0.05/9 = 99.44% on its interval
   [lower, upper], and the decisive interval is the wider of the month-block bootstrap interval and
-  the t interval on the monthly differences. The first test that holds decides. Lower above 0:
+  the t interval on the monthly differences (the one with the larger upper minus lower, never their
+  union). The first test that holds decides. Lower above 0:
   refuted. Upper below -0.02: supported. Upper below 0: small gain. Lower at or above -0.02 and
   upper at or above 0: not supported (a gain of 0.02 is excluded). Otherwise inconclusive. The
   threshold of 0.02 points is the minimum gain that both protocols set for a new input, because
@@ -42,7 +43,10 @@ decision_rule: >-
   19-month gap. A target reads as the better of its two summary readings, ranked supported, small
   gain, inconclusive, not supported, refuted. Partly supported: the two summary readings at a
   group are inconclusive or not supported and C3 is supported there. A failed positive control
-  makes both Primary demand groups inconclusive.
+  makes both Primary demand groups inconclusive. Stage A (section 10) reads C1 at the six and at the
+  eight, and S1, and its verdict is decided by those three readings alone; C2, C3, S2, S3, the
+  positive control, and every other contrast are Stage B, which starts only on the manager's word
+  after Stage A is scored and reviewed.
 benchmark: >-
   The matching placebo arm of each real arm; stored `R_F` and `A_F` of experiment 707, stored PLP of
   experiment 666, climatology, the manual heuristic, and the stored XGBoost-based forecasts BG2
@@ -194,8 +198,9 @@ or if the first fit's memory exceeds the cap.
   three-component Gaussian mixture centred on the mean physics-lite power, 20 epochs, no farm
   column.
 - **Two departures from experiment 666, applied to every arm.** The refit is monthly, as the
-  standing practice asks, and the training window starts at the first back-filled run (2020-10-15)
-  instead of 2024-04-01. The stored quarterly PLP forecasts of experiment 666 stay as a reference
+  standing practice asks, and the training rows start at the run of 2020-10-29 (the first
+  back-filled run is 2020-10-15, and its 14 earliest runs serve as placebo donors only) instead of
+  2024-04-01. The stored quarterly PLP forecasts of experiment 666 stay as a reference
   row.
 - **Rows.** A new row set, `solar_daily_1200_2025_12_to_2026_06_v1`: every daily 00 UTC run from
   2025-12-01, origin 12:00 UTC, daylight half-hours, leads 12 hours to under 348 hours from the run,
@@ -278,7 +283,7 @@ an era indicator if the manager approves, and the page says so.
 | Arm | Inputs beyond PLP's 18 | Folds | Seeds |
 |---|---|---|---|
 | `P0` (stored PLP, experiment 666) | none; quarterly refit, window from 2024-04-01 | overlap only | 0 to 2, stored |
-| `P0L` | none; monthly refit, window from 2020-10-15 | 7 | 3 |
+| `P0L` | none; monthly refit, rows from the run of 2020-10-29 | 7 | 3 |
 | `PF` | `cloud_missing` only | 7 | 5 |
 | `P1`, `P1p` | T1 real; T1 shuffled-run placebo | 7 | 5 each |
 | `P1t` | T1 time-shifted placebo | 7 | 3 |
@@ -321,9 +326,11 @@ flag says about the date.
   runs of a segment, or the upstream gap of 2024-01-03), the run issued 21 days earlier is used, and
   then the run 7 days earlier. Every donor is issued before the row's own run.
 
-**The checks use a common correction.** Five checks read at 95% (four placebo-carries-nothing
-contrasts and the gap-scored contrast) are corrected to 99%. One failing check at 99% triggers an
-audit and changes no verdict.
+**The checks use a common correction.** Eight checks are read at 1 - 0.05/8 = 99.375%: `D1p` minus
+`DF`, `D1t` minus `DF`, and the gap-scored contrast, each at the six and at the eight, and `P1p`
+minus `PF` and `P1t` minus `PF`. The six and the eight are never pooled in a check, because pooling
+signed-MW and MVA-only Primaries would let a placebo effect at one group hide behind the other. One
+failing check triggers an audit and changes no verdict.
 
 - **Placebo carries nothing:** `D1p` minus `DF`, `D1t` minus `DF`, `P1p` minus `PF`, and `P1t` minus
   `PF` each have an interval that contains zero. A failure fires audit trigger 5.
@@ -334,9 +341,11 @@ audit and changes no verdict.
 - **Positive control (Primary demand):** temperature goes through the cloud's exact handling. `K1`
   removes the mean and spread of 2 m temperature and of 2 m dew point from the base inputs and adds
   them back as four masked columns with the cloud's missing pattern and the flag. `K1p` is its
-  shuffled-run placebo. The control passes if `K1` minus `K1p` is wholly below zero at both groups.
+  shuffled-run placebo. The control passes if the 99.375% interval of `K1` minus `K1p` is wholly
+  below zero at both groups.
   A failure means the masked-gap handling cannot pass a known signal across the gap, and the Primary
-  demand reading of C1 and C2 is then `inconclusive` whatever the intervals say.
+  demand reading of C1 and C2 is then `inconclusive` whatever the intervals say. The control is a
+  Stage B arm, so the Stage A verdict does not use it.
 - **Solar farms have no positive control of this kind.** Every strong PLP input feeds the
   physics-lite power at the centre of the mixture, so masking one changes the network. A solar null
   is read only through an interval that bounds the effect, and the same-row pair checks the gap
@@ -393,6 +402,16 @@ real cloud. Every other number is exploratory and labelled so.
 | S2 | `P2` minus `P2p` | daylight, days 1 to 10, six farms pooled | one |
 | S3 | `P1` minus `P1p` | daylight, 12 to 36 hours (the solar protocol's band) | one |
 
+**Stage A decides the question; Stage B refines it.** Stage A reads C1 at the six and at the eight
+and S1, each at 99.44% so that Stage B keeps the family of nine readings, with seeds 0 to 2. Its
+verdict for each Primary demand group is the C1 verdict, its verdict for the solar farms is the S1
+verdict, and the front-matter rule combines the three. The Stage A verdict does not use C2, C3, S2,
+S3, the positive control, the minimum detectable effect, or any other Stage B contrast. C2, C3, S2,
+S3, `D1t`, `P1t`, the gap-scored contrast, the positive control, the same-row pairs, the replicate,
+and every exploratory slice that needs a Stage B arm are Stage B. A Stage B reading can change the
+verdict only through the rules above (the modifiers and audit trigger 2), after the manager has
+approved Stage B.
+
 **Metric.** CRPS as twice the mean pinball loss over the 11 quantile levels, in points of effective
 capacity, with the normalised MAE of the median beside every CRPS number. Each farm's error is
 divided by its own capacity before any mean.
@@ -400,10 +419,13 @@ divided by its own capacity before any mean.
 **Interval.** Per-row losses of each seed go through `experiment_store.losses_for_bootstrap` and
 `studies.bootstrap.bootstrap_difference_at_level`, which resamples whole calendar months paired
 across arms and draws a fitting seed, with 50,000 resamples (about 140 draws per tail at 99.44%).
-Seed noise is therefore inside the interval. The decisive interval is the wider of this interval
-and a t interval on the monthly differences, because a month bootstrap on 7 months covers less often
-than its nominal level. The contrast on seed-averaged quantiles (experiment 707's convention) is
-printed beside both as a descriptive reading.
+Seed noise is therefore inside the interval. The scorer totals the per-row differences by seed and
+month and resamples those totals with the same random stream, which gives the same interval at a
+cost of one number per seed and month (a test checks the equality). The decisive interval is the
+wider of this interval and a t interval on the monthly differences, where wider means the larger
+upper minus lower, not the union of the two. A month bootstrap on 7 months covers less often than
+its nominal level, which is why the t interval is read beside it. The contrast on seed-averaged
+quantiles (experiment 707's convention) is printed beside both as a descriptive reading.
 
 **Minimum detectable effect.** The scorer prints it before any contrast is read. The minimum
 detectable effect is the half-width, at 99.44%, of a null contrast between two halves of the
@@ -446,7 +468,8 @@ target's verdict separately, because the question has two parts.
   loss; cold winter nights; sunny April to June; the avoidable-curtailment cost; a day-ahead and a
   14-day example forecast per target.
 - **Real minus reference** (`D1` minus `D0`, `P1` minus `P0L`) and **flag-only minus reference** are
-  reported with intervals as the total effect and the date-proxy effect.
+  reported with intervals as the total effect and the date-proxy effect, at the six and at the
+  eight separately.
 
 **Checks list on the finished page:** the median minus the mean forecast per site; the MAE contrast
 beside each CRPS contrast; which audit triggers fired. A leave-one-Primary-out and a
@@ -516,7 +539,7 @@ placebo donor maps, the raw matrices, and a code review of every script.
 **Launch rules.** Before each launch, `free -g` shows memory available for the sum of the caps and
 `uptime` shows a load below 24. Every Python command runs with `OMP_NUM_THREADS=1`,
 `MKL_NUM_THREADS=1`, and `OPENBLAS_NUM_THREADS=1`, under `systemd-run --user --scope -p
-MemorySwapMax=0 -p OOMPolicy=continue` with a `MemoryMax` set as above (16G for the measuring fit),
+MemorySwapMax=0 -p OOMPolicy=continue` with a `MemoryMax` set as above (12G for the measuring fit),
 and with `uv run --no-sync` after `uv sync --group gpu`. Each stream runs one (arm, fold, seed) job
 at a time, with a fixed seed, its own output file, and an atomic write, so a crashed job reruns
 without touching the others. The fourth core is for loading and scoring.
@@ -531,15 +554,41 @@ without touching the others. The fourth core is for loading and scoring.
 | Solar farms | 259 | `PF`, `P1`, `P1p`, `P2`, and `P2p` at 35 each; `P0L`, `P1t`, `P0g`, and `P1g` at 21 each |
 | Total | 946 | |
 
-**Time (estimate).** A Primary demand fit took 62 s of GPU time in experiment 707's logs (a mean of
-38 s for `S_ens` on 10.3 to 13.0 million rows, and 24 s for the fine-tune and forecast), so 687 fits
-take about 12 GPU-hours, and up to twice that with data loading. The solar fit time rests on
+**Time (estimate).** A Primary demand fit takes 2 min 4 s (124 s, measured), so 687 fits take about
+23.7 stream-hours. The solar fit time rests on
 experiment 666's log, which prints the height of the forecast table and not the training rows, so
-the training-row count is unknown. The window from 2020-10-15 is about 3 times longer than the
-window of experiment 666, so 259 fits are estimated at about 9 GPU-hours. The total is about 21 to
-42 stream-hours, so on 2 streams the run takes about 10 to 21 hours of wall time. The first fit
+the training-row count is unknown. The window from 2020-10-29 is about 3 times longer than the
+window of experiment 666, so a solar fit is estimated at 125 to 250 s, and 259 fits at 9 to 18
+stream-hours. The whole plan is about 33 to 42 stream-hours, so on 2 streams it takes about 16 to 21
+hours of wall time. The run does not start as a whole: Stage A comes first. The first fit
 measures wall time, peak resident memory (the scope's `MemoryPeak`), and peak GPU memory
 (`torch.cuda.max_memory_allocated`), and the page reports the corrected figures.
+
+### Stage A and Stage B
+
+**Stage A is 132 fits and about 2.3 to 3.4 hours on 2 streams; the whole plan is 946 fits.** The
+manager asked for the smallest subset that decides the question within about 5 hours on 2 streams.
+Stage A fits seeds 0 to 2 of the arms below, on the folds shown, and nothing else. The scorer
+(`e00711_score.py score --stage A`) reads only these arms, and `e00711_jobs.py --stage A` lists the
+jobs and prints the count and the estimate.
+
+| Arms | Folds | Seeds | Fits | Reason |
+|---|---|---|---|---|
+| `D0n` | 2026-01, 2026-06 | 0 to 2 | 6 | the gate |
+| `DF`, `D1`, `D1p` | the 7 cloud-scored folds | 0 to 2 | 63 | no-cloud reference, real cloud, placebo (C1; `D1p` minus `DF`) |
+| `PF`, `P1`, `P1p` | the 7 solar folds | 0 to 2 | 63 | no-cloud reference, real cloud, placebo (S1; `P1p` minus `PF`) |
+| Total | | | 132 | 69 Primary demand fits at 124 s, 63 solar fits at 125 to 250 s |
+
+**Stage A needs the gate first.** The fit refuses every arm but `D0n` until `work/gate_passed.json`
+holds the fit gate and the prediction gate at both gate months. The one override is `--measure` for
+the measuring fit, which writes under the name `measure-<arm>`.
+
+**Stage B is everything else in the 946 fits, and it needs the manager's word.** Stage B holds seeds
+3 to 5 and the folds 2025-07 to 2025-11 of the Stage A arms, and the arms `D0g`, `D1g`, `D1t`, `D2`,
+`D2p`, `D3`, `K1`, `K1p`, `R0`, `R1`, `R1p`, `P0L`, `P0g`, `P1g`, `P1t`, `P2`, and `P2p`. It
+answers the questions Stage A leaves open: the minimum detectable effect (which needs seeds 0 to 5
+at the placebo arm), the summary T2, the gap-handling checks, the positive control, the replicate,
+and the solar S3 band. Its readings and checks are pre-registered in this section and in section 8.
 
 **First-fit request to the manager.** One stream runs one fit of `D1` on fold 2026-06, seed 0. The
 request asks for a GPU share for 2 streams (experiment 707 planned 5 GB per stream and never
@@ -604,7 +653,32 @@ not carry to the Candidate, which reads 14 thermal-lag and solar-gain columns th
 cloud-scored folds cover December to June only, and fold 2025-12 holds only 10 recent runs with
 cloud in its fine-tune window.
 
-## 13. Differences between the plan and the stage 1 code
+## 13. Differences between the plan and the code
+
+### Stage 2 code
+
+**The stage 2 code departs from the plan above in the places listed here, and the code review
+(2026-11-20) accepted the first three.**
+
+- **Solar rows start at the run of 2020-10-29, not 2020-10-15.** The farm tables keep the 14
+  earliest runs as donors for the time-shifted placebo, and `daylight_rows` starts the rows at
+  2020-10-29. The 14 dropped runs are about 0.7% of the training runs and are dropped from every
+  arm.
+- **The half-hour labelled at the origin is not forecast.** Its period ends at the origin, so each
+  solar run holds 671 half-hours, not 672. Stored `P0` holds that half-hour, and the `P0` reader
+  drops it.
+- **The replicate's scored rows come from the back-filled raw rows.** They are the rows the
+  replicate trains on, and scoring drops the flagged exact-zero half-hours as on the recent folds.
+  The replicate's fine-tune window keeps no row, origin, or weekly lag before 2021-07-20.
+- **The checks are eight, at 99.375%, and are read at the six and at the eight separately.** The
+  positive control is read at the same level.
+- **Bootstrap pooling.** The pooled mean weights each Primary or farm by its row count, which the
+  scorer prints beside every planned reading.
+- **Not yet implemented:** the avoidable-curtailment cost, cold winter nights, the example
+  forecasts, and the reference rows climatology, manual heuristic, BG2, S0M, and `A_F`. The
+  finished page drops them or the scorer gains them before its first real run.
+
+### Stage 1 code
 
 **The stage 1 code departs from the plan above in six places, and each departure is deliberate.**
 The code reviewer accepted the first four. The era screens await the maintainer's agreement before
