@@ -52,9 +52,9 @@ from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
-import e00709_features as features
+import e00709_features as features  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.capacity_labeller import Prompt
@@ -73,6 +73,9 @@ from studies.capacity_llm import (
     stream_message,
 )
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+JsonObject = dict[str, Any]
+"""A JSON object read from the command-line tool's output or from the trial log."""
 
 EXPERIMENT_ID: Final[int] = 712
 SLUG: Final[str] = "clean-era-labels-part-1"
@@ -290,7 +293,7 @@ def load_candidates() -> list[Candidate]:
                 onset=row["onset"],
                 alarm=row["alarm"],
                 end=row["end"],
-                stat_alarm=int(absorbed["alarm"].min()) if absorbed.height else None,
+                stat_alarm=min(absorbed["alarm"].to_list()) if absorbed.height else None,
             )
         )
     for number, row in enumerate(stat.iter_rows(named=True)):
@@ -735,7 +738,7 @@ def write_prompts(*, prompts: dict[str, Prompt]) -> None:
     (PROMPT_DIR / "system_prompt.txt").write_text(SYSTEM_PROMPT)
 
 
-def parse_label(*, text: str) -> dict[str, object]:
+def parse_label(*, text: str) -> JsonObject:
     """Validate a reply against the output schema of design section 2.3.
 
     Args:
@@ -807,9 +810,9 @@ def run_claude(*, prompt: Prompt) -> RawRun:
     )
 
 
-def stream_events(*, stdout: str) -> list[dict[str, object]]:
+def stream_events(*, stdout: str) -> list[JsonObject]:
     """Parse the `stream-json` lines that are valid JSON objects."""
-    events: list[dict[str, object]] = []
+    events: list[JsonObject] = []
     for line in stdout.splitlines():
         try:
             event = json.loads(line)
@@ -820,12 +823,12 @@ def stream_events(*, stdout: str) -> list[dict[str, object]]:
     return events
 
 
-def rate_limit_payloads(*, events: Sequence[dict[str, object]]) -> list[dict[str, object]]:
+def rate_limit_payloads(*, events: Sequence[JsonObject]) -> list[JsonObject]:
     """Return the raw payload of every `rate_limit_event`."""
     return [e for e in events if e.get("type") == "rate_limit_event"]
 
 
-def rate_limit_hit(*, events: Sequence[dict[str, object]], run: RawRun) -> str | None:
+def rate_limit_hit(*, events: Sequence[JsonObject], run: RawRun) -> str | None:
     """Return a description of a rate-limit message in a run, or `None`.
 
     A `rate_limit_event` whose status is anything but `allowed`, an error result, or an error
@@ -857,7 +860,7 @@ def rate_limit_hit(*, events: Sequence[dict[str, object]], run: RawRun) -> str |
     return None
 
 
-def read_log() -> list[dict[str, object]]:
+def read_log() -> list[JsonObject]:
     """Return every entry of the trial log, or an empty list if there is none."""
     if not LOG_PATH.exists():
         return []
@@ -901,7 +904,7 @@ class Trial:
         self.api_key_source = str(sources[-1]) if sources else "unknown"
         self.cli_version = ""
 
-    def _log(self, *, entry: dict[str, object]) -> None:
+    def _log(self, *, entry: JsonObject) -> None:
         """Append one entry to the log under the lock."""
         with self.lock:
             self.store.append_log(entry=entry)
@@ -927,7 +930,7 @@ class Trial:
         for attempt in range(self.attempts.get(call_id, 0), MAX_ATTEMPTS):
             if self.stop.is_set():
                 return
-            entry: dict[str, object] = {
+            entry: JsonObject = {
                 "call_id": call_id,
                 "attempt": attempt,
                 "tag": tag,
@@ -1013,13 +1016,13 @@ class Trial:
     def _finish(
         self,
         *,
-        entry: dict[str, object],
+        entry: JsonObject,
         reply: ModelReply,
-        events: Sequence[dict[str, object]],
+        events: Sequence[JsonObject],
     ) -> None:
         """Add the token counts and the cost to a log entry and to the running totals."""
         result = next((e for e in events if e.get("type") == "result"), {})
-        usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
+        usage: JsonObject = result.get("usage") or {}
         entry |= {
             "input_tokens": reply.input_tokens,
             "output_tokens": reply.output_tokens,
@@ -1145,7 +1148,7 @@ def print_summary() -> None:  # noqa: PLR0915 - one printed report
         print("no trial log yet")
         return
     seen: set[tuple[str, int]] = set()
-    entries: list[dict[str, object]] = []
+    entries: list[JsonObject] = []
     for entry in read_log():
         key = (str(entry["call_id"]), int(entry["attempt"]))
         if key not in seen:
@@ -1229,7 +1232,21 @@ def print_summary() -> None:  # noqa: PLR0915 - one printed report
         )
 
 
-def print_plan_quota(*, entries: Sequence[dict[str, object]]) -> None:
+def _utilization(*, info: JsonObject, kind: str) -> object:
+    """Return the utilisation of one rate-limit window.
+
+    The value sits under `unifiedWindows.<kind>.utilization`, with `utilization` directly in
+    `rate_limit_info` as a fallback.
+    """
+    windows = info.get("unifiedWindows")
+    if isinstance(windows, dict):
+        window = windows.get(kind)
+        if isinstance(window, dict) and "utilization" in window:
+            return window["utilization"]
+    return info.get("utilization")
+
+
+def print_plan_quota(*, entries: Sequence[JsonObject]) -> None:
     """Print what the logged rate-limit events show about plan-quota use, and what they cannot."""
     print("plan quota: the command-line tool reports no plan-quota use per call.")
     print("  Under a subscription (apiKeySource = none) total_cost_usd is an API-equivalent price,")
@@ -1245,21 +1262,36 @@ def print_plan_quota(*, entries: Sequence[dict[str, object]]) -> None:
     if not infos:
         print("  No rate_limit_event appeared in any call, so no counter is observable.")
         return
-    by_type: dict[str, list[dict[str, object]]] = {}
+    by_type: dict[str, list[JsonObject]] = {}
     for info in infos:
         by_type.setdefault(str(info.get("rateLimitType")), []).append(info)
     for kind, group in by_type.items():
         first, last = group[0], group[-1]
+        first_use = _utilization(info=first, kind=kind)
         print(
-            f"  {kind}: {len(group)} events; utilization first {first.get('utilization')!r}, "
-            f"last {last.get('utilization')!r}; resetsAt {last.get('resetsAt')!r}; "
+            f"  {kind}: {len(group)} events; utilization first {first_use!r}, "
+            f"last {_utilization(info=last, kind=kind)!r}; resetsAt {last.get('resetsAt')!r}; "
             f"status last {last.get('status')!r}"
         )
+    seen = sorted(
+        {
+            (kind, value)
+            for kind, group in by_type.items()
+            for value in (_utilization(info=i, kind=kind) for i in group)
+            if value is not None
+        },
+        key=str,
+    )
+    print(f"  Distinct (window, utilization) readings across all calls: {seen}")
+    print(
+        "  Each utilization is ACCOUNT-WIDE, shared by every session on the account, so the share "
+        "of this trial is below the resolution of the field and cannot be attributed."
+    )
     print(
         f"  isUsingOverage values: {sorted({str(i.get('isUsingOverage')) for i in infos})}; "
         f"overageStatus values: {sorted({str(i.get('overageStatus')) for i in infos})}"
     )
-    if not any("utilization" in i for i in infos):
+    if not any(_utilization(info=i, kind=str(i.get("rateLimitType"))) is not None for i in infos):
         print("  The payloads hold a status and reset time only: no usage counter is observable.")
 
 
