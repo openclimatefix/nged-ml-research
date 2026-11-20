@@ -9,6 +9,12 @@ real training rows given a matched share of non-zero flags.
 interconnection edges between Primary substations and scores them on injected transfers; see the
 [Network research plan](../differentiable-physics-network/plan.md).
 
+## Priority table
+
+| Experiment | Question | Priority | Waits for | State |
+|---|---|---|---|---|
+| 712 | Do era labels made by detectors and a language model, without hindsight, help the demand network after a permanent change without harming it after a temporary load move? | High (maintainer approval, 2026-11-20) | The plan pull request merged, then the manager's go; stage 2 waits for the stage 1 gate | Planned |
+
 ## Planned experiments
 
 <!-- planned-table -->
