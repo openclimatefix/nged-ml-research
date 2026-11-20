@@ -1,12 +1,16 @@
-# ruff: noqa: E501, D103, PT018
+# ruff: noqa: E501, D103, PT018, D205, D209
 """Experiment 715: the figures of design section 10, drawn from stored forecasts and stored network states.
 
 Usage:
-    e00715_figures.py demo OUT_DIR                 # render every chart type from random numbers, to check the code (not a result)
-    e00715_figures.py attention MONTH SEED OUT_DIR # target row to neighbour rows (F4 beside F4-R) and the null-key share
+    e00715_figures.py demo OUT_DIR                 # render every chart type from random numbers, to
+    check the code (not a result)
+    e00715_figures.py attention MONTH SEED OUT_DIR # target row to neighbour rows (F4 beside F4-R)
+    and the null-key share
     e00715_figures.py contrasts OUT_DIR            # N1 and N2 by Primary and by fold
-    e00715_figures.py events OUT_DIR TAG           # at least 12 logged events: host power, forecasts, neighbours' power
-    e00715_figures.py follow OUT_DIR               # follow share after permanent changes against after temporary moves
+    e00715_figures.py events OUT_DIR TAG           # at least 12 logged events: host power,
+    forecasts, neighbours' power
+    e00715_figures.py follow OUT_DIR               # follow share after permanent changes against
+    after temporary moves
 
 Every chart is written as SVG and optimised with `npx svgo@4 --multipass --precision=1 --final-newline`.
 **Anonymisation.** The charts show Primary substations by their D labels, which the rule on generators
@@ -16,7 +20,8 @@ the name, the identifier, or the time series of a metered generator. Colour is b
 `F4-W` Data Sky.
 
 **The attention maps show a product of attention weights, not influence.** The target row does not attend
-to a neighbour directly. The map multiplies, for each age and column, the weight of the target token on
+to a neighbour directly. The map multiplies, for each age and column, the weight of the target token
+on
 that host history row (the across-day attention of block 2, heads averaged) by the weight of that history
 token on each neighbour slot (the across-substation attention of block 2, heads averaged), then averages
 over the 48 columns and over the samples.
@@ -75,11 +80,16 @@ def save(chart: alt.TopLevelMixin, *, path: Path) -> None:
 
 
 def target_to_slot_map(*, across: torch.Tensor, nbr: torch.Tensor) -> np.ndarray:
-    """Return the (samples, 14 ages, 7) product of the target row's weights on the history rows and the history tokens' weights on the slots and the null key.
+    """Return the (samples, 14 ages, 7) product of the target row's weights on the history rows and
+    the history tokens' weights on the slots and the null key.
 
     Args:
-        across: (B, 48, heads, 15) the target token's across-day weights over the target row (index 0) and the 14 history rows.
+        across: (B, 48, heads, 15) the target token's across-day weights over the target row and
+            the 14 history rows.
         nbr: (B, 14, 48, heads, 7) the across-substation weights of the same block.
+
+    Returns:
+        The (B, 14, 7) map; index 6 of the last axis is the null key.
     """
     a = across.mean(dim=2)[:, :, 1:]  # (B, 48, 14)
     w = nbr.mean(dim=3).permute(0, 2, 1, 3)  # (B, 48, 14, 7)
@@ -163,7 +173,8 @@ def null_share_chart(*, table: pl.DataFrame) -> alt.Chart:
 def contrast_chart(
     *, table: pl.DataFrame, by: str, title: str, neighbours: pl.DataFrame | None = None
 ) -> alt.Chart:
-    """Mean difference and interval per `by` for the arms in `table` (columns `by`, `contrast`, `mean`, `lo`, `hi`)."""
+    """Mean difference and interval per `by` for the arms in `table` (columns `by`, `contrast`,
+    `mean`, `lo`, `hi`)."""
     order = sorted(table[by].unique().to_list())
     dom = sorted(table["contrast"].unique().to_list())
     colour = alt.Color(
@@ -212,7 +223,8 @@ def contrast_chart(
 def event_chart(
     *, series: pl.DataFrame, neighbours: pl.DataFrame, start_day: float, end_day: float, title: str
 ) -> alt.VConcatChart:
-    """Two panels over days from the event's start: the host's power and forecasts, and the neighbours' power on the host's scale."""
+    """Two panels over days from the event's start: the host's power and forecasts, and the
+    neighbours' power on the host's scale."""
     x = alt.X("day:Q", title="Days from the start of the event")
     shade = (
         alt.Chart(pl.DataFrame({"a": [start_day], "b": [end_day]}))  # ty: ignore[unresolved-attribute]
@@ -264,7 +276,8 @@ def event_chart(
 
 
 def follow_chart(*, table: pl.DataFrame, ceiling: pl.DataFrame) -> alt.Chart:
-    """Follow share after temporary moves (x) against after permanent changes (y): one point per arm, the ideal point, and the ceiling classifiers."""
+    """Follow share after temporary moves (x) against after permanent changes (y): one point per
+    arm, the ideal point, and the ceiling classifiers."""
     pts = (
         alt.Chart(table, width=420, height=360)
         .mark_point(filled=True, size=90)
@@ -530,7 +543,8 @@ def month_interval(
 
 
 def cmd_events(*, out_dir: Path, tag: str) -> None:
-    """Draw at least 12 logged events (6 of the six, 6 of the eight): host power, four forecasts, and the neighbours' power, in days from the event's start."""
+    """Draw at least 12 logged events (6 of the six, 6 of the eight): host power, four forecasts,
+    and the neighbours' power, in days from the event's start."""
     from datetime import UTC, datetime, timedelta
 
     import e00713_figures as f713  # ty: ignore[unresolved-import]

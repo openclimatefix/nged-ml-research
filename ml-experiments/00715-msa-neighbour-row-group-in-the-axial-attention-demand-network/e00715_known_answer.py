@@ -1,12 +1,14 @@
-# ruff: noqa: E501, PT018, ANN001
+# ruff: noqa: E501, PT018, ANN001, D205, D209
 """Experiment 715: the synthetic neighbour worlds and the known-answer gate (KN6, KN7, KN11 part (a), KN12).
 
 Usage: e00715_known_answer.py MONTH [--device cuda]      the fit gate: KN6, KN7, KN11(a), KN12
        e00715_known_answer.py --selftest                 CPU, no data, no fit
        e00715_known_answer.py --smoke MONTH              CPU, real fold, forward passes only: no training
-       e00715_known_answer.py --kn8 MONTH SEED           KN8, outside the gate (needs the F4-0 fit and 713's stored forecast)
+       e00715_known_answer.py --kn8 MONTH SEED           KN8, outside the gate (needs the F4-0 fit
+       and 713's stored forecast)
        e00715_known_answer.py --kn11b MONTH SEED         KN11(b), outside the gate
-       e00715_known_answer.py --kn13 MONTH SEED          KN13, outside the gate (delegates to `e00715_predict.py --kn13`)
+       e00715_known_answer.py --kn13 MONTH SEED          KN13, outside the gate (delegates to
+       `e00715_predict.py --kn13`)
 
 The other checks live in their own scripts: KN1, KN4, KN5 in `e00715_check_model.py`; KN2 and KN9 in
 `e00715_check_batch.py`; KN3 and KN10 in `e00715_check_neighbours.py`. The full run needs the GPU for
@@ -14,7 +16,8 @@ about an hour (design section 8.1). It writes `work/known_answers_passed.json`, 
 only when every check it runs passes; `e00715_fit.py` refuses to run without the file.
 
 **World W3** is experiment 713's world W0 (the real grid, the real ERA5 temperature, the real calendar,
-`0.5 + 0.02 max(0, 15.5 - T) + w[day type, half-hour]`) on four Primaries that form two neighbour pairs, with
+`0.5 + 0.02 max(0, 15.5 - T) + w[day type, half-hour]`) on four Primaries that form two neighbour
+pairs, with
 steps of +-0.30 of capacity that cover about 15% of the history: half temporary (4 to 12 days, mirrored
 at the partner with the opposite sign) and half permanent (45 days, no mirror). **W3p** draws the
 mirrored share from 0.3 to 1.0 and reports the gap of `F4` with no threshold. **KN7's world** is W0 with
@@ -58,7 +61,8 @@ SHARE_P: Final = (0.3, 1.0)
 
 
 def w0_base(*, temperature: np.ndarray, day_type: np.ndarray, half_hour: np.ndarray) -> np.ndarray:
-    """Return the noise-free W0 power (16, G) in shares of capacity, for every Primary (the four filled ones are used)."""
+    """Return the noise-free W0 power (16, G) in shares of capacity, for every Primary (the four
+    filled ones are used)."""
     w = ka.draw_table()
     return 0.5 + 0.02 * np.maximum(0.0, 15.5 - temperature) + w[day_type, half_hour][None, :]
 
@@ -95,7 +99,8 @@ def source_of(
     mean: np.ndarray,
     std: np.ndarray,
 ) -> fb.F4Source:
-    """Return the source that reads `power_in` as host history and `neighbour` as neighbour power (raw shares; None means the world's own power)."""
+    """Return the source that reads `power_in` as host history and `neighbour` as neighbour power
+    (raw shares; None means the world's own power)."""
     base = world.base.source
     dev = base.device
 
@@ -170,7 +175,8 @@ def train_from_scratch(*, world: tr.F4World, device: str, seed: int = 0) -> mdl.
 def w3_follow(
     *, model: mdl.MsaNet, world: tr.F4World, w3: wd.W3, mean: np.ndarray, std: np.ndarray
 ) -> dict[str, float]:
-    """Return the follow shares of a trained network on W3: with the steps and mirrors, against the same inputs without them."""
+    """Return the follow shares of a trained network on W3: with the steps and mirrors, against the
+    same inputs without them."""
     samples = held_out(world=world)
     with_steps, _, idx = medians(
         model=model, world=world, samples=samples,
@@ -270,7 +276,8 @@ def load_world(*, month: str, device: str) -> tuple:
 
 
 def smoke(*, month: str) -> int:
-    """Forward passes on the CPU: build W3, the sources, and the follow-share path with an untrained F4Net. No training."""
+    """Forward passes on the CPU: build W3, the sources, and the follow-share path with an untrained
+    F4Net. No training."""
     data, temperature, day_type, half_hour = load_world(month=month, device="cpu")
     base = w0_base(temperature=temperature, day_type=day_type, half_hour=half_hour)
     w3 = wd.build_w3(base=base, pairs=PAIRS, first_valid=lay.STEPS_PER_DAY * 20)
@@ -390,7 +397,8 @@ def run_checks(*, month: str, device: str) -> dict:
 
 
 def kn8(*, month: str, seed: int) -> dict:
-    """KN8: arm `F4-0` against the stored forecast of `M*`; print the largest absolute difference of the median (design 8.2)."""
+    """KN8: arm `F4-0` against the stored forecast of `M*`; print the largest absolute difference of
+    the median (design 8.2)."""
     import e00715_predict as pr
     import polars as pl
 

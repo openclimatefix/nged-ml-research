@@ -1,16 +1,22 @@
-# ruff: noqa: E501, PT018, PLW3301
-"""Experiment 715: the injected worlds (design section 7.3): the ceiling table, KN11, the predictions, and S1 to S7.
+# ruff: noqa: E501, PT018, PLW3301, D205, D209
+"""Experiment 715: the injected worlds (design section 7.3): the ceiling table, KN11, the
+predictions, and S1 to S7.
 
 Usage:
-    e00715_era.py ceiling                         # print the ceiling table; assert it equals the design's to 3 decimals
+    e00715_era.py ceiling                         # print the ceiling table; assert it equals the
+    design's to 3 decimals
     e00715_era.py kn11a MONTH                     # KN11(a), before any injected-world score is read
-    e00715_era.py predict ARM WORLD MONTH SEED    # prediction only: ARM on the injected passes of WORLD (`g2` or `bank`)
-    e00715_era.py follow WORLD                    # follow shares of every stored arm; S1 to S7 with their intervals
+    e00715_era.py predict ARM WORLD MONTH SEED    # prediction only: ARM on the injected passes of
+    WORLD (`g2` or `bank`)
+    e00715_era.py follow WORLD                    # follow shares of every stored arm; S1 to S7 with
+    their intervals
 
-**Prediction only.** The onset lies after every fit's cutoff, so every fitted state was trained on the real
+**Prediction only.** The onset lies after every fit's cutoff, so every fitted state was trained on
+the real
 power. `predict` loads the stored stage 3 state of an arm, reads the injected panel as the host's history
 and as the neighbour power (mode `predict_injected`: the real neighbours of an injected host carry their
-own injected power too), and forecasts each event's host at the origins 7, 10, 14, and 21 days after the
+own injected power too), and forecasts each event's host at the origins 7, 10, 14, and 21 days after
+the
 onset at all 14 lead days. **Every origin day is bounded by the days `ens.run_us` holds**, checked by
 `e00715_batch.check_origin_days`, and an origin outside them is dropped and counted in the log.
 
@@ -87,7 +93,8 @@ def gap(*, label: np.ndarray, score: np.ndarray) -> float:
 
 
 def ceiling_table(*, check: bool = True) -> pl.DataFrame:
-    """Print the ceiling table from experiment 714's out-of-fold scores, and assert it equals the design's to 3 decimals."""
+    """Print the ceiling table from experiment 714's out-of-fold scores, and assert it equals the
+    design's to 3 decimals."""
     rows = []
     for (subset, column), (aurocs, gaps) in PUBLISHED_CEILING.items():
         mine_a, mine_g = [], []
@@ -130,7 +137,8 @@ def ceiling_table(*, check: bool = True) -> pl.DataFrame:
 def g2_panel(
     *, month: str, index: int, clean: np.ndarray
 ) -> tuple[np.ndarray, pl.DataFrame, list[int]]:
-    """Return the injected panel of a second-generator pass on the adapter's grid, its truth table, and its touched Primaries."""
+    """Return the injected panel of a second-generator pass on the adapter's grid, its truth table,
+    and its touched Primaries."""
     import e00714_generator2 as g2  # ty: ignore[unresolved-import]
 
     gen = g2.read_pass(world="g2", month=month, index=index)
@@ -181,7 +189,8 @@ def window_of(*, truth: pl.DataFrame, n_grid: int) -> tuple[int, int]:
 
 
 def kn11a(*, month: str, device: str = "cpu") -> dict:
-    """KN11(a): the injected panels of both worlds equal the cleaned power outside the touched Primaries and windows."""
+    """KN11(a): the injected panels of both worlds equal the cleaned power outside the touched
+    Primaries and windows."""
     pipe = inp.load_pipeline(month=month, phase="predict")
     data = inp.build_fold_data(pipe=pipe, device=device)
     clean = data.clean
@@ -208,7 +217,8 @@ def kn11a(*, month: str, device: str = "cpu") -> dict:
 
 
 def kn11b(*, month: str, seed: int) -> dict:
-    """KN11(b): F4's prediction path with a stored state of `M*` reproduces experiment 713's bank forecasts of `M*` (1e-4 of capacity)."""
+    """KN11(b): F4's prediction path with a stored state of `M*` reproduces experiment 713's bank
+    forecasts of `M*` (1e-4 of capacity)."""
     star = arms.a713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     folder = era713.BANK713 / f"{star}_{month}_s{seed}"
     stored = sorted(folder.glob("pass[0-9][0-9].parquet")) if folder.exists() else []
@@ -237,7 +247,8 @@ def kn11b(*, month: str, seed: int) -> dict:
 
 
 def event_origins(*, truth: pl.DataFrame, ens_days: tuple[int, int]) -> list[tuple[int, int, int]]:
-    """Return (event index, days after the onset, contract origin index) inside the days `ens_days = (first, last)` of the ensemble table."""
+    """Return (event index, days after the onset, contract origin index) inside the days `ens_days =
+    (first, last)` of the ensemble table."""
     out = []
     for i, ev in enumerate(truth.iter_rows(named=True)):
         for k in ORIGIN_DAYS:
@@ -250,7 +261,8 @@ def event_origins(*, truth: pl.DataFrame, ens_days: tuple[int, int]) -> list[tup
 def injected_forecasts(
     *, arm: str, world: str, month: str, seed: int, data_dir: Path, origins: str, device: str
 ) -> Path:
-    """Forecast each event's host of every pass at the sparse origins; write `pass<NN>.parquet`; return the folder."""
+    """Forecast each event's host of every pass at the sparse origins; write `pass<NN>.parquet`;
+    return the folder."""
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
 
@@ -370,7 +382,8 @@ def injected_forecasts(
 
 
 def follow_share(*, injected_q50: np.ndarray, real_q50: np.ndarray, change: float) -> float:
-    """Return the follow share of one event at one origin: the mean median difference over the target rows, over the mean injected change."""
+    """Return the follow share of one event at one origin: the mean median difference over the
+    target rows, over the mean injected change."""
     assert change != 0.0
     return float(np.mean(injected_q50 - real_q50) / change)
 
@@ -385,7 +398,8 @@ def bootstrap_contrast(
     draws: int = DRAWS,
     seed: int = 0,
 ) -> dict:
-    """Return the AUROC of the follow share of `arm_a` minus that of `arm_b` at `k` days, with a 95% interval that resamples whole passes within months, then months."""
+    """Return the AUROC of the follow share of `arm_a` minus that of `arm_b` at `k` days, with a 95%
+    interval that resamples whole passes within months, then months."""
     d = table.filter(pl.col("days_after_onset") == k)
     if subset is not None:
         d = d.filter(pl.col("mirror_state").is_in(subset))

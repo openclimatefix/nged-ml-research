@@ -1,7 +1,8 @@
 # ruff: noqa: E501, PT018
 """Experiment 715: forecast one fold with a fitted F4 network (prediction phase).
 
-Usage: e00715_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--mask-neighbours] [--accept-code-change OLD_HASH ...]
+Usage: e00715_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--mask-neighbours]
+       [--accept-code-change OLD_HASH ...]
        e00715_predict.py --kn13 MONTH SEED [--device cuda]
 
 Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`, which opens
@@ -104,12 +105,15 @@ def forecast_frame(
     assert source.label == "cleaned", (
         f"the real-panel prediction reads the {source.label} array, not the cleaned power"
     )
-    assert torch.equal(source.host.power_in, source.host.power_z), (
-        "the host's history is not the cleaned power"
-    )
-    assert source.neighbour_power is source.host.power_z or torch.equal(
-        source.neighbour_power, source.host.power_z
-    )
+    cleaned = source.host.power_z
+    for name, array in (
+        ("the host's history", source.host.power_in),
+        ("the neighbour power", source.neighbour_power),
+    ):
+        same = array is cleaned or torch.allclose(
+            array, cleaned, atol=0.0, rtol=0.0, equal_nan=True
+        )
+        assert same, f"{name} is not the cleaned power"
     c_all = data.test_origin_idx + lay.NATIVE_OFFSET_STEPS
     assert data.source.ens is not None
     fb.check_origin_days(ens=data.source.ens, c_idx=c_all, what="the scored origins")
@@ -278,7 +282,7 @@ def compare_forecasts(*, new: pl.DataFrame, stored: pl.DataFrame) -> dict:
 
 
 def kn13(*, month: str, seed: int, device: str, data_dir: Path) -> dict:
-    """KN13: F4's prediction path on the stored stage 3 state of `M*` against experiment 713's stored forecast file."""
+    """KN13: F4's prediction path on the stored state of `M*` against experiment 713's stored forecast."""
     star = a713.m_star(data_dir=data_dir)
     stored_path = a713.fit_file(data_dir=data_dir, arm=star, month=month, seed=seed)
     state = a713.model_file(data_dir=data_dir, arm=star, month=month, seed=seed, stage=3)

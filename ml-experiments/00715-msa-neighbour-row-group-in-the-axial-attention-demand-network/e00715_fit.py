@@ -1,13 +1,15 @@
-# ruff: noqa: E501, PT018, PLR0915
+# ruff: noqa: E501, PT018, PLR0915, D205, D209
 """Experiment 715: fit one F4 network (one arm, one fold, one seed) in the training phase.
 
-Usage: e00715_fit.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH ...] [--accept-gate-change OLD_HASH]
+Usage: e00715_fit.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH ...]
+       [--accept-gate-change OLD_HASH]
 
 Run it through `run.sh`. It sets `E00667_PHASE=train`, under which `e00667_fold.install` sets the cleaned
 power to NaN from the fold month's start, so no code path can read a held-out reading, neighbour power
 included. It refuses to run without `work/known_answers_passed.json`, which `e00715_known_answer.py`
 writes. F4 skips stage 1 and runs stages 2 and 3 of experiment 713's recipe, starting from experiment
-713's stage 1 state of `M*` (or of arm `E`, for `F4E`) of the same fold and seed. A stage that ends at the
+713's stage 1 state of `M*` (or of arm `E`, for `F4E`) of the same fold and seed. A stage that ends
+at the
 60-pass cap is rerun from its starting state with a cap of 120 passes, and the log records both. Each
 stage's state is saved atomically, and a stage whose file exists is skipped, so a job that crashed
 resumes from its last finished stage.
@@ -117,7 +119,8 @@ def _mva_flags(*, labels: Sequence[str]):  # noqa: ANN202
 
 
 def check_fingerprint(*, data, data_dir: Path, month: str) -> None:  # noqa: ANN001
-    """Assert that the fold's standardiser equals the one that experiment 713's fits of the same fold used (read only)."""
+    """Assert that the fold's standardiser equals the one that experiment 713's fits of the same
+    fold used (read only)."""
     path = a713.root(data_dir=data_dir) / "work" / "standardiser" / f"{month}.sha256"
     assert path.exists(), f"{path} is missing: experiment 713 has not fitted fold {month} yet"
     assert path.read_text() == data.fingerprint, (

@@ -1,22 +1,27 @@
-# ruff: noqa: E501, PLR0911
+# ruff: noqa: E501, PLR0911, D205, D209
 """Experiment 715: the counted contrasts N1 and N2, the guards, the decision rule, and the report-only readings.
 
 Usage:
     e00715_score.py selftest       # the decision rule on constructed readings (no data)
-    e00715_score.py first          # first run on the stored `M*` and `C` alone: the table of experiment 713's section 1.5
-    e00715_score.py headline       # N1 and N2 at 98.75%, the guards, the readings, the verdict, the noise F4 actually has
-    e00715_score.py report-only    # the 95% report-only readings of section 7.1 and the KN8 branch of section 8.2
+    e00715_score.py first          # first run on the stored `M*` and `C` alone: the table of
+    experiment 713's section 1.5
+    e00715_score.py headline       # N1 and N2 at 98.75%, the guards, the readings, the verdict, the
+    noise F4 actually has
+    e00715_score.py report-only    # the 95% report-only readings of section 7.1 and the KN8 branch
+    of section 8.2
 
 Every table is printed and written to `score/<command>.json` in the experiment's data folder. All losses
 are in points of capacity, as in experiment 713's scorer, which this script imports: `contrast`,
 `load_arm`'s conversion to the contract origin, `add_losses`, `seed_average`, and `paired`. **Only the
-constants and the two rule functions differ from experiment 713's:** the noise floor is 0.054 at the six
+constants and the two rule functions differ from experiment 713's:** the noise floor is 0.054 at the
+six
 and 0.142 at the eight (2 seeds), `delta` is 0.094 and 0.25, `tau` is 0.03, and row 5 of the group table
 requires `L <= 0 <= U`. The module's constants in experiment 713's scorer are replaced at import time,
 so `contrast` reads F4's.
 
 **Contrasts, treatment minus reference.** N1 is `F4` minus `M*`, N2 is `F4` minus `F4-R`, each on experiment
-713's headline band (24 h up to, but not including, 240 h), the 8 folds, seeds 0 and 1, for the six and the
+713's headline band (24 h up to, but not including, 240 h), the 8 folds, seeds 0 and 1, for the six
+and the
 eight, at 98.75%. Every contrast needs the arms to hold identical keys, which `assert_same_keys` asserts.
 """
 
@@ -240,7 +245,8 @@ def tail_pinball(
 def seed_noise(
     *, per_seed: dict, groups: dict[str, np.ndarray], treatment: str, reference: str
 ) -> dict:
-    """Return the monthly standard deviation of seed 0 minus seed 1 for each arm and for the paired contrast (design section 7.2)."""
+    """Return the monthly standard deviation of seed 0 minus seed 1 for each arm and for the paired
+    contrast (design section 7.2)."""
     out: dict = {}
     for g in ("six", "eight"):
         monthly = {}
@@ -310,7 +316,8 @@ def cmd_headline() -> int:
 
 
 def print_shares(*, result: dict) -> None:
-    """Print the visible share of the neighbour tokens per fold and the two-link share of `F4-R` (design sections 2 and 9)."""
+    """Print the visible share of the neighbour tokens per fold and the two-link share of `F4-R`
+    (design sections 2 and 9)."""
     table = nb.load_table()
     rows = {}
     for month in arms.ALL_FOLDS:
@@ -433,7 +440,8 @@ def _primary_point(*, averaged: dict, treatment: str, reference: str, time_serie
 
 
 def cmd_first() -> int:
-    """First run, on the stored `M*` and `C` alone: the pooled CRPS of each over the headline band, which sets the scale of every contrast."""
+    """First run, on the stored `M*` and `C` alone: the pooled CRPS of each over the headline band,
+    which sets the scale of every contrast."""
     groups = group_ids()
     m_star = star()
     truth = sc.truth_stack()

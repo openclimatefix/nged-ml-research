@@ -1,9 +1,11 @@
-# ruff: noqa: E501
-"""Experiment 715: print the weather look-ahead statement for F4's matrix and check it against stored data (KN12).
+# ruff: noqa: E501, D205
+"""Experiment 715: print the weather look-ahead statement for F4's matrix and check it against
+stored data (KN12).
 
 Usage: e00715_weather_lookahead.py [--origin 2026-03-10] [--primary D5] [--check-data]
 
-For one contract origin (12:00 UTC on the given day) and one Primary, the script prints the statement of
+For one contract origin (12:00 UTC on the given day) and one Primary, the script prints the
+statement of
 experiment 713's host matrix of 15 rows by 48 half-hours (the target row and 14 history rows), then the
 statement for the neighbour rows: up to 6 neighbour slots of 14 rows each, 84 rows at most. A neighbour
 row holds the neighbour's power at the same 14 ages as the host's history rows (2 to 15 days before the
@@ -12,8 +14,10 @@ the neighbour's power and its signed-megawatt flag, never an ensemble or an anal
 history rows hold weather valid at most 1 day before the contract origin, as in experiment 713.
 
 With `--check-data` the script reads the stored run frame that the Candidate reads for the native origin
-and prints one PASS or FAIL line, computed from that data: PASS when the latest `nwp_init_time` is at least 9
-hours before the native origin and `power_fcst_init_time` is the native origin. The exit status is 1 on FAIL.
+and prints one PASS or FAIL line, computed from that data: PASS when the latest `nwp_init_time` is
+at least 9
+hours before the native origin and `power_fcst_init_time` is the native origin. The exit status is 1
+on FAIL.
 Experiment 713's `check_data` is the one implementation, so F4 and M* share the check.
 """
 

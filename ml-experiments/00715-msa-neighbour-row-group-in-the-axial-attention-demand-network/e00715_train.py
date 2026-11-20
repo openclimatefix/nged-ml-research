@@ -1,5 +1,6 @@
-# ruff: noqa: E501, PT018
-"""Experiment 715: the training loop of F4, stages 2 and 3, copied from experiment 713 (design sections 5 and 11.1).
+# ruff: noqa: E501, PT018, D205, D209
+"""Experiment 715: the training loop of F4, stages 2 and 3, copied from experiment 713 (design
+sections 5 and 11.1).
 
 Experiment 713's `train_stage`, `batch_for`, `validation_loss`, `param_groups`, and `synthetic_source`
 (`e00713_train.py` at commit 3ac110652, lines 543 to 698) are copied, because the batch, the parameter
@@ -57,6 +58,7 @@ class F4World:
         rewire_seed: The seed of the rewired draw (the seed of the neural network).
         capacity_mw: (16,) effective capacity, for the mirror world.
         mva_only: (16,) bool, for the mirror world's floor.
+        shuffle_pool: The pool of arm `F4-T`'s shuffled ages, or None for the other arms.
     """
 
     base: tr.World
@@ -166,7 +168,8 @@ def batch_for(
     cut: int, dropout: tuple[np.ndarray, np.ndarray] | None, drop_slots: np.ndarray | None = None,
     mask_all_slots: bool = False,
 ) -> fb.F4Assembled:  # fmt: skip
-    """Assemble the batch of `samples[index]` at lead days `lead`: experiment 713's host batch and the neighbour tensors."""
+    """Assemble the batch of `samples[index]` at lead days `lead`: experiment 713's host batch and
+    the neighbour tensors."""
     dev = source.device
     to = lambda a: torch.from_numpy(np.ascontiguousarray(a)).to(dev)  # noqa: E731
     nbr_ages = nbr_exists = None

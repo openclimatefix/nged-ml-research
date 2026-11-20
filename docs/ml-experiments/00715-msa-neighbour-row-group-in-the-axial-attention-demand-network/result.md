@@ -663,10 +663,16 @@ and a prose review.
 - `data/ml-experiments/briefs/msa_architecture/f4_design.md`, `f4_design_review.md`, and
   `f4_design_triage.md` (read, private): the design, the Opus review, and the triage that this page
   condenses.
-- `ml-experiments/00715-msa-neighbour-row-group-in-the-axial-attention-demand-network/` (to be
-  written): the scripts for the neighbour table, the network, the batches, the worlds, the arms, the
-  training and prediction, the known-answer checks, the injected-world adapters, the scorer, and the
-  figures and report.
+- `ml-experiments/00715-msa-neighbour-row-group-in-the-axial-attention-demand-network/`: the code,
+  written and unit-checked on the CPU, with no fit run yet. `e00715_neighbours.py` holds the
+  neighbour table and the slot draws, `e00715_model.py` the network, `e00715_batch.py` the
+  neighbour tensors and masks, `e00715_worlds.py` the mirror world and the synthetic world W3,
+  `e00715_arms.py`, `e00715_train.py`, and `e00715_fit.py` the arms and the training, and
+  `e00715_predict.py` the prediction. `e00715_known_answer.py` holds the fit gate, `e00715_era.py` the
+  injected worlds and the ceiling table, `e00715_score.py` the contrasts, `e00715_figures.py` and
+  `e00715_report.py` the figures and tables, and `e00715_weather_lookahead.py` check KN12. The files
+  `e00715_check_*.py` run the checks that need no fit, and `run.sh` runs a script under a memory cap
+  and one thread.
 - Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
   the stored stage 1 and stage 3 states and forecasts of M*, the inputs adapter, the fold statistics,
   and the scorer.

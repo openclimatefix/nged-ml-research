@@ -1,9 +1,11 @@
-# ruff: noqa: E501, PT018, D417
-"""Experiment 715: the neighbour tensors of a batch, the masks, the neighbour dropout, and the per-batch assertions.
+# ruff: noqa: E501, PT018, D205
+"""Experiment 715: the neighbour tensors of a batch, the masks, the neighbour dropout, and the
+per-batch assertions.
 
 `F4Source` wraps experiment 713's `Source`. It calls `Source.assemble` for the host matrix, then builds
 the neighbour tensors from an explicit array `neighbour_power`, set by the caller and never inferred.
-Experiment 713's stage 3 replaces `power_in` for all 16 Primaries (`e00713_train.synthetic_source`), so
+Experiment 713's stage 3 replaces `power_in` for all 16 Primaries (`e00713_train.synthetic_source`),
+so
 without an explicit array the neighbours would read the same shifted array as the host. Every source
 therefore carries a `label` that names the array the neighbour slots read, and `ARRAYS_OF_MODE` states
 which array each of the five modes of design section 5.2 reads.
@@ -167,9 +169,19 @@ class F4Source:
     ) -> F4Assembled:
         """Return the batch of samples (Primary, contract origin `c_idx`, lead day).
 
-        The host arguments are those of `Source.assemble`. The neighbour arguments are:
+        The host arguments are those of `Source.assemble`, which experiment 713's source documents.
 
         Args:
+            primary: (B,) long, the host Primary of each sample.
+            c_idx: (B,) long, the contract origin's grid index.
+            lead_day: (B,) long, the zero-based lead day.
+            ensemble: Whether the target row reads the ensemble weather.
+            ages: (B, 14) long, the host's shuffled ages (experiment 713's placebo); None for 2 to 15.
+            age_exists: (B, 14) bool, False for a shuffled row with no block.
+            mask_all_power: (B,) bool, mask every history power token (experiment 713's block dropout).
+            mask_newest_row: (B,) bool, mask the newest history row's power.
+            target_end: Grid index at and after which targets are NaN, or None.
+            cap_steps: The number of half-hours of the newest row that are hidden.
             nbr_ages: (B, 14) long, the ages at which the slots read their neighbour (arm `F4-T`);
                 None for ages 2 to 15.
             nbr_age_exists: (B, 14) bool, False for a shuffled row with no block.
@@ -177,6 +189,10 @@ class F4Source:
             mask_all_slots: Mask every slot (the read-out of design section 7.4).
             neighbour_power: Override of the array the slots read (check KN2).
             host_power_in: Override of the array the host's history reads (check KN2).
+            ens_day_offset: Shift, in days, of the ensemble run read (experiment 713's canary).
+
+        Returns:
+            The host batch, the neighbour tensors, the slot index, and the slot's Primary.
         """
         if ensemble and self.host.ens is not None:
             check_origin_days(ens=self.host.ens, c_idx=c_idx, what="assemble")

@@ -3,8 +3,10 @@
 
 Usage: e00715_report.py
 
-Reads `score/headline.json` and `score/report_only.json` from the experiment's data folder and prints the
-table of N1 and N2 (point, 98.75% interval, the three guards, the group's reading), the verdict, the seed
+Reads `score/headline.json` and `score/report_only.json` from the experiment's data folder and
+prints the
+table of N1 and N2 (point, 98.75% interval, the three guards, the group's reading), the verdict, the
+seed
 noise F4 actually has, and the report-only contrasts. It computes nothing new: every number is the
 scorer's. A missing file is stated, not skipped.
 """

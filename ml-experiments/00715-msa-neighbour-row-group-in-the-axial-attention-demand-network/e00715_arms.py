@@ -1,10 +1,12 @@
-# ruff: noqa: E501, PT018
-"""Experiment 715: the arms, the folds, the file layout, the job list, and the code hash (design sections 4, 6, and 11.1).
+# ruff: noqa: E501, PT018, D205, D209
+"""Experiment 715: the arms, the folds, the file layout, the job list, and the code hash (design
+sections 4, 6, and 11.1).
 
 An arm name is one of `F4` (the real neighbours), `F4-R` (the rewired placebo), `F4-T` (the
 time-shuffled placebo), `F4-W` and `F4-WR` (the real and rewired neighbours trained in the mirror
 world), `F4-0` (F4's training loop with the neighbour path absent), and `F4E` (the real neighbours with
-arm `E`'s convolution stem on the host rows). `M*` and the Candidate `C` are experiment 713's stored arms
+arm `E`'s convolution stem on the host rows). `M*` and the Candidate `C` are experiment 713's stored
+arms
 and are never refitted here.
 
 **The code hash covers every module that F4 imports, not only the fit modules.** It joins the hash of
@@ -244,7 +246,8 @@ def _git(*args: str) -> str:
 
 
 def code_record() -> dict:
-    """Return what a log records about the code: the hash, experiment 713's hash, the commit, whether the folder is dirty."""
+    """Return what a log records about the code: the hash, experiment 713's hash, the commit,
+    whether the folder is dirty."""
     return {
         "code_hash": code_hash(),
         "e00713_code_hash": a713.code_hash(),
@@ -351,7 +354,8 @@ def f4_source(
     mode: nb.SlotMode,
     rewire_seed: int,
 ) -> fb.F4Source:
-    """Return the source that reads the cleaned power as host history and as neighbour power (modes `stage2` and `predict_real`)."""
+    """Return the source that reads the cleaned power as host history and as neighbour power (modes
+    `stage2` and `predict_real`)."""
     scale = data.target_std.astype(np.float64) * capacity_mw()
     return fb.F4Source(
         host=data.source, neighbour_power=data.source.power_z, mw_scale=scale, table=table,

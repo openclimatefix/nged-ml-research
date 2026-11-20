@@ -3,13 +3,18 @@
 
 Usage: e00715_check_fit.py   (CPU only; run it through `run.sh`)
 
-The stub replaces `load_world` and `train_stage` (`e00715_fit.Deps`) and `make_samples`, and the check runs
+The stub replaces `load_world` and `train_stage` (`e00715_fit.Deps`) and `make_samples`, and the
+check runs
 `e00715_fit.fit` against a temporary data folder that holds a fake experiment 713 stage 1 state. It checks
-that (a) a fresh job runs stages 2 and 3 once each and saves both states, (b) a job that crashed in stage 3
-resumes without retraining stage 2, (c) a finished job is skipped, (d) a stage log with another code hash
-is refused, and accepted only when the exact old hash is named, (e) a stage that hits the 60-pass cap is
+that (a) a fresh job runs stages 2 and 3 once each and saves both states, (b) a job that crashed in
+stage 3
+resumes without retraining stage 2, (c) a finished job is skipped, (d) a stage log with another code
+hash
+is refused, and accepted only when the exact old hash is named, (e) a stage that hits the 60-pass
+cap is
 rerun from its starting state with a cap of 120 passes, (f) the log prints the peak host memory, and
-(g) a missing gate file refuses the job. Each refusal check has a matching accepting call, so a driver that
+(g) a missing gate file refuses the job. Each refusal check has a matching accepting call, so a
+driver that
 refuses everything fails.
 """
 

@@ -1,10 +1,13 @@
-# ruff: noqa: E501, PT018
-"""Experiment 715: checks KN2 (poisoned neighbour power), KN9 (host-scale power), and the mode table of design section 5.2.
+# ruff: noqa: E501, PT018, D205
+"""Experiment 715: checks KN2 (poisoned neighbour power), KN9 (host-scale power), and the mode table
+of design section 5.2.
 
 Usage: e00715_check_batch.py            # synthetic arrays, CPU, no data
-       e00715_check_batch.py real MONTH # the same checks on the real fold MONTH (CPU; the origins are the scored origins)
+       e00715_check_batch.py real MONTH # the same checks on the real fold MONTH (CPU; the origins
+       are the scored origins)
 
-KN2: setting every neighbour reading with a grid index above the native origin's grid index minus 48 to
+KN2: setting every neighbour reading with a grid index above the native origin's grid index minus 48
+to
 1e6, and in a second run to NaN, leaves the assembled inputs unchanged bit for bit, for every arm
 (`F4`, `F4-R`, `F4-T`), and on a network whose `W_o` is random, because a zero `W_o` hides the neighbours.
 The negative control (a cap of 0) must change the inputs for `F4` and `F4-R`; `F4-T` is exempt, as

@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, D205, D209
 """Experiment 715: the neighbour table, the slot layout, the rewired draw, and the time-shuffle ages.
 
 A sample of arm `F4` holds up to six neighbour slots. The neighbours of a host come from NGED's
@@ -194,7 +194,8 @@ def two_link_share(*, table: NeighbourTable, host: int, slots: tuple[int, ...]) 
 
 
 def slots_for(*, table: NeighbourTable, host: int, mode: SlotMode, seed: int) -> tuple[int, ...]:
-    """Return the slots of `host` in `mode`: `real` and `shuffled` hold the real neighbours, `rewired` the placebo, `none` nothing."""
+    """Return the slots of `host` in `mode`: `real` and `shuffled` hold the real neighbours,
+    `rewired` the placebo, `none` nothing."""
     if mode in {"real", "shuffled"}:
         return real_slots(table=table, host=host)
     if mode == "rewired":

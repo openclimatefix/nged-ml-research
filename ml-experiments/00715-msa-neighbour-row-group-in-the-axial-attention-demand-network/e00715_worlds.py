@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, D205, D209
 """Experiment 715: the mirror world of arms `F4-W` and `F4-WR`, and the synthetic worlds W3 and W3p.
 
 **The mirror world (design section 5.3).** Experiment 713's stage 3 draws experiment 581's lag-only
@@ -24,7 +24,8 @@ capacity shares) and `target` (the cleaned power plus the permanent changes only
 whose kind only the neighbour reveals: steps of +0.30 or -0.30 of capacity that start at a random
 half-hour and together cover about 15% of the history; half are temporary (4 to 12 days, uniform) and
 mirrored in full, with the opposite sign and the same megawatts, at the Primary's pair partner, and half
-are permanent (45 days) with no mirror. `build_w3` takes a `share_range`; `W3p` draws it from 0.3 to 1.0.
+are permanent (45 days) with no mirror. `build_w3` takes a `share_range`; `W3p` draws it from 0.3 to
+1.0.
 """
 
 from dataclasses import dataclass
@@ -139,6 +140,9 @@ def mirror_world(
         table: The neighbour table (the mirror lands on a listed neighbour).
         capacity_mw: (16,) effective capacity in megawatts.
         mva_only: (16,) bool, True for MVA-only Primaries (a mirrored step is floored at zero).
+
+    Returns:
+        The mirror world: the history array, the target array, and the events.
     """
     history = clean.copy()
     target = clean.copy()
@@ -181,7 +185,8 @@ def mirror_world(
 def describe(
     *, world: MirrorWorld, target_range: tuple[int, int], clean: np.ndarray
 ) -> dict[str, float]:
-    """Return the shares that design section 5.3 states: the kinds, the mirror classes, and the shifted target share."""
+    """Return the shares that design section 5.3 states: the kinds, the mirror classes, and the
+    shifted target share."""
     events = world.events
     n = len(events)
     temporary = [e for e in events if e["kind"] == "temporary"]
@@ -219,6 +224,7 @@ class W3:
             of the Primary's own.
         onset: (16, G) grid index where the Primary's own step covering the half-hour began, -1 if none.
         end: (16, G) grid index one past the last half-hour of that step, -1 if none.
+        pairs: The neighbour pairs of the world.
     """
 
     y: np.ndarray
@@ -232,7 +238,8 @@ class W3:
 
 
 def pair_table(*, pairs: tuple[tuple[int, int], ...]) -> nb.NeighbourTable:
-    """Return a neighbour table whose only links are the `pairs`, with every Primary signed-MW under one BSP per pair."""
+    """Return a neighbour table whose only links are the `pairs`, with every Primary signed-MW under
+    one BSP per pair."""
     neighbours: list[tuple[int, ...]] = [() for _ in range(nb.N_PRIMARIES)]
     bsp = list(range(100, 100 + nb.N_PRIMARIES))
     for a, b in pairs:
