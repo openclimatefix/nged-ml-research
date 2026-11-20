@@ -9,7 +9,7 @@ arrays and checks the world's formula, the follow share, and the gate file logic
 
 The full run needs the GPU for about 45 minutes. It runs, for the fold MONTH, KA5 (poisoned power),
 KA6 (future weather canary) on the real inputs, then fits the synthetic worlds W0 and W1 with the
-training loop of `e00713_train` (stage 1, at most 15 passes, arms `M`, `P`, `N`, `E`, `G`) and checks
+training loop of `e00713_train` (stage 1, at most 150 passes, arms `M`, `P`, `N`, `E`, `G`) and checks
 KA2, KA3, KA4, KA10, and KA12. KA1, KA7, and KA9 are run by `e00713_check_model.py` and
 `e00713_check_layout.py`; KA8 is run by `e00713_score.py`; KA11 by `e00713_era.py`. The script writes
 `work/known_answers_passed.json` only if every check it runs passes; `e00713_fit.py` refuses to run
@@ -50,7 +50,12 @@ STEP_SHARE: Final = 0.10
 NOISE_SD: Final = 0.01
 WORLD_SEED: Final = 0
 HELD_OUT_DAYS: Final = 60
-SYNTHETIC_PASSES: Final = 15
+SYNTHETIC_PASSES: Final = 150
+"""Pass cap of the synthetic fits; early stopping (patience 8) ends a fit well before it.
+
+Four Primaries give 5,672 stage-1 samples, so a pass is 23 steps of 256 and the cap is 3,450 steps.
+The cap applies to the known-answer fits only and leaves the real folds' budgets unchanged.
+"""
 THRESHOLDS: Final = {
     "KA2_mae": 0.02, "KA3_follow_m": 0.75, "KA3_follow_p": 0.25, "KA4_m_minus_n": 0.005,
     "KA10_abs_m_minus_p": 0.005, "KA12_slack": 0.05,
@@ -386,14 +391,22 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
         "m_minus_n": mae["W0"]["M"] - mae["W0"]["N"],
         "pass": mae["W0"]["M"] - mae["W0"]["N"] <= t["KA4_m_minus_n"],
     }
-    results["KA10"] = {
-        "abs_m_minus_p": abs(mae["W0"]["M"] - mae["W0"]["P"]),
-        "pass": abs(mae["W0"]["M"] - mae["W0"]["P"]) <= t["KA10_abs_m_minus_p"],
-    }
-    results["KA12"] = {
-        "follow_e": follow["W1"]["E"], "follow_g": follow["W1"]["G"], "follow_m": follow["W1"]["M"],
-        "pass": follow["W1"]["E"] >= follow["W1"]["M"] - t["KA12_slack"],
-    }  # fmt: skip
+    # KA10 and KA12 compare trained networks, so they mean something only once KA2 shows that the
+    # synthetic fits converged; before that they are not evaluated and count as failed
+    if results["KA2"]["pass"]:
+        results["KA10"] = {
+            "abs_m_minus_p": abs(mae["W0"]["M"] - mae["W0"]["P"]),
+            "pass": abs(mae["W0"]["M"] - mae["W0"]["P"]) <= t["KA10_abs_m_minus_p"],
+        }
+        results["KA12"] = {
+            "follow_e": follow["W1"]["E"], "follow_g": follow["W1"]["G"], "follow_m": follow["W1"]["M"],
+            "pass": min(follow["W1"]["E"], follow["W1"]["G"]) >= follow["W1"]["M"] - t["KA12_slack"],
+        }  # fmt: skip
+    else:
+        for name in ("KA10", "KA12"):
+            results[name] = {"pass": False, "evaluated": False, "note": "not evaluated: KA2 failed"}
+            print(name, "not evaluated: KA2 failed", flush=True)
+    results["order"] = "KA10 and KA12 are evaluated only after KA2 passes; KA12 tests E and G"
     return results
 
 

@@ -271,7 +271,10 @@ class MsaNet(nn.Module):
         self.ln_readout = nn.LayerNorm(WIDTH)
         self.w_q = nn.Linear(WIDTH, READOUT_WIDTH, bias=False)
         self.w_k = nn.Linear(WIDTH, READOUT_WIDTH, bias=False)
-        nn.init.zeros_(self.w_q.weight)
+        # W_k starts at zero, so every logit starts at zero and the untrained read-out is the
+        # day-type-weighted mean of the history (KA1). W_q keeps PyTorch's default random
+        # initialisation: with both matrices at zero, each gradient is proportional to the other
+        # matrix, so neither would ever move.
         nn.init.zeros_(self.w_k.weight)
         self.beta_day = nn.Parameter(beta_day_start())
         self.beta_age = nn.Parameter(torch.zeros(N_HISTORY))

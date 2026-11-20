@@ -361,7 +361,7 @@ Candidate's stored seeds give a CRPS of 7.18 on the headline band and a seed-noi
 | "Loss at D8" (R1) | The contrast ≥ +0.25, both intervals above zero |
 
 **Prediction for the era set, written before any fit:** `M*` reads the era and is vetoed on
-temporary moves, because the similar-day read-out copies recent levels by construction and no input
+temporary moves, because the similar-day read-out can copy recent levels and no input
 tells the network that a neighbour gained what the donor lost. `E` − `M*` is inside ±0.30 in R2.
 
 **What each outcome says.** If `M*` or `E` reads the era and neither is vetoed on temporary moves,
@@ -390,22 +390,34 @@ a uniform distribution on −0.10 to +0.10 (seed 0), keyed on the per-token loca
 local half-hour. The noise is Gaussian with standard deviation 0.01. `shift` is zero in world W0. In
 world W1 each Primary has level steps of +0.30 or −0.30 lasting 10 days, starting at random days
 that cover 10% of the history, in the power and so in the inputs and the targets. The training uses
-stage 1 with at most 15 passes and ERA5 as the target row's weather.
+stage 1 with at most 150 passes (patience 8) and ERA5 as the target row's weather.
+The 150-pass cap is a budget for the known-answer fits only. Four Primaries give 5,672 stage-1
+samples, so a pass is 23 steps and the cap is 3,450 steps, against about 5,300 steps in the stage 1
+of a real fold. The cap does not change the training budget of any real fold.
 
 | Check | What must hold | Threshold |
 |---|---|---|
 | KA1, untrained read-out | The median of an untrained neural network equals `base` (the weighted mean of similar days) computed independently in NumPy from the same batch, for `M1`, `E`, and `G` | Maximum absolute difference ≤ 1e-5 |
 | KA2, weather and day-type function | In W0, arm `N` after training has a mean absolute error of the median on held-out origins | ≤ 0.02 of capacity, twice the noise |
-| KA3, real history recovers a shift | In W1, the follow share on target tokens inside a step that began at least 3 days before the origin (the trained median on the W1 inputs, minus the trained median on the same inputs with the shift removed from the history power, divided by the step, averaged over the qualifying tokens) | `M` ≥ 0.75. Wiring checks that cannot fail on a correct build: `P` ≤ 0.25, `N` exactly 0 |
+| KA3, real history recovers a shift | In W1, the follow share on target tokens inside a step that began at least 3 days before the origin (the trained median on the W1 inputs, minus the trained median on the same inputs with the shift removed from the history power, divided by the step, averaged over the qualifying tokens) | `M` ≥ 0.75. KA3 tests a learned capability: the network must subtract the history days' weather effect, put its weight on the newest rows, and let the median depend on the lead day. Wiring checks that cannot fail on a correct build: `P` ≤ 0.25, `N` exactly 0 |
 | KA4, no harm from history | In W0, `M` minus `N`, mean absolute error of the median | ≤ +0.005 |
 | KA5, poisoned power | Setting every power reading with grid index above `origin_idx − 48` to 1e6, and in a second run to NaN, in a copy of the arrays leaves every model output unchanged, for 64 samples per fold and every test origin, for every arm with history rows | Bit-identical; and the negative control (cap 0) must change the output or raise |
 | KA6, future weather canary | A target row built from the ENS run of day D + 1 must fail the origin-time assertion | The assertion raises |
 | KA7, row layout | The grid indices and per-token day types of 1,000 random samples equal an independent calendar computation with `datetime` and `zoneinfo`; the masked columns of the age-2 row are exactly 43 to 47 | Exact |
 | KA8, stored Candidate | The scorer reproduces the detectable-effect table and the Candidate's export from the per-seed files | 3 decimals; 1e-4 MW or MVA |
 | KA9, placebo draw | No placebo row is younger than 16 days before the origin, the draw is identical on a second call, and no placebo row repeats inside a sample | Exact |
-| KA10, no recency signal where none exists | In W0, the absolute difference between `M` and `P` in mean absolute error of the median. A leak of target-time information through the history rows would make `M` beat `P` | ≤ 0.005 |
+| KA10, no recency signal where none exists | In W0, the absolute difference between `M` and `P` in mean absolute error of the median. A leak of target-time information through the history rows would make `M` beat `P` | ≤ 0.005. Evaluated only after KA2 passes |
 | KA11, injected bank | The injected power equals the cleaned power outside the injected hosts and windows; experiment 709's `none` event losses are reproduced | 1e-6 of capacity; 3 decimals |
-| KA12, stem on a step | In W1 with steps that begin at a random half-hour, arm `E` (and `G`) has a follow share at least that of `M` minus 0.05 | Report the value; a lower value fires audit trigger 1 |
+| KA12, stem on a step | In W1 with steps that begin at a random half-hour, arm `E` and arm `G` each have a follow share at least that of `M` minus 0.05 | Report the values; a lower value fires audit trigger 1. Evaluated only after KA2 passes |
+
+**KA3 tests a learned capability, not the wiring.** An exact copy of the history under the untrained
+prior follows 0.32 of a step. A read-out that averages raw history power cannot reach 0.75 unless
+the network also subtracts the weather effect of each history day, puts its weight on the newest
+rows, and makes the median depend on the lead day and on the age of the step. In the diagnosis of
+the first gate run, a single coefficient per lead day reached a follow share of 0.571, a median that
+follows fully wherever that coefficient exceeds 0.5 reached 0.827, and a network that also reads the
+age of the step from the history rows can reach 1.0. The threshold of 0.75 is therefore reachable,
+and it stays unchanged.
 
 **In the placebo `P`, the 14 history rows of each sample are 14 different 24-hour blocks of the same
 Primary, drawn uniformly from ages 16 to 379 days before the origin.** Each placebo row keeps the
@@ -607,7 +619,9 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   the layer-normalised tokens, plus a table `β_day[day type of the target token, day type of the
   history token]` (8 × 8) and a per-age bias `β_age`. A softmax over the visible rows gives weights
   `α`, a weighted mean `base`, and a weighted spread `s`; with no visible row, `base = 0`, `s = 0`,
-  and a flag `no_history = 1`. The maps and `β_age` start at zero, and `β_day` starts at 3.0 for the
+  and a flag `no_history = 1`. The key map and `β_age` start at zero. The query map has PyTorch's
+  default random initialisation, because with both maps at zero each gradient is proportional to the
+  other map and neither map would ever train. `β_day` starts at 3.0 for the
   same day type, 1.5 for two different Monday-to-Friday day types and for Sunday with a bank
   holiday, and 0 otherwise. A Monday-morning target token therefore starts with about 50% of the
   weight on the two Monday mornings, 45% on the eight other working-day mornings, and 5% on the

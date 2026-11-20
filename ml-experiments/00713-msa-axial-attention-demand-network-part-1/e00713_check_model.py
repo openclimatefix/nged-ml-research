@@ -14,6 +14,7 @@ and not a test in `tests/`. It skips (exit code 0) when `torch` is missing.
 6. An untrained trunk is the identity.
 7. Loading a Candidate `pretrained_P2` state leaves no unexpected key and no missing encoder key.
 8. One backward pass gives finite gradients.
+9. The read-out's `W_q` and `W_k` both receive a gradient within two steps (they are not a saddle).
 """
 
 import importlib.util
@@ -73,6 +74,27 @@ def numpy_base(inp: mdl.MsaInputs) -> np.ndarray:
                 w = np.exp(np.array(logit) - max(logit))
                 out[b, j] = float((w / w.sum()) @ np.array(z))
     return out
+
+
+def check_readout_gradients(inp: mdl.MsaInputs) -> None:
+    """The read-out projections are not a saddle point.
+
+    `W_k` gets a gradient at step 0, and after one optimiser step `W_q` gets one too. With both
+    matrices at zero, both gradients stay zero for ever.
+    """
+    net = build("M")
+    opt = torch.optim.AdamW(net.parameters(), lr=5e-4, weight_decay=1e-3)
+    target = torch.randn(B, 48, generator=torch.Generator().manual_seed(5))
+    norms: list[tuple[float, float]] = []
+    for _ in range(2):
+        opt.zero_grad()
+        mdl.per_token_nll(out=net(inp).out, target=target).mean().backward()
+        assert net.w_q.weight.grad is not None and net.w_k.weight.grad is not None
+        norms.append((float(net.w_q.weight.grad.norm()), float(net.w_k.weight.grad.norm())))
+        opt.step()
+    print("read-out gradient norms (W_q, W_k) at steps 0 and 1:", norms)
+    assert norms[0][1] > 0.0 and norms[1][0] > 0.0, norms
+    assert float(net.w_k.weight.abs().max()) > 0.0 and float(net.w_q.weight.abs().max()) > 0.0
 
 
 def main() -> int:
@@ -214,6 +236,7 @@ def main() -> int:
     loss.backward()
     grads = [p.grad for p in net.parameters() if p.grad is not None]
     assert grads and all(torch.isfinite(g).all() for g in grads)
+    check_readout_gradients(inp)
     # the attention hook: off by default, the forecast is bit-identical with it on, weights sum to 1
     net = build("M")
     for q in net.parameters():
