@@ -978,7 +978,7 @@ def event_means(*, bank: pl.DataFrame) -> pl.DataFrame:
         .agg(
             share=pl.col("share").mean(),
             shift_error_pts=pl.col("shift_error_pts").mean(),
-            crps_change=(pl.col("crps_shifted") - pl.col("crps_base")).mean(),
+            crps_change=(pl.col("crps_shifted") - pl.col("crps_base")).fill_nan(None).mean(),
             n_rows=pl.len(),
         )
     )
