@@ -1,7 +1,7 @@
 # ruff: noqa: E501, PT018
 """Experiment 713: forecast one fold with a fitted MSA network (prediction phase).
 
-Usage: e00713_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--accept-code-change OLD_HASH]
+Usage: e00713_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--accept-code-change OLD_HASH ...]
 
 Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`, which
 opens the fold month's scored window. It loads the stage 3 state, asserts that the fold's standardiser
@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 os.environ["E00667_PHASE"] = "predict"
@@ -149,7 +150,7 @@ def predict(
     device: str,
     mask_history: bool,
     data_dir: Path,
-    accept: str | None = None,
+    accept: Sequence[str] = (),
 ) -> Path:
     """Forecast one fold and write the per-seed file."""
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
@@ -220,7 +221,7 @@ def main() -> int:
     parser.add_argument("seed", type=int)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--mask-history", action="store_true")
-    parser.add_argument("--accept-code-change", default=None, metavar="OLD_HASH")
+    parser.add_argument("--accept-code-change", action="append", default=[], metavar="OLD_HASH")
     args = parser.parse_args()
     predict(
         arm=args.arm, month=args.month, seed=args.seed, device=args.device,

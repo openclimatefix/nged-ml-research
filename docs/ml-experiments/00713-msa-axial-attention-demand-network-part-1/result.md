@@ -802,6 +802,8 @@ carries the id as `e00713_`; none exists yet):
   injected banks, the three weather swaps, and the era set.
 - `e00713_known_answer.py` builds the synthetic world and runs KA1 to KA12.
 - `e00713_token_diagnostic.py` is the report-only token diagnostic described under Checks.
+- `e00713_smoke.py` is a smoke job of one tiny fit (six Primaries, a few passes, its own `smoke/` folder)
+  that exercises a crash, a resume, a rebuilt log, a prediction, and a score before the first real fit.
 - `e00713_score.py` and `e00713_report.py` compute every contrast, interval, and guard, and every
   number and figure of this page.
 - `run.sh` is the memory-capped wrapper, and `chain_seeds.sh` is the copy of experiment 667's chain

@@ -83,6 +83,7 @@ def check_nwp_init(*, data: inp.FoldData) -> None:
     minus the publication delay.
     """
     assert data.test_keys is not None
+    assert len(data.test_keys["origin_us"]) > 0, "FAIL: no scored origin to check"
     for origin_us in data.test_keys["origin_us"]:
         origin = datetime.fromtimestamp(int(origin_us) / 1e6, tz=UTC)
         latest, forecast_origin, path = inp.run_frame_timing(origin=origin)
@@ -130,7 +131,7 @@ def check_pretrain(*, pipe: inp.Pipeline, data: inp.FoldData, rng: np.random.Gen
         print(
             f"dense {name} against 574's pre-training rows: max abs diff {float(np.nanmax(diff)):.4f}"
         )
-        assert bool((diff <= float16_tolerance(want) + 1e-12).all() | np.isnan(diff).all()), name
+        assert bool(((diff <= float16_tolerance(want) + 1e-12) | np.isnan(diff)).all()), name
     st = np.load(e.stats_file(month=pipe.month))
     e.EX.mean, e.EX.std = st["mean"], st["std"]
     want_b1 = e.EX.scale(raw=e.EX.raw_pretrain(primary=p, origin_idx=o, target_idx=t, shift=None))

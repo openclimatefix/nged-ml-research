@@ -92,7 +92,12 @@ def check_data(*, contract: datetime) -> tuple[bool, list[str]]:
 
     ext.redirect()
     native = contract - timedelta(hours=3)
-    latest, forecast_origin, path = inp.run_frame_timing(origin=native)
+    try:
+        latest, forecast_origin, path = inp.run_frame_timing(origin=native)
+    except (AssertionError, FileNotFoundError, OSError) as err:
+        return False, [
+            f"FAIL: no stored run frame could be read for the native origin {native:%Y-%m-%d %H:%M} UTC: {err!r}"
+        ]
     ok = latest <= native - timedelta(hours=9) and forecast_origin == native
     verdict = "PASS" if ok else "FAIL"
     line = (

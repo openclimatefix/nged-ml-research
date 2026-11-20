@@ -127,13 +127,15 @@ def main() -> int:
 
     e = cand.e
     import e00560_data as d560  # ty: ignore[unresolved-import]
+    import numpy as np
     import torch  # ty: ignore[unresolved-import]
 
-    original = e.attach_tables
-
     def attach_pre(*, standardiser) -> None:  # noqa: ANN001
-        """Attach the `ft` table (its run origins feed the lag-age checks), then replace the table with `pre`."""
-        original(standardiser=standardiser)
+        """Store the run origins of the `ft` table (they feed the lag-age checks), then attach the `pre` table."""
+        _, origin = d560.raw_table(source="ft", cache=e.W560 / "expected")
+        e.CTX["origin_ft"] = np.asarray(
+            origin
+        )  # what 574's `attach_tables` stores, without its hard-coded `cuda`
         cols, _ = d560.raw_table(source="pre", cache=e.W560 / "expected")
         table = d560.standardised_table(cols=cols, standardiser=standardiser)
         e.CTX["table_ft"] = torch.from_numpy(table).to(args.device)

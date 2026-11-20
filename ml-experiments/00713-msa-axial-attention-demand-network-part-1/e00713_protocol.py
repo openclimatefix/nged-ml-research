@@ -104,7 +104,9 @@ def main() -> int:
     parser.add_argument("--no-cost", action="store_true")
     args = parser.parse_args()
     months = tuple(args.months)
-    star = score.arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    star = (
+        None if args.seeds is not None else score.arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    )  # selection.json is read only for the default seeds
 
     def seeds_for(arm: str) -> tuple[int, ...]:
         if args.seeds is not None:

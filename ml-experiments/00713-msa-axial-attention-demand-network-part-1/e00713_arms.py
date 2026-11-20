@@ -6,8 +6,10 @@ built on `M*`), or `C` (the Candidate, never refitted here except through `chain
 is read from `work/selection.json`, which `e00713_select.py` writes from the screen's fit logs.
 """
 
+import functools
 import hashlib
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal
@@ -67,32 +69,39 @@ SCREEN_ARMS: Final[dict[str, tuple[str, EncoderMode]]] = {
 
 FIT_CODE_FILES: Final = (
     "e00713_arms.py", "e00713_batch.py", "e00713_fit.py", "e00713_inputs.py", "e00713_layout.py",
-    "e00713_model.py", "e00713_train.py", "e00713_variants.py",
+    "e00713_model.py", "e00713_smoke.py", "e00713_train.py", "e00713_variants.py",
 )  # fmt: skip
 """The modules of this experiment whose edits can change a fitted state."""
-RECIPE_MODULES: Final = (
-    "e00087_common", "e00397_models", "e00397_prep", "e00422_prep", "e00428_data", "e00448_run",
-    "e00510_common", "e00558_lags", "e00559_model", "e00560_data", "e00574_fit", "e00574_model",
-    "e00632_data", "e00667_cand", "e00667_fold",
+RECIPE_EXPERIMENTS: Final = (
+    11, 87, 377, 381, 391, 397, 400, 402, 404, 407, 410, 418, 422, 425, 428, 435, 437, 448, 454, 470,
+    510, 511, 513, 515, 521, 545, 558, 559, 560, 562, 565, 568, 569, 572, 574, 578, 581, 632, 667,
+    668, 709,
 )  # fmt: skip
-"""Imported recipe modules of earlier experiments; their file hashes enter the code hash and the logs."""
+"""Experiments whose scripts a fit, a prediction, or a check of this experiment imports, directly or not.
+
+The list is the 82 modules that `e00713_check_inputs.py` leaves in `sys.modules` on fold 2025-11
+(code review 3), plus the modules the training and bank scripts import. It is static, so that the gate
+check before `load_pipeline` and the stage logs after it give the same hash. Every `e?????_*.py` file
+of each folder is hashed.
+"""
 
 
+@functools.cache
 def recipe_hashes() -> dict[str, str]:
-    """Return the sha256 (first 16 hex digits) of the file of each imported recipe module, or `missing`."""
-    import importlib.util
-
+    """Return the sha256 (first 16 hex digits) of every `e?????_*.py` file of the recipe experiments' folders."""
+    root = Path(__file__).resolve().parent.parent
     out = {}
-    for name in RECIPE_MODULES:
-        spec = importlib.util.find_spec(name)
-        out[name] = (
-            hashlib.sha256(Path(spec.origin).read_bytes()).hexdigest()[:16]
-            if spec is not None and spec.origin
-            else "missing"
-        )
+    for number in RECIPE_EXPERIMENTS:
+        folders = sorted(root.glob(f"{number:05d}-*"))
+        if not folders:
+            out[f"{number:05d}"] = "missing"
+            continue
+        for path in sorted(folders[0].glob("e?????_*.py")):
+            out[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
     return out
 
 
+@functools.cache
 def code_hash() -> str:
     """Return a hash of this experiment's fit modules and of the imported recipe modules."""
     here = Path(__file__).parent
@@ -125,22 +134,34 @@ def code_record() -> dict:
     }
 
 
-def check_code(*, earlier: dict, accept: str | None, record: dict, what: str) -> None:
-    """Refuse a state or a gate written by other code, unless the override names its old hash.
+def check_code(
+    *, earlier: dict, accept: Sequence[str], record: dict, what: str, kind: str = "state"
+) -> None:
+    """Refuse a state or a gate written by other code, unless an override names its exact old hash.
 
-    `accept` is the value of `--accept-code-change`: the hash of the earlier code. When it equals the
-    earlier hash, the override is appended to `record["code_overrides"]` with both hashes, both git
-    commits, and the diff stat of the fit modules between the old commit and the working tree.
+    `accept` holds the values of `--accept-code-change` (for stage states, repeatable, so that a job whose
+    stages were fitted under two hashes can be resumed) or the value of `--accept-gate-change` (for the gate
+    record). An override is appended to `record["code_overrides"]` with both hashes, both git commits, and
+    the diff stat of the fit modules between the old commit and the working tree. A gate without a code
+    record cannot be overridden: it must be written again by `e00713_known_answer.py`.
     """
     now = code_hash()
     old = earlier.get("code_hash")
+    if old is None:
+        msg = (
+            f"{what} carries no code record: rerun e00713_known_answer.py"
+            if kind == "gate"
+            else f"{what} carries no code record: refit it"
+        )
+        raise AssertionError(msg)
     if old == now:
         return
-    if accept is None or accept != old:
+    flag = "--accept-gate-change" if kind == "gate" else "--accept-code-change"
+    if old not in accept:
         msg = (
             f"{what} was written by code with hash {old}, and the code now has hash {now}. "
-            "After an edit that cannot change a fitted state, rerun with `--accept-code-change "
-            f"{old}`; the override is logged with a diff stat."
+            f"After an edit that cannot change a fitted state, rerun with `{flag} {old}`; "
+            "the override is logged with a diff stat."
         )
         raise AssertionError(msg)
     old_commit = earlier.get("git_commit", "unavailable")
@@ -150,11 +171,12 @@ def check_code(*, earlier: dict, accept: str | None, record: dict, what: str) ->
         else "unavailable"
     )
     entry = {
-        "what": what, "old_hash": old, "new_hash": now, "old_commit": old_commit,
+        "what": what, "kind": kind, "old_hash": old, "new_hash": now, "old_commit": old_commit,
         "new_commit": _git("rev-parse", "HEAD"), "diff_stat": stat,
     }  # fmt: skip
-    record.setdefault("code_overrides", []).append(entry)
-    print("code override accepted:", json.dumps(entry), flush=True)
+    if entry not in record.setdefault("code_overrides", []):
+        record["code_overrides"].append(entry)
+        print("code override accepted:", json.dumps(entry), flush=True)
 
 
 def root(*, data_dir: Path) -> Path:

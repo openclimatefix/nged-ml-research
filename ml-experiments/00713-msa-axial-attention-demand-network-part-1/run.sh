@@ -6,6 +6,7 @@
 #
 # Usage: run.sh e00713_fit.py M1 2025-11 0
 #        SLOT_MEM=8G run.sh e00713_check_model.py
+#        SLOT_MEM=12G run.sh e00713_smoke.py fit --crash-after 2   # the smoke job: modes count, fit, drop-final-log, predict, score
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # are set to dummy values here because the contracts package reads them at import. Check `free -g`
 # first and wait when under 25 GB is available.

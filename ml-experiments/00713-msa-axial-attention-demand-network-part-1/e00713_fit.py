@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Experiment 713: fit one MSA network (one arm, one fold, one seed) in the training phase.
 
-Usage: e00713_fit.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH]
+Usage: e00713_fit.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH ...] [--accept-gate-change OLD_HASH]
 
 Run it through `run.sh`. It sets `E00667_PHASE=train`, under which `e00667_fold.install` sets the
 cleaned power to NaN from the fold month's start, so no code path can read a held-out reading. It
@@ -11,7 +11,8 @@ records both. Each stage's state is saved atomically, and a stage whose file exi
 
 **Code policy.** Every stage log carries the code hash, the git commit, and a dirty flag. A resume, a
 finished-job skip, and the gate file are refused when their hash differs from the current code's, unless
-`--accept-code-change OLD_HASH` names the old hash; the override, both hashes, and the diff stat of the
+`--accept-code-change OLD_HASH` (stage states, repeatable) or `--accept-gate-change OLD_HASH` (the gate
+record) names the exact old hash; one flag never covers the other. The override, both hashes, and the diff stat of the
 fit modules go into the final log. The hash covers this experiment's fit modules and the imported
 recipe modules (`arms.RECIPE_MODULES`).
 """
@@ -23,6 +24,7 @@ import os
 import resource
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 os.environ["E00667_PHASE"] = "train"
@@ -67,7 +69,7 @@ def stage_log_file(*, data_dir: Path, arm: str, month: str, seed: int, stage: in
 
 
 def skip_finished(
-    *, arm: str, month: str, seed: int, data_dir: Path, accept: str | None, log: dict
+    *, arm: str, month: str, seed: int, data_dir: Path, accept: Sequence[str], log: dict
 ) -> dict:
     """Handle a job whose stage 3 state exists: check the code, rebuild a missing final log, and return it.
 
@@ -86,8 +88,11 @@ def skip_finished(
         stages.append(earlier)
     if final_log.exists():
         existing = json.loads(final_log.read_text())
-        if log.get("code_overrides"):
-            existing.setdefault("code_overrides", []).extend(log["code_overrides"])
+        new = [
+            o for o in log.get("code_overrides", []) if o not in existing.get("code_overrides", [])
+        ]
+        if new:
+            existing.setdefault("code_overrides", []).extend(new)
             write_json_atomic(obj=existing, path=final_log)
         print(f"{arm} {month} s{seed}: done, skipped", flush=True)
         return existing
@@ -97,7 +102,10 @@ def skip_finished(
         "dropped": None,
         "rebuilt_from_stage_logs": True,
         "recipe": arms.recipe_hashes(),
-        **arms.code_record(),
+        "rebuilt_by_code_hash": arms.code_hash(),
+        "rebuilt_by_git_commit": arms.code_record()["git_commit"],
+        "code_hash": stages[2].get("code_hash"),  # the hash the stages were fitted with
+        "git_commit": stages[2].get("git_commit"),
     }
     write_json_atomic(obj=rebuilt, path=final_log)
     print(f"{arm} {month} s{seed}: done, final log rebuilt from the stage logs", flush=True)
@@ -105,7 +113,14 @@ def skip_finished(
 
 
 def fit(
-    *, arm: str, month: str, seed: int, device: str, data_dir: Path, accept: str | None = None
+    *,
+    arm: str,
+    month: str,
+    seed: int,
+    device: str,
+    data_dir: Path,
+    accept: Sequence[str] = (),
+    accept_gate: str | None = None,
 ) -> dict:
     """Fit the three stages and return the log."""
     gate = arms.root(data_dir=data_dir) / "work" / "known_answers_passed.json"
@@ -114,9 +129,10 @@ def fit(
     log: dict = {"arm": arm, "month": month, "seed": seed}
     arms.check_code(
         earlier=json.loads(gate.read_text()).get("code", {}),
-        accept=accept,
+        accept=[accept_gate] if accept_gate else [],
         record=log,
         what="the known-answer gate file",
+        kind="gate",
     )
     final = arms.model_file(data_dir=data_dir, arm=arm, month=month, seed=seed, stage=3)
     if final.exists():
@@ -168,6 +184,7 @@ def fit(
             best_val=record.best_val,
             cap_hit=record.cap_hit,
             **arms.code_record(),
+            recipe=arms.recipe_hashes(),
         )
         log["stages"].append(entry)
         stage_log.parent.mkdir(parents=True, exist_ok=True)
@@ -212,10 +229,12 @@ def main() -> int:
     parser.add_argument("month")
     parser.add_argument("seed", type=int)
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--accept-code-change", default=None, metavar="OLD_HASH")
+    parser.add_argument("--accept-code-change", action="append", default=[], metavar="OLD_HASH")
+    parser.add_argument("--accept-gate-change", default=None, metavar="OLD_HASH")
     args = parser.parse_args()
     fit(
         accept=args.accept_code_change,
+        accept_gate=args.accept_gate_change,
         arm=args.arm,
         month=args.month,
         seed=args.seed,
