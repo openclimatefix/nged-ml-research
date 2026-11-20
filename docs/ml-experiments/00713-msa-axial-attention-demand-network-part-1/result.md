@@ -625,18 +625,20 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   same day type, 1.5 for two different Monday-to-Friday day types and for Sunday with a bank
   holiday, and 0 otherwise. A Monday-morning target token therefore starts with about 50% of the
   weight on the two Monday mornings, 45% on the eight other working-day mornings, and 5% on the
-  four weekend mornings.
-- **The head is the Candidate's mixture.** A network `[h_0 (64), base, s, no_history] → 64 → 9`
-  gives 3 mixture weights, 3 means, and 3 log standard deviations, initialised as the Candidate's
+  four weekend mornings. The read-out query also takes a map `w_lead` (14 → 32, no bias, default
+  random initialisation) of the one-hot lead day, added to `W_q h_0` (amendment 2).
+- **The head is the Candidate's mixture.** A network `[h_0 (64), base, s, no_history, one-hot lead day
+  (14)] → 64 → 9` gives 3 mixture weights, 3 means, and 3 log standard
+  deviations, initialised as the Candidate's
   head is (output weights zero, means at −0.5, 0, and +0.5), with `base` added to the 3 means. The
   loss is the mixture negative log-likelihood on the standardised target, and the 11 quantiles
   (0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99) come from the mixture, then are
   rescaled by the target standard deviation and mean into shares of capacity. No widening factor is
   applied to any arm. KA1 asserts that an untrained network forecasts a 3-component mixture centred
   on the day-type-weighted mean of the last 14 days at the same half-hour.
-- **Parameter count.** The built module is about 128,655 parameters (the encoders 8,128, the token
-  maps and embeddings 10,688, two axial blocks 100,600, the read-out 4,302, and the head 4,937);
-  `M1` trains 120,527 of them. Arm `A` has 33,536 fewer parameters than `M1` (33,280 attention
+- **Parameter count.** The built module is about 129,999 parameters (the encoders 8,128, the token
+  maps and embeddings 10,688, two axial blocks 100,600, the read-out 4,750, and the head 5,833);
+  `M1` trains 121,871 of them. Arm `A` has 33,536 fewer parameters than `M1` (33,280 attention
   weights and 256 in the two LayerNorms of the removed within-day sublayers), and arm `K` has 67,192
   fewer (66,560 attention weights, 120 key-bias values, and 512 in the removed LayerNorms). Both
   counts are those of the built modules.
@@ -688,6 +690,19 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   time, which removes up to 14 origin days for the folds whose window starts after 2024-04-01 (2026-05
   and 2026-06). The scored rows are identical, so no scored number depends on this difference, and
   nothing leaks.
+- **A fourth departure, made after two failed gate runs: the lead day has two more paths (amendment
+  2).** The original design gave the lead day one path, the embedding `lead_emb` added to the
+  tokens of the target row. The first known-answer gate run (J1) failed because the read-out's
+  `W_q` and `W_k` both started at zero and never trained (amendment 1). The second J1 run failed
+  KA3 alone, with a follow share of 0.0099 for arm `M` against the 0.75 threshold. An audit found
+  no implementation fault. The trained network was blind to the lead day: `lead_emb` shrank to a
+  mean length of 0.08, and setting the lead day to 14 moved the median by 0.012 standardised units
+  against a step of 2.1. A visible step persists to lead day 1 with probability 0.835 but averages
+  0.28 over the 14 lead days, so a lead-blind network does best by ignoring the step. The amendment
+  adds the one-hot lead day to the read-out query through `w_lead` (448 weights) and to the head's
+  input (896 weights). Both paths start with no effect, so KA1 holds for every arm. No threshold,
+  budget, arm, or decision rule changes. The amendment was made after the audit, and the three
+  failing J1 results (the dead read-out, then KA3 at 0.0099) stay on this page as the reason for it.
 - **Shared by all stages.** AdamW with weight decay 1e-3 and gradient clipping at 1.0; batch of 256
   samples; at most 60 passes with patience 8; loss `(weight × nll).sum() / weight.sum()` over finite
   targets. A pass visits every (Primary, origin day) once, with one lead day drawn uniformly,

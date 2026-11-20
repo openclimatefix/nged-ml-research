@@ -110,12 +110,8 @@ def sensitivity(*, model: mdl.MsaNet, x: mdl.MsaInputs) -> dict[str, float]:
     for block in model.blocks:
         h = block(h, row_exists=row_exists)
     h0, base, spread, no_history, _ = model._readout(h, readout_in)
-    out = model.head(
-        torch.cat([h0, base[..., None], spread[..., None], no_history[..., None]], dim=-1)
-    )
-    k = mdl.m559.COMPONENTS
-    out = torch.cat(
-        [out[..., :k], out[..., k : 2 * k] + base[..., None], out[..., 2 * k :]], dim=-1
+    out = model._mixture_out(
+        h0=h0, base=base, spread=spread, no_history=no_history, lead_day=x.lead_day
     )
     y = mdl.standardised_mixture_mean(
         out=out

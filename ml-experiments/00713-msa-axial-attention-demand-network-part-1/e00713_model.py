@@ -276,11 +276,17 @@ class MsaNet(nn.Module):
         # initialisation: with both matrices at zero, each gradient is proportional to the other
         # matrix, so neither would ever move.
         nn.init.zeros_(self.w_k.weight)
+        # the lead-day path (amendment 2): the one-hot lead day enters the read-out query through
+        # `w_lead` (default random initialisation) and the head's input. It has no effect at the
+        # start, because W_k is zero (so the logit is zero) and the head's output layer is zero. The
+        # partner of each zero layer is random, so W_k and the head's output layer get a gradient at
+        # step 0 and `w_lead` and the head's input weights get one from step 1.
+        self.w_lead = nn.Linear(N_LEAD_DAYS, READOUT_WIDTH, bias=False)
         self.beta_day = nn.Parameter(beta_day_start())
         self.beta_age = nn.Parameter(torch.zeros(N_HISTORY))
         # the Candidate's mixture head
         self.head = base_models.mlp(
-            n_in=WIDTH + 3, hidden=m559.MIXER_HIDDEN if hasattr(m559, "MIXER_HIDDEN") else 64,
+            n_in=WIDTH + 3 + N_LEAD_DAYS, hidden=m559.MIXER_HIDDEN if hasattr(m559, "MIXER_HIDDEN") else 64,
             layers=1, n_out=3 * m559.COMPONENTS, dropout=DROPOUT,
         )  # fmt: skip
         base_models.init_head(head=self.head, components=m559.COMPONENTS)
@@ -382,7 +388,8 @@ class MsaNet(nn.Module):
                 torch.ones_like(zero),
                 torch.zeros(b, N_HISTORY, N_COLS, device=x.device),
             )
-        q = self.w_q(h0)  # (B, 48, 32)
+        lead = functional.one_hot(inp.lead_day, N_LEAD_DAYS).to(h0.dtype)  # (B, 14)
+        q = self.w_q(h0) + self.w_lead(lead)[:, None, :]  # (B, 48, 32)
         k = self.w_k(h[:, 1:])  # (B, 14, 48, 32)
         logit = torch.einsum("bjd,brjd->brj", q, k) / float(np.sqrt(READOUT_WIDTH))
         day = self.beta_day[inp.day_type_top[:, None, :], inp.day_type_hist]
@@ -396,6 +403,38 @@ class MsaNet(nn.Module):
         var = (alpha * (z - base[:, None, :]) ** 2).sum(dim=1)
         spread = torch.where(any_visible, torch.sqrt(var + 1e-6), torch.zeros_like(var))
         return h0, base, spread, (~any_visible).to(x.dtype), alpha
+
+    def _mixture_out(
+        self,
+        *,
+        h0: torch.Tensor,
+        base: torch.Tensor,
+        spread: torch.Tensor,
+        no_history: torch.Tensor,
+        lead_day: torch.Tensor,
+    ) -> torch.Tensor:
+        """Return the raw mixture outputs (B, 48, 3K): the head on `h0`, the read-out, and the lead day.
+
+        The first `K` outputs are the mixture weights, the next `K` the component means plus `base`,
+        and the last `K` the scales.
+        """
+        lead = functional.one_hot(lead_day, N_LEAD_DAYS).to(h0.dtype)[:, None, :]
+        out = self.head(
+            torch.cat(
+                [
+                    h0,
+                    base[..., None],
+                    spread[..., None],
+                    no_history[..., None],
+                    lead.expand(-1, N_COLS, -1),
+                ],
+                dim=-1,
+            )
+        )
+        k = m559.COMPONENTS
+        return torch.cat(
+            [out[..., :k], out[..., k : 2 * k] + base[..., None], out[..., 2 * k :]], dim=-1
+        )
 
     def forward(self, inp: MsaInputs, *, return_attention: bool = False) -> MsaOutput:
         """Return the raw mixture outputs of the 48 target tokens of each sample.
@@ -416,12 +455,8 @@ class MsaNet(nn.Module):
         for block in self.blocks:
             x = block(x, row_exists=row_exists)
         h0, base, spread, no_history, alpha = self._readout(x, inp)
-        out = self.head(
-            torch.cat([h0, base[..., None], spread[..., None], no_history[..., None]], dim=-1)
-        )
-        k = m559.COMPONENTS
-        out = torch.cat(
-            [out[..., :k], out[..., k : 2 * k] + base[..., None], out[..., 2 * k :]], dim=-1
+        out = self._mixture_out(
+            h0=h0, base=base, spread=spread, no_history=no_history, lead_day=inp.lead_day
         )
         attention = None
         if return_attention:

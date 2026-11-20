@@ -77,24 +77,51 @@ def numpy_base(inp: mdl.MsaInputs) -> np.ndarray:
 
 
 def check_readout_gradients(inp: mdl.MsaInputs) -> None:
-    """The read-out projections are not a saddle point.
+    """No pair of linked zero-initialised layers is a saddle point.
 
-    `W_k` gets a gradient at step 0, and after one optimiser step `W_q` gets one too. With both
-    matrices at zero, both gradients stay zero for ever.
+    `W_k` and the head's output layer start at zero, so they get a gradient at step 0, and after one
+    optimiser step their random partners get one too: `W_q`, the lead-day map `w_lead` of the
+    read-out query, and the head's input weights for the one-hot lead day. With both layers of a
+    pair at zero, both gradients stay zero for ever.
     """
     net = build("M")
     opt = torch.optim.AdamW(net.parameters(), lr=5e-4, weight_decay=1e-3)
     target = torch.randn(B, 48, generator=torch.Generator().manual_seed(5))
-    norms: list[tuple[float, float]] = []
+    names = ("W_q", "W_k", "w_lead", "head_lead_in", "head_out")
+    norms: list[dict[str, float]] = []
     for _ in range(2):
         opt.zero_grad()
         mdl.per_token_nll(out=net(inp).out, target=target).mean().backward()
-        assert net.w_q.weight.grad is not None and net.w_k.weight.grad is not None
-        norms.append((float(net.w_q.weight.grad.norm()), float(net.w_k.weight.grad.norm())))
+        grads = {
+            "W_q": net.w_q.weight.grad,
+            "W_k": net.w_k.weight.grad,
+            "w_lead": net.w_lead.weight.grad,
+            "head_lead_in": net.head[0].weight.grad[:, -mdl.N_LEAD_DAYS :],
+            "head_out": net.head[-1].weight.grad,
+        }
+        norms.append({n: float(g.norm()) for n, g in grads.items() if g is not None})
+        assert list(norms[-1]) == list(names), norms
         opt.step()
-    print("read-out gradient norms (W_q, W_k) at steps 0 and 1:", norms)
-    assert norms[0][1] > 0.0 and norms[1][0] > 0.0, norms
+    print("read-out and lead-path gradient norms at steps 0 and 1:", norms)
+    assert norms[0]["W_k"] > 0.0 and norms[0]["head_out"] > 0.0, norms
+    assert all(norms[1][n] > 0.0 for n in names), norms
     assert float(net.w_k.weight.abs().max()) > 0.0 and float(net.w_q.weight.abs().max()) > 0.0
+
+
+def check_lead_path_is_off_at_start(inp: mdl.MsaInputs) -> None:
+    """An untrained network gives the same forecast for every lead day, for every arm."""
+    for arm in mdl.ARM_SWITCHES:
+        net = build(arm)
+        outs = []
+        for lead in (0, 6, 13):
+            same = mdl.MsaInputs(
+                **{**inp.__dict__, "lead_day": torch.full_like(inp.lead_day, lead)}
+            )
+            with torch.no_grad():
+                outs.append(net(same).out)
+        assert torch.allclose(outs[0], outs[1], atol=1e-6), arm
+        assert torch.allclose(outs[0], outs[2], atol=1e-6), arm
+    print("untrained forecasts do not depend on the lead day, for every arm")
 
 
 def main() -> int:
@@ -118,17 +145,23 @@ def main() -> int:
     assert totals["M"] - totals["A"] == 33_280 + 2 * 128
     assert totals["M"] - totals["K"] == 66_560 + 2 * 60 + 4 * 128
 
-    # KA1
+    # KA1, for every arm: the untrained median is the weighted mean of similar days (zero for the
+    # arm `N`, which has no history), whatever the lead day
     expected = numpy_base(inp)
-    for arm in ("M", "E", "G"):
+    for arm in mdl.ARM_SWITCHES:
         net = build(arm)
+        want = (
+            torch.zeros_like(torch.from_numpy(expected).float())
+            if arm == "N"
+            else torch.from_numpy(expected).float()
+        )
         with torch.no_grad():
             res = net(inp)
             median = mdl.standardised_quantiles(out=res.out)[..., 5]
-        diff = float((median - torch.from_numpy(expected).float()).abs().max())
+        diff = float((median - want).abs().max())
         print(f"KA1 arm {arm}: max |median - base| = {diff:.2e}")
         assert diff <= 1e-5, (arm, diff)
-        assert float((res.base - torch.from_numpy(expected).float()).abs().max()) <= 1e-5
+        assert float((res.base - want).abs().max()) <= 1e-5
 
     # E and G start from the same random weights as M at the same seed, for every shared parameter
     base_state = build("M", seed=3).state_dict()
@@ -237,6 +270,7 @@ def main() -> int:
     grads = [p.grad for p in net.parameters() if p.grad is not None]
     assert grads and all(torch.isfinite(g).all() for g in grads)
     check_readout_gradients(inp)
+    check_lead_path_is_off_at_start(inp)
     # the attention hook: off by default, the forecast is bit-identical with it on, weights sum to 1
     net = build("M")
     for q in net.parameters():
