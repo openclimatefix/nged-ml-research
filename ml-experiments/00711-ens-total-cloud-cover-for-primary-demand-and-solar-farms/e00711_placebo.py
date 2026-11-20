@@ -185,6 +185,9 @@ def assert_same_missing_pattern(*, targets: list[datetime], donors: np.ndarray) 
 def assert_donors_carry_cloud(*, donors: np.ndarray) -> None:
     """Assert that no mapped donor is a run in the gap or the upstream gap run.
 
+    Args:
+        donors: The donor day number of each target run, `UNMAPPED` where there is none.
+
     Raises:
         ValueError: If a donor run carries no cloud.
     """
@@ -230,6 +233,10 @@ def assert_shuffled_rules(*, targets: list[datetime], donors: np.ndarray, cut: d
 
 def assert_shifted_rules(*, targets: list[datetime], donors: np.ndarray) -> None:
     """Assert that every time-shifted donor is issued before its target run, and carries cloud.
+
+    Args:
+        targets: The target runs.
+        donors: The donor day number of each target run.
 
     Raises:
         ValueError: If a donor is not before its target, or the missing patterns differ.

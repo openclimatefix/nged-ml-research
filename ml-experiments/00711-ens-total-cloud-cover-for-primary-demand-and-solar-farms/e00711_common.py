@@ -175,6 +175,9 @@ def typed(*, scan: pl.LazyFrame) -> pl.LazyFrame:
 def read_pinned_version() -> int:
     """Return the Delta version recorded in the lineage note.
 
+    Returns:
+        The pinned Delta version of the production `Nwp` table.
+
     Raises:
         FileNotFoundError: If the lineage note does not exist yet; run the `pin` command first.
     """

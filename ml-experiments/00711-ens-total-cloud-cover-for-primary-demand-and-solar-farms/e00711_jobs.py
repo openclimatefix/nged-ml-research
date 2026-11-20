@@ -167,6 +167,9 @@ def counts_by_group(*, jobs: list[Job]) -> dict[str, int]:
 def check_counts(*, jobs: list[Job]) -> None:
     """Raise if the table's job counts differ from the plan's.
 
+    Args:
+        jobs: The jobs of the whole plan.
+
     Raises:
         ValueError: If a group's count differs from `PLAN_TOTALS`.
     """

@@ -618,6 +618,9 @@ def t_interval_of_months(*, paired: Paired, level: float) -> tuple[float, float]
     Args:
         paired: The month totals.
         level: The coverage in percent.
+
+    Returns:
+        The lower and upper limits, or `None` with fewer than 2 months.
     """
     if len(paired.months) < 2:
         return None
@@ -636,6 +639,13 @@ def wider(
     """Return the wider of the bootstrap interval and the t interval (the decisive interval).
 
     The wider interval is the one with the larger upper minus lower. It is not their union.
+
+    Args:
+        boot: The month-block bootstrap interval, or `None`.
+        t_int: The t interval, or `None`.
+
+    Returns:
+        The interval with the larger upper minus lower.
 
     Raises:
         ValueError: If neither interval exists.
@@ -674,15 +684,15 @@ class ArmLosses:
 
 
 class LossSource:
-    """Hands out arms' losses one at a time and forgets the oldest arms, to bound memory.
-
-    Args:
-        load: Returns an arm's losses, or `None` if the arm has no predictions.
-        keep: How many arms to hold at once.
-    """
+    """Hands out arms' losses one at a time and forgets the oldest arms, to bound memory."""
 
     def __init__(self, *, load: Callable[[str], ArmLosses | None], keep: int = 3) -> None:
-        """Hold the loader and an empty cache."""
+        """Hold the loader and an empty cache.
+
+        Args:
+            load: Returns an arm's losses, or `None` if the arm has no predictions.
+            keep: How many arms to hold at once.
+        """
         self._load = load
         self._keep = keep
         self._cache: dict[str, ArmLosses | None] = {}
@@ -943,6 +953,13 @@ def read_stored_solar(*, month: str, seed: int) -> pl.DataFrame:
     drops the half-hour labelled at the origin (a 711 arm does not forecast it), the valid times
     from 2026-07-01 on, and every run outside the month.
 
+    Args:
+        month: The month `YYYY-MM`.
+        seed: The fitting seed of the stored files.
+
+    Returns:
+        The predictions of the month, one row per run, farm, and valid time.
+
     Raises:
         ValueError: If no file covers the month.
     """
@@ -1065,6 +1082,9 @@ def drop_flagged_and_missing(
         frame: The predictions.
         actual: The actual of each row (NaN where unobserved).
         target: `primary` or `solar`; only Primary demand has a list of flagged half-hours.
+
+    Returns:
+        The kept rows and their actuals.
     """
     keep = np.isfinite(actual)
     out = frame.filter(pl.Series(keep))
@@ -1119,6 +1139,11 @@ def prepare(*, arm: arms.Arm, labels: dict[int, str], sky: pl.DataFrame | None) 
 
     Returns:
         The losses, or `None` if the arm has no predictions.
+
+    Args:
+        arm: The arm.
+        labels: The Primary or farm label of each `time_series_id`.
+        sky: The realised clear-sky index table, or `None`.
     """
     cells = [(m, s) for m in arm.months for s in arm.seeds if cell_exists(arm=arm, month=m, seed=s)]
     if not cells:

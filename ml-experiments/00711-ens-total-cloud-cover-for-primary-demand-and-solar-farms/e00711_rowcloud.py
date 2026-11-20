@@ -65,6 +65,12 @@ STEP_TOLERANCE: Final[float] = 1e-6
 def channel_indices(*, columns: tuple[str, ...]) -> list[int]:
     """Return the store channel of each named column.
 
+    Args:
+        columns: The names of the cloud columns.
+
+    Returns:
+        The channel index of each column, in order.
+
     Raises:
         ValueError: If a column is not a channel.
     """
@@ -83,8 +89,19 @@ class RunArrays:
         values: Shape (runs, `STEPS`, `len(CHANNELS)`), float32, NaN where a run has no value.
     """
 
+    first_day: int
+    values: np.ndarray
+
     def __init__(self, *, first_day: int, values: np.ndarray) -> None:
-        """Hold the array; it must have the shape of the store."""
+        """Hold the array; it must have the shape of the store.
+
+        Args:
+            first_day: The day number of `values[0]`.
+            values: The summaries, shape (runs, `STEPS`, `len(CHANNELS)`).
+
+        Raises:
+            ValueError: If `values` does not have the shape of the store.
+        """
         if values.ndim != 3 or values.shape[1:] != (STEPS, len(CHANNELS)):
             msg = f"values must have shape (runs, {STEPS}, {len(CHANNELS)}), not {values.shape}"
             raise ValueError(msg)
@@ -98,6 +115,14 @@ class RunArrays:
 
     def take(self, *, run_days: np.ndarray, steps: np.ndarray, channels: list[int]) -> np.ndarray:
         """Return `values[run, step, channels]` for each row, shape (rows, len(channels)).
+
+        Args:
+            run_days: The run of each row, as a day number.
+            steps: The lead step of each row.
+            channels: The channel indices to read.
+
+        Returns:
+            The values, shape (rows, len(channels)).
 
         Raises:
             ValueError: If a run day lies outside the array.
@@ -114,6 +139,12 @@ class RunArrays:
 def row_run_days(*, nwp_init: np.ndarray) -> np.ndarray:
     """Return each row's run as a day number, from its run time in microseconds since the epoch.
 
+    Args:
+        nwp_init: Each row's run time, in microseconds since the epoch.
+
+    Returns:
+        Each row's run as a day number.
+
     Raises:
         ValueError: If a run is not a 00:00 UTC run.
     """
@@ -125,6 +156,12 @@ def row_run_days(*, nwp_init: np.ndarray) -> np.ndarray:
 
 def row_steps(*, lead_hours: np.ndarray) -> np.ndarray:
     """Return each row's lead step: its lead in hours times two, less one (0 to 701).
+
+    Args:
+        lead_hours: Each row's lead from the origin, in hours.
+
+    Returns:
+        Each row's lead step.
 
     Raises:
         ValueError: If a lead is not a whole number of half-hours between 0.5 and 351 hours.
@@ -151,6 +188,12 @@ def missing_run_days() -> np.ndarray:
 
 def missing_flag(*, run_days: np.ndarray) -> np.ndarray:
     """Return each row's `cloud_missing` flag from its run date alone (never from a cloud value).
+
+    Args:
+        run_days: The run of each row, as a day number.
+
+    Returns:
+        True where the row's run carries no cloud.
 
     Raises:
         ValueError: If a run lies outside 2020-10-15 to 2026-06-30.
@@ -227,6 +270,10 @@ def donor_extras(
 def assert_same_flag(*, real_flag: np.ndarray, placebo_flag: np.ndarray) -> None:
     """Assert that the real and the placebo `cloud_missing` flags are equal on every row.
 
+    Args:
+        real_flag: The real arm's flag of each row.
+        placebo_flag: The placebo arm's flag of each row.
+
     Raises:
         ValueError: If a row is missing in one and not in the other.
     """
@@ -241,6 +288,10 @@ def assert_missing_is_nan(*, values: np.ndarray, flag: np.ndarray) -> None:
     A present run whose store slice holds a NaN (a series missing from a cache file, or a missing
     seven-variable summary) would otherwise become 0 after standardisation with `cloud_missing` = 0,
     so the network could not tell the hole from the mean.
+
+    Args:
+        values: The cloud values, shape (rows, channels).
+        flag: The `cloud_missing` flag of each row.
 
     Raises:
         ValueError: If a flagged row holds a value, or an unflagged row holds a NaN.
@@ -406,6 +457,12 @@ def store_path(*, site: str) -> Path:
 
 def load_store(*, site: str) -> RunArrays:
     """Return a Primary's `RunArrays` from its store file.
+
+    Args:
+        site: The Primary's site key.
+
+    Returns:
+        The Primary's summaries of every run.
 
     Raises:
         FileNotFoundError: If the store has not been built.

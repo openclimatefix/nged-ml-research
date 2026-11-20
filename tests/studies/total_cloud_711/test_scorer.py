@@ -395,17 +395,65 @@ def test_fits_refuse_without_both_gates_but_the_gate_arm_and_measuring_fit_run(t
     assert set(json.loads(marker.read_text())) == {"fit", "predict"}
 
 
-def test_existing_set_is_refused_when_dirty_or_from_another_branch(tmp_path: Path):
+def _git(*, repo: Path, args: list[str]) -> str:
+    """Run `git args` in `repo` and return its output."""
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+@pytest.fixture
+def small_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    """Build a tiny git repository and run the test inside it, so no real history is read.
+
+    The history is `old`, then `floor`, then `head` on one branch, plus `other`, a commit on a
+    branch that forked from `old`. `gate.FLOOR_COMMIT` is set to `floor`.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo=repo, args=["init", "-q", "-b", "main"])
+    commits = {}
+    for name in ("old", "floor", "head"):
+        (repo / "file.txt").write_text(name)
+        _git(repo=repo, args=["add", "file.txt"])
+        _git(repo=repo, args=["commit", "-q", "-m", name])
+        commits[name] = _git(repo=repo, args=["rev-parse", "HEAD"])
+    _git(repo=repo, args=["checkout", "-q", "-b", "side", commits["old"]])
+    (repo / "file.txt").write_text("other")
+    _git(repo=repo, args=["commit", "-q", "-am", "other"])
+    commits["other"] = _git(repo=repo, args=["rev-parse", "HEAD"])
+    _git(repo=repo, args=["checkout", "-q", "main"])
+    monkeypatch.chdir(repo)
+    monkeypatch.setattr(gate, "FLOOR_COMMIT", commits["floor"])
+    return commits
+
+
+def _write_manifest(*, folder: Path, commit: str, dirty: bool) -> None:
+    (folder / experiment_store.MANIFEST_NAME).write_text(
+        json.dumps({"commit": commit, "dirty": dirty})
+    )
+
+
+def test_existing_set_is_refused_when_dirty_or_from_another_branch(
+    tmp_path: Path, small_repo: dict[str, str]
+):
     folder = tmp_path / "d1-2026-06-s0"
     folder.mkdir()
-    manifest = folder / experiment_store.MANIFEST_NAME
-    head = gate.head_commit()
-    manifest.write_text(json.dumps({"commit": head, "dirty": False}))
+    head = small_repo["head"]
+    assert gate.head_commit() == head
+    _write_manifest(folder=folder, commit=head, dirty=False)
     gate.check_existing_set(folder=folder, head=head)
-    manifest.write_text(json.dumps({"commit": head, "dirty": True}))
+    _write_manifest(folder=folder, commit=head, dirty=True)
     with pytest.raises(ValueError, match="uncommitted"):
         gate.check_existing_set(folder=folder, head=head)
-    manifest.write_text(json.dumps({"commit": "0" * 40, "dirty": False}))
+    _write_manifest(folder=folder, commit=small_repo["other"], dirty=False)
+    with pytest.raises(ValueError, match="not an ancestor"):
+        gate.check_existing_set(folder=folder, head=head)
+    _write_manifest(folder=folder, commit="0" * 40, dirty=False)
     with pytest.raises(ValueError, match="not an ancestor"):
         gate.check_existing_set(folder=folder, head=head)
     usable, rejected = gate.usable_sets(names=[folder.name, "missing"], folder=tmp_path)
@@ -423,7 +471,6 @@ def test_a_gate_result_from_another_commit_does_not_open_the_fits(tmp_path: Path
     with pytest.raises(ValueError, match="code has changed"):
         gate.refuse_without_gate(arm="D1", measure=False, path=marker)
     assert gate.commit_is_current(commit=gate.head_commit())
-    assert gate.commit_is_current(commit=gate.FLOOR_COMMIT) in (True, False)
 
 
 def test_two_gate_commands_at_once_keep_both_results(tmp_path: Path):
@@ -443,21 +490,14 @@ def test_two_gate_commands_at_once_keep_both_results(tmp_path: Path):
     assert set(gate.read_marker(path=marker)["predict"]) == set(months)
 
 
-def test_a_set_older_than_the_floor_commit_is_refused(tmp_path: Path):
+def test_a_set_older_than_the_floor_commit_is_refused(tmp_path: Path, small_repo: dict[str, str]):
     folder = tmp_path / "d1-2026-06-s0"
     folder.mkdir()
-    head = gate.head_commit()
-    parent = subprocess.run(
-        ["git", "rev-parse", f"{gate.FLOOR_COMMIT}~1"], check=True, capture_output=True, text=True
-    ).stdout.strip()
-    (folder / experiment_store.MANIFEST_NAME).write_text(
-        json.dumps({"commit": parent, "dirty": False})
-    )
+    head = small_repo["head"]
+    _write_manifest(folder=folder, commit=small_repo["old"], dirty=False)
     with pytest.raises(ValueError, match="older than the floor"):
         gate.check_existing_set(folder=folder, head=head)
-    (folder / experiment_store.MANIFEST_NAME).write_text(
-        json.dumps({"commit": gate.FLOOR_COMMIT, "dirty": False})
-    )
+    _write_manifest(folder=folder, commit=small_repo["floor"], dirty=False)
     gate.check_existing_set(folder=folder, head=head)
 
 

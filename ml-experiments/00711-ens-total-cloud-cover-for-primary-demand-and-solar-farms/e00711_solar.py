@@ -117,6 +117,12 @@ def daylight_rows(*, table: pl.DataFrame) -> pl.DataFrame:
     A daylight half-hour without its inputs is allowed only on run 2024-01-03, which is absent
     upstream. Any other run's daylight half-hour without a stamp is an error.
 
+    Args:
+        table: The farm's table of runs, leads, and inputs.
+
+    Returns:
+        The daylight rows with all inputs.
+
     Raises:
         ValueError: If a daylight half-hour of another run lacks an input.
     """
@@ -223,6 +229,9 @@ def apply_solar_donors(
 
 def assert_same_flag(*, rows: pl.DataFrame) -> None:
     """Assert that a placebo row has null cloud if and only if the real row is `cloud_missing`.
+
+    Args:
+        rows: The solar rows with the real flag and the placebo cloud.
 
     Raises:
         ValueError: If a row's placebo cloud is null where the real flag is false, or the reverse.
