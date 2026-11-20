@@ -123,7 +123,14 @@ def load_arm(*, arm: str, seeds: tuple[int, ...], months: tuple[str, ...]) -> pl
                 seed=pl.lit(seed, dtype=pl.Int64)
             )
             parts.append(to_contract_shares(frame=frame))
-    return pl.concat(parts)
+    frame = pl.concat(parts)
+    assert frame.select(*KEYS, "seed").is_duplicated().sum() == 0, (
+        f"arm {arm!r} holds a duplicated (key, seed) row"
+    )
+    assert frame["seed"].n_unique() == len(seeds), (
+        f"arm {arm!r} does not hold every seed of {seeds}"
+    )
+    return frame
 
 
 def truth_stack() -> np.ndarray:
@@ -170,6 +177,10 @@ LEVELS_LIST: Final = (0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95
 
 def seed_average(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Return the seed mean of each quantile, sorted within the row (experiment 667's rule), with `seed` 0."""
+    counts = frame.group_by(KEYS).agg(pl.col("seed").n_unique().alias("_n"))["_n"]
+    assert counts.min() == counts.max() == frame["seed"].n_unique(), (
+        "a key is missing from a seed's file"
+    )
     cat = frame.group_by(KEYS).agg([pl.col(q).mean() for q in QCOLS]).sort(KEYS)
     q = np.sort(cat.select(QCOLS).to_numpy().astype(np.float32), axis=1)
     mean = cat.with_columns([pl.Series(name, q[:, i]) for i, name in enumerate(QCOLS)])
@@ -486,6 +497,17 @@ def supported_guards(
             (total - s_) / (count - n_) < 0 for s_, n_ in zip(by_id["s"], by_id["n"], strict=True)
         ]
         loo_month = [(by_month.sum() - x) / (len(by_month) - 1) < 0 for x in by_month]
+        full = float(total) / float(
+            count
+        )  # the sign of the full contrast, whatever it is, for audit trigger 4
+        flips_primary = [
+            np.sign((total - s_) / (count - n_)) != np.sign(full)
+            for s_, n_ in zip(by_id["s"], by_id["n"], strict=True)
+        ]
+        flips_month = [
+            np.sign((by_month.sum() - x) / (len(by_month) - 1)) != np.sign(by_month.mean())
+            for x in by_month
+        ]
         tails = {}
         for col in ("pin_q01", "pin_q99"):
             d = (
@@ -501,6 +523,8 @@ def supported_guards(
         swap = None if swap_a_points is None else bool(swap_a_points[g] < 0)
         out[g] = {
             "leave_one_primary_out": bool(all(loo_primary)), "leave_one_month_out": bool(all(loo_month)),
+            "leave_one_primary_flips_sign": bool(any(flips_primary)),
+            "leave_one_month_flips_sign": bool(any(flips_month)),
             "tails": tails, "mae_moves_with_crps": bool(mae < 0), "swap_a_keeps_sign": swap,
         }  # fmt: skip
         out[g]["all_hold"] = bool(

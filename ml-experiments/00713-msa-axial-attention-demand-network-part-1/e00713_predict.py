@@ -1,14 +1,16 @@
 # ruff: noqa: E501, PT018
 """Experiment 713: forecast one fold with a fitted MSA network (prediction phase).
 
-Usage: e00713_predict.py ARM MONTH SEED [--device cuda] [--mask-history]
+Usage: e00713_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--accept-code-change OLD_HASH]
 
 Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`, which
 opens the fold month's scored window. It loads the stage 3 state, asserts that the fold's standardiser
 equals the training phase's, forecasts every (Primary, scored origin, lead day), drops valid times on
 or after 2026-07-01, and writes `work/fits/<arm>/<month>_s<seed>.parquet` atomically. The columns are
 the Candidate's (`time_series_id`, `power_fcst_init_time`, `valid_time`, `q01` to `q99`, in shares of
-capacity) plus `seed`, `actual`, `lead_hours`, and `nwp_init_time`. `--mask-history` forecasts with
+capacity) plus `seed`, `mean` (the mixture mean), `actual`, `lead_hours`, and `nwp_init_time`. It refuses a
+state whose stage 3 log carries another code hash unless `--accept-code-change` names the old hash, and
+it writes a `predict` log with the code record. `--mask-history` forecasts with
 every history power token masked (the free read-out of section 2.7) under the arm name `<arm>-nohist`.
 """
 
@@ -140,7 +142,14 @@ def forecast_frame(
 
 
 def predict(
-    *, arm: str, month: str, seed: int, device: str, mask_history: bool, data_dir: Path
+    *,
+    arm: str,
+    month: str,
+    seed: int,
+    device: str,
+    mask_history: bool,
+    data_dir: Path,
+    accept: str | None = None,
 ) -> Path:
     """Forecast one fold and write the per-seed file."""
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
@@ -156,10 +165,20 @@ def predict(
     assert state.exists(), state
     stage_log = arms.log_file(data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit")
     stage_log = stage_log.with_name(f"{stage_log.stem}_stage3.json")
-    assert (
-        stage_log.exists()
-        and json.loads(stage_log.read_text()).get("code_hash") == arms.code_hash()
-    ), f"{state} was fitted by other code or has no stage log: refit it"
+    assert stage_log.exists(), f"{state} has no stage log: refit it"
+    predict_log: dict = {
+        "arm": name,
+        "month": month,
+        "seed": seed,
+        **arms.code_record(),
+        "recipe": arms.recipe_hashes(),
+    }
+    arms.check_code(
+        earlier=json.loads(stage_log.read_text()),
+        accept=accept,
+        record=predict_log,
+        what=f"{state.name}",
+    )
     pipe = inp.load_pipeline(
         month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
     )
@@ -184,6 +203,11 @@ def predict(
     tmp = out.with_name(out.name + f".{os.getpid()}.tmp")
     frame.write_parquet(tmp)
     tmp.rename(out)
+    log_path = arms.log_file(data_dir=data_dir, arm=name, month=month, seed=seed, kind="predict")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_log = log_path.with_name(log_path.name + f".{os.getpid()}.tmp")
+    tmp_log.write_text(json.dumps({**predict_log, "rows": frame.height}, indent=1, default=str))
+    tmp_log.rename(log_path)
     print(f"{name} {month} s{seed}: {frame.height} rows", flush=True)
     return out
 
@@ -196,10 +220,11 @@ def main() -> int:
     parser.add_argument("seed", type=int)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--mask-history", action="store_true")
+    parser.add_argument("--accept-code-change", default=None, metavar="OLD_HASH")
     args = parser.parse_args()
     predict(
         arm=args.arm, month=args.month, seed=args.seed, device=args.device,
-        mask_history=args.mask_history, data_dir=ML_EXPERIMENTS_DATA_DIR,
+        mask_history=args.mask_history, data_dir=ML_EXPERIMENTS_DATA_DIR, accept=args.accept_code_change,
     )  # fmt: skip
     return 0
 

@@ -36,8 +36,11 @@ class EnsTensors:
         filled: (16, n_days, 672) bool: whether the row exists.
         first_day: The day number (grid index // 48) of day index 0.
         run_us: (16, n_days) int64: the issue time of the ensemble run behind each (Primary, origin day)
-            in microseconds, 0 where the row is absent. `Source.assemble` asserts it is at least
-            9 hours before the origin (design 4.1, the origin-time assertion).
+            in microseconds, 0 where the row is absent. It is the origin minus 9 hours, set by
+            `ens_table` from the 09:00 origin it checked, not read from the run. The assertion in
+            `Source.assemble` is therefore a structural check of the code path (a later edit that
+            moves the run, as the KA6 canary does, is caught); the check against the stored
+            `nwp_init_time` column is `e00713_check_inputs.check_nwp_init`, on the scored origins.
     """
 
     weather: torch.Tensor

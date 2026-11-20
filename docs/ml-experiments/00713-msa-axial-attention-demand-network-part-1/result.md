@@ -666,6 +666,14 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   fresh mixer in stage 2, because its fine-tuning mixer has more inputs. The MSA trunk has the same
   inputs in both stages apart from the spread map, so it keeps what 6 years of ERA5 taught it. A
   second departure is 300 warm-up steps before a constant rate, because of the attention layers.
+- **A third departure: the MSA network trains on fewer target rows than the Candidate.** The matrix
+  holds the target half-hours from the contract origin (12:00 UTC) to the 672nd half-hour after it.
+  On fold 2026-03 the Candidate's training rows include 37,381 rows before the contract origin (leads
+  0.5 to 2.5 hours) and 175,925 rows after the 672nd half-hour, and the MSA network never trains on
+  them. The 730-day window of stages 2 and 3 is cut by origin day, where the Candidate cuts by valid
+  time, which removes up to 14 origin days for the folds whose window starts after 2024-04-01 (2026-05
+  and 2026-06). The scored rows are identical, so no scored number depends on this difference, and
+  nothing leaks.
 - **Shared by all stages.** AdamW with weight decay 1e-3 and gradient clipping at 1.0; batch of 256
   samples; at most 60 passes with patience 8; loss `(weight × nll).sum() / weight.sum()` over finite
   targets. A pass visits every (Primary, origin day) once, with one lead day drawn uniformly,

@@ -299,10 +299,15 @@ def cmd_bank(*, arm: str, month: str, seed: int, device: str, variant: str = "pl
             truth_cols, on=["time_series_id", "power_fcst_init_time", "valid_time"], how="inner"
         )
         out.parent.mkdir(parents=True, exist_ok=True)
-        tmp = out.with_name(out.name + ".tmp")
+        truth_out = out.with_name(f"pass{index:02d}_truth.parquet")
+        tmp_truth = truth_out.with_name(truth_out.name + f".{os.getpid()}.tmp")
+        events.write_parquet(
+            tmp_truth
+        )  # the truth file first, so a pass with a forecast always has its truth
+        tmp_truth.rename(truth_out)
+        tmp = out.with_name(out.name + f".{os.getpid()}.tmp")
         joined.write_parquet(tmp)
         tmp.rename(out)
-        events.write_parquet(out.with_name(f"pass{index:02d}_truth.parquet"))
         print(arm, month, seed, "pass", index, joined.height, "rows", flush=True)
 
 
@@ -392,6 +397,12 @@ def cmd_r1() -> None:
             groups=groups,
             level=95.0,
         )
+        months = sorted(arms.ALL_FOLDS)
+        monthly = np.array(c["monthly"])
+        assert len(monthly) == len(months), (len(monthly), len(months))
+        without = float(np.delete(monthly, months.index("2026-01")).mean())
+        c["without_2026_01"] = without
+        c["same_sign_without_2026_01"] = bool(np.sign(without) == np.sign(c["point"]))
         out[f"{t}-{r}"] = c
     score.write(name="era_r1", obj=out)
 

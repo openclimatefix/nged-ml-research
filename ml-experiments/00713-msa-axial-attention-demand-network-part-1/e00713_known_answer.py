@@ -410,7 +410,7 @@ def main() -> int:
     path = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR) / "work" / "known_answers_passed.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(str(path) + ".tmp")
-    tmp.write_text(json.dumps(results, indent=1, default=str))
+    tmp.write_text(json.dumps({**results, "code": arms.code_record()}, indent=1, default=str))
     tmp.rename(path)
     return 0
 

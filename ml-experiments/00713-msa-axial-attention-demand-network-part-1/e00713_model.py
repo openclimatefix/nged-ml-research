@@ -263,9 +263,6 @@ class MsaNet(nn.Module):
         self.power_b = nn.Parameter(torch.randn(WIDTH) * 0.02)
         self.m_target = nn.Parameter(torch.randn(WIDTH) * 0.02)
         self.m_hist = nn.Parameter(torch.randn(WIDTH) * 0.02)
-        self.stem: nn.Module | None = (
-            ConvStem() if switches.stem == "conv" else GruStem() if switches.stem == "gru" else None
-        )
         self.blocks = nn.ModuleList(
             AxialBlock(within_day=switches.within_day, across_day=switches.across_day)
             for _ in range(BLOCKS)
@@ -284,6 +281,10 @@ class MsaNet(nn.Module):
             layers=1, n_out=3 * m559.COMPONENTS, dropout=DROPOUT,
         )  # fmt: skip
         base_models.init_head(head=self.head, components=m559.COMPONENTS)
+        # built last, so that arms `E` and `G` draw the same initial weights as `M` for every shared parameter
+        self.stem: nn.Module | None = (
+            ConvStem() if switches.stem == "conv" else GruStem() if switches.stem == "gru" else None
+        )
 
     # ------------------------------------------------------------------ encoders
 

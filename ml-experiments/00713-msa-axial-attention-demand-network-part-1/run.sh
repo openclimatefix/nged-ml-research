@@ -4,7 +4,7 @@
 # `uv run` inside the scope, because the snap build of uv moves its child out of the capped scope),
 # and the folders of every experiment whose code this one imports on PYTHONPATH.
 #
-# Usage: run.sh e00713_fit.py --arm M1 --month 2025-11 --seed 0
+# Usage: run.sh e00713_fit.py M1 2025-11 0
 #        SLOT_MEM=8G run.sh e00713_check_model.py
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # are set to dummy values here because the contracts package reads them at import. Check `free -g`

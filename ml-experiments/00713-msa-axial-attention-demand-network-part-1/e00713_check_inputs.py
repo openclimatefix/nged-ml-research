@@ -22,7 +22,6 @@ import e00713_batch as bt
 import e00713_inputs as inp
 import e00713_layout as lay
 import numpy as np
-import polars as pl
 import torch  # ty: ignore[unresolved-import]
 
 torch.set_num_threads(1)
@@ -42,8 +41,6 @@ def check_cells(*, data: inp.FoldData, rng: np.random.Generator) -> None:
     ):
         n = len(rows.primary)
         pick = rng.choice(n, size=min(N_CELLS, n), replace=False)
-        import e00422_prep as prep422  # ty: ignore[unresolved-import]
-
         oi = (
             origin_idx[pick]
             if name == "scored rows"
@@ -62,11 +59,20 @@ def check_cells(*, data: inp.FoldData, rng: np.random.Generator) -> None:
         assert same, name
         assert filled, name
     total = int(ens.filled.sum())
-    from_rows = len(mr.primary) + len(test.primary)
-    print(
-        f"filled cells {total}; Candidate rows {from_rows}; "
-        f"cells that no Candidate row fills: {max(total - from_rows, 0)}"
-    )
+    for name, rows, oi in (
+        (
+            "training rows",
+            mr,
+            ((mr.origin_us - prep422.GRID_START_US) // prep422.STEP_US).astype(np.int64),
+        ),
+        ("scored rows", test, test.origin_idx),
+    ):
+        rel = rows.target_idx - (oi + lay.NATIVE_OFFSET_STEPS)
+        print(
+            f"{name}: {len(rows.primary)} Candidate rows, {int((rel < 0).sum())} before the contract origin and "
+            f"{int((rel >= inp.N_ENS_STEPS).sum())} after the {inp.N_ENS_STEPS}th half-hour (not held by the matrix)"
+        )
+    print(f"filled cells {total}")
 
 
 def check_nwp_init(*, data: inp.FoldData) -> None:
@@ -76,24 +82,26 @@ def check_nwp_init(*, data: inp.FoldData) -> None:
     after the origin minus 9 hours (design 4.1). The run is the one the Candidate resolves, the origin
     minus the publication delay.
     """
-    import e00087_common as common  # ty: ignore[unresolved-import]
-
     assert data.test_keys is not None
-    delay = common.PUBLICATION_DELAY
     for origin_us in data.test_keys["origin_us"]:
         origin = datetime.fromtimestamp(int(origin_us) / 1e6, tz=UTC)
-        frame = pl.read_parquet(
-            common.demand_frame_path(run=origin - delay), columns=["nwp_init_time"]
-        )
-        latest = frame["nwp_init_time"].max()
-        assert latest <= origin - timedelta(hours=9), (origin, latest)  # ty: ignore[unsupported-operator]
+        latest, forecast_origin, path = inp.run_frame_timing(origin=origin)
+        assert forecast_origin == origin, (path, origin, forecast_origin)
+        assert latest <= origin - timedelta(hours=9), (origin, latest)
     print(
-        f"nwp_init_time <= origin - 9 h holds in the run frames of all {len(data.test_keys['origin_us'])} scored origins"
+        f"PASS: nwp_init_time <= origin - 9 h and power_fcst_init_time == origin, read from the stored run frames of all {len(data.test_keys['origin_us'])} scored origins (none a stub)"
     )
 
 
-PRETRAIN_TOLERANCE = 0.003
-"""The dense arrays are float16, so 1e-6 is unreachable; 0.003 is a few float16 steps near 4."""
+def float16_tolerance(want: np.ndarray) -> np.ndarray:
+    """Return the allowed absolute difference per element: one float16 step at the value, plus 1e-4.
+
+    The dense arrays are float16, so 1e-6 is unreachable. One step is 0.0020 for 4 <= |x| < 8 and
+    0.0039 for 8 <= |x| < 16, so a fixed tolerance would fail a large standardised value falsely.
+    """
+    return np.spacing(np.abs(want).astype(np.float16)).astype(np.float64) + 1e-4
+
+
 N_PRETRAIN = 100_000
 
 
@@ -118,15 +126,21 @@ def check_pretrain(*, pipe: inp.Pipeline, data: inp.FoldData, rng: np.random.Gen
         ("weather 0 to 6", w, pre.x[pick][:, 0:7]),
         ("date-time", dt, pre.x[pick][:, 14:35]),
     ):
-        worst = float(np.nanmax(np.abs(got - want)))
-        print(f"dense {name} against 574's pre-training rows: max abs diff {worst:.4f}")
-        assert worst <= PRETRAIN_TOLERANCE, name
+        diff = np.abs(got.astype(np.float64) - want)
+        print(
+            f"dense {name} against 574's pre-training rows: max abs diff {float(np.nanmax(diff)):.4f}"
+        )
+        assert bool((diff <= float16_tolerance(want) + 1e-12).all() | np.isnan(diff).all()), name
     st = np.load(e.stats_file(month=pipe.month))
     e.EX.mean, e.EX.std = st["mean"], st["std"]
     want_b1 = e.EX.scale(raw=e.EX.raw_pretrain(primary=p, origin_idx=o, target_idx=t, shift=None))
     c = o + lay.NATIVE_OFFSET_STEPS
     rel = t - c
-    ok = (rel >= 0) & (rel < lay.STEPS_PER_DAY * lay.N_LEAD_DAYS) & (c >= lay.STEPS_PER_DAY * (lay.N_HISTORY_ROWS + 3))  # rows with a full history
+    ok = (
+        (rel >= 0)
+        & (rel < lay.STEPS_PER_DAY * lay.N_LEAD_DAYS)
+        & (c >= lay.STEPS_PER_DAY * (lay.N_HISTORY_ROWS + 3))
+    )  # rows with a full history
     p, c, rel, want_b1 = p[ok][:5000], c[ok][:5000], rel[ok][:5000], want_b1[ok][:5000]
     dev = src.device
     to = lambda a: torch.from_numpy(np.ascontiguousarray(a)).to(dev)  # noqa: E731
@@ -141,7 +155,7 @@ def check_pretrain(*, pipe: inp.Pipeline, data: inp.FoldData, rng: np.random.Gen
         "B1 (14 columns, stage 1 target row) against 574's pre-training rows, max abs diff per column:",
         per_col,
     )
-    assert float(np.nanmax(diff)) <= PRETRAIN_TOLERANCE, (
+    assert bool(((diff <= float16_tolerance(want_b1)) | np.isnan(diff)).all()), (
         "B1 columns differ from experiment 574's rows"
     )
 
@@ -201,7 +215,9 @@ def main() -> int:
     print("fingerprint", data.fingerprint[:12], "scored origins", len(data.test_origin_idx))  # ty: ignore[invalid-argument-type]
     origin_us = np.asarray(data.test_keys["origin_us"]) if data.test_keys else np.array([])
     assert bool(((origin_us % (24 * inp.HOUR_US)) == inp.ORIGIN_HOUR_US).all()), "origin not 09:00"
-    print("every scored origin is 09:00 UTC: nwp_init_time <= o - 9 h holds for the 00Z run")
+    print(
+        "every scored origin is 09:00 UTC (the 00Z run is 9 h earlier by construction; the stored run frames are checked below)"
+    )
     check_cells(data=data, rng=rng)
     check_nwp_init(data=data)
     assert lay.GRID_START_US == prep422.GRID_START_US

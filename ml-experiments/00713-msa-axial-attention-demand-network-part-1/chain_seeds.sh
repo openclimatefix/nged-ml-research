@@ -41,10 +41,13 @@ STEPS=${*:-pretrain step2 table fit ptable pfit}
 export E00667_MONTH=$M CHAIN667=$R/chains/$M/work
 mkdir -p "$R/logs" "$CHAIN667"
 
-snapshot() {  # every path, type, size, and mtime below chains/ and P7_D50_*, at any depth, plus a hash of the stored fits
-  (cd "$STORED" && find chains P7_D50_* -printf '%p %y %s %T@\n' | sort
-    find P7_D50_*/work/fits/P5 -name '*_s[01].parquet' -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum)
+snapshot() {  # every path, type, size, and mtime below chains/, P7_D50_*, tables/, and exports/, at any depth, plus hashes of the stored fits and exports
+  (cd "$STORED" && find chains P7_D50_* tables exports -printf '%p %y %s %T@\n' 2>/dev/null | sort
+    { find P7_D50_*/work/fits/P5 -name '*_s[01].parquet' -print0 2>/dev/null
+      find exports -name 'NRA_*.parquet' -print0 2>/dev/null; } | sort -z | xargs -0 -r sha256sum)
 }
+frames_snapshot() { (cd "$STORED" && find inputs/frames -printf '%p %s %T@\n' 2>/dev/null | sort); }
+FRAMES_BEFORE="$(frames_snapshot)"
 BEFORE="$(snapshot)"
 
 PYTHONPATH_ALL="$D"
@@ -71,10 +74,11 @@ done
 
 AFTER="$(snapshot)"
 if [ "$BEFORE" != "$AFTER" ]; then
-  echo "experiment 667's chains/ or P7_D50_* folders changed during the chain" >&2
+  echo "experiment 667's chains/, P7_D50_*, tables/, or exports/ changed during the chain" >&2
   diff <(echo "$BEFORE") <(echo "$AFTER") >&2 || true
   exit 1
 fi
+[ "$FRAMES_BEFORE" = "$(frames_snapshot)" ] || echo "warning: inputs/frames of experiment 667 changed during the chain (stub frames; any process may write them)" >&2
 echo "unchanged-folder assertion passed for $STORED"
 
 if [ "${REPRO:-0}" = 1 ]; then

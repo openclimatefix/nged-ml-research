@@ -60,6 +60,23 @@ class Pipeline:
     chain: Path  # `<root>/chains/<month>/work` of the Candidate chain that holds `pretrained_P2`
 
 
+def run_frame_timing(*, origin: datetime) -> tuple[datetime, datetime, Path]:
+    """Return the latest `nwp_init_time`, the `power_fcst_init_time`, and the path of an origin's stored run frame.
+
+    The frame is the one the Candidate reads (`demand_frame_path` for the run issued one publication
+    delay before the origin). A stub frame that `e00667_fold` writes for the months after 2026-06 holds
+    the run date itself, so a path under `inputs/frames` is refused.
+    """
+    import e00087_common as common  # ty: ignore[unresolved-import]
+
+    path = common.demand_frame_path(run=origin - common.PUBLICATION_DELAY)
+    assert "inputs/frames" not in path.as_posix(), f"{path} is a stub frame, not a stored run"
+    frame = pl.read_parquet(path, columns=["nwp_init_time", "power_fcst_init_time"])
+    forecast_origin = frame["power_fcst_init_time"].unique()
+    assert len(forecast_origin) == 1, (path, forecast_origin)
+    return frame["nwp_init_time"].max(), forecast_origin[0], path  # ty: ignore[invalid-return-type]
+
+
 def chain_dir(*, root: Path, month: str) -> Path:
     """Return the `work` folder of a Candidate chain for `month` under `root`."""
     return root / "chains" / month / "work"

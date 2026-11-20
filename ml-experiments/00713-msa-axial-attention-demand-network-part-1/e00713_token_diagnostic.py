@@ -121,6 +121,7 @@ def sensitivity(*, model: mdl.MsaNet, x: mdl.MsaInputs) -> dict[str, float]:
         out=out
     ).sum()  # samples are independent, so one backward pass
     y.backward()
+    model.zero_grad(set_to_none=True)  # leave no gradient on the parameters
     vis = (x.hist_visible & x.row_exists[:, :, None]).to(z_tokens.dtype)
     assert z_tokens.grad is not None
     assert z_readout.grad is not None

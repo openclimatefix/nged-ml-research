@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Experiment 713: score the arms by the evaluation protocol (design 6.5), with the climatology row.
 
-Usage: e00713_protocol.py TAG ARM[,ARM...] [--seeds 0 1 2 3 4] [--months 2025-11 ...] [--no-cost]
+Usage: e00713_protocol.py TAG ARM[,ARM...] [--seeds ...] [--months 2025-11 ...] [--no-cost]
 
 Adapted from `e00677_protocol.py`. Each arm is the seed mean of its quantiles (sorted within the row)
 in the layout of experiment 677: the contract origin (12:00 UTC), 672 half-hours, megawatts. The
@@ -93,11 +93,24 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("tag")
     parser.add_argument("arms")
-    parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        nargs="+",
+        default=None,
+        help="default: seeds 0 to 4 for M*, P, and C, and seeds 0 and 1 for every other arm",
+    )
     parser.add_argument("--months", nargs="+", default=list(score.arms.ALL_FOLDS))
     parser.add_argument("--no-cost", action="store_true")
     args = parser.parse_args()
-    seeds, months = tuple(args.seeds), tuple(args.months)
+    months = tuple(args.months)
+    star = score.arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+
+    def seeds_for(arm: str) -> tuple[int, ...]:
+        if args.seeds is not None:
+            return tuple(args.seeds)
+        return score.arms.HEADLINE_SEEDS if arm in {star, "P", "C"} else score.arms.SCREEN_SEEDS
+
     series = adapter.series_table()
     cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=cp.CACHE_DIR)
     actuals, context = adapter.actuals_and_context(
@@ -120,7 +133,7 @@ def main() -> int:
     )
     forecasts: dict[str, pl.DataFrame] = {}
     for arm in args.arms.split(","):
-        forecasts[arm] = arm_frame(arm=arm, seeds=seeds, months=months, series=series)
+        forecasts[arm] = arm_frame(arm=arm, seeds=seeds_for(arm), months=months, series=series)
         print("built", arm, forecasts[arm].height, flush=True)
     ids = series["time_series_id"].to_list()
     for (

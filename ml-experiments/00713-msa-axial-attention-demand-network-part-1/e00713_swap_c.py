@@ -24,41 +24,68 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 ROOT_SWAP: Path = ML_EXPERIMENTS_DATA_DIR / inp.NAME / "swap_c"
 
 
-def link_stored(*, month: str, seed: int) -> None:
-    """Link experiment 667's stored states and prediction table into the swap folder (read-only sources)."""
-    stored = inp.ROOT_667 / f"P7_D50_{month}" / "work" / "models" / "P5" / f"{month}_d0_s{seed}.pt"
-    assert stored.exists(), stored
-    dest = ROOT_SWAP / f"P7_D50_{month}" / "work" / "models" / "P5" / stored.name
+def link_file(*, source: Path, dest: Path) -> None:
+    """Make `dest` a link to `source`, replacing a dangling link; the parent folder is a real directory."""
     dest.parent.mkdir(parents=True, exist_ok=True)
+    if os.path.lexists(dest) and not dest.exists():
+        dest.unlink()  # a dangling link: `exists()` is False although the name is taken
     if not dest.exists():
-        dest.symlink_to(stored)
-    table = inp.ROOT_667 / "tables" / "predict" / f"T_{month}_s{seed}.npz"
-    if table.exists():
-        t_dest = ROOT_SWAP / "tables" / "predict" / table.name
-        t_dest.parent.mkdir(parents=True, exist_ok=True)
-        if not t_dest.exists():
-            t_dest.symlink_to(table)
+        dest.symlink_to(source)
 
 
-def link_chain(*, month: str) -> Path:
-    """Return a `work` folder under the swap folder that holds file links to experiment 667's chain.
+def link_tree(*, source: Path, dest: Path) -> Path:
+    """Mirror `source` as real directories under `dest`, with a link for every file; return `dest`.
 
-    The folders are real directories and only the files are links, so that no write through `CHAIN667`
-    can reach a folder of experiment 667.
+    No write through a path under `dest` can reach a folder of experiment 667, and a rename of a file
+    replaces its link and not its target.
     """
-    source = inp.chain_dir(root=inp.ROOT_667, month=month)
-    dest = ROOT_SWAP / "chains" / month / "work"
+    dest.mkdir(parents=True, exist_ok=True)
     for path in source.rglob("*"):
         target = dest / path.relative_to(source)
         if path.is_dir():
             target.mkdir(parents=True, exist_ok=True)
-        elif not target.exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.symlink_to(path)
-    dest.mkdir(parents=True, exist_ok=True)
-    assert dest.resolve() != source.resolve()
+        else:
+            link_file(source=path, dest=target)
     assert not str(dest.resolve()).startswith(str(inp.ROOT_667.resolve())), dest
     return dest
+
+
+def link_stored(*, month: str, seed: int) -> None:
+    """Link experiment 667's stored states, prediction table, and standardiser hash into the swap folder."""
+    fold = inp.ROOT_667 / f"P7_D50_{month}"
+    stored = fold / "work" / "models" / "P5" / f"{month}_d0_s{seed}.pt"
+    assert stored.exists(), stored
+    link_file(
+        source=stored, dest=ROOT_SWAP / f"P7_D50_{month}" / "work" / "models" / "P5" / stored.name
+    )
+    sha = fold / f"standardiser_{month}.sha256"  # `check_fingerprint` of the predict phase reads it
+    assert sha.exists(), sha
+    link_file(source=sha, dest=ROOT_SWAP / f"P7_D50_{month}" / sha.name)
+    table = inp.ROOT_667 / "tables" / "predict" / f"T_{month}_s{seed}.npz"
+    if table.exists():
+        link_file(source=table, dest=ROOT_SWAP / "tables" / "predict" / table.name)
+
+
+def link_chain(*, month: str) -> Path:
+    """Return a `work` folder under the swap folder that holds file links to experiment 667's chain."""
+    return link_tree(
+        source=inp.chain_dir(root=inp.ROOT_667, month=month),
+        dest=ROOT_SWAP / "chains" / month / "work",
+    )
+
+
+def redirect_inputs() -> None:
+    """Point experiment 667's extended-input paths at a linked copy under the swap folder.
+
+    `e00667_fold.install` writes stub run frames under `inputs/frames` and the `W560` cache under
+    `inputs/w560` of `e00667_extend.OUT_ROOT`. Both then land in the swap folder, and the files that
+    exist already are links to the stored ones. The call must come before `e00667_cand` is imported.
+    """
+    import e00667_extend as ext  # ty: ignore[unresolved-import]
+
+    link_tree(source=inp.ROOT_667 / "inputs", dest=ROOT_SWAP / "inputs")
+    ext.OUT_ROOT = ROOT_SWAP  # ty: ignore[invalid-assignment]
+    ext.RAW_DIR = ROOT_SWAP / "inputs" / "raw"  # ty: ignore[invalid-assignment]
 
 
 def snapshot_667() -> str:
@@ -80,6 +107,7 @@ def main() -> int:
     month, seed = args.month, args.seed
     before = snapshot_667()
     link_stored(month=month, seed=seed)
+    redirect_inputs()
     os.environ.update(
         E00667_ROOT=str(ROOT_SWAP), E00667_MONTH=month, E00667_PHASE="predict",
         CHAIN667=str(link_chain(month=month)),
@@ -108,7 +136,7 @@ def main() -> int:
         original(standardiser=standardiser)
         cols, _ = d560.raw_table(source="pre", cache=e.W560 / "expected")
         table = d560.standardised_table(cols=cols, standardiser=standardiser)
-        e.CTX["table_ft"] = torch.from_numpy(table).to("cuda")
+        e.CTX["table_ft"] = torch.from_numpy(table).to(args.device)
         del cols
 
     e.attach_tables = attach_pre

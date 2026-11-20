@@ -69,16 +69,92 @@ FIT_CODE_FILES: Final = (
     "e00713_arms.py", "e00713_batch.py", "e00713_fit.py", "e00713_inputs.py", "e00713_layout.py",
     "e00713_model.py", "e00713_train.py", "e00713_variants.py",
 )  # fmt: skip
-"""The modules whose edits change a fitted state."""
+"""The modules of this experiment whose edits can change a fitted state."""
+RECIPE_MODULES: Final = (
+    "e00087_common", "e00397_models", "e00397_prep", "e00422_prep", "e00428_data", "e00448_run",
+    "e00510_common", "e00558_lags", "e00559_model", "e00560_data", "e00574_fit", "e00574_model",
+    "e00632_data", "e00667_cand", "e00667_fold",
+)  # fmt: skip
+"""Imported recipe modules of earlier experiments; their file hashes enter the code hash and the logs."""
+
+
+def recipe_hashes() -> dict[str, str]:
+    """Return the sha256 (first 16 hex digits) of the file of each imported recipe module, or `missing`."""
+    import importlib.util
+
+    out = {}
+    for name in RECIPE_MODULES:
+        spec = importlib.util.find_spec(name)
+        out[name] = (
+            hashlib.sha256(Path(spec.origin).read_bytes()).hexdigest()[:16]
+            if spec is not None and spec.origin
+            else "missing"
+        )
+    return out
 
 
 def code_hash() -> str:
-    """Return a hash of the modules that decide a fitted state, written into each stage log and checked on resume."""
+    """Return a hash of this experiment's fit modules and of the imported recipe modules."""
     here = Path(__file__).parent
     h = hashlib.sha256()
     for name in FIT_CODE_FILES:
         h.update((here / name).read_bytes())
+    for name, digest in sorted(recipe_hashes().items()):
+        h.update(f"{name}:{digest}".encode())
     return h.hexdigest()[:16]
+
+
+def _git(*args: str) -> str:
+    """Return the output of a git command run in this folder, or `unavailable`."""
+    import subprocess
+
+    try:
+        return subprocess.run(
+            ["git", *args], cwd=Path(__file__).parent, capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except subprocess.CalledProcessError, FileNotFoundError:
+        return "unavailable"
+
+
+def code_record() -> dict:
+    """Return what a log records about the code: the hash, the git commit, whether the folder is dirty."""
+    return {
+        "code_hash": code_hash(),
+        "git_commit": _git("rev-parse", "HEAD"),
+        "git_dirty": bool(_git("status", "--porcelain", "--", ".")),
+    }
+
+
+def check_code(*, earlier: dict, accept: str | None, record: dict, what: str) -> None:
+    """Refuse a state or a gate written by other code, unless the override names its old hash.
+
+    `accept` is the value of `--accept-code-change`: the hash of the earlier code. When it equals the
+    earlier hash, the override is appended to `record["code_overrides"]` with both hashes, both git
+    commits, and the diff stat of the fit modules between the old commit and the working tree.
+    """
+    now = code_hash()
+    old = earlier.get("code_hash")
+    if old == now:
+        return
+    if accept is None or accept != old:
+        msg = (
+            f"{what} was written by code with hash {old}, and the code now has hash {now}. "
+            "After an edit that cannot change a fitted state, rerun with `--accept-code-change "
+            f"{old}`; the override is logged with a diff stat."
+        )
+        raise AssertionError(msg)
+    old_commit = earlier.get("git_commit", "unavailable")
+    stat = (
+        _git("diff", "--stat", old_commit, "--", *FIT_CODE_FILES)
+        if old_commit != "unavailable"
+        else "unavailable"
+    )
+    entry = {
+        "what": what, "old_hash": old, "new_hash": now, "old_commit": old_commit,
+        "new_commit": _git("rev-parse", "HEAD"), "diff_stat": stat,
+    }  # fmt: skip
+    record.setdefault("code_overrides", []).append(entry)
+    print("code override accepted:", json.dumps(entry), flush=True)
 
 
 def root(*, data_dir: Path) -> Path:

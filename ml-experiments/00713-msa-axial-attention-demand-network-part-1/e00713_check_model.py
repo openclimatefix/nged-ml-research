@@ -108,6 +108,16 @@ def main() -> int:
         assert diff <= 1e-5, (arm, diff)
         assert float((res.base - torch.from_numpy(expected).float()).abs().max()) <= 1e-5
 
+    # E and G start from the same random weights as M at the same seed, for every shared parameter
+    base_state = build("M", seed=3).state_dict()
+    for arm in ("E", "G"):
+        other = build(arm, seed=3).state_dict()
+        shared = [k for k in other if not k.startswith("stem.")]
+        assert set(shared) == set(base_state), arm
+        for k in shared:
+            assert torch.equal(other[k], base_state[k]), (arm, k)
+    print("E and G draw the same initial weights as M for every shared parameter")
+
     # the prior start: a Monday-morning token puts about 50% / 45% / 5% on the three groups
     prior = mdl.beta_day_start()
     w = torch.exp(prior[0, [0] * 2 + [1, 2, 3, 4] * 2 + [5, 5, 6, 6]])

@@ -8,17 +8,18 @@ row of the 15 x 48 matrix, the weather source, the issue time of the weather aga
 origin, and the span of valid times, and it prints the newest power timestamp against the origin. The
 layout is computed from `e00713_layout` alone, so the statement needs no fit and reads no power.
 
-With `--check-data` the script also reads the `nwp_init_time` and `power_fcst_init_time` columns of the
-ensemble summary file of the origin's run (one small file; the first 5 rows of the Primary) and
-prints them next to the statement.
-The origin-time assertion of the design is `nwp_init_time <= o - 9 h`
-with `o` the native origin.
+With `--check-data` the script also reads the stored run frame that the Candidate reads for the native origin
+(`demand_frame_path`; a stub frame is refused) and prints one PASS or FAIL line: PASS when its latest
+`nwp_init_time` is at least 9 hours before the native origin and its `power_fcst_init_time` is the native
+origin. The exit status is 1 on FAIL. Without the flag, the "(before: yes, by the layout alone)" on row 0 is the layout's
+own arithmetic, not a data check.
 """
 
 import argparse
 import sys
 from datetime import UTC, datetime, timedelta
 
+import e00713_inputs as inp
 import e00713_layout as lay
 import numpy as np
 
@@ -53,7 +54,7 @@ def statement(*, contract: datetime, primary: str, lead_day: int = 0) -> list[st
     lines.append(
         f"  0 | target, lead day {lead_day + 1} | {span(contract=contract, first_step=lay.STEPS_PER_DAY * lead_day)} | "
         f"ECMWF ENS mean and spread, run {run:%Y-%m-%d} 00Z; B1 columns from trailing windows of the same run and CAMS of the last complete UTC day before the origin | "
-        f"issued {native - run} before the native origin (before: yes)"
+        f"issued {native - run} before the native origin (before: yes, by the layout alone)"
     )
     newest_visible = lay.newest_visible_index(contract_idx=np.array([0]))[0]
     for slot, age in enumerate(lay.history_ages(), start=1):
@@ -81,23 +82,25 @@ def statement(*, contract: datetime, primary: str, lead_day: int = 0) -> list[st
     return lines
 
 
-def check_data(*, contract: datetime, primary: str) -> list[str]:
-    """Read the run's summary file and return the stored `nwp_init_time` and `power_fcst_init_time` values."""
-    import e00397_prep as prep  # ty: ignore[unresolved-import]
-    import e00578_common as k578  # ty: ignore[unresolved-import]
+def check_data(*, contract: datetime) -> tuple[bool, list[str]]:
+    """Read the stored run frame of the native origin and return (passed, lines): a real data check.
+
+    The run frame is the file the Candidate reads. The check asserts that its latest `nwp_init_time` is
+    at least 9 hours before the native origin and that its `power_fcst_init_time` is the native origin.
+    """
     import e00667_extend as ext  # ty: ignore[unresolved-import]
-    import polars as pl
 
     ext.redirect()
-    run = contract.replace(hour=0)
-    path = prep.SUMMARY_DIR / f"init={run:%Y-%m-%d}.parquet"
-    sites = k578.sites()
-    ts = sites.filter(pl.col("label") == primary)["time_series_id"].item()
-    frame = pl.scan_parquet(path).filter(pl.col("time_series_id") == ts).head(5).collect()
-    cols = [
-        c for c in ("nwp_init_time", "power_fcst_init_time", "valid_time") if c in frame.columns
-    ]
-    return [f"Stored file {path.name}, first rows of {primary}:", str(frame.select(cols))]
+    native = contract - timedelta(hours=3)
+    latest, forecast_origin, path = inp.run_frame_timing(origin=native)
+    ok = latest <= native - timedelta(hours=9) and forecast_origin == native
+    verdict = "PASS" if ok else "FAIL"
+    line = (
+        f"{verdict}: stored run frame {path.name}: latest nwp_init_time {latest:%Y-%m-%d %H:%M} UTC, "
+        f"power_fcst_init_time {forecast_origin:%Y-%m-%d %H:%M} UTC, native origin {native:%Y-%m-%d %H:%M} UTC "
+        "(required: nwp_init_time <= native origin - 9 h, power_fcst_init_time == native origin)"
+    )
+    return ok, [line]
 
 
 def main() -> int:
@@ -112,7 +115,9 @@ def main() -> int:
     contract = day.replace(hour=12)
     print("\n".join(statement(contract=contract, primary=args.primary, lead_day=args.lead_day - 1)))
     if args.check_data:
-        print("\n".join(check_data(contract=contract, primary=args.primary)))
+        ok, lines = check_data(contract=contract)
+        print("\n".join(lines))
+        return 0 if ok else 1
     return 0
 
 

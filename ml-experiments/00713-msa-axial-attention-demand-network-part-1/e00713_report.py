@@ -16,6 +16,7 @@ from typing import Final
 
 import e00713_arms as arms
 import e00713_model as mdl
+import e00713_score as score
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -118,9 +119,26 @@ def audit_triggers() -> dict[str, str]:  # noqa: PLR0912
         else ("not fired" if headline else "not computed")
     )
     if headline:
+        star_p = {g: headline[f"{star}-P:{g}"] for g in ("six", "eight")}
+        h1 = {g: headline[f"{star}-C:{g}"]["point"] for g in ("six", "eight")}
+        reasons = []
+        if headline["verdict"] not in {"not supported", "inconclusive"}:
+            reasons.append(
+                f"verdict {headline['verdict']!r} is outside the predicted not supported or inconclusive"
+            )
+        reasons += [
+            f"H1 {g} {h1[g]:+.3f} is outside +-{score.DELTA[g]}"
+            for g in h1
+            if abs(h1[g]) > score.DELTA[g]
+        ]
+        reasons += [
+            f"H2 {g} point {v['point']:+.3f} is above -0.10"
+            for g, v in star_p.items()
+            if v["point"] > -0.10
+        ]
         out["2 contradicts prediction"] = (
-            f"verdict is {headline['verdict']!r}; FIRED unless the write-up records a tested explanation"
-            if headline["verdict"] not in {"supported", "partly supported"}
+            ("FIRED unless the write-up records a tested explanation: " + "; ".join(reasons))
+            if reasons
             else "not fired"
         )
     else:
@@ -150,20 +168,16 @@ def audit_triggers() -> dict[str, str]:  # noqa: PLR0912
         )
     else:
         out["3 CRPS and MAE disagree"] = out["5 nested arm beats container"] = "not computed"
-    out["4 leave-one-out flips sign"] = (
-        ("FIRED: " if not headline["guards"]["all_hold"] else "not fired: ")
-        + json.dumps(
-            {
-                g: [
-                    headline["guards"][g]["leave_one_primary_out"],
-                    headline["guards"][g]["leave_one_month_out"],
-                ]
-                for g in ("six", "eight")
-            }
-        )
-        if headline and "guards" in headline
-        else "not computed"
-    )
+    if headline and "guards" in headline:
+        flips = [
+            f"{g}: leaving out a {kind} flips the sign"
+            for g in ("six", "eight")
+            for kind in ("primary", "month")
+            if headline["guards"][g][f"leave_one_{kind}_flips_sign"]
+        ]
+        out["4 leave-one-out flips sign"] = ("FIRED: " + "; ".join(flips)) if flips else "not fired"
+    else:
+        out["4 leave-one-out flips sign"] = "not computed"
     out["6 interval width against a sister experiment"] = (
         "not computed: compare by hand with experiment 667's and 709's intervals on the same rows"
     )
