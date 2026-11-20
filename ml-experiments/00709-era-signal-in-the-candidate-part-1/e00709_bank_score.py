@@ -103,15 +103,16 @@ def main() -> None:
     parser.add_argument("--level", type=float, default=99.44)
     args = parser.parse_args()
     arms = list(dict.fromkeys([args.reference, *args.arms]))
-    frames = []
-    for arm in arms:
-        for month in args.folds:
-            for seed in args.seeds:
-                frames.append(
-                    event_losses(arm=arm, month=month, seed=seed).with_columns(pl.lit(arm).alias("arm"))
-                )
-    losses = pl.concat(frames).group_by("arm", "fold", "pass", "event", "slice").agg(
-        pl.col("crps").mean(), pl.col("seed").n_unique().alias("n_seeds")
+    frames = [
+        event_losses(arm=arm, month=month, seed=seed).with_columns(pl.lit(arm).alias("arm"))
+        for arm in arms
+        for month in args.folds
+        for seed in args.seeds
+    ]
+    losses = (
+        pl.concat(frames)
+        .group_by("arm", "fold", "pass", "event", "slice")
+        .agg(pl.col("crps").mean(), pl.col("seed").n_unique().alias("n_seeds"))
     )
     assert losses["n_seeds"].min() == len(args.seeds), "an event is missing a seed"
     rng = np.random.default_rng(0)
@@ -137,7 +138,9 @@ def main() -> None:
             draws = rng.integers(0, n, size=(args.resamples, n))
             means = diff[draws].mean(axis=1)
             low, high = np.percentile(means, [alpha, 100.0 - alpha])
-            print(f"  {arm:12s} crps {mean:7.3f}  diff {diff.mean():+.3f} [{low:+.3f}, {high:+.3f}]")
+            print(
+                f"  {arm:12s} crps {mean:7.3f}  diff {diff.mean():+.3f} [{low:+.3f}, {high:+.3f}]"
+            )
             out.append(
                 {"slice": slice_name, "arm": arm, "events": n, "crps": mean,
                  "diff": float(diff.mean()), "lower": low, "upper": high}

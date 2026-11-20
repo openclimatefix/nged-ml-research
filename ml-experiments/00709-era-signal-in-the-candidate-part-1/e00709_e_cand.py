@@ -89,7 +89,9 @@ import e00709_e_stub as stub_frames  # ty: ignore[unresolved-import]
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00667_MONTH"
 
 NAME = "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
-ROOT = Path(os.environ["E00667_ROOT"])  # phase E: required, so no output reaches experiment 667's folder
+ROOT = Path(
+    os.environ["E00667_ROOT"]
+)  # phase E: required, so no output reaches experiment 667's folder
 """`E00667_ROOT` redirects every output to another folder, for the from-scratch re-run of one fold."""
 SHUFFLED = ARM.endswith("-p")
 SPEC_NAME = ARM[:-2] if SHUFFLED else ARM

@@ -96,7 +96,7 @@ def post_shift_expression() -> pl.Expr:
 
 
 def touched_expression(*, folds: list[str], seeds: list[int]) -> pl.Expr:
-    """Return a row filter for the Primaries that the curriculum world touched in every seed of a fold.
+    """Return a row filter for the Primaries that the curriculum world touched in all seeds.
 
     Only Primaries touched in every seed count, so each seed is scored on the same rows.
 
@@ -113,7 +113,7 @@ def touched_expression(*, folds: list[str], seeds: list[int]) -> pl.Expr:
         for seed in seeds:
             path = features.DATA_DIR / "worlds" / f"curriculum_{month}_s{seed}.pkl"
             with path.open("rb") as handle:
-                parts = pickle.load(handle)  # noqa: S301  (our own cache file)
+                parts = pickle.load(handle)
             touched = {int(p) for p in parts["touched"]}
             common = touched if common is None else common & touched
         expr = expr | (pl.col("fold") == month) & pl.col("primary").is_in(sorted(common or ()))
