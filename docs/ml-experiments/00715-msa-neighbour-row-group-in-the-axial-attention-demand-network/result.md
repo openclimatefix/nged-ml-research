@@ -494,7 +494,7 @@ and the fit script refuses to run a real fold without it. A failed check fires a
 | KN4, slot order | Permuting the filled slots leaves the output unchanged, with a random `W_o` | At most 1e-5 |
 | KN5, masks | With a random `W_o`: a masked token's value changes no output; a host with no visible neighbour equals the same network with every slot empty; one sample's output does not depend on another sample in the batch; gradients are finite | Exact; exact; at most 1e-6; no NaN |
 | KN6, mirror-only world | Section "The mirror-only world" below | Below |
-| KN7, no harm without events | In experiment 713's world with no shifts and four synthetic Primaries in two pairs, F4 minus the no-neighbour network, mean absolute error of the median, both trained from scratch with stage 1 only and at most 15 passes | At most +0.005 |
+| KN7, no harm without events | In experiment 713's world with no shifts and four synthetic Primaries in two pairs, F4 minus the no-neighbour network, mean absolute error of the median, both trained from scratch with stage 1 only and at most 150 passes (early stopping, patience 8) | At most +0.005 |
 | KN8, repeat of M* | F4-0 on fold 2025-11, seed 0, against the stored M* forecast: the largest absolute difference of the median is printed. KN8 does not gate the fits | At most 1e-3 of capacity, else the F4-0 reading below |
 | KN9, host-scale power | The host-scale value equals an independent NumPy computation; a synthetic transfer of fixed megawatts gives equal and opposite changes | 1e-5 |
 | KN10, time-shuffle draw | No shuffled row is younger than 16 days, the draw repeats, and no row repeats in a sample | Exact |
@@ -510,8 +510,8 @@ with the opposite sign at the pair partner; half are permanent, last 45 days, an
 From the host's rows alone the two kinds look identical until a temporary step ends. The reading
 uses origins 3 to 10 days after an onset and target half-hours at least 13 days after it, when every
 temporary step has ended and every permanent step remains. Each arm trains from scratch (random
-initial weights, stage 1 only, at most 15 passes): F4, whose slot holds the pair partner, needs a
-discrimination gap of at least 0.60; F4-R, whose slot holds a Primary of the other pair, needs an
+initial weights, stage 1 only, at most 150 passes with early stopping at patience 8): F4, whose slot
+holds the pair partner, needs a discrimination gap of at least 0.60; F4-R, whose slot holds a Primary of the other pair, needs an
 absolute gap of at most 0.15; and the no-neighbour network needs an absolute gap of at most 0.15 (a
 larger gap means the kind leaks through the host's rows, and the world is wrong). A report-only
 variant draws the mirrored share from 0.3 to 1.0.

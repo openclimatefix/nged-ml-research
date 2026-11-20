@@ -21,11 +21,13 @@ pairs, with
 steps of +-0.30 of capacity that cover about 15% of the history: half temporary (4 to 12 days, mirrored
 at the partner with the opposite sign) and half permanent (45 days, no mirror). **W3p** draws the
 mirrored share from 0.3 to 1.0 and reports the gap of `F4` with no threshold. **KN7's world** is W0 with
-no steps. Every arm trains from random weights with stage 1 only and at most 15 passes, and the new
+no steps. Every arm trains from random weights with stage 1 only and at most 150 passes (early
+stopping, patience 8), and the new
 parameters train at the base rate (there is no stage 1 state to warm start from).
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -50,7 +52,13 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 PAIRS: Final = ((2, 5), (9, 14))
 CROSS_PAIRS: Final = ((2, 9), (5, 14))
 PRIMARIES: Final = (2, 5, 9, 14)
-PASSES: Final = 15
+PASSES: Final = 150
+"""Pass cap of the synthetic fits; early stopping (patience 8, experiment 713's) ends a fit well before it.
+
+The cap applies to the known-answer fits only and leaves the real folds' budgets unchanged.
+"""
+TRAIN_LOGS: Final[list[dict]] = []
+"""The training log of every synthetic fit, stored in the gate file."""
 THRESHOLDS: Final = {
     "KN6_f4_gap": 0.60,
     "KN6_f4r_abs_gap": 0.15,
@@ -146,7 +154,7 @@ def medians(
     return np.concatenate(meds), np.concatenate(acts), np.concatenate(idxs)
 
 
-def train_from_scratch(*, world: tr.F4World, device: str, seed: int = 0) -> mdl.MsaNet:
+def train_from_scratch(*, world: tr.F4World, device: str, label: str, seed: int = 0) -> mdl.MsaNet:
     """Train one network from random weights with stage 1 only and at most `PASSES` passes."""
     torch.manual_seed(seed)
     spec = world.spec
@@ -165,10 +173,11 @@ def train_from_scratch(*, world: tr.F4World, device: str, seed: int = 0) -> mdl.
         mean=world.base.target_mean,
         std=world.base.target_std,
     )
-    tr.train_stage(
+    log = tr.train_stage(
         model=model, world=world, stage=1, samples=samples, seed=seed, encoders="random", max_passes=PASSES,
         source=source, ensemble=False, new_lr=tr713.PRETRAIN_LR,
     )  # fmt: skip
+    TRAIN_LOGS.append({"fit": label, "cap": PASSES, **vars(log)})
     return model
 
 
@@ -328,6 +337,9 @@ def run_checks(*, month: str, device: str) -> dict:
     print("\n".join(lines))
     results["KN12"] = {"pass": ok, "lines": lines}
     results["KN11a"] = era.kn11a(month=month)
+    if not (results["KN12"]["pass"] and results["KN11a"]["pass"]):
+        print("a base check failed: the synthetic fits are not run")
+        return results
     data, temperature, day_type, half_hour = load_world(month=month, device=device)
     base = w0_base(temperature=temperature, day_type=day_type, half_hour=half_hour)
     first_valid = lay.STEPS_PER_DAY * 20
@@ -351,7 +363,7 @@ def run_checks(*, month: str, device: str) -> dict:
                 table=table,
                 neighbours=neighbours,
             )
-            model = train_from_scratch(world=world, device=device)
+            model = train_from_scratch(world=world, device=device, label=f"{world_name} {arm}")
             follow = w3_follow(model=model, world=world, w3=w3, mean=mean, std=std)
             gaps[world_name][arm] = follow["gap"]
             print(world_name, arm, follow, flush=True)
@@ -376,7 +388,7 @@ def run_checks(*, month: str, device: str) -> dict:
             table=wd.pair_table(pairs=PAIRS),
             neighbours=neighbours,
         )
-        model = train_from_scratch(world=world, device=device)
+        model = train_from_scratch(world=world, device=device, label=f"W0 pairs {arm}")
         samples = held_out(world=world)
         med, act, _ = medians(
             model=model,
@@ -464,7 +476,18 @@ def main() -> int:  # noqa: PLR0911
     path = arms.gate_file(data_dir=ML_EXPERIMENTS_DATA_DIR)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(str(path) + ".tmp")
-    tmp.write_text(json.dumps({**results, "code": arms.code_record()}, indent=1, default=str))
+    tmp.write_text(
+        json.dumps(
+            {
+                **results,
+                "train_logs": TRAIN_LOGS,
+                "known_answer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "code": arms.code_record(),
+            },
+            indent=1,
+            default=str,
+        )
+    )
     tmp.rename(path)
     return 0
 
