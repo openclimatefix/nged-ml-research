@@ -1140,7 +1140,8 @@ show.
 
 ## 27. Phase B2 result: one arm passes the rule at 95% only (interim)
 
-**Only `b2-aug` meets the pre-registered B2 decision rule, and only at the 95% level.** The table compares each B2 arm with phase B's `none` on the same
+**Only `b2-aug` meets the pre-registered B2 decision rule, and only at the 95% level.** The table
+compares each B2 arm with phase B's `none` on the same
 rows (4 fold months, seeds 0 and 1). The 95% intervals resample whole fold months only, so each
 rests on 4 months. CRPS differences are in points of effective capacity.
 
