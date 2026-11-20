@@ -148,8 +148,8 @@ capacity), and the same host summaries computed without that error scored 0.81 a
 **A next experiment could test a better estimate of normal demand, neighbour rows read while a move
 is in force, and era labels ([experiment 712](../00712-clean-era-labels-part-1/result.md)) before a
 neural network is trained on a single substation.** The era labels are a lean and the neighbour rows
-a hypothesis, not findings. The frozen probe named in the title was not run, because [experiment
-713](../00713-msa-axial-attention-demand-network-part-1/result.md) stored no vectors for the probe
+a hypothesis, not findings. The frozen probe named in the title was not run, because experiment 713 (the
+axial-attention network, still a plan on PR 402) stored no vectors for the probe
 to read.
 
 **We asked whether the 14 most recent days of a substation's own power show if a level change will

@@ -1,6 +1,7 @@
 # ruff: noqa: E402, PT018
 """Tests of experiment 714's features, classifier, and second generator. Synthetic data only."""
 
+import ast
 import sys
 from pathlib import Path
 
@@ -205,7 +206,14 @@ def test_intermittent_rows() -> None:
 
 def test_second_generator_shares_no_injector_with_experiment_709() -> None:
     """The second generator never imports experiment 709's injector."""
-    assert "e00709_inject" not in sys.modules
+    tree = ast.parse(Path(g2.__file__).read_text())
+    imported = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    assert "e00709_inject" not in imported
     assert not hasattr(g2, "inject")
 
 
