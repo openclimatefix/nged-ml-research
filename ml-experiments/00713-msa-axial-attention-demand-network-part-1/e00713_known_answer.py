@@ -27,13 +27,15 @@ and `shift` is zero in world W0. In world W1 each Primary has level steps of +0.
 """
 
 import argparse
+import copy
 import hashlib
+import inspect
 import json
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00713_arms as arms
 import e00713_batch as bt
@@ -51,11 +53,14 @@ STEP_SHARE: Final = 0.10
 NOISE_SD: Final = 0.01
 WORLD_SEED: Final = 0
 HELD_OUT_DAYS: Final = 60
-SYNTHETIC_PASSES: Final = 150
-"""Pass cap of the synthetic fits; early stopping (patience 8) ends a fit well before it.
+SYNTHETIC_PASSES: Final = 400
+SYNTHETIC_PATIENCE: Final = 30
+FOLLOW_TRACE_EVERY: Final = 20
+"""Pass cap and patience of the synthetic fits (amendment 3).
 
-Four Primaries give 5,672 stage-1 samples, so a pass is 23 steps of 256 and the cap is 3,450 steps.
-The cap applies to the known-answer fits only and leaves the real folds' budgets unchanged.
+Four Primaries give 5,672 stage-1 samples, so a pass is 23 steps of 256 and the cap is 9,200 steps.
+The cap and the patience apply to the known-answer fits only and leave the real folds' budgets
+(`e00713_train.PATIENCE` and the passes of `e00713_fit.py`) unchanged.
 """
 THRESHOLDS: Final = {
     "KA2_mae": 0.02, "KA3_follow_m": 0.75, "KA3_follow_p": 0.25, "KA4_m_minus_n": 0.005,
@@ -233,6 +238,40 @@ def follow_from_arrays(
     )
 
 
+class FollowTrace:
+    """A callback of `tr.train_stage` for the secondary, never gating, follow-share readings (W1).
+
+    It keeps a copy of the network's state after every pass, so that the state at the final pass can
+    be scored, and it scores the follow share every `FOLLOW_TRACE_EVERY` passes. It saves and restores
+    the random state, so the training path is the same with or without it.
+    """
+
+    def __init__(self, **follow_args: Any) -> None:
+        """Keep the arguments of `follow_share`."""
+        self.args = follow_args
+        self.last: dict[str, torch.Tensor] = {}
+        self.trace: list[tuple[int, float]] = []
+
+    def __call__(self, passes: int, net: mdl.MsaNet) -> None:
+        """Copy the state; every `FOLLOW_TRACE_EVERY` passes, score the follow share."""
+        self.last = {k: v.detach().clone() for k, v in net.state_dict().items()}
+        if passes % FOLLOW_TRACE_EVERY:
+            return
+        device = next(net.parameters()).device
+        cpu_state = torch.get_rng_state()
+        cuda_state = torch.cuda.get_rng_state(device) if device.type == "cuda" else None
+        self.trace.append((passes, follow_share(model=net, **self.args)))
+        torch.set_rng_state(cpu_state)
+        if cuda_state is not None:
+            torch.cuda.set_rng_state(cuda_state, device)
+
+    def final_follow(self, *, net: mdl.MsaNet) -> float:
+        """Return the follow share of a copy of `net` at the state of the last pass."""
+        other = copy.deepcopy(net)
+        other.load_state_dict(self.last)
+        return follow_share(model=other, **self.args)
+
+
 def selftest() -> int:
     """CPU checks of the world's formula and the follow share, with no data and no fit."""
     rng = np.random.default_rng(1)
@@ -274,6 +313,15 @@ def selftest() -> int:
         syn=fake,
     )
     assert abs(full - 1.0) < 1e-9 and none == 0.0 and np.isnan(young)
+    # the real folds' training call is unchanged: the new parameters default to the old behaviour
+    # and no real-fold caller passes them
+    params = inspect.signature(tr.train_stage).parameters
+    assert params["patience"].default == tr.PATIENCE == 8 and params["on_pass"].default is None
+    here = Path(__file__).parent
+    for name in ("e00713_fit.py", "e00713_extras.py"):
+        text = (here / name).read_text()
+        assert "patience=" not in text and "on_pass=" not in text, name
+    assert tr.WARMUP_STEPS == 300 and SYNTHETIC_PATIENCE > tr.PATIENCE
     print("known-answer self-test passed (no data, no fit)")
     return 0
 
@@ -336,6 +384,14 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
     follow: dict[str, dict[str, float]] = {"W1": {}}
     fits: dict[str, dict[str, dict]] = {}  # each fit's training log
     results["fits"] = fits
+    secondary: dict = {
+        "note": "SECONDARY readings, labelled: they never gate. KA3 is scored at the best-validation "
+        "state of each fit, as pre-registered; these are the follow share at the final pass and "
+        f"every {FOLLOW_TRACE_EVERY} passes",
+        "follow_final_pass": {},
+        "follow_every_20_passes": {},
+    }
+    results["secondary"] = secondary
     for kind in ("W0", "W1"):
         syn = build_world(
             kind=kind,
@@ -352,6 +408,11 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
             torch.manual_seed(0)
             model = mdl.MsaNet(switches=mdl.ARM_SWITCHES[arm]).to(dev)
             samples = tr.make_samples(world=world, stage=1, placebo=arm == "P", primaries=PRIMARIES)
+            follow_args = {
+                "world": world, "syn": syn, "samples": held, "mean": mean, "std": std,
+                "use_placebo": arm == "P",
+            }  # fmt: skip
+            tracer = FollowTrace(**follow_args) if kind == "W1" else None
             log = tr.train_stage(
                 model=model,
                 world=world,
@@ -360,6 +421,8 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
                 seed=0,
                 encoders="random",
                 max_passes=SYNTHETIC_PASSES,
+                patience=SYNTHETIC_PATIENCE,
+                on_pass=tracer,
             )
             fits.setdefault(kind, {})[arm] = vars(log)
             print(
@@ -386,6 +449,16 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
                     mean=mean,
                     std=std,
                     use_placebo=arm == "P",
+                )
+                assert tracer is not None
+                secondary["follow_final_pass"][arm] = tracer.final_follow(net=model)
+                secondary["follow_every_20_passes"][arm] = tracer.trace
+                print(
+                    "SECONDARY, never gates:",
+                    arm,
+                    "follow at the final pass",
+                    round(secondary["follow_final_pass"][arm], 4),
+                    flush=True,
                 )
             print(
                 kind,

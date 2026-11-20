@@ -11,6 +11,7 @@ The loop takes a
 
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -298,9 +299,15 @@ def param_groups(
 
 def train_stage(
     *, model: mdl.MsaNet, world: World, stage: int, samples: SampleSet, seed: int,
-    encoders: str, max_passes: int = 60, log: StageLog | None = None,
+    encoders: str, max_passes: int = 60, log: StageLog | None = None, patience: int = PATIENCE,
+    on_pass: Callable[[int, mdl.MsaNet], None] | None = None,
 ) -> StageLog:  # fmt: skip
-    """Train `model` on one stage in place and leave it at the state of the best validation loss."""
+    """Train `model` on one stage in place and leave it at the state of the best validation loss.
+
+    `patience` and `on_pass` exist for the known-answer fits (amendment 3); a real fold passes
+    neither, so its patience is `PATIENCE` and nothing is called after a pass. `on_pass(passes,
+    model)` runs after each pass's validation and must not change the model or the random state.
+    """
     started = time.monotonic()
     log = log or StageLog(stage=stage)
     ensemble = stage >= 2
@@ -344,12 +351,14 @@ def train_stage(
         )
         log.val_history.append(val)
         log.passes = epoch + 1
+        if on_pass is not None:
+            on_pass(epoch + 1, model)
         if val < best - 1e-5:
             best, stale = val, 0
             best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
         else:
             stale += 1
-            if stale >= PATIENCE:
+            if stale >= patience:
                 break
     else:
         log.cap_hit = True

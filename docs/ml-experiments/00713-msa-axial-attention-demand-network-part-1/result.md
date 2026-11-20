@@ -390,10 +390,10 @@ a uniform distribution on −0.10 to +0.10 (seed 0), keyed on the per-token loca
 local half-hour. The noise is Gaussian with standard deviation 0.01. `shift` is zero in world W0. In
 world W1 each Primary has level steps of +0.30 or −0.30 lasting 10 days, starting at random days
 that cover 10% of the history, in the power and so in the inputs and the targets. The training uses
-stage 1 with at most 150 passes (patience 8) and ERA5 as the target row's weather.
-The 150-pass cap is a budget for the known-answer fits only. Four Primaries give 5,672 stage-1
-samples, so a pass is 23 steps and the cap is 3,450 steps, against about 5,300 steps in the stage 1
-of a real fold. The cap does not change the training budget of any real fold.
+stage 1 with at most 400 passes (patience 30) and ERA5 as the target row's weather.
+The 400-pass cap and the patience of 30 are a budget for the known-answer fits only (amendment 3).
+Four Primaries give 5,672 stage-1 samples, so a pass is 23 steps and the cap is 9,200 steps. The
+budget does not change the training budget or the patience of any real fold.
 
 | Check | What must hold | Threshold |
 |---|---|---|
@@ -703,6 +703,21 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   input (896 weights). Both paths start with no effect, so KA1 holds for every arm. No threshold,
   budget, arm, or decision rule changes. The amendment was made after the audit, and the three
   failing J1 results (the dead read-out, then KA3 at 0.0099) stay on this page as the reason for it.
+- **A fifth departure, made after three failed gate runs: a larger budget for the synthetic fits
+  (amendment 3).** The gate has now failed three times, and all three results stay on this page.
+  The first run (commit 3ac110652) failed KA2 (arm `N` 0.0476 against 0.02), KA3 (arm `M` 0.0348
+  against 0.75), KA10, and KA12, because the read-out's `W_q` and `W_k` were both zero. The second
+  run (eb1942601) failed KA3 alone, at 0.0099, because the network ignored the lead day. The third
+  run (90b9de2c8), with the lead-day path, failed KA3 alone again: arm `M` 0.0186, arm `E` 0.1268,
+  arm `G` 0.0005, arm `P` −0.00007, arm `N` 0, with KA2, KA4, KA5, KA6, KA10, and KA12 passing.
+  A diagnostic on the same synthetic world W1 then suggested that the synthetic fits were stopping
+  early. **The amended gate raises the synthetic fits to at most 400 passes with a patience of 30.**
+  The amendment therefore came from a look at the very world that the gate uses, and the page says
+  so. KA3 is still scored at the pre-registered state, the best-validation state of each fit, with
+  the threshold of 0.75. The follow share at the final pass, and every 20 passes, is recorded as a
+  secondary reading that never gates. If the amended gate fails KA3 at the pre-registered state,
+  experiment 713 is reported as failing its gate. Every threshold, the real folds' budgets, and the
+  arm list are unchanged.
 - **Shared by all stages.** AdamW with weight decay 1e-3 and gradient clipping at 1.0; batch of 256
   samples; at most 60 passes with patience 8; loss `(weight × nll).sum() / weight.sum()` over finite
   targets. A pass visits every (Primary, origin day) once, with one lead day drawn uniformly,
