@@ -48,3 +48,54 @@ Every number is interim.
 
 - **The calls bill to the maintainer's shared plan quota.** The trial's init event showed
   `apiKeySource` = none. The US-dollar figures are API-equivalent prices and not charges.
+
+## Code review of the labelling, detector, and scoring code (Opus)
+
+- **Accepted, both blockers.** The labelling script gained a `--primary` flag, and a no-call
+  `--agreement` mode now compares the labels with the known answers.
+- **Accepted, the end-day bug.** The episode table now writes the detector's own end day for an
+  `era` or `unknown` candidate, so the training mask no longer holds out the wrong rows.
+- **Accepted, the safety and measurement items.** Any unexpected error now stops the other worker,
+  each log entry has start and finish times, a resume re-checks the billing route and the prompt
+  version, and the account-wide utilisation is summarised before and after a run.
+- **Accepted, the calendar keys in the prompt.** The prompt now uses 7-day trailing means, one
+  climatology, and local clock hours, with no weekday split. `calendar_keys.md` lists what remains.
+- **Accepted, two scorer faults.** A gate that cannot be evaluated now blocks the verdict, and the
+  self-test prints the five real-row interval cells that differ from the stored file.
+- **Not applied.** The check that the `era_id` values are causal was left as a minor item.
+
+## Review of the D8 pilot section (Sonnet, numbers and prose)
+
+- **Accepted.** The 85 label calls are 65 distinct checks plus 20 retries, the extrapolation is
+  stated on both bases, the recovery table closes at 19 candidates, and the terms the section uses
+  are defined.
+- **Rejected, "in 4 years" for the year probe.** The probe result file holds no count of years, so
+  the claim could not be verified and was dropped.
+- **Rejected, renaming the section heading.** Renaming it would change the anchor slug.
+- **Changed, the stop rule.** The page quotes the plan's pilot rule (fewer than 40% of eras labelled
+  `era` within 7 days) and says that rule was written for the injected bank and does not bind D8.
+
+## Code review of the attempt 2 scripts (Opus)
+
+- **Accepted, three blockers.** Attempt 2 could have overwritten attempt 1's signal files, the go
+  tokens were not truly single-use, and nothing kept attempt 2 on D8 under about US$4. Attempt 2
+  now writes to its own files, claims a token by an atomic rename before the first call, and
+  refuses any run that is not D8 with arm `llm` and the stated limits.
+- **Accepted, the should-fix items.** The probe score now checks the prompt stamp and records the
+  hash the calls were made with. The summary reports structure-only counts of the reply format. The
+  leftover attempt 1 go files were renamed to `.used`, and attempt 1 now refuses to spend.
+- **Accepted, the test fixes.** The attempt 2 probe test no longer reads the real data folder, the
+  always-true assertion is replaced, and new tests cover the non-D10 refusal and the three blocker
+  cases.
+- **Not applied.** One minor item, the module-level constants reassigned through `globals()`, would
+  need a refactor to a frozen dataclass.
+
+## Review of the attempt 2 section (Sonnet, numbers and prose)
+
+- **Accepted.** The claim that the format fix removed the invalid replies was an overclaim and is
+  removed. The page now says that attempt 1 and attempt 2 are separate calls, that attempt 1's
+  strict parser accepted 55 of 65 checks, and that attempt 2 still has 30 of 67 replies over 40
+  words. The scaling time is about 24 minutes, not attempt 1's 35 minutes. The terms the section
+  uses are defined.
+- **Rejected, adding the strict first-reply split (34, 1, and 30).** The page reports the two counts
+  that matter for the comparison, and the split is in the call-log summary.
