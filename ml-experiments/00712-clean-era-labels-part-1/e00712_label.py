@@ -121,6 +121,11 @@ SCHEMA_KEYS: Final[frozenset[str]] = frozenset(
 )
 MAX_REASON_WORDS: Final[int] = 60
 MAX_KEY_TEXT: Final[int] = 40
+PARSER_STRICT: Final[str] = "strict-1"
+"""The first parser: every key present, `reason` of at most 60 words."""
+PARSER_LENIENT: Final[str] = "lenient-2"
+"""`register_row` may be absent (read as null); a long `reason` is cut to 60 words and flagged."""
+REPARSED_LOG_PATH: Final[Path] = RUN_DIR / "call_log_reparsed.jsonl"
 
 
 class SchemaError(ValueError):
@@ -139,6 +144,8 @@ class Answer:
         shape: `solar`, `flat`, `demand-like`, or `irregular`.
         register_row: The number of the register row relied on, or `None`.
         reason: The audit text, never parsed.
+        reason_truncated: Whether `reason` was cut to its first 60 words.
+        parser_version: `PARSER_STRICT` or `PARSER_LENIENT`.
     """
 
     label: str
@@ -148,6 +155,8 @@ class Answer:
     shape: str
     register_row: int | None
     reason: str
+    reason_truncated: bool = False
+    parser_version: str = PARSER_LENIENT
 
     def as_json(self) -> JsonObject:
         """Return the answer as a JSON-ready mapping."""
@@ -159,6 +168,8 @@ class Answer:
             "shape": self.shape,
             "register_row": self.register_row,
             "reason": self.reason,
+            "reason_truncated": self.reason_truncated,
+            "parser_version": self.parser_version,
         }
 
 
@@ -167,13 +178,17 @@ def _is_int(*, value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def parse_reply(*, text: str, n_register_rows: int = 0) -> Answer:
+def parse_reply(  # noqa: PLR0912 - one branch per schema field
+    *, text: str, n_register_rows: int = 0, strict: bool = False
+) -> Answer:
     """Validate a reply against the output schema of design section 2.3.
 
     Args:
         text: The reply text, as one JSON object (a surrounding code fence is removed).
         n_register_rows: How many register rows the prompt showed; `register_row` must be `None`
             when this is 0, and otherwise `None` or a number from 1 to this count.
+        strict: Use the first parser (`PARSER_STRICT`), which rejects an absent `register_row`
+            and a `reason` of more than 60 words.
 
     Returns:
         The answer.
@@ -191,8 +206,9 @@ def parse_reply(*, text: str, n_register_rows: int = 0) -> Answer:
     if not isinstance(obj, dict):
         msg = "not a JSON object"
         raise SchemaError(msg)
-    if set(obj) != SCHEMA_KEYS:
-        missing = sorted(SCHEMA_KEYS - set(obj))
+    required = SCHEMA_KEYS if strict else SCHEMA_KEYS - {"register_row"}
+    if not required <= set(obj) or not set(obj) <= SCHEMA_KEYS:
+        missing = sorted(required - set(obj))
         extra = sorted(str(k)[:MAX_KEY_TEXT] for k in set(obj) - SCHEMA_KEYS)
         msg = f"keys differ from the schema: missing {missing}, extra {extra}"
         raise SchemaError(msg)
@@ -215,14 +231,21 @@ def parse_reply(*, text: str, n_register_rows: int = 0) -> Answer:
     if obj["shape"] not in SHAPES:
         msg = "field 'shape' is not one of its four values"
         raise SchemaError(msg)
-    row = obj["register_row"]
+    row = obj.get("register_row")
     if row is not None and (not _is_int(value=row) or not 1 <= row <= n_register_rows):
         msg = "field 'register_row' is not null or a shown row number"
         raise SchemaError(msg)
     reason = obj["reason"]
-    if not isinstance(reason, str) or len(reason.split()) > MAX_REASON_WORDS:
+    if not isinstance(reason, str):
+        msg = "field 'reason' is not a string"
+        raise SchemaError(msg)
+    words = reason.split()
+    truncated = len(words) > MAX_REASON_WORDS
+    if truncated and strict:
         msg = "field 'reason' is not a string of at most 60 words"
         raise SchemaError(msg)
+    if truncated:
+        reason = " ".join(words[:MAX_REASON_WORDS])
     return Answer(
         label=obj["label"],
         onset_offset_days=obj["onset_offset_days"],
@@ -231,16 +254,100 @@ def parse_reply(*, text: str, n_register_rows: int = 0) -> Answer:
         shape=obj["shape"],
         register_row=row,
         reason=reason,
+        reason_truncated=truncated,
+        parser_version=PARSER_STRICT if strict else PARSER_LENIENT,
     )
 
 
-def schema_report(*, log_path: Path) -> tuple[int, int, Counter[str]]:
+def reparse_log(*, entries: Sequence[JsonObject]) -> list[JsonObject]:
+    """Re-parse the stored replies of an `llm` arm log with the current parser, without a call.
+
+    The input entries are not changed. Each label entry is copied with its `answer` read again from
+    `raw_output`, its stored answer kept as `original_answer`, and `parser_version` set. Once a
+    check has a valid answer, a later attempt of the same check is marked unused, because a live
+    run would not have made it. A reply that is still invalid keeps `answer` as `None` and gets a
+    `parse_error` that names a field and never a value.
+
+    Args:
+        entries: The log entries (arm `llm`, so no register row is shown).
+
+    Returns:
+        The new entries, in the same order.
+    """
+    out: list[JsonObject] = []
+    settled: set[str] = set()
+    for entry in entries:
+        new = {k: v for k, v in entry.items() if k != "answer"}
+        if entry.get("tag") != "label" or entry.get("status") != "ok":
+            new["answer"] = entry.get("answer")
+            out.append(new)
+            continue
+        new["original_answer"] = entry.get("answer")
+        new["parser_version"] = PARSER_LENIENT
+        call_id = str(entry["call_id"])
+        if call_id in settled:
+            new |= {"answer": None, "parse_error": "unused: the check was already answered"}
+        else:
+            try:
+                new["answer"] = parse_reply(text=str(entry.get("raw_output") or "")).as_json()
+                settled.add(call_id)
+            except SchemaError as error:
+                new |= {"answer": None, "parse_error": str(error)}
+        out.append(new)
+    return out
+
+
+def _confident_classes(*, entries: Sequence[JsonObject]) -> Counter[str]:
+    """Count the answers that set an era or a switch at the 0.8 confidence rule."""
+    found: Counter[str] = Counter()
+    for entry in entries:
+        answer = entry.get("answer")
+        if answer and answer["label"] in ("era", "switch") and answer["confidence"] >= 0.8:
+            found[answer["label"]] += 1
+    return found
+
+
+def print_reparse_comparison(
+    *, original: Sequence[JsonObject], reparsed: Sequence[JsonObject]
+) -> None:
+    """Print how many replies are valid, and how many set an era or a switch, under each parser.
+
+    No label, reason, or reply text is printed; a reply that is still invalid is listed by the
+    error type (the schema message, which names a field only).
+    """
+    for name, entries in (("strict", original), ("lenient", reparsed)):
+        labels = [e for e in entries if e.get("tag") == "label" and e.get("status") == "ok"]
+        valid = [e for e in labels if e.get("answer")]
+        used = [
+            e for e in labels if e.get("parse_error") != "unused: the check was already answered"
+        ]
+        print(
+            f"{name} parser: {len(valid)} of {len(used)} replies valid; "
+            f"at the 0.8 rule {dict(_confident_classes(entries=valid))}"
+        )
+    still: Counter[str] = Counter(
+        str(e["parse_error"])
+        for e in reparsed
+        if e.get("tag") == "label"
+        and e.get("answer") is None
+        and e.get("parse_error")
+        and not str(e["parse_error"]).startswith("unused")
+    )
+    print(f"still invalid under the lenient parser: {sum(still.values())}")
+    for message, count in still.most_common():
+        print(f"  {count} x {message}")
+    cut = sum(1 for e in reparsed if (e.get("answer") or {}).get("reason_truncated"))
+    print(f"replies whose reason was cut to 60 words: {cut}")
+
+
+def schema_report(*, log_path: Path, strict: bool = False) -> tuple[int, int, Counter[str]]:
     """Count the valid and invalid replies of a call log, with the schema errors by message.
 
     Only the structure of each reply is tested. No label, reason, or reply text is returned.
 
     Args:
         log_path: A trial or label call log.
+        strict: Use the first parser.
 
     Returns:
         The number of valid replies, the number of invalid replies, and a count of each message.
@@ -251,7 +358,7 @@ def schema_report(*, log_path: Path) -> tuple[int, int, Counter[str]]:
         if entry.get("status") != "ok" or entry.get("tag") in ("billing-probe", "year-probe"):
             continue
         try:
-            parse_reply(text=str(entry.get("raw_output", "")))
+            parse_reply(text=str(entry.get("raw_output", "")), strict=strict)
         except SchemaError as error:
             invalid += 1
             errors[str(error)] += 1
@@ -1377,6 +1484,51 @@ def print_agreement(  # noqa: PLR0915 - one block per printed table
         )
 
 
+def reparse_command(
+    *,
+    candidates: Sequence[prompts.Candidate],
+    rerun_bank: asof.DetectorBank,
+    era_table: pl.DataFrame,
+    known_events: pl.DataFrame,
+) -> None:
+    """Re-parse the stored log offline, build both signals, and compare the two parsers.
+
+    The call log is only read. The re-parsed entries go to `REPARSED_LOG_PATH`; the table of the
+    first parser is written as `llm_strict` and the table of the new parser as `llm`.
+
+    Args:
+        candidates: The `llm` arm's candidates.
+        rerun_bank: The detector bank.
+        era_table: `era_table.parquet`.
+        known_events: `known_events.parquet`.
+    """
+    original = read_log()
+    reparsed = reparse_log(entries=original)
+    REPARSED_LOG_PATH.write_text("".join(json.dumps(e) + "\n" for e in reparsed))
+    print(f"re-parsed {len(reparsed)} entries into {REPARSED_LOG_PATH}; the call log is unchanged")
+    print_reparse_comparison(original=original, reparsed=reparsed)
+    for name, entries in (("llm_strict", original), ("llm", reparsed)):
+        answers = resolved_from_log(entries=entries, candidates=candidates, arm="llm")
+        table = asof.build_table(
+            arm=name,
+            candidates=candidates,
+            answers=answers,
+            bank=rerun_bank,
+            n_sites=len(features.PRIMARIES),
+        )
+        print(f"{name}: wrote {asof.write_table(table=table, folder=SIGNALS_DIR)}")
+    for name, entries in (("first parser", original), ("lenient parser", reparsed)):
+        print(f"\n===== {name} =====")
+        print_agreement(
+            arm="llm",
+            candidates=candidates,
+            entries=entries,
+            era_table=era_table,
+            known_events=known_events,
+            n_days=features.N_DAYS,
+        )
+
+
 def build_probe_prompts(*, candidates: Sequence[prompts.Candidate], inputs: prompts.Inputs) -> int:
     """Build the probe Primary's prompts with the current builder into `PROBE_PROMPT_DIR`.
 
@@ -1450,6 +1602,9 @@ def _parser() -> argparse.ArgumentParser:
         action="append",
         choices=sorted(features.PRIMARIES),
         help="restrict the candidates, schedule, and calls to this Primary (repeatable)",
+    )
+    parser.add_argument(
+        "--reparse", action="store_true", help="re-parse the stored replies with the lenient parser"
     )
     parser.add_argument(
         "--agreement", action="store_true", help="compare the log with the known answers"
@@ -1550,6 +1705,16 @@ def main() -> int:  # noqa: PLR0911, PLR0912, PLR0915 - one branch per command
     print(f"{len(candidates)} union candidates{restricted}: {dict(sorted(counts.items()))}")
     if args.build_probe_prompts:
         build_probe_prompts(candidates=everything, inputs=prompts.load_inputs())
+        return 0
+    if args.reparse:
+        bank, rerun = asof.build_detector_bank(stat3_sites=_register_sites())
+        union, _ = _candidates_from_rerun(rerun=rerun)
+        reparse_command(
+            candidates=restrict_primaries(candidates=union, primaries=args.primary),
+            rerun_bank=bank,
+            era_table=pl.read_parquet(asof.ERA_TABLE_PATH),
+            known_events=pl.read_parquet(asof.KNOWN_EVENTS_PATH),
+        )
         return 0
     if args.agreement:
         low: list[prompts.Candidate] = []

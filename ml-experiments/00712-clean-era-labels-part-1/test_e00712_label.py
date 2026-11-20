@@ -92,7 +92,7 @@ def test_parse_reply_accepts_a_valid_reply_and_a_code_fence() -> None:
         ({"neighbour_mirror": "maybe"}, "neighbour_mirror"),
         ({"shape": "round"}, "shape"),
         ({"register_row": 1}, "register_row"),
-        ({"reason": "word " * 61}, "reason"),
+        ({"reason": 7}, "reason"),
     ],
 )
 def test_parse_reply_names_the_bad_field_and_never_a_value(change: dict, field: str) -> None:
@@ -118,10 +118,54 @@ def test_parse_reply_rejects_missing_and_extra_keys_and_non_json() -> None:
             label.parse_reply(text=text)
 
 
+def test_register_row_may_be_absent_and_a_long_reason_is_cut_and_flagged() -> None:
+    body = json.loads(_reply())
+    del body["register_row"]
+    answer = label.parse_reply(text=json.dumps(body))
+    assert answer.register_row is None
+    assert answer.parser_version == label.PARSER_LENIENT
+    assert not answer.reason_truncated
+    with pytest.raises(label.SchemaError, match="keys differ"):
+        label.parse_reply(text=json.dumps(body), strict=True)
+    long = label.parse_reply(text=_reply(reason="word " * 61))
+    assert long.reason_truncated
+    assert len(long.reason.split()) == label.MAX_REASON_WORDS
+    assert long.as_json()["parser_version"] == label.PARSER_LENIENT
+    with pytest.raises(label.SchemaError, match="reason"):
+        label.parse_reply(text=_reply(reason="word " * 61), strict=True)
+    with pytest.raises(label.SchemaError, match="confidence"):
+        label.parse_reply(text=_reply(reason="word " * 61, confidence=1.5))
+    assert label.parse_reply(text=_reply(), strict=True).parser_version == label.PARSER_STRICT
+
+
+def test_reparsing_a_log_leaves_the_original_entries_unchanged() -> None:
+    good = {"tag": "label", "status": "ok", "call_id": "llm:a_alarm", "answer": None,
+            "raw_output": _reply(reason="word " * 61)}  # fmt: skip
+    retry = {**good, "raw_output": _reply(label="switch"), "attempt": 1}
+    broken = {**good, "call_id": "llm:b_alarm", "raw_output": "not json"}
+    probe = {
+        "tag": "billing-probe",
+        "status": "ok",
+        "call_id": "llm:billing_probe_0",
+        "answer": None,
+    }
+    entries = [good, retry, broken, probe]
+    before = json.dumps(entries)
+    out = label.reparse_log(entries=entries)
+    assert json.dumps(entries) == before
+    assert out[0]["answer"]["reason_truncated"]
+    assert out[0]["parser_version"] == label.PARSER_LENIENT
+    assert out[0]["original_answer"] is None
+    assert out[1]["answer"] is None  # a live run would not have asked again
+    assert out[2]["answer"] is None
+    assert out[2]["parse_error"].startswith("not valid JSON")
+    assert out[3]["answer"] is None
+
+
 def test_stored_trial_replies_count_valid_and_invalid_only() -> None:
     if not label.TRIAL_LOG_PATH.exists():
         pytest.skip("the stored trial log is not on this machine")
-    valid, invalid, errors = label.schema_report(log_path=label.TRIAL_LOG_PATH)
+    valid, invalid, errors = label.schema_report(log_path=label.TRIAL_LOG_PATH, strict=True)
     print(f"stored trial replies: {valid} satisfy the schema, {invalid} fail it")
     for message, count in errors.items():
         print(f"  {count} x {message}")
