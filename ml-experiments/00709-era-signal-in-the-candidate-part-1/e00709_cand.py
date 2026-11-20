@@ -1035,7 +1035,12 @@ def write_contract(*, frame: pl.DataFrame, name: str) -> None:
     import e00667_export as exp  # ty: ignore[unresolved-import]
     from studies import experiment_store as store
 
-    rows = exp.contract_rows(mean=frame)
+    if IS_E:  # the stored rows before 2025-07-01 keep only half-hours with an observed target
+        import e00709_e_contract as e_contract  # ty: ignore[unresolved-import]
+
+        rows = e_contract.contract_rows(mean=frame)
+    else:
+        rows = exp.contract_rows(mean=frame)
     assert (rows["nwp_init_time"] == rows["power_fcst_init_time"].dt.truncate("1d")).all()
     # only the finalist rows (valid on or after 2026-07-01) are dropped; a forecast for the last days of
     # the month keeps its half-hours that fall in the next month, so every row set row is complete
