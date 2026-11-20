@@ -101,7 +101,7 @@ def known_1_loop_equals_old_loop() -> None:
         return value
 
     setting = net707.G09
-    models.mixture_nll = spy
+    models.mixture_nll = spy  # ty: ignore[invalid-assignment]
     try:
         torch.manual_seed(0)
         old = net707.new_model(n_inputs=width, n_primaries=N_PRIMARIES, setting=setting)
@@ -264,7 +264,8 @@ def known_3_prediction_only(*, month: str = "2026-01", seed: int = 0) -> None:
             message=f"{stored_arm}: the forecasts hold different keys",
         )
         gap = max(
-            float((joined[c] - joined[f"{c}_stored"]).abs().max()) for c in common.LEVEL_COLUMNS
+            float((joined[c] - joined[f"{c}_stored"]).abs().max())  # ty: ignore[invalid-argument-type]
+            for c in common.LEVEL_COLUMNS
         )
         check(condition=gap <= TOLERANCE_PREDICTION, message=f"{stored_arm}: gap {gap:.2e} > 1e-4")
         print(f"test 3: {stored_arm} {month} seed {seed} reproduced, largest gap {gap:.2e}")
@@ -448,7 +449,7 @@ def check_worlds(*, month: str = "2026-01", seed: int = 0) -> None:
         )
     check(condition=bool(np.array_equal(base.y, shifted_fold.y)), message="the target changed")
     standardiser = base.standardiser
-    spread = folds707.spread_table(fold=base)
+    spread = folds707.spread_table(fold=base)  # ty: ignore[invalid-argument-type]
     del base, empty, shifted_fold
     plain, _ = folds.ens_rows(
         standardiser=standardiser, refit=refit, window=arms707.W_F, power=None

@@ -323,7 +323,7 @@ def month_scale(*, month: str) -> MonthScale:
         table, and the number of recent rows.
     """
     fold = folds.build_fold(refit=prep.refit_of(month=month), window=arms707.W24, power=None)
-    spread = folds707.spread_table(fold=fold)
+    spread = folds707.spread_table(fold=fold)  # ty: ignore[invalid-argument-type]
     scale = net707.Scale(
         standardiser=fold.standardiser, target_mean=fold.target_mean, target_std=fold.target_std
     )

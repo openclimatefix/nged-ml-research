@@ -1000,7 +1000,7 @@ def observed(*, site: str, window: tuple[datetime, datetime]) -> pl.DataFrame:
     last = int(common.grid_index(times=window[1]))  # ty: ignore[invalid-argument-type]
     index = np.arange(first, last + 1)
     values = 100.0 * common.take(values=inject.observed_power()[site], index=index)
-    times = [common.GRID_START + i * common.STEP for i in index]
+    times = [common.GRID_START + int(i) * common.STEP for i in index]
     return pl.DataFrame({"valid_time": times, "value": values.astype(np.float64)})
 
 
