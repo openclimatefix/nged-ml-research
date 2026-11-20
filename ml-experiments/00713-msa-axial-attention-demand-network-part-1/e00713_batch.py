@@ -174,6 +174,11 @@ class Source:
                 "the ensemble run is not the origin's own run (issued after the origin)"
             )
             day = (c_idx // lay.STEPS_PER_DAY - self.ens.first_day + ens_day_offset)[:, None]
+            n_days = self.ens.filled.shape[1]
+            assert bool(((day >= 0) & (day < n_days)).all()), (
+                f"an origin day lies outside the ensemble table (0 to {n_days - 1}): "
+                f"{int(day.min())} to {int(day.max())}"
+            )  # raised here, not as a device-side assert in the gather below
             if self.ens.run_us is not None:
                 run = self.ens.run_us[primary, day[:, 0]]
                 origin = lay.GRID_START_US + (c_idx - lay.NATIVE_OFFSET_STEPS) * lay.STEP_US
@@ -235,6 +240,14 @@ def ka6_canary(
     assert ens is not None
     assert ens.run_us is not None, "the source carries no run times"
     day = c_idx // lay.STEPS_PER_DAY - ens.first_day
+    n_days = ens.run_us.shape[1]
+    day_min, day_max = (
+        int(day.min().cpu()),
+        int(day.max().cpu()),
+    )  # checked before the gather, so the error is readable
+    if day_min < 0 or day_max >= n_days:
+        msg = f"KA6 canary origin day index {day_min} to {day_max} is outside the ensemble table (0 to {n_days - 1})"
+        raise IndexError(msg)
     present = ens.run_us[primary, day] > 0
     assert bool(present.any()), "no sample of the canary has an ensemble row"
     bad = copy.copy(source)

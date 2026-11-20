@@ -272,7 +272,7 @@ def selftest() -> int:
     return 0
 
 
-def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:
+def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PLR0915
     """Run KA5, KA6, and the synthetic-world checks for the fold `month`; return the results."""
     os.environ["E00667_PHASE"] = "train"
     import e00713_inputs as inp
@@ -293,9 +293,16 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:
     results["KA5"] = bt.poison_check(
         source=src, batch=batch, ages=None, age_exists=None, ensemble=False, lead_day=lead
     )
-    ens_c = torch.from_numpy(
-        np.arange(int(data.cutoff_idx) - 48 * 40, int(data.cutoff_idx) - 48 * 3, 48) + 24
-    ).to(dev)
+    assert src.ens is not None
+    ens_c_np = np.arange(int(data.cutoff_idx) - 48 * 40, int(data.cutoff_idx) - 48 * 3, 48) + 24
+    ens_day = ens_c_np // lay.STEPS_PER_DAY - src.ens.first_day
+    ens_c_np = ens_c_np[
+        (ens_day >= 0) & (ens_day < src.ens.filled.shape[1])
+    ]  # only days the ensemble table holds
+    print(
+        f"KA6 canary origins: {len(ens_c_np)} of the 37 origin days from cutoff - 40 to cutoff - 4 days lie inside the ensemble table"
+    )
+    ens_c = torch.from_numpy(ens_c_np).to(dev)
     results["KA6"] = "canary raised: " + bt.ka6_canary(
         source=src,
         primary=prim[:1].expand(len(ens_c)),
