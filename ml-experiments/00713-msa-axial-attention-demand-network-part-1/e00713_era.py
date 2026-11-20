@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PT018, PERF401
 """Experiment 713: the secondary era set (design 1.10): KA11, the bank predictions, and R1 to R3.
 
 Usage:
@@ -9,7 +9,7 @@ Usage:
 
 **Prediction only.** The onset is the fold's cutoff day, so every fitted state was trained on the real
 power. `bank` loads the stored stage 3 state of an arm, replaces the history power with
-`InjectedPass.power` (`00709-*/worlds/bank_<month>_p<pass>.pkl`), and forecasts the host
+the injected panel `power` (`00709-*/worlds/bank_<month>_p<pass>.pkl`), and forecasts the host
 Primaries of the
 pass's events for every origin of the month. Nothing is refitted. The scored slices are those of
 `e00709_bank_score.event_losses`: the event's CRPS is the mean over its rows, against
@@ -37,6 +37,7 @@ import e00713_layout as lay
 import e00713_model as mdl
 import e00713_score as score
 import e00713_train as tr
+import e00713_variants as variants
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
@@ -63,6 +64,20 @@ def load_pass(*, month: str, index: int):  # noqa: ANN201
         return pickle.load(f)  # our own stored bank
 
 
+def full_panel(*, injected: np.ndarray, clean: np.ndarray) -> np.ndarray:
+    """Return the injected panel on the adapter's grid.
+
+    Experiment 709's panels start on the same half-hour as the cleaned power and end on 2026-06-30,
+    which is earlier than the adapter's grid end. The cleaned power fills the rest. The start is
+    checked by the comparison of the untouched Primaries in KA11.
+    """
+    injected = np.asarray(injected, dtype=np.float64)
+    assert injected.shape[0] == clean.shape[0] and injected.shape[1] <= clean.shape[1]
+    out = clean.astype(np.float64).copy()
+    out[:, : injected.shape[1]] = injected
+    return out
+
+
 def ka11(*, month: str, device: str) -> None:
     """KA11: the injected power equals the cleaned power outside the injected windows; `none` is reproduced."""
     pipe = inp.load_pipeline(month=month, phase="predict")
@@ -70,23 +85,35 @@ def ka11(*, month: str, device: str) -> None:
     clean = data.clean
     for index in PASSES:
         ipass = load_pass(month=month, index=index)
-        power = np.asarray(ipass.power, dtype=np.float64)
-        assert power.shape == clean.shape, (
-            f"the injected panel {power.shape} and the cleaned power {clean.shape} differ in shape"
-        )
+        power = full_panel(injected=ipass["power"], clean=clean)
         deviates = np.isfinite(power) & np.isfinite(clean) & (np.abs(power - clean) > 1e-6)
-        truth = ipass.truth
-        window = np.zeros(clean.shape[1], dtype=bool)
-        for event in truth.iter_rows(named=True):
-            end = event["end_day"] if event["end_day"] >= 0 else clean.shape[1] // 48
-            window[event["onset_day"] * 48 : (end + 1) * 48] = True
-        outside = deviates & ~window[None, :]
+        truth = ipass["truth_table"]
+        touched = sorted(ipass["touched"])
+        hosts = sorted(set(truth["host"].to_list()))
+        assert set(hosts) <= set(touched), "a host of the truth table is not a touched Primary"
+        n_grid = clean.shape[1]
+        ends = [
+            n_grid if event["end_day"] < 0 else (event["end_day"] + 1) * 48
+            for event in truth.iter_rows(named=True)
+        ]
+        starts = [event["onset_day"] * 48 for event in truth.iter_rows(named=True)]
+        # a touched Primary (host, donor, or recipient) may deviate only inside the window of the pass's events
+        allowed = np.zeros(clean.shape, dtype=bool)
+        for p in touched:
+            allowed[p, min(starts) : max(ends)] = True
+        outside = deviates & ~allowed
         assert not outside.any(), (
-            f"pass {index}: {int(outside.sum())} half-hours deviate outside the windows"
+            f"pass {index}: {int(outside.sum())} half-hours deviate outside the touched Primaries' windows; "
+            f"Primaries {sorted(set(np.nonzero(outside)[0].tolist()))}"
         )
-        hosts = set(truth["host"].to_list())
-        movers = set(np.nonzero(deviates.any(axis=1))[0].tolist())
-        print(f"pass {index}: hosts {sorted(hosts)}, Primaries that deviate {sorted(movers)}")
+        movers = sorted(set(np.nonzero(deviates.any(axis=1))[0].tolist()))
+        assert set(hosts) <= set(movers), (
+            f"pass {index}: a host does not deviate from the cleaned power"
+        )
+        print(
+            f"pass {index}: hosts {hosts}, touched {touched}, deviating {movers}, "
+            f"{int(deviates.sum())} half-hours deviate, none outside the windows"
+        )
     ids = k578.sites()["time_series_id"].to_numpy()
     for seed in arms.SCREEN_SEEDS:
         mine = bank_score.event_losses(arm="none", month=month, seed=seed, ids=ids)
@@ -168,10 +195,14 @@ def event_rows(
     return out
 
 
-def cmd_bank(*, arm: str, month: str, seed: int, device: str) -> None:
-    """Forecast the host Primaries of every pass with the injected history power."""
+def cmd_bank(*, arm: str, month: str, seed: int, device: str, variant: str = "plain") -> None:
+    """Forecast the host Primaries of every pass with the injected history power.
+
+    `variant` is `plain`, or one of the report-only read-outs of `e00713_variants` (`shuffle`, `mask9`),
+    which write to the folder `<arm>-<variant>_<month>_s<seed>`.
+    """
     data_dir = ML_EXPERIMENTS_DATA_DIR
-    folder = BANK713 / f"{arm}_{month}_s{seed}"
+    folder = BANK713 / f"{arm}{'' if variant == 'plain' else '-' + variant}_{month}_s{seed}"
     spec = arms.resolve(arm=arm, data_dir=data_dir)
     pipe = inp.load_pipeline(
         month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
@@ -188,9 +219,11 @@ def cmd_bank(*, arm: str, month: str, seed: int, device: str) -> None:
             continue
         ipass = load_pass(month=month, index=index)
         reference = pl.read_parquet(D709 / "bank" / f"none_{month}_s0" / f"pass{index:02d}.parquet")
-        events = ipass.truth
+        events = ipass["truth_table"]
         hosts = sorted(set(events["host"].to_list()))
-        z = (np.asarray(ipass.power) - data.target_mean[:, None]) / data.target_std[:, None]
+        z = (
+            full_panel(injected=ipass["power"], clean=data.clean) - data.target_mean[:, None]
+        ) / data.target_std[:, None]
         src = data.source.with_power_in(power_in=torch.from_numpy(z.astype(np.float32)).to(device))
         origins = np.sort(reference["power_fcst_init_time"].unique().to_numpy())
         import e00422_prep as prep422  # ty: ignore[unresolved-import]
@@ -221,7 +254,9 @@ def cmd_bank(*, arm: str, month: str, seed: int, device: str) -> None:
                     dropout=None,
                 )
                 with torch.no_grad():
-                    qq = mdl.standardised_quantiles(out=model(b.inputs).out)
+                    qq = mdl.standardised_quantiles(
+                        out=model(variants.apply_variant(inputs=b.inputs, variant=variant)).out
+                    )
                 p = prim.ravel()[sel]
                 qq = (
                     qq.cpu().numpy() * data.target_std[p][:, None, None]
@@ -301,7 +336,7 @@ def cmd_score() -> None:
                         fold=month,
                         seed=seed,
                     ):
-                        losses.append({"arm": arm, **r})  # noqa: PERF401
+                        losses.append({"arm": arm, **r})
                     ref = pl.read_parquet(D709 / "bank" / f"none_{month}_s{seed}" / path.name).join(
                         forecast.select("time_series_id", "power_fcst_init_time", "valid_time"),
                         on=["time_series_id", "power_fcst_init_time", "valid_time"], how="inner",
@@ -309,7 +344,7 @@ def cmd_score() -> None:
                     for r in event_rows(
                         forecast=ref, events=events, ids=ids, name=path.stem, fold=month, seed=seed
                     ):
-                        losses.append({"arm": "C", **r})  # noqa: PERF401
+                        losses.append({"arm": "C", **r})
     frame = pl.DataFrame(losses)
     per_event = frame.group_by("arm", "fold", "pass", "event", "slice").agg(pl.col("crps").mean())
     out = {}
@@ -373,13 +408,16 @@ def main() -> int:
     b.add_argument("seed", type=int)
     sub.add_parser("score")
     sub.add_parser("r1")
+    b.add_argument("--variant", default="plain", choices=variants.VARIANTS)
     for p in (k, b):
         p.add_argument("--device", default="cuda")
     args = parser.parse_args()
     if args.command == "ka11":
         ka11(month=args.month, device=args.device)
     elif args.command == "bank":
-        cmd_bank(arm=args.arm, month=args.month, seed=args.seed, device=args.device)
+        cmd_bank(
+            arm=args.arm, month=args.month, seed=args.seed, device=args.device, variant=args.variant
+        )
     elif args.command == "score":
         cmd_score()
     else:

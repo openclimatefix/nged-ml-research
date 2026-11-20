@@ -14,11 +14,11 @@ which is how the Candidate reads its lag times. The forecasts are written under 
 `<arm>-swapa` and `<arm>-swapb`.
 
 **The injected shifts of experiment 581** (`e00581_bank.contaminate`, passes 0 to 11) add a level
-shift to every Primary, ending 14 days after the month's start. The follow share of a pass is the
-median forecast on the shifted history minus the median forecast on the clean history, divided by the
-shift, averaged over lead days 2 to 10 of the origins whose history holds at least 3 shifted days
-(origins from 3 days after the onset to the end of the window). The same origins and a simple
-difference of two forward passes of one network make the share independent of the actual power.
+shift to every Primary, ending 14 days after the month's start. The follow share is experiment 581's
+`follow_q50` (`e00581_tails._aggregate`): the median forecast on the shifted history minus the median
+forecast of the same network on the clean history (581's "uninjected twin"), times the sign of the
+shift, divided by its depth. It is averaged over origins from 4 days after the onset to the end of the
+event (581's phase `d4-end`) and over lead days 1 to 5 (581's 24-120 h band), then over the 16 Primaries.
 """
 
 import argparse
@@ -150,7 +150,7 @@ def cmd_shifts(*, arm: str, month: str, seed: int, device: str) -> None:
         shares = []
         for p in range(16):
             row = rows[p]
-            first_day = (row["onset_idx"] + 3 * lay.STEPS_PER_DAY) // 48
+            first_day = (row["onset_idx"] + 4 * lay.STEPS_PER_DAY) // 48
             last_day = row["end_idx"] // 48
             days = np.arange(first_day, last_day)
             if not len(days):
@@ -158,7 +158,7 @@ def cmd_shifts(*, arm: str, month: str, seed: int, device: str) -> None:
             c = days * 48 + 24
             prim = np.full(len(c), p)
             diffs = []
-            for lead in range(1, 10):
+            for lead in range(1, 6):
                 a = median_at(model=model, source=src, primary=prim, c_idx=c, lead=lead, data=data)
                 b = median_at(
                     model=model, source=data.source, primary=prim, c_idx=c, lead=lead, data=data
