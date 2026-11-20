@@ -336,6 +336,7 @@ def real(*, month: str) -> None:
     import e00715_arms as arms
 
     table = nb.load_table()
+    arms.install_own_cache()
     pipe = inp.load_pipeline(month=month, phase="predict")
     data = inp.build_fold_data(pipe=pipe, device="cpu")
     src = arms.f4_source(data=data, table=table, mode="real", rewire_seed=0)
