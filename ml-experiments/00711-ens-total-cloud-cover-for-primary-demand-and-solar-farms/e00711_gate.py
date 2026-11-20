@@ -138,6 +138,18 @@ def missing_gates(*, path: Path = GATE_PATH) -> list[str]:
     return missing
 
 
+def gate_state_lines(*, path: Path = GATE_PATH) -> list[str]:
+    """Return the gate state as printable lines, for a dry run that must not raise.
+
+    A real fit raises if any gate result is missing or stale. A dry run prints these lines instead,
+    so that a launcher sees the refusal before the queue starts.
+    """
+    missing = missing_gates(path=path)
+    if not missing:
+        return ["gate: both gates passed at both gate months, current at HEAD"]
+    return [f"gate: a real fit would be refused; {line}" for line in missing]
+
+
 def refuse_without_gate(*, arm: str, measure: bool, path: Path = GATE_PATH) -> None:
     """Raise unless the gate marker holds both gates at both gate months.
 

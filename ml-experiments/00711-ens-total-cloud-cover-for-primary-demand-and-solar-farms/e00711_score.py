@@ -104,7 +104,11 @@ LEVEL_COLUMNS: Final[tuple[str, ...]] = (
 KEYS: Final[tuple[str, str, str]] = ("time_series_id", "power_fcst_init_time", "valid_time")
 SIX: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16")
 FIVE: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D14", "D16")
-"""The six without D9, whose first reading in the cleaned power table is 2023-11-21."""
+"""The six without D9, which has no back-filled row before origin 2023-08-09.
+
+D9 is therefore absent from the first four replicate folds (2023-04 to 2023-07), and leaving it out
+keeps the group fixed over all 12 folds.
+"""
 EIGHT: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
 EIGHT_WITHOUT_D8: Final[tuple[str, ...]] = tuple(p for p in EIGHT if p != "D8")
 SHORT_HISTORY: Final[tuple[str, ...]] = ("D15", "D18")
@@ -1709,7 +1713,7 @@ def verdicts_b1(*, readings: dict[str, Outcome]) -> dict[str, str]:
     """Print and return Stage B1's verdicts: C3 and G1, each by the decision rule.
 
     The verdicts are the decision rule applied to the decisive interval. Stage B1 gives no
-    front-matter verdict, because it holds no positive control and no solar arm. Section 12 of the
+    front-matter verdict, because it holds no positive control and no solar arm. Section 8 of the
     page says what each outcome means for the flag and date-proxy question.
     """
     print(
@@ -1727,6 +1731,49 @@ def verdicts_b1(*, readings: dict[str, Outcome]) -> dict[str, str]:
             f"[{reading.lower:+.3f}, {reading.upper:+.3f}])"
         )
     return out
+
+
+PRE_CHANGE_MONTHS: Final[tuple[str, ...]] = arms.REPLICATE_MONTHS[:3]
+"""Replicate folds 2023-04 to 2023-06, scored before the ENS resolution change of 2023-06-27."""
+POST_CHANGE_MONTHS: Final[tuple[str, ...]] = arms.REPLICATE_MONTHS[3:]
+"""Replicate folds 2023-07 to 2024-03, scored after the ENS resolution change of 2023-06-27."""
+
+
+def exploratory_b1(*, source: LossSource) -> None:
+    """Print Stage B1's exploratory readings at 95%, with no verdict word.
+
+    The readings are C3 and G1 per fold, C3 on the pre-change folds against the post-change folds,
+    and C3 and G1 with each Primary left out. Fold 2023-06 counts as pre-change. A harm that
+    concentrates in folds 2023-07 to 2023-09 is attributed to the era and not to cloud.
+    """
+    print("\n== Stage B1 exploratory readings (95% interval; no verdict word) ==")
+    pre = f"pre-change folds {PRE_CHANGE_MONTHS[0]} to {PRE_CHANGE_MONTHS[-1]}"
+    post = f"post-change folds {POST_CHANGE_MONTHS[0]} to {POST_CHANGE_MONTHS[-1]}"
+    cases = (
+        ("R1", "R1p", REPLICATE_GROUPS, arms.REPLICATE_MONTHS),
+        ("D1g", "D0g", PRIMARY_GROUPS, arms.CLOUD_SCORED_MONTHS),
+    )
+    for treatment, reference, groups, months in cases:
+        for group, members in groups.items():
+            slices = [
+                (f"{group}, fold {m}", primary_scope(members=members, months=(m,))) for m in months
+            ]
+            if months == arms.REPLICATE_MONTHS:
+                slices.append(
+                    (f"{group}, {pre}", primary_scope(members=members, months=PRE_CHANGE_MONTHS))
+                )
+                slices.append(
+                    (f"{group}, {post}", primary_scope(members=members, months=POST_CHANGE_MONTHS))
+                )
+            for left_out in members:
+                rest = tuple(x for x in members if x != left_out)
+                slices.append(
+                    (f"{group} without {left_out}", primary_scope(members=rest, months=months))
+                )
+            for name, where in slices:
+                _print_slice(
+                    source=source, treatment=treatment, reference=reference, name=name, where=where
+                )
 
 
 def score_b1(*, n_resamples: int) -> None:
@@ -1748,6 +1795,7 @@ def score_b1(*, n_resamples: int) -> None:
         ]
     )
     verdicts_b1(readings={r.key: r for r in readings})
+    exploratory_b1(source=source)
 
 
 def exploratory(*, source: LossSource) -> None:

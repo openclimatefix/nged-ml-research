@@ -541,6 +541,7 @@ def main() -> None:
         return
     if args.dry_run:
         done = prediction_path(arm=arm.name, month=args.fold, seed=args.seed).exists()
+        print("\n".join(gate.gate_state_lines()))
         print(
             f"{arm.name} {args.fold} seed {args.seed}: columns {arm.extra_columns}, "
             f"{'finished' if done else 'pending'}"

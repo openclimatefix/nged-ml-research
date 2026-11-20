@@ -573,3 +573,47 @@ def test_exploratory_per_fold_solar_rows_use_their_own_month_and_carry_no_verdic
         assert line.endswith("-> exploratory")
         for word in ("supported", "refuted", "inconclusive", "small gain"):
             assert word not in line
+
+
+def _replicate_arm(*, shift: float) -> score.ArmLosses:
+    members = score.FIVE
+    frame = pl.concat(
+        [
+            _losses(seeds=(0, 1, 2), shift=shift, months=arms.REPLICATE_MONTHS).with_columns(
+                label=pl.lit(member).cast(pl.Categorical)
+            )
+            for member in members
+        ]
+    )
+    return score.ArmLosses(
+        losses=frame,
+        averaged=frame.filter(pl.col("seed") == 0).with_columns(seed=pl.lit(-1).cast(pl.Int16)),
+        coverage={},
+        cells=frozenset((m, s) for m in arms.REPLICATE_MONTHS for s in (0, 1, 2)),
+    )
+
+
+def test_stage_b1_prints_per_fold_pre_post_and_leave_one_out_lines(
+    capsys: pytest.CaptureFixture[str],
+):
+    source = _source(R1=_replicate_arm(shift=-0.1), R1p=_replicate_arm(shift=0.0))
+    score.exploratory_b1(source=source)
+    lines = [
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("R1 minus") and "unavailable" not in line
+    ]
+    folds = [line for line in lines if ", fold " in line and "the five" in line]
+    assert len(folds) == 12
+    pre = next(line for line in lines if "pre-change folds 2023-04 to 2023-06" in line)
+    post = next(line for line in lines if "post-change folds 2023-07 to 2024-03" in line)
+    assert "months 3" in pre
+    assert "months 9" in post
+    assert sum("the five without" in line for line in lines) == 5
+    assert all(line.endswith("-> exploratory") for line in lines)
+
+
+def test_gate_state_lines_say_whether_a_real_fit_would_be_refused(tmp_path: Path):
+    lines = gate.gate_state_lines(path=tmp_path / "absent.json")
+    assert lines
+    assert all(line.startswith("gate: a real fit would be refused") for line in lines)

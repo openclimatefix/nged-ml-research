@@ -565,7 +565,7 @@ approved Stage B.
 | Contrast | Definition | Rows | Readings |
 |---|---|---|---|
 | C3 | `R1` minus `R1p`, with no gap rows and no flag | the 12 replicate folds, days 1 to 10 | the five (the six without D9, whose power history starts after the replicate begins); the eight |
-| G1 | `D1g` minus `D0g`, with no flag and no gap rows | the 7 cloud-scored folds, days 1 to 10 | the six; the eight |
+| G1 | `D1g` minus `D0g` (real cloud minus no cloud, not a placebo contrast), with no flag and no gap rows | the 7 cloud-scored folds, days 1 to 10 | the six; the eight |
 
 The scorer also prints `R1p` minus `R0` and `R1` minus `R0` at 99.375% as descriptive bounds beside
 C3, because `R0` has no cloud column and no flag. The verdict of each reading is the decision rule
@@ -587,9 +587,21 @@ no missing-value flag, so neither can contain the date-proxy penalty of `DF`.
   that is the only Stage B1 outcome that supports a statement of "no gain" at that level.
 - **C3 or G1 `refuted`.** The real cloud is worse than the placebo with no flag present, so the
   harm does not come from the flag.
-- **`R1p` minus `R0` or `D1g` minus `D0g` far from 0 with `R1` minus `R1p` near 0.** The cloud
-  columns, real or shuffled, change the forecast without adding information, which is a column
-  effect and not a date-proxy effect.
+- **`R1p` minus `R0` far from 0 while C3 is near 0.** The cloud columns, real or shuffled, change
+  the forecast without adding information, which is a column effect and not a date-proxy effect.
+
+**G1 is the total effect of the two cloud columns on a flag-free base, and Stage B1 cannot split
+it into information and a column effect,** because Stage B1 holds no `D1g` placebo. A G1 gain is a
+gain that a service could deliver.
+
+**Level of G1.** G1 was added to the planned readings by the amendment of 2026-11-20, after the
+Stage A results showed the cost of the flag. With C2, S2, and S3 unread, the family holds seven
+readings (C1 at two groups, S1, C3 at two groups, and G1 at two groups), and 99.44% holds. If Stage
+B runs, the family becomes 11 readings and every reading is read at 1 - 0.05/11 = 99.55%.
+
+**Stage B1 also prints exploratory lines, at 95% and with no verdict word.** They are C3 and G1 per
+fold, C3 on the folds 2023-04 to 2023-06 against the folds 2023-07 to 2024-03 (fold 2023-06 counts
+as before the change), and C3 and G1 with each Primary left out.
 
 **Metric.** CRPS as twice the mean pinball loss over the 11 quantile levels, in points of effective
 capacity, with the normalised MAE of the median beside every CRPS number. Each farm's error is
@@ -815,8 +827,8 @@ same rows with the seed noise inside the interval (experiment 707).
 ## 12. Review points to settle at implementation
 
 **The design review raised six points. Each is either settled with a recorded decision or marked
-"to be settled before Stage B".** Stage A depended on points 1 and 2 only. Stage B1 depends on point
-3, which must be settled before its first fit.
+"to be settled before Stage B".** Stage A depended on points 1 and 2 only. Point 3 is
+settled for Stage B1.
 
 - **Fewer seeds.** The bootstrap draws one fitting seed per resample, so the interval does not
   narrow as seeds are added. Cutting the planned arms to 3 seeds would save about 180 Primary demand
@@ -839,11 +851,35 @@ same rows with the seed noise inside the interval (experiment 707).
   and recent cloud summaries do not differ by more than the check's thresholds. The `D1p` minus
   `DF` check (section 6) is the safeguard: if an old-era donor makes the placebo worse than no
   cloud, the check fails and C1 reads `inconclusive` until the audit reports. The time-shifted
-  arms stay in Stage B as the second comparator.
+  arms stay in Stage B as the second comparator. The era check's 64 tests run on 16 series that
+  take 8 distinct values, because several Primaries share a weather cell, so the tests are not 64
+  independent passes.
 - **The replicate and the resolution change.** Fold 2023-06 straddles 2023-06-27. The `study` skill
   asks to drop the straddling part-month on both sides, add an era indicator to all three replicate
-  arms, and restrict donors to the row's era. **To be settled before the first Stage B1
-  fit**, because the replicate is in Stage B1.
+  arms, and restrict donors to the row's era. **Decided by the worker, reported to the manager
+  2026-11-20:** accept the replicate as it is, with the caveat below and with the split of the
+  replicate folds before and after 2023-06-27 pre-registered as exploratory (section 8). The
+  evidence, from the Stage B1 code and design review:
+    - The era check passed on all 16 series. The step in the monthly ENS-minus-ERA5 cloud bias is a
+      fall of 2.8 to 3.5 points on a 0 to 100 scale, and the deseasonalised step size is at most 0.93
+      against a fail limit of 3.
+    - The fall lies inside the year-to-year range of the same bias before the change, which was
+      -5.1 to +8.3 points. The step is nevertheless consistent in sign, so a real shift of about 2
+      to 3 points is plausible.
+    - Every `R1p` donor for a post-change run is an old-resolution run, because the donor rule needs
+      another calendar year and no same-era donor exists before the last replicate cut. `R1p`
+      therefore sees old-resolution cloud throughout, and `R1` meets new-resolution cloud in the
+      folds 2023-07 to 2024-03 after training mostly on old-resolution cloud. The change can only
+      push C3 against real cloud, never towards `supported`.
+    - The remedies fail. A same-era donor is not available, an era indicator is a step function of
+      the date and would reintroduce the date-proxy confound that Stage A measured, and dropping the
+      4-run part-month changes the reading by a fraction of its interval.
+
+  **Caveat for the finished page.** Folds 2023-07 to 2024-03 score new-resolution ENS cloud (from
+  2023-06-27). A C3 `supported` or `small gain` stands. A C3 `refuted` or `inconclusive` is read
+  beside the exploratory split and the per-fold lines. If the harm concentrates in folds 2023-07 to
+  2023-09, where `R1` had trained on at most two months of new-resolution cloud, the page attributes
+  the harm to the era and not to cloud.
 - **A calibrated positive control.** The `K1` control is large and trivial, because `K1p` has no
   temperature. A calibrated known-answer control would add a synthetic column equal to the realised
   clear-sky index plus Gaussian noise, tuned on one fold so that the unmasked column gains about
