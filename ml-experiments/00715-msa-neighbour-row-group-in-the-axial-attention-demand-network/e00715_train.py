@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PLR0915
+# ruff: noqa: E501, PT018
 """Experiment 715: the training loop of F4, stages 2 and 3, copied from experiment 713 (design sections 5 and 11.1).
 
 Experiment 713's `train_stage`, `batch_for`, `validation_loss`, `param_groups`, and `synthetic_source`
@@ -223,7 +223,9 @@ def validation_loss(
     return total / max(count, 1)
 
 
-def param_groups(*, model: mdl.MsaNet, stage: int, encoders: str) -> list[dict]:
+def param_groups(
+    *, model: mdl.MsaNet, stage: int, encoders: str, new_lr: float | None = None
+) -> list[dict]:
     """Return the optimiser groups: base rate, loaded encoders, `proj_s`, and the new parameters at 5e-4.
 
     A copy of `e00713_train.param_groups` (lines 605 to 633) with a group for the 36,888 new
@@ -254,7 +256,9 @@ def param_groups(*, model: mdl.MsaNet, stage: int, encoders: str) -> list[dict]:
     )
     if new:
         assert isinstance(model, f4.F4Net)
-        groups.append({"params": model.neighbour_parameters(), "lr": NEW_LR})
+        groups.append(
+            {"params": model.neighbour_parameters(), "lr": NEW_LR if new_lr is None else new_lr}
+        )
     for g in groups:
         g["base_lr"] = g["lr"]
     return groups
@@ -262,7 +266,8 @@ def param_groups(*, model: mdl.MsaNet, stage: int, encoders: str) -> list[dict]:
 
 def train_stage(
     *, model: mdl.MsaNet, world: F4World, stage: int, samples: F4Samples, seed: int, encoders: str,
-    max_passes: int = 60, log: tr.StageLog | None = None,
+    max_passes: int = 60, log: tr.StageLog | None = None, source: fb.F4Source | None = None,
+    ensemble: bool = True, new_lr: float | None = None,
 ) -> tr.StageLog:  # fmt: skip
     """Train `model` on stage 2 or 3 in place and leave it at the state of the best validation loss.
 
@@ -270,16 +275,18 @@ def train_stage(
     random stream is seeded as experiment 713 seeds it, `torch.manual_seed(seed * 7 + stage)`, and the
     neighbour path draws from its own generator, so the draws of the trunk are the draws of `M*`.
     """
-    assert stage in {2, 3}, stage
+    assert stage in {2, 3} or source is not None, (
+        "stage 1 needs the explicit source of a synthetic world"
+    )
     neighbours = world.spec.neighbour_path
     started = time.monotonic()
     log = log or tr.StageLog(stage=stage)
-    ensemble = True
-    source = stage_source(world=world, samples=samples, stage=stage)
+    source = source or stage_source(world=world, samples=samples, stage=stage)
     cut = tr.target_end(world=world.base, stage=stage)
     torch.manual_seed(seed * 7 + stage)
     optimiser = torch.optim.AdamW(
-        param_groups(model=model, stage=stage, encoders=encoders), weight_decay=tr.WEIGHT_DECAY
+        param_groups(model=model, stage=stage, encoders=encoders, new_lr=new_lr),
+        weight_decay=tr.WEIGHT_DECAY,
     )
     train_idx = np.nonzero(~samples.is_val)[0]
     best, best_state, stale, step = float("inf"), None, 0, 0

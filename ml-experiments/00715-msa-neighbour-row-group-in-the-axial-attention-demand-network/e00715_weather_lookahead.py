@@ -64,7 +64,11 @@ def main() -> int:
     args = parser.parse_args()
     day = datetime.fromisoformat(args.origin).replace(tzinfo=UTC)
     contract = day.replace(hour=12)
-    print("\n".join(w713.statement(contract=contract, primary=args.primary, lead_day=args.lead_day - 1)))
+    print(
+        "\n".join(
+            w713.statement(contract=contract, primary=args.primary, lead_day=args.lead_day - 1)
+        )
+    )
     print("\n".join(neighbour_statement(contract=contract, primary=args.primary)))
     if args.check_data:
         ok, lines = w713.check_data(contract=contract)
