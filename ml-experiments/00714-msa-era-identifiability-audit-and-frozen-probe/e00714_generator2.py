@@ -52,6 +52,12 @@ PERMANENT_KINDS: Final[tuple[PermanentKindType, ...]] = (
 SIZE_GRID: Final[tuple[float, ...]] = (-0.15, -0.05, 0.08, 0.30)
 """Signed step sizes as a share of capacity; none of them is a step size of experiment 709."""
 PASSES_PER_MONTH: Final[dict[WorldType, int]] = {"g2": 32, "gas": 8}
+CANDIDATE_FACTOR: Final[int] = 4
+"""The builder generates this many times as many passes as a world keeps, then keeps some."""
+CELL_MODULUS: Final[dict[WorldType, int]] = {"g2": 8, "gas": 4}
+"""A pass's index modulo this number fixes its mirror states, kinds, and step sizes, so a kept pass
+replaces only a candidate of the same design cell."""
+SELECTION_SEED: Final[int] = 714_500_000
 SEED_BASE: Final[dict[WorldType, int]] = {"g2": 714_100_000, "gas": 714_200_000}
 """Seed ranges disjoint from experiment 709's worlds (709_100_000 to 709_500_000)."""
 SWITCH_ROTATION: Final[tuple[tuple[MirrorType, MirrorType], ...]] = (
@@ -264,7 +270,8 @@ def choose_hosts(
 ) -> tuple[list[int], list[tuple[int, int | None]]]:  # fmt: skip
     """Draw donors, recipients, and permanent-change hosts that satisfy the separation rules.
 
-    Events are placed one after another. Every site of an event (a donor, a recipient, or a
+    Events are placed one after another, in a random order of the transfers and the permanent
+    changes. Every site of an event (a donor, a recipient, or a
     permanent-change host) must lie outside the sites and the neighbours of every earlier event, so
     no event sits in another event's neighbour set. A recipient is a metered neighbour of its
     donor and is the only site of its pair that lies in the neighbour set of the pair's donor.
@@ -286,18 +293,23 @@ def choose_hosts(
     panel = ctx.panel
     neighbours = panel.neighbours
     for _ in range(MAX_HOST_TRIES):
+        order = rng.permutation([*range(len(mirrors)), *([-1] * n_era)])
         forbidden: set[int] = set()
-        pairs: list[tuple[int, int | None]] = []
+        pairs: dict[int, tuple[int, int | None]] = {}
         era_hosts: list[int] = []
         failed = False
-        for mirror in mirrors:
+        for slot in order:
             options = [i for i in pool if i not in forbidden]
             if not options:
                 failed = True
                 break
             donor = int(rng.choice(options))
+            if slot < 0:
+                era_hosts.append(donor)
+                forbidden |= {donor, *neighbours[donor]}
+                continue
             recipient = None
-            if mirror != "hidden":
+            if mirrors[slot] != "hidden":
                 metered = [
                     j
                     for j in _metered(ctx=ctx, site=donor, onset_hh=onset_hh)
@@ -307,22 +319,12 @@ def choose_hosts(
                     failed = True
                     break
                 recipient = int(rng.choice(metered))
-            pairs.append((donor, recipient))
+            pairs[int(slot)] = (donor, recipient)
             forbidden |= {donor, *neighbours[donor]}
             if recipient is not None:
                 forbidden |= {recipient, *neighbours[recipient]}
-        if failed:
-            continue
-        for _era in range(n_era):
-            options = [i for i in pool if i not in forbidden]
-            if not options:
-                failed = True
-                break
-            host = int(rng.choice(options))
-            era_hosts.append(host)
-            forbidden |= {host, *neighbours[host]}
         if not failed:
-            return era_hosts, pairs
+            return era_hosts, [pairs[k] for k in range(len(mirrors))]
     msg = "no host assignment satisfies the separation rules"
     raise RuntimeError(msg)
 
@@ -536,9 +538,97 @@ def build_pass(*, ctx: common.Context, world: WorldType, month: str, index: int)
     )
 
 
+def balance_vector(*, truth: pl.DataFrame, n_sites: int) -> np.ndarray:
+    """Return, per Primary, the permanent changes minus the temporary moves scored there."""
+    out = np.zeros(n_sites)
+    for host, kind in zip(truth["host"].to_list(), truth["truth"].to_list(), strict=True):
+        out[host] += 1.0 if kind == "era" else -1.0
+    return out
+
+
+def select_balanced(
+    *, vectors: dict[tuple[str, int], np.ndarray], months: tuple[str, ...], per_month: int,
+    modulus: int, seed: int = SELECTION_SEED,
+) -> dict[str, list[int]]:  # fmt: skip
+    """Keep, in each fold month, the candidate passes whose Primaries balance the two classes.
+
+    A pass keeps its design cell (its index modulo `modulus`), so the mirror states, kinds, and
+    sizes stay balanced. Within each cell the search swaps a kept pass for an unkept one while the
+    sum over Primaries of the squared difference between permanent and temporary events falls,
+    over all months together and within each month.
+
+    Args:
+        vectors: The `balance_vector` of each candidate, by (month, index).
+        months: The fold months.
+        per_month: Passes to keep per fold month.
+        modulus: The number of design cells.
+        seed: Seed of the starting draw.
+
+    Returns:
+        The kept indices of each month.
+    """
+    rng = np.random.default_rng(seed)
+    per_cell = per_month // modulus
+    cells: dict[tuple[str, int], list[int]] = {}
+    for month, index in vectors:
+        cells.setdefault((month, index % modulus), []).append(index)
+    kept = {
+        key: [int(i) for i in rng.permutation(sorted(v))[:per_cell]] for key, v in cells.items()
+    }
+    n_sites = len(next(iter(vectors.values())))
+    month_sum = {m: np.zeros(n_sites) for m in months}
+    for (month, _cell), indices in kept.items():
+        for i in indices:
+            month_sum[month] += vectors[(month, i)]
+
+    def cost(sums: dict[str, np.ndarray]) -> float:
+        total = np.sum(list(sums.values()), axis=0)
+        return float(total @ total + sum(float(s @ s) for s in sums.values()))
+
+    best = cost(month_sum)
+    improved = True
+    while improved:
+        improved = False
+        for (month, cell), indices in kept.items():
+            for slot, old in enumerate(indices):
+                for new in cells[(month, cell)]:
+                    if new in indices:
+                        continue
+                    trial = dict(month_sum)
+                    trial[month] = month_sum[month] - vectors[(month, old)] + vectors[(month, new)]
+                    value = cost(trial)
+                    if value < best - 1e-9:
+                        best, month_sum, indices[slot], improved = value, trial, new, True
+                        break
+    result: dict[str, list[int]] = {m: [] for m in months}
+    for (month, _cell), indices in kept.items():
+        result[month].extend(indices)
+    return {m: sorted(v) for m, v in result.items()}
+
+
+_WORLD_FOLDER: str = "worlds"
+
+
+def use_folder(*, name: str) -> None:
+    """Store and read the generated passes under `name` in the experiment's data folder."""
+    global _WORLD_FOLDER  # noqa: PLW0603
+    _WORLD_FOLDER = name
+
+
+def stored_indices(*, world: WorldType, month: str) -> list[int]:
+    """Return the indices of the stored passes of a world's fold month, in increasing order."""
+    prefix = f"{month}_p"
+    found = (
+        int(path.stem.removeprefix(prefix))
+        for path in world_dir(world=world).glob(f"{prefix}*.npz")
+        if not path.name.endswith(".tmp.npz")
+    )
+    return sorted(found)
+
+
 def world_dir(*, world: WorldType) -> Path:
     """Return the folder that holds a generated world."""
-    return common.DATA_DIR / "worlds" / world
+    return common.DATA_DIR / _WORLD_FOLDER / world
 
 
 def write_pass(*, world: WorldType, month: str, index: int, generated: GeneratedPass) -> None:

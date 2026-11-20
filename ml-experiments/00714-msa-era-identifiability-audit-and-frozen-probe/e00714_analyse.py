@@ -32,7 +32,7 @@ HOST: Final[list[str]] = list(feats.HOST_FEATURES)
 NBR: Final[list[str]] = list(feats.NEIGHBOUR_FEATURES)
 STEP: Final[list[str]] = list(feats.STEP_FEATURES)
 OLD: Final[list[str]] = list(feats.OLD_FEATURES)
-RW: Final[list[str]] = ["rw_mirror_share", "rw_mirror_corr"]
+RW: Final[list[str]] = ["rw_mirror_share", "rw_mirror_z"]
 FEATURE_SETS: Final[dict[str, list[str]]] = {
     "host": HOST,
     "host_old": HOST + OLD,
@@ -56,6 +56,8 @@ MIRRORED: Final[tuple[str, ...]] = ("full", "partial")
 PERMUTATIONS: Final[int] = 20
 DRAWS: Final[int] = 10_000
 SECONDARY_DRAWS: Final[int] = 1000
+STRATIFIED_DRAWS: Final[int] = 1000
+SITE_PRIOR_LIMIT: Final[float] = 0.60
 SECONDARY_CONFIDENCE: Final[float] = 0.95
 TOLERANCE: Final[float] = 0.03
 NO_EVENT_TOLERANCE: Final[float] = 0.05
@@ -77,15 +79,13 @@ def matrix(*, frame: pl.DataFrame, columns: list[str]) -> np.ndarray:
 def oof_for_sets(*, frame: pl.DataFrame, sets: dict[str, list[str]], tree: bool) -> pl.DataFrame:
     """Return out-of-fold probabilities of each feature set for the rows of `frame`."""
     y = frame["label"].to_numpy().astype(float)
-    groups, months = frame["pass_id"].to_numpy(), frame["month"].to_numpy()
+    months = frame["month"].to_numpy()
     out = {}
     for name, columns in sets.items():
         x = matrix(frame=frame, columns=columns)
-        out[name] = model.out_of_fold(x=x, y=y, groups=groups, months=months)
+        out[name] = model.out_of_fold(x=x, y=y, months=months)
         if tree and name in ("host", "host_nbr"):
-            out[f"{name}_tree"] = model.out_of_fold(
-                x=x, y=y, groups=groups, months=months, model="tree"
-            )
+            out[f"{name}_tree"] = model.out_of_fold(x=x, y=y, months=months, model="tree")
     return pl.DataFrame(out)
 
 
@@ -174,6 +174,65 @@ def c6_contrast(
     return {"diff": est[0] - est[1], "low": low, "high": high}
 
 
+def mirror_share_extremes(*, tables: dict[str, pl.DataFrame]) -> dict:
+    """Return the fraction of rows at exactly 0 and at the clip of `mirror_share`, by class.
+
+    The no-event column (`np_mirror_share`) scores the real panel at the same hosts and onsets.
+    """
+    result: dict = {}
+    for world in ("bank", "g2"):
+        frame = tables[world].filter(pl.col("k") == 14)
+        for column in ("mirror_share", "np_mirror_share"):
+            for label, name in ((1, "permanent"), (0, "temporary")):
+                values = frame.filter(pl.col("label") == label)[column].drop_nulls().to_numpy()
+                result[f"{world}/{column}/{name}"] = {
+                    "median": float(np.median(values)),
+                    "at_zero": float(np.mean(values == 0.0)),
+                    "at_clip": float(np.mean(np.abs(values) >= feats.MIRROR_CLIP)),
+                }
+    return result
+
+
+def boot_limit(draws: int) -> int:
+    """Return the number of bootstrap draws used for the slower site-stratified readings."""
+    return min(draws, STRATIFIED_DRAWS)
+
+
+def site_prior_readings(
+    *, tables: dict[str, pl.DataFrame],
+    store: dict[tuple[str, int], tuple[pl.DataFrame, pl.DataFrame, list[np.ndarray]]], draws: int,
+) -> dict:  # fmt: skip
+    """Return how far the Primary alone predicts the class, and the AUROC within each Primary.
+
+    The site-prior AUROC scores each event by its Primary's share of permanent changes in the other
+    fold months, from the truth tables alone. The site-stratified AUROC ranks only pairs of a
+    permanent and a temporary event at the same Primary, so it cannot use the Primary's identity.
+    Both are secondary readings that sit beside C1 to C3 and C6.
+    """
+    result: dict = {}
+    for world in ("bank", "g2"):
+        frame = tables[world].filter(pl.col("k") == 14).sort("pass_id", "event")
+        sites = frame["host"].to_numpy()
+        label = frame["label"].to_numpy()
+        prior = model.site_prior_scores(sites=sites, label=label, months=frame["month"].to_numpy())
+        result[f"{world}/site_prior_auroc"] = model.auroc(label=label, score=prior)
+        for k in common.ORIGIN_DAYS:
+            f, preds, boot = store[(world, k)]
+            s, y, p = f["host"].to_numpy(), f["label"].to_numpy(), preds["host"].to_numpy()
+            values = np.array(
+                [
+                    model.site_stratified_auroc(sites=s[d], label=y[d], score=p[d])
+                    for d in boot[:draws]
+                ]
+            )
+            low, high = model.interval(values=values, confidence=SECONDARY_CONFIDENCE)
+            result[f"{world}/k{k}/site_stratified_auroc"] = {
+                "auroc": model.site_stratified_auroc(sites=s, label=y, score=p),
+                "low95": low, "high95": high,
+            }  # fmt: skip
+    return result
+
+
 def primary(*, tables: dict[str, pl.DataFrame], draws: int, out: Path, tree: bool) -> dict:
     """Fit the primary sets on `bank` and `g2`, compute C1 to C6 and their companion readings."""
     result: dict = {"auroc": {}, "contrasts": {}, "sign_only": {}, "secondary": {}}
@@ -200,6 +259,8 @@ def primary(*, tables: dict[str, pl.DataFrame], draws: int, out: Path, tree: boo
             result["sign_only"][f"{world}/k{k}"] = point_and_interval(
                 label=label, score=sign, draws=boot
             )
+    result["mirror_share_extremes"] = mirror_share_extremes(tables=tables)
+    result["site_prior"] = site_prior_readings(tables=tables, store=store, draws=boot_limit(draws))
     for name, k in (("C1", 7), ("C2", 14), ("C3", 28)):
         result["contrasts"][name] = result["auroc"][f"g2/k{k}/host"]
     frame, preds, boot = store[("g2", 14)]
@@ -249,36 +310,51 @@ def primary(*, tables: dict[str, pl.DataFrame], draws: int, out: Path, tree: boo
 
 
 def decisions(*, result: dict, placebo: dict) -> dict[str, bool]:
-    """Apply every part of the pre-registered decision rule to the contrasts and the placebos."""
+    """Apply every part of the pre-registered decision rule to the contrasts and the placebos.
+
+    Precedence: any failed audit flag makes the run `inconclusive_pending_audit`, and no outcome
+    is then stated. Otherwise outcome 3 applies only where the second generator does not clear
+    the threshold (`bank_inflated_g2_enough` names the case where both are high), and the
+    neighbour-row stop is the complement of the neighbour-row gain test.
+    """
     c, auroc = result["contrasts"], result["auroc"]
     enough_g2 = c["C1"]["low"] >= 0.70 and c["C2"]["low"] >= 0.70
     not_enough = c["C1"]["high"] < 0.70 or c["C2"]["high"] < 0.70
     bank_enough = all(auroc[f"bank/k{k}/host"]["low"] >= 0.70 for k in BANK_ENOUGH_ORIGINS)
-    neighbour = c["C5"]["low"] >= 0.05 and c["C5_auroc_host_nbr_mirrored"]["auroc"] >= 0.85
+    gain_clause = c["C5"]["low"] >= 0.05
+    neighbour = gain_clause and c["C5_auroc_host_nbr_mirrored"]["auroc"] >= 0.85
     hidden_small = abs(c["C5_gain_hidden"]["diff"]) < HIDDEN_GAIN_LIMIT
     shuffled_ok = all(placebo[f"{w}/shuffled_labels"]["within_0.03"] for w in ("bank", "g2"))
-    rewired_ok = (
-        abs(auroc["g2/k14/host_nbr_rewired"]["auroc"] - auroc["g2/k14/host"]["auroc"]) <= TOLERANCE
+    rewired_ok = all(
+        abs(auroc[f"{w}/k14/host_nbr_rewired"]["auroc"] - auroc[f"{w}/k14/host"]["auroc"])
+        <= TOLERANCE
+        for w in ("bank", "g2")
     )
     no_event_ok = all(
         abs(placebo[f"{w}/no_event_placebo"]["auroc"] - 0.5) <= NO_EVENT_TOLERANCE
         for w in ("bank", "g2")
     )
+    site_prior_ok = result["site_prior"]["g2/site_prior_auroc"] <= SITE_PRIOR_LIMIT
+    bank_inflated = c["C6"]["low"] > 0.10
     return {
         "outcome_1_host_rows_not_enough": not_enough,
         "outcome_2_host_rows_enough_on_g2": enough_g2,
         "outcome_2_host_rows_enough_on_bank_and_g2": enough_g2 and bank_enough,
         "neither_enough_nor_not_enough": not enough_g2 and not not_enough,
-        "outcome_3_injector_artefact": c["C6"]["low"] > 0.10,
+        "outcome_3_injector_artefact": bank_inflated and not enough_g2,
+        "bank_inflated_g2_enough": bank_inflated and enough_g2,
         "outcome_4_neighbour_rows_pass": neighbour,
         "outcome_4_hidden_mirror_gain_under_0.02": hidden_small,
         "outcome_4_full": neighbour and hidden_small,
-        "f4_stopped_gain_under_0.05": c["C5"]["diff"] < 0.05,
+        "f4_stopped_gain_interval_low_under_0.05": not gain_clause,
         "known_answer_pass": auroc["bank/k14/known_answer"]["auroc"] > 0.95,
         "shuffled_label_within_0.03": shuffled_ok,
-        "rewired_within_0.03": rewired_ok,
+        "rewired_within_0.03_bank_and_g2": rewired_ok,
         "no_event_within_0.05": no_event_ok,
-        "inconclusive_pending_audit": not (shuffled_ok and rewired_ok),
+        "g2_site_prior_auroc_within_limit": site_prior_ok,
+        "inconclusive_pending_audit": not (
+            shuffled_ok and rewired_ok and no_event_ok and site_prior_ok
+        ),
     }
 
 
@@ -297,7 +373,7 @@ def placebos(*, tables: dict[str, pl.DataFrame], permutations: int) -> dict:
             for p in np.unique(groups):
                 idx = np.flatnonzero(groups == p)
                 shuffled[idx] = rng.permutation(label[idx])
-            pred = model.out_of_fold(x=x, y=shuffled.astype(float), groups=groups, months=months)
+            pred = model.out_of_fold(x=x, y=shuffled.astype(float), months=months)
             scores.append(model.auroc(label=shuffled, score=pred))
         result[f"{world}/shuffled_labels"] = {
             "mean": float(np.mean(scores)), "min": float(np.min(scores)),
@@ -310,7 +386,7 @@ def placebos(*, tables: dict[str, pl.DataFrame], permutations: int) -> dict:
         for month in np.unique(months):
             test = months == month
             fitted = model.fit_logistic(
-                x=x[~test], y=label[~test].astype(float), groups=groups[~test]
+                x=x[~test], y=label[~test].astype(float), blocks=months[~test]
             )
             pred[test] = fitted.proba(x=x_np[test])
         result[f"{world}/no_event_placebo"] = {"auroc": model.auroc(label=label, score=pred)}
@@ -364,7 +440,7 @@ def coefficients(*, tables: dict[str, pl.DataFrame]) -> dict:
                 fitted = model.fit_logistic(
                     x=matrix(frame=frame, columns=columns),
                     y=frame["label"].to_numpy().astype(float),
-                    groups=frame["pass_id"].to_numpy(),
+                    blocks=frame["month"].to_numpy(),
                 )
                 order = np.argsort(-np.abs(fitted.weight))
                 result[f"{world}/k{k}/{name}"] = {
@@ -379,7 +455,7 @@ RAW_CUES: Final[dict[str, tuple[str, float]]] = {
     "high_fraction": ("high", -1.0),
     "flatness": ("flat", -1.0),
     "mirror_share": ("mirror_share", -1.0),
-    "mirror_corr": ("mirror_corr", -1.0),
+    "mirror_z": ("mirror_z", -1.0),
 }
 """Raw single cues, with the sign that makes a higher score mean a permanent change of the kind
 named by the plan's prediction: more steps, a lower high-level share, a less flat profile, and no
@@ -447,15 +523,21 @@ def secondary(*, tables: dict[str, pl.DataFrame], draws: int) -> tuple[pl.DataFr
 
 
 def transfer_reading(*, tables: dict[str, pl.DataFrame]) -> dict:
-    """Fit on one generator's events and score the other's (secondary)."""
+    """Fit on one world's other months and score the other world's month (secondary).
+
+    The classifier that scores month m of the destination world never saw month m of either world,
+    but it saw the same Primaries, which the two worlds share.
+    """
     result = {}
     for src, dst in (("bank", "g2"), ("g2", "bank")):
         for k in common.ORIGIN_DAYS:
             a = tables[src].filter(pl.col("k") == k).sort("pass_id", "event")
             b = tables[dst].filter(pl.col("k") == k).sort("pass_id", "event")
             score = model.transfer_scores(
-                x_train=matrix(frame=a, columns=HOST), y_train=a["label"].to_numpy().astype(float),
-                groups=a["pass_id"].to_numpy(), x_test=matrix(frame=b, columns=HOST),
+                x_source=matrix(frame=a, columns=HOST),
+                y_source=a["label"].to_numpy().astype(float),
+                months_source=a["month"].to_numpy(), x_dest=matrix(frame=b, columns=HOST),
+                months_dest=b["month"].to_numpy(),
             )  # fmt: skip
             result[f"{src}_to_{dst}/k{k}"] = model.auroc(label=b["label"].to_numpy(), score=score)
     return result
@@ -490,7 +572,33 @@ def outcome_table(*, result: dict, flags: dict[str, bool]) -> str:
         lines.append(
             f"| {key} | {value['auroc']:.3f} | [{value['low']:.3f}, {value['high']:.3f}] |"
         )
-    lines += ["", "| Decision flag | Value |", "|---|---|"]
+    lines += [
+        "",
+        (
+            "Site-prior AUROC (the Primary alone, from the other fold months' labels) and "
+            "the AUROC within each Primary (95% interval, secondary):"
+        ),
+        "",
+        "| Reading | Value | Interval (95%) |",
+        "|---|---|---|",
+    ]
+    for key, value in result["site_prior"].items():
+        if isinstance(value, dict):
+            lines.append(
+                f"| {key} | {value['auroc']:.3f} | [{value['low95']:.3f}, {value['high95']:.3f}] |"
+            )
+        else:
+            lines.append(f"| {key} | {value:.3f} | |")
+    lines += [
+        "",
+        (
+            "Precedence: `inconclusive_pending_audit` overrides every outcome. Outcome 3 applies "
+            "only when the second generator does not clear 0.70."
+        ),
+        "",
+        "| Decision flag | Value |",
+        "|---|---|",
+    ]
     lines += [f"| {k} | {v} |" for k, v in flags.items()]
     return "\n".join(lines) + "\n"
 

@@ -128,9 +128,7 @@ def _example_events(*, ctx: common.Context) -> list[dict]:
     chosen = []
     month = "2026-01"
     for truth, what in picks:
-        for index in range(g2.PASSES_PER_MONTH["g2"]):
-            if not (g2.world_dir(world="g2") / f"{month}_p{index}.npz").exists():
-                continue
+        for index in g2.stored_indices(world="g2", month=month):
             built = g2.read_pass(world="g2", month=month, index=index)
             sel = built.truth.filter(
                 (pl.col("truth") == truth)
@@ -194,12 +192,9 @@ def example_figure(*, ctx: common.Context, out: Path) -> None:
 def profile_figure(*, ctx: common.Context, out: Path) -> None:
     """Draw the change by half-hour of the day for the temporary moves and each permanent kind."""
     sums: dict[str, list[np.ndarray]] = {k: [] for k in KIND_ORDER}
-    for world, n in (("g2", g2.PASSES_PER_MONTH["g2"]), ("gas", g2.PASSES_PER_MONTH["gas"])):
+    for world in ("g2", "gas"):
         for month in common.MONTHS:
-            for index in range(n):
-                path = g2.world_dir(world=world) / f"{month}_p{index}.npz"  # ty: ignore[invalid-argument-type]
-                if not path.exists():
-                    continue
+            for index in g2.stored_indices(world=world, month=month):  # ty: ignore[invalid-argument-type]
                 built = g2.read_pass(world=world, month=month, index=index)  # ty: ignore[invalid-argument-type]
                 for ev in built.truth.iter_rows(named=True):
                     key = "temporary move" if ev["truth"] == "switch" else ev["kind"]
@@ -262,6 +257,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
+    if args.smoke:
+        g2.use_folder(name="worlds_smoke")
     results = common.DATA_DIR / ("results_smoke" if args.smoke else "results")
     out = results / "figures" if args.smoke else DOCS
     ctx = common.load_context()

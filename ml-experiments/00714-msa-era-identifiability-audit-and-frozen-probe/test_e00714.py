@@ -4,9 +4,6 @@
 import sys
 from pathlib import Path
 
-import numpy as np
-import pytest
-
 HERE = Path(__file__).parent
 for folder in (
     HERE,
@@ -18,10 +15,13 @@ for folder in (
 import e00714_threads  # noqa: F401  (must run before numpy)
 
 # isort: split
+import e00714_build as bld
 import e00714_common as common
 import e00714_features as feats
 import e00714_generator2 as g2
 import e00714_model as model
+import numpy as np
+import pytest
 
 N_SITES = 4
 N_DAYS = 60
@@ -120,7 +120,7 @@ def test_auroc_and_logistic_known_answer() -> None:
     y = np.repeat([0.0, 1.0], 200)
     x = np.concatenate([rng.normal(-3, 1, 200), rng.normal(3, 1, 200)])[:, None]
     groups = np.tile(np.arange(40), 10)
-    fitted = model.fit_logistic(x=x, y=y, groups=groups)
+    fitted = model.fit_logistic(x=x, y=y, blocks=groups % 4)
     assert model.auroc(label=y, score=fitted.proba(x=x)) > 0.99
     noise = rng.normal(size=(400, 1))
     assert abs(model.auroc(label=y, score=noise[:, 0]) - 0.5) < 0.08
@@ -133,8 +133,7 @@ def test_out_of_fold_never_scores_a_month_it_saw() -> None:
     months = np.repeat(np.array(["a", "b", "c", "d"]), 50)
     y = rng.integers(0, 2, 200).astype(float)
     x = np.where(months == "a", y, rng.normal(size=200))[:, None]  # only month a carries the label
-    groups = np.arange(200)
-    pred = model.out_of_fold(x=x, y=y, groups=groups, months=months)
+    pred = model.out_of_fold(x=x, y=y, months=months)
     held = months == "b"  # a noise month: scoring it with a fit that saw month a stays near 0.5
     assert abs(model.auroc(label=y[held], score=pred[held]) - 0.5) < 0.2
     assert np.isfinite(pred).all()
@@ -218,8 +217,8 @@ def test_mirror_ignores_common_mode_error_and_finds_a_mirror() -> None:
         capacity_mw=cap,
     )  # fmt: skip
     assert quiet is not None
-    assert abs(quiet["mirror_share"]) < 0.15
-    assert abs(quiet["mirror_corr"]) < 0.3
+    assert abs(quiet["mirror_share"]) < 0.4
+    assert abs(quiet["mirror_z"]) < 3.0
     window = slice((ONSET_DAY + 14) * common.DAY - 600, (ONSET_DAY + 14) * common.DAY)
     old = _old_mirror_share(
         host_mw=(shared[0, window] - ref.power[0, window]) * 100.0,
@@ -235,7 +234,50 @@ def test_mirror_ignores_common_mode_error_and_finds_a_mirror() -> None:
     )  # fmt: skip
     assert mirrored is not None
     assert mirrored["mirror_share"] == pytest.approx(0.9, abs=0.15)
-    assert mirrored["mirror_corr"] > 0.0
+    assert mirrored["mirror_z"] > 3.0
+
+
+def _old_mirror_corr(*, host: np.ndarray, neighbours: np.ndarray, n_pre: int) -> float:
+    """The correlation difference that the second version of the feature used."""
+    pre = slice(0, n_pre)
+    return float(
+        np.corrcoef(host[pre], neighbours[pre])[0, 1] - np.corrcoef(host, neighbours)[0, 1]
+    )
+
+
+def test_mirror_features_ignore_the_size_of_an_unmirrored_step() -> None:
+    """A time-varying shared error and a large unmirrored host step leave the features near 0.
+
+    The second version of the feature, the correlation before the onset minus the correlation over
+    the whole span, rose with the size of the host's step because the step adds variance that the
+    neighbours do not share. No mirror is possible here, so the feature must not rise.
+    """
+    cap = np.full(N_SITES, 100.0)
+    shares, zs, olds = [], [], []
+    for seed in range(12):
+        rng = np.random.default_rng(seed)
+        power, ref, sw = synthetic(step=0.0, seed=seed)
+        data = power.power.copy()
+        shared = np.zeros(N_HH)
+        for t in range(1, N_HH):
+            shared[t] = 0.995 * shared[t - 1] + 0.004 * rng.standard_normal()
+        data[:3] += shared
+        data[0, event().onset_hh :] -= 0.20
+        out = feats.build_features(
+            event=event(), k=14, power=common.PassPower(0, data), reference=ref, shortwave=sw,
+            capacity_mw=cap,
+        )  # fmt: skip
+        assert out is not None
+        shares.append(abs(out["mirror_share"]))
+        zs.append(abs(out["mirror_z"]))
+        cut = (ONSET_DAY + 14) * common.DAY + common.ORIGIN_HOUR_HH - common.LATENCY_HH
+        lo = event().onset_hh - common.WINDOW_HH
+        host = data[0, lo:cut] - ref.power[0, lo:cut]
+        nbr = data[1, lo:cut] + data[2, lo:cut] - ref.power[1, lo:cut] - ref.power[2, lo:cut]
+        olds.append(_old_mirror_corr(host=host, neighbours=nbr, n_pre=event().onset_hh - lo))
+    assert np.median(olds) > 0.5  # the old statistic reads the step as a mirror
+    assert np.median(zs) < 2.0
+    assert np.median(shares) < 0.5
 
 
 def _ring_context(*, n_sites: int = 16) -> common.Context:
@@ -300,3 +342,50 @@ def test_bank_unpickler_allows_only_known_globals() -> None:
 
     with pytest.raises(pickle.UnpicklingError):
         common._BankUnpickler(io.BytesIO(pickle.dumps(Evil()))).load()
+
+
+def test_rewired_neighbours_never_hold_an_injected_site() -> None:
+    """The rewired set excludes every touched site and the host, or is None."""
+    ctx = _ring_context()
+    for seed in range(50):
+        rng = np.random.default_rng(seed)
+        touched = {int(t) for t in rng.choice(16, size=6, replace=False)}
+        host = int(rng.choice(sorted(touched)))
+        chosen = bld.rewired_neighbours(ctx=ctx, host=host, touched=touched, rng=rng)
+        assert chosen is None or (chosen and not touched & set(chosen) and host not in chosen)
+    everything = bld.rewired_neighbours(
+        ctx=ctx, host=0, touched=set(range(16)), rng=np.random.default_rng(0)
+    )
+    assert everything is None
+
+
+def test_balanced_selection_beats_a_random_draw() -> None:
+    """The kept passes balance permanent and temporary events per Primary and keep every cell."""
+    rng = np.random.default_rng(0)
+    months = ("m1", "m2")
+    vectors = {
+        (m, i): rng.choice([-2.0, -1.0, 0.0, 1.0, 2.0], size=6) for m in months for i in range(16)
+    }
+    kept = g2.select_balanced(vectors=vectors, months=months, per_month=8, modulus=4)
+    for month in months:
+        assert len(kept[month]) == 8
+        assert sorted(i % 4 for i in kept[month]) == [0, 0, 1, 1, 2, 2, 3, 3]
+    chosen = sum(vectors[(m, i)] for m in months for i in kept[m])
+    first = sum(vectors[(m, i)] for m in months for i in range(8))
+    assert np.abs(chosen).sum() < np.abs(first).sum()
+
+
+def test_site_prior_scores_and_stratified_auroc() -> None:
+    """A site that decides the class scores near 1 by its prior, and 0.5 when stratified."""
+    months = np.repeat(np.array(["a", "b", "c", "d"]), 20)
+    sites = np.tile(np.arange(10), 8)
+    label = (sites < 5).astype(float)
+    prior = model.site_prior_scores(sites=sites, label=label, months=months)
+    assert model.auroc(label=label, score=prior) > 0.95
+    assert np.isnan(model.site_stratified_auroc(sites=sites, label=label, score=prior))
+    rng = np.random.default_rng(0)
+    label2 = rng.integers(0, 2, 80).astype(float)
+    assert (
+        abs(model.site_stratified_auroc(sites=sites, label=label2, score=rng.random(80)) - 0.5)
+        < 0.2
+    )

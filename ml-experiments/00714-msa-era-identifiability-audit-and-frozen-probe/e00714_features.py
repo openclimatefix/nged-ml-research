@@ -22,11 +22,14 @@ change.
 **Older-row features.** `old_change`, `old_spread`, `old_z`, and `flat_old`, from the median of the
 single same-weekday days at ages 21, 28, 42, 63, 91, and 364 days that end before the onset.
 
-**Neighbour features.** `mirror_share` and `mirror_corr`: each site's change is first measured
-against its own mean change at each half-hour of the 14 days before the onset, then `mirror_share`
-is the ratio of the neighbours' summed step in MW (negated) to the host's step in MW, and
-`mirror_corr` is the correlation of the two centred series before the onset minus the
-correlation over the whole span, which removes the shared error of the reference level.
+**Neighbour features.** `mirror_share` and `mirror_z`: each site's change is first measured
+against its own mean change at each half-hour of the 14 days before the onset. `mirror_share` is
+the negated product of the neighbours' summed step and the host's step in MW, over the host's
+squared step plus the squared standard deviation of the host's daily means before the onset (a
+ratio of steps that shrinks to 0 when the host's step is within its own noise). `mirror_z` reads
+the neighbours only: their summed step in MW, negated and signed by the direction of the host's
+step, over the standard deviation of the neighbours' daily means before the onset. It does not
+grow with the size of the host's step.
 """
 
 from dataclasses import dataclass
@@ -39,7 +42,7 @@ from scipy.ndimage import median_filter
 HOST_FEATURES: Final[tuple[str, ...]] = ("size", "flat", "asym", "corr", "signdays", "late")
 STEP_FEATURES: Final[tuple[str, ...]] = ("steps", "high")
 OLD_FEATURES: Final[tuple[str, ...]] = ("old_change", "old_spread", "old_z", "flat_old")
-NEIGHBOUR_FEATURES: Final[tuple[str, ...]] = ("mirror_share", "mirror_corr")
+NEIGHBOUR_FEATURES: Final[tuple[str, ...]] = ("mirror_share", "mirror_z")
 ALL_FEATURES: Final[tuple[str, ...]] = (
     *HOST_FEATURES, *STEP_FEATURES, *OLD_FEATURES, *NEIGHBOUR_FEATURES
 )  # fmt: skip
@@ -56,7 +59,8 @@ MIN_STEP_POINTS: Final[float] = 1.0
 MIRROR_CLIP: Final[float] = 2.0
 MIN_DAYS_CORR: Final[int] = 4
 MIN_OLD_ROWS: Final[int] = 2
-MIN_STEP_MW: Final[float] = 0.3
+MIN_PRE_DAYS: Final[int] = 5
+MIRROR_Z_CLIP: Final[float] = 10.0
 MIN_OLD_COVERAGE: Final[float] = 0.5
 
 
@@ -287,21 +291,32 @@ def centred_change(
     return window - baseline[np.arange(lo, end) % common.DAY]
 
 
+def _daily_std(*, series: np.ndarray, lo: int, onset_hh: int) -> float:
+    """Return the standard deviation of the daily means before the onset (0 if too few days)."""
+    pre = series[: onset_hh - lo]
+    n_days = pre.size // common.DAY
+    if n_days == 0:
+        return 0.0
+    days = pre[pre.size - n_days * common.DAY :].reshape(n_days, common.DAY)
+    means = np.array([d[np.isfinite(d)].mean() if np.isfinite(d).any() else np.nan for d in days])
+    means = means[np.isfinite(means)]
+    return float(means.std()) if means.size >= MIN_PRE_DAYS else 0.0
+
+
 def _neighbour_features(
     *, event: EventInput, power: common.PassPower, reference: common.PassPower,
     capacity_mw: np.ndarray, end: int,
 ) -> dict[str, float]:  # fmt: skip
     """Return the mirror features, each site measured against its own pre-onset days.
 
-    The series run from 14 days before the onset to the data cut. `mirror_share` is the negated
-    median post-onset step of the neighbours' summed change in MW over the host's median post-onset
-    step in MW (0 when the host's step is under 0.3 MW). `mirror_corr` is the correlation of the
-    host's change and the neighbours' summed change over the 14 days before the onset (the shared
-    error of the reference level) minus the same correlation over the whole span: a step that the
-    neighbours mirror lowers the correlation, a shared error does not. With no event both are
-    near 0.
+    The series run from 14 days before the onset to the data cut. With `h` the host's median
+    post-onset step in MW, `n` the neighbours' summed median post-onset step in MW, `s_h` the
+    standard deviation of the host's daily means before the onset, and `s_n` the same for the
+    neighbours' sum: `mirror_share = -n * h / (h**2 + s_h**2)` and
+    `mirror_z = -sign(h) * n / s_n`. With no event both are near 0. `mirror_z` never reads the
+    size of `h`, so an unmirrored step does not raise it.
     """
-    zero = {"mirror_share": 0.0, "mirror_corr": 0.0}
+    zero = {"mirror_share": 0.0, "mirror_z": 0.0}
     lo = event.onset_hh - common.WINDOW_HH
     host_c = centred_change(
         power=power, reference=reference, site=event.host, onset_hh=event.onset_hh, lo=lo, end=end
@@ -326,18 +341,13 @@ def _neighbour_features(
     if n_used == 0 or use.sum() < MIN_POST_HH:
         return zero
     step = float(np.median(host_mw[use]))
-    share = -float(np.median(total[use])) / step if abs(step) >= MIN_STEP_MW else 0.0
-    finite = np.isfinite(host_mw)
-    corr_pre = _correlation(x=host_mw[finite & ~post], z=total[finite & ~post])
-    corr_all = _correlation(x=host_mw[finite], z=total[finite])
+    nbr_step = float(np.median(total[use]))
+    s_host = _daily_std(series=host_mw, lo=lo, onset_hh=event.onset_hh)
+    s_nbr = _daily_std(series=total, lo=lo, onset_hh=event.onset_hh)
+    denominator = step**2 + s_host**2
+    share = -nbr_step * step / denominator if denominator > 0 else 0.0
+    z = -np.sign(step) * nbr_step / s_nbr if s_nbr > 0 else 0.0
     return {
         "mirror_share": float(np.clip(share, -MIRROR_CLIP, MIRROR_CLIP)),
-        "mirror_corr": corr_pre - corr_all,
+        "mirror_z": float(np.clip(z, -MIRROR_Z_CLIP, MIRROR_Z_CLIP)),
     }
-
-
-def _correlation(*, x: np.ndarray, z: np.ndarray) -> float:
-    """Return the correlation of two series, 0 if either is constant or empty."""
-    if x.size < 2 or np.std(x) == 0 or np.std(z) == 0:
-        return 0.0
-    return float(np.corrcoef(x, z)[0, 1])

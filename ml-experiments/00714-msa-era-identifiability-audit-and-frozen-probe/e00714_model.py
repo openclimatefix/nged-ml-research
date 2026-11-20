@@ -3,7 +3,8 @@
 **Classifier.** A logistic regression with an L2 penalty on standardised features (numpy and scipy;
 scikit-learn is not a declared dependency). The standardising mean and standard deviation, the
 median used to fill a missing value, and the penalty strength come from the training passes only.
-The penalty is chosen by an inner split into 4 groups of whole passes.
+The penalty is chosen by leaving one training fold month out at a time, which mirrors the outer
+split. Passes of one fold month share one real background, so an inner split by pass would not.
 
 **Outer split.** Leave one fold month out: the classifier is fitted on the passes of 3 fold months
 and scores the passes of the fourth, so no pass and no month seen in fitting is scored.
@@ -24,7 +25,6 @@ from scipy.stats import rankdata
 
 PENALTIES: Final[tuple[float, ...]] = (0.01, 0.1, 1.0, 10.0, 100.0)
 """Grid of the L2 penalty on the summed log-loss."""
-INNER_GROUPS: Final[int] = 4
 XGB_PARAMS: Final[dict] = {
     "max_depth": 2, "n_estimators": 80, "learning_rate": 0.1, "n_jobs": 1,
     "tree_method": "hist", "verbosity": 0, "random_state": 0,
@@ -100,14 +100,13 @@ def _fit_standardised(*, z: np.ndarray, y: np.ndarray, penalty: float) -> tuple[
     return result.x[:-1], float(result.x[-1])
 
 
-def fit_logistic(*, x: np.ndarray, y: np.ndarray, groups: np.ndarray, seed: int = 0) -> Logistic:
-    """Fit a logistic regression, choosing the penalty by an inner split of whole passes.
+def fit_logistic(*, x: np.ndarray, y: np.ndarray, blocks: np.ndarray) -> Logistic:
+    """Fit a logistic regression, choosing the penalty by leaving one block of rows out at a time.
 
     Args:
         x: Features, shape (rows, columns), NaN where missing.
         y: 0/1 labels.
-        groups: Pass identifier of each row, for the inner split.
-        seed: Seed of the inner split.
+        blocks: Fold month of each row; the penalty is chosen by leave-one-block-out validation.
 
     Returns:
         The fitted classifier, refitted on all rows at the chosen penalty.
@@ -119,16 +118,13 @@ def fit_logistic(*, x: np.ndarray, y: np.ndarray, groups: np.ndarray, seed: int 
     scale = filled.std(axis=0)
     scale = np.where(scale > 0, scale, 1.0)
     z = (filled - mean) / scale
-    names = np.unique(groups)
-    rng = np.random.default_rng(seed)
-    assign = dict(zip(names, rng.permutation(len(names)) % INNER_GROUPS, strict=True))
-    fold = np.array([assign[g] for g in groups])
     best, best_loss = PENALTIES[0], np.inf
     for penalty in PENALTIES:
         total = 0.0
-        for f in range(INNER_GROUPS):
-            train, test = fold != f, fold == f
-            if test.sum() == 0 or len(np.unique(y[train])) < 2:
+        for block in np.unique(blocks):
+            test = blocks == block
+            train = ~test
+            if len(np.unique(y[train])) < 2:
                 continue
             w, b = _fit_standardised(z=z[train], y=y[train], penalty=penalty)
             s = z[test] @ w + b
@@ -140,14 +136,13 @@ def fit_logistic(*, x: np.ndarray, y: np.ndarray, groups: np.ndarray, seed: int 
 
 
 def out_of_fold(
-    *, x: np.ndarray, y: np.ndarray, groups: np.ndarray, months: np.ndarray, model: str = "logistic"
+    *, x: np.ndarray, y: np.ndarray, months: np.ndarray, model: str = "logistic"
 ) -> np.ndarray:
     """Return out-of-fold probabilities by leaving each fold month out in turn.
 
     Args:
         x: Features, shape (rows, columns).
         y: 0/1 labels.
-        groups: Pass identifier of each row.
         months: Fold month of each row.
         model: `logistic` or `tree` (a boosted tree of depth 2).
 
@@ -162,7 +157,7 @@ def out_of_fold(
         if len(np.unique(y[train])) < 2:
             continue
         if model == "logistic":
-            fitted = fit_logistic(x=x[train], y=y[train], groups=groups[train])
+            fitted = fit_logistic(x=x[train], y=y[train], blocks=months[train])
             out[test] = fitted.proba(x=x[test])
         else:
             from xgboost import XGBClassifier
@@ -174,11 +169,59 @@ def out_of_fold(
 
 
 def transfer_scores(
-    *, x_train: np.ndarray, y_train: np.ndarray, groups: np.ndarray, x_test: np.ndarray
-) -> np.ndarray:
-    """Fit on one set of events and score another set (for the cross-generator reading)."""
-    fitted = fit_logistic(x=x_train, y=y_train, groups=groups)
-    return fitted.proba(x=x_test)
+    *, x_source: np.ndarray, y_source: np.ndarray, months_source: np.ndarray,
+    x_dest: np.ndarray, months_dest: np.ndarray,
+) -> np.ndarray:  # fmt: skip
+    """Fit on one world and score another, month by month, never fitting on the scored month.
+
+    The classifier that scores the destination world's month m is fitted on the source world's
+    other months, so no fold month of the scored rows was seen in fitting.
+
+    Args:
+        x_source: Features of the source world's events.
+        y_source: Labels of the source world's events.
+        months_source: Fold month of each source event.
+        x_dest: Features of the destination world's events.
+        months_dest: Fold month of each destination event.
+
+    Returns:
+        The predicted probability for every destination event.
+    """
+    out = np.full(len(x_dest), np.nan)
+    for month in np.unique(months_dest):
+        train = months_source != month
+        fitted = fit_logistic(x=x_source[train], y=y_source[train], blocks=months_source[train])
+        test = months_dest == month
+        out[test] = fitted.proba(x=x_dest[test])
+    return out
+
+
+def site_prior_scores(*, sites: np.ndarray, label: np.ndarray, months: np.ndarray) -> np.ndarray:
+    """Score each event by its site's share of permanent changes in the other fold months.
+
+    The score uses the labels and sites only, so its AUROC measures how far knowing the Primary
+    alone predicts the class. A site unseen in the other months scores the smoothed prior 0.5.
+    """
+    out = np.full(len(label), 0.5)
+    for month in np.unique(months):
+        test = months == month
+        for site in np.unique(sites[test]):
+            seen = (~test) & (sites == site)
+            out[test & (sites == site)] = (label[seen].sum() + 1.0) / (seen.sum() + 2.0)
+    return out
+
+
+def site_stratified_auroc(*, sites: np.ndarray, label: np.ndarray, score: np.ndarray) -> float:
+    """Return the AUROC over the pairs of a permanent and a temporary event at the same site."""
+    concordant, pairs = 0.0, 0.0
+    for site in np.unique(sites):
+        sel = sites == site
+        n_pos, n_neg = int(label[sel].sum()), int((1 - label[sel]).sum())
+        if n_pos == 0 or n_neg == 0:
+            continue
+        concordant += auroc(label=label[sel], score=score[sel]) * n_pos * n_neg
+        pairs += n_pos * n_neg
+    return concordant / pairs if pairs else float("nan")
 
 
 def resample_indices(

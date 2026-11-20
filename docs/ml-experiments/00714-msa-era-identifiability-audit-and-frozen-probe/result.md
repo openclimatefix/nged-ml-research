@@ -173,13 +173,14 @@ and are the hard cases; a second set of readings drops them).
 3. **Neighbour rows.** Add the cleaned power of the electrical neighbours of the host, from the
    reconciled interconnection table of experiment 395. The feature is the share of the host's change
    that the sum of the neighbours mirrors, with its sign. The rewired placebo replaces each real
-   neighbour set with the neighbours of another Primary that is not electrically linked to the host.
+   neighbour set with the neighbours of another Primary that is not electrically linked to the host,
+   and never uses a site that carries an injected change.
 
 **The classifier is a logistic regression with an L2 penalty, fitted separately for each origin,
 with whole passes held out.** Origins are 7, 14, and 28 days after the onset, so days since the
 onset is fixed within a fit and is not a feature (this gives the classifier the true onset, which an
 online detector would not know, so the result is an upper bound for the information in the rows).
-The penalty strength comes from an inner grouped split by pass. Folds hold out whole passes and
+The penalty strength comes from leaving one training fold month out at a time. Folds hold out
 whole fold months, so no event and no pass seen in fitting is scored. The standardising mean and
 standard deviation come from the training passes only.
 
@@ -236,8 +237,8 @@ and is reported as context for experiment 713.
 
 ## Standing practices
 
-- **Cleaned data.** All rows drop the half-hours that the `substation_zero` rule flags. The page
-  prints the number dropped per fold month.
+- **Cleaned data.** The panel's power table already has the `substation_zero` half-hours set to
+  missing. The page prints the missing and the exact-zero half-hours per fold month.
 - **D15 and D18 cut.** Every scored month falls after 2025-03-01, so the cut drops no row. The page
   says so.
 - **Stored data reused.** The experiment reads experiment 709's stored bank
@@ -334,8 +335,9 @@ the only feature that reads weather directly.
 
 **The experiment runs on the CPU with at most 2 cores and no GPU, in 1 to 2 hours.** Unpickling
 the bank's passes dominates (the 64 files hold about 5 GB), and the logistic fits take seconds.
-The code limits BLAS to one thread and reads one pass at a time. The workstation rules of the
-manager apply: a check-in before the run, and the `systemd-run` wrapper.
+`e00714_threads.py` limits BLAS and OpenMP to one thread and Polars to 2, and the code reads one
+pass at a time. The run commands add `-p AllowedCPUs=0-1` to the `systemd-run` call. The
+workstation rules of the manager apply: a check-in before the run, and the `systemd-run` wrapper.
 
 ## Method
 
@@ -364,18 +366,28 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   the whole grid of 119,760 half-hours from 2019-09-01 to 2026-06-30.
 - **Neighbour features (two).** Each site (the host and each neighbour) is measured against its own
   mean change at each half-hour of the day over the 14 days before the onset, which removes the
-  reference level's error that neighbouring Primaries share. `mirror_share` is the negated median
-  post-onset step of the neighbours' summed change in MW over the host's median step in MW.
-  `mirror_corr` is the correlation of the two series before the onset minus the correlation over
-  the whole span from 14 days before the onset to the data cut. The neighbours of an event are the
-  host's electrical neighbours, without the sites of other events of the same pass.
+  reference level's error that neighbouring Primaries share. With `h` the median post-onset step of
+  the host in MW, `n` the median post-onset step of the neighbours' summed change in MW, `s_h` the
+  standard deviation of the host's daily means before the onset, and `s_n` the same for the
+  neighbours' sum, `mirror_share` is `-n * h / (h^2 + s_h^2)`, clipped to plus or minus 2, and
+  `mirror_z` is `-sign(h) * n / s_n`, clipped to plus or minus 10. Both are continuous: no step size
+  below a fixed number of megawatts is set to 0. `mirror_z` reads the neighbours and only the sign
+  of the host's step, so a large unmirrored step does not raise it. The neighbours of an event are
+  the host's electrical neighbours, without the sites of other events of the same pass. A statistic
+  built from the correlation before the onset minus the correlation over the whole span is not
+  used, because a unit test shows that it rises with the size of an unmirrored step. D8, D15, and
+  D18 stay in the neighbour sets, so real level shifts at those Primaries enter the neighbours'
+  sum. A partial mirror that is scored at the receiving Primary has a share of 1 over the mirrored
+  fraction, from 1.4 to 3.3, so most of those events sit at the clip.
 - **Step features (two, secondary).** Steps per day and the fraction of half-hours at the high level.
 
 **Training regime.**
 
 - **Classifier.** A logistic regression with an L2 penalty (numpy and scipy, because scikit-learn is
-  not a declared dependency), fitted separately for each origin. The penalty comes from an inner
-  split of whole passes into 4 groups, over 0.01, 0.1, 1, 10, and 100. The standardising statistics
+  not a declared dependency), fitted separately for each origin. The penalty comes from leaving one
+  training fold month out at a time, over 0.01, 0.1, 1, 10, and 100. A split by pass would put the
+  same real background on both sides, because every pass of a fold month has its onset on day 1 or
+  day 2 of that month. The standardising statistics
   and the fill value for a missing feature come from the training passes.
 - **Boosted tree (sensitivity).** XGBoost, which is a declared dependency, with depth 2, 80 trees, and
   learning rate 0.1, on the host and host-plus-neighbour features.
@@ -384,7 +396,25 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   `e00709_classify`, `e00687_features`, `e00598_signals` and further modules) and 128 passes of the
   second generator, 32 for each fold month, with seeds 714,100,000 and up. The second generator's
   passes have onsets at a random half-hour on the first or second day of the month. No event of a
-  pass sits in the neighbour set of another event of the pass.
+  pass sits in the neighbour set of another event of the pass. The builder places the 2 temporary
+  moves and the 2 permanent changes of a pass in a random order.
+- **Balancing the Primaries across the classes.** A Primary that hosts mostly permanent changes
+  lets a classifier recognise the Primary instead of the event. With hosts drawn at
+  random, the score "this Primary's share of permanent changes in the other 3 fold months" has an
+  AUROC of 0.70 from the truth tables of the second generator alone, and 0.67 on experiment 709's
+  stored bank, where the pass design cannot change. The builder now generates 4 times as many candidate
+  passes (128 for each fold month) and keeps the 32 for each fold month that minimise the squared
+  difference between the permanent and the temporary events at each Primary, over all months and
+  within each month. A kept pass replaces only a candidate with the same mirror states, kinds, and
+  step sizes. This design change follows from the second code review and not from any
+  classifier AUROC. The builder prints the site-prior AUROC of the candidates (0.589) and of the
+  kept passes (0.472), and the analysis prints the site-prior AUROC of both worlds and a
+  site-stratified AUROC, which ranks only pairs of a permanent and a temporary event at the same
+  Primary, beside C1 to C3. The stored bank cannot be rebalanced, so its reading is secondary. The
+  gas world's 32 passes are balanced in the same way, but 8 passes for each fold month leave
+  little to choose from (site-prior AUROC 0.585 for the candidates, 0.349 for the kept passes).
+  The site-prior AUROC of the second generator must stay at or below 0.60, or the run is
+  inconclusive.
 - **Which Primary is scored in a temporary move.** In experiment 709's bank the scored Primary of a
   temporary move is always the donor, so its change is always a decrease, and 25% of its permanent
   changes are increases. A classifier that read only the sign of the change would therefore score
@@ -394,6 +424,9 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   any AUROC. The page prints a sign-only AUROC beside C1 to C3 and C6, and a secondary C6 on the
   events with a decrease only.
 - **Splits.** Leave one fold month out, so no pass and no fold month seen in fitting is scored.
+  The cross-generator reading fits on one world's other 3 fold months and scores the other world's
+  fourth fold month. Both worlds share the same real panel, the same fold months, and the same
+  Primaries, so the reading shows only whether the shape of the host rows transfers.
 - **Compute.** CPU only, 2 cores. `e00714_threads.py` sets the BLAS and OpenMP thread counts to 1
   before numpy loads, and XGBoost runs with one thread.
 
@@ -417,9 +450,28 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   full or partial mirror. The hidden subset holds every permanent change and the temporary moves
   with a hidden mirror.
 - **Placebos.** Class labels shuffled within each pass (20 permutations); neighbours rewired to those
-  of an unlinked Primary; the no-event placebo, which scores the classifier on the real panel at the
+  of an unlinked Primary that has a neighbour that is neither the host nor the site of an event of
+  the pass (the builder prints the number of events with no valid set, and their rewired features
+  are missing); the no-event placebo, which scores the classifier on the real panel at the
   same hosts and onsets; and the noiseless known-answer, which replaces the reference level by the
   real power so that the change is the injected change exactly.
+- **Decision flags.** The analysis prints a flag for each part of the decision rule and the
+  following precedence. The run is inconclusive pending an audit if any of these fails: the
+  shuffled-label placebo within 0.03 on both worlds; the rewired-neighbour AUROC within 0.03 of the
+  host-only AUROC at 14 days on both worlds; the no-event placebo within 0.05 of 0.50 on both
+  worlds; and the site-prior AUROC of the second generator at or below 0.60. Outcome 3 applies only
+  when the second generator does not clear 0.70 (`bank_inflated_g2_enough` names the case where
+  C6 is above +0.10 and the second generator does clear it). The neighbour-row stop is the
+  complement of the clause that C5's lower end is at least +0.05.
+- **Cleaned data.** The panel comes from the cleaned power table, in which the `substation_zero` rule
+  has already set its flagged half-hours to missing. The feature build prints, for each fold
+  month's data window, the number of missing half-hours and the number of exact zeros (none are
+  expected).
+- **Weather look-ahead.** The reference level reads the daily mean temperature of the UTC day. The
+  6 half-hours from 00:00 to 02:30 on the day of the data cut therefore read a daily mean that
+  includes temperatures after the origin. The effect is the same for both classes.
+- **Recipient gain cap.** The gain of a recipient in a flipped metered move is capped at 60% of its
+  capacity.
 - **Audit checks.** A test scrambles the power, the reference level, and the weather at and after the
   data cut and requires every feature to stay identical.
 

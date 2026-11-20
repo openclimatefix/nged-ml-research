@@ -29,6 +29,7 @@ from typing import Final
 import e00714_common as common
 import e00714_features as feats
 import e00714_generator2 as g2
+import e00714_model as model
 import numpy as np
 import polars as pl
 
@@ -38,11 +39,12 @@ KA_FEATURES: Final[tuple[str, ...]] = (*feats.HOST_FEATURES, *feats.NEIGHBOUR_FE
 
 def rewired_neighbours(
     *, ctx: common.Context, host: int, touched: set[int], rng: np.random.Generator
-) -> list[int]:
+) -> list[int] | None:
     """Return the neighbours of another Primary that is not electrically linked to the host.
 
-    The other Primary is neither the host nor a neighbour of the host, and neither it nor its
-    neighbours is touched by an event of the pass, so its neighbours carry no injected change.
+    The other Primary is neither the host nor a neighbour of the host. The returned neighbours
+    exclude the host and every site that carries an injected change in the pass (a host, a donor,
+    or a recipient), so the rewired features never read an injected step.
 
     Args:
         ctx: The context.
@@ -51,22 +53,21 @@ def rewired_neighbours(
         rng: The random generator.
 
     Returns:
-        The neighbour indices of the chosen Primary, without the host.
+        The clean neighbour indices of a random valid Primary, or None if no Primary has a
+        neighbour that is both unlinked to the host and untouched.
     """
     panel = ctx.panel
     linked = {host, *panel.neighbours[host]}
-    options = [
-        u
-        for u in range(len(panel.sites))
-        if u not in linked
-        and panel.neighbours[u]
-        and u not in touched
-        and not touched & set(panel.neighbours[u])
-    ]
+    options = []
+    for u in range(len(panel.sites)):
+        if u in linked or u in touched:
+            continue
+        clean = [j for j in panel.neighbours[u] if j != host and j not in touched]
+        if clean:
+            options.append(clean)
     if not options:
-        options = [u for u in range(len(panel.sites)) if u not in linked and panel.neighbours[u]]
-    chosen = int(rng.choice(options))
-    return [j for j in panel.neighbours[chosen] if j != host]
+        return None
+    return options[int(rng.integers(len(options)))]
 
 
 def _pass_rows(
@@ -80,7 +81,7 @@ def _pass_rows(
     real = common.PassPower(start_hh=lo, power=ctx.panel.power[:, lo:hi])
     rng = np.random.default_rng(714_300_000 + common.MONTHS.index(month) * 1000 + pass_index)
     rows: list[dict] = []
-    dropped = {"missing": 0, "events": 0}
+    dropped = {"missing": 0, "events": 0, "no_rewired_set": 0}
     hosts = truth["host"].to_list()
     all_recipients = set(touched) - set(hosts)
     for e, ev in enumerate(truth.iter_rows(named=True)):
@@ -89,6 +90,7 @@ def _pass_rows(
             ctx=ctx, truth=truth, index=e, world=world, all_recipients=all_recipients
         )
         rewired = rewired_neighbours(ctx=ctx, host=host, touched=set(touched), rng=rng)
+        dropped["no_rewired_set"] += int(rewired is None)
         any_dropped = False
         for k in common.ORIGIN_DAYS:
             base = feats.EventInput(
@@ -113,8 +115,12 @@ def _pass_rows(
                 dropped["missing"] += 1
                 any_dropped = True
                 continue
-            rw = compute(
-                event=dataclasses.replace(base, neighbours=rewired), src=power, ref=reference
+            rw = (
+                None
+                if rewired is None
+                else compute(
+                    event=dataclasses.replace(base, neighbours=rewired), src=power, ref=reference
+                )
             )
             ka = compute(event=base, src=power, ref=real)
             nop = compute(event=base, src=real, ref=reference)
@@ -128,10 +134,11 @@ def _pass_rows(
                 "label": int(ev["truth"] == "era"),
                 "size_true": ev["size"], "onset_day": ev["onset_day"], "onset_hh": ev["onset_hh"],
                 "duration_days": duration, "band": ev["band"], "in_force": in_force,
-                "mirror_state": ev["mirror_state"], "n_foreign_neighbours": n_foreign, **main,
+                "mirror_state": ev["mirror_state"], "n_foreign_neighbours": n_foreign,
+                "receiving_host": bool(ev.get("receiving_host", False)), **main,
             }  # fmt: skip
             row["rw_mirror_share"] = rw["mirror_share"] if rw else None
-            row["rw_mirror_corr"] = rw["mirror_corr"] if rw else None
+            row["rw_mirror_z"] = rw["mirror_z"] if rw else None
             for name in KA_FEATURES:
                 row[f"ka_{name}"] = ka[name] if ka else None
                 row[f"np_{name}"] = nop[name] if nop else None
@@ -189,26 +196,79 @@ def bank_truth(*, parts: dict, month: str) -> pl.DataFrame:
 
 
 def generate(*, world: g2.WorldType, limit: int | None) -> None:
-    """Generate and store the passes of the second generator."""
+    """Generate and store the passes of the second generator.
+
+    A full run generates `CANDIDATE_FACTOR` times as many candidate passes as the world keeps and
+    stores the balanced ones (`select_balanced`), then prints the site-prior AUROC of the
+    candidates and of the kept passes, computed from the truth tables alone. A smoke run
+    (`limit`) stores the first passes of each fold month, unbalanced, in `worlds_smoke`.
+    """
     ctx = common.load_context()
+    n_keep = g2.PASSES_PER_MONTH[world]
+    if limit is not None:
+        g2.use_folder(name="worlds_smoke")
+        for month in common.MONTHS:
+            for index in range(limit):
+                built = g2.build_pass(ctx=ctx, world=world, month=month, index=index)
+                g2.write_pass(world=world, month=month, index=index, generated=built)
+        return
+    folder = g2.world_dir(world=world)
+    for stale in [*folder.glob("*.npz"), *folder.glob("*.parquet")]:
+        stale.unlink()
+    candidates: dict[tuple[str, int], g2.GeneratedPass] = {}
     for month in common.MONTHS:
-        for index in range(g2.PASSES_PER_MONTH[world] if limit is None else limit):
+        for index in range(g2.CANDIDATE_FACTOR * n_keep):
             started = time.monotonic()
-            built = g2.build_pass(ctx=ctx, world=world, month=month, index=index)
+            candidates[(month, index)] = g2.build_pass(
+                ctx=ctx, world=world, month=month, index=index
+            )
+            print(
+                f"{world} {month} candidate {index}: {time.monotonic() - started:.1f} s", flush=True
+            )
+    n_sites = len(ctx.panel.sites)
+    vectors = {
+        key: g2.balance_vector(truth=built.truth, n_sites=n_sites)
+        for key, built in candidates.items()
+    }
+    kept = g2.select_balanced(
+        vectors=vectors, months=common.MONTHS, per_month=n_keep, modulus=g2.CELL_MODULUS[world]
+    )
+    rows = []
+    for month, indices in kept.items():
+        for index in indices:
+            built = candidates[(month, index)]
             g2.write_pass(world=world, month=month, index=index, generated=built)
-            print(f"{world} {month} p{index}: {time.monotonic() - started:.1f} s", flush=True)
+            rows.append(built.truth)
+    chosen = pl.concat(rows)
+    everyone = pl.concat([built.truth for built in candidates.values()])
+    for name, truth in (("candidates", everyone), ("kept", chosen)):
+        print(f"{world} {name}: site-prior AUROC {truth_site_prior(truth=truth):.3f}")
+    chosen.write_parquet(folder.parent / f"{world}_kept_truth.parquet")
+
+
+def truth_site_prior(*, truth: pl.DataFrame) -> float:
+    """Return the leave-one-month-out site-prior AUROC of a world's truth tables."""
+    label = (truth["truth"] == "era").to_numpy().astype(float)
+    score = model.site_prior_scores(
+        sites=truth["host"].to_numpy(), label=label, months=truth["month"].to_numpy()
+    )
+    return model.auroc(label=label, score=score)
 
 
 def build_features(*, world: str, limit: int | None) -> None:
     """Build and store the feature table of a world (`bank`, `g2`, or `gas`)."""
+    if limit is not None:
+        g2.use_folder(name="worlds_smoke")
     ctx = common.load_context()
     all_rows: list[dict] = []
-    drops: dict[str, int] = {}
+    drops = {m: {"events": 0, "no_rewired_set": 0} for m in common.MONTHS}
     for month in common.MONTHS:
-        n_passes = (
-            common.BANK_PASSES_PER_MONTH if world == "bank" else g2.PASSES_PER_MONTH[world]  # ty: ignore[invalid-argument-type]
+        indices = (
+            list(range(common.BANK_PASSES_PER_MONTH))
+            if world == "bank"
+            else g2.stored_indices(world=world, month=month)  # ty: ignore[invalid-argument-type]
         )
-        for index in range(n_passes if limit is None else min(limit, n_passes)):
+        for index in indices if limit is None else indices[:limit]:
             started = time.monotonic()
             if world == "bank":
                 parts = common.load_bank_pass(month=month, index=index)
@@ -225,7 +285,8 @@ def build_features(*, world: str, limit: int | None) -> None:
                 pass_index=index,
             )  # fmt: skip
             all_rows.extend(rows)
-            drops[month] = drops.get(month, 0) + dropped["events"]
+            for key in ("events", "no_rewired_set"):
+                drops[month][key] += dropped[key]
             print(
                 f"{world} {month} p{index}: {len(rows)} rows, {time.monotonic() - started:.1f} s",
                 flush=True,
@@ -234,10 +295,37 @@ def build_features(*, world: str, limit: int | None) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     table = pl.DataFrame(all_rows, infer_schema_length=None)
     table.write_parquet(folder / f"{world}.parquet")
-    pl.DataFrame({"month": list(drops), "events_dropped": list(drops.values())}).write_csv(
-        folder / f"{world}_dropped.csv"
-    )
-    print(f"wrote {table.height} rows; events with an origin dropped for missing data: {drops}")
+    pl.DataFrame(
+        {
+            "month": list(drops),
+            "events_dropped": [d["events"] for d in drops.values()],
+            "events_without_rewired_set": [d["no_rewired_set"] for d in drops.values()],
+        }
+    ).write_csv(folder / f"{world}_dropped.csv")
+    print(f"wrote {table.height} rows; per fold month: {drops}")
+    report = panel_report(ctx=ctx)
+    report.write_csv(folder / "panel_missing.csv")
+    print(report)
+
+
+def panel_report(*, ctx: common.Context) -> pl.DataFrame:
+    """Count, per fold month's data window, the half-hours of the panel that are missing or zero.
+
+    The panel comes from the cleaned power table, in which the `substation_zero` rule has already
+    set its flagged half-hours to missing, so no exact zero should remain.
+    """
+    rows = []
+    for month in common.MONTHS:
+        lo, hi = common.window_bounds(onset_day=common.month_start_day(month=month))
+        window = ctx.panel.power[:, lo:hi]
+        rows.append(
+            {
+                "month": month, "half_hours_read": int(np.isfinite(window).sum()),
+                "missing_half_hours": int(np.isnan(window).sum()),
+                "exact_zero_half_hours": int((window == 0).sum()),
+            }
+        )  # fmt: skip
+    return pl.DataFrame(rows)
 
 
 def main() -> None:
