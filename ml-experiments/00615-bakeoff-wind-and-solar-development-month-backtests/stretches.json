@@ -1,0 +1,164 @@
+[
+ {
+  "name": "wind_W1_high_wind",
+  "series": "W1",
+  "kind": "high-wind",
+  "month": "2025-12"
+ },
+ {
+  "name": "wind_W1_calm",
+  "series": "W1",
+  "kind": "calm",
+  "month": "2026-06"
+ },
+ {
+  "name": "wind_W1_gap",
+  "series": "W1",
+  "kind": "gap",
+  "month": "2026-03"
+ },
+ {
+  "name": "wind_W2_high_wind",
+  "series": "W2",
+  "kind": "high-wind",
+  "month": "2025-10"
+ },
+ {
+  "name": "wind_W2_calm",
+  "series": "W2",
+  "kind": "calm",
+  "month": "2026-06"
+ },
+ {
+  "name": "wind_W2_gap",
+  "series": "W2",
+  "kind": "gap",
+  "month": "2026-03"
+ },
+ {
+  "name": "wind_W3_high_wind",
+  "series": "W3",
+  "kind": "high-wind",
+  "month": "2025-12"
+ },
+ {
+  "name": "wind_W3_calm",
+  "series": "W3",
+  "kind": "calm",
+  "month": "2026-06"
+ },
+ {
+  "name": "wind_W3_gap",
+  "series": "W3",
+  "kind": "gap",
+  "month": "2026-03"
+ },
+ {
+  "name": "solar_Solar_A_very_sunny",
+  "series": "Solar A",
+  "kind": "very sunny",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_A_cloudy",
+  "series": "Solar A",
+  "kind": "cloudy",
+  "month": "2026-01"
+ },
+ {
+  "name": "solar_Solar_A_gap",
+  "series": "Solar A",
+  "kind": "gap",
+  "month": "2026-03"
+ },
+ {
+  "name": "solar_Solar_B_very_sunny",
+  "series": "Solar B",
+  "kind": "very sunny",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_B_cloudy",
+  "series": "Solar B",
+  "kind": "cloudy",
+  "month": "2026-01"
+ },
+ {
+  "name": "solar_Solar_B_gap",
+  "series": "Solar B",
+  "kind": "gap",
+  "month": "2025-10"
+ },
+ {
+  "name": "solar_Solar_C_very_sunny",
+  "series": "Solar C",
+  "kind": "very sunny",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_C_cloudy",
+  "series": "Solar C",
+  "kind": "cloudy",
+  "month": "2026-01"
+ },
+ {
+  "name": "solar_Solar_C_gap",
+  "series": "Solar C",
+  "kind": "gap",
+  "month": "2025-10"
+ },
+ {
+  "name": "solar_Solar_D_very_sunny",
+  "series": "Solar D",
+  "kind": "very sunny",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_D_cloudy",
+  "series": "Solar D",
+  "kind": "cloudy",
+  "month": "2026-01"
+ },
+ {
+  "name": "solar_Solar_D_gap",
+  "series": "Solar D",
+  "kind": "gap",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_E_very_sunny",
+  "series": "Solar E",
+  "kind": "very sunny",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_E_cloudy",
+  "series": "Solar E",
+  "kind": "cloudy",
+  "month": "2026-01"
+ },
+ {
+  "name": "solar_Solar_E_gap",
+  "series": "Solar E",
+  "kind": "gap",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_F_very_sunny",
+  "series": "Solar F",
+  "kind": "very sunny",
+  "month": "2026-06"
+ },
+ {
+  "name": "solar_Solar_F_cloudy",
+  "series": "Solar F",
+  "kind": "cloudy",
+  "month": "2026-01"
+ },
+ {
+  "name": "solar_Solar_F_gap",
+  "series": "Solar F",
+  "kind": "gap",
+  "month": "2025-10"
+ }
+]
