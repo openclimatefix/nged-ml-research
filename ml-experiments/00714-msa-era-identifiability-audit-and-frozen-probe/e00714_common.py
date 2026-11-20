@@ -17,6 +17,10 @@ last 5 days before an origin is read optimistically. The weather of the days aft
 never read.
 """
 
+import e00714_threads  # noqa: F401  (must run before numpy)
+
+# isort: split
+
 import pickle
 from dataclasses import dataclass
 from datetime import date
@@ -64,25 +68,39 @@ RIDGE: Final[float] = 1e-3
 
 
 class _Stub:
-    """Stand-in for a class of an experiment module that the unpickler does not import."""
+    """Stand-in for the one class of an experiment module that the bank pickles hold."""
 
     def __setstate__(self, state: object) -> None:
         self.state = state
 
 
-class _BankUnpickler(pickle.Unpickler):
-    """Unpickler that replaces classes of `e00*` experiment modules by stubs.
+ALLOWED_GLOBALS: Final[frozenset[tuple[str, str]]] = frozenset(
+    {
+        ("numpy", "dtype"),
+        ("numpy._core.numeric", "_frombuffer"),
+        ("polars.dataframe.frame", "DataFrame"),
+    }
+)
+"""The globals, besides `e00709_signal.Signal`, that a bank pickle holds (read from the pickles)."""
+STUBBED_GLOBALS: Final[frozenset[tuple[str, str]]] = frozenset({("e00709_signal", "Signal")})
 
-    The bank pickles hold one class of experiment 709 (`e00709_signal.Signal`, in the detector
-    signals that this experiment does not read). Importing it needs `e00709_classify`, then
-    `e00687_features`, then `e00598_signals`, and every further module of that chain on the path.
+
+class _BankUnpickler(pickle.Unpickler):
+    """Unpickler that allows only the globals that the bank pickles hold.
+
+    The pickles hold the class `e00709_signal.Signal` (in detector signals that this experiment
+    does not read). Importing it needs `e00709_classify`, then `e00687_features`, then
+    `e00598_signals`, and further modules, so a stub class takes its place. Any other global raises.
     """
 
     def find_class(self, module: str, name: str) -> type:
-        """Return a stub for experiment modules, the real class otherwise."""
-        if module.startswith("e00"):
+        """Return a stub for `Signal`, the real class for an allowed global, else raise."""
+        if (module, name) in STUBBED_GLOBALS:
             return type(name, (_Stub,), {})
-        return super().find_class(module, name)
+        if (module, name) in ALLOWED_GLOBALS:
+            return super().find_class(module, name)
+        msg = f"the bank pickle asks for the global {module}.{name}, which is not allowed"
+        raise pickle.UnpicklingError(msg)
 
 
 def month_start_day(*, month: str) -> int:
@@ -127,7 +145,7 @@ def load_bank_pass(*, month: str, index: int) -> dict:
         index: Pass index within the month, 0 to 15.
 
     Returns:
-        A dict with `passes` (a `PassPower`), `truth` (the truth table), and `touched`.
+        A dict with `power` (a `PassPower`), `truth` (the truth table), and `touched`.
     """
     path = BANK_DIR / f"bank_{month}_p{index}.pkl"
     with path.open("rb") as handle:

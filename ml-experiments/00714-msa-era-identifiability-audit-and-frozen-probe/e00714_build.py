@@ -11,8 +11,13 @@ The `features` command writes `features/<world>.parquet` under this experiment's
 one row per event and origin, with the features, the rewired-neighbour features
 (`rw_mirror_*`), the known-answer features computed on the noiseless change (`ka_*`), the
 no-event placebo features computed on the real panel (`np_*`), and the event's truth columns.
-`--limit n` builds only the first `n` passes of each fold month (a smoke run).
+`--limit n` builds only the first `n` passes of each fold month (a smoke run) and writes
+`features_smoke/` instead of `features/`.
 """
+
+import e00714_threads  # noqa: F401  (must run before numpy)
+
+# isort: split
 
 import argparse
 import dataclasses
@@ -21,7 +26,6 @@ import time
 from pathlib import Path
 from typing import Final
 
-import e00709_features as f709  # ty: ignore[unresolved-import]
 import e00714_common as common
 import e00714_features as feats
 import e00714_generator2 as g2
@@ -76,43 +80,55 @@ def _pass_rows(
     real = common.PassPower(start_hh=lo, power=ctx.panel.power[:, lo:hi])
     rng = np.random.default_rng(714_300_000 + common.MONTHS.index(month) * 1000 + pass_index)
     rows: list[dict] = []
-    dropped = {"missing": 0}
+    dropped = {"missing": 0, "events": 0}
+    hosts = truth["host"].to_list()
+    all_recipients = set(touched) - set(hosts)
     for e, ev in enumerate(truth.iter_rows(named=True)):
         host = ev["host"]
-        neighbours = list(ctx.panel.neighbours[host])
+        neighbours, n_foreign = own_neighbours(
+            ctx=ctx, truth=truth, index=e, world=world, all_recipients=all_recipients
+        )
         rewired = rewired_neighbours(ctx=ctx, host=host, touched=set(touched), rng=rng)
+        any_dropped = False
         for k in common.ORIGIN_DAYS:
             base = feats.EventInput(
                 host=host, onset_hh=ev["onset_hh"], onset_day=ev["onset_day"], neighbours=neighbours
             )
 
             def compute(
-                event: feats.EventInput,
-                src: common.PassPower,
-                ref: common.PassPower,
-                k: int = k,
-                host: int = host,
-            ) -> dict[str, float] | None:
+                *, event: feats.EventInput, src: common.PassPower, ref: common.PassPower,
+                k: int = k, host: int = host,
+            ) -> dict[str, float] | None:  # fmt: skip
                 return feats.build_features(
-                    event=event, k=k, power=src, reference=ref,
-                    shortwave=ctx.weather.shortwave[host], capacity_mw=ctx.panel.capacity_mw,
-                )  # fmt: skip
+                    event=event,
+                    k=k,
+                    power=src,
+                    reference=ref,
+                    shortwave=ctx.weather.shortwave[host],
+                    capacity_mw=ctx.panel.capacity_mw,
+                )
 
-            main = compute(base, power, reference)
+            main = compute(event=base, src=power, ref=reference)
             if main is None:
                 dropped["missing"] += 1
+                any_dropped = True
                 continue
-            rw = compute(dataclasses.replace(base, neighbours=rewired), power, reference)
-            ka = compute(base, power, real)
-            nop = compute(base, real, reference)
+            rw = compute(
+                event=dataclasses.replace(base, neighbours=rewired), src=power, ref=reference
+            )
+            ka = compute(event=base, src=power, ref=real)
+            nop = compute(event=base, src=real, ref=reference)
+            cut = (ev["onset_day"] + k) * common.DAY + common.ORIGIN_HOUR_HH - common.LATENCY_HH
+            duration = ev["duration_days"]
+            in_force = duration is None or ev["onset_hh"] + duration * common.DAY > cut
             row = {
                 "world": world, "month": month, "pass_index": pass_index,
                 "pass_id": f"{world}_{month}_p{pass_index}", "event": e, "k": k,
                 "host": host, "truth": ev["truth"], "kind": ev["kind"],
                 "label": int(ev["truth"] == "era"),
                 "size_true": ev["size"], "onset_day": ev["onset_day"], "onset_hh": ev["onset_hh"],
-                "duration_days": ev["duration_days"], "band": ev["band"],
-                "mirror_state": ev["mirror_state"], **main,
+                "duration_days": duration, "band": ev["band"], "in_force": in_force,
+                "mirror_state": ev["mirror_state"], "n_foreign_neighbours": n_foreign, **main,
             }  # fmt: skip
             row["rw_mirror_share"] = rw["mirror_share"] if rw else None
             row["rw_mirror_corr"] = rw["mirror_corr"] if rw else None
@@ -120,7 +136,43 @@ def _pass_rows(
                 row[f"ka_{name}"] = ka[name] if ka else None
                 row[f"np_{name}"] = nop[name] if nop else None
             rows.append(row)
+        dropped["events"] += int(any_dropped)
     return rows, dropped
+
+
+def own_neighbours(
+    *, ctx: common.Context, truth: pl.DataFrame, index: int, world: str, all_recipients: set[int]
+) -> tuple[list[int], int]:
+    """Return the host's neighbours without the sites of other events of the pass.
+
+    A neighbour that hosts another event of the pass (or is that event's recipient) would carry a
+    change that is not this event's mirror, so it is dropped. The second generator keeps such sites
+    apart by construction, so nothing is dropped there. The bank does not store which recipient
+    belongs to which transfer, so a metered-mirror transfer keeps every neighbour recipient, and the
+    other events drop all recipients.
+
+    Args:
+        ctx: The context.
+        truth: The pass's truth table.
+        index: Row of the event.
+        world: The world.
+        all_recipients: Touched sites that host no event (the bank's recipients).
+
+    Returns:
+        The kept neighbours and the number dropped.
+    """
+    ev = truth.row(index, named=True)
+    other_hosts = {h for j, h in enumerate(truth["host"].to_list()) if j != index}
+    foreign = set(other_hosts)
+    if world == "bank":
+        if ev["mirror_state"] in ("none", "hidden"):
+            foreign |= all_recipients
+    else:
+        for j, row in enumerate(truth.iter_rows(named=True)):
+            if j != index and row["recipient"] >= 0:
+                foreign.add(row["recipient"])
+    neighbours = [j for j in ctx.panel.neighbours[ev["host"]] if j not in foreign]
+    return neighbours, len(ctx.panel.neighbours[ev["host"]]) - len(neighbours)
 
 
 def bank_truth(*, parts: dict, month: str) -> pl.DataFrame:
@@ -173,18 +225,19 @@ def build_features(*, world: str, limit: int | None) -> None:
                 pass_index=index,
             )  # fmt: skip
             all_rows.extend(rows)
-            drops[month] = drops.get(month, 0) + dropped["missing"]
+            drops[month] = drops.get(month, 0) + dropped["events"]
             print(
                 f"{world} {month} p{index}: {len(rows)} rows, {time.monotonic() - started:.1f} s",
                 flush=True,
             )
-    FEATURE_DIR.mkdir(parents=True, exist_ok=True)
+    folder = FEATURE_DIR if limit is None else FEATURE_DIR.with_name("features_smoke")
+    folder.mkdir(parents=True, exist_ok=True)
     table = pl.DataFrame(all_rows, infer_schema_length=None)
-    table.write_parquet(FEATURE_DIR / f"{world}.parquet")
-    pl.DataFrame({"month": list(drops), "dropped": list(drops.values())}).write_csv(
-        FEATURE_DIR / f"{world}_dropped.csv"
+    table.write_parquet(folder / f"{world}.parquet")
+    pl.DataFrame({"month": list(drops), "events_dropped": list(drops.values())}).write_csv(
+        folder / f"{world}_dropped.csv"
     )
-    print(f"wrote {table.height} rows; events dropped for missing data by month: {drops}")
+    print(f"wrote {table.height} rows; events with an origin dropped for missing data: {drops}")
 
 
 def main() -> None:
@@ -203,5 +256,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    assert f709.N_HALF_HOURS > 0
     main()

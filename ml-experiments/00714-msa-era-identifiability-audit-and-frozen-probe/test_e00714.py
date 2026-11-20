@@ -1,8 +1,6 @@
 # ruff: noqa: E402, PT018
 """Tests of experiment 714's features, classifier, and second generator. Synthetic data only."""
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 
@@ -17,6 +15,9 @@ for folder in (
 ):
     sys.path.insert(0, str(folder))
 
+import e00714_threads  # noqa: F401  (must run before numpy)
+
+# isort: split
 import e00714_common as common
 import e00714_features as feats
 import e00714_generator2 as g2
@@ -192,3 +193,110 @@ def test_second_generator_shares_no_injector_with_experiment_709() -> None:
     """The second generator never imports experiment 709's injector."""
     assert "e00709_inject" not in sys.modules
     assert not hasattr(g2, "inject")
+
+
+def _old_mirror_share(*, host_mw: np.ndarray, neighbour_mw: np.ndarray) -> float:
+    """The uncentred slope that the first version of the mirror feature used."""
+    x, z = host_mw, -neighbour_mw
+    return float(np.sum(x * z) / np.sum(x * x))
+
+
+def test_mirror_ignores_common_mode_error_and_finds_a_mirror() -> None:
+    """With no event the mirror share is near 0; with a 90% mirror it is near 0.9.
+
+    The reference level's error is shared by neighbouring Primaries (here a constant offset). The
+    first version of the feature, an uncentred slope, read that shared error as a strong mirror.
+    """
+    cap = np.full(N_SITES, 100.0)
+    power, ref, sw = synthetic(step=0.0)
+    shared = power.power.copy()
+    shared[0] += 0.10
+    shared[1] += 0.10
+    shared[2] += 0.08
+    quiet = feats.build_features(
+        event=event(), k=14, power=common.PassPower(0, shared), reference=ref, shortwave=sw,
+        capacity_mw=cap,
+    )  # fmt: skip
+    assert quiet is not None
+    assert abs(quiet["mirror_share"]) < 0.15
+    assert abs(quiet["mirror_corr"]) < 0.3
+    window = slice((ONSET_DAY + 14) * common.DAY - 600, (ONSET_DAY + 14) * common.DAY)
+    old = _old_mirror_share(
+        host_mw=(shared[0, window] - ref.power[0, window]) * 100.0,
+        neighbour_mw=sum((shared[j, window] - ref.power[j, window]) * 100.0 for j in (1, 2)),
+    )
+    assert old < -0.3  # the old statistic fails the same input
+    moved = shared.copy()
+    moved[0, event().onset_hh :] -= 0.20
+    moved[1, event().onset_hh :] += 0.18
+    mirrored = feats.build_features(
+        event=event(), k=14, power=common.PassPower(0, moved), reference=ref, shortwave=sw,
+        capacity_mw=cap,
+    )  # fmt: skip
+    assert mirrored is not None
+    assert mirrored["mirror_share"] == pytest.approx(0.9, abs=0.15)
+    assert mirrored["mirror_corr"] > 0.0
+
+
+def _ring_context(*, n_sites: int = 16) -> common.Context:
+    """Return a context whose panel is a ring of Primaries with full readings."""
+    sites = tuple(f"S{i}" for i in range(n_sites))
+    neighbours = {i: sorted({(i - 1) % n_sites, (i + 1) % n_sites}) for i in range(n_sites)}
+    panel = common.f709.Panel(
+        sites=sites, power=np.full((n_sites, 20 * common.DAY), 0.5),
+        capacity_mw=np.full(n_sites, 30.0), is_mva=np.zeros(n_sites, dtype=bool),
+        neighbours=neighbours,
+    )  # fmt: skip
+    return common.Context(panel=panel, weather=None, references={})  # ty: ignore[invalid-argument-type]
+
+
+def test_no_event_sits_in_another_events_neighbour_set() -> None:
+    """Every event site is outside the neighbour sets of the other events' sites."""
+    ctx = _ring_context()
+    nbrs = ctx.panel.neighbours
+    pool = list(range(16))
+    for seed in range(100):
+        rng = np.random.default_rng(seed)
+        mirrors = g2.SWITCH_ROTATION[seed % 4]
+        eras, pairs = g2.choose_hosts(
+            ctx=ctx, pool=pool, onset_hh=15 * common.DAY, mirrors=mirrors, n_era=2, rng=rng
+        )
+        groups = [{h} for h in eras] + [{d, *([] if r is None else [r])} for d, r in pairs]
+        for a, group_a in enumerate(groups):
+            for b, group_b in enumerate(groups):
+                if a == b:
+                    continue
+                assert not any(nbrs[x] and set(nbrs[x]) & group_b for x in group_a), (seed, a, b)
+
+
+def test_half_of_the_transfers_are_scored_at_the_receiver() -> None:
+    """About half of the temporary moves have a positive change at the scored host."""
+    ctx = _ring_context()
+    rng = np.random.default_rng(0)
+    truth: list[dict] = []
+    pairs: list[tuple[int, int | None]] = [(0, 1), (4, None)] * 200
+    mirrors: tuple[g2.MirrorType, ...] = tuple(["full", "hidden"] * 200)  # ty: ignore[invalid-assignment]
+    g2._build_transfers(
+        ctx=ctx, pairs=pairs, mirrors=mirrors, onset_hh=100, onset_day=2, truth=truth, rng=rng
+    )  # fmt: skip
+    positive = np.mean([t["size"] > 0 for t in truth])
+    assert 0.4 < positive < 0.6
+    flipped_metered = [t for t in truth if t["receiving_host"] and t["mirror_state"] == "full"]
+    assert flipped_metered
+    assert all(t["host"] == 1 and t["recipient"] == 0 for t in flipped_metered)
+    flipped_hidden = [t for t in truth if t["receiving_host"] and t["mirror_state"] == "hidden"]
+    assert all(t["recipient"] == -1 and t["size"] > 0 for t in flipped_hidden)
+
+
+def test_bank_unpickler_allows_only_known_globals() -> None:
+    """An unpickler that is asked for any other global raises."""
+    import io
+    import os
+    import pickle
+
+    class Evil:
+        def __reduce__(self) -> tuple:
+            return (os.system, ("true",))
+
+    with pytest.raises(pickle.UnpicklingError):
+        common._BankUnpickler(io.BytesIO(pickle.dumps(Evil()))).load()

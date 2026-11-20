@@ -2,7 +2,8 @@
 
     .venv/bin/python ml-experiments/00714-*/e00714_analyse.py [--smoke]
 
-Reads `features/{bank,g2,gas}.parquet` (written by `e00714_build.py`) and writes under
+Reads `features/{bank,g2,gas}.parquet` (`features_smoke/` with `--smoke`), written by
+`e00714_build.py`, and writes under
 `results/`: `oof_<world>_k<k>.parquet` (out-of-fold probabilities by feature set),
 `primary_contrasts.json` (the six pre-registered contrasts), `placebos.json`,
 `sensitivity.json`, `coefficients.json`, `secondary_cues_by_kind.csv`, `calibration.csv`, and
@@ -10,6 +11,10 @@ Reads `features/{bank,g2,gas}.parquet` (written by `e00714_build.py`) and writes
 `gas` (intermittent steps) enters the secondary per-cue and per-kind readings only.
 `--smoke` uses 200 bootstrap draws and 3 label permutations and writes under `results_smoke/`.
 """
+
+import e00714_threads  # noqa: F401  (must run before numpy)
+
+# isort: split
 
 import argparse
 import json
@@ -53,11 +58,15 @@ DRAWS: Final[int] = 10_000
 SECONDARY_DRAWS: Final[int] = 1000
 SECONDARY_CONFIDENCE: Final[float] = 0.95
 TOLERANCE: Final[float] = 0.03
+NO_EVENT_TOLERANCE: Final[float] = 0.05
+HIDDEN_GAIN_LIMIT: Final[float] = 0.02
+BANK_ENOUGH_ORIGINS: Final[tuple[int, ...]] = (7, 14)
 
 
-def load_world(*, world: str) -> pl.DataFrame:
+def load_world(*, world: str, smoke: bool) -> pl.DataFrame:
     """Read a world's feature table, or raise if it is missing."""
-    return pl.read_parquet(FEATURE_DIR / f"{world}.parquet")
+    folder = FEATURE_DIR.with_name("features_smoke") if smoke else FEATURE_DIR
+    return pl.read_parquet(folder / f"{world}.parquet")
 
 
 def matrix(*, frame: pl.DataFrame, columns: list[str]) -> np.ndarray:
@@ -90,120 +99,191 @@ def hidden_mask(*, frame: pl.DataFrame) -> np.ndarray:
     return (frame["label"] == 1).to_numpy() | (frame["mirror_state"] == "hidden").to_numpy()
 
 
+def in_force_mask(*, frame: pl.DataFrame) -> np.ndarray:
+    """Return permanent changes and the temporary moves still in force at the data cut."""
+    return (frame["label"] == 1).to_numpy() | frame["in_force"].to_numpy()
+
+
+def negative_size_mask(*, frame: pl.DataFrame) -> np.ndarray:
+    """Return the rows whose injected change at the scored host is a decrease."""
+    return (frame["size_true"] < 0).to_numpy()
+
+
+def _sub_draws(*, draws: list[np.ndarray], mask: np.ndarray | None) -> list[np.ndarray]:
+    """Keep, in each draw, the rows inside the mask (the arrays keep their full length)."""
+    return draws if mask is None else [d[mask[d]] for d in draws]
+
+
 def point_and_interval(
-    *, label: np.ndarray, score: np.ndarray, draws: list[np.ndarray]
+    *, label: np.ndarray, score: np.ndarray, draws: list[np.ndarray], mask: np.ndarray | None = None
 ) -> dict[str, float]:
-    """Return an AUROC with its 99.17% interval over paired bootstrap draws."""
-    boot = model.bootstrap_auroc(label=label, score=score, draws=draws)
+    """Return an AUROC with its 99.17% interval over paired bootstrap draws, on the mask's rows."""
+    sel = np.ones(len(label), dtype=bool) if mask is None else mask
+    boot = model.bootstrap_auroc(label=label, score=score, draws=_sub_draws(draws=draws, mask=mask))
     low, high = model.interval(values=boot)
-    return {"auroc": model.auroc(label=label, score=score), "low": low, "high": high}
+    return {"auroc": model.auroc(label=label[sel], score=score[sel]), "low": low, "high": high}
 
 
 def contrast(
-    *, label: np.ndarray, a: np.ndarray, b: np.ndarray, draws: list[np.ndarray]
-) -> dict[str, float]:
-    """Return AUROC(a) - AUROC(b) with its 99.17% interval over paired draws."""
-    diff = model.bootstrap_auroc(label=label, score=a, draws=draws) - model.bootstrap_auroc(
-        label=label, score=b, draws=draws
+    *, label: np.ndarray, a: np.ndarray, b: np.ndarray, draws: list[np.ndarray],
+    mask: np.ndarray | None = None,
+) -> dict[str, float]:  # fmt: skip
+    """Return AUROC(a) - AUROC(b) with its 99.17% interval, point and draws on the mask's rows."""
+    sel = np.ones(len(label), dtype=bool) if mask is None else mask
+    sub = _sub_draws(draws=draws, mask=mask)
+    diff = model.bootstrap_auroc(label=label, score=a, draws=sub) - model.bootstrap_auroc(
+        label=label, score=b, draws=sub
     )
     low, high = model.interval(values=diff)
     return {
-        "diff": model.auroc(label=label, score=a) - model.auroc(label=label, score=b),
+        "diff": model.auroc(label=label[sel], score=a[sel])
+        - model.auroc(label=label[sel], score=b[sel]),
         "low": low, "high": high,
     }  # fmt: skip
+
+
+def c6_contrast(
+    *, bank: tuple[pl.DataFrame, np.ndarray, list[np.ndarray]],
+    second: tuple[pl.DataFrame, np.ndarray, list[np.ndarray]],
+    masks: tuple[np.ndarray | None, np.ndarray | None], seed: int,
+) -> dict[str, float]:  # fmt: skip
+    """Return the bank's AUROC minus the second generator's, with independent worlds' draws.
+
+    Args:
+        bank: The bank's frame, scores, and draws.
+        second: The second generator's frame, scores, and draws.
+        masks: Optional row masks of the bank and of the second generator.
+        seed: Seed of the random pairing of the two worlds' draws.
+
+    Returns:
+        The difference and its 99.17% interval.
+    """
+    est = []
+    boots = []
+    for (frame, score, draws), mask in zip((bank, second), masks, strict=True):
+        label = frame["label"].to_numpy()
+        sel = np.ones(len(label), dtype=bool) if mask is None else mask
+        est.append(model.auroc(label=label[sel], score=score[sel]))
+        boots.append(
+            model.bootstrap_auroc(
+                label=label, score=score, draws=_sub_draws(draws=draws, mask=mask)
+            )
+        )
+    np.random.default_rng(seed).shuffle(boots[1])  # independent worlds: pair the draws at random
+    low, high = model.interval(values=boots[0] - boots[1])
+    return {"diff": est[0] - est[1], "low": low, "high": high}
 
 
 def primary(*, tables: dict[str, pl.DataFrame], draws: int, out: Path, tree: bool) -> dict:
-    """Fit the primary sets on `bank` and `g2` and compute the six contrasts."""
-    result: dict = {"auroc": {}, "contrasts": {}}
-    oof: dict[tuple[str, int], tuple[pl.DataFrame, pl.DataFrame]] = {}
-    boots: dict[tuple[str, int], list[np.ndarray]] = {}
+    """Fit the primary sets on `bank` and `g2`, compute C1 to C6 and their companion readings."""
+    result: dict = {"auroc": {}, "contrasts": {}, "sign_only": {}, "secondary": {}}
+    store: dict[tuple[str, int], tuple[pl.DataFrame, pl.DataFrame, list[np.ndarray]]] = {}
     for world in ("bank", "g2"):
         for k in common.ORIGIN_DAYS:
             frame = tables[world].filter(pl.col("k") == k).sort("pass_id", "event")
-            preds = oof_for_sets(
-                frame=frame, sets={n: FEATURE_SETS[n] for n in PRIMARY_SETS}, tree=tree
-            )
-            oof[(world, k)] = (frame, preds)
+            sets = {n: FEATURE_SETS[n] for n in PRIMARY_SETS}
+            preds = oof_for_sets(frame=frame, sets=sets, tree=tree)
             preds.with_columns(
                 frame.select("pass_id", "month", "kind", "label", "mirror_state")
             ).write_parquet(out / f"oof_{world}_k{k}.parquet")
-            boots[(world, k)] = model.bootstrap_draws(
+            boot = model.bootstrap_draws(
                 months=frame["month"].to_numpy(), passes=frame["pass_id"].to_numpy(),
                 n_draws=draws, seed=714_000 + k,
             )  # fmt: skip
+            store[(world, k)] = (frame, preds, boot)
             label = frame["label"].to_numpy()
             for name in preds.columns:
                 result["auroc"][f"{world}/k{k}/{name}"] = point_and_interval(
-                    label=label, score=preds[name].to_numpy(), draws=boots[(world, k)]
+                    label=label, score=preds[name].to_numpy(), draws=boot
                 )
-    g2_frames = {k: oof[("g2", k)] for k in common.ORIGIN_DAYS}
+            sign = (frame["size"] > 0).to_numpy().astype(float)
+            result["sign_only"][f"{world}/k{k}"] = point_and_interval(
+                label=label, score=sign, draws=boot
+            )
     for name, k in (("C1", 7), ("C2", 14), ("C3", 28)):
         result["contrasts"][name] = result["auroc"][f"g2/k{k}/host"]
-    frame, preds = g2_frames[14]
+    frame, preds, boot = store[("g2", 14)]
     label = frame["label"].to_numpy()
-    result["contrasts"]["C4"] = contrast(
-        label=label,
-        a=preds["host_old"].to_numpy(),
-        b=preds["host"].to_numpy(),
-        draws=boots[("g2", 14)],
-    )
-    mask = mirrored_mask(frame=frame)
-    sub_draws = [d[mask[d]] for d in boots[("g2", 14)]]
-    result["contrasts"]["C5"] = contrast(
-        label=label, a=preds["host_nbr"].to_numpy(), b=preds["host"].to_numpy(), draws=sub_draws
-    )
+    host, old, nbr = (preds[n].to_numpy() for n in ("host", "host_old", "host_nbr"))
+    result["contrasts"]["C4"] = contrast(label=label, a=old, b=host, draws=boot)
+    mirrored, hidden = mirrored_mask(frame=frame), hidden_mask(frame=frame)
+    result["contrasts"]["C5"] = contrast(label=label, a=nbr, b=host, draws=boot, mask=mirrored)
     result["contrasts"]["C5_auroc_host_nbr_mirrored"] = point_and_interval(
-        label=label, score=preds["host_nbr"].to_numpy(), draws=sub_draws
+        label=label, score=nbr, draws=boot, mask=mirrored
     )
     result["contrasts"]["C5_auroc_host_nbr_hidden"] = point_and_interval(
-        label=label,
-        score=preds["host_nbr"].to_numpy(),
-        draws=[d[hidden_mask(frame=frame)[d]] for d in boots[("g2", 14)]],
+        label=label, score=nbr, draws=boot, mask=hidden
     )
     result["contrasts"]["C5_gain_hidden"] = contrast(
-        label=label, a=preds["host_nbr"].to_numpy(), b=preds["host"].to_numpy(),
-        draws=[d[hidden_mask(frame=frame)[d]] for d in boots[("g2", 14)]],
+        label=label, a=nbr, b=host, draws=boot, mask=hidden
+    )
+    bank = (
+        store[("bank", 14)][0],
+        store[("bank", 14)][1]["host"].to_numpy(),
+        store[("bank", 14)][2],
+    )
+    second = (frame, host, boot)
+    result["contrasts"]["C6"] = c6_contrast(
+        bank=bank, second=second, masks=(None, None), seed=714_006
+    )
+    # companion readings (secondary): sign cannot help on decreases only; moves in force at the cut
+    result["secondary"]["C6_decreases_only"] = c6_contrast(
+        bank=bank, second=second,
+        masks=(negative_size_mask(frame=bank[0]), negative_size_mask(frame=frame)), seed=714_007,
     )  # fmt: skip
-    bank_frame, bank_preds = oof[("bank", 14)]
-    rng = np.random.default_rng(714_006)
-    b_boot = model.bootstrap_auroc(
-        label=bank_frame["label"].to_numpy(),
-        score=bank_preds["host"].to_numpy(),
-        draws=boots[("bank", 14)],
-    )
-    g_boot = model.bootstrap_auroc(
-        label=label, score=preds["host"].to_numpy(), draws=boots[("g2", 14)]
-    )
-    rng.shuffle(g_boot)  # independent worlds: pair the draws at random
-    low, high = model.interval(values=b_boot - g_boot)
-    result["contrasts"]["C6"] = {
-        "diff": result["auroc"]["bank/k14/host"]["auroc"] - result["auroc"]["g2/k14/host"]["auroc"],
-        "low": low, "high": high,
-    }  # fmt: skip
+    result["secondary"]["C6_in_force"] = c6_contrast(
+        bank=bank, second=second,
+        masks=(in_force_mask(frame=bank[0]), in_force_mask(frame=frame)), seed=714_008,
+    )  # fmt: skip
+    for name, k in (("C1", 7), ("C2", 14), ("C3", 28)):
+        f, p, b = store[("g2", k)]
+        result["secondary"][f"{name}_in_force"] = point_and_interval(
+            label=f["label"].to_numpy(), score=p["host"].to_numpy(), draws=b,
+            mask=in_force_mask(frame=f),
+        )  # fmt: skip
+        result["secondary"][f"{name}_decreases_only"] = point_and_interval(
+            label=f["label"].to_numpy(), score=p["host"].to_numpy(), draws=b,
+            mask=negative_size_mask(frame=f),
+        )  # fmt: skip
     return result
 
 
-def decisions(*, result: dict) -> dict[str, bool | None]:
-    """Apply the pre-registered decision rule to the six contrasts."""
-    c = result["contrasts"]
-    auroc = result["auroc"]
+def decisions(*, result: dict, placebo: dict) -> dict[str, bool]:
+    """Apply every part of the pre-registered decision rule to the contrasts and the placebos."""
+    c, auroc = result["contrasts"], result["auroc"]
+    enough_g2 = c["C1"]["low"] >= 0.70 and c["C2"]["low"] >= 0.70
+    not_enough = c["C1"]["high"] < 0.70 or c["C2"]["high"] < 0.70
+    bank_enough = all(auroc[f"bank/k{k}/host"]["low"] >= 0.70 for k in BANK_ENOUGH_ORIGINS)
+    neighbour = c["C5"]["low"] >= 0.05 and c["C5_auroc_host_nbr_mirrored"]["auroc"] >= 0.85
+    hidden_small = abs(c["C5_gain_hidden"]["diff"]) < HIDDEN_GAIN_LIMIT
+    shuffled_ok = all(placebo[f"{w}/shuffled_labels"]["within_0.03"] for w in ("bank", "g2"))
+    rewired_ok = (
+        abs(auroc["g2/k14/host_nbr_rewired"]["auroc"] - auroc["g2/k14/host"]["auroc"]) <= TOLERANCE
+    )
+    no_event_ok = all(
+        abs(placebo[f"{w}/no_event_placebo"]["auroc"] - 0.5) <= NO_EVENT_TOLERANCE
+        for w in ("bank", "g2")
+    )
     return {
-        "host_rows_enough": c["C1"]["low"] >= 0.70 and c["C2"]["low"] >= 0.70,
-        "host_rows_not_enough": c["C1"]["high"] < 0.70 or c["C2"]["high"] < 0.70,
-        "injector_artefact": c["C6"]["low"] > 0.10,
-        "neighbour_rows_pass": c["C5"]["low"] >= 0.05
-        and c["C5_auroc_host_nbr_mirrored"]["auroc"] >= 0.85,
+        "outcome_1_host_rows_not_enough": not_enough,
+        "outcome_2_host_rows_enough_on_g2": enough_g2,
+        "outcome_2_host_rows_enough_on_bank_and_g2": enough_g2 and bank_enough,
+        "neither_enough_nor_not_enough": not enough_g2 and not not_enough,
+        "outcome_3_injector_artefact": c["C6"]["low"] > 0.10,
+        "outcome_4_neighbour_rows_pass": neighbour,
+        "outcome_4_hidden_mirror_gain_under_0.02": hidden_small,
+        "outcome_4_full": neighbour and hidden_small,
+        "f4_stopped_gain_under_0.05": c["C5"]["diff"] < 0.05,
         "known_answer_pass": auroc["bank/k14/known_answer"]["auroc"] > 0.95,
-        "rewired_within_0.03": abs(
-            auroc["g2/k14/host_nbr_rewired"]["auroc"] - auroc["g2/k14/host"]["auroc"]
-        )
-        <= TOLERANCE,
+        "shuffled_label_within_0.03": shuffled_ok,
+        "rewired_within_0.03": rewired_ok,
+        "no_event_within_0.05": no_event_ok,
+        "inconclusive_pending_audit": not (shuffled_ok and rewired_ok),
     }
 
 
-def placebos(*, tables: dict[str, pl.DataFrame], permutations: int, out: Path) -> dict:
-    """Run the shuffled-label placebo and the no-event placebo."""
+def placebos(*, tables: dict[str, pl.DataFrame], permutations: int) -> dict:
+    """Run the shuffled-label placebo (a check of the splits) and the no-event placebo."""
     result: dict = {}
     rng = np.random.default_rng(714_007)
     for world in ("bank", "g2"):
@@ -294,14 +374,35 @@ def coefficients(*, tables: dict[str, pl.DataFrame]) -> dict:
     return result
 
 
-def secondary(*, tables: dict[str, pl.DataFrame], draws: int) -> pl.DataFrame:
-    """Return each cue alone and together, for each permanent kind against the temporary moves.
+RAW_CUES: Final[dict[str, tuple[str, float]]] = {
+    "steps_per_day": ("steps", 1.0),
+    "high_fraction": ("high", -1.0),
+    "flatness": ("flat", -1.0),
+    "mirror_share": ("mirror_share", -1.0),
+    "mirror_corr": ("mirror_corr", -1.0),
+}
+"""Raw single cues, with the sign that makes a higher score mean a permanent change of the kind
+named by the plan's prediction: more steps, a lower high-level share, a less flat profile, and no
+mirror (a mirror marks a temporary move)."""
+
+
+def secondary(*, tables: dict[str, pl.DataFrame], draws: int) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Return each cue alone and together, and the raw single cues, for each permanent kind.
 
     The classifier of a cue set is fitted on every event of a world (bank, or g2 with gas) and
     scores held-out fold months. Positives are one permanent kind. Negatives are all temporary
-    moves, those with a metered mirror, or those with a hidden mirror. Every reading is secondary.
+    moves, those still in force at the data cut (sustained), those with a metered mirror, or those
+    with a hidden mirror. The raw cues are the feature values themselves, in the direction that the
+    plan's prediction states, with no fitting. Every reading is secondary.
+
+    Args:
+        tables: The feature tables of the worlds `bank`, `g2` and `gas`.
+        draws: The number of bootstrap draws.
+
+    Returns:
+        The fitted-cue table and the raw-cue table.
     """
-    rows = []
+    rows, raw_rows = [], []
     worlds = {"bank": tables["bank"], "g2_gas": pl.concat([tables["g2"], tables["gas"]])}
     for world, big in worlds.items():
         for k in common.ORIGIN_DAYS:
@@ -314,33 +415,35 @@ def secondary(*, tables: dict[str, pl.DataFrame], draws: int) -> pl.DataFrame:
             temporary = label == 0
             negatives = {
                 "all_temporary": temporary,
+                "sustained": temporary & frame["in_force"].to_numpy(),
                 "metered_mirror": temporary & np.isin(state, MIRRORED),
                 "hidden_mirror": temporary & (state == "hidden"),
             }
             boot = model.bootstrap_draws(
                 months=months, passes=passes, n_draws=draws, seed=714_100 + k
             )
+            scores = {cue: preds[cue].to_numpy() for cue in CUE_SETS}
+            raw = {
+                name: sign * frame[column].to_numpy().astype(float)
+                for name, (column, sign) in RAW_CUES.items()
+            }
             for kind in np.unique(kinds[label == 1]):
+                positive = kinds == kind
                 for neg_name, neg in negatives.items():
-                    sel = (kinds == kind) | neg
-                    for cue in CUE_SETS:
-                        score = preds[cue].to_numpy()
-                        values = model.bootstrap_auroc(
-                            label=(kinds == kind),
-                            score=score,
-                            draws=[d[sel[d]] for d in boot],
-                        )
+                    sel = positive | neg
+                    sub = [d[sel[d]] for d in boot]
+                    for cue, table in (*((c, scores[c]) for c in CUE_SETS), *raw.items()):
+                        values = model.bootstrap_auroc(label=positive, score=table, draws=sub)
                         low, high = model.interval(values=values, confidence=SECONDARY_CONFIDENCE)
-                        rows.append(
-                            {
-                                "world": world, "k": k, "kind": kind, "negatives": neg_name,
-                                "cue": cue,
-                                "auroc": model.auroc(label=(kinds == kind)[sel], score=score[sel]),
-                                "low95": low, "high95": high,
-                                "n_pos": int((kinds == kind).sum()), "n_neg": int(neg.sum()),
-                            }
-                        )  # fmt: skip
-    return pl.DataFrame(rows)
+                        entry = {
+                            "world": world, "k": k, "kind": kind, "negatives": neg_name,
+                            "cue": cue,
+                            "auroc": model.auroc(label=positive[sel], score=table[sel]),
+                            "low95": low, "high95": high,
+                            "n_pos": int(positive.sum()), "n_neg": int(neg.sum()),
+                        }  # fmt: skip
+                        (rows if cue in CUE_SETS else raw_rows).append(entry)
+    return pl.DataFrame(rows), pl.DataFrame(raw_rows)
 
 
 def transfer_reading(*, tables: dict[str, pl.DataFrame]) -> dict:
@@ -358,8 +461,8 @@ def transfer_reading(*, tables: dict[str, pl.DataFrame]) -> dict:
     return result
 
 
-def outcome_table(*, result: dict, flags: dict) -> str:
-    """Return the outcome table in Markdown: the six contrasts with their intervals."""
+def outcome_table(*, result: dict, flags: dict[str, bool]) -> str:
+    """Return the outcome table in Markdown: the six contrasts, the companions, and the outcome."""
     c = result["contrasts"]
     lines = [
         "| Contrast | Quantity | Estimate | Interval (99.17%) |",
@@ -377,6 +480,16 @@ def outcome_table(*, result: dict, flags: dict) -> str:
         value = c[key]
         est = value.get("auroc", value.get("diff"))
         lines.append(f"| {key} | {text} | {est:.3f} | [{value['low']:.3f}, {value['high']:.3f}] |")
+    lines += [
+        "",
+        "Sign-only AUROC (score is the sign of the measured change), beside C1 to C3 and C6:",
+        "",
+    ]
+    lines += ["| World and origin | Sign-only AUROC | Interval (99.17%) |", "|---|---|---|"]
+    for key, value in result["sign_only"].items():
+        lines.append(
+            f"| {key} | {value['auroc']:.3f} | [{value['low']:.3f}, {value['high']:.3f}] |"
+        )
     lines += ["", "| Decision flag | Value |", "|---|---|"]
     lines += [f"| {k} | {v} |" for k, v in flags.items()]
     return "\n".join(lines) + "\n"
@@ -390,18 +503,14 @@ def main() -> None:
     draws = 200 if args.smoke else DRAWS
     out = common.DATA_DIR / ("results_smoke" if args.smoke else "results")
     out.mkdir(parents=True, exist_ok=True)
-    tables = {w: load_world(world=w) for w in ("bank", "g2", "gas")}
+    tables = {w: load_world(world=w, smoke=args.smoke) for w in ("bank", "g2", "gas")}
     for world, frame in tables.items():
         print(world, frame.height, "rows")
     result = primary(tables=tables, draws=draws, out=out, tree=True)
-    flags = decisions(result=result)
+    placebo = placebos(tables=tables, permutations=3 if args.smoke else PERMUTATIONS)
+    flags = decisions(result=result, placebo=placebo)
     (out / "primary_contrasts.json").write_text(json.dumps({**result, "flags": flags}, indent=1))
-    (out / "placebos.json").write_text(
-        json.dumps(
-            placebos(tables=tables, permutations=3 if args.smoke else PERMUTATIONS, out=out),
-            indent=1,
-        )
-    )
+    (out / "placebos.json").write_text(json.dumps(placebo, indent=1))
     (out / "sensitivity.json").write_text(
         json.dumps(
             {**sensitivity(tables=tables, out=out), "transfer": transfer_reading(tables=tables)},
@@ -409,9 +518,9 @@ def main() -> None:
         )
     )
     (out / "coefficients.json").write_text(json.dumps(coefficients(tables=tables), indent=1))
-    secondary(tables=tables, draws=100 if args.smoke else SECONDARY_DRAWS).write_csv(
-        out / "secondary_cues_by_kind.csv"
-    )
+    fitted, raw = secondary(tables=tables, draws=100 if args.smoke else SECONDARY_DRAWS)
+    fitted.write_csv(out / "secondary_cues_by_kind.csv")
+    raw.write_csv(out / "raw_cues_by_kind.csv")
     frame = tables["g2"].filter(pl.col("k") == 14).sort("pass_id", "event")
     preds = pl.read_parquet(out / "oof_g2_k14.parquet")
     model.calibration_table(

@@ -206,9 +206,16 @@ shuffled copy of the post-origin power, where the AUROC must not move.
 **Placebos and controls.**
 
 - **Shuffled labels.** Permute the class labels within each pass, keeping the pair structure, and
-  refit. The AUROC must be 0.50 within 0.03, or the pipeline leaks.
-- **Experiment 660's `shuffled_placebo`.** Score the same classifier on the generator's placebo
-  events, which carry no real transfer, to confirm that a high AUROC needs a real shape.
+  refit. The AUROC must be 0.50 within 0.03, or the splits are wrong. The shuffle breaks any leak
+  through the features, so this placebo checks the cross-validation bookkeeping only. The test
+  that scrambles the data after the cut checks the features for leakage.
+- **No-event placebo (the reading of experiment 660's `shuffled_placebo`).** Experiment 660's
+  placebo events carry no real transfer. Scored at the original onsets, the windows hold no
+  event, so the classifier is fitted on genuine events and scores the real, uninjected panel at the
+  same hosts and onsets. The AUROC must be 0.50 within 0.05; a larger gap means that the draw of
+  hosts differs between classes. Re-timing the events with `shuffled_placebo` is not run, because
+  the re-timed windows still hold the injected shape and could not show that a real shape is
+  needed.
 - **Rewired neighbours.** Described above. The AUROC with rewired neighbours returns to the
   host-only value within 0.03.
 - **Known-answer.** Feed the classifier the true onset-minus-baseline change without noise on the
@@ -281,17 +288,18 @@ this section are secondary: they add detail and carry no decision rule.
   of the change. The cue is a secondary feature set and is not part of the host set.
 
 **Pre-registered prediction for the gas-generator kind (written before any run on the full worlds,
-and without looking at the per-cue readings of the smoke run).**
+after the smoke primary table was read, and without looking at the per-cue readings of the smoke
+run).**
 The shape-flatness cannot separate an intermittent step from a sustained temporary move, because
 both are constant-megawatt steps, so its AUROC for that pair is predicted to lie between 0.40 and
 0.60. The step-frequency cue alone is predicted to score 0.70 or more against sustained temporary
-moves (temporary moves lasting beyond the window), because an intermittent step switches several
-times per day and a sustained move switches rarely. The mirror cue is predicted to score 0.50 within
-0.10 against temporary moves with a hidden mirror, and to score above 0.50 only because the
-temporary moves with a metered mirror carry a mirror. A flat permanent step is the case where shape
-cannot help, so the shape-flatness AUROC for a flat step against temporary moves is predicted to lie
-between 0.40 and 0.60. A permanent kind that follows the host's daily profile or daylight is
-predicted to score above 0.65 on the shape-flatness alone.
+moves (temporary moves still in force at the data cut of the origin), because an intermittent step
+switches several times per day and a sustained move switches rarely. The mirror cue is predicted to
+score 0.50 within 0.10 against temporary moves with a hidden mirror, and to score above 0.50 only
+because the temporary moves with a metered mirror carry a mirror. A flat permanent step is the case
+where shape cannot help, so the shape-flatness AUROC for a flat step against temporary moves is
+predicted to lie between 0.40 and 0.60. A permanent kind that follows the host's daily profile or
+daylight is predicted to score above 0.65 on the shape-flatness alone.
 
 **The 82 labelled real events are a descriptive check only.** The load-transfer logs hold 82
 labelled events, 22 of them in the scored year. The page may print the cue values of those events
@@ -354,8 +362,13 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   median, their spread, the ratio of the two, and the shape-flatness of the change against their
   median. Experiment 709's injected panels hold the 364-day rows, because each stored panel covers
   the whole grid of 119,760 half-hours from 2019-09-01 to 2026-06-30.
-- **Neighbour features (two).** The slope and the correlation of the negated change of the sum of the
-  neighbours' power in MW on the host's change in MW, over the post-onset half-hours.
+- **Neighbour features (two).** Each site (the host and each neighbour) is measured against its own
+  mean change at each half-hour of the day over the 14 days before the onset, which removes the
+  reference level's error that neighbouring Primaries share. `mirror_share` is the negated median
+  post-onset step of the neighbours' summed change in MW over the host's median step in MW.
+  `mirror_corr` is the correlation of the two series before the onset minus the correlation over
+  the whole span from 14 days before the onset to the data cut. The neighbours of an event are the
+  host's electrical neighbours, without the sites of other events of the same pass.
 - **Step features (two, secondary).** Steps per day and the fraction of half-hours at the high level.
 
 **Training regime.**
@@ -366,13 +379,23 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   and the fill value for a missing feature come from the training passes.
 - **Boosted tree (sensitivity).** XGBoost, which is a declared dependency, with depth 2, 80 trees, and
   learning rate 0.1, on the host and host-plus-neighbour features.
-- **Worlds.** Experiment 709's 64 bank passes (read only; `e00709_signal.Signal` is replaced by a
-  stub when unpickling, because importing it needs the chain `e00709_classify`, `e00687_features`,
-  `e00598_signals` and torch-dependent modules) and 128 passes of the second generator, 32 for each
-  fold month, with seeds 714,100,000 and up. The second generator's passes have onsets at a random
-  half-hour on the first or second day of the month.
+- **Worlds.** Experiment 709's 64 bank passes (read only; the unpickler allows four globals, and
+  `e00709_signal.Signal` is replaced by a stub, because importing it needs the chain
+  `e00709_classify`, `e00687_features`, `e00598_signals` and further modules) and 128 passes of the
+  second generator, 32 for each fold month, with seeds 714,100,000 and up. The second generator's
+  passes have onsets at a random half-hour on the first or second day of the month. No event of a
+  pass sits in the neighbour set of another event of the pass.
+- **Which Primary is scored in a temporary move.** In experiment 709's bank the scored Primary of a
+  temporary move is always the donor, so its change is always a decrease, and 25% of its permanent
+  changes are increases. A classifier that read only the sign of the change would therefore score
+  above 0.5 on the bank. In the second generator, half of the temporary moves are scored at the
+  receiving Primary (a gain), so the sign mix of the temporary moves matches the sign mix of the
+  permanent changes (half increases). This design change follows from a code review and not from
+  any AUROC. The page prints a sign-only AUROC beside C1 to C3 and C6, and a secondary C6 on the
+  events with a decrease only.
 - **Splits.** Leave one fold month out, so no pass and no fold month seen in fitting is scored.
-- **Compute.** CPU only, 2 cores, one BLAS thread.
+- **Compute.** CPU only, 2 cores. `e00714_threads.py` sets the BLAS and OpenMP thread counts to 1
+  before numpy loads, and XGBoost runs with one thread.
 
 **Measurement.**
 
@@ -380,7 +403,16 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   predictions of all four fold months.
 - **Intervals.** A bootstrap that resamples whole passes within fold months and then fold months,
   10,000 draws, at 99.17% for the six planned contrasts (C1 to C6). The predictions are not refitted
-  per draw. Secondary readings use 95% intervals, labelled secondary.
+  per draw. Secondary readings use 95% intervals, labelled secondary. With 4 fold months resampled
+  with replacement, 1.6% of draws repeat one fold month four times, which is more than the 0.42% of
+  each tail, so the lower ends of C1 and C2 sit close to the worst single fold month's AUROC.
+  "Host rows are enough" is therefore a statement about every fold month.
+- **Readings beside the six contrasts (secondary).** The AUROC of the sign of the change alone; C6
+  on the events with a decrease only; C1 to C3 and C6 on the permanent changes and the temporary
+  moves still in force at the data cut (a move that has ended before the cut shows only the
+  reference level's error); the AUROC of each raw cue in the direction the plan states.
+- **C5 and its companions** are computed, point estimate and interval, on the one subset that each
+  names (the mirrored subset, or the hidden subset).
 - **Mirror subsets.** The mirrored subset holds every permanent change and the temporary moves with a
   full or partial mirror. The hidden subset holds every permanent change and the temporary moves
   with a hidden mirror.
@@ -397,6 +429,7 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
   the bank loader, the weather-only reference level.
 - `.../e00714_generator2.py`: the second generator (worlds `g2` and `gas`), built on experiment 660's
   generator.
+- `.../e00714_threads.py`: sets the BLAS and OpenMP thread counts to 1 before numpy loads.
 - `.../e00714_features.py`: the host, step, older-row, and neighbour features.
 - `.../e00714_build.py`: generates the second generator's passes and builds the feature tables.
 - `.../e00714_model.py`: the logistic regression, the boosted tree, the cross-validation, and the

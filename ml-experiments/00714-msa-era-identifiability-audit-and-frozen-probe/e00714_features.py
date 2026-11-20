@@ -22,8 +22,11 @@ change.
 **Older-row features.** `old_change`, `old_spread`, `old_z`, and `flat_old`, from the median of the
 single same-weekday days at ages 21, 28, 42, 63, 91, and 364 days that end before the onset.
 
-**Neighbour features.** `mirror_share` and `mirror_corr`, the regression slope and the correlation
-of the (negated) change of the sum of the neighbours, in MW, on the host's change in MW.
+**Neighbour features.** `mirror_share` and `mirror_corr`: each site's change is first measured
+against its own mean change at each half-hour of the 14 days before the onset, then `mirror_share`
+is the ratio of the neighbours' summed step in MW (negated) to the host's step in MW, and
+`mirror_corr` is the correlation of the two centred series before the onset minus the
+correlation over the whole span, which removes the shared error of the reference level.
 """
 
 from dataclasses import dataclass
@@ -53,6 +56,7 @@ MIN_STEP_POINTS: Final[float] = 1.0
 MIRROR_CLIP: Final[float] = 2.0
 MIN_DAYS_CORR: Final[int] = 4
 MIN_OLD_ROWS: Final[int] = 2
+MIN_STEP_MW: Final[float] = 0.3
 MIN_OLD_COVERAGE: Final[float] = 0.5
 
 
@@ -198,8 +202,8 @@ def build_features(
     )
     out.update(
         _neighbour_features(
-            event=event, power=power, reference=reference, capacity_mw=capacity_mw, lo=lo,
-            end=end, change=change, post=post,
+            event=event, power=power, reference=reference, capacity_mw=capacity_mw,
+            end=end,
         )
     )  # fmt: skip
     return out
@@ -244,28 +248,96 @@ def _older_features(
     }
 
 
+def centred_change(
+    *, power: common.PassPower, reference: common.PassPower, site: int, onset_hh: int, lo: int,
+    end: int,
+) -> np.ndarray | None:  # fmt: skip
+    """Return a site's change over `[lo, end)` against its own pre-onset behaviour.
+
+    The change is power minus the reference level. The mean change at each half-hour of the day over
+    the 14 days before the onset is subtracted. Those days lie before the origin, so no feature
+    reads data after the origin. The subtraction removes the reference level's error that the host
+    and its neighbours share.
+
+    Args:
+        power: Power of the pass.
+        reference: The reference level.
+        site: Site index.
+        onset_hh: First half-hour of the event.
+        lo: First half-hour of the window.
+        end: Half-hour after the last of the window.
+
+    Returns:
+        The centred change in shares of capacity, or None if fewer than half of the 14 pre-onset
+        days have readings.
+    """
+    pre_lo = onset_hh - common.WINDOW_HH
+    pre = power.get(site=site, lo=pre_lo, hi=onset_hh) - reference.get(
+        site=site, lo=pre_lo, hi=onset_hh
+    )
+    if np.isfinite(pre).mean() < MIN_OLD_COVERAGE:
+        return None
+    hh_pre = np.arange(pre_lo, onset_hh) % common.DAY
+    baseline = np.zeros(common.DAY)
+    for h in range(common.DAY):
+        vals = pre[hh_pre == h]
+        vals = vals[np.isfinite(vals)]
+        baseline[h] = vals.mean() if vals.size else 0.0
+    window = power.get(site=site, lo=lo, hi=end) - reference.get(site=site, lo=lo, hi=end)
+    return window - baseline[np.arange(lo, end) % common.DAY]
+
+
 def _neighbour_features(
     *, event: EventInput, power: common.PassPower, reference: common.PassPower,
-    capacity_mw: np.ndarray, lo: int, end: int, change: np.ndarray, post: np.ndarray,
+    capacity_mw: np.ndarray, end: int,
 ) -> dict[str, float]:  # fmt: skip
-    """Return the mirror features: slope and correlation of the negated neighbour-sum change."""
+    """Return the mirror features, each site measured against its own pre-onset days.
+
+    The series run from 14 days before the onset to the data cut. `mirror_share` is the negated
+    median post-onset step of the neighbours' summed change in MW over the host's median post-onset
+    step in MW (0 when the host's step is under 0.3 MW). `mirror_corr` is the correlation of the
+    host's change and the neighbours' summed change over the 14 days before the onset (the shared
+    error of the reference level) minus the same correlation over the whole span: a step that the
+    neighbours mirror lowers the correlation, a shared error does not. With no event both are
+    near 0.
+    """
     zero = {"mirror_share": 0.0, "mirror_corr": 0.0}
+    lo = event.onset_hh - common.WINDOW_HH
+    host_c = centred_change(
+        power=power, reference=reference, site=event.host, onset_hh=event.onset_hh, lo=lo, end=end
+    )
+    if host_c is None:
+        return zero
     total = np.zeros(end - lo)
     n_used = 0
     for j in event.neighbours:
-        c = power.get(site=j, lo=lo, hi=end) - reference.get(site=j, lo=lo, hi=end)
-        if np.isfinite(c).mean() < MIN_OLD_COVERAGE or event.host == j:
+        if j == event.host:
+            continue
+        c = centred_change(
+            power=power, reference=reference, site=j, onset_hh=event.onset_hh, lo=lo, end=end
+        )
+        if c is None or np.isfinite(c).mean() < MIN_OLD_COVERAGE:
             continue
         total += np.where(np.isfinite(c), c, 0.0) * capacity_mw[j]
         n_used += 1
-    if n_used == 0:
-        return zero
-    host_mw = change / 100.0 * capacity_mw[event.host]
+    host_mw = host_c * capacity_mw[event.host]
+    post = np.arange(lo, end) >= event.onset_hh
     use = post & np.isfinite(host_mw)
-    if use.sum() < MIN_POST_HH:
+    if n_used == 0 or use.sum() < MIN_POST_HH:
         return zero
-    x, z = host_mw[use], -total[use]
-    denom = float(np.sum(x * x))
-    share = float(np.sum(x * z) / denom) if denom > 0 else 0.0
-    corr = float(np.corrcoef(x, z)[0, 1]) if np.std(x) > 0 and np.std(z) > 0 else 0.0
-    return {"mirror_share": float(np.clip(share, -MIRROR_CLIP, MIRROR_CLIP)), "mirror_corr": corr}
+    step = float(np.median(host_mw[use]))
+    share = -float(np.median(total[use])) / step if abs(step) >= MIN_STEP_MW else 0.0
+    finite = np.isfinite(host_mw)
+    corr_pre = _correlation(x=host_mw[finite & ~post], z=total[finite & ~post])
+    corr_all = _correlation(x=host_mw[finite], z=total[finite])
+    return {
+        "mirror_share": float(np.clip(share, -MIRROR_CLIP, MIRROR_CLIP)),
+        "mirror_corr": corr_pre - corr_all,
+    }
+
+
+def _correlation(*, x: np.ndarray, z: np.ndarray) -> float:
+    """Return the correlation of two series, 0 if either is constant or empty."""
+    if x.size < 2 or np.std(x) == 0 or np.std(z) == 0:
+        return 0.0
+    return float(np.corrcoef(x, z)[0, 1])

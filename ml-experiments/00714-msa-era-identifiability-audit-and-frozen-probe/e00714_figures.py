@@ -4,7 +4,8 @@
 
 - `auroc_by_feature_set.svg`: AUROC by input set and horizon, with 99.17% intervals, for the second
   generator and for experiment 709's bank.
-- `example_hosts.svg`: six example hosts' last 14 days before the origin, three with a permanent
+- `example_hosts.svg`: six example hosts from 14 days before to 7 days after the onset, three
+  with a permanent
   change and three with a temporary move, anonymised (the label is a letter, the axis is days).
 - `change_profile.svg`: the change by half-hour of the day (post-onset power minus the real power
   that the Primary would have had), for the temporary moves and each permanent kind, each profile
@@ -13,6 +14,10 @@
 Each SVG is written under `docs/ml-experiments/<id>-<slug>/` (or the private results folder with
 `--smoke`) and then optimised with `npx svgo@4 --multipass --precision=1 --final-newline`.
 """
+
+import e00714_threads  # noqa: F401  (must run before numpy)
+
+# isort: split
 
 import argparse
 import json
@@ -124,6 +129,8 @@ def _example_events(*, ctx: common.Context) -> list[dict]:
     month = "2026-01"
     for truth, what in picks:
         for index in range(g2.PASSES_PER_MONTH["g2"]):
+            if not (g2.world_dir(world="g2") / f"{month}_p{index}.npz").exists():
+                continue
             built = g2.read_pass(world="g2", month=month, index=index)
             sel = built.truth.filter(
                 (pl.col("truth") == truth)
@@ -142,19 +149,13 @@ def example_figure(*, ctx: common.Context, out: Path) -> None:
     rows = []
     for letter, item in zip("ABCDEF", _example_events(ctx=ctx), strict=False):
         event, built = item["event"], item["built"]
-        origin = (event["onset_day"] + 14) * common.DAY + common.ORIGIN_HOUR_HH
-        end = origin - common.LATENCY_HH
-        lo = end - common.WINDOW_HH
+        onset = event["onset_hh"]
+        lo, end = onset - 14 * common.DAY, onset + 7 * common.DAY
         power = built.power.get(site=event["host"], lo=lo, hi=end) * 100.0
-        days = (np.arange(lo, end) - origin) / common.DAY
+        days = (np.arange(lo, end) - onset) / common.DAY
         label = f"Host {letter}: {'permanent' if event['truth'] == 'era' else 'temporary'}"
         rows += [
-            {
-                "host": label,
-                "days": float(d),
-                "power": float(p),
-                "onset": event["onset_hh"] / common.DAY - origin / common.DAY,
-            }
+            {"host": label, "days": float(d), "power": float(p), "onset": 0.0}
             for d, p in zip(days, power, strict=True)
             if np.isfinite(p)
         ]
@@ -165,8 +166,8 @@ def example_figure(*, ctx: common.Context, out: Path) -> None:
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "days:Q",
-                title="Days relative to the forecast origin",
-                scale=alt.Scale(domain=[-14.5, 0]),
+                title="Days relative to the onset",
+                scale=alt.Scale(domain=[-14, 7]),
             ),
             y=alt.Y("power:Q", title="Power (% of capacity)", scale=alt.Scale(zero=False)),
         )
@@ -174,7 +175,7 @@ def example_figure(*, ctx: common.Context, out: Path) -> None:
     onset = (
         alt.Chart(frame)
         .mark_rule(color=theme.BRAND_ORANGE, strokeDash=[4, 3])
-        .encode(x=alt.X("onset:Q", scale=alt.Scale(domain=[-14.5, 0])))  # ty: ignore[unresolved-attribute]
+        .encode(x=alt.X("onset:Q", scale=alt.Scale(domain=[-14, 7])))  # ty: ignore[unresolved-attribute]
     )
     chart = (
         alt.layer(line, onset)
@@ -183,7 +184,7 @@ def example_figure(*, ctx: common.Context, out: Path) -> None:
     )
     chart = chart.properties(
         title=alt.TitleParams(
-            "The last 14 days before the origin at six hosts, from the second generator",
+            "From 14 days before to 7 days after the onset at six hosts, second generator",
             subtitle=["Dashed orange line: the onset of the injected event. Hosts are anonymised."],
         )
     )

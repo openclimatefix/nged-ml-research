@@ -75,6 +75,8 @@ GAS_SIZE: Final[tuple[float, float]] = (0.04, 0.12)
 GAS_RUN_HH: Final[tuple[int, int]] = (4, 24)
 LATITUDE_DEG: Final[float] = 52.5
 LONGITUDE_DEG: Final[float] = -1.5
+FLIP_PROBABILITY: Final[float] = 0.5
+"""Chance that a transfer is scored at its receiving Primary."""
 MAX_HOST_TRIES: Final[int] = 4000
 MIN_PRE_COVERAGE: Final[float] = 0.9
 
@@ -262,8 +264,10 @@ def choose_hosts(
 ) -> tuple[list[int], list[tuple[int, int | None]]]:  # fmt: skip
     """Draw donors, recipients, and permanent-change hosts that satisfy the separation rules.
 
-    All donors and recipients are different Primaries, a recipient is a metered neighbour of its
-    donor, and a permanent-change host is neither a donor nor a recipient nor a neighbour of one.
+    Events are placed one after another. Every site of an event (a donor, a recipient, or a
+    permanent-change host) must lie outside the sites and the neighbours of every earlier event, so
+    no event sits in another event's neighbour set. A recipient is a metered neighbour of its
+    donor and is the only site of its pair that lies in the neighbour set of the pair's donor.
 
     Args:
         ctx: The context.
@@ -280,38 +284,45 @@ def choose_hosts(
         RuntimeError: If no assignment satisfies the rules.
     """
     panel = ctx.panel
+    neighbours = panel.neighbours
     for _ in range(MAX_HOST_TRIES):
-        if len(pool) < len(mirrors) + n_era:
-            break
-        donors = [int(d) for d in rng.choice(pool, size=len(mirrors), replace=False)]
-        used = set(donors)
         forbidden: set[int] = set()
         pairs: list[tuple[int, int | None]] = []
+        era_hosts: list[int] = []
         failed = False
-        for donor, mirror in zip(donors, mirrors, strict=True):
-            options = [
-                j
-                for j in _metered(ctx=ctx, site=donor, onset_hh=onset_hh)
-                if j not in used and panel.sites[j] not in common.EXCLUDED_HOSTS
-            ]
-            if mirror == "hidden":
-                recipient = None  # the receiver is not metered, so no recipient row exists
-            elif options:
-                recipient = int(rng.choice(options))
-            else:
+        for mirror in mirrors:
+            options = [i for i in pool if i not in forbidden]
+            if not options:
                 failed = True
                 break
-            if recipient is not None:
-                used.add(recipient)
+            donor = int(rng.choice(options))
+            recipient = None
+            if mirror != "hidden":
+                metered = [
+                    j
+                    for j in _metered(ctx=ctx, site=donor, onset_hh=onset_hh)
+                    if j not in forbidden and panel.sites[j] not in common.EXCLUDED_HOSTS
+                ]
+                if not metered:
+                    failed = True
+                    break
+                recipient = int(rng.choice(metered))
             pairs.append((donor, recipient))
-            forbidden |= {donor, *panel.neighbours[donor]}
+            forbidden |= {donor, *neighbours[donor]}
             if recipient is not None:
-                forbidden |= {recipient, *panel.neighbours[recipient]}
+                forbidden |= {recipient, *neighbours[recipient]}
         if failed:
             continue
-        free = [i for i in pool if i not in forbidden]
-        if len(free) >= n_era:
-            return [int(h) for h in rng.choice(free, size=n_era, replace=False)], pairs
+        for _era in range(n_era):
+            options = [i for i in pool if i not in forbidden]
+            if not options:
+                failed = True
+                break
+            host = int(rng.choice(options))
+            era_hosts.append(host)
+            forbidden |= {host, *neighbours[host]}
+        if not failed:
+            return era_hosts, pairs
     msg = "no host assignment satisfies the separation rules"
     raise RuntimeError(msg)
 
@@ -319,8 +330,13 @@ def choose_hosts(
 def _transfer_rows(
     *, ctx: common.Context, donor: int, recipient: int | None, size: float, onset_hh: int,
     duration_hh: int, share: float, first_id: int, rng: np.random.Generator,
+    receiver_only: bool = False,
 ) -> list[dict]:  # fmt: skip
-    """Return experiment 660's rows of one transfer (the donor's row, then the recipient's)."""
+    """Return experiment 660's rows of one transfer (the donor's row, then the recipient's).
+
+    With `receiver_only` the donor is not metered: the single row is the gain of the scored site
+    (`donor` is then the receiving Primary), of `size` times `share` of its capacity.
+    """
     panel = ctx.panel
     sites = panel.sites
     common_fields = {
@@ -331,6 +347,15 @@ def _transfer_rows(
         "ramp_in_hh": int(rng.integers(0, 9)),
         "ramp_out_hh": int(rng.integers(0, 9)),
     }
+    if receiver_only:
+        gain = size * share
+        return [
+            {
+                **common_fields, "event_id": first_id, "site": sites[donor], "role": "recipient",
+                "event_class": "edge_transfer_unseen_donor", "delta": gain, "units": gain / 0.01,
+                "partners": [],
+            }
+        ]  # fmt: skip
     rows = [
         {
             **common_fields, "event_id": first_id, "site": sites[donor], "role": "donor",
@@ -363,6 +388,60 @@ def _power_panel(*, ctx: common.Context) -> gen.PowerPanel:
         neighbours={s: [sites[j] for j in ctx.panel.neighbours[i]] for i, s in enumerate(sites)},
         origin=f709.GRID_START,
     )
+
+
+def _build_transfers(
+    *, ctx: common.Context, pairs: list[tuple[int, int | None]], mirrors: tuple[MirrorType, ...],
+    onset_hh: int, onset_day: int, truth: list[dict], rng: np.random.Generator,
+) -> list[dict]:  # fmt: skip
+    """Return the generator rows of every transfer, and append each transfer's truth row.
+
+    Half of the transfers are scored at the receiving Primary, so that the sign of the change does
+    not separate the temporary moves from the permanent changes.
+
+    Args:
+        ctx: The context.
+        pairs: The (donor, recipient or None) pair of each transfer.
+        mirrors: Mirror state of each transfer.
+        onset_hh: First half-hour of the transfers.
+        onset_day: Grid day of the onset.
+        truth: The truth rows, appended to.
+        rng: The random generator.
+
+    Returns:
+        The rows for `apply_events`.
+    """
+    panel = ctx.panel
+    transfer_rows: list[dict] = []
+    for k, ((donor, recipient), mirror) in enumerate(zip(pairs, mirrors, strict=True)):
+        size = float(rng.uniform(*TRANSFER_SIZE))
+        days = float(np.exp(rng.uniform(np.log(DURATION_DAYS[0]), np.log(DURATION_DAYS[1]))))
+        share = float(rng.uniform(*MIRROR_SHARE[mirror]))
+        flipped = bool(rng.random() < FLIP_PROBABILITY)
+        new_rows = _transfer_rows(
+            ctx=ctx, donor=donor, recipient=recipient, size=size, onset_hh=onset_hh,
+            duration_hh=round(days * common.DAY), share=share, first_id=2 * k, rng=rng,
+            receiver_only=flipped and recipient is None,
+        )  # fmt: skip
+        transfer_rows.extend(new_rows)
+        if not flipped:
+            scored, mirror_site, signed = donor, recipient, -size
+        elif recipient is None:
+            scored, mirror_site, signed = donor, None, size * share
+        else:
+            scored, mirror_site, signed = recipient, donor, float(new_rows[1]["delta"])
+        band = "<60" if days < 60 else ("60-120" if days <= 120 else ">120")
+        truth.append(
+            {
+                "host": scored, "site": panel.sites[scored], "truth": "switch", "kind": "transfer",
+                "size": signed, "onset_hh": onset_hh, "onset_day": onset_day,
+                "end_day": onset_day + round(days), "duration_days": days, "band": band,
+                "mirror_state": mirror, "share": share,
+                "recipient": -1 if mirror_site is None else mirror_site,
+                "running_share": float("nan"), "receiving_host": flipped,
+            }
+        )  # fmt: skip
+    return transfer_rows
 
 
 def build_pass(*, ctx: common.Context, world: WorldType, month: str, index: int) -> GeneratedPass:
@@ -425,31 +504,13 @@ def build_pass(*, ctx: common.Context, world: WorldType, month: str, index: int)
                 "host": host, "site": site, "truth": "era", "kind": kind, "size": signed,
                 "onset_hh": onset_hh, "onset_day": onset_day, "end_day": -1,
                 "duration_days": None, "band": None, "mirror_state": "none", "share": None,
-                "recipient": -1, **extra,
+                "recipient": -1, "receiving_host": False, **extra,
             }
         )  # fmt: skip
-    transfer_rows: list[dict] = []
-    for k, ((donor, recipient), mirror) in enumerate(zip(pairs, mirrors, strict=True)):
-        size = float(rng.uniform(*TRANSFER_SIZE))
-        days = float(np.exp(rng.uniform(np.log(DURATION_DAYS[0]), np.log(DURATION_DAYS[1]))))
-        share = float(rng.uniform(*MIRROR_SHARE[mirror]))
-        transfer_rows.extend(
-            _transfer_rows(
-                ctx=ctx, donor=donor, recipient=recipient, size=size, onset_hh=onset_hh,
-                duration_hh=round(days * common.DAY), share=share, first_id=2 * k, rng=rng,
-            )
-        )  # fmt: skip
-        band = "<60" if days < 60 else ("60-120" if days <= 120 else ">120")
-        truth.append(
-            {
-                "host": donor, "site": panel.sites[donor], "truth": "switch", "kind": "transfer",
-                "size": -size, "onset_hh": onset_hh, "onset_day": onset_day,
-                "end_day": onset_day + round(days), "duration_days": days, "band": band,
-                "mirror_state": mirror, "share": share,
-                "recipient": -1 if recipient is None else recipient,
-                "running_share": float("nan"),
-            }
-        )  # fmt: skip
+    transfer_rows = _build_transfers(
+        ctx=ctx, pairs=pairs, mirrors=mirrors, onset_hh=onset_hh, onset_day=onset_day,
+        truth=truth, rng=rng,
+    )  # fmt: skip
     table = pl.DataFrame(transfer_rows + rows, schema=gen.EVENT_COLUMNS)
     injected = gen.apply_events(panel=_power_panel(ctx=ctx), events=table)
     touched = {t["host"] for t in truth} | {t["recipient"] for t in truth if t["recipient"] >= 0}
@@ -463,7 +524,7 @@ def build_pass(*, ctx: common.Context, world: WorldType, month: str, index: int)
             "size": pl.Float64, "onset_hh": pl.Int64, "onset_day": pl.Int64,
             "end_day": pl.Int64, "duration_days": pl.Float64, "band": pl.String,
             "mirror_state": pl.String, "share": pl.Float64, "recipient": pl.Int64,
-            "running_share": pl.Float64,
+            "running_share": pl.Float64, "receiving_host": pl.Boolean,
         },
     ).with_columns(
         world=pl.lit(world), month=pl.lit(month), pass_index=pl.lit(index, dtype=pl.Int64)
