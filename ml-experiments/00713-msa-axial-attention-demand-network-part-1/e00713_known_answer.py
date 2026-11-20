@@ -27,6 +27,7 @@ and `shift` is zero in world W0. In world W1 each Primary has level steps of +0.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -333,6 +334,8 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
     half_hour = lay.local_half_hours_for_grid(grid_start_us=prep422.GRID_START_US, n_grid=n_grid)
     mae: dict[str, dict[str, float]] = {"W0": {}, "W1": {}}
     follow: dict[str, dict[str, float]] = {"W1": {}}
+    fits: dict[str, dict[str, dict]] = {}  # each fit's training log
+    results["fits"] = fits
     for kind in ("W0", "W1"):
         syn = build_world(
             kind=kind,
@@ -349,7 +352,7 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
             torch.manual_seed(0)
             model = mdl.MsaNet(switches=mdl.ARM_SWITCHES[arm]).to(dev)
             samples = tr.make_samples(world=world, stage=1, placebo=arm == "P", primaries=PRIMARIES)
-            tr.train_stage(
+            log = tr.train_stage(
                 model=model,
                 world=world,
                 stage=1,
@@ -357,6 +360,18 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
                 seed=0,
                 encoders="random",
                 max_passes=SYNTHETIC_PASSES,
+            )
+            fits.setdefault(kind, {})[arm] = vars(log)
+            print(
+                kind,
+                arm,
+                "passes",
+                log.passes,
+                "cap_hit",
+                log.cap_hit,
+                "best_val",
+                log.best_val,
+                flush=True,
             )
             med, act, _idx = predict_medians(
                 model=model, world=world, samples=held, source=world.source, use_placebo=arm == "P", mean=mean, std=std,
@@ -410,6 +425,11 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:  # noqa: PL
     return results
 
 
+def sha256_of_this_file() -> str:
+    """Return the sha256 of this script, which holds the thresholds and the pass cap."""
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
 def main() -> int:
     """Run the self-test, or the checks of a fold, and write the gate file when all pass."""
     parser = argparse.ArgumentParser()
@@ -421,16 +441,21 @@ def main() -> int:
     if args.selftest:
         return selftest()
     assert args.month, "give the fold month, for example 2026-01"
+    work = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR) / "work"
+    work.mkdir(parents=True, exist_ok=True)
+    if not args.skip_fits:
+        (work / "known_answers_passed.json").unlink(missing_ok=True)  # never leave a stale gate
     results = run_checks(month=args.month, device=args.device, skip_fits=args.skip_fits)
     print(json.dumps(results, indent=1, default=str))
+    (work / "known_answers_last_run.json").write_text(json.dumps(results, indent=1, default=str))
     failed = [k for k, v in results.items() if isinstance(v, dict) and not v.get("pass", True)]
     if failed or args.skip_fits:
         print("gate file not written; failed:", failed, "skipped fits:", args.skip_fits)
         return 1 if failed else 0
-    path = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR) / "work" / "known_answers_passed.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = work / "known_answers_passed.json"
     tmp = Path(str(path) + ".tmp")
-    tmp.write_text(json.dumps({**results, "code": arms.code_record()}, indent=1, default=str))
+    record = {**results, "code": arms.code_record(), "known_answer_sha256": sha256_of_this_file()}
+    tmp.write_text(json.dumps(record, indent=1, default=str))
     tmp.rename(path)
     return 0
 
