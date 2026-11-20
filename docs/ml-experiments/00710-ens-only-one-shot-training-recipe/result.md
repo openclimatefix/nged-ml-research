@@ -445,15 +445,16 @@ and the 7 days after an event, and the slump share of the injected bank for the 
 **E2 adds the `-n` states that I3 to I6 need.** It fits `FTh90d-n` on 12 folds with seeds 0 to 2 (36
 fits, each with bank passes; the `S_ens(F)` stage is experiment 707's stored state that `M2-n` also
 uses), and writes the bank passes of the stored `M1-n` and `M2-n` for the same folds and seeds (72
-passes, no fit). I3 to I6 then read the CRPS contrast `FTh90d-i` minus `FTh90d-n` and the slump-share contrasts
-of `M1`, `M2`, and `FTh90d`, each `-i` minus `-n`, where `FTh90d` stands for `B*`. The slump contrasts
-pair the `-i` and `-n` states on the seeds that hold bank passes in both. The commands are in
-`E1_E2_commands.md` in the experiment folder.
+passes, no fit). I3 to I6 then read the CRPS contrast `FTh90d-i` minus `FTh90d-n` and the
+slump-share contrasts of `M1`, `M2`, and `FTh90d`, each `-i` minus `-n`, where `FTh90d` stands for
+`B*`. The slump contrasts pair the `-i` and `-n` states on the seeds that hold bank passes in both.
+The commands are in `E1_E2_commands.md` in the experiment folder.
 
-**E1 gets its own Bonferroni family, `E`, of 2 readings (the six and the eight), read at 97.5%.** The
-guard readings (the tails, the lead bands, cold nights, and the clear-sky slice) use a one-sided 95%
-bound, as the guards of C1 do, and the eight without D8 uses the level of the family. The readings of the experiment's families R, W, and I stay at 6, 8, and
-12, so the levels of C1 to C7 and I1 to I6 are unchanged and E2 adds no reading.
+**E1 gets its own Bonferroni family, `E`, of 2 readings (the six and the eight), read at 97.5%.**
+The guard readings (the tails, the lead bands, cold nights, and the clear-sky slice) use a one-sided
+95% bound, as the guards of C1 do, and the eight without D8 uses the level of the family. The
+readings of the experiment's families R, W, and I stay at 6, 8, and 12, so the levels of C1 to C7
+and I1 to I6 are unchanged and E2 adds no reading.
 
 **E1 does not change the pre-registered verdict of C1.** The verdict of C1 is read from the rule
 above, and E1 is read as explanatory. If `M1h90-i` scores better than `M1-i` and close to
