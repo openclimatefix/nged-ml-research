@@ -43,8 +43,9 @@ def rewired_neighbours(
     """Return the neighbours of another Primary that is not electrically linked to the host.
 
     The other Primary is neither the host nor a neighbour of the host. The returned neighbours
-    exclude the host and every site that carries an injected change in the pass (a host, a donor,
-    or a recipient), so the rewired features never read an injected step.
+    exclude the host, the host's own neighbours, and every site that carries an injected change in
+    the pass (a host, a donor, or a recipient), so the rewired features never read an injected
+    step or one of the host's own neighbours.
 
     Args:
         ctx: The context.
@@ -62,7 +63,7 @@ def rewired_neighbours(
     for u in range(len(panel.sites)):
         if u in linked or u in touched:
             continue
-        clean = [j for j in panel.neighbours[u] if j != host and j not in touched]
+        clean = [j for j in panel.neighbours[u] if j not in linked and j not in touched]
         if clean:
             options.append(clean)
     if not options:

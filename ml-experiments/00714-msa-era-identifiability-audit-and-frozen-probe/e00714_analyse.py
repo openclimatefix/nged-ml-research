@@ -57,7 +57,7 @@ PERMUTATIONS: Final[int] = 20
 DRAWS: Final[int] = 10_000
 SECONDARY_DRAWS: Final[int] = 1000
 STRATIFIED_DRAWS: Final[int] = 1000
-SITE_PRIOR_LIMIT: Final[float] = 0.60
+SITE_PRIOR_BAND: Final[float] = 0.10
 SECONDARY_CONFIDENCE: Final[float] = 0.95
 TOLERANCE: Final[float] = 0.03
 NO_EVENT_TOLERANCE: Final[float] = 0.05
@@ -210,6 +210,14 @@ def site_prior_readings(
     Both are secondary readings that sit beside C1 to C3 and C6.
     """
     result: dict = {}
+    gas = tables["gas"].filter(pl.col("k") == 14)
+    gas_label = gas["label"].to_numpy()
+    result["gas/site_prior_auroc"] = model.auroc(
+        label=gas_label,
+        score=model.site_prior_scores(
+            sites=gas["host"].to_numpy(), label=gas_label, months=gas["month"].to_numpy()
+        ),
+    )
     for world in ("bank", "g2"):
         frame = tables[world].filter(pl.col("k") == 14).sort("pass_id", "event")
         sites = frame["host"].to_numpy()
@@ -230,7 +238,34 @@ def site_prior_readings(
                 "auroc": model.site_stratified_auroc(sites=s, label=y, score=p),
                 "low95": low, "high95": high,
             }  # fmt: skip
+    result["C6_site_stratified"] = _c6_stratified(store=store, draws=draws)
     return result
+
+
+def _c6_stratified(
+    *, store: dict[tuple[str, int], tuple[pl.DataFrame, pl.DataFrame, list[np.ndarray]]], draws: int
+) -> dict[str, float]:
+    """Return the bank's site-stratified AUROC minus the second generator's at 14 days (secondary).
+
+    Both sides rank only pairs at the same Primary, so the bank's site route cannot enter the
+    difference. The two worlds' draws are paired at random.
+    """
+    values, point = [], []
+    for world in ("bank", "g2"):
+        f, preds, boot = store[(world, 14)]
+        s, y, p = f["host"].to_numpy(), f["label"].to_numpy(), preds["host"].to_numpy()
+        point.append(model.site_stratified_auroc(sites=s, label=y, score=p))
+        values.append(
+            np.array(
+                [
+                    model.site_stratified_auroc(sites=s[d], label=y[d], score=p[d])
+                    for d in boot[:draws]
+                ]
+            )
+        )
+    np.random.default_rng(714_009).shuffle(values[1])
+    low, high = model.interval(values=values[0] - values[1], confidence=SECONDARY_CONFIDENCE)
+    return {"diff": point[0] - point[1], "low95": low, "high95": high}
 
 
 def primary(*, tables: dict[str, pl.DataFrame], draws: int, out: Path, tree: bool) -> dict:
@@ -312,10 +347,12 @@ def primary(*, tables: dict[str, pl.DataFrame], draws: int, out: Path, tree: boo
 def decisions(*, result: dict, placebo: dict) -> dict[str, bool]:
     """Apply every part of the pre-registered decision rule to the contrasts and the placebos.
 
-    Precedence: any failed audit flag makes the run `inconclusive_pending_audit`, and no outcome
-    is then stated. Otherwise outcome 3 applies only where the second generator does not clear
-    the threshold (`bank_inflated_g2_enough` names the case where both are high), and the
-    neighbour-row stop is the complement of the neighbour-row gain test.
+    Each world is audited by its own placebos. The second generator's contrasts (C1 to C5 and
+    outcomes 1, 2, and 4) are gated by the second generator's audit alone, because the bank's
+    no-event placebo is a function of the bank's known site imbalance. The bank's readings and the
+    comparison C6 (outcome 3) need both audits. Outcome 3 applies only where the second generator
+    does not clear the threshold (`bank_inflated_g2_enough` names the case where both are high),
+    and the neighbour-row stop is the complement of the neighbour-row gain test.
     """
     c, auroc = result["contrasts"], result["auroc"]
     enough_g2 = c["C1"]["low"] >= 0.70 and c["C2"]["low"] >= 0.70
@@ -324,17 +361,23 @@ def decisions(*, result: dict, placebo: dict) -> dict[str, bool]:
     gain_clause = c["C5"]["low"] >= 0.05
     neighbour = gain_clause and c["C5_auroc_host_nbr_mirrored"]["auroc"] >= 0.85
     hidden_small = abs(c["C5_gain_hidden"]["diff"]) < HIDDEN_GAIN_LIMIT
-    shuffled_ok = all(placebo[f"{w}/shuffled_labels"]["within_0.03"] for w in ("bank", "g2"))
-    rewired_ok = all(
-        abs(auroc[f"{w}/k14/host_nbr_rewired"]["auroc"] - auroc[f"{w}/k14/host"]["auroc"])
-        <= TOLERANCE
+    audit = {
+        w: {
+            "shuffled": placebo[f"{w}/shuffled_labels"]["within_0.03"],
+            "rewired": abs(
+                auroc[f"{w}/k14/host_nbr_rewired"]["auroc"] - auroc[f"{w}/k14/host"]["auroc"]
+            )
+            <= TOLERANCE,
+            "no_event": abs(placebo[f"{w}/no_event_placebo"]["auroc"] - 0.5) <= NO_EVENT_TOLERANCE,
+        }
         for w in ("bank", "g2")
-    )
-    no_event_ok = all(
-        abs(placebo[f"{w}/no_event_placebo"]["auroc"] - 0.5) <= NO_EVENT_TOLERANCE
-        for w in ("bank", "g2")
-    )
-    site_prior_ok = result["site_prior"]["g2/site_prior_auroc"] <= SITE_PRIOR_LIMIT
+    }
+    site_priors = {
+        w: abs(result["site_prior"][f"{w}/site_prior_auroc"] - 0.5) <= SITE_PRIOR_BAND
+        for w in ("g2", "gas")
+    }
+    g2_ok = all(audit["g2"].values()) and site_priors["g2"]
+    bank_ok = all(audit["bank"].values())
     bank_inflated = c["C6"]["low"] > 0.10
     return {
         "outcome_1_host_rows_not_enough": not_enough,
@@ -348,14 +391,43 @@ def decisions(*, result: dict, placebo: dict) -> dict[str, bool]:
         "outcome_4_full": neighbour and hidden_small,
         "f4_stopped_gain_interval_low_under_0.05": not gain_clause,
         "known_answer_pass": auroc["bank/k14/known_answer"]["auroc"] > 0.95,
-        "shuffled_label_within_0.03": shuffled_ok,
-        "rewired_within_0.03_bank_and_g2": rewired_ok,
-        "no_event_within_0.05": no_event_ok,
-        "g2_site_prior_auroc_within_limit": site_prior_ok,
-        "inconclusive_pending_audit": not (
-            shuffled_ok and rewired_ok and no_event_ok and site_prior_ok
-        ),
+        "g2_shuffled_label_within_0.03": audit["g2"]["shuffled"],
+        "g2_rewired_within_0.03": audit["g2"]["rewired"],
+        "g2_no_event_within_0.05": audit["g2"]["no_event"],
+        "g2_site_prior_within_0.10_of_0.5": site_priors["g2"],
+        "gas_site_prior_within_0.10_of_0.5": site_priors["gas"],
+        "bank_shuffled_label_within_0.03": audit["bank"]["shuffled"],
+        "bank_rewired_within_0.03": audit["bank"]["rewired"],
+        "bank_no_event_within_0.05": audit["bank"]["no_event"],
+        "g2_inconclusive_pending_audit": not g2_ok,
+        "bank_inconclusive_pending_audit": not bank_ok,
+        "c6_inconclusive_pending_audit": not (g2_ok and bank_ok),
     }
+
+
+def stated_outcome(*, flags: dict[str, bool]) -> str:
+    """Return the outcome that the precedence rule states, or why none is stated.
+
+    Second-generator outcomes need a clean second-generator audit. Outcome 3 and the bank
+    readings need both audits. Outcome 1 is stated before outcome 4.
+    """
+    if flags["g2_inconclusive_pending_audit"]:
+        return "inconclusive pending an audit of the second generator"
+    if flags["outcome_1_host_rows_not_enough"]:
+        text = "outcome 1: host rows are not enough"
+    elif flags["outcome_2_host_rows_enough_on_g2"]:
+        text = "outcome 2: host rows are enough on the second generator"
+    else:
+        text = "neither enough nor not enough on the second generator"
+    if flags["outcome_4_full"]:
+        text += "; outcome 4: neighbour rows pass"
+    if flags["c6_inconclusive_pending_audit"]:
+        return text + "; bank comparison (C6, outcome 3) inconclusive pending a bank audit"
+    if flags["outcome_3_injector_artefact"]:
+        text += "; outcome 3: injector artefact"
+    elif flags["bank_inflated_g2_enough"]:
+        text += "; bank inflated, second generator enough"
+    return text
 
 
 def placebos(*, tables: dict[str, pl.DataFrame], permutations: int) -> dict:
@@ -526,7 +598,9 @@ def transfer_reading(*, tables: dict[str, pl.DataFrame]) -> dict:
     """Fit on one world's other months and score the other world's month (secondary).
 
     The classifier that scores month m of the destination world never saw month m of either world,
-    but it saw the same Primaries, which the two worlds share.
+    but it saw the same Primaries, which the two worlds share. A bank-trained classifier also
+    carries the bank's site preferences into the balanced second generator, which pulls that
+    reading down.
     """
     result = {}
     for src, dst in (("bank", "g2"), ("g2", "bank")):
@@ -584,17 +658,19 @@ def outcome_table(*, result: dict, flags: dict[str, bool]) -> str:
     ]
     for key, value in result["site_prior"].items():
         if isinstance(value, dict):
-            lines.append(
-                f"| {key} | {value['auroc']:.3f} | [{value['low95']:.3f}, {value['high95']:.3f}] |"
-            )
+            est = value.get("auroc", value.get("diff"))
+            lines.append(f"| {key} | {est:.3f} | [{value['low95']:.3f}, {value['high95']:.3f}] |")
         else:
             lines.append(f"| {key} | {value:.3f} | |")
     lines += [
         "",
         (
-            "Precedence: `inconclusive_pending_audit` overrides every outcome. Outcome 3 applies "
-            "only when the second generator does not clear 0.70."
+            "Precedence: the second generator's audit gates C1 to C5 and outcomes 1, 2, and 4; "
+            "the bank's audit gates the bank readings; C6 and outcome 3 need both. Outcome 3 "
+            "applies only when the second generator does not clear 0.70."
         ),
+        "",
+        f"Stated outcome: {stated_outcome(flags=flags)}",
         "",
         "| Decision flag | Value |",
         "|---|---|",

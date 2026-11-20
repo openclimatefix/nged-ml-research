@@ -570,7 +570,7 @@ def select_balanced(
     rng = np.random.default_rng(seed)
     per_cell = per_month // modulus
     cells: dict[tuple[str, int], list[int]] = {}
-    for month, index in vectors:
+    for month, index in sorted(vectors):
         cells.setdefault((month, index % modulus), []).append(index)
     kept = {
         key: [int(i) for i in rng.permutation(sorted(v))[:per_cell]] for key, v in cells.items()

@@ -128,15 +128,23 @@ def test_auroc_and_logistic_known_answer() -> None:
 
 
 def test_out_of_fold_never_scores_a_month_it_saw() -> None:
-    """Out-of-fold scores of a month come from a fit without that month."""
+    """Out-of-fold scores of a month come from a fit without that month.
+
+    Only month b carries the label in its feature. A fit that included month b would learn a large
+    weight and spread month b's probabilities; a fit without it learns only noise and gives month
+    b nearly one probability.
+    """
     rng = np.random.default_rng(0)
-    months = np.repeat(np.array(["a", "b", "c", "d"]), 50)
-    y = rng.integers(0, 2, 200).astype(float)
-    x = np.where(months == "a", y, rng.normal(size=200))[:, None]  # only month a carries the label
+    months = np.repeat(np.array(["a", "b", "c", "d"]), [30, 150, 30, 30])
+    y = rng.integers(0, 2, 240).astype(float)
+    x = np.where(months == "b", y, rng.normal(size=240))[:, None]
     pred = model.out_of_fold(x=x, y=y, months=months)
-    held = months == "b"  # a noise month: scoring it with a fit that saw month a stays near 0.5
-    assert abs(model.auroc(label=y[held], score=pred[held]) - 0.5) < 0.2
+    held = months == "b"
     assert np.isfinite(pred).all()
+    assert np.ptp(pred[held]) < 0.1
+    z = (x - x.mean()) / x.std()
+    w, b = model._fit_standardised(z=z, y=y, penalty=0.01)  # a fit that saw month b
+    assert np.ptp(1 / (1 + np.exp(-(z[held] @ w + b)))) > 0.2  # the fault would be visible
 
 
 def test_bootstrap_keeps_whole_passes() -> None:
@@ -253,6 +261,15 @@ def test_mirror_features_ignore_the_size_of_an_unmirrored_step() -> None:
     neighbours do not share. No mirror is possible here, so the feature must not rise.
     """
     cap = np.full(N_SITES, 100.0)
+    medians: dict[float, float] = {}
+    for step_size in (0.05, 0.30):
+        medians[step_size] = _unmirrored_step_medians(cap=cap, step_size=step_size)
+    # more than one step size: the feature must not grow with the size of the host's step
+    assert abs(medians[0.30] - medians[0.05]) < 1.0
+
+
+def _unmirrored_step_medians(*, cap: np.ndarray, step_size: float) -> float:
+    """Return the median `mirror_z` of an unmirrored host step, and check the other statistics."""
     shares, zs, olds = [], [], []
     for seed in range(12):
         rng = np.random.default_rng(seed)
@@ -262,7 +279,7 @@ def test_mirror_features_ignore_the_size_of_an_unmirrored_step() -> None:
         for t in range(1, N_HH):
             shared[t] = 0.995 * shared[t - 1] + 0.004 * rng.standard_normal()
         data[:3] += shared
-        data[0, event().onset_hh :] -= 0.20
+        data[0, event().onset_hh :] -= step_size
         out = feats.build_features(
             event=event(), k=14, power=common.PassPower(0, data), reference=ref, shortwave=sw,
             capacity_mw=cap,
@@ -275,9 +292,12 @@ def test_mirror_features_ignore_the_size_of_an_unmirrored_step() -> None:
         host = data[0, lo:cut] - ref.power[0, lo:cut]
         nbr = data[1, lo:cut] + data[2, lo:cut] - ref.power[1, lo:cut] - ref.power[2, lo:cut]
         olds.append(_old_mirror_corr(host=host, neighbours=nbr, n_pre=event().onset_hh - lo))
-    assert np.median(olds) > 0.5  # the old statistic reads the step as a mirror
+    if step_size >= 0.3:
+        assert np.median(olds) > 0.5  # the old statistic reads the step as a mirror
     assert np.median(zs) < 2.0
-    assert np.median(shares) < 0.5
+    if step_size >= 0.3:
+        assert np.median(shares) < 0.5
+    return float(np.median(zs))
 
 
 def _ring_context(*, n_sites: int = 16) -> common.Context:
@@ -352,7 +372,8 @@ def test_rewired_neighbours_never_hold_an_injected_site() -> None:
         touched = {int(t) for t in rng.choice(16, size=6, replace=False)}
         host = int(rng.choice(sorted(touched)))
         chosen = bld.rewired_neighbours(ctx=ctx, host=host, touched=touched, rng=rng)
-        assert chosen is None or (chosen and not touched & set(chosen) and host not in chosen)
+        own = {host, *ctx.panel.neighbours[host]}
+        assert chosen is None or (chosen and not (touched | own) & set(chosen))
     everything = bld.rewired_neighbours(
         ctx=ctx, host=0, touched=set(range(16)), rng=np.random.default_rng(0)
     )
@@ -389,3 +410,28 @@ def test_site_prior_scores_and_stratified_auroc() -> None:
         abs(model.site_stratified_auroc(sites=sites, label=label2, score=rng.random(80)) - 0.5)
         < 0.2
     )
+
+
+def test_site_prior_never_reads_the_scored_month() -> None:
+    """When each month alone decides the class, the leave-one-month-out prior scores below 0.5.
+
+    A prior that used the scored month would score 1.
+    """
+    months = np.repeat(np.array(["a", "b", "c", "d"]), 20)
+    sites = np.tile(np.arange(10), 8)
+    flipped = np.isin(months, ["b", "d"])
+    label = ((sites < 5) ^ flipped).astype(float)
+    prior = model.site_prior_scores(sites=sites, label=label, months=months)
+    assert model.auroc(label=label, score=prior) < 0.5
+
+
+def test_selection_does_not_depend_on_the_order_of_the_candidates() -> None:
+    """The kept passes are the same whatever order the caller inserts the candidates in."""
+    rng = np.random.default_rng(1)
+    months = ("m1", "m2")
+    vectors = {(m, i): rng.choice([-1.0, 0.0, 1.0], size=5) for m in months for i in range(16)}
+    kept = g2.select_balanced(vectors=vectors, months=months, per_month=8, modulus=4)
+    shuffled_keys = list(vectors)
+    np.random.default_rng(2).shuffle(shuffled_keys)  # ty: ignore[invalid-argument-type]
+    reordered = {key: vectors[key] for key in shuffled_keys}
+    assert g2.select_balanced(vectors=reordered, months=months, per_month=8, modulus=4) == kept

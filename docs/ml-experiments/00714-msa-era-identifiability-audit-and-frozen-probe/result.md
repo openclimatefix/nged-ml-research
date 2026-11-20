@@ -173,8 +173,9 @@ and are the hard cases; a second set of readings drops them).
 3. **Neighbour rows.** Add the cleaned power of the electrical neighbours of the host, from the
    reconciled interconnection table of experiment 395. The feature is the share of the host's change
    that the sum of the neighbours mirrors, with its sign. The rewired placebo replaces each real
-   neighbour set with the neighbours of another Primary that is not electrically linked to the host,
-   and never uses a site that carries an injected change.
+   neighbour set with the neighbours of another Primary that is not electrically linked to the host.
+   The rewired set leaves out the host, the host's own neighbours, and every site that carries an
+   injected change in the pass.
 
 **The classifier is a logistic regression with an L2 penalty, fitted separately for each origin,
 with whole passes held out.** Origins are 7, 14, and 28 days after the onset, so days since the
@@ -336,8 +337,10 @@ the only feature that reads weather directly.
 **The experiment runs on the CPU with at most 2 cores and no GPU, in 1 to 2 hours.** Unpickling
 the bank's passes dominates (the 64 files hold about 5 GB), and the logistic fits take seconds.
 `e00714_threads.py` limits BLAS and OpenMP to one thread and Polars to 2, and the code reads one
-pass at a time. The run commands add `-p AllowedCPUs=0-1` to the `systemd-run` call. The
-workstation rules of the manager apply: a check-in before the run, and the `systemd-run` wrapper.
+pass at a time. The run commands prefix `taskset -c 0,1`, which pins the process to 2 cores
+(`-p AllowedCPUs=0-1` is ignored on the workstation, because the user manager does not delegate
+the `cpuset` controller). `systemd-run` enforces the memory limit. The workstation rules of the
+manager apply: a check-in before the run, and the `systemd-run` wrapper.
 
 ## Method
 
@@ -377,8 +380,15 @@ workstation rules of the manager apply: a check-in before the run, and the `syst
   built from the correlation before the onset minus the correlation over the whole span is not
   used, because a unit test shows that it rises with the size of an unmirrored step. D8, D15, and
   D18 stay in the neighbour sets, so real level shifts at those Primaries enter the neighbours'
-  sum. A partial mirror that is scored at the receiving Primary has a share of 1 over the mirrored
-  fraction, from 1.4 to 3.3, so most of those events sit at the clip.
+  sum. With no event, the medians of `mirror_share` and `mirror_z` are slightly negative
+  (-0.10 to -0.23 and -0.09 to -0.24 in most cells of the second generator), because centring does
+  not remove the drift of the reference level's shared error after the onset, and 10% to 20% of the
+  no-event rows of `mirror_share` sit at the clip. Both effects are the same in the two classes. A
+  partial mirror that is scored at the receiving Primary carries a true ratio of the donor's loss to
+  the recipient's gain of 1.835 in MW (the median of 1 over the mirrored fraction is 1.84), but
+  the host's gain is small (median 0.41 MW), so noise dominates: the feature has a median of 0.21 at
+  14 days, and 22% of those events sit at the clip. The analysis prints the share of rows at 0 and
+  at the clip, by class.
 - **Step features (two, secondary).** Steps per day and the fraction of half-hours at the high level.
 
 **Training regime.**
@@ -399,22 +409,32 @@ workstation rules of the manager apply: a check-in before the run, and the `syst
   pass sits in the neighbour set of another event of the pass. The builder places the 2 temporary
   moves and the 2 permanent changes of a pass in a random order.
 - **Balancing the Primaries across the classes.** A Primary that hosts mostly permanent changes
-  lets a classifier recognise the Primary instead of the event. With hosts drawn at
-  random, the score "this Primary's share of permanent changes in the other 3 fold months" has an
-  AUROC of 0.70 from the truth tables of the second generator alone, and 0.67 on experiment 709's
-  stored bank, where the pass design cannot change. The builder now generates 4 times as many candidate
-  passes (128 for each fold month) and keeps the 32 for each fold month that minimise the squared
-  difference between the permanent and the temporary events at each Primary, over all months and
-  within each month. A kept pass replaces only a candidate with the same mirror states, kinds, and
-  step sizes. This design change follows from the second code review and not from any
-  classifier AUROC. The builder prints the site-prior AUROC of the candidates (0.589) and of the
-  kept passes (0.472), and the analysis prints the site-prior AUROC of both worlds and a
-  site-stratified AUROC, which ranks only pairs of a permanent and a temporary event at the same
-  Primary, beside C1 to C3. The stored bank cannot be rebalanced, so its reading is secondary. The
-  gas world's 32 passes are balanced in the same way, but 8 passes for each fold month leave
-  little to choose from (site-prior AUROC 0.585 for the candidates, 0.349 for the kept passes).
-  The site-prior AUROC of the second generator must stay at or below 0.60, or the run is
-  inconclusive.
+  lets a classifier recognise the Primary instead of the event. With the 2 transfers placed before
+  the 2 permanent changes, the score "this Primary's share of permanent changes in the other 3 fold
+  months" has an AUROC of 0.70 from the truth tables of the second generator alone, and 0.67 on
+  experiment 709's stored bank, where the pass design cannot change. A random placement order alone
+  gives 0.57 (random draws that keep the design cells give 0.568 with a standard deviation of
+  0.031). The builder generates 4 times as many candidate passes (128 for each fold month) and
+  keeps the 32 for each fold month that minimise the squared difference between the permanent and
+  the temporary events at each Primary, over all months and within each month. A kept pass
+  replaces only a candidate with the same mirror states, kinds, and step sizes. This design change
+  follows from the second code review and not from any classifier AUROC. The builder prints the
+  site-prior AUROC of the candidates (0.589) and of the kept passes (0.472), and the analysis
+  prints the site-prior AUROC of both worlds and a site-stratified AUROC, which ranks only pairs
+  of a permanent and a temporary event at the same Primary, beside C1 to C3. The stored bank
+  cannot be rebalanced, so its reading is secondary. The gas world's 32 passes are balanced in the
+  same way, but 8 passes for each fold month leave little to choose from (site-prior AUROC 0.585
+  for the candidates, 0.349 for the kept passes). The balanced selection and the site-prior gate
+  are departures from the pre-registration, made after the second code review. The gate was set
+  when the kept value, 0.472, was already known, so it checks the build and cannot fail on the
+  kept passes. It is two-sided: the second generator's site-prior AUROC must lie within 0.10 of
+  0.50, because a balanced selection pushes the leave-one-month-out prior below 0.5 (a classifier
+  fitted on the other 3 months learns site preferences that are reversed in the scored month,
+  which biases the reading downwards). The gas world's value is printed beside every gas reading
+  and does not gate. The bank's site route is known (0.671), so every bank reading is read beside
+  the bank's site-stratified AUROC, and C6 includes the bank's site route. A companion C6 computed
+  within each Primary (the bank's site-stratified AUROC minus the second generator's, secondary,
+  95% interval) is printed beside C6.
 - **Which Primary is scored in a temporary move.** In experiment 709's bank the scored Primary of a
   temporary move is always the donor, so its change is always a decrease, and 25% of its permanent
   changes are increases. A classifier that read only the sign of the change would therefore score
@@ -455,14 +475,19 @@ workstation rules of the manager apply: a check-in before the run, and the `syst
   are missing); the no-event placebo, which scores the classifier on the real panel at the
   same hosts and onsets; and the noiseless known-answer, which replaces the reference level by the
   real power so that the change is the injected change exactly.
-- **Decision flags.** The analysis prints a flag for each part of the decision rule and the
-  following precedence. The run is inconclusive pending an audit if any of these fails: the
-  shuffled-label placebo within 0.03 on both worlds; the rewired-neighbour AUROC within 0.03 of the
-  host-only AUROC at 14 days on both worlds; the no-event placebo within 0.05 of 0.50 on both
-  worlds; and the site-prior AUROC of the second generator at or below 0.60. Outcome 3 applies only
-  when the second generator does not clear 0.70 (`bank_inflated_g2_enough` names the case where
-  C6 is above +0.10 and the second generator does clear it). The neighbour-row stop is the
-  complement of the clause that C5's lower end is at least +0.05.
+- **Decision flags.** The analysis prints a flag for each part of the decision rule, and a stated
+  outcome computed by this precedence. Each world is audited by its own placebos: the
+  shuffled-label placebo within 0.03, the rewired-neighbour AUROC within 0.03 of the host-only
+  AUROC at 14 days, and the no-event placebo within 0.05 of 0.50. The second generator's audit
+  also needs the site-prior AUROC within 0.10 of 0.50. A failed second-generator audit makes C1 to
+  C5 and outcomes 1, 2, and 4 inconclusive. A failed bank audit makes the bank readings and C6
+  (outcome 3) inconclusive, and the bank's no-event placebo never gates the second generator's
+  result, because on the bank the no-event features are a function of the host and the fold month,
+  so that placebo follows the bank's known site imbalance. Outcome 3 applies only when the
+  second generator does not clear 0.70 (`bank_inflated_g2_enough` names the case where C6 is above
+  +0.10 and the second generator does clear it). The neighbour-row stop is the complement of the
+  clause that C5's lower end is at least +0.05. The cross-generator reading fitted on the bank
+  carries the bank's site preferences into the balanced second generator, which pulls it down.
 - **Cleaned data.** The panel comes from the cleaned power table, in which the `substation_zero` rule
   has already set its flagged half-hours to missing. The feature build prints, for each fold
   month's data window, the number of missing half-hours and the number of exact zeros (none are
