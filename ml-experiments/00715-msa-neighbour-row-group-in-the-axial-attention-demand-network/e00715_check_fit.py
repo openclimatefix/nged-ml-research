@@ -140,7 +140,16 @@ def main() -> int:
         results["d: the exact old hash is accepted and logged"] = "deadbeefdeadbeef" in json.dumps(
             accepted.get("code_overrides", accepted)
         )
+        record["e00713_code_hash"] = "0123456789abcdef"
+        stage_log.write_text(json.dumps(record))
+        results["d: a changed experiment 713 hash refuses even the exact old hash"] = refused(
+            root=root, accept=["deadbeefdeadbeef"]
+        )
         stage_log.write_text(original)
+        final_log = arms.log_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, kind="fit")
+        results["h: the final log records the checkpoint flag"] = (
+            json.loads(final_log.read_text()).get("checkpoint_neighbours") is False
+        )
         for stage in (2, 3):
             arms.model_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, stage=stage).unlink()
         arms.log_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, kind="fit").unlink()

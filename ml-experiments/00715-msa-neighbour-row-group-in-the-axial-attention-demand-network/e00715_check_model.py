@@ -282,12 +282,12 @@ def counts() -> None:
     assert table["final LayerNorm"] == 64, table
     assert table["two across-substation attentions"] == 25_344, table
     assert table["new"] == f4.NEW_PARAMETERS == table["new_by_prefix"] == 36_888, table
-    assert table["total"] == f4.F4_PARAMETERS == 165_543, table
-    assert mdl.parameter_count(model=mdl.MsaNet()) == f4.M_STAR_PARAMETERS == 128_655
+    assert table["total"] == f4.F4_PARAMETERS == 166_887, table
+    assert mdl.parameter_count(model=mdl.MsaNet()) == f4.M_STAR_PARAMETERS == 129_999
     assert (
         f4.parameter_table(model=f4.F4Net(switches=mdl.ARM_SWITCHES["E"]))["total"]
         == f4.F4E_PARAMETERS
-        == 168_103
+        == 169_447
     )
     one = f.cross[0]
     assert sum(p.numel() for p in one.parameters()) == 12_672
@@ -297,7 +297,7 @@ def counts() -> None:
     print(
         "counts passed:",
         {k: v for k, v in table.items() if k != "new_by_prefix"},
-        "; with the convolution stem 168,103",
+        "; with the convolution stem 169,447",
     )
 
 
@@ -329,15 +329,34 @@ def checkpointing() -> None:
     new_grads = [k for k in g0 if k.startswith(f4.NEW_PREFIXES)]
     dead = [k for k in new_grads if "null_key" not in k and float(g0[k].abs().max()) == 0.0]
     assert not dead, f"a new parameter has no gradient: {dead}"
-    print(
-        f"checkpointing passed: output, {len(g0)} gradients, and later draws bit-identical (negative control below)"
+    print(f"checkpointing passed: output, {len(g0)} gradients, and later draws bit-identical")
+    # negative control: a naive checkpoint, which leaves the neighbour generator alone, must give other gradients
+    naive = f4.F4Net._run_path
+
+    def naive_run_path(self: f4.F4Net, fn, *args):  # noqa: ANN001, ANN002, ANN202
+        if not (self.checkpoint_neighbours and self.training and torch.is_grad_enabled()):
+            return fn(*args)
+        return f4.checkpoint(fn, *args, use_reentrant=False)
+
+    f4.F4Net._run_path = naive_run_path  # ty: ignore[invalid-assignment]
+    try:
+        _, model = mstar_pair()
+        randomise_output_projection(model=model)
+        model.train()
+        model.checkpoint_neighbours = True
+        model.seed_neighbour_path(key=11)
+        torch.manual_seed(4)
+        model(inp, nbr).out.square().mean().backward()
+        gn = {n: p.grad.clone() for n, p in model.named_parameters() if p.grad is not None}
+    finally:
+        f4.F4Net._run_path = naive  # ty: ignore[invalid-assignment]
+    naive_worst = max(float((g0[k] - gn[k]).abs().max()) for k in g0 if k in gn)
+    assert naive_worst > 1e-6, (
+        "negative control failed: a checkpoint that ignores the neighbour generator gave the same gradients"
     )
-    # negative control: restoring only the default generators (a naive checkpoint) must differ when the state is not restored
-    model = f4.F4Net(switches=mdl.ARM_SWITCHES["M"])
-    model.seed_neighbour_path(key=11)
-    a = torch.rand(3, generator=model.nbr_generator)
-    b = torch.rand(3, generator=model.nbr_generator)
-    assert not torch.equal(a, b), "the generator does not advance"
+    print(
+        f"checkpointing negative control: a naive checkpoint moves a gradient by {naive_worst:.2e}"
+    )
 
 
 def main() -> int:

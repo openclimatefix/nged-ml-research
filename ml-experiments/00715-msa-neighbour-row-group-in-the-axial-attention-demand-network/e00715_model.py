@@ -43,10 +43,10 @@ CROSS_HEAD_WIDTH: Final = mdl.WIDTH // CROSS_HEADS
 NBR_ENCODER_HEADS: Final = 4
 NBR_DROPOUT: Final = 0.1
 """Dropout inside the neighbour path (the same rate as the trunk's)."""
-M_STAR_PARAMETERS: Final = 128_655
+M_STAR_PARAMETERS: Final = 129_999
 NEW_PARAMETERS: Final = 36_888
 F4_PARAMETERS: Final = M_STAR_PARAMETERS + NEW_PARAMETERS
-F4E_PARAMETERS: Final = 168_103
+F4E_PARAMETERS: Final = 169_447
 NEW_PREFIXES: Final = (
     "nbr_emb.", "rel_emb.", "age_emb_n.", "col_emb_n.", "u_own", "u_host", "b_nbr", "m_nbr",
     "nbr_encoder.", "nbr_ln_out.", "cross.",
@@ -356,12 +356,8 @@ class F4Net(mdl.MsaNet):
             x = x + block.drop(y)
             x = x + block.drop(block.transition(block.ln_transition(x)))
         h0, base, spread, no_history, alpha = self._readout(x, inp)
-        out = self.head(
-            torch.cat([h0, base[..., None], spread[..., None], no_history[..., None]], dim=-1)
-        )
-        k = mdl.m559.COMPONENTS
-        out = torch.cat(
-            [out[..., :k], out[..., k : 2 * k] + base[..., None], out[..., 2 * k :]], dim=-1
+        out = self._mixture_out(
+            h0=h0, base=base, spread=spread, no_history=no_history, lead_day=inp.lead_day
         )
         attention = nbr_attention = enc_attention = None
         if return_attention:

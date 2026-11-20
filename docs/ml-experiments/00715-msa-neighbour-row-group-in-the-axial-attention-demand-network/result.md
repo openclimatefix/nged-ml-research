@@ -245,10 +245,10 @@ value projections, and always holds the null key. Second, the output projection 
 across-substation attention has no bias, so a host token whose only key is the null key receives
 exactly zero throughout training.
 
-**The count is 36,888 new parameters on the 128,655 of M*, 165,543 in total (29% more).** The parts
+**The count is 36,888 new parameters on the 129,999 of M*, 166,887 in total (28% more).** The parts
 are the neighbour tokens (2,880), the neighbour encoder (8,600), a final LayerNorm (64), and two
 across-substation attentions (12,672 each). With arm `E`'s stem on the host rows the total is
-168,103. The check script asserts every count against the built module.
+169,447. The check script asserts every count against the built module.
 
 **Zero initialisation makes F4 loaded with an M* state reproduce M* up to listed divergences.**
 `W_o` starts at zero with no bias, so the neighbour path adds exactly zero to every host token, and

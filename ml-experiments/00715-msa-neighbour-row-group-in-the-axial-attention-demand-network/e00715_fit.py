@@ -21,8 +21,17 @@ differs from the current code's, unless `--accept-code-change OLD_HASH` (stage s
 F4 imports (`e00715_arms.code_hash`).
 
 **Nothing is written into experiment 713's data.** The dense-array cache is redirected to F4's own
-folder before the first call, and the script asserts that the modification times of experiment 713's
-`work` folder are unchanged when the fit ends.
+folder before the first call. When the fit ends, the script asserts that the modification times of the
+files it reads from experiment 713's data are unchanged: the stage 1 state and log, the standardiser
+hash file, `selection.json`, and the `cache/` folder. **A write by F4 to any other file in experiment
+713's folder is not detected.** A failed assertion marks the final log `watch_failed`, and a finished-job
+skip refuses such a log.
+
+**GPU memory.** `--checkpoint-neighbours` recomputes the neighbour path in the backward pass; the log
+records the flag. Code review 2 estimated the peak at about 6.2 GB per process with the flag and
+9.5 GB without. The first fit of phase 0 measures `peak_gpu_mb`; plan one process per slot, or 7 GB
+per process.
+The gate's synthetic fits cannot use the flag, so run the gate alone in its slot.
 """
 
 import argparse
@@ -193,6 +202,9 @@ def skip_finished(
         stages.append(earlier)
     if final_log.exists():
         existing = json.loads(final_log.read_text())
+        assert not existing.get("watch_failed"), (
+            f"{final_log} is marked `watch_failed`: a file read from experiment 713's data changed during the fit; refit the job"
+        )
         new = [
             o for o in log.get("code_overrides", []) if o not in existing.get("code_overrides", [])
         ]
@@ -228,7 +240,9 @@ def fit(
         flush=True,
     )
     assert month in spec.folds, f"arm {arm} is not fitted on fold {month}: {spec.folds}"
-    log: dict = {"arm": arm, "month": month, "seed": seed}
+    log: dict = {
+        "arm": arm, "month": month, "seed": seed, "checkpoint_neighbours": checkpoint_neighbours,
+    }  # fmt: skip
     arms.check_code(
         earlier=json.loads(gate.read_text()).get("code", {}), accept=[accept_gate] if accept_gate else [],
         record=log, what="the known-answer gate file", kind="gate",
@@ -329,9 +343,14 @@ def fit(
         data_dir=data_dir,
         files=[state_path, log_path_1, *read_files(data_dir=data_dir, month=month)],
     )
-    assert before == after, (
-        "a file that F4 reads from experiment 713's data, or its cache folder, changed during the fit"
-    )
+    if before != after:
+        log["watch_failed"] = True
+        write_json_atomic(
+            obj=log,
+            path=arms.log_file(data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit"),
+        )
+        msg = "a file that F4 reads from experiment 713's data, or its cache folder, changed during the fit"
+        raise AssertionError(msg)
     return log
 
 

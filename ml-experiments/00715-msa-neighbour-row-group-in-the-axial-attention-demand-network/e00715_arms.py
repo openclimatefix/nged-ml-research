@@ -296,7 +296,8 @@ def check_code(
     """Refuse a state or a gate written by other code, unless an override names its exact old hash.
 
     `accept` holds the values of `--accept-code-change` (for stage states, repeatable) or the value of
-    `--accept-gate-change` (for the gate record). An override is appended to `record["code_overrides"]`
+    `--accept-gate-change` (for the gate record). **No override is accepted when experiment 713's code
+    hash differs from the one the record holds.** An override is appended to `record["code_overrides"]`
     with both hashes, both git commits, and the diff stat of the fit modules. A state or gate without
     a code record cannot be overridden.
     """
@@ -310,6 +311,14 @@ def check_code(
     if old == now:
         return
     flag = "--accept-gate-change" if kind == "gate" else "--accept-code-change"
+    old_713, now_713 = earlier.get("e00713_code_hash"), a713.code_hash()
+    if old_713 != now_713:
+        msg = (
+            f"{what} was written with experiment 713's code at hash {old_713}, and that code now has hash "
+            f"{now_713}. A change to experiment 713's code can change an F4 network, so no override "
+            f"(`{flag}`) is accepted: refit, or rerun the gate."
+        )
+        raise AssertionError(msg)
     if old not in accept:
         msg = (
             f"{what} was written by code with hash {old}, and the code now has hash {now}. "

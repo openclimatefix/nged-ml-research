@@ -31,6 +31,8 @@ import hashlib
 import json
 import os
 import sys
+import traceback
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
 
@@ -348,13 +350,21 @@ def kn11a_in_subprocess(*, month: str) -> dict:
     }
 
 
-def run_checks(*, month: str, device: str) -> dict:
-    """Run KN12, KN11(a), KN6, and KN7 for the fold `month`; return the results."""
+def capped(*, labels: Sequence[str]) -> list[str]:
+    """Return the labels among `labels` whose synthetic fit ended at the pass cap."""
+    return [e["fit"] for e in TRAIN_LOGS if e["fit"] in labels and e.get("cap_hit")]
+
+
+def run_checks(*, month: str, device: str, results: dict) -> dict:
+    """Run KN12, KN11(a), KN6, and KN7 for the fold `month`; fill and return `results`.
+
+    A comparison whose fit ended at the pass cap is `not evaluated` and fails the gate. The caller
+    keeps `results`, so a crash still leaves every result so far.
+    """
     from datetime import UTC, datetime
 
     import e00715_weather_lookahead as wl
 
-    results: dict = {}
     ok, lines = wl.w713.check_data(contract=datetime(2026, 3, 10, 12, tzinfo=UTC))
     print("\n".join(lines))
     nbr_lines = wl.neighbour_statement(contract=datetime(2026, 3, 10, 12, tzinfo=UTC), primary="D5")
@@ -393,7 +403,10 @@ def run_checks(*, month: str, device: str) -> dict:
             print(world_name, arm, follow, flush=True)
     t = THRESHOLDS
     g = gaps["W3"]
+    hit = capped(labels=["W3 F4", "W3 F4-R", "W3 M"])
     results["KN6"] = {
+        "not evaluated": f"the fits {hit} ended at the {PASSES}-pass cap", "pass": False, "gaps": g,
+    } if hit else {
         "gaps": g, "W3p_f4_gap_report_only": gaps["W3p"]["F4"],
         "pass": g["F4"] >= t["KN6_f4_gap"] and abs(g["F4-R"]) <= t["KN6_f4r_abs_gap"] and abs(g["M"]) <= t["KN6_m_abs_gap"],
     }  # fmt: skip
@@ -424,11 +437,18 @@ def run_checks(*, month: str, device: str) -> dict:
         )
         mae[arm] = ka.mae_of_median(med=med, act=act)
         print("W0 pairs", arm, "MAE", round(mae[arm], 4), flush=True)
+    hit = capped(labels=["W0 pairs F4", "W0 pairs M"])
     results["KN7"] = {
         "mae": mae,
         "f4_minus_m": mae["F4"] - mae["M"],
         "pass": mae["F4"] - mae["M"] <= t["KN7_f4_minus_m"],
     }
+    if hit:
+        results["KN7"] = {
+            "not evaluated": f"the fits {hit} ended at the {PASSES}-pass cap",
+            "pass": False,
+            "mae": mae,
+        }
     return results
 
 
@@ -493,7 +513,14 @@ def main() -> int:  # noqa: PLR0911
         return 0 if result.get("pass", True) else 1
     gate = arms.gate_file(data_dir=ML_EXPERIMENTS_DATA_DIR)
     gate.unlink(missing_ok=True)  # a stale gate never survives a new run
-    results = run_checks(month=args.month, device=args.device)
+    results: dict = {}
+    crashed = None
+    try:
+        run_checks(month=args.month, device=args.device, results=results)
+    except Exception:  # noqa: BLE001
+        crashed = traceback.format_exc()
+        results["crashed"] = {"pass": False, "traceback": crashed}
+        print(crashed, flush=True)
     print(json.dumps(results, indent=1, default=str))
     record = {
         **results, "train_logs": TRAIN_LOGS, "known_answer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
