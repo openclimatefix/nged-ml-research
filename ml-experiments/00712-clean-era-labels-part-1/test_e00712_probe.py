@@ -66,6 +66,7 @@ def scratch(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setattr(probe, "LOG_PATH", folder / "probe_log.jsonl")
     monkeypatch.setattr(probe, "STOP_PATH", folder / "stopped.json")
     monkeypatch.setattr(probe, "GO_FILE", folder / "go.txt")
+    monkeypatch.setattr(probe, "CALLS_DIR", folder / "calls")
     monkeypatch.setattr(probe.trial, "cli_version", lambda: "stub")
     monkeypatch.setattr(
         probe, "probe_prompt", lambda *, stem: probe.Prompt(system="s", text=stem, images=())
@@ -164,3 +165,96 @@ def test_the_call_cap_stops_the_run(scratch: Path, monkeypatch) -> None:
     monkeypatch.setattr(probe.trial, "run_claude", fake)
     assert probe.run_probe(stems=STEMS, resume=False, expect_key_source="none") == 3
     assert fake.calls == 3
+
+
+@pytest.fixture
+def v2() -> Iterator[None]:
+    probe.configure_attempt(name="v2")
+    yield
+    probe.configure_attempt(name="v1")
+
+
+def test_the_v2_probe_has_its_own_files_and_the_same_limits(v2: None) -> None:
+    assert probe.LOG_PATH.name == "probe_log_v2.jsonl"
+    assert probe.STOP_PATH.name == "stopped_v2.json"
+    assert probe.RESULT_PATH.name == "probe_result_v2.json"
+    assert probe.GO_FILE.name == "probe_go_token_v2.txt"
+    assert probe.CALLS_DIR.name == "calls_v2"
+    assert probe.PROMPT_SOURCE_DIR.name == "prompts_v2"
+    assert (probe.MAX_CALLS, probe.MAX_USD, probe.MAX_INPUT_TOKENS) == (14, 2.0, 200_000)
+    assert probe.MAX_EXACT_HITS == 3
+
+
+def test_the_prompt_stamp_must_match_the_current_prompt_version(
+    v2: None, tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(probe, "PROMPT_SOURCE_DIR", tmp_path)
+    assert not probe.prompts_match_the_code()  # no stamp
+    (tmp_path / "prompt_version_sha256.txt").write_text("0" * 64)
+    assert not probe.prompts_match_the_code()  # a wrong stamp
+    (tmp_path / "prompt_version_sha256.txt").write_text(probe.label.prompt_version_hash())
+    assert probe.prompts_match_the_code()
+
+
+def test_attempt_1_is_closed_for_spending(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "argv", ["e00712_probe.py", "--run-probe", "--go-token", "x" * 20])
+    monkeypatch.setattr(
+        probe, "select_prompts", lambda **_: [f"llm_D10_x{i}_alarm" for i in range(10)]
+    )
+    monkeypatch.setattr(probe.asof, "load_stored_candidates", list)
+    monkeypatch.setattr(probe, "probe_prompt", lambda *, stem: probe.Prompt("s", stem, ()))
+    assert probe.main() == 1
+    assert "attempt 1 is closed" in capsys.readouterr().err
+
+
+def test_the_probe_refuses_a_stem_that_is_not_d10(v2: None, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "argv", ["e00712_probe.py", "--attempt", "v2", "--run-probe"])
+    monkeypatch.setattr(
+        probe, "select_prompts", lambda **_: [f"llm_D8_x{i}_alarm" for i in range(10)]
+    )
+    monkeypatch.setattr(probe.asof, "load_stored_candidates", list)
+    assert probe.main() == 1
+    assert "only use D10" in capsys.readouterr().err
+
+
+def test_the_score_counts_only_calls_made_with_the_stamped_prompts(v2: None) -> None:
+    truth = dict.fromkeys(STEMS, 2023)
+    hashes = {s: f"h-{s}" for s in STEMS}
+    entries = [
+        {"tag": "probe", "status": "ok", "call_id": s, "answer": {"year": 2020},
+         "prompt_version_sha256": "calls-hash", "prompt_sha256": hashes[s]}
+        for s in STEMS
+    ]  # fmt: skip
+    result = probe.score(
+        entries=entries, truth=truth, stems=STEMS, version="calls-hash", prompt_hashes=hashes
+    )
+    assert result["prompt_version_sha256"] == "calls-hash"  # never the hash at scoring time
+    assert result["complete"]
+    old = [e | {"prompt_version_sha256": "older"} for e in entries]
+    assert (
+        probe.score(entries=old, truth=truth, stems=STEMS, version="calls-hash")["n_answered"] == 0
+    )
+    edited = [e | {"prompt_sha256": "edited"} for e in entries]
+    assert (
+        probe.score(
+            entries=edited, truth=truth, stems=STEMS, version="calls-hash", prompt_hashes=hashes
+        )["n_answered"]
+        == 0
+    )
+
+
+def test_every_probe_call_records_the_prompt_version(scratch: Path, monkeypatch) -> None:
+    fake = _Fake(["OK", *[_reply(2023)] * 10])
+    monkeypatch.setattr(probe.trial, "run_claude", fake)
+    assert probe.run_probe(stems=STEMS, resume=False, expect_key_source="none") == 0
+    versions = {e["prompt_version_sha256"] for e in probe.read_log()}
+    assert versions == {probe.label.prompt_version_hash()}
+
+
+def test_a_score_refuses_to_replace_a_different_complete_result(scratch: Path, monkeypatch) -> None:
+    monkeypatch.setattr(probe, "RESULT_PATH", scratch / "result.json")
+    first = {"complete": True, "passed": True, "n": 1}
+    assert probe.write_result(result=first)
+    assert probe.write_result(result=first)
+    assert not probe.write_result(result={**first, "passed": False})
+    assert json.loads(probe.RESULT_PATH.read_text()) == first

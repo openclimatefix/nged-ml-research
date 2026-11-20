@@ -1,5 +1,20 @@
 """Experiment 712, stage 1: label the detector candidates of the real record, and build the arms.
 
+**Attempt 2 (`--attempt v2`) is a second D8-only attempt with a new identity.** Its prompt text is
+`e00712_prompt_v2`, its pin is `prompt_pin_v2.json`, its output folder is `stage1_v2/`, its probe
+files carry `_v2`, and its go-token files are new and single-use (renamed to `<name>.used` after the
+paid step succeeds). The default `--attempt v1` is unchanged and still reproducible. **Every change
+of attempt 2 is justified by the schema failures of attempt 1 and by reply-format robustness
+alone. None was decided from the label content or the agreement with the known answers of D8.**
+
+**Attempt 2 spends only on `--primary D8 --arm llm`, within US$4, 140 calls and 1.1 million input
+tokens.** A go token is claimed by an atomic rename to `<name>.used.<timestamp>` before the first
+call, and a token found in any `*_go_token*.used*` file is refused, so a token is single-use across
+the probe and the labelling and across processes. A stopped or failed run needs a new token for any
+resume, and so does a billing-probe failure before any label call. Attempt 1 is closed and refuses
+to spend. A check whose first attempt timed out gets one further attempt, logged as retry reason
+`other`; if that reply fails the schema, the check ends with one real reply.
+
 **Nothing in this script spends unless the maintainer's manager says so.** The default is a dry
 run. A call needs `--run-stage1`, a `--go-token` equal to the first line of `STAGE1_GO_FILE` (a
 file in the private data folder that the manager writes), an `--expect-key-source` that the billing
@@ -43,7 +58,7 @@ import warnings
 from collections import Counter
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -51,6 +66,7 @@ from typing import Any, Final
 import e00709_features as features  # ty: ignore[unresolved-import]
 import e00712_asof as asof
 import e00712_prompt as prompts
+import e00712_prompt_v2 as prompts_v2
 import e00712_trial as trial
 import numpy as np
 import polars as pl
@@ -86,6 +102,15 @@ PROBE_RESULT_PATH: Final[Path] = OUT_DIR / "probe" / "probe_result.json"
 """The year probe's score, written by `e00712_probe.py`."""
 PROBE_PRIMARY: Final[str] = "D10"
 MIN_TOKEN_CHARACTERS: Final[int] = 16
+ATTEMPTS: Final[tuple[str, ...]] = ("v1", "v2")
+V1_PROMPT_TEXTS: Final[tuple[str, str, str]] = (
+    prompts.SYSTEM_PROMPT,
+    prompts.SCHEMA_NO_REGISTER,
+    prompts.SCHEMA_WITH_REGISTER,
+)
+"""The attempt 1 prompt texts, kept so that `configure_attempt("v1")` can restore them."""
+ATTEMPT_STATE: dict[str, Any] = {"name": "v1"}
+"""The attempt that the module's paths and prompt texts are set for."""
 MIN_WILSON_N: Final[int] = 5
 WILSON_Z: Final[float] = 1.96
 WINDOWS: Final[tuple[str, ...]] = ("seven_day", "five_hour")
@@ -95,6 +120,12 @@ STAGE1_MAX_CALLS: Final[int] = 520
 STAGE1_MAX_INPUT_TOKENS: Final[int] = 5_000_000
 """The most a stage 1 run may be given: the plan's table has at most 480 calls, 3.8 million input
 tokens, and about US$17."""
+V2_MAX_USD: Final[float] = 4.0
+V2_MAX_CALLS: Final[int] = 140
+"""The 65 D8 checks, one retry each, and the billing probes of any restarts."""
+V2_MAX_INPUT_TOKENS: Final[int] = 1_100_000
+"""Twice the estimated 492,000 input tokens of the 65 D8 prompts, plus margin."""
+V2_PRIMARY: Final[str] = "D8"
 MAX_WORKERS: Final[int] = 2
 MAX_ATTEMPTS: Final[int] = 2
 """A reply that fails the schema is asked for once more; each attempt is a call."""
@@ -374,10 +405,61 @@ def prompt_version_hash() -> str:
     """Return the hash of everything that fixes a prompt.
 
     The hash covers the system prompt, the two schema texts, and the source of the prompt builder.
+    For attempt 2 it also covers the source of `e00712_prompt_v2`.
     """
     source = Path(prompts.__file__).read_bytes()
     parts = (prompts.SYSTEM_PROMPT, prompts.SCHEMA_NO_REGISTER, prompts.SCHEMA_WITH_REGISTER)
-    return hashlib.sha256("\x00".join(parts).encode() + b"\x00" + source).hexdigest()
+    data = "\x00".join(parts).encode() + b"\x00" + source
+    if ATTEMPT_STATE["name"] == "v2":
+        data += b"\x00" + Path(prompts_v2.__file__).read_bytes()
+    return hashlib.sha256(data).hexdigest()
+
+
+def configure_attempt(*, name: str) -> None:
+    """Point the paths and the prompt texts of this module at one attempt.
+
+    Attempt `v1` uses the original names. Attempt `v2` uses `stage1_v2/`, `prompt_pin_v2.json`,
+    `stage1_go_token_v2.txt`, `probe/prompts_v2/`, and `probe/probe_result_v2.json`, and the
+    reply-format texts of `e00712_prompt_v2`.
+
+    Args:
+        name: `v1` or `v2`.
+
+    Raises:
+        ValueError: If the name is not an attempt.
+    """
+    if name not in ATTEMPTS:
+        msg = f"unknown attempt {name!r}"
+        raise ValueError(msg)
+    suffix = "" if name == "v1" else "_v2"
+    texts = V1_PROMPT_TEXTS
+    if name == "v2":
+        texts = (
+            prompts_v2.SYSTEM_PROMPT,
+            prompts_v2.SCHEMA_NO_REGISTER,
+            prompts_v2.SCHEMA_WITH_REGISTER,
+        )
+    prompts.SYSTEM_PROMPT, prompts.SCHEMA_NO_REGISTER, prompts.SCHEMA_WITH_REGISTER = texts
+    run_dir = OUT_DIR / f"stage1{suffix}"
+    paths = {
+        "RUN_DIR": run_dir,
+        "PROMPT_DIR": run_dir / "prompts",
+        "LOG_PATH": run_dir / "call_log.jsonl",
+        "STOP_PATH": run_dir / "stopped.json",
+        "REPARSED_LOG_PATH": run_dir / "call_log_reparsed.jsonl",
+        "SIGNALS_DIR": OUT_DIR / f"signals{suffix}",
+        "STAGE1_GO_FILE": OUT_DIR / f"stage1_go_token{suffix}.txt",
+        "PIN_PATH": OUT_DIR / f"prompt_pin{suffix}.json",
+        "PROBE_PROMPT_DIR": OUT_DIR / "probe" / f"prompts{suffix}",
+        "PROBE_RESULT_PATH": OUT_DIR / "probe" / f"probe_result{suffix}.json",
+    }
+    globals().update(paths)
+    ATTEMPT_STATE["name"] = name
+
+
+def attempt_name() -> str:
+    """Return the attempt that the module is configured for."""
+    return str(ATTEMPT_STATE["name"])
 
 
 def _now() -> str:
@@ -412,12 +494,60 @@ def probe_blocker() -> str | None:
     return None
 
 
+def token_valid(*, token: str | None, path: Path) -> bool:
+    """Return True if the token equals the first line of the go file and was never used.
+
+    A token is refused if the first line of any `*_go_token*.used*` file in the go file's folder
+    holds it, so a token is single-use across the probe and the labelling, across uses, and across
+    processes.
+
+    Args:
+        token: The token given on the command line.
+        path: The go file.
+
+    Returns:
+        Whether the token may start a paid step.
+    """
+    if not token or len(token) < MIN_TOKEN_CHARACTERS or not path.exists():
+        return False
+    lines = path.read_text().splitlines()
+    if not lines or lines[0].strip() != token:
+        return False
+    for used in path.parent.glob("*_go_token*.used*"):
+        spent = used.read_text().splitlines()
+        if spent and spent[0].strip() == token:
+            return False
+    return True
+
+
+def claim_token(*, token: str | None, path: Path) -> Path | None:
+    """Claim a go token by an atomic rename to `<name>.used.<timestamp>`, before the first call.
+
+    A second process that checks the token afterwards finds no go file. A run that stops or fails
+    after the claim needs a new token for any resume, and so does a billing-probe failure before
+    any label call.
+
+    Args:
+        token: The token given on the command line.
+        path: The go file.
+
+    Returns:
+        The path of the claimed (renamed) file, or `None` if the token is not valid or another
+        process claimed it first.
+    """
+    if not token_valid(token=token, path=path):
+        return None
+    used = path.with_name(f"{path.name}.used.{time.time_ns()}")
+    try:
+        path.rename(used)
+    except FileNotFoundError:
+        return None
+    return used
+
+
 def go_token_valid(*, token: str | None) -> bool:
     """Return True if the token equals the first line of the go file the manager wrote."""
-    if not token or len(token) < MIN_TOKEN_CHARACTERS or not STAGE1_GO_FILE.exists():
-        return False
-    lines = STAGE1_GO_FILE.read_text().splitlines()
-    return bool(lines) and lines[0].strip() == token
+    return token_valid(token=token, path=STAGE1_GO_FILE)
 
 
 # ---------------------------------------------------------------- the log and resume
@@ -545,11 +675,14 @@ class Labeller:
         self.version_hash = prompt_version_hash()
         earlier = read_log() if resume else []
         self.attempts: dict[str, int] = {}
+        self.parse_failed: set[str] = set()
         for entry in earlier:
             if entry.get("prompt_version_sha256") != self.version_hash:
                 continue
             call_id = str(entry["call_id"])
             self.attempts[call_id] = self.attempts.get(call_id, 0) + 1
+            if entry.get("parse_error"):
+                self.parse_failed.add(call_id)
         self.done = len(earlier)
         self.output_tokens = sum(int(e["output_tokens"]) for e in earlier)
         self.api_key_source = "unknown"
@@ -685,6 +818,12 @@ class Labeller:
                 "prompt": prompt.text,
                 "estimated_input_tokens": estimate_input_tokens(prompt=prompt),
                 "started_utc": _now(),
+                "run_attempt": attempt_name(),
+                "retry_reason": (
+                    None
+                    if attempt == 0
+                    else ("parse_failure" if call_id in self.parse_failed else "other")
+                ),
             }
             try:
                 self._reserve(prompt=prompt)
@@ -700,6 +839,7 @@ class Labeller:
                     self.inflight -= 1
             if finished:
                 return answer
+            self.parse_failed.add(call_id)
         return None
 
     def _attempt(
@@ -1164,6 +1304,117 @@ def print_example(*, table: asof.AsOfTable, candidates: list[prompts.Candidate])
         )
 
 
+def reply_accounting(*, entries: Sequence[JsonObject]) -> JsonObject:
+    """Count the checks by how they were answered: first reply, retry, or never.
+
+    A retry is an attempt after the first one of the same check, and the retries are counted by
+    their `retry_reason`. No reply text is read.
+
+    Args:
+        entries: The log entries.
+
+    Returns:
+        `first_reply_valid`, `retry_valid`, `never_valid` (two attempts, none valid), `unfinished`
+        (no valid reply and fewer than two attempts), and `retries_by_reason`.
+    """
+    groups: dict[str, list[JsonObject]] = {}
+    for entry in entries:
+        if entry.get("tag") == "label":
+            groups.setdefault(str(entry["call_id"]), []).append(entry)
+    first = retry = never = unfinished = 0
+    reasons: Counter[str] = Counter()
+    for group in groups.values():
+        ordered = sorted(group, key=lambda e: int(e.get("attempt", 0)))
+        valid = [e for e in ordered if e.get("answer") is not None]
+        if valid and int(valid[0].get("attempt", 0)) == 0:
+            first += 1
+        elif valid:
+            retry += 1
+        elif len(ordered) >= MAX_ATTEMPTS:
+            never += 1
+        else:
+            unfinished += 1
+        reasons.update(str(e.get("retry_reason") or "unrecorded") for e in ordered[1:])
+    return {
+        "first_reply_valid": first,
+        "retry_valid": retry,
+        "never_valid": never,
+        "unfinished": unfinished,
+        "retries_by_reason": dict(reasons),
+    }
+
+
+V2_MAX_REASON_WORDS: Final[int] = 40
+
+
+def _reply_object(*, text: str) -> JsonObject | None:
+    """Return the JSON object of a reply (any code fence removed), or `None` if there is none."""
+    body = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+    try:
+        obj = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
+def reply_format_counts(*, entries: Sequence[JsonObject]) -> JsonObject:
+    """Count the format of the label replies of an `llm` arm log, reading structure only.
+
+    No label, confidence, or reason text is returned or printed. A reply is valid under the
+    attempt 2 strict parser if it is bare JSON (no fence, no prose), has every key but
+    `register_row` (which it may carry), satisfies the lenient parser, and has a `reason` of at
+    most 40 words.
+
+    Args:
+        entries: The log entries.
+
+    Returns:
+        Counts of replies that are not bare JSON, carry a `register_row` key, have a `reason` over
+        40 words, or fail the lenient parser, and of checks valid at the first reply, at the retry,
+        or never under the attempt 2 strict parser.
+    """
+    counts = {"replies": 0, "not_bare_json": 0, "register_row_present": 0,
+              "reason_over_40_words": 0, "fail_lenient_parser": 0}  # fmt: skip
+    groups: dict[str, list[tuple[int, bool]]] = {}
+    for entry in entries:
+        if entry.get("tag") != "label" or entry.get("status") != "ok":
+            continue
+        text = str(entry.get("raw_output") or "")
+        counts["replies"] += 1
+        bare = text.strip().startswith("{") and text.strip().endswith("}")
+        counts["not_bare_json"] += not bare
+        obj = _reply_object(text=text)
+        words_over = False
+        if obj is not None:
+            counts["register_row_present"] += "register_row" in obj
+            reason = obj.get("reason")
+            words_over = isinstance(reason, str) and len(reason.split()) > V2_MAX_REASON_WORDS
+            counts["reason_over_40_words"] += words_over
+        try:
+            parse_reply(text=text)
+            lenient = True
+        except SchemaError:
+            lenient = False
+        counts["fail_lenient_parser"] += not lenient
+        groups.setdefault(str(entry["call_id"]), []).append(
+            (int(entry.get("attempt", 0)), bare and lenient and not words_over)
+        )
+    first = retry = never = 0
+    for group in groups.values():
+        valid = sorted(a for a, ok in group if ok)
+        if valid and valid[0] == 0:
+            first += 1
+        elif valid:
+            retry += 1
+        else:
+            never += 1
+    return counts | {
+        "v2_first_reply_valid": first,
+        "v2_retry_valid": retry,
+        "v2_never_valid": never,
+    }
+
+
 def print_summary(*, path: Path | None = None) -> None:
     """Print the totals of a call log, the plan-quota readings, and the count of invalid replies.
 
@@ -1180,6 +1431,15 @@ def print_summary(*, path: Path | None = None) -> None:
     print(f"replies that satisfy the schema: {valid}; that fail it: {invalid}")
     for message, count in errors.most_common():
         print(f"  {count} x {message}")
+    accounting = reply_accounting(entries=entries)
+    print(
+        f"checks answered: valid at the first reply {accounting['first_reply_valid']}, "
+        f"valid at the retry {accounting['retry_valid']}, never valid {accounting['never_valid']}, "
+        f"unfinished {accounting['unfinished']}; "
+        f"retries by reason {accounting['retries_by_reason']}"
+    )
+    if attempt_name() == "v2":
+        print(f"reply format (structure only): {reply_format_counts(entries=entries)}")
     inputs = [int(e.get("input_tokens") or 0) for e in entries]
     outputs = [int(e.get("output_tokens") or 0) for e in entries]
     print(
@@ -1547,6 +1807,7 @@ def build_probe_prompts(*, candidates: Sequence[prompts.Candidate], inputs: prom
     for call_id, prompt in built.items():
         (PROBE_PROMPT_DIR / f"{call_id.replace(':', '_')}.txt").write_text(prompt.text)
     (PROBE_PROMPT_DIR / "system_prompt.txt").write_text(prompts.SYSTEM_PROMPT)
+    (PROBE_PROMPT_DIR / "prompt_version_sha256.txt").write_text(prompt_version_hash())
     tokens = [estimate_input_tokens(prompt=p) for p in built.values()]
     print(
         f"{len(built)} {PROBE_PRIMARY} prompts written to {PROBE_PROMPT_DIR}; estimated input "
@@ -1563,12 +1824,13 @@ def _limits_from(*, args: argparse.Namespace) -> Limits | None:
     if None in (args.max_usd, args.max_calls, args.max_input_tokens):
         print("--max-usd, --max-calls, and --max-input-tokens are all required", file=sys.stderr)
         return None
-    if (
-        args.max_usd > STAGE1_MAX_USD
-        or args.max_calls > STAGE1_MAX_CALLS
-        or args.max_input_tokens > STAGE1_MAX_INPUT_TOKENS
-    ):
-        print("a limit is above the stage 1 maximum of the plan", file=sys.stderr)
+    maxima = (STAGE1_MAX_USD, STAGE1_MAX_CALLS, STAGE1_MAX_INPUT_TOKENS)
+    if attempt_name() == "v2":
+        maxima = (V2_MAX_USD, V2_MAX_CALLS, V2_MAX_INPUT_TOKENS)
+    if args.max_usd > maxima[0] or args.max_calls > maxima[1] or args.max_input_tokens > maxima[2]:
+        print(
+            f"a limit is above the maximum of attempt {attempt_name()}: {maxima}", file=sys.stderr
+        )
         return None
     return Limits(args.max_usd, args.max_calls, args.max_input_tokens)
 
@@ -1579,6 +1841,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--list-candidates", action="store_true", help="print candidates (default)")
     parser.add_argument("--dry-run", action="store_true", help="build prompts, make no call")
     parser.add_argument("--arm", choices=("llm", "llm-ecr"), default="llm")
+    parser.add_argument(
+        "--attempt", choices=ATTEMPTS, default="v1", help="v2: the second D8-only attempt"
+    )
     parser.add_argument("--build-arms", nargs="+", choices=asof.ARMS, help="write signals/<arm>")
     parser.add_argument("--example", action="store_true", help="print the det arm worked example")
     parser.add_argument("--pin-prompt", action="store_true", help="write the prompt pin (no call)")
@@ -1628,8 +1893,14 @@ def _spend(  # noqa: PLR0911 - one return per refused gate
     Returns:
         The exit status.
     """
+    if attempt_name() == "v1":
+        print("refused: attempt 1 is closed; use --attempt v2", file=sys.stderr)
+        return 1
+    if args.primary != [V2_PRIMARY] or args.arm != "llm":
+        print(f"refused: attempt 2 runs arm llm on --primary {V2_PRIMARY} only", file=sys.stderr)
+        return 1
     if not go_token_valid(token=args.go_token):
-        print("refused: --go-token is missing or does not match the go file", file=sys.stderr)
+        print("refused: --go-token is missing, does not match, or was used", file=sys.stderr)
         return 1
     if not pin_matches():
         print("refused: the prompt pin is missing or does not match the code", file=sys.stderr)
@@ -1661,6 +1932,11 @@ def _spend(  # noqa: PLR0911 - one return per refused gate
         arm=args.arm, candidates=candidates, low=low, era_table=era_table
     )
     inputs = prompts.load_inputs()
+    claimed = claim_token(token=args.go_token, path=STAGE1_GO_FILE)
+    if claimed is None:
+        print("refused: the go token could not be claimed", file=sys.stderr)
+        return 1
+    print(f"go token claimed: {claimed.name}; a resume needs a new token")
     return run_stage1(
         candidates=arm_candidates,
         inputs=inputs,
@@ -1680,6 +1956,10 @@ def main() -> int:  # noqa: PLR0911, PLR0912, PLR0915 - one branch per command
         The exit status.
     """
     args = _parser().parse_args()
+    configure_attempt(name=args.attempt)
+    if args.reparse and attempt_name() == "v2":
+        print("refused: attempt 2 is parsed live; there is nothing to re-parse", file=sys.stderr)
+        return 1
     if args.schema_report is not None:
         valid, invalid, errors = schema_report(log_path=args.schema_report)
         print(f"replies that satisfy the schema: {valid}; that fail it: {invalid}")
@@ -1773,6 +2053,8 @@ def main() -> int:  # noqa: PLR0911, PLR0912, PLR0915 - one branch per command
                 changed = ceiling_changes(candidates=union, era_table=era_table, known_events=known)
                 print(f"ceiling: {changed} candidates change class when other_site counts")
             if args.build_arms:
+                if attempt_name() == "v2" and arm in ("llm", "llm-ecr"):
+                    table = replace(table, arm=f"{arm.replace('-', '_')}_v2")
                 print(f"{arm}: wrote {asof.write_table(table=table, folder=SIGNALS_DIR)}")
             if arm == "det" and args.example:
                 print_example(table=table, candidates=union)

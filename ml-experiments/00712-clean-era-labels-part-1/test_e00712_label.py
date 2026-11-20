@@ -870,15 +870,23 @@ def test_a_resume_ignores_entries_of_another_prompt_version(stubbed, monkeypatch
     assert not label.LOG_PATH.exists()
 
 
-def test_spend_refuses_a_resume_over_a_log_of_another_prompt_version(stubbed, monkeypatch) -> None:
+def _spend_args(**changes: object) -> types.SimpleNamespace:
+    base = {
+        "go_token": "t" * 20, "probe_only": False, "expect_key_source": "none", "resume": True,
+        "new_version": False, "max_usd": 1.0, "max_calls": 10, "max_input_tokens": 1000,
+        "arm": "llm", "primary": ["D8"],
+    }  # fmt: skip
+    return types.SimpleNamespace(**(base | changes))
+
+
+def test_spend_refuses_a_resume_over_a_log_of_another_prompt_version(
+    v2: None, stubbed, monkeypatch
+) -> None:
     label.RUN_DIR.mkdir(parents=True, exist_ok=True)
     label.LOG_PATH.write_text(json.dumps({"prompt_version_sha256": "old", "call_id": "x"}) + "\n")
     monkeypatch.setattr(label, "go_token_valid", lambda **_: True)
     monkeypatch.setattr(label, "pin_matches", lambda: True)
-    args = types.SimpleNamespace(
-        go_token="t", probe_only=False, expect_key_source="none", resume=True, new_version=False,
-        max_usd=1.0, max_calls=10, max_input_tokens=1000, arm="llm",
-    )  # fmt: skip
+    args = _spend_args()
     assert label._spend(args=args, candidates=[], low=[]) == 1
     args.resume = False
     assert label._spend(args=args, candidates=[], low=[]) == 1
@@ -1023,3 +1031,245 @@ def test_a_real_prompt_has_no_weekday_split(real_inputs: prompts.Inputs) -> None
     text = prompts.prompt_of(inputs=real_inputs, check=check).text.lower()
     assert "weekday" not in text
     assert "weekend" not in text
+
+
+# ---------------------------------------------------------------- attempt 2
+
+V1_HASH = "4910761a8dcb3bb98de7a31b05cb08b19f1a5c029c2a66c56012a74220019dc5"
+
+
+@pytest.fixture
+def v2() -> Iterator[None]:
+    label.configure_attempt(name="v2")
+    yield
+    label.configure_attempt(name="v1")
+
+
+def test_attempt_1_is_unchanged_and_reproducible() -> None:
+    label.configure_attempt(name="v1")
+    assert label.attempt_name() == "v1"
+    assert label.prompt_version_hash() == V1_HASH
+    assert label.PIN_PATH.name == "prompt_pin.json"
+    assert label.RUN_DIR.name == "stage1"
+    assert label.STAGE1_GO_FILE.name == "stage1_go_token.txt"
+    assert (prompts.SYSTEM_PROMPT, prompts.SCHEMA_NO_REGISTER, prompts.SCHEMA_WITH_REGISTER) == (
+        label.V1_PROMPT_TEXTS
+    )
+    assert "60 words" in prompts.SCHEMA_NO_REGISTER
+
+
+def test_attempt_2_has_a_new_identity_and_its_own_files(v2: None) -> None:
+    assert label.prompt_version_hash() != V1_HASH
+    assert label.PIN_PATH.name == "prompt_pin_v2.json"
+    assert label.RUN_DIR.name == "stage1_v2"
+    assert label.LOG_PATH.parent.name == "stage1_v2"
+    assert label.STAGE1_GO_FILE.name == "stage1_go_token_v2.txt"
+    assert label.PROBE_PROMPT_DIR.name == "prompts_v2"
+    assert label.PROBE_RESULT_PATH.name == "probe_result_v2.json"
+    assert "40 words" in prompts.SCHEMA_NO_REGISTER
+    assert "no code fence" in prompts.SYSTEM_PROMPT
+    assert 'has no "register_row" key' in prompts.SCHEMA_NO_REGISTER
+    assert "always include this key" in prompts.SCHEMA_WITH_REGISTER
+    label.configure_attempt(name="v1")
+    assert label.prompt_version_hash() == V1_HASH
+
+
+def test_the_v2_schema_has_no_register_row_line_for_arm_llm(v2: None) -> None:
+    lines = [line.strip() for line in prompts.SCHEMA_NO_REGISTER.splitlines()]
+    assert not any(line.startswith('"register_row"') for line in lines)
+
+
+def test_a_reply_without_register_row_parses_under_the_v2_schema(v2: None) -> None:
+    body = json.loads(_reply())
+    del body["register_row"]
+    assert label.parse_reply(text=json.dumps(body)).register_row is None
+
+
+def test_the_pin_refuses_without_a_passing_v2_probe_on_the_current_hash(
+    v2: None, tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(label, "PROBE_RESULT_PATH", tmp_path / "probe_result_v2.json")
+    assert label.probe_blocker() is not None
+    result = {"prompt_version_sha256": label.prompt_version_hash(), "passed": True}
+    label.PROBE_RESULT_PATH.write_text(json.dumps(result))
+    assert label.probe_blocker() is None
+    label.PROBE_RESULT_PATH.write_text(json.dumps(result | {"prompt_version_sha256": V1_HASH}))
+    assert "different prompt version" in str(label.probe_blocker())
+    label.PROBE_RESULT_PATH.write_text(json.dumps(result | {"passed": False}))
+    assert label.probe_blocker() is not None
+
+
+def _write_token(folder: Path, name: str, token: str) -> Path:
+    path = folder / name
+    path.write_text(token + "\n")
+    return path
+
+
+def test_a_claimed_token_is_refused_again_even_when_the_file_is_rewritten(tmp_path: Path) -> None:
+    path = _write_token(tmp_path, "stage1_go_token_v2.txt", "a" * 20)
+    assert label.claim_token(token="a" * 20, path=path) is not None
+    assert not path.exists()
+    assert label.claim_token(token="a" * 20, path=path) is None
+    _write_token(tmp_path, "stage1_go_token_v2.txt", "b" * 20)
+    assert label.claim_token(token="b" * 20, path=path) is not None
+    _write_token(tmp_path, "stage1_go_token_v2.txt", "b" * 20)  # B again, after two uses
+    assert not label.token_valid(token="b" * 20, path=path)
+    _write_token(tmp_path, "stage1_go_token_v2.txt", "a" * 20)
+    assert not label.token_valid(token="a" * 20, path=path)
+    _write_token(tmp_path, "stage1_go_token_v2.txt", "c" * 20)
+    assert label.token_valid(token="c" * 20, path=path)
+    assert len(list(tmp_path.glob("*.used.*"))) == 2
+
+
+def test_a_probe_token_cannot_start_the_labelling(tmp_path: Path) -> None:
+    probe_file = _write_token(tmp_path, "probe_go_token_v2.txt", "p" * 20)
+    assert label.claim_token(token="p" * 20, path=probe_file) is not None
+    stage_file = _write_token(tmp_path, "stage1_go_token_v2.txt", "p" * 20)
+    assert not label.token_valid(token="p" * 20, path=stage_file)
+    assert label.claim_token(token="p" * 20, path=stage_file) is None
+
+
+def test_two_claims_of_one_token_cannot_both_succeed(tmp_path: Path) -> None:
+    path = _write_token(tmp_path, "stage1_go_token_v2.txt", "q" * 20)
+    first = label.claim_token(token="q" * 20, path=path)
+    second = label.claim_token(token="q" * 20, path=path)
+    assert first is not None
+    assert second is None
+
+
+def test_a_v2_run_claims_the_token_before_the_first_call_and_a_resume_needs_a_new_one(
+    v2: None, stubbed, monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(label, "STAGE1_GO_FILE", tmp_path / "stage1_go_token_v2.txt")
+    _write_token(tmp_path, "stage1_go_token_v2.txt", "g" * 20)
+    monkeypatch.setattr(label, "pin_matches", lambda: True)
+    pl.DataFrame({"x": [1]}).write_parquet(tmp_path / "era.parquet")
+    monkeypatch.setattr(label.asof, "ERA_TABLE_PATH", tmp_path / "era.parquet")
+    monkeypatch.setattr(label, "arm_inputs", lambda *, candidates, **_: (candidates, None))
+    monkeypatch.setattr(label.prompts, "load_inputs", lambda: stubbed.inputs)
+    seen: list[bool] = []
+
+    class Spy(_Fake):
+        def __call__(self, *, prompt: object) -> label.trial.RawRun:
+            seen.append((tmp_path / "stage1_go_token_v2.txt").exists())
+            return super().__call__(prompt=prompt)
+
+    monkeypatch.setattr(label.trial, "run_claude", Spy(["OK", _reply(), _reply(), _reply()]))
+    args = _spend_args(
+        go_token="g" * 20, resume=False, max_usd=4.0, max_calls=100, max_input_tokens=800_000
+    )
+    assert label._spend(args=args, candidates=[_candidate()], low=[]) == 0
+    assert seen
+    assert not any(seen)  # the file was already renamed when the first call started
+    assert list(tmp_path.glob("stage1_go_token_v2.txt.used.*"))
+    args.resume = True
+    assert label._spend(args=args, candidates=[_candidate()], low=[]) == 1
+
+
+def test_attempt_1_is_closed_and_attempt_2_is_limited_to_d8_arm_llm(v2: None, monkeypatch) -> None:
+    monkeypatch.setattr(label, "go_token_valid", lambda **_: True)
+    monkeypatch.setattr(label, "pin_matches", lambda: True)
+    assert label._spend(args=_spend_args(primary=None), candidates=[], low=[]) == 1
+    assert label._spend(args=_spend_args(primary=["D10"]), candidates=[], low=[]) == 1
+    assert label._spend(args=_spend_args(primary=["D8", "D10"]), candidates=[], low=[]) == 1
+    assert label._spend(args=_spend_args(arm="llm-ecr"), candidates=[], low=[]) == 1
+    ok = {"max_usd": 4.0, "max_calls": 100, "max_input_tokens": 800_000}
+    too_much = {"max_usd": 4.5, "max_calls": 141, "max_input_tokens": 1_200_000}
+    for name, value in too_much.items():
+        assert label._limits_from(args=_spend_args(**(ok | {name: value}))) is None
+    limits = {"max_usd": 4.0, "max_calls": 140, "max_input_tokens": 1_100_000}
+    assert label._limits_from(args=_spend_args(**limits)) is not None
+    label.configure_attempt(name="v1")
+    assert label._spend(args=_spend_args(), candidates=[], low=[]) == 1
+
+
+def test_attempt_2_shares_no_path_with_attempt_1_and_refuses_reparse(monkeypatch, capsys) -> None:
+    names = (
+        "RUN_DIR", "PROMPT_DIR", "LOG_PATH", "STOP_PATH", "REPARSED_LOG_PATH", "SIGNALS_DIR",
+        "STAGE1_GO_FILE", "PIN_PATH", "PROBE_PROMPT_DIR", "PROBE_RESULT_PATH",
+    )  # fmt: skip
+    label.configure_attempt(name="v1")
+    first = {n: getattr(label, n) for n in names}
+    label.configure_attempt(name="v2")
+    try:
+        second = {n: getattr(label, n) for n in names}
+        assert all(first[n] != second[n] for n in names)
+        monkeypatch.setattr(sys, "argv", ["e00712_label.py", "--attempt", "v2", "--reparse"])
+        assert label.main() == 1
+        assert "nothing to re-parse" in capsys.readouterr().err
+    finally:
+        label.configure_attempt(name="v1")
+
+
+def test_the_format_counts_read_structure_only() -> None:
+    def entry(text: str, call_id: str, attempt: int = 0) -> dict:
+        return {"tag": "label", "status": "ok", "call_id": call_id, "attempt": attempt,
+                "raw_output": text}  # fmt: skip
+
+    clean = json.loads(_reply())
+    del clean["register_row"]
+    entries = [
+        entry(json.dumps(clean), "llm:a_alarm"),
+        entry("```json\n" + json.dumps(clean) + "\n```", "llm:b_alarm"),
+        entry(json.dumps(clean), "llm:b_alarm", 1),
+        entry(json.dumps({**clean, "register_row": None}), "llm:c_alarm"),
+        entry(json.dumps({**clean, "reason": "word " * 41}), "llm:d_alarm"),
+        entry("not json", "llm:e_alarm"),
+        entry("still not json", "llm:e_alarm", 1),
+    ]
+    counts = label.reply_format_counts(entries=entries)
+    assert counts["replies"] == 7
+    assert counts["not_bare_json"] == 3
+    assert counts["register_row_present"] == 1
+    assert counts["reason_over_40_words"] == 1
+    assert counts["fail_lenient_parser"] == 2
+    assert (counts["v2_first_reply_valid"], counts["v2_retry_valid"]) == (2, 1)
+    assert counts["v2_never_valid"] == 2
+    assert not any(isinstance(v, str) for v in counts.values())
+
+
+def test_an_unanswered_check_with_one_attempt_is_unfinished_not_never_valid() -> None:
+    entries = [{"tag": "label", "call_id": "llm:a_alarm", "attempt": 0, "answer": None}]
+    accounting = label.reply_accounting(entries=entries)
+    assert accounting["unfinished"] == 1
+    assert accounting["never_valid"] == 0
+
+
+def test_retries_are_counted_by_reason_and_summarised(stubbed, monkeypatch) -> None:
+    fake = _Fake(["OK", "not json", _reply(), _reply(), _reply(label="switch")])
+    assert _run(stubbed, fake, monkeypatch) == 0
+    entries = label.read_log()
+    retries = [e for e in entries if e["tag"] == "label" and e["attempt"] == 1]
+    assert [e["retry_reason"] for e in retries] == ["parse_failure"]
+    assert all(e["retry_reason"] is None for e in entries if e.get("attempt") == 0)
+    assert all(e["run_attempt"] == "v1" for e in entries)
+    accounting = label.reply_accounting(entries=entries)
+    assert accounting["first_reply_valid"] == 2
+    assert accounting["retry_valid"] == 1
+    assert accounting["never_valid"] == 0
+    assert accounting["retries_by_reason"] == {"parse_failure": 1}
+
+
+def test_a_check_with_two_invalid_replies_is_never_valid(stubbed, monkeypatch) -> None:
+    fake = _Fake(["OK", "not json", "still not json", _reply(), _reply()])
+    assert _run(stubbed, fake, monkeypatch) == 0
+    accounting = label.reply_accounting(entries=label.read_log())
+    assert accounting["never_valid"] == 1
+    assert accounting["first_reply_valid"] == 2
+    attempts = [e["attempt"] for e in label.read_log() if e["tag"] == "label"][:2]
+    assert attempts == [0, 1]  # one retry at most
+
+
+def test_a_resume_after_a_failed_call_records_the_retry_as_other(stubbed, monkeypatch) -> None:
+    label.RUN_DIR.mkdir(parents=True, exist_ok=True)
+    first = _candidate()
+    failed = {
+        "call_id": f"llm:{first.key}_alarm", "attempt": 0, "tag": "label", "status": "failed",
+        "prompt_version_sha256": label.prompt_version_hash(), "input_tokens": 0,
+        "output_tokens": 0, "cost_usd": 0.0, "check_offset_days": 0, "model": "m",
+    }  # fmt: skip
+    label.LOG_PATH.write_text(json.dumps(failed) + "\n")
+    fake = _Fake(["OK", _reply(), _reply(), _reply()])
+    assert _run(stubbed, fake, monkeypatch, resume=True) == 0
+    retry = next(e for e in label.read_log() if e.get("attempt") == 1)
+    assert retry["retry_reason"] == "other"

@@ -74,3 +74,28 @@ Every number is interim.
 - **Rejected, renaming the section heading.** Renaming it would change the anchor slug.
 - **Changed, the stop rule.** The page quotes the plan's pilot rule (fewer than 40% of eras labelled
   `era` within 7 days) and says that rule was written for the injected bank and does not bind D8.
+
+## Code review of the attempt 2 scripts (Opus)
+
+- **Accepted, three blockers.** Attempt 2 could have overwritten attempt 1's signal files, the go
+  tokens were not truly single-use, and nothing kept attempt 2 on D8 under about US$4. Attempt 2
+  now writes to its own files, claims a token by an atomic rename before the first call, and
+  refuses any run that is not D8 with arm `llm` and the stated limits.
+- **Accepted, the should-fix items.** The probe score now checks the prompt stamp and records the
+  hash the calls were made with. The summary reports structure-only counts of the reply format. The
+  leftover attempt 1 go files were renamed to `.used`, and attempt 1 now refuses to spend.
+- **Accepted, the test fixes.** The attempt 2 probe test no longer reads the real data folder, the
+  always-true assertion is replaced, and new tests cover the non-D10 refusal and the three blocker
+  cases.
+- **Not applied.** One minor item, the module-level constants reassigned through `globals()`, would
+  need a refactor to a frozen dataclass.
+
+## Review of the attempt 2 section (Sonnet, numbers and prose)
+
+- **Accepted.** The claim that the format fix removed the invalid replies was an overclaim and is
+  removed. The page now says that attempt 1 and attempt 2 are separate calls, that attempt 1's
+  strict parser accepted 55 of 65 checks, and that attempt 2 still has 30 of 67 replies over 40
+  words. The scaling time is about 24 minutes, not attempt 1's 35 minutes. The terms the section
+  uses are defined.
+- **Rejected, adding the strict first-reply split (34, 1, and 30).** The page reports the two counts
+  that matter for the comparison, and the split is in the call-log summary.

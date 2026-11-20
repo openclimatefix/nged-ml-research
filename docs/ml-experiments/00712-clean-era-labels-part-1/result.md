@@ -284,6 +284,8 @@ offline with the `--reparse` option, with no new call, and all 65 checks are val
 reply. The 20 retries would not be needed. The looser parser is the parser to use for any later run,
 and the prompt pin stays.
 
+Attempt 2, which changed the reply format only, is in the next section.
+
 **Under the rule that a label counts only at confidence 0.8 or more, the labeller recovered none of
 D8's known eras or switching events.** The classes recorded for D8 come from its dated ECR
 connections and from switching events verified in the load. In the table, a state is one of the four
@@ -324,6 +326,96 @@ only first replies under the looser parser, the 16 Primaries would need about 31
 the first basis. Both bases exceed the 245 to 386 calls for arm `llm` under "Cost, billing, and
 staging" because D8 needed 4.5 calls per candidate on the first basis and 3.4 on the second, against
 the cost trial's 4.2. Both figures are interim.
+
+## D8 attempt 2 of the labelling (interim)
+
+**The maintainer approved one more attempt on D8 alone.** The labeller again recovered none of D8's
+known eras or switching events. Every figure in this section is interim. The attempt is not the
+write-up and sets no verdict. No run was made on the 16 Primaries, and no label was injected into the
+bank. The attempt 1 numbers in the section above are unchanged, and attempt 1 is closed to spending.
+In this section, a known class counts as recovered when a check labels the candidate with that class
+at confidence 0.8 or more, as in the pilot section. A parser is the code that reads a reply and
+checks its format. The strict parser is attempt 1's original parser, and the looser parser is the
+parser described in the pilot section, which makes `register_row` optional and cuts a longer `reason`
+to 60 words.
+
+**Attempt 2 changed the reply format only.** The worker who designed the change says it was decided
+without reading D8's label content or its agreement with the known classes. The page holds no
+evidence for that claim, and the null result of attempt 1 on D8 was known when the change was
+designed. The attempt 2 prompt tells the language model to reply with raw JSON and nothing else. The
+`llm` arm has no `register_row` key. The `reason` (the language model's free-text justification) is
+limited to 40 words. When a reply fails to parse, the script retries the check once and counts the
+retry as a call. The prompt has a new hash and a new pin file. The hash is a fingerprint of the prompt
+text, the schema text, and the prompt-builder code, and the pin file records it, so a changed prompt
+cannot reuse an earlier approval. A go token is a single-use approval string that the manager writes
+before each paid step, and the script now refuses a token it has used. The scoring rule is the
+pre-registered rule, unchanged.
+
+**A code review of the changed scripts found 3 blockers and 4 should-fix items, and the fixes are
+recorded in `review_triage.md`.** The review was a fresh review by a larger language model (Opus),
+and the findings were verified before they were applied. A blocker is a finding that must be fixed
+before any call, and a should-fix item is a finding that is worth fixing but does not stop a run. The
+blockers were that the attempt 2 run could overwrite attempt 1's signal files, that a go token was
+not truly single-use, and that nothing stopped the run from continuing past D8 once the reported
+price reached about US$4. The should-fix items included two findings: the probe scorer could record
+the wrong prompt hash, and the script did not count reply formats (for example, how many replies were
+raw JSON) without reading the labels.
+
+**The year probe passed again.** The year probe tests whether the language model can recover the
+calendar year from the prompt. A pass means it cannot do so beyond chance: the pin rule allows at most
+3 exact years of 10. The probe used the same 10 prompts as attempt 1's year probe, rebuilt with the
+attempt 2 prompt builder. The language model named the exact year
+for 2 of the 10 prompts, and a year within 1 year for 4 of the 10 (including the 2 exact years). The
+10 answers are not independent, because they come from 5 candidates. The probe made 11 calls (10
+prompts and 1 billing probe) and used 61,384 input tokens and 10,432 output tokens, at a reported
+US$0.350 (the price the command-line tool reports, which is the price the same calls would cost
+through the pay-per-token application-programming-interface, API).
+
+**The D8 run made 68 calls: 65 checks, 1 billing probe, and 2 retries after unterminated JSON.** The
+19 candidates took the same 65 checks as attempt 1. The calls used 438,551 input tokens (a mean of
+6,449 per call) and 32,732 output tokens, at a reported US$2.033 (API-equivalent). The summed call
+time was 584 s, and the elapsed time was 301 s with 2 calls in parallel. The init event showed
+`apiKeySource = none`, so the calls ran on the subscription login. No call was limited by a
+rate-limit event. The account-wide seven-day utilisation was 0.39 before and after the run, so the
+run's own share cannot be attributed.
+
+**Under the looser parser, all 65 checks reached a valid reply, and the format change did not
+measurably improve on that.** Of the 65 checks, 63 were valid at the first reply, 2 were valid after
+the retry, and none lacked a valid reply. The looser parser alone had already accepted all 65 of
+attempt 1's first replies. Attempt 1 and attempt 2 are separate sets of calls, not the same replies.
+Attempt 1's strict parser accepted 55 of its 65 checks: 45 at the first reply, 10 only after a retry,
+and 10 never. Read by the structure of the 67 label replies of attempt 2 (65 first replies and 2
+retries), the 40-word limit was ignored in 30 replies, and 1 reply still carried `register_row`. The
+looser parser cuts a longer `reason` to 60 words, and the attempt 2 prompt asks for 40.
+
+**Under the 0.8 rule, the labeller again recovered none of D8's known eras or switching events.** The
+table states each check as `unknown` at the alarm, 7 days after it (+7 d), 21 days after it (+21 d),
+and at closure (the last check of the candidate). The +21 d check exists for only 1 of the 2
+switching-event candidates. The cells for the known eras, the verified switching events, and the
+unresolved candidate each hold at most 3 candidates, so we give no intervals.
+
+| Known class | Candidates | Recovered | Notes |
+|---|---|---|---|
+| Era (dated ECR connection) | 3 | 0 | `unknown` at every check |
+| Verified switching event | 2 | 0 | `unknown` at every check |
+| Unresolved | 1 | not applicable | the recorded classes do not settle this candidate |
+| No known class | 13 | not applicable | not scored |
+
+The 3, 2, 1, and 13 candidates sum to the 19 candidates. Every check of every candidate was `unknown`
+or `none`, so no candidate of any class reached state `era`, and the delay from alarm to a first
+`era` label cannot be measured. The detectors' own delays are the same as in attempt 1: the register
+date to the alarm was 73 days and 33 days, and the telemetry date to the alarm was 10 days and 21
+days.
+
+**After two attempts, the labeller at either prompt and the 0.8 rule recovers none of D8's known eras
+or switching events.** The reply-format change did not change the null. Whether to continue, to stop,
+or to try a different design is the maintainer's choice. A different prompt would need a new pin and
+a new year probe, and must not be tuned on D8's known classes.
+
+**Scaling attempt 2's D8 counts to the 16 Primaries gives about 329 calls, US$9.8, 2.1 million input
+tokens, and about 24 minutes at 2 parallel calls.** D8 holds 19 of the 92 candidates, and the
+estimate scales attempt 2's run by 92 / 19 (68 / 19 x 92 is about 329 calls). The estimate is
+interim, and no 16-Primary run was made.
 
 ## Compute
 
@@ -372,13 +464,24 @@ stored predictions reused, and fitted networks saved.
 - `ml-experiments/00712-clean-era-labels-part-1/e00712_asof.py`: builds the check schedule and, for
   every arm, a table of the label known on each day (the as-of table), in the format of experiment
   709's signals. The module makes no call.
-- `ml-experiments/00712-clean-era-labels-part-1/e00712_label.py`: the stage 1 labelling script. The
-  script runs as a dry run unless told otherwise. A call needs the manager's go token, a key source
-  confirmed by the billing probe, the prompt pin, and explicit limits on calls, tokens, and reported
-  price. The script also builds the arms that need no call. The `--reparse` option re-parses the
-  stored replies with the looser parser and makes no call. The `--agreement` option compares the
-  call log with the known classes of the candidates and makes no call. The D8 pilot used this
-  script.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_label.py`: the stage 1 labelling script.
+  The script runs as a dry run unless told otherwise. A call needs the manager's go token, a billing
+  probe that confirms which credential pays for the calls, the prompt pin, and explicit limits on
+  calls, tokens, and reported price. The script also builds the arms that need no call. The
+  `--reparse` option re-parses the stored replies with the looser parser (see the D8 pilot section)
+  and makes no call. The `--agreement` option compares the call log with the known classes of the
+  candidates and makes no call. The script ran the labelling of attempt 1 and of attempt 2.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_prompt_v2.py`: the attempt 2 prompt builder.
+  The module replaces the reply-format instructions of `e00712_prompt.py` with an instruction to
+  reply with raw JSON and nothing else, no `register_row` key for arm `llm`, and a 40-word `reason`.
+  The module reuses the rest of `e00712_prompt.py` and makes no call. The attempt 2 outputs sit beside
+  the attempt 1 outputs in the private folder:
+    - `stage1_v2/`: the call log and stored replies of the attempt 2 D8 run.
+    - `signals_v2/`: the label signals the run built.
+    - `prompt_pin_v2.json`: the hash of the approved attempt 2 prompt.
+    - `probe/prompts_v2/` and `probe/probe_result_v2.json`: the year probe's prompts and result.
+    - `stage1_go_token_v2.txt`: the go token, which a run renames to `<name>.used.<timestamp>` when
+      the run claims it.
 - `ml-experiments/00712-clean-era-labels-part-1/e00712_probe.py`: the year-guessing probe, whose
   result decides whether the prompt is pinned. A probe reply is never used as a label.
 - `ml-experiments/00712-clean-era-labels-part-1/e00712_score.py`: the scorer for the planned
