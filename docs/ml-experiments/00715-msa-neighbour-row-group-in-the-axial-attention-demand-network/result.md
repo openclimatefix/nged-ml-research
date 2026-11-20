@@ -511,8 +511,8 @@ From the host's rows alone the two kinds look identical until a temporary step e
 uses origins 3 to 10 days after an onset and target half-hours at least 13 days after it, when every
 temporary step has ended and every permanent step remains. Each arm trains from scratch (random
 initial weights, stage 1 only, at most 150 passes with early stopping at patience 8): F4, whose slot
-holds the pair partner, needs a discrimination gap of at least 0.60; F4-R, whose slot holds a Primary of the other pair, needs an
-absolute gap of at most 0.15; and the no-neighbour network needs an absolute gap of at most 0.15 (a
+holds the pair partner, needs a discrimination gap of at least 0.60; F4-R, whose slot holds a
+Primary of the other pair, needs an absolute gap of at most 0.15; and the no-neighbour network needs an absolute gap of at most 0.15 (a
 larger gap means the kind leaks through the host's rows, and the world is wrong). A report-only
 variant draws the mirrored share from 0.3 to 1.0.
 
