@@ -191,7 +191,7 @@ def aligned_figure(*, out: Path) -> None:
         width=WIDTH,
         height=240,
         title=alt.TitleParams(
-            "Sign-aligned host features raise the AUROC by 0.03 to 0.05, still below 0.70",
+            "Sign-aligned features raise the AUROC by 0.006 to 0.052, still below 0.70",
             subtitle=[
                 "AUROC of host rows on the second generator. Dashed line: the threshold of 0.70.",
                 "The two sign-aligned sets are post hoc, from the audit, and carry no interval.",
@@ -243,10 +243,10 @@ def raw_cue_figure(*, results: Path, out: Path) -> None:
         title=alt.TitleParams(
             "No single raw cue separates every kind of permanent change from temporary moves",
             subtitle=[
-                "AUROC at 14 days of one cue with no fitting, oriented as the plan states",
-                "(a value below 0.50 means the cue points the wrong way). Positives: one",
-                "permanent kind. Negatives: all temporary moves. Dashed line: chance. Bars: 95%",
-                "intervals, secondary.",
+                "AUROC at 14 days of one cue with no fitting, oriented so that a higher score",
+                "means a permanent change (below 0.50: the cue points the wrong way).",
+                "Positives: one permanent kind. Negatives: all temporary moves.",
+                "Dashed line: chance. Bars: 95% intervals, secondary.",
             ],
         ),
     )  # fmt: skip
