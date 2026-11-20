@@ -158,7 +158,9 @@ def cmd_shifts(*, arm: str, month: str, seed: int, device: str) -> None:
             c = days * 48 + 24
             prim = np.full(len(c), p)
             diffs = []
-            for lead in range(1, 6):
+            for lead in range(
+                1, 6
+            ):  # lead indices 1 to 5: 24 h to 144 h after the 12:00 UTC origin (experiment 581: 24 h to 120 h after 09:00 UTC); report-only
                 a = median_at(model=model, source=src, primary=prim, c_idx=c, lead=lead, data=data)
                 b = median_at(
                     model=model, source=data.source, primary=prim, c_idx=c, lead=lead, data=data

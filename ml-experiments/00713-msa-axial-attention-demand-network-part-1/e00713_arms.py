@@ -6,6 +6,7 @@ built on `M*`), or `C` (the Candidate, never refitted here except through `chain
 is read from `work/selection.json`, which `e00713_select.py` writes from the screen's fit logs.
 """
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,6 +63,22 @@ SCREEN_ARMS: Final[dict[str, tuple[str, EncoderMode]]] = {
     "M2": ("M", "trained"),
     "M3": ("M", "random"),
 }
+
+
+FIT_CODE_FILES: Final = (
+    "e00713_arms.py", "e00713_batch.py", "e00713_fit.py", "e00713_inputs.py", "e00713_layout.py",
+    "e00713_model.py", "e00713_train.py", "e00713_variants.py",
+)  # fmt: skip
+"""The modules whose edits change a fitted state."""
+
+
+def code_hash() -> str:
+    """Return a hash of the modules that decide a fitted state, written into each stage log and checked on resume."""
+    here = Path(__file__).parent
+    h = hashlib.sha256()
+    for name in FIT_CODE_FILES:
+        h.update((here / name).read_bytes())
+    return h.hexdigest()[:16]
 
 
 def root(*, data_dir: Path) -> Path:

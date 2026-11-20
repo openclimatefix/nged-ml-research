@@ -34,6 +34,13 @@ def fake_source() -> bt.Source:
         spread=torch.rand(8, ens_days, 672, 7, generator=g).half(),
         filled=torch.ones(8, ens_days, 672, dtype=torch.bool),
         first_day=FIRST_DAY,
+        run_us=(
+            lay.GRID_START_US
+            + ((FIRST_DAY + torch.arange(ens_days)) * 48 + 24 - 6) * lay.STEP_US
+            - lay.ENSEMBLE_LEAD_US
+        )[None]
+        .expand(8, -1)
+        .clone(),
     )
     return bt.Source(
         power_z=power, dense_weather=torch.randn(8, N_GRID, 21, generator=g).half(),
@@ -111,13 +118,7 @@ def main() -> int:
     t = src.assemble(primary=prim, c_idx=c, lead_day=lead, ensemble=True, target_end=cut)
     assert bool(torch.isnan(t.target[t.target_idx >= cut]).all())
     # KA6 canary
-    try:
-        src.assemble(primary=prim, c_idx=c, lead_day=lead, ensemble=True, ens_day_offset=1)
-    except AssertionError:
-        print("KA6 canary raised")
-    else:
-        msg = "KA6: the next day's ensemble run was accepted"
-        raise AssertionError(msg)
+    print("KA6 canary raised:", bt.ka6_canary(source=src, primary=prim, c_idx=c, lead_day=lead))
     print("batch checks passed")
     return 0
 

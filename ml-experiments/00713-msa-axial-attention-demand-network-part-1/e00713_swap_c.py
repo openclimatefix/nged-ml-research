@@ -13,6 +13,7 @@ and skips the fine-tune; nothing under `00667-*/` is written. The forecasts are
 """
 
 import argparse
+import hashlib
 import os
 import sys
 from pathlib import Path
@@ -39,6 +40,36 @@ def link_stored(*, month: str, seed: int) -> None:
             t_dest.symlink_to(table)
 
 
+def link_chain(*, month: str) -> Path:
+    """Return a `work` folder under the swap folder that holds file links to experiment 667's chain.
+
+    The folders are real directories and only the files are links, so that no write through `CHAIN667`
+    can reach a folder of experiment 667.
+    """
+    source = inp.chain_dir(root=inp.ROOT_667, month=month)
+    dest = ROOT_SWAP / "chains" / month / "work"
+    for path in source.rglob("*"):
+        target = dest / path.relative_to(source)
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+        elif not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.symlink_to(path)
+    dest.mkdir(parents=True, exist_ok=True)
+    assert dest.resolve() != source.resolve()
+    assert not str(dest.resolve()).startswith(str(inp.ROOT_667.resolve())), dest
+    return dest
+
+
+def snapshot_667() -> str:
+    """Return a hash of every path, size, and modification time below experiment 667's folder."""
+    h = hashlib.sha256()
+    for path in sorted(inp.ROOT_667.rglob("*")):
+        st = path.lstat()
+        h.update(f"{path} {st.st_size} {st.st_mtime_ns}\n".encode())
+    return h.hexdigest()
+
+
 def main() -> int:
     """Run the Candidate's prediction with the ERA5 table."""
     parser = argparse.ArgumentParser()
@@ -47,10 +78,11 @@ def main() -> int:
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
     month, seed = args.month, args.seed
+    before = snapshot_667()
     link_stored(month=month, seed=seed)
     os.environ.update(
         E00667_ROOT=str(ROOT_SWAP), E00667_MONTH=month, E00667_PHASE="predict",
-        CHAIN667=str(inp.chain_dir(root=inp.ROOT_667, month=month)),
+        CHAIN667=str(link_chain(month=month)),
     )  # fmt: skip
     sys.argv = [
         "e00667_cand.py",
@@ -81,6 +113,7 @@ def main() -> int:
 
     e.attach_tables = attach_pre
     cand.run_fit(device=args.device)
+    assert snapshot_667() == before, "swap (c) changed a path under experiment 667's folder"
     return 0
 
 

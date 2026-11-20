@@ -76,8 +76,16 @@ def fit(*, arm: str, month: str, seed: int, device: str, data_dir: Path) -> dict
     }
     for stage in (1, 2, 3):
         path = arms.model_file(data_dir=data_dir, arm=arm, month=month, seed=seed, stage=stage)
+        stage_log = arms.log_file(data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit")
+        stage_log = stage_log.with_name(f"{stage_log.stem}_stage{stage}.json")
         if path.exists():
             model.load_state_dict(torch.load(path, map_location=device))
+            assert stage_log.exists(), f"{path} has no stage log: refit the stage"
+            earlier = json.loads(stage_log.read_text())
+            assert earlier.get("code_hash") == arms.code_hash(), (
+                f"{path} was fitted by other code (hash {earlier.get('code_hash')}, now {arms.code_hash()}): refit it"
+            )
+            log["stages"].append(earlier)
             continue
         samples = tr.make_samples(world=world, stage=stage, placebo=spec.placebo)
         start_state = copy.deepcopy(model.state_dict())
@@ -94,8 +102,19 @@ def fit(*, arm: str, month: str, seed: int, device: str, data_dir: Path) -> dict
             )  # fmt: skip
             entry["rerun"] = vars(again).copy()
             record = again
-        entry.update(passes=record.passes, best_val=record.best_val, cap_hit=record.cap_hit)
+        entry.update(
+            passes=record.passes,
+            best_val=record.best_val,
+            cap_hit=record.cap_hit,
+            code_hash=arms.code_hash(),
+        )
         log["stages"].append(entry)
+        stage_log.parent.mkdir(parents=True, exist_ok=True)
+        tmp_stage = stage_log.with_name(stage_log.name + f".{os.getpid()}.tmp")
+        tmp_stage.write_text(json.dumps(entry, indent=1, default=str))
+        tmp_stage.rename(
+            stage_log
+        )  # written before the state file, so a state file always has its log
         tr.save_atomic(state=model.state_dict(), path=path)
         print(
             f"{arm} {month} s{seed} stage {stage}: {record.passes} passes, val {record.best_val:.4f}",
@@ -107,7 +126,7 @@ def fit(*, arm: str, month: str, seed: int, device: str, data_dir: Path) -> dict
         log["peak_gpu_mb"] = torch.cuda.max_memory_allocated() / 2**20
     log_path = arms.log_file(data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit")
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = log_path.with_name(log_path.name + ".tmp")
+    tmp = log_path.with_name(log_path.name + f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(log, indent=1, default=str))
     tmp.rename(log_path)
     return log

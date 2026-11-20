@@ -537,9 +537,19 @@ schedule. The session checks in with the manager before the first fit and before
 ## Checks
 
 **These checks run when the experiment runs; none has run yet.** The finished page lists their
-results here, with the median minus the mean forecast per Primary, the MAE contrast beside each CRPS
+results here, with the median minus the mean forecast per Primary (the prediction files carry the
+mixture mean), the MAE contrast beside each CRPS
 contrast, and which of the seven audit triggers fired. Audit trigger 5 applies: `N`, `K`, or `A`
 beating `M*`, `P` beating `M*`, or `M*` beating `E` or `G`, is a nested arm beating its container.
+
+**A report-only token diagnostic runs on every fitted network.** For each fitted network, on 256
+real samples of one fold at lead days 1 and 7, `e00713_token_diagnostic.py` records three measures
+in its own file, `work/token_diagnostic/<arm>_<month>_s<seed>.json`. The first is the length of each
+part of a token: weather, date-time, Primary, time of day, lead, ensemble spread, day age, and power.
+The second is how far the forecast moves with history power, split into the part through the
+read-out base and the part through the trunk. The third is the distance between the masked-token
+vector and the vector of a token with the power at its Primary's mean level. The diagnostic changes no
+training, no forecast, and no verdict, and it is declared here before the first fit.
 
 **Reviews, in order:** an Opus design review ran before this plan was committed (triage in the pull
 request). An Opus code review of the layout, model, adapter, batch, training, scoring, and Candidate
@@ -612,7 +622,10 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   on the day-type-weighted mean of the last 14 days at the same half-hour.
 - **Parameter count.** The built module is about 128,655 parameters (the encoders 8,128, the token
   maps and embeddings 10,688, two axial blocks 100,600, the read-out 4,302, and the head 4,937);
-  `M1` trains 120,527 of them. Arm `A` has 33,280 fewer attention weights and arm `K` 66,560 fewer.
+  `M1` trains 120,527 of them. Arm `A` has 33,536 fewer parameters than `M1` (33,280 attention
+  weights and 256 in the two LayerNorms of the removed within-day sublayers), and arm `K` has 67,192
+  fewer (66,560 attention weights, 120 key-bias values, and 512 in the removed LayerNorms). Both
+  counts are those of the built modules.
   The Candidate's lag network has about 30,000 parameters. A check script asserts every count, and
   the count of the built module is the reference.
 - **Arm differences.** `M1`, `M2`, and `M3` differ only in the encoders: `M1` and `M2` load the
@@ -662,8 +675,10 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   fourteenth of the target half-hours a pass of the Candidate shows. Every fit logs, per stage, the
   pass at which early stopping fired and whether the cap was hit. A stage that ends at the 60-pass
   cap is rerun from its starting state at 120 passes before any score of that arm is read, and the
-  report lists every rerun. Drawing more lead days per pair is not adopted, because it changes the
-  sample weights within an origin.
+  report lists every rerun. A rerun repeats the 60 passes of the first attempt, so a capped stage costs
+  up to 180 passes of GPU time in total, and phase 12 of the compute plan covers those reruns.
+  Drawing more lead days per pair is not adopted, because it changes the sample weights within an
+  origin.
 - **Embargo and validation.** Every training process runs with the cleaned power set to NaN from the
   fold month's start, and prediction runs in a separate process. Early stopping uses held-out
   origin days (7 days in every 42, with a purge of 15 days before and 9 days after), grouped by
@@ -778,6 +793,7 @@ carries the id as `e00713_`; none exists yet):
 - `e00713_bank.py`, `e00713_swap_c.py`, and `e00713_era.py` run the prediction-only read-outs: the
   injected banks, the three weather swaps, and the era set.
 - `e00713_known_answer.py` builds the synthetic world and runs KA1 to KA12.
+- `e00713_token_diagnostic.py` is the report-only token diagnostic described under Checks.
 - `e00713_score.py` and `e00713_report.py` compute every contrast, interval, and guard, and every
   number and figure of this page.
 - `run.sh` is the memory-capped wrapper, and `chain_seeds.sh` is the copy of experiment 667's chain

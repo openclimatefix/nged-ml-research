@@ -7,6 +7,9 @@ Adapted from `e00677_protocol.py`. Each arm is the seed mean of its quantiles (s
 in the layout of experiment 677: the contract origin (12:00 UTC), 672 half-hours, megawatts. The
 arm `C` is the stored Candidate (`e00713_score.load_arm`). The climatology and the manual-heuristic
 rows are the stored reference arms of experiment 87, relabelled from the 09:00 to the 12:00 origin.
+The climatology is the 51-member climatology of experiment 48's weekly walk-forward run, as experiment 87
+recomputed it at 11 levels (`e00087_assemble.py`); it is not refitted per fold, and its training window is
+that of experiment 48's run, which this experiment did not re-derive. The row is report-only.
 Every arm is scored on the half-hours that all of them share, with `studies.eval_protocol.metrics`:
 the mean absolute error of the median, CRPS, threshold-weighted CRPS, and the coverage and pinball
 loss at q01, q05, q95, and q99, by the slices of the protocol. The slices include the cold nights, the
@@ -120,7 +123,12 @@ def main() -> int:
         forecasts[arm] = arm_frame(arm=arm, seeds=seeds, months=months, series=series)
         print("built", arm, forecasts[arm].height, flush=True)
     ids = series["time_series_id"].to_list()
-    for name, stored_name in REFERENCES.items():
+    for (
+        name,
+        stored_name,
+    ) in (
+        REFERENCES.items()
+    ):  # stored experiment 87 arms; Climatology is experiment 48's, not refitted per fold
         stored = pl.read_parquet(
             adapter.stored_path(
                 root=ML_EXPERIMENTS_DATA_DIR,
@@ -276,6 +284,9 @@ def write_cost(
             pieces.append(
                 cost.with_columns(limit_fraction=pl.lit(fraction), row_set=pl.lit(row_set))
             )
+    if not pieces:
+        print("curtailment cost undefined for every row set: no curtailment_cost.csv written")
+        return
     pl.concat(pieces).write_csv(out / "curtailment_cost.csv")
 
 

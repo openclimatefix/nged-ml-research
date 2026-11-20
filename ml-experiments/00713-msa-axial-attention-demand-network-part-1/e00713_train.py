@@ -9,8 +9,10 @@ The loop takes a
 `World` so that the synthetic world of `e00713_known_answer.py` and the real folds share it.
 """
 
+import os
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -128,6 +130,21 @@ def placebo_ages_for(*, primary: np.ndarray, c_idx: np.ndarray, pool: np.ndarray
     return out
 
 
+def candidate_epoch_days() -> int:
+    """Return the days from the grid start to the Candidate's day 0 (`e00397_prep.FIRST_RUN`, 2024-04-01).
+
+    The Candidate counts the origin day from `FIRST_RUN` before it cuts the held-out and purged weeks
+    (`e00510_common.py`), so the MSA arms count the same way and hold out the same days (code review 1, S2).
+    """
+    import e00397_prep as prep397  # ty: ignore[unresolved-import]
+    import e00422_prep as prep422  # ty: ignore[unresolved-import]
+
+    grid_start = datetime.fromtimestamp(prep422.GRID_START_US / 1e6, tz=UTC)
+    days = (prep397.FIRST_RUN - grid_start).days
+    assert days == 1674, days
+    return days
+
+
 def make_samples(
     *, world: World, stage: int, placebo: bool, primaries: tuple[int, ...] | None = None
 ) -> SampleSet:
@@ -161,7 +178,7 @@ def make_samples(
     end = np.minimum(cc + 672, world.clean.shape[1])
     has_target = (csum[prim, end] - csum[prim, np.minimum(cc, end)]) > 0
     prim, cc = prim[has_target], cc[has_target]
-    held, purged = prep422.purge_masks(origin_day=cc // lay.STEPS_PER_DAY)
+    held, purged = prep422.purge_masks(origin_day=cc // lay.STEPS_PER_DAY - candidate_epoch_days())
     keep = ~purged
     prim, cc, held = prim[keep], cc[keep], held[keep]
     ages = None
@@ -303,7 +320,9 @@ def train_stage(
         for start in range(0, len(order), BATCH):
             sel = order[start : start + BATCH]
             native = samples.c_idx[sel] - lay.NATIVE_OFFSET_STEPS
-            drop = lags.block_dropout_masks(origin_idx=native, seed=seed * 1009 + epoch)
+            drop = lags.block_dropout_masks(
+                origin_idx=native, seed=(seed * 1009 + stage) * 1009 + epoch
+            )
             b = batch_for(
                 source=source, samples=samples, index=sel, lead=lead_all[start : start + BATCH],
                 ensemble=ensemble, cut=cut, dropout=drop,
@@ -345,6 +364,8 @@ def train_stage(
 def save_atomic(*, state: dict, path: Path) -> None:
     """Write a state file atomically (temporary name, then rename)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(
+        path.name + f".{os.getpid()}.tmp"
+    )  # two jobs on one state cannot share a temporary file
     torch.save(state, tmp)
     tmp.rename(path)

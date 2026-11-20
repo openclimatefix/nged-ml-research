@@ -27,6 +27,13 @@ MIN_AGE: Final = 2
 MAX_AGE: Final = MIN_AGE + N_HISTORY_ROWS - 1
 """The age of the oldest history row (15)."""
 N_LEAD_DAYS: Final = 14
+GRID_START_US: Final = 1_567_296_000_000_000
+"""2019-09-01 00:00 UTC in microseconds, the grid start of experiment 422 (checked against it in `e00713_check_inputs.py`)."""
+STEP_US: Final = 1_800_000_000
+"""One half-hour in microseconds."""
+HOUR_US: Final = 3_600_000_000
+ENSEMBLE_LEAD_US: Final = 9 * HOUR_US
+"""The ensemble run behind an origin was issued at least this long before the native origin."""
 NATIVE_OFFSET_STEPS: Final = 6
 """Grid steps from the native origin (09:00 UTC) to the contract origin (12:00 UTC)."""
 POWER_CAP_STEPS: Final = 48

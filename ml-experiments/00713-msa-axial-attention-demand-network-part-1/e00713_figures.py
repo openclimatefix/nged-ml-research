@@ -3,6 +3,7 @@
 
 Usage:
     e00713_figures.py series OUT_DIR           # day-ahead and 14-day forecasts against actuals
+    e00713_figures.py events TAG OUT_DIR       # the Candidate and M* on real logged events, three Primaries per group
     e00713_figures.py injected OUT_DIR         # permanent change and temporary move, onset marked
     e00713_figures.py contrasts TAG OUT_DIR    # per-Primary and per-fold CRPS contrasts with intervals
 
@@ -10,9 +11,9 @@ These scripts read the stored forecasts of the fits (`work/fits/<arm>/`), the ba
 (`bank713/`), and the protocol rows (`score/protocol_<TAG>/rows.parquet`). They run after the fits and
 fit nothing. `M*` is the arm in `work/selection.json`.
 
-**Anonymisation.** The forecasts are for Primary substations, which the rule does not cover, but every
-axis counts hours or days from the origin and carries no calendar date, so no chart could be matched
-to public generation data.
+**Anonymisation.** The forecasts are for Primary substations, which the rule does not cover. The series,
+injected, and contrast charts count hours or days from the origin; the event charts carry calendar dates
+because the events are logged at substations, not at metered generators.
 
 Every chart is written as SVG and optimised with `npx svgo@4 --multipass --precision=1 --final-newline`.
 Colour is by arm: Candidate `C` Data Blue, `M*` Brand Orange, `E` Data Green, `P` Data Purple,
@@ -294,6 +295,146 @@ def cmd_injected(*, out_dir: Path) -> None:
         save(chart, path=out_dir / f"injected_{truth_kind}.svg")
 
 
+def event_runs(*, rows: pl.DataFrame, groups: dict[str, np.ndarray], per_group: int) -> list[dict]:
+    """Return the longest runs of consecutive origin days with `event_rows` for each group, one run per Primary.
+
+    `rows` are the protocol rows of the Candidate. A run is a stretch of origin days on which the Primary
+    has at least one half-hour inside a logged event.
+    """
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    sites = k578.sites()
+    label_of = dict(zip(sites["time_series_id"].to_list(), sites["label"].to_list(), strict=True))
+    primary_of = dict(
+        zip(sites["time_series_id"].to_list(), sites["primary"].to_list(), strict=True)
+    )
+    days = (
+        rows.filter(pl.col("event_rows"))
+        .with_columns(day=pl.col("power_fcst_init_time").dt.date())
+        .select("time_series_id", "day")
+        .unique()
+        .sort("time_series_id", "day")
+    )
+    runs: list[dict] = []
+    for tid, frame in days.group_by("time_series_id", maintain_order=True):
+        t = int(tid[0])
+        ordinal = frame["day"].dt.epoch("d").to_numpy()
+        start = 0
+        for i in range(1, len(ordinal) + 1):
+            if i == len(ordinal) or ordinal[i] != ordinal[i - 1] + 1:
+                runs.append(
+                    {
+                        "time_series_id": t, "label": label_of[t], "primary": int(primary_of[t]),
+                        "first": frame["day"][start], "last": frame["day"][i - 1], "length": i - start,
+                    }
+                )  # fmt: skip
+                start = i
+    chosen = []
+    for name in ("six", "eight"):
+        ids = set(groups[name].tolist())
+        mine = sorted((r for r in runs if r["time_series_id"] in ids), key=lambda r: -r["length"])
+        seen: set[int] = set()
+        picked = []
+        for r in mine:
+            if r["time_series_id"] in seen:
+                continue
+            seen.add(r["time_series_id"])
+            picked.append({**r, "group": name})
+            if len(picked) == per_group:
+                break
+        chosen.extend(picked)
+    return chosen
+
+
+def cmd_events(*, tag: str, out_dir: Path, per_group: int = 3) -> None:
+    """Draw the Candidate and `M*` on real logged events: lead-day-1 median by origin day against the actual."""
+    from datetime import timedelta
+
+    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    truth = score.truth_stack()
+    rows = pl.read_parquet(score.SCORE_DIR / f"protocol_{tag}" / "rows.parquet").filter(
+        pl.col("arm") == "C"
+    )
+    picked = event_runs(rows=rows, groups=score.group_ids(), per_group=per_group)
+    assert picked, "no real events found in the protocol rows"
+    for k, run in enumerate(picked):
+        pad = timedelta(days=7)
+        lo, hi = run["first"] - pad, run["last"] + pad
+        months = [m for m in arms.ALL_FOLDS if f"{lo:%Y-%m}" <= m <= f"{hi:%Y-%m}"]
+        frames = []
+        for shown in ("C", "M*"):
+            f = pl.concat(
+                [
+                    seed_mean_frame(arm=arm_name(shown=shown, star=star), month=m, seeds=(0, 1))
+                    for m in months
+                ]
+            )
+            lead = (f["valid_time"] - f["power_fcst_init_time"]).dt.total_minutes() / 60.0
+            f = f.with_columns(lead_h=lead).filter(
+                (pl.col("time_series_id") == run["time_series_id"])
+                & (pl.col("lead_h") > 0)
+                & (pl.col("lead_h") <= 24)
+            )
+            grid = (
+                (f["valid_time"].dt.epoch("us").to_numpy() - 1_567_296_000_000_000) // 1_800_000_000
+            ).astype(np.int64)
+            f = f.with_columns(
+                actual=pl.Series(truth[run["primary"], grid] * 100.0),
+                day=pl.col("power_fcst_init_time").dt.date(),
+            )
+            daily = (
+                f.group_by("day")
+                .agg(median=pl.col("q50").mean() * 100.0, actual=pl.col("actual").mean())
+                .sort("day")
+            )
+            frames.append(daily.with_columns(arm=pl.lit(shown)))
+        data = (
+            pl.concat(frames)
+            .filter((pl.col("day") >= lo) & (pl.col("day") <= hi))
+            .with_columns(day=pl.col("day").cast(pl.Datetime("us")))
+        )
+        actual = data.filter(pl.col("arm") == "C").select("day", "actual")
+        band = pl.DataFrame(
+            {"a": [run["first"]], "b": [run["last"] + timedelta(days=1)]}
+        ).with_columns(pl.all().cast(pl.Datetime("us")))
+        x = alt.X("day:T", title="Origin day (12:00 UTC)")
+        lines = (
+            alt.Chart(data, width=WIDTH, height=200)  # ty: ignore[unresolved-attribute]
+            .mark_line(strokeWidth=1.6, clip=True)
+            .encode(
+                x=x,
+                y=alt.Y(
+                    "median:Q",
+                    title="Mean power, lead day 1 (% of capacity)",
+                    scale=alt.Scale(zero=False),
+                ),
+                color=alt.Color(
+                    "arm:N",
+                    scale=alt.Scale(domain=["C", "M*"], range=[COLOUR["C"], COLOUR["M*"]]),
+                    legend=alt.Legend(title=None, orient="top"),
+                ),
+            )
+        )
+        truth_line = (
+            alt.Chart(actual, width=WIDTH, height=200)  # ty: ignore[unresolved-attribute]
+            .mark_line(color="#222222", strokeDash=[4, 3], clip=True)
+            .encode(x=x, y="actual:Q")
+        )  # ty: ignore[unresolved-attribute]
+        shade = alt.Chart(band).mark_rect(color=theme.GREY_1, opacity=0.2).encode(x="a:T", x2="b:T")  # ty: ignore[unresolved-attribute]
+        chart = alt.layer(shade, lines, truth_line).properties(
+            title=alt.TitleParams(
+                [
+                    f"Primary {run['label']} ({run['group']}), a logged event of {run['length']} origin days",
+                    "Dashed black: actual. Coloured: forecast of the next 24 hours from each origin day. Shaded: days with half-hours inside the event.",
+                ],
+                anchor="start",
+                fontSize=12,
+                subtitleFontSize=11,
+            )
+        )
+        save(chart, path=out_dir / f"event_{run['group']}_{run['label']}_{k}.svg")
+
+
 def month_interval(
     *, month: np.ndarray, values: np.ndarray, seed: int = 713
 ) -> tuple[float, float, float]:
@@ -395,6 +536,9 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("series", "injected"):
         sub.add_parser(name).add_argument("out_dir", type=Path)
+    e = sub.add_parser("events")
+    e.add_argument("tag")
+    e.add_argument("out_dir", type=Path)
     c = sub.add_parser("contrasts")
     c.add_argument("tag")
     c.add_argument("out_dir", type=Path)
@@ -404,6 +548,8 @@ def main() -> int:
         cmd_series(out_dir=args.out_dir)
     elif args.command == "injected":
         cmd_injected(out_dir=args.out_dir)
+    elif args.command == "events":
+        cmd_events(tag=args.tag, out_dir=args.out_dir)
     else:
         cmd_contrasts(tag=args.tag, out_dir=args.out_dir)
     return 0

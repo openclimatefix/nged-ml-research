@@ -13,6 +13,7 @@ every history power token masked (the free read-out of section 2.7) under the ar
 """
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -67,15 +68,23 @@ def forecast_frame(
                     (48 * b.inputs.lead_day[:, None] + src.steps),
                 ].all()
             ), "a scored row has no ensemble inputs"  # ty: ignore[unresolved-attribute]
-            q = mdl.standardised_quantiles(out=model(b.inputs).out)
+            out = model(b.inputs).out
+            m = mdl.standardised_mixture_mean(out=out)
+            m = m * torch.from_numpy(data.target_std).to(m.device)[b.inputs.primary][:, None]
+            m = (
+                (m + torch.from_numpy(data.target_mean).to(m.device)[b.inputs.primary][:, None])
+                .cpu()
+                .numpy()
+            )
+            q = mdl.standardised_quantiles(out=out)
             q = q * torch.from_numpy(data.target_std).to(q.device)[b.inputs.primary][:, None, None]
             q = q + torch.from_numpy(data.target_mean).to(q.device)[b.inputs.primary][:, None, None]
             q = torch.sort(q, dim=-1).values.cpu().numpy()
             actual = data.source.power_z[b.inputs.primary[:, None], b.target_idx].cpu().numpy()
             tidx = b.target_idx.cpu().numpy()
-            parts.append((sel, q, tidx, actual))
+            parts.append((sel, q, tidx, actual, m))
     rows = []
-    for sel, q, tidx, actual in parts:
+    for sel, q, tidx, actual, m in parts:
         n = len(sel)
         pr = np.repeat(prim[sel], 48)
         c = np.repeat(cc[sel], 48)
@@ -92,6 +101,7 @@ def forecast_frame(
                         name: q[:, :, i].reshape(-1).astype(np.float32)
                         for i, name in enumerate(QCOLS)
                     },
+                    "mean": m.reshape(-1).astype(np.float32),
                     "actual": (actual.reshape(-1) * std + mean).astype(np.float32),
                 }
             )
@@ -120,6 +130,7 @@ def forecast_frame(
             "valid_time",
             *QCOLS,
             "seed",
+            "mean",
             "actual",
             "lead_hours",
             "nwp_init_time",
@@ -143,6 +154,12 @@ def predict(
     spec = arms.resolve(arm=arm, data_dir=data_dir)
     state = arms.model_file(data_dir=data_dir, arm=arm, month=month, seed=seed, stage=3)
     assert state.exists(), state
+    stage_log = arms.log_file(data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit")
+    stage_log = stage_log.with_name(f"{stage_log.stem}_stage3.json")
+    assert (
+        stage_log.exists()
+        and json.loads(stage_log.read_text()).get("code_hash") == arms.code_hash()
+    ), f"{state} was fitted by other code or has no stage log: refit it"
     pipe = inp.load_pipeline(
         month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
     )
@@ -164,7 +181,7 @@ def predict(
         grid_start_us=prep422.GRID_START_US, time_series_ids=ids,
     )  # fmt: skip
     out.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out.with_name(out.name + ".tmp")
+    tmp = out.with_name(out.name + f".{os.getpid()}.tmp")
     frame.write_parquet(tmp)
     tmp.rename(out)
     print(f"{name} {month} s{seed}: {frame.height} rows", flush=True)

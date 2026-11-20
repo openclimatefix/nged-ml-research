@@ -339,7 +339,9 @@ def cmd_w2(*, month: str, device: str) -> None:
     pipe = inp.load_pipeline(month=month, phase="train")
     data = inp.build_fold_data(pipe=pipe, device=device)
     raw = pipe.d632.dense_raw()
-    temperature = np.asarray(raw[:, :, 2], dtype=np.float64)
+    temperature = np.asarray(
+        raw[:, :, pipe.d632.prep.WEATHER.index("temperature_2m")], dtype=np.float64
+    )
     if np.nanmedian(temperature) > 100:
         temperature = temperature - 273.15
     n_grid = temperature.shape[1]

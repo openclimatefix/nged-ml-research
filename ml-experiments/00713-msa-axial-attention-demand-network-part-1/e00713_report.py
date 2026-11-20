@@ -6,8 +6,7 @@ Usage: e00713_report.py
 The script reads `score/*.json` (written by `e00713_score.py` and `e00713_era.py`), the fit logs under
 `work/logs/`, and `work/selection.json`, and prints one table per section of the page. It computes no
 new score. A table whose input file does not exist yet is reported as missing. The figures of the page
-(example forecasts, the read-out weights by age and day type, the event plots, and the load-shift
-plots) are not drawn here; the implementation note lists them as open work.
+are drawn by `e00713_figures.py` and `e00713_attention.py`; the audit triggers are printed at the end.
 """
 
 import json
@@ -83,6 +82,120 @@ def parameter_table() -> None:
         print(letter, mdl.parameter_count(model=mdl.MsaNet(switches=mdl.ARM_SWITCHES[letter])))
 
 
+def sign(x: float) -> int:
+    """Return the sign of `x` as -1, 0, or 1."""
+    return (x > 0) - (x < 0)
+
+
+NESTED: Final = ((None, "A"), (None, "K"), ("K", "N"), (None, "N"))
+"""(treatment, reference) pairs of the report-only table in which the reference is nested in the treatment."""
+
+
+def audit_triggers() -> dict[str, str]:  # noqa: PLR0912
+    """Return the seven audit triggers of the `ml-experiment` skill as fired / not fired / not computed, with the reason.
+
+    A trigger that needs a number the stored files do not hold is reported as `not computed`, never as
+    not fired.
+    """
+    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    out: dict[str, str] = {}
+    gate = ROOT / "work" / "known_answers_passed.json"
+    screen, headline = read_json(name="screen"), read_json(name="headline")
+    reasons = []
+    if not gate.exists():
+        reasons.append("the known-answer gate file is missing")
+    if screen and screen["rules"]["sanity_stop_and_audit"]:
+        reasons.append("the sanity rule of the screen fired (M* minus P positive in both groups)")
+    if headline:
+        reasons += [
+            f"{k} H2 interval upper {v:.3f} is not below zero"
+            for k, v in headline["h2_upper"].items()
+            if v >= 0 and headline["verdict"] == "supported"
+        ]
+    out["1 control fails"] = (
+        ("FIRED: " + "; ".join(reasons))
+        if reasons
+        else ("not fired" if headline else "not computed")
+    )
+    if headline:
+        out["2 contradicts prediction"] = (
+            f"verdict is {headline['verdict']!r}; FIRED unless the write-up records a tested explanation"
+            if headline["verdict"] not in {"supported", "partly supported"}
+            else "not fired"
+        )
+    else:
+        out["2 contradicts prediction"] = "not computed"
+    report = read_json(name="report_only")
+    if report:
+        flips = []
+        for key, v in report.items():
+            if key.startswith("crps:"):
+                other = report.get("abs_err:" + key[len("crps:") :])
+                if other and sign(v["point"]) != sign(other["point"]):
+                    flips.append(key[len("crps:") :])
+        out["3 CRPS and MAE disagree"] = ("FIRED: " + ", ".join(flips)) if flips else "not fired"
+        nested = []
+        for key, v in report.items():
+            if not key.startswith("crps:"):
+                continue
+            pair = key.split(":")[1]
+            for t, r in NESTED:
+                if pair == f"{t or star}-{r}" and v["point"] > 0:
+                    nested.append(
+                        f"{pair}:{key.split(':')[2]} point {v['point']:.3f}"
+                        + (" (clear)" if v["lower"] > 0 else "")
+                    )
+        out["5 nested arm beats container"] = (
+            ("FIRED: " + "; ".join(nested)) if nested else "not fired"
+        )
+    else:
+        out["3 CRPS and MAE disagree"] = out["5 nested arm beats container"] = "not computed"
+    out["4 leave-one-out flips sign"] = (
+        ("FIRED: " if not headline["guards"]["all_hold"] else "not fired: ")
+        + json.dumps(
+            {
+                g: [
+                    headline["guards"][g]["leave_one_primary_out"],
+                    headline["guards"][g]["leave_one_month_out"],
+                ]
+                for g in ("six", "eight")
+            }
+        )
+        if headline and "guards" in headline
+        else "not computed"
+    )
+    out["6 interval width against a sister experiment"] = (
+        "not computed: compare by hand with experiment 667's and 709's intervals on the same rows"
+    )
+    out["7 later design depends on the result"] = (
+        "not computed: the maintainer decides, once the verdict is known"
+    )
+    return out
+
+
+def median_minus_mean() -> None:
+    """Print, per site, the mean of the median forecast minus the mean forecast of the selected arm (a stored `mean` column)."""
+    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    parts = []
+    for month in arms.ALL_FOLDS:
+        path = arms.fit_file(data_dir=ML_EXPERIMENTS_DATA_DIR, arm=star, month=month, seed=0)
+        if not path.exists():
+            print("[missing]", path)
+            return
+        frame = pl.read_parquet(path)
+        if "mean" not in frame.columns:
+            print(f"[no mean column] {path}: predict again to add it")
+            return
+        parts.append(frame.select("time_series_id", (pl.col("q50") - pl.col("mean")).alias("d")))
+    table = (
+        pl.concat(parts)
+        .group_by("time_series_id")
+        .agg((pl.col("d").mean() * 100).alias("median_minus_mean_pct"))
+        .sort("time_series_id")
+    )
+    print("\n## Median minus mean forecast, per site (% of capacity), M* seed 0\n", table)
+
+
 def main() -> int:
     """Print all tables."""
     parameter_table()
@@ -110,6 +223,10 @@ def main() -> int:
             for extra in ("readings", "h2_upper", "verdict", "rules", "rules_without_2025_11"):
                 if extra in data:
                     print(extra, data[extra])
+    print("\n## Audit triggers")
+    for name, state in audit_triggers().items():
+        print(f"- {name}: {state}")
+    median_minus_mean()
     return 0
 
 

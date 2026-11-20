@@ -452,6 +452,15 @@ def standardised_quantiles(*, out: torch.Tensor) -> torch.Tensor:
     return q.view(*shape, len(base_models.LEVELS))
 
 
+def standardised_mixture_mean(*, out: torch.Tensor) -> torch.Tensor:
+    """Return the mean (B, 48) of the mixture, in standardised units: the weights times the component means."""
+    shape = out.shape[:-1]
+    log_w, mean, _ = base_models.mixture_parts(
+        out=out.reshape(-1, out.shape[-1]), components=m559.COMPONENTS
+    )
+    return (torch.softmax(log_w, dim=-1) * mean).sum(dim=-1).view(*shape)
+
+
 def parameter_count(*, model: nn.Module, trainable_only: bool = False) -> int:
     """Return the number of parameters of `model`."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad or not trainable_only)

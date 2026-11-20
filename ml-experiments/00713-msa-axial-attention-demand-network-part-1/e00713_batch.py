@@ -35,12 +35,16 @@ class EnsTensors:
         spread: (16, n_days, 672, 7) float16.
         filled: (16, n_days, 672) bool: whether the row exists.
         first_day: The day number (grid index // 48) of day index 0.
+        run_us: (16, n_days) int64: the issue time of the ensemble run behind each (Primary, origin day)
+            in microseconds, 0 where the row is absent. `Source.assemble` asserts it is at least
+            9 hours before the origin (design 4.1, the origin-time assertion).
     """
 
     weather: torch.Tensor
     spread: torch.Tensor
     filled: torch.Tensor
     first_day: int
+    run_us: torch.Tensor | None = None  # (16, n_days) int64: issue time of the run behind each row
 
 
 @dataclass
@@ -52,6 +56,10 @@ class Assembled:
     target_idx: torch.Tensor  # (B, 48) grid index of each target token
     hist_idx: torch.Tensor  # (B, 14, 48) grid index of each history token
     c_idx: torch.Tensor  # (B,)
+
+
+CAMS_COLUMNS: Final = [19, 20]
+"""The two `cams_prev_day_*` columns of the 21 weather columns (7 weather, 12 B1 grid, 2 CAMS)."""
 
 
 class Source:
@@ -95,7 +103,7 @@ class Source:
             power_in=power_in,
         )  # fmt: skip
 
-    def assemble(
+    def assemble(  # noqa: PLR0915
         self,
         *,
         primary: torch.Tensor,
@@ -163,16 +171,33 @@ class Source:
                 "the ensemble run is not the origin's own run (issued after the origin)"
             )
             day = (c_idx // lay.STEPS_PER_DAY - self.ens.first_day + ens_day_offset)[:, None]
+            if self.ens.run_us is not None:
+                run = self.ens.run_us[primary, day[:, 0]]
+                origin = lay.GRID_START_US + (c_idx - lay.NATIVE_OFFSET_STEPS) * lay.STEP_US
+                present = run > 0
+                assert bool((run[present] <= (origin - lay.ENSEMBLE_LEAD_US)[present]).all()), (
+                    "nwp_init_time is later than the origin minus 9 hours"
+                )
             rel = lay.STEPS_PER_DAY * lead_day[:, None] + steps
             top_weather = self.ens.weather[p2, day, rel].float()
             top_spread = self.ens.spread[p2, day, rel].float()
             filled = self.ens.filled[p2, day, rel]
         else:
             top_weather = self.dense_weather[p2, top_idx].float()
+            # the two CAMS columns of the target row are the origin's, as in experiment 574's
+            # pre-training rows and in stages 2 and 3: the dense array holds them per grid stamp, so
+            # read them at the origin stamp and not at each target half-hour (code review 1, B1)
+            origin_stamp = c_idx - lay.NATIVE_OFFSET_STEPS
+            cams = self.dense_weather[primary, origin_stamp][:, CAMS_COLUMNS].float()
+            top_weather[:, :, CAMS_COLUMNS] = cams[:, None, :]
             top_spread = torch.zeros(b, lay.STEPS_PER_DAY, mdl.N_SPREAD, device=self.device)
             filled = torch.ones(b, lay.STEPS_PER_DAY, dtype=torch.bool, device=self.device)
         target = self.power_z[p2, top_idx].clone()
         target[~filled] = float("nan")
+        if ensemble:
+            # a target row with a gap in its ensemble weather is dropped from the loss (code review 1,
+            # S1): the unfilled tokens carry zero weather, which prediction never sees
+            target[~filled.all(dim=1)] = float("nan")
         if target_end is not None:
             target[top_idx >= target_end] = float("nan")
         inputs = mdl.MsaInputs(
@@ -190,6 +215,39 @@ class Source:
         if cap_steps == lay.POWER_CAP_STEPS:
             check_cheap(batch=out)
         return out
+
+
+def ka6_canary(
+    *, source: Source, primary: torch.Tensor, c_idx: torch.Tensor, lead_day: torch.Tensor
+) -> str:
+    """Check KA6: a table keyed by the run of the next day fails the origin-time assertion on the data.
+
+    The canary copies the source with every present run moved one day later and assembles the samples
+    whose (Primary, origin day) row exists. The data assertion in `Source.assemble` must raise.
+    """
+    import copy
+    import dataclasses
+
+    ens = source.ens
+    assert ens is not None
+    assert ens.run_us is not None, "the source carries no run times"
+    day = c_idx // lay.STEPS_PER_DAY - ens.first_day
+    present = ens.run_us[primary, day] > 0
+    assert bool(present.any()), "no sample of the canary has an ensemble row"
+    bad = copy.copy(source)
+    later = torch.where(ens.run_us > 0, ens.run_us + 24 * lay.HOUR_US, ens.run_us)
+    bad.ens = dataclasses.replace(ens, run_us=later)
+    try:
+        bad.assemble(
+            primary=primary[present],
+            c_idx=c_idx[present],
+            lead_day=lead_day[present],
+            ensemble=True,
+        )
+    except AssertionError as err:
+        return str(err)
+    msg = "KA6: a target row from the next day's ensemble run was accepted"
+    raise AssertionError(msg)
 
 
 def check_cheap(*, batch: Assembled) -> None:

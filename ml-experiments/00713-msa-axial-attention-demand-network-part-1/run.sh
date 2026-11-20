@@ -15,6 +15,11 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$(dirname "$here")"
 script="$1"
 shift
+available_gb=$(free -g | awk '/^Mem:/ {print $7}')
+if [ "${available_gb:-0}" -lt "${MIN_AVAILABLE_GB:-25}" ]; then
+    echo "only ${available_gb} GB available; wait until ${MIN_AVAILABLE_GB:-25} GB is free (set MIN_AVAILABLE_GB to override)" >&2
+    exit 1
+fi
 export PYTHONPATH="$here"
 for d in "$root"/00*/; do
     export PYTHONPATH="$PYTHONPATH:${d%/}"

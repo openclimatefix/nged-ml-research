@@ -41,7 +41,10 @@ STEPS=${*:-pretrain step2 table fit ptable pfit}
 export E00667_MONTH=$M CHAIN667=$R/chains/$M/work
 mkdir -p "$R/logs" "$CHAIN667"
 
-snapshot() { (cd "$STORED" && find chains P7_D50_* -maxdepth 2 -printf '%p %T@\n' | sort); }
+snapshot() {  # every path, type, size, and mtime below chains/ and P7_D50_*, at any depth, plus a hash of the stored fits
+  (cd "$STORED" && find chains P7_D50_* -printf '%p %y %s %T@\n' | sort
+    find P7_D50_*/work/fits/P5 -name '*_s[01].parquet' -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum)
+}
 BEFORE="$(snapshot)"
 
 PYTHONPATH_ALL="$D"

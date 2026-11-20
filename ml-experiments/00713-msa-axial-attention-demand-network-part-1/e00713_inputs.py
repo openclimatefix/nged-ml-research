@@ -79,6 +79,10 @@ def load_pipeline(*, month: str, phase: str, chain_root: Path = ROOT_667) -> Pip
     chain = chain_dir(root=chain_root, month=month)
     stats = chain_dir(root=ROOT_667, month=month) / "stats" / e.SPEC.b1 / f"{month}.npz"
     e.stats_file = lambda *, month: stats
+    assert month == fold.FINAL_MONTH, (
+        fold.FINAL_MONTH,
+        month,
+    )  # the module reads E00667_MONTH once, at import
     fold.install(e, months=[month], reference_month=fold.PREVIOUS_MONTH)
     d632.CACHE = CACHE  # ty: ignore[invalid-assignment]  # nothing may be written into experiment 632's folder
     CACHE.mkdir(parents=True, exist_ok=True)
@@ -130,9 +134,13 @@ def ens_table(
     weather[p, d, r] = x[keep][:, ENS_WEATHER_COLUMNS].astype(np.float16)
     spread[p, d, r] = x[keep][:, ENS_SPREAD_COLUMNS].astype(np.float16)
     filled[p, d, r] = True
+    run_us = np.zeros((bt.N_PRIMARIES, n_days), np.int64)
+    run_us[p, d] = (
+        origin_us[keep] - lay.ENSEMBLE_LEAD_US
+    )  # the 00Z run, issued 9 hours before the origin
     return bt.EnsTensors(
         weather=torch.from_numpy(weather), spread=torch.from_numpy(spread),
-        filled=torch.from_numpy(filled), first_day=first_day,
+        filled=torch.from_numpy(filled), first_day=first_day, run_us=torch.from_numpy(run_us),
     )  # fmt: skip
 
 
@@ -227,11 +235,16 @@ def build_fold_data(*, pipe: Pipeline, device: str, keep_rows: bool = False) -> 
         )  # fmt: skip
         ens.weather = torch.where(scored.filled[..., None], scored.weather, ens.weather)
         ens.spread = torch.where(scored.filled[..., None], scored.spread, ens.spread)
+        ens.run_us = torch.where(scored.filled.any(dim=-1), scored.run_us, ens.run_us)  # ty: ignore[no-matching-overload]
         ens.filled |= scored.filled
     ens = bt.EnsTensors(
         weather=ens.weather.to(device), spread=ens.spread.to(device),
         filled=ens.filled.to(device), first_day=first_day,
+        run_us=None if ens.run_us is None else ens.run_us.to(device),
     )  # fmt: skip
+    blocks = ens.filled.view(*ens.filled.shape[:2], lay.N_LEAD_DAYS, lay.STEPS_PER_DAY)
+    partly = int((blocks.any(dim=-1) & ~blocks.all(dim=-1)).sum())
+    total_rows = int(blocks.any(dim=-1).sum())
     source = bt.Source(
         power_z=power_z.to(device), dense_weather=dense_weather.to(device),
         dense_datetime=dense_datetime.to(device), day_type=day_type.to(device), ens=ens,
@@ -240,9 +253,15 @@ def build_fold_data(*, pipe: Pipeline, device: str, keep_rows: bool = False) -> 
         month=pipe.month, source=source, cutoff_idx=cutoff_idx, target_mean=base.target_mean,
         target_std=base.target_std, clean=clean, fingerprint=fingerprint(mr_base=base),
         train_ens_days=(first_day, last_day), test_origin_idx=test_origin_idx, test_keys=test_keys,
-        dropped_per_fold=flagged_counts(month=pipe.month, cutoff_us=int(cut_dt.timestamp() * 1e6)),
+        dropped_per_fold={
+            **flagged_counts(month=pipe.month, cutoff_us=int(cut_dt.timestamp() * 1e6)),
+            "target_rows_partly_filled": partly,
+            "target_rows_with_any_weather": total_rows,
+        },
     )  # fmt: skip
-    check_weather_finite(raw=raw, test_origin_idx=test_origin_idx)
+    check_weather_finite(
+        raw=raw, test_origin_idx=test_origin_idx, b1_grid=b1_grid, cams=cams, day_code=day_code
+    )
     if keep_rows:
         data.rows = (mr, test)
     return data
@@ -273,16 +292,31 @@ def flagged_counts(*, month: str, cutoff_us: int) -> dict[str, int]:
     }
 
 
-def check_weather_finite(*, raw: np.ndarray, test_origin_idx: np.ndarray | None) -> None:
-    """Assert the raw ERA5 and CAMS weather is finite at every history token and stage 1 target token.
+def check_weather_finite(
+    *,
+    raw: np.ndarray,
+    test_origin_idx: np.ndarray | None,
+    b1_grid: np.ndarray,
+    cams: np.ndarray,
+    day_code: np.ndarray,
+) -> None:
+    """Assert the raw ERA5, CAMS, and B1 inputs are finite at every history token and target token.
 
-    The check covers every scored origin (prediction phase), on the raw array: the standardised
-    array holds 0 where a value was missing.
+    The check covers every scored origin (prediction phase), on the raw arrays: the standardised
+    arrays hold 0 where a value was missing, which would hide a gap. `b1_grid` holds the 12 valid-time
+    B1 columns and `cams` the 2 CAMS day columns, read through `day_code` as the dense array reads them.
     """
     if test_origin_idx is None:
         return
     for o in test_origin_idx:
         c = int(o) + lay.NATIVE_OFFSET_STEPS
         lo, hi = c - lay.STEPS_PER_DAY * lay.MAX_AGE, c + lay.STEPS_PER_DAY * lay.N_LEAD_DAYS
-        block = np.asarray(raw[:, lo:hi, :7])
-        assert bool(np.isfinite(block).all()), f"non-finite ERA5 or CAMS weather around index {c}"
+        assert bool(np.isfinite(np.asarray(raw[:, lo:hi, :7])).all()), (
+            f"non-finite ERA5 or CAMS weather around index {c}"
+        )
+        assert bool(np.isfinite(np.asarray(b1_grid[:, lo:hi])).all()), (
+            f"non-finite B1 valid-time column around index {c}"
+        )
+        assert bool(np.isfinite(np.asarray(cams)[:, day_code[lo:hi]]).all()), (
+            f"non-finite CAMS day column around index {c}"
+        )

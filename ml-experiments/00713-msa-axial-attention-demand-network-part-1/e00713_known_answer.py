@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PLR0915
+# ruff: noqa: E501, PT018
 """Experiment 713: the synthetic world and known-answer checks KA1 to KA12 (design section 3).
 
 Usage: e00713_known_answer.py MONTH [--device cuda] [--skip-fits]
@@ -293,23 +293,24 @@ def run_checks(*, month: str, device: str, skip_fits: bool) -> dict:
     results["KA5"] = bt.poison_check(
         source=src, batch=batch, ages=None, age_exists=None, ensemble=False, lead_day=lead
     )
-    ens_c = torch.from_numpy(np.array([int(data.cutoff_idx) - 48 * 3])).to(dev)
-    try:
-        src.assemble(
-            primary=prim[:1], c_idx=ens_c, lead_day=lead[:1], ensemble=True, ens_day_offset=1
-        )
-    except AssertionError as err:
-        results["KA6"] = f"canary raised: {err}"
-    else:
-        msg = "KA6 failed: a target row from the next day's ensemble run was accepted"
-        raise AssertionError(msg)
+    ens_c = torch.from_numpy(
+        np.arange(int(data.cutoff_idx) - 48 * 40, int(data.cutoff_idx) - 48 * 3, 48) + 24
+    ).to(dev)
+    results["KA6"] = "canary raised: " + bt.ka6_canary(
+        source=src,
+        primary=prim[:1].expand(len(ens_c)),
+        c_idx=ens_c,
+        lead_day=lead[:1].expand(len(ens_c)),
+    )
     if skip_fits:
         return results
     # the synthetic worlds
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
 
     raw = pipe.d632.dense_raw()
-    temperature = np.asarray(raw[:, :, 2], dtype=np.float64)
+    temperature = np.asarray(
+        raw[:, :, pipe.d632.prep.WEATHER.index("temperature_2m")], dtype=np.float64
+    )
     if np.nanmedian(temperature) > 100:
         temperature = temperature - 273.15
     n_grid = temperature.shape[1]

@@ -199,6 +199,19 @@ def restrict(
     return out
 
 
+def paired(*, treatment: pl.DataFrame, reference: pl.DataFrame, metric: str) -> pl.DataFrame:
+    """Return the rows both frames hold, joined on the keys, with the loss difference `d` (treatment minus reference).
+
+    Both frames must hold exactly the same keys; the join is never by row position.
+    """
+    assert treatment.height == reference.height, (treatment.height, reference.height)
+    joined = treatment.select(*KEYS, metric).join(
+        reference.select(*KEYS, pl.col(metric).alias("_ref")), on=list(KEYS), how="inner"
+    )
+    assert joined.height == treatment.height, "treatment and reference hold different keys"
+    return joined.with_columns(d=pl.col(metric) - pl.col("_ref")).drop("_ref")
+
+
 def t_interval(*, monthly: np.ndarray, level: float) -> tuple[float, float]:
     """Return the t interval on monthly differences at `level` percent (n - 1 degrees of freedom)."""
     n = len(monthly)
@@ -222,10 +235,9 @@ def contrast(
     lo, hi = bootstrap.bootstrap_difference_at_level(
         losses=loss, treatment=treatment, reference=reference, metric=metric, level=level, n_resamples=N_RESAMPLES,
     )  # fmt: skip
-    t_row = sel[treatment].sort(KEYS)
-    r_row = sel[reference].sort(KEYS)
-    diff = t_row[metric].to_numpy() - r_row[metric].to_numpy()
-    months = t_row["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
+    both = paired(treatment=sel[treatment], reference=sel[reference], metric=metric)
+    diff = both["d"].to_numpy()
+    months = both["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
     monthly = np.array([diff[months == m].mean() for m in np.unique(months)])
     point = float(diff.mean())
     t_lo, t_hi = t_interval(monthly=monthly, level=level)
@@ -242,14 +254,14 @@ def contrast(
             group=group,
             band=band,
             groups=groups,
-        ).sort(KEYS)
+        )
         b = restrict(
             frame=per_seed[reference].filter(pl.col("seed") == s),
             group=group,
             band=band,
             groups=groups,
-        ).sort(KEYS)
-        seed_diffs.append(float((a[metric].to_numpy() - b[metric].to_numpy()).mean()))
+        )
+        seed_diffs.append(float(paired(treatment=a, reference=b, metric=metric)["d"].mean()))  # ty: ignore[invalid-argument-type]
     same_sign = sum(1 for d in seed_diffs if d * sign > 0)
     floor = NOISE_FLOOR.get(group)
     return {
@@ -281,7 +293,7 @@ def group_reading(*, c: dict, group: str) -> str:
 
 
 def verdict(  # noqa: PLR0911
-    *, readings: dict[str, str], h2_upper: dict[str, float], guards_hold: bool = True
+    *, readings: dict[str, str], h2_upper: dict[str, float], guards_hold: bool
 ) -> str:
     """Return the experiment's verdict by the first row of the verdict table of section 1.8."""
     r = list(readings.values())
@@ -397,6 +409,18 @@ def load_scored(
     )
 
 
+def load_all(
+    *, names: list[str], months: tuple[str, ...], seeds: tuple[int, ...]
+) -> tuple[dict[str, pl.DataFrame], dict[str, pl.DataFrame], dict[str, np.ndarray]]:
+    """Return every arm's per-seed and seed-averaged scored rows and the Primary groups; assert equal keys."""
+    groups, truth = group_ids(), truth_stack()
+    per_seed, averaged = {}, {}
+    for n in names:
+        per_seed[n], averaged[n] = load_scored(arm=n, seeds=seeds, months=months, truth=truth)
+    assert_same_keys(frames=averaged)  # not an intersection: arms that differ in keys are a fault
+    return per_seed, averaged, groups
+
+
 def run_contrasts(
     *,
     star: str,
@@ -404,40 +428,86 @@ def run_contrasts(
     seeds: tuple[int, ...],
     pairs: list[tuple[str, str]],
     level: float,
+    metric: str = "crps",
+    loaded: tuple[dict[str, pl.DataFrame], dict[str, pl.DataFrame], dict[str, np.ndarray]]
+    | None = None,
 ) -> dict:
     """Score contrasts (treatment, reference) for the six and the eight."""
-    groups, truth = group_ids(), truth_stack()
     names = sorted({n for p in pairs for n in p})
-    per_seed, averaged = {}, {}
-    for n in names:
-        per_seed[n], averaged[n] = load_scored(
-            arm="C" if n == "C" else n, seeds=seeds, months=months, truth=truth
-        )
-    # all arms share the scored keys: restrict each to the intersection of the keys, then assert
-    common = None
-    for n in names:
-        k = averaged[n].select(KEYS).unique()
-        common = k if common is None else common.join(k, on=list(KEYS), how="inner")
-    for n in names:
-        per_seed[n] = per_seed[n].join(common, on=list(KEYS), how="inner")
-        averaged[n] = averaged[n].join(common, on=list(KEYS), how="inner")
-    assert_same_keys(frames=averaged)
+    per_seed, averaged, groups = loaded or load_all(names=names, months=months, seeds=seeds)
     out: dict = {
         "star": star,
         "level": level,
-        "n_common_keys": (common.height if common is not None else 0),
+        "metric": metric,
+        "n_common_keys": averaged[names[0]].height,
     }
     for t, r in pairs:
         for g in ("six", "eight"):
             out[f"{t}-{r}:{g}"] = contrast(
-                per_seed=per_seed,
-                averaged=averaged,
-                treatment=t,
-                reference=r,
-                group=g,
-                groups=groups,
-                level=level,
+                per_seed=per_seed, averaged=averaged, treatment=t, reference=r, group=g,
+                groups=groups, level=level, metric=metric,
+            )  # fmt: skip
+    return out
+
+
+def supported_guards(
+    *,
+    star: str,
+    averaged: dict[str, pl.DataFrame],
+    groups: dict[str, np.ndarray],
+    swap_a_points: dict[str, float] | None,
+) -> dict:
+    """Return the four guards of the `supported` verdict (design 1.8) on the 24-240 h band of each group.
+
+    The guards are: the sign of M* minus the Candidate survives leaving out each Primary and each month;
+    the q01 and q99 pinball losses are within 0.05 points of the Candidate's (one-sided 95% t bound over
+    months); the median's absolute error moves with CRPS; and swap (a) keeps the sign of H1.
+    """
+    out: dict = {}
+    for g in ("six", "eight"):
+        sel = {
+            n: restrict(frame=averaged[n], group=g, band=HEADLINE_BAND_HOURS, groups=groups)
+            for n in (star, "C")
+        }
+        crps = paired(treatment=sel[star], reference=sel["C"], metric="crps")
+        month = crps["power_fcst_init_time"].dt.strftime("%Y-%m")
+        by_month = (
+            crps.with_columns(m=month)
+            .group_by("m")
+            .agg(pl.col("d").mean())
+            .sort("m")["d"]
+            .to_numpy()
+        )
+        by_id = crps.group_by("time_series_id").agg(
+            pl.col("d").sum().alias("s"), pl.len().alias("n")
+        )
+        total, count = by_id["s"].sum(), by_id["n"].sum()
+        loo_primary = [
+            (total - s_) / (count - n_) < 0 for s_, n_ in zip(by_id["s"], by_id["n"], strict=True)
+        ]
+        loo_month = [(by_month.sum() - x) / (len(by_month) - 1) < 0 for x in by_month]
+        tails = {}
+        for col in ("pin_q01", "pin_q99"):
+            d = (
+                paired(treatment=sel[star], reference=sel["C"], metric=col)
+                .with_columns(m=month)
+                .group_by("m")
+                .agg(pl.col("d").mean())["d"]
+                .to_numpy()
             )
+            upper = d.mean() + stats.t.ppf(0.95, len(d) - 1) * d.std(ddof=1) / np.sqrt(len(d))
+            tails[col] = {"upper_95": float(upper), "ok": bool(upper <= 0.05)}
+        mae = float(paired(treatment=sel[star], reference=sel["C"], metric="abs_err")["d"].mean())  # ty: ignore[invalid-argument-type]
+        swap = None if swap_a_points is None else bool(swap_a_points[g] < 0)
+        out[g] = {
+            "leave_one_primary_out": bool(all(loo_primary)), "leave_one_month_out": bool(all(loo_month)),
+            "tails": tails, "mae_moves_with_crps": bool(mae < 0), "swap_a_keeps_sign": swap,
+        }  # fmt: skip
+        out[g]["all_hold"] = bool(
+            out[g]["leave_one_primary_out"] and out[g]["leave_one_month_out"]
+            and all(t["ok"] for t in tails.values()) and out[g]["mae_moves_with_crps"] and swap is True
+        )  # fmt: skip
+    out["all_hold"] = bool(out["six"]["all_hold"] and out["eight"]["all_hold"])
     return out
 
 
@@ -464,22 +534,33 @@ def cmd_screen() -> int:
 
 
 def cmd_headline() -> int:
-    """H1 and H2 at 98.75% with 5 seeds, the three guards, the readings, and the verdict."""
+    """H1 and H2 at 98.75% with 5 seeds, the three guards, the four `supported` guards, the readings, and the verdict."""
     star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
-    res = run_contrasts(
-        star=star,
-        months=arms.ALL_FOLDS,
-        seeds=arms.HEADLINE_SEEDS,
-        pairs=[(star, "C"), (star, "P")],
-        level=LEVEL,
+    loaded = load_all(
+        names=sorted({star, "C", "P"}), months=arms.ALL_FOLDS, seeds=arms.HEADLINE_SEEDS
     )
+    res = run_contrasts(
+        star=star, months=arms.ALL_FOLDS, seeds=arms.HEADLINE_SEEDS,
+        pairs=[(star, "C"), (star, "P")], level=LEVEL, loaded=loaded,
+    )  # fmt: skip
     readings = {g: group_reading(c=res[f"{star}-C:{g}"], group=g) for g in ("six", "eight")}
     h2_upper = {g: res[f"{star}-P:{g}"]["upper"] for g in ("six", "eight")}
+    swap_a_points = None
+    try:
+        swap = run_contrasts(
+            star=star, months=arms.ALL_FOLDS, seeds=arms.SCREEN_SEEDS,
+            pairs=[(f"{star}-swapa", "C")], level=95.0,
+        )  # fmt: skip
+        swap_a_points = {g: swap[f"{star}-swapa-C:{g}"]["point"] for g in ("six", "eight")}
+    except FileNotFoundError as err:
+        res["swap_a_missing"] = str(err)
+    res["guards"] = supported_guards(
+        star=star, averaged=loaded[1], groups=loaded[2], swap_a_points=swap_a_points
+    )
     res["readings"] = readings
     res["h2_upper"] = h2_upper
-    res["verdict"] = verdict(readings=readings, h2_upper=h2_upper)
-    res["note"] = (
-        "the `supported` guards (leave-one-out, q01/q99, MAE, swap (a)) are read from the report-only tables"
+    res["verdict"] = verdict(
+        readings=readings, h2_upper=h2_upper, guards_hold=res["guards"]["all_hold"]
     )
     write(name="headline", obj=res)
     return 0
@@ -506,7 +587,11 @@ def cmd_swaps() -> int:
         level=95.0,
     )
     res["guard_swap_a"] = {
-        g: group_reading(c=res[f"{star}-swapa-C:{g}"], group=g) for g in ("six", "eight")
+        g: {
+            "reading": group_reading(c=res[f"{star}-swapa-C:{g}"], group=g),
+            "keeps_h1_sign": bool(res[f"{star}-swapa-C:{g}"]["point"] < 0),
+        }
+        for g in ("six", "eight")
     }
     write(name="swaps", obj=res)
     return 0
@@ -524,27 +609,17 @@ def cmd_report_only() -> int:
         (star, "C"),
         (star, "P"),
     ]
+    names = sorted({n for p in pairs for n in p})
+    loaded = load_all(
+        names=names, months=arms.ALL_FOLDS, seeds=arms.SCREEN_SEEDS
+    )  # asserts equal keys
     out = {}
     for metric in ("crps", "abs_err"):
-        groups, truth = group_ids(), truth_stack()
-        names = sorted({n for p in pairs for n in p})
-        per_seed, averaged = {}, {}
-        for n in names:
-            per_seed[n], averaged[n] = load_scored(
-                arm=n, seeds=arms.SCREEN_SEEDS, months=arms.ALL_FOLDS, truth=truth
-            )
-        for t, r in pairs:
-            for g in ("six", "eight"):
-                out[f"{metric}:{t}-{r}:{g}"] = contrast(
-                    per_seed=per_seed,
-                    averaged=averaged,
-                    treatment=t,
-                    reference=r,
-                    group=g,
-                    groups=groups,
-                    metric=metric,
-                    level=95.0,
-                )
+        res = run_contrasts(
+            star=star, months=arms.ALL_FOLDS, seeds=arms.SCREEN_SEEDS, pairs=pairs, level=95.0,
+            metric=metric, loaded=loaded,
+        )  # fmt: skip
+        out.update({f"{metric}:{k}": v for k, v in res.items() if ":" in k})
     write(name="report_only", obj=out)
     return 0
 
