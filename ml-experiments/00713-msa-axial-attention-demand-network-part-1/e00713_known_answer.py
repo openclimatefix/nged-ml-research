@@ -7,9 +7,9 @@ Usage: e00713_known_answer.py MONTH [--device cuda] [--skip-fits]
 `--selftest` runs on the CPU with no data and no fit: it builds a small synthetic world from random
 arrays and checks the world's formula, the follow share, and the gate file logic.
 
-The full run needs the GPU for about 45 minutes. It runs, for the fold MONTH, KA5 (poisoned power),
+The full run needs the GPU for up to about 2 hours. It runs, for the fold MONTH, KA5 (poisoned power),
 KA6 (future weather canary) on the real inputs, then fits the synthetic worlds W0 and W1 with the
-training loop of `e00713_train` (stage 1, at most 150 passes, arms `M`, `P`, `N`, `E`, `G`) and checks
+training loop of `e00713_train` (stage 1, at most 400 passes with patience 30, arms `M`, `P`, `N`, `E`, `G`) and checks
 KA2, KA3, KA4, KA10, and KA12. KA1, KA7, and KA9 are run by `e00713_check_model.py` and
 `e00713_check_layout.py`; KA8 is run by `e00713_score.py`; KA11 by `e00713_era.py`. The script writes
 `work/known_answers_passed.json` only if every check it runs passes; `e00713_fit.py` refuses to run
@@ -243,7 +243,8 @@ class FollowTrace:
 
     It keeps a copy of the network's state after every pass, so that the state at the final pass can
     be scored, and it scores the follow share every `FOLLOW_TRACE_EVERY` passes. It saves and restores
-    the random state, so the training path is the same with or without it.
+    the random state. Evaluation mode and `no_grad` mean that no random number is drawn anyway, and
+    the training loop sets train mode again at the start of each pass.
     """
 
     def __init__(self, **follow_args: Any) -> None:

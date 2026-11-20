@@ -37,6 +37,8 @@ import numpy as np
 import polars as pl
 
 STEP_DAYS: Final = 10
+W2_PASSES: Final = 150
+"""Pass cap of the W2 diagnostic's fit, as before amendment 3; patience stays at `PATIENCE`."""
 WEEK_WINDOWS: Final = ((0, 7), (7, 14), (14, 21), (21, 28))
 R1_SPLIT_MONTH: Final = "2026-03"
 INTERNAL_LEADS: Final = (0, 6, 13)
@@ -382,7 +384,7 @@ def cmd_w2(*, month: str, device: str) -> None:
         samples=samples,
         seed=0,
         encoders="random",
-        max_passes=ka.SYNTHETIC_PASSES,
+        max_passes=W2_PASSES,
     )
     z_clean = (syn.y - syn.shift - mean[:, None]) / std[:, None]
     without = world.source.with_power_in(
