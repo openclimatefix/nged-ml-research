@@ -1957,6 +1957,9 @@ def main() -> int:  # noqa: PLR0911, PLR0912, PLR0915 - one branch per command
     """
     args = _parser().parse_args()
     configure_attempt(name=args.attempt)
+    if args.reparse and attempt_name() == "v2":
+        print("refused: attempt 2 is parsed live; there is nothing to re-parse", file=sys.stderr)
+        return 1
     if args.schema_report is not None:
         valid, invalid, errors = schema_report(log_path=args.schema_report)
         print(f"replies that satisfy the schema: {valid}; that fail it: {invalid}")
@@ -1983,9 +1986,6 @@ def main() -> int:  # noqa: PLR0911, PLR0912, PLR0915 - one branch per command
     if args.build_probe_prompts:
         build_probe_prompts(candidates=everything, inputs=prompts.load_inputs())
         return 0
-    if args.reparse and attempt_name() == "v2":
-        print("refused: attempt 2 is parsed live; there is nothing to re-parse", file=sys.stderr)
-        return 1
     if args.reparse:
         bank, rerun = asof.build_detector_bank(stat3_sites=_register_sites())
         union, _ = _candidates_from_rerun(rerun=rerun)
