@@ -18,5 +18,5 @@ for d in "$root"/00*/; do
 done
 export OMP_NUM_THREADS="${SLOT_CORES:-1}" MKL_NUM_THREADS="${SLOT_CORES:-1}" OPENBLAS_NUM_THREADS="${SLOT_CORES:-1}"
 export POLARS_MAX_THREADS="${SLOT_CORES:-1}" RAYON_NUM_THREADS="${SLOT_CORES:-1}"
-exec systemd-run --user --scope -p MemoryMax=16G -p MemorySwapMax=0 -p OOMPolicy=continue \
+exec systemd-run --user --scope -p MemoryMax="${SLOT_MEM:-16G}" -p MemorySwapMax=0 -p OOMPolicy=continue \
     uv run --no-sync python "$here/$script" "$@"

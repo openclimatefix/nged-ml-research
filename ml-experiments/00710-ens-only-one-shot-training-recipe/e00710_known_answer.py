@@ -547,8 +547,7 @@ def known_6_slump_known_answer() -> None:
 def known_7_known_699() -> None:
     """Test 7: experiment 699's known-answer table reproduces (`e00699_contrasts.py known`)."""
     root = Path(__file__).resolve().parents[1]
-    folders = [str(p) for p in root.iterdir() if p.is_dir()]
-    env = os.environ | {"PYTHONPATH": os.pathsep.join([*folders, os.environ.get("PYTHONPATH", "")])}
+    env = dict(os.environ)  # `run_phase.sh` already put the experiment folders on PYTHONPATH
     script = next(root.glob("00699-*/e00699_contrasts.py"))
     done = subprocess.run(
         [sys.executable, str(script), "known"], capture_output=True, text=True, env=env, check=False
