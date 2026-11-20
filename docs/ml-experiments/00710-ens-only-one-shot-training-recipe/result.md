@@ -8,7 +8,7 @@ theme: retraining-and-training-history
 also_relevant_to:
   - weather-products-and-blending
   - switching-labels-in-the-forecast
-status: planned
+status: finished
 kind: change
 protocol: demand-v2
 size: >-
@@ -52,220 +52,711 @@ metric: >-
   effective capacity, with the normalised MAE of the median beside it, and, per Primary group, the
   sunny half-hours, cold nights, the slump share into injected and real switching events, and the
   half-hours after an event.
-production_status: not-for-production
+verdict: partly supported
+best_arm: >-
+  `FTh90d-i` (ENS-only, two stages, 90-day half-life in the fine-tune, trained with injection): CRPS
+  2.826 points at the six signed-MW Primaries and 3.596 at the eight MVA-only Primaries on seeds 0
+  to 4, against 2.860 and 3.606 for the 3-stage reference `M1-i`.
+headline: >-
+  The ENS-only recipe `FTh90d-i` minus the 3-stage reference `M1-i` (C1) is -0.034 points of CRPS
+  (99.17% interval -0.084 to -0.001) at the six signed-MW Primaries, so the recipe matches and
+  beats the reference there. At the eight MVA-only Primaries C1 is -0.010 (-0.039 to +0.014), within
+  the 0.02 margin, but the guard "upper limit below +0.02 without D8" failed (+0.012, -0.013 to
+  +0.038), so the eight is inconclusive. Giving the reference the same 90-day half-life (E1) removed
+  most of the gap at the eight.
+lessons: >-
+  C1 at the six rests on 3 winter months (2025-12, 2026-01, 2026-02: -0.126, -0.173, -0.070) and
+  is -0.021 (-0.047 to -0.002, 95%) without 2026-01. The ENS-only recipe's advantage came from the
+  90-day half-life and from injection harming the reference: injection raised the reference's CRPS
+  by +0.036 at the eight (I1, +0.012 to +0.060) and the ENS-only recipes' by +0.008 and -0.004 (I2,
+  I3). One-stage recipes scored 0.052 to 0.070 worse than the two-stage ENS-only recipe (C3), and
+  a recency weight beat equal weights and the placebo in one stage (C4, C5). Injection cut the
+  slump share from about 0.22 to 0.26 down to about 0.08 to 0.13 (I4 to I6).
+take_home_message: >-
+  A demand neural network trained only on ECMWF ENS forecasts, with a short fine-tune that favours
+  the last 90 days, forecast as well as the 3-stage recipe at the six substations that report
+  signed megawatts, and within the margin at the eight that report apparent power, but the eight
+  depended on one substation (D8). Giving the 3-stage recipe the same 90-day setting removed most
+  of the ENS-only recipe's lead, so the experiment does not show that ERA5 and CAMS pre-training
+  can be dropped. Training with synthetic load-shift events cut the forecast's slump into real-looking
+  events by more than half, at a small cost on ordinary rows.
+advice:
+  - >-
+    Fit the 3-stage reference with the 90-day fine-tune half-life before comparing it with any
+    ENS-only recipe, because that one setting accounted for most of the ENS-only lead at the eight
+    (E1, C1).
+  - >-
+    Report the leave-one-Primary-out reading of every contrast at the eight, because D8 and D22
+    carry the ENS-only recipe's match there (C1 without D8: +0.012; without D22: +0.003).
+  - >-
+    Train with injected load-shift events where the forecast must not follow a switching event: the
+    slump share fell from 0.22 to 0.26 to 0.08 to 0.13 in all three recipes, at a cost on ordinary
+    rows that was clear only for the 3-stage reference at the eight (I1 to I6).
+  - >-
+    Use a recency weight in any single stage that trains on the long ENS history, and do not use
+    that single stage alone: it beat equal weights and the age-permuted placebo, and still scored
+    0.052 to 0.070 worse than a stage followed by a short fine-tune (C3, C4, C5).
+  - >-
+    Select a fine-tune on a recency-weighted held-out set, because the unweighted set picked the
+    first epoch in 58 to 60 of 60 fits, so the half-life comparison is a comparison of one epoch
+    (fit logs, result review M3).
+production_status: candidate
 adopted_in: none
 ---
-**This page is a pre-registration. No network has been fitted, and every number below is quoted
-from an earlier experiment, with its source named.** The status is `planned`. Everything on the page
-was written before any fit.
+**An ECMWF-ENS-only recipe forecast as well as the 3-stage reference at the six signed-megawatt
+Primaries, and was within the margin at the eight MVA-only Primaries only when D8 was counted.** The
+ENS-only recipe `FTh90d-i` trains the pooled mixture density network on the ECMWF ENS archive alone,
+then fine-tunes it with a 90-day half-life, and the selection keeps the first epoch of that
+fine-tune. Its CRPS, the continuous ranked probability score, is 2.826 points of effective capacity
+at the six and 3.596 at the eight, against 2.860 and 3.606 for the 3-stage reference `M1-i`. A lower
+CRPS is better. The pre-registered rule gives `partly supported`: `supported and beats the
+reference` at the six, and `inconclusive` at the eight.
 
-## Plan
+We asked whether the demand network needs the ERA5 and CAMS pre-training stage. The reference trains
+first on ERA5 reanalysis and CAMS solar estimates of past weather, then on the archive of ENS
+forecasts, then fine-tunes on the last 730 days of ENS with a half-life of 0.5 years. The ENS-only
+recipes drop the first stage, and vary where and how a recency weight enters. Every recipe was also
+trained with synthetic switching events injected into its lag inputs ("injection", state `-i`) or
+without them (state `-n`). The six Primaries that report signed megawatts and the eight that report
+only apparent power (MVA) are scored separately. The recipes, the contrasts, and the decision rule
+were fixed before any fit and are kept under "Pre-registered plan" below.
 
-### What we are asking, and what we will decide
+**In brief, the six matched and beat the reference, and the eight is open.** At the six, C1
+(`FTh90d-i` minus `M1-i`) is -0.034 points (99.17% interval -0.084 to -0.001). At the eight, C1 is
+-0.010 (-0.039 to +0.014), which would be `supported`, but the guard that the upper limit stay below
++0.02 without D8 failed (+0.012, with a 99.17% interval of -0.013 to +0.038).
 
-**We ask whether the demand network needs the ERA5 and CAMS pre-training stage at all.** Today's
-reference recipe trains the pooled mixture density network in three stages: first on ERA5
-reanalysis and CAMS solar estimates of past weather, then on the archive of ECMWF ENS forecasts,
-then on the last 730 days of ENS with a recency weight. Dropping the first stage would remove two
-weather sources and a code path from any future production recipe. [Experiment
-707](../00707-ens-backfill-pretraining-gain-against-ens-history-length/result.md) found that the
-first stage still helped at the eight MVA-only Primaries (-0.041 points of CRPS) and not clearly at
-the six signed-megawatt Primaries (+0.019).
+**Four qualifiers belong to the headline.**
 
-**We will fit several ENS-only recipes and compare each with the reference.** The recipes differ in
-where and how a recency weight enters: a separate final stage, a loss weight over one stage, a
-schedule over epochs, a hard window, a floor, a sampling probability, weight averaging, a cyclic
-schedule, and a half-life per Primary. Every recipe is fitted with and without synthetic switching
-events injected into its lag inputs, and every recipe is scored on five kinds of half-hour: all of
-them, sunny ones, cold nights, the slump into switching events, and the half-hours after an event.
+- **The 90-day half-life, not the missing pre-training stage, drives most of the gap at the eight.**
+  The reference was never given the 90-day half-life in the minimal plan. The extension arm `M1h90`
+  (E1) gives it. `M1h90-i` minus `M1-i` is -0.023 (-0.040 to -0.005, 95%) at the eight, and
+  `M1h90-i` minus `FTh90d-i` is -0.012 (-0.032 to +0.009, 97.5%).
+- **Injection harmed the reference more than the ENS-only recipes at the eight.** I1 (`M1-i` minus
+  `M1-n`) is +0.036 (+0.012 to +0.060) at the eight, against +0.008 for `M2` (I2) and -0.004 for
+  `FTh90d` (I3).
+- **The six's advantage sits in 3 winter months.** C1 is -0.126, -0.173, and -0.070 in 2025-12,
+  2026-01, and 2026-02, and lies within 0.02 of zero in the other 9 months.
+- **The six is not separated from experiment 707's failed placebo.** Whether ERA5 and CAMS help the
+  six was already unresolved in [experiment
+  707](../00707-ens-backfill-pretraining-gain-against-ens-history-length/result.md), and C2 (`M2-i`
+  minus `M1-i`, -0.029, -0.073 to +0.003) repeats its sign.
 
-**We will decide whether the best ENS-only recipe forecasts within 0.02 points of CRPS of the
-reference, in each of the two Primary groups.** The experiment adopts nothing. The result tells the
-maintainer whether to drop ERA5 and CAMS pre-training from the production recipe, and which recency
-weight to use if so. The result applies to the pooled network of experiment 707, not to the
-production Candidate network, which is modular and fine-tunes daily with a 90-day half-life.
+The experiment adopts nothing. The result applies to the pooled network of experiment 707, not to
+the modular Candidate network of the production service.
 
-**Protocol line.** This is a comparison of ENS-only recipes with the reference recipe `M1`, which is
-arm `A_F` of experiment 707, scored under the demand protocol `demand-v2`
-(`protocol: demand-v2` in the front matter), on row set `fold_a_daily_gap_v1`. The reference is a
-stored research recipe of experiment 707, so Primary demand research default 3 (the GAM stack and
-heuristic blend of experiment 322) is context here, not the benchmark.
+## Figures
 
-### Why the stop rule allows the attempt
+![Contrasts C1 to C5, E1, S2, and I1 to I3 at the six and the eight, with the +0.02
+margin](contrasts.svg)
 
-**A plain count of the theme's Experiments table gives three `not supported` verdicts on recency
-weighting (experiments 331, 407, and 466), and one direct `not supported` verdict on one-shot ENS
-training (experiment 519).** After three, the stop rule asks for the maintainer's approval, so the
-threshold is reached. The related verdicts on a different pairing of weather products (experiments 3
-and 9) are listed and not counted. Experiment 519 trained the lag-free network and gave it ENS rows
-during pre-training. Experiment 3 and experiment 9 compared ERA5 and CAMS training with ENS
-training of the first stage of a different model.
+![Slump share into injected events with and without injection, per recipe and
+group](slump_share.svg)
 
-**The maintainer approved the attempt on 2026-11-19, through the manager.** The request reads:
-"train in one shot ... using just the long history of ECMWF ENS ... find an optimal recipe", with
-recency-weighted arms. The maintainer later noted that experiments 331, 407, and 466 tested other
-models or targets, and that the half-life arms H1 and H2 of experiment 407 are the only arm-level
-result on the demand network.
+![Day-ahead and 14-day forecasts of the Primary D10 for the 3-stage reference and the ENS-only
+recipe](example_forecast.svg)
 
-**A `not supported` or `refuted` verdict here counts once against each of the two ideas, recency
-weighting and one-shot ENS training.** The write-up then says what a further attempt would change.
+![Day-ahead forecasts around six injected and two real load shifts, at both metering
+groups](load_shift_events.svg)
 
-### What is new against each earlier verdict
+**The example forecast is a winter origin, which is a favourable month for the ENS-only recipe.**
+The Primary D10 and the origin are those of experiment 425's winter example. The first choice, D5,
+was replaced because D5 sits inside a real event. C1 at the six is -0.173 in fold 2026-01, the
+largest of the 12 folds, so Figure 3 does not represent a typical month. The injected events in
+Figure 4 are the first event in fold order of depth 0.50 for each of the lengths 3, 7, and 15 days
+in each group, a rule fixed before looking. The real events are the December pair of D5 and D16
+(transfer 23), the only real events that experiment 580 verified and experiment 582 left usable. The
+event log from NGED may miss events, so some half-hours that look clean may sit inside an unlogged
+event.
 
-| Experiment | What it tested (pre-registration, from the experiment's own page) | What is new here |
+## Results
+
+### Headline CRPS and the error of the median
+
+**Every table gives CRPS in points of effective capacity with the normalised mean absolute error
+(MAE) of the median forecast in brackets.** Lower is better for both. The rows `M1-n` and `M2-n` are
+the stored forecasts of experiment 707's `A_F` and `R_F`. A seed set of `01234` means five seeds,
+and `012` means three. The shared scoring rows number 2,922,247 half-hours across every arm and
+reference, after dropping 785 actuals that the `substation_zero` rule flags.
+
+| Arm | Seeds | The six | The eight |
+|---|---|---|---|
+| `M1-i` | 01234 | 2.860 (5.051) | 3.606 (6.537) |
+| `M1-n` | 01234 | 2.838 (5.037) | 3.571 (6.470) |
+| `M2-i` | 01234 | 2.831 (5.007) | 3.620 (6.571) |
+| `M2-n` | 01234 | 2.819 (4.995) | 3.612 (6.565) |
+| `M3-i` | 012 | 2.922 (5.171) | 3.782 (6.879) |
+| `W-h1-i` | 012 | 2.864 (5.070) | 3.711 (6.750) |
+| `PP-i` | 012 | 2.913 (5.158) | 3.673 (6.685) |
+| `P-i` | 012 | 2.955 (5.216) | 3.810 (6.930) |
+| `FTh90d-i` | 01234 | 2.826 (5.001) | 3.596 (6.520) |
+| `FTh90d-n` | 012 | 2.831 (5.016) | 3.604 (6.544) |
+| `M1h90-i` | 012 | 2.858 (5.049) | 3.588 (6.495) |
+
+**The four load-shift scenarios separate the ordinary rows from the rows near a switching event.**
+"Inside events" are the half-hours that NGED logged as inside a switching event, and "the 7 days
+after" are the half-hours in the week after an event ends. The "outside" rows are all the others.
+The event log may miss events, so the "outside" rows are not event-free. The two event slices share
+no row (checked: 0 rows in both).
+
+At the six, with CRPS and the MAE of the median in brackets:
+
+| Arm | All rows | Outside events and 7 days after | Inside events | The 7 days after |
+|---|---|---|---|---|
+| `M1-i` | 2.860 (5.051) | 2.613 (4.712) | 9.104 (13.517) | 3.617 (6.216) |
+| `M1-n` | 2.838 (5.037) | 2.608 (4.714) | 8.474 (12.824) | 3.764 (6.535) |
+| `M2-i` | 2.831 (5.007) | 2.597 (4.682) | 8.771 (13.183) | 3.524 (6.081) |
+| `M2-n` | 2.819 (4.995) | 2.592 (4.680) | 8.386 (12.592) | 3.747 (6.432) |
+| `M3-i` | 2.922 (5.171) | 2.683 (4.840) | 8.877 (13.331) | 3.762 (6.455) |
+| `W-h1-i` | 2.864 (5.070) | 2.629 (4.748) | 8.724 (13.108) | 3.681 (6.209) |
+| `PP-i` | 2.913 (5.158) | 2.672 (4.825) | 8.943 (13.455) | 3.734 (6.355) |
+| `P-i` | 2.955 (5.216) | 2.722 (4.902) | 8.790 (13.097) | 3.731 (6.246) |
+| `FTh90d-i` | 2.826 (5.001) | 2.593 (4.680) | 8.796 (13.190) | 3.420 (5.898) |
+| `FTh90d-n` | 2.831 (5.016) | 2.604 (4.704) | 8.438 (12.626) | 3.678 (6.309) |
+| `M1h90-i` | 2.858 (5.049) | 2.618 (4.721) | 8.959 (13.289) | 3.560 (6.103) |
+
+At the eight:
+
+| Arm | All rows | Outside events and 7 days after | Inside events | The 7 days after |
+|---|---|---|---|---|
+| `M1-i` | 3.606 (6.537) | 3.616 (6.558) | 4.645 (8.156) | 2.878 (5.135) |
+| `M1-n` | 3.571 (6.470) | 3.578 (6.489) | 4.711 (8.255) | 2.868 (5.113) |
+| `M2-i` | 3.620 (6.571) | 3.630 (6.593) | 4.671 (8.222) | 2.885 (5.135) |
+| `M2-n` | 3.612 (6.565) | 3.620 (6.586) | 4.719 (8.304) | 2.895 (5.133) |
+| `M3-i` | 3.782 (6.879) | 3.796 (6.909) | 4.745 (8.387) | 2.879 (5.144) |
+| `W-h1-i` | 3.711 (6.750) | 3.720 (6.772) | 4.755 (8.364) | 2.967 (5.319) |
+| `PP-i` | 3.673 (6.685) | 3.681 (6.705) | 4.726 (8.343) | 2.974 (5.327) |
+| `P-i` | 3.810 (6.930) | 3.824 (6.959) | 4.725 (8.238) | 2.954 (5.292) |
+| `FTh90d-i` | 3.596 (6.520) | 3.605 (6.541) | 4.710 (8.261) | 2.843 (5.062) |
+| `FTh90d-n` | 3.604 (6.544) | 3.612 (6.564) | 4.775 (8.371) | 2.885 (5.131) |
+| `M1h90-i` | 3.588 (6.495) | 3.597 (6.515) | 4.648 (8.132) | 2.880 (5.161) |
+
+| Subset | The six | The eight |
 |---|---|---|
-| [331](../00331-primary-demand-recency-weights-on-gam-and-kalman/result.md) | A GAM with a Kalman filter at Primaries, half-life against equal weights: -0.025 points of CRPS (95% interval -0.032 to -0.017) | A neural network, ENS weather, a window back to 2021, weight schedules, injection, and four extra metrics |
-| [407](../00407-pooled-mixture-density-network-tail-arms-and-recency-weights/result.md) | Arms H1 and H2 of the pooled network: fine-tune half-lives of 1 year (+0.009, -0.015 to +0.033 at the six) and 0.25 years (+0.073, -0.003 to +0.140), on five screen months and a 24-month window. This counts as one arm-level result at most | Twelve folds, the long window, the half-life varied inside a one-shot stage as well as in the fine-tune, other weight shapes, schedules, injection, and the four metrics |
-| [466](../00466-wind-and-solar-recency-weighting/result.md) | Wind and solar networks with 12.5 to 26 months of history; best solar -0.14% (95% interval -0.36% to +0.08%) | Primary demand, a history of 47 to 58 months, and every other change above |
-| [519](../00519-ens-share-in-lagless-network-pretraining-ratio-sweep/result.md) | ENS rows in the pre-training of the lag-free network: the forecast got worse at the eight, by 0.06 to 0.22 points | The pooled network with lag inputs, ENS as the only weather source in every stage, and the ENS history reaching back to 2021 |
+| All rows | 826,396 (12) | 1,103,553 (12) |
+| Sunny half-hours (months) | 131,652 (12) | 175,970 (12) |
+| Cold nights | 35,496 (7) | 37,704 (7) |
+| Inside events | 28,120 (8) | 9,376 (7) |
+| The 7 days after | 21,496 (7) | 26,864 (9) |
+| Outside events and 7 days after | 776,780 (12) | 1,067,313 (12) |
 
-**The reference's third stage already is a recency-weighted ENS fine-tune.** The reference `M1`
-(`A_F` of experiment 707) trains on ERA5 and CAMS with equal weights, then on ENS from 2021-07-20
-with equal weights, then on the last 730 days of ENS with weight `0.5 ** (age / 0.5 years)`. The
-arms here change three properties of that last step: the half-life, the shape of the weight
-(exponential, hard window, exponential with a floor, or a schedule over epochs), and the mechanism
-(a loss weight, a sampling probability, a separate stage, or a weight per Primary). No arm
-introduces a recency weight where none existed. The stored fine-tune also caps the window at 730
-days, so a 2021 row never carries weight in the reference.
+**Inside logged events the injected state is worse at the six and within 0.07 of the uninjected
+state at the eight; in the week after an event, injection helps at the six for all three recipes
+that have both states.** `M1-i` scores 9.104 against `M1-n`'s 8.474 inside events at the six, and
+3.617 against 3.764 in the 7 days after. None of these absolute differences has a paired interval,
+and the 95% intervals on the absolute values overlap.
+
+### Contrasts
+
+**Each row of the table is treatment minus reference in CRPS, with the Bonferroni level of its
+family in brackets, and the MAE of the median beside it at 95%.** The month-block bootstrap
+resamples whole forecast-origin months (100,000 resamples). C1 to C5 and I1 to I3 are
+pre-registered; E1 is the pre-registered extension; S2 is a secondary reading (`FTh90d-i` minus
+`M2-i`, the effect of the 90-day half-life on the ENS-only recipe).
+
+| Contrast | Group | CRPS (level) | MAE of the median (95%) |
+|---|---|---|---|
+| C1 FTh90d-i minus M1-i (headline) | The six | -0.034 (-0.084 to -0.001) (99.17%) | -0.050 (-0.108 to +0.001) |
+| C1 FTh90d-i minus M1-i (headline) | The eight | -0.010 (-0.039 to +0.014) (99.17%) | -0.017 (-0.065 to +0.025) |
+| C2 M2-i minus M1-i | The six | -0.029 (-0.073 to +0.003) (99.17%) | -0.043 (-0.091 to -0.002) |
+| C2 M2-i minus M1-i | The eight | +0.014 (-0.002 to +0.032) (99.17%) | +0.034 (+0.007 to +0.063) |
+| C3 PP-i minus M2-i | The six | +0.070 (+0.040 to +0.096) (99.17%) | +0.130 (+0.087 to +0.172) |
+| C3 PP-i minus M2-i | The eight | +0.052 (+0.017 to +0.106) (99.17%) | +0.114 (+0.041 to +0.212) |
+| C4 W-h1-i minus M3-i | The six | -0.058 (-0.092 to -0.015) (99.38%) | -0.101 (-0.156 to -0.038) |
+| C4 W-h1-i minus M3-i | The eight | -0.071 (-0.122 to -0.011) (99.38%) | -0.129 (-0.209 to -0.044) |
+| C5 W-h1-i minus P-i (placebo) | The six | -0.091 (-0.154 to -0.029) (99.38%) | -0.145 (-0.232 to -0.064) |
+| C5 W-h1-i minus P-i (placebo) | The eight | -0.099 (-0.152 to -0.050) (99.38%) | -0.180 (-0.262 to -0.098) |
+| E1 M1h90-i minus FTh90d-i | The six | +0.018 (-0.011 to +0.057) (97.5%) | +0.026 (-0.015 to +0.070) |
+| E1 M1h90-i minus FTh90d-i | The eight | -0.012 (-0.032 to +0.009) (97.5%) | -0.031 (-0.063 to +0.001) |
+| S2 FTh90d-i minus M2-i | The six | -0.005 (-0.017 to +0.004) (99.17%) | -0.006 (-0.025 to +0.012) |
+| S2 FTh90d-i minus M2-i | The eight | -0.024 (-0.050 to -0.002) (99.17%) | -0.051 (-0.093 to -0.013) |
+| I1 M1-i minus M1-n | The six | +0.022 (-0.024 to +0.106) (99.58%) | +0.013 (-0.042 to +0.081) |
+| I1 M1-i minus M1-n | The eight | +0.036 (+0.012 to +0.060) (99.58%) | +0.067 (+0.031 to +0.102) |
+| I2 M2-i minus M2-n | The six | +0.012 (-0.013 to +0.061) (99.58%) | +0.013 (-0.015 to +0.050) |
+| I2 M2-i minus M2-n | The eight | +0.008 (-0.023 to +0.046) (99.58%) | +0.006 (-0.039 to +0.056) |
+| I3 FTh90d-i minus FTh90d-n | The six | +0.009 (-0.013 to +0.045) (99.58%) | +0.008 (-0.017 to +0.034) |
+| I3 FTh90d-i minus FTh90d-n | The eight | -0.004 (-0.046 to +0.041) (99.58%) | -0.018 (-0.077 to +0.042) |
+
+**The decision rule gives these readings.**
+
+- **C1 at the six: `supported and beats the reference`.** The upper limit is -0.001, below zero.
+  Every guard held: the point estimate on seeds 0 to 2 is -0.024 (-0.062 to +0.005, 95%) and on
+  seeds 3 and 4 is -0.045 (-0.088 to -0.012); `FTh90d-i` minus `M2-i` is -0.005; the q01 and q99
+  tails, the five lead bands, and cold nights stayed within 0.05. The protected sunny slice
+  `sunny_clear_sky_index` was not built, so the verdict has no sunny guard, as the plan allows.
+- **C1 at the eight: `inconclusive`, because the guard "upper limit below +0.02 on the eight without
+  D8" failed.** C1 without D8 is +0.012 (-0.013 to +0.038). The other guards held.
+- **C2 (`M2-i` minus `M1-i`) is -0.029 at the six and +0.014 at the eight.** The eight repeats the
+  sign of experiment 707 with a smaller size (+0.014 here against +0.041 there). The post hoc
+  contrast `M2-n` minus `M1-n` (the stored forecasts) is +0.041 (+0.030 to +0.053, 95%) at the eight
+  and -0.019 (-0.038 to -0.002) at the six.
+- **C3 (`PP-i` minus `M2-i`) is +0.070 at the six and +0.052 at the eight,** so the best one-stage
+  recipe scored worse than the two-stage ENS-only recipe. The lower limit is +0.040 at the six,
+  above the margin, and +0.017 at the eight, below it.
+- **C4 and C5 both lie below zero at both groups, so the rule's wording "a recency weight helps in
+  one stage" holds.** C4 (`W-h1-i` minus `M3-i`, equal weights) is -0.058 and -0.071. The placebo is
+  not neutral: `P-i` minus `M3-i` is +0.033 (-0.010 to +0.078, 95%) at the six and +0.028 (-0.015 to
+  +0.071) at the eight, so C5 (-0.091 and -0.099) is C4 plus the placebo's own loss, and C4 gives
+  the size of the gain over equal weights.
+- **E1 is explanatory and changes no verdict.** At the eight `M1h90-i` is 0.012 ahead of `FTh90d-i`.
+  At the six `M1h90-i` is 0.018 behind (-0.011 to +0.057). The guards of E1 failed on cold nights in
+  both groups, and on lead days 2 to 7 at the six, and are read as explanatory.
+- **Injection (I1 to I3) did not show "no harm" for any recipe.** The upper limit stays above +0.02
+  in all six readings, so the rule's wording "injection does no harm" is not earned. The one clear
+  harm is I1 at the eight (+0.036). The pre-registered prediction "under 0.02" holds as a point
+  estimate for I2 and I3 and fails for I1 (+0.022 at the six, +0.036 at the eight).
+- **The slump reduction (I4 to I6) is clear in every recipe and group.** The paired difference in
+  slump share, `-i` minus `-n`, is -0.142 (-0.169 to -0.118) and -0.130 (-0.143 to -0.116) for `M1`,
+  -0.156 and -0.133 for `M2`, and -0.154 and -0.131 for `FTh90d`, at the six and the eight. All six
+  upper limits lie below zero.
+
+**The prediction written before any fit was right on two counts, wrong on one, and mixed on one.**
+C1 was predicted between -0.02 and +0.03 at the six and between 0 and +0.04 at the eight, and came
+out below both ranges (-0.034 and -0.010). The placebo contrast C5 was predicted below zero at the
+eight, and is (-0.099). Injection was predicted to lower the slump share, and does. Injection was
+predicted to raise CRPS on ordinary rows by under 0.02, which holds for I2 and I3 in both groups and
+fails for I1 in both.
+
+### Leave-one-Primary-out, fold by fold, and seed halves
+
+**At the eight, C1 changes sign when D8 or D22 is left out, and at the six it does not.** The table
+gives C1 (95% intervals) with one Primary removed. Without D8, C1 is +0.012 (-0.007 to +0.031);
+without D22, +0.003 (-0.024 to +0.030). At the six, C1 stays between -0.027 and -0.045, but the
+upper limit reaches 0.000 without D5 (-0.059 to -0.000) or D10 (-0.073 to -0.000), so the "beats"
+wording is fragile.
+
+| Left out | C1, the six (95%) | Left out | C1, the eight (95%) |
+|---|---|---|---|
+| D5 | -0.027 (-0.059 to -0.000) | D2 | -0.010 (-0.032 to +0.011) |
+| D9 | -0.045 (-0.087 to -0.011) | D3 | -0.012 (-0.036 to +0.010) |
+| D10 | -0.032 (-0.073 to -0.000) | D4 | -0.021 (-0.043 to -0.002) |
+| D11 | -0.041 (-0.081 to -0.008) | D8 | +0.012 (-0.007 to +0.031) |
+| D14 | -0.030 (-0.061 to -0.006) | D12 | -0.022 (-0.057 to +0.006) |
+| D16 | -0.031 (-0.063 to -0.005) | D19 | -0.022 (-0.041 to -0.004) |
+| | | D21 | -0.009 (-0.032 to +0.013) |
+| | | D22 | +0.003 (-0.024 to +0.030) |
+
+**C1 at the six is concentrated in winter.** C1 by fold at the six (2025-07 to 2026-06) is +0.001,
+-0.006, -0.011, -0.009, -0.010, -0.126, -0.173, -0.070, +0.005, -0.001, -0.019, and +0.020. At the
+eight it is -0.034, +0.022, +0.007, -0.062, +0.029, -0.087, -0.015, +0.010, +0.036, +0.001, -0.004,
+and -0.020 (negative in 6 of 12 folds). Without fold 2026-01, C1 is -0.021 (-0.047 to -0.002) at the
+six and -0.010 (-0.033 to +0.011) at the eight. The t test on the 12 monthly differences gives p =
+0.077 at the six and p = 0.371 at the eight.
+
+**The minimum detectable effect of the design was 0.018 points.** The scorer computes it from the
+seed-half differences (standard deviation 0.0253 over 12 folds).
+
+### Sunny half-hours and cold nights
+
+**On sunny half-hours the ENS-only recipe and the reference score alike, and on cold nights the
+ENS-only recipe scores better than the injected reference but not better than the uninjected one.**
+The sunny slice is `sunny_unit_shape`, the descriptive slice; the clear-sky-index slice that the
+plan protects could not be built. C1 on cold nights is -0.174 (-0.205 to -0.116, 90%) at the six and
+-0.126 (-0.173 to -0.069) at the eight. `FTh90d-i` scores 4.399 on cold nights at the six, against
+4.573 for `M1-i` and 4.312 for `M1-n`. Cold nights cover 7 months, so the absolute intervals are
+wide (for example 2.378 to 5.539 for `FTh90d-i` at the six). Sunny half-hours and cold nights, six
+then eight:
+
+| Arm | Sunny half-hours | Cold nights |
+|---|---|---|
+| `M1-i` | 3.707 (6.685) | 4.573 (7.167) |
+| `M1-n` | 3.682 (6.634) | 4.312 (6.883) |
+| `M2-i` | 3.730 (6.739) | 4.466 (7.019) |
+| `M2-n` | 3.712 (6.690) | 4.270 (6.747) |
+| `M3-i` | 4.151 (7.557) | 4.557 (7.178) |
+| `W-h1-i` | 3.795 (6.870) | 4.452 (7.065) |
+| `PP-i` | 3.913 (7.063) | 4.590 (7.292) |
+| `P-i` | 4.113 (7.464) | 4.653 (7.321) |
+| `FTh90d-i` | 3.706 (6.699) | 4.399 (6.887) |
+| `FTh90d-n` | 3.706 (6.679) | 4.265 (6.678) |
+| `M1h90-i` | 3.702 (6.682) | 4.522 (7.041) |
+
+| Arm | Sunny half-hours | Cold nights |
+|---|---|---|
+| `M1-i` | 4.871 (8.977) | 3.354 (5.926) |
+| `M1-n` | 4.828 (8.868) | 3.320 (5.928) |
+| `M2-i` | 4.935 (9.122) | 3.284 (5.775) |
+| `M2-n` | 4.902 (9.067) | 3.276 (5.815) |
+| `M3-i` | 5.463 (10.200) | 3.523 (6.168) |
+| `W-h1-i` | 5.164 (9.625) | 3.505 (6.228) |
+| `PP-i` | 5.130 (9.516) | 3.472 (6.142) |
+| `P-i` | 5.420 (10.096) | 3.617 (6.417) |
+| `FTh90d-i` | 4.850 (8.934) | 3.228 (5.686) |
+| `FTh90d-n` | 4.827 (8.883) | 3.238 (5.771) |
+| `M1h90-i` | 4.786 (8.781) | 3.316 (5.854) |
+
+### Slump into load-shift events
+
+**Injection cut the slump share of every recipe from about 0.22 to 0.26 down to about 0.08 to
+0.13.** The slump share is `sign(d) * (q50 with shifted lags - q50 with unshifted lags) / abs(d)`,
+with `d` the depth of the injected event as a share of capacity. A forecast that keeps to the normal
+running arrangement scores 0, and one that takes up the whole step scores 1. The table gives 95%
+month-block intervals over events (144 events at the six, 192 at the eight).
+
+| Arm | The six: share (95% interval) | The eight: share (95% interval) |
+|---|---|---|
+| `M1-i` | 0.082 (0.061 to 0.105) | 0.123 (0.095 to 0.150) |
+| `M1-n` | 0.224 (0.202 to 0.247) | 0.253 (0.220 to 0.284) |
+| `M2-i` | 0.087 (0.065 to 0.111) | 0.127 (0.102 to 0.151) |
+| `M2-n` | 0.244 (0.215 to 0.274) | 0.261 (0.224 to 0.294) |
+| `FTh90d-i` | 0.083 (0.062 to 0.105) | 0.118 (0.093 to 0.141) |
+| `FTh90d-n` | 0.236 (0.208 to 0.266) | 0.249 (0.211 to 0.283) |
+
+**The share rises through an event, and falls back in the week after.** The table gives the share by
+days since onset and in the 7 days after the event ends, for seeds 0 to 4 where five exist and seeds
+0 to 2 otherwise. The rows "first 4 days" and "day 4 to end" hold different event mixes (108 of the
+144 events at the six hold each phase), so the two cannot be compared as one effect.
+
+| Arm | The six: all events | First 4 days | Day 4 to end | 7 days after | The eight: all events | First 4 days | Day 4 to end | 7 days after |
+|---|---|---|---|---|---|---|---|---|
+| `M1-i` (01234) | 0.082 | 0.061 | 0.100 | 0.085 | 0.121 | 0.085 | 0.148 | 0.103 |
+| `M2-i` (01234) | 0.086 | 0.066 | 0.103 | 0.087 | 0.126 | 0.091 | 0.154 | 0.105 |
+| `M3-i` (012) | 0.114 | 0.088 | 0.137 | 0.115 | 0.167 | 0.120 | 0.202 | 0.139 |
+| `W-h1-i` (012) | 0.105 | 0.085 | 0.124 | 0.106 | 0.153 | 0.115 | 0.184 | 0.125 |
+| `PP-i` (012) | 0.101 | 0.083 | 0.117 | 0.106 | 0.144 | 0.110 | 0.171 | 0.123 |
+| `P-i` (012) | 0.113 | 0.091 | 0.134 | 0.116 | 0.162 | 0.116 | 0.199 | 0.139 |
+| `FTh90d-i` (01234) | 0.082 | 0.061 | 0.099 | 0.088 | 0.116 | 0.083 | 0.144 | 0.104 |
+| `FTh90d-n` (012) | 0.236 | 0.180 | 0.286 | 0.165 | 0.249 | 0.194 | 0.293 | 0.158 |
+| `M1h90-i` (012) | 0.077 | 0.054 | 0.095 | 0.087 | 0.111 | 0.075 | 0.138 | 0.101 |
+
+**The recipes without a fine-tune hold a larger share than the two-stage recipes.** `M3-i`,
+`W-h1-i`, `PP-i`, and `P-i` (seeds 0 to 2) hold 0.10 to 0.11 at the six and 0.14 to 0.17 at the
+eight, against 0.08 to 0.09 and 0.12 to 0.13 for `M1-i`, `M2-i`, and `FTh90d-i`.
+
+**The real December events show a small slump share and an error against the normal running
+arrangement of 5 to 11 points of capacity in magnitude.** Two real events were verified well enough
+to use: D5 and D16, both in transfer 23 of experiment 580 (a step of -0.256 of capacity at D5 and
++0.151 at D16). Only the injected state was stored for the real events, so they cannot show what
+injection changed. Per event, with no interval:
+
+| Primary | Transfer | Step (share of capacity) | Arm | Half-hours | Slump share | Error against the normal running arrangement (points) |
+|---|---|---|---|---|---|---|
+| D5 | 23 | -0.256 | `M1-i` | 2,106 | +0.027 | +7.63 |
+| D5 | 23 | -0.256 | `M2-i` | 2,106 | +0.069 | +7.33 |
+| D5 | 23 | -0.256 | `FTh90d-i` | 2,106 | +0.065 | +7.75 |
+| D16 | 23 | +0.151 | `M1-i` | 1,404 | +0.103 | -7.84 |
+| D16 | 23 | +0.151 | `M2-i` | 1,404 | +0.112 | -7.13 |
+| D16 | 23 | +0.151 | `FTh90d-i` | 1,404 | +0.104 | -7.22 |
+| D5 | 23 | -0.256 | `M1-i` | 9,126 | +0.122 | +11.31 |
+| D5 | 23 | -0.256 | `M2-i` | 9,126 | +0.135 | +11.03 |
+| D5 | 23 | -0.256 | `FTh90d-i` | 9,126 | +0.130 | +10.84 |
+| D16 | 23 | +0.151 | `M1-i` | 9,126 | +0.015 | -5.76 |
+| D16 | 23 | +0.151 | `M2-i` | 9,126 | +0.026 | -5.43 |
+| D16 | 23 | +0.151 | `FTh90d-i` | 9,126 | +0.013 | -5.59 |
+
+**The first six rows are the December fold and the last six the January fold, each with the
+half-hours of that fold.** The slump share is small in both (0.01 to 0.14), and the magnitude of the
+error against the normal running arrangement is 5.4 to 11.3 points of capacity. The share differs
+little between `M1-i`, `M2-i`, and `FTh90d-i`. The flagged May events (transfers 24 to 26) are not
+used, because their depths are unverified (experiment 582), and the lines for transfers 25 and 26 at
+D12 are identical in the scorer log, which suggests one event entered twice.
+
+### Coverage, tails, and convergence
+
+**The lower tail is over-covered and the upper tail is near nominal, in the same way for every
+arm.** The share of actuals below q05 is 0.022 to 0.038 (nominal 0.05), and below q95 is 0.930 to
+0.964 (nominal 0.95). The table gives both shares.
+
+| Arm | The six: q05 / q95 | The eight: q05 / q95 |
+|---|---|---|
+| `M1-i` | 0.022 / 0.932 | 0.026 / 0.959 |
+| `M1-n` | 0.024 / 0.933 | 0.027 / 0.959 |
+| `M2-i` | 0.024 / 0.935 | 0.027 / 0.960 |
+| `M2-n` | 0.026 / 0.935 | 0.027 / 0.960 |
+| `M3-i` | 0.028 / 0.935 | 0.035 / 0.964 |
+| `W-h1-i` | 0.023 / 0.933 | 0.029 / 0.960 |
+| `PP-i` | 0.025 / 0.932 | 0.030 / 0.962 |
+| `P-i` | 0.029 / 0.930 | 0.038 / 0.959 |
+| `FTh90d-i` | 0.025 / 0.934 | 0.027 / 0.959 |
+| `FTh90d-n` | 0.028 / 0.934 | 0.029 / 0.958 |
+| `M1h90-i` | 0.024 / 0.932 | 0.028 / 0.956 |
+
+**No arm ended its final stage at the epoch limit in more than a quarter of its fits, so no arm is
+labelled "not converged".** The share at the limit is at most 0.02. That label says nothing about
+the fine-tunes, for the reason in caveat 3 below.
+
+| Arm | Fits | Mean steps of the final stage | Mean seconds per fit | Share at the limit | Effective rows per batch |
+|---|---|---|---|---|---|
+| `M1-i` | 68 | 25,156 | 147 | 0.00 | 10,542 |
+| `M2-i` | 68 | 19,528 | 109 | 0.00 | 10,542 |
+| `M2-n` | 8 | 16,193 | 50 | 0.00 | 10,571 |
+| `W-h1-i` | 44 | 18,579 | 101 | 0.02 | 10,232 |
+| `PP-i` | 44 | 19,878 | 106 | 0.02 | 11,899 |
+| `FTh90d-i` | 68 | 2,109 | 65 | 0.00 | 5,994 |
+| `FTh90d-n` | 36 | 2,123 | 89 | 0.00 | 5,993 |
+| `M1h90-i` | 36 | 2,123 | 93 | 0.00 | 5,993 |
+| `P-i` | 36 | 17,917 | 113 | 0.00 | 9,757 |
+
+**The median forecast is below the mean forecast at every Primary, by 0.08 to 1.8 points of
+capacity.** The table gives the mass-weighted mean of the 11 quantiles minus the median, per
+Primary, for seeds 0 to 2 of each arm.
+
+| Arm | D5 | D9 | D10 | D11 | D14 | D16 | D2 | D3 | D4 | D8 | D12 | D19 | D21 | D22 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `M1-i` | -0.44 | -0.19 | -0.71 | -0.07 | -0.14 | -0.23 | -0.17 | -0.14 | -0.22 | -0.89 | -1.83 | -0.27 | -0.12 | -0.28 |
+| `M2-i` | -0.45 | -0.19 | -0.68 | -0.08 | -0.13 | -0.19 | -0.16 | -0.13 | -0.23 | -1.01 | -1.69 | -0.28 | -0.12 | -0.19 |
+| `FTh90d-i` | -0.43 | -0.19 | -0.62 | -0.08 | -0.13 | -0.19 | -0.16 | -0.12 | -0.24 | -1.10 | -1.83 | -0.28 | -0.12 | -0.26 |
+
+### Tuning folds
+
+**The four tuning folds (2024-10, 2025-01, 2025-03, 2025-06) chose `B*`, `O*`, and `h_T`.** `B*` is
+`FTh90d`, the ENS-only recipe with the lowest CRPS on folds 2025-03 and 2025-06, `O*` is `PP` (the
+best one-stage recipe), and `h_T` is 1 year. The table gives the mean CRPS on those two folds,
+interim, from two seeds. Recipes such as `S`, `HW730`, `W-h0.5`, and `W-h2` have a tuning score only
+and no verdict.
+
+| Arm | Mean CRPS on tuning folds 2025-03 and 2025-06 |
+|---|---|
+| `M1` | 4.153 |
+| `FTh90d` | 4.186 |
+| `M2` | 4.221 |
+| `PP` | 4.239 |
+| `FTh1` | 4.241 |
+| `EMA` | 4.254 |
+| `RFE` | 4.275 |
+| `CYC` | 4.278 |
+| `S` | 4.293 |
+| `W-h1` | 4.297 |
+| `FLR` | 4.305 |
+| `W-h2` | 4.313 |
+| `M3` | 4.325 |
+| `HW730` | 4.346 |
+| `W-h0.5` | 4.355 |
+| `SMP` | 4.382 |
+| `HW365` | 4.575 |
+
+## Checks
+
+- **Median minus mean, per Primary:** the median forecast is below the mean at all 16 Primaries in
+  all three arms checked (`M1-i`, `M2-i`, `FTh90d-i`), by 0.08 to 1.8 points of capacity (D15, which
+  is report-only, by 3.4 to 3.9). The largest gaps are D12 (-1.7 to -1.8), D8 (-0.9 to -1.1), and
+  D10 (-0.6 to -0.7). The mean is a mass-weighted mean of the 11 quantiles, because the forecast
+  stores no mean.
+- **Error of the median beside each quantile-score contrast:** the MAE of the median points the same
+  way as the CRPS contrast in all 20 readings (C1 to C5, E1, S2, and I1 to I3, in both groups), in
+  the contrasts table. Audit trigger 3 did not fire. C1's MAE contrasts are -0.050 and -0.017.
+- **Audit trigger 1, a control fails: not fired.** Known-answer tests 1 to 7 passed. Both stop
+  checks passed (`M2-i` minus `M1-i`: +0.026; `M2-i` minus `M2-n`: +0.065, against a stop at 0.10).
+  The placebo passed in the pre-registered sense (C5 below zero), but it is not neutral (see C4 and
+  C5 above).
+- **Audit trigger 2, a result contradicts its prediction: fired.** C1 lay below both predicted
+  ranges and I1 above the predicted bound. The session tested an explanation: E1 shows that the
+  90-day half-life accounts for most of the eight's gap, and I1 to I3 and `M2-n` minus `M1-n` show
+  that injection hurts the reference more.
+- **Audit trigger 4, leaving one Primary out flips a sign: fired.** At the eight, C1 turns positive
+  without D8 (+0.012) or D22 (+0.003). At the six no sign flips, and the "beats" wording weakens
+  without D5 or D10. The verdict's wording at the eight is `inconclusive` for this reason.
+- **Audit trigger 5, a nested arm beats the one that contains it: weakly fired.** `M2-i`, which
+  drops ERA5 and CAMS, scores better than `M1-i` at the six (-0.029, interval includes zero).
+  Experiment 707's placebo failed at the six, so the six's sign is unattributed to the weather data.
+- **Audit triggers 6 and 7: not fired.** C1's half-widths of 0.041 and 0.027 are 1.7 to 1.8 times
+  the 0.024 and 0.015 rescaled from experiment 707, below the factor of 2. No design that depends on
+  this result was known when this page was written. Dropping ERA5 and CAMS from a production recipe
+  would rest on a headline that has one injection world per fold and seed, which the experiment does
+  not replicate.
+- **No separate audit has run.** The adversarial result review (`result_review_1.md`, in the private
+  briefs folder) re-derived the headline contrasts from the stored forecasts with its own code,
+  within 0.004 points of the scorer, which is the re-derivation an audit does. Whether that review
+  stands in for the audit is for the maintainer to decide.
+- **Code reviews 1 to 4,** each triaged in `NOTES_for_reviewer.md`: review 1 (training loop,
+  weights, injection, scorer; one blocker on the job order and scorer, fixed); review 2 (the fixes,
+  and the launcher, with N1 to N5 fixed before Phase T and Phase S); review 3 (the E1 and E2
+  extension: no blocker; the `--stored M2-n` command and the known-answer gate added); review 4 (the
+  aggregate-based scorer, which reproduces the earlier scorer's 282 shared numbers to 8e-16, with no
+  blocker).
+- **Result review 1: seven major findings (M1 to M7) and nine minor ones (m1 to m9),** triaged
+  below.
+
+### Triage of the result review
+
+- **M1, injection harms the reference more (accepted).** Reported in the contrasts and in the
+  qualifiers, and tested by E1 and E2: I1 is +0.036 at the eight, while I2 and I3 are +0.008 and
+  -0.004. The claim "an ENS-only recipe matches the reference" holds only for networks trained with
+  injection. The uninjected contrast S1 (`FTh90d-n` minus `M1-n`) is -0.001 at the six and +0.027 at
+  the eight, both `inconclusive` (no guards).
+- **M2, C1 mixes the half-life with dropping pre-training (accepted).** E1 fitted the reference with
+  the 90-day half-life (36 fits). At the eight, C1 (-0.010) is about C2 (+0.014, the effect of
+  dropping pre-training) plus S2 (-0.024, the effect of the 90-day half-life).
+- **M3, the fine-tune selection set moves against the recency weight (accepted, caveat 3).** The
+  unweighted `V_sel` picked epoch 0 in 60 of 60 `M1-i`, 58 of 60 `M2-i`, and 60 of 60 `FTh90d-i`
+  fits.
+- **M4, leave-one-Primary-out flips the sign at the eight (accepted).** Reported above, with trigger
+  4.
+- **M5, "beats" at the six rests on three winter months (accepted).** The verdict is reported as the
+  rule gives it, followed by the fold-by-fold and without-2026-01 readings.
+- **M6, the slump contrasts I4 and I5 were not read (accepted, resolved).** E2 wrote the bank passes
+  of `M1-n` and `M2-n`, and fitted `FTh90d-n`, so I4 to I6 are read.
+- **M7, injection did not help on the logged event rows at the six (accepted, descriptive).**
+  Reported in the scenario tables.
+- **m1, the NaN in the slump table's CRPS-change column (accepted, fixed).** The scorer ignores NaN
+  actuals (commit `23509a5d0`).
+- **m2, the two slump phases hold different event mixes (accepted, stated).**
+- **m3, the real-event lines are ambiguous (accepted).** The page labels the December and January
+  folds, and does not use the May events.
+- **m4, the steps table omits the cap (accepted, partly).** The final-stage steps and the share at
+  the limit are in the convergence table, and no one-stage arm reached its cap of 34,040 steps
+  (result review). The cap column is not printed. `FTh90d` and `M3` load their `S_ens` state from
+  `M2-i`, so the steps of the fine-tune alone appear.
+- **m5, the protected sunny guard did not run (accepted, stated).** The plan allows that fallback.
+- **m6, the placebo is not neutral (accepted, stated).** Under C4 and C5 above.
+- **m7, pre-registered descriptive readings are missing (accepted, partly).** The page adds the
+  load-shift scenario "outside events", the readings without fold 2026-01, leave-one-Primary-out at
+  both groups, the example forecasts, and the event plots. It does not add per-Primary tables, the
+  D15 and D18 scores beyond the median-minus-mean gap, or a `-i` minus `-n` difference for every
+  recipe on every metric.
+- **m8, `O*` changed between two launches (accepted, stated in Method).** `O*` was `CYC` for two
+  unscored `CYC-i` fits and was then rewritten to `PP` before any scored fold read it.
+- **m9, housekeeping (accepted).** The known-answer marker and the committed scripts agree, and the
+  2026-06 files hold valid times after 2026-06-30, which the scorer drops.
+
+## Caveats
+
+1. **The headline holds for networks trained with injection.** Without injection, the stored
+    reference leads the stored ENS-only recipe `M2-n` at the eight by 0.041 points (post hoc). The
+    experiment chose the injected state as the headline before the fits, and no `-n` state of `B*`
+    was in the minimal plan.
+2. **The seeds and the injection worlds are few.** Each (fold, seed) has one injection world, so the
+    injection family rests on at most five draws per fold. C1 at the six is -0.024 on seeds 0 to 2
+    and -0.045 on seeds 3 and 4, and the result review found that `M1-i` scores worse on seeds 3 and
+    4 (2.882 against 2.864 at the six).
+3. **A fine-tune is in effect a fixed one-epoch fine-tune.** The unweighted selection set picked
+    epoch 0 and then stopped by patience at 7 epochs. For `FTh90d-i`, the chosen state had a worse
+    `V_sel` loss than the starting state in 48 of 60 fits, yet the fine-tune lowers test CRPS
+    (`M3-i` minus `M2-i` is +0.078 at the six and +0.161 at the eight, post hoc). The half-life
+    comparison (`FTh90d` against `FTh1` against `M2`) is a comparison of one AdamW epoch at 2e-4,
+    not of selected optima.
+4. **The six and the eight rest on few Primaries.** The six has 6 Primaries and the eight 8, and the
+    eight's match depends on D8 and D22.
+5. **The real-event result is two events.** Only the December pair of D5 and D16 is a clean real
+    test, with no interval, and only the injected state was stored.
+6. **The event log may miss events.** An "outside events" half-hour may sit inside an unlogged
+    event, and the event slices may therefore understate how far the forecasts fail near a switching
+    event.
+7. **The placebo tests recency and season adjacency together.** The weather-shuffle placebo of
+    experiment 707 was not rerun, because no contrast here claims a pre-training gain.
+8. **The sunny guard did not run.** The slice `sunny_clear_sky_index` was not built, so the verdict
+    has no sunny guard.
+9. **The 12-month bootstrap undercovers.** The t tests on the monthly differences sit beside the
+    intervals, and C1 at the six has p = 0.077, which does not exclude zero at an uncorrected 95%.
+
+## What was not run
+
+**Several pre-registered arms and contrasts were not run, because the minimal plan and the E1 and E2
+subset never included them and the rest of the extension was not released.** The arms `S`, `HW730`,
+`W-h0.5`, and `W-h2` have tuning scores only (folds 2025-03 and 2025-06, two seeds), so C6 (`S-i`
+minus `W-h0.5-i`) and C7 (`HW730-i` minus `M3-i`) have no reading. `W-h1` was scored in the `-i`
+state only. The `-n` states of `M3`, `W-h1`, `PP`, and `P` were not fitted, and `FTh90d-n` has seeds
+0 to 2 only, so the secondary contrast `B*-n` minus `M1-n` is read only as S1 on those seeds. The
+scorer does not print the scores of the reference rows (climatology, BG2, the manual heuristic, and
+`S0M`), so experiment 707's scores stand for them. Per-Primary tables and the D15 and D18 scores
+were not produced.
+
+## What to try next
+
+- **Fit the reference with the 90-day half-life in every group and state, and with a second set of
+  injection worlds.** `M1h90-i` ran with seeds 0 to 2 only.
+- **Select the fine-tune on a recency-weighted held-out set,** or admit the pre-fine-tune state as a
+  candidate, and fit the one-epoch fine-tune as such.
+- **Replicate the eight without D8 and D22,** or add Primaries, before any claim that a recipe
+  matches the reference at the MVA-only Primaries.
+- **Test a winning recipe on the Candidate network** only after the points above.
+
+## Stop-rule count
+
+**This verdict adds no `not supported` or `refuted` to the stop rule's count.** The Experiments
+table of the theme holds three `not supported` verdicts on recency weighting (experiments 331, 407,
+and 466) and one on one-shot ENS training (experiment 519), as the plan counted. The verdict `partly
+supported` here leaves both counts as they are. C3 is evidence against one-stage training (+0.052 to
++0.070 against the two-stage recipe), but the decision rule does not read it.
+
+## Method
+
+**The network is the pooled mixture density network of experiment 707, with a widening of 1.15.**
+Its input has 46 columns, including 3 origin lags, an 8-wide Primary embedding, 2 GELU layers of
+width 64, dropout 0.1, 3 mixture components, and 11 quantile levels. The window F of experiment 707
+supplies the ENS rows (2021-07-20 on).
+
+- **Stages:** `M1` (the reference) trains on ERA5 and CAMS, then ENS from 2021-07-20, then 730 days
+  of ENS at a 0.5-year half-life. `M2` skips the first stage. `M3` is `M2` without the fine-tune.
+  `FTh90d` is `M2` with a 90-day half-life in the fine-tune, `M1h90` is `M1` with the same. `W-h1`
+  is one stage from scratch with an exponential loss weight at a 1-year half-life. `PP` is one stage
+  with a half-life per Primary. `P` is `W-h1` with the weights' ages permuted among whole calendar
+  months.
+- **Training:** fresh AdamW at 5e-4 for a stage from scratch and 2e-4 for a stage that follows
+  another, batch of 16,384, weight decay 1e-3, gradient clip 1.0, patience 6, and a loss of `(w *
+  nll).sum() / w.sum()`. Every stage is selected on an unweighted held-out set `V_sel` of held-out
+  weeks in the last 730 days. Fits ran on the workstation's GPU, one fit per job, with 542 jobs and
+  13.0 hours of summed wall-clock in the fit logs.
+- **Injection (`-i`):** the generator `synthetic_clean` of experiment 581 adds a shift of 3, 7, 15,
+  or 30 days, a depth of 0.15, 0.30, or 0.50 of capacity, and a random sign, to the power in the
+  three lag inputs only, until 5% of the half-hours are covered. The shift never enters the target.
+  One world per (fold, seed) serves every stage and epoch, with seed 7,100,000 + 1,000 times the
+  network seed + YYYYMM. The scoring bank is `contaminate` of experiment 581, with passes `k` and
+  `k+12` for fold `k`. The weights of an injected event are those of the rows whose lags it shifts.
+  The mean share of rows with a shifted lag is 0.064 to 0.065.
+- **Scoring:** 12 monthly folds (2025-07 to 2026-06), CRPS (twice the mean pinball loss over 11
+  quantiles) at lead days 1 to 10 in points of effective capacity, month-block bootstrap on
+  seed-averaged forecasts with 100,000 resamples, Bonferroni levels 99.17% (R, 6 readings), 99.375%
+  (W, 8), 97.5% (E, 2), and 99.58% (I, 12), and guards from the decision rule. The seeds are 0 to 4
+  for `M1`, `M2`, and `FTh90d`, and 0 to 2 for the others, and `FTh90d` is the `B*` named on the
+  tuning folds. All Primaries use the same cleaning and row set `fold_a_daily_gap_v1`.
+- **Weather at origin:** every row reads the 00Z ENS run issued 9 hours before its origin, the lags
+  are at least 3.5 hours old, and the code asserts this on every row. Experiment 404's voided
+  lag-free scores above 24 hours play no part, since the network has no lag-free head.
+- **Departures from the plan:** `O*` changed from `CYC` to `PP` on the tuning folds before any
+  scored fold read it (two `CYC-i` fits at 2025-07 remain, unscored). The summed fit time is the
+  wall-clock sum over the logs, not GPU time. The scorer works on cached sums by slice, month, and
+  label, and `OutsideScorer` in `e00710_report.py` re-derives the "outside events" scenario.
+
+## Files
+
+- **Code:** `ml-experiments/00710-ens-only-one-shot-training-recipe/`, with scripts `e00710_arms.py`
+  (arms and jobs), `e00710_fit.py` (the fits), `e00710_folds.py` (rows and folds),
+  `e00710_inject.py` (the injection), `e00710_known_answer.py` (the seven tests), `e00710_net.py`
+  (the network and loop), `e00710_score.py` (the scorer), `e00710_weights.py` (the weight rules),
+  `e00710_report.py` (every number on this page, and the four figures), `run_phase.sh`,
+  `E1_E2_commands.md`, and `NOTES_for_reviewer.md`. To redraw the figures and reprint the numbers,
+  run `run_phase.sh e00710_report.py`.
+- **Reused code:** experiments 707, 581, 699, 587, and 425 (imported through `PYTHONPATH`; none
+  edited).
+- **Figures:** `contrasts.svg`, `slump_share.svg`, `example_forecast.svg`, and
+  `load_shift_events.svg` in this folder.
+- **Private data:** `data/ml-experiments/00710-ens-only-one-shot-training-recipe/work/` (`models/`,
+  `pretrained/`, `seed_preds/`, `bank/`, `score_cache/`, `known_answer/`, `logs_run/`,
+  `report_cache/`, `report_tables.md`, and `tuning_choices.json`).
+- **Private briefs:** `data/ml-experiments/briefs/ens_one_shot/` (`design.md`, `design_review.md`,
+  `findings.md`, `code_review_1.md` to `code_review_4.md`, `result_review_1.md` and its scripts and
+  logs).
+
+## Pre-registered plan
+
+**The sections from here to the end are the plan, written and committed before any fit.** The
+sections above this one were written after the results.
+
+### What we asked, and what we would decide
+
+**We asked whether the demand network needs the ERA5 and CAMS pre-training stage at all.** The
+hypothesis, the prediction, and the decision rule are in the front matter of this page. Experiment
+707 had found that the first stage still helped at the eight (-0.041 points) and not clearly at the
+six (+0.019). The maintainer approved the attempt on 2026-11-19, through the manager, under the stop
+rule: three `not supported` verdicts on recency weighting (experiments 331, 407, and 466) and one on
+one-shot ENS training (experiment 519) had already been counted.
 
 ### Arms
 
-**The notation is `h` for the half-life in years and `w = 0.5 ** (age / h)` for the exponential
-weight, where `age` is the refit time minus the row's valid time, in days.** "From scratch" means a
-fresh network and a fresh AdamW at learning rate 5e-4. A stage that follows another stage uses 2e-4.
-Batch size (16,384), weight decay (1e-3), dropout (0.1), gradient clip (1.0), patience (6), and the
-1.15 widening of the quantile bands are those of experiment 707 in every arm.
-
-**The maintainer's arms.**
-
-| Arm | Recipe | Difference from the reference `M1` |
-|---|---|---|
-| `M1` | ERA5 and CAMS stage, then `S_ens(F)`, then the 730-day fine-tune at `h` = 0.5 | The reference; arm `A_F` of experiment 707 |
-| `M2` | `S_ens(F)`, then the fine-tune | Drops the ERA5 and CAMS stage; arm `R_F` of experiment 707 |
-| `M3` | `S_ens(F)` only | Drops the ERA5 and CAMS stage and the recency-weighted stage |
-| `W-h0.5`, `W-h1`, `W-h2` | One stage from scratch on window F with an exponential loss weight over the whole window, `h` = 0.5, 1, and 2 years | One stage with recency weight and no 730-day cap; `M3` is the `h` = infinity end of the series |
-| `S` | One stage from scratch. Epoch 1 has equal weights, epochs 2 to 6 use `h` = 8, 4, 2, 1, and 0.5 years, and every later epoch uses `h` = 0.5 | The weight is a function of the epoch |
-
-**The creative arms differ in kind from the maintainer's arms.**
-
-| Arm | Kind | Recipe |
-|---|---|---|
-| `HW730`, `HW365` | Hard window | One stage from scratch with equal weights on the last 730 or 365 days |
-| `FLR` | Exponential with a floor | One stage with `w = 0.1 + 0.9 * 0.5 ** (age / 0.5)` |
-| `SMP` | Sampling probability | One stage in which each batch is drawn with probability proportional to `0.5 ** (age / 0.5)` and the loss is unweighted |
-| `RFE` | Recent-only final epoch | `S_ens(F)`, then exactly one epoch on the last 365 days at 2e-4 |
-| `EMA` | Weight averaging | The recipe of `M2` with an exponential moving average (decay 0.999 per step) of the network weights over the fine-tune |
-| `CYC` | Warm restarts | Three cycles of 4 epochs, with equal weights, `h` = 2, and `h` = 0.5, and a cosine learning-rate schedule in each cycle |
-| `PP` | Weight per Primary | One stage with half-life `h_p` per Primary, chosen from {0.5, 1, 2, infinity} on tuning folds 2024-10 and 2025-01, with each Primary's total weight share fixed at its equal-weight value |
-| `FTh90d`, `FTh1` | Half-life of the separate stage | The recipe of `M2` with a fine-tune half-life of 90 days or 1 year |
-
-**The `W` arms change each Primary's share of the total weight as well as the recency.** D9 has no
-power before 2023-08-23, and D15 and D18 lose rows before 2025-03-01, so a short-history Primary
-gains weight share under a short half-life. Contrast C4 therefore mixes the recency effect with the
-change in Primary mix, and `PP` fixes the shares. The sources of the methods are [Loshchilov and
-Hutter (2017)](https://arxiv.org/abs/1608.03983) for warm restarts, [Polyak and Juditsky
-(1992)](https://doi.org/10.1137/0330046) and [Izmailov et al.
-(2018)](https://arxiv.org/abs/1803.05407) for weight averaging, and [Byrd and Lipton
-(2019)](https://arxiv.org/abs/1812.03372) for testing a sampler beside a loss weight.
-
-**Every arm is fitted in two injection states.** In `-n`, no synthetic events enter training. In
-`-i`, synthetic events enter every training stage. The stored forecasts of experiment 707 hold no
-injection, so they serve as `M1-n` and `M2-n`, and the state after `M2-i`'s equal-weight stage is
-`M3-i` with no extra fit.
-
-### Row set, folds, and standing practices
-
-**Every arm is scored on row set `fold_a_daily_gap_v1`, on the 12 monthly folds 2025-07 to 2026-06
-of experiment 707, with the same Primaries and the same cleaning.** The six signed-MW Primaries (D5,
-D9, D10, D11, D14, D16) and the eight MVA-only Primaries (D2, D3, D4, D8, D12, D19, D21, D22) are
-scored separately. D15 and D18 are reported and not in any contrast. No valid time on or after
-2026-07-01 is scored. The ENS window is window F of experiment 707, which starts on 2021-07-20 and
-excludes the lockdown rows.
-
-**Four tuning folds precede the scored year, so a choice made on them reads no scored row.** The
-tuning folds are the test months 2024-10, 2025-01, 2025-03, and 2025-06. They name `B*` (the
-ENS-only recipe with the lowest tuning CRPS on 2025-03 and 2025-06), `O*` (the best one-stage
-recipe), and `h_T` (the half-life of the best `W` arm). Among recipes within 0.01 points of the
-best, the recipe with the fewest stages, then the fewest hyper-parameters, wins, with one-stage
-recipes preferred.
-
-**The experiment follows these standing practices.**
-
-- **Monthly refits,** at 00:00 UTC on the first day of each test month.
-- **Cleaned data everywhere:** the half-hours that the `substation_zero` rule flags are dropped from
-  training, lags, inference inputs, and scoring, and the count dropped per fold is reported.
-- **The noisy start of D15 and D18 is cut:** every row before 2025-03-01 is dropped.
-- **Every fitted network is saved** in the experiment's data folder, never in git.
-- **Stored forecasts are reused first:** `M1-n` and `M2-n` are the stored `A_F` and `R_F` of
-  experiment 707, and the reference rows come from stored forecasts.
-- **A screen precedes the scored year,** and the four tuning folds play that part. Every number from
-  them is labelled interim.
-- **Tails and cold nights are reported** beside CRPS, with the q05 and q95 coverage.
-- **Example forecasts are plotted:** a day-ahead forecast and a full 14-day forecast of each
-  Primary group, and at least six event plots across both metering groups, with the unlogged-event
-  caveat. Generators are anonymised.
-- **The four load-shift scenarios are reported** (all rows; rows outside events and at least 7 days
-  after one; rows inside events; the 7 days after an event ends).
-- **The normalised MAE of the median** is reported in every metric table.
-- **The pull request is opened as a draft** and marked ready after the reviews are triaged.
-
-**The experiment departs from one practice.** The minimal plan screens on four tuning folds with two
-seeds and not on one fold per season, because the tuning folds must precede every scored month.
-
-### Weather at the forecast origin
-
-**Every row of every arm reads weather issued at or before its forecast origin.** An ENS training
-row takes the member mean and spread of one 00Z run, and its origin is that run's initialisation
-time plus 9 hours. The code asserts this on every row, and a row enters a fold only if its valid
-time is at least 3.5 hours before the refit. A scored row reads the 00Z run issued 9 hours before
-its origin. The three lag inputs are power readings at least 3.5 hours old at the origin. The
-network has no lag-free head, so no score reads experiment 404's voided lag-free scores above 24
-hours. The `M1` ERA5 and CAMS rows read analysed weather at their valid time, in training only, as
-in experiment 707, and ERA5 arrives about 5 days late. The cold-night and sunny labels are analysis
-values at the valid time, applied identically to every arm, and never reach a network.
-
-**The implementation prints one training row and one scored row before any fit.** The print gives
-the Primary, the run's initialisation time, the origin, the valid time, the lead, the times of the
-three lags, the row's age at the refit, and its weight under each weight rule.
-
-**A recency weight is a function of one quantity, the row's age at the refit.** One network serves
-every origin of its test month, and the refit time is at or before every scored origin of that
-month. A weight never reads the target, the forecast error, the weather, or a row after the refit.
-
-### Loss, steps, and selection
-
-**Every arm minimises a weighted negative log-likelihood normalised inside each batch,
-`(w * nll).sum() / w.sum()`.** The loss does not change when every weight is multiplied by a
-constant. Every new stage is selected on one set, `V_sel`, with an unweighted loss: the held-out
-weeks inside the last 730 days, which carry unshifted lags in both injection states. Training losses
-are never compared across arms. The report prints the effective rows per batch, because the
-effective share is about 0.32 for `h` = 0.5 over 4.5 years and about 0.63 for the reference's
-fine-tune (pre-registration, from the weight formula).
-
-**No ENS-only arm may take more steps than the reference may.** A one-stage arm on window F has an
-epoch limit of 59, so its step cap equals the cap of `M2` (about 37,760 steps at fold 2026-01). The
-report prints, per arm, the steps used beside the cap, the GPU seconds, and the share of fits whose
-final stage stopped at its epoch limit. An arm that stopped at the limit in more than a quarter of
-its fits is labelled "not converged".
-
-### Injection of synthetic switching events
-
-**The generator is `synthetic_clean` of experiment 581, unchanged.** For each Primary it draws
-events until 5% of the half-hours are covered, with a length of 3, 7, 15, or 30 days, a depth of
-0.15, 0.30, or 0.50 of capacity, a random sign, and a random start. The shift is added to the
-power that feeds the three lag inputs and never to the target, so the target stays at the normal
-running arrangement (NRA).
-
-**Each (fold, network seed) has one world, which every stage and every epoch of every `-i` arm with
-that seed reads.** The world seed is 7,100,000 + 1,000 times the network seed + YYYYMM. The
-multiplier of 1,000 keeps the seeds of different folds apart, and the range (7,302,410 to
-7,306,606) does not overlap the ranges of experiment 699. The arms of one fold and seed therefore
-differ in the weights and the schedule only.
-
-**An injected event carries the weight of the rows whose lags it shifts.** A lag-only event has no
-loss term of its own, a separate weight would mix the recency contrast with the injection contrast,
-and the realised share of shifted rows under a short window may be small. Every `-i` fit logs the
-unweighted and the weighted share of rows with a shifted lag, per Primary.
+| Arm | Recipe |
+|---|---|
+| `M1` | ERA5 and CAMS stage, then `S_ens(F)`, then the 730-day fine-tune at a 0.5-year half-life (the reference; arm `A_F` of experiment 707) |
+| `M2` | `S_ens(F)`, then the fine-tune (arm `R_F` of experiment 707) |
+| `M3` | `S_ens(F)` only |
+| `W-h0.5`, `W-h1`, `W-h2` | One stage from scratch with an exponential loss weight, half-life 0.5, 1, and 2 years |
+| `S` | One stage with a half-life that shortens over epochs 1 to 6 |
+| `HW730`, `HW365` | Hard window of the last 730 or 365 days |
+| `FLR`, `SMP`, `RFE`, `EMA`, `CYC` | Weight floor, sampling probability, recent-only final epoch, weight averaging, warm restarts |
+| `PP` | Half-life per Primary |
+| `FTh90d`, `FTh1` | The recipe of `M2` with a fine-tune half-life of 90 days or 1 year |
+| `M1h90` | The recipe of `M1` with a fine-tune half-life of 90 days (extension E1) |
+| `P` | The placebo: `W-h_T` with the weights' ages permuted among whole calendar months |
 
 ### Contrasts
 
@@ -286,252 +777,31 @@ its own Bonferroni level.
 | I, 99.58% (12 readings) | I1 to I3: `X-i` minus `X-n` for `X` in `M1`, `M2`, `B*`, on CRPS | Does injection harm the forecast on ordinary rows? |
 | | I4 to I6: the same three, on the slump share of the injected bank | Does injection reduce the slump? |
 
-**The family levels are those of the full plan and stay fixed when the extension below is not
-run.** The minimal plan reads fewer contrasts at the same, more conservative levels.
-
-**A secondary contrast, `B*-n` minus `M1-n`, repeats C1 without injection.** It has its own verdict
-line and does not change the experiment's verdict. The minimum detectable effect is stated before
-the run: experiment 707's C1 interval at 99.69% had a half-width of about 0.026 at the six and 0.017
-at the eight, so the half-widths at 99.17% are about 0.024 and 0.015 (rescaled from experiment
-707). A `supported` verdict at the six therefore needs a point estimate below about -0.004, and at
-the eight below about +0.005.
-
-**Every other difference is descriptive and printed at 95%.** That covers each recipe's `-i` minus
-`-n` on every metric, each `W` arm and each creative finalist minus `M3` and minus `M1`, `SMP` minus
-`W-h0.5`, per-Primary and per-lead-band tables, each contrast without fold 2026-01, and a t test on
-the 12 monthly differences.
-
-### Decision rule
-
 **The margin is 0.02 points of CRPS, because ERA5 and CAMS pre-training is a fitted stage with two
-weather sources, so an ENS-only recipe needs to match the reference and not to beat it.** C1 is read
-per group on [lower, upper], and the first test that holds gives the verdict.
-
-1. **Lower above +0.02:** the ENS-only recipe is worse by more than the margin. `refuted`.
-2. **Upper below +0.02:** the ENS-only recipe matches the reference. `supported`.
-3. **Lower above 0:** the ENS-only recipe is worse, and a loss larger than the margin is not
-    excluded. `not supported`.
-4. **Otherwise:** `inconclusive`, with the interval's width printed.
-
-**Two guards protect a `supported` verdict against seed noise and against harm on a protected
-slice.** Experiment 707's audit found +0.024 at the six between two seed sets of one stored arm,
-which is as large as the margin. A group's `supported` therefore needs the point estimate of C1
-below +0.02 on seeds 0 to 2 and on seeds 3 and 4 separately, the upper limit of C1 on the eight
-without D8 below +0.02, and the one-sided 95% bound of C1 within 0.05 on the 0.01 and 0.99 pinball
-tails, on each lead band, on cold nights, and on `sunny_clear_sky_index`. If the realised clear-sky
-index cannot be built, the protocol has no protected sunny slice, and `sunny_unit_shape` stays
-descriptive.
-
-**The six get three extra readings, because experiment 707's placebo failed there (C5 -0.011, -0.055
-to +0.050).** The page makes no claim that ERA5 and CAMS weather helps or does not help the six.
-The stored `R_F` scored slightly better than `A_F` at the six (2.821 against 2.840, experiment 707),
-so the page also reports `B*-i` minus `M2-i`, and a `supported` at the six needs that point estimate
-below +0.02. C2 shows whether the +0.019 of experiment 707's C1 repeats.
-
-**A claim about recency needs the placebo.** The page says "a recency weight helps" at a group only
-when the upper limits of both C4 and C5 are below 0. When C4 passes and C5 fails, the page says that
-the weighted arm scored better and that weights unrelated to age did as well. The injection rule is
-that injection "does no harm" for a recipe when the upper limit of its CRPS contrast (I1 to I3) is
+weather sources, so an ENS-only recipe needs to match the reference and not to beat it.** The
+decision rule in the front matter gives the first test that holds. A group's `supported` also needed
+the point estimate of C1 below +0.02 on seeds 0 to 2 and on seeds 3 and 4 separately, the upper
+limit of C1 on the eight without D8 below +0.02, and the one-sided 95% bounds of C1 within 0.05 on
+the 0.01 and 0.99 pinball tails, each lead band, cold nights, and `sunny_clear_sky_index`. A claim
+that a recency weight helps needed the upper limits of C4 and of the placebo contrast C5 both below
+zero. Injection "does no harm" for a recipe when the upper limit of its CRPS contrast (I1 to I3) is
 below +0.02, and "reduces the slump" when the upper limit of its slump contrast (I4 to I6) is below
 0.
 
-### Known-answer tests and the placebo
+### Phases, extension, and stop conditions
 
-**All of these run before the first fit of the tuning phase, and a failure stops the experiment.**
+**The experiment committed to the minimal plan, about 380 fits and 8 to 10 GPU-hours.** Phase T
+fitted 15 ENS-only recipes and `M1-i` on the four tuning folds with seeds 0 and 1 (interim). Phase S
+fitted `M1`, `M2`, `W-h_T`, `P`, `B*`, and `O*` on the 12 scored folds with seeds 0 to 2. Phase C
+fitted seeds 3 and 4 of `M1-i`, `M2-i`, and `B*-i`. The pre-registered extension subset E1 and E2
+ran after the minimal plan's results were reviewed: E1 fitted `M1h90-i`, and E2 fitted `FTh90d-n`
+and wrote the bank passes of the stored `M1-n` and `M2-n`. The rest of the extension (the other core
+arms, the finalists, and the `-n` states) waited for the manager and did not run.
 
-1. **The new loop equals the old loop when its features are off:** per-step losses agree to 1e-6
-   against `train_network` of experiment 707 on one thread, one seed, 200,000 rows, and two epochs.
-2. **A refit with the new loop matches the stored `R_F`:** on folds 2026-06 and 2026-01 with seeds 0
-   to 2, within two standard errors of the seed spread, per group, with the comparison logged.
-3. **The stored forecasts are reproduced by prediction only** from the saved networks to 1e-4, and
-   `M3-n` loads each stored `S_ens(F)` state with the scale of the matching `R_F` fit.
-4. **The weight rules give known values:** `W-h0.5` equals the stored `fold.weight` to 1e-6, `h` =
-   infinity gives all ones, `HW730` keeps exactly the rows of window `W24` (5,608,723 rows at fold
-   2026-01, experiment 707's log), epoch 6 of `S` equals `W-h0.5`, a factor of 10 on every weight
-   changes no loss, and the sampler's frequencies match its weights.
-5. **An empty world changes nothing:** with no event, the rebuilt lag columns equal the cached
-   columns bit for bit in each of the four copied functions. With a world, only the three lag value
-   columns differ, the last changed half-hour lies before the refit, and the held-out rows are
-   unchanged.
-6. **The slump share has a known answer:** a forecaster whose median copies the 1-day lag scores 1
-   on the rows whose 1-day lag is shifted, and a forecaster that ignores the lags scores 0, for both
-   signs.
-7. **Experiment 699's known-answer table still reproduces** (MAE 7.124 and 7.165, copied shares
-   0.123 and 0.075, from experiment 699), which shows the imported bank and share functions are
-   intact.
-
-**The placebo `P` gives each row the weight of `W-h_T` after the ages are permuted among whole
-calendar months.** A seed fixed by the fold draws the permutation, a row takes the age of the
-matching offset in the permuted month (clipped to the month's end), the partial first month of
-window F keeps its own ages, and all Primaries share the permutation. The placebo keeps the weight
-distribution, the effective rows, and the block structure in time, and removes the link between
-weight and recency. A failed placebo fires audit trigger 1. The placebo tests recency and season
-adjacency together. The experiment does not rerun experiment 707's weather-shuffle placebo, because
-no contrast here claims a pre-training gain.
-
-### Injected-event scoring and metrics
-
-**The bank of injected events for scoring is `contaminate` of experiment 581, separate from the
-training world.** Fold `k` (0 to 11) is forecast with pass `k` and pass `k + 12`, so each Primary
-meets each of the 12 combinations of depth and length with both signs over the year. Every arm,
-state, and seed uses the same two passes. The stored networks are forecast with shifted lags and no
-refit.
-
-**Every metric is reported for every arm in both states, for the six and for the eight, with a 95%
-month-block interval and the number of half-hours behind it.** A subset under 100 half-hours is
-marked thin, with the number of months that hold any row of the subset.
-
-| Metric | Definition |
-|---|---|
-| CRPS and normalised MAE of the median | As experiment 707, over all shared half-hours |
-| Sunny half-hours | CRPS and MAE on `sunny_clear_sky_index`, and descriptively on `sunny_unit_shape` |
-| Cold nights | CRPS and MAE on `cold_nights` (sun more than 5 degrees below the horizon, ERA5 temperature at or below 3 degrees Celsius) |
-| Slump share, injected events | `sign(d) * (q50 with shifted lags - q50 with unshifted lags) / abs(d)`, with `d` the depth as a share of capacity, averaged within each event and then over events; 0 for a forecast that keeps to the NRA, 1 for one that takes up the whole step. Also by days since onset, as in experiment 587 |
-| NRA error, injected events | Mean of `sign(d) * (q50 with shifted lags - NRA actual)` in points of capacity, shifted minus unshifted, and the CRPS difference against the NRA actual |
-| After an event | The slump share and the NRA error for origins in the 7 days after the event ends |
-| Real events | The same formulas on the verified transfers of experiment 580; the December D5 and D16 pair is the real-event result, and the May events are flagged as unusable (experiment 582); figures per event, no interval |
-| Labelled-event slices | CRPS and MAE on `event_rows` and `event_following_7_days`, as experiment 707's scorer reports them |
-
-### Phases, fit counts, and the pre-registered extension
-
-**The experiment commits to the minimal plan, about 380 fits and 8 to 10 GPU-hours, which is
-comparable with the 8 GPU-hours of experiment 707.** The minimal plan holds three groups of fits.
-
-- **Phase T, tuning folds, `-i` state:** the 15 ENS-only recipes (`M2`, the three `W` arms, `S`, the
-  ten creative arms) plus `M1-i`, on the four tuning folds with seeds 0 and 1: 128 fits, labelled
-  interim. `M3` needs no fit.
-- **Phase S, scored folds, `-i` state:** `M1`, `M2`, `W-h_T`, the placebo `P`, and `B*` (and `O*`
-  if it differs) on 12 folds and seeds 0 to 2, at most 180 fits. The stored `M1-n` and `M2-n` give
-  the `-n` state of `M1` and `M2`.
-- **Phase C, seeds 3 and 4:** `M1-i`, `M2-i`, and `B*-i` on 12 folds, 72 fits. Phase C is never cut,
-  because the decision rule reads C1 on seeds 3 and 4 separately.
-
-**The minimal plan reads C1 to C5, I1, I2, I4, and I5.** `HW730`, `S`, `W-h0.5`, `W-h1`, and `W-h2`
-get tuning scores in the minimal plan, and a recipe that is not a scored arm gets no verdict.
-
-**The extension is pre-registered and starts only after the minimal plan's results are reviewed and
-the manager gives the word.** The full plan has about 960 fits and 19 to 25 GPU-hours (pre-registered
-estimate from the design; the upper figure allows for the bank forecasts). The extension adds these
-fits to the minimal plan, and no fit of the extension changes what the minimal plan has already
-read.
-
-- **The 120 interim `-n` fits of Phase T** (every recipe on the tuning folds without injection), for
-  the per-recipe injection contrast on the tuning folds.
-- **Phase S for the other core arms:** `S`, `W-h0.5`, `W-h1`, `W-h2`, and `HW730` in the `-i` state,
-  and the `-n` state of the new recipes, which opens C6, C7, I3, I6, and the secondary contrast
-  `B*-n` minus `M1-n`.
-- **The two creative finalists** in Phase S, and `O*` if it lies outside them, and the `-n` seeds 3
-  and 4 of `B*` (24 fits).
-- **Cut order if the budget shrinks:** the `-n` state of `W-h1`, `W-h2`, `S`, and `HW730` first,
-  then `W-h1-i`, then the `-n` seeds 3 and 4 of `B*`.
-
-### Pre-registered extension subset (E1 and E2)
-
-**E1 and E2 are the part of the extension that the manager approved first, and they run after the
-minimal plan.** E1 asks whether giving the reference the 90-day half-life accounts for the gain of
-the best ENS-only recipe, because the 90-day half-life was never given to the reference `M1`. E2
-supplies the with-and-without-injection contrasts I3 to I6, which the minimal plan could not read
-because it fits no `-n` state of `FTh90d`, and stores no bank passes of `M1-n`.
-
-**E1 adds one arm and one contrast.** The arm `M1h90` has the three stages of `M1` (the ERA5 and
-CAMS stage, `S_ens(F)`, and the 730-day fine-tune) with the fine-tune half-life set to 90 days
-(`h` = 90 / 365.25 years) instead of 0.5 years. It is fitted in the `-i` state on the 12 scored
-folds with seeds 0 to 2, 36 fits. It loads the first two stage states that `M1-i` stored for the same
-fold and seed, so only the fine-tune trains. The contrast E1 is `M1h90-i` minus `FTh90d-i` at the six
-and at the eight, with and without D8 at the eight, on CRPS, with the guards that C1 uses. The scorer
-also prints the CRPS of `M1h90-i` beside `M1-i` and `FTh90d-i` on the sunny half-hours, cold nights,
-and the 7 days after an event, and the slump share of the injected bank for the same three arms.
-
-**E2 adds the `-n` states that I3 to I6 need.** It fits `FTh90d-n` on 12 folds with seeds 0 to 2 (36
-fits, each with bank passes; the `S_ens(F)` stage is experiment 707's stored state that `M2-n` also
-uses), and writes the bank passes of the stored `M1-n` and `M2-n` for the same folds and seeds (72
-passes, no fit). I3 to I6 then read the CRPS contrast `FTh90d-i` minus `FTh90d-n` and the
-slump-share contrasts of `M1`, `M2`, and `FTh90d`, each `-i` minus `-n`, where `FTh90d` stands for
-`B*`. The slump contrasts pair the `-i` and `-n` states on the seeds that hold bank passes in both.
-The commands are in `E1_E2_commands.md` in the experiment folder.
-
-**E1 gets its own Bonferroni family, `E`, of 2 readings (the six and the eight), read at 97.5%.**
-The guard readings (the tails, the lead bands, cold nights, and the clear-sky slice) use a one-sided
-95% bound, as the guards of C1 do, and the eight without D8 uses the level of the family. The
-readings of the experiment's families R, W, and I stay at 6, 8, and 12, so the levels of C1 to C7
-and I1 to I6 are unchanged and E2 adds no reading.
-
-**E1 does not change the pre-registered verdict of C1.** The verdict of C1 is read from the rule
-above, and E1 is read as explanatory. If `M1h90-i` scores better than `M1-i` and close to
-`FTh90d-i`, the 90-day half-life accounts for part of the gap that C1 measures. The page reports
-that reading and does not use it to change the arm or the margin of C1.
-
-**The arms `S`, `HW730`, and `W-h0.5` and `W-h2` wait for the manager's word.** The manager decides
-whether to run them after E1 and E2 are scored and reviewed.
-
-### Stop conditions and invalid conditions
-
-**The experiment stops, and reports to the manager, in five cases.** A known-answer test fails. An
-origin, cut, or injection guard raises. The one-fold timing pilot puts the total above the GPU-hours
-the maintainer approves, or a fit above 16 GB of host memory. On the tuning folds, `M2-i` scores
-more than 0.10 points worse than `M1-i` or than `M2-n`, which would point to a fault in the new loop.
-Or the measured share of rows with a shifted lag lies outside the range fixed after the pilot. The
-experiment is `invalid` if any row reads a run issued after its origin, a training row passes the
-refit, a world changes a half-hour at or after the refit, arms are scored on different rows, or a
-valid time on or after 2026-07-01 is scored.
-
-### Compute and code
-
-**All new code goes in `ml-experiments/00710-ens-only-one-shot-training-recipe/`, and nothing under
-`src/` or `packages/` changes.** The scripts import experiments 707, 581, and 699 through
-`PYTHONPATH`, and no script of those experiments is edited. The new code holds a training loop with
-epoch-dependent weights, a sampler, a learning-rate schedule, and weight averaging; the weight
-rules; the injection of a (fold, seed) world into copies of `build_fold`, `ens_rows`,
-`fold_pretrain`, and `run_inputs`; the bank forecasts; the scorer; and the known-answer checks.
-Every script gets a code review before its first run.
-
-**The compute plan is checks on one core, a one-fold timing pilot, and a request to the manager.**
-The pilot runs fold 2026-01, seed 0, arms `M1-i` and `W-h0.5-i`, with both bank passes, under
-`MemoryMax=16G`, and records wall-clock, peak host memory, peak GPU memory, and the share of shifted
-rows. Fits run only after the manager replies with cores and GPU memory. The expected request is 3
-streams on 4 cores with one thread per stream and about 5 GPU gigabytes per stream (experiment 707's
-unverified estimate). The workstation's GPU is used, so no money is spent.
-
-### Risks
-
-- **Seed noise is as large as the margin at the six,** so C1 at the six may end `inconclusive`.
-- **The 12-month bootstrap undercovers,** so the t tests on the monthly differences are printed
-  beside each interval.
-- **A world is one draw per (fold, seed),** so the injection family rests on at most five draws per
-  fold.
-- **Short effective windows hold few events,** so a half-life of 0.5 years may teach injection
-  little.
-- **Only the December D5 and D16 pair is a clean real-event test,** so the real-event figures are
-  descriptive.
-- **`B*`, `O*`, and `h_T` are chosen on four tuning months with two seeds,** so the choice may
-  differ from the one the scored year would make.
-- **One-stage arms train at 5e-4 throughout and the reference ends at 2e-4,** so `W` minus `M2` mixes
-  the weight path with the final learning rate.
-- **The window length and the ENS resolution upgrade of 2023-06-27 are confounded** above 24 months
-  (experiment 707), and `HW730` minus `M3` carries the confound.
-- **The stored `-n` arms and the new `-n` arms come from two code paths,** which known-answer tests 1
-  to 3 bound.
-
-### Open questions for the maintainer
-
-1. **Are 19 to 25 GPU-hours (about 960 fits) acceptable for the full plan?** The minimal plan needs
-   8 to 10.
-2. **Should the window start on 2020-10-15 (window C, lockdown rows kept with a `covid` input)
-   instead of 2021-07-20?** Window F reuses the stored `A_F` and `R_F`.
-3. **Is it right that an injected event takes its row's weight?**
-4. **Is one world per (fold, seed), shared by every stage and epoch, acceptable?**
-5. **Is the `-i` state the right state for the headline?**
-6. **Is a margin of 0.02 the right bar for "matches"?** A stricter reading would ask the ENS-only
-   recipe to beat the reference at the eight.
-7. **Should a winning recipe be retested on the Candidate network in a later experiment?**
-
-## Method
-
-To be completed with the results.
-
-## Files
-
-To be completed with the results. The code will be in
-`ml-experiments/00710-ens-only-one-shot-training-recipe/` and the private data in
-`data/ml-experiments/00710-ens-only-one-shot-training-recipe/`. The design, its review, and the
-findings are private files under `data/ml-experiments/briefs/ens_one_shot/`.
+**The experiment would have stopped on five conditions and would have been `invalid` on five more.**
+The stops were a failing known-answer test, a failing origin, cut, or injection guard, a timing
+pilot over the approved GPU-hours or 16 GB of host memory, `M2-i` more than 0.10 worse than `M1-i`
+or `M2-n` on the tuning folds, and a share of shifted rows outside the pilot's range. It was
+`invalid` if any row read a run issued after its origin, a training row passed the refit, a world
+changed a half-hour at or after the refit, arms were scored on different rows, or a valid time on or
+after 2026-07-01 was scored. None applied.

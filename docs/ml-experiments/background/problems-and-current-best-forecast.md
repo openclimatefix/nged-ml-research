@@ -59,6 +59,28 @@ heuristic](https://openclimatefix.github.io/nged-substation-forecast/background/
   was off and raised it by 0.225 when the engine ran, on about 19% of half-hours
   ([experiment 696 (engine state in the pre-training mixer)](../00696-gas-engine-state-tracker-part-3-engine-state-in-the-pre-training-mixer/result.md))
   (exp 696; D8 and one host, 8 monthly refits, 10 seeds; provisional).
+- **Training the pooled neural network with synthetic load-shift events in its lag inputs cut the
+  forecast's slump into injected events by more than half.** The slump share, the fraction of an
+  injected step that the median forecast follows, fell from 0.22 to 0.26 without injection to 0.08 to
+  0.13 with it, in three recipes at the 6 signed-megawatt and the 8 MVA-only Primaries, and the
+  paired differences' intervals lie below zero. Injection raised CRPS on ordinary rows by +0.036
+  (+0.012 to +0.060) for the 3-stage recipe at the eight, and by +0.008 and -0.004 (both intervals
+  include zero) for the two ENS-only recipes ([experiment
+  710](../00710-ens-only-one-shot-training-recipe/result.md)) (exp 710; 6 or 8 Primaries, 12
+  monthly refits, 3 to 5 seeds; provisional).
+- **Shortening the fine-tune half-life from 0.5 years to 90 days lowered CRPS at the eight MVA-only
+  Primaries.** The 3-stage recipe changed by -0.023 points (95% interval -0.040 to -0.005) and the
+  ENS-only recipe by -0.024 (99.17% interval -0.050 to -0.002), against -0.006 and -0.005 at the six
+  signed-megawatt Primaries, where both intervals include zero. The fine-tune selection set is
+  unweighted and chose its first epoch in 58 to 60 of 60 fits ([experiment
+  710](../00710-ens-only-one-shot-training-recipe/result.md)) (exp 710; 6 or 8 Primaries, 12
+  monthly refits, 3 to 5 seeds; provisional).
+- **An ENS-only recipe matched the 3-stage recipe at the six signed-megawatt Primaries and was
+  inconclusive at the eight MVA-only Primaries.** The ENS-only minus the 3-stage CRPS was -0.034
+  points (99.17% interval -0.084 to -0.001) at the six and -0.010 (-0.039 to +0.014) at the eight,
+  where the match depended on D8. Giving the 3-stage recipe the 90-day half-life too removed most
+  of the gap at the eight ([experiment 710](../00710-ens-only-one-shot-training-recipe/result.md))
+  (exp 710; 6 or 8 Primaries, 12 monthly refits, 5 seeds; provisional).
 
 ## Problem 2: generator output
 
@@ -194,4 +216,4 @@ releases](https://openclimatefix.github.io/nged-substation-forecast/live_service
   Primary scores near 5 and the 5-Primary scores near 2.7 come from different rows ([row sets and
   scoring](row-sets-and-scoring.md)) (docs).
 
-Last checked against experiment 225.
+Last checked against experiment 710.
