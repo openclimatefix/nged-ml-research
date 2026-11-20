@@ -651,11 +651,12 @@ The experiment is planned and has no fitted result yet, so these bullets describ
 ## Reviews
 
 An Opus agent reviewed the design before this page was written, and the design was revised after it
-(14 should-fix findings and 9 minor ones, all accepted, as the pull request body summarises).
-Still to come: an Opus code review of each new script before any fit (checklist: the NaN path of an all-masked attention, the neighbour-power array of each mode, the
-random streams and the gradient clipping, the coverage of the code hash, and the prediction
-reproduction KN13), the known-answer checks, a result review, an audit if a trigger fires, a
-write-up review against the printed report, and a prose review.
+(14 should-fix findings and 9 minor ones, all accepted, as the pull request body summarises). Still
+to come: an Opus code review of each new script before any fit (checklist: the NaN path of an all-
+masked attention, the neighbour-power array of each mode, the random streams and the gradient
+clipping, the coverage of the code hash, and the prediction reproduction KN13), the known-answer
+checks, a result review, an audit if a trigger fires, a write-up review against the printed report,
+and a prose review.
 
 ## Files
 
