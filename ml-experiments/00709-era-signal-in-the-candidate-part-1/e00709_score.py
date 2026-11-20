@@ -15,6 +15,7 @@ fits a neural network.
 """
 
 import argparse
+import pickle
 from pathlib import Path
 from typing import Final
 
@@ -94,6 +95,31 @@ def post_shift_expression() -> pl.Expr:
     return expr
 
 
+def touched_expression(*, folds: list[str], seeds: list[int]) -> pl.Expr:
+    """Return a row filter for the Primaries that the curriculum world touched in every seed of a fold.
+
+    Only Primaries touched in every seed count, so each seed is scored on the same rows.
+
+    Args:
+        folds: Fold months scored.
+        seeds: Seeds scored.
+
+    Returns:
+        A Polars boolean expression over `fold` and `primary`.
+    """
+    expr = pl.lit(False)
+    for month in folds:
+        common: set[int] | None = None
+        for seed in seeds:
+            path = features.DATA_DIR / "worlds" / f"curriculum_{month}_s{seed}.pkl"
+            with path.open("rb") as handle:
+                parts = pickle.load(handle)  # noqa: S301  (our own cache file)
+            touched = {int(p) for p in parts["touched"]}
+            common = touched if common is None else common & touched
+        expr = expr | (pl.col("fold") == month) & pl.col("primary").is_in(sorted(common or ()))
+    return expr
+
+
 def read_arm(
     *,
     arm: str,
@@ -116,7 +142,7 @@ def read_arm(
             parts.append(
                 row_losses(
                     forecast=frame, truth=truth, capacity_mw=capacity_mw, to_site=to_site
-                ).with_columns(pl.lit(seed).alias("seed"))
+                ).with_columns(pl.lit(seed).alias("seed"), pl.lit(month).alias("fold"))
             )
     return pl.concat(parts)
 
@@ -175,6 +201,7 @@ def main() -> None:
         )
     )
     post_shift = post_shift_expression()
+    touched = touched_expression(folds=args.folds, seeds=args.seeds)
     scopes = {
         "all rows": pl.lit(True),
         "D8": pl.col("primary") == d8,
@@ -183,6 +210,7 @@ def main() -> None:
         f"weeks after a stat alarm (<= {POST_SHIFT_DAYS} days), D8": post_shift
         & (pl.col("primary") == d8),
         "other rows": ~post_shift,
+        "touched Primaries (curriculum world)": touched,
     }
     SCORES_DIR.mkdir(parents=True, exist_ok=True)
     out = []
