@@ -84,6 +84,7 @@ import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 import e00667_fold as fold  # ty: ignore[unresolved-import]
+import e00709_e_stub as stub_frames  # ty: ignore[unresolved-import]
 
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00667_MONTH"
 
@@ -169,6 +170,7 @@ def _stats_file(*, month: str):
 
 
 e.step2_file, e.stats_file = _step2_file, _stats_file
+stub_frames.redirect_stub_frames(e=e)  # stand-in frames go under phase E's folder
 fold.install(e, months=MINE.months, reference_month=fold.PREVIOUS_MONTH)
 
 E3_EMBARGO_DAYS, DOWN_WEIGHT, DOWN_WEIGHT_DAYS = 7, 0.5, 7

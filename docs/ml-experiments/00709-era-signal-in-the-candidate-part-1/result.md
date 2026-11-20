@@ -913,6 +913,8 @@ and table chains (3 folds, 2 seeds) run through `e00709_e_chain.sh`, which write
 experiment's data folder and reads experiment 667's extended inputs only. Each changed or new script
 gets an Opus review before its first run. Phase E starts after phase B and B2 end.
 
+**The first phase E pilot wrote 61 stand-in frames into experiment 667's folder, and they await the maintainer's approval to delete.** Experiment 667's `fold.install` writes a one-row stand-in demand frame for each run that has none. The pilot chain for fold 2025-04 wrote 61 of them (`init=2025-03-01` to `init=2025-04-30`, 1,057 bytes each) into experiment 667's `inputs/frames`, and the chain's guard stopped the run. None of the files replaced a real frame, because the folder held no 2025 file before. No other experiment script reads the folder. `e00709_e_stub.py` now writes the stand-ins under `e_667/inputs/frames` of this experiment's data folder, and the guard still fails the chain if a file lands in experiment 667's folder. The deletion command and the list of files are in `briefs/eras_709_handover3.md` (private).
+
 ## 26. Open questions for the maintainer, and the `all` arm's D8 outlier (interim)
 
 **The maintainer has two open questions, and this plan does not decide either.** The first is whether phase E should use daily origins. The stored rows give about 6 origins per month, and rebuilding daily rows from experiment 607's daily summaries would change the recipe against the screen folds. The second is whether any learned arm is worth carrying on, given that only the oracle has helped D8 so far.

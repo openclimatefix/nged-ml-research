@@ -69,6 +69,7 @@ import numpy as np
 import torch  # ty: ignore[unresolved-import]
 
 import e00667_fold as fold  # ty: ignore[unresolved-import]
+import e00709_e_stub as stub_frames  # ty: ignore[unresolved-import]
 
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00667_MONTH"
 
@@ -87,6 +88,7 @@ assert CHAIN_ENV, "set CHAIN667 to the chain's work folder"
 CHAIN = Path(CHAIN_ENV)
 assert "00591" not in str(CHAIN.resolve()), "experiment 591's chain is read-only"
 arm.CHAIN = CHAIN
+stub_frames.redirect_stub_frames(e=e)  # stand-in frames go under phase E's folder
 fold.install(e, months=MINE.months)
 if fold.is_final(months=MINE.months):
     # the final fold has no stored B1 statistics: pre-training derives them into the chain folder
