@@ -6,6 +6,7 @@ Usage:
     e00713_score.py screen               # sanity and stop rules on the 4 screen folds
     e00713_score.py headline             # H1 and H2 on the 8 folds, 5 seeds, guards, and the verdict
     e00713_score.py report-only          # the 95% report-only readings of section 1.4 (seeds 0 and 1)
+    e00713_score.py swaps                # history-weather swaps (a), (b), (c) of section 4.3
     e00713_score.py write-predictions    # seed-averaged sets into the experiment store (once per arm)
 
 Every table is printed and written to `score/<command>.json` in the experiment's data folder. All
@@ -15,9 +16,8 @@ capacity). A forecast file is converted to the contract's origin (12:00 UTC, the
 3 hours) with valid times from 12:00 UTC to 14 days later, valid times from 2026-07-01 are dropped, and
 rows with no cleaned actual are dropped for every arm alike.
 
-The climatology row, the cold-winter-night and time-of-day slices, the threshold-weighted CRPS, the
-avoidable-curtailment cost, and the four load-shift scenarios of section 6.5 are not computed here;
-the implementation note lists them.
+The climatology row, the slices, the threshold-weighted CRPS, the tails, the four load-shift
+scenarios, the leave-one-out tables, and the avoidable-curtailment cost are in `e00713_protocol.py`.
 """
 
 import argparse
@@ -93,6 +93,18 @@ def candidate_files(*, month: str, seed: int) -> Path:
     return root / f"P7_D50_{month}" / "work" / "fits" / "P5" / f"{month}_d0_s{seed}.parquet"
 
 
+SWAP_C: Final = "C-swapc"
+"""The Candidate predicting with ERA5 at its lag times (design 4.3, swap (c))."""
+
+
+def swap_c_file(*, month: str, seed: int) -> Path:
+    """Return the forecast file that `e00713_swap_c.py` wrote."""
+    return (
+        ML_EXPERIMENTS_DATA_DIR / arms.NAME / "swap_c" / f"P7_D50_{month}" / "work" / "fits" / "P5"
+        / f"{month}_d0_s{seed}.parquet"
+    )  # fmt: skip
+
+
 def load_arm(*, arm: str, seeds: tuple[int, ...], months: tuple[str, ...]) -> pl.DataFrame:
     """Return an arm's per-seed rows in contract origin and capacity shares, with a `seed` column."""
     parts = []
@@ -101,6 +113,8 @@ def load_arm(*, arm: str, seeds: tuple[int, ...], months: tuple[str, ...]) -> pl
             path = (
                 candidate_files(month=month, seed=seed)
                 if arm == "C"
+                else swap_c_file(month=month, seed=seed)
+                if arm == SWAP_C
                 else arms.fit_file(
                     data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed
                 )
@@ -471,6 +485,33 @@ def cmd_headline() -> int:
     return 0
 
 
+def cmd_swaps() -> int:
+    """Report-only: the history-weather swaps (a), (b), and (c) of design 4.3 against the Candidate (seeds 0 and 1).
+
+    Swap (a) alone feeds the `supported` guard. Swap (b) minus swap (a) is the effect of the 14 B1
+    columns, and swap (c) says how much the Candidate gains from ERA5 at its lag times.
+    """
+    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    res = run_contrasts(
+        star=star,
+        months=arms.ALL_FOLDS,
+        seeds=arms.SCREEN_SEEDS,
+        pairs=[
+            (f"{star}-swapa", "C"),
+            (f"{star}-swapb", "C"),
+            (f"{star}-swapb", f"{star}-swapa"),
+            (star, f"{star}-swapa"),
+            (SWAP_C, "C"),
+        ],
+        level=95.0,
+    )
+    res["guard_swap_a"] = {
+        g: group_reading(c=res[f"{star}-swapa-C:{g}"], group=g) for g in ("six", "eight")
+    }
+    write(name="swaps", obj=res)
+    return 0
+
+
 def cmd_report_only() -> int:
     """The 95% report-only readings of section 1.4 on seeds 0 and 1 and the normalised MAE beside CRPS."""
     star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
@@ -526,12 +567,13 @@ def main() -> int:
     """Dispatch the sub-command."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "command", choices=("candidate", "screen", "headline", "report-only", "write-predictions")
+        "command",
+        choices=("candidate", "screen", "headline", "report-only", "swaps", "write-predictions"),
     )
     args = parser.parse_args()
     return {
         "candidate": cmd_candidate, "screen": cmd_screen, "headline": cmd_headline,
-        "report-only": cmd_report_only, "write-predictions": cmd_write_predictions,
+        "report-only": cmd_report_only, "swaps": cmd_swaps, "write-predictions": cmd_write_predictions,
     }[args.command]()  # fmt: skip
 
 
