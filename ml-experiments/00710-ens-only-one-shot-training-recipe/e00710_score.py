@@ -4,7 +4,10 @@ The scorer reads `seed_preds/<arm>-<state>/<month>_s<seed>.parquet` of this expe
 `e00710_fit.py`) and, for `M1-n` and `M2-n`, the stored `A_F` and `R_F` forecasts of experiment 707.
 It averages the seeds that both arms of a contrast hold in quantile space, widens the outer
 quantiles by 1.15 about the median, and scores the result on the half-hours that every arm and
-every reference holds (`e00381_score.score_arms`).
+every reference holds (`e00381_score.score_arms` selects the same half-hours).
+Memory stays bounded because each variant is scored one fold at a time into sums of its row losses
+by slice, month, and Primary (`Scorer`), which are cached under `work/score_cache/`; every printed
+figure follows from those sums.
 
 **Metrics, per Primary group (the signed-MW six and the MVA-only eight):** CRPS and the normalised
 MAE of the median; the same on sunny half-hours (`sunny_clear_sky_index` if the slice table has it,
@@ -32,6 +35,8 @@ uv run --no-sync python ml-experiments/00710-*/e00710_score.py --tuning
 """
 
 import argparse
+import gc
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -40,7 +45,7 @@ from pathlib import Path
 from typing import Final
 
 import e00377_adapter as adapter  # ty: ignore[unresolved-import]
-import e00381_score as s381  # ty: ignore[unresolved-import]
+import e00377_score as base377  # ty: ignore[unresolved-import]
 import e00397_score as s397  # ty: ignore[unresolved-import]
 import e00407_score as s407  # ty: ignore[unresolved-import]
 import e00581_bank as bank581  # ty: ignore[unresolved-import]
@@ -99,6 +104,21 @@ PP_ARMS: Final[dict[str, float | str]] = {
 """The arms whose tuning fits give `PP` each Primary's half-life in years (`M3` is infinite)."""
 SUNNY_KEY: Final[str] = "one-sided 95% bound within 0.05 on sunny_clear_sky_index"
 """The one guard that may be absent: the slice table has no clear-sky-index column until built."""
+SCORE_CACHE_DIR: Final[Path] = OUT_DIR / "score_cache"
+"""One parquet file of scored aggregates per variant (`Scorer.aggregate`)."""
+AGGREGATE_VERSION: Final[str] = "1"
+"""Change this when the columns or the meaning of the aggregates change, to invalidate the cache."""
+ALL_ROWS: Final[str] = "all rows"
+"""The name of the slice that holds every headline-band half-hour."""
+SUMMED_METRICS: Final[tuple[str, ...]] = (
+    "crps",
+    "mae_median",
+    "pinball_q01",
+    "pinball_q99",
+    "coverage_q05",
+    "coverage_q95",
+)
+"""The row losses whose sums the aggregates hold; every printed figure reads one of them."""
 
 
 @dataclass(frozen=True)
@@ -190,48 +210,275 @@ def seed_average(*, variant: Variant, months: tuple[str, ...]) -> pl.DataFrame:
     return pl.concat(pieces).sort(KEYS)
 
 
-def load_references(*, series: pl.DataFrame) -> dict[str, pl.DataFrame]:
-    """Return the reference forecasts that every scored set includes, keyed by name.
+def variant_files(*, variant: Variant, months: tuple[str, ...]) -> list[Path]:
+    """Return the forecast files that a variant reads: one per seed and fold."""
+    folder = forecast_folder(arm=variant.arm, state=variant.state)
+    return [folder / f"{m}_s{s}.parquet" for m in variant.months or months for s in variant.seeds]
+
+
+def files_digest(*, paths: list[Path]) -> str:
+    """Return the SHA-256 of the folder, name, size, and modification time of each file."""
+    digest = hashlib.sha256()
+    for path in paths:
+        stat = path.stat()
+        digest.update(
+            f"{path.parent.name}/{path.name}|{stat.st_size}|{stat.st_mtime_ns}\n".encode()
+        )
+    return digest.hexdigest()
+
+
+def frame_digest(*, frame: pl.DataFrame) -> str:
+    """Return a SHA-256 of a frame's schema, height, and the sum of its row hashes."""
+    hashes = frame.hash_rows().to_numpy()
+    total = int(hashes.sum(dtype=np.uint64)) if len(hashes) else 0
+    return hashlib.sha256(f"{frame.schema}|{frame.height}|{total}".encode()).hexdigest()
+
+
+def scored_keys(*, keys: pl.DataFrame, ctx: dict) -> pl.DataFrame:
+    """Return the keys of the half-hours that `metrics.row_losses` scores."""
+    return metrics._scored_keys(
+        forecast=keys, actuals=ctx["actuals"], holdout_start=metrics.HOLDOUT_START
+    )
+
+
+def variant_scored_keys(
+    *, variant: Variant, months: tuple[str, ...], series: pl.DataFrame, ctx: dict
+) -> pl.DataFrame:
+    """Return the keys of the half-hours that a variant's forecast has and that are scored.
+
+    Only the key columns of the first seed's file are read. Every seed holds the same keys
+    (`average_files` checks that when the variant is scored).
+
+    Args:
+        variant: The arm, state, and seeds.
+        months: The folds, for a variant that names none of its own.
+        series: The series table.
+        ctx: The scoring context.
+
+    Returns:
+        The scored keys, sorted by key.
+
+    Raises:
+        ValueError: If a key is held twice.
+    """
+    folder = forecast_folder(arm=variant.arm, state=variant.state)
+    pieces = [
+        pl.read_parquet(folder / f"{m}_s{variant.seeds[0]}.parquet", columns=KEYS).with_columns(
+            pl.col("time_series_id").cast(series.schema["time_series_id"])
+        )
+        for m in variant.months or months
+    ]
+    keys = (
+        pl.concat(pieces)
+        .join(series.select("time_series_id"), on="time_series_id", how="semi")
+        .sort(KEYS)
+    )
+    if keys.is_duplicated().any():
+        msg = f"{variant.name}: the stored forecast holds a key twice"
+        raise ValueError(msg)
+    return scored_keys(keys=keys, ctx=ctx)
+
+
+def reference_scored_keys(*, series: pl.DataFrame, ctx: dict) -> dict[str, pl.DataFrame]:
+    """Return the scored keys of each reference, holding one reference forecast at a time.
+
+    Only the keys of the references matter: they enter the shared half-hours and nothing else. The
+    references are `S0M_w115` (experiment 389's monthly XGBoost forecast, whose widening changes
+    no key) and the references of experiment 707's scorer.
 
     Args:
         series: The series table.
+        ctx: The scoring context.
 
     Returns:
-        `S0M_w115` and the references of experiment 707's scorer.
+        The scored keys by reference name: `S0M_w115`, `bg2`, `manual_heuristic`, `climatology`.
     """
-    references = s397.references(series=series)
-    out = {"S0M_w115": references["xgb_monthly_e389_widened"]}
-    out |= {name: references[name] for name in s707.REFERENCE_NAMES}
+    stored = pl.read_parquet(s397.E389_ARMS / "S0M_raw.parquet")
+    frame = adapter.forecast_frame(stored=stored, series=series, unit="fraction")
+    del stored
+    out = {"S0M_w115": scored_keys(keys=frame.select(KEYS), ctx=ctx)}
+    del frame
+    references = base377.reference_frames(series=series)
+    for name in s707.REFERENCE_NAMES:
+        out[name] = scored_keys(keys=references.pop(name).select(KEYS), ctx=ctx)
+    del references
+    gc.collect()
     return out
 
 
-def load_frames(
-    *,
-    series: pl.DataFrame,
-    months: tuple[str, ...],
-    variants: list[Variant],
-    references: dict[str, pl.DataFrame] | None = None,
-) -> dict[str, pl.DataFrame]:
-    """Return the scored forecasts in MW: each variant widened by 1.15, and the references.
+class Scorer:
+    """The shared slice table and the scored aggregates of the variants, computed on demand.
 
-    Args:
-        series: The series table.
-        months: The folds, for a variant that names none of its own.
-        variants: The variants to load.
-        references: The references from `load_references`, or `None` to load them.
-
-    Returns:
-        The frames keyed by variant name, `S0M_w115`, `bg2`, `manual_heuristic`, and `climatology`.
+    The aggregates of a variant are the sums of its row losses and the half-hour counts, by slice,
+    fold, and Primary, over the headline-band half-hours. Every printed figure follows from the
+    sums, so no frame of row losses is held for more than one fold of one variant. The aggregates
+    are written to `SCORE_CACHE_DIR` under the variant's name and a digest of its input files and
+    of the scoring context, and a later run reads them back.
     """
-    frames: dict[str, pl.DataFrame] = {}
-    for variant in variants:
-        stored = seed_average(variant=variant, months=variant.months or months)
-        frames[variant.name] = adapter.forecast_frame(
-            stored=s407.widen_global(frame=stored), series=series, unit="fraction"
+
+    def __init__(
+        self,
+        *,
+        series: pl.DataFrame,
+        ctx: dict,
+        variants: list[Variant],
+        months: tuple[str, ...],
+        reference_keys: dict[str, pl.DataFrame],
+    ) -> None:
+        """Build the shared slice table of the variants and the references.
+
+        Args:
+            series: The series table.
+            ctx: The scoring context of `s707.cleaned_scoring_context`.
+            variants: The variants to score.
+            months: The folds, for a variant that names none of its own.
+            reference_keys: The scored keys of the references (`reference_scored_keys`).
+        """
+        self.series = series
+        self.ctx = ctx
+        self.months = months
+        self.variants: dict[str, Variant] = {v.name: v for v in variants}
+        self.aggregates: dict[str, pl.DataFrame] = {}
+        shared: pl.DataFrame | None = None
+        for variant in variants:
+            keys = variant_scored_keys(variant=variant, months=months, series=series, ctx=ctx)
+            shared = (
+                keys
+                if shared is None
+                else shared.join(
+                    keys, on=list(metrics.KEY_COLUMNS), how="inner", maintain_order="left"
+                )
+            )
+        for keys in reference_keys.values():
+            shared = (
+                keys
+                if shared is None
+                else shared.join(
+                    keys, on=list(metrics.KEY_COLUMNS), how="inner", maintain_order="left"
+                )
+            )
+        if shared is None:
+            msg = "at least one variant or reference is needed to build a slice table"
+            raise ValueError(msg)
+        print(f"scored: {', '.join([*self.variants, *reference_keys])}")
+        self.table = metrics.shared_slice_table(
+            forecasts={"shared": shared},
+            actuals=ctx["actuals"],
+            context=ctx["context"],
+            events=ctx["events"],
+            first_readings=ctx["first_readings"],
         )
-    frames |= load_references(series=series) if references is None else references
-    print("scored:", ", ".join(frames))
-    return frames
+        print(f"shared half-hours: {self.table.height}")
+        del shared
+        gc.collect()
+        self.slices: tuple[str, ...] = tuple(
+            c for c in self.table.columns if c not in metrics.KEY_COLUMNS
+        )
+        self.context_digest = hashlib.sha256(
+            "|".join(
+                [
+                    AGGREGATE_VERSION,
+                    frame_digest(frame=self.table),
+                    frame_digest(frame=ctx["actuals"]),
+                    frame_digest(frame=series),
+                    frame_digest(frame=ctx["thresholds"]),
+                ]
+            ).encode()
+        ).hexdigest()
+
+    def cache_path(self, *, variant: Variant) -> Path:
+        """Return the cache file of a variant's aggregates."""
+        files = files_digest(paths=variant_files(variant=variant, months=self.months))
+        return SCORE_CACHE_DIR / f"{variant.name}__{files[:16]}__{self.context_digest[:16]}.parquet"
+
+    def get(self, name: str) -> pl.DataFrame | None:
+        """Return a variant's aggregates, or `None` if the name is not one of the variants."""
+        if name not in self.aggregates:
+            variant = self.variants.get(name)
+            if variant is None:
+                return None
+            path = self.cache_path(variant=variant)
+            if path.exists():
+                self.aggregates[name] = pl.read_parquet(path)
+            else:
+                self.aggregates[name] = self.aggregate(variant=variant)
+                common.atomic_write(frame=self.aggregates[name], target=path)
+        return self.aggregates[name]
+
+    def require(self, name: str) -> pl.DataFrame:
+        """Return a variant's aggregates, raising `KeyError` for a name that is not a variant."""
+        found = self.get(name)
+        if found is None:
+            raise KeyError(name)
+        return found
+
+    def aggregate(self, *, variant: Variant) -> pl.DataFrame:
+        """Score a variant one fold at a time and return its aggregates.
+
+        Args:
+            variant: The arm, state, and seeds.
+
+        Returns:
+            One row per slice, month of the forecast origin, and Primary, with `n` (half-hours) and
+            the sum of each of `SUMMED_METRICS`, over the half-hours of the headline band.
+
+        Raises:
+            ValueError: If the scored half-hours are not exactly the keys of the slice table, or a
+                summed loss is null.
+        """
+        pieces = []
+        scored = 0
+        for month in variant.months or self.months:
+            stored = seed_average(variant=variant, months=(month,))
+            frame = adapter.forecast_frame(
+                stored=s407.widen_global(frame=stored), series=self.series, unit="fraction"
+            )
+            del stored
+            kept = metrics.restrict_to_slice_table(forecast=frame, slice_table=self.table)
+            del frame
+            losses = metrics.row_losses(
+                forecast=kept,
+                actuals=self.ctx["actuals"],
+                series=self.series,
+                thresholds=self.ctx["thresholds"],
+            )
+            del kept
+            rows = metrics._with_slice_columns(rows=losses, slice_table=self.table)
+            del losses
+            scored += rows.height
+            pieces.append(self.month_sums(rows=rows, variant=variant))
+            del rows
+            gc.collect()
+        if scored != self.table.height:
+            msg = (
+                f"{variant.name}: {scored} scored half-hours, but the slice table holds "
+                f"{self.table.height}. Score every variant on the shared rows"
+            )
+            raise ValueError(msg)
+        return (
+            pl.concat(pieces)
+            .group_by("slice", "month", "label")
+            .agg(pl.col("n").sum(), *[pl.col(m).sum() for m in SUMMED_METRICS])
+            .sort("slice", "month", "label")
+        )
+
+    def month_sums(self, *, rows: pl.DataFrame, variant: Variant) -> pl.DataFrame:
+        """Return the sums of the row losses of one fold, by slice, month, and Primary."""
+        headline = rows.filter(pl.col(HEADLINE)).with_columns(
+            month=pl.col("power_fcst_init_time").dt.strftime("%Y-%m")
+        )
+        if headline.select(SUMMED_METRICS).null_count().sum_horizontal().item():
+            msg = f"{variant.name}: a headline-band row loss is null"
+            raise ValueError(msg)
+        pieces = []
+        for name in (ALL_ROWS, *self.slices):
+            part = headline if name == ALL_ROWS else headline.filter(pl.col(name))
+            pieces.append(
+                part.group_by("month", "label")
+                .agg(pl.len().cast(pl.Int64).alias("n"), *[pl.col(m).sum() for m in SUMMED_METRICS])
+                .with_columns(slice=pl.lit(name))
+            )
+        return pl.concat(pieces)
 
 
 def resolve(*, name: str, args: argparse.Namespace) -> str:
@@ -295,50 +542,142 @@ def needed_variants(
     return list(variants.values()), have
 
 
+def month_totals(
+    *,
+    aggregate: pl.DataFrame,
+    group: str,
+    metric: str,
+    slice_name: str = ALL_ROWS,
+    without_label: str | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return the sum of a metric and the half-hour count in each month, on a group and a slice.
+
+    Args:
+        aggregate: The aggregates of one variant (`Scorer.aggregate`).
+        group: A key of `SUBSETS`.
+        metric: One of `SUMMED_METRICS`.
+        slice_name: `ALL_ROWS` or a column of the slice table.
+        without_label: A Primary to leave out, such as `D8`.
+
+    Returns:
+        The months (sorted), the sums, and the counts; empty arrays if no half-hour is left.
+    """
+    keep = (pl.col("slice") == slice_name) & pl.col("label").is_in(list(SUBSETS[group]))
+    if without_label is not None:
+        keep &= pl.col("label") != without_label
+    totals = (
+        aggregate.filter(keep)
+        .group_by("month")
+        .agg(pl.col(metric).sum(), pl.col("n").sum())
+        .sort("month")
+    )
+    return (
+        totals["month"].to_numpy(),
+        totals[metric].to_numpy().astype(np.float64),
+        totals["n"].to_numpy().astype(np.float64),
+    )
+
+
+def month_sum_bounds(
+    *, sums: np.ndarray, counts: np.ndarray, level_percent: float, n_resamples: int
+) -> tuple[float, float]:
+    """Return the interval of a mean from resampling whole months, from each month's sum and count.
+
+    The random stream and the draw order are those of `bootstrap._resample_bounds` for one seed, so
+    the bounds equal what the row-level resampling returns, up to floating-point summation order.
+
+    Args:
+        sums: The sum of the per-row value in each month, months in sorted order.
+        counts: The number of rows in each month.
+        level_percent: The interval's coverage in percent, above 1 and below 100.
+        n_resamples: How many resamples to draw.
+
+    Returns:
+        The lower and upper percentiles of the resampled mean.
+
+    Raises:
+        ValueError: If the level is not above 1 and below 100.
+    """
+    if not 1.0 < level_percent < 100.0:
+        msg = f"level is a coverage in percent, above 1 and below 100: {level_percent}"
+        raise ValueError(msg)
+    generator = np.random.default_rng(bootstrap.BOOTSTRAP_SEED)
+    resampled = np.empty(n_resamples)
+    for resample in range(n_resamples):
+        generator.integers(0, 1)
+        drawn = generator.integers(0, len(counts), size=len(counts))
+        resampled[resample] = sums[drawn].sum() / counts[drawn].sum()
+    tail = (100.0 - level_percent) / 2.0
+    return float(np.percentile(resampled, tail)), float(np.percentile(resampled, 100.0 - tail))
+
+
 def contrast(
     *,
     label: str,
     group: str,
     treatment: pl.DataFrame,
     reference: pl.DataFrame,
-    table: pl.DataFrame,
     metric: str = "crps",
-    where: pl.Expr | None = None,
+    slice_name: str = ALL_ROWS,
+    without_label: str | None = None,
     level_percent: float = DESCRIPTIVE_LEVEL,
     note: str = "",
 ) -> dict[str, float] | None:
     """Print one contrast with the bootstrap interval and return its figures, or `None`.
 
+    The contrast is the mean over the shared half-hours of treatment minus reference. Both
+    variants hold the same half-hours (the slice table's), so the month total of the difference is
+    the difference of the month totals.
+
     Args:
         label: The contrast's name.
         group: A key of `SUBSETS`.
-        treatment: Scored rows of the treatment.
-        reference: Scored rows of the reference.
-        table: The shared slice table.
-        metric: A metric column.
-        where: An extra filter, such as a slice, a lead band, or a dropped Primary.
+        treatment: The aggregates of the treatment.
+        reference: The aggregates of the reference.
+        metric: One of `SUMMED_METRICS`.
+        slice_name: `ALL_ROWS` or a column of the slice table, such as a slice or a lead band.
+        without_label: A Primary to drop.
         level_percent: The interval's coverage in percent.
         note: Text to append to the line.
 
     Returns:
         The difference, the interval, the half-hours, and the months, or `None` for empty rows.
+
+    Raises:
+        ValueError: If the two variants hold different months or half-hour counts.
     """
-    keep = pl.col("label").is_in(list(SUBSETS[group])) & pl.col(HEADLINE)
-    if where is not None:
-        keep &= where
-    try:
-        r = metrics.month_bootstrap_contrast(
-            treatment=treatment,
-            reference=reference,
-            metric=metric,
-            where=keep,
-            level_percent=level_percent,
-            n_resamples=N_RESAMPLES,
-            slice_table=table,
-        )
-    except ValueError as error:
-        print(f"{label:34s} {group:16s} {metric:10s} unavailable: {error}")
+    months, sums, counts = month_totals(
+        aggregate=treatment,
+        group=group,
+        metric=metric,
+        slice_name=slice_name,
+        without_label=without_label,
+    )
+    ref_months, ref_sums, ref_counts = month_totals(
+        aggregate=reference,
+        group=group,
+        metric=metric,
+        slice_name=slice_name,
+        without_label=without_label,
+    )
+    if len(months) == 0 and len(ref_months) == 0:
+        msg = "the two forecasts share no half-hour in the filter"
+        print(f"{label:34s} {group:16s} {metric:10s} unavailable: {msg}")
         return None
+    if not (np.array_equal(months, ref_months) and np.array_equal(counts, ref_counts)):
+        msg = f"{label}: the two variants hold different half-hours in the filter"
+        raise ValueError(msg)
+    low, high = month_sum_bounds(
+        sums=sums - ref_sums, counts=counts, level_percent=level_percent, n_resamples=N_RESAMPLES
+    )
+    r = {
+        "difference": float((sums.sum() - ref_sums.sum()) / counts.sum()),
+        "lower": low,
+        "upper": high,
+        "level_percent": level_percent,
+        "n_half_hours": int(counts.sum()),
+        "n_months": len(months),
+    }
     thin = " THIN" if r["n_half_hours"] < metrics.THIN_HALF_HOURS else ""
     print(
         f"{label:34s} {group:16s} {metric:10s} {r['difference']:+.3f} "
@@ -348,87 +687,102 @@ def contrast(
     return {k: float(r[k]) for k in ("difference", "lower", "upper", "n_half_hours", "n_months")}
 
 
-def group_value(*, rows: pl.DataFrame, group: str, metric: str, where: pl.Expr | None) -> float:
+def group_value(*, aggregate: pl.DataFrame, group: str, metric: str) -> float:
     """Return the equal-weight mean over a group's Primaries of the headline-band metric."""
-    return s707.group_metric(rows=rows, members=SUBSETS[group], metric=metric, where=where)
+    per_label = (
+        aggregate.filter(
+            (pl.col("slice") == ALL_ROWS) & pl.col("label").is_in(list(SUBSETS[group]))
+        )
+        .group_by("label")
+        .agg(pl.col(metric).sum(), pl.col("n").sum())
+    )
+    if per_label.is_empty():
+        return float("nan")
+    return float(np.mean((per_label[metric] / per_label["n"]).to_numpy()))
 
 
 def absolute_interval(
-    *, rows: pl.DataFrame, table: pl.DataFrame, group: str, metric: str, where: pl.Expr | None
+    *, aggregate: pl.DataFrame, group: str, metric: str, slice_name: str
 ) -> tuple[float, float, float, int, int]:
-    """Return the mean of a metric on a row set with a 95% month-block interval.
+    """Return the mean of a metric on a slice with a 95% month-block interval.
 
     The mean here is over half-hours, so it can differ slightly from the equal-weight mean over
     Primaries that `group_value` returns. Each resample draws calendar months with replacement
     and recomputes the half-hour mean from the months' sums and counts, which is exact.
 
     Args:
-        rows: Scored rows of one arm.
-        table: The shared slice table.
+        aggregate: The aggregates of one variant.
         group: A key of `SUBSETS`.
-        metric: A metric column.
-        where: A slice or other filter, or `None`.
+        metric: One of `SUMMED_METRICS`.
+        slice_name: `ALL_ROWS` or a column of the slice table.
 
     Returns:
         The mean, the lower and upper limits, the number of half-hours, and the number of months;
         `nan` limits if the set is empty.
     """
-    joined = metrics._with_slice_columns(rows=rows, slice_table=table)
-    keep = pl.col("label").is_in(list(SUBSETS[group])) & pl.col(HEADLINE)
-    if where is not None:
-        keep &= where
-    part = joined.filter(keep)
-    if part.is_empty():
+    months, sums, counts = month_totals(
+        aggregate=aggregate, group=group, metric=metric, slice_name=slice_name
+    )
+    if len(months) == 0:
         nan = float("nan")
         return nan, nan, nan, 0, 0
-    values = part[metric].to_numpy().astype(np.float64)
-    months = part["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
-    unique, inverse = np.unique(months, return_inverse=True)
-    sums = np.bincount(inverse, weights=values, minlength=len(unique))
-    counts = np.bincount(inverse, minlength=len(unique)).astype(np.float64)
     rng = np.random.default_rng(ABSOLUTE_SEED)
-    draws = rng.integers(0, len(unique), size=(ABSOLUTE_RESAMPLES, len(unique)))
+    draws = rng.integers(0, len(months), size=(ABSOLUTE_RESAMPLES, len(months)))
     means = sums[draws].sum(axis=1) / counts[draws].sum(axis=1)
     tail = (100.0 - DESCRIPTIVE_LEVEL) / 2.0
     low, high = np.percentile(means, [tail, 100.0 - tail])
-    return float(values.mean()), float(low), float(high), len(values), len(unique)
+    return (
+        float(sums.sum() / counts.sum()),
+        float(low),
+        float(high),
+        int(counts.sum()),
+        len(months),
+    )
 
 
-def slice_expressions(*, table: pl.DataFrame) -> dict[str, pl.Expr | None]:
-    """Return the slices that the metrics are reported on, as filter expressions.
+def slice_names(*, slices: tuple[str, ...]) -> list[str]:
+    """Return the slices that the metrics are reported on, `ALL_ROWS` first.
 
     The sunny slice is `sunny_clear_sky_index` if the table has it (the protocol's protected
     slice) and `sunny_unit_shape` otherwise; `sunny_unit_shape` is also printed when both exist.
 
     Args:
-        table: The shared slice table.
+        slices: The columns of the shared slice table.
 
     Returns:
-        The expression of each slice present; `None` for all rows.
+        The slices present, in reporting order.
     """
-    out: dict[str, pl.Expr | None] = {"all rows": None}
-    for name in ("sunny_clear_sky_index", "sunny_unit_shape", "cold_nights", "event_rows"):
-        if name in table.columns:
-            out[name] = pl.col(name)
-    if "event_following_7_days" in table.columns:
-        out["event_following_7_days"] = pl.col("event_following_7_days")
+    out = [ALL_ROWS]
+    out += [
+        name
+        for name in ("sunny_clear_sky_index", "sunny_unit_shape", "cold_nights", "event_rows")
+        if name in slices
+    ]
+    if "event_following_7_days" in slices:
+        out.append("event_following_7_days")
     return out
 
 
-def metric_tables(*, rows: dict[str, pl.DataFrame], table: pl.DataFrame) -> None:
+def mean_coverage(*, aggregate: pl.DataFrame, group: str, metric: str) -> float:
+    """Return the mean of a coverage column over a group's headline-band half-hours."""
+    _months, sums, counts = month_totals(aggregate=aggregate, group=group, metric=metric)
+    return float(sums.sum() / counts.sum()) if counts.sum() else float("nan")
+
+
+def metric_tables(*, aggregates: dict[str, pl.DataFrame], slices: tuple[str, ...]) -> None:
     """Print each metric, per group and slice, with its interval and the subset size.
 
     Args:
-        rows: Scored rows of each variant (the full-seed variants).
-        table: The shared slice table.
+        aggregates: The aggregates of each variant (the full-seed variants).
+        slices: The columns of the shared slice table.
     """
     print("\n== CRPS and MAE of the median per group and slice (95% month-block intervals) ==")
-    for slice_name, expr in slice_expressions(table=table).items():
+    for slice_name in slice_names(slices=slices):
         for group in GROUPS:
-            for name, frame in rows.items():
+            for name, aggregate in aggregates.items():
                 for metric in SCALE_METRICS:
                     mean, low, high, n, months = absolute_interval(
-                        rows=frame, table=table, group=group, metric=metric, where=expr
+                        aggregate=aggregate, group=group, metric=metric, slice_name=slice_name
                     )
                     thin = " THIN" if n < metrics.THIN_HALF_HOURS else ""
                     print(
@@ -437,32 +791,46 @@ def metric_tables(*, rows: dict[str, pl.DataFrame], table: pl.DataFrame) -> None
                     )
     print("\n== coverage of q05 and q95 (nominal 0.05 and 0.95) ==")
     for group in GROUPS:
-        for name, frame in rows.items():
-            part = frame.filter(pl.col("label").is_in(list(SUBSETS[group])) & pl.col(HEADLINE))
+        for name, aggregate in aggregates.items():
             print(
-                f"{group:16s} {name:18s} q05 {part['coverage_q05'].mean():.3f} "
-                f"q95 {part['coverage_q95'].mean():.3f}"
+                f"{group:16s} {name:18s} "
+                f"q05 {mean_coverage(aggregate=aggregate, group=group, metric='coverage_q05'):.3f} "
+                f"q95 {mean_coverage(aggregate=aggregate, group=group, metric='coverage_q95'):.3f}"
             )
 
 
-def minimum_detectable_effect(*, rows: dict[str, pl.DataFrame]) -> float | None:
+def fold_means(*, aggregate: pl.DataFrame, members: tuple[str, ...]) -> pl.DataFrame:
+    """Return, per fold, the group's CRPS: the mean over Primaries of each Primary's fold mean."""
+    return (
+        aggregate.filter((pl.col("slice") == ALL_ROWS) & pl.col("label").is_in(list(members)))
+        .group_by("label", "month")
+        .agg(pl.col("crps").sum(), pl.col("n").sum())
+        .with_columns(crps=pl.col("crps") / pl.col("n"))
+        .group_by("month")
+        .agg(pl.col("crps").mean())
+        .rename({"month": "fold"})
+        .sort("fold")
+    )
+
+
+def minimum_detectable_effect(*, scorer: Scorer) -> float | None:
     """Print and return the minimum detectable effect at the six (a lower bound).
 
     The effect is the standard deviation over folds of the six's CRPS difference between the mean
     of an arm's seeds 0 to 2 and the mean of its seeds 3 and 4, divided by the square root of two.
 
     Args:
-        rows: Scored rows keyed by variant name.
+        scorer: The scorer that holds the variants' aggregates.
 
     Returns:
         The effect, or `None` if `M2-n` has no complete second seed set.
     """
     print("\n== minimum detectable effect, signed-MW six (before any contrast) ==")
     names = [Variant(arm=MDE_ARM[:2], state="n", seeds=h).name for h in MDE_HALVES]
-    if not all(n in rows for n in names):
+    if not all(n in scorer.variants for n in names):
         print("not computed: the stored M2-n lacks seeds 0 to 2 and 3 and 4 on every fold")
         return None
-    per_fold = [s707.per_label_fold(rows=rows[n], members=SUBSETS[SIX]) for n in names]
+    per_fold = [fold_means(aggregate=scorer.require(n), members=SUBSETS[SIX]) for n in names]
     gap = (
         per_fold[0]
         .join(per_fold[1], on="fold", suffix="_second")
@@ -542,7 +910,7 @@ def c1_guards(
     group: str,
     treatment: pl.DataFrame,
     reference: pl.DataFrame,
-    table: pl.DataFrame,
+    slices: tuple[str, ...],
     seed_sets: dict[str, tuple[pl.DataFrame, pl.DataFrame] | None],
     versus_m2: tuple[pl.DataFrame, pl.DataFrame] | None,
     family_level: float,
@@ -553,11 +921,12 @@ def c1_guards(
 
     Args:
         group: The group.
-        treatment: Scored rows of `B*-i`.
-        reference: Scored rows of `M1-i`.
-        table: The shared slice table.
-        seed_sets: For `seeds_012` and `seeds_34`, the (treatment, reference) rows on those seeds.
-        versus_m2: The rows of `B*-i` and `M2-i` on shared seeds, for the six.
+        treatment: The aggregates of `B*-i`.
+        reference: The aggregates of `M1-i`.
+        slices: The columns of the shared slice table.
+        seed_sets: For `seeds_012` and `seeds_34`, the (treatment, reference) aggregates on those
+            seeds.
+        versus_m2: The aggregates of `B*-i` and `M2-i` on shared seeds, for the six.
         family_level: The level of family R (family E for the extension E1).
         prefix: The contrast's label in the printed lines (`E1` for the extension).
         with_versus_m2: Whether the six get the `B*` minus `M2` check (not for `E1`).
@@ -571,8 +940,8 @@ def c1_guards(
         if pair is None:
             out[f"point below +0.02 on {name}"] = None
         else:
-            d = group_value(rows=pair[0], group=group, metric="crps", where=None) - group_value(
-                rows=pair[1], group=group, metric="crps", where=None
+            d = group_value(aggregate=pair[0], group=group, metric="crps") - group_value(
+                aggregate=pair[1], group=group, metric="crps"
             )
             out[f"point below +0.02 on {name}"] = bool(d < MARGIN)
     if group == EIGHT:
@@ -581,8 +950,7 @@ def c1_guards(
             group=group,
             treatment=treatment,
             reference=reference,
-            table=table,
-            where=pl.col("label") != "D8",
+            without_label="D8",
             level_percent=family_level,
         )
         out["upper below +0.02 on the eight without D8"] = (
@@ -592,9 +960,9 @@ def c1_guards(
         if versus_m2 is None:
             out["B* minus M2 below +0.02 at the six"] = None
         else:
-            d = group_value(
-                rows=versus_m2[0], group=group, metric="crps", where=None
-            ) - group_value(rows=versus_m2[1], group=group, metric="crps", where=None)
+            d = group_value(aggregate=versus_m2[0], group=group, metric="crps") - group_value(
+                aggregate=versus_m2[1], group=group, metric="crps"
+            )
             out["B* minus M2 below +0.02 at the six"] = bool(d < MARGIN)
     sunny = "sunny_clear_sky_index"
     checks: dict[str, tuple[str, str | None]] = {
@@ -615,7 +983,7 @@ def c1_guards(
     }
     for name, (metric, column) in checks.items():
         key = f"one-sided 95% bound within 0.05 on {name}"
-        if column is not None and column not in table.columns:
+        if column is not None and column not in slices:
             out[key] = None
             continue
         r = contrast(
@@ -623,9 +991,8 @@ def c1_guards(
             group=group,
             treatment=treatment,
             reference=reference,
-            table=table,
             metric=metric,
-            where=None if column is None else pl.col(column),
+            slice_name=ALL_ROWS if column is None else column,
             level_percent=ONE_SIDED_LEVEL,
         )
         out[key] = None if r is None else r["upper"] < SLICE_MARGIN
@@ -634,18 +1001,16 @@ def c1_guards(
 
 def family_contrasts(
     *,
-    rows: dict[str, pl.DataFrame],
+    scorer: Scorer,
     have: dict[tuple[str, str], tuple[int, ...]],
-    table: pl.DataFrame,
     args: argparse.Namespace,
     mde: float | None,
 ) -> dict[tuple[str, str], dict[str, float]]:
     """Print the tested contrasts C1 to C7 and I1 to I3 per group, and the verdict of C1.
 
     Args:
-        rows: Scored rows of each variant, keyed by variant name.
+        scorer: The scorer that holds the variants' aggregates.
         have: The complete seeds of each (arm, state).
-        table: The shared slice table.
         args: The command-line arguments (`B*`, `O*`, `h_T`).
         mde: The minimum detectable effect, or `None`.
 
@@ -677,9 +1042,8 @@ def family_contrasts(
             figures = contrast(
                 label=f"{label} {ta}-i minus {ra}-i",
                 group=group,
-                treatment=rows[names[0]],
-                reference=rows[names[1]],
-                table=table,
+                treatment=scorer.require(names[0]),
+                reference=scorer.require(names[1]),
                 level_percent=level,
             )
             if figures is not None:
@@ -693,9 +1057,8 @@ def family_contrasts(
             figures = contrast(
                 label=f"I{n} {x}-i minus {x}-n",
                 group=group,
-                treatment=rows[names[0]],
-                reference=rows[names[1]],
-                table=table,
+                treatment=scorer.require(names[0]),
+                reference=scorer.require(names[1]),
                 level_percent=arms.FAMILY_LEVELS["I"][0],
             )
             if figures is not None:
@@ -712,9 +1075,8 @@ def family_contrasts(
             figures = contrast(
                 label=f"{label} {ta}-{ts} minus {ra}-{rs}",
                 group=group,
-                treatment=rows[names[0]],
-                reference=rows[names[1]],
-                table=table,
+                treatment=scorer.require(names[0]),
+                reference=scorer.require(names[1]),
                 level_percent=arms.FAMILY_LEVELS["R"][0],
                 note="[secondary contrast]",
             )
@@ -724,15 +1086,15 @@ def family_contrasts(
                     f"{label} {group}: secondary verdict (no guards): "
                     f"{verdict_for(lower=figures['lower'], upper=figures['upper'])}"
                 )
-    c1_verdicts(rows=rows, have=have, table=table, args=args, found=found)
+    c1_verdicts(scorer=scorer, have=have, args=args, found=found)
     return found
 
 
 def e1_extras(
     *,
-    rows: dict[str, pl.DataFrame],
+    aggregates: dict[str, pl.DataFrame],
     variants: list[Variant],
-    table: pl.DataFrame,
+    slices: tuple[str, ...],
     months: tuple[str, ...],
 ) -> None:
     """Print the guards, the slice CRPS, and the slump share of the pre-registered extension E1.
@@ -742,10 +1104,10 @@ def e1_extras(
     nights, and the 7 days after an event, and the slump share beside it.
 
     Args:
-        rows: Scored rows by variant name.
+        aggregates: The aggregates by variant name.
         variants: `M1h90-i` and `FTh90d-i` first (the contrast), then `M1-i` if it holds the same
             folds and seeds.
-        table: The shared slice table.
+        slices: The columns of the shared slice table.
         months: The folds the variants hold.
     """
     treatment, reference = variants[0], variants[1]
@@ -755,11 +1117,14 @@ def e1_extras(
     for group in GROUPS:
         guards = c1_guards(
             group=group,
-            treatment=rows[treatment.name],
-            reference=rows[reference.name],
-            table=table,
+            treatment=aggregates[treatment.name],
+            reference=aggregates[reference.name],
+            slices=slices,
             seed_sets={
-                f"seeds {list(treatment.seeds)}": (rows[treatment.name], rows[reference.name])
+                f"seeds {list(treatment.seeds)}": (
+                    aggregates[treatment.name],
+                    aggregates[reference.name],
+                )
             },
             versus_m2=None,
             family_level=arms.FAMILY_LEVELS["E"][0],
@@ -770,19 +1135,15 @@ def e1_extras(
         missing = [k for k, v in guards.items() if v is None and k != SUNNY_KEY]
         print(f"E1 {group}: guards failed {failed}; not available {missing} (read as explanatory)")
     print("\n== pre-registered extension E1: CRPS on the slices (95% month-block intervals) ==")
-    wanted = ("all rows", "sunny_clear_sky_index", "sunny_unit_shape", "cold_nights")
-    slices = slice_expressions(table=table)
+    wanted = (ALL_ROWS, "sunny_clear_sky_index", "sunny_unit_shape", "cold_nights")
+    present = slice_names(slices=slices)
     for slice_name in (*wanted, "event_following_7_days"):
-        if slice_name not in slices:
+        if slice_name not in present:
             continue
         for group in GROUPS:
             for v in variants:
                 mean, low, high, n, n_months = absolute_interval(
-                    rows=rows[v.name],
-                    table=table,
-                    group=group,
-                    metric="crps",
-                    where=slices[slice_name],
+                    aggregate=aggregates[v.name], group=group, metric="crps", slice_name=slice_name
                 )
                 thin = " THIN" if n < metrics.THIN_HALF_HOURS else ""
                 print(
@@ -794,16 +1155,16 @@ def e1_extras(
 
 def e1_report(
     *,
-    rows: dict[str, pl.DataFrame],
+    scorer: Scorer,
     have: dict[tuple[str, str], tuple[int, ...]],
-    table: pl.DataFrame,
+    months: tuple[str, ...],
 ) -> None:
     """Print the guards, slice CRPS, and slump share of E1 on the seeds all three arms hold.
 
     Args:
-        rows: Scored rows by variant name.
+        scorer: The scorer that holds the variants' aggregates.
         have: The complete seeds of each (arm, state).
-        table: The shared slice table.
+        months: The folds to read.
     """
     seeds = tuple(
         sorted(
@@ -816,8 +1177,13 @@ def e1_report(
         print("E1 (pre-registered extension): skipped, no seed is complete for all three arms")
         return
     variants = [Variant(arm=a, state="i", seeds=seeds) for a in ("M1h90", "FTh90d", "M1")]
-    if all(v.name in rows for v in variants):
-        e1_extras(rows=rows, variants=variants, table=table, months=tuple(arms.SCORED_MONTHS))
+    if all(v.name in scorer.variants for v in variants):
+        e1_extras(
+            aggregates={v.name: scorer.require(v.name) for v in variants},
+            variants=variants,
+            slices=scorer.slices,
+            months=months,
+        )
 
 
 def e1_variants(*, seeds: tuple[int, ...], months: tuple[str, ...]) -> list[Variant]:
@@ -839,18 +1205,16 @@ def e1_variants(*, seeds: tuple[int, ...], months: tuple[str, ...]) -> list[Vari
 
 def c1_verdicts(
     *,
-    rows: dict[str, pl.DataFrame],
+    scorer: Scorer,
     have: dict[tuple[str, str], tuple[int, ...]],
-    table: pl.DataFrame,
     args: argparse.Namespace,
     found: dict[tuple[str, str], dict[str, float]],
 ) -> None:
     """Print C1's verdict per group, with the guards, and the experiment's verdict.
 
     Args:
-        rows: Scored rows by variant name.
+        scorer: The scorer that holds the variants' aggregates.
         have: The complete seeds of each (arm, state).
-        table: The shared slice table.
         args: The command-line arguments.
         found: The contrast figures from `family_contrasts`.
     """
@@ -860,7 +1224,7 @@ def c1_verdicts(
 
     def pick(a: str, s: str, seeds: tuple[int, ...]) -> pl.DataFrame | None:
         name = Variant(arm=a, state=s, seeds=seeds).name
-        return rows.get(name)
+        return scorer.get(name)
 
     both = tuple(sorted(set(have.get((b, "i"), ())) & set(have.get(("M1", "i"), ()))))
     with_m2 = tuple(sorted(set(have.get((b, "i"), ())) & set(have.get(("M2", "i"), ()))))
@@ -881,7 +1245,7 @@ def c1_verdicts(
             group=group,
             treatment=t_all,
             reference=r_all,
-            table=table,
+            slices=scorer.slices,
             seed_sets=seed_sets,
             versus_m2=None if t_m2 is None or m2 is None else (t_m2, m2),
             family_level=level,
@@ -1124,11 +1488,14 @@ def slump_tables(*, variants: list[Variant], months: tuple[str, ...]) -> dict[st
                 )
                 if e.is_empty():
                     continue
+                # A mean over no value is `None` in Polars; print it as `nan` instead of crashing.
+                share, nra_error, crps_change = e.select(
+                    pl.col("share", "shift_error_pts", "crps_change").mean().fill_null(float("nan"))
+                ).row(0)
                 print(
                     f"{v.name:18s} {group:16s} {part:13s} events={e.height:4d} "
-                    f"half-hours={int(e['n_rows'].sum()):6d} share {e['share'].mean():+.3f} "
-                    f"NRA error {e['shift_error_pts'].mean():+.3f} pts "
-                    f"CRPS change {e['crps_change'].mean():+.3f} pts"
+                    f"half-hours={int(e['n_rows'].sum()):6d} share {share:+.3f} "
+                    f"NRA error {nra_error:+.3f} pts CRPS change {crps_change:+.3f} pts"
                 )
     return out
 
@@ -1644,26 +2011,24 @@ def parsimony_pick(*, ranking: dict[str, float], one_shot_only: bool) -> str:
     )
 
 
-def t_tests(*, rows: dict[str, pl.DataFrame], names: dict[str, tuple[str, str]]) -> None:
+def t_tests(*, scorer: Scorer, names: dict[str, tuple[str, str]]) -> None:
     """Print a t test on the monthly differences of each named contrast, per group.
 
     Args:
-        rows: Scored rows by variant name.
+        scorer: The scorer that holds the variants' aggregates.
         names: Each contrast's treatment and reference variant names.
     """
     print("\n== t tests on the monthly differences (descriptive) ==")
     for label, (t, r) in names.items():
-        if t not in rows or r not in rows:
+        treatment, reference = scorer.get(t), scorer.get(r)
+        if treatment is None or reference is None:
             continue
         for group in GROUPS:
-            keep = pl.col("label").is_in(list(SUBSETS[group])) & pl.col(HEADLINE)
-            a = rows[t].filter(keep).select(*KEYS, "crps")
-            b = rows[r].filter(keep).select(*KEYS, other=pl.col("crps"))
-            joined = a.join(b, on=KEYS, validate="1:1").with_columns(
-                month=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"),
-                diff=pl.col("crps") - pl.col("other"),
+            _months, sums, counts = month_totals(aggregate=treatment, group=group, metric="crps")
+            _months, ref_sums, _counts = month_totals(
+                aggregate=reference, group=group, metric="crps"
             )
-            monthly = joined.group_by("month").agg(pl.col("diff").mean())["diff"].to_numpy()
+            monthly = (sums - ref_sums) / counts
             if len(monthly) > 1:
                 result = stats.ttest_1samp(monthly, 0.0)
                 print(
@@ -1711,20 +2076,21 @@ def interim_pick(
     return best
 
 
-def interim_banner(*, seeds: tuple[int, ...], months: tuple[str, ...], rows: pl.DataFrame) -> str:
+def interim_banner(
+    *, seeds: tuple[int, ...], months: tuple[str, ...], aggregate: pl.DataFrame
+) -> str:
     """Return the banner that heads every table of an interim run.
 
     Args:
         seeds: The seeds scored.
         months: The folds scored.
-        rows: Scored rows of one arm of the contrast.
+        aggregate: The aggregates of one arm of the contrast.
 
     Returns:
         The banner text with the half-hours behind each group.
     """
     counts = {
-        g: rows.filter(pl.col("label").is_in(list(SUBSETS[g])) & pl.col(HEADLINE)).height
-        for g in GROUPS
+        g: int(month_totals(aggregate=aggregate, group=g, metric="crps")[2].sum()) for g in GROUPS
     }
     return (
         f"INTERIM: folds included [{', '.join(months)}]; seeds [{', '.join(map(str, seeds))}]; "
@@ -1744,7 +2110,7 @@ def interim_contrasts(*, args: argparse.Namespace, series: pl.DataFrame, ctx: di
         series: The series table.
         ctx: The scoring context of `s707.cleaned_scoring_context`.
     """
-    references = load_references(series=series)
+    reference_keys = reference_scored_keys(series=series, ctx=ctx)
     pairs = {
         label: (resolve(name=t, args=args), "i", resolve(name=r, args=args), "i")
         for label, (t, r) in arms.CONTRAST_NAMES.items()
@@ -1763,35 +2129,45 @@ def interim_contrasts(*, args: argparse.Namespace, series: pl.DataFrame, ctx: di
         ]
         if label == "E1":
             variants = e1_variants(seeds=seeds, months=months)
-        frames = load_frames(series=series, months=months, variants=variants, references=references)
-        table, _scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
-        del frames, _scored
-        banner = interim_banner(seeds=seeds, months=months, rows=rows[variants[0].name])
+        scorer = Scorer(
+            series=series, ctx=ctx, variants=variants, months=months, reference_keys=reference_keys
+        )
+        banner = interim_banner(
+            seeds=seeds, months=months, aggregate=scorer.require(variants[0].name)
+        )
         print(f"\n== {heading} ==\n{banner}")
         level = arms.FAMILY_LEVELS[arms.FAMILY_OF[label]][0]
         for group in GROUPS:
             contrast(
                 label=heading,
                 group=group,
-                treatment=rows[variants[0].name],
-                reference=rows[variants[1].name],
-                table=table,
+                treatment=scorer.require(variants[0].name),
+                reference=scorer.require(variants[1].name),
                 level_percent=level,
             )
         print(f"{banner}\n   CRPS of each arm, all rows (95% month-block intervals)")
         for v in variants:
             for group in GROUPS:
                 mean, low, high, n, n_months = absolute_interval(
-                    rows=rows[v.name], table=table, group=group, metric="crps", where=None
+                    aggregate=scorer.require(v.name),
+                    group=group,
+                    metric="crps",
+                    slice_name=ALL_ROWS,
                 )
                 print(
                     f"   {v.name:18s} {group:16s} {mean:.3f} ({low:.3f} to {high:.3f}) n={n} "
                     f"months={n_months}"
                 )
         if label == "E1":
-            e1_extras(rows=rows, variants=variants, table=table, months=months)
+            e1_extras(
+                aggregates={v.name: scorer.require(v.name) for v in variants},
+                variants=variants,
+                slices=scorer.slices,
+                months=months,
+            )
         print(f"{label}: INTERIM, no verdict")
-        del table, rows
+        del scorer
+        gc.collect()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1867,21 +2243,22 @@ def main() -> None:
             size = seed_average(variant=variants[0], months=months).estimated_size("gb")
             print(
                 f"one stored forecast ({variants[0].name}, {len(months)} folds): {size:.2f} GB; "
-                f"the scored rows hold about 20 metric and 25 slice columns more, so budget "
-                f"about {len(variants) * size * 2.5:.0f} GB for the rows of every variant at once"
+                f"the scorer holds one fold of one variant at a time, plus the slice table"
             )
         return
-    frames = load_frames(series=series, months=months, variants=variants)
-    table, _scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
-    del frames, _scored
-    s707.assert_before_holdout(name="the shared slice table", frame=table)
-    print(f"shared half-hours across every arm and reference: {table.height}")
-    mde = minimum_detectable_effect(rows=rows)
+    reference_keys = reference_scored_keys(series=series, ctx=ctx)
+    scorer = Scorer(
+        series=series, ctx=ctx, variants=variants, months=months, reference_keys=reference_keys
+    )
+    del reference_keys
+    s707.assert_before_holdout(name="the shared slice table", frame=scorer.table)
+    print(f"shared half-hours across every arm and reference: {scorer.table.height}")
+    mde = minimum_detectable_effect(scorer=scorer)
     full = [v for v in variants if v.seeds == have.get((v.arm, v.state))]
-    metric_tables(rows={v.name: rows[v.name] for v in full}, table=table)
-    found = family_contrasts(rows=rows, have=have, table=table, args=args, mde=mde)
+    metric_tables(aggregates={v.name: scorer.require(v.name) for v in full}, slices=scorer.slices)
+    found = family_contrasts(scorer=scorer, have=have, args=args, mde=mde)
     del found
-    e1_report(rows=rows, have=have, table=table)
+    e1_report(scorer=scorer, have=have, months=months)
     events = slump_tables(variants=full, months=months)
     slump_contrasts(events=events, have=have, args=args, months=months)
     for v in full:
@@ -1897,7 +2274,7 @@ def main() -> None:
                 Variant(arm=ta, state="i", seeds=seeds).name,
                 Variant(arm=ra, state="i", seeds=seeds).name,
             )
-    t_tests(rows=rows, names=names)
+    t_tests(scorer=scorer, names=names)
     print(f"\nscored at {datetime.now(UTC):%F %H:%M} UTC")
 
 
