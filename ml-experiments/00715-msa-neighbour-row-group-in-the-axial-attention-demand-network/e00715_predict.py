@@ -28,11 +28,11 @@ from pathlib import Path
 
 os.environ["E00667_PHASE"] = "predict"
 
-import e00713_arms as a713
-import e00713_inputs as inp
-import e00713_layout as lay
-import e00713_model as mdl
-import e00713_train as tr713
+import e00713_arms as a713  # ty: ignore[unresolved-import]
+import e00713_inputs as inp  # ty: ignore[unresolved-import]
+import e00713_layout as lay  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
+import e00713_train as tr713  # ty: ignore[unresolved-import]
 import e00715_arms as arms
 import e00715_batch as fb
 import e00715_model as f4
@@ -115,7 +115,7 @@ def forecast_frame(
     fb.check_origin_days(ens=data.source.ens, c_idx=c_all, what="the scored origins")
     prim, cc, lead = np.meshgrid(np.arange(16), c_all, np.arange(14), indexing="ij")
     prim, cc, lead = prim.ravel(), cc.ravel(), lead.ravel()
-    samples = tr.F4Samples(primary=prim, c_idx=cc, is_val=np.zeros(len(prim), bool))
+    samples = tr.F4Samples(primary=prim, c_idx=cc, is_val=np.zeros(len(prim), bool))  # ty: ignore[unknown-argument]
     if spec is not None and spec.slots == "shuffled":
         pool = nb.shuffle_pool(table=source.table, pool=tr713.block_pool(clean=data.clean))
         samples.nbr_ages = tr713.placebo_ages_for(primary=prim, c_idx=cc, pool=pool)
@@ -268,7 +268,7 @@ def compare_forecasts(*, new: pl.DataFrame, stored: pl.DataFrame) -> dict:
             "max_abs_difference": float("nan"),
         }
     joined = new.select(keys, *QCOLS).join(stored.select(keys, *QCOLS), on=keys, suffix="_s")
-    worst = max(float((joined[q] - joined[f"{q}_s"]).abs().max()) for q in QCOLS)
+    worst = max(float((joined[q] - joined[f"{q}_s"]).abs().max()) for q in QCOLS)  # ty: ignore[invalid-argument-type]
     return {
         "same_keys": True,
         "n_rows": joined.height,

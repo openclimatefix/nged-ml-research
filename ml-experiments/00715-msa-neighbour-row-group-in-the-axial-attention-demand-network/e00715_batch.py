@@ -19,9 +19,9 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Final, Literal
 
-import e00713_batch as bt
-import e00713_layout as lay
-import e00713_model as mdl
+import e00713_batch as bt  # ty: ignore[unresolved-import]
+import e00713_layout as lay  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00715_model as f4
 import e00715_neighbours as nb
 import numpy as np

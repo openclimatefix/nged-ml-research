@@ -17,8 +17,8 @@ names and differs from the other candidate arrays, and the host's history reads 
 
 import sys
 
-import e00713_batch as bt
-import e00713_layout as lay
+import e00713_batch as bt  # ty: ignore[unresolved-import]
+import e00713_layout as lay  # ty: ignore[unresolved-import]
 import e00715_batch as fb
 import e00715_check_model as cm
 import e00715_model as f4
@@ -66,7 +66,7 @@ def shuffled_ages(
     *, src: fb.F4Source, primary: np.ndarray, c: np.ndarray
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Return the (ages, exists) of the `F4-T` draw for these samples from a full pool."""
-    import e00713_train as tr
+    import e00713_train as tr  # ty: ignore[unresolved-import]
 
     clean = np.isfinite(src.neighbour_power.numpy())
     pool = nb.shuffle_pool(table=src.table, pool=tr.block_pool(clean=clean))
@@ -112,11 +112,11 @@ def kn2(
                 one = s.assemble(
                     primary=p_t[i : i + 1], c_idx=c_t[i : i + 1], lead_day=lead[i : i + 1],
                     ensemble=ensemble, neighbour_power=power, host_power_in=host_in,
-                    **{k: v[i : i + 1] for k, v in extra.items()},
+                    **{k: v[i : i + 1] for k, v in extra.items()},  # ty: ignore[invalid-argument-type]
                 )  # fmt: skip
                 one_ref = s.assemble(
                     primary=p_t[i : i + 1], c_idx=c_t[i : i + 1], lead_day=lead[i : i + 1],
-                    ensemble=ensemble, **{k: v[i : i + 1] for k, v in extra.items()},
+                    ensemble=ensemble, **{k: v[i : i + 1] for k, v in extra.items()},  # ty: ignore[invalid-argument-type]
                 )  # fmt: skip
                 assert tensors_equal(one, one_ref), (
                     f"KN2 {arm} sample {i}: a poisoned reading ({value}) reached the inputs"
@@ -332,7 +332,7 @@ def real(*, month: str) -> None:
     import os
 
     os.environ["E00667_PHASE"] = "predict"
-    import e00713_inputs as inp
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
     import e00715_arms as arms
 
     table = nb.load_table()

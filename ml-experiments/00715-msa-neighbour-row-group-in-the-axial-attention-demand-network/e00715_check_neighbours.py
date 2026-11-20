@@ -113,8 +113,8 @@ def kn10() -> None:
     for host in range(16):
         near = list(table.neighbours[host])
         assert (pool_t[host] == (pool[host] & pool[near].any(axis=0))).all()
-    import e00713_layout as lay
-    import e00713_train as tr
+    import e00713_layout as lay  # ty: ignore[unresolved-import]
+    import e00713_train as tr  # ty: ignore[unresolved-import]
 
     prim = np.repeat(np.arange(16), 20)
     c_idx = np.tile(np.arange(40, 60), 16) * 48 + 24 + 600 * 48

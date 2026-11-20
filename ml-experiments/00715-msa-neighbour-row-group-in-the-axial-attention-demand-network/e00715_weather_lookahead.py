@@ -21,8 +21,8 @@ import argparse
 import sys
 from datetime import UTC, datetime, timedelta
 
-import e00713_layout as lay
-import e00713_weather_lookahead as w713
+import e00713_layout as lay  # ty: ignore[unresolved-import]
+import e00713_weather_lookahead as w713  # ty: ignore[unresolved-import]
 import e00715_neighbours as nb
 import numpy as np
 

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501, PT018, PLR0912
 """Experiment 715: `F4Net`, the axial-attention demand network with a third axis of neighbour slots.
 
 `F4Net` subclasses experiment 713's `MsaNet` and keeps every one of its module names, so a stored
@@ -27,7 +27,7 @@ masks that `M*` drew.
 from dataclasses import dataclass
 from typing import Final
 
-import e00713_model as mdl
+import e00713_model as mdl  # ty: ignore[unresolved-import]
 import torch  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]
 
@@ -286,6 +286,8 @@ class F4Net(mdl.MsaNet):
         """
         x, row_exists = self._tokens(inp)
         n_out = vis = None
+        if return_attention:
+            self.nbr_encoder.record = {}  # the encoder runs once, before the blocks
         if nbr is not None:
             n_out, vis = self._neighbour_tokens(nbr)
         recorded: list[tuple[str, mdl.Attention]] = []
@@ -297,7 +299,6 @@ class F4Net(mdl.MsaNet):
                     recorded.append((f"{kind}_{i}", module))
             for cross in self.cross:
                 cross.record = {}
-            self.nbr_encoder.record = {}
         for i, block in enumerate(self.blocks):
             b, r, c, w = x.shape
             # the three steps of `AxialBlock.forward`, with the across-substation attention between the first two
@@ -341,13 +342,14 @@ class F4Net(mdl.MsaNet):
                         batch, mdl.N_COLS, *w_.shape[1:2], w_.shape[-1]
                     )
             for cross in self.cross:
-                nbr_attention.append(cross.record.pop("weights"))  # ty: ignore[unresolved-attribute]
+                if "weights" in cross.record:  # ty: ignore[unsupported-operator]
+                    nbr_attention.append(cross.record.pop("weights"))  # ty: ignore[unresolved-attribute]
                 cross.record = None
-            enc_attention = self.nbr_encoder.record.pop("weights")  # ty: ignore[unresolved-attribute]
+            enc_attention = self.nbr_encoder.record.pop("weights", None)  # ty: ignore[unresolved-attribute]
             self.nbr_encoder.record = None
         return F4Output(
-            out=out, base=base, spread=spread, no_history=no_history, alpha=alpha,
-            attention=attention, target_vector=h0.detach() if return_attention else None,
+            out=out, base=base, spread=spread, no_history=no_history, alpha=alpha,  # ty: ignore[unknown-argument]
+            attention=attention, target_vector=h0.detach() if return_attention else None,  # ty: ignore[unknown-argument]
             nbr_attention=nbr_attention, nbr_encoder_attention=enc_attention,
         )  # fmt: skip
 

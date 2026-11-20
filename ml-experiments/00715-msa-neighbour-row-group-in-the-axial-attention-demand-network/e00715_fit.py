@@ -36,9 +36,9 @@ from pathlib import Path
 
 os.environ["E00667_PHASE"] = "train"
 
-import e00713_arms as a713
-import e00713_model as mdl
-import e00713_train as tr713
+import e00713_arms as a713  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
+import e00713_train as tr713  # ty: ignore[unresolved-import]
 import e00715_arms as arms
 import e00715_model as f4
 import e00715_neighbours as nb
@@ -84,7 +84,7 @@ def real_world(
     *, month: str, seed: int, spec: arms.ArmSpec, device: str, data_dir: Path
 ) -> tuple[tr.F4World, dict]:
     """Load the fold's dense arrays and build the `F4World` (the real pipeline; needs the data folder)."""
-    import e00713_inputs as inp
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
     import e00715_batch as fb
     from studies.eval_protocol.slices import MVA_ONLY_LABELS
 

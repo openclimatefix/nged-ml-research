@@ -15,7 +15,7 @@ sample does not change when another changes, and every gradient is finite.
 
 import sys
 
-import e00713_model as mdl
+import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00715_model as f4
 import torch  # ty: ignore[unresolved-import]
 

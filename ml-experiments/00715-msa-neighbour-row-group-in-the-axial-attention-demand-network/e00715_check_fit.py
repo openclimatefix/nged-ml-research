@@ -20,8 +20,8 @@ import tempfile
 from contextlib import redirect_stdout
 from pathlib import Path
 
-import e00713_arms as a713
-import e00713_model as mdl
+import e00713_arms as a713  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00715_arms as arms
 import e00715_fit as fit
 import e00715_train as tr
@@ -64,7 +64,7 @@ class Stub:
         return fit.tr713.StageLog(stage=stage, passes=max_passes, best_val=0.5, cap_hit=cap)
 
     def deps(self) -> fit.Deps:
-        return fit.Deps(load_world=lambda **_: (None, {"stub": 0}), train_stage=self.train_stage)
+        return fit.Deps(load_world=lambda **_: (None, {"stub": 0}), train_stage=self.train_stage)  # ty: ignore[invalid-argument-type]
 
 
 def run(*, root: Path, stub: Stub, accept=()) -> tuple[dict, str]:

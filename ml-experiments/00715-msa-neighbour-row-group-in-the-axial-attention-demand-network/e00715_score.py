@@ -26,8 +26,8 @@ import sys
 from pathlib import Path
 from typing import Final
 
-import e00713_arms as a713
-import e00713_score as sc
+import e00713_arms as a713  # ty: ignore[unresolved-import]
+import e00713_score as sc  # ty: ignore[unresolved-import]
 import e00715_arms as arms
 import e00715_neighbours as nb
 import numpy as np
@@ -275,7 +275,7 @@ def cmd_headline() -> int:
     )
     readings = {g: group_reading(c=n1[g], group=g) for g in ("six", "eight")}
     n2_upper = {g: n2[g]["upper"] for g in ("six", "eight")}
-    averaged = n1["_frames"][1]  # ty: ignore[invalid-subscript]
+    averaged = n1["_frames"][1]  # ty: ignore[not-subscriptable]
     guards = {
         g: {
             "leave_one_out": leave_one_out(averaged=averaged, treatment="F4", reference=m_star, group=g, groups=groups),
@@ -286,15 +286,15 @@ def cmd_headline() -> int:
     }  # fmt: skip
     s6_path = SCORE_DIR / "s6_donor_harm.json"
     donor = json.loads(s6_path.read_text())["f4_minus_mstar"] if s6_path.exists() else None
-    guards["donor_after_temporary_moves"] = {
+    guards["donor_after_temporary_moves"] = {  # ty: ignore[invalid-assignment]
         "s6_f4_minus_mstar": donor,
         "within_limit": None if donor is None else donor <= DONOR_HARM_LIMIT,
     }
     guards_hold = bool(
-        all(g["leave_one_out"]["sign_holds_without_each_month"] and g["leave_one_out"]["sign_holds_without_each_primary"] and g["tails"]["within_tolerance"] and g["mae_moves_with_crps"] for g in (guards["six"], guards["eight"]))
+        all(g["leave_one_out"]["sign_holds_without_each_month"] and g["leave_one_out"]["sign_holds_without_each_primary"] and g["tails"]["within_tolerance"] and g["mae_moves_with_crps"] for g in (guards["six"], guards["eight"]))  # ty: ignore[not-subscriptable]
         and guards["donor_after_temporary_moves"]["within_limit"]
     )  # fmt: skip
-    noise = seed_noise(per_seed=n1["_frames"][0], groups=groups, treatment="F4", reference=m_star)  # ty: ignore[invalid-subscript]
+    noise = seed_noise(per_seed=n1["_frames"][0], groups=groups, treatment="F4", reference=m_star)  # ty: ignore[not-subscriptable]
     result = {
         "star": m_star, "level": LEVEL, "delta": DELTA, "tau": TAU, "noise_floor": NOISE_FLOOR,
         "N1": {g: dict(n1[g]) for g in ("six", "eight")},
@@ -374,7 +374,7 @@ def cmd_report_only() -> int:
             for g in ("six", "eight", "other", "all16")
         }
         if name == "F4-minus-Mstar_5seeds":
-            per_seed, averaged = res["_frames"]  # ty: ignore[invalid-subscript]
+            per_seed, averaged = res["_frames"]  # ty: ignore[not-subscriptable]
             out[name]["by_lead_band"] = {
                 b: {
                     g: sc.contrast(

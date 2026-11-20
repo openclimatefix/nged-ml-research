@@ -29,11 +29,11 @@ import sys
 from pathlib import Path
 from typing import Final
 
-import e00713_arms as a713
-import e00713_known_answer as ka
-import e00713_layout as lay
-import e00713_model as mdl
-import e00713_train as tr713
+import e00713_arms as a713  # ty: ignore[unresolved-import]
+import e00713_known_answer as ka  # ty: ignore[unresolved-import]
+import e00713_layout as lay  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
+import e00713_train as tr713  # ty: ignore[unresolved-import]
 import e00715_arms as arms
 import e00715_batch as fb
 import e00715_model as f4
@@ -114,7 +114,7 @@ def source_of(
 def held_out(*, world: tr.F4World) -> tr.F4Samples:
     """Return the 60 days after the cutoff for the four Primaries."""
     s = ka.test_samples(world=world.base, primaries=PRIMARIES)
-    return tr.F4Samples(primary=s.primary, c_idx=s.c_idx, is_val=s.is_val)
+    return tr.F4Samples(primary=s.primary, c_idx=s.c_idx, is_val=s.is_val)  # ty: ignore[unknown-argument]
 
 
 def medians(
@@ -152,7 +152,7 @@ def train_from_scratch(*, world: tr.F4World, device: str, seed: int = 0) -> mdl.
     )
     model = model.to(device)
     s = tr713.make_samples(world=world.base, stage=1, placebo=False, primaries=PRIMARIES)
-    samples = tr.F4Samples(primary=s.primary, c_idx=s.c_idx, is_val=s.is_val)
+    samples = tr.F4Samples(primary=s.primary, c_idx=s.c_idx, is_val=s.is_val)  # ty: ignore[unknown-argument]
     source = source_of(
         world=world,
         power_in=None,
@@ -248,7 +248,7 @@ def selftest() -> int:
 def load_world(*, month: str, device: str) -> tuple:
     """Return the real fold's pipeline data and the temperature, day type, and half-hour arrays of the grid."""
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
-    import e00713_inputs as inp
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
 
     arms.install_own_cache()
     os.environ["E00667_PHASE"] = "train"
@@ -404,7 +404,7 @@ def kn8(*, month: str, seed: int) -> dict:
     b = pl.read_parquet(stored).select(*keys, pl.col("q50").alias("q50_s"))
     j = a.join(b, on=keys)
     cap = float(arms.capacity_mw().max())
-    worst = float((j["q50"] - j["q50_s"]).abs().max())
+    worst = float((j["q50"] - j["q50_s"]).abs().max())  # ty: ignore[invalid-argument-type]
     return {
         "rows": j.height,
         "max_abs_difference_mw": worst,

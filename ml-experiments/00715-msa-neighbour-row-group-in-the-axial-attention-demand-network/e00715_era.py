@@ -29,8 +29,8 @@ from typing import Final
 
 os.environ.setdefault("E00667_PHASE", "predict")
 
-import e00713_era as era713
-import e00713_inputs as inp
+import e00713_era as era713  # ty: ignore[unresolved-import]
+import e00713_inputs as inp  # ty: ignore[unresolved-import]
 import e00715_arms as arms
 import e00715_batch as fb
 import e00715_neighbours as nb
@@ -232,7 +232,7 @@ def kn11b(*, month: str, seed: int) -> dict:
         keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
         j = mine.join(theirs, on=keys, suffix="_s")
         assert j.height > 0, f"{path.name}: no common rows"
-        worst = max(worst, max(float((j[q] - j[f"{q}_s"]).abs().max()) for q in pr.QCOLS))
+        worst = max(worst, max(float((j[q] - j[f"{q}_s"]).abs().max()) for q in pr.QCOLS))  # ty: ignore[invalid-argument-type]
     return {"max_abs_difference": worst, "pass": worst <= 1e-4}
 
 
@@ -289,7 +289,7 @@ def injected_forecasts(
         hosts = np.array([truth["host"][i] for i, _, _ in pairs])
         c = np.array([o for _, _, o in pairs])
         fb.check_origin_days(ens=ens, c_idx=c, what=f"{world} pass {index}")
-        samples = tr.F4Samples(primary=hosts, c_idx=c, is_val=np.zeros(len(c), bool))
+        samples = tr.F4Samples(primary=hosts, c_idx=c, is_val=np.zeros(len(c), bool))  # ty: ignore[unknown-argument]
         frames = []
         with torch.no_grad():
             for lead in range(14):

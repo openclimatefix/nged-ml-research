@@ -27,9 +27,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal
 
-import e00713_arms as a713
-import e00713_inputs as inp
-import e00713_model as mdl
+import e00713_arms as a713  # ty: ignore[unresolved-import]
+import e00713_inputs as inp  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00715_batch as fb
 import e00715_neighbours as nb
 import numpy as np
@@ -328,7 +328,7 @@ def install_own_cache() -> Path:
     """
     import shutil
 
-    import e00713_inputs as inp
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
 
     own = own_cache()
     own.mkdir(parents=True, exist_ok=True)

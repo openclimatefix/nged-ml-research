@@ -27,10 +27,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Final
 
-import e00713_batch as bt
-import e00713_layout as lay
-import e00713_model as mdl
-import e00713_train as tr
+import e00713_batch as bt  # ty: ignore[unresolved-import]
+import e00713_layout as lay  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
+import e00713_train as tr  # ty: ignore[unresolved-import]
 import e00715_arms as arms
 import e00715_batch as fb
 import e00715_model as f4
@@ -89,7 +89,7 @@ def make_samples(*, world: F4World, stage: int) -> F4Samples:
     if world.spec.slots == "shuffled":
         assert world.shuffle_pool is not None
         ages = tr.placebo_ages_for(primary=s.primary, c_idx=s.c_idx, pool=world.shuffle_pool)
-    return F4Samples(primary=s.primary, c_idx=s.c_idx, is_val=s.is_val, ages=None, nbr_ages=ages)
+    return F4Samples(primary=s.primary, c_idx=s.c_idx, is_val=s.is_val, ages=None, nbr_ages=ages)  # ty: ignore[unknown-argument]
 
 
 def shifted_history(*, world: tr.World, samples: tr.SampleSet) -> torch.Tensor:

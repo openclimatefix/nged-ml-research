@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import Final
 
 import e00581_bank as bank581  # ty: ignore[unresolved-import]
-import e00713_layout as lay
+import e00713_layout as lay  # ty: ignore[unresolved-import]
 import e00715_neighbours as nb
 import numpy as np
 
