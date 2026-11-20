@@ -79,8 +79,10 @@ days of one Primary to an attention network (an MSA network, named after the mul
 alignment that [Jumper et al. (2021)](https://doi.org/10.1038/s41586-021-03819-2) used in
 AlphaFold 2) and reads whether the network separates the two classes in its secondary readings R2
 (the gain after injected permanent changes) and R3 (the harm after injected temporary moves). This
-page is the plan for a test of whether such a network could possibly separate them. No file has
-been read and no feature has been computed for this experiment.
+page is the plan for a test of whether such a network could possibly separate them. No result on
+the full bank or on the full second generator has been computed for this experiment. A smoke run of
+the code on 16 bank passes and 16 second-generator passes checked that the code runs. Its AUROC
+values are not reported and do not change the predictions below.
 
 **The test builds a small classifier by hand and fits no neural network.** For each injected event
 in the 64 passes that experiment 709 stored, and in a fresh set of passes from a second generator
@@ -245,6 +247,81 @@ and is reported as context for experiment 713.
   injected temporary moves together, and experiment 699's to test on a second generator, are both
   followed. The advice to store the prevailing output concerns forecasts and does not apply.
 
+## Secondary readings: shape of the change, step frequency, and the mirror
+
+**The maintainer's working definition decides which cues are primary.** A load shift moves a
+roughly constant number of megawatts from one substation to another, often with a mirror at a
+neighbour. Every other level shift, such as a new gas generator or a large solar farm, changes the
+daily shape of the load and its response to sunlight and price. The shape-flatness of the change
+(how constant the megawatts are across the half-hours of the day) and the neighbour mirror are
+therefore the two cues that the classifier is built around. The host feature set (the pre-registered
+set of the Design section) holds the shape-flatness as one of its six features, and the neighbour
+feature set holds the mirror.
+
+**The pre-registered contrasts C1 to C6 and the thresholds stay as written above.** The readings in
+this section are secondary: they add detail and carry no decision rule.
+
+- **Each cue alone and both together.** For each permanent kind in turn, the AUROC for telling that
+  kind from the temporary moves, using the shape-flatness alone, the mirror alone, and both, at
+  7, 14, and 28 days after the onset. The classifier of each cue set is fitted on the events of a
+  world with whole fold months held out. Three groups of temporary moves serve as the negatives:
+  all, those with a metered mirror (full or partial), and those with a hidden mirror.
+- **Kinds in the second generator.** A flat step (the case where shape cannot help), a step that
+  follows the host's daily profile, a daylight-only step, and a quantised step. Experiment 709's
+  bank adds its own four kinds (steps of -10%, -25%, +15%, and a solar-shaped reduction).
+- **A gas-generator kind.** A fifth permanent kind in a separate world of 32 passes (8 per fold
+  month, 64 permanent changes and 64 temporary moves): constant-megawatt steps that switch on and
+  off at random times within and across days, with a running share that changes from week to week.
+  It uses the pulse rows of experiment 660's generator, with steps of 4% to 12% of capacity (the
+  range of the real gas-engine episodes of a Primary that experiment 194 describes). The
+  generator's own time series is never plotted. These passes are not part of the 128 passes that
+  carry C1 to C6.
+- **The step-frequency cue.** The number of up and down steps per day in the post-onset rows, and
+  the fraction of half-hours at the high level, from a two-threshold trigger on the running median
+  of the change. The cue is a secondary feature set and is not part of the host set.
+
+**Pre-registered prediction for the gas-generator kind (written before any run on the full worlds,
+and without looking at the per-cue readings of the smoke run).**
+The shape-flatness cannot separate an intermittent step from a sustained temporary move, because
+both are constant-megawatt steps, so its AUROC for that pair is predicted to lie between 0.40 and
+0.60. The step-frequency cue alone is predicted to score 0.70 or more against sustained temporary
+moves (temporary moves lasting beyond the window), because an intermittent step switches several
+times per day and a sustained move switches rarely. The mirror cue is predicted to score 0.50 within
+0.10 against temporary moves with a hidden mirror, and to score above 0.50 only because the
+temporary moves with a metered mirror carry a mirror. A flat permanent step is the case where shape
+cannot help, so the shape-flatness AUROC for a flat step against temporary moves is predicted to lie
+between 0.40 and 0.60. A permanent kind that follows the host's daily profile or daylight is
+predicted to score above 0.65 on the shape-flatness alone.
+
+**The 82 labelled real events are a descriptive check only.** The load-transfer logs hold 82
+labelled events, 22 of them in the scored year. The page may print the cue values of those events
+where the telemetry shows them, to compare against the injected events. No classifier trains or
+scores on them, because experiment 580 confirmed 1 of the 23 labelled events of at least 7 days
+in the telemetry.
+
+## Assumptions and risks
+
+**A load shift is assumed to look like a roughly constant decrease in megawatts at the donor
+substation and a matching increase at the receiver.** A load shift switches a circuit, and a circuit
+can carry any behaviour. In the extreme, a switched circuit could look exactly like a generator or a
+solar farm connected to a substation for a while, or moved from one substation to another. The
+maintainer has never seen that in the data. This experiment assumes that a load shift moves a
+substantially large number of connections, so that in aggregate it is a roughly constant change in
+megawatts. A load shift of the other kind is not modelled, and the classifier would misread it as a
+permanent change.
+
+**The classifier is given the true onset.** An online detector would not know the onset, so an AUROC
+from this experiment is an upper bound on what the rows can tell.
+
+**The weather-only reference level is noisy.** Its error, a few points of capacity at a Primary, is
+the floor on the size of change that the host rows can resolve, and the older rows exist to lower
+that floor.
+
+**ERA5 stands in for the weather analysis that a live forecast reads at the origin.** The
+reanalysis arrives about 5 days late in live use, so the weather of the last 5 days before the
+origin is read more accurately here than a live forecast could read it. The shortwave correlation is
+the only feature that reads weather directly.
+
 ## Compute
 
 **The experiment runs on the CPU with at most 2 cores and no GPU, in 1 to 2 hours.** Unpickling
@@ -254,17 +331,80 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
 
 ## Method
 
-*To be completed with the finished write-up.* The Method section will list, as bullets, the
-architecture (there is no neural network; the three input sets and the features), the training
-regime (the classifier, the penalty, the splits, the second generator's parameters, and the seeds),
-and the measurement (the AUROC, the bootstrap, the six contrasts, the placebos, and the audit
-checks).
+**Architecture (no neural network).**
+
+- Each event at each origin (7, 14, or 28 days after the onset day, at 09:00 UTC) becomes one row of
+  summary numbers computed from the 14 days of power that end 6 hours before the origin (the
+  Candidate's data cut), as shares of capacity.
+- **Reference level for the size of a change: a weather-only linear fit, fitted per Primary and per
+  fold month.** Experiment 667's stored forecasts cannot serve as the reference. They start on
+  2025-11-01, so the 14 days before the onset of the 2025-11 fold are not stored. Their
+  normal-running-arrangement output reads the Candidate's lags, so it is not lag-free. The fit
+  regresses the Primary's power on 96 calendar dummies (half-hour of the day, weekday or weekend),
+  daily mean ERA5 temperature and its square, ERA5 shortwave radiation and its square, and the annual
+  cycle, ridge penalty 0.001, over the 730 days that end 28 days before the start of the fold month.
+  It reads real, uninjected power only.
+- **Host features (six).** The median change against the reference level; the shape-flatness of the
+  change (the absolute mean of the daily profile over its root mean square, 1 for a constant
+  number of megawatts); the night-to-midday contrast; the correlation across days of the daily
+  change with daily mean shortwave; the share of days with the change at the sign of the median; and
+  the change of the last 3 days minus the median change.
+- **Older-row features (four).** Six single same-weekday days at ages 21, 28, 42, 63, 91, and 364
+  days before the origin, left out when the day ends after the onset: the change against their
+  median, their spread, the ratio of the two, and the shape-flatness of the change against their
+  median. Experiment 709's injected panels hold the 364-day rows, because each stored panel covers
+  the whole grid of 119,760 half-hours from 2019-09-01 to 2026-06-30.
+- **Neighbour features (two).** The slope and the correlation of the negated change of the sum of the
+  neighbours' power in MW on the host's change in MW, over the post-onset half-hours.
+- **Step features (two, secondary).** Steps per day and the fraction of half-hours at the high level.
+
+**Training regime.**
+
+- **Classifier.** A logistic regression with an L2 penalty (numpy and scipy, because scikit-learn is
+  not a declared dependency), fitted separately for each origin. The penalty comes from an inner
+  split of whole passes into 4 groups, over 0.01, 0.1, 1, 10, and 100. The standardising statistics
+  and the fill value for a missing feature come from the training passes.
+- **Boosted tree (sensitivity).** XGBoost, which is a declared dependency, with depth 2, 80 trees, and
+  learning rate 0.1, on the host and host-plus-neighbour features.
+- **Worlds.** Experiment 709's 64 bank passes (read only; `e00709_signal.Signal` is replaced by a
+  stub when unpickling, because importing it needs the chain `e00709_classify`, `e00687_features`,
+  `e00598_signals` and torch-dependent modules) and 128 passes of the second generator, 32 for each
+  fold month, with seeds 714,100,000 and up. The second generator's passes have onsets at a random
+  half-hour on the first or second day of the month.
+- **Splits.** Leave one fold month out, so no pass and no fold month seen in fitting is scored.
+- **Compute.** CPU only, 2 cores, one BLAS thread.
+
+**Measurement.**
+
+- **Metric.** The AUROC for the label "permanent" against "temporary", pooled over the out-of-fold
+  predictions of all four fold months.
+- **Intervals.** A bootstrap that resamples whole passes within fold months and then fold months,
+  10,000 draws, at 99.17% for the six planned contrasts (C1 to C6). The predictions are not refitted
+  per draw. Secondary readings use 95% intervals, labelled secondary.
+- **Mirror subsets.** The mirrored subset holds every permanent change and the temporary moves with a
+  full or partial mirror. The hidden subset holds every permanent change and the temporary moves
+  with a hidden mirror.
+- **Placebos.** Class labels shuffled within each pass (20 permutations); neighbours rewired to those
+  of an unlinked Primary; the no-event placebo, which scores the classifier on the real panel at the
+  same hosts and onsets; and the noiseless known-answer, which replaces the reference level by the
+  real power so that the change is the injected change exactly.
+- **Audit checks.** A test scrambles the power, the reference level, and the weather at and after the
+  data cut and requires every feature to stay identical.
 
 ## Files
 
-- `ml-experiments/00714-msa-era-identifiability-audit-and-frozen-probe/`: the scripts, to be
-  written after the plan review. They will build the feature table from the bank, generate the
-  second generator's passes, fit and score the classifiers, and draw the figures.
+- `ml-experiments/00714-msa-era-identifiability-audit-and-frozen-probe/e00714_common.py`: constants,
+  the bank loader, the weather-only reference level.
+- `.../e00714_generator2.py`: the second generator (worlds `g2` and `gas`), built on experiment 660's
+  generator.
+- `.../e00714_features.py`: the host, step, older-row, and neighbour features.
+- `.../e00714_build.py`: generates the second generator's passes and builds the feature tables.
+- `.../e00714_model.py`: the logistic regression, the boosted tree, the cross-validation, and the
+  bootstrap.
+- `.../e00714_analyse.py`: the six contrasts, the placebos, the secondary readings, and the outcome
+  table.
+- `.../e00714_figures.py`: the three figures.
+- `.../test_e00714.py`: unit and known-answer tests on synthetic data.
 - `data/ml-experiments/00709-era-signal-in-the-candidate-part-1/worlds/bank_<month>_p<pass>.pkl`
   (read only, private): experiment 709's 64 injected passes, 16 for each of the months 2025-11,
   2026-01, 2026-04, and 2026-06. See the [experiment 709
