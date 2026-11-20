@@ -7,6 +7,11 @@ question that asks for the calendar year and month of the data. The plan's rule 
 prompts pass if at most 3 of the 10 years are exactly right. **A probe reply is not a label and is
 never used as one.**
 
+**`--attempt v2` runs the same probe for attempt 2** on the 10 held D10 prompts that
+`e00712_label.py --attempt v2 --build-probe-prompts` rebuilds with the attempt 2 prompt text into
+`probe/prompts_v2/`, under the same limits and the same pass rule. The probe never sees D8, and its
+files and its single-use go token (`probe_go_token_v2.txt`) are separate from attempt 1's.
+
 **Nothing here spends unless the manager says so.** The default is a dry run, which builds the
 prompts and prints their file names and token estimates. A call needs `--run-probe`, a `--go-token`
 equal to the first line of `GO_FILE` (a file in the private data folder that the manager writes),
@@ -62,6 +67,7 @@ LOG_PATH: Final[Path] = PROBE_DIR / "probe_log.jsonl"
 STOP_PATH: Final[Path] = PROBE_DIR / "stopped.json"
 RESULT_PATH: Final[Path] = PROBE_DIR / "probe_result.json"
 GO_FILE: Final[Path] = OUT_DIR / "probe_go_token.txt"
+CALLS_DIR: Final[Path] = PROBE_DIR / "calls"
 PROMPT_SOURCE_DIR: Final[Path] = label.PROBE_PROMPT_DIR
 FILE_PREFIX: Final[str] = "llm_"
 """The arm prefix of the file names `e00712_label.py --build-probe-prompts` writes."""
@@ -319,12 +325,44 @@ def seven_day_utilisation(*, entries: Sequence[JsonObject], last: bool) -> objec
 # ---------------------------------------------------------------- the gates and the log
 
 
+def configure_attempt(*, name: str) -> None:
+    """Point this script's files at one attempt (`v1` or `v2`), after `e00712_label`'s.
+
+    Attempt `v2` uses `probe_log_v2.jsonl`, `stopped_v2.json`, `calls_v2/`, `probe_result_v2.json`,
+    `probe_go_token_v2.txt`, and the prompts in `probe/prompts_v2/`.
+
+    Args:
+        name: `v1` or `v2`.
+    """
+    label.configure_attempt(name=name)
+    suffix = "" if name == "v1" else "_v2"
+    globals().update(
+        {
+            "LOG_PATH": PROBE_DIR / f"probe_log{suffix}.jsonl",
+            "STOP_PATH": PROBE_DIR / f"stopped{suffix}.json",
+            "RESULT_PATH": label.PROBE_RESULT_PATH,
+            "GO_FILE": OUT_DIR / f"probe_go_token{suffix}.txt",
+            "CALLS_DIR": PROBE_DIR / f"calls{suffix}",
+            "PROMPT_SOURCE_DIR": label.PROBE_PROMPT_DIR,
+        }
+    )
+
+
+def prompts_match_the_code() -> bool:
+    """Return True if the stored prompts were built with the current prompt version.
+
+    Attempt 1 has no hash file, so it is not checked; attempt 2 needs the file that
+    `e00712_label.py --attempt v2 --build-probe-prompts` writes, with the current hash.
+    """
+    if label.attempt_name() == "v1":
+        return True
+    stamp = PROMPT_SOURCE_DIR / "prompt_version_sha256.txt"
+    return stamp.exists() and stamp.read_text().strip() == label.prompt_version_hash()
+
+
 def go_token_valid(*, token: str | None) -> bool:
-    """Return True if the token equals the first line of the go file the manager wrote."""
-    if not token or len(token) < MIN_TOKEN_CHARACTERS or not GO_FILE.exists():
-        return False
-    lines = GO_FILE.read_text().splitlines()
-    return bool(lines) and lines[0].strip() == token
+    """Return True if the token equals the first line of the go file and was not used before."""
+    return label.token_valid(token=token, path=GO_FILE)
 
 
 def read_log() -> list[JsonObject]:
@@ -348,7 +386,7 @@ class Prober:
             resume: Whether to continue from the existing log, whose totals the guard then counts.
         """
         PROBE_DIR.mkdir(parents=True, exist_ok=True)
-        self.store = CallStore(directory=PROBE_DIR / "calls", log_path=LOG_PATH)
+        self.store = CallStore(directory=CALLS_DIR, log_path=LOG_PATH)
         self.guard = BudgetGuard.from_log(log_path=LOG_PATH) if resume else BudgetGuard()
         self.guard.ceiling_usd = MAX_USD
         self.guard.max_calls = MAX_CALLS
@@ -482,6 +520,7 @@ class Prober:
                 "model": trial.MODEL_ID,
                 "claude_code_version": self.cli_version,
                 "system_prompt": prompt.system,
+                "prompt_version_sha256": label.prompt_version_hash(),
                 "prompt_sha256": prompts.sha256(text=prompt.text),
                 "estimated_input_tokens": estimate_input_tokens(prompt=prompt),
             }
@@ -606,8 +645,19 @@ def run_probe(*, stems: Sequence[str], resume: bool, expect_key_source: str) -> 
 # ---------------------------------------------------------------- scoring and output
 
 
+def stamp_hash() -> str | None:
+    """Return the prompt version hash that the stored probe prompts were built with, if stamped."""
+    stamp = PROMPT_SOURCE_DIR / "prompt_version_sha256.txt"
+    return stamp.read_text().strip() if stamp.exists() else None
+
+
 def score(
-    *, entries: Sequence[JsonObject], truth: dict[str, int], stems: Sequence[str]
+    *,
+    entries: Sequence[JsonObject],
+    truth: dict[str, int],
+    stems: Sequence[str],
+    version: str | None = None,
+    prompt_hashes: dict[str, str] | None = None,
 ) -> JsonObject:
     """Score the logged guesses against the true years.
 
@@ -615,6 +665,10 @@ def score(
         entries: The log entries.
         truth: The true year of each prompt stem.
         stems: The selected stems.
+        version: If given, count only entries made with this prompt version hash, and stamp the
+            result with it (the hash the calls were made with, never the hash at scoring time).
+        prompt_hashes: If given, count only entries whose `prompt_sha256` equals the hash of the
+            stem's current stored prompt.
 
     Returns:
         A dict with the number answered, the exact-year hits, the within-1-year hits, whether all
@@ -623,14 +677,20 @@ def score(
     guessed: dict[str, int] = {}
     for entry in entries:
         answer = entry.get("answer")
-        if entry.get("tag") == "probe" and entry.get("status") == "ok" and answer is not None:
-            guessed[str(entry["call_id"])] = int(answer["year"])
+        if entry.get("tag") != "probe" or entry.get("status") != "ok" or answer is None:
+            continue
+        if version is not None and entry.get("prompt_version_sha256") != version:
+            continue
+        call_id = str(entry["call_id"])
+        if prompt_hashes is not None and entry.get("prompt_sha256") != prompt_hashes.get(call_id):
+            continue
+        guessed[call_id] = int(answer["year"])
     answered = [s for s in stems if s in guessed]
     exact = sum(guessed[s] == truth[s] for s in answered)
     within_one = sum(abs(guessed[s] - truth[s]) <= 1 for s in answered)
     complete = len(answered) == len(stems)
     return {
-        "prompt_version_sha256": label.prompt_version_hash(),
+        "prompt_version_sha256": version or label.prompt_version_hash(),
         "n_selected": len(stems),
         "n_answered": len(answered),
         "exact_year_hits": exact,
@@ -638,6 +698,42 @@ def score(
         "complete": complete,
         "passed": (exact <= MAX_EXACT_HITS) if complete else None,
     }
+
+
+def score_current(*, candidates: Sequence[prompts.Candidate], stems: Sequence[str]) -> JsonObject:
+    """Score the log, counting for attempt 2 only calls made with the stamped prompts."""
+    version = stamp_hash() if label.attempt_name() == "v2" else None
+    hashes = (
+        {s: prompts.sha256(text=probe_prompt(stem=s).text) for s in stems}
+        if version is not None
+        else None
+    )
+    return score(
+        entries=read_log(),
+        truth=true_years(candidates=candidates),
+        stems=stems,
+        version=version,
+        prompt_hashes=hashes,
+    )
+
+
+def write_result(*, result: JsonObject) -> bool:
+    """Write the result file unless that would replace a different complete result.
+
+    Args:
+        result: The score.
+
+    Returns:
+        Whether the file was written.
+    """
+    if RESULT_PATH.exists():
+        old = json.loads(RESULT_PATH.read_text())
+        if old.get("complete") and old != result:
+            print(f"refused: {RESULT_PATH} holds a different complete result", file=sys.stderr)
+            return False
+    RESULT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RESULT_PATH.write_text(json.dumps(result, indent=2))
+    return True
 
 
 def print_score(*, result: JsonObject) -> None:
@@ -663,6 +759,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--go-token", help="the token the manager wrote to the go file")
     parser.add_argument("--expect-key-source", help="apiKeySource the billing probe must report")
     parser.add_argument("--resume", action="store_true", help="continue from the existing log")
+    parser.add_argument("--attempt", choices=label.ATTEMPTS, default="v1")
     return parser
 
 
@@ -673,6 +770,7 @@ def main() -> int:  # noqa: PLR0911 - one exit status per refusal
         The exit status.
     """
     args = _parser().parse_args()
+    configure_attempt(name=args.attempt)
     candidates = asof.load_stored_candidates()
     stems = select_prompts(candidates=candidates)
     if len(stems) != N_PROMPTS:
@@ -680,11 +778,22 @@ def main() -> int:  # noqa: PLR0911 - one exit status per refusal
         return 1
     print(f"selected prompts ({len(stems)}): {', '.join(stems)}")
     if args.score:
-        result = score(entries=read_log(), truth=true_years(candidates=candidates), stems=stems)
+        if not prompts_match_the_code():
+            print("refused: the stored probe prompts do not match the code", file=sys.stderr)
+            return 1
+        result = score_current(candidates=candidates, stems=stems)
         print_score(result=result)
-        PROBE_DIR.mkdir(parents=True, exist_ok=True)
-        RESULT_PATH.write_text(json.dumps(result, indent=2))
-        return 0
+        return 0 if write_result(result=result) else 1
+    if not all(stem.startswith(f"{FILE_PREFIX}{PRIMARY}_") for stem in stems):
+        print(f"refused: the probe may only use {PRIMARY} prompts", file=sys.stderr)
+        return 1
+    if not prompts_match_the_code():
+        print(
+            "refused: the stored probe prompts were not built with the current prompt version; "
+            "run e00712_label.py --build-probe-prompts for this attempt",
+            file=sys.stderr,
+        )
+        return 1
     built = {s: probe_prompt(stem=s) for s in stems}
     if not args.run_probe:
         tokens = {s: estimate_input_tokens(prompt=p) for s, p in built.items()}
@@ -696,8 +805,11 @@ def main() -> int:  # noqa: PLR0911 - one exit status per refusal
         )
         print(f"probe system prompt:\n{PROBE_SYSTEM_PROMPT}\nprobe question:{PROBE_QUESTION}")
         return 0
+    if label.attempt_name() == "v1":
+        print("refused: attempt 1 is closed; use --attempt v2", file=sys.stderr)
+        return 1
     if not go_token_valid(token=args.go_token):
-        print("refused: --go-token is missing or does not match the go file", file=sys.stderr)
+        print("refused: --go-token is missing, does not match, or was used", file=sys.stderr)
         return 1
     if not args.expect_key_source:
         print("refused: --expect-key-source is required", file=sys.stderr)
@@ -705,10 +817,15 @@ def main() -> int:  # noqa: PLR0911 - one exit status per refusal
     if (LOG_PATH.exists() or STOP_PATH.exists()) and not args.resume:
         print(f"refused: {LOG_PATH} or {STOP_PATH} exists; pass --resume", file=sys.stderr)
         return 1
+    claimed = label.claim_token(token=args.go_token, path=GO_FILE)
+    if claimed is None:
+        print("refused: the go token could not be claimed", file=sys.stderr)
+        return 1
+    print(f"go token claimed: {claimed.name}; a resume needs a new token")
     status = run_probe(stems=stems, resume=args.resume, expect_key_source=args.expect_key_source)
-    result = score(entries=read_log(), truth=true_years(candidates=candidates), stems=stems)
+    result = score_current(candidates=candidates, stems=stems)
     print_score(result=result)
-    RESULT_PATH.write_text(json.dumps(result, indent=2))
+    write_result(result=result)
     return status
 
 
