@@ -87,7 +87,8 @@ each sudden shift in a substation's load as a flagged shift. A language model re
 the flagged shift, as shares of the substation's capacity, and labels the shift a permanent change,
 a temporary load move, or noise. The Candidate then trains and forecasts with those labels, each
 delayed until the first forecast time after the label could have been made. This page is the plan.
-No label has been made and no neural network has been trained for this experiment. The figures
+The only labelling run so far is an interim pilot on one Primary (see "D8 pilot of the labelling (interim)"
+below), and no neural network has been trained for this experiment. The figures
 taken from experiment 709 and from a small trial of the language-model calls (the cost trial,
 described under Cost, billing, and staging) are provisional, because experiment 667 stored only two
 random seeds.
@@ -202,10 +203,11 @@ changes only if a closure check answers `switch` or `noise` at confidence 0.8 or
 **Labelling bills to the maintainer's shared plan quota, so the dollar figures are prices, not
 charges.** The cost trial's init event showed `apiKeySource = none`, which means the calls ran on
 the subscription login. Every US$ figure below is the price the command-line tool reports, which is
-the API-equivalent price. The rate-limit events do carry an account-wide seven-day utilisation
-(`unifiedWindows.seven_day.utilization` = 0.32, constant across all 22 calls, shared by every
-session), so the trial's own share is below the resolution of that field and cannot be attributed.
-The labelling script counts calls and tokens, and the plan treats the quota as the limit.
+the application programming interface (API) equivalent price. The rate-limit events do carry an
+account-wide seven-day utilisation (`unifiedWindows.seven_day.utilization` = 0.32, constant across
+all 22 calls, shared by every session), so the trial's own share is below the resolution of that
+field and cannot be attributed. The labelling script counts calls and tokens, and the plan treats
+the quota as the limit.
 
 **The cost trial on a single Primary measured cost and nothing else.** It sent 22 calls (one probe
 and 21 check calls on 5 candidates) with 167,708 input tokens and 10,071 output tokens in 198.9 s,
@@ -241,6 +243,87 @@ US$15.
 substation-year and about 4.2 calls each, 2,500 substations with the same 7.2 years of record as
 the 16 Primaries would need about 480 million input tokens once to label the history and about 67
 million a year after that.
+
+## D8 pilot of the labelling (interim)
+
+**A pilot on the 19 candidates of Primary D8 ran the labelling script before the 16-Primary run.**
+Every figure in this section is interim. The pilot is not the write-up and sets no verdict. D8 is a
+substation, so its Embedded Capacity Register (ECR) dates are public facts. The pilot used the
+prompt as pinned after the year probe. No cell below holds more than 3 candidates, so we give no
+intervals.
+
+**The year probe passed.** The year probe sent the language model 10 prompts, built from 5
+candidates of Primary D10, and asked it for the calendar year of each. The 10 replies are not
+independent, because several prompts come from the same candidate. The language model named the
+exact year for 2 of the 10 prompts, and a year within 1 year of the true year for 3 of the 10
+(including the 2 exact years). The pin rule under "Gates before any score is read" allows at most 3
+exact years of 10, so the prompt passes. The year probe made 11 calls: the 10 prompts and 1 billing
+probe, which shows which key source bills the calls. The calls used 61,140 input tokens and 8,697
+output tokens, at a reported US$0.33 (price as reported by the command-line tool, the
+application-programming-interface (API) equivalent).
+
+**The labelling made 87 calls on D8, of which 65 were distinct checks.** A check is one request to
+label one candidate on one check day. The 19 candidates took 65 checks. A strict reply parser
+rejected the first reply to 20 of the checks, and the script retried each of those once, so the 65
+checks took 85 label calls. The other 2 calls were billing probes. The first run stopped at its
+80-call cap, and a second run resumed it. Together the 87 calls used 551,253 input tokens and 44,666
+output tokens, at a reported US$2.179 (API-equivalent). The summed call time was 830 s. The elapsed
+time was about 440 s, with 2 calls in parallel. The init event showed `apiKeySource = none`, so the
+calls ran on the subscription login. No call was limited by a rate-limit event. The account-wide
+seven-day utilisation was 0.36 before and after the run, so the pilot's own share of the quota
+cannot be attributed.
+
+**The strict reply parser left 10 of 65 checks without a valid reply, and a looser parser accepts
+all 65 on the first reply.** Of the 85 label replies, 55 were valid under the strict parser and 30
+were invalid. Of the 65 checks, 45 had a valid first reply, 10 more had a valid retry, and 10 never
+had a valid reply. Of the 30 invalid replies, 16 lacked the `register_row` key (the field that
+names the ECR row the language model cites, if any) and 14 had a `reason` (the language model's
+free-text justification) longer than 60 words. The looser parser makes `register_row` optional and
+cuts a longer `reason` to 60 words. The prompt is unchanged. We re-parsed the stored first replies
+offline with the `--reparse` option, with no new call, and all 65 checks are valid on the first
+reply. The 20 retries would not be needed. The looser parser is the parser to use for any later run,
+and the prompt pin stays.
+
+**Under the rule that a label counts only at confidence 0.8 or more, the labeller recovered none of
+D8's known eras or switching events.** The classes recorded for D8 come from its dated ECR
+connections and from switching events verified in the load. In the table, a state is one of the four
+states of the era signal (`unknown`, `era`, `switch`, and `none`), and `unknown` means no label has
+reached confidence 0.8. Under both parsers, all three known eras and both known switching events
+stayed `unknown`.
+
+| Known class | Candidates | Recovered | Notes |
+|---|---|---|---|
+| Era (dated ECR connection) | 3 | 0 | all three stayed `unknown` |
+| Verified switching event | 2 | 0 | neither candidate was labelled `switch` |
+| Unresolved | 1 | not applicable | the recorded classes do not settle this candidate |
+| No known class | 13 | not applicable | not scored |
+
+The 3, 2, 1, and 13 candidates sum to the 19 candidates. One of the 13 candidates with no known
+class was labelled `era` at the 21-day check, at confidence exactly 0.8, and only under the looser
+parser. Under the strict parser, no candidate reached state `era`.
+
+**The detectors alarmed late on two of the three known eras.** The alarms came 73 days and 33 days
+after the ECR dates, and 10 days and 21 days after the dates visible in the telemetry. No candidate
+with a known class reached state `era`, so the delay from alarm to a first `era` label cannot be
+measured.
+
+**The labeller is below the plan's pilot rule for this setting, so continuing to the 16 Primaries is
+the maintainer's choice.** The plan states no gate for moving from D8 to the other 15 Primaries. The
+nearest rule is the stage 2 pilot rule, which stops the run when fewer than 40% of detected eras
+are labelled `era` within 7 days of the alarm. That rule is written for the injected bank, so it
+does not bind this pilot, but 0 of 3 known eras is far below 40%. A change to the prompt would need
+a new pin and a new year probe. The change must not be tuned on D8's known classes, because tuning
+on them would leak them into the prompt.
+
+**Scaling D8's counts to the 16 Primaries gives a rough cost, on two bases.** D8 holds 19 of the 92
+candidates, and no other Primary holds more than 13. Counting every call the pilot made, including
+the 20 retries, the 16 Primaries would need about 412 calls (85 / 19 x 92), 2.7 million input
+tokens, a reported US$10.6 (API-equivalent), and about 35 minutes at 2 parallel calls. Counting
+only first replies under the looser parser, the 16 Primaries would need about 315 calls (65 / 19 x
+92). Tokens, price, and time on that basis are not measured, and scale to roughly 20 to 25% below
+the first basis. Both bases exceed the 245 to 386 calls for arm `llm` under "Cost, billing, and
+staging" because D8 needed 4.5 calls per candidate on the first basis and 3.4 on the second, against
+the cost trial's 4.2. Both figures are interim.
 
 ## Compute
 
@@ -278,12 +361,39 @@ stored predictions reused, and fitted networks saved.
 ## Files
 
 - `ml-experiments/00712-clean-era-labels-part-1/e00712_trial.py`: the cost trial. The script sends
-  the probe and the 20 scheduled checks for the Primary, plus any retry, and writes the call log.
-  The script produces no label that is used. The `--summary` option reads the utilisation from
-  `unifiedWindows.<type>.utilization`, where the payloads hold it, as well as from
-  `rate_limit_info.utilization`, and prints that the figure is account-wide.
+  the billing probe and the 20 scheduled checks for the one Primary tried, plus any retry, and
+  writes the call log. The script produces no label that is used. The `--summary` option reads the
+  seven-day utilisation of the shared quota from `unifiedWindows.<type>.utilization` and from
+  `rate_limit_info.utilization`. The option also prints that the figure is account-wide.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_prompt.py`: lists the candidates and the
+  checks and builds the prompt. The prompt carries no calendar key (a field that reveals the date;
+  see `calendar_keys.md`), scales capacity using readings up to the check day only, and includes the
+  register table for arm `llm-ecr`. The module makes no call.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_asof.py`: builds the check schedule and, for
+  every arm, a table of the label known on each day (the as-of table), in the format of experiment
+  709's signals. The module makes no call.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_label.py`: the stage 1 labelling script. The
+  script runs as a dry run unless told otherwise. A call needs the manager's go token, a key source
+  confirmed by the billing probe, the prompt pin, and explicit limits on calls, tokens, and reported
+  price. The script also builds the arms that need no call. The `--reparse` option re-parses the
+  stored replies with the looser parser and makes no call. The `--agreement` option compares the
+  call log with the known classes of the candidates and makes no call. The D8 pilot used this
+  script.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_probe.py`: the year-guessing probe, whose
+  result decides whether the prompt is pinned. A probe reply is never used as a label.
+- `ml-experiments/00712-clean-era-labels-part-1/e00712_score.py`: the scorer for the planned
+  contrasts, vetoes, gates, and checks. It has been self-tested only, and no score has been read.
+- `ml-experiments/00712-clean-era-labels-part-1/test_e00712_label.py` and `test_e00712_probe.py`:
+  tests of the labelling script and the probe. No test makes a call, because each test replaces
+  the command-line tool that makes the calls with a stand-in.
+- `ml-experiments/00712-clean-era-labels-part-1/calendar_keys.md`: the calendar keys the pinned
+  prompt still carries and why the plan accepts them.
+- `ml-experiments/00712-clean-era-labels-part-1/review_triage.md`: what each review of the plan
+  found and what the plan did with each finding.
 - `data/ml-experiments/00712-clean-era-labels-part-1/`: the experiment's private folder (the call
   store, label tables, forecasts, and fitted networks). The folder is never committed.
-- `data/ml-experiments/briefs/clean_era_labels/design.md`: the design behind this plan.
+- `data/ml-experiments/briefs/clean_era_labels/design.md`: the private design that this plan
+  summarises. The file is not committed, so a reader of the published docs cannot open it; the
+  committed `review_triage.md` records what the reviews of the design changed.
 - [Experiment 709](../00709-era-signal-in-the-candidate-part-1/result.md): the stored signals,
   forecasts, and injected bank that the stored arms read.
