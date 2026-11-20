@@ -180,8 +180,89 @@ def test_stage_a_has_132_jobs_and_a_short_wall_clock():
     low, high = jobs.wall_hours(jobs=stage_a)
     assert 2.0 < low < high < 4.0
     stage_b = jobs.plan_jobs(stage="B")
-    assert len(stage_b) == 946 - 132
+    assert len(stage_b) == jobs.STAGE_B_COUNT == 946 - 132 - 150
     assert not {j.set_name for j in stage_a} & {j.set_name for j in stage_b}
+
+
+def test_stage_b1_is_the_150_reduced_stage_b_jobs_on_seeds_0_to_2():
+    stage_b1 = jobs.plan_jobs(stage="B1")
+    assert len(stage_b1) == jobs.STAGE_B1_COUNT == 150
+    counts = {}
+    for job in stage_b1:
+        counts[job.arm] = counts.get(job.arm, 0) + 1
+    assert counts == {"R0": 36, "R1": 36, "R1p": 36, "D0g": 21, "D1g": 21}
+    assert all(j.seed in (0, 1, 2) for j in stage_b1)
+    names = {j.set_name for j in stage_b1}
+    assert not names & {j.set_name for j in jobs.plan_jobs(stage="A")}
+    assert not names & {j.set_name for j in jobs.plan_jobs(stage="B")}
+    assert len(names) == 150
+    # Seeds 3 to 5 of R1 and R1p are not run: they stay in Stage B.
+    assert {j.seed for j in jobs.plan_jobs(stage="B") if j.arm == "R1"} >= {3, 4, 5}
+    assert jobs.expected_cells(arm="R1", stage="B1") == {
+        (m, s) for m in arms.REPLICATE_MONTHS for s in (0, 1, 2)
+    }
+    assert jobs.expected_cells(arm="D1", stage="B1") == set()
+
+
+def test_stage_b1_specs_read_c3_and_g1_at_the_planned_level_and_nothing_else():
+    specs = score.planned_specs(stage="B1")
+    assert [s.key for s in specs] == ["C3 the five", "C3 the eight", "G1 the six", "G1 the eight"]
+    assert {(s.treatment, s.reference) for s in specs} == {("R1", "R1p"), ("D1g", "D0g")}
+    assert all(s.level == score.PLANNED_LEVEL for s in specs)
+    assert score.check_specs(stage="B1") == []
+    bounds = score.b1_bound_specs()
+    assert {(b.treatment, b.reference) for b in bounds} == {("R1p", "R0"), ("R1", "R0")}
+    assert all(b.level == score.CHECK_LEVEL for b in bounds)
+
+
+def test_stage_b1_verdicts_apply_the_decision_rule_to_each_reading(
+    capsys: pytest.CaptureFixture[str],
+):
+    def reading(key: str, difference: float, half: float) -> score.Reading:
+        return score.Reading(
+            key=key,
+            label=key,
+            scope="s",
+            difference=difference,
+            lower=difference - half,
+            upper=difference + half,
+            boot=None,
+            t_interval=None,
+            averaged=None,
+            n_half_hours=10,
+            n_months=7,
+            seeds=(0, 1, 2),
+            level=99.44,
+            label_rows={},
+        )
+
+    out = score.verdicts_b1(
+        readings={
+            "C3 the five": reading("C3 the five", -0.1, 0.05),
+            "C3 the eight": reading("C3 the eight", 0.0, 0.05),
+            "G1 the six": reading("G1 the six", 0.2, 0.05),
+        }
+    )
+    assert out == {
+        "C3 the five": "supported",
+        "C3 the eight": "inconclusive",
+        "G1 the six": "refuted",
+    }
+    assert "G1 the eight: verdict withheld" in capsys.readouterr().out
+
+
+def test_every_scorer_run_saves_its_output_under_work_scores(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.setattr(score.common, "WORK_DIR", tmp_path)
+    when = datetime(2026, 11, 20, 8, 30, 5, tzinfo=UTC)
+    path = score.scores_path(name="score-B1", now=when)
+    assert path == tmp_path / "work" / "scores" / "score-B1_20261120T083005Z.txt"
+    saved = score.run_saved(name="score-B1", action=lambda: print("a reading"))
+    assert saved.parent == tmp_path / "work" / "scores"
+    assert saved.name.startswith("score-B1_")
+    assert saved.read_text() == "a reading\n"
+    assert "a reading" in capsys.readouterr().out
 
 
 def test_a_reading_needs_every_planned_cell_of_both_arms():
@@ -447,3 +528,48 @@ def test_a_failed_or_incomplete_placebo_check_overrides_c1_and_s1():
 def test_bounds_are_the_real_arm_against_no_cloud():
     keys = [b.key for b in score.bound_specs()]
     assert keys == ["D1 minus DF the six", "D1 minus DF the eight", "P1 minus PF"]
+
+
+def _solar_arm(*, shift_by_month: dict[str, float]) -> score.ArmLosses:
+    months = arms.SOLAR_MONTHS
+    frame = _losses(seeds=(0, 1), shift=0.0, months=months).with_columns(
+        label=pl.lit("A").cast(pl.Categorical)
+    )
+    shifts = pl.col("fold").cast(pl.String).replace_strict(shift_by_month, return_dtype=pl.Float32)
+    frame = frame.with_columns(crps=pl.col("crps") + shifts)
+    return score.ArmLosses(
+        losses=frame,
+        averaged=frame.filter(pl.col("seed") == 0).with_columns(seed=pl.lit(-1).cast(pl.Int16)),
+        coverage={},
+        cells=frozenset((m, s) for m in months for s in (0, 1)),
+    )
+
+
+def test_exploratory_per_fold_solar_rows_use_their_own_month_and_carry_no_verdict(
+    capsys: pytest.CaptureFixture[str],
+):
+    months = arms.SOLAR_MONTHS
+    shifts = {m: 0.1 * (i + 1) for i, m in enumerate(months)}
+    source = _source(
+        P1=_solar_arm(shift_by_month=shifts),
+        P1p=_solar_arm(shift_by_month=dict.fromkeys(months, 0.0)),
+    )
+    score.exploratory(source=source)
+    lines = [
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("P1 minus P1p") and "unavailable" not in line
+    ]
+    folds = [line for line in lines if ", fold " in line]
+    assert len(folds) == len(months)
+    for line, month, shift in zip(folds, months, shifts.values(), strict=True):
+        assert f"fold {month}" in line
+        assert f"{shift:+.3f}" in line
+        assert "months 1" in line
+        assert "range of 2 seeds" in line
+    total = [line for line in lines if ", fold " not in line and "months 7" in line]
+    assert total, "an all-fold row must still read seven months"
+    for line in lines:
+        assert line.endswith("-> exploratory")
+        for word in ("supported", "refuted", "inconclusive", "small gain"):
+            assert word not in line

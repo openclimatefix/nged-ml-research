@@ -34,7 +34,7 @@ SECONDS_PER_FIT: Final[dict[arms.TargetType, tuple[float, float]]] = {
 
 A Primary demand fit takes 124 s (2 min 4 s, measured). A solar fit takes 125 to 250 s (estimated).
 """
-StageType = Literal["A", "B", "all"]
+StageType = Literal["A", "B1", "B", "all"]
 STAGE_A_ARMS: Final[dict[str, tuple[str, ...]]] = {
     "D0n": arms.GATE_MONTHS,
     "DF": arms.CLOUD_SCORED_MONTHS,
@@ -44,11 +44,25 @@ STAGE_A_ARMS: Final[dict[str, tuple[str, ...]]] = {
     "P1": arms.SOLAR_MONTHS,
     "P1p": arms.SOLAR_MONTHS,
 }
-"""The arms of Stage A and the folds each runs on. Every other fit is Stage B."""
+"""The arms of Stage A and the folds each runs on. Stage B1 and Stage B hold every other fit."""
 STAGE_A_SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 """The fitting seeds of Stage A."""
 STAGE_A_COUNT: Final[int] = 132
 """Stage A's job count: 6 gate fits, 63 Primary demand fits, and 63 solar fits."""
+STAGE_B1_ARMS: Final[dict[str, tuple[str, ...]]] = {
+    "R0": arms.REPLICATE_MONTHS,
+    "R1": arms.REPLICATE_MONTHS,
+    "R1p": arms.REPLICATE_MONTHS,
+    "D0g": arms.CLOUD_SCORED_MONTHS,
+    "D1g": arms.CLOUD_SCORED_MONTHS,
+}
+"""The arms of Stage B1 (the reduced Stage B the manager approved on 2026-11-20) and their folds."""
+STAGE_B1_SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
+"""The fitting seeds of Stage B1. Seeds 3 to 5 of `R1` and `R1p` are not run."""
+STAGE_B1_COUNT: Final[int] = 150
+"""Stage B1's job count: R0, R1, and R1p 36 each (12 folds x 3 seeds), D0g and D1g 21 each."""
+STAGE_B_COUNT: Final[int] = 664
+"""The jobs left after Stage A and Stage B1 (946 - 132 - 150); they are not run."""
 PLAN_TOTALS: Final[dict[str, int]] = {
     "primary_recent12": 423,
     "primary_pairs": 84,
@@ -72,10 +86,13 @@ class Job:
         return arms.set_name(arm=self.arm, month=self.month, seed=self.seed)
 
     @property
-    def stage(self) -> Literal["A", "B"]:
-        """Return the job's stage: `A` if the arm, fold, and seed are in Stage A, else `B`."""
-        in_a = self.month in STAGE_A_ARMS.get(self.arm, ()) and self.seed in STAGE_A_SEEDS
-        return "A" if in_a else "B"
+    def stage(self) -> Literal["A", "B1", "B"]:
+        """Return the job's stage: `A`, else `B1` if in Stage B1, else `B` (not run)."""
+        if self.month in STAGE_A_ARMS.get(self.arm, ()) and self.seed in STAGE_A_SEEDS:
+            return "A"
+        if self.month in STAGE_B1_ARMS.get(self.arm, ()) and self.seed in STAGE_B1_SEEDS:
+            return "B1"
+        return "B"
 
     def command_arguments(self) -> str:
         """Return the arguments that `e00711_fit.py` takes for this job."""
@@ -87,8 +104,8 @@ def expected_cells(*, arm: str, stage: StageType) -> set[tuple[str, int]]:
 
     Args:
         arm: The arm's name.
-        stage: `A` for Stage A's cells, `B` or `all` for every cell of the arm's plan. A Stage A
-            arm has the Stage A cells only in `A`.
+        stage: `A` for Stage A's cells, `B1` for Stage B1's cells, `B` or `all` for every cell of
+            the arm's plan. An arm that is not in the stage has no cells in `A` or `B1`.
 
     Returns:
         The planned (fold, seed) pairs; an arm that is not in Stage A has none in `A`.
@@ -96,6 +113,8 @@ def expected_cells(*, arm: str, stage: StageType) -> set[tuple[str, int]]:
     spec = arms.ARMS[arm]
     if stage == "A":
         return {(m, s) for m in STAGE_A_ARMS.get(arm, ()) for s in STAGE_A_SEEDS}
+    if stage == "B1":
+        return {(m, s) for m in STAGE_B1_ARMS.get(arm, ()) for s in STAGE_B1_SEEDS}
     return {(m, s) for m in spec.months for s in spec.seeds}
 
 
@@ -107,7 +126,7 @@ def plan_jobs(*, names: list[str] | None = None, stage: StageType = "all") -> li
 
     Args:
         names: Arm names, or `None` for all of the fitted arms.
-        stage: `A` or `B` for one stage's jobs, `all` for every job.
+        stage: `A`, `B1`, or `B` for one stage's jobs, `all` for every job.
 
     Returns:
         One job per fold and seed of each arm.
@@ -206,7 +225,7 @@ def main() -> None:
     """Print the count and the estimate, and optionally write the job list."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arms", nargs="+", default=None)
-    parser.add_argument("--stage", choices=("A", "B", "all"), default="all")
+    parser.add_argument("--stage", choices=("A", "B1", "B", "all"), default="all")
     parser.add_argument("--write", type=Path, default=None, help="write one job per line")
     parser.add_argument("--pending", action="store_true", help="drop jobs whose set exists")
     args = parser.parse_args()
@@ -216,6 +235,12 @@ def main() -> None:
     jobs = plan_jobs(names=args.arms, stage=args.stage)
     if args.stage == "A" and args.arms is None and len(jobs) != STAGE_A_COUNT:
         msg = f"Stage A holds {len(jobs)} jobs, not the pre-registered {STAGE_A_COUNT}"
+        raise ValueError(msg)
+    if args.stage == "B1" and args.arms is None and len(jobs) != STAGE_B1_COUNT:
+        msg = f"Stage B1 holds {len(jobs)} jobs, not the pre-registered {STAGE_B1_COUNT}"
+        raise ValueError(msg)
+    if args.stage == "B" and args.arms is None and len(jobs) != STAGE_B_COUNT:
+        msg = f"Stage B holds {len(jobs)} jobs, not the expected {STAGE_B_COUNT}"
         raise ValueError(msg)
     if args.pending:
         import e00711_gate as gate

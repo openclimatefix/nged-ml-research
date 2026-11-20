@@ -33,16 +33,22 @@ and no calendar date of a farm's data.
 uv run --no-sync python ml-experiments/00711-*/e00711_score.py sky-index   # once
 uv run --no-sync python ml-experiments/00711-*/e00711_score.py gate
 uv run --no-sync python ml-experiments/00711-*/e00711_score.py score --resamples 50000
+uv run --no-sync python ml-experiments/00711-*/e00711_score.py score --stage B1
 ```
+
+**Every run also saves its full output** to `work/scores/<command>[-stage]_<UTC time>.txt` under the
+experiment's data folder.
 """
 
 import argparse
+import contextlib
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import cache
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, TextIO
 
 import e00711_arms as arms
 import e00711_common as common
@@ -468,6 +474,23 @@ class Reading:
             f"{boot}{t_text}{averaged} -> {self.verdict}"
         )
 
+    def exploratory_line(self) -> str:
+        """Return the reading as one line with no verdict word.
+
+        An exploratory reading is descriptive. With one month, the interval holds only the spread of
+        the per-seed contrasts, so the line says `range of N seeds` instead of an interval.
+        """
+        if self.n_months < 2:
+            spread = f"range of {len(self.seeds)} seeds [{self.lower:+.3f}, {self.upper:+.3f}]"
+        else:
+            spread = f"[{self.lower:+.3f}, {self.upper:+.3f}] level {self.level:.2f}%"
+        averaged = "" if self.averaged is None else f" seed-averaged {self.averaged:+.3f}"
+        return (
+            f"{self.label:34s} {self.scope:34s} {self.difference:+.3f} {spread} "
+            f"seeds {list(self.seeds)} n={self.n_half_hours:,} months {self.n_months}"
+            f"{averaged} -> exploratory"
+        )
+
     def rows_line(self) -> str:
         """Return the rows of one seed per label, which are the weights of the pooled mean."""
         rows = ", ".join(f"{k} {v:,}" for k, v in sorted(self.label_rows.items()))
@@ -523,6 +546,9 @@ def paired_month_sums(*, a: pl.DataFrame, b: pl.DataFrame, metric: str = "crps")
         b_sorted.select(order)
     ):
         msg = f"the two arms do not hold the same rows ({a.height:,} and {b.height:,})"
+        raise ValueError(msg)
+    if a_sorted.height == 0:
+        msg = "the selection holds no rows"
         raise ValueError(msg)
     frame = pl.DataFrame(
         {
@@ -1289,6 +1315,8 @@ def planned_specs(*, stage: StageType) -> list[Spec]:
     Stage A reads C1 at the six and at the eight, and S1. Stage B (the whole plan) adds C2, C3, S2,
     and S3, and reads all nine.
     """
+    if stage == "B1":
+        return b1_specs()
     cloud, solar_months = arms.CLOUD_SCORED_MONTHS, arms.SOLAR_MONTHS
     solar_all = solar_scope(months=solar_months)
     specs = _primary_specs(prefix="C1", pair=("D1", "D1p"), months=cloud, level=PLANNED_LEVEL)
@@ -1337,6 +1365,49 @@ def planned_specs(*, stage: StageType) -> list[Spec]:
     return specs
 
 
+def b1_specs() -> list[Spec]:
+    """Return Stage B1's planned readings at 99.44%: C3 (the five, the eight) and G1 (six, eight).
+
+    C3 is the replicate `R1` minus `R1p`, with no gap and no flag, on the 12 replicate folds. G1 is
+    `D1g` minus `D0g`, the flag-free, gap-free pair on the 7 cloud-scored folds.
+    """
+    cloud = arms.CLOUD_SCORED_MONTHS
+    c3 = [
+        _spec(
+            key=f"C3 {group}",
+            pair=("R1", "R1p"),
+            scope=f"{group}, days 1 to 10, replicate",
+            months=arms.REPLICATE_MONTHS,
+            where=primary_scope(members=members, months=arms.REPLICATE_MONTHS),
+            level=PLANNED_LEVEL,
+        )
+        for group, members in REPLICATE_GROUPS.items()
+    ]
+    return c3 + _primary_specs(prefix="G1", pair=("D1g", "D0g"), months=cloud, level=PLANNED_LEVEL)
+
+
+def b1_bound_specs() -> list[Spec]:
+    """Return `R1p` minus `R0` and `R1` minus `R0` (the five, the eight) at 99.375%.
+
+    With no flag and no gap, `R1p` minus `R0` shows what the placebo's own shift is, and `R1` minus
+    `R0` shows the total effect of the cloud columns. Both are descriptive bounds beside C3.
+    """
+    out: list[Spec] = []
+    for pair in (("R1p", "R0"), ("R1", "R0")):
+        out += [
+            _spec(
+                key=f"{pair[0]} minus {pair[1]} {group}",
+                pair=pair,
+                scope=f"{group}, days 1 to 10, replicate",
+                months=arms.REPLICATE_MONTHS,
+                where=primary_scope(members=members, months=arms.REPLICATE_MONTHS),
+                level=CHECK_LEVEL,
+            )
+            for group, members in REPLICATE_GROUPS.items()
+        ]
+    return out
+
+
 def check_specs(*, stage: StageType) -> list[Spec]:
     """Return the checks at 99.375%: placebo carries nothing, and the gap-scored folds.
 
@@ -1344,6 +1415,8 @@ def check_specs(*, stage: StageType) -> list[Spec]:
     minus `DF` and `P1p` minus `PF`. Stage B adds the time-shifted placebos and the gap-scored
     check.
     """
+    if stage == "B1":
+        return []
     cloud, solar_months = arms.CLOUD_SCORED_MONTHS, arms.SOLAR_MONTHS
     primary_pairs = [("D1p", "DF")] + ([("D1t", "DF")] if stage != "A" else [])
     solar_pairs = [("P1p", "PF")] + ([("P1t", "PF")] if stage != "A" else [])
@@ -1632,6 +1705,51 @@ def verdicts(
     return out
 
 
+def verdicts_b1(*, readings: dict[str, Outcome]) -> dict[str, str]:
+    """Print and return Stage B1's verdicts: C3 and G1, each by the decision rule.
+
+    The verdicts are the decision rule applied to the decisive interval. Stage B1 gives no
+    front-matter verdict, because it holds no positive control and no solar arm. Section 12 of the
+    page says what each outcome means for the flag and date-proxy question.
+    """
+    print(
+        "\n== Stage B1 verdicts (decision rule applied to each reading; no front-matter verdict) =="
+    )
+    out: dict[str, str] = {}
+    for key in (*(f"C3 {g}" for g in REPLICATE_GROUPS), *(f"G1 {g}" for g in PRIMARY_GROUPS)):
+        reading = readings.get(key)
+        if not isinstance(reading, Reading):
+            print(f"{key}: verdict withheld, the reading is incomplete")
+            continue
+        out[key] = reading.verdict
+        print(
+            f"{key}: {reading.verdict} ({reading.difference:+.3f}, "
+            f"[{reading.lower:+.3f}, {reading.upper:+.3f}])"
+        )
+    return out
+
+
+def score_b1(*, n_resamples: int) -> None:
+    """Print Stage B1's readings: C3 and G1 at 99.44%, and the `R0` bounds at 99.375%."""
+    source = make_source(with_sky=False)
+    print_arms(source=source, stage="B1")
+    print(
+        f"\n== Stage B1 planned readings, level {PLANNED_LEVEL:.2f}%, {n_resamples:,} resamples =="
+    )
+    readings = [
+        run_spec(source=source, spec=s, stage="B1", n_resamples=n_resamples) for s in b1_specs()
+    ]
+    print_outcomes(outcomes=readings, rows=True)
+    print(f"\n== bounds beside C3: placebo and real arm against no cloud ({CHECK_LEVEL:.3f}%) ==")
+    print_outcomes(
+        outcomes=[
+            run_spec(source=source, spec=b, stage="B1", n_resamples=n_resamples)
+            for b in b1_bound_specs()
+        ]
+    )
+    verdicts_b1(readings={r.key: r for r in readings})
+
+
 def exploratory(*, source: LossSource) -> None:
     """Print the exploratory readings at 95%: lead bands, sky regimes, labels, folds, totals."""
     print("\n== exploratory readings (95% interval; each with its half-hour count) ==")
@@ -1653,7 +1771,7 @@ def exploratory(*, source: LossSource) -> None:
             base = (
                 primary_scope(members=labels, months=months, band=band)
                 if target == "primary"
-                else solar_scope(months=arms.SOLAR_MONTHS, band=band, farms=labels)
+                else solar_scope(months=months, band=band, farms=labels)
             )
             return base if extra is None else base & extra
 
@@ -1738,7 +1856,7 @@ def _print_slice(
     except ValueError as error:
         print(f"{treatment} minus {reference} {name}: unavailable ({error})")
         return
-    print(reading.line())
+    print(reading.exploratory_line())
 
 
 def gate(*, source: LossSource, record: bool) -> bool:
@@ -1877,6 +1995,9 @@ def make_source(*, with_sky: bool) -> LossSource:
 
 def score(*, n_resamples: int, stage: StageType) -> None:
     """Print every number the page quotes for `stage`, in the order of the module docstring."""
+    if stage == "B1":
+        score_b1(n_resamples=n_resamples)
+        return
     source = make_source(with_sky=True)
     print_arms(source=source, stage=stage)
     if stage == "A":
@@ -1922,6 +2043,42 @@ def score(*, n_resamples: int, stage: StageType) -> None:
     exploratory(source=source)
 
 
+class _Tee:
+    """Write each string to the real output and to a file."""
+
+    def __init__(self, *, first: TextIO, second: TextIO) -> None:
+        self._streams = (first, second)
+
+    def write(self, text: str) -> int:
+        """Write `text` to both streams."""
+        for stream in self._streams:
+            stream.write(text)
+        return len(text)
+
+    def flush(self) -> None:
+        """Flush both streams."""
+        for stream in self._streams:
+            stream.flush()
+
+
+def scores_path(*, name: str, now: datetime | None = None) -> Path:
+    """Return `work/scores/<name>_<UTC timestamp>.txt` under the experiment's data folder."""
+    stamp = (now or datetime.now(UTC)).strftime("%Y%m%dT%H%M%SZ")
+    return common.WORK_DIR / "work" / "scores" / f"{name}_{stamp}.txt"
+
+
+def run_saved(*, name: str, action: Callable[[], None]) -> Path:
+    """Run `action`, print its output as usual, and save the same output to `scores_path`."""
+    path = scores_path(name=name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as handle:
+        tee = _Tee(first=sys.stdout, second=handle)
+        with contextlib.redirect_stdout(tee):  # ty: ignore[invalid-argument-type]
+            action()
+    print(f"saved the output to {path}")
+    return path
+
+
 def main() -> None:
     """Run a scorer command."""
     parser = argparse.ArgumentParser(
@@ -1929,16 +2086,23 @@ def main() -> None:
     )
     parser.add_argument("command", choices=("score", "gate", "sky-index"))
     parser.add_argument("--resamples", type=int, default=N_RESAMPLES)
-    parser.add_argument("--stage", choices=("A", "B", "all"), default="A")
+    parser.add_argument("--stage", choices=("A", "B1", "B", "all"), default="A")
     args = parser.parse_args()
     arms.check_table()
     if args.command == "sky-index":
-        build_sky_index()
+        run_saved(name="sky-index", action=build_sky_index)
     elif args.command == "gate":
-        passed = gate(source=make_source(with_sky=False), record=True)
-        print("gate:", "PASS" if passed else "FAIL")
+
+        def run_gate() -> None:
+            passed = gate(source=make_source(with_sky=False), record=True)
+            print("gate:", "PASS" if passed else "FAIL")
+
+        run_saved(name="gate", action=run_gate)
     else:
-        score(n_resamples=args.resamples, stage=args.stage)
+        run_saved(
+            name=f"score-{args.stage}",
+            action=lambda: score(n_resamples=args.resamples, stage=args.stage),
+        )
     _ = timedelta
 
 

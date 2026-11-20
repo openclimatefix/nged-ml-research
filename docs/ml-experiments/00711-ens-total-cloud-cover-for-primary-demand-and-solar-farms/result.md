@@ -61,9 +61,12 @@ metric: >-
 production_status: not-for-production
 adopted_in: none
 ---
-**Status: planned. The sections below are the plan; the finished page replaces them. Every number
-on this page is interim: each is quoted from an earlier experiment, read from a log, or estimated,
-and none is a result of this experiment.**
+**Status: planned in the front matter, because the experiment is staged and not finished. Stage A
+(132 fits) is scored, and its interim results are in the section "Results (Stage A, interim)".
+Stage B1 (150 fits) is approved and not run. The rest of Stage B (664 fits) is not run.** The
+sections after the results are the plan. Every number in them is quoted from an earlier experiment,
+read from a log, or estimated, and none is a result of this experiment. The finished page replaces
+the plan.
 
 This experiment asks whether a forecast of cloud cover helps two forecasts that already use the
 weather. The first is the forecast of the power that 16 Primary substations draw. The second is the
@@ -101,6 +104,131 @@ on the port target (the Candidate `P7+D50` for Primary demand, and PLP for the s
 
 **No new XGBoost model is fitted.** The stored XGBoost-based forecasts BG2 and S0M appear as
 reference rows only, as the maintainer's decision of 2026-11-02 requires.
+
+## Results (Stage A, interim)
+
+**Stage A found no detectable gain from ENS total cloud cover at this resolution, and its verdict is
+`inconclusive` at the six Primaries, at the eight Primaries, and at the six solar farms.** Stage A
+fitted 132 neural networks on seeds 0 to 2 (section 10) and was scored on 2026-11-20 by `e00711_score.py
+score --stage A`. Each interval below is the decisive interval of section 8 at 99.44%, in points of
+CRPS, and a negative difference favours the real cloud. The reading C1 is `D1` minus `D1p` on the
+seven cloud-scored folds, and S1 is `P1` minus `P1p` on the seven solar folds.
+
+| Reading | Difference | Interval at 99.44% | Gain that the interval excludes | Verdict |
+|---|---|---|---|---|
+| C1, the six Primaries | -0.029 | [-0.112, +0.056] | larger than 0.11 points | `inconclusive` |
+| C1, the eight Primaries | -0.001 | [-0.065, +0.087] | larger than 0.065 points | `inconclusive` |
+| S1, the six solar farms | +0.022 | [-0.056, +0.103] | larger than 0.056 points | `inconclusive` |
+
+**The intervals are about four times wider than the 0.02-point threshold, so Stage A cannot say
+whether a gain of 0.02 points exists.** The realised half-widths are 0.084 at the six, 0.076 at the
+eight, and 0.080 at the farms. The interim minimum detectable effect that the scorer printed (0.065,
+0.036, and 0.084) understated them, because a split of seed 0 against seed 1 leaves out the
+seed-to-seed spread of the real contrast, and the page quotes the realised half-widths instead. More
+seeds would barely narrow the intervals: 6 seeds would narrow the t interval at the six by about 7%,
+because the month-to-month spread and the t quantile at 6 degrees of freedom set its width. Only
+more months would narrow the intervals.
+
+**The Primary demand estimates fall inside the predicted range of -0.03 to +0.01 points, and the
+solar estimate falls outside the predicted range of -0.03 to 0 points.** The solar estimate lies on
+the placebo's side and within noise.
+
+### Checks
+
+**All three placebo checks passed, but each has little power.** The check reads the placebo arm
+minus the no-cloud arm, and a placebo that carried information or harm would show a difference from
+zero.
+
+| Check | Difference | Interval at 99.375% |
+|---|---|---|
+| `D1p` minus `DF`, the six | +0.001 | [-0.094, +0.186] |
+| `D1p` minus `DF`, the eight | -0.003 | [-0.053, +0.050] |
+| `P1p` minus `PF`, the six farms | +0.003 | [-0.068, +0.065] |
+
+**The page may say that no placebo shift larger than about 0.1 points was detected, and may not say
+that the placebo carries nothing.** At the six, the check cannot rule out a shift of 0.09 points in
+either direction. In fold 2025-12 alone, `D1p` minus `DF` at the six is +0.119 points, which means
+the placebo harmed the forecast there, and `D1` minus `DF` in that fold is +0.001. The pooled check
+passes because the other folds offset the 2025-12 harm.
+
+### The missing-value flag raises the CRPS of Primary demand
+
+**The flag alone makes the Primary demand forecast 0.12 to 0.15 points worse than stored `R_F`, so
+C1 is measured on a weaker base network than `R_F`.** `DF` has one extra input column, the
+`cloud_missing` flag, and no other change from `D0n`. The flag-only arm `DF` minus stored `D0`
+(experiment 707's `R_F`) is +0.122 points at the six and +0.147 at the eight. The difference is
+positive in 13 of the 14 (fold, group) cells, and it is much larger than the seed-to-seed spread of
+0.03 to 0.10 points. `D1` minus `D0` is +0.094 at the six and +0.142 at the eight, so the masked-gap
+recipe as a whole is worse than `R_F`.
+
+**The flag moves the level of the median forecast, which is the signature of a date proxy.** In fold
+2025-12 at the six, the mean signed error of the median is -3.53 points for `D0`, -4.79 for `DF`, and
+-4.92 for `D1`. In that fold every scored row has the flag set to 0, and the fine-tune window holds
+unflagged rows from December 2023 to March 2024, so the network treats the scored rows like rows
+from two winters earlier. Experiment 568 found the same date-proxy effect, and the flag-only arm was
+planned to measure it.
+
+**The refit code is not the cause.** `D0n` reproduces stored `D0` to within 1e-6 points of CRPS in
+every (fold, seed, group) cell at the two gate months. The `DF` and `D0n` fit logs show identical row
+counts at every stage.
+
+**C1 stays valid, and a null on this base is weaker evidence than a null on `R_F`.** `D1` and `D1p`
+hold the identical flag and the identical missing pattern, and each seed starts from the same
+initialisation in both arms, so C1 measures the information in the cloud values. The flag's level
+shift could absorb part of what cloud would otherwise add. A gain found on this base would need a
+re-test without the flag, and the `D1g` minus `D0g` pair of Stage B1 does that.
+
+### Solar farms: the gain over stored PLP comes from the monthly refit
+
+**`P1` minus `P0` is -0.163 points, and the gain belongs to the monthly refit and the longer training
+window, not to cloud.** `PF` minus `P0`, which has no cloud, is -0.189 points, a larger gain than the
+one with cloud. Stored `P0` over-forecasts by 1.58 points in fold 2026-01 where `P1` errs by -0.13,
+which fits a `P0` that saw one winter of training data. A shift test on `P0` and `P1` found that
+zero shift scores best at both test folds, so the row alignment is right. Only `P0L` (Stage B) can
+separate the window from the cloud, and the page does not describe the line as a gain from cloud.
+
+### Stop-rule counts
+
+**Stage A's `inconclusive` verdict adds nothing to any count, and the counts of section 2 stand.** The
+count on ENS total cloud cover is 0 (1 if experiment 568 is counted). The count on irradiance-like
+inputs to Primary demand is 3, and the maintainer's request of 2026-11-19 is the approval for this
+fourth experiment. The count on irradiance-like inputs to the solar farm forecast is 2 on the strict
+reading and 5 on the broad reading.
+
+### Review findings
+
+**An independent review of the Stage A scorer output accepted the three verdicts and found one
+scorer bug, which is fixed.**
+
+- **The per-fold solar rows ignored their fold.** The scorer's exploratory section built the solar
+  filter with all seven folds, so the seven per-fold rows printed the S1 figure. The filter now takes
+  the fold, a test covers it, and the rerun of `score --stage A` prints the correct rows. The
+  seven per-fold differences of `P1` minus `P1p` range from -0.050 to +0.096 points, and six of the
+  seven favour the placebo. They are descriptive only, and no trend with months of recent cloud
+  is visible. The
+  planned readings, the checks, and the bounds were never affected.
+- **Exploratory rows carry no verdict word.** With one month, the interval of a row holds only the
+  range of the three per-seed contrasts. The scorer now prints "range of 3 seeds" and "exploratory"
+  on every exploratory line, and no `supported`, `refuted`, or `small gain` label from the single-fold
+  rows is quoted anywhere. In fold 2025-12 the apparent gain at the six is placebo harm, not a cloud
+  gain.
+- **The exploratory section has a multiplicity problem.** About 110 exploratory lines print at 95%
+  with no correction, so about 5 are expected to exclude zero by chance.
+- **S3 is no longer blind.** The exploratory "six farms, day 1" band equals the S3 band read on the
+  Stage A arms (+0.001, [-0.074, +0.070] at 95%), so any later S3 reading is labelled "read after the
+  exploratory band was seen".
+- **Leakage and anonymisation passed.** Every prediction row has its origin at the planned hour, no
+  donor run was published after its fold's cut, and the scorer prints farm labels A to F with no
+  identifier, coordinate, or per-label start date. The solar example of section 7 carries no farm label
+  and no cloud value.
+
+### What Stage A does not show
+
+**Stage A does not show that cloud is useless, only that its gain, if any, is smaller than the
+intervals above.** It has no positive control, so a null cannot yet be told from a masked-gap recipe
+that cannot pass a known signal. The base network carries a date-proxy penalty, and the cloud-scored
+folds cover December to June only. A reading of `not supported` needs an interval that excludes 0.02
+points, which Stage A cannot give.
 
 ## 1. Hypothesis, prediction, and the smallest gain worth porting
 
@@ -431,6 +559,38 @@ and every exploratory slice that needs a Stage B arm are Stage B. A Stage B read
 verdict only through the rules above (the modifiers and audit trigger 2), after the manager has
 approved Stage B.
 
+**Stage B1 reads two contrasts, each at 99.44%, and gives no front-matter verdict.** The scorer
+(`e00711_score.py score --stage B1`) reads only the arms of Stage B1, with seeds 0 to 2.
+
+| Contrast | Definition | Rows | Readings |
+|---|---|---|---|
+| C3 | `R1` minus `R1p`, with no gap rows and no flag | the 12 replicate folds, days 1 to 10 | the five (the six without D9, whose power history starts after the replicate begins); the eight |
+| G1 | `D1g` minus `D0g`, with no flag and no gap rows | the 7 cloud-scored folds, days 1 to 10 | the six; the eight |
+
+The scorer also prints `R1p` minus `R0` and `R1` minus `R0` at 99.375% as descriptive bounds beside
+C3, because `R0` has no cloud column and no flag. The verdict of each reading is the decision rule
+above applied to the decisive interval. A Stage B1 reading changes the front-matter verdict through
+the `partly supported` and audit trigger 2 rules only if the manager later runs Stage B, because the
+front-matter rule needs C2 and the positive control. Until then, Stage B1 answers the date-proxy
+question of the Stage A results and nothing else.
+
+**What each Stage B1 outcome would mean for the flag and date-proxy question.** C3 and G1 contain
+no missing-value flag, so neither can contain the date-proxy penalty of `DF`.
+
+- **C3 `supported` or `small gain`, or G1 the same.** Cloud carries information that the flag-based
+  Stage A recipe could not show, and the flag's date proxy hid it. The Stage A `inconclusive` would
+  then read as a limit of the base network, and a flag-free re-test on the recent folds would be
+  worth proposing to the manager.
+- **C3 and G1 both `inconclusive`.** The flag was not hiding a gain that these intervals can
+  resolve, and the question stays open at the width of the intervals.
+- **C3 or G1 `not supported`.** A gain of 0.02 points is excluded on a base without the flag, and
+  that is the only Stage B1 outcome that supports a statement of "no gain" at that level.
+- **C3 or G1 `refuted`.** The real cloud is worse than the placebo with no flag present, so the
+  harm does not come from the flag.
+- **`R1p` minus `R0` or `D1g` minus `D0g` far from 0 with `R1` minus `R1p` near 0.** The cloud
+  columns, real or shuffled, change the forecast without adding information, which is a column
+  effect and not a date-proxy effect.
+
 **Metric.** CRPS as twice the mean pinball loss over the 11 quantile levels, in points of effective
 capacity, with the normalised MAE of the median beside every CRPS number. Each farm's error is
 divided by its own capacity before any mean.
@@ -609,12 +769,24 @@ assertion.
 holds the fit gate and the prediction gate at both gate months. The one override is `--measure` for
 the measuring fit, which writes under the name `measure-<arm>`.
 
-**Stage B is everything else in the 946 fits, and it needs the manager's word.** Stage B holds seeds
-3 to 5 and the folds 2025-07 to 2025-11 of the Stage A arms, and the arms `D0g`, `D1g`, `D1t`, `D2`,
-`D2p`, `D3`, `K1`, `K1p`, `R0`, `R1`, `R1p`, `P0L`, `P0g`, `P1g`, `P1t`, `P2`, and `P2p`. It
-answers the questions Stage A leaves open: the minimum detectable effect (which needs seeds 0 to 5
-at the placebo arm), the summary T2, the gap-handling checks, the positive control, the replicate,
-and the solar S3 band. Its readings and checks are pre-registered in this section and in section 8.
+**Stage B1 is the reduced Stage B that the manager approved on 2026-11-20: 150 fits on seeds 0 to
+2.** Stage B1 fits `R0`, `R1`, and `R1p` on the 12 replicate folds (36 fits each), and `D0g` and
+`D1g` on the 7 cloud-scored folds (21 fits each). `e00711_jobs.py --stage B1` lists the jobs, checks
+the count of 150 (`STAGE_B1_COUNT`), and takes `--pending` to skip finished fits. The scorer reads
+Stage B1 with `e00711_score.py score --stage B1` (section 8).
+
+**Stage B is the other 664 of the 946 fits, and it is not run.** It holds seeds 3 to 5 of every arm
+that the plan gives 6 seeds (including `R1` and `R1p`), the folds 2025-07 to 2025-11 of the Stage A
+arms, and the arms `D1t`, `D2`, `D2p`, `D3`, `K1`, `K1p`, `P0L`, `P0g`, `P1g`, `P1t`, `P2`, and
+`P2p`. `e00711_jobs.py --stage B` lists them and checks the count of 664. They would answer the
+questions that Stage A and Stage B1 leave open: the 3-against-3 minimum detectable effect, the
+summary T2, the gap-handling checks, the positive control, and the solar S3 band. Running any of
+them needs a new word from the manager.
+
+**Amendment of 2026-11-20: the 6-seed rows of the plan for `R1` and `R1p` are not run.** The
+manager approved the reduced Stage B on 2026-11-20. Stage A excludes only gains above 0.11 points at
+the six, so the replicate answers the date-proxy question and not a power question, and seeds 3 to
+5 would not change that answer. Section 12, point 1 records the same decision.
 
 **First-fit request to the manager.** One stream runs one fit of `D1` on fold 2026-06, seed 0. The
 request asks for a GPU share for 2 streams (experiment 707 planned 5 GB per stream and never
@@ -643,7 +815,8 @@ same rows with the seed noise inside the interval (experiment 707).
 ## 12. Review points to settle at implementation
 
 **The design review raised six points. Each is either settled with a recorded decision or marked
-"to be settled before Stage B".** Stage A depends on points 1 and 2 only.
+"to be settled before Stage B".** Stage A depended on points 1 and 2 only. Stage B1 depends on point
+3, which must be settled before its first fit.
 
 - **Fewer seeds.** The bootstrap draws one fitting seed per resample, so the interval does not
   narrow as seeds are added. Cutting the planned arms to 3 seeds would save about 180 Primary demand
@@ -651,8 +824,9 @@ same rows with the seed noise inside the interval (experiment 707).
   read a seed-averaged contrast with a bootstrap that resamples seeds inside each month draw, which
   needs a new helper whose move into `src/studies/` would need its own reviewed pull request.
   **Settled for Stage A (the manager's Stage A instruction, 2026-11-20):** Stage A uses seeds 0 to
-  2. **To be settled before Stage B:** whether Stage B adds seeds 3 to 5 (needed for the
-  3-against-3 minimum detectable effect and for the arms that the plan gives 6 seeds) or keeps 3.
+  2. **Settled for Stage B1 (the manager's approval, 2026-11-20):** Stage B1 keeps seeds 0 to 2, and
+  seeds 3 to 5 of `R1` and `R1p` are not run. Seeds 3 to 5 of the other arms stay in the unrun
+  Stage B, where the question of the 3-against-3 minimum detectable effect stays open.
 - **The era of the placebo cloud.** For a scored run in 2025-12 to 2026-06, the real cloud comes
   from ECMWF's open data and every shuffled-run donor comes from the back-filled runs before
   2024-04-01, many of them before the 2023-06-27 resolution change. C1 and C2 are then an era
@@ -668,8 +842,8 @@ same rows with the seed noise inside the interval (experiment 707).
   arms stay in Stage B as the second comparator.
 - **The replicate and the resolution change.** Fold 2023-06 straddles 2023-06-27. The `study` skill
   asks to drop the straddling part-month on both sides, add an era indicator to all three replicate
-  arms, and restrict donors to the row's era. **To be settled before Stage B**, because the
-  replicate is Stage B.
+  arms, and restrict donors to the row's era. **To be settled before the first Stage B1
+  fit**, because the replicate is in Stage B1.
 - **A calibrated positive control.** The `K1` control is large and trivial, because `K1p` has no
   temperature. A calibrated known-answer control would add a synthetic column equal to the realised
   clear-sky index plus Gaussian noise, tuned on one fold so that the unmasked column gains about
@@ -692,6 +866,24 @@ cloud-scored folds cover December to June only, and fold 2025-12 holds only 10 r
 cloud in its fine-tune window.
 
 ## 13. Differences between the plan and the code
+
+### Amendment of 2026-11-20: Stage B1
+
+**The manager approved a reduced Stage B (Stage B1) on 2026-11-20, and the plan changes in three
+places.**
+
+- **Stage B1 is 150 fits on seeds 0 to 2:** `R0`, `R1`, and `R1p` at 36 each, and `D0g` and `D1g` at
+  21 each. The other 664 fits are Stage B and are not run.
+- **The 6-seed rows of the plan for `R1` and `R1p` are not run.** Stage A excludes only gains above
+  0.11 points at the six, so the replicate answers the date-proxy question and not a power question.
+- **`e00711_jobs.py` and `e00711_score.py` take `--stage B1`,** and every scorer run saves its full
+  output to `work/scores/<command>[-stage]_<UTC time>.txt` under the experiment's data folder.
+
+### Stage A scoring code
+
+**The scorer's per-fold solar rows were wrong in the first Stage A run, and the code now fixes
+them.** The exploratory filter ignored the fold, and the rows now carry no verdict word (section
+"Results (Stage A, interim)"). The planned readings, checks, and bounds did not change.
 
 ### Stage 2 code
 
