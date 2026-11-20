@@ -434,9 +434,9 @@ def translate_rows(
     signal: sg.Signal,
     fs: FoldSignals,
     rows: dict,
-    target_idx,
-    power_lag,
-    power_sig,
+    target_idx: np.ndarray,
+    power_lag: np.ndarray,
+    power_sig: np.ndarray,
     block: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Translate the lags of rows inside an era's first days or inside a switching event.
@@ -671,7 +671,7 @@ def build_alt_world(*, fs: FoldSignals, clean: np.ndarray) -> AltWorld:
 
 
 def overlay(*, real: sg.Signal, world: sg.Signal, sites: list[int]) -> sg.Signal:
-    """Return the real signal with the injected world's columns at `sites` (learned arms), or the world alone (oracle arms).
+    """Return the real signal with the injected world's columns at `sites` (or the world alone).
 
     The oracle's and the placebo's world already holds the real record's events.
     """
@@ -695,7 +695,9 @@ def train_curriculum(
     *, model: torch.nn.Module, x, z, w, p, is_val, seed: int, lr: float, max_epochs: int,
     fresh_lr: float | None, frozen: bool, anchor: dict | None, lam: float, device: str,
 ) -> tuple[int, float]:  # fmt: skip
-    """Experiment 574's `train` with the curriculum's tensors in `ALT`: read by the odd epochs (rule `es`) or by half of the rows in every epoch (rule `b2`).
+    """Experiment 574's `train` with the curriculum's tensors in `ALT`.
+
+    The odd epochs read them (rule `es`), or half of the rows in every epoch do (rule `b2`).
 
     Validation always reads the plain rows. The O-enc layers sit outside `model.weather` and
     `model.datetime`, so freezing the encoders leaves them trainable. The curriculum replaces only
@@ -978,7 +980,7 @@ def forecast_window(
     lag_x=None,
     cut=CUT_DAY,
 ):
-    """Return the forecast frame of origins in [lo, hi) with the signal block, the lag translation, and the era block."""
+    """Return the forecast frame of origins in [lo, hi), with the signal, lag, and era blocks."""
     sel = (test.origin >= lo) & (test.origin < hi)
     if not sel.any():
         return None

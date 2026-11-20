@@ -508,7 +508,7 @@ def check_as_of_alignment() -> bool:
 
 
 def check_bank_lag_columns(*, cand, test) -> bool:
-    """A host's lag column 37 on the injected panel equals the clean lag before the onset and differs after it.
+    """A host's lag column 37 equals the clean lag before the onset and differs after it.
 
     The bank passes `lag_x` built from the injected panel, as experiment 693 does. Without it, the
     host's lag columns would read the clean panel and the bank would show no step to the model.
@@ -615,7 +615,7 @@ def run_alignment(*, month: str) -> bool:
 
 
 def check_weather_runs(*, origins_us: np.ndarray) -> tuple[bool, str]:
-    """For every origin, the weather run is 00:00 UTC of the origin's day, its demand frame and summary file exist.
+    """For every origin, the weather run is 00:00 UTC of its day, and its frame and summary exist.
 
     Args:
         origins_us: Origin times in microseconds since the epoch.
@@ -643,7 +643,7 @@ def check_weather_runs(*, origins_us: np.ndarray) -> tuple[bool, str]:
 
 
 def run_weather(*, arms: list[str], month: str, seed: int) -> bool:
-    """Every stored forecast's weather run is the 00:00 UTC run of the origin day; print one example row per arm."""
+    """Check that every stored forecast uses the 00:00 UTC run of its origin day; print one row per arm."""
     import e00667_export as exp  # ty: ignore[unresolved-import]
 
     ok = True

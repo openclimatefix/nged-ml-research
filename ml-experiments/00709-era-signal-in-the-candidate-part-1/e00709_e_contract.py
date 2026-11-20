@@ -1,10 +1,11 @@
 # ruff: noqa: E501, PT018
 """Phase E's contract rows: experiment 667's `contract_rows` with series-origins that may be incomplete.
 
-The stored rows of experiment 667 before 2025-07-01 keep only half-hours with an observed target, so
-a series-origin can hold fewer than 14 * 48 forecast rows (for example when the telemetry has a gap).
-Experiment 667's `contract_rows` asserts that every series-origin holds all of them. This copy keeps
-every other assertion and requires only that no series-origin holds more than 14 * 48 rows.
+The stored rows of experiment 667 before 2025-07-01 keep only half-hours with an observed target,
+so a series-origin can hold fewer than 672 forecast rows (14 days of half-hours), for example when
+the telemetry has a gap. Experiment 667's `contract_rows` asserts that every series-origin holds
+all 672. This copy keeps every other assertion and requires only that no series-origin holds more
+than 672 rows.
 """
 
 from datetime import timedelta

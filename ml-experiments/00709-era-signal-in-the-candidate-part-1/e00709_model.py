@@ -2,7 +2,8 @@
 """Experiment 709: the candidate network with an era encoder, an anchor on the output, and O-enc.
 
 `EraPermLagMdn` is `e00613_nbmodel.PermLagMdn` (the candidate's stage 3 network) plus four parts.
-Each part leaves the output unchanged at the start, so a zero era block gives exactly `PermLagMdn`'s output.
+Each part leaves the output unchanged at the start, so a zero era block gives
+`PermLagMdn`'s output.
 
 - **Era encoder.** Nine inputs (unknown flag, class weight, age, six changes) pass through
   `Linear(9, 16)`, GELU, `Linear(16, 8)`. The 8 outputs are multiplied by the `active` flag (so a
@@ -218,7 +219,7 @@ class EraPermLagMdn(nb.PermLagMdn):
             out = out + ID_L2 * (self.era_ids.weight**2).mean()
         return out
 
-    def load_state_dict(self, state_dict, strict: bool = True, assign: bool = False):  # noqa: ANN001, ANN201
+    def load_state_dict(self, state_dict: dict, strict: bool = True, assign: bool = False):  # noqa: ANN201
         """Load a stage 2 state dict: pad the lag layer and `mixer_ft.0.weight`, allow the era parts missing.
 
         Args:
