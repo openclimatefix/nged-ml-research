@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PLR0915, ANN001, ANN202
+# ruff: noqa: E501, ANN001, ANN003, ANN201, D102, D107
 """Experiment 715: check the fit driver's resume, skip, and code-policy logic with a stub that trains nothing.
 
 Usage: e00715_check_fit.py   (CPU only; run it through `run.sh`)
