@@ -271,7 +271,7 @@ def compare_forecasts(*, new: pl.DataFrame, stored: pl.DataFrame) -> dict:
             "n_stored": b.height,
             "max_abs_difference": float("nan"),
         }
-    joined = new.select(keys, *QCOLS).join(stored.select(keys, *QCOLS), on=keys, suffix="_s")
+    joined = new.select(*keys, *QCOLS).join(stored.select(*keys, *QCOLS), on=keys, suffix="_s")
     worst = max(float((joined[q] - joined[f"{q}_s"]).abs().max()) for q in QCOLS)  # ty: ignore[invalid-argument-type]
     return {
         "same_keys": True,

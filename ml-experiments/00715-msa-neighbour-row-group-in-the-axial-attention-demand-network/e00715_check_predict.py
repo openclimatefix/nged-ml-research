@@ -13,6 +13,7 @@ the ensemble table. No state is loaded, nothing is trained, and nothing is writt
 
 import os
 import sys
+from datetime import UTC, datetime, timedelta
 
 os.environ["E00667_PHASE"] = "predict"
 
@@ -29,11 +30,48 @@ import torch  # ty: ignore[unresolved-import]
 from studies.experiment_store import HOLDOUT_START
 
 
+def small_frame() -> pl.DataFrame:
+    """Return a small forecast frame with the columns of the stored files."""
+    rng = np.random.default_rng(0)
+    n = 40
+    base = pl.DataFrame(
+        {
+            "time_series_id": np.repeat([1, 2], n // 2),
+            "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=UTC)] * n,
+            "valid_time": [
+                datetime(2026, 1, 1, tzinfo=UTC) + timedelta(minutes=30 * (i % (n // 2)))
+                for i in range(n)
+            ],
+        }
+    )
+    return base.with_columns(
+        *(
+            pl.Series(c, np.sort(rng.random((n, len(pr.QCOLS))), axis=1)[:, i].astype(np.float32))
+            for i, c in enumerate(pr.QCOLS)
+        )
+    )
+
+
+def check_compare(*, frame: pl.DataFrame) -> None:
+    """Check `compare_forecasts`: identical frames, a shifted copy (negative control), and a missing row."""
+    same = pr.compare_forecasts(new=frame, stored=frame)
+    assert same["same_keys"] and same["max_abs_difference"] == 0.0 and same["pass"]
+    shifted = frame.with_columns(*(pl.col(c) + 1e-3 for c in pr.QCOLS))
+    diff = pr.compare_forecasts(new=frame, stored=shifted)
+    assert diff["max_abs_difference"] > pr.KN13_TOLERANCE and not diff["pass"], diff
+    fewer = pr.compare_forecasts(new=frame, stored=frame.head(frame.height - 1))
+    assert not fewer["same_keys"]
+
+
 def main() -> int:
     """Run the checks on the fold named on the command line."""
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
 
+    if sys.argv[1] == "compare":
+        check_compare(frame=small_frame())
+        print("compare_forecasts check passed on a small frame")
+        return 0
     month = sys.argv[1]
     arms.install_own_cache()
     pipe = inp.load_pipeline(month=month, phase="predict")
@@ -56,9 +94,10 @@ def main() -> int:
     frame, counts = pr.forecast_frame(**common, mask_history=False, mask_neighbours=False)  # ty: ignore[invalid-argument-type]
     keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
     assert frame.select(keys).is_duplicated().sum() == 0, "duplicated keys"
-    assert (frame["valid_time"] < pl.lit(HOLDOUT_START).cast(pl.Datetime("us", "UTC"))).all(), (
-        "a valid time is in the holdout"
+    held = frame.filter(
+        pl.col("valid_time") >= pl.lit(HOLDOUT_START).cast(pl.Datetime("us", "UTC"))
     )
+    assert held.height == 0, "a valid time is in the holdout"
     q = frame.select(pr.QCOLS).to_numpy()
     assert (np.diff(q, axis=1) >= -1e-9).all(), "the quantiles are not sorted"
     assert np.isfinite(q).all(), "a quantile is not finite"
@@ -72,13 +111,7 @@ def main() -> int:
     assert moved > 0, "masking the host history changed nothing"
     # a zero-initialised F4Net ignores its neighbours, so masking them changes nothing
     assert float(np.abs(nonbr["q50"].to_numpy() - frame["q50"].to_numpy()).max()) < 1e-6
-    same = pr.compare_forecasts(new=frame, stored=frame)
-    assert same["same_keys"] and same["max_abs_difference"] == 0.0 and same["pass"]
-    shifted = frame.with_columns(*(pl.col(c) + 1e-3 for c in pr.QCOLS))
-    diff = pr.compare_forecasts(new=frame, stored=shifted)
-    assert diff["max_abs_difference"] > pr.KN13_TOLERANCE and not diff["pass"], diff
-    fewer = pr.compare_forecasts(new=frame, stored=frame.head(frame.height - 1))
-    assert not fewer["same_keys"]
+    check_compare(frame=frame)
     ens = data.source.ens
     assert ens is not None
     try:
