@@ -9,7 +9,7 @@ also_relevant_to:
   - lsc-detectors
   - switching-labels-in-the-forecast
   - lagged-power-and-error-correction
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -50,10 +50,218 @@ metric: >-
   rows; normalised MAE of the median; q05-q95 coverage; q01, q05, q95, and q99 pinball loss; the
   four load-shift scenarios; cold winter nights; avoidable-curtailment cost; detection and
   classification delay.
+verdict: inconclusive
+best_arm: >-
+  No arm is best on every reading. On the real rows `none` (the Candidate without an era signal)
+  scores 3.967 points of capacity on all rows, and no learned arm differs from it (best `soft`,
+  difference -0.003, 99.44% interval -0.046 to +0.047). On injected eras the oracle, which reads the
+  true dates, lowers the error by 7.4 points of capacity (-8.7 to -6.1), and `all` by 2.9, `soft` by
+  2.0, `stat` by 0.6, and `hmm` by 0.3.
+headline: >-
+  An era signal lowers the error after an injected era: the oracle by 7.4 points of capacity, and the
+  learned arms `all`, `soft`, `stat`, and `hmm` by 2.9, 2.0, 0.6, and 0.3 (7 to 28 days after the
+  onset, 128 events). The arms that help most also raise the error after an injected switching
+  event, at the Primary that loses the demand (`all` by 3.9 points, 99.44% interval +2.4 to +5.5).
+  On the real rows of four test months no learned arm lowers the error on all rows, and at D8 only
+  `hmm` lowers it with an interval that excludes zero (-0.064).
+lessons: >-
+  Phase B's curriculum never survived early stopping, so `aug` equalled `none`. Phase B2 mixed the
+  injected world into every training batch, and its one arm that met the pre-registered rule at 95%
+  (`b2-aug`) fails at 99.44%, while the placebo moved the same way. The contrasts against the
+  prevailing output (C1b and C2) were not scored because the prevailing output was not stored. In
+  the one case we examined (`all` at D8 in 2026-01), a detector carried a temporary excursion
+  forward as an era.
+take_home_message: >-
+  Telling the demand neural network when a substation's behaviour changed for good helps a lot after
+  an injected change, but the versions that help most also make the forecast worse after a temporary
+  load move, because they treat the move as permanent. On real months the network with an era signal
+  forecast no better than the network without one. The experiment therefore cannot say whether an
+  era signal is worth adopting until a version that separates permanent changes from temporary
+  moves is tested against the prevailing forecast.
+advice:
+  - >-
+    Do not carry a learned era signal forward until it passes the veto on switching events:
+    every learned arm that lowered the error after eras raised it at the donor Primary of an
+    injected switching event, `all` by 3.9 points, `soft` by 0.34, `hmm` by 0.24, and `stat` by
+    0.11 (bank, switching events).
+  - >-
+    Score any new era signal on injected eras and on injected switching events together, because
+    the arms that lowered the error most after eras (`all`, `soft`) raised it most after switching
+    events (bank table).
+  - >-
+    Store the prevailing output of every arm in the next era experiment, so that the contrast
+    against the prevailing forecast (C1b) can be scored (verdict paragraph).
+  - >-
+    Judge a curriculum arm against a placebo arm that receives the same training rows: in phase B2
+    the placebo lowered the all-rows error by 0.037 points, about three-quarters of the 0.050 of
+    the arm trained on injected eras with no signal (section 27).
 production_status: not-for-production
 adopted_in: none
 ---
-**Status: planned. The sections below are the plan; the finished page replaces them.**
+**We asked whether telling a demand-forecasting neural network when a substation's behaviour changed
+for good improves its forecast.** The answer is yes after an injected change, and not shown on the
+real months we scored. The network is the Candidate, the modular network of [the final models
+page](../final-models.md) that forecasts demand at the 16 Primary substations ("Primaries") of one
+electricity network operator for up to 14 days ahead. An era is a sudden change that lasts, such as
+a large generator or solar farm connecting to a Primary. A switching event is a temporary move of
+demand from one Primary to a neighbour, which the forecast must not carry forward. We gave the
+Candidate an era signal built only from data before the forecast origin (the time at which the
+forecast is issued), in several forms: fixed rules (`rule`, `soft`), a hidden Markov model (`hmm`),
+a statistical detector (`stat`), a version that turns every detected shift into an era (`all`), and
+an oracle that reads the true dates and is an upper bound, not a deployable arm. We compared each
+with the same network without a signal (`none`). We scored four test months (2025-11, 2026-01,
+2026-04, and 2026-06) with two training seeds, on the real series and on real series into which we
+injected synthetic eras and switching events. All numbers are interim: the plan pre-registered five
+seeds, and we ran two because experiment 667, which supplies the first two of the Candidate's three
+training stages, stores them for seeds 0 and 1 only.
+
+**Verdict: inconclusive.** The decision rule rests on two contrasts, C1b and C2, which compare each
+arm with that arm's prevailing output (the forecast the network makes without the era signal). We
+did not score C1b or C2, because we did not store the prevailing output of any arm. The scored
+contrasts point two ways. After injected eras, five of the seven era signals lower the continuous
+ranked probability score (CRPS, lower is better, in points of the Primary's effective capacity) with
+a 99.44% interval that excludes zero in at least one window: `oracle`, `all`, `soft`, `stat`, and
+`hmm`. After injected switching events, every learned arm that helps after eras raises the CRPS at
+the donor Primary (the Primary that loses the demand), which fails the pre-registered veto on
+switching events. On the real rows, no learned arm lowers the CRPS
+on all rows. An audit was required (see Checks), and it reproduced the bank table.
+
+**On the real rows, no learned arm lowers the error on all rows, and at D8 only `hmm` lowers it with
+an interval that excludes zero.** Differences are from `none`, with 99.44% intervals (the
+pre-registered level for nine contrasts) that resample whole fold months, so four fold months and
+two seeds support each interval. D8 is the Primary where a solar farm connected on 2025-03-24.
+
+| Arm | All rows | D8 | Other Primaries | D8, 14 days after a stat alarm |
+|---|---|---|---|---|
+| `none` (CRPS) | 3.967 | 7.686 | 3.719 | 7.252 |
+| `oracle` | +0.003 [-0.018, +0.044] | -0.047 [-0.107, +0.015] | +0.007 | -0.088 [-0.193, +0.005] |
+| `soft` | -0.003 [-0.046, +0.047] | -0.060 [-0.223, +0.053] | +0.001 | -0.025 |
+| `hmm` | +0.071 [-0.025, +0.205] | -0.064 [-0.141, -0.010] | +0.080 | -0.107 [-0.363, +0.028] |
+| `rule` | +0.012 [-0.029, +0.071] | +0.053 | +0.009 | -0.029 |
+| `stat` | +0.030 [-0.019, +0.124] | +0.325 [+0.056, +0.695] | +0.010 | +0.077 |
+| `all` | +0.102 [-0.019, +0.289] | +1.366 [-0.095, +4.970] | +0.018 | -0.027 |
+| `placebo` | +0.019 [-0.069, +0.116] | -0.004 | +0.021 | -0.010 |
+
+**After injected eras, five arms lower the error, and the arms that help most do the most harm after
+injected switching events.** The injected bank holds 16 passes per fold month, where a pass is one
+injection run over the panel with two eras and two switching events. Four fold months therefore give
+128 events of each kind, the same events for both seeds and for every arm, and the CRPS of an event
+is the mean over its rows and over the two seeds. An era is scored against the injected power for
+forecast origins 0 to 7 and 7 to 28 days after its onset. A switching event is scored at its donor
+Primary against the power without the switch, from its onset to 7 days after its end or the end of
+the fold month, whichever comes first (only 48 of the 128 events end at least 7 days before the
+month ends). The recipient Primary is not in the table. Differences
+are from `none`, with 99.44% percentile intervals that resample whole passes (a fold month and a
+pass index), because the events of one pass share a panel.
+
+| Arm | Era, 0 to 7 days | Era, 7 to 28 days | Switching event, donor, onset to end + 7 days or month end |
+|---|---|---|---|
+| `none` (CRPS) | 10.971 | 10.751 | 3.355 |
+| `oracle` | -7.115 [-8.375, -5.881] | -7.386 [-8.714, -6.090] | -0.083 [-0.132, -0.038] |
+| `all` | -1.527 [-2.384, -0.743] | -2.858 [-4.253, -1.550] | +3.901 [+2.430, +5.538] |
+| `soft` | -0.839 [-1.427, -0.323] | -2.047 [-3.119, -1.026] | +0.337 [+0.081, +0.695] |
+| `stat` | -0.060 [-0.136, +0.021] | -0.639 [-1.165, -0.221] | +0.112 [+0.018, +0.261] |
+| `hmm` | +0.001 [-0.147, +0.141] | -0.343 [-0.531, -0.161] | +0.242 [+0.137, +0.379] |
+| `rule` | -0.015 [-0.091, +0.077] | -0.053 [-0.151, +0.061] | +0.022 [-0.061, +0.182] |
+| `placebo` | -0.059 [-0.114, +0.000] | -0.044 [-0.123, +0.044] | -0.016 [-0.039, +0.005] |
+
+**The oracle lowers the error after eras by about 7 points of capacity, and `all` lowers it by 2.9
+points at the price of raising it by 3.9 points at the donor Primary of a switching event.** The
+oracle's figure pools injected steps of different sizes, so it is not the pre-registered C1a. The
+arm `all` turns every detected shift into an era, so it carries a switching event forward at the
+donor. An audit that scored the recipient Primary instead (the Primary that gains the demand, 96
+events with a metered recipient) found that `all` lowers the recipient's CRPS by 0.03 points, so the
+harm is confined to the donor. The placebo is within 0.06 points of `none` everywhere. The
+pre-registered veto on switching events (C7 above 0.1, or its interval end above 0.2) fails for
+`all`, `soft`, `hmm`, and `stat`, and only `rule` passes it, so no arm that gains after eras can be
+called supported under the screen's rule. The two decision rules in this page differ on a failed C7:
+section 11 gives "partly supported" when C2 passes, and section 20 gives "not supported for
+adoption" whatever C2 shows. Section 20 refines the earlier sections, so its rule governs.
+
+**In phase B2, the arm trained on injected eras with no signal (`b2-aug`) meets the pre-registered
+rule at 95% and fails it at 99.44%.** Phase B2 mixes the curriculum (the injected world) into every
+training batch, and its four arms run on the four test months with two seeds. At 95%, `b2-aug`
+lowers the all-rows CRPS by 0.050 (interval -0.103 to -0.001) and changes the touched Primaries (the
+Primaries that received an injected era) by +0.008. At 99.44% the all-rows interval is -0.109 to
++0.005. The placebo moves the same way (-0.037, 95% interval -0.127 to +0.096), and the injected
+rows receive a second noise draw, which could explain both moves without any era effect (we did not
+test this). The curriculum world held 2 eras in 6 of the 8 fold-and-seed pairs and 4 in the other 2,
+so 6 of the 8 pairs are weak tests of the curriculum, and the contrast `aug` against `none` is not
+decisive (section 27).
+
+**At D8, `e-stat` lowers the error in phase E although `stat` raised it in the screen months, so the
+sign of its effect at one Primary is not stable.** Phase E is a robustness check at one Primary: it
+has about 6 forecast origins per month and wide intervals, and its oracle reads the scored months.
+It scores the folds 2025-04 to 2025-06 with seeds 0 and 1, and differences are from `e-none` (CRPS
+8.718 at D8 and 3.717 on all rows), with 95% month-block intervals. At D8, `e-stat` is -0.569
+[-1.339, -0.242], `e-rule` -0.170 [-0.425, +0.049], `e-placebo` -0.110 [-0.295, +0.049], and
+`e-oracle` +0.374 [-0.399, +1.420]. On all rows only `e-rule` has an interval that excludes zero
+(+0.021 [+0.000, +0.042]). A series-origin may hold fewer than 672 forecast rows (14 days of
+half-hours), because the stored rows keep only half-hours with an observed target. These numbers are
+never pooled with the four screen months.
+
+**The `all` arm's D8 outlier comes from one fold month and is consistent with a temporary
+excursion.** D8's daily mean power was about 7.5 MW from 2026-01-19 to 2026-01-25 against about 4 MW
+before and after, with no mirror shift in its three neighbours. The `all` arm turned the excursion
+into an era. Leaving out fold 2026-01 changes the `all` contrast at D8 from +1.366 to -0.018.
+Section 26 has the details and the maintainer's open questions.
+
+## Checks
+
+- **Median minus mean forecast per site, and the error of the median forecast beside every CRPS
+  contrast:** not computed. The scorers print CRPS only, so the normalised mean absolute error of
+  the median that the evaluation protocol requires is missing, and trigger 3 cannot be cleared.
+- **Triggers that fired:** trigger 1 (a known-answer test) required an audit of the bank table,
+  because the bank is the known-answer test of the signal. A Sonnet agent that did not write the
+  experiment re-derived the bank contrasts from the raw forecast files with its own code. All
+  contrasts matched the table to three decimals, 0 events differed between arms, and no left-out
+  site or fold flipped a sign of the era contrasts of `soft` and `all`, the switching contrast of
+  `all` and `hmm`, or the D8 contrasts of `hmm` and `stat`. Trigger 2 applies to phase E, where
+  `stat` changes sign against the screen months and `e-oracle` raises the D8 error. Trigger 4 found
+  two fragile contrasts: the `all` contrast at D8 depends on fold 2026-01 alone, and `hmm` on eras 0
+  to 7 days changes sign when any of 6 sites or fold 2025-11 or 2026-04 is left out. The `soft` D8
+  contrast is driven by fold 2026-01 (-0.199), and the `hmm` all-rows contrast by fold 2025-11
+  (+0.216).
+- **Scored Primary of a switching event:** the table scores the donor. At the recipient, `all`
+  changes the CRPS by -0.029, so the sign of its harm depends on which Primary is scored.
+- **Controls:** the placebo is within 0.06 points of `none` on injected eras and switching events,
+  as a control that carries no information should be.
+- **`aug` against `none`:** the two agree to 3 decimals, because stage 3 always keeps its first
+  epoch in phase B (section 23). Every phase B curriculum contrast is void.
+- **Intervals:** the real-row intervals resample 4 fold months, so they are wide, and an interval at
+  99.44% is wider than the 95% interval that the B2 rule and phase E use.
+- **Not scored:** C1b, C2, C4 to C7 except the switching-event reading above, the state slices
+  (undetected, unknown, classified), the bank's classification scores, cold winter nights,
+  avoidable-curtailment cost, and the four load-shift scenarios.
+
+## Method
+
+- **Architecture (all arms):** the Candidate network of experiments 667 and 677, with frozen stage 1
+  and stage 2 weights from experiment 667 for seeds 0 and 1, and a stage 3 that sees the era signal
+  as extra input columns.
+- **Era signals:** the oracle reads the true era dates and the injected switching events, `rule` and
+  `soft` use fixed thresholds on shifts, `hmm` uses a hidden Markov model fitted before 2025-01-01,
+  `stat` uses the statistical detector of phase A, and `all` turns every detected shift into an era.
+  The placebo moves the oracle's change vector to other dates. Every signal at an origin uses data
+  up to the day before the origin.
+- **Training regime:** stage 3 is fitted per fold, seed, and arm on the pre-fold history, with
+  patience 8 and the best state restored. The curriculum injects eras and switching events into the
+  training panel. Phase B2 reads the injected world with probability 0.5 per row and epoch.
+- **Measurement:** CRPS in points of effective capacity against the cleaned half-hourly power, at
+  the contract's 12:00 UTC origin, on experiment 677's monthly-refit rows for 2025-11 to 2026-06 and
+  on the phase E row set for 2025-04 to 2025-06. Differences are paired, with a bootstrap that
+  resamples whole fold months. The injected bank is scored by a percentile bootstrap over passes,
+  and each switching event is scored at its donor Primary only.
+  The bank scorer maps an event's host panel index to the Primary's time series identifier through
+  the site map. Its bootstrap resamples passes, and the 16 passes of a fold month share one trained
+  network per seed, so the interval does not include the noise of fitting the network.
+- **Changes in phase B2 and phase E:** phase B2 changes the stage 3 rule to mix the curriculum into
+  every batch and runs four arms; phase E runs five arms on three earlier months.
+
+## Plan as registered
+
+The sections below are the plan as registered before the first fit, with the interim amendments of
+sections 22 to 27.
 
 This experiment asks whether the Candidate network (the modular network of
 [the final models page](../final-models.md)) forecasts better after a permanent change at a Primary
@@ -98,9 +306,10 @@ is the continuous ranked probability score in points of capacity, lower is bette
 | L-rule | Learned, rule classifier | The same detector, then a three-state rule (`unknown`, `era`, `switch`) from the neighbour mirror, the weather response, and duration | Era package for class `era`; removal for class `switch`; no action while `unknown` |
 | L-soft | Learned, trained classifier | The same detector, then a small neural classifier that outputs a probability of `era` | The era vector and anchor scaled by the probability; removal scaled by one minus the probability |
 | L-hmm | Learned, recurrent states | Sticky hidden-Markov model, forward filter; duration and recurrence are the only evidence of class | Learned vector per (Primary, state); a state counts as an era after 28 days of dwell |
-| L-R | Learned, reset only | L-rule's dates and classes | Anchor and lag translation only; no era encoder and no new weights |
+| L-stat | Learned, statistics detector | Step changes in 12 distribution statistics of the Primary's own raw power over trailing 28-day windows, each change compared with the same change one year earlier; then L-rule's three-state rule with two shape-evidence terms | The era package of O with detected dates, plus a learned vector per (Primary, era id), with one shared vector for an era id first confirmed after the training cut |
 
-All ten arms change stage 3 only and share stage 1 and stage 2 weights with A0, seed by seed.
+All ten arms (L-stat replaces L-R) change stage 3 only and share stage 1 and stage 2 weights with
+A0, seed by seed.
 Reference rows, not arms: A0-prev (A0's prevailing output, 16 head refits), the stored Candidate
 forecasts of experiments 667 and 668, climatology, and NGED's manual heuristic.
 
@@ -190,7 +399,7 @@ them.**
 - **The neighbours' mirror image.** A switching event moves load between electrical neighbours, so a
   neighbour shows the opposite shift and the sum is conserved. An era changes the substation's own
   net demand, and no neighbour moves. The classifier reuses the causal mirror statistic of
-  `ml-experiments/00687-causal-detector-features-for-the-prevailing-forecast-heads/e00687_features.py`,
+`ml-experiments/00687-causal-detector-features-for-the-prevailing-forecast-heads/e00687_features.py`,
   which reads no input later than 6 hours before the origin. Two limits apply: a neighbour may be
   unmetered, and experiment 456 found that a mirror test passed at shifted dates as often as at true
   dates.
@@ -391,6 +600,10 @@ A0-aug has the persistent steps and no signal.
   (2012)](https://doi.org/10.1080/01621459.2012.737745)).** Run daily on an expanding window, PELT
   is the same kind of arm as the change-point detector. Stage 0 uses a penalised least-squares
   segmentation in hindsight as a cross-check.
+- **L-R (reset only).** Stage 0 found that L-rule classed 3 of 64 steps of 25% as `era` by day 28,
+  so
+  an arm that acts only on L-rule's `era` class would differ from A0 on almost no row. L-stat takes
+  its place.
 - **The hindsight switching labels as a forecast input.** The labels are not available at the
   origin, so the labels score the classifier only.
 - **The weather encoder and the date-time encoder as separate arms, and the gas-engine state.** The
@@ -744,11 +957,270 @@ the anchor rule in section 2). The list below states the remaining decisions.
     conclusions in bold leads, no pronoun-opening sentences, no money metaphor, and expand ECMWF,
     ERA5, CAMS, PELT, and GELU on first use.
 
+## 21. Stage 0 results and the L-stat arm (interim)
+
+**Stage 0 ran on 2026-11-19 and the numbers below are interim.** The maintainer asked for arm
+L-stat:
+detect eras from 28-day summary statistics of raw power, find steps in those statistics, give each
+step an era id, and feed the id to the network. The design of L-stat is in this section and in the
+arm table. It replaces L-R, so the arm count and the compute budget stay level.
+
+**The perturbation test found one real leak, which is fixed.** Experiment 687's noise unit and the
+G4 threshold read past the origin for neighbours with an incomplete window. The rule and soft
+classifiers were refitted, and the cut test passes for 200 pairs and every arm.
+
+**The daily-feature change-point detector detects few small steps.** It needs a step of 3 noise
+units
+in one feature. At D8 one unit is 9% to 13% of capacity, so it detects 13 of 64 injected steps of
+10% and 14 of 64 solar-shaped steps, and misses D8's 2025 solar connection. It detects D8's gas
+change
+18 days after 2023-08-15 (gate: 14 days). Injected steps of 25% pass the detection gate (34 of 64
+within 7 days).
+
+**L-stat detects both D8 changes and rarely mistakes a load shift for an era.**
+
+- D8 gas change: alarm 10 days after 2023-08-15, classed `era` 9 days later (gate passed).
+- D8 solar change: alarm 33 days after the register date (2025-03-24) and 21 days after the
+  telemetry date fitted on the same statistic (2025-04-05). The gate passes on the telemetry date,
+  which rests on the same statistic as the alarm, so the pass is labelled as such. The earlier
+  telemetry estimate (2025-06-10) was 9 weeks later and is replaced.
+- Verified switching events (experiment 580, 15 transfers outside the scored window): 0 ever classed
+  `era` (Wilson 95% interval 0.00 to 0.20). Experiment 41 labelled events: 2 of 93 (0.02).
+- Injected bank, `era` class by day 28: L-stat 79 of 190 era events, against 13 for L-rule.
+  L-stat's `era` class on injected switching events is 5 of 211 at day 28.
+- False alarms: 0.31 per Primary-year on clean history at threshold 4.0 (limit 0.5).
+
+**Expectation, recorded before any fit:** L-stat keeps 10% to 30% of the ceiling on steps of 25% and
+under 10% on steps of 10%, because at most about 13 of the 28 scored days follow an `era` class
+(the state needs a dwell of 14 days). C7 is within +-0.1.
+
+**Plan changes from the L-stat design.**
+
+- L-stat is eligible as L-best. Two descriptive readings sit outside the nine contrasts: L-stat
+  minus L-rule on injected era events (NRA output), and L-stat with its era-id table zeroed at
+  inference, on stable rows and on rows after an era.
+- Era id 0 means "no era yet" and carries no vector. An id first confirmed after the training cut
+  uses one shared "new era" vector.
+- Anchor rule for every learned arm: the anchor equals the level change minus the offset's own
+  change between the knot before the onset and the newest knot, clipped between zero and the full
+  change. The known-answer check gains a case with an era confirmed after a refit. Phases B and C
+  never exercise that case, and phase D does.
+- Phase B gains 20 stage 3 fits (about 2 GPU job-hours) and about 1 hour of bank inference, and
+  loses L-R. An irregular-engine era kind exists in stage 0 only.
+
+## 22. Amendments made while running phase B (interim)
+
+**Phase B runs on 2 seeds, not the pre-registered 5.** Experiment 667 stores the stage 1 and stage 2
+weights for seeds 0 and 1 only, so seeds 2 to 4 would need new stage 1 and stage 2 chains. The
+manager accepted seeds 0 and 1 on 2026-11-19. The screen's intervals come from 2 seeds across
+4 folds, so the intervals over seeds are wide and every phase B number stays interim. The nine
+contrasts keep their Bonferroni level, and the write-up states the 2-seed caveat beside each
+interval.
+
+**The curriculum holds 4 eras per fold and seed, not the planned 8.** Each injected pass touches up
+to 6 of the 13 eligible Primaries, so at most 2 passes with disjoint touched Primaries fit. Their
+onsets lie 120 and 100 days before the cut, not 120 to 60 days. The one-fold pilot logged
+`alt_passes 2` and `alt_eras 4`. The curriculum arms therefore see fewer injected eras than
+designed, and the write-up counts that as a limitation of every curriculum arm.
+
+**The oracle's curriculum switch vectors are read with hindsight.** `hindsight_vector` averages up
+to 120 days from the onset, so a long injected switching event that starts 100 to 120 days before
+the cut can read telemetry from the scored month. Only the oracle arms are affected, and they are
+labelled non-causal.
+
+**The bank's oracle and placebo hold the injected events only.** The bank overlays each world at
+the touched Primaries, so the real record would have to be placed inside the 30-day bank window,
+which the separation rule forbids.
+
+## 23. First interim result: stage 3 keeps its first epoch, so the curriculum is void in phase B
+
+**Every contrast that involves the curriculum (the injection of eras) is void in phase B, and the
+arm A0-aug equals A0 by construction.** Stage 3 stops after 8 epochs without a gain in the
+validation loss and keeps the best state. In fold 2025-11, seed 0, every arm ran 9 epochs and kept
+the state of the first epoch, so the odd epochs, which read the injected world, never survive the
+selection. A0 and A0-aug have the same validation loss to 16 digits, and their forecasts differ by
+at most 4e-6 in the median. The curriculum world also held only 2 eras in this fold, not the 4 of
+the one-fold pilot and not the 8 planned. The signal arms learn the era path from one epoch on the
+real record, so phase B still tests the signal on the real record but not the curriculum.
+
+**The first numbers are interim, from one fold and one seed, and carry no interval.** The CRPS in
+points of effective capacity, over all rows, is 4.183 for A0, 4.178 for the oracle arm (D8: 7.440
+against 7.546), and 4.264 for the placebo (+0.08, mostly on the other Primaries). Nothing here
+supports or refutes the hypothesis.
+
+## 24. Phase B2 (proposed): mix the curriculum into every batch
+
+**Phase B2 keeps phase B's selection rule and mixes the injected world into every batch, for four
+arms.** A fixed number of epochs was rejected in the Opus review, because stage 3 fine-tunes the
+stage 2 weights at a low learning rate and every arm kept its first epoch. A fixed run of 4 epochs
+would give every arm, A0 included, a worse baseline than the production recipe, and the last update
+would be made on the injected world. The arms are A0-aug, the oracle, the placebo, and L-stat. A0
+never reads the injected world, so A0 under B2 is phase B's A0, and B2 reuses those fits.
+
+**Rule.** In every epoch, each training row in a batch reads the curriculum tensors with probability
+0.5, and its plain values otherwise. The coin comes from a separate CPU generator seeded with
+`seed * 1000 + epoch`, so the row order is phase B's. Selection is unchanged: patience 8, best state
+restored, loss on plain validation rows. The per-epoch validation loss is logged. The odd-epoch
+alternation of phase B is retired, and the curriculum acts from the first step, so selection cannot
+strip it out.
+
+**Contrasts.** Each B2 arm is paired against A0 from phase B on the same rows: A0-aug minus A0
+(lag-only
+learning from injected eras), oracle minus A0, placebo minus A0, and L-stat minus A0. The write-up
+also reports CRPS on the touched Primaries separately, as a harm check. It says that the selection
+rule changed after an interim look and why, gives the realised number of eras per fold, and says
+that
+for the signal arms the mixing is partly a noise augmentation, because the injected rows get a
+second noise draw.
+
+**B2 runs on phase B's cached curriculum worlds.** The world held 2 eras in fold 2025-11, not the
+planned 8, because each pass touches up to 6 of 13 eligible Primaries and the passes must be
+disjoint. The cache is keyed by fold and seed, so B2 reuses the same worlds, and `alt_eras` is
+logged
+for every fit. A fold with fewer than 4 eras is reported as a weak test of the curriculum.
+
+**Decision rule, fixed before the first B2 fit.** A B2 arm helps when its difference from A0 on all
+rows is below 0 with the bootstrap interval (blocks of fold month and Primary, 95%) excluding zero,
+and the difference on the touched Primaries is not above +0.05 points. An arm whose interval
+contains zero is reported as not distinguishable from A0. Every B2 number is interim until all 4
+folds and both seeds are scored.
+
+**Cost.** 4 arms on 4 folds and 2 seeds is 32 fits, about 9 to 10 minutes each at 2 concurrent jobs,
+so about 2.5 hours of wall-clock time after phase B finishes. Phase B's aug result is void.
+
+## 25. Phase E: a one-substation robustness check on D8, reported apart
+
+**Phase E is a robustness check on one substation, and its numbers are never pooled with the screen
+folds'.** The maintainer approved it after seeing the corrected scope. It runs the arms none,
+oracle,
+placebo, stat, and rule (5 arms) on the folds 2025-04, 2025-05, and 2025-06 with seeds 0 and 1,
+which
+is 30 fits, and it scores the rows against its own row set id,
+`experiment_709_phase_e_monthly_refit_rows_valid_2025_04_to_2025_06`. Its arms are named `e-<arm>`.
+
+**The history is shorter, and D8's solar connection sits at the start of the test months.** The
+ensemble summaries start on 2024-04-01, so the 2025-04 fold trains on about 12 months of ensemble
+history, against about 19 for the first screen fold. D8's 8.91 MW solar farm connected on
+2025-03-24,
+a week before the first test month, so the first fold's training rows hold almost no days after the
+connection, and the fold tests how an era signal behaves when the new era is a week old. The
+hidden-Markov models were fitted on days before 2025-01-01, so they read no day of these folds.
+
+**Phase E scores every fifth day's forecast, not every day's.** Experiment 667 keeps experiment
+397's
+stored rows before 2025-07-01, which hold only every fifth day's run, so each E fold has about 6
+forecast origins in its month, against about 30 for a screen fold. The 7-day embargo and the 7-day
+down-weight window cover one or two runs in the training rows near the cut. The intervals are wider
+for that reason. Rebuilding the rows from experiment 607's daily summaries would give daily origins
+but change the recipe relative to the screen folds, so the plan keeps the stored rows. The daily
+frames rebuilt in `frames_e/` serve only the timing check, and the rebuild is optional.
+
+**The oracle in phase E reads the scored months.** The oracle's change vector for D8's solar farm
+averages up to 120 days after its onset (2025-04-05 in the era table), which reaches into the test
+months of the three E folds. The E oracle is reported as an arm that knows the scored months, and
+the placebo, which moves the same vector to other dates, carries part of the same information.
+
+**The extra work is outside the screen's pipeline, and every piece is a copy in this experiment's
+folder.** The daily demand frames of 2025-04-01 to 2025-06-30 are rebuilt by `e00709_e_frames.py`
+from the archive with experiment 48's `build_run`, into `frames_e/` of this experiment's data
+folder;
+a rebuild of 2025-05-29 matched a stored snapshot frame on all its rows. Six new stage 1, stage 2,
+and table chains (3 folds, 2 seeds) run through `e00709_e_chain.sh`, which writes to `e_667/` of
+this
+experiment's data folder and reads experiment 667's extended inputs only. Each changed or new script
+gets an Opus review before its first run. Phase E starts after phase B and B2 end.
+
+**The first phase E pilot wrote 61 stand-in frames into experiment 667's folder, and they await the
+maintainer's approval to delete.** Experiment 667's `fold.install` writes a one-row stand-in demand
+frame for each run that has none. The pilot chain for fold 2025-04 wrote 61 of them
+(`init=2025-03-01` to `init=2025-04-30`, 1,057 bytes each) into experiment 667's `inputs/frames`,
+and the chain's guard stopped the run. None of the files replaced a real frame, because the folder
+held no 2025 file before. No other experiment script reads the folder. `e00709_e_stub.py` now writes
+the stand-ins under `e_667/inputs/frames` of this experiment's data folder, and the guard still
+fails the chain if a file lands in experiment 667's folder. The deletion command and the list of
+files are in `briefs/eras_709_handover3.md` (private).
+
+**Phase E's contract rows relax one assertion, and every phase E table says so.** The stored rows of
+experiment 667 before 2025-07-01 keep only half-hours with an observed target, so a series-origin
+holds between 637 and 672 forecast rows. Experiment 667's `contract_rows` asserts exactly 672 (14
+days of half-hours) per series-origin. The copy `e00709_e_contract.py` asserts at most 672 and keeps
+every other assertion. An Opus code review verified that the relaxation lets no row with a wrong
+origin or valid time through, that the scorer computes CRPS only where the target is observed, and
+that all five arms are scored on the same rows (`losses_for_bootstrap` raises otherwise). The
+caption of every phase E table reads: "about 6 origins per month, wide intervals, one-substation
+robustness check; the oracle reads the scored months; series-origins may hold fewer than 672 rows
+because the stored rows keep only half-hours with an observed target".
+
+## 26. Open questions for the maintainer, and one outlier at a single substation (interim)
+
+**Whether phase E should use daily origins, and whether any learned arm is worth carrying on, are
+open questions that this page does not decide.** The stored rows give about 6 origins per month, and
+rebuilding daily rows from experiment 607's daily summaries would change the recipe against the
+screen folds. For the second question, the arms that have lowered the error at D8 are the oracle
+(not distinguishable from zero at 99.44%), `hmm` in the screen months, and `e-stat` in phase E.
+
+**The `all` arm's D8 outlier in fold 2026-01 is consistent with a temporary excursion that `all`
+treated as an era.** The `all` arm turns every detected shift into an era. At D8 it flags an episode
+from 2026-01-19 to 2026-02-02, with the era starting on 2026-01-21. D8's daily mean power is about
+7.5 MW from 2026-01-19 to 2026-01-25, against about 4 MW before and after. The summed daily mean of
+D8's three electrical neighbours (D3, D5, and D14) stays between 20 and 25 MW with no mirror-image
+change, so the excursion is not conserved load moving between neighbours. D8 has no labelled
+switching event in 2026. The arm `all` has no classifier to reject the shift, so it carries the
+excursion forward as a persistent era.
+
+## 27. Phase B2 result: one arm passes the rule at 95% only (interim)
+
+**Only `b2-aug` meets the pre-registered B2 decision rule, and only at the 95% level.** The table
+compares each B2 arm with phase B's `none` on the same
+rows (4 fold months, seeds 0 and 1). The 95% intervals resample whole fold months only, so each
+rests on 4 months. CRPS differences are in points of effective capacity.
+
+| Arm | All rows | D8 | Touched Primaries |
+|---|---|---|---|
+| `b2-aug` | -0.050 [-0.103, -0.001] | -0.007 | +0.008 [-0.089, +0.198] |
+| `b2-placebo` | -0.037 [-0.127, +0.096] | +0.001 | -0.011 |
+| `b2-oracle` | +0.009 [-0.010, +0.032] | -0.058 [-0.076, -0.036] | +0.026 |
+| `b2-stat` | +0.009 [-0.060, +0.118] | +0.386 [+0.071, +0.629] | +0.041 |
+
+**The curriculum contrast `aug` against `none` is not decisive.** The `b2-aug` interval only just
+excludes zero. `b2-placebo` moves the same way with an interval that contains zero, which is what a
+noise augmentation would do, because the injected rows get a second noise draw. The curriculum world
+also held 2 eras in 6 of the 8 fold-and-seed pairs and 4 in the other 2 (seed 0 of folds 2026-04 and
+2026-06), so 6 of the 8 pairs are weak tests of the curriculum (a fold with fewer than 4 eras is a
+weak
+test, section 24). The `b2-oracle` gain at D8 repeats phase B's, and `b2-stat` is worse at D8 as in
+phase B.
+
 ## Files
 
-- Code: `ml-experiments/00709-era-signal-in-the-candidate-part-1/` (to be written, each script
-  reviewed by Opus before its first run).
-- Data: `data/ml-experiments/00709-era-signal-in-the-candidate-part-1/` (private; holds the era
-  table, detector outputs, and stored forecasts).
+- `ml-experiments/00709-era-signal-in-the-candidate-part-1/e00709_era_table.py`,
+  `e00709_features.py`, `e00709_statdetect.py`, `e00709_bocpd.py`, `e00709_hmm.py`,
+  `e00709_classify.py`, `e00709_stage0.py`, `e00709_probe_hosts.py`: phase A, which builds the era
+  table of known cases, the detectors, the era-or-switch classifiers, and the stage 0 report.
+- `e00709_signal.py`, `e00709_inject.py`, `e00709_model.py`: the era signal tables per arm, the
+  injection of eras and switching events, and the network's signal input.
+- `e00709_cand.py`: the stage 3 fit, predict, and bank commands of the Candidate for one arm, fold,
+  and seed (`--rule es` for phase B, `--rule b2` for phase B2, and the `IS_E` branches for phase E).
+- `e00709_chain.sh`: runs the train, predict, and bank phases for a list of arms, folds, and seeds
+  with capped memory.
+- `e00709_checks.py`: the synthetic, signal, alignment, and weather checks that gate the chain.
+- `e00709_score.py`: scores stored forecasts on the real rows (all rows, D8, other Primaries, the 14
+  days after a stat alarm, the touched Primaries); `e00709_bank_score.py` scores the injected bank
+  on eras and switching events; `e00709_stats.py` holds shared statistics.
+- `e00709_e_chain.sh`, `e00709_e_gpu.sh`, `e00709_e_k1.py`, `e00709_e_cand.py`,
+  `e00709_e_frames.py`, `e00709_e_stub.py`, `e00709_e_contract.py`: the phase E copies of experiment
+  667's chain, which write to `e_667/` of the data folder, redirect stand-in frames there, and relax
+  the rows-per-origin assertion.
+- Earlier experiments read: [experiment
+  667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md) (stage 1
+  and 2 weights, extended inputs), and experiments 559, 572, 574, 591, 613, 660, 687, and 696 for
+  the injection and the Candidate code.
+- Data (private, not committed): `data/ml-experiments/00709-era-signal-in-the-candidate-part-1/`
+  holds `era_table.parquet`, `known_events.parquet`, `signals/` (one table per arm), `fits/`
+  (network weights), `predictions/` (80 phase B sets, 32 `b2-` sets, and 30 `e-` sets, each a seed's
+  quantile forecasts), `bank/` (injected-bank forecasts and event tables), `scores/`
+  (`interim_phase_b_real_rows.csv`, `interim_b2_real_rows.csv`, `interim_b2_rows.csv`,
+  `interim_phase_e_rows.csv`,
+  `interim_bank_rows.csv`), `checks.json`, and `e_667/` (phase E chains).
 - Briefs and reviews: the findings file, the design, and the design review were written under
   `data/ml-experiments/briefs/eras_embedding/` (private).
