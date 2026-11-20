@@ -17,14 +17,15 @@ without any injection (what the normal running arrangement would have read). The
   switch.
 
 One unit is one injected event, and its loss is the mean CRPS over its rows, averaged over the
-seeds. The interval is a percentile bootstrap over events, so it rests on the number of events
-printed. Every number is interim.
+seeds. The interval is a percentile bootstrap that resamples whole passes (a fold month and a
+pass index), because the events of one pass share a panel. Every number is interim.
 """
 
 import argparse
 from pathlib import Path
 from typing import Final
 
+import e00578_common as k578  # ty: ignore[unresolved-import]
 import e00709_features as features  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
@@ -35,13 +36,14 @@ BANK_DIR: Final[Path] = features.DATA_DIR / "bank"
 SCORES_DIR: Final[Path] = features.DATA_DIR / "scores"
 
 
-def event_losses(*, arm: str, month: str, seed: int) -> pl.DataFrame:
+def event_losses(*, arm: str, month: str, seed: int, ids: np.ndarray) -> pl.DataFrame:
     """Return one row per (pass, event, slice) with the mean CRPS of the arm's rows in the slice.
 
     Args:
         arm: Arm name as stored under `bank/`.
         month: Fold month.
         seed: Seed.
+        ids: The `time_series_id` of each Primary in panel order; an event's `host` indexes it.
 
     Returns:
         Columns `fold`, `pass`, `event`, `slice`, `seed`, `crps`, `n_rows`.
@@ -62,7 +64,7 @@ def event_losses(*, arm: str, month: str, seed: int) -> pl.DataFrame:
         site = forecast["time_series_id"].to_numpy()
         q = forecast.select(list(QCOLS)).to_numpy().astype(np.float64)
         for index, event in enumerate(events.iter_rows(named=True)):
-            host_rows = site == event["host"]
+            host_rows = site == ids[event["host"]]
             is_era = event["truth"] == "era"
             onset = event["onset_day"]
             if is_era:
@@ -103,8 +105,11 @@ def main() -> None:
     parser.add_argument("--level", type=float, default=99.44)
     args = parser.parse_args()
     arms = list(dict.fromkeys([args.reference, *args.arms]))
+    ids = k578.sites()["time_series_id"].to_numpy()
     frames = [
-        event_losses(arm=arm, month=month, seed=seed).with_columns(pl.lit(arm).alias("arm"))
+        event_losses(arm=arm, month=month, seed=seed, ids=ids).with_columns(
+            pl.lit(arm).alias("arm")
+        )
         for arm in arms
         for month in args.folds
         for seed in args.seeds
@@ -135,8 +140,12 @@ def main() -> None:
             if arm == args.reference:
                 print(f"  {arm:12s} crps {mean:7.3f}")
                 continue
-            draws = rng.integers(0, n, size=(args.resamples, n))
-            means = diff[draws].mean(axis=1)
+            clusters = (wide["fold"] + "/" + wide["pass"]).to_numpy()
+            names, inverse = np.unique(clusters, return_inverse=True)
+            sums = np.bincount(inverse, weights=diff, minlength=len(names))
+            counts = np.bincount(inverse, minlength=len(names))
+            draws = rng.integers(0, len(names), size=(args.resamples, len(names)))
+            means = sums[draws].sum(axis=1) / counts[draws].sum(axis=1)
             low, high = np.percentile(means, [alpha, 100.0 - alpha])
             print(
                 f"  {arm:12s} crps {mean:7.3f}  diff {diff.mean():+.3f} [{low:+.3f}, {high:+.3f}]"

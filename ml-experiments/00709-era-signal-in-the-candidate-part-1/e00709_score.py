@@ -156,6 +156,7 @@ def main() -> None:
     parser.add_argument("--reference", default="none")
     parser.add_argument("--level", type=float, default=95.0)
     parser.add_argument("--resamples", type=int, default=2000)
+    parser.add_argument("--tag", default="real_rows", help="the output file is interim_<tag>.csv")
     args = parser.parse_args()
     panel = features.load_panel()
     to_site = series_to_site()
@@ -249,7 +250,7 @@ def main() -> None:
                 f"{scope:16s} {arm:12s} crps {mean:7.4f}  diff {mean - ref_mean:+.4f} "
                 f"[{low:+.4f}, {high:+.4f}]"
             )
-    pl.DataFrame(out).write_csv(SCORES_DIR / "interim_real_rows.csv")
+    pl.DataFrame(out).write_csv(SCORES_DIR / f"interim_{args.tag}.csv")
 
 
 if __name__ == "__main__":
