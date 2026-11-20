@@ -2,6 +2,7 @@
 """Experiment 715: the counted contrasts N1 and N2, the guards, the decision rule, and the report-only readings.
 
 Usage:
+    e00715_score.py screen         # the interim stop rule on the 4 screen folds, after phase 1
     e00715_score.py selftest       # the decision rule on constructed readings (no data)
     e00715_score.py first          # first run on the stored `M*` and `C` alone: the table of
     experiment 713's section 1.5
@@ -319,17 +320,36 @@ def print_shares(*, result: dict) -> None:
     """Print the visible share of the neighbour tokens per fold and the two-link share of `F4-R`
     (design sections 2 and 9)."""
     table = nb.load_table()
-    rows = {}
-    for month in arms.ALL_FOLDS:
-        shares = []
-        for seed in SEEDS:
-            path = arms.log_file(
-                data_dir=ML_EXPERIMENTS_DATA_DIR, arm="F4", month=month, seed=seed, kind="predict"
-            )
-            if path.exists():
-                shares.append(json.loads(path.read_text()).get("visible_share"))
-        rows[month] = shares
-    result["visible_neighbour_share_by_fold"] = rows
+    rows: dict[str, dict[str, float]] = {}
+    for arm in ("F4", "F4-R", "F4-T"):
+        rows[arm] = {}
+        for month in arms.ALL_FOLDS:
+            shares = []
+            for seed in SEEDS:
+                path = arms.log_file(
+                    data_dir=ML_EXPERIMENTS_DATA_DIR,
+                    arm=arm,
+                    month=month,
+                    seed=seed,
+                    kind="predict",
+                )
+                if path.exists():
+                    shares.append(json.loads(path.read_text()).get("visible_share"))
+            shares = [x for x in shares if x is not None]
+            if shares:
+                rows[arm][month] = float(np.mean(shares))
+    result["visible_neighbour_share_by_arm_and_fold"] = rows
+    gaps = {m: 100.0 * (rows["F4"][m] - rows["F4-T"][m]) for m in rows["F4"] if m in rows["F4-T"]}
+    result["visible_share_gap_f4_minus_f4t_points"] = gaps
+    wide = {m: g for m, g in gaps.items() if abs(g) > VISIBLE_GAP_POINTS}
+    result["visible_share_gap_above_limit"] = wide
+    for arm, by_fold in rows.items():
+        print(f"visible share of the neighbour tokens, {arm}, by fold:", by_fold)
+    if wide:
+        print(
+            f"CAUTION: the visible share of F4 differs from that of F4-T by more than {VISIBLE_GAP_POINTS} points "
+            f"in {wide}; read it beside F4 minus F4-T, because the two arms then see different amounts of neighbour data"
+        )
     two = {}
     for seed in SEEDS:
         per_host = [
@@ -342,7 +362,6 @@ def print_shares(*, result: dict) -> None:
         ]
         two[seed] = float(np.nanmean(per_host))
     result["two_link_share_of_the_rewired_slots"] = two
-    print("visible share of the neighbour tokens by fold:", rows)
     print("share of the rewired slots that are two links from the host, by seed:", two)
 
 
@@ -461,6 +480,74 @@ def cmd_first() -> int:
     return 0
 
 
+SCREEN_FOLDS: Final = ("2025-11", "2026-01", "2026-03", "2026-06")
+"""Experiment 713's four screen folds, which the interim stop rule reads."""
+VISIBLE_GAP_POINTS: Final = 5.0
+"""A visible-share gap between F4 and F4-T above this many percentage points is flagged."""
+STOP_ABOVE: Final = 0.15
+STOP_ABOVE_WITH_SIGNS: Final = 0.10
+STOP_MIN_POSITIVE_FOLDS: Final = 3
+
+
+def screen_decision(*, points: dict[str, float], folds_positive: dict[str, int]) -> str:
+    """Return `stop` or `advance` by design section 6: stop if F4 minus M* is above +0.15 in both
+    groups, or above +0.10 in both groups and positive in at least 3 of the 4 folds in both."""
+    both = ("six", "eight")
+    if all(points[g] > STOP_ABOVE for g in both):
+        return "stop"
+    if all(
+        points[g] > STOP_ABOVE_WITH_SIGNS and folds_positive[g] >= STOP_MIN_POSITIVE_FOLDS
+        for g in both
+    ):
+        return "stop"
+    return "advance"
+
+
+def cmd_screen() -> int:
+    """Interim reading of the pre-registered stop rule on the 4 screen folds (design section 6).
+
+    Positive means that F4 has the larger CRPS, so the neighbour rows hurt. The reading is interim:
+    it is the only one this command makes before phase 2, and the headline reads all 8 folds.
+    """
+    groups = group_ids()
+    m_star = star()
+    _, averaged = pair(treatment="F4", reference=m_star, months=SCREEN_FOLDS)
+    points, positive, per_fold = {}, {}, {}
+    for g in ("six", "eight"):
+        sel = {
+            n: sc.restrict(frame=averaged[n], group=g, band=sc.HEADLINE_BAND_HOURS, groups=groups)
+            for n in ("F4", m_star)
+        }
+        both = sc.paired(treatment=sel["F4"], reference=sel[m_star], metric="crps")
+        months = both["power_fcst_init_time"].dt.strftime("%Y-%m")
+        points[g] = float(both["d"].mean())
+        per_fold[g] = {
+            m: float(both.filter(months == m)["d"].mean())
+            for m in sorted(months.unique().to_list())
+        }
+        assert set(per_fold[g]) == set(SCREEN_FOLDS), f"the screen folds are missing: {per_fold[g]}"
+        positive[g] = sum(v > 0 for v in per_fold[g].values())
+    decision = screen_decision(points=points, folds_positive=positive)
+    for g in ("six", "eight"):
+        signs = " ".join(f"{m}:{'+' if v > 0 else '-'}" for m, v in per_fold[g].items())
+        print(
+            f"{g}: F4 minus {m_star} = {points[g]:+.4f}; signs {signs} ({positive[g]} of 4 positive)"
+        )
+    print(
+        f"INTERIM stop rule (design section 6): stop if above +{STOP_ABOVE} in both groups, or above "
+        f"+{STOP_ABOVE_WITH_SIGNS} in both and positive in at least {STOP_MIN_POSITIVE_FOLDS} of 4 folds in both"
+    )
+    print(f"INTERIM reading: {decision.upper()}")
+    write(
+        name="screen",
+        obj={
+            "interim": True, "decision": decision, "points": points, "per_fold": per_fold,
+            "folds_positive": positive,
+        },
+    )  # fmt: skip
+    return 0
+
+
 def write(*, name: str, obj: object) -> None:
     """Write `score/<name>.json` atomically and print it."""
     SCORE_DIR.mkdir(parents=True, exist_ok=True)
@@ -473,6 +560,26 @@ def write(*, name: str, obj: object) -> None:
 
 def selftest() -> int:
     """Check the decision rule on constructed readings."""
+    assert (
+        screen_decision(points={"six": 0.16, "eight": 0.2}, folds_positive={"six": 1, "eight": 1})
+        == "stop"
+    )
+    assert (
+        screen_decision(points={"six": 0.12, "eight": 0.11}, folds_positive={"six": 3, "eight": 4})
+        == "stop"
+    )
+    assert (
+        screen_decision(points={"six": 0.12, "eight": 0.11}, folds_positive={"six": 2, "eight": 4})
+        == "advance"
+    )
+    assert (
+        screen_decision(points={"six": 0.20, "eight": 0.05}, folds_positive={"six": 4, "eight": 4})
+        == "advance"
+    )
+    assert (
+        screen_decision(points={"six": 0.15, "eight": 0.15}, folds_positive={"six": 0, "eight": 0})
+        == "advance"
+    )
 
     def c(
         *,
@@ -607,11 +714,14 @@ def selftest() -> int:
 def main() -> int:
     """Run one command."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["selftest", "first", "headline", "report-only"])
+    parser.add_argument(
+        "command", choices=["selftest", "first", "screen", "headline", "report-only"]
+    )
     args = parser.parse_args()
     return {
         "selftest": selftest,
         "first": cmd_first,
+        "screen": cmd_screen,
         "headline": cmd_headline,
         "report-only": cmd_report_only,
     }[args.command]()

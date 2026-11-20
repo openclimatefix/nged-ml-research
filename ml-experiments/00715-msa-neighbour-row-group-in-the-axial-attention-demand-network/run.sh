@@ -6,11 +6,11 @@
 #
 # Usage: run.sh e00715_fit.py F4 2025-11 0
 #        SLOT_MEM=8G run.sh e00715_check_model.py
-#        EXTRA_PYTHONPATH=/path/to/00713-folder:/path/to/00714-folder run.sh e00715_known_answer.py selftest
+#        EXTRA_PYTHONPATH=/path/to/00713-folder run.sh e00715_known_answer.py selftest
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # are set to dummy values here because the contracts package reads them at import. Check `free -g`
-# first and wait when under 25 GB is available. EXTRA_PYTHONPATH names the folders of experiments
-# 713 and 714 while their branches are unmerged and their folders are not under ml-experiments/.
+# first and wait when under 25 GB is available. EXTRA_PYTHONPATH names the folder of experiment
+# 713 while its branch is unmerged and its folder is not under ml-experiments/.
 set -euo pipefail
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}"
 here="$(cd "$(dirname "$0")" && pwd)"

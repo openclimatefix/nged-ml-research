@@ -34,6 +34,8 @@ import sys
 from pathlib import Path
 from typing import Final
 
+os.environ["E00667_PHASE"] = "train"
+
 import e00713_arms as a713  # ty: ignore[unresolved-import]
 import e00713_known_answer as ka  # ty: ignore[unresolved-import]
 import e00713_layout as lay  # ty: ignore[unresolved-import]
@@ -266,8 +268,12 @@ def load_world(*, month: str, device: str) -> tuple:
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
 
     arms.install_own_cache()
-    os.environ["E00667_PHASE"] = "train"
     pipe = inp.load_pipeline(month=month, phase="train")
+    import e00667_fold as fold  # ty: ignore[unresolved-import]
+
+    assert fold.PHASE == "train", (
+        f"the known-answer worlds must be built in the train phase, not {fold.PHASE!r}"
+    )
     data = inp.build_fold_data(pipe=pipe, device=device)
     raw = pipe.d632.dense_raw()
     temperature = np.asarray(
@@ -325,18 +331,36 @@ def smoke(*, month: str) -> int:
     return 0
 
 
+def kn11a_in_subprocess(*, month: str) -> dict:
+    """Run KN11(a) in its own process, because it needs the predict phase and the fits need the train phase."""
+    import subprocess
+
+    env = {**os.environ, "E00667_PHASE": "predict"}
+    done = subprocess.run(
+        [sys.executable, str(Path(__file__).parent / "e00715_era.py"), "kn11a", month],
+        env=env, capture_output=True, text=True, check=False,
+    )  # fmt: skip
+    print(done.stdout[-2000:])
+    return {
+        "pass": done.returncode == 0,
+        "month": month,
+        "stderr_tail": done.stderr[-1000:] if done.returncode else "",
+    }
+
+
 def run_checks(*, month: str, device: str) -> dict:
     """Run KN12, KN11(a), KN6, and KN7 for the fold `month`; return the results."""
     from datetime import UTC, datetime
 
-    import e00715_era as era
     import e00715_weather_lookahead as wl
 
     results: dict = {}
     ok, lines = wl.w713.check_data(contract=datetime(2026, 3, 10, 12, tzinfo=UTC))
     print("\n".join(lines))
-    results["KN12"] = {"pass": ok, "lines": lines}
-    results["KN11a"] = era.kn11a(month=month)
+    nbr_lines = wl.neighbour_statement(contract=datetime(2026, 3, 10, 12, tzinfo=UTC), primary="D5")
+    print("\n".join(nbr_lines))
+    results["KN12"] = {"pass": ok, "lines": lines, "neighbour_statement": nbr_lines}
+    results["KN11a"] = kn11a_in_subprocess(month=month)
     if not (results["KN12"]["pass"] and results["KN11a"]["pass"]):
         print("a base check failed: the synthetic fits are not run")
         return results
@@ -467,29 +491,32 @@ def main() -> int:  # noqa: PLR0911
         )
         print(json.dumps(result, indent=1))
         return 0 if result.get("pass", True) else 1
+    gate = arms.gate_file(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    gate.unlink(missing_ok=True)  # a stale gate never survives a new run
     results = run_checks(month=args.month, device=args.device)
     print(json.dumps(results, indent=1, default=str))
+    record = {
+        **results, "train_logs": TRAIN_LOGS, "known_answer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "code": arms.code_record(),
+    }  # fmt: skip
+    last = gate.with_name("known_answers_last_run.json")
+    last.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(path=last, text=json.dumps(record, indent=1, default=str))
     failed = [k for k, v in results.items() if isinstance(v, dict) and not v.get("pass", True)]
     if failed:
-        print("gate file not written; failed:", failed)
-        return 1
-    path = arms.gate_file(data_dir=ML_EXPERIMENTS_DATA_DIR)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = Path(str(path) + ".tmp")
-    tmp.write_text(
-        json.dumps(
-            {
-                **results,
-                "train_logs": TRAIN_LOGS,
-                "known_answer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "code": arms.code_record(),
-            },
-            indent=1,
-            default=str,
+        print(
+            "gate file not written; failed:", failed, "(every fit's training log is in", last, ")"
         )
-    )
-    tmp.rename(path)
+        return 1
+    write_atomic(path=gate, text=json.dumps(record, indent=1, default=str))
     return 0
+
+
+def write_atomic(*, path: Path, text: str) -> None:
+    """Write `text` under a temporary name, then rename."""
+    tmp = Path(str(path) + ".tmp")
+    tmp.write_text(text)
+    tmp.rename(path)
 
 
 if __name__ == "__main__":

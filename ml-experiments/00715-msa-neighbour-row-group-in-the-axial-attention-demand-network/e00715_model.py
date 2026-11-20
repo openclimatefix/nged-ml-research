@@ -24,12 +24,14 @@ and the across-substation attention always holds the null key.
 masks that `M*` drew.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 import e00713_model as mdl  # ty: ignore[unresolved-import]
 import torch  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]
+from torch.utils.checkpoint import checkpoint  # ty: ignore[unresolved-import]
 
 N_SLOTS: Final = 6
 D_N: Final = 32
@@ -204,6 +206,8 @@ class F4Net(mdl.MsaNet):
         """Build `MsaNet` first, then the neighbour modules (36,888 parameters)."""
         super().__init__(switches=switches)
         assert switches.within_day and switches.across_day and not switches.top_row_only
+        self.checkpoint_neighbours = False
+        """Recompute the neighbour path's activations in the backward pass instead of storing them."""
         self.nbr_generator: torch.Generator | None = None
         """The neighbour path's own generator; set it with `seed_neighbour_path` before training."""
         self.nbr_emb = nn.Embedding(mdl.N_PRIMARIES, D_N)
@@ -247,6 +251,36 @@ class F4Net(mdl.MsaNet):
 
     # ------------------------------------------------------------------ forward
 
+    def _run_path(self, fn: Callable[..., Any], *args: torch.Tensor) -> Any:
+        """Call `fn(*args)`, with gradient checkpointing when `checkpoint_neighbours` is set in training.
+
+        `torch.utils.checkpoint` restores only the default random generators, so a recompute would draw
+        other dropout masks from `nbr_generator` than the forward pass did. This wrapper sets the
+        generator to its state before the forward call at the start of a recompute, and after the
+        recompute puts back the state it found, so the masks, the gradients, and the
+        later draws equal those of the unchecked path.
+        """
+        if not (self.checkpoint_neighbours and self.training and torch.is_grad_enabled()):
+            return fn(*args)
+        gen = self.nbr_generator
+        assert gen is not None, "the neighbour path needs `F4Net.nbr_generator` in training"
+        start = gen.get_state()
+        first = [True]
+
+        def inner(*a: torch.Tensor) -> Any:
+            if first[0]:
+                first[0] = False
+                gen.set_state(start)  # a no-op: the state is the one the call began with
+                return fn(*a)
+            kept = gen.get_state()  # the state after every forward draw
+            gen.set_state(start)
+            try:
+                return fn(*a)
+            finally:  # the recompute may stop early by raising, so restore in every case
+                gen.set_state(kept)
+
+        return checkpoint(inner, *args, use_reentrant=False)
+
     def _neighbour_tokens(self, nbr: NeighbourInputs) -> tuple[torch.Tensor, torch.Tensor]:
         """Return `n_out` (B, 6, 14, 48, 32), zero where not visible, and the visibility mask."""
         vis = nbr.visible & nbr.slot_exists[:, :, None, None]
@@ -289,7 +323,10 @@ class F4Net(mdl.MsaNet):
         if return_attention:
             self.nbr_encoder.record = {}  # the encoder runs once, before the blocks
         if nbr is not None:
-            n_out, vis = self._neighbour_tokens(nbr)
+            n_out, vis = self._run_path(
+                lambda *f: self._neighbour_tokens(NeighbourInputs(*f)),
+                nbr.slot_index, nbr.slot_exists, nbr.slot_relation, nbr.z_own, nbr.z_host, nbr.visible,
+            )  # fmt: skip
         recorded: list[tuple[str, mdl.Attention]] = []
         if return_attention:
             for i, block in enumerate(self.blocks):
@@ -306,13 +343,12 @@ class F4Net(mdl.MsaNet):
             x = x + block.drop(y.view(b, r, c, w))
             if n_out is not None:
                 assert vis is not None
-                delta = self.cross[i](
-                    x[:, 1:],
-                    n_out=n_out,
-                    visible=vis,
-                    training=self.training,
-                    gen=self.nbr_generator,
-                )
+                delta = self._run_path(
+                    lambda x_, n_, v_, cross=self.cross[i]: cross(
+                        x_, n_out=n_, visible=v_, training=self.training, gen=self.nbr_generator
+                    ),
+                    x[:, 1:], n_out, vis,
+                )  # fmt: skip
                 x = torch.cat([x[:, :1], x[:, 1:] + delta], dim=1)
             cols = block.ln_across(x).permute(0, 2, 1, 3).reshape(b * c, r, w)
             ok = row_exists[:, None, :].expand(b, c, r).reshape(b * c, r)

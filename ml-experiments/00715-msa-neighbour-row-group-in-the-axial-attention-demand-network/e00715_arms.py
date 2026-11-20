@@ -50,7 +50,7 @@ CEILING_GPU_HOURS: Final = 20.0
 
 OWN_FIT_FILES: Final = (
     "e00715_arms.py", "e00715_batch.py", "e00715_fit.py", "e00715_model.py", "e00715_neighbours.py",
-    "e00715_predict.py", "e00715_train.py", "e00715_worlds.py",
+    "e00715_predict.py", "e00715_train.py", "e00715_worlds.py", "e00715_era.py",
 )  # fmt: skip
 """The modules of this experiment whose edits can change a fitted state."""
 IMPORTED_713_FILES: Final = (
@@ -219,6 +219,38 @@ def _module_file(*, name: str) -> Path:
 
 
 @functools.cache
+def resolved_recipe_hashes() -> dict[str, str]:
+    """Return the sha256 (16 hex digits) of the recipe files that `importlib` resolves in this process.
+
+    Experiment 713's `recipe_hashes` reads the folders of its own checkout, while this process imports
+    the copies on `PYTHONPATH`, which can be another checkout. A recipe module that cannot be found
+    is recorded as `missing`.
+    """
+    out = {}
+    for name in a713.recipe_hashes():
+        if not name.endswith(".py"):
+            continue
+        spec = importlib.util.find_spec(name.removesuffix(".py"))
+        origin = None if spec is None else spec.origin
+        out[name] = (
+            "missing"
+            if origin is None
+            else hashlib.sha256(Path(origin).read_bytes()).hexdigest()[:16]
+        )
+    return out
+
+
+def check_recipe_paths() -> None:
+    """Assert that the recipe files this process imports equal those that experiment 713's hash covers."""
+    theirs = {k: v for k, v in a713.recipe_hashes().items() if k.endswith(".py")}
+    mine = resolved_recipe_hashes()
+    differing = sorted(k for k in theirs if mine.get(k) != theirs[k])
+    assert not differing, (
+        f"the recipe modules imported here differ from the files experiment 713's hash covers: {differing}"
+    )
+
+
+@functools.cache
 def code_hash() -> str:
     """Return the hash of F4's fit modules, experiment 713's hash, and the imported modules of 713 and 714."""
     here = Path(__file__).parent
@@ -226,6 +258,8 @@ def code_hash() -> str:
     for name in OWN_FIT_FILES:
         h.update((here / name).read_bytes())
     h.update(f"e00713:{a713.code_hash()}".encode())
+    for name, digest in sorted(resolved_recipe_hashes().items()):
+        h.update(f"{name}:{digest}".encode())
     for name in IMPORTED_713_FILES:
         h.update(_module_file(name=name.removesuffix(".py")).read_bytes())
     for name in IMPORTED_714_FILES:
@@ -306,6 +340,7 @@ def check_warm_start(
     The state's log carries experiment 713's `code_hash`; it must equal `e00713_arms.code_hash()` as
     this checkout computes it. A state fitted by other code is refused unless `accept` names its hash.
     """
+    check_recipe_paths()
     a713.check_code(earlier=stage1_log, accept=accept, record=record, what=what)
 
 

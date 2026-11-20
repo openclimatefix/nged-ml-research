@@ -301,12 +301,52 @@ def counts() -> None:
     )
 
 
+def checkpointing() -> None:
+    """Check that checkpointing the neighbour path leaves outputs, gradients, and later draws unchanged."""
+    inp, nbr = random_inputs(b=6), random_neighbours(b=6)
+    results = []
+    for use in (False, True):
+        _, model = mstar_pair()  # trained-looking weights, so the neighbours reach the output
+        randomise_output_projection(model=model)
+        model.train()
+        model.checkpoint_neighbours = use
+        model.seed_neighbour_path(key=11)
+        torch.manual_seed(4)
+        out = model(inp, nbr).out
+        out.square().mean().backward()
+        grads = {n: p.grad.clone() for n, p in model.named_parameters() if p.grad is not None}
+        assert model.nbr_generator is not None
+        results.append(
+            (out.detach(), grads, torch.rand(3, generator=model.nbr_generator), torch.rand(2))
+        )
+    (o0, g0, d0, r0), (o1, g1, d1, r1) = results
+    assert torch.equal(o0, o1), "checkpointing changed the output"
+    assert g0.keys() == g1.keys()
+    worst = max(float((g0[k] - g1[k]).abs().max()) for k in g0)
+    assert worst == 0.0, f"checkpointing changed a gradient by {worst}"
+    assert torch.equal(d0, d1), "checkpointing changed the neighbour generator's later draws"
+    assert torch.equal(r0, r1), "checkpointing changed the global generator's later draws"
+    new_grads = [k for k in g0 if k.startswith(f4.NEW_PREFIXES)]
+    dead = [k for k in new_grads if "null_key" not in k and float(g0[k].abs().max()) == 0.0]
+    assert not dead, f"a new parameter has no gradient: {dead}"
+    print(
+        f"checkpointing passed: output, {len(g0)} gradients, and later draws bit-identical (negative control below)"
+    )
+    # negative control: restoring only the default generators (a naive checkpoint) must differ when the state is not restored
+    model = f4.F4Net(switches=mdl.ARM_SWITCHES["M"])
+    model.seed_neighbour_path(key=11)
+    a = torch.rand(3, generator=model.nbr_generator)
+    b = torch.rand(3, generator=model.nbr_generator)
+    assert not torch.equal(a, b), "the generator does not advance"
+
+
 def main() -> int:
     """Run every check."""
     counts()
     kn1()
     kn4()
     kn5()
+    checkpointing()
     return 0
 
 

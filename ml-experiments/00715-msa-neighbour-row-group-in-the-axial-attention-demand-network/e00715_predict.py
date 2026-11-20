@@ -267,6 +267,7 @@ def compare_forecasts(*, new: pl.DataFrame, stored: pl.DataFrame) -> dict:
     if not same_keys:
         return {
             "same_keys": False,
+            "pass": False,
             "n_new": a.height,
             "n_stored": b.height,
             "max_abs_difference": float("nan"),

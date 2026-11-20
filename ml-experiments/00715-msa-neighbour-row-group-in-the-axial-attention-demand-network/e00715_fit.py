@@ -27,6 +27,7 @@ folder before the first call, and the script asserts that the modification times
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import resource
@@ -82,6 +83,26 @@ def mtimes_of(*, folder: Path) -> dict[str, int]:
     return out
 
 
+def read_files(*, data_dir: Path, month: str) -> list[Path]:
+    """Return the files of experiment 713's data, other than the stage 1 state and log, that an F4 fit reads."""
+    root = a713.root(data_dir=data_dir)
+    return [
+        root / "work" / "standardiser" / f"{month}.sha256",
+        a713.selection_file(data_dir=data_dir),
+    ]
+
+
+def watched_mtimes(*, data_dir: Path, files: Sequence[Path]) -> dict[str, int]:
+    """Return the modification times of `files` and of every file in experiment 713's `cache` folder.
+
+    Experiment 713 writes its own logs, fits, and states into `work/` while F4 fits, so the assertion
+    watches only what F4 reads, and the cache folder that the redirect protects.
+    """
+    out = {str(f): f.stat().st_mtime_ns for f in files if f.exists()}
+    out.update(mtimes_of(folder=a713.root(data_dir=data_dir) / "cache"))
+    return out
+
+
 def real_world(
     *, month: str, seed: int, spec: arms.ArmSpec, device: str, data_dir: Path
 ) -> tuple[tr.F4World, dict]:
@@ -129,7 +150,13 @@ def check_fingerprint(*, data, data_dir: Path, month: str) -> None:  # noqa: ANN
 
 
 def new_model(
-    *, spec: arms.ArmSpec, seed: int, device: str, state: dict, data_dir: Path
+    *,
+    spec: arms.ArmSpec,
+    seed: int,
+    device: str,
+    state: dict,
+    data_dir: Path,
+    checkpoint_neighbours: bool = False,
 ) -> tuple[mdl.MsaNet, str]:
     """Build the network of `spec`, load the stage 1 state, and apply the encoder rule of the selected arm.
 
@@ -141,6 +168,7 @@ def new_model(
     if spec.neighbour_path:
         model: mdl.MsaNet = f4.F4Net(switches=spec.switches)
         model.load_mstar_state(state)  # ty: ignore[unresolved-attribute]
+        model.checkpoint_neighbours = checkpoint_neighbours  # ty: ignore[unresolved-attribute]
     else:
         model = mdl.MsaNet(switches=spec.switches)
         model.load_state_dict(state)
@@ -185,12 +213,20 @@ def skip_finished(
 
 def fit(
     *, arm: str, month: str, seed: int, device: str, data_dir: Path, accept: Sequence[str] = (),
-    accept_gate: str | None = None, deps: Deps | None = None,
+    accept_gate: str | None = None, deps: Deps | None = None, checkpoint_neighbours: bool = False,
 ) -> dict:  # fmt: skip
     """Fit stages 2 and 3 and return the log."""
     gate = arms.gate_file(data_dir=data_dir)
     assert gate.exists(), f"{gate} is missing: run e00715_known_answer.py first"
     spec = arms.resolve(arm=arm)
+    gate_sha = json.loads(gate.read_text()).get("known_answer_sha256")
+    own_sha = hashlib.sha256(
+        (Path(__file__).parent / "e00715_known_answer.py").read_bytes()
+    ).hexdigest()
+    print(
+        f"known-answer file sha256: gate {gate_sha}, current {own_sha}, {'equal' if gate_sha == own_sha else 'DIFFERENT'}",
+        flush=True,
+    )
     assert month in spec.folds, f"arm {arm} is not fitted on fold {month}: {spec.folds}"
     log: dict = {"arm": arm, "month": month, "seed": seed}
     arms.check_code(
@@ -208,7 +244,6 @@ def fit(
         )
     )
     started = time.monotonic()
-    before = mtimes_of(folder=a713.root(data_dir=data_dir) / "work")
     start_arm = spec.start_arm(data_dir=data_dir)
     state_path = arms.stage1_state_file(
         data_dir=data_dir, start_arm=start_arm, month=month, seed=seed
@@ -218,6 +253,10 @@ def fit(
     )
     assert state_path.exists() and log_path_1.exists(), (
         f"experiment 713's stage 1 state or log of {start_arm} {month} s{seed} is missing: {state_path}"
+    )
+    before = watched_mtimes(
+        data_dir=data_dir,
+        files=[state_path, log_path_1, *read_files(data_dir=data_dir, month=month)],
     )
     stage1_log = json.loads(log_path_1.read_text())
     arms.check_warm_start(
@@ -230,7 +269,8 @@ def fit(
         month=month, seed=seed, spec=spec, device=device, data_dir=data_dir
     )
     model, encoders = new_model(
-        spec=spec, seed=seed, device=device, state=torch.load(state_path, map_location=device), data_dir=data_dir
+        spec=spec, seed=seed, device=device, state=torch.load(state_path, map_location=device), data_dir=data_dir,
+        checkpoint_neighbours=checkpoint_neighbours,
     )  # fmt: skip
     log.update(
         stages=[], dropped=dropped, start_arm=start_arm, stage1_code_hash=stage1_log.get("code_hash"),
@@ -282,12 +322,15 @@ def fit(
     log["peak_host_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
     if device.startswith("cuda"):
         log["peak_gpu_mb"] = torch.cuda.max_memory_allocated() / 2**20
-    after = mtimes_of(folder=a713.root(data_dir=data_dir) / "work")
-    assert before == after, (
-        "the modification times of experiment 713's work folder changed: F4 wrote into it"
-    )
     write_json_atomic(
         obj=log, path=arms.log_file(data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit")
+    )  # written before the read-only assertion, so a failed assertion never loses the log
+    after = watched_mtimes(
+        data_dir=data_dir,
+        files=[state_path, log_path_1, *read_files(data_dir=data_dir, month=month)],
+    )
+    assert before == after, (
+        "a file that F4 reads from experiment 713's data, or its cache folder, changed during the fit"
     )
     return log
 
@@ -301,10 +344,15 @@ def main() -> int:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--accept-code-change", action="append", default=[], metavar="OLD_HASH")
     parser.add_argument("--accept-gate-change", default=None, metavar="OLD_HASH")
+    parser.add_argument(
+        "--checkpoint-neighbours", action="store_true",
+        help="recompute the neighbour path in the backward pass, to lower the GPU peak; results are bit-identical",
+    )  # fmt: skip
     args = parser.parse_args()
     fit(
         accept=args.accept_code_change, accept_gate=args.accept_gate_change, arm=args.arm,
         month=args.month, seed=args.seed, device=args.device, data_dir=ML_EXPERIMENTS_DATA_DIR,
+        checkpoint_neighbours=args.checkpoint_neighbours,
     )  # fmt: skip
     return 0
 
