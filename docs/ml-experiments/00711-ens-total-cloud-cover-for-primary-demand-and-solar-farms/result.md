@@ -604,6 +604,46 @@ not carry to the Candidate, which reads 14 thermal-lag and solar-gain columns th
 cloud-scored folds cover December to June only, and fold 2025-12 holds only 10 recent runs with
 cloud in its fine-tune window.
 
+## 13. Differences between the plan and the stage 1 code
+
+**The stage 1 code departs from the plan above in six places, and each departure is deliberate.**
+The code reviewer accepted the first four. The era screens await the maintainer's agreement before
+`era-check` runs, so that the definition is not chosen after its results are seen.
+
+- **The cloud cache starts at the first back-filled run, 2020-10-15, not at 2021-07-20.** Rows
+  still read only runs from 2021-07-20 (985 back-filled runs). The 278 earlier runs serve as donors
+  and lag sources, because the time-shifted donor of run 2021-07-20 is the run of 2021-07-06. The
+  cache therefore holds 1,485 files (1,263 back-filled runs and 222 recent runs). The earlier runs
+  also enter the shuffled-run donor pool, so a scored run can draw a donor from 2020-10 to
+  2021-07, which widens the era mix that section 12 discusses.
+- **The time-shifted donor has a fourth fallback of 744 days.** After 14, 21, and 7 days earlier,
+  the rule takes the run issued 744 days earlier. The runs from 2025-11-21 to 2025-11-27 have no
+  donor at 7, 14, or 21 days, because each of those days lies in the gap. The 744 days map
+  2025-11-21 to 2023-11-08 (two years and 14 days of the calendar, less 29 February 2024).
+- **The origin assertion is a copy.** The Primary demand code calls a copy of experiment 707's
+  `assert_origin_after_run`, because `e00707_prep.py` imports `torch` and the tests run without it.
+  The copy behaves identically, and `assert_primary_rows` adds two checks: the origin is exactly the
+  run plus 9 hours, and the run is a 00:00 UTC run.
+- **7,243,785 is the number of rows of each run, not of all runs.** Each of the 222 runs from
+  2025-11-21 to 2026-06-30 holds 7,243,785 rows at Delta version 2589, and the 222 runs together
+  hold 1,608,120,270 rows. The table check tests the per-run figure.
+- **The era screens use two scales, and a test fails if either reading exceeds 3.** The literal
+  reading divides the step by the standard deviation of the adjacent 12 monthly values, which
+  includes the seasonal cycle. The deseasonalised reading removes the cycle. For the winters test
+  (December to March of 2021-22, 2022-23, and 2023-24 against December 2025 to March 2026), the
+  scale is the standard deviation of the earlier months about their calendar-month means. For the
+  resolution-change test (each month from 2023-07 to 2024-03 against the same month a year
+  earlier), the scale is the standard deviation of the year-over-year differences in the 12 months
+  before 2023-06. The code also reports the step divided by its standard error.
+- **The build refuses to run unless three checks have passed at the pinned Delta version.** The
+  checks are `table-check`, `older-columns`, and `era-check`, each of which records its result
+  under `work/checks/`. Every cache file holds its Delta version, `pin --force` deletes or refuses
+  to keep a file from another version, and the lineage note records the code commit, the package
+  versions, and the SHA-256 of each script. The data check also fails on cloud stored as a
+  fraction, on duplicate keys, on a stuck series, on two runs with identical cloud, and on a
+  correlation below 0.95 with the cloud files of experiment 561. Delta-rs keeps old table versions
+  for 30 days by default, so the cache can be rebuilt from the pinned version for a limited time.
+
 ## Files
 
 **Planned files; the finished page lists the files as written.**
