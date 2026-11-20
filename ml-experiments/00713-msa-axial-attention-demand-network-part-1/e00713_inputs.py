@@ -18,14 +18,16 @@ import hashlib
 import os
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Final
 
+import e00410_stale_predict as stale  # ty: ignore[unresolved-import]
 import e00713_batch as bt
 import e00713_layout as lay
 import numpy as np
+import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -151,9 +153,10 @@ class FoldData:
     test_origin_idx: np.ndarray | None  # native origin indices of the scored origins
     test_keys: dict[str, np.ndarray] | None
     dropped_per_fold: dict[str, int]
+    rows: tuple[Any, Any] | None = None  # the Candidate's (MonthRows, test rows), kept for checks
 
 
-def build_fold_data(*, pipe: Pipeline, device: str) -> FoldData:
+def build_fold_data(*, pipe: Pipeline, device: str, keep_rows: bool = False) -> FoldData:
     """Build the fold's dense arrays, statistics, and ensemble table (the WP3 adapter).
 
     The training rows come from `e00574_fit.build_month`, and the scored rows from
@@ -233,16 +236,41 @@ def build_fold_data(*, pipe: Pipeline, device: str) -> FoldData:
         power_z=power_z.to(device), dense_weather=dense_weather.to(device),
         dense_datetime=dense_datetime.to(device), day_type=day_type.to(device), ens=ens,
     )  # fmt: skip
-    in_window = np.isfinite(clean[:, :cutoff_idx]).sum()
     data = FoldData(
         month=pipe.month, source=source, cutoff_idx=cutoff_idx, target_mean=base.target_mean,
         target_std=base.target_std, clean=clean, fingerprint=fingerprint(mr_base=base),
         train_ens_days=(first_day, last_day), test_origin_idx=test_origin_idx, test_keys=test_keys,
-        dropped_per_fold={"finite_cleaned_half_hours_before_cutoff": int(in_window)},
+        dropped_per_fold=flagged_counts(month=pipe.month, cutoff_us=int(cut_dt.timestamp() * 1e6)),
     )  # fmt: skip
     check_weather_finite(raw=raw, test_origin_idx=test_origin_idx)
-    del mr, test
+    if keep_rows:
+        data.rows = (mr, test)
     return data
+
+
+def flagged_counts(*, month: str, cutoff_us: int) -> dict[str, int]:
+    """Return the exact count of `substation_zero` half-hours of the 16 Primaries that the fold drops.
+
+    The count is read from the flagged-keys table (`e00410_stale_predict.FLAGGED_KEYS`), which the
+    cleaning rule wrote, and not from the cleaned power. `training_and_history` holds the flagged
+    half-hours before the fold's cutoff, and `scored_window` those from the cutoff to 15 days after
+    the end of the fold month (the actuals of the scored 14-day horizons).
+    """
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    ids = k578.sites()["time_series_id"].to_list()
+    flagged = pl.read_parquet(stale.FLAGGED_KEYS).select("time_series_id", "valid_time")
+    flagged = flagged.filter(pl.col("time_series_id").is_in(ids))
+    cutoff = datetime.fromtimestamp(cutoff_us / 1e6, tz=UTC)
+    year, mon = (int(part) for part in month.split("-"))
+    month_end = datetime(year + (mon == 12), mon % 12 + 1, 1, tzinfo=UTC)
+    times = flagged["valid_time"].dt.replace_time_zone("UTC")
+    before = times < cutoff
+    window = (times >= cutoff) & (times < month_end + timedelta(days=15))
+    return {
+        "flagged_before_cutoff": int(before.sum()),
+        "flagged_in_scored_window": int(window.sum()),
+    }
 
 
 def check_weather_finite(*, raw: np.ndarray, test_origin_idx: np.ndarray | None) -> None:
