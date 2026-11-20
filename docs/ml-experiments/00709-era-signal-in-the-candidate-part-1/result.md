@@ -80,9 +80,10 @@ take_home_message: >-
   moves is tested against the prevailing forecast.
 advice:
   - >-
-    Do not carry a learned era signal forward without a classifier that rejects temporary load
-    moves: the arm with no classifier raised the error at the donor Primary of an injected
-    switching event by 3.9 points, and `soft` and `hmm` by 0.34 and 0.24 (bank, switching events).
+    Do not carry a learned era signal forward until it passes the veto on switching events:
+    every learned arm that lowered the error after eras raised it at the donor Primary of an
+    injected switching event, `all` by 3.9 points, `soft` by 0.34, `hmm` by 0.24, and `stat` by
+    0.11 (bank, switching events).
   - >-
     Score any new era signal on injected eras and on injected switching events together, because
     the arms that lowered the error most after eras (`all`, `soft`) raised it most after switching
@@ -120,8 +121,9 @@ did not score C1b or C2, because we did not store the prevailing output of any a
 contrasts point two ways. After injected eras, five of the seven era signals lower the continuous
 ranked probability score (CRPS, lower is better, in points of the Primary's effective capacity) with
 a 99.44% interval that excludes zero in at least one window: `oracle`, `all`, `soft`, `stat`, and
-`hmm`. After injected switching events, the arms that help most after eras raise the CRPS at the
-donor Primary (the Primary that loses the demand). On the real rows, no learned arm lowers the CRPS
+`hmm`. After injected switching events, every learned arm that helps after eras raises the CRPS at
+the donor Primary (the Primary that loses the demand), which fails the pre-registered veto on
+switching events. On the real rows, no learned arm lowers the CRPS
 on all rows. An audit was required (see Checks), and it reproduced the bank table.
 
 **On the real rows, no learned arm lowers the error on all rows, and at D8 only `hmm` lowers it with
@@ -146,11 +148,13 @@ injection run over the panel with two eras and two switching events. Four fold m
 128 events of each kind, the same events for both seeds and for every arm, and the CRPS of an event
 is the mean over its rows and over the two seeds. An era is scored against the injected power for
 forecast origins 0 to 7 and 7 to 28 days after its onset. A switching event is scored at its donor
-Primary against the power without the switch, from its onset to 7 days after its end. Differences
+Primary against the power without the switch, from its onset to 7 days after its end or the end of
+the fold month, whichever comes first (only 48 of the 128 events end at least 7 days before the
+month ends). The recipient Primary is not in the table. Differences
 are from `none`, with 99.44% percentile intervals that resample whole passes (a fold month and a
 pass index), because the events of one pass share a panel.
 
-| Arm | Era, 0 to 7 days | Era, 7 to 28 days | Switching event, donor, onset to end + 7 days |
+| Arm | Era, 0 to 7 days | Era, 7 to 28 days | Switching event, donor, onset to end + 7 days or month end |
 |---|---|---|---|
 | `none` (CRPS) | 10.971 | 10.751 | 3.355 |
 | `oracle` | -7.115 [-8.375, -5.881] | -7.386 [-8.714, -6.090] | -0.083 [-0.132, -0.038] |
@@ -167,8 +171,12 @@ oracle's figure pools injected steps of different sizes, so it is not the pre-re
 arm `all` turns every detected shift into an era, so it carries a switching event forward at the
 donor. An audit that scored the recipient Primary instead (the Primary that gains the demand, 96
 events with a metered recipient) found that `all` lowers the recipient's CRPS by 0.03 points, so the
-harm is confined to the donor. The placebo is within 0.06 points of `none` everywhere. Whether a
-classifier keeps the gain without the harm is the question C2 asks, and these data cannot answer it.
+harm is confined to the donor. The placebo is within 0.06 points of `none` everywhere. The
+pre-registered veto on switching events (C7 above 0.1, or its interval end above 0.2) fails for
+`all`, `soft`, `hmm`, and `stat`, and only `rule` passes it, so no arm that gains after eras can be
+called supported under the screen's rule. The two decision rules in this page differ on a failed C7:
+section 11 gives "partly supported" when C2 passes, and section 20 gives "not supported for
+adoption" whatever C2 shows. Section 20 refines the earlier sections, so its rule governs.
 
 **In phase B2, the arm trained on injected eras with no signal (`b2-aug`) meets the pre-registered
 rule at 95% and fails it at 99.44%.** Phase B2 mixes the curriculum (the injected world) into every
@@ -244,7 +252,8 @@ Section 26 has the details and the maintainer's open questions.
   on the phase E row set for 2025-04 to 2025-06. Differences are paired, with a bootstrap that
   resamples whole fold months. The injected bank is scored by a percentile bootstrap over passes.
   The bank scorer maps an event's host panel index to the Primary's time series identifier through
-  the site map.
+  the site map. Its bootstrap resamples passes, and the 16 passes of a fold month share one trained
+  network per seed, so the interval does not include the noise of fitting the network.
 - **Changes in phase B2 and phase E:** phase B2 changes the stage 3 rule to mix the curriculum into
   every batch and runs four arms; phase E runs five arms on three earlier months.
 
