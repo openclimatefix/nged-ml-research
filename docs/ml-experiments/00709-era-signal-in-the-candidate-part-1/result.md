@@ -919,6 +919,19 @@ gets an Opus review before its first run. Phase E starts after phase B and B2 en
 
 **The `all` arm's D8 outlier in fold 2026-01 comes from a temporary excursion that `all` treated as an era.** The `all` arm turns every detected shift into an era. At D8 it flags an episode from 2026-01-19 to 2026-02-02, with the era starting on 2026-01-21. D8's daily mean power is about 7.5 MW from 2026-01-19 to 2026-01-25, against about 4 MW before and after. The summed daily mean of D8's three electrical neighbours (D3, D5, and D14) stays between 20 and 25 MW with no mirror-image change. The excursion is therefore temporary and is not conserved load moving between neighbours. D8 has no labelled switching event in 2026. `all` has no classifier to reject the shift, so it carries a temporary excursion forward as a persistent era, which is the failure the arm was designed to show.
 
+## 27. Phase B2 result: only the lag-only arm passes the rule, and the placebo moves the same way (interim)
+
+**Only `b2-aug` meets the pre-registered B2 decision rule, and its effect is more likely noise augmentation than an era signal.** The table compares each B2 arm with phase B's `none` on the same rows (4 fold months, seeds 0 and 1). The 95% intervals resample whole fold months only, so each rests on 4 months. CRPS differences are in points of effective capacity.
+
+| Arm | All rows | D8 | Touched Primaries |
+|---|---|---|---|
+| `b2-aug` | -0.050 [-0.103, -0.001] | -0.007 | +0.008 [-0.089, +0.198] |
+| `b2-placebo` | -0.037 [-0.127, +0.096] | +0.001 | -0.011 |
+| `b2-oracle` | +0.009 [-0.010, +0.032] | -0.058 [-0.076, -0.036] | +0.026 |
+| `b2-stat` | +0.009 [-0.060, +0.118] | +0.386 [+0.071, +0.629] | +0.041 |
+
+**The curriculum contrast `aug` against `none` is not decisive.** The `b2-aug` interval only just excludes zero. `b2-placebo` moves the same way with an interval that contains zero, which is what a noise augmentation would do, because the injected rows get a second noise draw. The curriculum world also held 2 eras in 6 of the 8 fold-and-seed pairs and 4 in the other 2 (seed 0 of folds 2026-04 and 2026-06), so every fold is a weak test of the curriculum (a fold with fewer than 4 eras is a weak test, section 24). The `b2-oracle` gain at D8 repeats phase B's, and `b2-stat` is worse at D8 as in phase B.
+
 ## Files
 
 - Code: `ml-experiments/00709-era-signal-in-the-candidate-part-1/` (to be written, each script
