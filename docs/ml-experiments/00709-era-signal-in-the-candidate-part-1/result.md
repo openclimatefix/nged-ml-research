@@ -250,7 +250,7 @@ Section 26 has the details and the maintainer's open questions.
 - **Measurement:** CRPS in points of effective capacity against the cleaned half-hourly power, at
   the contract's 12:00 UTC origin, on experiment 677's monthly-refit rows for 2025-11 to 2026-06 and
   on the phase E row set for 2025-04 to 2025-06. Differences are paired, with a bootstrap that
-  resamples whole fold months. The injected bank is scored by a percentile bootstrap over passes.
+  resamples whole fold months. The injected bank is scored by a percentile bootstrap over passes, and each switching event is scored at its donor Primary only.
   The bank scorer maps an event's host panel index to the Primary's time series identifier through
   the site map. Its bootstrap resamples passes, and the 16 passes of a fold month share one trained
   network per seed, so the interval does not include the noise of fitting the network.
