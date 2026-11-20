@@ -15,6 +15,7 @@ for folder in (
 import e00714_threads  # noqa: F401  (must run before numpy)
 
 # isort: split
+import e00714_analyse as ana
 import e00714_build as bld
 import e00714_common as common
 import e00714_features as feats
@@ -127,24 +128,30 @@ def test_auroc_and_logistic_known_answer() -> None:
     assert model.auroc(label=np.array([0, 1]), score=np.array([1.0, 1.0])) == 0.5
 
 
+def _reversed_relation_data(*, seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return features, labels, and months: month b follows `x = y`, the others `x = 1 - y`."""
+    rng = np.random.default_rng(seed)
+    months = np.repeat(np.array(["a", "b", "c", "d"]), [30, 150, 30, 30])
+    y = rng.integers(0, 2, 240).astype(float)
+    x = np.where(months == "b", y, 1.0 - y) + 0.3 * rng.normal(size=240)
+    return x[:, None], y, months
+
+
 def test_out_of_fold_never_scores_a_month_it_saw() -> None:
     """Out-of-fold scores of a month come from a fit without that month.
 
-    Only month b carries the label in its feature. A fit that included month b would learn a large
-    weight and spread month b's probabilities; a fit without it learns only noise and gives month
-    b nearly one probability.
+    Months a, c, and d carry the label as `x = 1 - y` and month b as `x = y`. A fit without month b
+    learns a negative weight and scores month b near 0. A fit that saw month b's 150 rows learns a
+    positive weight and scores it near 1. The check runs over 20 seeds.
     """
-    rng = np.random.default_rng(0)
-    months = np.repeat(np.array(["a", "b", "c", "d"]), [30, 150, 30, 30])
-    y = rng.integers(0, 2, 240).astype(float)
-    x = np.where(months == "b", y, rng.normal(size=240))[:, None]
-    pred = model.out_of_fold(x=x, y=y, months=months)
-    held = months == "b"
-    assert np.isfinite(pred).all()
-    assert np.ptp(pred[held]) < 0.1
-    z = (x - x.mean()) / x.std()
-    w, b = model._fit_standardised(z=z, y=y, penalty=0.01)  # a fit that saw month b
-    assert np.ptp(1 / (1 + np.exp(-(z[held] @ w + b)))) > 0.2  # the fault would be visible
+    for seed in range(20):
+        x, y, months = _reversed_relation_data(seed=seed)
+        held = months == "b"
+        pred = model.out_of_fold(x=x, y=y, months=months)
+        assert np.isfinite(pred).all()
+        assert model.auroc(label=y[held], score=pred[held]) < 0.2, seed
+        leaked = model.fit_logistic(x=x, y=y, blocks=months).proba(x=x[held])
+        assert model.auroc(label=y[held], score=leaked) > 0.8, seed  # the fault is visible
 
 
 def test_bootstrap_keeps_whole_passes() -> None:
@@ -254,22 +261,26 @@ def _old_mirror_corr(*, host: np.ndarray, neighbours: np.ndarray, n_pre: int) ->
 
 
 def test_mirror_features_ignore_the_size_of_an_unmirrored_step() -> None:
-    """A time-varying shared error and a large unmirrored host step leave the features near 0.
+    """A time-varying shared error and an unmirrored host step must not raise the features.
 
     The second version of the feature, the correlation before the onset minus the correlation over
-    the whole span, rose with the size of the host's step because the step adds variance that the
-    neighbours do not share. No mirror is possible here, so the feature must not rise.
+    the whole span, rose with the size of the host's step (median 0.18 at 0.05 and 0.96 at 0.30)
+    because the step adds variance that the neighbours do not share. No mirror is possible here.
+    `mirror_z` reads the neighbours and the sign of the step, so its median is the same at both
+    sizes; `mirror_share` shrinks with the step size; both stay below 2.
     """
     cap = np.full(N_SITES, 100.0)
-    medians: dict[float, float] = {}
-    for step_size in (0.05, 0.30):
-        medians[step_size] = _unmirrored_step_medians(cap=cap, step_size=step_size)
-    # more than one step size: the feature must not grow with the size of the host's step
-    assert abs(medians[0.30] - medians[0.05]) < 1.0
+    small = _unmirrored_step_medians(cap=cap, step_size=0.05)
+    large = _unmirrored_step_medians(cap=cap, step_size=0.30)
+    assert large["old"] - small["old"] > 0.5  # the setup shows the growth of the old statistic
+    assert abs(large["z"] - small["z"]) < 0.3
+    assert large["share"] <= small["share"] + 0.05
+    assert max(small["z"], large["z"]) < 2.0
+    assert max(small["share"], large["share"]) < 2.0
 
 
-def _unmirrored_step_medians(*, cap: np.ndarray, step_size: float) -> float:
-    """Return the median `mirror_z` of an unmirrored host step, and check the other statistics."""
+def _unmirrored_step_medians(*, cap: np.ndarray, step_size: float) -> dict[str, float]:
+    """Return the medians of |mirror_z|, |mirror_share|, and the old correlation statistic."""
     shares, zs, olds = [], [], []
     for seed in range(12):
         rng = np.random.default_rng(seed)
@@ -292,12 +303,11 @@ def _unmirrored_step_medians(*, cap: np.ndarray, step_size: float) -> float:
         host = data[0, lo:cut] - ref.power[0, lo:cut]
         nbr = data[1, lo:cut] + data[2, lo:cut] - ref.power[1, lo:cut] - ref.power[2, lo:cut]
         olds.append(_old_mirror_corr(host=host, neighbours=nbr, n_pre=event().onset_hh - lo))
-    if step_size >= 0.3:
-        assert np.median(olds) > 0.5  # the old statistic reads the step as a mirror
-    assert np.median(zs) < 2.0
-    if step_size >= 0.3:
-        assert np.median(shares) < 0.5
-    return float(np.median(zs))
+    return {
+        "z": float(np.median(zs)),
+        "share": float(np.median(shares)),
+        "old": float(np.median(olds)),
+    }
 
 
 def _ring_context(*, n_sites: int = 16) -> common.Context:
@@ -413,16 +423,18 @@ def test_site_prior_scores_and_stratified_auroc() -> None:
 
 
 def test_site_prior_never_reads_the_scored_month() -> None:
-    """When each month alone decides the class, the leave-one-month-out prior scores below 0.5.
+    """When each month alone decides the class, the leave-one-month-out prior scores near 0.
 
-    A prior that used the scored month would score 1.
+    The correct prior reads the other 3 months, whose labels are reversed, and scores 0. A prior
+    that read the scored month alone would score 1, and a prior that read all 4 months would score
+    0.5.
     """
     months = np.repeat(np.array(["a", "b", "c", "d"]), 20)
     sites = np.tile(np.arange(10), 8)
     flipped = np.isin(months, ["b", "d"])
     label = ((sites < 5) ^ flipped).astype(float)
     prior = model.site_prior_scores(sites=sites, label=label, months=months)
-    assert model.auroc(label=label, score=prior) < 0.5
+    assert model.auroc(label=label, score=prior) < 0.3
 
 
 def test_selection_does_not_depend_on_the_order_of_the_candidates() -> None:
@@ -435,3 +447,85 @@ def test_selection_does_not_depend_on_the_order_of_the_candidates() -> None:
     np.random.default_rng(2).shuffle(shuffled_keys)  # ty: ignore[invalid-argument-type]
     reordered = {key: vectors[key] for key in shuffled_keys}
     assert g2.select_balanced(vectors=reordered, months=months, per_month=8, modulus=4) == kept
+
+
+def test_rewired_neighbours_exclude_the_hosts_own_neighbours_in_a_fixed_case() -> None:
+    """Host 0 on a ring: Primary 2's neighbour 1 is the host's own neighbour and is left out."""
+    ctx = _ring_context()
+    for seed in range(20):
+        chosen = bld.rewired_neighbours(
+            ctx=ctx, host=0, touched={0}, rng=np.random.default_rng(seed)
+        )
+        assert chosen is not None
+        assert 1 not in chosen and 15 not in chosen and 0 not in chosen
+
+
+def _decision_inputs(
+    *, g2_state: str, bank_enough: bool, c6_high: bool, known: bool, nbr: str,
+    g2_ok: bool, bank_ok: bool,
+) -> tuple[dict, dict]:  # fmt: skip
+    """Build the contrasts and placebos that give one combination of audits and outcomes."""
+    low, high = {"enough": (0.8, 0.9), "not_enough": (0.5, 0.6), "neither": (0.6, 0.8)}[g2_state]
+    bank_low = 0.8 if bank_enough else 0.5
+    host = {"auroc": 0.6, "low": low, "high": high}
+    contrasts = {
+        "C1": host, "C2": host,
+        "C5": {"low": 0.0 if nbr == "stopped" else 0.1},
+        "C5_auroc_host_nbr_mirrored": {"auroc": 0.9},
+        "C5_gain_hidden": {"diff": 0.05 if nbr == "hidden_gain" else 0.0},
+        "C6": {"low": 0.2 if c6_high else 0.0},
+    }  # fmt: skip
+    auroc = {"bank/k14/known_answer": {"auroc": 0.99 if known else 0.5}}
+    for k in (7, 14):
+        auroc[f"bank/k{k}/host"] = {"low": bank_low, "auroc": 0.7}
+    for w in ("bank", "g2"):
+        auroc[f"{w}/k14/host"] = {"auroc": 0.7, "low": bank_low}
+        auroc[f"{w}/k14/host_nbr_rewired"] = {"auroc": 0.7}
+    result = {
+        "contrasts": contrasts, "auroc": auroc,
+        "site_prior": {"g2/site_prior_auroc": 0.5 if g2_ok else 0.8, "gas/site_prior_auroc": 0.5},
+    }  # fmt: skip
+    placebo = {}
+    for w, ok in (("g2", g2_ok), ("bank", bank_ok)):
+        placebo[f"{w}/shuffled_labels"] = {"within_0.03": True}
+        placebo[f"{w}/no_event_placebo"] = {"auroc": 0.5 if ok else 0.7}
+    return result, placebo
+
+
+def test_stated_outcome_for_every_combination_of_audits_and_flags() -> None:
+    """The stated outcome follows the plan's definitions for every combination of the inputs."""
+    import itertools
+
+    for g2_ok, bank_ok, g2_state, bank_enough, c6_high, known, nbr in itertools.product(
+        (True, False), (True, False), ("enough", "not_enough", "neither"), (True, False),
+        (True, False), (True, False), ("full", "stopped", "hidden_gain"),
+    ):  # fmt: skip
+        result, placebo = _decision_inputs(
+            g2_state=g2_state, bank_enough=bank_enough, c6_high=c6_high, known=known, nbr=nbr,
+            g2_ok=g2_ok, bank_ok=bank_ok,
+        )  # fmt: skip
+        flags = ana.decisions(result=result, placebo=placebo)
+        text = ana.stated_outcome(flags=flags)
+        case = (g2_ok, bank_ok, g2_state, bank_enough, c6_high, known, nbr)
+        outcome_2 = g2_state == "enough" and bank_enough and bank_ok and g2_ok
+        assert flags["outcome_2_host_rows_enough_on_bank_and_g2"] == outcome_2, case
+        if not g2_ok:
+            assert text.startswith("inconclusive pending an audit of the second"), case
+            continue
+        assert not text.startswith("inconclusive"), case
+        if not known:
+            assert text.startswith("uninterpretable"), case
+            assert "outcome 1" not in text and "outcome 2" not in text, case
+            continue
+        assert ("outcome 1:" in text) == (g2_state == "not_enough"), case
+        assert ("outcome 2:" in text) == outcome_2, case
+        if g2_state == "enough" and not bank_ok:
+            assert "bank half of outcome 2 is inconclusive" in text, case
+        if g2_state == "enough" and bank_ok and not bank_enough:
+            assert "not on the bank" in text, case
+        assert ("outcome 4:" in text) == (nbr == "full"), case
+        assert ("F4 stopped" in text) == (nbr == "stopped"), case
+        assert ("also gain on hidden" in text) == (nbr == "hidden_gain"), case
+        assert ("outcome 3:" in text) == (c6_high and g2_state != "enough" and bank_ok), case
+        assert ("bank comparison" in text) == (not bank_ok), case
+        assert ("bank inflated" in text) == (c6_high and g2_state == "enough" and bank_ok), case

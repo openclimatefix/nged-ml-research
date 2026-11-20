@@ -469,24 +469,32 @@ manager apply: a check-in before the run, and the `systemd-run` wrapper.
 - **Mirror subsets.** The mirrored subset holds every permanent change and the temporary moves with a
   full or partial mirror. The hidden subset holds every permanent change and the temporary moves
   with a hidden mirror.
-- **Placebos.** Class labels shuffled within each pass (20 permutations); neighbours rewired to those
-  of an unlinked Primary that has a neighbour that is neither the host nor the site of an event of
-  the pass (the builder prints the number of events with no valid set, and their rewired features
-  are missing); the no-event placebo, which scores the classifier on the real panel at the
-  same hosts and onsets; and the noiseless known-answer, which replaces the reference level by the
-  real power so that the change is the injected change exactly.
+- **Placebos.** Class labels shuffled within each pass (20 permutations); neighbours rewired to
+  those of an unlinked Primary, leaving out the host, the host's own neighbours, and every site of
+  an event of the pass (the builder prints the number of events with no valid set, which is 1 of
+  512 on the second generator and 2 of 256 on the bank, and their rewired features are missing;
+  the analysis prints the mean rewired set size); the no-event placebo, which scores the
+  classifier on the real panel at the same hosts and onsets; and the noiseless known-answer, which
+  replaces the reference level by the real power so that the change is the injected change
+  exactly.
 - **Decision flags.** The analysis prints a flag for each part of the decision rule, and a stated
-  outcome computed by this precedence. Each world is audited by its own placebos: the
-  shuffled-label placebo within 0.03, the rewired-neighbour AUROC within 0.03 of the host-only
-  AUROC at 14 days, and the no-event placebo within 0.05 of 0.50. The second generator's audit
-  also needs the site-prior AUROC within 0.10 of 0.50. A failed second-generator audit makes C1 to
-  C5 and outcomes 1, 2, and 4 inconclusive. A failed bank audit makes the bank readings and C6
-  (outcome 3) inconclusive, and the bank's no-event placebo never gates the second generator's
-  result, because on the bank the no-event features are a function of the host and the fold month,
-  so that placebo follows the bank's known site imbalance. Outcome 3 applies only when the
-  second generator does not clear 0.70 (`bank_inflated_g2_enough` names the case where C6 is above
-  +0.10 and the second generator does clear it). The neighbour-row stop is the complement of the
-  clause that C5's lower end is at least +0.05. The cross-generator reading fitted on the bank
+  outcome computed by this precedence. Each world is audited by its own placebos: the shuffled-
+  label placebo within 0.03, the rewired-neighbour AUROC within 0.03 of the host-only AUROC at 14
+  days, and the no-event placebo within 0.05 of 0.50. The second generator's audit also needs the
+  site-prior AUROC within 0.10 of 0.50. A failed second-generator audit makes C1 to C5 and
+  outcomes 1, 2, and 4 inconclusive. A failed bank audit makes the bank readings and C6 (outcome
+  3) inconclusive, and the bank's no-event placebo never gates the second generator's result,
+  because on the bank the no-event features are a function of the host and the fold month, so that
+  placebo follows the bank's known site imbalance. Outcome 2 is stated only when the second
+  generator and the bank both clear 0.70 with clean audits. When the second generator clears 0.70
+  alone, the stated outcome says so, and says either that the bank half is inconclusive pending a
+  bank audit or that the bank does not clear 0.70 (no pre-registered outcome). If the known-answer
+  control fails (AUROC not above 0.95), the stated outcome is "uninterpretable" in place of
+  outcome 1 or outcome 2. The stated outcome also says when C5 fails (the neighbour-row stop, or a
+  gain on hidden mirrors of 0.02 or more). C6 alone decides outcome 3. Outcome 3 applies only when
+  the second generator does not clear 0.70 (`bank_inflated_g2_enough` names the case where C6 is
+  above +0.10 and the second generator does clear it). The neighbour-row stop is the complement of
+  the clause that C5's lower end is at least +0.05. The cross-generator reading fitted on the bank
   carries the bank's site preferences into the balanced second generator, which pulls it down.
 - **Cleaned data.** The panel comes from the cleaned power table, in which the `substation_zero` rule
   has already set its flagged half-hours to missing. The feature build prints, for each fold

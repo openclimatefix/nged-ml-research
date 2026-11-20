@@ -138,6 +138,7 @@ def _pass_rows(
                 "mirror_state": ev["mirror_state"], "n_foreign_neighbours": n_foreign,
                 "receiving_host": bool(ev.get("receiving_host", False)), **main,
             }  # fmt: skip
+            row["n_rewired"] = None if rewired is None else len(rewired)
             row["rw_mirror_share"] = rw["mirror_share"] if rw else None
             row["rw_mirror_z"] = rw["mirror_z"] if rw else None
             for name in KA_FEATURES:

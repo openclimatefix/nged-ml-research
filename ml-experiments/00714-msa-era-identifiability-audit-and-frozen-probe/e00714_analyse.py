@@ -295,6 +295,10 @@ def primary(*, tables: dict[str, pl.DataFrame], draws: int, out: Path, tree: boo
                 label=label, score=sign, draws=boot
             )
     result["mirror_share_extremes"] = mirror_share_extremes(tables=tables)
+    result["rewired_set_size"] = {
+        w: float(tables[w].filter(pl.col("k") == 14)["n_rewired"].drop_nulls().mean())  # ty: ignore[invalid-argument-type]
+        for w in ("bank", "g2")
+    }
     result["site_prior"] = site_prior_readings(tables=tables, store=store, draws=boot_limit(draws))
     for name, k in (("C1", 7), ("C2", 14), ("C3", 28)):
         result["contrasts"][name] = result["auroc"][f"g2/k{k}/host"]
@@ -382,7 +386,10 @@ def decisions(*, result: dict, placebo: dict) -> dict[str, bool]:
     return {
         "outcome_1_host_rows_not_enough": not_enough,
         "outcome_2_host_rows_enough_on_g2": enough_g2,
-        "outcome_2_host_rows_enough_on_bank_and_g2": enough_g2 and bank_enough,
+        "bank_host_rows_enough": bank_enough,
+        "outcome_2_host_rows_enough_on_bank_and_g2": (
+            enough_g2 and bank_enough and bank_ok and g2_ok
+        ),
         "neither_enough_nor_not_enough": not enough_g2 and not not_enough,
         "outcome_3_injector_artefact": bank_inflated and not enough_g2,
         "bank_inflated_g2_enough": bank_inflated and enough_g2,
@@ -405,28 +412,56 @@ def decisions(*, result: dict, placebo: dict) -> dict[str, bool]:
     }
 
 
+def _host_row_text(*, flags: dict[str, bool]) -> str:
+    """Return the host-row part of the stated outcome (outcomes 1 and 2, or neither)."""
+    if flags["outcome_1_host_rows_not_enough"]:
+        return "outcome 1: host rows are not enough"
+    if not flags["outcome_2_host_rows_enough_on_g2"]:
+        return "neither enough nor not enough on the second generator"
+    if flags["bank_inconclusive_pending_audit"]:
+        return (
+            "host rows are enough on the second generator; the bank half of outcome 2 is "
+            "inconclusive pending a bank audit"
+        )
+    if flags["bank_host_rows_enough"]:
+        return "outcome 2: host rows are enough on the bank and on the second generator"
+    return (
+        "host rows are enough on the second generator but not on the bank "
+        "(no pre-registered outcome)"
+    )
+
+
+def _neighbour_text(*, flags: dict[str, bool]) -> str:
+    """Return the neighbour-row part of the stated outcome (outcome 4 or why it fails)."""
+    if flags["outcome_4_full"]:
+        return "; outcome 4: neighbour rows pass"
+    if flags["f4_stopped_gain_interval_low_under_0.05"]:
+        return "; F4 stopped (C5 lower end under +0.05)"
+    if flags["outcome_4_neighbour_rows_pass"]:
+        return "; neighbour rows pass on metered mirrors but also gain on hidden mirrors"
+    return "; neighbour rows gain, but the AUROC on mirrored events is under 0.85"
+
+
 def stated_outcome(*, flags: dict[str, bool]) -> str:
     """Return the outcome that the precedence rule states, or why none is stated.
 
-    Second-generator outcomes need a clean second-generator audit. Outcome 3 and the bank
-    readings need both audits. Outcome 1 is stated before outcome 4.
+    Second-generator readings need a clean second-generator audit and a passed known-answer
+    control. Outcome 2 needs the bank to clear 0.70 as well, with a clean bank audit. Outcome 3
+    and the bank comparison need both audits. Outcome 1 is stated before outcome 4.
     """
     if flags["g2_inconclusive_pending_audit"]:
         return "inconclusive pending an audit of the second generator"
-    if flags["outcome_1_host_rows_not_enough"]:
-        text = "outcome 1: host rows are not enough"
-    elif flags["outcome_2_host_rows_enough_on_g2"]:
-        text = "outcome 2: host rows are enough on the second generator"
-    else:
-        text = "neither enough nor not enough on the second generator"
-    if flags["outcome_4_full"]:
-        text += "; outcome 4: neighbour rows pass"
+    if not flags["known_answer_pass"]:
+        return (
+            "uninterpretable: the known-answer control failed (the features cannot carry the class)"
+        )
+    text = _host_row_text(flags=flags) + _neighbour_text(flags=flags)
     if flags["c6_inconclusive_pending_audit"]:
         return text + "; bank comparison (C6, outcome 3) inconclusive pending a bank audit"
     if flags["outcome_3_injector_artefact"]:
-        text += "; outcome 3: injector artefact"
-    elif flags["bank_inflated_g2_enough"]:
-        text += "; bank inflated, second generator enough"
+        return text + "; outcome 3: injector artefact (C6 alone decides it)"
+    if flags["bank_inflated_g2_enough"]:
+        return text + "; bank inflated, second generator enough"
     return text
 
 
@@ -617,7 +652,7 @@ def transfer_reading(*, tables: dict[str, pl.DataFrame]) -> dict:
     return result
 
 
-def outcome_table(*, result: dict, flags: dict[str, bool]) -> str:
+def outcome_table(*, result: dict, flags: dict[str, bool], placebo: dict) -> str:
     """Return the outcome table in Markdown: the six contrasts, the companions, and the outcome."""
     c = result["contrasts"]
     lines = [
@@ -662,6 +697,21 @@ def outcome_table(*, result: dict, flags: dict[str, bool]) -> str:
             lines.append(f"| {key} | {est:.3f} | [{value['low95']:.3f}, {value['high95']:.3f}] |")
         else:
             lines.append(f"| {key} | {value:.3f} | |")
+    auroc = result["auroc"]
+    lines += [
+        "",
+        "Placebos (the bank's no-event placebo follows the bank's site route):",
+        "",
+        "| World | Shuffled-label mean | No-event AUROC | Rewired minus host | Mean rewired set |",
+        "|---|---|---|---|---|",
+    ]
+    for w in ("bank", "g2"):
+        gap = auroc[f"{w}/k14/host_nbr_rewired"]["auroc"] - auroc[f"{w}/k14/host"]["auroc"]
+        lines.append(
+            f"| {w} | {placebo[f'{w}/shuffled_labels']['mean']:.3f} "
+            f"| {placebo[f'{w}/no_event_placebo']['auroc']:.3f} | {gap:+.3f} "
+            f"| {result['rewired_set_size'][w]:.2f} |"
+        )
     lines += [
         "",
         (
@@ -671,6 +721,8 @@ def outcome_table(*, result: dict, flags: dict[str, bool]) -> str:
         ),
         "",
         f"Stated outcome: {stated_outcome(flags=flags)}",
+        "",
+        "Raw flags, before the audit gates (`gas_site_prior_within_0.10_of_0.5` does not gate):",
         "",
         "| Decision flag | Value |",
         "|---|---|",
@@ -710,7 +762,7 @@ def main() -> None:
     model.calibration_table(
         label=frame["label"].to_numpy(), proba=preds["host"].to_numpy()
     ).write_csv(out / "calibration.csv")
-    text = outcome_table(result=result, flags=flags)
+    text = outcome_table(result=result, flags=flags, placebo=placebo)
     (out / "outcome_table.md").write_text(text)
     print(text)
 
