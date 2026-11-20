@@ -15,7 +15,8 @@ experiment 707's scorer; the coverage of q05 and q95. Each figure prints the num
 (or events) behind it and the number of months, and a subset under 100 half-hours is marked thin.
 
 **Contrasts** are treatment minus reference in the `i` state, read at the Bonferroni level of their
-family (`e00710_arms.FAMILY_LEVELS`: R 99.17%, W 99.375%, I 99.58%) with a month-block bootstrap of
+family (`e00710_arms.FAMILY_LEVELS`: R 99.17%, W 99.375%, I 99.58%, and E, the two readings of the
+pre-registered extension E1, 97.5%) with a month-block bootstrap of
 100,000 resamples. Everything else prints at 95%.
 
 **The slump share** of a row with a shifted lag is `sign(d) * (q50 with shifted lags - q50 with
@@ -282,6 +283,7 @@ def needed_variants(
         for t, r in arms.CONTRAST_NAMES.values()
     ]
     pairs += [(x, "i", x, "n") for x in ("M1", "M2", args.b_star)]
+    pairs += [("M1h90", "i", "M1", "i")]
     pairs += [(args.b_star, "n", "M1", "n"), (args.b_star, "i", "M2", "i")]
     for ta, ts, ra, rs in pairs:
         shared = tuple(sorted(set(have.get((ta, ts), ())) & set(have.get((ra, rs), ()))))
@@ -544,6 +546,8 @@ def c1_guards(
     seed_sets: dict[str, tuple[pl.DataFrame, pl.DataFrame] | None],
     versus_m2: tuple[pl.DataFrame, pl.DataFrame] | None,
     family_level: float,
+    prefix: str = "C1",
+    with_versus_m2: bool = True,
 ) -> dict[str, bool | None]:
     """Return whether each condition that guards a `supported` verdict holds for a group.
 
@@ -554,7 +558,9 @@ def c1_guards(
         table: The shared slice table.
         seed_sets: For `seeds_012` and `seeds_34`, the (treatment, reference) rows on those seeds.
         versus_m2: The rows of `B*-i` and `M2-i` on shared seeds, for the six.
-        family_level: The level of family R.
+        family_level: The level of family R (family E for the extension E1).
+        prefix: The contrast's label in the printed lines (`E1` for the extension).
+        with_versus_m2: Whether the six get the `B*` minus `M2` check (not for `E1`).
 
     Returns:
         Each check's name and whether it holds; `None` where the rows are not available. The
@@ -571,7 +577,7 @@ def c1_guards(
             out[f"point below +0.02 on {name}"] = bool(d < MARGIN)
     if group == EIGHT:
         r = contrast(
-            label="C1 without D8",
+            label=f"{prefix} without D8",
             group=group,
             treatment=treatment,
             reference=reference,
@@ -582,7 +588,7 @@ def c1_guards(
         out["upper below +0.02 on the eight without D8"] = (
             None if r is None else r["upper"] < MARGIN
         )
-    if group == SIX:
+    if group == SIX and with_versus_m2:
         if versus_m2 is None:
             out["B* minus M2 below +0.02 at the six"] = None
         else:
@@ -613,7 +619,7 @@ def c1_guards(
             out[key] = None
             continue
         r = contrast(
-            label=f"C1 {name}",
+            label=f"{prefix} {name}",
             group=group,
             treatment=treatment,
             reference=reference,
@@ -720,6 +726,115 @@ def family_contrasts(
                 )
     c1_verdicts(rows=rows, have=have, table=table, args=args, found=found)
     return found
+
+
+def e1_extras(
+    *,
+    rows: dict[str, pl.DataFrame],
+    variants: list[Variant],
+    table: pl.DataFrame,
+    months: tuple[str, ...],
+) -> None:
+    """Print the guards, the slice CRPS, and the slump share of the pre-registered extension E1.
+
+    The guards are those of C1, read on `M1h90-i` minus `FTh90d-i` at the level of family E. The
+    CRPS of `M1h90-i`, `M1-i`, and `FTh90d-i` is printed on all rows, the sunny half-hours, cold
+    nights, and the 7 days after an event, and the slump share beside it.
+
+    Args:
+        rows: Scored rows by variant name.
+        variants: `M1h90-i` and `FTh90d-i` first (the contrast), then `M1-i` if it holds the same
+            folds and seeds.
+        table: The shared slice table.
+        months: The folds the variants hold.
+    """
+    treatment, reference = variants[0], variants[1]
+    print(
+        "\n== pre-registered extension E1: guards (those of C1), read at the level of family E =="
+    )
+    for group in GROUPS:
+        guards = c1_guards(
+            group=group,
+            treatment=rows[treatment.name],
+            reference=rows[reference.name],
+            table=table,
+            seed_sets={
+                f"seeds {list(treatment.seeds)}": (rows[treatment.name], rows[reference.name])
+            },
+            versus_m2=None,
+            family_level=arms.FAMILY_LEVELS["E"][0],
+            prefix="E1",
+            with_versus_m2=False,
+        )
+        failed = [k for k, v in guards.items() if v is False]
+        missing = [k for k, v in guards.items() if v is None and k != SUNNY_KEY]
+        print(f"E1 {group}: guards failed {failed}; not available {missing} (read as explanatory)")
+    print("\n== pre-registered extension E1: CRPS on the slices (95% month-block intervals) ==")
+    wanted = ("all rows", "sunny_clear_sky_index", "sunny_unit_shape", "cold_nights")
+    slices = slice_expressions(table=table)
+    for slice_name in (*wanted, "event_following_7_days"):
+        if slice_name not in slices:
+            continue
+        for group in GROUPS:
+            for v in variants:
+                mean, low, high, n, n_months = absolute_interval(
+                    rows=rows[v.name],
+                    table=table,
+                    group=group,
+                    metric="crps",
+                    where=slices[slice_name],
+                )
+                thin = " THIN" if n < metrics.THIN_HALF_HOURS else ""
+                print(
+                    f"{slice_name:24s} {group:16s} {v.name:18s} crps {mean:.3f} "
+                    f"({low:.3f} to {high:.3f}) n={n} months={n_months}{thin}"
+                )
+    slump_tables(variants=variants, months=months)
+
+
+def e1_report(
+    *,
+    rows: dict[str, pl.DataFrame],
+    have: dict[tuple[str, str], tuple[int, ...]],
+    table: pl.DataFrame,
+) -> None:
+    """Print the guards, slice CRPS, and slump share of E1 on the seeds all three arms hold.
+
+    Args:
+        rows: Scored rows by variant name.
+        have: The complete seeds of each (arm, state).
+        table: The shared slice table.
+    """
+    seeds = tuple(
+        sorted(
+            set(have.get(("M1h90", "i"), ()))
+            & set(have.get(("FTh90d", "i"), ()))
+            & set(have.get(("M1", "i"), ()))
+        )
+    )
+    if not seeds:
+        print("E1 (pre-registered extension): skipped, no seed is complete for all three arms")
+        return
+    variants = [Variant(arm=a, state="i", seeds=seeds) for a in ("M1h90", "FTh90d", "M1")]
+    if all(v.name in rows for v in variants):
+        e1_extras(rows=rows, variants=variants, table=table, months=tuple(arms.SCORED_MONTHS))
+
+
+def e1_variants(*, seeds: tuple[int, ...], months: tuple[str, ...]) -> list[Variant]:
+    """Return the E1 variants on given seeds and folds: `M1h90-i`, `FTh90d-i`, and `M1-i` if held.
+
+    Args:
+        seeds: The seeds of the contrast.
+        months: The folds of the contrast.
+
+    Returns:
+        The variants, with `M1-i` last and only if its forecasts exist on those seeds and folds.
+    """
+    out = [Variant(arm=a, state="i", seeds=seeds, months=months) for a in ("M1h90", "FTh90d")]
+    folder = forecast_folder(arm="M1", state="i")
+    if all((folder / f"{m}_s{s}.parquet").exists() for m in months for s in seeds):
+        out.append(Variant(arm="M1", state="i", seeds=seeds, months=months))
+    return out
 
 
 def c1_verdicts(
@@ -1018,29 +1133,74 @@ def slump_tables(*, variants: list[Variant], months: tuple[str, ...]) -> dict[st
     return out
 
 
+def bank_seeds(*, arm: str, state: str, months: tuple[str, ...]) -> tuple[int, ...]:
+    """Return the seeds whose two bank passes exist for every fold.
+
+    Args:
+        arm: The arm.
+        state: `i` or `n`.
+        months: The folds.
+
+    Returns:
+        The seeds, in order.
+    """
+    folder = OUT_DIR / "bank" / f"{arm}-{state}"
+    passes = [
+        (month, pass_id)
+        for month in months
+        for pass_id in (
+            arms.SCORED_MONTHS.index(month),
+            arms.SCORED_MONTHS.index(month) + len(bank581.COMBOS),
+        )
+    ]
+    return tuple(
+        s for s in range(5) if all((folder / f"{m}_s{s}_p{p}.parquet").exists() for m, p in passes)
+    )
+
+
 def slump_contrasts(
     *,
     events: dict[str, pl.DataFrame],
     have: dict[tuple[str, str], tuple[int, ...]],
     args: argparse.Namespace,
+    months: tuple[str, ...],
 ) -> None:
     """Print I4 to I6, the `i` minus `n` slump share of `M1`, `M2`, and `B*`, per group.
 
-    The resampling unit is the calendar month of the event, as for the CRPS contrasts.
+    The resampling unit is the calendar month of the event, as for the CRPS contrasts. The seeds
+    are those that both states hold with a forecast and with every bank pass, so that a stored
+    `-n` bank of seeds 0 to 2 pairs with the first three seeds of an `-i` arm that holds five.
 
     Args:
-        events: The per-event tables from `slump_tables`.
+        events: The per-event tables from `slump_tables`, reused where they hold the same seeds.
         have: The complete seeds of each (arm, state).
         args: The command-line arguments.
+        months: The folds.
     """
     print("\n== I4 to I6: slump share, X-i minus X-n (events paired, month-block bootstrap) ==")
     level = arms.FAMILY_LEVELS["I"][0]
     for n, x in enumerate(("M1", "M2", args.b_star), start=4):
-        seeds = tuple(sorted(set(have.get((x, "i"), ())) & set(have.get((x, "n"), ()))))
+        seeds = tuple(
+            sorted(
+                set(have.get((x, "i"), ()))
+                & set(have.get((x, "n"), ()))
+                & set(bank_seeds(arm=x, state="i", months=months))
+                & set(bank_seeds(arm=x, state="n", months=months))
+            )
+        )
         names = [Variant(arm=x, state=s, seeds=seeds).name for s in ("i", "n")]
-        if not seeds or not all(nm in events for nm in names):
+        if not seeds:
             print(f"I{n}: skipped, {x} has no shared seeds with bank files in both states")
             continue
+        for nm, state in zip(names, ("i", "n"), strict=True):
+            if nm not in events:
+                bank = bank_table(variant=Variant(arm=x, state=state, seeds=seeds), months=months)
+                if not bank.is_empty():
+                    events[nm] = event_means(bank=bank)
+        if not all(nm in events for nm in names):
+            print(f"I{n}: skipped, {x} has no shared seeds with bank files in both states")
+            continue
+        print(f"I{n} seeds {list(seeds)}")
         for group in GROUPS:
             a, b = (
                 events[nm].filter(
@@ -1050,9 +1210,9 @@ def slump_contrasts(
             )
             joined = a.join(b, on=["month", "pass", "primary"], suffix="_n", validate="1:1")
             values = (joined["share"] - joined["share_n"]).to_numpy()
-            months = joined["month"].to_numpy()
+            event_months = joined["month"].to_numpy()
             low, high = bootstrap._resample_bounds(
-                values=values[None, :], months=months, level=level, n_resamples=N_RESAMPLES
+                values=values[None, :], months=event_months, level=level, n_resamples=N_RESAMPLES
             )
             print(
                 f"I{n} {x}-i minus {x}-n {group:16s} {values.mean():+.3f} ({low:+.3f} to "
@@ -1601,6 +1761,8 @@ def interim_contrasts(*, args: argparse.Namespace, series: pl.DataFrame, ctx: di
             Variant(arm=ta, state=ts, seeds=seeds, months=months),
             Variant(arm=ra, state=rs, seeds=seeds, months=months),
         ]
+        if label == "E1":
+            variants = e1_variants(seeds=seeds, months=months)
         frames = load_frames(series=series, months=months, variants=variants, references=references)
         table, _scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
         del frames, _scored
@@ -1626,6 +1788,8 @@ def interim_contrasts(*, args: argparse.Namespace, series: pl.DataFrame, ctx: di
                     f"   {v.name:18s} {group:16s} {mean:.3f} ({low:.3f} to {high:.3f}) n={n} "
                     f"months={n_months}"
                 )
+        if label == "E1":
+            e1_extras(rows=rows, variants=variants, table=table, months=months)
         print(f"{label}: INTERIM, no verdict")
         del table, rows
 
@@ -1717,8 +1881,9 @@ def main() -> None:
     metric_tables(rows={v.name: rows[v.name] for v in full}, table=table)
     found = family_contrasts(rows=rows, have=have, table=table, args=args, mde=mde)
     del found
+    e1_report(rows=rows, have=have, table=table)
     events = slump_tables(variants=full, months=months)
-    slump_contrasts(events=events, have=have, args=args)
+    slump_contrasts(events=events, have=have, args=args, months=months)
     for v in full:
         if v.state == "i" and v.arm in ("M1", "M2", args.b_star):
             real_event_table(variant=v, months=months)

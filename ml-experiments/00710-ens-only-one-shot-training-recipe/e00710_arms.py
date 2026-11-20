@@ -337,6 +337,13 @@ ARMS: Final[dict[str, Arm]] = {
         Arm(name="FTh90d", stages=(S_ENS, _ft(h=90.0 / 365.25)), scored="finalist"),
         Arm(name="FTh1", stages=(S_ENS, _ft(h=1.0)), scored="finalist"),
         Arm(
+            name="M1h90",
+            kind="reference",
+            stages=(S_ERA, S_ENS_FROM_ERA, _ft(h=90.0 / 365.25)),
+            tuned=False,
+            i_only=True,
+        ),
+        Arm(
             name="P",
             kind="placebo",
             stages=(_one(weight=WeightRule(kind="placebo"), days=None),),
@@ -367,12 +374,15 @@ CONTRAST_NAMES: Final[dict[str, tuple[str, str]]] = {
     "C5": ("W-h_T", "P"),
     "C6": ("S", "W-h0.5"),
     "C7": ("HW730", "M3"),
+    "E1": ("M1h90", "FTh90d"),
 }
-"""Each tested contrast as (treatment, reference), all in the `i` state."""
+"""Each tested contrast as (treatment, reference), all in the `i` state. `E1` is the pre-registered
+extension: the 3-stage reference with a 90-day fine-tune against the `FTh90d` recipe."""
 FAMILY_LEVELS: Final[dict[str, tuple[float, int]]] = {
     "R": (100.0 - 5.0 / 6.0, 6),
     "W": (100.0 - 5.0 / 8.0, 8),
     "I": (100.0 - 5.0 / 12.0, 12),
+    "E": (100.0 - 5.0 / 2.0, 2),
 }
 """Each contrast family's two-sided level in percent and its number of readings (Bonferroni)."""
 FAMILY_OF: Final[dict[str, str]] = {
@@ -383,6 +393,7 @@ FAMILY_OF: Final[dict[str, str]] = {
     "C5": "W",
     "C6": "W",
     "C7": "W",
+    "E1": "E",
     "I1": "I",
     "I2": "I",
     "I3": "I",

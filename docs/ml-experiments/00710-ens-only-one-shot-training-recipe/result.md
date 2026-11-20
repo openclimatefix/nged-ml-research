@@ -282,6 +282,7 @@ its own Bonferroni level.
 | | C5 (placebo): `W-h_T-i` minus `P-i` | Is that gain a gain from recency? |
 | | C6: `S-i` minus `W-h0.5-i` | Does a schedule beat a constant weight with the same final half-life? |
 | | C7: `HW730-i` minus `M3-i` | Does discarding rows older than 730 days harm the forecast? |
+| E, 97.5% (2 readings) | E1 (pre-registered extension, explanatory): `M1h90-i` minus `FTh90d-i` | Does the 90-day half-life account for the gain of the best ENS-only recipe? |
 | I, 99.58% (12 readings) | I1 to I3: `X-i` minus `X-n` for `X` in `M1`, `M2`, `B*`, on CRPS | Does injection harm the forecast on ordinary rows? |
 | | I4 to I6: the same three, on the slump share of the injected bank | Does injection reduce the slump? |
 
@@ -423,6 +424,44 @@ read.
   and 4 of `B*` (24 fits).
 - **Cut order if the budget shrinks:** the `-n` state of `W-h1`, `W-h2`, `S`, and `HW730` first,
   then `W-h1-i`, then the `-n` seeds 3 and 4 of `B*`.
+
+### Pre-registered extension subset (E1 and E2)
+
+**E1 and E2 are the part of the extension that the manager approved first, and they run after the
+minimal plan.** E1 asks whether giving the reference the 90-day half-life accounts for the gain of
+the best ENS-only recipe, because the 90-day half-life was never given to the reference `M1`. E2
+supplies the with-and-without-injection contrasts I3 to I6, which the minimal plan could not read
+because it fits no `-n` state of `FTh90d`, and stores no bank passes of `M1-n`.
+
+**E1 adds one arm and one contrast.** The arm `M1h90` has the three stages of `M1` (the ERA5 and
+CAMS stage, `S_ens(F)`, and the 730-day fine-tune) with the fine-tune half-life set to 90 days
+(`h` = 90 / 365.25 years) instead of 0.5 years. It is fitted in the `-i` state on the 12 scored
+folds with seeds 0 to 2, 36 fits. It loads the first two stage states that `M1-i` stored for the same
+fold and seed, so only the fine-tune trains. The contrast E1 is `M1h90-i` minus `FTh90d-i` at the six
+and at the eight, with and without D8 at the eight, on CRPS, with the guards that C1 uses. The scorer
+also prints the CRPS of `M1h90-i` beside `M1-i` and `FTh90d-i` on the sunny half-hours, cold nights,
+and the 7 days after an event, and the slump share of the injected bank for the same three arms.
+
+**E2 adds the `-n` states that I3 to I6 need.** It fits `FTh90d-n` on 12 folds with seeds 0 to 2 (36
+fits, each with bank passes; the `S_ens(F)` stage is experiment 707's stored state that `M2-n` also
+uses), and writes the bank passes of the stored `M1-n` and `M2-n` for the same folds and seeds (72
+passes, no fit). I3 to I6 then read the CRPS contrast `FTh90d-i` minus `FTh90d-n` and the slump-share contrasts
+of `M1`, `M2`, and `FTh90d`, each `-i` minus `-n`, where `FTh90d` stands for `B*`. The slump contrasts
+pair the `-i` and `-n` states on the seeds that hold bank passes in both. The commands are in
+`E1_E2_commands.md` in the experiment folder.
+
+**E1 gets its own Bonferroni family, `E`, of 2 readings (the six and the eight), read at 97.5%.** The
+guard readings (the tails, the lead bands, cold nights, and the clear-sky slice) use a one-sided 95%
+bound, as the guards of C1 do, and the eight without D8 uses the level of the family. The readings of the experiment's families R, W, and I stay at 6, 8, and
+12, so the levels of C1 to C7 and I1 to I6 are unchanged and E2 adds no reading.
+
+**E1 does not change the pre-registered verdict of C1.** The verdict of C1 is read from the rule
+above, and E1 is read as explanatory. If `M1h90-i` scores better than `M1-i` and close to
+`FTh90d-i`, the 90-day half-life accounts for part of the gap that C1 measures. The page reports
+that reading and does not use it to change the arm or the margin of C1.
+
+**The arms `S`, `HW730`, and `W-h0.5` and `W-h2` wait for the manager's word.** The manager decides
+whether to run them after E1 and E2 are scored and reviewed.
 
 ### Stop conditions and invalid conditions
 
