@@ -40,6 +40,7 @@ import argparse
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import cache
 from pathlib import Path
 from typing import Final, Literal
 
@@ -147,6 +148,7 @@ RANK: Final[tuple[TargetVerdictType, ...]] = (
 )
 """The better verdict comes first."""
 SEED_HALVES: Final[dict[str, tuple[tuple[int, ...], tuple[int, ...]]]] = {
+    "interim": ((0,), (1,)),
     "primary": ((0, 1, 2), (3, 4, 5)),
     "solar": ((0, 1), (2, 3)),
 }
@@ -813,7 +815,7 @@ def minimum_detectable_effect(
     *,
     source: LossSource,
     arm: str,
-    target: Literal["primary", "solar"],
+    target: Literal["primary", "solar", "interim"],
     where: pl.Expr | None,
     level: float,
     n_resamples: int,
@@ -843,10 +845,33 @@ def minimum_detectable_effect(
 # --- reading the store ------------------------------------------------------------------------
 
 
+@cache
+def _head() -> str:
+    """Return the checked-out commit, read once."""
+    return gate_marker.head_commit()
+
+
+REJECTED_SETS: Final[dict[str, str]] = {}
+"""The prediction sets that the manifest check rejected, by set name, with the reason."""
+
+
 def available(*, arm: str, month: str, seed: int) -> bool:
-    """Return whether the store holds the arm's set for the fold and seed."""
-    folder = common.WORK_DIR / "predictions" / arms.set_name(arm=arm, month=month, seed=seed)
-    return folder.exists()
+    """Return whether the store holds a usable set for the arm, fold, and seed.
+
+    A set whose manifest is `dirty`, whose commit is not an ancestor of `HEAD`, or whose commit is
+    older than the floor commit is not used. It is recorded in `REJECTED_SETS`, and the arm's cell
+    then counts as absent.
+    """
+    name = arms.set_name(arm=arm, month=month, seed=seed)
+    folder = common.WORK_DIR / "predictions" / name
+    if not folder.exists():
+        return False
+    try:
+        gate_marker.check_existing_set(folder=folder, head=_head())
+    except (ValueError, FileNotFoundError) as error:
+        REJECTED_SETS[name] = str(error)
+        return False
+    return True
 
 
 def stored_d0_path(*, month: str, seed: int) -> Path:
@@ -1349,6 +1374,31 @@ def check_specs(*, stage: StageType) -> list[Spec]:
     return specs
 
 
+def bound_specs() -> list[Spec]:
+    """Return `D1` minus `DF` (at the six and at the eight) and `P1` minus `PF`.
+
+    They are printed beside C1 and S1 as a bound: they show how much of a C1 or S1 reading the
+    placebo's own shift from no cloud explains.
+    """
+    solar_months = arms.SOLAR_MONTHS
+    return [
+        *_primary_specs(
+            prefix="D1 minus DF",
+            pair=("D1", "DF"),
+            months=arms.CLOUD_SCORED_MONTHS,
+            level=CHECK_LEVEL,
+        ),
+        _spec(
+            key="P1 minus PF",
+            pair=("P1", "PF"),
+            scope="six farms, days 1 to 10",
+            months=solar_months,
+            where=solar_scope(months=solar_months),
+            level=CHECK_LEVEL,
+        ),
+    ]
+
+
 def control_specs() -> list[Spec]:
     """Return the positive control `K1` minus `K1p` at the six and at the eight (Stage B only)."""
     return _primary_specs(
@@ -1371,6 +1421,8 @@ def print_arms(*, source: LossSource, stage: StageType) -> None:
             f"{arm.name:4s} {len(held.cells)} of {len(needed)} planned (fold, seed) cells; "
             f"actual below: {coverage}"
         )
+    for name, reason in sorted(REJECTED_SETS.items()):
+        print(f"set {name} not used: {reason}")
     print_input_columns(names=[a.name for a in arms.fitted_arms()])
 
 
@@ -1388,6 +1440,32 @@ def print_input_columns(*, names: list[str]) -> None:
                 extras = columns[-len(arm.extra_columns) :] if arm.extra_columns else []
                 print(f"{name:4s} {len(columns)} columns, last {len(extras)}: {extras}")
                 break
+
+
+def print_interim_mde(*, source: LossSource, n_resamples: int) -> None:
+    """Print Stage A's interim minimum detectable effect: seed 0 of the placebo against seed 1.
+
+    The bootstrap draws one fitting seed per resample, so a split of seed 0 against seed 1 of the
+    placebo arm has the noise structure of the 3-against-3 split that Stage B can make. Without this
+    number, a Stage A `inconclusive` cannot be told from an underpowered contrast.
+    """
+    print("\n== interim minimum detectable effect (seed 0 against seed 1; half-width at 99.44%) ==")
+    cloud = arms.CLOUD_SCORED_MONTHS
+    cases = [
+        ("D1p", f"{group}, 7 folds", primary_scope(members=members, months=cloud))
+        for group, members in PRIMARY_GROUPS.items()
+    ] + [("P1p", "six farms, days 1 to 10", solar_scope(months=arms.SOLAR_MONTHS))]
+    for arm, scope, where in cases:
+        mde = minimum_detectable_effect(
+            source=source,
+            arm=arm,
+            target="interim",
+            where=where,
+            level=PLANNED_LEVEL,
+            n_resamples=n_resamples,
+        )
+        text = "not computed: the arm lacks seeds 0 and 1" if mde is None else f"{mde:.3f} points"
+        print(f"{arm} {scope}: {text}")
 
 
 def print_mde(*, source: LossSource, n_resamples: int) -> None:
@@ -1453,17 +1531,50 @@ def control_results(*, outcomes: list[Outcome]) -> dict[str, bool | None]:
     return {o.key: (None if isinstance(o, Incomplete) else o.upper < 0.0) for o in outcomes}
 
 
+def _solar_verdict(
+    *, readings: Mapping[str, Outcome], checks: Mapping[str, bool | None] | None, full: bool
+) -> TargetVerdictType | None:
+    """Print and return the solar farms' verdict, or `None` if a reading or the check is missing."""
+    s1 = readings.get("S1")
+    s2 = readings.get("S2") if full else None
+    if not isinstance(s1, Reading) or (full and not isinstance(s2, Reading)):
+        print("solar farms: verdict withheld, a planned reading is incomplete")
+        return None
+    state = (checks or {}).get("P1p minus PF", "absent")
+    if state in (None, "absent"):
+        print("solar farms: verdict withheld, the `P1p` minus `PF` check is incomplete")
+        return None
+    result: TargetVerdictType = s1.verdict
+    if isinstance(s2, Reading):
+        result = better(first=s1.verdict, second=s2.verdict)
+    if state is False:
+        result = "inconclusive"
+    print(f"solar farms: S1 {s1.verdict} -> {result}")
+    return result
+
+
 def verdicts(
     *,
     readings: Mapping[str, Outcome],
     controls: dict[str, bool | None],
     stage: StageType,
+    checks: Mapping[str, bool | None] | None = None,
 ) -> dict[str, str]:
     """Print the verdict of each Primary demand group, the solar farms, and the front matter.
 
     Stage A reads C1 and S1 only: its verdict is decided by those contrasts, and it does not use
     the positive control (Stage B's). Stage B reads the whole plan, and withholds a verdict if a
     planned reading or the control is incomplete.
+
+    **A failed placebo check overrides C1 and S1.** If `D1p` minus `DF` fails at a group (its
+    interval does not contain zero), that group's C1 verdict reads `inconclusive`. If the check is
+    incomplete, the verdict is withheld. The same holds for S1 and `P1p` minus `PF`.
+
+    Args:
+        readings: The planned readings by key.
+        controls: The positive control by key (Stage B).
+        stage: The stage.
+        checks: Which checks passed, by key; `None` or an absent key means the check was not read.
 
     Returns:
         The printed verdicts by name (for the tests).
@@ -1487,6 +1598,10 @@ def verdicts(
             print(f"{group}: verdict withheld, the positive control has not run")
             continue
         assert isinstance(c1, Reading)
+        placebo_state = (checks or {}).get(f"D1p minus DF {group}", "absent")
+        if placebo_state in (None, "absent"):
+            print(f"{group}: verdict withheld, the `D1p` minus `DF` check is incomplete")
+            continue
         result, fired = group_verdict(
             reading=GroupReading(
                 c1=c1.verdict,
@@ -1496,21 +1611,17 @@ def verdicts(
                 control_passed=control,
             )
         )
+        if placebo_state is False:
+            result = "inconclusive"
+            fired.append("`D1p` minus `DF` failed: C1 reads inconclusive until the audit reports")
         group_results[group] = result
         out[group] = result
         c2_text = c2.verdict if isinstance(c2, Reading) else "not in this stage"
         c3_text = c3.verdict if isinstance(c3, Reading) else "not in this stage"
         print(f"{group}: C1 {c1.verdict}, C2 {c2_text}, C3 {c3_text} -> {result}; {fired}")
-    s1, s2 = readings.get("S1"), readings.get("S2") if full else None
-    solar_result: TargetVerdictType | None = None
-    if isinstance(s1, Reading) and (not full or isinstance(s2, Reading)):
-        solar_result = s1.verdict
-        if full and isinstance(s2, Reading):
-            solar_result = better(first=s1.verdict, second=s2.verdict)
+    solar_result = _solar_verdict(readings=readings, checks=checks, full=full)
+    if solar_result is not None:
         out["solar"] = solar_result
-        print(f"solar farms: S1 {s1.verdict} -> {solar_result}")
-    else:
-        print("solar farms: verdict withheld, a planned reading is incomplete")
     if len(group_results) == len(PRIMARY_GROUPS) and solar_result is not None:
         front = front_matter_verdict(
             six=group_results["the six"], eight=group_results["the eight"], solar=solar_result
@@ -1768,7 +1879,9 @@ def score(*, n_resamples: int, stage: StageType) -> None:
     """Print every number the page quotes for `stage`, in the order of the module docstring."""
     source = make_source(with_sky=True)
     print_arms(source=source, stage=stage)
-    if stage != "A":
+    if stage == "A":
+        print_interim_mde(source=source, n_resamples=n_resamples)
+    else:
         print_mde(source=source, n_resamples=n_resamples)
     print(f"\n== planned readings, level {PLANNED_LEVEL:.2f}%, {n_resamples:,} resamples ==")
     readings = [
@@ -1793,7 +1906,19 @@ def score(*, n_resamples: int, stage: StageType) -> None:
         ]
         print_outcomes(outcomes=control_outcomes)
         controls = control_results(outcomes=control_outcomes)
-    verdicts(readings={r.key: r for r in readings}, controls=controls, stage=stage)
+    print("\n== bounds beside C1 and S1: the real arm against no cloud (99.375%) ==")
+    print_outcomes(
+        outcomes=[
+            run_spec(source=source, spec=b, stage=stage, n_resamples=n_resamples)
+            for b in bound_specs()
+        ]
+    )
+    verdicts(
+        readings={r.key: r for r in readings},
+        controls=controls,
+        stage=stage,
+        checks=check_results(outcomes=checks),
+    )
     exploratory(source=source)
 
 

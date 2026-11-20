@@ -33,6 +33,7 @@ OMP_NUM_THREADS=1 POLARS_MAX_THREADS=1 systemd-run --user --scope -p MemoryMax=1
 
 import argparse
 import os
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -59,6 +60,20 @@ RUN_END: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
 GRID_END: Final[datetime] = datetime(2026, 7, 17, tzinfo=UTC)
 """The sun-position grid runs to here, beyond the last valid time of the last run."""
 SOLAR_DIR: Final[Path] = common.WORK_DIR / "solar_inputs"
+
+
+@dataclass
+class BuildWindow:
+    """The runs and the output folder of one build."""
+
+    first: datetime
+    end: datetime
+    out: Path
+
+
+WINDOW: Final[BuildWindow] = BuildWindow(first=RUN_FIRST, end=RUN_END, out=SOLAR_DIR)
+"""The runs and the output folder of this build. `--limit-runs` narrows the runs and `--out-dir`
+moves the output, for a dry run in a scratch folder; the real build leaves both as they are."""
 CLOUD_COLUMNS: Final[tuple[str, ...]] = (
     "cloud_mean",
     "cloud_spread",
@@ -135,8 +150,8 @@ def _farm_scan(*, cell: int, version: int) -> pl.LazyFrame:
     """Return the table at the pinned version, filtered to the farm's cell and the runs."""
     return common.scan_nwp(version=version).filter(
         (pl.col("h3_index") == cell)
-        & (pl.col("init_time") >= RUN_FIRST)
-        & (pl.col("init_time") < RUN_END)
+        & (pl.col("init_time") >= WINDOW.first)
+        & (pl.col("init_time") < WINDOW.end)
     )
 
 
@@ -248,7 +263,7 @@ def day_rows(*, grid: pl.DataFrame, stamp_keys: pl.DataFrame, day: int) -> pl.Da
     low = SOLAR_FIRST_LEAD_HOURS + 24 * (day - 1)
     return (
         grid.with_columns(init_time=(pl.col("time") - timedelta(hours=low)).dt.truncate("1d"))
-        .filter((pl.col("init_time") >= RUN_FIRST) & (pl.col("init_time") < RUN_END))
+        .filter((pl.col("init_time") >= WINDOW.first) & (pl.col("init_time") < WINDOW.end))
         .with_columns(lead3=(pl.col("end3") - pl.col("init_time")).dt.total_hours())
         .with_columns(fine=pl.col("lead3") <= c666.THREE_HOURLY_UNTIL_HOURS)
         .with_columns(
@@ -351,7 +366,7 @@ def build_day(
 
 def missing_runs() -> list[datetime]:
     """Return the runs that carry no cloud: the 19-month gap and run 2024-01-03."""
-    runs = common.runs_between(first=RUN_FIRST, last=RUN_END - timedelta(days=1))
+    runs = common.runs_between(first=WINDOW.first, last=WINDOW.end - timedelta(days=1))
     return [r for r in runs if common.is_missing_run(run=r)]
 
 
@@ -369,7 +384,7 @@ def archive_gaps(*, site: str, stamps: pl.DataFrame) -> list[str]:
     )
     have_by_run = {init: set(g["lead_h"].to_list()) for (init,), g in present.group_by("init_time")}
     gaps = []
-    for init in common.runs_between(first=RUN_FIRST, last=RUN_END - timedelta(days=1)):
+    for init in common.runs_between(first=WINDOW.first, last=WINDOW.end - timedelta(days=1)):
         if init == common.UPSTREAM_GAP_RUN:
             continue
         have = have_by_run.get(init, set())
@@ -475,8 +490,9 @@ def build_farm(*, site: str, version: int) -> None:
         cloud_missing="cloud_missing",
         actual="actual",
     ).sort("init_time", "time")
-    SOLAR_DIR.mkdir(parents=True, exist_ok=True)
-    target = SOLAR_DIR / f"{site}.parquet"
+    folder = WINDOW.out
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / f"{site}.parquet"
     out_table.write_parquet(target.with_suffix(".tmp"))
     target.with_suffix(".tmp").rename(target)
     print(
@@ -491,7 +507,18 @@ def main() -> None:
     """Build every farm, one after another, at the pinned Delta version."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sites", nargs="+", default=None)
+    parser.add_argument(
+        "--limit-runs", type=int, default=None, help="dry run: only the first N runs"
+    )
+    parser.add_argument("--out-dir", type=Path, default=None, help="dry run: write here")
     args = parser.parse_args()
+    if args.limit_runs is not None:
+        if args.out_dir is None or args.out_dir.resolve() == SOLAR_DIR.resolve():
+            msg = "--limit-runs needs --out-dir other than the real solar_inputs folder"
+            raise SystemExit(msg)
+        WINDOW.end = RUN_FIRST + timedelta(days=args.limit_runs)
+    if args.out_dir is not None:
+        WINDOW.out = args.out_dir
     version = common.read_pinned_version()
     failing = common.checks_pass_at(version=version)
     if failing:

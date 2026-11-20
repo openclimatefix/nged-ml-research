@@ -2,6 +2,7 @@
 """Tests of the scorer's contrasts, stages, and gate marker on synthetic losses (no torch)."""
 
 import json
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,6 +16,11 @@ import pytest
 
 from studies import bootstrap, experiment_store
 
+PASSED_CHECKS = {
+    "D1p minus DF the six": True,
+    "D1p minus DF the eight": True,
+    "P1p minus PF": True,
+}
 MONTHS = ("2025-12", "2026-01", "2026-02", "2026-03")
 
 
@@ -258,17 +264,20 @@ def test_stage_a_verdicts_use_only_c1_and_s1(capsys: pytest.CaptureFixture[str])
         "C1 the eight": reading("C1 the eight", -0.01, 0.01),
         "S1": reading("S1", -0.2, -0.05),
     }
-    out = score.verdicts(readings=readings, controls={}, stage="A")
+    out = score.verdicts(readings=readings, controls={}, stage="A", checks=PASSED_CHECKS)
     assert out["the six"] == "supported"
     assert out["the eight"] == "not supported"
     assert out["solar"] == "supported"
     assert out["front matter"] == "partly supported"
     assert "Stage A verdict" in capsys.readouterr().out
     withheld = score.verdicts(
-        readings={**readings, "S1": score.Incomplete(key="S1", reason="x")}, controls={}, stage="A"
+        readings={**readings, "S1": score.Incomplete(key="S1", reason="x")},
+        controls={},
+        stage="A",
+        checks=PASSED_CHECKS,
     )
     assert "front matter" not in withheld
-    full = score.verdicts(readings=readings, controls={}, stage="B")
+    full = score.verdicts(readings=readings, controls={}, stage="B", checks=PASSED_CHECKS)
     assert full == {}
 
 
@@ -283,14 +292,21 @@ def test_fits_refuse_without_both_gates_but_the_gate_arm_and_measuring_fit_run(t
         gate.refuse_without_gate(arm="D1", measure=False, path=marker)
     for kind in gate.GATE_KINDS:
         for month in arms.GATE_MONTHS:
-            gate.record(kind=kind, month=month, passed=True, detail="ok", commit="abc", path=marker)
+            gate.record(
+                kind=kind,
+                month=month,
+                passed=True,
+                detail="ok",
+                commit=gate.head_commit(),
+                path=marker,
+            )
     gate.refuse_without_gate(arm="D1", measure=False, path=marker)
     gate.record(
         kind="predict",
         month=arms.GATE_MONTHS[0],
         passed=False,
         detail="1e-2",
-        commit="abc",
+        commit=gate.head_commit(),
         path=marker,
     )
     with pytest.raises(ValueError, match="failed"):
@@ -314,3 +330,120 @@ def test_existing_set_is_refused_when_dirty_or_from_another_branch(tmp_path: Pat
     usable, rejected = gate.usable_sets(names=[folder.name, "missing"], folder=tmp_path)
     assert usable == set()
     assert len(rejected) == 1
+
+
+def test_a_gate_result_from_another_commit_does_not_open_the_fits(tmp_path: Path):
+    marker = tmp_path / "gate.json"
+    for kind in gate.GATE_KINDS:
+        for month in arms.GATE_MONTHS:
+            gate.record(
+                kind=kind, month=month, passed=True, detail="ok", commit="0" * 40, path=marker
+            )
+    with pytest.raises(ValueError, match="code has changed"):
+        gate.refuse_without_gate(arm="D1", measure=False, path=marker)
+    assert gate.commit_is_current(commit=gate.head_commit())
+    assert gate.commit_is_current(commit=gate.FLOOR_COMMIT) in (True, False)
+
+
+def test_two_gate_commands_at_once_keep_both_results(tmp_path: Path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    marker = tmp_path / "gate.json"
+    months = [f"2026-{m:02d}" for m in range(1, 13)]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(
+            pool.map(
+                lambda m: gate.record(
+                    kind="predict", month=m, passed=True, detail=m, commit="x", path=marker
+                ),
+                months,
+            )
+        )
+    assert set(gate.read_marker(path=marker)["predict"]) == set(months)
+
+
+def test_a_set_older_than_the_floor_commit_is_refused(tmp_path: Path):
+    folder = tmp_path / "d1-2026-06-s0"
+    folder.mkdir()
+    head = gate.head_commit()
+    parent = subprocess.run(
+        ["git", "rev-parse", f"{gate.FLOOR_COMMIT}~1"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (folder / experiment_store.MANIFEST_NAME).write_text(
+        json.dumps({"commit": parent, "dirty": False})
+    )
+    with pytest.raises(ValueError, match="older than the floor"):
+        gate.check_existing_set(folder=folder, head=head)
+    (folder / experiment_store.MANIFEST_NAME).write_text(
+        json.dumps({"commit": gate.FLOOR_COMMIT, "dirty": False})
+    )
+    gate.check_existing_set(folder=folder, head=head)
+
+
+def test_the_scorer_does_not_read_a_set_that_the_manifest_check_rejects(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setattr(score.common, "WORK_DIR", tmp_path)
+    folder = tmp_path / "predictions" / arms.set_name(arm="D1", month="2026-06", seed=0)
+    folder.mkdir(parents=True)
+    (folder / experiment_store.MANIFEST_NAME).write_text(
+        json.dumps({"commit": gate.head_commit(), "dirty": True})
+    )
+    score.REJECTED_SETS.clear()
+    assert not score.available(arm="D1", month="2026-06", seed=0)
+    assert "uncommitted" in score.REJECTED_SETS["d1-2026-06-s0"]
+    assert not score.available(arm="D1", month="2026-05", seed=0)
+
+
+def test_the_interim_minimum_detectable_effect_needs_only_seeds_0_and_1():
+    source = _source(
+        p=_arm_losses(seeds=(0, 1, 2), shift=0.0), one=_arm_losses(seeds=(0,), shift=0.0)
+    )
+    mde = score.minimum_detectable_effect(
+        source=source, arm="p", target="interim", where=None, level=99.0, n_resamples=200
+    )
+    assert mde is not None
+    assert mde >= 0
+    assert (
+        score.minimum_detectable_effect(
+            source=source, arm="one", target="interim", where=None, level=99.0, n_resamples=200
+        )
+        is None
+    )
+
+
+def test_a_failed_or_incomplete_placebo_check_overrides_c1_and_s1():
+    def reading(key: str) -> score.Reading:
+        return score.Reading(
+            key=key,
+            label=key,
+            scope="s",
+            difference=-0.2,
+            lower=-0.3,
+            upper=-0.1,
+            boot=None,
+            t_interval=None,
+            averaged=None,
+            n_half_hours=10,
+            n_months=7,
+            seeds=(0, 1, 2),
+            level=99.44,
+            label_rows={"D5": 10},
+        )
+
+    readings = {k: reading(k) for k in ("C1 the six", "C1 the eight", "S1")}
+    failed = {**PASSED_CHECKS, "D1p minus DF the six": False, "P1p minus PF": False}
+    out = score.verdicts(readings=readings, controls={}, stage="A", checks=failed)
+    assert out["the six"] == "inconclusive"
+    assert out["the eight"] == "supported"
+    assert out["solar"] == "inconclusive"
+    incomplete = {**PASSED_CHECKS, "D1p minus DF the eight": None}
+    out = score.verdicts(readings=readings, controls={}, stage="A", checks=incomplete)
+    assert "the eight" not in out
+    assert "front matter" not in out
+    assert "front matter" not in score.verdicts(readings=readings, controls={}, stage="A")
+
+
+def test_bounds_are_the_real_arm_against_no_cloud():
+    keys = [b.key for b in score.bound_specs()]
+    assert keys == ["D1 minus DF the six", "D1 minus DF the eight", "P1 minus PF"]

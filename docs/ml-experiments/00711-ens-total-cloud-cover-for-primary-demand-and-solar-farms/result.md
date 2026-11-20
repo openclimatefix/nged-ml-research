@@ -329,8 +329,14 @@ flag says about the date.
 **The checks use a common correction.** Eight checks are read at 1 - 0.05/8 = 99.375%: `D1p` minus
 `DF`, `D1t` minus `DF`, and the gap-scored contrast, each at the six and at the eight, and `P1p`
 minus `PF` and `P1t` minus `PF`. The six and the eight are never pooled in a check, because pooling
-signed-MW and MVA-only Primaries would let a placebo effect at one group hide behind the other. One
-failing check triggers an audit and changes no verdict.
+signed-MW and MVA-only Primaries would let a placebo effect at one group hide behind the other. A
+failing check triggers an audit. It changes no verdict, with one exception that Stage A needs: if
+`D1p` minus `DF` fails at a group (its interval does not contain zero, in either direction), the
+group's C1 verdict reads `inconclusive` until the audit reports, and if the check is incomplete the
+verdict is withheld. The same holds for S1 and `P1p` minus `PF`. The reason is that a shuffled-run
+donor that makes the placebo worse than no cloud at all would make C1 look like a gain. The scorer
+prints `D1` minus `DF` (and `P1` minus `PF`) beside C1 (and S1) as the bound, so that a reader can
+see how much of C1 the placebo's own shift explains.
 
 - **Placebo carries nothing:** `D1p` minus `DF`, `D1t` minus `DF`, `P1p` minus `PF`, and `P1t` minus
   `PF` each have an interval that contains zero. A failure fires audit trigger 5.
@@ -402,11 +408,24 @@ real cloud. Every other number is exploratory and labelled so.
 | S2 | `P2` minus `P2p` | daylight, days 1 to 10, six farms pooled | one |
 | S3 | `P1` minus `P1p` | daylight, 12 to 36 hours (the solar protocol's band) | one |
 
-**Stage A decides the question; Stage B refines it.** Stage A reads C1 at the six and at the eight
+**Stage A can find a gain or a loss; under a null it will most likely read `inconclusive`.** The
+estimated minimum detectable effect is about 0.05 points at the six, 0.03 at the eight, and 0.02 at
+the farms. A verdict of `not supported` needs a lower limit at or above -0.02, which at a half-width
+of 0.05 needs a point estimate of +0.03 or more at the six and about +0.01 at the eight. Stage A can
+therefore return `supported`, `small gain`, or `refuted`, and a true null at the six is expected to
+read `inconclusive`. Stage B does not narrow C1, because adding seeds does not narrow an interval
+that draws one fitting seed per resample (section 12, point 1). Stage A prints an interim minimum
+detectable effect before any contrast, from a split of seed 0 against seed 1 of `D1p` (at the six
+and at the eight) and of `P1p`. That split has the noise structure of the 3-against-3 split, so a
+Stage A `inconclusive` can be told from an underpowered contrast by comparing the interval's
+half-width with the interim figure.
+
+**Stage A reads these contrasts, and Stage B refines them.** Stage A reads C1 at the six and at the eight
 and S1, each at 99.44% so that Stage B keeps the family of nine readings, with seeds 0 to 2. Its
 verdict for each Primary demand group is the C1 verdict, its verdict for the solar farms is the S1
 verdict, and the front-matter rule combines the three. The Stage A verdict does not use C2, C3, S2,
-S3, the positive control, the minimum detectable effect, or any other Stage B contrast. C2, C3, S2,
+S3, the positive control, the 3-against-3 minimum detectable effect (Stage A prints only the
+interim one), or any other Stage B contrast. C2, C3, S2,
 S3, `D1t`, `P1t`, the gap-scored contrast, the positive control, the same-row pairs, the replicate,
 and every exploratory slice that needs a Stage B arm are Stage B. A Stage B reading can change the
 verdict only through the rules above (the modifiers and audit trigger 2), after the manager has
@@ -579,6 +598,13 @@ jobs and prints the count and the estimate.
 | `PF`, `P1`, `P1p` | the 7 solar folds | 0 to 2 | 63 | no-cloud reference, real cloud, placebo (S1; `P1p` minus `PF`) |
 | Total | | | 132 | 69 Primary demand fits at 124 s, 63 solar fits at 125 to 250 s |
 
+**The solar inputs are built before the first solar fit.** `e00711_solar_inputs.py` writes one table
+per farm. A dry run of 30 runs and of 120 runs for one farm, into a scratch folder, took 7 s and 24 s
+with a peak resident memory of 0.56 and 0.60 GB. That scales to about 6.5 minutes and 1.5 GB per
+farm for the 2,086 runs, so the six farms take about 40 minutes in sequence. The dry runs found no
+null cloud at any stamped half-hour of the runs that serve as donors, and every row passed the origin
+assertion.
+
 **Stage A needs the gate first.** The fit refuses every arm but `D0n` until `work/gate_passed.json`
 holds the fit gate and the prediction gate at both gate months. The one override is `--measure` for
 the measuring fit, which writes under the name `measure-<arm>`.
@@ -616,24 +642,34 @@ same rows with the seed noise inside the interval (experiment 707).
 
 ## 12. Review points to settle at implementation
 
-**The design review raised six points that this plan does not yet settle.** Each is settled with the
-manager, or by a plan review, before the first fit.
+**The design review raised six points. Each is either settled with a recorded decision or marked
+"to be settled before Stage B".** Stage A depends on points 1 and 2 only.
 
 - **Fewer seeds.** The bootstrap draws one fitting seed per resample, so the interval does not
   narrow as seeds are added. Cutting the planned arms to 3 seeds would save about 180 Primary demand
   fits and 70 solar fits, with no loss of interval width. The alternative is to keep 6 seeds and
   read a seed-averaged contrast with a bootstrap that resamples seeds inside each month draw, which
   needs a new helper whose move into `src/studies/` would need its own reviewed pull request.
+  **Settled for Stage A (the manager's Stage A instruction, 2026-11-20):** Stage A uses seeds 0 to
+  2. **To be settled before Stage B:** whether Stage B adds seeds 3 to 5 (needed for the
+  3-against-3 minimum detectable effect and for the arms that the plan gives 6 seeds) or keeps 3.
 - **The era of the placebo cloud.** For a scored run in 2025-12 to 2026-06, the real cloud comes
   from ECMWF's open data and every shuffled-run donor comes from the back-filled runs before
   2024-04-01, many of them before the 2023-06-27 resolution change. C1 and C2 are then an era
   contrast as well as an information contrast. The options are to draw donors from the recent
   segment, at least 14 days from the row's run, and to use the time-shifted rule where fewer than
   about 20 eligible recent runs exist (folds 2025-12 and 2026-01), or to make the time-shifted
-  arms `D1t` and `P1t` the planned comparator with 6 and 5 seeds.
+  arms `D1t` and `P1t` the planned comparator with 6 and 5 seeds. **Decided by the worker, reported
+  to the manager:** keep the shuffled-run donors as they are. The era check passed (64 tests, 0
+  failed, Delta version 2589; `work/checks/era_check.json`), which is evidence that the back-filled
+  and recent cloud summaries do not differ by more than the check's thresholds. The `D1p` minus
+  `DF` check (section 6) is the safeguard: if an old-era donor makes the placebo worse than no
+  cloud, the check fails and C1 reads `inconclusive` until the audit reports. The time-shifted
+  arms stay in Stage B as the second comparator.
 - **The replicate and the resolution change.** Fold 2023-06 straddles 2023-06-27. The `study` skill
   asks to drop the straddling part-month on both sides, add an era indicator to all three replicate
-  arms, and restrict donors to the row's era.
+  arms, and restrict donors to the row's era. **To be settled before Stage B**, because the
+  replicate is Stage B.
 - **A calibrated positive control.** The `K1` control is large and trivial, because `K1p` has no
   temperature. A calibrated known-answer control would add a synthetic column equal to the realised
   clear-sky index plus Gaussian noise, tuned on one fold so that the unmasked column gains about
@@ -642,11 +678,13 @@ manager, or by a plan review, before the first fit.
   the column is a control only. PLP's `longwave`, `relative_humidity`, `precipitation`, and
   `pressure_surface` inputs do not enter the physics-lite power, so a solar version is possible.
   Reporting `K1` minus `DF` on shared seeds would measure how much masking costs a strong signal.
-- **A solar replicate.** A back-fill replicate for the farms with enough early history is possible
-  and is left out to hold the experiment to one screen of results.
+  **To be settled before Stage B**, because the positive control is Stage B.
+- **A solar replicate.** A back-fill replicate for the farms with enough early history is possible.
+  **Settled:** the plan leaves it out, to hold the experiment to one screen of results.
 - **The solar holdout.** `evaluation-protocol-solar.md` would allow July and August 2026, two
-  high-sun months, but the store refuses valid times from 2026-07-01. A labelled exploratory
-  reading of those months is an option.
+  high-sun months, but the store refuses valid times from 2026-07-01. **Settled:** the experiment
+  reads no valid time from 2026-07-01 on, and a labelled exploratory reading of those months is
+  not part of this plan.
 
 **One further limit applies to every result.** `R_F` is not the port target, so a gain on `R_F` may
 not carry to the Candidate, which reads 14 thermal-lag and solar-gain columns that `R_F` lacks. The
