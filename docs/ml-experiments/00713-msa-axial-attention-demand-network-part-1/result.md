@@ -122,6 +122,47 @@ step late, and the validation loss does not reward following: arm `M` reaches a 
 loss than the placebo `P` in W1. So the failure is a finding about what this network learns on this
 training budget, and the test is correctly specified.
 
+### Diagnostics after the failed gate, which are not a gate result
+
+**Six diagnostic fits and four replications followed the failed gate. They are diagnostics only,
+they gate nothing, and they support no claim that the gate is passed.** Each run is a single
+trajectory of arm `M` in synthetic world W1, with the code hash e85b84e2ea04b3cb, a cap of 400
+passes, and no confidence interval. The variants changed the gradient-clip norm (1.0 or 10) and the
+learning rate of the lead-day parameters only (the lead-day map `w_lead`, the lead embedding, and
+the head's 14 lead-day input columns), by a factor of 1 or 10. The first six rows ran at training
+seed 0 on world seed 0, the world that amendment 3 was derived from. V0 reproduces the amended gate.
+
+**The multiplier of 10 was chosen on that same world and seed, after seeing its result, so the first
+V2 figure is an optimistic selection.** The four replications changed the training seed or drew a
+fresh world (world seed 1000, never used before and not used to choose the multiplier). The fixed
+table of weekday-by-half-hour effects kept its own seed in every run.
+
+| Run | Change from the amended gate | Training seed | World seed | Follow at the best-validation state | Follow at the final pass |
+|---|---|---|---|---|---|
+| V0 | None (the amended gate) | 0 | 0 | 0.142 | 0.112 |
+| V1 | Clip norm 10 | 0 | 0 | 0.024 | 0.276 |
+| V2 | Lead-day learning rate × 10 | 0 | 0 | 0.806 | 0.685 |
+| V3 | Clip norm 10 and lead-day learning rate × 10 | 0 | 0 | 0.586 | 0.787 |
+| V0N | None, no early stopping (400 passes) | 0 | 0 | 0.129 | 0.236 |
+| V2N | Lead-day learning rate × 10, no early stopping (400 passes) | 0 | 0 | 0.820 | 0.395 |
+| R1 | As V2 | 1 | 0 | 0.857 | 0.815 |
+| R2 | As V2 | 2 | 0 | 0.377 | 0.649 |
+| R3 | As V2 | 0 | 1000 | 0.454 | 0.368 |
+| R4 | As V0 | 0 | 1000 | 0.063 | 0.185 |
+
+**Arm `M` reached the 0.75 threshold at the best-validation state on 2 of the 4 runs that used the
+lead-day multiplier (V2 and R1), and missed it on the other 2 (R2 and R3).** The follow share at the
+best-validation state varied from 0.377 to 0.857 across training seeds and worlds, and the
+unmodified baseline gave 0.142 and 0.063. The no-early-stopping runs followed more than 0.9 at some
+passes (0.912 for V0N, 0.929 for V2N), but their best-validation states stayed at 0.129 and 0.820,
+so the state that validation loss picks is a noisy selector of the follow share.
+
+**No amendment was made, the gate remains failed, and whether to continue is the maintainer's
+decision.** The diagnostics concern one family of synthetic worlds, one fold, and single runs, so
+they say nothing about the real folds. The options that follow from them, with the reasons, are in
+`gate_options.md` and the two diagnostic reports (`diag_option5/README.md` and
+`diag_option5/replication/README.md`), in `data/ml-experiments/briefs/msa_architecture/`.
+
 **No real fold has been fitted.** The 160 fits, the Candidate refits, and every scored contrast of
 the plan below are unrun, and all of the text below describes the plan as it was committed, with the
 departures that amendments 1 to 3 added. A reader should take nothing in the plan below as evidence.
