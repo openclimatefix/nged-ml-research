@@ -61,7 +61,70 @@ metric: >-
   absolute error of the median beside it.
 ---
 
-**Status: planned. No network has been fitted and no number below is a result.**
+**Status: planned, and blocked. The experiment failed its pre-registered known-answer gate on its
+fourth run, and no real fold has been fitted.** No number below is a result of the experiment. The
+experiment carries no verdict word. Whether to continue is the maintainer's decision, and no further
+amendment to the gate is planned.
+
+## The known-answer gate has failed four times
+
+**The gate trains networks on a synthetic world with a known answer, and arm `M` must follow a level
+step that appears in the history rows.** The check is KA3: in synthetic world W1, arm `M` must move
+its median by at least 0.75 of a step of 0.30 of capacity (the follow share). Arm `M` has never come
+near that figure. All four results stay on this page, each with the commit that produced it.
+
+| Run | Commit | Failed checks | Numbers | Cause found |
+|---|---|---|---|---|
+| First gate run (J1) | 3ac110652 | KA2, KA3, KA10, KA12 | Arm `N` mean absolute error 0.0476 against a limit of 0.02; follow share of `M` 0.0348; \|`M` − `P`\| 0.0166 against 0.005; follow share of `E` −0.0197 | The read-out's two query and key maps both started at zero, so neither trained |
+| Rerun 2 | eb1942601 | KA3 | Follow share of `M` 0.0099 | The trained network barely read the lead day |
+| Rerun 3 | 90b9de2c8 | KA3 | `M` 0.0186, `E` 0.1268, `G` 0.0005, `P` −0.00007, `N` 0 | KA2, KA4, KA5, KA6, KA10, and KA12 passed |
+| Amended gate | 94dfb9652 | KA3, KA12 | `M` 0.1418 at the best-validation state; `G` 0.0395 against the KA12 limit of `M` − 0.05 = 0.0918 | KA2, KA4, KA5, KA6, and KA10 passed |
+
+**The first fault was a bug, which the first gate run found and amendment 1 fixed.** The read-out's
+query map `W_q` and key map `W_k` both started at zero, so each gradient (proportional to the other
+map) stayed zero and the read-out never trained. The query map now has the default random
+initialisation, the key map stays at zero, and the untrained network is unchanged (KA1 holds). A new
+check fails on the old initialisation. The fix changes every real fold's network, because the
+read-out now trains there too.
+
+**The second fault was a weak lead-day path, which amendment 2 (`design_amendment_2.md`) addressed
+after an audit.** The lead day entered only as an embedding on the target row's tokens. In the
+audit, the embedding shrank to a mean length of 0.08, and moving the lead day from 1 to 14 changed
+the median by 0.012 standardised units against a step of 2.1. Amendment 2 adds the one-hot lead day
+to the read-out query and to the head's input, 1,344 parameters in all, with no effect at the start.
+Rerun 3 followed, with a follow share of `M` of 0.0186.
+
+**Amendment 3 (`design_amendment_3.md`) raised the budget of the synthetic fits only, and the
+amended gate still failed.** The synthetic fits ran at most 400 passes with a patience of 30, where
+they had run 150 and 8. The real folds' budgets and every threshold were unchanged. The amendment
+came from a diagnostic on the same synthetic world W1 that the gate uses, so it was a post-hoc
+change of the gate's budget. The amended gate stopped every fit by early stopping before the cap: W1
+`M` at pass 193, `P` at 205, `N` at 257, `E` at 175, `G` at 199, and W0 `M` at 350. It took 67
+minutes on one GPU, with a peak of 5,090 MiB.
+
+**Scored at the pre-registered state, the best-validation state of each fit, the amended gate fails
+KA3 and KA12.** The follow share of arm `M` is 0.1418 against 0.75. In KA12, arm `G` reaches 0.0395,
+below `M` minus 0.05 = 0.0918, so the check fails. **Experiment 713 therefore failed its
+pre-registered known-answer gate.**
+
+**Secondary readings, which never gate.** The final-pass follow shares of the W1 fits are 0.1117 for
+`M`, 0.2154 for `E`, and 0.0297 for `G`. The follow share of `M`, read every 20 passes, ranged from
+0.005 to 0.189 with no trend, so a single reading is weak evidence either way. These readings were
+recorded before the run as labelled secondary readings, and none of them is used for the pass or
+fail decision. The best of them, 0.2154 for `E`, is also below 0.75.
+
+**The audit of the gate found no implementation fault.** `ka3_audit.md` (in
+`data/ml-experiments/briefs/msa_architecture/`, an Opus audit) checked the gate and its scorer with
+oracles: a hand-set read-out on the newest history row scores 0.936, and rules that follow the step
+score 1.000 through the same scorer, so the follow share can reach 1. The audit found that the
+history path trains and that the network can read the step. The trained network learns to follow the
+step late, and the validation loss does not reward following: arm `M` reaches a worse validation
+loss than the placebo `P` in W1. So the failure is a finding about what this network learns on this
+training budget, and the test is correctly specified.
+
+**No real fold has been fitted.** The 160 fits, the Candidate refits, and every scored contrast of
+the plan below are unrun, and all of the text below describes the plan as it was committed, with the
+departures that amendments 1 to 3 added. A reader should take nothing in the plan below as evidence.
 
 ## What this experiment asks
 
@@ -717,7 +780,7 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   the threshold of 0.75. The follow share at the final pass, and every 20 passes, is recorded as a
   secondary reading that never gates. If the amended gate fails KA3 at the pre-registered state,
   experiment 713 is reported as failing its gate. Every threshold, the real folds' budgets, and the
-  arm list are unchanged.
+  arm list are unchanged. The amended gate failed KA3 and KA12 (see the status section above).
 - **Shared by all stages.** AdamW with weight decay 1e-3 and gradient clipping at 1.0; batch of 256
   samples; at most 60 passes with patience 8; loss `(weight × nll).sum() / weight.sum()` over finite
   targets. A pass visits every (Primary, origin day) once, with one lead day drawn uniformly,
