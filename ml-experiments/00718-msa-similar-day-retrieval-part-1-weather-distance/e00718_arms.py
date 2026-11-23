@@ -141,6 +141,23 @@ def gate_file(*, data_dir: Path) -> Path:
     return root(data_dir=data_dir, part=1) / "work" / "known_answers_passed.json"
 
 
+def result_file(*, data_dir: Path) -> Path:
+    """Return the known-answer result record, which the gate writes whether it passes or fails."""
+    return root(data_dir=data_dir, part=1) / "work" / "known_answers_result.json"
+
+
+GATE_FILES: Final = ("e00718_known_answer.py", "e00718_worlds.py")
+"""The scripts that decide a known-answer result; the gate file is valid only for their current text."""
+
+
+def gate_hash() -> str:
+    """Return a hash of the gate's own scripts and of the fit code (`code_hash`)."""
+    h = hashlib.sha256(code_hash().encode())
+    for name in GATE_FILES:
+        h.update(_module_path(name=name).read_bytes())
+    return h.hexdigest()[:16]
+
+
 def own_cache(*, data_dir: Path) -> Path:
     """Return F9's own dense-array cache, so that no file is written into experiment 713's folder."""
     return root(data_dir=data_dir, part=1) / "cache"
@@ -248,7 +265,10 @@ def check_code(
     `--accept-gate-change` (the gate record). An override is appended to `record["code_overrides"]`
     with both hashes and both git commits. A record without a code hash cannot be overridden.
     """
-    now, old = code_hash(), earlier.get("code_hash")
+    gate = kind == "gate"
+    now, old = (
+        (gate_hash(), earlier.get("gate_hash")) if gate else (code_hash(), earlier.get("code_hash"))
+    )
     if old is None:
         msg = f"{what} carries no code record: refit it"
         raise AssertionError(msg)

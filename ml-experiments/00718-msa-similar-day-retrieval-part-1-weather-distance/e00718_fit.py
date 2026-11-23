@@ -207,7 +207,7 @@ def fit(
         gate = arms.gate_file(data_dir=data_dir)
         assert gate.exists(), f"{gate} is missing: run e00718_known_answer.py first"
         arms.check_code(
-            earlier=json.loads(gate.read_text()).get("code", {}),
+            earlier=json.loads(gate.read_text()).get("code", {}),  # carries the gate hash
             accept=[accept_gate] if accept_gate else [],
             record=log,
             what="the known-answer gate file",

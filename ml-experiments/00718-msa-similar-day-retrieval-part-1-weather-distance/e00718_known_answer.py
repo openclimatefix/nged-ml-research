@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915, PT018
+# ruff: noqa: PT017, E501, PLR0915, PT018
 """Experiment 718, WP5b: the known-answer gate (design section 10.2): checks KS1 to KS3 on worlds WS and WN.
 
 Usage: e00718_known_answer.py MONTH [--device cuda]   # the real gate: needs the fold's stored data and the GPU
@@ -16,6 +16,7 @@ unconditional. WS+, `U27` in WS, and the frozen-encoder fit are not part of this
 
 import argparse
 import json
+import os
 import sys
 import time
 from collections.abc import Callable, Sequence
@@ -159,6 +160,7 @@ def fit_world_arm(
         "arm": arm, "seed": seed, "trajectory": trajectory, "val_history": list(log.val_history),
         "metric": float(np.median(picks)) if picks else float("nan"),
         "real_budget_pass": real_budget_pass(val_history=log.val_history),
+        "metric_at_real_budget_pass": float(trajectory[real_budget_pass(val_history=log.val_history) - 1]) if trajectory else float("nan"),
     }  # fmt: skip
 
 
@@ -199,20 +201,50 @@ def evaluate_checks(
     return out
 
 
-def write_gate(*, data_dir: Path, result: dict) -> Path:
-    """Write the gate file atomically; the fit reads its `code` record."""
-    path = arms.gate_file(data_dir=data_dir)
+def write_record(*, path: Path, result: dict) -> Path:
+    """Write a record of the gate's result atomically, with the code record and the gate hash."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    code = {**arms.code_record(), "gate_hash": arms.gate_hash()}
     tmp.write_text(
         json.dumps(
-            {"code": arms.code_record(), "recipe": arms.recipe_hashes(), "result": result},
+            {"code": code, "recipe": arms.recipe_hashes(), "result": result},
             indent=1,
             default=float,
         )
     )
     tmp.rename(path)
     return path
+
+
+def write_gate(*, data_dir: Path, result: dict) -> Path:
+    """Write the gate file that every real fit requires; the fit reads its `code` record."""
+    return write_record(path=arms.gate_file(data_dir=data_dir), result=result)
+
+
+def finish(*, data_dir: Path, result: dict, manager_accepts_unread_ks3: bool = False) -> int:
+    """Write the result record in every case, and the gate file only when every check passes and KS3 was read.
+
+    A passing run whose KS3 precondition failed writes the gate file only when
+    `manager_accepts_unread_ks3` is true, and logs that in the result record.
+    """
+    checks = result.get("checks")
+    ok = bool(checks and checks["all_pass"])
+    read = bool(checks and not checks["ks3_unread"])
+    result["gate_written"] = bool(ok and (read or manager_accepts_unread_ks3))
+    result["manager_accepts_unread_ks3"] = manager_accepts_unread_ks3
+    path = write_record(path=arms.result_file(data_dir=data_dir), result=result)
+    print("result record:", path)
+    if not ok:
+        print("a known-answer check failed or the run stopped: no gate file; go to the manager")
+        return 1
+    if not read and not manager_accepts_unread_ks3:
+        print(
+            "KS3's difference tests are unread (the precondition failed): no gate file; send them to the manager"
+        )
+        return 1
+    print("gate file:", write_gate(data_dir=data_dir, result=result))
+    return 0
 
 
 def tables_for(
@@ -254,6 +286,37 @@ def gaps_of(
     }
 
 
+def _check_finish(*, good: dict, bad_wn: dict, good_ws: dict, gaps: dict) -> None:
+    """Check that the result record is always written and the gate file only for a read, passing run."""
+    import tempfile
+
+    unread = evaluate_checks(ws=good_ws, wn=bad_wn, gaps=gaps, floor=0.04)
+    assert unread["ks3_unread"], unread
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        gate, record = arms.gate_file(data_dir=root), arms.result_file(data_dir=root)
+        assert finish(data_dir=root, result={"checks": unread}) == 1
+        assert record.exists()
+        assert not gate.exists(), "the gate file was written with KS3 unread"
+        assert (
+            finish(data_dir=root, result={"checks": unread}, manager_accepts_unread_ks3=True) == 0
+        )
+        assert json.loads(record.read_text())["result"]["manager_accepts_unread_ks3"] is True
+        assert json.loads(gate.read_text())["code"]["gate_hash"] == arms.gate_hash()
+        gate.unlink()
+        assert finish(data_dir=root, result={"checks": good}) == 0 and gate.exists()
+        gate.unlink()
+        assert finish(data_dir=root, result={"stopped": "pre-check"}) == 1 and not gate.exists()
+        bad = {**good, "all_pass": False}
+        assert finish(data_dir=root, result={"checks": bad}) == 1 and not gate.exists()
+        stale = {"gate_hash": "old"}
+        try:
+            arms.check_code(earlier=stale, accept=[], record={}, what="gate", kind="gate")
+            raise SystemExit("a gate file with another gate hash was accepted")
+        except AssertionError as err:
+            assert "--accept-gate-change" in str(err)
+
+
 def selftest() -> int:
     """Check the checks' logic, the real-budget rule, and a two-pass fit of arms `Z`, `R`, and `N` in a tiny world on the CPU."""
     good_ws = {"Z": 0.12, "R": 0.03, "P90": 0.10, "U": 0.03, "U-A": 0.09, "N": 0.2}
@@ -261,6 +324,7 @@ def selftest() -> int:
     gaps = {"gap_R": 0.033, "gap_RM": 0.023, "gap_U": 0.05}
     res = evaluate_checks(ws=good_ws, wn=good_wn, gaps=gaps, floor=0.04)
     assert res["all_pass"] and not res["ks3_unread"], res
+    _check_finish(good=res, bad_wn={**good_wn, "N": 0.2}, good_ws=good_ws, gaps=gaps)
     assert not evaluate_checks(ws={**good_ws, "R": 0.099}, wn=good_wn, gaps=gaps, floor=0.04)[
         "KS1"
     ]["pass"]
@@ -360,7 +424,7 @@ def selftest() -> int:
     return 0
 
 
-def run(*, month: str, device: str) -> int:
+def run(*, month: str, device: str, manager_accepts_unread_ks3: bool = False) -> int:
     """Run the pre-check and the gating fits for the fold `month` and write the gate file (needs the stored data and the GPU)."""
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
@@ -428,7 +492,7 @@ def run(*, month: str, device: str) -> int:
                     "pre-check: a gap is below 0.010; the world is mis-specified, no world fit runs"
                 )
                 print(result["stopped"])
-                return 1
+                return finish(data_dir=ML_EXPERIMENTS_DATA_DIR, result=result)
         else:
             floor = worlds.held_out_floor(arrays=arrays)
         fits: dict[str, list[dict]] = {}
@@ -451,21 +515,20 @@ def run(*, month: str, device: str) -> int:
         scores[kind] = {a: arm_score(fits=fits, arm=a) for a in arm_list}
     result["scores"] = scores
     result["checks"] = evaluate_checks(ws=scores["WS"], wn=scores["WN"], gaps=gaps, floor=floor)
+    result["fits"] = (
+        fits_all  # every per-pass trajectory, for the real-budget reading and the traces
+    )
     result["secondary_real_budget_pass"] = {
         k: {a: [f["real_budget_pass"] for f in v] for a, v in fits.items()}
         for k, fits in fits_all.items()
     }
     result["seconds"] = round(time.monotonic() - started, 1)
     print(json.dumps(result["checks"], indent=1, default=float))
-    if not result["checks"]["all_pass"]:
-        print("a known-answer check failed: no gate file is written; stop and go to the manager")
-        return 1
-    if result["checks"]["ks3_unread"]:
-        print(
-            "KS3's difference tests are unread (the precondition failed): send them to the manager; the gate file records this"
-        )
-    print("gate file:", write_gate(data_dir=ML_EXPERIMENTS_DATA_DIR, result=result))
-    return 0
+    return finish(
+        data_dir=ML_EXPERIMENTS_DATA_DIR,
+        result=result,
+        manager_accepts_unread_ks3=manager_accepts_unread_ks3,
+    )
 
 
 def main() -> int:
@@ -474,11 +537,20 @@ def main() -> int:
     parser.add_argument("month", nargs="?")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument(
+        "--manager-accepts-unread-ks3",
+        action="store_true",
+        help="write the gate file although KS3's difference tests were unread; the result record logs it",
+    )
     args = parser.parse_args()
     if args.selftest:
         return selftest()
     assert args.month, "give the fold month"
-    return run(month=args.month, device=args.device)
+    return run(
+        month=args.month,
+        device=args.device,
+        manager_accepts_unread_ks3=args.manager_accepts_unread_ks3,
+    )
 
 
 if __name__ == "__main__":
