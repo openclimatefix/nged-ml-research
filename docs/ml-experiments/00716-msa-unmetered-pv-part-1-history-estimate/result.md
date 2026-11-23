@@ -276,6 +276,24 @@ capacity.** The first rung whose `gap` is at least 0.010 is used, decided from N
 the real weather before any PV fit. No threshold changes between rungs. If no rung passes, the
 work stops before any PV fit and goes to the designer.
 
+**An early-stopping pre-check follows, and a failure steps the ladder up one rung.** The pre-check
+reads no PV fit. It computes the Gaussian negative log-likelihood of the naive and of the oracle
+reference on the (sample, lead day) pairs and target tokens that experiment 713's `validation_loss`
+averages. The difference must be at least 10 times the standard deviation of arm `M`'s validation
+loss over its last 10 passes in the same world, with the best pass reconstructed from `val_history`
+by 713's improvement test and a patience of 8. After a failed pre-check at rung N, the command
+`e00716_world_rung.py --after N` refuses to run unless `precheck_rung<N>.json` exists, records a failure,
+and comes from the current world code. It then computes the next rung and never chooses a rung
+numbered N or lower, and arm `M` is refitted at seed 0 in WH and WT at the new rung. If no rung above
+N passes, F7
+stops before any PV fit and the designer is asked. **Every extra fit of arm `M` is charged to the
+reserve of phase 9 of design section 10 (1.5 GPU-process-hours), and all three worlds use the same rung.**
+Arm `M` at seeds 1 and 2 and in world WN is fitted only at the rung that finally passes.
+
+**The phase 0 smoke fit of arm `H` runs after the gate, not before it.** `fit()` refuses to run
+before the known-answer gate has passed and has no flag to skip the gate, so the smoke fit of the run
+brief's phase 0 moves to follow the gate.
+
 ## Leakage and what a live service could build
 
 **The history PV estimate rides on the CAMS analysis, which is the lab shortcut experiment 713
@@ -357,9 +375,20 @@ The oracle may therefore learn more from the history than a single linear model 
 probably understates how much the estimate tells a neural network, and the KF9 threshold of 0.5 ×
 `gap` is probably easier to meet than a single-model reading would make it.
 
-**The choice of rung rests on one draw of each world.** The `gap` of one rung varies from draw to draw:
-rung 2 gave a smaller WH `gap` than rung 1 although the Monte Carlo predicted no change. The page that
-reports the gate says so beside the chosen rung.
+**The choice of rung rests on one draw of each world, and the draw may be high (a known risk).** The
+`gap` of one rung varies from draw to draw: rung 2 gave a smaller WH `gap` than rung 1 although the
+Monte Carlo predicted no change. The second code review re-ran the ladder at world draw 0 and
+reproduced `world_rung.json` for rungs 1 to 4: WH gives 0.0053, 0.0014, 0.0050, and 0.0165, and WT gives
+0.0283, 0.0332, 0.0351, and 0.0825, so rung 4 is the first rung that passes in both worlds. Three more
+draws of rung 4 gave a WH `gap` of 0.0041, 0.0061, and 0.0044, with a WT `gap` of 0.080 to 0.087,
+so rung
+4's WH `gap` passes on 1 of 4 draws, and at draw 0 the pass rests on one Primary. Rung 5 gives WH 0.0099
+and WT 0.0869. **If the early-stopping pre-check fails at rung 4, `--after 4` therefore finds no passing
+rung and F7 stops before any PV fit.** KF9 compares against the `gap` of the same draw that the gating
+fits use, so its threshold of 0.5 × 0.0165 = 0.0082 is internally consistent, but a `gap` estimate that
+is probably high makes KF9 harder to pass than a typical draw would. The ladder and its rule are not
+changed here; whether to fix a mean over several draws as the quantity is a decision for the designer,
+taken as an amendment before any fit of arm `M`.
 
 **The gating fits mirror the real recipe, with two stated differences.** The encoders are frozen, the
 constant divisors of both token paths are calibrated on the arm's own training samples before the first
@@ -370,8 +399,29 @@ state, and the early-stopping patience is off, so the state that KF15 reads is t
 **The cold-night guard of `supported` is computed inside the scorer.** The protocol scorer of experiment
 713 loads only 713's own arms, so the scorer here reads the same two thresholds of the `cold_nights`
 slice (the sun more than 5 degrees below the horizon, and the ERA5 temperature at or below 3 degrees
-Celsius) from the dense table, in the winter months, in points of capacity. A missing input raises
-instead of passing.
+Celsius) from the dense table, in points of capacity. A missing input raises instead of passing.
+**The guard's slice departs from the protocol's `cold_nights` slice in two ways.** The guard adds a
+restriction to UTC months 12, 1, and 2, to match "cold winter nights", whereas the protocol's slice has
+no month restriction. The guard also reads the sun at the grid stamp (the cosine of the zenith in dense
+column 7), whereas the protocol reads it at the half-hour midpoint. Dense column 2 as the protocol's
+`temperature_c` series has not been compared.
+
+**KF2 runs on the training phase and on the held-out origins.** The poison test runs once on 64
+stage 2 samples of the training phase and once, in a process of its own, on 64 draws from the scored
+origins of the held-out month, where the target table holds the runs of that month. An arm with no
+history row or no target row (`H`, `H-S`, and `H-X` have no target row) skips the negative control for
+that input and instead asserts that the poison changes nothing. **KF4's real-data half cannot show that
+the dense shortwave and temperature values are right.** Its comparison of the dense `u` with
+`e00634_common.unit_curve` reads both sides from the dense table, so it tests the composition of the
+yield function (the column order, the day of the year, and the normalisation by the 99th percentile)
+and not the weather. The independent rows hold forecasts, so the geometry columns are compared for
+equality and the weather columns for correlation (0.90 for shortwave and 0.93 for temperature in fold
+2025-11).
+
+**S5 pools the 14 Primaries of the six and the eight, and report-only contrasts are read on the cells
+both arms hold.** An arm that exists on 5 folds (`Z`) or at 2 seeds (`H-X`, `T`) gives a contrast on
+those folds and seeds, and the scorer prints and records which folds, seeds, and cells are missing. A
+contrast with no common cell is recorded as `not_read` with its reason.
 
 **The `HT-S` exception covers the first 28 days of each fold's own Candidate rows.** KF3 prints the count
 for the first fold, and the count decides whether the exception days include days that have a real
