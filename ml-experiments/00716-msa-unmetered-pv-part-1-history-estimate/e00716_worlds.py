@@ -39,7 +39,7 @@ HELD_OUT_DAYS: Final = 60
 GAP_MIN: Final = 0.010
 VALIDATION_LEADS: Final = (0, 1, 3, 6, 9, 13)
 """Experiment 713's `VALIDATION_LEAD_DAYS` (zero-based lead-day indices)."""
-PENALTIES: Final = (1.0, 10.0, 100.0, 1_000.0, 10_000.0, 100_000.0)
+PENALTIES: Final = (1.0, 10.0, 100.0, 1_000.0, 10_000.0, 100_000.0, 1_000_000.0, 10_000_000.0)
 """Candidate ridge penalties, added to the Gram matrix of standardised features pooled over leads."""
 CV_BLOCKS: Final = 3
 SOLAR_HALF_HOURS_UTC: Final = (12, 29)
