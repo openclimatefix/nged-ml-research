@@ -3,7 +3,10 @@
 import argparse
 import sys
 
-import e00716_report as report716
+import e00716_report as report716  # ty: ignore[unresolved-import]
+import e00717_guard as guard
+
+guard.require_part1(report716)
 
 
 def main() -> int:

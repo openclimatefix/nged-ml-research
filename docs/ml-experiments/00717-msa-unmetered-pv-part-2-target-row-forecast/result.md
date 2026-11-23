@@ -136,7 +136,10 @@ path `γ_t ⊙ (W2_t GELU(W1_t [p0_mean·ok, p0_sd·ok, ok]) / r_t)` enters the 
 gross demand minus the forecast PV, the decomposition of experiment 064; `p0_sd` lets the head
 widen the mixture when the ENS members disagree about the sky. The network, training recipe,
 optimiser groups (1e-2 for `a` and `c`, 3e-3 for `γ_h` and `γ_t`), and known-answer checks are those
-of experiment 716, with world WT and checks KF11 and KF12 for part 2.
+of experiment 716, with world WT and checks KF11 and KF12 for part 2. **KF11 requires `HT-S` minus
+`HT` in world WT to be at least 0.5 × the `gap` of WT** (`HT-S` reads the target sky of the run 28 days
+earlier), and the same two pre-checks as in part 1 apply to WT: the `gap` of at least 0.010 and the
+early-stopping check, which uses the rung that part 1's ladder chose.
 
 ## Counted contrasts and the decision rule
 
@@ -191,6 +194,26 @@ The experiment is planned and has no fitted result yet, so these bullets describ
 The amendments that part 1's page lists (48 ridge regressions per Primary pooled over the 14 leads, the
 gating fits that mirror the real recipe, and the cold-night guard computed inside the scorer) apply to
 this page unchanged.
+
+**The pre-check, the step up, and the reserve are as on the page of part 1.** After a failed
+early-stopping pre-check at rung N, the step up to the next rung needs a failed pre-check record of
+rung N, every extra fit of arm `M` is charged to the reserve of phase 9 of design section 10, and F7
+stops before any PV fit if no rung above N passes.
+
+**The choice of rung is fragile, and the risk is known.** The page of part 1 gives the numbers: the WH
+`gap` of rung 4 passes 0.010 on 1 of 4 world draws (0.0165 at draw 0, then 0.0041, 0.0061, and 0.0044),
+rung 5 gives WH 0.0099 and WT 0.0869, and WT passes by a factor of 3 to 8 at every rung tried. If the
+early-stopping pre-check fails at rung 4, no rung passes and F7 stops before any PV fit.
+
+**The cold-night guard departs from the protocol's slice in two ways.** The guard restricts to UTC
+months 12, 1, and 2, which the protocol's slice does not, and reads the sun at the grid stamp, not at the
+half-hour midpoint.
+
+**Merge experiment 716 (part 1) first, then rebase this branch onto `main`.** Until part 1 is on `main`,
+`ty check` cannot resolve the `e00716_*` imports of this folder, so they carry `ty: ignore` comments.
+Every script here calls `e00717_guard.require_part1`, which refuses to run when `EXTRA_PYTHONPATH` does
+not name an existing part 1 folder or when an `e00716_*` module comes from any other folder, so a removed
+part 1 checkout cannot silently give way to a stale copy.
 
 **The fits of `HT`, `HT-S`, and `T` run through this folder's `run.sh`,** which finds
 `e00716_fit.py` and `e00716_predict.py` in part 1's folder through `EXTRA_PYTHONPATH`. The fits write

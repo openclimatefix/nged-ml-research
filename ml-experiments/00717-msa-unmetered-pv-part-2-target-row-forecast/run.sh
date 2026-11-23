@@ -8,6 +8,9 @@
 #        run.sh e00717_score.py part2 --n-seeds 5
 #        EXTRA_PYTHONPATH=<part 1 checkout>/ml-experiments/00716-... run.sh ...
 #        SLOT_MEM=8G run.sh e00716_check_model.py
+# Merge order: experiment 716 (part 1) merges first, then this branch is rebased onto main. Until then
+# `ty check` cannot resolve the e00716_* imports, so they carry `ty: ignore` comments, and every
+# e00717 script calls `e00717_guard.require_part1`, which refuses a stale copy of e00716_*.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # are set to dummy values here because the contracts package reads them at import. Check `free -g`
 # first and wait when under 25 GB is available.
@@ -17,6 +20,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$(dirname "$here")"
 # Part 2 imports part 1's code (e00716_*), which lives in its own worktree: EXTRA_PYTHONPATH names that folder.
 EXTRA_PYTHONPATH="${EXTRA_PYTHONPATH:?set EXTRA_PYTHONPATH to the 00716 folder of the part 1 checkout}"
+[ -d "$EXTRA_PYTHONPATH" ] || { echo "EXTRA_PYTHONPATH names $EXTRA_PYTHONPATH, which does not exist" >&2; exit 1; }
 script="$1"
 shift
 available_gb=$(free -g | awk '/^Mem:/ {print $7}')

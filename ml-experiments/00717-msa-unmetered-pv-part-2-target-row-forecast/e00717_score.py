@@ -9,7 +9,10 @@ Run `run.sh e00717_score.py part2 --n-seeds 5` (or `--n-seeds 2`) and
 import argparse
 import sys
 
-import e00716_score as score
+import e00716_score as score  # ty: ignore[unresolved-import]
+import e00717_guard as guard
+
+guard.require_part1(score)
 
 
 def selftest() -> int:

@@ -5,9 +5,12 @@ import json
 import sys
 from pathlib import Path
 
-import e00716_arms as arms
-import e00716_figures as figs
-import e00716_score as score
+import e00716_arms as arms  # ty: ignore[unresolved-import]
+import e00716_figures as figs  # ty: ignore[unresolved-import]
+import e00716_score as score  # ty: ignore[unresolved-import]
+import e00717_guard as guard
+
+guard.require_part1(arms, figs, score)
 
 
 def cmd_contrasts(*, out_dir: Path) -> int:
