@@ -343,6 +343,22 @@ def kf14_check(
     }
 
 
+def kf14_correlations(
+    *, ghi: np.ndarray, cos_zenith_at: dict[int, np.ndarray], n_steps: int
+) -> dict[int, float]:
+    """Return the correlation of `ghi` with the mean positive cosine of the zenith over the period ending `shift` grid steps after each stamp, for shifts -1, 0 and +1.
+
+    The two-sided violation counts of `kf14_check` cannot tell a period-end label from a stamp 30
+    minutes later, because both give no end violations. The period-end label is right when shift 0
+    correlates best. `cos_zenith_at` must hold steps `-n_steps - 1` to `n_steps + 1`.
+    """
+    out = {}
+    for shift in (-1, 0, 1):
+        window = [np.clip(cos_zenith_at[k + shift], 0.0, None) for k in range(-n_steps + 1, 1)]
+        out[shift] = float(np.corrcoef(ghi, np.mean(window, axis=0))[0, 1])
+    return out
+
+
 def kf14_synthetic() -> list[str]:
     """KF14 on a toy series: a period-end series passes, and the same series stamped at the period start fails."""
     n = 48 * 60
@@ -358,15 +374,25 @@ def kf14_synthetic() -> list[str]:
     def mean_over(lo: int, hi: int) -> np.ndarray:
         return np.mean([np.clip(cz_of(k), 0, None) for k in range(lo, hi + 1)], axis=0) * 1000.0
 
-    at = {k: cz_of(k) for k in range(-period, period + 1)}
+    at = {k: cz_of(k) for k in range(-period - 1, period + 2)}
     end_labelled = mean_over(-period + 1, 0)  # the stamp is the end of the period
     start_labelled = mean_over(0, period - 1)  # the stamp is the start of the period
+    later = mean_over(
+        -period, -1
+    )  # a stamp one grid step (30 minutes) after the period end: the period ended before the stamp
     good = kf14_check(ghi=end_labelled, cos_zenith_at=at, n_steps=period)
     bad = kf14_check(ghi=start_labelled, cos_zenith_at=at, n_steps=period)
     assert good["end_violations"] == 0 and good["start_violations"] > 0, good
     assert bad["end_violations"] > 0, ("a period-start series must fail the check", bad)
+    # the +30 minute control: it has no end violations, so only the correlation tells it from the period end
+    shifted = kf14_check(ghi=later, cos_zenith_at=at, n_steps=period)
+    assert shifted["end_violations"] == 0, shifted
+    right = kf14_correlations(ghi=end_labelled, cos_zenith_at=at, n_steps=period)
+    wrong = kf14_correlations(ghi=later, cos_zenith_at=at, n_steps=period)
+    assert max(right, key=right.get) == 0, right  # ty: ignore[no-matching-overload]
+    assert max(wrong, key=wrong.get) == -1, ("a +30 minute series must fail the correlation", wrong)  # ty: ignore[no-matching-overload]
     return [
-        f"KF14 logic: a period-end series gives {good}, a period-start series gives {bad} (fails, as it must)"
+        f"KF14 logic: a period-end series gives {good}, a period-start series gives {bad} (fails, as it must); a series stamped 30 minutes after the period end has no end violations but its best correlation is at shift -1 (the period ends a step before the stamp), not 0 ({wrong})"
     ]
 
 
@@ -415,11 +441,11 @@ def kf14_real() -> list[str]:
         period_us = int(np.median(np.diff(stamps_us)))
         n_steps = max(1, period_us // pv.STEP_US)
         idx = (stamps_us - pv.GRID_START_US) // pv.STEP_US
-        keep = (idx >= n_steps) & (idx < raw.shape[1] - n_steps)
+        keep = (idx >= n_steps + 1) & (idx < raw.shape[1] - n_steps - 1)
         idx = idx[keep]
         at = {
             k: np.asarray(raw[pos, idx + k, 7], dtype=np.float64)
-            for k in range(-n_steps, n_steps + 1)
+            for k in range(-n_steps - 1, n_steps + 2)
         }
         res = kf14_check(
             ghi=frame["ghi_w_m2"].to_numpy()[keep].astype(np.float64),
@@ -427,7 +453,19 @@ def kf14_real() -> list[str]:
             n_steps=n_steps,
         )
         assert res["end_violations"] == 0 and res["start_violations"] > 0, (site, res)
-        out.append(f"KF14 {site}: period {period_us // 60_000_000} min, {res}")
+        corr = kf14_correlations(
+            ghi=frame["ghi_w_m2"].to_numpy()[keep].astype(np.float64),
+            cos_zenith_at=at,
+            n_steps=n_steps,
+        )
+        assert max(corr, key=corr.get) == 0, (
+            site,
+            "period end is not the best-correlated label",
+            corr,
+        )  # ty: ignore[no-matching-overload]
+        out.append(
+            f"KF14 {site}: period {period_us // 60_000_000} min, {res}; correlation with the mean cosine of the zenith over the period ending at shift -1, 0, +1 steps: {corr}"
+        )
         break  # one site is enough: the stamp convention is a property of the file
     assert out, "no Primary's site is in the CAMS file"
     return out
