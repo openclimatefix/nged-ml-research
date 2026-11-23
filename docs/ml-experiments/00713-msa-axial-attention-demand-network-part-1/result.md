@@ -705,11 +705,14 @@ unmetered PV lets the network separate demand from solar in the past.
   [649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md) and 673. The yield
   curve is the physics solar curve of experiment 639. PV̂ enters as one extra history column, or, in
   a second variant, history power is grossed up to net power plus PV̂.
-- **Leakage and the 27 h rule:** history power already obeys the 27 h rule, and CAMS whole days at
-  least 36 hours old are available live (experiment 504). PV̂ is therefore buildable live for ages
-  3 to 15 and for most of age 2, which is stricter than the ERA5 history weather of the lab
-  shortcut. Experiment 673's table rests on probes trained to the 2026-06 cutoff, so earlier folds
-  need the as-of capacity of their own cutoff.
+- **Leakage and the 27 h rule:** history power already obeys the 27 h rule. Experiment 504 sets the
+  CAMS cutoff at 21:00 UTC on the second day before the origin's date, so the latest wholly
+  available CAMS day ends 57 hours before the 09:00 UTC native origin. In the matrix, that makes PV̂
+  buildable live for the history rows of ages 4 to 15 and for columns 0 to 24 of age 3. Age 2 and
+  columns 25 to 47 of age 3 are not buildable live. The estimate would also read ERA5 temperature,
+  so a read-out that masks the PV̂ columns is still not buildable live while the history weather is
+  the lab shortcut of design section 4.2. Experiment 673's table rests on probes trained to the
+  2026-06 cutoff, so earlier folds need the as-of capacity of their own cutoff.
 - **Cost:** one fitted arm on the four screen folds with 2 seeds, of the order of 12
   GPU-process-hours by analogy with F3 and F5 (an estimate, not a measurement).
 - **Stored-score evidence that would support H-PV:** after the eight folds are scored, a positive
