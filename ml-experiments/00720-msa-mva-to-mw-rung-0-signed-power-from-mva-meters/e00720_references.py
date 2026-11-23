@@ -131,7 +131,7 @@ def day_scores(
 
 
 def read_674_labels(*, work: Path | None = None, arm: str = "B"):  # noqa: ANN201
-    """Read experiment 674's stored known-answer day labels (`site`, `level`, `date`, `cls`); read-only."""
+    """Read experiment 674's stored known-answer day labels (`site`, `level`, `date`, `cls`) and its own truth columns (`any_negative`, `crossing`); read-only."""
     import polars as pl
 
     if work is None:
@@ -139,7 +139,7 @@ def read_674_labels(*, work: Path | None = None, arm: str = "B"):  # noqa: ANN20
 
         work = feat.WORK
     return pl.read_parquet(work / "known_answer_days.parquet").select(
-        "site", "level", "date", cls=f"cls_{arm}"
+        "site", "level", "date", "any_negative", "crossing", cls=f"cls_{arm}"
     )
 
 

@@ -1,6 +1,8 @@
 # ruff: noqa: E501
 """Experiment 720: known-answer checks of the bar functions and of the grid-length rule of the loader."""
 
+from pathlib import Path
+
 import e00720_bars as bars
 import e00720_real as real
 import numpy as np
@@ -31,7 +33,17 @@ def main() -> int:
             continue
         msg = "a bad grid length was accepted"
         raise AssertionError(msg)
-    print("PASS bars and grid-length rule")
+    try:
+        real.check_f7_commit(module_file=Path(__file__))
+    except RuntimeError:
+        pass
+    else:
+        msg = "a tree at another commit was accepted as experiment 716"
+        raise AssertionError(msg)
+    f7 = Path(__file__).resolve().parents[3] / "msa-f7-pv-part-1" / "ml-experiments"
+    for mod in f7.glob("00716-*/e00716_pv.py"):
+        assert real.check_f7_commit(module_file=mod) == real.F7_COMMIT
+    print("PASS bars, grid-length rule, and the experiment 716 commit pin")
     return 0
 
 

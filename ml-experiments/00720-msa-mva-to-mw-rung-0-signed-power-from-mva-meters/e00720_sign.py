@@ -88,6 +88,7 @@ def anchored_posterior(
     scored_days: np.ndarray,
     params: SignParams = SignParams(),  # noqa: B008
     u_min: float = U_MIN,
+    anchor_value: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return `ρ` for the scored days, built from anchor rows of the reference days only.
 
@@ -101,6 +102,8 @@ def anchored_posterior(
         scored_days: Day indices to label. They must not overlap `reference_days`.
         params: The constants.
         u_min: The gate.
+        anchor_value: The quantity whose value under the cut selects anchor rows: the CAMS clear-sky
+            index of the design, or `None` for `u` itself. NaN counts as no sun (an anchor).
 
     Returns:
         `rho` with shape `(len(scored_days), 48)`, and `fallback` of the same shape: 1 where the
@@ -108,6 +111,7 @@ def anchored_posterior(
         with `u < 2 × u_min` instead (the trailing dull rows).
     """
     assert not np.intersect1d(reference_days, scored_days).size, "scored days leak into the anchors"
+    a_val = u if anchor_value is None else np.nan_to_num(anchor_value, nan=0.0)
     n_scored = len(scored_days)
     rho = np.zeros((n_scored, v.shape[1]))
     fallback = np.zeros((n_scored, v.shape[1]))
@@ -124,7 +128,7 @@ def anchored_posterior(
         usable = np.isfinite(g_ref)
         done = np.zeros(n_scored, dtype=bool)
         for cut, flag in ((u_min, 0.0), (2.0 * u_min, 1.0)):
-            anchor = usable & (u[reference_days, h] < cut)
+            anchor = usable & (a_val[reference_days, h] < cut)
             w = base_w * same_type * anchor[None, :]
             n_eff = w.sum(axis=1)
             todo = (~done) & (n_eff >= MIN_ANCHORS)
@@ -233,6 +237,7 @@ def evaluate_sign(
     u: np.ndarray,
     dead_band: float = DEAD_BAND_POINTS,
     u_min: float = U_MIN,
+    row_mask: np.ndarray | None = None,
 ) -> dict[str, float]:
     """Score `ρ` against the signed truth on gated half-hours outside the dead band.
 
@@ -240,6 +245,8 @@ def evaluate_sign(
     class is `x_true < 0`. Also returns the counts, so every rate names its denominator.
     """
     ok = np.isfinite(rho) & np.isfinite(x_true) & (u >= u_min) & (np.abs(x_true) >= dead_band)
+    if row_mask is not None:
+        ok &= row_mask
     pos = x_true[ok] < 0.0
     s = rho[ok]
     return {

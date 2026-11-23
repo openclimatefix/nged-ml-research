@@ -185,3 +185,31 @@ def load_panel(*, dense_raw_path: Path) -> Panel:
         k,
         temp,
     )
+
+
+F7_COMMIT: Final[str] = "126577d1d6d34ed880a79b542d86ecde10e3689e"
+"""The commit of experiment 716 (branch `msa-f7-pv-part-1`) whose `e00716_pv` this experiment imports."""
+
+
+def check_f7_commit(*, module_file: Path) -> str:
+    """Return the commit of the tree that holds `module_file`, after asserting it is `F7_COMMIT` and clean.
+
+    Raises:
+        RuntimeError: When the tree is at another commit or has uncommitted changes.
+    """
+    import subprocess
+
+    folder = module_file.resolve().parent
+    head = subprocess.run(
+        ["git", "-C", str(folder), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    dirty = subprocess.run(
+        ["git", "-C", str(folder), "status", "--porcelain", "--", str(folder)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    if head != F7_COMMIT or dirty:
+        msg = f"experiment 716 is at {head[:9]} (dirty: {bool(dirty)}); the plan pins {F7_COMMIT[:9]} and a clean tree"
+        raise RuntimeError(msg)
+    return head

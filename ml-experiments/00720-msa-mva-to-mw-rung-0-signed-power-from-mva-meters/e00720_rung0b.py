@@ -19,6 +19,7 @@ experiment 662's probe, and the page says so.
 """
 
 import argparse
+import json
 import sys
 import time
 from collections.abc import Callable
@@ -54,6 +55,8 @@ class ProbeWorld:
     reference_days: np.ndarray
     scored_days: np.ndarray
     days_us: np.ndarray | None = None
+    k: np.ndarray | None = None
+    """CAMS clear-sky index (days by 48); anchors are rows with `k < 0.3`, as the design says."""
 
 
 def _safe(a: np.ndarray) -> np.ndarray:
@@ -67,7 +70,7 @@ def _hindsight_post(
     ref = pw.reference_days
     g = p + pw.v
     anchors = np.zeros_like(pw.v, dtype=bool)
-    anchors[ref] = pw.u[ref] < sign.U_MIN
+    anchors[ref] = (pw.u if pw.k is None else np.nan_to_num(pw.k))[ref] < sign.U_MIN
     f_all = fit.fit_demand_mean(g=g, rows=anchors, day_type=pw.day_type, temperature=pw.temperature)
     phi, sigma_r = fit.fit_residual(g=g, f=f_all, rows=anchors)
     spec = fit.k0_spec(phi=phi, sigma_r=sigma_r, q=Q_POINTS)
@@ -120,6 +123,24 @@ def hindsight_bars(*, pw: ProbeWorld, p: np.ndarray) -> dict[str, float | bool]:
     return flat
 
 
+MIDDAY_SLOTS: Final[tuple[int, int]] = (20, 28)
+"""Half-hour slots 10:00 to 14:00 UTC, where the area is also reported alone."""
+REFERENCES: Final[tuple[str, ...]] = ("reference_reading_blind", "reference_hour_of_day")
+"""Pre-registered: the anchored read-out must beat both on the pooled area and on the midday area."""
+
+
+def reading_blind_rho(*, p: np.ndarray) -> np.ndarray:
+    """Score each half-hour by the PV estimate alone (never reads the meter); a rank score in `[0, 1]`."""
+    top = float(np.nanmax(p)) if np.isfinite(p).any() else 1.0
+    return np.clip(p / max(top, 1e-9), 0.0, 1.0)
+
+
+def hour_of_day_rho(*, u: np.ndarray, reference_days: np.ndarray, n_scored: int) -> np.ndarray:
+    """Score each half-hour by the reference days' mean yield at that half-hour of the day ("midday means export")."""
+    shape = np.nanmean(u[reference_days], axis=0)
+    return np.tile(shape / max(float(shape.max()), 1e-9), (n_scored, 1))
+
+
 def evaluate_world(
     *, pw: ProbeWorld, keep: dict[str, np.ndarray] | None = None
 ) -> list[dict[str, Any]]:
@@ -134,7 +155,7 @@ def evaluate_world(
     for sky, p in (("real", p_real), ("shifted", p_shift)):
         anchored, fallback = sign.anchored_posterior(
             v=pw.v, p=p, u=pw.u, day_type=pw.day_type, temperature=pw.temperature,
-            reference_days=pw.reference_days, scored_days=sd,
+            reference_days=pw.reference_days, scored_days=sd, anchor_value=pw.k,
         )  # fmt: skip
         results: dict[str, np.ndarray] = {
             "anchored": anchored,
@@ -149,10 +170,19 @@ def evaluate_world(
                 full = np.full(pw.v.shape, np.nan)
                 full[lo:hi] = rho
                 results[f"unanchored_{weights}_pass{k}"] = full[sd]
+        results["reference_reading_blind"] = reading_blind_rho(p=p[sd])
+        results["reference_hour_of_day"] = hour_of_day_rho(
+            u=pw.u, reference_days=pw.reference_days, n_scored=len(sd)
+        )
         if keep is not None and sky == "real":
             keep.update(results)
+        midday = np.zeros(pw.u[sd].shape, dtype=bool)
+        midday[:, MIDDAY_SLOTS[0] : MIDDAY_SLOTS[1]] = True
         for name, rho in results.items():
             metrics = sign.evaluate_sign(rho=rho, x_true=pw.x_true[sd], u=pw.u[sd])
+            metrics["auc_midday"] = sign.evaluate_sign(
+                rho=rho, x_true=pw.x_true[sd], u=pw.u[sd], row_mask=midday
+            )["auc"]
             rows.append(
                 {
                     "world": pw.name,
@@ -165,12 +195,27 @@ def evaluate_world(
     return rows
 
 
+def beats_references(*, rows: list[dict[str, Any]]) -> dict[str, bool]:
+    """Pre-registered check: the anchored read-out beats both references on the pooled and the midday area (real sky).
+
+    Args:
+        rows: Rows of `evaluate_world` for one or more worlds; the mean over worlds is compared.
+    """
+    out: dict[str, bool] = {}
+    for ref in REFERENCES:
+        for col in ("auc", "auc_midday"):
+            a = [r[col] for r in rows if r["readout"] == "anchored" and r["sky"] == "real"]
+            b = [r[col] for r in rows if r["readout"] == ref and r["sky"] == "real"]
+            out[f"anchored_beats_{ref}_{col}"] = bool(a and b and np.nanmean(a) > np.nanmean(b))
+    return out
+
+
 def false_reverse_no_injection(*, pw: ProbeWorld) -> dict[str, float]:
     """Return the false-reverse rate of the anchored read-out on the world's sunny middays (gate forced open)."""
     sd = pw.scored_days
     rho, _ = sign.anchored_posterior(
         v=pw.v, p=_safe(pw.p), u=pw.u, day_type=pw.day_type, temperature=pw.temperature,
-        reference_days=pw.reference_days, scored_days=sd,
+        reference_days=pw.reference_days, scored_days=sd, anchor_value=pw.k,
     )  # fmt: skip
     mid = (pw.u[sd] >= 0.5) & (np.abs(np.arange(48) - 24)[None, :] <= 4)
     rate, n = sign.false_reverse_rate(rho=rho, mask=mid)
@@ -190,6 +235,7 @@ def build_probe_world(
     level: float,
     fold_name: str,
     estimate_scale: float = 1.0,
+    host_scale: float = 1.0,
     q: float = Q_POINTS,
     holidays_us: frozenset[int] = frozenset(),
 ) -> ProbeWorld:
@@ -207,6 +253,8 @@ def build_probe_world(
             summer-midday half-hours before 2025-07-01 (`0` is the no-injection placebo).
         fold_name: The scored month.
         estimate_scale: Multiplier of the injected capacity in `p` (1.0 oracle; 0.7 and 1.3 sensitivity).
+        host_scale: Multiplier of the host's own PV estimate in `p` (1.0; 0.7 and 1.3 at level 0, where
+            the D5 bar is read; 2.5 in the hard check world).
         holidays_us: Start-of-day instants (microseconds) of bank holidays, read as Sundays.
 
     Returns:
@@ -231,7 +279,7 @@ def build_probe_world(
     else:
         increment = 0.0
         x = y_pct.copy()
-    p = p_host_pct + estimate_scale * increment * np.nan_to_num(u)
+    p = host_scale * p_host_pct + estimate_scale * increment * np.nan_to_num(u)
     mat = lambda a: real.to_day_matrix(values=a, stamp_us=stamp_us)
     x_m, days_us = mat(x)
     reading = worlds.reading_from_signed(x=x_m, q=q)
@@ -249,7 +297,7 @@ def build_probe_world(
     scored = real.days_in(days_us=days_us, lo_us=w.cutoff_us, hi_us=w.score_end_us)
     return ProbeWorld(
         name=name, v=v, p=np.where(np.isfinite(p_m), p_m, np.nan), u=np.nan_to_num(u_m), day_type=day_type,
-        temperature=np.nan_to_num(temp_day, nan=10.0), x_true=x_m, reference_days=ref, scored_days=scored, days_us=days_us,
+        temperature=np.nan_to_num(temp_day, nan=10.0), x_true=x_m, reference_days=ref, scored_days=scored, days_us=days_us, k=np.nan_to_num(mat(k)[0]),
     )  # fmt: skip
 
 
@@ -279,6 +327,7 @@ def run_worlds(
     labels_674: Any = None,
     limit_worlds: int | None = None,
     gate: hmm.CostGate | None = None,
+    rho_store: dict[str, np.ndarray] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Score every world and return `(readout_rows, reference_rows)`; nothing is written here.
 
@@ -291,30 +340,50 @@ def run_worlds(
 
     gate = gate or hmm.CostGate(cap_hours=RUNG0B_CAP_HOURS)
     plan = [
-        (site, fold_name, level, scale)
+        (site, fold_name, level, scale, hscale)
         for fold_name in folds
         for site in sites
-        for level, scale in [(0.0, 1.0), (1.0, 1.0), (2.0, 1.0), *[(2.0, sc) for sc in SENSITIVITY]]
+        for level, scale, hscale in [
+            (0.0, 1.0, 1.0),
+            *[(0.0, 1.0, hs) for hs in SENSITIVITY],
+            (1.0, 1.0, 1.0),
+            (2.0, 1.0, 1.0),
+            *[(2.0, sc, 1.0) for sc in SENSITIVITY],
+        ]
     ]
     if limit_worlds:
         plan = plan[:limit_worlds]
     rows: list[dict[str, Any]] = []
     ref_rows: list[dict[str, Any]] = []
-    for i, (site, fold_name, level, scale) in enumerate(plan):
+    for i, (site, fold_name, level, scale, hscale) in enumerate(plan):
         t0 = time.perf_counter()
         farm_at = farm_for_site[site]
         y = panel.power_pct[panel.sites.index(site)]
         y = np.where(np.isfinite(farm_at(panel.stamp_us)), y, np.nan)
         j = panel.sites.index(site)
         pw = build_probe_world(
-            name=f"{site}|{fold_name}|L{level:g}|s{scale:g}", y_pct=y, stamp_us=panel.stamp_us, u=panel.u[j], k=panel.k[j],
+            name=f"{site}|{fold_name}|L{level:g}|s{scale:g}|h{hscale:g}", y_pct=y, stamp_us=panel.stamp_us, u=panel.u[j], k=panel.k[j],
             temperature_c=panel.temperature_c[j], p_host_pct=host_p(site, fold_name),
-            farm_at=farm_at if level > 0 else None, level=level, fold_name=fold_name, estimate_scale=scale,
+            farm_at=farm_at if level > 0 else None, level=level, fold_name=fold_name, estimate_scale=scale, host_scale=hscale,
         )  # fmt: skip
         keep: dict[str, np.ndarray] = {}
         for r in evaluate_world(pw=pw, keep=keep):
-            rows.append({"site": site, "fold": fold_name, "level": level, "scale": scale, **r})
+            rows.append(
+                {
+                    "site": site,
+                    "fold": fold_name,
+                    "level": level,
+                    "scale": scale,
+                    "host_scale": hscale,
+                    **r,
+                }
+            )
         sd = pw.scored_days
+        if rho_store is not None:
+            for key, arr in keep.items():
+                rho_store[f"{pw.name}|{key}"] = arr
+            rho_store[f"{pw.name}|x_true"] = pw.x_true[sd]
+            rho_store[f"{pw.name}|u"] = pw.u[sd]
         assert pw.days_us is not None
         month = ((pw.days_us.astype("datetime64[us]").astype("datetime64[M]").astype(int)) % 12) + 1
         weekend = (pw.day_type > 0).astype(int)
@@ -329,6 +398,7 @@ def run_worlds(
                 "fold": fold_name,
                 "level": level,
                 "scale": scale,
+                "host_scale": hscale,
                 "reference": "506_gated_rule",
                 **rm,
             }
@@ -348,12 +418,16 @@ def run_worlds(
                     **ds,
                 }
             )
-        if labels_674 is not None and scale == 1.0 and level in (0.0, 1.0, 2.0):
+        if labels_674 is not None and scale == 1.0 and hscale == 1.0:
             dates = _yyyymmdd(days_us=pw.days_us[sd])
             lab = labels_674.filter((labels_674["site"] == site) & (labels_674["level"] == level))
             cls = dict(zip(lab["date"].to_list(), lab["cls"].to_list(), strict=True))
+            neg = dict(zip(lab["date"].to_list(), lab["any_negative"].to_list(), strict=True))
             label = np.array([cls.get(int(d), "not_scorable") for d in dates], dtype=object)
-            ds = refs.day_scores(call=truth, truth=truth, label=label)
+            truth_674 = np.array(
+                [bool(neg.get(int(d), False)) for d in dates]
+            )  # 674's own world, not 720's
+            ds = refs.day_scores(call=truth_674, truth=truth_674, label=label)
             ref_rows.append(
                 {
                     "site": site,
@@ -370,6 +444,7 @@ def run_worlds(
                 "fold": fold_name,
                 "level": level,
                 "scale": scale,
+                "host_scale": hscale,
                 "reference": "720_hindsight_bars",
                 **hindsight_bars(pw=pw, p=_safe(pw.p)),
             }
@@ -421,6 +496,8 @@ def run_real(
         return lambda times: series[((times - panel.stamp_us[0]) // step).astype(int)]
 
     farm_for_site = {s: make_farm(data.FARM_OF_SITE[s]) for s in real.SIGNED_SIX}
+    commit = real.check_f7_commit(module_file=Path(pv.__file__))
+    guard.private_path(name="rung0b_provenance.json").write_text(json.dumps({"f7_commit": commit}))
     t649, t662 = pv.read_tables()
     series = data.series_table()
     cap_mw = np.array(
@@ -438,15 +515,17 @@ def run_real(
                 ]
             )
             est = pv.dense_share(
-                raw=raw, doy=doy, capacities_mw=caps, power_capacity_mw=cap_mw, u99=data.u99()
-            )
+                raw=raw, doy=doy, capacities_mw=caps, power_capacity_mw=cap_mw
+            )  # F7's own u99 default
             cache[fold] = 100.0 * np.asarray(est.share, dtype=np.float64)
         return cache[fold][panel.sites.index(site)]
 
+    store: dict[str, np.ndarray] = {}
     rows, ref_rows = run_worlds(
         panel=panel, sites=real.SIGNED_SIX, folds=real.RUNG0_FOLDS, farm_for_site=farm_for_site, host_p=host_p,
-        labels_674=refs.read_674_labels(), limit_worlds=limit_worlds,
+        labels_674=refs.read_674_labels(), limit_worlds=limit_worlds, rho_store=store,
     )  # fmt: skip
+    np.savez_compressed(str(guard.private_path(name="rung0b_rho.npz")), **store)  # ty: ignore[invalid-argument-type]
     pl.DataFrame(rows).write_csv(guard.private_path(name="rung0b_readouts.csv"))
     pl.DataFrame(ref_rows).write_csv(guard.private_path(name="rung0b_references.csv"))
     print(
@@ -493,6 +572,25 @@ def selftest() -> int:
         np.arange(560, 600),
     )
     fr = false_reverse_no_injection(pw=pw0)
+    # a hard check world: the PV estimate is 2.5 times too high at a non-exporter, so the check must be able to fail
+    pw_hard = ProbeWorld(
+        "hard",
+        pw0.v,
+        2.5 * pw0.p,
+        pw0.u,
+        pw0.day_type,
+        pw0.temperature,
+        pw0.x_true,
+        pw0.reference_days,
+        pw0.scored_days,
+    )
+    fr_hard = false_reverse_no_injection(pw=pw_hard)
+    assert fr_hard["false_reverse_rate"] > 5 * max(fr["false_reverse_rate"], 0.01), (fr, fr_hard)
+    refs_pass = beats_references(rows=rows)
+    assert set(refs_pass) == {
+        f"anchored_beats_{r}_{c}" for r in REFERENCES for c in ("auc", "auc_midday")
+    }
+    assert {"reference_reading_blind", "reference_hour_of_day"} <= {r["readout"] for r in rows}
     assert fr["false_reverse_rate"] < 0.01 and fr["n_rows"] > 100, fr
     # plumbing of the injection on a fake panel
     start = int(np.datetime64("2023-01-01T00:30:00", "us").astype(np.int64))
@@ -527,12 +625,20 @@ def selftest() -> int:
         sites=["D5"], stamp_us=stamp, power_pct=y_fake[None, :], u=u_fake[None, :], k=np.clip(u_fake * 1.2, 0, 1.5)[None, :],
         temperature_c=np.full((1, n), 12.0),
     )  # fmt: skip
-    labels = pl.DataFrame({"site": ["D5"], "level": [2.0], "date": [20260415], "cls": ["reverse"]})
+    labels = pl.DataFrame(
+        {
+            "site": ["D5"],
+            "level": [2.0],
+            "date": [20260415],
+            "cls": ["reverse"],
+            "any_negative": [True],
+        }
+    )
     rows, ref_rows = run_worlds(
         panel=fake_panel, sites=("D5",), folds=("2026-04",), farm_for_site={"D5": farm},
         host_p=lambda site, fold: 5.0 * u_fake, labels_674=labels, limit_worlds=5,
     )  # fmt: skip
-    assert {r["scale"] for r in rows} == {1.0, 0.7, 1.3}
+    assert {r["host_scale"] for r in rows} == {1.0, 0.7, 1.3}
     kinds = {r["reference"] for r in ref_rows}
     assert {
         "506_gated_rule",
