@@ -50,7 +50,9 @@ decision_rule: >-
   in one group with no loss in the other, or gain in both with H2 or a guard failing), small gain
   (small gain in a group with no gain and no loss), inconclusive. The era readings R1 to R3 are
   secondary and change no verdict. A not supported or refuted verdict closes the last-14-days
-  axial line.
+  axial line. The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4),
+  so any statement about following level shifts and the era set R1 to R3 is unsupported by a passing
+  known-answer test.
 benchmark: >-
   The Candidate of experiment 667 (P7+D50): stored forecasts for seeds 0 and 1 of every fold, and
   seeds 2 to 4 refitted into a new output root; and the placebo network P.
@@ -61,10 +63,10 @@ metric: >-
   absolute error of the median beside it.
 ---
 
-**Status: planned, and blocked. The experiment failed its pre-registered known-answer gate on its
-fourth run, and no real fold has been fitted.** No number below is a result of the experiment. The
-experiment carries no verdict word. Whether to continue is the maintainer's decision, and no further
-amendment to the gate is planned.
+**Status: planned. The experiment failed its pre-registered known-answer gate on its fourth run, the
+maintainer waived the gate on 2026-11-23, and no real fold has been fitted yet.** No number below is
+a result of the experiment. The experiment carries no verdict word. The waiver lets the real folds
+run, and it does not turn the failed gate into a pass. No further amendment to the gate is planned.
 
 ## The known-answer gate has failed four times
 
@@ -163,6 +165,24 @@ they say nothing about the real folds. The options that follow from them, with t
 `gate_options.md` and the two diagnostic reports (`diag_option5/README.md` and
 `diag_option5/replication/README.md`), in `data/ml-experiments/briefs/msa_architecture/`.
 
+### The maintainer waived the gate
+
+**On 2026-11-23 the maintainer decided, in these words: "Go ahead with option 1".** Option 1 of
+`gate_options.md` is to waive KA3 for the real folds and disclose the failure. **The waiver changes
+no threshold.** The gate file `work/known_answers_passed.json` is written by a separate script,
+`e00713_waive_gate.py`, with `waived: true`, the failed checks (KA3 and KA12, with their values at the
+amended gate, commit 94dfb9652), the passed checks (KA2, KA4, KA5, KA6, and KA10), the decision
+quoted above, the date, the code record, and the sha256 of `e00713_known_answer.py`. The script
+refuses to write the file unless the stored last-run results show exactly KA3 and KA12 failing and
+the code hash equals e85b84e2ea04b3cb. The fit scripts still check the code record of the gate file,
+so a waived gate written under one code hash is refused under another. The report script prints the
+waiver and fires audit trigger 1 (a control fails).
+
+**The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
+failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
+are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
+and take-home message of this experiment carries that fact.**
+
 **No real fold has been fitted.** The 160 fits, the Candidate refits, and every scored contrast of
 the plan below are unrun, and all of the text below describes the plan as it was committed, with the
 departures that amendments 1 to 3 added. A reader should take nothing in the plan below as evidence.
@@ -206,6 +226,11 @@ three prediction-only checks bracket the effect.
 
 **There is no verdict yet.** The finished page replaces this section with the verdict word and its
 numbers, after the take-home message.
+
+**The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
+failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
+are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
+and take-home message of this experiment carries that fact.**
 
 ## Pre-registered contrasts
 
@@ -263,6 +288,11 @@ and the manual heuristic and BG2 where stored rows cover the scored keys. The sc
 reference rows are missing.
 
 ## Decision rule
+
+**The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
+failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
+are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
+and take-home message of this experiment carries that fact.**
 
 **Each group is read on H1, with D the point estimate and [L, U] the 98.75% bootstrap interval. The
 group's reading is the first row that holds.** The three guards are the t guard (the t interval on
@@ -400,6 +430,11 @@ history did no better than one. The differences that could change the result are
 across-day attention, the similar-day starting point, and the ENS stages.
 
 ## Secondary: the era hypothesis
+
+**The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
+failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
+are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
+and take-home message of this experiment carries that fact.**
 
 **Everything in this section is secondary. No reading here is counted among the four counted
 readings, and no reading here can change the verdict.** Each interval is read at 95%. The set holds

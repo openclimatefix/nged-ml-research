@@ -92,6 +92,20 @@ NESTED: Final = ((None, "A"), (None, "K"), ("K", "N"), (None, "N"))
 """(treatment, reference) pairs of the report-only table in which the reference is nested in the treatment."""
 
 
+def waiver_statement() -> str:
+    """Return the sentence that the page prints when the known-answer gate was waived, or an empty string."""
+    gate = ROOT / "work" / "known_answers_passed.json"
+    record = json.loads(gate.read_text()) if gate.exists() else {}
+    if not record.get("waived"):
+        return ""
+    waiver = record["waiver"]
+    return (
+        f"the known-answer gate was waived by the maintainer on {waiver['date']} "
+        f'(decision: "{waiver["decision_quoted"]}"; failed checks {", ".join(waiver["failed_checks"])}; '
+        f"follow share of arm M {record['KA3']['follow']['M']:.4f} against 0.75). {waiver['statement']}"
+    )
+
+
 def audit_triggers() -> dict[str, str]:  # noqa: PLR0912
     """Return the seven audit triggers of the `ml-experiment` skill as fired / not fired / not computed, with the reason.
 
@@ -105,6 +119,8 @@ def audit_triggers() -> dict[str, str]:  # noqa: PLR0912
     reasons = []
     if not gate.exists():
         reasons.append("the known-answer gate file is missing")
+    elif json.loads(gate.read_text()).get("waived"):
+        reasons.append(waiver_statement())
     if screen and screen["rules"]["sanity_stop_and_audit"]:
         reasons.append("the sanity rule of the screen fired (M* minus P positive in both groups)")
     if headline:
@@ -213,6 +229,10 @@ def median_minus_mean() -> None:
 def main() -> int:
     """Print all tables."""
     parameter_table()
+    statement = waiver_statement()
+    if statement:
+        print("\n## Known-answer gate: WAIVED\n" + statement)
+        print("The era secondary set R1 to R3 is unsupported by a passing known-answer test.")
     sel = ROOT / "work" / "selection.json"
     print("\n## Choice of M*:", sel.read_text() if sel.exists() else "[missing]")
     training_log_table()
