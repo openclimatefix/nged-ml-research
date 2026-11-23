@@ -118,7 +118,16 @@ def kr7(*, source, tables: dict[str, dict], arm: str, n: int = 256) -> str:  # n
     rng = np.random.default_rng(7)
     table = tables[arm][fb.TABLE_ENS]
     primary = rng.choice(table.primaries, size=n)
-    day = rng.choice(table.days, size=n)
+    # The ensemble table covers fewer days than the row tables of a full fold, and a batch assembles only
+    # origin days inside it.
+    ens = source.ens
+    c_all = lay.contract_idx_of_day(day=table.days)
+    inside = table.days[
+        (c_all // lay.STEPS_PER_DAY - ens.first_day >= 0)
+        & (c_all // lay.STEPS_PER_DAY - ens.first_day < ens.filled.shape[1])
+    ]
+    assert inside.size > 0, "no origin day of the table is inside the ensemble table"
+    day = rng.choice(inside, size=n)
     lead = rng.integers(0, lay.N_LEAD_DAYS, size=n)
     batch = f9.assemble(
         primary=torch.from_numpy(primary), c_idx=torch.from_numpy(lay.contract_idx_of_day(day=day)),

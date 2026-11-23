@@ -78,7 +78,9 @@ def forecast_frame(
                 primary=prim[sel], day=cc[sel] // 48, lead_day=lead[sel]
             )
             got = np.where(b.inputs.row_exists.cpu().numpy(), b.ages.cpu().numpy(), -1)
-            assert np.array_equal(got[table_ages >= 0], table_ages[table_ages >= 0]), (
+            # A row of the table that holds no reading at all is reported absent by `row_exists`, as in
+            # experiment 713 (a fixed row of age 2 to 15 can be empty); every row that exists is the table's.
+            assert np.array_equal(got[got >= 0], table_ages[got >= 0]), (
                 "the rows of a scored forecast differ from the row table"
             )
             out = model(b.inputs).out
