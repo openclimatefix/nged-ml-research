@@ -143,7 +143,7 @@ def train_stage(
     *, model: pvm.PvNet, world: tr.World, stage: int, samples: tr.SampleSet, seed: int,
     encoders: str, max_passes: int = 60, log: tr.StageLog | None = None, patience: int = tr.PATIENCE,
     on_pass: Callable[[int, pvm.PvNet], None] | None = None, new_lr_scale: float = 1.0,
-    max_steps: int | None = None,
+    max_steps: int | None = None, train_source: pvb.PvSource | None = None,
 ) -> tr.StageLog:  # fmt: skip
     """Train `model` on stage 2 or 3 in place and leave it at the state of the best validation loss.
 
@@ -153,6 +153,9 @@ def train_stage(
     started = time.monotonic()
     log = log or tr.StageLog(stage=stage)
     source = tr.synthetic_source(world=world, samples=samples) if stage == 3 else world.source
+    fit_source = (
+        source if train_source is None else train_source
+    )  # the gating fits train on shifted histories and validate on the unshifted source
     cut = tr.target_end(world=world, stage=stage)
     torch.manual_seed(seed * 7 + stage)
     optimiser = torch.optim.AdamW(
@@ -176,7 +179,7 @@ def train_stage(
                 seed=seed, stage=stage, epoch=epoch, batch=batch_index, n=len(sel)
             )
             b = batch_for(
-                source=source, samples=samples, index=sel, lead=lead_all[start : start + tr.BATCH],
+                source=fit_source, samples=samples, index=sel, lead=lead_all[start : start + tr.BATCH],
                 cut=cut, dropout=drop, pv_masks=masks,
             )  # fmt: skip
             w = tr.token_weights(target_idx=b.target_idx, world=world, stage=stage)

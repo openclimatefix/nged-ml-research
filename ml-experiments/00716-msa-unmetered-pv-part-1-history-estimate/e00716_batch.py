@@ -91,18 +91,30 @@ def apply_ok_mask(
 class PvSource:
     """A 713 `Source` plus the PV arrays of one arm."""
 
-    def __init__(self, *, source: bt.Source, tables: PvTables) -> None:
-        """Hold the wrapped source and the tables; both sit on one device."""
-        assert source.ens is not None, (
+    def __init__(self, *, source: bt.Source, tables: PvTables, world: bool = False) -> None:
+        """Hold the wrapped source and the tables; both sit on one device.
+
+        `world` is true for the known-answer worlds, whose target row reads the dense ERA5-and-CAMS
+        weather (stage 1's weather) and whose source has no ensemble table.
+        """
+        assert world or source.ens is not None, (
             "F7 reads the ensemble table in stages 2 and 3 and at prediction"
         )
-        assert tables.first_day == source.ens.first_day, (tables.first_day, source.ens.first_day)
-        self.source, self.tables = source, tables
+        if not world:
+            assert tables.first_day == source.ens.first_day, (
+                tables.first_day,
+                source.ens.first_day,
+            )  # ty: ignore[unresolved-attribute]
+        self.source, self.tables, self.world = source, tables, world
         self.device = source.device
 
     def with_power_in(self, *, power_in: torch.Tensor) -> PvSource:
         """Return a source whose history power is `power_in` (stage 3's synthetic shifts); the PV arrays are unchanged."""
-        return PvSource(source=self.source.with_power_in(power_in=power_in), tables=self.tables)
+        return PvSource(
+            source=self.source.with_power_in(power_in=power_in),
+            tables=self.tables,
+            world=self.world,
+        )
 
     @property
     def ens(self) -> bt.EnsTensors | None:
@@ -146,7 +158,7 @@ class PvSource:
         """
         assert ensemble, "F7 fits and predicts with the ensemble target row"
         out = self.source.assemble(
-            primary=primary, c_idx=c_idx, lead_day=lead_day, ensemble=True,
+            primary=primary, c_idx=c_idx, lead_day=lead_day, ensemble=not self.world,
             mask_all_power=mask_all_power, mask_newest_row=mask_newest_row, target_end=target_end,
             power_in=power_in, cap_steps=cap_steps,
         )  # fmt: skip
@@ -164,7 +176,8 @@ class PvSource:
         top_pv = top_table[p2, day, rel]
         top_ok = tb.top_filled[p2, day, rel] & torch.isfinite(top_pv).all(dim=-1)
         top_pv = torch.where(top_ok[..., None], top_pv, torch.zeros_like(top_pv))
-        self.check_run_times(primary=primary, day=day[:, 0], c_idx=c_idx)
+        if not self.world:
+            self.check_run_times(primary=primary, day=day[:, 0], c_idx=c_idx)
         inputs = pvm.PvInputs(
             **out.inputs.__dict__, hist_pv=hist_pv, hist_pv_ok=hist_ok, top_pv=top_pv, top_pv_ok=top_ok
         )  # fmt: skip

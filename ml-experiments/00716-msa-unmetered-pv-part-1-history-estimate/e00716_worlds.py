@@ -237,6 +237,7 @@ def origin_sets(
     fake = SimpleNamespace(source=None, cutoff_idx=cutoff_idx, clean=clean)
     samples = tr.make_samples(world=fake, stage=1, placebo=False, primaries=primaries)  # ty: ignore[invalid-argument-type]
     keep = ~samples.is_val
+    held_mask = samples.is_val
     pos_of = {p: i for i, p in enumerate(primaries)}
     train_pos = np.array([pos_of[int(p)] for p in samples.primary[keep]], dtype=np.int64)
     train_c = samples.c_idx[keep].astype(np.int64)
@@ -244,7 +245,12 @@ def origin_sets(
     val_c = np.tile(days * 48 + 24, len(primaries)).astype(np.int64)
     val_pos = np.repeat(np.arange(len(primaries)), len(days)).astype(np.int64)
     assert int(val_c.max()) + 48 * N_LEADS <= n_grid, "validation targets leave the grid"
-    return {"train": (train_pos, train_c), "val": (val_pos, val_c)}
+    held_pos = np.array([pos_of[int(p)] for p in samples.primary[held_mask]], dtype=np.int64)
+    return {
+        "train": (train_pos, train_c),
+        "val": (val_pos, val_c),
+        "held": (held_pos, samples.c_idx[held_mask].astype(np.int64)),
+    }
 
 
 # ---------------------------------------------------------------- features
@@ -441,6 +447,7 @@ class ReferenceResult:
     err_solar: np.ndarray
     err_all: np.ndarray
     resid_sd: float
+    err_full: np.ndarray | None = None
 
 
 def run_reference(
@@ -481,7 +488,7 @@ def run_reference(
     err = np.abs(predict(hs=hs_val, z=z_val, w=w, v=v) - val.y)
     return ReferenceResult(
         penalty=best, cv_mae=cv, err_solar=err[:, :, val.solar].reshape(-1), err_all=err.reshape(-1),
-        resid_sd=float(err[:, :, val.solar].std()),
+        resid_sd=float(err[:, :, val.solar].std()), err_full=err,
     )  # fmt: skip
 
 
@@ -534,3 +541,37 @@ def gap_of_world(
         mae_oracle=mae_o,
         penalties=penalties,
     )
+
+
+def heldout_nll(
+    *, world: PvWorld, dense: Dense4, kind: str, cutoff_idx: int, target_std: np.ndarray
+) -> dict[str, float]:
+    """Return the Gaussian negative log-likelihood of the naive and the oracle reference on the tokens that experiment 713's `validation_loss` averages.
+
+    The tokens are the held-out origins' target tokens at lead days 1, 2, 4, 7, 10, and 14, all 48
+    half-hours, unweighted, in the world's standardised units (errors divided by each Primary's
+    `target_std`), each reference as a Gaussian with its own error standard deviation. The references
+    are the ridge references of `gap_of_world`, scored on the held-out origins instead.
+    """
+    sets = origin_sets(world=world, cutoff_idx=cutoff_idx)
+    errors: dict[str, list[np.ndarray]] = {"naive": [], "oracle": []}
+    for pos in range(len(PRIMARIES)):
+        tpos, tc = sets["train"]
+        hpos, hc = sets["held"]
+        for reference in ("naive", "oracle"):
+            train = build_features(
+                world=world, dense=dense, pos=pos, c=tc[tpos == pos], kind=kind, reference=reference
+            )
+            held = build_features(
+                world=world, dense=dense, pos=pos, c=hc[hpos == pos], kind=kind, reference=reference
+            )
+            res = run_reference(train=train, val=held)
+            assert res.err_full is not None
+            errors[reference].append(
+                res.err_full[:, list(VALIDATION_LEADS)].reshape(-1) / target_std[pos]
+            )
+    out = {}
+    for reference, parts in errors.items():
+        z = np.concatenate(parts)
+        out[reference] = 0.5 * float(np.log(2 * np.pi * np.mean(z**2))) + 0.5
+    return out
