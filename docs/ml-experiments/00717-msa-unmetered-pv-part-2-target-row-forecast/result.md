@@ -195,6 +195,9 @@ The amendments that part 1's page lists (48 ridge regressions per Primary pooled
 gating fits that mirror the real recipe, and the cold-night guard computed inside the scorer) apply to
 this page unchanged.
 
+**KF7 runs on the GPU, as on the page of part 1.** The stored forecast of `M*` was written on the GPU,
+and the CPU path differs from it by 8.4e-6 of capacity at the 99th percentile.
+
 **The pre-check, the step up, and the reserve are as on the page of part 1.** After a failed
 early-stopping pre-check at rung N, the step up to the next rung needs a failed pre-check record of
 rung N, every extra fit of arm `M` is charged to the reserve of phase 9 of design section 10, and F7
