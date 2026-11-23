@@ -56,7 +56,7 @@ metric: >-
 **We ask whether the axial-attention network of experiment 713 forecasts a Primary substation's
 demand better when its 14 history rows are the 14 past days with the weather nearest to the target
 day's forecast weather, instead of the last 14 days.** This is part 1 of follow-up F9. Part 2
-([experiment 719](../00719-msa-similar-day-retrieval-part-2-union-of-measures/result.md)) tests a
+(experiment 719, on its own page) tests a
 union of three retrieval measures. This page is the plan: no neural network has been fitted, and
 every number below is a design value or a figure from an earlier experiment. The code is written
 and unit-tested on the CPU only.
@@ -255,8 +255,8 @@ The experiment is planned and has no fitted result yet, so these bullets describ
 
 ## Departures from the design
 
-The code departs from the design in these places, each chosen to keep experiment 713 unedited or to
-keep a check independent.
+The code departs from the design in these places, each chosen to keep experiment 713 unedited, to
+keep a check independent, or to follow the design where experiment 713's code does not.
 
 - The weather of the pool is read from experiment 713's float16 standardised array and converted to
   float64. The design asked for float64 from the source rows. The table builder and its independent
@@ -270,14 +270,44 @@ keep a check independent.
   so that experiment 713 stays unedited.
 - The 27-row arms have more rows than the 24 age buckets, so a placebo draw for them can put two
   rows in one bucket.
-- Each row table also stores the selected weather distance as a float32 array, `distance`, so that
-  the read-out "mean selected distance by stage and lead day" needs no second pass.
-- The worlds zero the `covid` date-time column, so that no arm can read an era from it. The sparse-
-  world eras are laid out on the real grid.
+- Each row table stores the selected weather distance as a float32 array, `distance`, and its
+  provenance: the hash of the builder's code, the phase, the arm, the month, and the standardiser
+  fingerprint. The builder and the fit refuse a table whose provenance differs.
+- The tolerance of the independent recomputation (KR3) for a rank swap between tied blocks is a
+  relative 1e-9, as in the design. KR4 requires that the placebo's class counts equal the
+  treatment's in at least 90% of samples, because a class that runs out of eligible blocks passes
+  its shortfall to an older class. KR4 also prints the mean weather distance of the replaced rows
+  beside the treatment's.
+- With 2 seeds, the reading "small gain" needs both seeds to agree in sign, as design section 7.3
+  states. Experiment 713's scorer accepts 1 seed of 2 for that reading, so this experiment's
+  decision code applies its own rule and leaves experiment 713's scorer unedited.
+- Audit trigger 5 (a nested arm beats its container) fires only when the nested arm is better in
+  both Primary groups, because the design names no group.
+- The tables of all arms of a fold are built in one pass, and each weather distance is computed once
+  for the 379-day pool and shared by the arms that read it. On 6 origin days of fold 2025-11 the 8
+  weather arms cost 1.28 CPU-hours per fold when extrapolated to the fold's 2,267 origin days, which
+  is about 10 CPU-hours for 8 folds. The extrapolation is a lower bound, because the pool of arm
+  `UX` grows with the day. The design estimated 22 CPU-hours, and the code review's estimate for a
+  build without reuse was 60 to 90.
+- The worlds zero the `covid` date-time column, so that no arm can read an era from it. World WS
+  puts the start of its last era 400 days before the cutoff, not 91. With 91 days, arm `U`'s 379-day
+  pool crosses the era boundary at every held-out origin, and the reference gap of `U` on the real
+  grid of fold 2025-11 was 0.0000002 against a minimum of 0.010. With 400 days the gaps on that grid
+  are 0.043 (`R`), 0.039 (`Z`), and 0.064 (`U`). The targets of the last era are masked in training,
+  so training loses 400 days of targets.
+- The known-answer gate writes a result record in every case, with the per-pass trajectories of
+  every fit. It writes the gate file only when every check passes and KS3's difference tests were
+  read, unless the manager passes `--manager-accepts-unread-ks3`. The gate file is valid only for
+  the current text of the gate's scripts, by a gate hash.
 - Not written: the sparse world with a power pool (`WS+`), `U27` in the sparse world, the frozen-
   encoder world, audit triggers 2, 3, 4, and 6, and the swap tables of the `ft` arm. The cold-night
   slice and the swap points are inputs that the scorer takes from the caller. Without them the
-  `supported` guard fails by rule, so a missing input can never produce a positive verdict.
+  `supported` guard fails by rule, so a missing input cannot produce a positive verdict.
+- Checks that need the first full table build or a second process, and that are not yet run: KR1 on
+  the stored stage 3 state of `M*`, KR2 (c) against a train-phase table, KR3 on 1,000 samples per
+  arm of the built tables, and the candidate-table half of KR9. `e00718_check_real.py` runs KR2 (a),
+  KR3, KR7's batch assembly, and KR8 on a slice of one real fold on the CPU. It passed on 6 origin
+  days of fold 2025-11 for all 8 weather arms.
 
 ## Reviews
 
@@ -288,8 +318,9 @@ prose review.
 
 ## Files
 
-**Merge order: experiment 718 merges before experiment 719**, because experiment 719 imports the
-code in this folder.
+**Merge order: experiment 713 (pull request 402) merges first, then this experiment, then experiment
+719.** Experiment 719 imports the code in this folder. This page does not link to experiment 719's
+page, which does not exist until experiment 719 merges.
 
 - `data/ml-experiments/briefs/msa_architecture/f9_design.md`, `f9_design_review.md`, and
   `f9_design_triage.md` (read, private): the design that this page condenses.
