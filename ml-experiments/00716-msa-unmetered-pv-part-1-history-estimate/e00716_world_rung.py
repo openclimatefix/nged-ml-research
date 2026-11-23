@@ -64,7 +64,9 @@ def load_dense4() -> wd.Dense4:
 def rung_record_problems(*, record: dict) -> list[str]:
     """Return why a stored rung or `world_rung.json` record is not an eight-draw record on the current validation window (empty when it is).
 
-    A record from the 60-day, single-draw rule lacks `held_out_days`, `draws`, `mean`, and `sd`, and is refused.
+    A record from the 60-day, single-draw rule lacks `held_out_days`, `draws`, `mean`, and `sd`, and is
+    refused. So is a record with no results, a rung with no worlds, a world with the wrong number of
+    draws, and (for `world_rung.json`) a chosen rung that is absent from `results` or does not pass.
     """
     out = []
     if record.get("held_out_days") != wd.HELD_OUT_DAYS:
@@ -72,14 +74,34 @@ def rung_record_problems(*, record: dict) -> list[str]:
             f"held_out_days is {record.get('held_out_days')}, not {wd.HELD_OUT_DAYS}: the record is from another window"
         )
     results = record.get("results", {"_": record})
+    if not results:
+        out.append("no rung results")
     for number, res in results.items():
-        for kind, g in res.get("gaps", {}).items():
+        gaps = res.get("gaps", {})
+        if set(gaps) != {"WH", "WT"}:
+            out.append(f"rung {number}: holds worlds {sorted(gaps)}, not WH and WT")
+        for kind, g in gaps.items():
             missing = [k for k in ("draws", "mean", "sd") if k not in g]
             if missing or len(g.get("draws", [])) != wd.N_DRAWS:
                 out.append(
                     f"rung {number} {kind}: lacks the {wd.N_DRAWS}-draw fields {missing or 'draws'}"
                 )
+    chosen = record.get("rung")
+    if "results" in record and chosen is not None:
+        res = results.get(str(chosen))
+        if res is None:
+            out.append(f"the chosen rung {chosen} is absent from the results")
+        elif not out and not rung_passes(gaps=res["gaps"]):
+            out.append(f"the chosen rung {chosen} does not pass the rule")
     return out
+
+
+def stored_rung_problems(*, name: str, stored: dict) -> list[str]:
+    """Return why a stored `rung<N>.json` cannot be reused: other world code, a dirty tree, or a record that is not an eight-draw record of the current window (F12)."""
+    return [
+        *arms.artefact_problems(what=name, record=stored, files=arms.WORLD_FILES),
+        *rung_record_problems(record=stored),
+    ]
 
 
 def rung_passes(*, gaps: dict[str, dict]) -> bool:
@@ -125,14 +147,7 @@ def run_rungs(
         rung = wd.RUNGS[number - 1]
         path = out_dir / f"rung{number}.json"
         stored = json.loads(path.read_text()) if path.exists() and not force else None
-        problems = (
-            [
-                *arms.artefact_problems(what=path.name, record=stored, files=arms.WORLD_FILES),
-                *rung_record_problems(record=stored),
-            ]
-            if stored is not None
-            else []
-        )
+        problems = stored_rung_problems(name=path.name, stored=stored) if stored is not None else []
         if stored is not None and problems:
             print(f"rung {number}: recomputed ({'; '.join(problems)})", flush=True)
         if stored is not None and not problems:
@@ -180,6 +195,11 @@ def run_rungs(
         "results": results,
         "stepped_up_after": after or None,
     }
+
+
+def precheck_path(*, work: Path, rung: int) -> Path:
+    """Return the file that `e00716_known_answer.py precheck` writes for `rung`: `work/known_answers/precheck_rung<N>.json` (`known_answer.precheck_file` must agree)."""
+    return work / "known_answers" / f"precheck_rung{rung}.json"
 
 
 def step_up_problems(*, after: int, precheck_path: Path) -> list[str]:
@@ -233,6 +253,62 @@ def selftest_records() -> None:
         assert not problems, problems
     print(
         "a step up needs a failed pre-check record of that rung, and a rung file with no code record is not reused"
+    )
+
+
+def selftest_rule() -> None:
+    """Check each condition of the rung rule and of the record checks on its own, so that removing any one of them fails a test."""
+    clean = {**arms.code_record(), "git_dirty": False}
+
+    def world(first: float, rest: float, n: int = wd.N_DRAWS) -> dict:
+        draws = [first] + [rest] * (n - 1)
+        return {"gap": first, "draws": draws, "mean": float(np.mean(draws)), "sd": 0.001}
+
+    both = lambda g: {"WH": g, "WT": g}  # noqa: E731
+    assert rung_passes(gaps=both(world(0.0146, 0.0125)))
+    assert not rung_passes(gaps=both(world(0.012, 0.0075))), (
+        "draw 0 passes and the mean fails: the rung must fail"
+    )
+    assert not rung_passes(gaps=both(world(0.009, 0.0125))), (
+        "the mean passes and draw 0 fails: the rung must fail"
+    )
+    assert not rung_passes(gaps={"WH": world(0.0146, 0.0125), "WT": world(0.012, 0.0075)}), (
+        "one world's mean fails"
+    )
+    one = {**world(0.0146, 0.0125, n=1)}
+    rec = {
+        "rung": 4,
+        "held_out_days": wd.HELD_OUT_DAYS,
+        "n_draws": 1,
+        "gaps": both(one),
+        "code": clean,
+    }
+    assert rung_record_problems(record=rec), "a record with one draw (and mean and sd) was accepted"
+    assert stored_rung_problems(name="rung4.json", stored=rec), (
+        "a stored single-draw rung file with a current code record was reused"
+    )
+    full = {**rec, "gaps": both(world(0.0146, 0.0125)), "n_draws": wd.N_DRAWS}
+    assert not stored_rung_problems(name="rung4.json", stored=full), stored_rung_problems(
+        name="rung4.json", stored=full
+    )
+    top = {"rung": 4, "held_out_days": wd.HELD_OUT_DAYS, "code": clean}
+    assert rung_record_problems(record={**top, "results": {}}), (
+        "a record with empty results was accepted"
+    )
+    assert rung_record_problems(record={**top, "results": {"4": {"gaps": {}}}}), (
+        "a rung with no worlds was accepted"
+    )
+    assert rung_record_problems(record={**top, "results": {"3": full}}), (
+        "a chosen rung absent from the results was accepted"
+    )
+    assert rung_record_problems(
+        record={**top, "results": {"4": {"gaps": both(world(0.012, 0.0075))}}}
+    ), "a chosen rung that fails was accepted"
+    assert not rung_record_problems(
+        record={**top, "results": {"4": {"gaps": both(world(0.0146, 0.0125))}}}
+    )
+    print(
+        "rung rule: draw 0 and the mean are each required, and records with one draw, no results, or a failing chosen rung are refused"
     )
 
 
@@ -356,6 +432,7 @@ def selftest() -> int:
         f"toy world: WH naive {res.mae_naive:.4f} oracle {res.mae_oracle:.4f}; WT naive {res_t.mae_naive:.4f} oracle {res_t.mae_oracle:.4f}"
     )
     selftest_ladder(dense=dense, real_days=real_days)
+    selftest_rule()
     selftest_records()
     print("selftest passed")
     return 0
@@ -380,7 +457,7 @@ def main() -> int:
     work = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "work"
     if args.after:
         problems = step_up_problems(
-            after=args.after, precheck_path=work / f"precheck_rung{args.after}.json"
+            after=args.after, precheck_path=precheck_path(work=work, rung=args.after)
         )
         assert not problems, "; ".join(problems)
     dense = load_dense4()

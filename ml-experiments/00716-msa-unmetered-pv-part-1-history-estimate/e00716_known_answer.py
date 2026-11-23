@@ -293,8 +293,10 @@ def maes(
     out = {"all": float(err[ok].mean()), "solar": float(err[solar].mean())}
     if day is not None:
         early = (day - first_day) < wd.EARLY_DAYS
-        out["solar_early"] = float(err[solar & early].mean())
-        out["solar_late"] = float(err[solar & ~early].mean())
+        for name, sel in (("solar_early", solar & early), ("solar_late", solar & ~early)):
+            out[name] = (
+                float(err[sel].mean()) if sel.any() else float("nan")
+            )  # empty side: no warning
     return out
 
 
@@ -396,7 +398,9 @@ def precheck_diagnostics(*, m_val_history: list[float]) -> dict:
     (residuals of a straight-line fit, 2 degrees of freedom). Neither changes the verdict of the pre-check.
     """
     history = np.asarray(m_val_history, dtype=np.float64)
-    best = best_pass(val_history=m_val_history)
+    best = best_pass(
+        val_history=m_val_history, patience=M_PATIENCE
+    )  # arm `M` trains with patience 30, not 8
     window = history[max(0, best - 10) : best]
     last = history[-10:]
     trend = np.polyfit(np.arange(len(last)), last, 1)
@@ -681,6 +685,10 @@ def check_world_rung_file() -> None:
                     raise AssertionError(f"F2: chosen_rung accepted {label}")
             (Path(tmp) / "world_rung.json").write_text(json.dumps(good))
             assert chosen_rung() == 4
+            # finding 1: `--after N` reads the file that `precheck` writes
+            assert wrung.precheck_path(work=work_root(), rung=4) == precheck_file(rung=4), (
+                precheck_file(rung=4)
+            )
         finally:
             PATH_OVERRIDE.clear()
     print(
@@ -702,6 +710,23 @@ def check_diagnostics() -> None:
     idx = np.full((2, 4), 20)  # inside the solar block
     day = np.array([[0] * 4, [100] * 4])
     out = maes(med=med, act=act, idx=idx, day=day, first_day=0)
+    empty = maes(med=med, act=act, idx=idx, day=np.zeros((2, 4), dtype=int), first_day=0)
+    assert np.isnan(empty["solar_late"]) and empty["solar_early"] == 2.0, (
+        empty
+    )  # no tokens on one side: NaN, no warning
+    # the best pass of the diagnostic uses arm M's patience of 30: a 12-pass stall before the true best must not end the search
+    stall = (
+        [1.0 - 0.01 * i for i in range(10)]
+        + [0.91] * 12
+        + [0.5]
+        + [0.5 + 0.001 * i for i in range(40)]
+    )
+    assert best_pass(val_history=stall) < 23 <= best_pass(val_history=stall, patience=M_PATIENCE), (
+        "patience 8 stops at the stall"
+    )
+    assert precheck_diagnostics(m_val_history=stall)["noise_to_best"] > 0.1, (
+        "the 10 passes must end at the true best pass (23)"
+    )
     assert out["solar_early"] == 1.0 and out["solar_late"] == 3.0 and out["solar"] == 2.0, out
     print(
         "pre-check diagnostics print without changing the verdict, and the solar MAE splits at day 60"

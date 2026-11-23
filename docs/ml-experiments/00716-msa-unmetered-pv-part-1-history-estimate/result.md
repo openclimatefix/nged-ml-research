@@ -398,20 +398,21 @@ probably understates how much the estimate tells a neural network, and the KF9 t
 
 **The first rung failed on fresh draws on the 60-day window, and the validation window was widened
 before any fit of `M`.** The stored rung-4 pass came from an upper-tail world draw: on the 60
-validation days, 3 of 10 fresh draws reached 0.010 and the mean was 0.0087. The ten values of WH's
-`gap` at rung 4 for draws 0 to 9 were 0.0165, 0.0041, 0.0061, 0.0044, 0.0124, 0.0058, 0.0027,
-0.0215, 0.0062, and 0.0075. Before any fit of `M`, and with those values known, the `gap` and KF9 to
-KF12 were moved to the 236 days after the cutoff and the rung rule gained a condition on the mean
-over draws 0 to 7. The world itself was not changed. **The change turns rung 5 from a fail into a
-pass:** on the 60 days rung 5 fails at draw 0 (0.0099), and on the 236 days it passes (0.0147 in WH,
-0.1163 in WT), so a failed early-stopping pre-check at rung 4 now leads to rung 5 and not to a stop.
-KF9 at rung 4 needs 0.0073 where the 60-day rule needed 0.0082, and KF11 needs 0.057 where the
-60-day rule needed 0.041. The rebuilt `world_rung.json` gives, for draws 0 to 7 on the 236 days, WH
-at rung 4: 0.0146, 0.0097, 0.0091, 0.0122, 0.0116, 0.0147, 0.0104, and 0.0208 (mean 0.0129), and WT
-at rung 4: 0.1141, 0.1148, 0.1097, 0.1147, 0.1067, 0.1140, 0.1152, and 0.1094 (mean 0.1123). Rungs 1
-to 3 fail in WH with means of 0.0036, 0.0057, and 0.0059, so rung 4 is chosen. A gating fit takes
-about 40% longer, because every held-out sample is scored at all 14 lead days (about 13,200 rows per
-pass, against about 3,400), which is an estimated 0.5 GPU-process-hours over phase 1.
+validation days, 3 of 10 fresh draws reached 0.010 and the mean was 0.0087. Before any fit of `M`,
+and with those values known, the `gap` and KF9 to KF12 were moved to the 236 days after the cutoff
+and the rung rule gained a condition on the mean over draws 0 to 7. The world itself was not
+changed. The ten values of WH's `gap` at rung 4 for draws 0 to 9 on the 60 days were 0.0165, 0.0041,
+0.0061, 0.0044, 0.0124, 0.0058, 0.0027, 0.0215, 0.0062, and 0.0075. **The change turns rung 5 from a
+fail into a pass:** on the 60 days rung 5 fails at draw 0 (0.0099), and on the 236 days it passes
+(0.0147 in WH, 0.1163 in WT), so a failed early-stopping pre-check at rung 4 now leads to rung 5 and
+not to a stop. KF9 at rung 4 needs 0.0073 where the 60-day rule needed 0.0082, and KF11 needs 0.057
+where the 60-day rule needed 0.041. The rebuilt `world_rung.json` gives, for draws 0 to 7 on the 236
+days, WH at rung 4: 0.0146, 0.0097, 0.0091, 0.0122, 0.0116, 0.0147, 0.0104, and 0.0208 (mean
+0.0129), and WT at rung 4: 0.1141, 0.1148, 0.1097, 0.1147, 0.1067, 0.1140, 0.1152, and 0.1094 (mean
+0.1123). Rungs 1 to 3 fail in WH with means of 0.0036, 0.0057, and 0.0059, so rung 4 is chosen. A
+gating fit takes about 40% longer, because every held-out sample is scored at all 14 lead days
+(about 13,200 rows per pass, against about 3,400), which is an estimated 0.5 GPU-process-hours over
+phase 1.
 
 **The gating fits mirror the real recipe, with two stated differences.** The encoders are frozen, the
 constant divisors of both token paths are calibrated on the arm's own training samples before the first
