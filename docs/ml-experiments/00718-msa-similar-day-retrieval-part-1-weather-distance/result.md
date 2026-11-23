@@ -253,6 +253,32 @@ The experiment is planned and has no fitted result yet, so these bullets describ
   example plots. A stated departure: the date-time encoder holds calendar columns, as in experiment
   713.
 
+## Departures from the design
+
+The code departs from the design in these places, each chosen to keep experiment 713 unedited or to
+keep a check independent.
+
+- The weather of the pool is read from experiment 713's float16 standardised array and converted to
+  float64. The design asked for float64 from the source rows. The table builder and its independent
+  recomputation read the same array.
+- Each placebo draw is seeded by the placebo seed, the Primary, the origin day, the lead day, and an
+  arm tag. The design names the first four. The arm tag keeps the draws of different placebo arms
+  independent.
+- The negative control "a pool that admits the block of age 0" is a block of age 1 under a power cap
+  of 0, because the block of age 0 lies beyond the grid index that a cap of 0 exposes.
+- The newest-row dropout is applied after experiment 713's `Source.assemble`, to the rows of age 2,
+  so that experiment 713 stays unedited.
+- The 27-row arms have more rows than the 24 age buckets, so a placebo draw for them can put two
+  rows in one bucket.
+- Each row table also stores the selected weather distance as a float32 array, `distance`, so that
+  the read-out "mean selected distance by stage and lead day" needs no second pass.
+- The worlds zero the `covid` date-time column, so that no arm can read an era from it. The sparse-
+  world eras are laid out on the real grid.
+- Not written: the sparse world with a power pool (`WS+`), `U27` in the sparse world, the frozen-
+  encoder world, audit triggers 2, 3, 4, and 6, and the swap tables of the `ft` arm. The cold-night
+  slice and the swap points are inputs that the scorer takes from the caller. Without them the
+  `supported` guard fails by rule, so a missing input can never produce a positive verdict.
+
 ## Reviews
 
 An Opus agent reviewed the design before this page was written, and the design was revised after it.
@@ -262,12 +288,16 @@ prose review.
 
 ## Files
 
+**Merge order: experiment 718 merges before experiment 719**, because experiment 719 imports the
+code in this folder.
+
 - `data/ml-experiments/briefs/msa_architecture/f9_design.md`, `f9_design_review.md`, and
   `f9_design_triage.md` (read, private): the design that this page condenses.
 - `ml-experiments/00718-msa-similar-day-retrieval-part-1-weather-distance/`: the code for both parts
-  (retrieval, network, batches, training, fit, prediction, read-outs, and scoring on stored
-  forecasts), written and unit-checked on the CPU, with no fit run yet. The worlds, the
-  known-answer gate, the counted-contrast scorer, and the figures are not written yet.
+  (retrieval and its independent recomputation, network, batches, training, fit, prediction,
+  read-outs, the worlds and known-answer gate, the counted contrasts and decision rules, the
+  figures, and a report script that prints the result tables), written and unit-checked on the
+  CPU. No fit has run, and no table has been built on real data.
 - Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
   the stored states and forecasts of `M*` and `P`, the inputs adapter, the fold statistics, and the
   scorer.
