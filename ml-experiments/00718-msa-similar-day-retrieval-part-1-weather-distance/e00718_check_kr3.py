@@ -47,11 +47,11 @@ def raw_arrays(*, source) -> dict:
 
 
 def check_arm(
-    *, arm: str, source, days: np.ndarray, provider, n_samples: int, seed: int, mutate=None,
+    *, arm: str, source, days: np.ndarray, provider, n_samples: int, seed: int, mutate=None, primaries: np.ndarray | None = None,
 ) -> tuple[list[str], int]:  # fmt: skip
     """Compare the builder's table of `arm` with the reference on random samples; return the report lines and the number of tie swaps."""
     arrays = tab.pool_arrays_from_source(source=source, with_calendar=arm == "UX", holidays=set())
-    primaries = cb.TABLE_PRIMARIES
+    primaries = cb.TABLE_PRIMARIES if primaries is None else primaries
     table = ret.build_table(
         arm=arm, arrays=arrays, primaries=primaries, days=days, target_provider=provider
     )
