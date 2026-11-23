@@ -343,6 +343,11 @@ def kf14_check(
     }
 
 
+def best_shift(corr: dict[int, float]) -> int:
+    """Return the shift whose correlation is largest."""
+    return max(corr, key=lambda k: corr[k])
+
+
 def kf14_correlations(
     *, ghi: np.ndarray, cos_zenith_at: dict[int, np.ndarray], n_steps: int
 ) -> dict[int, float]:
@@ -389,8 +394,8 @@ def kf14_synthetic() -> list[str]:
     assert shifted["end_violations"] == 0, shifted
     right = kf14_correlations(ghi=end_labelled, cos_zenith_at=at, n_steps=period)
     wrong = kf14_correlations(ghi=later, cos_zenith_at=at, n_steps=period)
-    assert max(right, key=right.get) == 0, right  # ty: ignore[no-matching-overload]
-    assert max(wrong, key=wrong.get) == -1, ("a +30 minute series must fail the correlation", wrong)  # ty: ignore[no-matching-overload]
+    assert best_shift(right) == 0, right
+    assert best_shift(wrong) == -1, ("a +30 minute series must fail the correlation", wrong)
     return [
         f"KF14 logic: a period-end series gives {good}, a period-start series gives {bad} (fails, as it must); a series stamped 30 minutes after the period end has no end violations but its best correlation is at shift -1 (the period ends a step before the stamp), not 0 ({wrong})"
     ]
@@ -458,11 +463,11 @@ def kf14_real() -> list[str]:
             cos_zenith_at=at,
             n_steps=n_steps,
         )
-        assert max(corr, key=corr.get) == 0, (
+        assert best_shift(corr) == 0, (
             site,
             "period end is not the best-correlated label",
             corr,
-        )  # ty: ignore[no-matching-overload]
+        )
         out.append(
             f"KF14 {site}: period {period_us // 60_000_000} min, {res}; correlation with the mean cosine of the zenith over the period ending at shift -1, 0, +1 steps: {corr}"
         )

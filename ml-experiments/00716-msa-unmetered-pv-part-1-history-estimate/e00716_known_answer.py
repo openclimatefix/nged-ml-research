@@ -505,6 +505,7 @@ def selftest() -> int:
     assert k15["in_range"][14] is False and not k15["all_in_range"]
     print("early-stopping pre-check, Gaussian NLL, and KF15: ok")
     check_order()
+    check_records()
     smoke()
     print("selftest passed")
     return 0
@@ -518,6 +519,7 @@ def check_order() -> None:
         root = Path(tmp)
         (root / "known_answers").mkdir()
         PATH_OVERRIDE.update(root=root, rung=4)
+        clean = {**arms.code_record(), "git_dirty": False}  # the self-test runs from any tree
         try:
             for call in (
                 lambda: fit_arms(kind="WH", seed=0, device="cpu"),
@@ -530,14 +532,14 @@ def check_order() -> None:
                     assert "precheck" in str(err), err
                 else:
                     raise AssertionError("B5: a fit ran before the early-stopping pre-check")
-            write_json(obj={"rung": 4, "pass": False}, path=precheck_file(rung=4))
+            write_json(obj={"rung": 4, "pass": False, **clean}, path=precheck_file(rung=4))
             try:
                 fit_arms(kind="WH", seed=0, device="cpu")
             except AssertionError as err:
                 assert "step up" in str(err) and "--after 4" in str(err), err
             else:
                 raise AssertionError("B5: a PV gating fit ran after a failed pre-check")
-            write_json(obj={"rung": 4, "pass": True}, path=precheck_file(rung=4))
+            write_json(obj={"rung": 4, "pass": True, **clean}, path=precheck_file(rung=4))
             require_precheck(rung=4)
             try:
                 require_precheck(rung=5)
@@ -549,6 +551,45 @@ def check_order() -> None:
             PATH_OVERRIDE.clear()
     print(
         "B5: fit-arms and the later fit-m jobs refuse before a passed pre-check, and a failed pre-check names the step up to the next rung"
+    )
+
+
+def check_records() -> None:
+    """S1 and S2: a wiring record or an artefact is refused when edited, written from a dirty tree, or written by other code or other check scripts."""
+    body = {
+        "check": "KF2", "pass": True, "detail": {}, "fold": "2025-11",
+        "check_file_sha256": arms.check_file_hashes(), **arms.code_record(), "git_dirty": False,
+    }  # fmt: skip
+    record = {**body, "seal": arms.seal_of(body=body)}
+    assert not arms.wiring_problems(name="KF2", record=record), arms.wiring_problems(
+        name="KF2", record=record
+    )
+    cases = {
+        "an edited field": {**record, "pass": False, "detail": {"x": 1}},
+        "other check scripts": {**record, "check_file_sha256": {**record["check_file_sha256"], "e00716_check_batch.py": "0"}},
+        "other fit code": {**record, "code_hash": "0"},
+        "other 713 code": {**record, "e00713_code_hash": "0"},
+        "a dirty tree": {**record, "git_dirty": True},
+        "no fold": {k: v for k, v in record.items() if k != "fold"},
+    }  # fmt: skip
+    for label, bad in cases.items():
+        assert arms.wiring_problems(name="KF2", record=bad), (
+            f"S2: a record with {label} was accepted"
+        )
+    art = {**arms.code_record(), "git_dirty": False}
+    assert not arms.artefact_problems(what="job", record=art)
+    for label, bad in {
+        "other code": {**art, "code_hash": "0"},
+        "a dirty tree": {**art, "git_dirty": True},
+        "no record": {},
+    }.items():
+        assert arms.artefact_problems(what="job", record=bad), (
+            f"S1: an artefact with {label} was accepted"
+        )
+    stale_file = {**art, "file_sha256": {**art["file_sha256"], arms.WORLD_FILES[0]: "0"}}
+    assert arms.artefact_problems(what="world_rung.json", record=stale_file, files=arms.WORLD_FILES)
+    print(
+        "S1 and S2: records and artefacts are refused when edited, dirty, or written by other code or check scripts"
     )
 
 

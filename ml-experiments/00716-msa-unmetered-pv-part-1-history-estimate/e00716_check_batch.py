@@ -175,7 +175,7 @@ def kf2_poison(
         f"KF2: {n} samples, history p after the contract origin and target-row values of later runs set to 1e6 and to NaN: every assembled input bit-identical; negative controls: an in-range history poison changed the inputs in the {controls[0]} samples whose Primary has a history estimate, and the sample's own target-row day changed them in the {controls[1]} samples whose Primary has a target row (the other samples carry no such input, so nothing may change)"
     )
     # the same on a network with random gains: the output is identical
-    net = pvm.PvNet(arm=net_arm, seed=3)
+    net = pvm.PvNet(arm=net_arm, seed=3)  # ty: ignore[invalid-argument-type]
     with torch.no_grad():
         for name in net.new_parameter_names():
             dict(net.named_parameters())[name].add_(
@@ -301,7 +301,7 @@ def main() -> int:
                 month=month, arm=arm, phase=phase
             )
             keys = (
-                held_out_keys(ps=ps, test_origin_idx=test_origin_idx)
+                held_out_keys(ps=ps, test_origin_idx=test_origin_idx)  # ty: ignore[invalid-argument-type]
                 if phase == "predict"
                 else real_keys(ps=ps, world=world, tr=tr)
             )
