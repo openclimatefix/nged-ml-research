@@ -579,7 +579,8 @@ def pipe_rows(*, pipe: object) -> tuple[object, object]:
 
 def main() -> int:
     """Run the requested checks and print every line."""
-    which = sys.argv[1] if len(sys.argv) > 1 else "all"
+    argv = list(sys.argv)  # 713's pipeline import replaces `sys.argv`, so read it first
+    which = argv[1] if len(argv) > 1 else "all"
     lines: list[str] = []
     if which in {"synthetic", "all"}:
         lines += (
@@ -594,15 +595,13 @@ def main() -> int:
         lines += kf14_real()
     if which == "kf4real":
         lines += kf4_real(
-            month=sys.argv[2]
-            if len(sys.argv) > 2 and not sys.argv[2].startswith("--")
-            else "2025-11"
+            month=argv[2] if len(argv) > 2 and not argv[2].startswith("--") else "2025-11"
         )
     if which in {"capacity", "all"}:
         lines += kf5_capacity()
     print("\n".join(lines))
     print("PASS")
-    if "--record" in sys.argv:
+    if "--record" in argv:
         names = {
             "synthetic": ("KF3",),
             "capacity": ("KF5",),
@@ -616,7 +615,7 @@ def main() -> int:
                 data_dir=ML_EXPERIMENTS_DATA_DIR,
                 name=name,
                 passed=True,
-                fold=sys.argv[2] if name in arms.FOLD_CHECKS else None,
+                fold=argv[2] if name in arms.FOLD_CHECKS else None,
             )
         if which == "synthetic":
             arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name="KF6", passed=True)

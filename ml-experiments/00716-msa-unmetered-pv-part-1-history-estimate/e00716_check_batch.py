@@ -279,10 +279,11 @@ def check_inputs_equal_713(*, ps: pvb.PvSource) -> list[str]:
 def main() -> int:
     """Run the requested checks."""
     torch.set_num_threads(1)
-    which = sys.argv[1] if len(sys.argv) > 1 else "synthetic"
+    argv = list(sys.argv)  # 713's pipeline import replaces `sys.argv`, so read it first
+    which = argv[1] if len(argv) > 1 else "synthetic"
     lines: list[str] = []
     if which in {"real", "real-train", "real-predict"}:
-        month, phase = sys.argv[2], "predict" if which == "real-predict" else "train"
+        month, phase = argv[2], "predict" if which == "real-predict" else "train"
         if which == "real":
             # the predict phase runs first, in a process of its own: 713's pipeline module reads its
             # phase once, at import, and the parent holds nothing yet
@@ -330,9 +331,9 @@ def main() -> int:
             raise AssertionError(msg)
     print("\n".join(lines))
     print("PASS")
-    if "--record" in sys.argv and which == "real":
+    if "--record" in argv and which == "real":
         arms.write_wiring_record(
-            data_dir=ML_EXPERIMENTS_DATA_DIR, name="KF2", passed=True, fold=sys.argv[2]
+            data_dir=ML_EXPERIMENTS_DATA_DIR, name="KF2", passed=True, fold=argv[2]
         )
     return 0
 
