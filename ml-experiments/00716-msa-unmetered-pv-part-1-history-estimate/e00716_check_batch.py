@@ -12,10 +12,12 @@ import sys
 
 import e00713_batch as bt  # ty: ignore[unresolved-import]
 import e00713_layout as lay  # ty: ignore[unresolved-import]
+import e00716_arms as arms
 import e00716_batch as pvb
 import e00716_model as pvm
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 G = 48 * 70
 FIRST_DAY = 17
@@ -64,20 +66,49 @@ def sample_keys(*, n: int, seed: int = 1) -> tuple[torch.Tensor, torch.Tensor, t
     )
 
 
+def real_keys(*, ps: pvb.PvSource, world: object, tr: object, n: int = 64) -> Keys:
+    """Return 64 random stage 2 training samples of the real fold and every origin of its first month that the target table covers."""
+    samples = tr.make_samples(world=world, stage=2, placebo=False)  # ty: ignore[unresolved-attribute]
+    g = np.random.default_rng(1)
+    pick = g.choice(len(samples.c_idx), size=min(n, len(samples.c_idx)), replace=False)
+    primary = torch.as_tensor(samples.primary[pick], dtype=torch.long)
+    c_idx = torch.as_tensor(samples.c_idx[pick], dtype=torch.long)
+    lead = torch.as_tensor(g.integers(0, 14, size=len(pick)), dtype=torch.long)
+    first = world.cutoff_idx // 48  # ty: ignore[unresolved-attribute]
+    days = [
+        d
+        for d in range(first, first + 31)
+        if 0 <= d - ps.tables.first_day < ps.tables.top_p0.shape[1]
+    ]
+    test_c = torch.as_tensor(np.array(days) * 48 + 24, dtype=torch.long)
+    test_p = torch.as_tensor(g.integers(0, 16, size=len(days)), dtype=torch.long)
+    test_k = torch.as_tensor(g.integers(0, 14, size=len(days)), dtype=torch.long)
+    print(
+        f"KF2 real keys: {len(pick)} training samples and {len(days)} test origins covered by the target table"
+    )
+    return torch.cat([primary, test_p]), torch.cat([c_idx, test_c]), torch.cat([lead, test_k])
+
+
 def equal_inputs(a: pvm.PvInputs, b: pvm.PvInputs) -> bool:
     """Return whether every tensor of two batches is bit-identical."""
     return all(torch.equal(getattr(a, k), getattr(b, k)) for k in a.__dict__)
 
 
-def kf2_poison(*, ps: pvb.PvSource, n: int = 64) -> list[str]:
-    """KF2: poisoning every history `p` after the contract origin and every target-row value of a later run changes no input.
+Keys = tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
-    The poisoned copy sets history `p` at every grid index after the sample's contract origin, and
-    the target table of every origin day after the sample's own day (a run issued after the native
-    origin minus 9 hours), to 1e6 and then to NaN. The negative control poisons from 15 days before
-    the origin (offset 0 into the history window) and must change the inputs.
+
+def kf2_poison(*, ps: pvb.PvSource, n: int = 64, keys: Keys | None = None) -> list[str]:
+    """KF2: poisoning every history `p` from 48 steps before the contract origin and every target-row value of a later run changes no input.
+
+    The poisoned copy sets history `p` at every grid index from the contract origin minus 48 steps on
+    (so the 24 hours before the origin are covered, and the newest history token sits one step before
+    that), and the target table of every origin day after the sample's own day (a run issued after the
+    native origin minus 9 hours), to 1e6 and then to NaN. Two negative controls must change the inputs: a
+    history poison of 7.0 (inside the range assertion) from 15 days before the origin, and a poison of
+    the sample's own target-row day.
     """
-    primary, c_idx, lead = sample_keys(n=n)
+    primary, c_idx, lead = sample_keys(n=n) if keys is None else keys
+    n = len(primary)
     out = []
     for i in range(n):
         p, c, k = primary[i : i + 1], c_idx[i : i + 1], lead[i : i + 1]
@@ -85,7 +116,7 @@ def kf2_poison(*, ps: pvb.PvSource, n: int = 64) -> list[str]:
         day = int(c[0]) // 48 - ps.tables.first_day
         for value in POISONS:
             hp = ps.tables.hist_p.clone()
-            hp[:, int(c[0]) + 1 :] = value
+            hp[:, int(c[0]) - 48 :] = value
             tp = ps.tables.top_p0.clone()
             tp[:, day + 1 :] = value
             poisoned = ps.assemble(
@@ -95,16 +126,19 @@ def kf2_poison(*, ps: pvb.PvSource, n: int = 64) -> list[str]:
                 f"KF2: sample {i}: a poisoned value ({value}) reached the inputs"
             )
         hp = ps.tables.hist_p.clone()
-        hp[:, int(c[0]) - 48 * 15 :] = 1e6
-        try:
-            loose = ps.assemble(primary=p, c_idx=c, lead_day=k, hist_p_override=hp)
-        except AssertionError:
-            continue  # the per-batch range assertion caught the poison: the control changed the outcome
+        hp[:, int(c[0]) - 48 * 15 :] = 7.0
+        loose = ps.assemble(primary=p, c_idx=c, lead_day=k, hist_p_override=hp)
         assert not equal_inputs(base.inputs, loose.inputs), (
-            f"KF2: sample {i}: the negative control did not change the inputs"
+            f"KF2: sample {i}: the history negative control did not change the inputs"
+        )
+        tp = ps.tables.top_p0.clone()
+        tp[:, day] = 7.0
+        own = ps.assemble(primary=p, c_idx=c, lead_day=k, top_p0_override=tp)
+        assert not equal_inputs(base.inputs, own.inputs), (
+            f"KF2: sample {i}: the target-row negative control (the sample's own day) did not change the inputs"
         )
     out.append(
-        f"KF2: {n} samples, history p after the contract origin and target-row values of later runs set to 1e6 and to NaN: every assembled input bit-identical; negative control changes the inputs"
+        f"KF2: {n} samples, history p after the contract origin and target-row values of later runs set to 1e6 and to NaN: every assembled input bit-identical; negative controls (an in-range history poison, and the sample's own target-row day) change the inputs"
     )
     # the same on a network with random gains: the output is identical
     net = pvm.PvNet(arm="HT", seed=3)
@@ -119,7 +153,7 @@ def kf2_poison(*, ps: pvb.PvSource, n: int = 64) -> list[str]:
     for i in range(8):
         p, c, k = primary[i : i + 1], c_idx[i : i + 1], lead[i : i + 1]
         hp = ps.tables.hist_p.clone()
-        hp[:, int(c[0]) + 1 :] = 1e6
+        hp[:, int(c[0]) - 48 :] = 1e6
         tp = ps.tables.top_p0.clone()
         tp[:, int(c[0]) // 48 - ps.tables.first_day + 1 :] = 1e6
         with torch.no_grad():
@@ -211,10 +245,13 @@ def main() -> int:
     which = sys.argv[1] if len(sys.argv) > 1 else "synthetic"
     lines: list[str] = []
     if which == "real":
+        import e00713_train as tr  # ty: ignore[unresolved-import]
         import e00716_fit as fit  # ty: ignore[unresolved-import]
 
-        ps = fit.build_pv_source_for_check(month=sys.argv[2])  # ty: ignore[unresolved-attribute]
-        lines += kf2_poison(ps=ps, n=64)
+        for arm in ("H", "H-S", "H-X", "HT", "HT-S", "T"):
+            ps, world = fit.build_pv_source_for_check(month=sys.argv[2], arm=arm)  # ty: ignore[unresolved-attribute]
+            lines += kf2_poison(ps=ps, n=64, keys=real_keys(ps=ps, world=world, tr=tr))
+            lines[-2:] = [f"[{arm}, fold {sys.argv[2]}] {x}" for x in lines[-2:]]
     else:
         source, tables = synthetic_source()
         ps = pvb.PvSource(source=source, tables=tables)
@@ -226,6 +263,10 @@ def main() -> int:
         )
     print("\n".join(lines))
     print("PASS")
+    if "--record" in sys.argv and which == "real":
+        arms.write_wiring_record(
+            data_dir=ML_EXPERIMENTS_DATA_DIR, name="KF2", passed=True, detail={"fold": sys.argv[2]}
+        )
     return 0
 
 

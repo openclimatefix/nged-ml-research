@@ -172,6 +172,7 @@ def fit(
         entry = {
             "stage": stage,
             "pairs": len(samples),
+            "train_pairs": int((~samples.is_val).sum()),
             "first": vars(record[0]).copy(),
             "rerun": None if record[1] is None else vars(record[1]).copy(),
         }
@@ -436,16 +437,21 @@ def default_loader(arm: str, month: str, seed: int, device: str) -> FitInputs:
     )
 
 
-def build_pv_source_for_check(*, month: str, arm: str = "HT") -> pvb.PvSource:
-    """Return the real fold's `PvSource` of `arm` on the CPU, for the KF2 check on real arrays (`e00716_check_batch.py real MONTH`)."""
+def build_pv_source_for_check(*, month: str, arm: str = "HT") -> tuple[pvb.PvSource, tr.World]:
+    """Return the real fold's `PvSource` of `arm` on the CPU and 713's `World` around it, for KF2 on real arrays (`e00716_check_batch.py real MONTH`)."""
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
 
     arms.install_own_cache()
     pipe = inp.load_pipeline(month=month, phase="train", chain_root=inp.chain_root_of_seed(seed=0))
     data = inp.build_fold_data(pipe=pipe, device="cpu", keep_rows=True)
-    return pvb.PvSource(
+    source = pvb.PvSource(
         source=data.source, tables=build_pv_tables(pipe=pipe, data=data, arm=arm, device="cpu")
     )
+    world = tr.World(
+        source=source, cutoff_idx=data.cutoff_idx, clean=data.clean, target_mean=data.target_mean,
+        target_std=data.target_std, month=month, placebo_pool=None,
+    )  # fmt: skip
+    return source, world
 
 
 def main() -> int:

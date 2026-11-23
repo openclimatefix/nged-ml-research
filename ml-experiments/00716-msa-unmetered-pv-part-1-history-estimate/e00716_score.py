@@ -3,7 +3,10 @@
 
 Usage: run.sh e00716_score.py baseline       # WP6a: experiment 713's scorer on M* and C, solar-block slices
        run.sh e00716_score.py zrule          # the rule on arm Z
-       run.sh e00716_score.py part1          # A1 and A2, guards, readings, verdict, S1 to S5
+       run.sh e00716_score.py part1 --n-seeds 5   # A1 and A2, guards, readings, verdict, S1, S2, S4, report-only cuts
+       run.sh e00716_score.py part2 --n-seeds 5   # B1 and B2 (the 16-Primary table is in the file)
+       run.sh e00716_score.py screen         # part 1's stop rule on the four screen folds (interim)
+       run.sh e00716_score.py secondary1 --n-seeds 5  # S3 and S5 (secondary2 for part 2)
        run.sh e00716_score.py --selftest     # the decision logic on synthetic frames (no data)
 
 Experiment 713's scorer does the loading of forecast files, the losses, the seed average, the
@@ -316,6 +319,68 @@ def supported_guards(
     return out
 
 
+# ---------------------------------------------------------------- cold winter nights (guard of `supported`)
+
+COLD_NIGHT_MAX_TEMPERATURE_C: Final = 3.0
+"""The protocol's `cold_nights` slice: the ERA5 temperature at or below this, and the sun more than 5 degrees below the horizon."""
+NIGHT_COS_ZENITH_MAX: Final = float(np.sin(np.radians(-5.0)))
+"""The sun is more than 5 degrees below the horizon when the cosine of the zenith is below this."""
+
+
+def cold_night_grid(*, raw: np.ndarray) -> np.ndarray:
+    """Return a (16, G) bool array of the half-hours that the protocol's `cold_nights` slice would hold: the sun more than 5 degrees below the horizon and the temperature at or below 3 C.
+
+    `raw` is the dense table of experiment 713 (column 2 is the temperature in degrees Celsius, column
+    7 the cosine of the zenith at the stamp). The guard reads this re-implementation of the protocol's
+    two thresholds, in points of capacity, because the protocol's own scorer loads only experiment 713's arms.
+    """
+    return (np.asarray(raw[:, :, 7]) < NIGHT_COS_ZENITH_MAX) & (
+        np.asarray(raw[:, :, 2]) <= COLD_NIGHT_MAX_TEMPERATURE_C
+    )
+
+
+def cold_night_difference(
+    *, averaged: dict, groups: dict, treatment: str, reference: str, cold: np.ndarray, prim_of: dict[int, int], grid_start_us: int,
+    step_us: int = 1_800_000_000,
+) -> dict[str, float]:  # fmt: skip
+    """Return, per counted group, the treatment's mean CRPS minus the reference's on the cold winter nights of the headline band (points of capacity; positive is worse)."""
+    out = {}
+    for g in GROUPS_COUNTED:
+        sel = {
+            n: s713.restrict(
+                frame=averaged[n], group=g, band=s713.HEADLINE_BAND_HOURS, groups=groups
+            )
+            for n in (treatment, reference)
+        }
+        both = s713.paired(treatment=sel[treatment], reference=sel[reference], metric="crps")
+        prim = np.array([prim_of[t] for t in both["time_series_id"].to_list()])
+        idx = ((both["valid_time"].dt.epoch("us").to_numpy() - grid_start_us) // step_us).astype(
+            np.int64
+        )
+        winter = both["valid_time"].dt.month().is_in([12, 1, 2]).to_numpy()
+        keep = cold[prim, np.clip(idx, 0, cold.shape[1] - 1)] & winter
+        assert keep.any(), f"no cold winter night in group {g}: the guard cannot be read"
+        out[g] = float(both["d"].to_numpy()[keep].mean())
+    return out
+
+
+def load_cold_inputs() -> tuple[np.ndarray, dict[int, int], int]:
+    """Read the dense table of experiment 713 and the Primary map of the scorer, and return the cold-night grid, the map, and the grid start."""
+    import e00422_prep as prep422  # ty: ignore[unresolved-import]
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    raw = np.load(
+        ML_EXPERIMENTS_DATA_DIR
+        / "00713-msa-axial-attention-demand-network-part-1"
+        / "cache"
+        / "dense_raw.npy",
+        mmap_mode="r",
+    )
+    sites = k578.sites()
+    prim_of = dict(zip(sites["time_series_id"].to_list(), sites["primary"].to_list(), strict=True))
+    return cold_night_grid(raw=raw), prim_of, prep422.GRID_START_US
+
+
 # ---------------------------------------------------------------- the rule on Z
 
 
@@ -607,6 +672,96 @@ def report_only_tables(
     return out
 
 
+# ---------------------------------------------------------------- audit trigger 5, the 16-Primary table, leave-one-out tables
+
+
+def audit_trigger_5(
+    *, per_seed: dict, averaged: dict, groups: dict, part: int, n_seeds: int
+) -> dict:
+    """Return audit trigger 5 (713's): a nested arm beating its container, `H-S` beating `H` in part 1 and `H` beating `HT` in part 2.
+
+    The trigger fires when the nested arm's contrast against its container reads "gain" or "small gain" in either group.
+    """
+    nested, container = ("H-S", "H") if part == 1 else ("H", "HT")
+    readings = {
+        g: reading(
+            c=contrast(
+                per_seed=per_seed, averaged=averaged, treatment=nested, reference=container, group=g, groups=groups,
+                level=LEVEL_COUNTED, n_seeds=n_seeds,
+            )
+        )
+        for g in GROUPS_COUNTED
+    }  # fmt: skip
+    return {
+        "nested": nested,
+        "container": container,
+        "readings": readings,
+        "fires": bool(any(r in {"gain", "small gain"} for r in readings.values())),
+    }
+
+
+def per_primary_table(
+    *, per_seed: dict, averaged: dict, pairs: dict[str, tuple[str, str]], n_seeds: int
+) -> dict:
+    """Return, for every one of the 16 Primaries, each contrast's CRPS point and 95% month-block interval and the normalised MAE of the median (points of capacity).
+
+    Design 7.1 and 11.2: part 2 is scored at every Primary. Each Primary is its own group, so the
+    thresholds that belong to the six and the eight do not apply and only the point and the interval are read.
+    """
+    out: dict = {}
+    for pid in range(16):
+        groups = {f"p{pid}": np.array([pid])}
+        row: dict = {}
+        for label, (t, r) in pairs.items():
+            crps = contrast(
+                per_seed=per_seed,
+                averaged=averaged,
+                treatment=t,
+                reference=r,
+                group=f"p{pid}",
+                groups=groups,
+                level=LEVEL_SECONDARY,
+                n_seeds=n_seeds,
+            )
+            mae = contrast(per_seed=per_seed, averaged=averaged, treatment=t, reference=r, group=f"p{pid}", groups=groups, level=LEVEL_SECONDARY, metric="abs_err", n_seeds=n_seeds)  # fmt: skip
+            row[label] = {
+                "point": crps["point"],
+                "lower": crps["lower"],
+                "upper": crps["upper"],
+                "mae_point": mae["point"],
+            }
+        out[pid] = row
+    return out
+
+
+def leave_one_out_tables(*, averaged: dict, groups: dict, treatment: str, reference: str) -> dict:
+    """Return the first contrast's CRPS point (headline band) with each Primary left out and with each month left out, per counted group."""
+    out: dict = {}
+    for g in GROUPS_COUNTED:
+        sel = {
+            n: s713.restrict(
+                frame=averaged[n], group=g, band=s713.HEADLINE_BAND_HOURS, groups=groups
+            )
+            for n in (treatment, reference)
+        }
+        d = s713.paired(treatment=sel[treatment], reference=sel[reference], metric="crps")
+        by_id = d.group_by("time_series_id").agg(pl.col("d").sum().alias("s"), pl.len().alias("n"))
+        total, count = float(by_id["s"].sum()), float(by_id["n"].sum())
+        month = (
+            d.with_columns(m=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"))
+            .group_by("m")
+            .agg(pl.col("d").mean())
+            .sort("m")
+        )
+        months = month["d"].to_numpy()
+        out[g] = {
+            "all": total / count,
+            "without_primary": {int(i): (total - float(s_)) / (count - float(n_)) for i, s_, n_ in by_id.iter_rows()},
+            "without_month": {m: float((months.sum() - x) / (len(months) - 1)) for m, x in zip(month["m"], months, strict=True)},
+        }  # fmt: skip
+    return out
+
+
 # ---------------------------------------------------------------- one part
 
 PART_PAIRS: Final = {
@@ -674,6 +829,12 @@ def score_part(
     placebo = PlaceboReading(
         upper={g: out[f"counted:placebo:{g}"]["upper"] for g in GROUPS_COUNTED}, point={g: out[f"counted:placebo:{g}"]["point"] for g in GROUPS_COUNTED}, control_reading=control_reading,
     )  # fmt: skip
+    assert cold_night_difference is not None, (
+        "the cold-night guard needs its input: pass `cold_night_difference` (a missing input never passes)"
+    )
+    assert part == 2 or mask_points is not None, (
+        "part 1's mask guard needs the two masked read-outs: pass `mask_points`"
+    )
     out["guards"] = supported_guards(
         treatment=pairs["first"][0], reference=pairs["first"][1], averaged=averaged, groups=groups,
         mask_points=mask_points if part == 1 else {"none": {g: out[f"counted:first:{g}"]["point"] for g in GROUPS_COUNTED}},
@@ -708,6 +869,15 @@ def score_part(
         reference=pairs["first"][1],
         n_seeds=n_seeds,
     )
+    out["audit_trigger_5"] = audit_trigger_5(
+        per_seed=per_seed, averaged=averaged, groups=groups, part=part, n_seeds=n_seeds
+    )
+    out["per_primary"] = per_primary_table(
+        per_seed=per_seed, averaged=averaged, pairs={"first": pairs["first"], "placebo": pairs["placebo"]}, n_seeds=n_seeds
+    )  # fmt: skip
+    out["leave_one_out"] = leave_one_out_tables(
+        averaged=averaged, groups=groups, treatment=pairs["first"][0], reference=pairs["first"][1]
+    )
     out["secondary_count_note"] = (
         "14 secondary readings across S1 to S5 (S1, S2, and S4 give 4 each, S3 and S5 one each); one false positive among them is likely"
     )
@@ -728,18 +898,47 @@ def score_dir_of(*, part: int) -> Path:
     return arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z" if part == 1 else "T") / "score"
 
 
-def available_seeds(*, names: list[str], months: tuple[str, ...]) -> tuple[int, ...]:
-    """Return the seeds that every arm holds for every month: 0 to 4 if present, else 0 and 1 (the two-seed case)."""
-    for seeds in (arms.HEADLINE_SEEDS, arms.TWO_SEEDS):
-        if all(
-            fit_path(name=n, month=m, seed=s).exists() if n in arms.ARMS or "-" in n else True
-            for n in names
-            for m in months
-            for s in seeds
-        ):
-            return seeds
-    msg = f"no seed set of {arms.HEADLINE_SEEDS} or {arms.TWO_SEEDS} is complete for {names}"
-    raise FileNotFoundError(msg)
+def pinned_seeds(*, n_seeds: int, names: list[str], months: tuple[str, ...]) -> tuple[int, ...]:
+    """Return the seed set the manager chose (5 seeds or F4's 2), and refuse when any arm lacks a file of it.
+
+    The set is never read from the files that happen to exist, so that a half-finished phase cannot be
+    scored silently at 2 seeds.
+    """
+    assert n_seeds in {2, 5}, "the seed set is 5 (seeds 0 to 4) or 2 (seeds 0 and 1)"
+    seeds = arms.HEADLINE_SEEDS if n_seeds == 5 else arms.TWO_SEEDS
+    missing = [
+        str(fit_path(name=n, month=m, seed=sd))
+        for n in names
+        if n in arms.ARMS or "-" in n
+        for m in months
+        for sd in seeds
+        if not fit_path(name=n, month=m, seed=sd).exists()
+    ]
+    assert not missing, (
+        f"{len(missing)} forecast files of the {n_seeds}-seed set are missing, for example {missing[:3]}"
+    )
+    return seeds
+
+
+MASK_READOUTS: Final = {"cams": "H-cams", "convention": "H-convention"}
+"""Part 1's two masked read-outs of arm `H` (no refit): the CAMS-rule mask and 713's convention mask."""
+
+
+def mask_points_of(
+    *, star: str, months: tuple[str, ...], seeds: tuple[int, ...], truth: np.ndarray | None
+) -> dict[str, dict[str, float]]:
+    """Return each masked read-out's contrast point against `M*` per counted group (a missing read-out raises)."""
+    names = [star, *MASK_READOUTS.values()]
+    per_seed, averaged, groups = load_all(
+        names=names, months=months, seeds=dict.fromkeys(names, seeds), truth=truth
+    )
+    return {
+        key: {
+            g: contrast(per_seed=per_seed, averaged=averaged, treatment=name, reference=star, group=g, groups=groups, level=LEVEL_COUNTED, n_seeds=len(seeds))["point"]
+            for g in GROUPS_COUNTED
+        }
+        for key, name in MASK_READOUTS.items()
+    }  # fmt: skip
 
 
 def cmd_baseline() -> int:
@@ -805,20 +1004,228 @@ def cmd_zrule() -> int:
     return 0
 
 
-def cmd_part(*, part: int) -> int:
-    """Score a part and write `score/part<N>.json`."""
+def cmd_part(*, part: int, n_seeds: int) -> int:
+    """Score a part and write `score/part<N>.json`.
+
+    The cold-night guard reads the dense table, and part 1's mask guard reads the two masked read-outs
+    of `H`; a missing input raises, so the verdict never passes a guard it could not compute.
+    """
     star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     pairs = pairs_of_part(part=part, star=star)
     names = sorted({n for p in pairs.values() for n in p if n != star})
-    seeds = available_seeds(names=names, months=arms.ALL_FOLDS)
-    out = score_part(part=part, star=star, months=arms.ALL_FOLDS, seeds=seeds)
+    seeds = pinned_seeds(n_seeds=n_seeds, names=names, months=arms.ALL_FOLDS)
+    truth = s713.truth_stack()
+    mask_points = (
+        mask_points_of(star=star, months=arms.ALL_FOLDS, seeds=seeds, truth=truth)
+        if part == 1
+        else None
+    )
+    first_t, first_r = pairs["first"]
+    per_seed_names = sorted({first_t, first_r})
+    _, averaged, groups = load_all(
+        names=per_seed_names,
+        months=arms.ALL_FOLDS,
+        seeds=dict.fromkeys(per_seed_names, seeds),
+        truth=truth,
+    )
+    cold, prim_of, grid_start = load_cold_inputs()
+    cold_diff = cold_night_difference(
+        averaged=averaged, groups=groups, treatment=first_t, reference=first_r, cold=cold, prim_of=prim_of, grid_start_us=grid_start,
+    )  # fmt: skip
+    out = score_part(
+        part=part, star=star, months=arms.ALL_FOLDS, seeds=seeds, truth=truth, mask_points=mask_points, cold_night_difference=cold_diff,
+    )  # fmt: skip
+    out["cold_night_difference"] = cold_diff
+    out["mask_points"] = mask_points
+    out["extra_contrasts"] = report_only_extra(part=part, star=star, seeds=seeds, truth=truth)
     write(name=f"part{part}", obj=out, score_dir=score_dir_of(part=part))
     print(
         json.dumps(
-            {k: out[k] for k in ("readings", "placebo_control_readings", "verdict", "closes_line")},
+            {
+                k: out[k]
+                for k in (
+                    "readings",
+                    "placebo_control_readings",
+                    "verdict",
+                    "closes_line",
+                    "audit_trigger_5",
+                )
+            },
             indent=1,
         )
     )
+    return 0
+
+
+def extra_pairs(*, part: int, star: str) -> dict[str, tuple[str, str]]:
+    """Return the report-only contrasts of design 7.5 that are not counted: nested and cross-arm readings, and every arm against `C`."""
+    if part == 1:
+        pairs = {"H-X": ("H", "H-X"), "H-S vs M*": ("H-S", star), "H vs Z": ("H", "Z")}
+        arm_list = ("H", "H-S", "H-X", "Z")
+    else:
+        pairs = {"HT vs M*": ("HT", star), "T vs M*": ("T", star), "HT vs T": ("HT", "T")}
+        arm_list = ("HT", "HT-S", "T")
+    return {**pairs, **{f"{a} vs C": (a, "C") for a in arm_list}}
+
+
+def report_only_extra(
+    *, part: int, star: str, seeds: tuple[int, ...], truth: np.ndarray | None
+) -> dict:
+    """Return each extra contrast at 95% in both groups, or the reason it could not be read (a missing arm is reported, never guessed)."""
+    out: dict = {}
+    for label, (t, r) in extra_pairs(part=part, star=star).items():
+        try:
+            names = [t, r]
+            ps, av, groups = load_all(
+                names=names, months=arms.ALL_FOLDS, seeds=dict.fromkeys(names, seeds), truth=truth
+            )
+            out[label] = {
+                g: contrast(
+                    per_seed=ps,
+                    averaged=av,
+                    treatment=t,
+                    reference=r,
+                    group=g,
+                    groups=groups,
+                    level=LEVEL_SECONDARY,
+                    n_seeds=len(seeds),
+                )
+                for g in GROUPS_COUNTED
+            }
+        except (FileNotFoundError, AssertionError) as err:
+            out[label] = {"not_read": str(err)[:200]}
+    return out
+
+
+def screen_stop_rule(*, first: dict[str, dict], monthly: dict[str, np.ndarray]) -> dict:
+    """Return 713's screen stop rule for part 1: `H` minus `M*` above +0.15 in both groups, or above +0.10 in both groups and positive in at least 3 of 4 folds in both groups."""
+    big = all(first[g]["point"] > 0.15 for g in GROUPS_COUNTED)
+    moderate = all(
+        first[g]["point"] > 0.10 and int((np.asarray(monthly[g]) > 0).sum()) >= 3
+        for g in GROUPS_COUNTED
+    )
+    return {
+        "stop": bool(big or moderate),
+        "above_0_15_both": bool(big),
+        "above_0_10_and_3_of_4_both": bool(moderate),
+    }
+
+
+def cmd_screen() -> int:
+    """Part 1's stop rule on the four screen folds, seeds 0 and 1 (every number is interim), with fold 2025-11 left out as a second reading."""
+    star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    names = ["H", star]
+    seeds = pinned_seeds(n_seeds=2, names=["H"], months=arms.SCREEN_FOLDS)
+    per_seed, averaged, groups = load_all(
+        names=names, months=arms.SCREEN_FOLDS, seeds=dict.fromkeys(names, seeds)
+    )
+    first = {
+        g: contrast(
+            per_seed=per_seed,
+            averaged=averaged,
+            treatment="H",
+            reference=star,
+            group=g,
+            groups=groups,
+            level=LEVEL_SECONDARY,
+            n_seeds=2,
+        )
+        for g in GROUPS_COUNTED
+    }
+    monthly = {g: np.array(first[g]["monthly"]) for g in GROUPS_COUNTED}
+    out = {
+        "interim": True,
+        "folds": list(arms.SCREEN_FOLDS),
+        "first": first,
+        "rule": screen_stop_rule(first=first, monthly=monthly),
+    }
+    without = {g: {**first[g], "point": float(np.mean(monthly[g][1:]))} for g in GROUPS_COUNTED}
+    out["rule_without_2025_11"] = screen_stop_rule(
+        first=without, monthly={g: monthly[g][1:] for g in GROUPS_COUNTED}
+    )
+    write(name="screen", obj=out, score_dir=score_dir_of(part=1))
+    print(
+        json.dumps(
+            {"rule": out["rule"], "rule_without_2025_11": out["rule_without_2025_11"]}, indent=1
+        )
+    )
+    return 0
+
+
+def capacity_share_of_fold(*, fold: str) -> dict[int, float]:
+    """Return each Primary's PV capacity over its power capacity at `fold` (the S5 share), from the as-of capacity table."""
+    import e00397_prep as prep397  # ty: ignore[unresolved-import]
+    import e00716_pv as pv
+
+    rows = list(prep397.primaries().iter_rows(named=True))
+    caps = pv.capacity_table(fold=fold, sites=[r["site"] for r in rows])
+    return {
+        i: (c.mw / float(r["effective_capacity_mw"]) if c.source is not None else 0.0)
+        for i, (c, r) in enumerate(zip(caps, rows, strict=True))
+    }
+
+
+def cmd_secondary(*, part: int, n_seeds: int) -> int:
+    """S3 (the dull-day gap against the shifted-`M*` control) and S5 (the per-Primary contrast against the PV share), on the solar block of the sunny folds."""
+    import e00422_prep as prep422  # ty: ignore[unresolved-import]
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+    import e00716_pv as pv
+
+    star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    pairs = pairs_of_part(part=part, star=star)
+    treated, reference = pairs["first"]
+    names = sorted({treated, reference})
+    seeds = pinned_seeds(n_seeds=n_seeds, names=names, months=SUNNY_FOLDS)
+    truth = s713.truth_stack()
+    raw_t = s713.seed_average(frame=load_arm(arm=treated, seeds=seeds, months=SUNNY_FOLDS))
+    raw_r = s713.seed_average(frame=load_arm(arm=reference, seeds=seeds, months=SUNNY_FOLDS))
+    raw_c = shift_control(star_frame=raw_r, treated_frame=raw_t)
+    frames = {
+        n: s713.add_losses(frame=f, truth=truth)
+        for n, f in (("t", raw_t), ("r", raw_r), ("c", raw_c))
+    }
+    sites = k578.sites()
+    prim_of = dict(zip(sites["time_series_id"].to_list(), sites["primary"].to_list(), strict=True))
+    raw = np.load(
+        ML_EXPERIMENTS_DATA_DIR
+        / "00713-msa-axial-attention-demand-network-part-1"
+        / "cache"
+        / "dense_raw.npy",
+        mmap_mode="r",
+    )
+    clear = pv.clear_sky(cos_zenith=np.asarray(raw[:, :, 7], dtype=np.float64))
+    csi = daily_clear_sky_index(ghi=np.asarray(raw[:, :, 0], dtype=np.float64), clear=clear)
+    groups = s713.group_ids()
+    sliced = {k: solar_block(in_folds(f, SUNNY_FOLDS)) for k, f in frames.items()}
+    with_thirds = {
+        k: dullness_thirds(frame=f, csi=csi, prim_of=prim_of, grid_start_us=prep422.GRID_START_US)
+        for k, f in sliced.items()
+    }
+    out: dict = {
+        "part": part,
+        "seeds": list(seeds),
+        "S3": {
+            g: secondary_s3(
+                treated=with_thirds["t"],
+                star=with_thirds["r"],
+                control=with_thirds["c"],
+                group=g,
+                groups=groups,
+            )
+            for g in GROUPS_COUNTED
+        },
+    }
+    both = s713.paired(treatment=sliced["t"], reference=sliced["r"], metric="crps")
+    first_by_primary = {
+        int(k): float(v)
+        for k, v in both.group_by("time_series_id").agg(pl.col("d").mean()).iter_rows()
+    }
+    first_by_primary = {prim_of[k]: v for k, v in first_by_primary.items()}
+    out["S5"] = secondary_s5(
+        first_by_primary=first_by_primary, pv_share=capacity_share_of_fold(fold="2026-06")
+    )
+    write(name=f"secondary_part{part}", obj=out, score_dir=score_dir_of(part=part))
+    print(json.dumps(out, indent=1, default=float))
     return 0
 
 
@@ -1015,6 +1422,86 @@ def selftest() -> int:
     csi = daily_clear_sky_index(ghi=ghi, clear=clear)
     assert np.allclose(csi[0], np.linspace(0.3, 1.0, 40)), csi[0][:5]
     print("daily clear-sky index recovers the sky factor: ok")
+
+    def averaged_of(frames: dict) -> dict:
+        return {
+            k: v.group_by(*KEYS)
+            .agg(pl.col("crps").mean(), pl.col("abs_err").mean(), pl.col("pin_q01").mean(), pl.col("pin_q99").mean(), pl.col("lead_hours").first())
+            .with_columns(seed=pl.lit(0, dtype=pl.Int64))
+            for k, v in frames.items()
+        }  # fmt: skip
+
+    # the cold-night guard reads a number and refuses a missing input
+    from datetime import UTC
+
+    grid_start = int(datetime(2026, 1, 1, tzinfo=UTC).timestamp() * 1e6)
+    cold_all = np.ones((16, 48 * 120), dtype=bool)
+    diff = cold_night_difference(averaged=averaged, groups=groups, treatment="H", reference="star", cold=cold_all, prim_of={i: i for i in range(16)}, grid_start_us=grid_start)  # fmt: skip
+    assert all(abs(v + 0.08) < 1e-6 for v in diff.values()), diff
+    try:
+        cold_night_difference(averaged=averaged, groups=groups, treatment="H", reference="star", cold=~cold_all, prim_of={i: i for i in range(16)}, grid_start_us=grid_start)  # fmt: skip
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("an empty cold-night slice must raise, not pass")
+    print("cold-night guard: reads the difference on cold winter nights, and an empty slice raises")
+    # the stop rule of the screen
+    first = {g: {"point": 0.2} for g in GROUPS_COUNTED}
+    assert screen_stop_rule(
+        first=first, monthly={g: np.array([0.3, 0.2, 0.1, -0.1]) for g in GROUPS_COUNTED}
+    )["stop"]
+    first = {g: {"point": 0.12} for g in GROUPS_COUNTED}
+    assert screen_stop_rule(
+        first=first, monthly={g: np.array([0.3, 0.2, 0.1, -0.1]) for g in GROUPS_COUNTED}
+    )["stop"]
+    assert not screen_stop_rule(
+        first=first, monthly={g: np.array([0.3, 0.2, -0.1, -0.1]) for g in GROUPS_COUNTED}
+    )["stop"]
+    assert not screen_stop_rule(
+        first={g: {"point": 0.05} for g in GROUPS_COUNTED},
+        monthly={g: np.ones(4) for g in GROUPS_COUNTED},
+    )["stop"]
+    print("screen stop rule: above +0.15, or above +0.10 with 3 of 4 folds, in both groups")
+    # audit trigger 5, the 16-Primary table, and the leave-one-out tables
+    ps5 = {
+        **per_seed,
+        "H-S": star["frame"].with_columns(
+            crps=pl.col("crps") - 0.30, abs_err=pl.col("abs_err") - 0.27
+        ),
+    }
+    av5 = averaged_of(ps5)
+    trig = audit_trigger_5(per_seed=ps5, averaged=av5, groups=groups, part=1, n_seeds=5)
+    assert trig["fires"] and trig["nested"] == "H-S", trig
+    ps5["H-S"] = star["frame"].with_columns(crps=pl.col("crps") + 0.10)
+    assert not audit_trigger_5(
+        per_seed=ps5, averaged=averaged_of(ps5), groups=groups, part=1, n_seeds=5
+    )["fires"]
+    table = per_primary_table(
+        per_seed=per_seed,
+        averaged=averaged,
+        pairs={"first": ("H", "star"), "placebo": ("H", "star")},
+        n_seeds=5,
+    )
+    assert len(table) == 16 and all(
+        abs(r["first"]["point"] + 0.08) < 1e-6 and abs(r["first"]["mae_point"] + 0.07) < 1e-6
+        for r in table.values()
+    )
+    loo = leave_one_out_tables(averaged=averaged, groups=groups, treatment="H", reference="star")
+    assert (
+        len(loo["six"]["without_primary"]) == 6
+        and len(loo["six"]["without_month"]) == 4
+        and abs(loo["six"]["all"] + 0.08) < 1e-6
+    )
+    print(
+        "audit trigger 5 fires when a nested arm beats its container; the 16-Primary table and the leave-one-out tables have the right shape"
+    )
+    # the reading `supported` is reachable once every guard has an input
+    assert (
+        verdict(
+            readings={"six": "gain", "eight": "gain"}, placebo=clean, guards_hold=guards["all_hold"]
+        )
+        == "supported"
+    )
     print("selftest passed")
     return 0
 
@@ -1022,14 +1509,32 @@ def selftest() -> int:
 def main() -> int:
     """Dispatch."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", nargs="?", choices=("baseline", "zrule", "part1"))
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=("baseline", "zrule", "part1", "part2", "screen", "secondary1", "secondary2"),
+    )
+    parser.add_argument(
+        "--n-seeds",
+        type=int,
+        choices=(2, 5),
+        help="the manager's seed set (required to score a part): 5 seeds or 2",
+    )
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
     if args.selftest:
         return selftest()
-    return {"baseline": cmd_baseline, "zrule": cmd_zrule, "part1": lambda: cmd_part(part=1)}[
-        args.command
-    ]()
+    if args.command in {"part1", "part2", "secondary1", "secondary2"}:
+        assert args.n_seeds is not None, "pass --n-seeds 5 or --n-seeds 2"
+    return {
+        "baseline": cmd_baseline,
+        "zrule": cmd_zrule,
+        "screen": cmd_screen,
+        "part1": lambda: cmd_part(part=1, n_seeds=args.n_seeds),
+        "part2": lambda: cmd_part(part=2, n_seeds=args.n_seeds),
+        "secondary1": lambda: cmd_secondary(part=1, n_seeds=args.n_seeds),
+        "secondary2": lambda: cmd_secondary(part=2, n_seeds=args.n_seeds),
+    }[args.command]()
 
 
 if __name__ == "__main__":

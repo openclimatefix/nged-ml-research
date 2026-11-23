@@ -1,9 +1,15 @@
-# ruff: noqa: E501, PT018, E731, ANN003
+# ruff: noqa: E501, PT018, PT017, PLR0915, E731, ANN003
 """Experiment 716: known-answer checks KF6 and KF9 to KF12, KF15, and the early-stopping pre-check (WP5b; design section 8.2).
 
 Usage: run.sh e00716_known_answer.py --selftest
-       run.sh e00716_known_answer.py fit WORLD SEED [--device cuda]       # arm M, then the gating arms, in one world
-       run.sh e00716_known_answer.py finish [--wiring-passed KF1 KF2 ...]  # the checks, the gate file
+       run.sh e00716_known_answer.py fit-m WORLD SEED [--device cuda]    # arm M, hiding the world's sky
+       run.sh e00716_known_answer.py precheck                            # the early-stopping pre-check, before any PV fit
+       run.sh e00716_known_answer.py fit-arms WORLD SEED [--device cuda] # the three gating arms (refuses before a passed pre-check)
+       run.sh e00716_known_answer.py finish                              # the checks, the gate file (reads work/wiring/*.json)
+
+Order (design 8.2): `fit-m WH 0` and `fit-m WT 0`, then `precheck`. A failed pre-check goes up one rung:
+`e00716_world_rung.py --after N`, then `fit-m WH 0`, `fit-m WT 0` and `precheck` again. Only after a pass
+are the other `fit-m` jobs (seeds 1 and 2, and world WN) and every `fit-arms` job allowed.
 
 This file is implemented and has not been run on real data: the work package's brief forbids any GPU
 use and any fit. `--selftest` runs the decision logic on synthetic numbers and one smoke pass of a
@@ -108,6 +114,37 @@ class WorldSource(pvb.PvSource):
         return batch
 
 
+class HidingSource(bt.Source):
+    """Experiment 713's source with the hidden sky columns zeroed in the history rows or the target row, for training arm `M` in a world.
+
+    Arm `M` is trained "in each world" (design 8.2), and each world hides one part of the sky, so `M`
+    must never see the part its world hides.
+    """
+
+    def __init__(self, *, source: bt.Source, hide: str) -> None:
+        """Copy the arrays of `source` and set the part of the sky to hide."""
+        super().__init__(
+            power_z=source.power_z, dense_weather=source.dense_weather, dense_datetime=source.dense_datetime,
+            day_type=source.day_type, ens=source.ens, power_in=source.power_in,
+        )  # fmt: skip
+        assert hide in {"history", "target", "none"}, hide
+        self.hide = hide
+        self.cols = sorted(HIDDEN_COLUMNS.values())
+
+    def with_power_in(self, *, power_in: torch.Tensor) -> HidingSource:
+        """Return the same hiding source with `power_in` as the history power."""
+        return HidingSource(source=super().with_power_in(power_in=power_in), hide=self.hide)
+
+    def assemble(self, **kwargs) -> bt.Assembled:
+        """Assemble as `bt.Source` does, then hide the sky."""
+        batch = super().assemble(**kwargs)
+        if self.hide == "history":
+            batch.inputs.hist_weather[..., self.cols] = 0.0
+        elif self.hide == "target":
+            batch.inputs.top_weather[..., self.cols] = 0.0
+        return batch
+
+
 # ---------------------------------------------------------------- the PV tables of a world
 
 
@@ -118,8 +155,8 @@ def world_tables(
 
     `p` is `s u` over the world's own `target_std`, clipped to 0..10, for the four Primaries (other
     rows are absent). `H-S` and `HT-S` read the yield curve of the shifted sky (`shifted` is the pair
-    (ghi, temperature) from `pv.shifted_sky`, 28 days earlier). `WN` reads `0.30 u` whatever the world's
-    dip. `H` fills `hist_p`; `HT` and `T` fill the target table too, with `p0_sd = 0`.
+    (ghi, temperature) from `pv.shifted_sky`, 28 days earlier); `H-S` shifts the history estimate and
+    `HT-S` the target row only. `WN` reads `0.30 u`, and its world has no dip (`build_world(s_override=0)`). `H` fills `hist_p`; `HT` and `T` fill the target table too, with `p0_sd = 0`.
     """
     n_grid = world.y.shape[1]
     n_days = n_grid // lay.STEPS_PER_DAY
@@ -137,7 +174,13 @@ def world_tables(
             for i in range(u.shape[0])
         ])  # fmt: skip
     size = np.full(u.shape[0], 0.30) if kind == "WN" else world.s
-    p = np.clip(size[:, None] * u / target_std[:, None], 0.0, 10.0)
+    p_top = np.clip(size[:, None] * u / target_std[:, None], 0.0, 10.0)
+    # `HT-S` shifts the target-row estimate only: its history rows are real (design section 5), so they read the world's own `u`
+    p_hist = (
+        np.clip(size[:, None] * world.u / target_std[:, None], 0.0, 10.0)
+        if arm == "HT-S"
+        else p_top
+    )
     hist_p = np.zeros((16, n_grid), dtype=np.float32)
     hist_ok = np.zeros((16, n_grid), dtype=bool)
     top_p0 = np.zeros((16, n_days, lay.STEPS_PER_DAY * lay.N_LEAD_DAYS, 2), dtype=np.float32)
@@ -145,11 +188,11 @@ def world_tables(
     rel = np.arange(lay.STEPS_PER_DAY * lay.N_LEAD_DAYS)
     for pos, prim in enumerate(wd.PRIMARIES):
         if spec_hist:
-            hist_p[prim], hist_ok[prim] = p[pos], True
+            hist_p[prim], hist_ok[prim] = p_hist[pos], True
         if spec_top:
             idx = (np.arange(n_days) * lay.STEPS_PER_DAY + 24)[:, None] + rel[None, :]
             valid = idx < n_grid
-            vals = np.where(valid, p[pos][np.clip(idx, 0, n_grid - 1)], 0.0)
+            vals = np.where(valid, p_top[pos][np.clip(idx, 0, n_grid - 1)], 0.0)
             top_p0[prim, :, :, 0] = vals
             top_filled[prim] = valid
     to = lambda a: torch.from_numpy(np.ascontiguousarray(a)).to(device)
@@ -343,10 +386,26 @@ def run_gating_arm(
     *, arm: str, start_state: dict, world713: tr.World, mean: np.ndarray, std: np.ndarray, seed: int, passes: int, samples: tr.SampleSet, held: tr.SampleSet,
     train_source: pvb.PvSource | None, device: str,
 ) -> dict:  # fmt: skip
-    """Train one gating arm from `start_state` for `passes` passes with no early stopping and record the metrics after every pass."""
+    """Train one gating arm from `start_state` for `passes` passes with no early stopping and record the metrics after every pass.
+
+    The settings mirror the real fits (design 8.2): the encoders are frozen as `M*`'s are, the constant
+    divisors `r_h` and `r_t` are calibrated on the arm's own training samples before the first step,
+    stage 2's cut and token weights apply, there is no ensemble target row (the world's own source),
+    `p0_sd` is zero, shifts are in training only, and validation reads the unshifted source. The trunk
+    trains at 2e-4 and `proj_s` at the stage 2 rate of 5e-4, as in experiment 713.
+    """
     spec = arms.ARMS[arm]
     model = pvm.PvNet(arm=spec.net, seed=seed).to(device)  # ty: ignore[invalid-argument-type]
     model.load_m_star(state=copy.deepcopy(start_state))
+    model.freeze_encoders()
+    scale: dict[str, float] = {}
+    if model.pv.any_path:
+        cut = tr.target_end(world=world713, stage=2)
+        scale = model.calibrate_scale(
+            batches=pvt.calibration_batches(
+                world=world713, samples=samples, source=world713.source, cut=cut
+            )  # ty: ignore[invalid-argument-type]
+        )
     per_pass: list[dict] = []
 
     def on_pass(_passes: int, net: torch.nn.Module) -> None:
@@ -363,19 +422,31 @@ def run_gating_arm(
         torch.set_rng_state(state)
 
     log = pvt.train_stage(
-        model=model, world=world713, stage=2, samples=samples, seed=seed, encoders="trained", max_passes=passes, patience=10**6, on_pass=on_pass, train_source=train_source,
+        model=model, world=world713, stage=2, samples=samples, seed=seed, encoders="frozen", max_passes=passes, patience=10**6, on_pass=on_pass, train_source=train_source,
     )  # fmt: skip
     return {
         "val_history": list(log.val_history),
         "per_pass": per_pass,
+        "scale": scale,
         "a": None if model.pv_a is None else model.pv_a.detach().cpu().tolist(),
         "c": None if model.pv_c is None else model.pv_c.detach().cpu().tolist(),
     }
 
 
+PATH_OVERRIDE: dict[str, object] = {}
+"""The self-test points the work folder and the chosen rung at a temporary folder through this dictionary."""
+
+
+def work_root() -> Path:
+    """Return part 1's `work/` folder."""
+    if "root" in PATH_OVERRIDE:
+        return Path(str(PATH_OVERRIDE["root"]))
+    return arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "work"
+
+
 def work_dir() -> Path:
     """Return `work/known_answers/` of part 1's data folder."""
-    return arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "work" / "known_answers"
+    return work_root() / "known_answers"
 
 
 # ---------------------------------------------------------------- self-test
@@ -433,9 +504,52 @@ def selftest() -> int:
     k15 = kf15(c_by_primary={2: -1.0, 5: -0.9, 9: -1.2, 14: -1.4})
     assert k15["in_range"][14] is False and not k15["all_in_range"]
     print("early-stopping pre-check, Gaussian NLL, and KF15: ok")
+    check_order()
     smoke()
     print("selftest passed")
     return 0
+
+
+def check_order() -> None:
+    """B5: no PV gating fit and no later `M` fit may run before a passed pre-check, and the ladder steps up after a failure."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "known_answers").mkdir()
+        PATH_OVERRIDE.update(root=root, rung=4)
+        try:
+            for call in (
+                lambda: fit_arms(kind="WH", seed=0, device="cpu"),
+                lambda: fit_m(kind="WH", seed=1, device="cpu"),
+                lambda: fit_m(kind="WN", seed=0, device="cpu"),
+            ):
+                try:
+                    call()
+                except AssertionError as err:
+                    assert "precheck" in str(err), err
+                else:
+                    raise AssertionError("B5: a fit ran before the early-stopping pre-check")
+            write_json(obj={"rung": 4, "pass": False}, path=precheck_file(rung=4))
+            try:
+                fit_arms(kind="WH", seed=0, device="cpu")
+            except AssertionError as err:
+                assert "step up" in str(err) and "--after 4" in str(err), err
+            else:
+                raise AssertionError("B5: a PV gating fit ran after a failed pre-check")
+            write_json(obj={"rung": 4, "pass": True}, path=precheck_file(rung=4))
+            require_precheck(rung=4)
+            try:
+                require_precheck(rung=5)
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError("B5: a pre-check at rung 4 must not release a fit at rung 5")
+        finally:
+            PATH_OVERRIDE.clear()
+    print(
+        "B5: fit-arms and the later fit-m jobs refuse before a passed pre-check, and a failed pre-check names the step up to the next rung"
+    )
 
 
 def smoke() -> None:
@@ -516,6 +630,84 @@ def smoke() -> None:
         device="cpu",
     )
     assert len(out["per_pass"]) == 1 and np.isfinite(out["per_pass"][0]["solar"]), out
+    assert set(out["scale"]) == {"hist", "top"} and all(
+        v > 0 and abs(v - 1.0) > 1e-3 for v in out["scale"].values()
+    ), (
+        "B2: the gating arm must calibrate the constant divisors r_h and r_t before its first step",
+        out["scale"],
+    )
+    # B6: HT-S shifts the target row only; its history rows are real
+    sh = pv.shifted_sky(raw=pseudo_raw(dense=dense))
+    t_ht = world_tables(
+        world=world, dense=dense, arm="HT", kind="WT", target_std=std4, device="cpu"
+    )
+    t_hts = world_tables(
+        world=world,
+        dense=dense,
+        arm="HT-S",
+        kind="WT",
+        target_std=std4,
+        device="cpu",
+        shifted=(sh[0], sh[1]),
+    )
+    t_hs = world_tables(
+        world=world,
+        dense=dense,
+        arm="H-S",
+        kind="WH",
+        target_std=std4,
+        device="cpu",
+        shifted=(sh[0], sh[1]),
+    )
+    t_h = world_tables(world=world, dense=dense, arm="H", kind="WH", target_std=std4, device="cpu")
+    assert torch.equal(t_hts.hist_p, t_ht.hist_p), "B6: HT-S history rows must be the real estimate"
+    assert not torch.equal(t_hts.top_p0, t_ht.top_p0), (
+        "B6: HT-S target row must be the shifted estimate"
+    )
+    assert not torch.equal(t_hs.hist_p, t_h.hist_p), "B6: H-S history rows must be shifted"
+    # B3: world WN has no dip, and the estimate 0.30 u is of PV that does not exist
+    wn = wd.build_world(dense=dense, rung=wd.RUNGS[3], s_override=0.0)
+    wh = wd.build_world(dense=dense, rung=wd.RUNGS[3])
+    assert float(np.abs(wn.s).max()) == 0.0 and float(np.abs(wh.s).min()) > 0.0
+
+    def slope_on_u(w: wd.PvWorld) -> float:
+        """Least-squares slope of the part of the power that the level and anomaly leave over, on `u`."""
+        left = (w.y - w.known - (w.level + w.anomaly) * w.d).reshape(-1)
+        u = w.u.reshape(-1)
+        return float((left * u).sum() / (u * u).sum())
+
+    assert abs(slope_on_u(wn)) < 0.02 and slope_on_u(wh) < -0.3, (
+        "B3: WN must carry no dip",
+        slope_on_u(wn),
+        slope_on_u(wh),
+    )
+    tables_n = world_tables(
+        world=wn, dense=dense, arm="H", kind="WN", target_std=std4, device="cpu"
+    )
+    assert float(tables_n.hist_p.max()) > 0.0, "WN's estimate must still be non-zero"
+    # B4: arm M's source hides the same sky as its world
+    plain = bt.Source(power_z=torch.zeros(16, n_grid), dense_weather=torch.ones(16, n_grid, 21).half(), dense_datetime=torch.ones(16, n_grid, 21).half(), day_type=torch.zeros(n_grid, dtype=torch.long), ens=None)  # fmt: skip
+    keys = {
+        "primary": torch.tensor([2]),
+        "c_idx": torch.tensor([48 * 40 + 24]),
+        "lead_day": torch.tensor([0]),
+        "ensemble": False,
+    }
+    cols = sorted(HIDDEN_COLUMNS.values())
+    for hide, hist_zero, top_zero in (
+        ("history", True, False),
+        ("target", False, True),
+        ("none", False, False),
+    ):
+        b = HidingSource(source=plain, hide=hide).assemble(**keys)
+        assert (float(b.inputs.hist_weather[..., cols].abs().max()) == 0.0) == hist_zero, (
+            "B4",
+            hide,
+        )
+        assert (float(b.inputs.top_weather[..., cols].abs().max()) == 0.0) == top_zero, ("B4", hide)
+    print(
+        "B2 calibration, B3 WN without a dip, B4 hiding source for arm M, and B6 HT-S history rows: ok"
+    )
     print(
         f"smoke: one gating pass of HT in a tiny WT world, solar MAE {out['per_pass'][0]['solar']:.3f}"
     )
@@ -540,70 +732,191 @@ def write_json(*, obj: object, path: Path) -> None:
     tmp.rename(path)
 
 
-def run_job(*, kind: str, seed: int, device: str, fold: str = "2026-01") -> Path:
-    """Fit arm `M` and the three gating arms of one world and one seed, and write `work/known_answers/<kind>_s<seed>.json`.
+def chosen_rung() -> int:
+    """Return the rung that `work/world_rung.json` names, and refuse when no rung passed the `gap` pre-check."""
+    if "rung" in PATH_OVERRIDE:
+        return int(str(PATH_OVERRIDE["rung"]))
+    record = json.loads((work_root() / "world_rung.json").read_text())
+    assert record["rung"] is not None, (
+        "no rung passed the gap pre-check: F7 stops before any PV fit"
+    )
+    return int(record["rung"])
 
-    Reads the chosen rung from `work/world_rung.json` and the template weather arrays from the real
-    fold (experiment 713's pipeline, on the GPU).
+
+def m_files(*, kind: str, seed: int, rung: int) -> tuple[Path, Path]:
+    """Return the state file and the log file of arm `M` of a world, a seed, and a rung."""
+    stem = f"M_{kind}_s{seed}_r{rung}"
+    return work_dir() / f"{stem}.pt", work_dir() / f"{stem}.json"
+
+
+def precheck_file(*, rung: int) -> Path:
+    """Return the file that records the early-stopping pre-check at a rung."""
+    return work_dir() / f"precheck_rung{rung}.json"
+
+
+def require_precheck(*, rung: int) -> None:
+    """Refuse to continue unless the early-stopping pre-check has passed at `rung` (the rung is decided before any PV fit)."""
+    path = precheck_file(rung=rung)
+    assert path.exists(), f"run the `precheck` command first: {path.name} is missing"
+    record = json.loads(path.read_text())
+    assert record["rung"] == rung and record["pass"], (
+        f"the early-stopping pre-check failed at rung {rung}: step up with `e00716_world_rung.py --after {rung}`"
+    )
+
+
+@dataclass
+class WorldContext:
+    """What every command of a world needs: the real fold's arrays, the dense weather, and the world."""
+
+    data: object
+    dense: wd.Dense4
+    world: wd.PvWorld
+    std4: np.ndarray
+    hide: str
+    rung: wd.Rung
+
+
+def world_context(
+    *, kind: str, rung_number: int, device: str, fold: str = "2026-01"
+) -> WorldContext:
+    """Build world `kind` at `rung_number` on the real fold's weather (experiment 713's pipeline).
+
+    World WN has no dip (`s = 0`), and the job asserts it.
     """
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
     import e00716_world_rung as wr
 
-    path = work_dir() / f"{kind}_s{seed}.json"
-    if path.exists():
-        print(f"{path.name}: done, skipped", flush=True)
-        return path
-    rung_file = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "work" / "world_rung.json"
-    chosen = json.loads(rung_file.read_text())["rung"]
-    assert chosen is not None, "no rung passed the gap pre-check: F7 stops before any PV fit"
-    rung = wd.RUNGS[int(chosen) - 1]
+    rung = wd.RUNGS[rung_number - 1]
     arms.install_own_cache()
     pipe = inp.load_pipeline(month=fold, phase="train")
     data = inp.build_fold_data(pipe=pipe, device=device)
     dense = wr.load_dense4()
-    world = wd.build_world(dense=dense, rung=rung)
+    world = wd.build_world(dense=dense, rung=rung, s_override=0.0 if kind == "WN" else None)
+    if kind == "WN":
+        assert float(np.abs(world.s).max()) == 0.0, "world WN must carry no dip"
     check_hidden_columns()
-    hide = {"WH": "history", "WT": "target", "WN": "none"}[kind]
     _, std4 = world_standardisation(world=world, cutoff_idx=data.cutoff_idx)
-    sh_ghi, sh_temp, _, _ = pv.shifted_sky(raw=pseudo_raw(dense=dense))
-    out: dict = {"kind": kind, "seed": seed, "rung": rung.number, "arms": {}}
-    # arm M from scratch, stage 1 alone, with experiment 713's own loop and its amended budget
-    tables_z = world_tables(
-        world=world, dense=dense, arm="Z", kind=kind, target_std=std4, device=device
-    )
-    w_m, mean, std = to_tr_world(
-        world=world,
-        template=data.source,
-        tables=tables_z,
-        hide="none",
-        cutoff_idx=data.cutoff_idx,
-        device=device,
-    )
-    bare = tr.World(
-        source=bt.Source(power_z=w_m.source.power_z, dense_weather=data.source.dense_weather, dense_datetime=data.source.dense_datetime, day_type=data.source.day_type, ens=None),  # ty: ignore[unresolved-attribute]
-        cutoff_idx=w_m.cutoff_idx, clean=w_m.clean, target_mean=w_m.target_mean, target_std=w_m.target_std, month=w_m.month, placebo_pool=None,
+    return WorldContext(
+        data=data, dense=dense, world=world, std4=std4, hide=HIDE_OF_WORLD[kind], rung=rung
     )  # fmt: skip
+
+
+HIDE_OF_WORLD: Final = {"WH": "history", "WT": "target", "WN": "none"}
+
+
+def m_world(*, ctx: WorldContext, device: str) -> tr.World:
+    """Return experiment 713's `World` for arm `M` in this world: the synthetic power, and the same hidden sky as the world's other arms."""
+    tables_z = world_tables(
+        world=ctx.world, dense=ctx.dense, arm="Z", kind="WT", target_std=ctx.std4, device=device
+    )
+    w_m, _, _ = to_tr_world(
+        world=ctx.world, template=ctx.data.source, tables=tables_z, hide="none", cutoff_idx=ctx.data.cutoff_idx, device=device,  # ty: ignore[unresolved-attribute]
+    )  # fmt: skip
+    plain = w_m.source.source  # ty: ignore[unresolved-attribute]
+    return tr.World(
+        source=HidingSource(source=plain, hide=ctx.hide), cutoff_idx=w_m.cutoff_idx, clean=w_m.clean, target_mean=w_m.target_mean,
+        target_std=w_m.target_std, month=w_m.month, placebo_pool=None,
+    )  # fmt: skip
+
+
+def fit_m(*, kind: str, seed: int, device: str) -> Path:
+    """Train arm `M` of one world and seed from scratch (stage 1, experiment 713's amended budget) on a source that hides the world's sky, and store its state and log.
+
+    Seed 0 of worlds WH and WT is fitted first, to run the pre-check at the rung of `world_rung.json`.
+    Every other (world, seed) waits for the pre-check to pass at that rung, so the rung is decided
+    before any later fit.
+    """
+    rung_number = chosen_rung()
+    state_path, log_path = m_files(kind=kind, seed=seed, rung=rung_number)
+    if state_path.exists() and log_path.exists():
+        print(f"{state_path.name}: done, skipped", flush=True)
+        return state_path
+    if not (kind in {"WH", "WT"} and seed == 0):
+        require_precheck(rung=rung_number)
+    ctx = world_context(kind=kind, rung_number=rung_number, device=device)
+    bare = m_world(ctx=ctx, device=device)
+    assert isinstance(bare.source, HidingSource) and bare.source.hide == HIDE_OF_WORLD[kind]
     torch.manual_seed(seed)
     m = mdl.MsaNet().to(device)
     samples0 = tr.make_samples(world=bare, stage=1, placebo=False, primaries=wd.PRIMARIES)
     m_log = tr.train_stage(
-        model=m,
-        world=bare,
-        stage=1,
-        samples=samples0,
-        seed=seed,
-        encoders="random",
-        max_passes=M_PASSES,
-        patience=M_PATIENCE,
+        model=m, world=bare, stage=1, samples=samples0, seed=seed, encoders="random", max_passes=M_PASSES, patience=M_PATIENCE,
+    )  # fmt: skip
+    state = {k: v.detach().cpu().clone() for k, v in m.state_dict().items()}
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(state, state_path)
+    write_json(
+        obj={"kind": kind, "seed": seed, "rung": rung_number, "passes": m_log.passes, "best_val": m_log.best_val, "cap_hit": m_log.cap_hit, "val_history": list(m_log.val_history), **arms.code_record()},
+        path=log_path,
+    )  # fmt: skip
+    return state_path
+
+
+def precheck(*, device: str = "cpu") -> int:
+    """Run the early-stopping pre-check at the rung of `world_rung.json`, from arm `M` of seed 0 in WH and WT, and write `precheck_rung<N>.json`.
+
+    The check reads no PV fit. On a failure it prints the step to the next rung.
+    """
+    del device
+    import e00716_world_rung as wr
+
+    rung_number = chosen_rung()
+    dense = wr.load_dense4()
+    world = wd.build_world(dense=dense, rung=wd.RUNGS[rung_number - 1])
+    cutoff = wr.fold_cutoff_idx(fold="2026-01")
+    _, std4 = world_standardisation(world=world, cutoff_idx=cutoff)
+    out: dict = {}
+    for kind in ("WH", "WT"):
+        _, log_path = m_files(kind=kind, seed=0, rung=rung_number)
+        assert log_path.exists(), f"fit M first: {log_path.name} is missing"
+        nll = wd.heldout_nll(
+            world=world, dense=dense, kind=kind, cutoff_idx=cutoff, target_std=std4
+        )
+        history = json.loads(log_path.read_text())["val_history"]
+        out[kind] = early_stopping_precheck(
+            nll_naive=nll["naive"], nll_oracle=nll["oracle"], m_val_history=history
+        )
+    passed = all(v["pass"] for v in out.values())
+    write_json(
+        obj={"rung": rung_number, "pass": passed, "kinds": out, **arms.code_record()},
+        path=precheck_file(rung=rung_number),
     )
-    out["M"] = {
-        "passes": m_log.passes,
-        "best_val": m_log.best_val,
-        "cap_hit": m_log.cap_hit,
-        "val_history": list(m_log.val_history),
-    }
-    start = {k: v.detach().cpu().clone() for k, v in m.state_dict().items()}
-    held_c = np.arange(data.cutoff_idx // 48, data.cutoff_idx // 48 + wd.HELD_OUT_DAYS) * 48 + 24
+    print(json.dumps(out, indent=1, default=float))
+    if not passed:
+        print(
+            f"PRE-CHECK FAILED at rung {rung_number}: run `e00716_world_rung.py --after {rung_number}`, then fit M again at the new rung",
+            flush=True,
+        )
+        return 1
+    return 0
+
+
+def fit_arms(*, kind: str, seed: int, device: str) -> Path:
+    """Train the three gating arms of one world and seed from the stored arm `M`, and write `work/known_answers/<kind>_s<seed>.json`.
+
+    Refuses unless the early-stopping pre-check passed at the chosen rung.
+    """
+    rung_number = chosen_rung()
+    require_precheck(rung=rung_number)
+    path = work_dir() / f"{kind}_s{seed}.json"
+    if path.exists():
+        print(f"{path.name}: done, skipped", flush=True)
+        return path
+    state_path, log_path = m_files(kind=kind, seed=seed, rung=rung_number)
+    assert state_path.exists() and log_path.exists(), f"fit M first: {state_path.name} is missing"
+    ctx = world_context(kind=kind, rung_number=rung_number, device=device)
+    import e00716_world_rung as wr
+
+    sh_ghi, sh_temp, _, _ = pv.shifted_sky(raw=pseudo_raw(dense=ctx.dense))
+    del wr
+    start = torch.load(state_path, map_location="cpu")
+    m_log = json.loads(log_path.read_text())
+    out: dict = {
+        "kind": kind, "seed": seed, "rung": rung_number, "arms": {},
+        "M": {k: m_log[k] for k in ("passes", "best_val", "cap_hit", "val_history")},
+    }  # fmt: skip
+    cutoff = ctx.data.cutoff_idx  # ty: ignore[unresolved-attribute]
+    held_c = np.arange(cutoff // 48, cutoff // 48 + wd.HELD_OUT_DAYS) * 48 + 24
     held = tr.SampleSet(
         primary=np.repeat(np.asarray(wd.PRIMARIES), len(held_c)),
         c_idx=np.tile(held_c, len(wd.PRIMARIES)),
@@ -612,22 +925,11 @@ def run_job(*, kind: str, seed: int, device: str, fold: str = "2026-01") -> Path
     for arm in WORLD_ARMS[kind]:
         shifted = (sh_ghi, sh_temp) if arm.endswith("-S") else None
         tables = world_tables(
-            world=world,
-            dense=dense,
-            arm=arm,
-            kind=kind,
-            target_std=std4,
-            device=device,
-            shifted=shifted,
-        )
+            world=ctx.world, dense=ctx.dense, arm=arm, kind=kind, target_std=ctx.std4, device=device, shifted=shifted,
+        )  # fmt: skip
         w713, mean, std = to_tr_world(
-            world=world,
-            template=data.source,
-            tables=tables,
-            hide=hide,
-            cutoff_idx=data.cutoff_idx,
-            device=device,
-        )
+            world=ctx.world, template=ctx.data.source, tables=tables, hide=ctx.hide, cutoff_idx=cutoff, device=device,  # ty: ignore[unresolved-attribute]
+        )  # fmt: skip
         samples = tr.make_samples(world=w713, stage=1, placebo=False, primaries=wd.PRIMARIES)
         train_source = tr.synthetic_source(world=w713, samples=samples)
         out["arms"][arm] = run_gating_arm(
@@ -646,56 +948,75 @@ def run_job(*, kind: str, seed: int, device: str, fold: str = "2026-01") -> Path
     return path
 
 
-def finish(*, wiring_passed: list[str]) -> int:
-    """Aggregate the jobs, run the decision logic, and write `known_answers_passed.json` only if every gating check passes."""
-    import e00716_world_rung as wr
+WIRING_REQUIRED: Final = (
+    "KF1",
+    "KF2",
+    "KF3",
+    "KF4",
+    "KF5",
+    "KF6",
+    "KF7",
+    "KF8",
+    "KF13",
+    "KF13b",
+    "KF14",
+)
+"""The wiring checks whose records `finish` reads from `work/wiring/` (each check script writes its own)."""
 
-    root = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "work"
+
+def read_wiring_records() -> tuple[dict[str, dict], list[str]]:
+    """Return the stored wiring records and the names that are missing, failed, or written by other code."""
+    records: dict[str, dict] = {}
+    bad: list[str] = []
+    for name in WIRING_REQUIRED:
+        path = arms.wiring_file(data_dir=ML_EXPERIMENTS_DATA_DIR, name=name)
+        if not path.exists():
+            bad.append(f"missing wiring record {name}")
+            continue
+        rec = json.loads(path.read_text())
+        records[name] = rec
+        if not rec.get("pass"):
+            bad.append(f"wiring check {name} did not pass")
+        elif rec.get("code_hash") != arms.code_hash():
+            bad.append(f"wiring record {name} was written by other code: rerun it")
+    return records, bad
+
+
+def finish() -> int:
+    """Aggregate the jobs, run the decision logic, and write `known_answers_passed.json` only if every gating check passes."""
+    root = work_root()
     rung_record = json.loads((root / "world_rung.json").read_text())
     chosen = str(rung_record["rung"])
+    require_precheck(rung=int(chosen))
     gaps = {k: rung_record["results"][chosen]["gaps"][k]["gap"] for k in ("WH", "WT")}
     metrics, jobs, fixed = {}, {}, {}
     for kind in WORLD_ARMS:
         runs = {}
         for seed in SEEDS:
             job = json.loads((work_dir() / f"{kind}_s{seed}.json").read_text())
+            assert job["rung"] == int(chosen), (
+                f"{kind} seed {seed} was fitted at rung {job['rung']}, not {chosen}"
+            )
             jobs[f"{kind}:{seed}"] = job
             for arm, res in job["arms"].items():
                 runs[f"{arm}:{seed}"] = res
         metrics[kind] = gating_metric(runs=runs)
         fixed[kind] = {
-            a: {
-                m: float(np.median([runs[f"{a}:{s}"]["per_pass"][-1][m] for s in SEEDS]))
-                for m in ("solar", "all")
-            }
+            a: {m: float(np.median([runs[f"{a}:{s}"]["per_pass"][-1][m] for s in SEEDS])) for m in ("solar", "all")}
             for a in WORLD_ARMS[kind]
-        }
+        }  # fmt: skip
     results = kf_results(kind_metrics=metrics, gaps=gaps)
     results["secondary_pass60"] = kf_results(kind_metrics=fixed, gaps=gaps)
     cs = np.median([jobs[f"WT:{s}"]["arms"]["HT"]["c"] for s in SEEDS], axis=0)
     results["KF15"] = kf15(c_by_primary={prim: float(cs[prim]) for prim in wd.PRIMARIES})
-    dense = wr.load_dense4()
-    rung = wd.RUNGS[int(chosen) - 1]
-    world = wd.build_world(dense=dense, rung=rung)
-    cutoff = wr.fold_cutoff_idx(fold="2026-01")
-    _, std4 = world_standardisation(world=world, cutoff_idx=cutoff)
-    pre = {}
-    for kind in ("WH", "WT"):
-        nll = wd.heldout_nll(
-            world=world, dense=dense, kind=kind, cutoff_idx=cutoff, target_std=std4
-        )
-        noise_history = jobs[f"{kind}:0"]["M"]["val_history"]
-        pre[kind] = early_stopping_precheck(
-            nll_naive=nll["naive"], nll_oracle=nll["oracle"], m_val_history=noise_history
-        )
-    results["early_stopping_precheck"] = pre
-    results["wiring_checks_reported_passed"] = sorted(wiring_passed)
+    pre = json.loads(precheck_file(rung=int(chosen)).read_text())
+    results["early_stopping_precheck"] = pre["kinds"]
+    records, bad = read_wiring_records()
+    results["wiring_records"] = {
+        k: {"pass": v.get("pass"), "code_hash": v.get("code_hash")} for k, v in records.items()
+    }
     gating = ("KF9", "KF10", "KF11", "KF12")
-    failed = [k for k in gating if not results[k]["pass"]] + [
-        f"precheck:{k}" for k, v in pre.items() if not v["pass"]
-    ]
-    required = {"KF1", "KF2", "KF3", "KF4", "KF5", "KF6", "KF7", "KF8", "KF13", "KF13b", "KF14"}
-    failed += [f"missing wiring check {k}" for k in sorted(required - set(wiring_passed))]
+    failed = [k for k in gating if not results[k]["pass"]] + bad
     results["failed"] = failed
     write_json(obj=results, path=root / "known_answers_last_run.json")
     print(json.dumps(results, indent=1, default=float))
@@ -712,19 +1033,23 @@ def finish(*, wiring_passed: list[str]) -> int:
 def main() -> int:
     """Dispatch."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", nargs="?", choices=("fit", "finish"))
+    parser.add_argument("command", nargs="?", choices=("fit-m", "precheck", "fit-arms", "finish"))
     parser.add_argument("world", nargs="?", choices=tuple(WORLD_ARMS))
     parser.add_argument("seed", nargs="?", type=int)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--wiring-passed", nargs="*", default=[])
     args = parser.parse_args()
     if args.selftest:
         return selftest()
-    if args.command == "fit":
-        run_job(kind=args.world, seed=args.seed, device=args.device)
+    if args.command == "fit-m":
+        fit_m(kind=args.world, seed=args.seed, device=args.device)
         return 0
-    return finish(wiring_passed=args.wiring_passed)
+    if args.command == "fit-arms":
+        fit_arms(kind=args.world, seed=args.seed, device=args.device)
+        return 0
+    if args.command == "precheck":
+        return precheck()
+    return finish()
 
 
 if __name__ == "__main__":

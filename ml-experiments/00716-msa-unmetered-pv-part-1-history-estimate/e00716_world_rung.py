@@ -1,7 +1,7 @@
 # ruff: noqa: E501, PT018
 """Experiment 716: choose the rung of the synthetic worlds from the NumPy references (WP5a; design section 8.2).
 
-Usage: run.sh e00716_world_rung.py [--fold 2026-01] [--rungs 1 2 3 4 5] [--force]
+Usage: run.sh e00716_world_rung.py [--fold 2026-01] [--rungs 1 2 3 4 5] [--force] [--after N]
        run.sh e00716_world_rung.py --selftest
 
 This is a CPU task that reads the dense weather table and fits no neural network. For each rung in
@@ -12,6 +12,9 @@ rung where both `gap` values are at least 0.010 and writes `work/world_rung.json
 computed. If no rung passes, it writes the file with `rung: null` and exits with status 2, so that the
 manager is told and F7 stops before any PV fit. A rung whose file `work/world_rung/rung<N>.json`
 exists is not recomputed unless `--force` is given.
+
+`--after N` steps the ladder up after the early-stopping pre-check failed at rung N: rungs up to N are kept in the
+file but the first passing rung above N is chosen, and `known_answer.py` then fits `M` again at that rung.
 
 `--selftest` checks the block ridge against a direct solve and the world's formula on small arrays.
 """
@@ -57,9 +60,19 @@ def load_dense4() -> wd.Dense4:
 
 
 def run_rungs(
-    *, dense: wd.Dense4, cutoff_idx: int, rungs: list[int], out_dir: Path, force: bool
+    *,
+    dense: wd.Dense4,
+    cutoff_idx: int,
+    rungs: list[int],
+    out_dir: Path,
+    force: bool,
+    after: int = 0,
 ) -> dict:
-    """Compute the `gap` of WH and WT per rung in order and stop at the first rung that passes."""
+    """Compute the `gap` of WH and WT per rung in order and stop at the first rung that passes.
+
+    A rung numbered `after` or lower is read or computed and recorded but never chosen: this is the step up
+    after the early-stopping pre-check failed at rung `after` (design 8.2), so the ladder continues from the next rung.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     results: dict[str, dict] = {}
     chosen: int | None = None
@@ -91,10 +104,15 @@ def run_rungs(
             tmp.write_text(json.dumps(record, indent=1, default=str))
             tmp.rename(path)
         results[str(number)] = record
-        if record["passes"]:
+        if record["passes"] and number > after:
             chosen = number
             break
-    return {"rung": chosen, "gap_min": wd.GAP_MIN, "results": results}
+    return {
+        "rung": chosen,
+        "gap_min": wd.GAP_MIN,
+        "results": results,
+        "stepped_up_after": after or None,
+    }
 
 
 def selftest() -> int:
@@ -155,6 +173,26 @@ def selftest() -> int:
     print(
         f"toy world: WH naive {res.mae_naive:.4f} oracle {res.mae_oracle:.4f}; WT naive {res_t.mae_naive:.4f} oracle {res_t.mae_oracle:.4f}"
     )
+    # the step up: with the pre-check failed at rung 4, the chosen rung must be above 4
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        for n in (1, 2, 3, 4, 5):
+            (out / f"rung{n}.json").write_text(
+                json.dumps({"rung": n, "passes": n >= 4, "gaps": {}})
+            )
+        assert (
+            run_rungs(dense=dense, cutoff_idx=0, rungs=[1, 2, 3, 4, 5], out_dir=out, force=False)[
+                "rung"
+            ]
+            == 4
+        )
+        stepped = run_rungs(
+            dense=dense, cutoff_idx=0, rungs=[1, 2, 3, 4, 5], out_dir=out, force=False, after=4
+        )
+        assert stepped["rung"] == 5 and stepped["stepped_up_after"] == 4, stepped
+    print("the ladder steps up to rung 5 after a failed pre-check at rung 4")
     print("selftest passed")
     return 0
 
@@ -165,6 +203,12 @@ def main() -> int:
     parser.add_argument("--fold", default="2026-01")
     parser.add_argument("--rungs", type=int, nargs="+", default=[1, 2, 3, 4, 5])
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--after",
+        type=int,
+        default=0,
+        help="step up: never choose a rung numbered at or below this (the rung whose early-stopping pre-check failed)",
+    )
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
     if args.selftest:
@@ -178,6 +222,7 @@ def main() -> int:
         rungs=args.rungs,
         out_dir=work / "world_rung",
         force=args.force,
+        after=args.after,
     )
     summary["fold"] = args.fold
     summary["code"] = arms.code_record()

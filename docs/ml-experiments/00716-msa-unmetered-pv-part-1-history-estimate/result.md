@@ -345,6 +345,38 @@ The experiment is planned and has no fitted result yet, so these bullets describ
 - **Departures from earlier advice:** see "Why this runs although the stop rule counts earlier
   verdicts".
 
+## Amendments made after the first code review
+
+**The reference regression is read as 48 ridge regressions per Primary, pooled over the 14 leads.**
+The design asks for "a ridge regression, fitted separately for each of the four Primaries". A single
+linear model cannot scale a level by the target day's daily shape, so each Primary gets one ridge
+regression for each of the 48 half-hours of the target day, with one shared penalty chosen by 3-fold
+cross-validation over contiguous blocks of origins, and the 14 lead days pooled. The history features
+carry the same weight at every lead. The naive and the oracle references share this structure.
+The oracle may therefore learn more from the history than a single linear model would, so `gap`
+probably understates how much the estimate tells a neural network, and the KF9 threshold of 0.5 ×
+`gap` is probably easier to meet than a single-model reading would make it.
+
+**The choice of rung rests on one draw of each world.** The `gap` of one rung varies from draw to draw:
+rung 2 gave a smaller WH `gap` than rung 1 although the Monte Carlo predicted no change. The page that
+reports the gate says so beside the chosen rung.
+
+**The gating fits mirror the real recipe, with two stated differences.** The encoders are frozen, the
+constant divisors of both token paths are calibrated on the arm's own training samples before the first
+step, and the fits start from an arm `M` trained in the same world with the same hidden sky. `proj_s`
+trains at the stage 2 rate of experiment 713 (5e-4), which the design's list of gating settings did not
+state, and the early-stopping patience is off, so the state that KF15 reads is the best of all 60 passes.
+
+**The cold-night guard of `supported` is computed inside the scorer.** The protocol scorer of experiment
+713 loads only 713's own arms, so the scorer here reads the same two thresholds of the `cold_nights`
+slice (the sun more than 5 degrees below the horizon, and the ERA5 temperature at or below 3 degrees
+Celsius) from the dense table, in the winter months, in points of capacity. A missing input raises
+instead of passing.
+
+**The `HT-S` exception covers the first 28 days of each fold's own Candidate rows.** KF3 prints the count
+for the first fold, and the count decides whether the exception days include days that have a real
+earlier donor in the archive.
+
 ## Reviews
 
 Two Opus design reviews preceded this page (18 findings in the second, all accepted; the first
@@ -360,8 +392,10 @@ review.
   `f7_design_review_2.md`, and the two triage files (read, private): the design that this page
   condenses.
 - `ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/`: the code, written and
-  unit-checked on the CPU, with no fit run yet. It holds the code of both parts; part 2's folder
-  imports it.
+  unit-checked on the CPU, with no fit run yet. It holds the code of both parts (the PV estimate and
+  capacity, `PvNet`, batches, the copied training loop, the fit driver, prediction, the synthetic
+  worlds and ridge references, the known-answer gate, the scorer, the read-outs, figures, and report);
+  part 2's folder imports it.
 - Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
   the stored stage 1 and stage 3 states and forecasts of `M*`, the inputs adapter, and the scorer.
 - Read from experiments 649, 662, 673, 405, and 634: the capacity tables and the yield curve.

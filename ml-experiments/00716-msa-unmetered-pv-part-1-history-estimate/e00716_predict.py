@@ -258,10 +258,21 @@ def main() -> int:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--readout", choices=READOUTS, default=None)
     parser.add_argument("--kf7", action="store_true")
+    parser.add_argument(
+        "--record", action="store_true", help="with --kf7: write the wiring record of KF7"
+    )
     parser.add_argument("--accept-code-change", action="append", default=[], metavar="OLD_HASH")
     args = parser.parse_args()
     if args.kf7:
-        print(kf7(data_dir=ML_EXPERIMENTS_DATA_DIR, device="cpu"))
+        message = kf7(data_dir=ML_EXPERIMENTS_DATA_DIR, device="cpu")
+        print(message)
+        if args.record:
+            arms.write_wiring_record(
+                data_dir=ML_EXPERIMENTS_DATA_DIR,
+                name="KF7",
+                passed=True,
+                detail={"message": str(message)},
+            )
         return 0
     predict(
         arm=args.arm,

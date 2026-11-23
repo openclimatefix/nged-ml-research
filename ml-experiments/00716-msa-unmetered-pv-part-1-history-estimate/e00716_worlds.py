@@ -183,12 +183,15 @@ def yield_and_shape(*, dense: Dense4) -> tuple[np.ndarray, np.ndarray]:
     return np.clip(u, 0.0, None), d
 
 
-def build_world(*, dense: Dense4, rung: Rung, seed: int = 0) -> PvWorld:
+def build_world(
+    *, dense: Dense4, rung: Rung, seed: int = 0, s_override: float | None = None
+) -> PvWorld:
     """Return the world of `rung`: `y = known + (L_b + e_day) d - s u + noise`.
 
     `L_b` is normal with standard deviation 0.10 and redrawn every `rung.redraw_days` days (with a
     random offset per Primary); `e_day` is normal with standard deviation `rung.e_sd`, one draw per UTC
-    day; the noise has standard deviation 0.01.
+    day; the noise has standard deviation 0.01. `s_override` replaces the dip size `s` of every Primary
+    (world WN passes 0: the power has no dip, so the estimate `0.30 u` is of PV that does not exist).
     """
     n_primary, n_grid = dense.ghi.shape
     rng = np.random.default_rng([seed, rung.number, 7])
@@ -201,7 +204,11 @@ def build_world(*, dense: Dense4, rung: Rung, seed: int = 0) -> PvWorld:
             + w[dense.day_type, dense.half_hour]
         )
     u, d = yield_and_shape(dense=dense)
-    s = np.asarray(S_BASE) * rung.s_scale
+    s = (
+        np.asarray(S_BASE) * rung.s_scale
+        if s_override is None
+        else np.full(n_primary, float(s_override))
+    )
     day = np.arange(n_grid) // lay.STEPS_PER_DAY
     n_days = int(day.max()) + 1
     level = np.zeros((n_primary, n_grid))

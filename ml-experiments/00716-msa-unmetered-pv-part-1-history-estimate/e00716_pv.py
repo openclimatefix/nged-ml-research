@@ -618,6 +618,14 @@ def target_raw_from_rows(
     rows (experiment 713's device table is float16, which cannot meet the 1e-6 check of KF4), and the
     geometry columns 14 to 16 are read as they are, as `e00634_common.unit_curve` does.
     """
+    origin_us_int = (
+        np.asarray(origin_us).astype("datetime64[us]").astype(np.int64)
+        if np.asarray(origin_us).dtype.kind == "M"
+        else np.asarray(origin_us).astype(np.int64)
+    )
+    assert (origin_us_int % (24 * 3_600_000_000) == 9 * 3_600_000_000).all(), (
+        "every native origin is 09:00 UTC (as experiment 713 asserts); the ENS run is the 00Z run of the day"
+    )
     c_idx = origin_idx + native_offset_steps
     day = c_idx // GRID_STEPS_PER_DAY - first_day
     rel = target_idx - c_idx

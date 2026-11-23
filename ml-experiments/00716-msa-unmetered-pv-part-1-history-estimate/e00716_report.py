@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PERF401
+# ruff: noqa: E501, PT018, PERF401
 """Experiment 716: print every number that `result.md` quotes, from the stored score and log files (WP7).
 
 Usage: run.sh e00716_report.py [--part 1]
@@ -97,7 +97,42 @@ def report(*, part: int, data_dir: Path = ML_EXPERIMENTS_DATA_DIR) -> int:
             rows=contrast_rows(results=res["report_only_first"], prefix=""),
         )
         print("\nby Primary:", res["report_only_first"].get("by_primary"))
+        print(
+            "\n## All 16 Primaries (CRPS points of capacity, 95% interval; normalised MAE of the median)"
+        )
+        label = {"first": "A1/B1", "placebo": "A2/B2"}
+        print(
+            "primary | "
+            + " | ".join(f"{label[k]} point [lower, upper] mae" for k in ("first", "placebo"))
+        )
+        for pid, row in sorted((res.get("per_primary") or {}).items(), key=lambda kv: int(kv[0])):
+            cells = [
+                f"{row[k]['point']:+.3f} [{row[k]['lower']:+.3f}, {row[k]['upper']:+.3f}] {row[k]['mae_point']:+.3f}"
+                for k in ("first", "placebo")
+            ]
+            print(f"{int(pid):>7} | " + " | ".join(cells))
+        print("\naudit trigger 5:", json.dumps(res.get("audit_trigger_5"), default=float))
+        print(
+            "cold-night difference:",
+            res.get("cold_night_difference"),
+            "| mask points:",
+            res.get("mask_points"),
+        )
+        print(
+            "extra report-only contrasts:",
+            json.dumps(
+                {
+                    k: (v if "not_read" in v else {g: round(c["point"], 3) for g, c in v.items()})
+                    for k, v in (res.get("extra_contrasts") or {}).items()
+                },
+                default=float,
+            ),
+        )
         print(res["secondary_count_note"])
+    for name in ("screen", f"secondary_part{part}"):
+        extra = read_json(path=folder / "score" / f"{name}.json")
+        if extra is not None:
+            print(f"\n## {name}:", json.dumps(extra, default=float)[:3000])
     if part == 1:
         z = read_json(path=folder / "score" / "zrule.json")
         if z is not None:
@@ -151,9 +186,20 @@ def selftest() -> int:
             "verdict": "inconclusive", "closes_line": False, "readings": {"six": "cannot tell", "eight": "cannot tell"}, "placebo_control_readings": {"six": "cannot tell", "eight": "cannot tell"},
             "harmful_placebo": False, "counted:first:six": c, "sensitivity_99_375:first:six": c, "guards": {"all_hold": False}, "secondary_s1_s2": {"S1:six": c}, "secondary_s4": {"S4:six": c},
             "report_only_first": {"mae:six": c, "by_primary": {"5": 0.01}}, "secondary_count_note": "14 secondary readings",
+            "per_primary": {str(i): {k: {"point": 0.01 * i, "lower": -0.1, "upper": 0.1, "mae_point": 0.02} for k in ("first", "placebo")} for i in range(16)},
+            "audit_trigger_5": {"fires": False}, "cold_night_difference": {"six": 0.0, "eight": 0.0}, "mask_points": None, "extra_contrasts": {"H vs Z": {"six": c, "eight": c}},
         }  # fmt: skip
         (folder / "score" / "part1.json").write_text(json.dumps(fake))
-        assert report(part=1, data_dir=base) == 0
+        import contextlib
+        import io
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            assert report(part=1, data_dir=base) == 0
+        text = buffer.getvalue()
+        assert "All 16 Primaries" in text and text.count("+0.") > 16 and " 15 |" in text, (
+            "the 16-Primary table must print every Primary"
+        )
     finally:
         import shutil
 

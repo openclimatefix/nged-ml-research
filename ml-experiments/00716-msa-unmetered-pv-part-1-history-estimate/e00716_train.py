@@ -161,7 +161,10 @@ def train_stage(
     optimiser = torch.optim.AdamW(
         param_groups(model=model, stage=stage, encoders=encoders, new_lr_scale=new_lr_scale)
     )
-    trunk_params = [p for g in optimiser.param_groups if g["trunk"] for p in g["params"]]
+    # the trunk clip takes the trunk's parameters in `model.parameters()` order, as experiment 713's clip does, so that
+    # the norm is summed in the same order and a binding clip scales the gradient bit-for-bit alike
+    is_trunk = {id(p) for g in optimiser.param_groups if g["trunk"] for p in g["params"]}
+    trunk_params = [p for p in model.parameters() if id(p) in is_trunk]
     new_params = [p for g in optimiser.param_groups if not g["trunk"] for p in g["params"]]
     train_idx = np.nonzero(~samples.is_val)[0]
     best, best_state, stale, step = float("inf"), None, 0, 0

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501, PT018, PLR0915, ANN003
 """Experiment 716: KF13 and KF13b, the copied training loop against experiment 713's (WP4 check; CPU, synthetic world).
 
 Usage: run.sh e00716_check_train.py
@@ -21,12 +21,14 @@ import e00713_batch as bt  # ty: ignore[unresolved-import]
 import e00713_layout as lay  # ty: ignore[unresolved-import]
 import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00713_train as tr  # ty: ignore[unresolved-import]
+import e00716_arms as arms
 import e00716_batch as pvb
 import e00716_check_model as ckm
 import e00716_model as pvm
 import e00716_train as pvt
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 N_DAYS_GRID = 170
 FIRST_DAY = 40
@@ -38,7 +40,9 @@ def synthetic_world(*, seed: int = 0) -> tuple[tr.World, pvb.PvTables]:
     """Return a world of 170 days with ensemble rows on days 40 to 139, and random non-zero PV tables."""
     g = torch.Generator().manual_seed(seed)
     n_grid = 48 * N_DAYS_GRID
-    power = torch.randn(16, n_grid, generator=g)
+    power = 6.0 * torch.randn(
+        16, n_grid, generator=g
+    )  # a wide target, so that the trunk gradient clip of 1.0 binds
     power[torch.rand(16, n_grid, generator=g) < 0.02] = float("nan")
     run = torch.zeros(16, N_ENS_DAYS, dtype=torch.int64)
     c = (FIRST_DAY + torch.arange(N_ENS_DAYS)) * 48 + 24
@@ -72,8 +76,65 @@ def state_equal(*, a: dict, b: dict, keys: list[str]) -> list[str]:
     return [k for k in keys if not torch.equal(a[k], b[k])]
 
 
-def run() -> None:
-    """Run KF13 and KF13b."""
+def check_groups() -> None:
+    """KF8's group half: the optimiser groups, rates, decays, warm-up flags, and clips equal design section 6."""
+    for encoders in ("trained", "frozen"):
+        for stage in (2, 3):
+            m = pvm.PvNet(arm="HT", seed=0)
+            if encoders == "frozen":
+                m.freeze_encoders()
+            groups = pvt.param_groups(model=m, stage=stage, encoders=encoders)
+            names = {id(p): n for n, p in m.named_parameters()}
+            by_name = {names[id(p)]: g for g in groups for p in g["params"]}
+            for n, g in by_name.items():
+                if n.startswith(pvm.NEW_PREFIX):
+                    lr, wd = pvt.NEW_RATES.get(n, pvt.NEW_DEFAULT)
+                    assert (g["lr"], g["weight_decay"], g["warmup"], g["trunk"]) == (
+                        lr,
+                        wd,
+                        False,
+                        False,
+                    ), (n, g["lr"])
+                    assert (lr, wd) in {(1e-2, 0.0), (3e-3, 0.0), (2e-3, 1e-3)}, (n, lr, wd)
+                else:
+                    assert (
+                        g["trunk"] and g["warmup"] and g["weight_decay"] == tr.WEIGHT_DECAY == 1e-3
+                    ), n
+                    spread = n.startswith("proj_s")
+                    want = tr.SPREAD_LR if (spread and stage == 2) else tr.FINE_TUNE_LR
+                    if encoders == "trained" and "encoder" in n:
+                        want = tr.FINE_TUNE_LR
+                    assert g["lr"] == want, (n, g["lr"], want)
+            gains = {
+                n: (g["lr"], g["weight_decay"]) for n, g in by_name.items() if n in pvt.GAIN_NAMES
+            }
+            assert gains and all(v[1] == 0.0 for v in gains.values()), gains
+            assert tr.GRAD_CLIP == 1.0
+    print(
+        "KF8 groups: trunk 2e-4 (proj_s 5e-4 in stage 2) with decay 1e-3 and warm-up; gains 1e-2 and 3e-3 with decay 0; W1, W2, pv_head_in 2e-3 with decay 1e-3; no warm-up on the new groups; clip 1.0 on each group alone"
+    )
+
+
+class ClipRecorder:
+    """Record the norm that `clip_grad_norm_` returns, and optionally clip globally (the negative control)."""
+
+    def __init__(self, *, global_params: list | None = None) -> None:
+        """Hold the norms and the all-parameter list of a global clip."""
+        self.norms: list[float] = []
+        self.global_params = global_params
+        self.original = torch.nn.utils.clip_grad_norm_
+
+    def __call__(self, params, max_norm, *args, **kwargs):  # noqa: ANN001, ANN002, ANN204
+        """Clip as `torch` does, recording the norm of each call (or clipping every parameter together)."""
+        if self.global_params is not None:
+            return self.original(self.global_params, max_norm, *args, **kwargs)
+        out = self.original(params, max_norm, *args, **kwargs)
+        self.norms.append(float(out))
+        return out
+
+
+def run_mode(*, encoders: str) -> None:
+    """Run KF13, KF13b, the live-group control, and the global-clip control with `encoders` trained or frozen."""
     torch.use_deterministic_algorithms(True)
     tr.BATCH = 32  # a smaller batch gives about 40 steps in one pass
     world, tables = synthetic_world()
@@ -86,64 +147,127 @@ def run() -> None:
 
     ref = mdl.MsaNet()
     ref.load_state_dict(start)
-    tr.train_stage(
-        model=ref,
-        world=world,
-        stage=2,
-        samples=samples,
-        seed=SEED,
-        encoders="trained",
-        max_passes=1,
-    )
+    if encoders == "frozen":
+        ref.freeze_encoders()
+    recorder = ClipRecorder()
+    torch.nn.utils.clip_grad_norm_ = recorder  # ty: ignore[invalid-assignment]
+    try:
+        tr.train_stage(
+            model=ref,
+            world=world,
+            stage=2,
+            samples=samples,
+            seed=SEED,
+            encoders=encoders,
+            max_passes=1,
+        )
+    finally:
+        torch.nn.utils.clip_grad_norm_ = recorder.original
     ref_state = copy.deepcopy(ref.state_dict())
     start_copy = copy.deepcopy(start)
-    assert state_equal(a=ref_state, b=start_copy, keys=list(start)) != list(start) or True
     moved = [k for k in start if not torch.equal(ref_state[k], start_copy[k])]
     assert len(moved) > 20, "the reference loop barely moved the weights"
+    bound = sum(1 for x in recorder.norms if x > tr.GRAD_CLIP)
+    assert recorder.norms[0] > tr.GRAD_CLIP and bound > len(recorder.norms) // 2, (
+        "the trunk clip does not bind, so a global clip would pass the check",
+        recorder.norms[:5],
+    )
+    print(
+        f"[{encoders}] the trunk gradient norm at step 1 is {recorder.norms[0]:.2f}; the clip of {tr.GRAD_CLIP} binds in {bound} of {len(recorder.norms)} steps"
+    )
 
     pv_world = tr.World(
         source=pvb.PvSource(source=world.source, tables=tables), cutoff_idx=world.cutoff_idx, clean=world.clean,
         target_mean=world.target_mean, target_std=world.target_std, month=world.month, placebo_pool=None,
     )  # fmt: skip
-    for arm, scale, label in (("Z", 1.0, "KF13"), ("HT", 0.0, "KF13b")):
+
+    def pv_model(arm: str) -> pvm.PvNet:
         model = pvm.PvNet(arm=arm, seed=SEED)  # ty: ignore[invalid-argument-type]
         model.load_m_star(state=copy.deepcopy(start))
+        if encoders == "frozen":
+            model.freeze_encoders()
+        return model
+
+    for arm, scale, label in (("Z", 1.0, "KF13"), ("HT", 0.0, "KF13b")):
+        model = pv_model(arm)
         pvt.train_stage(
-            model=model, world=pv_world, stage=2, samples=samples, seed=SEED, encoders="trained",
-            max_passes=1, new_lr_scale=scale,
-        )  # fmt: skip
+            model=model,
+            world=pv_world,
+            stage=2,
+            samples=samples,
+            seed=SEED,
+            encoders=encoders,
+            max_passes=1,
+            new_lr_scale=scale,
+        )
         got = model.state_dict()
         bad = state_equal(a=got, b=ref_state, keys=list(ref_state))
-        assert not bad, f"{label}: the trunk differs from experiment 713's in {bad[:5]}"
+        assert not bad, (
+            f"{label} [{encoders}]: the trunk differs from experiment 713's in {bad[:5]}"
+        )
         if arm == "HT":
-            new = [k for k in got if k not in ref_state]
-            assert new, "no new parameters in HT"
+            assert [k for k in got if k not in ref_state], "no new parameters in HT"
         print(
-            f"{label}: {len(ref_state)} trunk tensors bit-identical to experiment 713's after one pass ({int((~samples.is_val).sum()) // 32} steps)"
+            f"{label} [{encoders}]: {len(ref_state)} trunk tensors bit-identical to experiment 713's after one pass ({int((~samples.is_val).sum()) // 32} steps)"
         )
 
-    # Negative control: a live new group (scale 1) must change the trunk, or the check could not fail.
-    model = pvm.PvNet(arm="HT", seed=SEED)  # ty: ignore[invalid-argument-type]
-    model.load_m_star(state=copy.deepcopy(start))
+    # Negative control 1: a live new group (scale 1) must change the trunk, or the check could not fail.
+    model = pv_model("HT")
     pvt.train_stage(
         model=model,
         world=pv_world,
         stage=2,
         samples=samples,
         seed=SEED,
-        encoders="trained",
+        encoders=encoders,
         max_passes=1,
         new_lr_scale=1.0,
     )
     bad = state_equal(a=model.state_dict(), b=ref_state, keys=list(ref_state))
     assert bad, "negative control: a live PV group left the trunk unchanged"
-    print(f"negative control: with the new group live, {len(bad)} trunk tensors differ")
+    print(
+        f"negative control [{encoders}]: with the new group live, {len(bad)} trunk tensors differ"
+    )
+
+    # Negative control 2: a global clip (one norm over the trunk and the new group) must change the trunk.
+    model = pv_model("HT")
+    torch.nn.utils.clip_grad_norm_ = ClipRecorder(  # ty: ignore[invalid-assignment]
+        global_params=[p for p in model.parameters() if p.requires_grad]
+    )  # ty: ignore[invalid-assignment]
+    try:
+        pvt.train_stage(
+            model=model,
+            world=pv_world,
+            stage=2,
+            samples=samples,
+            seed=SEED,
+            encoders=encoders,
+            max_passes=1,
+            new_lr_scale=0.0,
+        )
+    finally:
+        torch.nn.utils.clip_grad_norm_ = recorder.original
+    bad = state_equal(a=model.state_dict(), b=ref_state, keys=list(ref_state))
+    assert bad, (
+        "negative control: a global clip left the trunk bit-identical, so KF13b cannot see the two clips"
+    )
+    print(f"negative control [{encoders}]: with one global clip, {len(bad)} trunk tensors differ")
+
+
+def run() -> None:
+    """Run KF13 and KF13b with trained and with frozen encoders, and the group half of KF8."""
+    check_groups()
+    for encoders in ("trained", "frozen"):
+        run_mode(encoders=encoders)
 
 
 def main() -> int:
     """Run the checks."""
     run()
     print("e00716_check_train: all checks passed")
+    if "--record" in sys.argv:
+        for name in ("KF13", "KF13b"):
+            arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name=name, passed=True)
     return 0
 
 

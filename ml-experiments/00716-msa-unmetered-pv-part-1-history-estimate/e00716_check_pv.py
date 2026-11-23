@@ -1,7 +1,9 @@
-# ruff: noqa: E501, PT018, ISC004, C416
+# ruff: noqa: E501, PT018, PT017, ISC004, C416
 """Experiment 716: the checks of `e00716_pv.py` that need no fit (KF3, KF4, KF5; design section 8.1).
 
-Usage: run.sh e00716_check_pv.py [synthetic|capacity|all]
+Usage: run.sh e00716_check_pv.py [synthetic|capacity|all|kf14|kf4real MONTH] [--record]
+
+`kf14` and `kf4real` read stored data (CPU, read only); `--record` writes the wiring record of the check that ran.
 
 `synthetic` runs on built arrays (no stored data except the constant `u99`); `capacity` reads the
 stored capacity tables of experiments 649, 662, and 673 and prints KF5.
@@ -9,8 +11,10 @@ stored capacity tables of experiments 649, 662, and 673 and prints KF5.
 
 import sys
 
+import e00716_arms as arms
 import e00716_pv as pv
 import numpy as np
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 
 def synthetic_raw(*, n_grid: int = 48 * 120, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
@@ -309,16 +313,253 @@ def kf3c_target_donor() -> list[str]:
     ]
 
 
+# ------------------------------------------------------------------ KF14, KF6, and KF4's real-data half
+
+
+def kf14_check(
+    *, ghi: np.ndarray, cos_zenith_at: dict[int, np.ndarray], n_steps: int, floor_w_m2: float = 5.0
+) -> dict[str, int]:
+    """Count the stamps that contradict a period-end labelling, and the stamps that contradict a period-start labelling.
+
+    `cos_zenith_at[k]` is the cosine of the zenith `k` grid steps (half-hours) after each stamp, for `k`
+    from `-n_steps` to `n_steps`; `n_steps` is the length of the CAMS period in grid steps. A positive
+    irradiance under a period-end label means the sun was up at some point of `(t - period, t]`, so a
+    stamp with `ghi` above the floor while the sun is down at every grid step of that period is a
+    contradiction (`end_violations`); the same test on `[t, t + period)` counts the contradictions of a
+    period-start label (`start_violations`). The labelling is period end when the first count is zero and
+    the second is not (a series with no sunrise or sunset in the sample cannot tell the two apart).
+    """
+    lit = ghi > floor_w_m2
+    end_dark = np.ones(len(ghi), dtype=bool)
+    start_dark = np.ones(len(ghi), dtype=bool)
+    for k in range(-n_steps, 1):
+        end_dark &= cos_zenith_at[k] <= 0.0
+    for k in range(n_steps + 1):
+        start_dark &= cos_zenith_at[k] <= 0.0
+    return {
+        "end_violations": int((lit & end_dark).sum()),
+        "start_violations": int((lit & start_dark).sum()),
+        "n_lit": int(lit.sum()),
+    }
+
+
+def kf14_synthetic() -> list[str]:
+    """KF14 on a toy series: a period-end series passes, and the same series stamped at the period start fails."""
+    n = 48 * 60
+    steps = np.arange(n)
+    cz = (
+        np.sin(np.pi * np.clip(((steps % 48) / 2.0 - 5.0) / 14.0, 0.0, 1.0)) - 0.001
+    )  # at or below zero while the sun is down
+    period = 2
+
+    def cz_of(offset: np.ndarray | int) -> np.ndarray:
+        return np.roll(cz, -offset)  # cos zenith `offset` steps after each stamp
+
+    def mean_over(lo: int, hi: int) -> np.ndarray:
+        return np.mean([np.clip(cz_of(k), 0, None) for k in range(lo, hi + 1)], axis=0) * 1000.0
+
+    at = {k: cz_of(k) for k in range(-period, period + 1)}
+    end_labelled = mean_over(-period + 1, 0)  # the stamp is the end of the period
+    start_labelled = mean_over(0, period - 1)  # the stamp is the start of the period
+    good = kf14_check(ghi=end_labelled, cos_zenith_at=at, n_steps=period)
+    bad = kf14_check(ghi=start_labelled, cos_zenith_at=at, n_steps=period)
+    assert good["end_violations"] == 0 and good["start_violations"] > 0, good
+    assert bad["end_violations"] > 0, ("a period-start series must fail the check", bad)
+    return [
+        f"KF14 logic: a period-end series gives {good}, a period-start series gives {bad} (fails, as it must)"
+    ]
+
+
+def check_origin_hour() -> list[str]:
+    """`target_raw_from_rows` accepts native origins at 09:00 UTC and refuses any other hour."""
+    x = np.zeros((2, 28), dtype=np.float32)
+    kwargs = {
+        "x": x, "primary": np.array([0, 0]), "origin_idx": np.array([100, 100]), "target_idx": np.array([106, 107]),
+        "mean": np.zeros(28), "std": np.ones(28), "first_day": 0, "n_days": 10,
+    }  # fmt: skip
+    day_us = 24 * 3_600_000_000
+    pv.target_raw_from_rows(
+        origin_us=np.array([9 * 3_600_000_000, 9 * 3_600_000_000 + day_us]),
+        **kwargs,  # ty: ignore[invalid-argument-type]
+    )
+    try:
+        pv.target_raw_from_rows(
+            origin_us=np.array([10 * 3_600_000_000, 9 * 3_600_000_000]),
+            **kwargs,  # ty: ignore[invalid-argument-type]
+        )
+    except AssertionError as err:
+        assert "09:00" in str(err), err
+    else:
+        raise AssertionError("an origin at 10:00 UTC was accepted")
+    return ["origin hour: native origins must be 09:00 UTC; a 10:00 origin is refused"]
+
+
+def kf14_real() -> list[str]:
+    """KF14 on the CAMS source file of experiment 707 (read only), with the sun's geometry of the dense table at the same stamps."""
+    import e00397_prep as prep397  # ty: ignore[unresolved-import]
+    import e00707_prep as prep707  # ty: ignore[unresolved-import]
+    import e00716_world_rung as wr
+    import polars as pl
+
+    raw = np.load(
+        wr.ML_EXPERIMENTS_DATA_DIR / wr.NAME_713_CACHE / "cache" / "dense_raw.npy", mmap_mode="r"
+    )
+    sites = [r["site"] for r in prep397.primaries().iter_rows(named=True)]
+    cams = pl.read_parquet(prep707.CAMS_PATH)
+    out = []
+    for pos, site in enumerate(sites):
+        frame = cams.filter(pl.col("site") == site).sort("time")
+        if frame.is_empty():
+            continue
+        stamps_us = frame["time"].dt.epoch("us").to_numpy()
+        period_us = int(np.median(np.diff(stamps_us)))
+        n_steps = max(1, period_us // pv.STEP_US)
+        idx = (stamps_us - pv.GRID_START_US) // pv.STEP_US
+        keep = (idx >= n_steps) & (idx < raw.shape[1] - n_steps)
+        idx = idx[keep]
+        at = {
+            k: np.asarray(raw[pos, idx + k, 7], dtype=np.float64)
+            for k in range(-n_steps, n_steps + 1)
+        }
+        res = kf14_check(
+            ghi=frame["ghi_w_m2"].to_numpy()[keep].astype(np.float64),
+            cos_zenith_at=at,
+            n_steps=n_steps,
+        )
+        assert res["end_violations"] == 0 and res["start_violations"] > 0, (site, res)
+        out.append(f"KF14 {site}: period {period_us // 60_000_000} min, {res}")
+        break  # one site is enough: the stamp convention is a property of the file
+    assert out, "no Primary's site is in the CAMS file"
+    return out
+
+
+def kf6_statements() -> list[str]:
+    """KF6: experiment 713's row-by-row statement, then the source and issue time of every PV value for each fit family."""
+    from datetime import UTC, datetime
+
+    import e00713_layout as lay  # ty: ignore[unresolved-import]
+    import e00713_weather_lookahead as la  # ty: ignore[unresolved-import]
+
+    contract = datetime(2026, 3, 10, 12, tzinfo=UTC)
+    out = [*la.statement(contract=contract, primary="D5"), ""]
+    newest_p = -(
+        lay.STEPS_PER_DAY * (lay.MIN_AGE - 1) + 1
+    )  # the last stamp of the age-2 row, in steps from the contract origin
+    assert newest_p < 0, "a history PV value would be read at or after the contract origin"
+    hist = (
+        "history rows (ages 2 to 15): p at each token's own stamp from the CAMS irradiance and ERA5 temperature analysis at that stamp "
+        f"(no issue time; a lab shortcut for ages 2 to 5, as in 713), the as-of capacity table of the fold; newest stamp {newest_p} steps from the contract origin: before it, PASS"
+    )
+    run = "target row: p from the ECMWF ENS run of 00Z of the origin day, issued 9 hours before the native origin (before: yes, by the layout alone), PASS"
+    for arm, lines in {
+        "Z": ["no PV value is read"],
+        "H": [hist],
+        "H-S": [
+            hist.replace(
+                "at each token's own stamp", "28 days before each token's stamp (CAMS), a placebo"
+            )
+        ],
+        "H-X": [
+            hist.replace(
+                "the as-of capacity table of the fold",
+                "the partner Primary's p at the same stamp (a placebo)",
+            )
+        ],
+        "HT": [hist, run],
+        "HT-S": [
+            hist,
+            run.replace(
+                "of the origin day",
+                "of the day 28 days earlier (a placebo; the first 28 days of the ENS record use the run 28 days later)",
+            ),
+        ],
+        "T": [run],
+    }.items():
+        out += [f"fit family {arm}:", *[f"  {x}" for x in lines]]
+    return [*out, "KF6: PASS"]
+
+
+def kf4_real(*, month: str = "2025-11") -> list[str]:
+    """KF4's real-data half: the dense `u` against `e00634_common.unit_curve` at 1e-6, and the dense geometry columns against the Candidate's rows."""
+    import e00634_common as c634  # ty: ignore[unresolved-import]
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
+    import e00716_arms as arms
+
+    arms.install_own_cache()
+    pipe = inp.load_pipeline(month=month, phase="train", chain_root=inp.chain_root_of_seed(seed=0))
+    raw = pipe.d632.dense_raw()
+    n_grid = raw.shape[1]
+    doy = pv.day_of_year(grid_start_us=pv.GRID_START_US, n_grid=n_grid)
+    times_us = pv.GRID_START_US + np.arange(n_grid, dtype=np.int64) * pv.STEP_US
+    pos = np.arange(0, n_grid, 7)  # every 7th stamp is enough for the 1e-6 comparison
+    worst = 0.0
+    for prim in range(16):
+        u, _ = pv.yield_curve(
+            ghi_mean=raw[prim, :, 0].astype(np.float64), ghi_sd=np.zeros(n_grid), cos_zenith=raw[prim, :, 7].astype(np.float64),
+            sin_azimuth=raw[prim, :, 8].astype(np.float64), cos_azimuth=raw[prim, :, 9].astype(np.float64), doy=doy,
+            temperature_c=raw[prim, :, 2].astype(np.float64),
+        )  # fmt: skip
+        x = np.zeros((len(pos), 17))
+        x[:, 14], x[:, 15], x[:, 16] = raw[prim, pos, 7], raw[prim, pos, 8], raw[prim, pos, 9]
+        ref = c634.unit_curve(
+            ghi=raw[prim, pos, 0].astype(np.float64),
+            x=x,
+            times_us=times_us[pos],
+            temp=raw[prim, pos, 2].astype(np.float64),
+        )
+        worst = max(worst, float(np.abs(u[pos] - ref).max()))
+    assert worst <= 1e-6, f"the dense u differs from e00634_common.unit_curve by {worst}"
+    mr, _ = pipe_rows(pipe=pipe)
+    return [
+        f"KF4 real: the dense u equals e00634_common.unit_curve to {worst:.2e} at every 7th stamp of every Primary",
+        pv.check_dense_columns(raw=raw, x_rows=mr.x, grid_index=mr.target_idx, primary=mr.primary),  # ty: ignore[unresolved-attribute]
+    ]
+
+
+def pipe_rows(*, pipe: object) -> tuple[object, object]:
+    """Return the Candidate rows of the fold (`mr`, `test`) from 713's adapter."""
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
+
+    data = inp.build_fold_data(pipe=pipe, device="cpu", keep_rows=True)  # ty: ignore[invalid-argument-type]
+    return data.rows
+
+
 def main() -> int:
     """Run the requested checks and print every line."""
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     lines: list[str] = []
     if which in {"synthetic", "all"}:
-        lines += kf4_estimate() + kf3_placebos() + kf3c_target_donor()
+        lines += (
+            kf4_estimate()
+            + kf3_placebos()
+            + kf3c_target_donor()
+            + kf14_synthetic()
+            + kf6_statements()
+            + check_origin_hour()
+        )
+    if which == "kf14":
+        lines += kf14_real()
+    if which == "kf4real":
+        lines += kf4_real(
+            month=sys.argv[2]
+            if len(sys.argv) > 2 and not sys.argv[2].startswith("--")
+            else "2025-11"
+        )
     if which in {"capacity", "all"}:
         lines += kf5_capacity()
     print("\n".join(lines))
     print("PASS")
+    if "--record" in sys.argv:
+        names = {
+            "synthetic": ("KF3",),
+            "capacity": ("KF5",),
+            "kf14": ("KF14",),
+            "kf4real": ("KF4",),
+        }
+        for name in names.get(which, ()):
+            arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name=name, passed=True)
+        if which == "synthetic":
+            arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name="KF6", passed=True)
     return 0
 
 

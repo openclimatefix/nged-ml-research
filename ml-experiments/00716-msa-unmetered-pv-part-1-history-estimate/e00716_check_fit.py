@@ -21,6 +21,7 @@ import e00713_train as tr  # ty: ignore[unresolved-import]
 import e00716_arms as arms
 import e00716_fit as fit
 import e00716_model as pvm
+import numpy as np
 import torch  # ty: ignore[unresolved-import]
 
 MONTH, SEED = "2025-11", 0
@@ -83,7 +84,13 @@ def run(*, base: Path) -> None:
         return first, rerun
 
     fit.train_with_rerun = stub_train  # ty: ignore[invalid-assignment]
-    tr.make_samples = lambda **_: [0, 1, 2]  # ty: ignore[invalid-assignment]
+
+    class FakeSamples(list):
+        """Three samples with the `is_val` flags that the fit log counts."""
+
+        is_val = np.array([False, False, True])
+
+    tr.make_samples = lambda **_: FakeSamples([0, 1, 2])  # ty: ignore[invalid-assignment]
     tr.target_end = lambda **_: 10  # ty: ignore[invalid-assignment]
     pvm.PvNet.calibrate_scale = lambda self, batches: {"r_hist": 1.0}  # ty: ignore[invalid-assignment]
     import e00716_train as pvt

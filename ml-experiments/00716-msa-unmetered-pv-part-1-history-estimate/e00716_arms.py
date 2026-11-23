@@ -65,7 +65,7 @@ ARMS: Final[dict[str, PvArmSpec]] = {
 
 FIT_CODE_FILES: Final = (
     "e00716_arms.py", "e00716_batch.py", "e00716_fit.py", "e00716_model.py", "e00716_pv.py",
-    "e00716_train.py",
+    "e00716_train.py", "e00716_worlds.py", "e00716_world_rung.py", "e00716_known_answer.py",
 )  # fmt: skip
 """The modules of this folder whose edits can change a fitted state (prediction has its own record)."""
 
@@ -79,6 +79,13 @@ def code_hash() -> str:
         h.update((here / name).read_bytes())
     h.update(f"e00713:{arms713.code_hash()}".encode())
     return h.hexdigest()[:16]
+
+
+@functools.cache
+def file_hashes() -> dict[str, str]:
+    """Return the first 12 hex digits of the sha256 of each fit module (the known-answer files included)."""
+    here = Path(__file__).parent
+    return {n: hashlib.sha256((here / n).read_bytes()).hexdigest()[:12] for n in FIT_CODE_FILES}
 
 
 def _git(*args: str) -> str:
@@ -96,6 +103,7 @@ def code_record() -> dict:
     return {
         "code_hash": code_hash(),
         "e00713_code_hash": arms713.code_hash(),
+        "file_sha256": file_hashes(),
         "git_commit": _git("rev-parse", "HEAD"),
         "git_dirty": bool(_git("status", "--porcelain", "--", ".")),
     }
@@ -293,3 +301,26 @@ def watched_mtimes(*, data_dir: Path) -> dict[str, int]:
         *sorted((base / "cache").glob("*")),
     ]
     return {str(f): f.stat().st_mtime_ns for f in files if f.exists()}
+
+
+def wiring_file(*, data_dir: Path, name: str) -> Path:
+    """Return the record of one wiring check (`KF1` to `KF14`), which `e00716_known_answer.py finish` reads."""
+    return root(data_dir=data_dir, arm="Z") / "work" / "wiring" / f"{name}.json"
+
+
+def write_wiring_record(
+    *, data_dir: Path, name: str, passed: bool, detail: dict | None = None
+) -> Path:
+    """Write the record of a wiring check with this folder's code hash (a record written by other code is refused)."""
+    path = wiring_file(data_dir=data_dir, name=name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(
+        json.dumps(
+            {"check": name, "pass": bool(passed), "detail": detail or {}, **code_record()},
+            indent=1,
+            default=str,
+        )
+    )
+    tmp.rename(path)
+    return path

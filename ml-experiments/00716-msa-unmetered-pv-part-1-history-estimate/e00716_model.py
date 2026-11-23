@@ -243,24 +243,21 @@ class PvNet(mdl.MsaNet):
         `r` is the root mean square of `W2 GELU(W1 [...])` over every element of every token with
         `ok` true, so the divided path has about unit variance per element. It is never trained.
         """
-        out = {}
-        for which, enabled in (
-            ("hist", self.pv_hist_w1 is not None),
-            ("top", self.pv_top_w1 is not None),
-        ):
-            if not enabled:
-                continue
-            buffer = self.pv_hist_r if which == "hist" else self.pv_top_r
-            total, count = 0.0, 0
-            for batch in batches:
+        enabled = {"hist": self.pv_hist_w1 is not None, "top": self.pv_top_w1 is not None}
+        sums = {w: 0.0 for w, on in enabled.items() if on}
+        counts = dict.fromkeys(sums, 0)
+        for batch in batches:  # one pass: `batches` may be a one-shot generator
+            for which in sums:
                 y = self.raw_path_output(which=which, inp=batch)  # ty: ignore[invalid-argument-type]
                 ok = batch.hist_pv_ok if which == "hist" else batch.top_pv_ok
                 picked = y[ok]
-                total += float((picked.double() ** 2).sum())
-                count += picked.numel()
-            assert count > 0, f"no token with ok true to calibrate r_{which}"
-            rms = math.sqrt(total / count)
-            buffer.fill_(rms)
+                sums[which] += float((picked.double() ** 2).sum())
+                counts[which] += picked.numel()
+        out = {}
+        for which, total in sums.items():
+            assert counts[which] > 0, f"no token with ok true to calibrate r_{which}"
+            rms = math.sqrt(total / counts[which])
+            (self.pv_hist_r if which == "hist" else self.pv_top_r).fill_(rms)
             out[which] = rms
         return out
 

@@ -126,13 +126,18 @@ def load_state(*, arm: str, month: str, seed: int) -> pvm.PvNet:
 
 
 def steps_of(*, arm: str, month: str, seed: int) -> int:
-    """Return the optimiser steps of stage 3 recorded in the fit log (passes times samples over 256), or 0 when the log lacks them."""
+    """Return the fit's own optimiser steps over stages 2 and 3 (design 7.5): each stage's passes times the batches of its training pairs; the fit log must hold `train_pairs`."""
     path = arms.log_file(
         data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed, kind="fit"
     )
     log = json.loads(path.read_text())
-    entry = log["stages"][-1]
-    return int(entry["passes"] * -(-entry["pairs"] // pvt.tr.BATCH))
+    total = 0
+    for entry in log["stages"]:
+        assert "train_pairs" in entry, (
+            f"{path.name} has no `train_pairs` in stage {entry.get('stage')}: refit"
+        )
+        total += int(entry["passes"] * -(-entry["train_pairs"] // pvt.tr.BATCH))
+    return total
 
 
 def write(*, name: str, obj: object, part: int) -> Path:
@@ -182,7 +187,7 @@ def main() -> int:
         return selftest()
     part = arms.ARMS[args.arm].part
     if args.command == "contrasts":
-        seeds = score.available_seeds(names=[args.arm], months=arms.ALL_FOLDS)
+        seeds = score.available_seeds(names=[args.arm], months=arms.ALL_FOLDS)  # ty: ignore[unresolved-attribute]
         write(
             name=f"readouts_{args.arm}",
             obj=readout_contrasts(base=args.arm, months=arms.ALL_FOLDS, seeds=seeds),

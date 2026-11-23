@@ -11,8 +11,10 @@ inputs and every `ok` pattern), and `check_pv_gradients` (KF8).
 import sys
 
 import e00713_model as mdl  # ty: ignore[unresolved-import]
+import e00716_arms as arms
 import e00716_model as pvm
 import torch  # ty: ignore[unresolved-import]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 B = 6
 
@@ -238,6 +240,23 @@ def check_cosine_table() -> list[str]:
     ]  # fmt: skip
 
 
+def check_calibration_generator() -> list[str]:
+    """Regression for review blocker B1: `calibrate_scale` must accept a one-shot generator for `HT` (both buffers)."""
+    inp = random_inputs(seed=1, b=4)
+    out = []
+    for arm in ("H", "T", "HT"):
+        net = pvm.PvNet(arm=arm, seed=0)
+        scale = net.calibrate_scale(
+            batches=(x for x in [inp, inp])  # ty: ignore[invalid-argument-type]
+        )  # a generator, as `fit()` passes
+        want = {"H": {"hist"}, "T": {"top"}, "HT": {"hist", "top"}}[arm]
+        assert set(scale) == want, (arm, scale)
+        listed = pvm.PvNet(arm=arm, seed=0).calibrate_scale(batches=[inp, inp])
+        assert scale == listed, (arm, scale, listed)
+        out.append(f"B1 {arm}: calibrated {scale} from a generator, equal to the list result")
+    return out
+
+
 def main() -> int:
     """Run every check and print the lines."""
     torch.set_num_threads(1)
@@ -248,9 +267,13 @@ def main() -> int:
         + check_zero_start()
         + check_pv_gradients()
         + check_cosine_table()
+        + check_calibration_generator()
     )
     print("\n".join(lines))
     print("PASS")
+    if "--record" in sys.argv:
+        for name in ("KF1", "KF8"):
+            arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name=name, passed=True)
     return 0
 
 
