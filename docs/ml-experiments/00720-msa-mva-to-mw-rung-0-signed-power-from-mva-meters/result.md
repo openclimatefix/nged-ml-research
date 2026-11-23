@@ -189,6 +189,44 @@ a hard cap of 15 core-hours for rung 0e and a projected-cost gate.** One job run
 `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0` scope with 1 BLAS thread and the
 virtual environment's Python called directly. No GPU is used.
 
+## Measured cost of the hidden Markov model
+
+**One forward-backward pass at 164 states over a 122,000-half-hour series took 158.5 s on 1 core,
+about 93 times the 1.7 s the addendum estimated.** The peak resident memory was 540 MB. The pair
+emission, which integrates the path between the midpoint of the previous and the current signed power
+over 4 sub-steps, causes most of the difference. A fit of one unit size needs about 50 passes
+(a profile over unit size, then the Baum-Welch rounds), so one whole-span era costs about 2.2
+core-hours at 164 states. Rung 0e on experiment 694's segments (V2) at the full 164 states would
+cost about 14.6 core-hours, which sits against the cap of 15. The harness therefore runs V2 and K1
+on a grid of 21 residual bins, a coarse-then-fine profile of the unit size (9 passes), and 2
+Baum-Welch rounds, and the cost gate measures the first pass and stops the run when the projected
+total exceeds the cap.
+
+## Departures from the first report, and status of every rung
+
+**The code departs from the design in these places.** Injected worlds use the oracle capacity, with
+0.7 and 1.3 times as a sensitivity, instead of a capacity estimated from a probe. The unanchored
+control uses a symmetric window of 14 neighbours. The anchored read-out relaxes its anchor cut from
+an unreduced share of 0.3 to 0.6 when too few anchor rows exist. The day type may include bank
+holidays. The pair emission runs from the midpoint of the previous and current signed power. On
+experiment 694's series no weather exists, so the demand mean of the hindsight model is calendar
+only and is fitted on the 28-day pre-roll. The panel loader is built on the torch-free functions of
+experiment 506, and it cuts the 126,624-step `dense_raw.npy` of experiment 713 to the 121,248 steps
+of the grid that experiment 412's CAMS arrays share.
+
+**Status, with no script yet run on real data:**
+
+- Rungs 0a and 0d (census, gate table): done on synthetic data; the read-only loader is wired.
+- Rung 0b (sign posterior): the posterior, the metrics, and the injection plumbing are done on
+  synthetic data. The `--run` branch, which needs the farm series, the F7 PV estimate, and the
+  references of experiments 506 and 674, is not wired.
+- Rung 0c (known-answer checks of the folded loss): done; six checks pass.
+- Rung 0e (hindsight model): the model, the Brier and signed-CRPS functions, the bar functions, and
+  the V2 and K1 harness against experiment 694's `M2` (paired cluster bootstrap, cost gate) are done
+  on synthetic data. The `--run` branch of V2 is written but has never run. V3, V4, the addendum's
+  section 3 analyses, and the filtered and smoothed bar tables over real series are not written.
+- Figure and report scripts: not written.
+
 ## Method
 
 The experiment is planned and has no result yet, so these bullets describe the design.
@@ -234,11 +272,13 @@ of the fixed code, a results review, a numbers review, and a prose review.
     - `e00720_census.py` (rungs 0a and 0d) and `e00720_real.py`: the census, the gate table, the
       fold windows, and the read-only loader of the stored panel.
     - `e00720_guard.py` and `e00720_check_guard.py`: the anonymisation guard.
+    - `e00720_v2.py` and `e00720_check_bars.py` (rung 0e): the hindsight fit on one 694 segment, the
+      paired cluster bootstrap against `M2`, the false-alarm statistics, and the bar functions of
+      `e00720_bars.py`.
     - `run.sh`: the slot wrapper (8 GB cap, no swap, one thread, 25 GB free check).
 - **Not written yet:** the references of experiments 506 and 674 on the injected rows; the farm and
-  F7 wiring of the real run of rung 0b; V2, K1, and V3 of rung 0e, which need experiment 694's
-  assets; V4 and the analyses of the addendum's section 3; the figure scripts; the table that
-  prints the result. The first real run of each script waits for an Opus code review.
+  F7 wiring of the real run of rung 0b; V3, V4, and the analyses of the addendum's section 3; the
+  figure scripts; the report script. The first real run of each script waits for an Opus code review.
 - Read from earlier experiments: experiments 412, 417, 420, and 405 (injection and gate), 694
   (generator tracker, to rerun on the same segments), and 716 (the PV estimate and the as-of
   capacity table, imported through `PYTHONPATH`).
