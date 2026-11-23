@@ -52,7 +52,9 @@ decision_rule: >-
   secondary and change no verdict. A not supported or refuted verdict closes the last-14-days
   axial line. The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4),
   so any statement about following level shifts and the era set R1 to R3 is unsupported by a passing
-  known-answer test.
+  known-answer test. The 24 screen fits of M1, M2, and M3 ran under the waived gate on 2026-11-23 and
+  their preliminary scores are interim; arm P, the other four folds, and the later phases are still
+  running or not started.
 benchmark: >-
   The Candidate of experiment 667 (P7+D50): stored forecasts for seeds 0 and 1 of every fold, and
   seeds 2 to 4 refitted into a new output root; and the placebo network P.
@@ -63,10 +65,16 @@ metric: >-
   absolute error of the median beside it.
 ---
 
-**Status: planned. The experiment failed its pre-registered known-answer gate on its fourth run, the
-maintainer waived the gate on 2026-11-23, and no real fold has been fitted yet.** No number below is
-a result of the experiment. The experiment carries no verdict word. The waiver lets the real folds
-run, and it does not turn the failed gate into a pass. No further amendment to the gate is planned.
+**Status: planned. The experiment failed its pre-registered known-answer gate on its fourth run, and
+the maintainer waived the gate on 2026-11-23.** The 24 screen fits (arms `M1`, `M2`, and `M3`, on
+the 4 screen folds, with seeds 0 and 1) then ran under the waived gate on 2026-11-23, and
+preliminary scores exist. The screen is complete for `M1`, `M2`, and `M3`. The placebo arm `P`
+(phase 2), the other four folds, and the later phases are still running or not started. The page
+keeps `status: planned` until it is finished, and the experiment carries no verdict word. The screen
+scores are interim, and the plan text below is the plan as committed. The waiver lets the real folds
+run, and it does not turn the failed gate into a pass. Every statement about the era set R1 to R3 or
+about following level shifts is unsupported by a passing known-answer test. No further amendment to
+the gate is planned.
 
 ## The known-answer gate has failed four times
 
@@ -203,9 +211,13 @@ failed KA3 and KA12. The era secondary set R1 to R3 and any statement about foll
 are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
 and take-home message of this experiment carries that fact.**
 
-**No real fold has been fitted.** The 160 fits, the Candidate refits, and every scored contrast of
-the plan below are unrun, and all of the text below describes the plan as it was committed, with the
-departures that amendments 1 to 3 added. A reader should take nothing in the plan below as evidence.
+**The 24 screen fits ran under the waived gate on 2026-11-23, and the rest of the plan is unrun.**
+The screen fits are arms `M1`, `M2`, and `M3` on the 4 screen folds with seeds 0 and 1, and their
+preliminary scores are interim (see the solar section for the one reading made from them). The
+placebo `P` (phase 2), the other four folds, the Candidate refits, and every counted contrast are
+still running or not started. The text below describes the plan as it was committed, with the
+departures that amendments 1 to 4 added, and a reader should take nothing in the plan below as
+evidence.
 
 ## What this experiment asks
 
