@@ -1,10 +1,9 @@
 # ruff: noqa: E501
 """Experiment 720: read-only access to the stored panel, and the fold windows. Nothing is written here.
 
-The loaders import earlier experiments' modules (`e00510_common`, `e00087_common`, `e00412_inputs`),
-which import `torch`, so run any script that calls `load_panel` with a Python that has the `gpu`
-group installed. They read on the CPU only. The pure functions (`to_day_matrix`, `fold_windows`, and
-the census and gate functions in the scripts) need no earlier experiment and are tested without one.
+The loader `load_panel` imports experiment 87's and experiment 506's modules, which do not import
+`torch`. The pure functions (`to_day_matrix`, `fold_windows`, and the census and gate functions in the
+scripts) need no earlier experiment and are tested without one.
 """
 
 from dataclasses import dataclass

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D417, E731, PT018
+# ruff: noqa: E501, D417, E731, PT018, PERF401
 """Experiment 720, rungs 0b and 0e (V1): the sign read-outs side by side on one injected world.
 
 A `ProbeWorld` is one Primary at one injection level and one fold: day matrices of the reading with
@@ -20,8 +20,10 @@ experiment 662's probe, and the page says so.
 
 import argparse
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Final
 
 import e00720_fit as fit
@@ -51,6 +53,7 @@ class ProbeWorld:
     x_true: np.ndarray
     reference_days: np.ndarray
     scored_days: np.ndarray
+    days_us: np.ndarray | None = None
 
 
 def _safe(a: np.ndarray) -> np.ndarray:
@@ -83,8 +86,13 @@ def hindsight_rho(*, pw: ProbeWorld, p: np.ndarray) -> np.ndarray:
     return out[pw.scored_days]
 
 
-def evaluate_world(*, pw: ProbeWorld) -> list[dict[str, Any]]:
-    """Score every read-out with the real and the shifted sky; return one row per read-out and sky."""
+def evaluate_world(
+    *, pw: ProbeWorld, keep: dict[str, np.ndarray] | None = None
+) -> list[dict[str, Any]]:
+    """Score every read-out with the real and the shifted sky; return one row per read-out and sky.
+
+    With `keep`, the real-sky `rho` arrays (scored days by 48) are stored in it under the read-out's name.
+    """
     rows: list[dict[str, Any]] = []
     sd = pw.scored_days
     p_real = _safe(pw.p)
@@ -107,6 +115,8 @@ def evaluate_world(*, pw: ProbeWorld) -> list[dict[str, Any]]:
                 full = np.full(pw.v.shape, np.nan)
                 full[lo:hi] = rho
                 results[f"unanchored_{weights}_pass{k}"] = full[sd]
+        if keep is not None and sky == "real":
+            keep.update(results)
         for name, rho in results.items():
             metrics = sign.evaluate_sign(rho=rho, x_true=pw.x_true[sd], u=pw.u[sd])
             rows.append(
@@ -205,8 +215,200 @@ def build_probe_world(
     scored = real.days_in(days_us=days_us, lo_us=w.cutoff_us, hi_us=w.score_end_us)
     return ProbeWorld(
         name=name, v=v, p=np.where(np.isfinite(p_m), p_m, np.nan), u=np.nan_to_num(u_m), day_type=day_type,
-        temperature=np.nan_to_num(temp_day, nan=10.0), x_true=x_m, reference_days=ref, scored_days=scored,
+        temperature=np.nan_to_num(temp_day, nan=10.0), x_true=x_m, reference_days=ref, scored_days=scored, days_us=days_us,
     )  # fmt: skip
+
+
+LEVELS: Final[tuple[float, ...]] = (0.0, 1.0, 2.0)
+SENSITIVITY: Final[tuple[float, ...]] = (0.7, 1.3)
+"""Multipliers of the injected capacity in `p` at level 2 (1.0 is the oracle)."""
+RUNG0B_CAP_HOURS: Final[float] = 3.0
+
+
+def _yyyymmdd(*, days_us: np.ndarray) -> np.ndarray:
+    d = (days_us // real.US_PER_DAY).astype("datetime64[D]")
+    return (
+        (d.astype("datetime64[Y]").astype(int) + 1970) * 10000
+        + (d.astype("datetime64[M]").astype(int) % 12 + 1) * 100
+        + (d - d.astype("datetime64[M]")).astype(int)
+        + 1
+    )
+
+
+def run_worlds(
+    *,
+    panel: real.Panel,
+    sites: tuple[str, ...],
+    folds: tuple[str, ...],
+    farm_for_site: dict[str, Callable[[np.ndarray], np.ndarray]],
+    host_p: Callable[[str, str], np.ndarray],
+    labels_674: Any = None,
+    limit_worlds: int | None = None,
+    gate: hmm.CostGate | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Score every world and return `(readout_rows, reference_rows)`; nothing is written here.
+
+    A world is a site, a fold, a level, and an estimate scale. Level 0 has no injection; levels 1 and 2
+    use the oracle scale 1.0, and level 2 also uses 0.7 and 1.3. Every world of a site and fold reads
+    the same rows, because the union gap of the farm series is masked in the host's power as well.
+    The first world is timed, and the cost gate stops the run when the projection exceeds its cap.
+    """
+    import e00720_references as refs
+
+    gate = gate or hmm.CostGate(cap_hours=RUNG0B_CAP_HOURS)
+    plan = [
+        (site, fold_name, level, scale)
+        for fold_name in folds
+        for site in sites
+        for level, scale in [(0.0, 1.0), (1.0, 1.0), (2.0, 1.0), *[(2.0, sc) for sc in SENSITIVITY]]
+    ]
+    if limit_worlds:
+        plan = plan[:limit_worlds]
+    rows: list[dict[str, Any]] = []
+    ref_rows: list[dict[str, Any]] = []
+    for i, (site, fold_name, level, scale) in enumerate(plan):
+        t0 = time.perf_counter()
+        farm_at = farm_for_site[site]
+        y = panel.power_pct[panel.sites.index(site)]
+        y = np.where(np.isfinite(farm_at(panel.stamp_us)), y, np.nan)
+        j = panel.sites.index(site)
+        pw = build_probe_world(
+            name=f"{site}|{fold_name}|L{level:g}|s{scale:g}", y_pct=y, stamp_us=panel.stamp_us, u=panel.u[j], k=panel.k[j],
+            temperature_c=panel.temperature_c[j], p_host_pct=host_p(site, fold_name),
+            farm_at=farm_at if level > 0 else None, level=level, fold_name=fold_name, estimate_scale=scale,
+        )  # fmt: skip
+        keep: dict[str, np.ndarray] = {}
+        for r in evaluate_world(pw=pw, keep=keep):
+            rows.append({"site": site, "fold": fold_name, "level": level, "scale": scale, **r})
+        sd = pw.scored_days
+        assert pw.days_us is not None
+        month = ((pw.days_us.astype("datetime64[us]").astype("datetime64[M]").astype(int)) % 12) + 1
+        weekend = (pw.day_type > 0).astype(int)
+        demand = refs.dark_demand_levels(
+            v=pw.v, u=pw.u, month=month, weekend=weekend, rows=pw.reference_days
+        )
+        called = refs.gated_rule_called(p=_safe(pw.p), u=pw.u, demand=demand)
+        rm = refs.rule_metrics(called=called[sd], x_true=pw.x_true[sd], u=pw.u[sd])
+        ref_rows.append(
+            {
+                "site": site,
+                "fold": fold_name,
+                "level": level,
+                "scale": scale,
+                "reference": "506_gated_rule",
+                **rm,
+            }
+        )
+        truth = refs.day_truth(x_true=pw.x_true[sd], u=pw.u[sd])
+        for name in ("anchored", "hindsight"):
+            ds = refs.day_scores(
+                call=refs.day_call_from_rho(rho=keep[name], u=pw.u[sd]), truth=truth
+            )
+            ref_rows.append(
+                {
+                    "site": site,
+                    "fold": fold_name,
+                    "level": level,
+                    "scale": scale,
+                    "reference": f"720_{name}_day",
+                    **ds,
+                }
+            )
+        if labels_674 is not None and scale == 1.0 and level in (0.0, 1.0, 2.0):
+            dates = _yyyymmdd(days_us=pw.days_us[sd])
+            lab = labels_674.filter((labels_674["site"] == site) & (labels_674["level"] == level))
+            cls = dict(zip(lab["date"].to_list(), lab["cls"].to_list(), strict=True))
+            label = np.array([cls.get(int(d), "not_scorable") for d in dates], dtype=object)
+            ds = refs.day_scores(call=truth, truth=truth, label=label)
+            ref_rows.append(
+                {
+                    "site": site,
+                    "fold": fold_name,
+                    "level": level,
+                    "scale": scale,
+                    "reference": "674_day_labeller",
+                    **ds,
+                }
+            )
+        if level == 0.0:
+            ref_rows.append(
+                {
+                    "site": site,
+                    "fold": fold_name,
+                    "level": level,
+                    "scale": scale,
+                    "reference": "720_anchored_false_reverse_gate_open",
+                    **false_reverse_no_injection(pw=pw),
+                }
+            )
+        if i == 0:
+            gate.seconds_per_pass = time.perf_counter() - t0
+            gate.check(n_passes_total=len(plan))
+    return rows, ref_rows
+
+
+def run_real(
+    *, dense_raw: Path | None, limit_worlds: int | None
+) -> int:  # pragma: no cover - needs the stored panel
+    """Run rung 0b on the stored panel (waits for the Opus code review). Writes only under the private folder.
+
+    Reads the farms' recorded output (`e00506_data.farm_norm`), experiment 716's PV estimate and as-of
+    capacity (put its folder on `EXTRA_PYTHONPATH`), and experiment 674's stored day labels. Estimated
+    cost: 120 worlds at about 1 to 3 minutes each, under the 3 core-hour cap of the gate.
+    """
+    import e00506_data as data  # ty: ignore[unresolved-import]
+    import e00716_pv as pv  # ty: ignore[unresolved-import]
+    import e00720_guard as guard
+    import e00720_references as refs
+    import polars as pl
+
+    if dense_raw is None:
+        msg = "give --dense-raw (experiment 713's dense_raw.npy)"
+        raise SystemExit(msg)
+    panel = real.load_panel(dense_raw_path=dense_raw)
+    n = len(panel.stamp_us)
+    raw = np.load(dense_raw, mmap_mode="r")[:, :n]
+    farms = {f: data.farm_norm(farm=f) for f in "ABC"}
+    union_gap = ~np.isfinite(sum(farms.values()))
+    step = real.US_PER_HALF_HOUR
+
+    def make_farm(letter: str) -> Callable[[np.ndarray], np.ndarray]:
+        series = np.where(union_gap, np.nan, farms[letter])
+        return lambda times: series[((times - panel.stamp_us[0]) // step).astype(int)]
+
+    farm_for_site = {s: make_farm(data.FARM_OF_SITE[s]) for s in real.SIGNED_SIX}
+    t649, t662 = pv.read_tables()
+    series = data.series_table()
+    cap_mw = np.array(
+        [float(series.filter(pl.col("site") == s)["effective_capacity_mw"][0]) for s in panel.sites]
+    )
+    doy = pv.day_of_year(grid_start_us=int(panel.stamp_us[0]), n_grid=n)
+    cache: dict[str, np.ndarray] = {}
+
+    def host_p(site: str, fold: str) -> np.ndarray:
+        if fold not in cache:
+            caps = np.array(
+                [
+                    pv.as_of_capacity(site=s, fold=fold, table_649=t649, table_662=t662).mw
+                    for s in panel.sites
+                ]
+            )
+            est = pv.dense_share(
+                raw=raw, doy=doy, capacities_mw=caps, power_capacity_mw=cap_mw, u99=data.u99()
+            )
+            cache[fold] = 100.0 * np.asarray(est.share, dtype=np.float64)
+        return cache[fold][panel.sites.index(site)]
+
+    rows, ref_rows = run_worlds(
+        panel=panel, sites=real.SIGNED_SIX, folds=real.RUNG0_FOLDS, farm_for_site=farm_for_site, host_p=host_p,
+        labels_674=refs.read_674_labels(), limit_worlds=limit_worlds,
+    )  # fmt: skip
+    pl.DataFrame(rows).write_csv(guard.private_path(name="rung0b_readouts.csv"))
+    pl.DataFrame(ref_rows).write_csv(guard.private_path(name="rung0b_references.csv"))
+    print(
+        f"wrote {len(rows)} read-out rows and {len(ref_rows)} reference rows under the private folder"
+    )
+    return 0
 
 
 def selftest() -> int:
@@ -274,6 +476,50 @@ def selftest() -> int:
     )
     assert not np.intersect1d(built.scored_days, built.reference_days).size
     assert (built.x_true[built.scored_days] < 0).any(), "the injection must create reverse flow"
+    # the full world loop on a fake panel, with a fake farm, a fake host estimate, and fake 674 labels
+    import polars as pl
+
+    fake_panel = real.Panel(
+        sites=["D5"], stamp_us=stamp, power_pct=y_fake[None, :], u=u_fake[None, :], k=np.clip(u_fake * 1.2, 0, 1.5)[None, :],
+        temperature_c=np.full((1, n), 12.0),
+    )  # fmt: skip
+    labels = pl.DataFrame({"site": ["D5"], "level": [2.0], "date": [20260415], "cls": ["reverse"]})
+    rows, ref_rows = run_worlds(
+        panel=fake_panel, sites=("D5",), folds=("2026-04",), farm_for_site={"D5": farm},
+        host_p=lambda site, fold: 5.0 * u_fake, labels_674=labels, limit_worlds=5,
+    )  # fmt: skip
+    assert {r["scale"] for r in rows} == {1.0, 0.7, 1.3}
+    kinds = {r["reference"] for r in ref_rows}
+    assert {
+        "506_gated_rule",
+        "720_anchored_day",
+        "674_day_labeller",
+        "720_anchored_false_reverse_gate_open",
+    } <= kinds, kinds
+    tiny = hmm.CostGate(cap_hours=1e-12)
+    try:
+        run_worlds(
+            panel=fake_panel,
+            sites=("D5",),
+            folds=("2026-04",),
+            farm_for_site={"D5": farm},
+            host_p=lambda s, f: 5.0 * u_fake,
+            limit_worlds=2,
+            gate=tiny,
+        )
+    except RuntimeError:
+        pass
+    else:
+        msg = "the cost gate did not stop the world loop"
+        raise AssertionError(msg)
+    assert (
+        int(
+            _yyyymmdd(days_us=np.array([int(np.datetime64("2026-04-05", "us").astype(np.int64))]))[
+                0
+            ]
+        )
+        == 20260405
+    )
     print(
         f"PASS rung 0b driver: anchored beats shifted sky by {by[('anchored', 'real')]['auc'] - by[('anchored', 'shifted')]['auc']:.3f}; hindsight area {by[('hindsight', 'real')]['auc']:.3f}; placebo false reverse {fr['false_reverse_rate']:.4f}; injection plumbing builds {built.scored_days.size} scored days"
     )
@@ -285,13 +531,14 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--run", action="store_true")
+    ap.add_argument("--dense-raw", type=Path, default=None)
+    ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
     if args.selftest:
         return selftest()
     if args.run:
-        msg = "the real-data run of rung 0b is not wired yet: it waits for the code review (see the page)"
-        raise SystemExit(msg)
-    ap.error("give --selftest")
+        return run_real(dense_raw=args.dense_raw, limit_worlds=args.limit)
+    ap.error("give --selftest or --run")
     return 2
 
 
