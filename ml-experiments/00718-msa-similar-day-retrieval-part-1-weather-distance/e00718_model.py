@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PLR1714
+# ruff: noqa: E501, PLR1714
 """Experiment 718: the axial-attention demand network with age-bucketed tables (design section 3).
 
 `F9Net` subclasses experiment 713's `MsaNet`. Experiment 713 indexes three parameter tables by the
@@ -75,14 +75,23 @@ class F9Attention(mdl.Attention):
         key_ok: torch.Tensor | None = None,
         key_ids: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Attend over the length-L axis of `x` (N, L, 64); `key_ids` (N, L) selects each key's bias."""
-        assert key_ids is not None and self.key_bias is not None
+        """Attend over the length-L axis of `x` (N, L, 64); `key_ids` (N, L) selects each key's bias.
+
+        `key_ids` None means that the keys are the target row and the buckets 0 to `L - 2` in order,
+        which is experiment 713's layout of ages 2 to 15 newest first.
+        """
+        assert self.key_bias is not None
         n, length, _ = x.shape
         q, k, v = (
             self.qkv(x).view(n, length, 3, mdl.HEADS, mdl.WIDTH // mdl.HEADS).permute(2, 0, 3, 1, 4)
         )
         bias = torch.zeros(n, mdl.HEADS, 1, length, device=x.device, dtype=x.dtype)
-        bias = bias + self.key_bias[:, key_ids].permute(1, 0, 2)[:, :, None, :]
+        if (
+            key_ids is None
+        ):  # the standard layout: the slice of experiment 713, so that its gradient sums in the same order
+            bias = bias + self.key_bias[None, :, None, :length]
+        else:
+            bias = bias + self.key_bias[:, key_ids].permute(1, 0, 2)[:, :, None, :]
         if key_ok is not None:
             bias = bias.masked_fill(~key_ok[:, None, None, :], float("-inf"))
         if self.record is not None:
@@ -108,7 +117,7 @@ class F9Block(mdl.AxialBlock):
         return new  # ty: ignore[invalid-return-type]
 
     def forward(  # ty: ignore[invalid-method-override]
-        self, x: torch.Tensor, *, row_exists: torch.Tensor, key_ids: torch.Tensor
+        self, x: torch.Tensor, *, row_exists: torch.Tensor, key_ids: torch.Tensor | None
     ) -> torch.Tensor:
         """Return `x` (B, R, 48, 64) after the block; `row_exists` is (B, R), `key_ids` (B, R)."""
         b, r, c, w = x.shape
@@ -118,7 +127,7 @@ class F9Block(mdl.AxialBlock):
         if self.across is not None and self.ln_across is not None:
             cols = self.ln_across(x).permute(0, 2, 1, 3).reshape(b * c, r, w)
             ok = row_exists[:, None, :].expand(b, c, r).reshape(b * c, r)
-            ids = key_ids[:, None, :].expand(b, c, r).reshape(b * c, r)
+            ids = None if key_ids is None else key_ids[:, None, :].expand(b, c, r).reshape(b * c, r)
             y = self.across(cols, key_ok=ok, key_ids=ids).view(b, c, r, w).permute(0, 2, 1, 3)  # ty: ignore[unknown-argument]
             x = x + self.drop(y)
         return x + self.drop(self.transition(self.ln_transition(x)))
@@ -174,7 +183,14 @@ class F9Net(mdl.MsaNet):
 
     # ------------------------------------------------------------------ forward
 
-    def _tokens_f9(self, inp: F9Inputs) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    # In the standard layout (the history rows are the buckets 0 to H - 1 in order, which is the layout of
+    # experiment 713) the three tables are read with experiment 713's slices, so that their gradients are
+    # summed in experiment 713's order and an F9 fit of arm `Z` is bit-identical to experiment 713's loop.
+    # Any other layout reads the tables by bucket.
+
+    def _tokens_f9(
+        self, inp: F9Inputs, *, standard: bool
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
         """Return the tokens (B, 1 + H, 48, 64), the (B, 1 + H) row-exists mask, and the key ids."""
         assert inp.age_bucket is not None
         b, h = len(inp.primary), inp.n_history
@@ -198,16 +214,28 @@ class F9Net(mdl.MsaNet):
             z[..., None] * self.power_u + self.power_b,
             self.m_hist.expand_as(x[:, 1:]),
         )
-        hist = x[:, 1:] + self.age_emb(inp.age_bucket)[:, :, None, :] + power
+        age = (
+            self.age_emb.weight[None, :h, None, :]
+            if standard
+            else self.age_emb(inp.age_bucket)[:, :, None, :]
+        )
+        hist = x[:, 1:] + age + power
         row_exists = torch.ones(b, 1 + h, dtype=torch.bool, device=x.device)
         row_exists[:, 1:] = inp.row_exists
-        key_ids = torch.cat(
-            [torch.full((b, 1), TARGET_KEY, dtype=torch.long, device=x.device), inp.age_bucket + 1],
-            dim=1,
-        )
+        key_ids = None
+        if not standard:
+            key_ids = torch.cat(
+                [
+                    torch.full((b, 1), TARGET_KEY, dtype=torch.long, device=x.device),
+                    inp.age_bucket + 1,
+                ],
+                dim=1,
+            )
         return torch.cat([x[:, :1] + top[:, None], hist], dim=1), row_exists, key_ids
 
-    def _readout_f9(self, x: torch.Tensor, inp: F9Inputs) -> tuple[torch.Tensor, ...]:
+    def _readout_f9(
+        self, x: torch.Tensor, inp: F9Inputs, *, standard: bool
+    ) -> tuple[torch.Tensor, ...]:
         """Return `h0`, `base`, `spread`, `no_history`, and `alpha` with `beta_age` read by bucket."""
         assert inp.age_bucket is not None
         h = self.ln_readout(x)
@@ -217,7 +245,12 @@ class F9Net(mdl.MsaNet):
         k = self.w_k(h[:, 1:])
         logit = torch.einsum("bjd,brjd->brj", q, k) / float(np.sqrt(mdl.READOUT_WIDTH))
         day = self.beta_day[inp.day_type_top[:, None, :], inp.day_type_hist]
-        logit = logit + day + self.beta_age[inp.age_bucket][:, :, None]
+        beta_age = (
+            self.beta_age[None, : inp.n_history, None]
+            if standard
+            else self.beta_age[inp.age_bucket][:, :, None]
+        )
+        logit = logit + day + beta_age
         visible = inp.hist_visible & inp.row_exists[:, :, None]
         any_visible = visible.any(dim=1)
         logit = logit.masked_fill(~visible, -1e9)
@@ -234,7 +267,15 @@ class F9Net(mdl.MsaNet):
         With `return_attention` the output also holds the attention weights of every block and the
         64-number vector that enters the head; the flag only records.
         """
-        x, row_exists, key_ids = self._tokens_f9(inp)
+        assert inp.age_bucket is not None
+        h = inp.n_history
+        standard = h <= mdl.N_HISTORY and bool(
+            (
+                (inp.age_bucket == torch.arange(h, device=inp.age_bucket.device)[None, :])
+                | ~inp.row_exists
+            ).all()
+        )
+        x, row_exists, key_ids = self._tokens_f9(inp, standard=standard)
         attention_modules: list[tuple[str, mdl.Attention]] = []
         if return_attention:
             for i, block in enumerate(self.blocks):
@@ -245,7 +286,7 @@ class F9Net(mdl.MsaNet):
                         attention_modules.append((f"{kind}_{i}", module))
         for block in self.blocks:
             x = block(x, row_exists=row_exists, key_ids=key_ids)
-        h0, base, spread, no_history, alpha = self._readout_f9(x, inp)
+        h0, base, spread, no_history, alpha = self._readout_f9(x, inp, standard=standard)
         out = self._mixture_out(
             h0=h0, base=base, spread=spread, no_history=no_history, lead_day=inp.lead_day
         )
