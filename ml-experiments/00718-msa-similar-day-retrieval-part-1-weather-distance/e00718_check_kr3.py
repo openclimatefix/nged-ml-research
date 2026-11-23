@@ -47,14 +47,16 @@ def raw_arrays(*, source) -> dict:
 
 
 def check_arm(
-    *, arm: str, source, days: np.ndarray, provider, n_samples: int, seed: int
-) -> tuple[list[str], int]:
+    *, arm: str, source, days: np.ndarray, provider, n_samples: int, seed: int, mutate=None,
+) -> tuple[list[str], int]:  # fmt: skip
     """Compare the builder's table of `arm` with the reference on random samples; return the report lines and the number of tie swaps."""
     arrays = tab.pool_arrays_from_source(source=source, with_calendar=arm == "UX", holidays=set())
     primaries = cb.TABLE_PRIMARIES
     table = ret.build_table(
         arm=arm, arrays=arrays, primaries=primaries, days=days, target_provider=provider
     )
+    if mutate is not None:
+        table = mutate(table)
     raw = raw_arrays(source=source)
     rng = np.random.default_rng(seed)
     swaps = checked = 0
@@ -80,7 +82,7 @@ def check_arm(
             weather_dists = [dist[a] for a, m in rows if m in {ref.WEATHER}]
             edge = max(weather_dists) if weather_dists else 0.0
             assert weather_dists and all(
-                abs(dist[a] - edge) <= 1e-8 * max(edge, 1.0) for a in only if a in dist
+                abs(dist[a] - edge) <= 1e-9 * max(edge, 1.0) for a in only if a in dist
             ), (arm, p, day, lead, got.tolist(), want.tolist())
             swaps += 1
             continue
@@ -111,13 +113,69 @@ def check_arm(
         assert all((a + lead) % 7 == 0 for a, m in rows if m == ref.WEEKDAY), (
             "a weekday row is on another weekday"
         )
-    # a table with one age moved must fail
-    broken = table.ages.copy()
-    broken[0, 0, 0, 0] = broken[0, 0, 0, 0] + 1
-    assert not np.array_equal(broken, table.ages)
     return [
         f"KR3 {arm}: {checked} samples equal the independent recomputation ({swaps} rank swaps between tied blocks)"
     ], swaps
+
+
+def expect_failure(*, what: str, **kwargs) -> str:  # noqa: ANN003
+    """Run `check_arm` with a deliberate fault and require that it fails."""
+    try:
+        check_arm(**kwargs)
+    except AssertionError:
+        return f"KR3 negative control: {what} fails the comparison"
+    msg = f"KR3 negative control: {what} was not detected"
+    raise SystemExit(msg)
+
+
+def negative_controls(*, source, days: np.ndarray, provider) -> list[str]:
+    """Check that the comparison fails for a table with one age moved and for a table built under a relaxed 27 h rule."""
+
+    def move_one_age(table):  # noqa: ANN202
+        table.ages[0, 0, 0, 0] += 1
+        return table
+
+    common = {"source": source, "days": days, "provider": provider, "n_samples": 1000, "seed": 5}
+    lines = [
+        expect_failure(what="a table with one age moved", arm="R", mutate=move_one_age, **common)
+    ]
+    old = ret.NEWEST_VISIBLE_BEFORE_CONTRACT
+    ret.NEWEST_VISIBLE_BEFORE_CONTRACT = 6  # ty: ignore[invalid-assignment]
+    try:
+        what = "arm U built with a visibility cap of 6 instead of 54 half-hours"
+        lines.append(
+            expect_failure(what=what, arm="U", **common)
+        )  # arm U's recency rows take the youngest eligible block
+    finally:
+        ret.NEWEST_VISIBLE_BEFORE_CONTRACT = old
+    return lines
+
+
+def joint_equals_single(*, source, days: np.ndarray, provider) -> str:
+    """Check that the tables built together in one pass equal the tables built one arm at a time (the reuse of distances changes nothing)."""
+    arms_all = ["R", "R-A", "P90", "U", "U-A", "U27", "U27-A", "UX"]
+    arrays = tab.pool_arrays_from_source(source=source, with_calendar=True, holidays=set())
+    joint = ret.build_tables(
+        arms=arms_all,
+        arrays=arrays,
+        primaries=cb.TABLE_PRIMARIES,
+        days=days,
+        target_provider=provider,
+    )
+    for arm in arms_all:
+        single = ret.build_table(
+            arm=arm,
+            arrays=arrays,
+            primaries=cb.TABLE_PRIMARIES,
+            days=days,
+            target_provider=provider,
+        )
+        assert np.array_equal(joint[arm].ages, single.ages), (
+            f"arm {arm}: the joint pass chose other rows"
+        )
+        assert np.array_equal(joint[arm].measure, single.measure)
+        assert np.allclose(joint[arm].distance, single.distance, rtol=1e-6, equal_nan=True)  # ty: ignore[invalid-argument-type]
+    return f"KR3 joint pass: the tables of {len(arms_all)} arms built in one pass equal the tables built one arm at a time"
 
 
 def main() -> int:
@@ -189,6 +247,12 @@ def main() -> int:
             else:
                 differs += int(u != x)
     assert differs > 0, "UX never differs from U inside the window"
+    lines.append(
+        joint_equals_single(source=source, days=ens_days, provider=tab.ens_provider(ens=source.ens))
+    )
+    lines += negative_controls(
+        source=source, days=ens_days, provider=tab.ens_provider(ens=source.ens)
+    )
     lines.append(
         f"KR3 UX: equals U outside the window, and differs from U in {differs} of the checked in-window samples"
     )

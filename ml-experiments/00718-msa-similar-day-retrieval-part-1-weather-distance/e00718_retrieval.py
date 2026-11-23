@@ -12,10 +12,10 @@ differ by less than 1e-9 relative, in which case the younger block wins.
 """
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Final
+from typing import Any, Final
 
 import e00718_layout as lay
 import numpy as np
@@ -518,80 +518,126 @@ def build_table(
     target_provider: TargetProvider, with_calendar: bool | None = None,
     young_weather: YoungWeather | None = None,
 ) -> RowTable:  # fmt: skip
-    """Build the row table of `arm` for the Primaries and origin days.
+    """Build the row table of one arm (see `build_tables`)."""
+    return build_tables(
+        arms=[arm], arrays=arrays, primaries=primaries, days=days, target_provider=target_provider,
+        with_calendar=with_calendar, young_weather=young_weather,
+    )[arm]  # fmt: skip
+
+
+def build_tables(  # noqa: PLR0915
+    *, arms: Sequence[str], arrays: PoolArrays, primaries: np.ndarray, days: np.ndarray,
+    target_provider: TargetProvider, with_calendar: bool | None = None,
+    young_weather: YoungWeather | None = None,
+) -> dict[str, RowTable]:  # fmt: skip
+    """Build the row tables of several arms in one pass, computing each weather distance once.
+
+    The distance of a (Primary, origin day, lead day) sample to every block of ages 2 to 379 is
+    computed once, and every arm that reads weather takes the prefix of it that its pool covers
+    (arm `R`'s pool is the first 90 ages), so that `R`, `R-A`, `U`, `U-A`, `U27`, `U27-A`, and `UX`
+    cost one distance computation instead of seven (design section 11).
 
     Args:
-        arm: The arm name.
+        arms: The arm names.
         arrays: The fold's retrieval arrays.
         primaries: (P,) Primary indices, ascending.
         days: (D,) origin day numbers, ascending.
         target_provider: Returns the 14 target rows' weather for a (Primary, day).
-        with_calendar: Whether to read the calendar arrays (default: arm `UX`).
+        with_calendar: Whether to read the calendar arrays (default: arm `UX` only).
         young_weather: The selection swap's live-fair rule: for a (Primary, day) it returns the
             (4, 48, 7) float64 weather that the blocks of ages 2 to 5 read in the distance (the
             stored ensemble forecast), or None to keep the analysis. Ages 6 and above always read
             the analysis. The default None is the pool of every arm.
     """
-    n_rows = lay.ROWS_PER_ARM[arm]
-    ages_out = np.full(
-        (len(primaries), len(days), lay.N_LEAD_DAYS, n_rows), lay.ABSENT, dtype=np.int16
-    )
-    meas_out = np.full(ages_out.shape, lay.MEASURE_FIXED, dtype=np.int8)
-    no_weather = np.zeros(ages_out.shape[:3], dtype=bool)
-    dist_out = np.full(ages_out.shape, np.nan, dtype=np.float32)
-    needs_weather = arm in {"R", "R-A", "U", "U-A", "UX", "U27", "U27-A"}
-    use_calendar = (arm == "UX") if with_calendar is None else with_calendar
+    weather_arms = {"R", "R-A", "U", "U-A", "UX", "U27", "U27-A"}
+    shape = (len(primaries), len(days), lay.N_LEAD_DAYS)
+    outs: dict[str, dict[str, Any]] = {}
+    for arm in arms:
+        n_rows = lay.ROWS_PER_ARM[arm]
+        ages_out = np.full((*shape, n_rows), lay.ABSENT, dtype=np.int16)
+        outs[arm] = {
+            "ages": ages_out,
+            "measure": np.full(ages_out.shape, lay.MEASURE_FIXED, dtype=np.int8),
+            "no_weather": np.zeros(shape, dtype=bool),
+            "distance": np.full(ages_out.shape, np.nan, dtype=np.float32),
+            "calendar": (arm == "UX") if with_calendar is None else with_calendar,
+        }
+    any_weather = any(a in weather_arms for a in arms)
     for pi, p in enumerate(primaries):
         for di, day in enumerate(days):
             c = int(lay.contract_idx_of_day(day=int(day)))
-            pool_ages = long_pool_ages(arm=arm, day=int(day))
-            pool_ages = pool_ages[c - lay.STEPS_PER_DAY * pool_ages >= 0]
-            ok = eligible_ages(arrays=arrays, primary=int(p), contract_idx=c, ages=pool_ages)
+            long_ages = np.arange(lay.MIN_AGE, lay.LONG_POOL_MAX_AGE + 1, dtype=np.int64)
+            long_ages = long_ages[c - lay.STEPS_PER_DAY * long_ages >= 0]
             weather_t, filled_t = target_provider(int(p), int(day))
-            w_mask = pool_ages <= lay.LONG_POOL_MAX_AGE
-            if needs_weather and len(pool_ages):
-                grid = lay.block_index(contract_idx=c, ages=pool_ages[w_mask])
+            pool_w = pool_dt = None
+            if any_weather and len(long_ages):
+                grid = lay.block_index(contract_idx=c, ages=long_ages)
                 pool_w = arrays.weather[int(p)][grid]
                 young = None if young_weather is None else young_weather(int(p), int(day))
                 if young is not None:
                     assert young.shape == (4, lay.STEPS_PER_DAY, N_WEATHER)
-                    assert pool_ages[0] == lay.MIN_AGE
-                    n_young = int((pool_ages[w_mask] <= YOUNGEST_ANALYSIS_AGE - 1).sum())
+                    assert long_ages[0] == lay.MIN_AGE
+                    n_young = int((long_ages <= YOUNGEST_ANALYSIS_AGE - 1).sum())
                     pool_w = pool_w.copy()
                     pool_w[:n_young] = young[:n_young]
                 pool_dt = arrays.day_type[grid]
+            per_arm = {}
+            for arm in arms:
+                pool_ages = long_pool_ages(arm=arm, day=int(day))
+                pool_ages = pool_ages[c - lay.STEPS_PER_DAY * pool_ages >= 0]
+                ok = eligible_ages(arrays=arrays, primary=int(p), contract_idx=c, ages=pool_ages)
+                per_arm[arm] = (pool_ages, ok, int((pool_ages <= lay.LONG_POOL_MAX_AGE).sum()))
             for lead in range(lay.N_LEAD_DAYS):
                 top = c + lay.STEPS_PER_DAY * lead + np.arange(lay.STEPS_PER_DAY)
-                target = TargetRow(
-                    weather=weather_t[lead], filled=filled_t[lead], day_type=arrays.day_type[top],
-                    day_class=arrays.day_class[top] if use_calendar and arrays.day_class is not None else None,
-                    christmas_offset=float(_CHRISTMAS_CACHE[0][day + lead]),
-                    in_window=bool(_CHRISTMAS_CACHE[1][day + lead]),
-                )  # fmt: skip
-                distance = None
-                if needs_weather and len(pool_ages) and bool(filled_t[lead].any()):
-                    distance = np.full(len(pool_ages), np.inf)
-                    distance[w_mask] = weather_distance(
-                        target=target, pool_weather=pool_w, pool_day_type=pool_dt
-                    )
-                cal = None
-                if use_calendar and arrays.day_class is not None and len(pool_ages):
-                    grid = lay.block_index(contract_idx=c, ages=pool_ages)
-                    cal = calendar_distance(
-                        target=target, pool_day_class=arrays.day_class[grid],
-                        pool_offset=_CHRISTMAS_CACHE[0][day - pool_ages],
+                has_weather = bool(filled_t[lead].any())
+                long_distance = None
+                for arm in arms:
+                    o = outs[arm]
+                    pool_ages, ok, n_w = per_arm[arm]
+                    cal_ok = o["calendar"] and arrays.day_class is not None
+                    target = TargetRow(
+                        weather=weather_t[lead], filled=filled_t[lead], day_type=arrays.day_type[top],
+                        day_class=arrays.day_class[top] if cal_ok else None,
+                        christmas_offset=float(_CHRISTMAS_CACHE[0][day + lead]),
+                        in_window=bool(_CHRISTMAS_CACHE[1][day + lead]),
                     )  # fmt: skip
-                a, m, nw = rows_for_sample(
-                    arm=arm, target=target, ages=pool_ages, ok=ok, distance=distance, cal_distance=cal,
-                    lead_day=lead, primary=int(p), day=int(day),
-                )  # fmt: skip
-                ages_out[pi, di, lead], meas_out[pi, di, lead] = a, m
-                if distance is not None:
-                    got = a >= 0
-                    pos = np.searchsorted(pool_ages, a[got])
-                    dist_out[pi, di, lead][got] = distance[pos]
-                no_weather[pi, di, lead] = nw and needs_weather
-    return RowTable(
-        arm=arm, primaries=np.asarray(primaries), days=np.asarray(days), ages=ages_out,
-        measure=meas_out, no_weather=no_weather, distance=dist_out,
-    )  # fmt: skip
+                    distance = None
+                    if arm in weather_arms and len(pool_ages) and has_weather:
+                        if long_distance is None:
+                            assert pool_w is not None
+                            long_distance = weather_distance(
+                                target=target,
+                                pool_weather=pool_w,
+                                pool_day_type=pool_dt,  # ty: ignore[invalid-argument-type]
+                            )
+                        distance = np.full(len(pool_ages), np.inf)
+                        distance[:n_w] = long_distance[:n_w]
+                    cal = None
+                    if cal_ok and len(pool_ages):
+                        grid_c = lay.block_index(contract_idx=c, ages=pool_ages)
+                        cal = calendar_distance(
+                            target=target, pool_day_class=arrays.day_class[grid_c],  # ty: ignore[not-subscriptable]
+                            pool_offset=_CHRISTMAS_CACHE[0][day - pool_ages],
+                        )  # fmt: skip
+                    a, m, nw = rows_for_sample(
+                        arm=arm, target=target, ages=pool_ages, ok=ok, distance=distance, cal_distance=cal,
+                        lead_day=lead, primary=int(p), day=int(day),
+                    )  # fmt: skip
+                    o["ages"][pi, di, lead], o["measure"][pi, di, lead] = a, m
+                    if distance is not None:
+                        got = a >= 0
+                        pos = np.searchsorted(pool_ages, a[got])
+                        o["distance"][pi, di, lead][got] = distance[pos]
+                    o["no_weather"][pi, di, lead] = nw and arm in weather_arms
+    return {
+        arm: RowTable(
+            arm=arm,
+            primaries=np.asarray(primaries),
+            days=np.asarray(days),
+            ages=o["ages"],
+            measure=o["measure"],
+            no_weather=o["no_weather"],
+            distance=o["distance"],
+        )
+        for arm, o in outs.items()
+    }

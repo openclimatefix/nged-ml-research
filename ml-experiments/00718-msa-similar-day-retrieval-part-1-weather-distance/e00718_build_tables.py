@@ -7,12 +7,13 @@ blanks the fold month's power (design section 2.4). Each build writes the `era5`
 table covers all 16 Primaries and every origin day from the first with a full history to the last
 scored origin. `--limit-days N` keeps the last N days only, and exists for tests.
 
-Usage: run.sh e00718_build_tables.py ARM MONTH [--seed 0] [--limit-days N]
+Usage: run.sh e00718_build_tables.py ARMS MONTH [--seed 0] [--limit-days N]
 """
 
 import argparse
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import e00713_inputs as inp  # ty: ignore[unresolved-import]
@@ -29,18 +30,18 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 
 def build_tables(
-    *, source: Source, arm: str, days: np.ndarray, holidays: set | frozenset
-) -> dict[str, ret.RowTable]:
-    """Return the `era5` and `ens` tables of `arm` for all Primaries and `days`, built from `source`."""
+    *, source: Source, arms_to_build: Sequence[str], days: np.ndarray, holidays: set | frozenset
+) -> dict[str, dict[str, ret.RowTable]]:
+    """Return the `era5` and `ens` tables of every arm in `arms_to_build` for all Primaries and `days`, built in one pass from `source`."""
     assert source.ens is not None
     arrays = tab.pool_arrays_from_source(
-        source=source, with_calendar=arm == "UX", holidays=set(holidays)
+        source=source, with_calendar="UX" in arms_to_build, holidays=set(holidays)
     )
     primaries = np.arange(source.power_z.shape[0])
-    return {
-        fb.TABLE_ERA5: ret.build_table(arm=arm, arrays=arrays, primaries=primaries, days=days, target_provider=tab.era5_provider(arrays=arrays)),
-        fb.TABLE_ENS: ret.build_table(arm=arm, arrays=arrays, primaries=primaries, days=days, target_provider=tab.ens_provider(ens=source.ens)),
-    }  # fmt: skip
+    common = {"arms": list(arms_to_build), "arrays": arrays, "primaries": primaries, "days": days}
+    era5 = ret.build_tables(target_provider=tab.era5_provider(arrays=arrays), **common)  # ty: ignore[invalid-argument-type]
+    ens = ret.build_tables(target_provider=tab.ens_provider(ens=source.ens), **common)  # ty: ignore[invalid-argument-type]
+    return {a: {fb.TABLE_ERA5: era5[a], fb.TABLE_ENS: ens[a]} for a in arms_to_build}
 
 
 def days_of_fold(*, source: Source, last_origin_idx: int, limit: int | None) -> np.ndarray:
@@ -52,54 +53,70 @@ def days_of_fold(*, source: Source, last_origin_idx: int, limit: int | None) -> 
 
 
 def build(
-    *, arm: str, month: str, seed: int, data_dir: Path, limit: int | None, device: str = "cpu"
-) -> list[Path]:
-    """Build and save the two tables of `arm` for the fold `month`."""
-    paths = [
-        arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v)
-        for v in (fb.TABLE_ERA5, fb.TABLE_ENS)
-    ]
+    *, arms_to_build: Sequence[str], month: str, seed: int, data_dir: Path, limit: int | None,
+    device: str = "cpu",
+) -> None:  # fmt: skip
+    """Build and save the two tables of every arm in `arms_to_build` for the fold `month`, in one pass over the fold.
+
+    A table that exists is kept only when its provenance (builder code, phase, arm, month, and
+    standardiser fingerprint) matches; otherwise the build stops.
+    """
     pipe = inp.load_pipeline(
         month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
     )
     data = inp.build_fold_data(pipe=pipe, device=device)
     assert data.test_origin_idx is not None
-    meta = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
-    if all(p.exists() for p in paths):
-        for p in (
-            paths
-        ):  # an existing table is kept only when its provenance matches the code and the fold
-            fit_mod.load_table(path=p, expect=meta)
-        print(f"{arm} {month}: tables exist with matching provenance, skipped", flush=True)
-        return paths
+    todo = []
+    for arm in arms_to_build:
+        paths = [
+            arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v)
+            for v in (fb.TABLE_ERA5, fb.TABLE_ENS)
+        ]
+        meta = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
+        if all(p.exists() for p in paths):
+            for p in paths:  # an existing table is kept only when its provenance matches
+                fit_mod.load_table(path=p, expect=meta)
+            print(f"{arm} {month}: tables exist with matching provenance, skipped", flush=True)
+        else:
+            todo.append(arm)
+    if not todo:
+        return
     last = int(np.max(data.test_origin_idx)) + lay713.NATIVE_OFFSET_STEPS
     days = days_of_fold(source=data.source, last_origin_idx=last, limit=limit)
     started = time.monotonic()
     tables = build_tables(
         source=data.source,
-        arm=arm,
+        arms_to_build=todo,
         days=days,
         holidays=lay713.england_bank_holidays(years=range(2019, 2029)),
     )
-    for version, path in zip((fb.TABLE_ERA5, fb.TABLE_ENS), paths, strict=True):
-        fit_mod.save_table(table=tables[version], path=path, meta=meta)
+    for arm, by_version in tables.items():
+        meta = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
+        for version, table in by_version.items():
+            path = arms.table_file(data_dir=data_dir, arm=arm, month=month, version=version)
+            fit_mod.save_table(table=table, path=path, meta=meta)
+    cpu = time.process_time()
     print(
-        f"{arm} {month}: {len(days)} days built in {time.monotonic() - started:.0f} s", flush=True
+        f"{','.join(todo)} {month}: {len(days)} days built in {time.monotonic() - started:.0f} s ({cpu:.0f} CPU s)",
+        flush=True,
     )
-    return paths
 
 
 def main() -> int:
     """Parse the command line and build."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("arm", choices=sorted(lay.ROWS_PER_ARM))
+    parser.add_argument(
+        "arms", help=f"comma-separated arms, or `all`; arms: {sorted(lay.ROWS_PER_ARM)}"
+    )
     parser.add_argument("month")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--limit-days", type=int, default=None)
     args = parser.parse_args()
     arms.install_own_cache(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    wanted = sorted(lay.ROWS_PER_ARM) if args.arms == "all" else args.arms.split(",")
+    assert set(wanted) <= set(lay.ROWS_PER_ARM), wanted
     build(
-        arm=args.arm,
+        arms_to_build=wanted,
         month=args.month,
         seed=args.seed,
         data_dir=ML_EXPERIMENTS_DATA_DIR,

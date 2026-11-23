@@ -255,12 +255,99 @@ def screen(
         "stop_rule": dec.stop_rule(first_contrast={g: first[g]["point"] for g in dec.GROUPS}, monthly=months),
         "audit_trigger_1_placebo": dec.audit_trigger_1(placebo_point={g: second[g]["point"] for g in dec.GROUPS}),
     }  # fmt: skip
+    out.update(
+        nested_and_u27(averaged=averaged, per_seed=per_seed, groups=groups, star=star, args=args)
+    )
     if z_present and "Z" in averaged:
         z = counted_contrast(treatment="Z", reference=star, **args)  # ty: ignore[invalid-argument-type]
         out["Z-STAR"] = z
         out["audit_trigger_1_z_rule"] = dec.z_rule_fires(
             z_minus_star={g: z[g]["point"] for g in dec.GROUPS}
         )
+    return out
+
+
+def nested_and_u27(*, averaged: dict, per_seed: dict, groups: dict, star: str, args: dict) -> dict:
+    """Return audit trigger 5 (a nested arm beats its container) and the `U27` advance rule, for the arms that are stored."""
+    out: dict = {}
+
+    def points(treatment: str, reference: str) -> dict[str, float] | None:
+        if treatment not in averaged or reference not in averaged:
+            return None
+        c = counted_contrast(treatment=treatment, reference=reference, **args)
+        return {g: c[g]["point"] for g in dec.GROUPS}
+
+    triggers = {}
+    for nested, container in ((star, "U27"), ("R-A", "R"), ("U-A", "U"), ("U27-A", "U27")):
+        d = points(nested, container)
+        if d is not None:
+            triggers[f"{nested}-{container}"] = dec.nested_beats_container(nested_minus_container=d)
+    if triggers:
+        out["audit_trigger_5"] = triggers
+        out["audit_trigger_5_fires"] = any(triggers.values())
+    u27_a, u27_star = points("U27", "U27-A"), points("U27", star)
+    if u27_a is not None and u27_star is not None:
+        out["u27_advances"] = dec.u27_advances(u27_minus_u27a=u27_a, u27_minus_star=u27_star)
+    return out
+
+
+def u27_exception(*, per_seed: dict, averaged: dict, groups: dict) -> bool | None:
+    """Return whether `U27` minus `U27-A` is below zero in both groups with its 95% interval; None where `U27-A` is not stored."""
+    if "U27" not in averaged or "U27-A" not in averaged:
+        return None
+    c = counted_contrast(
+        per_seed=per_seed, averaged=averaged, groups=groups, treatment="U27", reference="U27-A",
+        n_seeds=2, level=dec.REPORT_LEVEL,
+    )  # fmt: skip
+    return all(c[g]["upper"] < 0 for g in dec.GROUPS)
+
+
+CHRISTMAS_WINDOWS: Final = {
+    "20 December to 5 January": ((12, 20), (1, 5)),
+    "24 to 26 December": ((12, 24), (12, 26)),
+}
+
+
+def christmas_reading(*, averaged: dict, star: str, boot: int = 5000) -> dict:
+    """Return the report-only Christmas readings: `UX` minus `U` and `UX` minus `M*` on the windows' targets, all 16 Primaries, with a day-block 95% interval.
+
+    One winter: a pointer for a follow-up, not a decision (design section 8).
+    """
+    out: dict = {
+        "label": "report-only, one winter, targets by valid day; an interval from resampling days"
+    }
+    rng = np.random.default_rng(0)
+    for t_raw, r_raw in (("UX", "U"), ("UX", "STAR")):
+        t, r = t_raw, resolve(name=r_raw, star=star)
+        if t not in averaged or r not in averaged:
+            out[f"{t}-{r}"] = "not stored"
+            continue
+        both = s713.paired(treatment=averaged[t], reference=averaged[r], metric="crps")
+        both = (
+            both.join(averaged[t].select(*KEYS, "valid_time"), on=list(KEYS))
+            if "valid_time" not in both.columns
+            else both
+        )
+        md = pl.col("valid_time").dt.month().cast(pl.Int32) * 100 + pl.col(
+            "valid_time"
+        ).dt.day().cast(pl.Int32)
+        for name, ((m0, d0), (m1, d1)) in CHRISTMAS_WINDOWS.items():
+            lo, hi = m0 * 100 + d0, m1 * 100 + d1
+            sel = both.filter((md >= lo) | (md <= hi) if lo > hi else (md >= lo) & (md <= hi))
+            if sel.height == 0:
+                out[f"{t}-{r}, {name}"] = "no targets in the stored folds"
+                continue
+            days = (
+                sel.with_columns(day=pl.col("valid_time").dt.date())
+                .group_by("day")
+                .agg(pl.col("d").mean())["d"]
+                .to_numpy()
+            )
+            means = rng.choice(days, size=(boot, len(days))).mean(axis=1)
+            out[f"{t}-{r}, {name}"] = {
+                "point": float(days.mean()), "lower": float(np.quantile(means, 0.025)),
+                "upper": float(np.quantile(means, 0.975)), "days": len(days),
+            }  # fmt: skip
     return out
 
 
@@ -371,12 +458,23 @@ def _write(*, part: int, name: str, obj: object) -> None:
     print(json.dumps(obj, indent=1, default=float))
 
 
+def _available(*, arm: str, months: Sequence[str], seeds: Sequence[int]) -> bool:
+    """Return whether every forecast file of `arm` for the folds and seeds exists."""
+    return all(
+        sc.fit_path(arm=arm, month=m, seed=s, data_dir=ML_EXPERIMENTS_DATA_DIR).exists()
+        for m in months
+        for s in seeds
+    )
+
+
 def _load(
-    *, part: int, months: Sequence[str], seeds: Sequence[int], extra: Sequence[str] = ()
-) -> tuple[dict, dict, dict, str]:
+    *, part: int, months: Sequence[str], seeds: Sequence[int], extra: Sequence[str] = (), optional: Sequence[str] = ()
+) -> tuple[dict, dict, dict, str]:  # fmt: skip
+    """Load the counted arms and `extra` (all required) and those of `optional` that are stored."""
     star = a713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     spec = COUNTED[part]
     names = {star, "P", "C", spec["first"][1], spec["second"][2], spec["placebo_arm"], *extra}
+    names |= {a for a in optional if _available(arm=a, months=months, seeds=seeds)}
     per_seed, averaged, groups = sc.load_all(names=sorted(names), months=months, seeds=seeds)  # ty: ignore[invalid-argument-type]
     return per_seed, averaged, groups, star
 
@@ -385,7 +483,7 @@ LAST: dict = {}
 """The dicts of the last self-test, for the report's own self-test."""
 
 
-def self_test() -> int:
+def self_test() -> int:  # noqa: PLR0915
     """Run the screen, the headline, the clean-fold reading, and the report-only readings on synthetic scored forecasts."""
     rng = np.random.default_rng(0)
     months = [f"2025-{m:02d}" for m in (11, 12)] + [f"2026-{m:02d}" for m in range(1, 7)]
@@ -394,7 +492,7 @@ def self_test() -> int:
     rows = []
     for mi, month in enumerate(months):
         for tid in range(16):
-            for day in range(2, 8):
+            for day in (2, 3, 4, 5, 6, 7, 24):
                 for hr in (30, 100, 200):
                     t0 = datetime.fromisoformat(f"{month}-{day:02d}T12:00:00")
                     rows.append(
@@ -429,7 +527,7 @@ def self_test() -> int:
         "U-A": 0.0,
         "U27": -0.1,
         "U27-A": 0.0,
-        "UX": -0.1,
+        "UX": -0.3,
     }
     star = "M1"
     effect[star] = 0.0
@@ -462,12 +560,25 @@ def self_test() -> int:
         )
         return per, avg
 
-    names = [star, "P", "C", "R", "R-A", "Z", "P90", "U", "U-A"]
+    names = [star, "P", "C", "R", "R-A", "Z", "P90", "U", "U-A", "U27", "U27-A", "UX"]
     per_seed, averaged = {}, {}
     for n in names:
         per_seed[n], averaged[n] = make(n, (0, 1))
     sc_out = screen(part=1, per_seed=per_seed, averaged=averaged, groups=ids, star=star)
     assert sc_out["stop_rule"] is False and sc_out["audit_trigger_1_placebo"] is False
+    assert sc_out["audit_trigger_5_fires"] is False and sc_out["u27_advances"] is True, sc_out
+    assert set(sc_out["audit_trigger_5"]) == {"M1-U27", "R-A-R", "U-A-U", "U27-A-U27"}
+    assert u27_exception(per_seed=per_seed, averaged=averaged, groups=ids) is True
+    xmas = christmas_reading(averaged=averaged, star=star)
+    key = "UX-U, 20 December to 5 January"
+    assert xmas[key]["point"] < -0.15 and xmas[key]["upper"] < 0 and xmas[key]["days"] >= 6, xmas
+    assert xmas["UX-M1, 24 to 26 December"]["days"] >= 1 and xmas[key]["days"] <= 20, xmas
+    closed = dec.line_closure(
+        verdicts={"part1": "not supported", "part2": "refuted"},
+        first_points={q: dict.fromkeys(dec.GROUPS, 0.1) for q in ("part1", "part2")},
+        u27_exception=u27_exception(per_seed=per_seed, averaged=averaged, groups=ids),
+    )
+    assert closed["closed"] is False, "a U27 exception keeps the line open"
     assert sc_out["audit_trigger_1_z_rule"] is False
     h = headline(
         part=1,
@@ -513,10 +624,40 @@ def self_test() -> int:
     return 0
 
 
+def closure(*, part: int) -> None:
+    """Write the line closure (design section 7.4) from the two parts' headline records and the `U27` exception."""
+    heads = {
+        f"part{q}": json.loads((_score_dir(part=q) / "headline.json").read_text()) for q in (1, 2)
+    }
+    firsts = {
+        f"part{q}": {g: heads[f"part{q}"][COUNTED[q]["first"][0]][g]["point"] for g in dec.GROUPS}
+        for q in (1, 2)
+    }
+    months = a713.ALL_FOLDS
+    if not _available(arm="U27-A", months=months, seeds=arms.SCREEN_SEEDS):
+        months = a713.SCREEN_FOLDS
+    per_seed, averaged, groups, _ = _load(
+        part=2, months=months, seeds=arms.SCREEN_SEEDS, optional=("U27", "U27-A")
+    )
+    exception = u27_exception(per_seed=per_seed, averaged=averaged, groups=groups)
+    _write(
+        part=part,
+        name="closure",
+        obj=dec.line_closure(
+            verdicts={k: v["verdict"] for k, v in heads.items()},
+            first_points=firsts,
+            u27_exception=exception,
+        ),
+    )
+
+
 def main() -> int:
     """Run a command."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["screen", "headline", "report-only", "self-test"])
+    parser.add_argument(
+        "command",
+        choices=["screen", "headline", "report-only", "closure", "christmas", "self-test"],
+    )
     parser.add_argument("part", nargs="?", type=int, choices=[1, 2])
     parser.add_argument(
         "--seeds", type=int, default=2, help="seeds per counted arm of the headline: 2 or 5"
@@ -528,8 +669,9 @@ def main() -> int:
     part = args.part
     if args.command == "screen":
         per_seed, averaged, groups, star = _load(
-            part=part, months=a713.SCREEN_FOLDS, seeds=arms.SCREEN_SEEDS, extra=("Z",)
-        )
+            part=part, months=a713.SCREEN_FOLDS, seeds=arms.SCREEN_SEEDS, extra=("Z",),
+            optional=("R", "R-A", "U", "U-A", "U27", "U27-A"),
+        )  # fmt: skip
         _write(
             part=part,
             name="screen",
@@ -557,17 +699,29 @@ def main() -> int:
                 part=part, per_seed=per_seed, averaged=averaged, groups=groups, star=star
             ),
         )
-    else:
+    elif args.command == "report-only":
+        named = {n for pair in REPORT_ONLY_PAIRS[part] for n in pair} - {"STAR"}
         per_seed, averaged, groups, star = _load(
-            part=part, months=a713.ALL_FOLDS, seeds=arms.SCREEN_SEEDS
+            part=part, months=a713.ALL_FOLDS, seeds=arms.SCREEN_SEEDS, optional=sorted(named)
         )
+        sites = s713.k578.sites()  # ty: ignore[unresolved-attribute]
+        labels = dict(zip(sites["time_series_id"].to_list(), sites["label"].to_list(), strict=True))
         _write(
             part=part,
             name="report_only",
             obj=report_only(
-                part=part, per_seed=per_seed, averaged=averaged, groups=groups, star=star
+                part=part, per_seed=per_seed, averaged=averaged, groups=groups, star=star,
+                labels=labels,
             ),
+        )  # fmt: skip
+    elif args.command == "christmas":
+        months = ("2025-12", "2026-01")
+        _, averaged, _, star = _load(
+            part=2, months=months, seeds=arms.SCREEN_SEEDS, optional=("U", "UX")
         )
+        _write(part=2, name="christmas", obj=christmas_reading(averaged=averaged, star=star))
+    else:
+        closure(part=part)
     return 0
 
 

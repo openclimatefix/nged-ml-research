@@ -27,6 +27,25 @@ N_ORIGIN_DAYS = 8
 ARMS = ("Z", "R", "R-A", "P90", "U", "U-A", "U27", "U27-A", "UX")
 
 
+def sparsify_age_2_blocks(*, power: torch.Tensor) -> None:
+    """Leave 20 readings in the visible part of some age-2 blocks and 5 in the hidden tail, so the 27 h rule decides them.
+
+    Under the cap of 54 half-hours the block holds 20 visible readings and is not eligible. Under a
+    relaxed cap (6 half-hours) it holds 25 and is eligible, so a relaxed cap changes the tables.
+    """
+    for p in TABLE_PRIMARIES:
+        for day in range(FIRST_ORIGIN_DAY, FIRST_ORIGIN_DAY + N_ORIGIN_DAYS):
+            if (int(p) + day) % 2:
+                continue
+            c = int(lay.contract_idx_of_day(day=np.array([day]))[0])
+            block = power[p, c - 96 : c - 48].clone()
+            kept = torch.full_like(block, float("nan"))
+            kept[:20] = torch.randn(20)  # indices c - 96 .. c - 77, all visible under the cap of 54
+            kept[43:48] = torch.randn(5)  # indices c - 53 .. c - 49, hidden under the cap of 54
+            power[p, c - 96 : c - 48] = kept
+            power[p, c - 96 : c - 48][torch.isnan(block) & torch.isnan(kept)] = float("nan")
+
+
 def synthetic_source(*, seed: int = 0) -> bt.Source:
     """Return a synthetic `Source` of 16 Primaries with an ensemble table."""
     g = torch.Generator().manual_seed(seed)
@@ -35,6 +54,7 @@ def synthetic_source(*, seed: int = 0) -> bt.Source:
     power[torch.rand(power.shape, generator=g) < 0.03] = float("nan")
     power[0, 48 * 100 : 48 * 130] = float("nan")
     power[:, : 48 * 5] = float("nan")
+    sparsify_age_2_blocks(power=power)
     weather = torch.randn(N_PRIMARIES, n_grid, bt.TOP_WIDTH, generator=g).half()
     dt = torch.randn(N_PRIMARIES, n_grid, 21, generator=g).half()
     day_type = ((torch.arange(n_grid) // 48 + 1) % 7).long()
@@ -112,6 +132,20 @@ def check_arm(*, base: bt.Source, arm: str) -> list[str]:
             )
         )
     return lines
+
+
+def check_cap_changes_tables(*, base: bt.Source) -> str:
+    """A visibility cap of 6 half-hours instead of 54 must change the tables of arm `U` (the sparse age-2 blocks decide it)."""
+    real = make_tables(source=base, arm="U")[fb.TABLE_ERA5]
+    old = ret.NEWEST_VISIBLE_BEFORE_CONTRACT
+    ret.NEWEST_VISIBLE_BEFORE_CONTRACT = 6  # ty: ignore[invalid-assignment]
+    try:
+        relaxed = make_tables(source=base, arm="U")[fb.TABLE_ERA5]
+    finally:
+        ret.NEWEST_VISIBLE_BEFORE_CONTRACT = old
+    changed = int((real.ages != relaxed.ages).any(axis=-1).sum())
+    assert changed > 0, "a relaxed visibility cap did not change any row of arm U"
+    return f"KR2 negative control: a visibility cap of 6 instead of 54 changes {changed} (Primary, day, lead) rows of arm U"
 
 
 def check_negative_controls(*, base: bt.Source) -> list[str]:
@@ -239,6 +273,7 @@ def main() -> int:
     for arm in ARMS:
         lines += check_arm(base=base, arm=arm)
     lines += check_negative_controls(base=base)
+    lines.append(check_cap_changes_tables(base=base))
     lines += check_phases(base=base)
     lines.append(check_weather_poison())
     print("\n".join(lines))
