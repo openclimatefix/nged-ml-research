@@ -73,7 +73,9 @@ run, and it does not turn the failed gate into a pass. No further amendment to t
 **The gate trains networks on a synthetic world with a known answer, and arm `M` must follow a level
 step that appears in the history rows.** The check is KA3: in synthetic world W1, arm `M` must move
 its median by at least 0.75 of a step of 0.30 of capacity (the follow share). Arm `M` has never come
-near that figure. All four results stay on this page, each with the commit that produced it.
+near that figure. All four results stay on this page, each with the commit that produced it. An
+earlier attempt at fd76ccb09 crashed at KA6 (a CUDA index error in the canary, before any check
+produced a result), so it is not a gate result. Commit 3ac110652 fixed the canary.
 
 | Run | Commit | Failed checks | Numbers | Cause found |
 |---|---|---|---|---|
@@ -159,8 +161,8 @@ unmodified baseline gave 0.142 and 0.063. The no-early-stopping runs followed mo
 passes (0.912 for V0N, 0.929 for V2N), but their best-validation states stayed at 0.129 and 0.820,
 so the state that validation loss picks is a noisy selector of the follow share.
 
-**No amendment was made, the gate remains failed, and whether to continue is the maintainer's
-decision.** The diagnostics concern one family of synthetic worlds, one fold, and single runs, so
+**No amendment was made, and the gate remains failed. The maintainer's decision follows below.**
+The diagnostics concern one family of synthetic worlds, one fold, and single runs, so
 they say nothing about the real folds. The options that follow from them, with the reasons, are in
 `gate_options.md` and the two diagnostic reports (`diag_option5/README.md` and
 `diag_option5/replication/README.md`), in `data/ml-experiments/briefs/msa_architecture/`.
@@ -174,10 +176,28 @@ no threshold.** The gate file `work/known_answers_passed.json` is written by a s
 amended gate, commit 94dfb9652), the passed checks (KA2, KA4, KA5, KA6, and KA10), the decision
 quoted above, the date, the code record, and the sha256 of `e00713_known_answer.py`. The script
 refuses to write the file unless the stored last-run results show exactly KA3 and KA12 failing and
-the code hash equals e85b84e2ea04b3cb. The fit scripts still check the code record of the gate file,
-so a waived gate written under one code hash is refused under another. The report script prints the
-waiver and fires audit trigger 1 (a control fails).
+the code hash equals e85b84e2ea04b3cb, and the sha256 of the last-run file and of
+`e00713_known_answer.py` equal the values pinned in the script. The fit scripts still check the code
+record of the gate file, so a waived gate written under one code hash is refused under another. The
+report script prints the waiver and fires audit trigger 1 (a control fails).
 
+**Option 1 as written covers KA3 only, and the waiver covers KA12 as well.** KA12 also failed at the
+amended gate: arm `G` followed 0.0395 against the limit of arm `M` minus 0.05 = 0.0918, so the stem
+of arm `G` did not follow a step within 0.05 of arm `M`, which bears on the stem readings of R2 and
+R3. The manager relayed the maintainer's verbatim "Go ahead." in answer to a question that included
+KA12 (`G` 0.039 against 0.092). The quoted decision above is unchanged, and the waiver record
+carries both statements.
+
+**Option 1 carries its own risk: a null result on the real folds may come from the slow learning the
+gate found.** The gate and the option-5 diagnostics showed that early stopping on validation loss
+can end training before arm `M` learns to read a step. An H2 near zero then cannot separate "the
+recent days carry little" from "the training budget stops before the read-out learns to use them",
+as the gate and the option-5 diagnostics showed in synthetic world W1. The waiver does not remove
+that ambiguity, and a null H2 therefore does not close the line without this caveat.
+
+**Operator caution: a full rerun of `e00713_known_answer.py` deletes the gate file, waived or not.**
+The waiver script must be run again after a rerun, and it refuses when the last-run results are not
+those of the amended gate.
 **The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
 failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
 are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
@@ -504,12 +524,13 @@ temporary moves, because the similar-day read-out can copy recent levels and no 
 tells the network that a neighbour gained what the donor lost. `E` − `M*` is inside ±0.30 in R2.
 
 **What each outcome says.** If `M*` or `E` reads the era and neither is vetoed on temporary moves,
-the injected evidence supports the hypothesis, and the next step is a confirmation with 5 seeds and
-new passes. If the same arm is vetoed on temporary moves, the network follows any level change and
-does not tell a lasting change from a temporary move; the write-up then prints the mean of the two
-changes, as experiment 709 advises. If neither arm reads the era, the hypothesis is not supported
-as stated. If no reading at D8 passes, the design says nothing about D8, because both of D8's
-register connections fall before 2025-11, so no scored origin sees an era begin there.
+the injected evidence supports the hypothesis (unsupported by a passing known-answer test; amendment
+4), and the next step is a confirmation with 5 seeds and new passes. If the same arm is vetoed on
+temporary moves, the network follows any level change (unsupported by a passing known-answer test;
+amendment 4) and does not tell a lasting change from a temporary move; the write-up then prints the
+mean of the two changes, as experiment 709 advises. If neither arm reads the era, the hypothesis is
+not supported as stated. If no reading at D8 passes, the design says nothing about D8, because both
+of D8's register connections fall before 2025-11, so no scored origin sees an era begin there.
 
 **Limits.** D8's scored rows contain no era onset. The injected kinds exclude a generator that
 steps on and off within a day. The bank has four fold months and 2 seeds. A veto on temporary moves
@@ -921,6 +942,8 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   6 event plots across both groups, and the caveat that NGED's logs may miss events. Experiment
   632's sequence network followed 0.40 of a shift against 0.27 for the lag network, so the
   expectation is that `M*` follows more than `C`.
+  Every statement about following level shifts carries the waiver sentence (unsupported by a passing
+  known-answer test; amendment 4).
 - **Figures.** A day-ahead forecast and a full 14-day forecast of one origin, winter and summer, at a
   signed-MW and an MVA-only Primary, for `M*` and `C`; the read-out weights by age and day type for
   `M*` and `P`, and before and after an injected permanent change; and a training-log table of the

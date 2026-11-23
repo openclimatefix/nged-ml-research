@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501
 """Experiment 713: write the known-answer gate file as a waived gate (design amendment 4).
 
 Usage: e00713_waive_gate.py [--selftest]
@@ -37,6 +37,15 @@ DECISION_OPTION: Final = (
     "option 1 of gate_options.md: waive KA3 for the real folds, and disclose the failure"
 )
 WAIVER_DATE: Final = "2026-11-23"
+DECISION_KA12: Final = (
+    "Option 1 as written covers KA3 only. KA12 also failed at the amended gate (arm G 0.0395 against "
+    'arm M minus 0.05 = 0.0918). The manager relayed the maintainer\'s verbatim "Go ahead." in answer to '
+    "a question that included KA12, so the waiver covers KA3 and KA12."
+)
+EXPECTED_LAST_RUN_SHA256: Final = "dcfe7f1e8d9e4563994e1deaa6087985cf8af1c8e1033531120cade092726bfb"
+EXPECTED_KNOWN_ANSWER_SHA256: Final = (
+    "8fa3cfbdac29c6a0930e94e65a9fc7c76a38df8ed38e161609239ced713d76ed"
+)
 
 
 def problems(*, results: dict | None, code_hash: str) -> list[str]:
@@ -52,6 +61,12 @@ def problems(*, results: dict | None, code_hash: str) -> list[str]:
     failed = {
         k for k, v in results.items() if k.startswith("KA") and isinstance(v, dict) and not v.get("pass", True)
     }  # fmt: skip
+    for name in sorted(EXPECTED_FAILED):
+        entry = results.get(name)
+        if isinstance(entry, dict) and entry.get("pass") is not False:
+            out.append(f"{name} has pass {entry.get('pass')!r}, not False")
+        if isinstance(entry, dict) and entry.get("evaluated") is False:
+            out.append(f"{name} was not evaluated")
     if failed != EXPECTED_FAILED:
         out.append(f"the failed checks are {sorted(failed)}, not {sorted(EXPECTED_FAILED)}")
     for name in sorted(EXPECTED_PASSED):
@@ -65,7 +80,9 @@ def problems(*, results: dict | None, code_hash: str) -> list[str]:
     return out
 
 
-def build_record(*, results: dict, code: dict, known_answer_sha256: str) -> dict:
+def build_record(
+    *, results: dict, code: dict, known_answer_sha256: str, last_run_sha256: str
+) -> dict:
     """Return the waived gate record: the last run's results plus the waiver and the code record."""
     return {
         **results,
@@ -74,6 +91,7 @@ def build_record(*, results: dict, code: dict, known_answer_sha256: str) -> dict
             "date": WAIVER_DATE,
             "decision_quoted": DECISION,
             "decision_option": DECISION_OPTION,
+            "decision_ka12": DECISION_KA12,
             "decided_by": "the maintainer",
             "failed_checks": sorted(EXPECTED_FAILED),
             "passed_checks": sorted(EXPECTED_PASSED | set(EXPECTED_RECORDED)),
@@ -88,14 +106,33 @@ def build_record(*, results: dict, code: dict, known_answer_sha256: str) -> dict
         },
         "code": code,
         "known_answer_sha256": known_answer_sha256,
+        "last_run_sha256": last_run_sha256,
     }
 
 
-def waive(*, work: Path, code: dict, known_answer_sha256: str) -> Path:
-    """Write the waived gate file in `work`, or raise AssertionError with every reason for refusal."""
+def waive(
+    *,
+    work: Path,
+    code: dict,
+    known_answer_sha256: str,
+    expected_last_run_sha256: str = EXPECTED_LAST_RUN_SHA256,
+    expected_known_answer_sha256: str = EXPECTED_KNOWN_ANSWER_SHA256,
+) -> Path:
+    """Write the waived gate file in `work`, or raise AssertionError with every reason for refusal.
+
+    The last-run file and the known-answer script must be the very files whose sha256 the waiver
+    pins, because neither the code hash nor the last-run file records which thresholds were run.
+    """
     last = work / "known_answers_last_run.json"
     results = json.loads(last.read_text()) if last.exists() else None
     reasons = problems(results=results, code_hash=code["code_hash"])
+    last_sha = hashlib.sha256(last.read_bytes()).hexdigest() if last.exists() else ""
+    if last_sha != expected_last_run_sha256:
+        reasons.append(f"the last-run file has sha256 {last_sha}, not {expected_last_run_sha256}")
+    if known_answer_sha256 != expected_known_answer_sha256:
+        reasons.append(
+            f"e00713_known_answer.py has sha256 {known_answer_sha256}, not {expected_known_answer_sha256}"
+        )
     gate = work / "known_answers_passed.json"
     if gate.exists() and not json.loads(gate.read_text()).get("waived"):
         reasons.append(f"{gate} exists and is not a waived gate, so it is not overwritten")
@@ -104,7 +141,12 @@ def waive(*, work: Path, code: dict, known_answer_sha256: str) -> Path:
     tmp = Path(str(gate) + ".tmp")
     tmp.write_text(
         json.dumps(
-            build_record(results=results, code=code, known_answer_sha256=known_answer_sha256),
+            build_record(
+                results=results,
+                code=code,
+                known_answer_sha256=known_answer_sha256,
+                last_run_sha256=last_sha,
+            ),
             indent=1,
             default=str,
         )
@@ -132,38 +174,46 @@ def selftest() -> int:
     ]
     for bad in refused:
         assert problems(results=bad, code_hash=AMENDED_GATE_CODE_HASH), bad
+    refused.append({**good, "KA3": {**good["KA3"], "pass": None}})  # falsy but not False
+    refused.append({**good, "KA12": {"pass": False, "evaluated": False}})
+    for bad in refused[-2:]:
+        assert problems(results=bad, code_hash=AMENDED_GATE_CODE_HASH), bad
+
+    def refuses(**kwargs: object) -> bool:
+        try:
+            waive(**kwargs)  # ty: ignore[invalid-argument-type]
+        except AssertionError:
+            return True
+        return False
+
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        for bad_code in (
-            {**code, "code_hash": "f" * 16},
-        ):  # last-run file missing, then hash differs
-            try:
-                waive(work=work, code=bad_code, known_answer_sha256="s")
-            except AssertionError:
-                pass
-            else:
-                raise AssertionError("waiver written without a last-run file")
-        (work / "known_answers_last_run.json").write_text(json.dumps(good))
-        try:
-            waive(work=work, code={**code, "code_hash": "f" * 16}, known_answer_sha256="s")
-        except AssertionError:
-            pass
-        else:
-            raise AssertionError("waiver written under a different code hash")
+        last = work / "known_answers_last_run.json"
+        pins = {"expected_known_answer_sha256": "s"}
+        assert refuses(work=work, code=code, known_answer_sha256="s", **pins)  # no last-run file
+        last.write_text(json.dumps(good))
+        last_sha = hashlib.sha256(last.read_bytes()).hexdigest()
+        pins["expected_last_run_sha256"] = last_sha
+        assert refuses(
+            work=work, code={**code, "code_hash": "f" * 16}, known_answer_sha256="s", **pins
+        )
+        assert refuses(work=work, code=code, known_answer_sha256="other", **pins)  # script differs
+        assert refuses(work=work, code=code, known_answer_sha256="s")  # last-run sha not pinned
         assert not (work / "known_answers_passed.json").exists()
-        path = waive(work=work, code=code, known_answer_sha256="s")
+        last.write_text(json.dumps({**good, "KA12": {"pass": False, "x": 1}}))  # a different run
+        assert refuses(work=work, code=code, known_answer_sha256="s", **pins)
+        last.write_text(json.dumps(good))
+        path = waive(work=work, code=code, known_answer_sha256="s", **pins)
         record = json.loads(path.read_text())
-        assert record["waived"] is True and record["code"] == code
+        assert record["waived"] is True
+        assert record["code"] == code
+        assert record["last_run_sha256"] == last_sha
         assert record["waiver"]["decision_quoted"] == DECISION
+        assert record["waiver"]["decision_ka12"] == DECISION_KA12
         assert record["waiver"]["failed_checks"] == ["KA12", "KA3"]
         # a real pass is never overwritten
         path.write_text(json.dumps({"code": code}))
-        try:
-            waive(work=work, code=code, known_answer_sha256="s")
-        except AssertionError:
-            pass
-        else:
-            raise AssertionError("a real gate pass was overwritten")
+        assert refuses(work=work, code=code, known_answer_sha256="s", **pins)
     print("waiver self-test passed (no data, no fit)")
     return 0
 
