@@ -121,6 +121,20 @@ def stop_rule(*, first_contrast: dict[str, float], monthly: dict[str, np.ndarray
     return bool(big or moderate)
 
 
+Z_LIMIT: Final = {"six": 0.076, "eight": 0.20}
+"""The rule on arm `Z` (section 4): twice the seed-noise standard error for 2 seeds and 4 months."""
+
+
+def z_rule_fires(*, z_minus_star: dict[str, float]) -> bool:
+    """Return whether `Z` minus `M*` exceeds the limit in absolute value in either group, which fires audit trigger 1."""
+    return any(abs(z_minus_star[g]) > Z_LIMIT[g] for g in GROUPS)
+
+
+def nested_beats_container(*, nested_minus_container: dict[str, float]) -> bool:
+    """Return whether a nested arm beats its container (`M*` beating `U27`, a placebo beating its treatment) in both groups: audit trigger 5."""
+    return all(nested_minus_container[g] < 0 for g in GROUPS)
+
+
 def audit_trigger_1(*, placebo_point: dict[str, float]) -> bool:
     """Return whether A2 or B2 is positive in both groups on the screen folds (audit trigger 1)."""
     return all(placebo_point[g] > 0 for g in GROUPS)
