@@ -30,14 +30,19 @@ if str(PART_1_FOLDER) not in sys.path:
     sys.path.append(str(PART_1_FOLDER))
 
 
+def with_part(*, args: list[str]) -> list[str]:
+    """Insert part 2 after the command, unless a part is named or the command is `self-test`."""
+    has_part = len(args) > 1 and args[1] in {"1", "2"}
+    if args and args[0] != "self-test" and not has_part:
+        return [args[0], "2", *args[1:]]
+    return args
+
+
 def run_part_1_script(*, module: str, takes_part: bool) -> int:
     """Run one of experiment 718's scripts as `__main__`, inserting part 2 after the command."""
     import runpy
 
-    args = sys.argv[1:]
-    has_part = len(args) > 1 and args[1] in {"1", "2"}
-    if takes_part and args and args[0] != "self-test" and not has_part:
-        args = [args[0], "2", *args[1:]]
+    args = with_part(args=sys.argv[1:]) if takes_part else sys.argv[1:]
     sys.argv = [f"{module}.py", *args]
     runpy.run_module(module, run_name="__main__")
     return 0

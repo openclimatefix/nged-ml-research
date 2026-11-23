@@ -21,6 +21,12 @@ def main() -> int:
         )
         assert result.returncode == 0, result.stdout[-500:] + result.stderr[-500:]
         assert "all checks passed" in result.stdout, result.stdout[-300:]
+    for command, want in (
+        (["headline", "--seeds", "2"], ["headline", "2", "--seeds", "2"]),
+        (["headline", "1"], ["headline", "1"]),
+        (["self-test"], ["self-test"]),
+    ):
+        assert e00719_part1.with_part(args=command) == want, command
     print(f"e00719_check_import: part 1 found at {e00719_part1.PART_1_FOLDER}; all checks passed")
     return 0
 

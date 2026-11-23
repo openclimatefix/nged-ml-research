@@ -209,45 +209,69 @@ keep a check independent, or to follow the design where experiment 713's code do
 - The 27-row arms have more rows than the 24 age buckets, so a placebo draw for them can put two
   rows in one bucket.
 - Each row table stores the selected weather distance as a float32 array, `distance`, and its
-  provenance: the hash of the builder's code, the phase, the arm, the month, and the standardiser
-  fingerprint. The builder and the fit refuse a table whose provenance differs.
+  provenance: the hash of the builder's code, the phase the builder ran in (read from the loaded
+  fold, not a constant), the arm, the month, the standardiser fingerprint, a digest of the inputs
+  (the pool weather, the day types, and the ensemble table before the fold's cutoff), and the
+  `--limit-days` value. The builder, the fit, and the prediction refuse a table whose provenance
+  differs. A table built with `--limit-days` is rebuilt by a full build and refused by a fit.
 - The tolerance of the independent recomputation (KR3) for a rank swap between tied blocks is a
   relative 1e-9, as in the design. KR4 requires that the placebo's class counts equal the
   treatment's in at least 90% of samples, because a class that runs out of eligible blocks passes
   its shortfall to an older class. KR4 also prints the mean weather distance of the replaced rows
-  beside the treatment's.
+  beside the treatment's. KR8 reads the finite power flags and its own visibility rule, not the
+  builder's eligibility function, and exempts the 14 fixed rows of ages 2 to 15, which the design
+  does not filter by eligibility.
 - With 2 seeds, the reading "small gain" needs both seeds to agree in sign, as design section 7.3
   states. Experiment 713's scorer accepts 1 seed of 2 for that reading. This experiment requires
-  both, and the manager approved the stricter rule. The rule can only make a verdict harder to
-  reach, never easier. This experiment's decision code applies it and leaves experiment 713's scorer
-  unedited.
+  both, and the manager approved the stricter rule. The rule makes "small gain" harder to reach. A
+  reading that fails that row falls to the next row of the table, so with 2 seeds it falls in
+  practice to "cannot tell", because "no detectable difference" is out of reach at 2 seeds. This
+  experiment's decision code applies the rule and leaves experiment 713's scorer unedited.
 - Audit trigger 5 (a nested arm beats its container) fires only when the nested arm is better in
   both Primary groups, because the design names no group.
 - The tables of all arms of a fold are built in one pass, and each weather distance is computed once
-  for the 379-day pool and shared by the arms that read it. On 6 origin days of fold 2025-11 the 8
-  weather arms cost 1.28 CPU-hours per fold when extrapolated to the fold's 2,267 origin days, which
-  is about 10 CPU-hours for 8 folds. The extrapolation is a lower bound, because the pool of arm
-  `UX` grows with the day. The design estimated 22 CPU-hours, and the code review's estimate for a
-  build without reuse was 60 to 90.
-- The worlds zero the `covid` date-time column, so that no arm can read an era from it. World WS
-  puts the start of its last era 400 days before the cutoff, not 91. With 91 days, arm `U`'s 379-day
-  pool crosses the era boundary at every held-out origin, and the reference gap of `U` on the real
-  grid of fold 2025-11 was 0.0000002 against a minimum of 0.010. With 400 days the gaps on that grid
-  are 0.043 (`R`), 0.039 (`Z`), and 0.064 (`U`). The targets of the last era are masked in training,
-  so training loses 400 days of targets.
+  for the 379-day pool and shared by the arms that read it. Arm `UX` is built only for the two folds
+  on which it is fitted. On 6 origin days of fold 2025-11 the 9 arms cost 1.30 CPU-hours per fold
+  when extrapolated to the fold's 2,267 origin days, which is about 10 CPU-hours for 8 folds. That
+  extrapolation is an upper bound, because the pools of arms `U` and `U27` are truncated for the
+  first 364 origin days. The slice run peaked at 6.76 GB, almost all of it the fold's load, and a
+  full build is estimated at about 7.9 GB, so it runs under a 12 GB limit. The build enforces a cap
+  of 3 CPU-hours per fold with `RLIMIT_CPU`. The design estimated 22 CPU-hours, and the estimate of
+  the second code review for a build without reuse was 60 to 90.
+- The sequence of the sparse world's last era was: the designed layout (a last era of 91 days)
+  failed the pre-check, because the reference gap of arm `U` on the real grid of fold 2025-11 was
+  0.0000008 against a minimum of 0.010. Arm `U`'s 379-day pool then crosses the era boundary at
+  every held-out origin. The last era was widened to 400 days before any world fit ran, and no
+  fitted result had been seen. With 400 days the gaps on that grid are 0.043 (`R`), 0.039 (`Z`), and
+  0.064 (`U`). The widening leaves 4,620 stage 1 training samples instead of 5,460 (15% fewer) and
+  18.0 steps per pass, so 2,160 steps over the 120 fixed passes instead of 2,760. About 40% of
+  training samples have a 379-day pool that crosses an era boundary, whereas no held-out origin
+  does, so a network that learns to discount old matching rows in training may under-use them at the
+  held-out origins. The reference gap of 0.064 assumes full use, and the reference gap with only
+  rows up to 91 days old is 0.041, so KS2 can still fail on a correct network, although less likely
+  than under the designed layout. The change is a gate-world change made before any fit, and it
+  amends design section 10.2, whose rule is that a failed pre-check goes back to the designer. The
+  worlds also zero the `covid` date-time column, so that no arm can read an era from it.
 - The known-answer gate writes a result record in every case, with the per-pass trajectories of
-  every fit. It writes the gate file only when every check passes and KS3's difference tests were
-  read, unless the manager passes `--manager-accepts-unread-ks3`. The gate file is valid only for
-  the current text of the gate's scripts, by a gate hash.
+  every fit, and deletes an earlier gate file when it starts. It writes the gate file only when
+  every check passes and KS3's difference tests were read. The gate file is valid only for the
+  current text of the gate's scripts, by a gate hash. The override `--manager-accepts-unread-ks3`
+  takes the path of the manager's written decision, and the note's path and hash go into the result
+  record, the gate file, and every fit log.
+- The fit asserts, by sha256 before and after, that the files of experiment 713 that it reads are
+  unchanged: the selection file and the job's pre-trained encoder file. It does not watch the other
+  files that experiment 713's jobs write.
 - Not written: the sparse world with a power pool (`WS+`), `U27` in the sparse world, the frozen-
   encoder world, audit triggers 2, 3, 4, and 6, and the swap tables of the `ft` arm. The cold-night
   slice and the swap points are inputs that the scorer takes from the caller. Without them the
   `supported` guard fails by rule, so a missing input cannot produce a positive verdict.
-- Checks that need the first full table build or a second process, and that are not yet run: KR1 on
-  the stored stage 3 state of `M*`, KR2 (c) against a train-phase table, KR3 on 1,000 samples per
-  arm of the built tables, and the candidate-table half of KR9. `e00718_check_real.py` runs KR2 (a),
-  KR3, KR7's batch assembly, and KR8 on a slice of one real fold on the CPU. It passed on 6 origin
-  days of fold 2025-11 for all 8 weather arms.
+- `e00718_check_real.py` runs KR2 (a), KR3, KR7's batch assembly, and KR8 on the last origin days of
+  one real fold on the CPU, and a table-level poison check that rebuilds the tables from power that
+  is NaN or filled after the visibility cap. `e00718_check_built.py` runs KR8, KR3 on 1,000 samples
+  per arm over all days, KR7's buckets, and KR1 (a) on a fold's built tables, and `--kr2c` runs KR2
+  (c) in a training-phase process. KR1 (a) compares the CPU forecast with a forecast stored from the
+  GPU, so its tolerance is 1e-5, not the design's 1e-6. The candidate-table half of KR9 is not yet
+  run.
 
 ## Reviews
 
@@ -272,8 +296,7 @@ exists. Run `e00719_check_import.py` to check the path.
   `e00719_contrasts.py`, `e00719_figures.py`, and `e00719_report.py`, which run experiment 718's
   scripts for this part. Experiment 718's scripts fit, predict, and score the arms of this part
   and write under this experiment's data folder. No fit has run.
-- Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-
-  research/pull/402)):
+- Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
   the stored states and forecasts of `M*` and `P`, and the scorer.
 - Written by this experiment (to be created): fitted states under
   `data/ml-experiments/00719-msa-similar-day-retrieval-part-2-union-of-measures/work/` and
