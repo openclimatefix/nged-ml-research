@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, ISC004
+# ruff: noqa: E501, PT018, ISC004, C416
 """Experiment 716: the checks of `e00716_pv.py` that need no fit (KF3, KF4, KF5; design section 8.1).
 
 Usage: run.sh e00716_check_pv.py [synthetic|capacity|all]

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501, PT018, PT017
 """Experiment 716: the checks of `e00716_batch.py` that need no fit (KF2, the mask dropout, the origin-time assertion; WP3).
 
 Usage: run.sh e00716_check_batch.py [synthetic|real MONTH]
