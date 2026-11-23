@@ -151,7 +151,13 @@ class F9Source:
 
 
 def poison_check(
-    *, source: F9Source, batch: F9Assembled, ensemble: bool, lead_day: torch.Tensor, limit: int = 64
+    *,
+    source: F9Source,
+    batch: F9Assembled,
+    ensemble: bool,
+    lead_day: torch.Tensor,
+    limit: int = 64,
+    need_control: bool = True,
 ) -> str:
     """KR2 (a) on the first `limit` samples of `batch`: poisoned copies change no input.
 
@@ -160,6 +166,7 @@ def poison_check(
     control rebuilds the sample from the poisoned copy with a cap of 0 and the ages of the batch, and
     must change the inputs wherever the sample holds a row that the cap-0 rule makes visible (a row of
     age 2, whose newest half-hours lie between 27 h and 24.5 h before the contract origin).
+    `need_control` is False for arms whose rows do not always include age 2 (a random or weather-nearest pool).
     """
     n = min(limit, len(batch.c_idx))
     controls = 0
@@ -196,7 +203,9 @@ def poison_check(
             f"sample {i}: the negative control (cap 0) did not change the inputs"
         )
         controls += 1
-    assert controls > 0, "no sample held a row of age 2, so the negative control did not run"
+    assert controls > 0 or not need_control, (
+        "no sample held a row of age 2, so the negative control did not run"
+    )
     return f"KR2 (a): {n} samples identical under poison 1e6 and NaN; the cap-0 negative control changed {controls} samples"
 
 

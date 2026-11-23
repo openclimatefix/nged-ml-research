@@ -28,22 +28,29 @@ ARMS = ("Z", "R", "R-A", "P90", "U", "U-A", "U27", "U27-A", "UX")
 
 
 def sparsify_age_2_blocks(*, power: torch.Tensor) -> None:
-    """Leave 20 readings in the visible part of some age-2 blocks and 5 in the hidden tail, so the 27 h rule decides them.
+    """Give some age-2 blocks 20, 23, 23 plus one hidden, or 24 readings, so that the 27 h rule and the threshold of 24 decide them.
 
-    Under the cap of 54 half-hours the block holds 20 visible readings and is not eligible. Under a
-    relaxed cap (6 half-hours) it holds 25 and is eligible, so a relaxed cap changes the tables.
+    By `(Primary + day) % 4`: 0 holds 20 visible readings and 5 in the hidden tail (eligible only
+    under a cap of 6 half-hours); 1 holds 23 visible readings (eligible only under a threshold of
+    23); 2 holds 23 visible readings and one at `c - 53` (eligible only under a cap of 53); 3 holds
+    exactly 24 visible readings (eligible).
     """
     for p in TABLE_PRIMARIES:
         for day in range(FIRST_ORIGIN_DAY, FIRST_ORIGIN_DAY + N_ORIGIN_DAYS):
-            if (int(p) + day) % 2:
-                continue
             c = int(lay.contract_idx_of_day(day=np.array([day]))[0])
-            block = power[p, c - 96 : c - 48].clone()
-            kept = torch.full_like(block, float("nan"))
-            kept[:20] = torch.randn(20)  # indices c - 96 .. c - 77, all visible under the cap of 54
-            kept[43:48] = torch.randn(5)  # indices c - 53 .. c - 49, hidden under the cap of 54
+            kept = torch.full((48,), float("nan"))
+            case = (int(p) + day) % 4
+            if case == 0:
+                kept[:20] = torch.randn(20)
+                kept[43:48] = torch.randn(5)
+            elif case == 1:
+                kept[:23] = torch.randn(23)
+            elif case == 2:
+                kept[:23] = torch.randn(23)
+                kept[43] = torch.randn(1)[0]  # the reading at c - 53
+            else:
+                kept[:24] = torch.randn(24)
             power[p, c - 96 : c - 48] = kept
-            power[p, c - 96 : c - 48][torch.isnan(block) & torch.isnan(kept)] = float("nan")
 
 
 def synthetic_source(*, seed: int = 0) -> bt.Source:
@@ -114,7 +121,15 @@ def check_arm(*, base: bt.Source, arm: str) -> list[str]:
         if arm != "Z":
             absent = ~batch.inputs.row_exists
             assert not bool(batch.inputs.hist_visible[absent].any())
-        lines.append(fb.poison_check(source=source, batch=batch, ensemble=ensemble, lead_day=lead))
+        lines.append(
+            fb.poison_check(
+                source=source,
+                batch=batch,
+                ensemble=ensemble,
+                lead_day=lead,
+                need_control=arm not in {"R", "R-A", "P90", "U-A"},
+            )
+        )
     lines.append(
         f"{arm}: {n_rows} rows assembled for both tables; the grid indices, buckets, and cheap assertions hold"
     )
@@ -134,18 +149,27 @@ def check_arm(*, base: bt.Source, arm: str) -> list[str]:
     return lines
 
 
-def check_cap_changes_tables(*, base: bt.Source) -> str:
-    """A visibility cap of 6 half-hours instead of 54 must change the tables of arm `U` (the sparse age-2 blocks decide it)."""
+def check_cap_changes_tables(*, base: bt.Source) -> list[str]:
+    """A cap of 6 or 53 half-hours instead of 54, or a threshold of 23 instead of 24, must each change the tables of arm `U`."""
     real = make_tables(source=base, arm="U")[fb.TABLE_ERA5]
-    old = ret.NEWEST_VISIBLE_BEFORE_CONTRACT
-    ret.NEWEST_VISIBLE_BEFORE_CONTRACT = 6  # ty: ignore[invalid-assignment]
-    try:
-        relaxed = make_tables(source=base, arm="U")[fb.TABLE_ERA5]
-    finally:
-        ret.NEWEST_VISIBLE_BEFORE_CONTRACT = old
-    changed = int((real.ages != relaxed.ages).any(axis=-1).sum())
-    assert changed > 0, "a relaxed visibility cap did not change any row of arm U"
-    return f"KR2 negative control: a visibility cap of 6 instead of 54 changes {changed} (Primary, day, lead) rows of arm U"
+    lines = []
+    for name, value, what in (
+        ("NEWEST_VISIBLE_BEFORE_CONTRACT", 6, "a visibility cap of 6"),
+        ("NEWEST_VISIBLE_BEFORE_CONTRACT", 53, "a visibility cap of 53"),
+        ("MIN_VISIBLE_HALF_HOURS", 23, "a threshold of 23"),
+    ):
+        old = getattr(ret, name)
+        setattr(ret, name, value)
+        try:
+            relaxed = make_tables(source=base, arm="U")[fb.TABLE_ERA5]
+        finally:
+            setattr(ret, name, old)
+        changed = int((real.ages != relaxed.ages).any(axis=-1).sum())
+        assert changed > 0, f"{what} did not change any row of arm U"
+        lines.append(
+            f"KR2 negative control: {what} instead of 54 or 24 changes {changed} (Primary, day, lead) rows of arm U"
+        )
+    return lines
 
 
 def check_negative_controls(*, base: bt.Source) -> list[str]:
@@ -273,7 +297,7 @@ def main() -> int:
     for arm in ARMS:
         lines += check_arm(base=base, arm=arm)
     lines += check_negative_controls(base=base)
-    lines.append(check_cap_changes_tables(base=base))
+    lines += check_cap_changes_tables(base=base)
     lines += check_phases(base=base)
     lines.append(check_weather_poison())
     print("\n".join(lines))

@@ -15,6 +15,7 @@ unconditional. WS+, `U27` in WS, and the frozen-encoder fit are not part of this
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -223,23 +224,31 @@ def write_gate(*, data_dir: Path, result: dict) -> Path:
     return write_record(path=arms.gate_file(data_dir=data_dir), result=result)
 
 
-def finish(*, data_dir: Path, result: dict, manager_accepts_unread_ks3: bool = False) -> int:
+def finish(*, data_dir: Path, result: dict, manager_note: Path | None = None) -> int:
     """Write the result record in every case, and the gate file only when every check passes and KS3 was read.
 
     A passing run whose KS3 precondition failed writes the gate file only when
-    `manager_accepts_unread_ks3` is true, and logs that in the result record.
+    `manager_note` names the manager's written decision; the note's path and sha256 go into the result
+    record, the gate file, and every fit log.
     """
     checks = result.get("checks")
     ok = bool(checks and checks["all_pass"])
     read = bool(checks and not checks["ks3_unread"])
-    result["gate_written"] = bool(ok and (read or manager_accepts_unread_ks3))
-    result["manager_accepts_unread_ks3"] = manager_accepts_unread_ks3
+    accepted = manager_note is not None
+    if manager_note is not None:
+        assert manager_note.is_file(), f"{manager_note} is not a file"
+        result["manager_note"] = {
+            "path": str(manager_note),
+            "sha256": hashlib.sha256(manager_note.read_bytes()).hexdigest(),
+        }
+    result["gate_written"] = bool(ok and (read or accepted))
+    result["manager_accepts_unread_ks3"] = accepted
     path = write_record(path=arms.result_file(data_dir=data_dir), result=result)
     print("result record:", path)
     if not ok:
         print("a known-answer check failed or the run stopped: no gate file; go to the manager")
         return 1
-    if not read and not manager_accepts_unread_ks3:
+    if not read and not accepted:
         print(
             "KS3's difference tests are unread (the precondition failed): no gate file; send them to the manager"
         )
@@ -296,13 +305,14 @@ def _check_finish(*, good: dict, bad_wn: dict, good_ws: dict, gaps: dict) -> Non
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         gate, record = arms.gate_file(data_dir=root), arms.result_file(data_dir=root)
+        note = root / "note.txt"
+        note.write_text("the manager accepts KS3 unread, test")
         assert finish(data_dir=root, result={"checks": unread}) == 1
         assert record.exists()
         assert not gate.exists(), "the gate file was written with KS3 unread"
-        assert (
-            finish(data_dir=root, result={"checks": unread}, manager_accepts_unread_ks3=True) == 0
-        )
-        assert json.loads(record.read_text())["result"]["manager_accepts_unread_ks3"] is True
+        assert finish(data_dir=root, result={"checks": unread}, manager_note=note) == 0
+        assert json.loads(record.read_text())["result"]["manager_note"]["sha256"]
+        assert json.loads(gate.read_text())["result"]["manager_note"]["path"] == str(note)
         assert json.loads(gate.read_text())["code"]["gate_hash"] == arms.gate_hash()
         gate.unlink()
         assert finish(data_dir=root, result={"checks": good}) == 0 and gate.exists()
@@ -461,11 +471,18 @@ def precheck(*, month: str, last_era_days: int) -> int:
     return 0
 
 
-def run(*, month: str, device: str, manager_accepts_unread_ks3: bool = False) -> int:
+def run(*, month: str, device: str, manager_note: Path | None = None) -> int:
     """Run the pre-check and the gating fits for the fold `month` and write the gate file (needs the stored data and the GPU)."""
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
 
+    for stale in (
+        arms.gate_file(data_dir=ML_EXPERIMENTS_DATA_DIR),
+        arms.result_file(data_dir=ML_EXPERIMENTS_DATA_DIR),
+    ):
+        stale.unlink(
+            missing_ok=True
+        )  # a rerun that fails must not leave an earlier gate file valid
     arms.install_own_cache(data_dir=ML_EXPERIMENTS_DATA_DIR)
     pipe = inp.load_pipeline(month=month, phase="train", chain_root=inp.chain_root_of_seed(seed=0))
     data = inp.build_fold_data(pipe=pipe, device=device)
@@ -564,7 +581,7 @@ def run(*, month: str, device: str, manager_accepts_unread_ks3: bool = False) ->
     return finish(
         data_dir=ML_EXPERIMENTS_DATA_DIR,
         result=result,
-        manager_accepts_unread_ks3=manager_accepts_unread_ks3,
+        manager_note=manager_note,
     )
 
 
@@ -582,8 +599,10 @@ def main() -> int:
     parser.add_argument("--last-era-days", type=int, default=worlds.LAST_ERA_DAYS)
     parser.add_argument(
         "--manager-accepts-unread-ks3",
-        action="store_true",
-        help="write the gate file although KS3's difference tests were unread; the result record logs it",
+        type=Path,
+        default=None,
+        metavar="NOTE",
+        help="path of the manager's written decision; write the gate file although KS3's difference tests were unread; the note's hash goes into every record",
     )
     args = parser.parse_args()
     if args.selftest:
@@ -594,7 +613,7 @@ def main() -> int:
     return run(
         month=args.month,
         device=args.device,
-        manager_accepts_unread_ks3=args.manager_accepts_unread_ks3,
+        manager_note=args.manager_accepts_unread_ks3,
     )
 
 

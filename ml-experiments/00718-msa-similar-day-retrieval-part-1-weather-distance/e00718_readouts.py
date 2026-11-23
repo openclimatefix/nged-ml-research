@@ -64,6 +64,7 @@ def mean_distance_by_lead(
     """
     assert table.distance is not None, "the table holds no distances: rebuild it"
     d = table.distance.astype(np.float64)
+    d = np.where(np.isfinite(d), d, np.nan)  # calendar rows carry an infinite distance
     if measure is not None:
         d = np.where(table.measure == measure, d, np.nan)
     flat = np.moveaxis(d, 2, 0).reshape(lay.N_LEAD_DAYS, -1)

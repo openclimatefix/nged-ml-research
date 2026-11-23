@@ -32,9 +32,8 @@ MEASURE_OF = {
 }
 
 
-def raw_arrays(*, source) -> dict:
+def raw_arrays(*, source, holidays: set | frozenset = frozenset()) -> dict:
     """Return the loaded arrays as plain NumPy arrays, read from the source and not from `PoolArrays`."""
-    holidays: set = set()
     n_grid = source.n_grid
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
 
@@ -42,22 +41,26 @@ def raw_arrays(*, source) -> dict:
         "finite": torch.isfinite(source.power_z).cpu().numpy(),
         "weather": source.dense_weather[..., :7].double().cpu().numpy(),
         "day_type": source.day_type.cpu().numpy().astype(np.int64),
-        "day_class": ret.day_class_for_grid(grid_start_us=prep422.GRID_START_US, n_grid=n_grid, holidays=holidays),
+        "day_class": ret.day_class_for_grid(grid_start_us=prep422.GRID_START_US, n_grid=n_grid, holidays=set(holidays)),
     }  # fmt: skip
 
 
 def check_arm(
     *, arm: str, source, days: np.ndarray, provider, n_samples: int, seed: int, mutate=None, primaries: np.ndarray | None = None,
+    table: ret.RowTable | None = None, holidays: set | frozenset = frozenset(),
 ) -> tuple[list[str], int]:  # fmt: skip
     """Compare the builder's table of `arm` with the reference on random samples; return the report lines and the number of tie swaps."""
-    arrays = tab.pool_arrays_from_source(source=source, with_calendar=arm == "UX", holidays=set())
     primaries = cb.TABLE_PRIMARIES if primaries is None else primaries
-    table = ret.build_table(
-        arm=arm, arrays=arrays, primaries=primaries, days=days, target_provider=provider
-    )
+    if table is None:
+        arrays = tab.pool_arrays_from_source(
+            source=source, with_calendar=arm == "UX", holidays=set(holidays)
+        )
+        table = ret.build_table(
+            arm=arm, arrays=arrays, primaries=primaries, days=days, target_provider=provider
+        )
     if mutate is not None:
         table = mutate(table)
-    raw = raw_arrays(source=source)
+    raw = raw_arrays(source=source, holidays=holidays)
     rng = np.random.default_rng(seed)
     swaps = checked = 0
     for _ in range(n_samples):
@@ -139,15 +142,18 @@ def negative_controls(*, source, days: np.ndarray, provider) -> list[str]:
     lines = [
         expect_failure(what="a table with one age moved", arm="R", mutate=move_one_age, **common)
     ]
-    old = ret.NEWEST_VISIBLE_BEFORE_CONTRACT
-    ret.NEWEST_VISIBLE_BEFORE_CONTRACT = 6  # ty: ignore[invalid-assignment]
-    try:
-        what = "arm U built with a visibility cap of 6 instead of 54 half-hours"
-        lines.append(
-            expect_failure(what=what, arm="U", **common)
-        )  # arm U's recency rows take the youngest eligible block
-    finally:
-        ret.NEWEST_VISIBLE_BEFORE_CONTRACT = old
+    for name, value, what in (
+        ("NEWEST_VISIBLE_BEFORE_CONTRACT", 6, "a visibility cap of 6 instead of 54 half-hours"),
+        ("NEWEST_VISIBLE_BEFORE_CONTRACT", 53, "a visibility cap of 53 instead of 54 half-hours"),
+        ("MIN_VISIBLE_HALF_HOURS", 23, "a threshold of 23 instead of 24 readings"),
+    ):
+        old = getattr(ret, name)
+        setattr(ret, name, value)
+        try:
+            # arm U's recency rows take the youngest eligible block, so the cap and the threshold decide them
+            lines.append(expect_failure(what=f"arm U built with {what}", arm="U", **common))
+        finally:
+            setattr(ret, name, old)
     return lines
 
 

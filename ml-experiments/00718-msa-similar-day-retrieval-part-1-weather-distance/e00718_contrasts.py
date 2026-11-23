@@ -14,6 +14,7 @@ PART is 1 (A1 = R - M*, A2 = R - R-A) or 2 (B1 = U - M*, B2 = U - U-A). Every co
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -90,6 +91,10 @@ def counted_contrast(
     level: float, band: tuple[float, float] | None = BAND, metric: str = "crps",
 ) -> dict[str, dict]:  # fmt: skip
     """Return the contrast of each of the six and the eight, with the group reading of `e00718_decision`."""
+    stored = per_seed[treatment]["seed"].n_unique()
+    assert stored == n_seeds, (
+        f"{treatment} holds {stored} seeds, and the reading was asked for {n_seeds}"
+    )
     out = {}
     for g in dec.GROUPS:
         c = s713.contrast(
@@ -452,7 +457,7 @@ def _score_dir(*, part: int) -> Path:
 def _write(*, part: int, name: str, obj: object) -> None:
     path = _score_dir(part=part) / f"{name}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(obj, indent=1, default=float))
     tmp.rename(path)
     print(json.dumps(obj, indent=1, default=float))

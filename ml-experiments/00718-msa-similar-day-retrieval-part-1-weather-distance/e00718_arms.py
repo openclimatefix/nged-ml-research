@@ -311,25 +311,41 @@ def install_own_cache(*, data_dir: Path) -> Path:
     return own
 
 
-def watched_713_files(*, data_dir: Path) -> dict[str, tuple[float, int]]:
-    """Return the modification time and size of the files of experiment 713 that F9 reads: cache arrays and stored states.
+def watched_713_files(*, data_dir: Path, month: str, seed: int) -> dict[str, str]:
+    """Return the sha256 of the files of experiment 713 that this job reads: the selection file and the job's pre-trained encoders.
 
-    Files that experiment 713's own jobs write while F9 runs (logs, new states) are not read by F9
-    and are not watched.
+    Experiment 713's own jobs write other files while F9 runs, so only files that F9 opens are
+    hashed. A file that does not exist is recorded as `missing`.
     """
-    base = a713.root(data_dir=data_dir)
-    out: dict[str, tuple[float, int]] = {}
-    for folder, pattern in ((base / "work", "*.pt"), (base / "cache", "*.npy")):
-        if folder.exists():
-            for path in sorted(folder.rglob(pattern)):
-                if path.is_file():
-                    stat = path.stat()
-                    out[str(path)] = (stat.st_mtime, stat.st_size)
-    return out
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
+
+    paths = [
+        a713.selection_file(data_dir=data_dir),
+        inp.pretrained_encoder_file(
+            chain_root=inp.chain_root_of_seed(seed=seed), month=month, seed=seed
+        ),
+    ]
+    return {
+        str(p): hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "missing"
+        for p in paths
+    }
 
 
-def changed_watched_files(
-    *, before: dict[str, tuple[float, int]], after: dict[str, tuple[float, int]]
-) -> list[str]:
-    """Return the files that existed before the fit and changed or vanished; new files are ignored."""
+def changed_watched_files(*, before: dict[str, str], after: dict[str, str]) -> list[str]:
+    """Return the watched files whose hash changed between two readings."""
     return [k for k, v in before.items() if after.get(k) != v]
+
+
+def cpu_only_cuda_calls() -> None:
+    """Map `.to("cuda")` calls in experiment 574's loader to the CPU, so that a CPU-only job can load a real fold."""
+    import torch  # ty: ignore[unresolved-import]
+
+    original = torch.Tensor.to
+
+    def to(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003, ANN202
+        args = tuple("cpu" if (isinstance(a, str) and a.startswith("cuda")) else a for a in args)
+        if str(kwargs.get("device", "")).startswith("cuda"):
+            kwargs["device"] = "cpu"
+        return original(self, *args, **kwargs)  # ty: ignore[no-matching-overload]
+
+    torch.Tensor.to = to  # ty: ignore[invalid-assignment]

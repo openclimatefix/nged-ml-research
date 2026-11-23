@@ -8,21 +8,25 @@ tables of some arms for the last `--limit-days` origin days in memory (nothing i
 - KR8: every chosen block is at least age 2, inside its pool, and visible at its origin (`check_table`);
 - KR2 (a): the batch assertions and the leakage poison on real samples, for both tables;
 - KR7: a real batch of arm `U` reads the age buckets that the table names;
+- KR2 (a) at table level: tables rebuilt for one origin day from power that is set to 1e6 or to NaN at
+  every half-hour newer than the contract origin minus 54 half-hours equal the tables built from the real
+  power, and power set to NaN just before that bound changes them (the negative control);
 - the CPU seconds of the build, per arm and in one pass, for the CPU budget of the full build.
 
-KR2 (c), KR1 (a), and the 1,000-sample KR3 on the full tables need the first full build and the
-stored states; `--phase-digest` writes the digest of the tables that this process builds under its own
-`E00667_PHASE`, so that a second process in the other phase can be compared. Usage:
+KR2 (c), KR1 (a), and the 1,000-sample KR3 on the full tables are run by `e00718_check_built.py` on the
+full tables. Usage:
     run.sh e00718_check_real.py MONTH [--limit-days 3] [--arms R,U,U27,UX] [--samples 300]
 """
 
 import argparse
+import copy
 import json
 import sys
 import time
 
 import e00713_inputs as inp  # ty: ignore[unresolved-import]
 import e00713_layout as lay713  # ty: ignore[unresolved-import]
+import e00718_arms as arms
 import e00718_batch as fb
 import e00718_build_tables as bt
 import e00718_check_kr3 as ck
@@ -34,16 +38,53 @@ import torch  # ty: ignore[unresolved-import]
 
 
 def cpu_only_cuda_calls() -> None:
-    """Map `.to("cuda")` calls in experiment 574's loader to the CPU, so the real fold loads without a GPU (this script only)."""
-    original = torch.Tensor.to
+    """Map `.to("cuda")` calls in experiment 574's loader to the CPU (see `e00718_arms.cpu_only_cuda_calls`)."""
+    arms.cpu_only_cuda_calls()
 
-    def to(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003, ANN202
-        args = tuple("cpu" if (isinstance(a, str) and a.startswith("cuda")) else a for a in args)
-        if str(kwargs.get("device", "")).startswith("cuda"):
-            kwargs["device"] = "cpu"
-        return original(self, *args, **kwargs)  # ty: ignore[no-matching-overload]
 
-    torch.Tensor.to = to  # ty: ignore[invalid-assignment]
+def _same_tables(a: dict, b: dict) -> bool:
+    return all(
+        np.array_equal(a[arm][v].ages, b[arm][v].ages)
+        and np.array_equal(a[arm][v].measure, b[arm][v].measure)
+        and np.array_equal(a[arm][v].no_weather, b[arm][v].no_weather)
+        for arm in a
+        for v in a[arm]
+    )
+
+
+def poisoned_rebuild(*, source, days: np.ndarray, wanted: list[str], holidays) -> list[str]:  # noqa: ANN001
+    """Rebuild the tables of the last two origin days from poisoned power, and compare (B1, KR2 (a) at table level)."""
+    lines = []
+    for day in days[-2:]:
+        one = np.array([day])
+        c = int(lay.contract_idx_of_day(day=int(day)))
+        cutoff = c - lay713.NEWEST_VISIBLE_BEFORE_CONTRACT
+        reference = bt.build_tables(
+            source=source, arms_to_build=wanted, days=one, holidays=holidays
+        )
+        for value in (1e6, float("nan")):
+            poisoned = copy.copy(source)
+            power = source.power_z.clone()
+            power[:, cutoff + 1 :] = value
+            poisoned.power_z = power
+            rebuilt = bt.build_tables(
+                source=poisoned, arms_to_build=wanted, days=one, holidays=holidays
+            )
+            assert _same_tables(reference, rebuilt), (
+                f"day {day}: a table changed when the power newer than the contract origin minus 54 half-hours was set to {value}"
+            )
+        control = copy.copy(source)
+        power = source.power_z.clone()
+        power[:, cutoff - 48 * 20 : cutoff + 1] = float("nan")
+        control.power_z = power
+        changed = bt.build_tables(source=control, arms_to_build=wanted, days=one, holidays=holidays)
+        assert not _same_tables(reference, changed), (
+            f"day {day}: the negative control (the 20 days up to the bound set to NaN) left every table unchanged"
+        )
+        lines.append(
+            f"KR2 (a) tables, day {day}: power newer than the bound set to 1e6 and to NaN leaves the tables of {','.join(wanted)} unchanged; the 20 days up to the bound set to NaN changes them"
+        )
+    return lines
 
 
 def main() -> int:  # noqa: PLR0915
@@ -89,13 +130,12 @@ def main() -> int:  # noqa: PLR0915
     )
     for arm in wanted:
         assert np.array_equal(joint[arm]["ens"].ages, singles[arm]["ens"].ages)
-    arrays = tab.pool_arrays_from_source(
-        source=source, with_calendar="UX" in wanted, holidays=set(holidays)
-    )
     assert source.ens is not None
     for arm in wanted:
         for version, table in joint[arm].items():
-            line = lookahead.check_table(table=table, arrays=arrays)
+            line = lookahead.check_table(
+                table=table, finite=np.isfinite(source.power_z.cpu().numpy())
+            )
             lines.append(f"KR8 {version}: {line}")
             assert line.startswith("PASS"), line
     primaries = np.arange(source.power_z.shape[0])
@@ -125,6 +165,7 @@ def main() -> int:  # noqa: PLR0915
                 f"KR2 (a) {arm}: "
                 + fb.poison_check(source=f9, batch=batch, ensemble=ensemble, lead_day=lead)
             )
+    lines += poisoned_rebuild(source=source, days=days, wanted=wanted, holidays=holidays)
     n_days_fold = (last // lay713.STEPS_PER_DAY + 1) - (
         lay713.STEPS_PER_DAY * (lay713.MAX_AGE + 1) + 24
     ) // lay713.STEPS_PER_DAY

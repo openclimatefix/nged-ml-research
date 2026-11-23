@@ -175,7 +175,10 @@ def predict(
     assert saved.exists() and saved.read_text() == data.fingerprint, (
         "the standardiser differs from the training phase"
     )
-    expect = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
+    expect = fit_mod.table_meta(
+        arm=arm, month=month, fingerprint=data.fingerprint, phase="predict",
+        digest=fit_mod.inputs_digest(source=data.source, cutoff_idx=data.cutoff_idx),
+    )  # fmt: skip
     tables = {
         fb.TABLE_ERA5: fit_mod.load_table(
             path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version="era5"),

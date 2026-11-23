@@ -3,7 +3,7 @@
 
 Usage: e00718_fit.py ARM MONTH SEED [--device cuda] [--smoke] [--accumulate N] [--accept-code-change OLD_HASH ...] [--accept-gate-change OLD_HASH]
 
-Run it through `run.sh`. It sets `E00667_PHASE=train`, under which the fold month's cleaned power is
+Run it through `run.sh`. `load_pipeline(phase="train")` sets `E00667_PHASE=train` before the fold module is imported, under which the fold month's cleaned power is
 NaN, so no code path can read a held-out reading. The row tables are read from
 `work/tables/<arm>/<month>_{era5,ens}.npz`, which `e00718_tables.py` builds in the prediction phase,
 and their hashes go into the log. Every arm is fitted with all three stages from the seed's own
@@ -11,8 +11,8 @@ initialisation (design section 6.1); the encoders of `M*` are loaded from the Ca
 frozen. A real fit refuses to start without `work/known_answers_passed.json` (part 1's gate). The
 `--smoke` path skips the gate, writes under `work/smoke/`, stops each stage after 2 passes, and its
 outputs are never scored. A stage that ends at the 60-pass cap is rerun from its starting state with
-a cap of 120 passes. After the fit the modification times of experiment 713's `work` and `cache`
-files are asserted unchanged.
+a cap of 120 passes. After the fit the hashes of experiment 713's selection file and the job's encoder file
+are asserted unchanged.
 
 **Code policy.** Every stage log carries the code hash, the git commit, and a dirty flag. A resume, a
 finished-job skip, and the gate file are refused when their hash differs from the current code's,
@@ -37,6 +37,7 @@ os.environ.setdefault("E00667_PHASE", "train")
 from typing import Final
 
 import e00713_inputs as inp  # ty: ignore[unresolved-import]
+import e00713_layout as lay713  # ty: ignore[unresolved-import]
 import e00713_train as tr  # ty: ignore[unresolved-import]
 import e00718_arms as arms
 import e00718_batch as fb
@@ -59,6 +60,7 @@ class Loaded:
     world: tr.World
     fingerprint: str
     dropped: dict
+    inputs_digest: str = ""
 
 
 Loader = Callable[[str, int, str], Loaded]
@@ -74,7 +76,10 @@ def real_loader(month: str, seed: int, device: str) -> Loaded:
         source=data.source, cutoff_idx=data.cutoff_idx, clean=data.clean, target_mean=data.target_mean,
         target_std=data.target_std, month=month, placebo_pool=None,
     )  # fmt: skip
-    return Loaded(world=world, fingerprint=data.fingerprint, dropped=data.dropped_per_fold)
+    return Loaded(
+        world=world, fingerprint=data.fingerprint, dropped=data.dropped_per_fold,
+        inputs_digest=inputs_digest(source=data.source, cutoff_idx=data.cutoff_idx),
+    )  # fmt: skip
 
 
 TABLE_CODE_FILES: Final = (
@@ -94,15 +99,52 @@ def table_code_hash() -> str:
     return h.hexdigest()[:16]
 
 
-def table_meta(*, arm: str, month: str, fingerprint: str) -> dict[str, str]:
-    """Return the provenance a row table carries: its builder's code hash, phase, arm, month, and the standardiser fingerprint."""
+def inputs_digest(*, source: object, cutoff_idx: int) -> str:
+    """Return a digest of the arrays that decide a table and that do not depend on the phase.
+
+    The digest covers the pool weather, the day types, and the ensemble table for the origin days
+    before the fold's cutoff, which the training and prediction phases share. The ensemble table of
+    the fold's own days differs between the phases by design and is left out.
+    """
+    h = hashlib.sha256()
+    arrays = [source.dense_weather[..., :7], source.day_type]  # ty: ignore[unresolved-attribute]
+    ens = source.ens  # ty: ignore[unresolved-attribute]
+    if ens is not None:
+        n_days = max(cutoff_idx // lay713.STEPS_PER_DAY - lay713.N_LEAD_DAYS - ens.first_day, 0)
+        arrays += [ens.weather[:, :n_days], ens.filled[:, :n_days], ens.run_us[:, :n_days]]
+    for a in arrays:
+        h.update(np.ascontiguousarray(a.cpu().numpy()).tobytes())
+    return h.hexdigest()[:16]
+
+
+def table_meta(
+    *, arm: str, month: str, fingerprint: str, phase: str, digest: str = "", limit_days: int | None = None,
+) -> dict[str, str]:  # fmt: skip
+    """Return the provenance a row table carries.
+
+    It holds the hash of the builder's code, the phase the builder ran in (`pipe.fold.PHASE`), the arm,
+    the month, the standardiser fingerprint, a digest of the input arrays, and the `--limit-days` value
+    (`none` for a full build), so that a limited table never passes for a full one.
+    """
     return {
         "builder_hash": table_code_hash(),
-        "phase": "predict",
+        "phase": phase,
         "arm": arm,
         "month": month,
         "fingerprint": fingerprint,
+        "inputs_digest": digest,
+        "limit_days": "none" if limit_days is None else str(limit_days),
     }
+
+
+def fit_expectation(*, loaded: Loaded, arm: str, month: str) -> dict[str, str]:
+    """Return the provenance that a fit and a prediction require: a full table built in the prediction phase from these inputs."""
+    meta = table_meta(
+        arm=arm, month=month, fingerprint=loaded.fingerprint, phase="predict", digest=loaded.inputs_digest,
+    )  # fmt: skip
+    if not loaded.inputs_digest:
+        del meta["inputs_digest"]
+    return meta
 
 
 def save_table(*, table: ret.RowTable, path: Path, meta: dict[str, str] | None = None) -> None:
@@ -122,6 +164,13 @@ def save_table(*, table: ret.RowTable, path: Path, meta: dict[str, str] | None =
         meta=json.dumps(meta or {}, sort_keys=True),
     )
     tmp.rename(path)
+
+
+def provenance_diff(*, path: Path, expect: dict[str, str]) -> dict[str, tuple[str | None, str]]:
+    """Return the keys of `expect` that a stored table's provenance does not match, as (found, expected)."""
+    z = np.load(path)
+    meta = json.loads(str(z["meta"])) if "meta" in z.files else {}
+    return {k: (meta.get(k), v) for k, v in expect.items() if meta.get(k) != v}
 
 
 def load_table(*, path: Path, expect: dict[str, str] | None = None) -> ret.RowTable:
@@ -206,6 +255,13 @@ def fit(
     if not smoke:
         gate = arms.gate_file(data_dir=data_dir)
         assert gate.exists(), f"{gate} is missing: run e00718_known_answer.py first"
+        gate_record = json.loads(gate.read_text())
+        log["gate"] = {
+            "manager_accepts_unread_ks3": gate_record.get("result", {}).get(
+                "manager_accepts_unread_ks3"
+            ),
+            "manager_note": gate_record.get("result", {}).get("manager_note"),
+        }
         arms.check_code(
             earlier=json.loads(gate.read_text()).get("code", {}),  # carries the gate hash
             accept=[accept_gate] if accept_gate else [],
@@ -245,7 +301,7 @@ def fit(
         print(f"{arm} {month} s{seed}: done, skipped", flush=True)
         return json.loads(final_log.read_text())
     started = time.monotonic()
-    before = arms.watched_713_files(data_dir=data_dir)
+    before = arms.watched_713_files(data_dir=data_dir, month=month, seed=seed)
     loaded = loader(month, seed, device)
     world = loaded.world
     if not smoke:
@@ -254,9 +310,7 @@ def fit(
         tables = {
             v: load_table(
                 path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v),
-                expect=None
-                if smoke
-                else table_meta(arm=arm, month=month, fingerprint=loaded.fingerprint),
+                expect=None if smoke else fit_expectation(loaded=loaded, arm=arm, month=month),
             )
             for v in (fb.TABLE_ERA5, fb.TABLE_ENS)
         }
@@ -335,7 +389,7 @@ def fit(
     if device.startswith("cuda"):
         log["peak_gpu_mb"] = torch.cuda.max_memory_allocated() / 2**20
     write_json_atomic(obj=log, path=final_log)
-    after = arms.watched_713_files(data_dir=data_dir)
+    after = arms.watched_713_files(data_dir=data_dir, month=month, seed=seed)
     changed = arms.changed_watched_files(before=before, after=after)
     assert not changed, (
         f"a file of experiment 713 that this fit reads changed during the fit: {changed[:3]}"

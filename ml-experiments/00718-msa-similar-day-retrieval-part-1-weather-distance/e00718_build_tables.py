@@ -11,6 +11,7 @@ Usage: run.sh e00718_build_tables.py ARMS MONTH [--seed 0] [--limit-days N]
 """
 
 import argparse
+import resource
 import sys
 import time
 from collections.abc import Sequence
@@ -59,25 +60,36 @@ def build(
     """Build and save the two tables of every arm in `arms_to_build` for the fold `month`, in one pass over the fold.
 
     A table that exists is kept only when its provenance (builder code, phase, arm, month, and
-    standardiser fingerprint) matches; otherwise the build stops.
+    standardiser fingerprint, input digest, and `--limit-days`) matches. A table that differs only in
+    `--limit-days` is rebuilt; any other difference stops the build.
     """
     pipe = inp.load_pipeline(
         month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
     )
     data = inp.build_fold_data(pipe=pipe, device=device)
     assert data.test_origin_idx is not None
+    assert pipe.fold.PHASE == "predict", "tables are built from the prediction-phase power"
+    digest = fit_mod.inputs_digest(source=data.source, cutoff_idx=data.cutoff_idx)
     todo = []
     for arm in arms_to_build:
         paths = [
             arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v)
             for v in (fb.TABLE_ERA5, fb.TABLE_ENS)
         ]
-        meta = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
-        if all(p.exists() for p in paths):
-            for p in paths:  # an existing table is kept only when its provenance matches
-                fit_mod.load_table(path=p, expect=meta)
+        meta = fit_mod.table_meta(
+            arm=arm, month=month, fingerprint=data.fingerprint, phase=pipe.fold.PHASE,
+            digest=digest, limit_days=limit,
+        )  # fmt: skip
+        diffs = [fit_mod.provenance_diff(path=p, expect=meta) for p in paths if p.exists()]
+        if len(diffs) == len(paths) and not any(diffs):
             print(f"{arm} {month}: tables exist with matching provenance, skipped", flush=True)
+        elif diffs and all(set(d) <= {"limit_days"} for d in diffs):
+            print(
+                f"{arm} {month}: a table of another --limit-days exists; it is rebuilt", flush=True
+            )
+            todo.append(arm)
         else:
+            assert not any(diffs), f"{arm} {month}: an existing table has other provenance: {diffs}"
             todo.append(arm)
     if not todo:
         return
@@ -91,7 +103,10 @@ def build(
         holidays=lay713.england_bank_holidays(years=range(2019, 2029)),
     )
     for arm, by_version in tables.items():
-        meta = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
+        meta = fit_mod.table_meta(
+            arm=arm, month=month, fingerprint=data.fingerprint, phase=pipe.fold.PHASE,
+            digest=digest, limit_days=limit,
+        )  # fmt: skip
         for version, table in by_version.items():
             path = arms.table_file(data_dir=data_dir, arm=arm, month=month, version=version)
             fit_mod.save_table(table=table, path=path, meta=meta)
@@ -111,10 +126,27 @@ def main() -> int:
     parser.add_argument("month")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--limit-days", type=int, default=None)
+    parser.add_argument(
+        "--max-cpu-hours",
+        type=float,
+        default=3.0,
+        help="CPU-time cap of one build, enforced with RLIMIT_CPU",
+    )
     args = parser.parse_args()
+    arms.cpu_only_cuda_calls()
     arms.install_own_cache(data_dir=ML_EXPERIMENTS_DATA_DIR)
     wanted = sorted(lay.ROWS_PER_ARM) if args.arms == "all" else args.arms.split(",")
     assert set(wanted) <= set(lay.ROWS_PER_ARM), wanted
+    if args.arms == "all" and args.month not in arms.UX_FOLDS:
+        wanted.remove("UX")  # arm UX is fitted on two folds only
+        print(
+            f"arm UX is not built for fold {args.month}: it is fitted on {arms.UX_FOLDS}",
+            flush=True,
+        )
+    limit_s = int(args.max_cpu_hours * 3600)
+    resource.setrlimit(
+        resource.RLIMIT_CPU, (limit_s, limit_s + 60)
+    )  # the cap is enforced: the kernel stops the build
     build(
         arms_to_build=wanted,
         month=args.month,
