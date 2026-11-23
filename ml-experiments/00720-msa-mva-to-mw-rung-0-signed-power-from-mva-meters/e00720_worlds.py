@@ -77,6 +77,7 @@ class SyntheticWorld:
         day_type: Daily type 0 (weekday), 1 (Saturday), 2 (Sunday), `(n_days,)`.
         doy: Day of year, `(n_days,)`.
         export_share: Share of days with at least one reverse-flow half-hour.
+        demand_mean: The gross demand before the autoregressive residual, `(n_days, 48)`.
     """
 
     x: np.ndarray
@@ -87,6 +88,7 @@ class SyntheticWorld:
     day_type: np.ndarray
     doy: np.ndarray
     export_share: float
+    demand_mean: np.ndarray
 
 
 def synthetic_world(
@@ -132,6 +134,7 @@ def synthetic_world(
     for t in range(STEPS_PER_DAY):
         state = 0.9 * state + rng.normal(0.0, 0.01 * capacity, n_days)
         resid[:, t] = state
+    demand_mean = demand.copy()
     demand = demand + resid
     p_sunny = sunny_share_summer * (0.1 + 0.9 * (season + 1.0) / 2.0)
     sunny = rng.random(n_days) < p_sunny
@@ -143,4 +146,59 @@ def synthetic_world(
     reading = reading_from_signed(x=x, q=q)
     p = estimate_scale * pv_capacity * u
     export_share = float(np.mean((x < 0.0).any(axis=1)))
-    return SyntheticWorld(x, reading, u, p, temp, day_type, doy, export_share)
+    return SyntheticWorld(x, reading, u, p, temp, day_type, doy, export_share, demand_mean)
+
+
+@dataclass(frozen=True)
+class SwitchingSample:
+    """One simulated run of the switching model of `e00720_hmm`.
+
+    Attributes:
+        m: Readings, `(T,)`.
+        x: Signed power, `(T,)`.
+        n: Unit count per half-hour, `(T,)`.
+        f: The regression mean of gross demand, `(T,)`.
+        p: The PV estimate, `(T,)`.
+    """
+
+    m: np.ndarray
+    x: np.ndarray
+    n: np.ndarray
+    f: np.ndarray
+    p: np.ndarray
+
+
+def simulate_switching(
+    *,
+    n_steps: int,
+    f: np.ndarray,
+    p: np.ndarray,
+    trans_n: np.ndarray,
+    unit_size: float,
+    pv_scale: float,
+    phi: float,
+    sigma_r: float,
+    q: float,
+    sigma_e: float,
+    df: float,
+    seed: int,
+) -> SwitchingSample:
+    """Simulate the model of `e00720_hmm` exactly as it is written (the path emission included)."""
+    rng = np.random.default_rng(seed)
+    k = trans_n.shape[0]
+    n = np.zeros(n_steps, dtype=np.int64)
+    r = np.zeros(n_steps)
+    sd = sigma_r / np.sqrt(1.0 - phi**2)
+    r[0] = rng.normal(0.0, sd)
+    cum = np.cumsum(trans_n, axis=1)
+    for t in range(1, n_steps):
+        n[t] = min(int(np.searchsorted(cum[n[t - 1]], rng.random())), k - 1)
+        r[t] = phi * r[t - 1] + rng.normal(0.0, sigma_r)
+    x = f + r - pv_scale * p - unit_size * n
+    start = 0.5 * (np.concatenate([[x[0]], x[:-1]]) + x)
+    acc = np.zeros(n_steps)
+    for j in range(N_SUBSTEPS):
+        frac = (j + 0.5) / N_SUBSTEPS
+        acc += np.sqrt((start + (x - start) * frac) ** 2 + q**2)
+    noise = rng.standard_t(df, n_steps) * sigma_e if df > 0 else rng.normal(0.0, sigma_e, n_steps)
+    return SwitchingSample(acc / N_SUBSTEPS + noise, x, n, f, p)
