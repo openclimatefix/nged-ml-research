@@ -234,7 +234,8 @@ row tables are built on the CPU, in about 22 CPU-hours for both parts, and use n
 - **Arm `R` is tested as the design of experiment 713 specifies, on the maintainer's instruction,**
   with two readings fixed (the share of columns for the day type, and the fold's standardiser).
 - **The pool blocks' weather is ERA5 and CAMS, a lab shortcut, in the distance and in the tokens.**
-- **A null result may come from slow learning,** and the known-answer world trains its encoders while
+- **A null result may come from slow learning,** and the known-answer world trains its encoders
+  while
   the real arms freeze the Candidate's.
 - **The date-time encoder holds calendar columns,** as in experiment 713.
 
@@ -246,7 +247,8 @@ The experiment is planned and has no fitted result yet, so these bullets describ
   bucket and a per-sample key bias.
 - **Training regime:** all three stages of experiment 713's recipe from the seed's initialisation,
   monthly refits over 8 folds (2025-11 to 2026-06), seeds 0 and 1.
-- **Measurement:** CRPS in points of capacity on experiment 713's row set, scored against the cleaned
+- **Measurement:** CRPS in points of capacity on experiment 713's row set, scored against the
+  cleaned
   power; month-block bootstrap intervals; no valid time on or after 2026-07-01 is scored.
 - **Standing practices followed:** monthly refit; cleaned data; the short-history cut; fitted states
   saved outside git; stored forecasts reused as controls; a screen on four folds first; forecast
@@ -279,8 +281,10 @@ keep a check independent, or to follow the design where experiment 713's code do
   its shortfall to an older class. KR4 also prints the mean weather distance of the replaced rows
   beside the treatment's.
 - With 2 seeds, the reading "small gain" needs both seeds to agree in sign, as design section 7.3
-  states. Experiment 713's scorer accepts 1 seed of 2 for that reading, so this experiment's
-  decision code applies its own rule and leaves experiment 713's scorer unedited.
+  states. Experiment 713's scorer accepts 1 seed of 2 for that reading. This experiment requires
+  both, and the manager approved the stricter rule. The rule can only make a verdict harder to
+  reach, never easier. This experiment's decision code applies it and leaves experiment 713's scorer
+  unedited.
 - Audit trigger 5 (a nested arm beats its container) fires only when the nested arm is better in
   both Primary groups, because the design names no group.
 - The tables of all arms of a fold are built in one pass, and each weather distance is computed once
@@ -329,7 +333,8 @@ page, which does not exist until experiment 719 merges.
   read-outs, the worlds and known-answer gate, the counted contrasts and decision rules, the
   figures, and a report script that prints the result tables), written and unit-checked on the
   CPU. No fit has run, and no table has been built on real data.
-- Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
+- Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-
+  research/pull/402)):
   the stored states and forecasts of `M*` and `P`, the inputs adapter, the fold statistics, and the
   scorer.
 - Written by this experiment (to be created): fitted states under
