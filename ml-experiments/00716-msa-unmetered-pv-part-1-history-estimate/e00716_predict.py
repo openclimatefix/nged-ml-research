@@ -221,7 +221,11 @@ def predict(
 
 
 def kf7(*, data_dir: Path, device: str = "cpu") -> str:
-    """KF7: predict fold 2025-11, seed 0 from the stored stage 3 state of `M*` as arm `Z` and compare with `M*`'s stored forecast."""
+    """KF7: predict fold 2025-11, seed 0 from the stored stage 3 state of `M*` as arm `Z` and compare with `M*`'s stored forecast.
+
+    The stored forecast was written on the GPU, and the CPU path differs from it by 8.4e-6 of capacity at
+    the 99th percentile (experiment 713's own CPU path gives the same difference), so KF7 runs with `--device cuda`.
+    """
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
@@ -264,7 +268,7 @@ def main() -> int:
     parser.add_argument("--accept-code-change", action="append", default=[], metavar="OLD_HASH")
     args = parser.parse_args()
     if args.kf7:
-        message = kf7(data_dir=ML_EXPERIMENTS_DATA_DIR, device="cpu")
+        message = kf7(data_dir=ML_EXPERIMENTS_DATA_DIR, device=args.device)
         print(message)
         if args.record:
             arms.write_wiring_record(

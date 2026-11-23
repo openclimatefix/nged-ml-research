@@ -406,6 +406,10 @@ no month restriction. The guard also reads the sun at the grid stamp (the cosine
 column 7), whereas the protocol reads it at the half-hour midpoint. Dense column 2 as the protocol's
 `temperature_c` series has not been compared.
 
+**KF7 runs on the GPU.** The stored forecast of `M*` was written on the GPU, and the CPU path differs from
+it by 8.4e-6 of capacity at the 99th percentile (experiment 713's own CPU path gives the same difference),
+so the 1e-6 tolerance is met only by a GPU run.
+
 **KF2 runs on the training phase and on the held-out origins.** The poison test runs once on 64
 stage 2 samples of the training phase and once, in a process of its own, on 64 draws from the scored
 origins of the held-out month, where the target table holds the runs of that month. An arm with no
