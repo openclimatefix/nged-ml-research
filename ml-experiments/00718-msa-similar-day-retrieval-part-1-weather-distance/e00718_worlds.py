@@ -37,7 +37,7 @@ LEVEL_SD: Final = 0.10
 NOISE_SD: Final = 0.01
 E_SD: Final = 0.05
 ERA_DAYS: Final = 730
-LAST_ERA_DAYS: Final = 91
+LAST_ERA_DAYS: Final = 400
 HELD_OUT_DAYS: Final = 60
 DATETIME_NAMES: Final = (
     "cos_zenith", "sin_azimuth", "cos_azimuth", "sin_hour", "cos_hour", "sin_hour_2", "cos_hour_2",
@@ -130,12 +130,14 @@ def era_of(*, n_grid: int, boundary: int) -> np.ndarray:
     return np.where(t >= boundary, 0, (boundary - 1 - t) // (ERA_DAYS * lay713.STEPS_PER_DAY) + 1)
 
 
-def build_ws(*, template: tr.bt.Source, cutoff: int, seed: int = SEED) -> WorldArrays:  # ty: ignore[unresolved-attribute]
-    """Return world WS: `y = 0.5 + c[p, era, regime] + noise`, with the last era starting 91 days before `cutoff`."""
+def build_ws(
+    *, template: tr.bt.Source, cutoff: int, seed: int = SEED, last_era_days: int = LAST_ERA_DAYS
+) -> WorldArrays:  # ty: ignore[unresolved-attribute]
+    """Return world WS: `y = 0.5 + c[p, era, regime] + noise`, with the last era starting 400 days before `cutoff`."""
     n_grid = template.n_grid
     n_blocks = int(block_of(t=np.array([n_grid - 1]))[0]) + 1
     regime = draw_regimes(n_blocks=n_blocks, seed=seed)
-    boundary = cutoff - LAST_ERA_DAYS * lay713.STEPS_PER_DAY
+    boundary = cutoff - last_era_days * lay713.STEPS_PER_DAY
     era = era_of(n_grid=n_grid, boundary=boundary)
     rng = np.random.default_rng([seed, 12])
     table = rng.normal(0.0, LEVEL_SD, size=(mdl.N_PRIMARIES, int(era.max()) + 1, N_REGIMES))

@@ -28,6 +28,7 @@ import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00713_train as tr  # ty: ignore[unresolved-import]
 import e00718_arms as arms
 import e00718_batch as fb
+import e00718_layout as lay
 import e00718_model as f9
 import e00718_retrieval as ret
 import e00718_train as ftr
@@ -364,9 +365,9 @@ def selftest() -> int:
     assert float(arr.weather[2, 100, 0]) == q_block - 15.5
     assert float(arr.datetime[..., worlds.DATETIME_NAMES.index("covid")].abs().max()) == 0.0
     assert worlds.datetime_names_match_prep()
-    # the last era starts 91 days before the cutoff and the targets of the last era are masked in training
+    # the last era starts 400 days before the cutoff and the targets of the last era are masked in training
     world, mean, std = worlds.to_world(arrays=arr, template=template, device="cpu")
-    assert tr.target_end(world=world, stage=1) == arr.boundary == cutoff - 91 * 48
+    assert tr.target_end(world=world, stage=1) == arr.boundary == cutoff - worlds.LAST_ERA_DAYS * 48
     held = worlds.held_out_samples(arrays=arr)
     assert int(held.c_idx.min()) // 48 == cutoff // 48 and len(held.primary) == 4 * 60
     # the weather path keeps the 32 regimes apart (no clipping or saturation up to +-15.5)
@@ -421,6 +422,42 @@ def selftest() -> int:
         "known-answer self-test: the checks' logic, the real-budget rule, the era layout, the regimes in the weather path, and a two-pass fit of Z, R, and N pass"
     )
     print("e00718_known_answer: all checks passed")
+    return 0
+
+
+def precheck(*, month: str, last_era_days: int) -> int:
+    """Run the pre-check of world WS on the real grid on the CPU (no fit): print the three gaps and the gap of `U` with its rows older than 91 days hidden."""
+    import e00422_prep as prep422  # ty: ignore[unresolved-import]  # noqa: F401
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
+    import e00718_check_real as cr
+
+    cr.cpu_only_cuda_calls()
+    pipe = inp.load_pipeline(month=month, phase="train", chain_root=inp.chain_root_of_seed(seed=0))
+    data = inp.build_fold_data(pipe=pipe, device="cpu")
+    template = data.source
+    arrays = worlds.build_ws(template=template, cutoff=data.cutoff_idx, last_era_days=last_era_days)
+    held = worlds.held_out_samples(arrays=arrays)
+    days = np.unique(held.c_idx // lay713.STEPS_PER_DAY)
+    arm_list = ("Z", "R", "P90", "U", "U-A")
+    tabs = tables_for(arm_list=arm_list, template=template, arrays=arrays, days=days)
+    gaps = gaps_of(arrays=arrays, tables=tabs, held=held)
+    pi = {p: i for i, p in enumerate(tabs["U"].primaries.tolist())}
+    di = {d: i for i, d in enumerate(tabs["U"].days.tolist())}
+    rows_u = np.stack(
+        [
+            tabs["U"].ages[pi[int(p)], di[int(c) // lay713.STEPS_PER_DAY]]
+            for p, c in zip(held.primary, held.c_idx, strict=True)
+        ]
+    )
+    young = np.where(rows_u > lay.SHORT_POOL_MAX_AGE, -1, rows_u)
+    mae_young = worlds.reference_gap(arrays=arrays, rows_a=young, rows_b=young, samples=held)[0]
+    out = {
+        "month": month, "last_era_days": last_era_days, "held_out_samples": len(held.primary), "gaps": {k: float(gaps[k]) for k in ("gap_R", "gap_RM", "gap_U")},
+        "reference_mae": gaps["reference_mae"], "mae_U_rows_up_to_91_days_only": mae_young,
+        "gap_U_with_rows_up_to_91_days_only": gaps["reference_mae"]["U-A"] - mae_young,
+        "minimum_gap": worlds.GAP_MINIMUM,
+    }  # fmt: skip
+    print(json.dumps(out, indent=1, default=float))
     return 0
 
 
@@ -538,6 +575,12 @@ def main() -> int:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument(
+        "--precheck",
+        action="store_true",
+        help="CPU only: the pre-check gaps of world WS on the real grid, no fit",
+    )
+    parser.add_argument("--last-era-days", type=int, default=worlds.LAST_ERA_DAYS)
+    parser.add_argument(
         "--manager-accepts-unread-ks3",
         action="store_true",
         help="write the gate file although KS3's difference tests were unread; the result record logs it",
@@ -546,6 +589,8 @@ def main() -> int:
     if args.selftest:
         return selftest()
     assert args.month, "give the fold month"
+    if args.precheck:
+        return precheck(month=args.month, last_era_days=args.last_era_days)
     return run(
         month=args.month,
         device=args.device,
