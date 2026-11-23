@@ -34,8 +34,12 @@ S_BASE: Final = (0.30, 0.40, 0.50, 0.60)
 """The dip's size `s` at the four Primaries at rungs 1 to 3, in shares of capacity."""
 LEVEL_SD: Final = 0.10
 NOISE_SD: Final = 0.01
-HELD_OUT_DAYS: Final = 60
-"""Validation origins: the 60 days after the cutoff, as in experiment 713's known-answer fits."""
+HELD_OUT_DAYS: Final = 236
+"""Validation origins: the 236 days after the cutoff, the longest window the dense weather table allows (design addendum 1)."""
+N_DRAWS: Final = 8
+"""World draws 0 to 7 (`build_world(seed=k)`): a rung passes only if the mean `gap` over them and draw 0's own `gap` both reach `GAP_MIN`."""
+EARLY_DAYS: Final = 60
+"""The first 60 validation days, the window of the original design: KF9 and KF11 are also printed on days 1 to 60 and 61 to 236 (secondary)."""
 GAP_MIN: Final = 0.010
 VALIDATION_LEADS: Final = (0, 1, 3, 6, 9, 13)
 """Experiment 713's `VALIDATION_LEAD_DAYS` (zero-based lead-day indices)."""
@@ -123,6 +127,33 @@ def dense4_from_raw(
         ghi=col(0), temperature_c=temperature, dew_c=dew, precip=col(5), cos_zenith=col(7),
         sin_azimuth=col(8), cos_azimuth=col(9), day_type=day_type, half_hour=half_hour, doy=doy,
     )  # fmt: skip
+
+
+def check_validation_weather_finite(
+    *, raw: np.ndarray, b1_grid: np.ndarray, cams: np.ndarray, day_code: np.ndarray, cutoff_idx: int
+) -> str:
+    """Assert that every input the networks read is finite over the whole validation window (design addendum 1, F11).
+
+    `dense4_from_raw` and `b1_scale` turn a missing value into 0, which would read as night. The window
+    runs from the oldest history token of the first validation origin to the last target token of the
+    last one, and covers all 28 dense columns of the four Primaries, the 12 B1 grid columns, and the 2 CAMS
+    day columns.
+    """
+    first_origin = (cutoff_idx // 48) * 48 + 24
+    last_origin = first_origin + 48 * (HELD_OUT_DAYS - 1)
+    lo = first_origin - lay.STEPS_PER_DAY * lay.MAX_AGE
+    hi = last_origin + lay.STEPS_PER_DAY * lay.N_LEAD_DAYS
+    assert hi <= raw.shape[1], (
+        f"the validation window ends at {hi}, past the dense table's {raw.shape[1]}"
+    )
+    sel = np.asarray(PRIMARIES)
+    for name, block in (
+        ("dense weather (28 columns)", np.asarray(raw[sel, lo:hi, :])),
+        ("B1 grid columns", np.asarray(b1_grid[sel, lo:hi])),
+        ("CAMS day columns", np.asarray(cams)[sel][:, day_code[lo:hi]]),
+    ):
+        assert bool(np.isfinite(block).all()), f"non-finite {name} inside the validation window"
+    return f"every dense, B1, and CAMS input is finite from index {lo} to {hi} ({HELD_OUT_DAYS} validation days)"
 
 
 def draw_table(*, n_day_types: int = 8) -> np.ndarray:
@@ -233,7 +264,7 @@ def origin_sets(
 
     Training origins are experiment 713's stage 1 sample set (`make_samples` with its held-out and
     purged weeks) of the world's finite power, excluding the held-out weeks; validation origins are the
-    60 days after the cutoff.
+    `HELD_OUT_DAYS` days after the cutoff.
     """
     from types import SimpleNamespace
 

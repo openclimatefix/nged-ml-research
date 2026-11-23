@@ -5,11 +5,13 @@ Usage: run.sh e00716_world_rung.py [--fold 2026-01] [--rungs 1 2 3 4 5] [--force
        run.sh e00716_world_rung.py --selftest
 
 This is a CPU task that reads the dense weather table and fits no neural network. For each rung in
-the fixed order, it builds worlds WH and WT, fits the naive and the oracle ridge reference of each
-Primary, and prints the `gap` of each world (the naive reference's MAE of the median minus the
-oracle's, on solar-block validation tokens pooled over the four Primaries). It stops at the first
-rung where both `gap` values are at least 0.010 and writes `work/world_rung.json` with every `gap` it
-computed. If no rung passes, it writes the file with `rung: null` and exits with status 2, so that the
+the fixed order, it builds worlds WH and WT for world draws 0 to 7, fits the naive and the oracle ridge
+reference of each Primary, and prints the `gap` of each world and draw (the naive reference's MAE of
+the median minus the oracle's, on solar-block validation tokens pooled over the four Primaries, on the
+236 days after the cutoff). A rung passes when, in both worlds, the mean `gap` over the eight draws and
+the `gap` of draw 0 are both at least 0.010 (design addendum 1); a rung whose mean passes and whose
+draw 0 fails is a failed rung. It stops at the first passing rung and writes `work/world_rung.json`
+with every `gap` it computed, the eight draws, their mean and standard deviation, and `held_out_days`. If no rung passes, it writes the file with `rung: null` and exits with status 2, so that the
 manager is told and F7 stops before any PV fit. A rung whose file `work/world_rung/rung<N>.json`
 exists is not recomputed unless `--force` is given.
 
@@ -59,6 +61,48 @@ def load_dense4() -> wd.Dense4:
     )
 
 
+def rung_record_problems(*, record: dict) -> list[str]:
+    """Return why a stored rung or `world_rung.json` record is not an eight-draw record on the current validation window (empty when it is).
+
+    A record from the 60-day, single-draw rule lacks `held_out_days`, `draws`, `mean`, and `sd`, and is refused.
+    """
+    out = []
+    if record.get("held_out_days") != wd.HELD_OUT_DAYS:
+        out.append(
+            f"held_out_days is {record.get('held_out_days')}, not {wd.HELD_OUT_DAYS}: the record is from another window"
+        )
+    results = record.get("results", {"_": record})
+    for number, res in results.items():
+        for kind, g in res.get("gaps", {}).items():
+            missing = [k for k in ("draws", "mean", "sd") if k not in g]
+            if missing or len(g.get("draws", [])) != wd.N_DRAWS:
+                out.append(
+                    f"rung {number} {kind}: lacks the {wd.N_DRAWS}-draw fields {missing or 'draws'}"
+                )
+    return out
+
+
+def rung_passes(*, gaps: dict[str, dict]) -> bool:
+    """Return whether a rung passes: in every world, the mean `gap` over the draws and the `gap` of draw 0 are both at least `GAP_MIN`."""
+    return bool(
+        gaps and all(g["mean"] >= wd.GAP_MIN and g["draws"][0] >= wd.GAP_MIN for g in gaps.values())
+    )
+
+
+def summarise_draws(*, results: list[dict[str, wd.GapResult]]) -> dict[str, dict]:
+    """Return per world: draw 0's full result under `gap`, and the draws, their mean, and their standard deviation (ddof 1)."""
+    out = {}
+    for kind in results[0]:
+        gaps = [r[kind].gap for r in results]
+        first = results[0][kind]
+        out[kind] = {
+            "gap": first.gap, "gap_per_primary": first.gap_per_primary, "mae_naive": first.mae_naive,
+            "mae_oracle": first.mae_oracle, "penalties": first.penalties, "draws": gaps,
+            "mean": float(np.mean(gaps)), "sd": float(np.std(gaps, ddof=1)) if len(gaps) > 1 else 0.0,
+        }  # fmt: skip
+    return out
+
+
 def run_rungs(
     *,
     dense: wd.Dense4,
@@ -68,8 +112,9 @@ def run_rungs(
     force: bool,
     after: int = 0,
 ) -> dict:
-    """Compute the `gap` of WH and WT per rung in order and stop at the first rung that passes.
+    """Compute the `gap` of WH and WT at draws 0 to 7 per rung in order and stop at the first rung that passes.
 
+    A rung passes when, in both worlds, the mean over the draws and the `gap` of draw 0 reach `GAP_MIN`.
     A rung numbered `after` or lower is read or computed and recorded but never chosen: this is the step up
     after the early-stopping pre-check failed at rung `after` (design 8.2), so the ladder continues from the next rung.
     """
@@ -81,7 +126,10 @@ def run_rungs(
         path = out_dir / f"rung{number}.json"
         stored = json.loads(path.read_text()) if path.exists() and not force else None
         problems = (
-            arms.artefact_problems(what=path.name, record=stored, files=arms.WORLD_FILES)
+            [
+                *arms.artefact_problems(what=path.name, record=stored, files=arms.WORLD_FILES),
+                *rung_record_problems(record=stored),
+            ]
             if stored is not None
             else []
         )
@@ -92,21 +140,29 @@ def run_rungs(
             print(f"rung {number}: read from {path.name}", flush=True)
         else:
             started = time.monotonic()
-            world = wd.build_world(dense=dense, rung=rung)
-            gaps = {}
-            for kind in ("WH", "WT"):
-                res = wd.gap_of_world(world=world, dense=dense, kind=kind, cutoff_idx=cutoff_idx)
-                gaps[kind] = {
-                    "gap": res.gap, "gap_per_primary": res.gap_per_primary, "mae_naive": res.mae_naive,
-                    "mae_oracle": res.mae_oracle, "penalties": res.penalties,
+            per_draw = []
+            for draw in range(wd.N_DRAWS):
+                world = wd.build_world(dense=dense, rung=rung, seed=draw)
+                found = {
+                    kind: wd.gap_of_world(world=world, dense=dense, kind=kind, cutoff_idx=cutoff_idx, log=False)
+                    for kind in ("WH", "WT")
                 }  # fmt: skip
+                per_draw.append(found)
                 print(
-                    f"rung {number} {kind}: gap {res.gap:.4f} (naive {res.mae_naive:.4f}, oracle {res.mae_oracle:.4f})",
+                    f"rung {number} draw {draw}: "
+                    + ", ".join(f"{k} gap {r.gap:.4f}" for k, r in found.items()),
+                    flush=True,
+                )
+            gaps = summarise_draws(results=per_draw)
+            for kind, g in gaps.items():
+                print(
+                    f"rung {number} {kind}: draw 0 {g['gap']:.4f}, mean {g['mean']:.4f}, sd {g['sd']:.4f}, "
+                    f"draws {[round(x, 4) for x in g['draws']]}",
                     flush=True,
                 )
             record = {
                 "rung": number, "settings": vars(rung), "gaps": gaps, "seconds": round(time.monotonic() - started, 1),
-                "passes": all(g["gap"] >= wd.GAP_MIN for g in gaps.values()),  # ty: ignore[unsupported-operator]
+                "passes": rung_passes(gaps=gaps), "held_out_days": wd.HELD_OUT_DAYS, "n_draws": wd.N_DRAWS,
                 "code": arms.code_record(),
             }  # fmt: skip
             tmp = path.with_name(path.name + ".tmp")
@@ -119,6 +175,8 @@ def run_rungs(
     return {
         "rung": chosen,
         "gap_min": wd.GAP_MIN,
+        "held_out_days": wd.HELD_OUT_DAYS,
+        "n_draws": wd.N_DRAWS,
         "results": results,
         "stepped_up_after": after or None,
     }
@@ -135,6 +193,21 @@ def step_up_problems(*, after: int, precheck_path: Path) -> list[str]:
     if record.get("pass") is not False or record.get("rung") != after:
         out.append(f"{precheck_path.name} does not record a failed pre-check at rung {after}")
     return out
+
+
+def check_finite_weather(*, cutoff_idx: int) -> str:
+    """Run the finite-weather check of the validation window on the stored dense table and the B1 tables of experiment 713 (design addendum 1, F11)."""
+    import e00632_data as d632  # ty: ignore[unresolved-import]
+
+    cache = ML_EXPERIMENTS_DATA_DIR / NAME_713_CACHE / "cache"
+    raw = np.load(cache / "dense_raw.npy", mmap_mode="r")
+    b1_grid = np.load(cache / "dense_b1_grid.npy", mmap_mode="r")
+    cams = np.load(cache / "dense_b1_cams.npy")
+    stamp_us = lay.GRID_START_US + np.arange(raw.shape[1], dtype=np.int64) * lay.STEP_US
+    day_code = np.clip(stamp_us // d632.DAY_US - 1 - d632.DAY0, 0, d632.N_DAYS - 1)
+    return wd.check_validation_weather_finite(
+        raw=raw, b1_grid=b1_grid, cams=cams, day_code=day_code, cutoff_idx=cutoff_idx
+    )
 
 
 def selftest_records() -> None:
@@ -160,6 +233,65 @@ def selftest_records() -> None:
         assert not problems, problems
     print(
         "a step up needs a failed pre-check record of that rung, and a rung file with no code record is not reused"
+    )
+
+
+def selftest_ladder(*, dense: wd.Dense4, real_days: int) -> None:
+    """Check the step up, the mean-and-draw-0 rule, and the refusal of a single-draw record on stored toy rung files."""
+    wd.HELD_OUT_DAYS = real_days  # ty: ignore[invalid-assignment]
+    # the step up: with the pre-check failed at rung 4, the chosen rung must be above 4
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        # rung 3: the mean passes and draw 0 fails, so the rung fails; rung 4 passes; rung 5 passes (the rescue case)
+        toy = {
+            1: (0.004, 0.004),
+            2: (0.005, 0.005),
+            3: (0.012, 0.009),
+            4: (0.0129, 0.0146),
+            5: (0.0149, 0.0147),
+        }
+        for n, (mean, first) in toy.items():
+            gaps = {
+                k: {
+                    "mean": mean,
+                    "draws": [first] + [mean] * (wd.N_DRAWS - 1),
+                    "sd": 0.001,
+                    "gap": first,
+                }
+                for k in ("WH", "WT")
+            }
+            (out / f"rung{n}.json").write_text(
+                json.dumps(
+                    {
+                        "rung": n,
+                        "passes": rung_passes(gaps=gaps),
+                        "gaps": gaps,
+                        "held_out_days": wd.HELD_OUT_DAYS,
+                        "n_draws": wd.N_DRAWS,
+                        "code": {**arms.code_record(), "git_dirty": False},
+                    }
+                )
+            )
+        assert not json.loads((out / "rung3.json").read_text())["passes"], (
+            "a rung whose mean passes and whose draw 0 fails must fail"
+        )
+        assert not rung_record_problems(record=json.loads((out / "rung5.json").read_text()))
+        old = {"rung": 4, "passes": True, "gaps": {"WH": {"gap": 0.0165}}}
+        assert rung_record_problems(record=old), "a single-draw, 60-day record was accepted"
+        assert (
+            run_rungs(dense=dense, cutoff_idx=0, rungs=[1, 2, 3, 4, 5], out_dir=out, force=False)[
+                "rung"
+            ]
+            == 4
+        )
+        stepped = run_rungs(
+            dense=dense, cutoff_idx=0, rungs=[1, 2, 3, 4, 5], out_dir=out, force=False, after=4
+        )
+        assert stepped["rung"] == 5 and stepped["stepped_up_after"] == 4, stepped
+    print(
+        "the ladder steps up to rung 5 after a failed pre-check at rung 4, a rung whose mean passes and whose draw 0 fails is failed, and a single-draw record is refused"
     )
 
 
@@ -207,6 +339,8 @@ def selftest() -> int:
         cos_azimuth=np.tile(np.cos(np.pi + (hour - 12) / 12 * np.pi / 2), (4, 1)),
         day_type=rng.integers(0, 8, n_grid), half_hour=(steps % 48).astype(np.int64), doy=(1.0 + (steps // 48) % 365),
     )  # fmt: skip
+    real_days = wd.HELD_OUT_DAYS
+    wd.HELD_OUT_DAYS = 60  # ty: ignore[invalid-assignment]  # the toy grid is 400 days long
     world = wd.build_world(dense=dense, rung=wd.RUNGS[4])
     assert np.isfinite(world.y).all()
     night = dense.cos_zenith <= 0
@@ -221,33 +355,7 @@ def selftest() -> int:
     print(
         f"toy world: WH naive {res.mae_naive:.4f} oracle {res.mae_oracle:.4f}; WT naive {res_t.mae_naive:.4f} oracle {res_t.mae_oracle:.4f}"
     )
-    # the step up: with the pre-check failed at rung 4, the chosen rung must be above 4
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp)
-        for n in (1, 2, 3, 4, 5):
-            (out / f"rung{n}.json").write_text(
-                json.dumps(
-                    {
-                        "rung": n,
-                        "passes": n >= 4,
-                        "gaps": {},
-                        "code": {**arms.code_record(), "git_dirty": False},
-                    }
-                )
-            )
-        assert (
-            run_rungs(dense=dense, cutoff_idx=0, rungs=[1, 2, 3, 4, 5], out_dir=out, force=False)[
-                "rung"
-            ]
-            == 4
-        )
-        stepped = run_rungs(
-            dense=dense, cutoff_idx=0, rungs=[1, 2, 3, 4, 5], out_dir=out, force=False, after=4
-        )
-        assert stepped["rung"] == 5 and stepped["stepped_up_after"] == 4, stepped
-    print("the ladder steps up to rung 5 after a failed pre-check at rung 4")
+    selftest_ladder(dense=dense, real_days=real_days)
     selftest_records()
     print("selftest passed")
     return 0
@@ -277,6 +385,7 @@ def main() -> int:
         assert not problems, "; ".join(problems)
     dense = load_dense4()
     cutoff = fold_cutoff_idx(fold=args.fold)
+    print(check_finite_weather(cutoff_idx=cutoff), flush=True)
     summary = run_rungs(
         dense=dense,
         cutoff_idx=cutoff,

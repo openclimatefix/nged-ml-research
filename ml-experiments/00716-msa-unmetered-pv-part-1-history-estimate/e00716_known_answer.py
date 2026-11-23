@@ -47,6 +47,7 @@ import e00716_batch as pvb
 import e00716_model as pvm
 import e00716_pv as pv
 import e00716_train as pvt
+import e00716_world_rung as wrung
 import e00716_worlds as wd
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
@@ -244,10 +245,10 @@ def predict_medians(
     primary: np.ndarray,
     mean: np.ndarray,
     std: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return (median, actual, target index) per (origin, lead day, column) in capacity shares, on the unshifted source with every PV flag as the arm sets it."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Return (median, actual, target index, origin day) per (origin, lead day, column) in capacity shares, on the unshifted source with every PV flag as the arm sets it."""
     model.eval()
-    meds, acts, idxs = [], [], []
+    meds, acts, idxs, days = [], [], [], []
     samples = tr.SampleSet(primary=primary, c_idx=c_idx, is_val=np.zeros(len(primary), bool))
     with torch.no_grad():
         for lead in range(lay.N_LEAD_DAYS):
@@ -265,16 +266,36 @@ def predict_medians(
                 meds.append(q * std[p][:, None] + mean[p][:, None])
                 acts.append(b.target.cpu().numpy() * std[p][:, None] + mean[p][:, None])
                 idxs.append(b.target_idx.cpu().numpy())
-    return np.concatenate(meds), np.concatenate(acts), np.concatenate(idxs)
+                days.append(
+                    np.repeat((c_idx[sel] // lay.STEPS_PER_DAY)[:, None], meds[-1].shape[1], axis=1)
+                )
+    return np.concatenate(meds), np.concatenate(acts), np.concatenate(idxs), np.concatenate(days)
 
 
-def maes(*, med: np.ndarray, act: np.ndarray, idx: np.ndarray) -> dict[str, float]:
-    """Return the MAE of the median on all finite target tokens and on the solar block (UTC half-hours 12 to 29)."""
+def maes(
+    *,
+    med: np.ndarray,
+    act: np.ndarray,
+    idx: np.ndarray,
+    day: np.ndarray | None = None,
+    first_day: int = 0,
+) -> dict[str, float]:
+    """Return the MAE of the median on all finite target tokens and on the solar block (UTC half-hours 12 to 29).
+
+    With `day` (the origin day of each token) and `first_day` (the first validation day), the solar-block
+    MAE is also returned for the first `EARLY_DAYS` validation days (`solar_early`) and for the later days
+    (`solar_late`): secondary readings of KF9 and KF11 that never gate (design addendum 1, F5).
+    """
     ok = np.isfinite(act)
     err = np.abs(med - act)
     utc = idx % lay.STEPS_PER_DAY
     solar = ok & (utc >= wd.SOLAR_HALF_HOURS_UTC[0]) & (utc <= wd.SOLAR_HALF_HOURS_UTC[1])
-    return {"all": float(err[ok].mean()), "solar": float(err[solar].mean())}
+    out = {"all": float(err[ok].mean()), "solar": float(err[solar].mean())}
+    if day is not None:
+        early = (day - first_day) < wd.EARLY_DAYS
+        out["solar_early"] = float(err[solar & early].mean())
+        out["solar_late"] = float(err[solar & ~early].mean())
+    return out
 
 
 def best_pass(*, val_history: list[float], patience: int = PATIENCE_713) -> int:
@@ -296,7 +317,9 @@ def check_metric(*, per_pass: list[float], best: int, width: int = GATING_CHECK_
     return float(np.median(per_pass[lo:best]))
 
 
-def gating_metric(*, runs: dict[str, dict]) -> dict[str, dict[str, float]]:
+def gating_metric(
+    *, runs: dict[str, dict], metrics: tuple[str, ...] = ("solar", "all")
+) -> dict[str, dict[str, float]]:
     """Return, per arm and metric (`solar`, `all`), the median over the seeds of each seed's check metric.
 
     `runs[f"{arm}:{seed}"]` holds `val_history` and `per_pass` (a list of `{"all", "solar"}` dicts).
@@ -305,7 +328,7 @@ def gating_metric(*, runs: dict[str, dict]) -> dict[str, dict[str, float]]:
     arms_seen = sorted({k.split(":")[0] for k in runs})
     for arm in arms_seen:
         out[arm] = {}
-        for metric in ("solar", "all"):
+        for metric in metrics:
             vals = []
             for k, run in runs.items():
                 if k.split(":")[0] != arm:
@@ -359,7 +382,29 @@ def early_stopping_precheck(
     noise = float(last.std(ddof=1)) if len(last) > 1 else float("inf")
     need = THRESHOLDS["noise_factor"] * noise  # ty: ignore[unsupported-operator]
     diff = nll_naive - nll_oracle
-    return {"difference": diff, "noise": noise, "need": need, "pass": bool(diff >= need)}
+    return {
+        "difference": diff, "noise": noise, "need": need, "pass": bool(diff >= need),
+        **precheck_diagnostics(m_val_history=m_val_history),
+    }  # fmt: skip
+
+
+def precheck_diagnostics(*, m_val_history: list[float]) -> dict:
+    """Return the two printed, never gating, diagnostics of the pre-check (design addendum 1, F9).
+
+    `noise_to_best` is the standard deviation (ddof 1) of the 10 validation losses ending at the best
+    pass, and `noise_detrended` is the standard deviation of the last 10 after removing a linear trend
+    (residuals of a straight-line fit, 2 degrees of freedom). Neither changes the verdict of the pre-check.
+    """
+    history = np.asarray(m_val_history, dtype=np.float64)
+    best = best_pass(val_history=m_val_history)
+    window = history[max(0, best - 10) : best]
+    last = history[-10:]
+    trend = np.polyfit(np.arange(len(last)), last, 1)
+    resid = last - np.polyval(trend, np.arange(len(last)))
+    return {
+        "noise_to_best": float(window.std(ddof=1)) if len(window) > 1 else float("inf"),
+        "noise_detrended": float(np.sqrt((resid**2).sum() / (len(last) - 2))) if len(last) > 2 else float("inf"),
+    }  # fmt: skip
 
 
 def gaussian_nll_standardised(*, errors: np.ndarray, std: np.ndarray) -> float:
@@ -410,7 +455,7 @@ def run_gating_arm(
 
     def on_pass(_passes: int, net: torch.nn.Module) -> None:
         state = torch.get_rng_state()
-        med, act, idx = predict_medians(
+        med, act, idx, day = predict_medians(
             model=net,
             source=world713.source,
             c_idx=held.c_idx,
@@ -418,7 +463,15 @@ def run_gating_arm(
             mean=mean,
             std=std,
         )  # ty: ignore[invalid-argument-type]
-        per_pass.append(maes(med=med, act=act, idx=idx))
+        per_pass.append(
+            maes(
+                med=med,
+                act=act,
+                idx=idx,
+                day=day,
+                first_day=int(held.c_idx.min()) // lay.STEPS_PER_DAY,
+            )
+        )
         torch.set_rng_state(state)
 
     log = pvt.train_stage(
@@ -506,6 +559,8 @@ def selftest() -> int:
     print("early-stopping pre-check, Gaussian NLL, and KF15: ok")
     check_order()
     check_records()
+    check_world_rung_file()
+    check_diagnostics()
     smoke()
     print("selftest passed")
     return 0
@@ -566,7 +621,7 @@ def check_records() -> None:
     )
     cases = {
         "an edited field": {**record, "pass": False, "detail": {"x": 1}},
-        "other check scripts": {**record, "check_file_sha256": {**record["check_file_sha256"], "e00716_check_batch.py": "0"}},
+        "other check scripts": {**record, "check_file_sha256": {**arms.check_file_hashes(), "e00716_check_batch.py": "0"}},
         "other fit code": {**record, "code_hash": "0"},
         "other 713 code": {**record, "e00713_code_hash": "0"},
         "a dirty tree": {**record, "git_dirty": True},
@@ -586,10 +641,70 @@ def check_records() -> None:
         assert arms.artefact_problems(what="job", record=bad), (
             f"S1: an artefact with {label} was accepted"
         )
-    stale_file = {**art, "file_sha256": {**art["file_sha256"], arms.WORLD_FILES[0]: "0"}}
+    stale_file = {**art, "file_sha256": {**arms.file_hashes(), arms.WORLD_FILES[0]: "0"}}
     assert arms.artefact_problems(what="world_rung.json", record=stale_file, files=arms.WORLD_FILES)
     print(
         "S1 and S2: records and artefacts are refused when edited, dirty, or written by other code or check scripts"
+    )
+
+
+def check_world_rung_file() -> None:
+    """F2: `chosen_rung` refuses a `world_rung.json` that is stale, from the 60-day single-draw rule, or lacks the eight-draw fields, and accepts a current one."""
+    import tempfile
+
+    clean = {**arms.code_record(), "git_dirty": False}
+    gaps = {
+        k: {"gap": 0.0146, "draws": [0.0146] + [0.0129] * 7, "mean": 0.0129, "sd": 0.0038}
+        for k in ("WH", "WT")
+    }
+    good = {
+        "rung": 4, "held_out_days": wd.HELD_OUT_DAYS, "n_draws": wd.N_DRAWS, "code": clean,
+        "results": {"4": {"gaps": gaps, "passes": True}},
+    }  # fmt: skip
+    cases = {
+        "a 60-day single-draw file": {**good, "held_out_days": 60, "results": {"4": {"gaps": {"WH": {"gap": 0.0165}}}}},
+        "a file without the eight-draw fields": {**good, "results": {"4": {"gaps": {"WH": {"gap": 0.0146}}}}},
+        "a file of another window": {**good, "held_out_days": 60},
+        "a file of other world code": {**good, "code": {**clean, "file_sha256": {**arms.file_hashes(), arms.WORLD_FILES[0]: "0"}}},
+        "a file from a dirty tree": {**good, "code": {**clean, "git_dirty": True}},
+    }  # fmt: skip
+    with tempfile.TemporaryDirectory() as tmp:
+        PATH_OVERRIDE.update(root=Path(tmp))
+        try:
+            for label, record in cases.items():
+                (Path(tmp) / "world_rung.json").write_text(json.dumps(record))
+                try:
+                    chosen_rung()
+                except AssertionError:
+                    pass
+                else:
+                    raise AssertionError(f"F2: chosen_rung accepted {label}")
+            (Path(tmp) / "world_rung.json").write_text(json.dumps(good))
+            assert chosen_rung() == 4
+        finally:
+            PATH_OVERRIDE.clear()
+    print(
+        "F2: chosen_rung refuses a stale, single-draw, or 60-day world_rung.json and accepts a current one"
+    )
+
+
+def check_diagnostics() -> None:
+    """The pre-check's printed diagnostics do not change its verdict, and `maes` splits the solar MAE at 60 days."""
+    hist = [1.0 - 0.05 * i for i in range(20)] + [
+        0.05 + 0.01 * i for i in range(30)
+    ]  # best at pass 20, then drifting up
+    pre = early_stopping_precheck(nll_naive=0.5, nll_oracle=0.3, m_val_history=hist)
+    assert pre["pass"] == (pre["difference"] >= 10 * pre["noise"]), pre
+    assert pre["noise_detrended"] < pre["noise"], "a linear drift must shrink the detrended noise"
+    assert pre["noise_to_best"] > 0 and np.isfinite(pre["noise_to_best"]), pre
+    med = np.zeros((2, 4))
+    act = np.array([[1.0, 1.0, 1.0, 1.0], [3.0, 3.0, 3.0, 3.0]])
+    idx = np.full((2, 4), 20)  # inside the solar block
+    day = np.array([[0] * 4, [100] * 4])
+    out = maes(med=med, act=act, idx=idx, day=day, first_day=0)
+    assert out["solar_early"] == 1.0 and out["solar_late"] == 3.0 and out["solar"] == 2.0, out
+    print(
+        "pre-check diagnostics print without changing the verdict, and the solar MAE splits at day 60"
     )
 
 
@@ -777,7 +892,13 @@ def chosen_rung() -> int:
     """Return the rung that `work/world_rung.json` names, and refuse when no rung passed the `gap` pre-check."""
     if "rung" in PATH_OVERRIDE:
         return int(str(PATH_OVERRIDE["rung"]))
-    record = json.loads((work_root() / "world_rung.json").read_text())
+    record = read_checked(path=work_root() / "world_rung.json", files=WORLD_FILES)
+    problems = wrung.rung_record_problems(record=record)
+    assert not problems, (
+        "world_rung.json: "
+        + "; ".join(problems)
+        + ": rebuild it with `e00716_world_rung.py --force`"
+    )
     assert record["rung"] is not None, (
         "no rung passed the gap pre-check: F7 stops before any PV fit"
     )
@@ -1037,13 +1158,16 @@ def finish() -> int:
     """Aggregate the jobs, run the decision logic, and write `known_answers_passed.json` only if every gating check passes."""
     root = work_root()
     rung_record = read_checked(path=root / "world_rung.json", files=WORLD_FILES)
+    assert not wrung.rung_record_problems(record=rung_record), wrung.rung_record_problems(
+        record=rung_record
+    )
     chosen = str(rung_record["rung"])
     require_precheck(rung=int(chosen))
     for kind in WORLD_ARMS:
         for seed in SEEDS:
             read_checked(path=m_files(kind=kind, seed=seed, rung=int(chosen))[1])
     gaps = {k: rung_record["results"][chosen]["gaps"][k]["gap"] for k in ("WH", "WT")}
-    metrics, jobs, fixed = {}, {}, {}
+    metrics, jobs, fixed, all_runs = {}, {}, {}, {}
     for kind in WORLD_ARMS:
         runs = {}
         for seed in SEEDS:
@@ -1055,11 +1179,26 @@ def finish() -> int:
             for arm, res in job["arms"].items():
                 runs[f"{arm}:{seed}"] = res
         metrics[kind] = gating_metric(runs=runs)
+        all_runs[kind] = runs
         fixed[kind] = {
             a: {m: float(np.median([runs[f"{a}:{s}"]["per_pass"][-1][m] for s in SEEDS])) for m in ("solar", "all")}
             for a in WORLD_ARMS[kind]
         }  # fmt: skip
     results = kf_results(kind_metrics=metrics, gaps=gaps)
+    for part in ("early", "late"):
+        split = {
+            kind: {
+                arm: {"solar": m[f"solar_{part}"], "all": m["all"]}
+                for arm, m in gating_metric(
+                    runs=all_runs[kind],
+                    metrics=("solar_early", "solar_late", "all"),
+                ).items()
+            }
+            for kind in WORLD_ARMS
+        }
+        results[f"secondary_days_{'1_60' if part == 'early' else '61_236'}"] = kf_results(
+            kind_metrics=split, gaps=gaps
+        )
     results["secondary_pass60"] = kf_results(kind_metrics=fixed, gaps=gaps)
     cs = np.median([jobs[f"WT:{s}"]["arms"]["HT"]["c"] for s in SEEDS], axis=0)
     results["KF15"] = kf15(c_by_primary={prim: float(cs[prim]) for prim in wd.PRIMARIES})
