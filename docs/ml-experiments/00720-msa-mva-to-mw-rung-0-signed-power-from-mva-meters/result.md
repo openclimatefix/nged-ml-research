@@ -194,13 +194,20 @@ virtual environment's Python called directly. No GPU is used.
 **One forward-backward pass at 164 states over a 122,000-half-hour series took 158.5 s on 1 core,
 about 93 times the 1.7 s the addendum estimated.** The peak resident memory was 540 MB. The pair
 emission, which integrates the path between the midpoint of the previous and the current signed power
-over 4 sub-steps, causes most of the difference. A fit of one unit size needs about 50 passes
-(a profile over unit size, then the Baum-Welch rounds), so one whole-span era costs about 2.2
-core-hours at 164 states. Rung 0e on experiment 694's segments (V2) at the full 164 states would
-cost about 14.6 core-hours, which sits against the cap of 15. The harness therefore runs V2 and K1
-on a grid of 21 residual bins, a coarse-then-fine profile of the unit size (9 passes), and 2
-Baum-Welch rounds, and the cost gate measures the first pass and stops the run when the projected
-total exceeds the cap.
+over 4 sub-steps, causes most of the difference. A fit of one unit size needs about 50 passes (a
+profile over unit size, then the Baum-Welch rounds), so one whole-span era costs about 2.2 core-hours
+at 164 states. Rung 0e on experiment 694's 44 segments (V2) at 164 states would cost about 14.6
+core-hours, which sits against the cap of 15.
+
+**The reduced grid brings V2 to about 4 core-hours.** The harness runs V2, K1, and V3 on a grid of 21
+residual bins (84 states), a coarse-then-fine profile of the unit size, and 2 Baum-Welch rounds, which
+is 12 passes per fit. A synthetic 148-day segment at that setting took 2.78 s per pass and 33.4 s per
+fit, and one rerun of experiment 694's `M2` on the same segment took 7.7 s. One injected run (hindsight
+fit plus `M2` rerun) therefore takes about 41 s. The 44 segments and 8 schedules make 352 runs, about
+4.0 core-hours, and K1 and V3 add about 0.1 core-hours. `CostGate` times the first run and raises when
+the projected total exceeds 15 core-hours, so a run whose projection is above the cap does not start
+its second run. The per-pass time at 84 states is measured on synthetic data only, so the real
+projection waits for the first real run's own timing.
 
 ## Departures from the first report, and status of every rung
 
@@ -212,20 +219,35 @@ holidays. The pair emission runs from the midpoint of the previous and current s
 experiment 694's series no weather exists, so the demand mean of the hindsight model is calendar
 only and is fitted on the 28-day pre-roll. The panel loader is built on the torch-free functions of
 experiment 506, and it cuts the 126,624-step `dense_raw.npy` of experiment 713 to the 121,248 steps
-of the grid that experiment 412's CAMS arrays share.
+of the grid that experiment 412's CAMS arrays share. V3 runs only the forced `K` = 3 fit, which is
+the stricter of the two controls. The history majority of the `M1` re-cut is the class held by most of
+the 7 days before the target day, an assumption the review should check. The second control period of
+V3 ends on a date that is read from a private file, because the date is an era date. Experiment
+716's folder comes in through `EXTRA_PYTHONPATH`, and nothing is merged from that branch.
 
-**Status, with no script yet run on real data:**
+**Status of every rung.** No script has run on real data. Each line says which of three states the
+rung is in: done on synthetic data, wired (the real-data branch is written and was exercised against
+stubs), or not run on real data.
 
-- Rungs 0a and 0d (census, gate table): done on synthetic data; the read-only loader is wired.
-- Rung 0b (sign posterior): the posterior, the metrics, and the injection plumbing are done on
-  synthetic data. The `--run` branch, which needs the farm series, the F7 PV estimate, and the
-  references of experiments 506 and 674, is not wired.
+- Rungs 0a and 0d (census, gate table): done on synthetic data. The read-only loader is wired, and its
+  grid-length rule is checked against the shapes of the stored arrays.
+- Rung 0b (sign posterior): done on synthetic data. The `--run` branch is wired: farm series with a
+  union gap mask, the F7 PV estimate and as-of capacity, the references of experiments 506 and 674,
+  oracle and 0.7 and 1.3 capacity scales, the Brier and signed-CRPS bars of the hindsight read-out
+  (smoothed and filtered), and a cost gate. A fake panel exercises the whole world loop. Not run on
+  real data.
 - Rung 0c (known-answer checks of the folded loss): done; six checks pass.
-- Rung 0e (hindsight model): the model, the Brier and signed-CRPS functions, the bar functions, and
-  the V2 and K1 harness against experiment 694's `M2` (paired cluster bootstrap, cost gate) are done
-  on synthetic data. The `--run` branch of V2 is written but has never run. V3, V4, the addendum's
-  section 3 analyses, and the filtered and smoothed bar tables over real series are not written.
-- Figure and report scripts: not written.
+- Rung 0e V2, K1, and V3: wired against experiment 694's assets. A stub of those assets exercises
+  every line, including the comparison of the rerun `M2` with the stored `inject.pkl` and `k1.pkl`,
+  the paired cluster bootstrap, and the private outputs. Not run on real data. The variants "unit size
+  scaled to the host" and "farm and engine injected together" are not wired.
+- Rung 0e V4 and the section 3 analyses: the pure functions (matched running and idle profiles,
+  running share by group, price fifths, export-day bands, class re-cut of stored forecasts) are done
+  on synthetic data, and `run_section3` and `run_m1_recut` are wired but were never run, not even
+  against stubs. The system-price fifths and the cleaner series in the MSA network are not wired.
+- Figure and report scripts: done on synthetic tables. Every chart goes to the private folder unless
+  its table passes the public-aggregate guard, and the guard refuses a profile table and a dated
+  generator table.
 
 ## Method
 
@@ -275,10 +297,13 @@ of the fixed code, a results review, a numbers review, and a prose review.
     - `e00720_v2.py` and `e00720_check_bars.py` (rung 0e): the hindsight fit on one 694 segment, the
       paired cluster bootstrap against `M2`, the false-alarm statistics, and the bar functions of
       `e00720_bars.py`.
+    - `e00720_references.py`: experiment 506's gated rule and experiment 674's day labels on the same
+      worlds. `e00720_analyses.py`: V4 and the section 3 functions. `e00720_figures.py` and
+      `e00720_report.py`: the charts and the report, private by default.
     - `run.sh`: the slot wrapper (8 GB cap, no swap, one thread, 25 GB free check).
-- **Not written yet:** the references of experiments 506 and 674 on the injected rows; the farm and
-  F7 wiring of the real run of rung 0b; V3, V4, and the analyses of the addendum's section 3; the
-  figure scripts; the report script. The first real run of each script waits for an Opus code review.
+- **Not wired:** the price fifths, the cleaner series in the MSA network, and the V2 variants with the
+  unit size scaled to the host and with a farm and an engine together. The first real run of each
+  script waits for an Opus code review.
 - Read from earlier experiments: experiments 412, 417, 420, and 405 (injection and gate), 694
   (generator tracker, to rerun on the same segments), and 716 (the PV estimate and the as-of
   capacity table, imported through `PYTHONPATH`).
