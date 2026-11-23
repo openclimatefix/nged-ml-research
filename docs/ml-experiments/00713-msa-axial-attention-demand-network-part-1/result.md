@@ -435,6 +435,307 @@ screen folds are 2025-11, 2026-01, 2026-03, and 2026-06, with seeds 0 and 1, for
   section. A change after the screen is labelled post hoc and leaves the pre-registered contrasts
   unchanged.
 
+## Does the MSA approach struggle with unmetered solar forecasting?
+
+**Everything in this section is interim.** It reads the stored forecasts of the four screen folds
+(2025-11, 2026-01, 2026-03, and 2026-06), and no reading in it is one of the four counted readings
+or changes any verdict. The known-answer gate was waived (see the status above), so any statement
+here about following level shifts is unsupported by a passing known-answer test. Every CRPS is in
+points of capacity, from seed-averaged forecasts, on the headline band (leads 24 h to under 240 h
+after the 12:00 UTC origin). "The MSA" below means the mean of the three screen arms `M1`, `M2`, and
+`M3` unless one arm is named. A contrast is the MSA's CRPS minus the Candidate's, so a positive
+contrast means the MSA is worse. The solar block is the half-hours stamped 06:00 to 14:30 UTC
+(period end). The analysis was made by a read-only analyst, who fitted nothing.
+
+**The stored scores do not show the MSA neural network struggling with unmetered solar.** Across the
+14 Primaries, the MSA's solar-block contrast does not grow with a Primary's embedded-PV share in any
+of the four folds. On clear days the MSA does relatively better than on cloudy days in 6 of 8
+fold-and-group cells, with one of the other two cells spanning zero. The one solar-shaped signal is
+the eight MVA-only Primaries in fold 2026-06, where the solar block carries most of the loss. In
+that fold the loss sits on the cloudiest third of days, not the clearest, and the pattern matches a
+forecast median that sits lower than the Candidate's at every hour (hypothesis).
+
+### What the 14-day matrix tells the MSA about solar
+
+**The MSA receives no PV capacity and no PV estimate; the network can learn each Primary's solar
+response only from irradiance columns, solar geometry, a Primary embedding, and the 14 history rows
+of net power.** The inputs are those of design section 2.2, read from `e00713_inputs.py`:
+
+- **History rows (ages 2 to 15 days):** net power over capacity, standardised per Primary and
+  visible only 27 h or more before the contract origin. Each history token also carries 7 weather
+  columns at the token's own half-hour from the dense ERA5-and-CAMS table (shortwave irradiance,
+  longwave irradiance, 2 m temperature, 2 m dew point, surface pressure, precipitation, and 10 m
+  wind speed; experiment 437's docstring says the shortwave column of that table is CAMS). The
+  token adds 12 trailing columns (trailing means of temperature and shortwave over 3 h, 6 h, and
+  24 h, with their short-window changes) and 2 CAMS columns, the mean irradiance and clear-sky
+  ratio of the UTC day before the token's day.
+- **Target row:** the 7 ENS-mean columns and 7 ENS-spread columns of the origin day's 00Z run,
+  the same 14 trailing columns built from that ENS run, and CAMS of the last complete UTC day
+  before the origin.
+- **Every token:** 21 date-time columns, among them the cosine of the solar zenith angle and the
+  sine and cosine of the solar azimuth, and two learned embeddings of the Primary.
+
+**A Primary's PV capacity is therefore implicit in the MSA, as in the Candidate.** The network can
+read the size of a Primary's solar dip from how the history rows' net power fell on the sunny
+history days, which the Candidate cannot do beyond its two power lags. The history rows' weather is
+the lab shortcut of design section 4.2, so the MSA sees the history days' actual sunshine, while
+the Candidate reads ENS weather at its lag times.
+
+### Which Primaries carry the most embedded PV
+
+**D12, D22, D5, and D10 carry the largest unmetered-PV share of the 14 Primaries; D4 and D3 carry
+the smallest.** Two independent estimates rank the Primaries almost identically. The first divides
+the calibrated probe capacity of [experiment
+673](../00673-pv-capacity-for-nged-per-primary-with-register-cross-check/result.md)
+(`00673-*/work/deliverable_table.parquet`, MW of AC output, whole summer 2025) by the Primary's
+capacity in `site_map.csv`. The second is a measurement made for this section: the fall in net
+power, in points of capacity, per 1 kW/m² of CAMS irradiance at the Primary's own point. The fit
+uses half-hours stamped 10:00 to 14:30 UTC on valid dates 1 April to 30 June 2026, with power and
+irradiance both demeaned within each cell of (ISO week, half-hour, weekend flag). The 90% interval
+resamples whole days.
+
+| Primary | Group | Probe capacity over Primary capacity, % (p10 to p90) | Net-power fall per 1 kW/m², points (90% interval) |
+|---|---|---|---|
+| D12 | eight | 160 (154 to 166) | −134 (export folds the reading; see below) |
+| D22 | eight | 61 (57 to 64) | 61 (55 to 68) |
+| D5 | six | 52 (50 to 54) | 48 (41 to 55) |
+| D10 | six | 47 (45 to 49) | 65 (59 to 72) |
+| D2 | eight | 36 (35 to 38) | 53 (49 to 56) |
+| D16 | six | 35 (32 to 37) | 52 (47 to 56) |
+| D9 | six | 34 (31 to 38) | 45 (41 to 49) |
+| D14 | six | 33 (32 to 35) | 44 (40 to 48) |
+| D11 | six | 32 (29 to 35) | 40 (37 to 42) |
+| D19 | eight | 27 (25 to 28) | 43 (39 to 48) |
+| D21 | eight | 26 (23 to 28) | 38 (33 to 43) |
+| D8 | eight | 25 (17 to 35) | 29 (19 to 40) |
+| D3 | eight | 20 (19 to 22) | 28 (25 to 30) |
+| D4 | eight | 10 (9 to 12) | 19 (14 to 23) |
+
+**The two estimates rank the 13 Primaries other than D12 almost identically (Spearman 0.95; 0.56
+with D12).** D12 is the exception because its unmetered PV exceeds its demand at a sunny midday. An
+apparent-power meter then reads the export as a positive flow, so more sunshine raises D12's
+reading and the slope comes out negative. The probe's share of 160% says the same thing. The
+uncertainty that matters is larger than either interval. The probe intervals cover one network's
+seed-and-bootstrap spread for one summer, and the MVA shares assume power factor 1 (experiment 673
+gives the conversion-loss interval). The sunshine slope also absorbs any demand that moves with
+sunshine, such as cooling load. Neither estimate tracks capacity growth through the eight folds.
+
+### Does the solar-hour loss track embedded-PV share?
+
+**The MSA's loss is concentrated in the solar block only at the eight in fold 2026-06; at the six in
+June the loss is spread over the whole day.** Figure 1 draws the contrast by half-hour. The group
+contrasts, solar block against the other hours:
+
+| Fold | Six, solar block | Six, other hours | Eight, solar block | Eight, other hours |
+|---|---|---|---|---|
+| 2025-11 | +0.048 | −0.158 | +0.015 | −0.019 |
+| 2026-01 | −0.129 | −0.158 | −0.109 | −0.051 |
+| 2026-03 | +0.040 | −0.146 | −0.139 | −0.157 |
+| 2026-06 | +0.083 | +0.105 | +0.175 | +0.039 |
+
+**The relative weakness of the solar block moves between groups and folds rather than following
+the season.** The six are relatively worse in the solar block in 2025-11 and 2026-03 (by about 0.2
+points against their other hours), which are the darker folds. The eight are relatively worse in
+the solar block only in June (by 0.136). All three arms show the June pattern at the eight: the
+solar-block contrast is +0.164 (`M1`), +0.186 (`M2`), and +0.175 (`M3`).
+
+![Contrast by half-hour of valid time](solar_contrast_by_half_hour.svg)
+
+**Figure 1. Only fold 2026-06 has an MSA loss, and at the eight that loss peaks in the solar
+block.** At the six the June loss runs through the evening and night as well.
+
+**Across the 14 Primaries, the solar-block contrast has no rank correlation with the probe's PV
+share in any fold.** The Spearman correlation, with a 95% interval from 2,000 resamples of origin
+days and Primaries together:
+
+| Fold | Solar-block contrast | Solar block minus other hours |
+|---|---|---|
+| 2025-11 | −0.19 (−0.78 to +0.47) | −0.09 (−0.66 to +0.56) |
+| 2026-01 | −0.16 (−0.69 to +0.52) | +0.57 (−0.31 to +0.89) |
+| 2026-03 | +0.46 (−0.27 to +0.83) | +0.22 (−0.42 to +0.69) |
+| 2026-06 | +0.10 (−0.54 to +0.72) | +0.13 (−0.54 to +0.71) |
+
+**Fourteen Primaries cannot rule out a moderate correlation, but the point estimates do not
+favour one.** Every interval spans zero and is about 1.2 wide. `M1` alone gives the same picture
+(June: +0.11, −0.50 to +0.75). In June the largest solar-block loss is at D22 (+0.72), the second
+highest share, while D12, the highest, gains (−0.18) and D5, the third highest, is near zero
+(+0.08). Figure 2 draws every Primary and fold. The rank correlation mixes the two groups, whose
+meters and contrasts differ, and each group is too small to correlate alone.
+
+![Solar-block contrast against PV share](solar_contrast_vs_pv_share.svg)
+
+**Figure 2. The solar-block contrast does not grow with embedded-PV share in any fold.** The
+x-axis is logarithmic so that D12 fits.
+
+### Clear days against cloudy days
+
+**In 6 of 8 fold-and-group cells the MSA does relatively better on clear days than on cloudy days
+(a correlation, not a test of cause).** The exceptions are both in fold 2025-11, and the six's
+interval there spans zero. Each valid UTC day of each Primary gets the CAMS clear-sky
+index of its daylight hours (summed irradiance over summed clear-sky irradiance, hours with
+clear-sky irradiance above 50 W/m²). The days are split into thirds within each Primary and fold.
+The table gives the solar-block contrast per third, and the clear third minus the cloudy third with
+a 95% interval from resampling origin days:
+
+| Fold | Group | Cloudy third | Middle third | Clear third | Clear minus cloudy |
+|---|---|---|---|---|---|
+| 2025-11 | six | +0.01 | +0.08 | +0.05 | +0.04 (−0.03 to +0.11) |
+| 2025-11 | eight | −0.18 | +0.01 | +0.23 | +0.41 (+0.23 to +0.59) |
+| 2026-01 | six | +0.03 | +0.36 | −0.89 | −0.92 (−1.34 to −0.57) |
+| 2026-01 | eight | +0.06 | +0.03 | −0.50 | −0.57 (−0.76 to −0.40) |
+| 2026-03 | six | +0.59 | −0.10 | −0.51 | −1.09 (−1.31 to −0.87) |
+| 2026-03 | eight | +0.05 | −0.32 | −0.17 | −0.22 (−0.38 to −0.06) |
+| 2026-06 | six | +0.58 | −0.11 | −0.12 | −0.70 (−0.85 to −0.56) |
+| 2026-06 | eight | +0.41 | −0.10 | +0.25 | −0.16 (−0.28 to −0.04) |
+
+**In June the MSA's largest loss sits on the cloudiest third, where both systems already forecast
+too little net demand and the MSA forecasts even less.** The mean error of the median (median minus
+actual, points of capacity, solar block, June, six) is −5.2 for the Candidate and −6.9 for the MSA
+on the cloudy third, and +3.5 and +2.5 on the clear third. At the eight the same figures are −2.1
+and −3.3, and −0.2 and −0.3. The MSA's median sits about 1 to 2 points lower than the Candidate's in
+every third. A lower median hurts where the Candidate is already too low and helps where the
+Candidate is too high. That uniform shift explains the sign of every June third without any
+solar-specific error (hypothesis: the stored quantiles were not shifted and re-scored to confirm
+it).
+
+**A target day duller than its 14-day history window shows the MSA's largest losses in every fold
+at the six (a correlation).** For each origin, the history-window clear-sky index is the mean over
+the UTC days 2 to 15 days before the origin's date. With the valid days split into thirds of
+(valid-day index minus window index), the six's solar-block contrast on the "duller than the
+window" third is +0.02, +0.41, +0.57, and +0.48 in the four folds, against −0.04, −0.89, −0.46, and
+−0.07 on the "sunnier than the window" third. That ordering is what a network copying the history
+rows' solar dip onto a dull target day would produce (hypothesis). The same ordering also follows
+from the uniform low median above, because the duller-than-window days are mostly the cloudy days.
+
+**The daily correlations are mixed in sign and do not single out sunshine.** Spearman between the
+daily solar-block contrast and the daily clear-sky index, days with at least 200 rows: six +0.06,
+−0.20, −0.63, and −0.56, eight +0.60, −0.34, −0.41, and +0.01 (folds in order). Negative means the
+MSA does relatively better on sunnier days.
+
+### What four folds cannot say
+
+- **Season and month are one variable.** The only summer fold is 2026-06. The other three folds
+  have little solar generation, so "solar-block" there mostly means "daylight demand".
+- **June's sunny spell is confounded with the late-June origins.** The sunshine report finds that
+  valid days 20 to 30 June were the sunniest such span of the 7 Junes in the CAMS record. The
+  findings report finds that the loss sits in forecasts issued from 15 June onward. The two cannot
+  be separated within one month.
+- **One month carries the whole loss.** The four folds give one fold with a loss and three with a
+  gain at both groups.
+- **The noise floor limits what a group number can mean.** `e00713_score.NOISE_FLOOR` is 0.034 at
+  the six and 0.090 at the eight, for a whole-band contrast of seed-averaged forecasts. The June
+  whole-band contrast is outside the floor only at the six (`M1` +0.109); at the eight it equals
+  the floor (+0.090). The solar-block subsets above hold about 37% of the rows, so their seed noise
+  is larger than the floor, and no floor exists for a single Primary.
+- **Neither PV-share estimate is per fold.** Both are summer values, so neither can say whether
+  PV grew between the history window and the target week.
+
+### Should an explicit unmetered-PV arm be added now?
+
+**Answer: no arm now; score the four unscreened folds (2025-12, 2026-02, 2026-04, and 2026-05)
+first, and in the meantime write down a history-row PV arm, not a target-row PV forecast, as the
+first candidate.** The stored scores support the experiment manager's timing: no correlation with PV
+share, no clear-day weakness, and a June loss that a uniform median shift can explain. Folds 2026-04
+and 2026-05 add the two sunniest months available before the holdout, which is the evidence the four
+screen folds lack. The experiment manager's reason needs one correction. The earlier experiments
+that found explicit PV did not help net demand tested a PV forecast for the target period, not a PV
+estimate of the past fed to history rows. Experiment F5 is neither arm: the follow-up queue lists F5
+as a contrast-row solar read-out from the sunniest and dullest rows of 60 to 90 days, and marks F5
+"Expected to fail; run last".
+
+**Earlier experiments found that CAMS explains past net demand well, so a historical PV estimate is
+feasible.** Each of the following uses realised irradiance, not a forecast:
+
+- [Experiment 039](../00039-pv-disaggregation-cams-injection/result.md) (`partly
+  supported`): a demand fit minus one CAMS-driven solar shape recovers 0.854 (95% 0.815 to 0.866)
+  of injected solar-farm capacity.
+- [Experiment 046](../00046-embedded-solar-share-of-primary-forecast-error/result.md) (`refuted`): a
+  correction from realised CAMS sunshine improved the XGBoost best guess by about 1 point (about
+  20% of 4.72) from April to September; the same correction from the ENS sunshine forecast
+  improved it by 0.06.
+- [Experiment 289](../00289-summer-gap-weather-input-discriminator/result.md) (`partly
+  supported`): realised sunshine closes 71% of the GAM's April-to-June gap to BG2.
+- [Experiment 639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md) (`partly
+  supported`): with recorded weather, a neural network given a physics solar curve and a probed
+  capacity beats the free network on sunny middays by 0.75 points.
+- [Experiment
+  661](../00661-pv-ens-time-resolution-shortwave-interpolation-audit-and-bias-adapter/result.md)
+  (`refuted`): the explicit term keeps its gain of about 0.8 points with recorded weather, even when
+  that weather is coarsened to 6-hour windows.
+
+**Explicit PV terms built on forecast weather did not help forecast net demand.**
+
+- [Experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md) (`refuted`): with
+  ENS weather the explicit solar network is worse than the free network on sunny middays by 0.37,
+  0.25, and 0.27 points at days 1 to 2, 3 to 5, and 6 to 10. The page stops the explicit-capacity
+  line.
+- [Experiment 501](../00501-explicit-pv-column-from-the-474-capacity-table/result.md) (`refuted`):
+  an explicit PV column from the experiment 474 capacity table moved sunny-midday CRPS by −0.014
+  (98.33% interval −0.027 to +0.000).
+- [Experiment 416](../00416-mdn-explicit-solar-term-better-powered-follow-up/result.md)
+  (`inconclusive`) and [experiment
+  409](../00409-mdn-solar-term-day-of-year-and-anomaly-known-answer/result.md) (`not supported`): an
+  explicit solar term in the pooled mixture density network did not beat free irradiance.
+- [Experiment 031](../00031-embedded-pv-features-primary-demand/result.md) (`inconclusive`): no
+  PV-capacity feature helped the XGBoost stack.
+- [Experiment 504](../00504-neural-demand-leak-free-recent-cams-irradiance-inputs/result.md) (`not
+  supported`): CAMS irradiance a live service could hold (whole days at least 36 hours old) changed
+  CRPS by +0.010 at the six and +0.006 at the eight. That test fed recent sunshine as a summary
+  input to a network without history rows.
+
+**Candidate arm H-PV: a historical PV estimate in the history rows.** The idea is that the MSA's
+read-out averages the 14 history rows' net power at each half-hour, so a sunny window teaches a
+deep dip and a dull window a shallow one. Giving each history token an estimate of its own
+unmetered PV lets the network separate demand from solar in the past.
+
+- **Inputs:** per history token, PV̂ = capacity × a CAMS-driven yield curve. The capacity is a
+  per-fold, as-of value from the probe tables of experiments
+  [649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md) and 673. The yield
+  curve is the physics solar curve of experiment 639. PV̂ enters as one extra history column, or, in
+  a second variant, history power is grossed up to net power plus PV̂.
+- **Leakage and the 27 h rule:** history power already obeys the 27 h rule, and CAMS whole days at
+  least 36 hours old are available live (experiment 504). PV̂ is therefore buildable live for ages
+  3 to 15 and for most of age 2, which is stricter than the ERA5 history weather of the lab
+  shortcut. Experiment 673's table rests on probes trained to the 2026-06 cutoff, so earlier folds
+  need the as-of capacity of their own cutoff.
+- **Cost:** one fitted arm on the four screen folds with 2 seeds, of the order of 12
+  GPU-process-hours by analogy with F3 and F5 (an estimate, not a measurement).
+- **Stored-score evidence that would support H-PV:** after the eight folds are scored, a positive
+  solar-block contrast on target days duller than their history window, larger in April to June
+  and at higher-share Primaries, beyond what a constant median shift explains.
+
+**Candidate arm T-PV: an explicit PV forecast in the target row.** The target row would carry
+PV̂ from the ENS shortwave forecast and the same capacity.
+
+- **Inputs:** ENS-mean and ENS-spread shortwave of the origin's 00Z run, the same capacity table,
+  and the same yield curve.
+- **Leakage:** none beyond the Candidate's, because the run is issued 9 h before the native
+  origin.
+- **Cost:** as H-PV.
+- **Prior evidence:** against, from experiments 644, 501, 416, and 409, which used the same kind
+  of ENS-driven term.
+- **Stored-score evidence that would support T-PV:** a solar-block loss on clear target days that
+  grows with PV share. The four screen folds show the opposite on clear days.
+
+### Numbers checked against the two source reports
+
+**The numbers above were re-derived from the stored forecasts and match the scorer output to 4
+decimals, except for two labels in the source reports that did not verify.** The analyst re-derived
+the group CRPS of `C`, `M1`, `M2`, and `M3` (all 32 values), the June per-Primary contrasts of `M1`,
+the 3-hour block table, the split of origins at 15 June, the split of valid dates at 20 June, the
+June irradiance and clear-sky table for 2020 to 2026, and the daily Spearman values. The two items
+that did not verify, and that this section does not quote:
+
+- **The eight-Primary solar-hour contrast for 2 to 19 June in the sunshine report** is an unweighted
+  mean of daily values. Weighted by rows, it is +0.081, and the 20-to-30 June value is +0.266.
+- **The "signed median error" and "median absolute error" labels in the findings report** name means
+  of per-row errors, not medians. The pooled median of the signed error is +0.71 for the Candidate
+  and −1.03 for `M1` in June, and the pooled median of the absolute error is 2.97 and 3.09. The
+  direction holds in every fold either way: the median of `M1` sits below the Candidate's.
+
+The bootstrap intervals, drift table, load-transfer table, lead-day rows, the experiment 677 ratios,
+the seed pairs, and the ERA5 cross-check of the two source reports were not checked.
+
 ## Why this is not a repeat
 
 | Earlier experiment | What it tested | What differs here |
@@ -1008,10 +1309,15 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
 
 ## Follow-ups, specified and not run
 
-- **An MSA arm trained with ENS history weather**, so that the contrast with the Candidate is like
-  for like and the arm could run in a live service.
-- **Similarity retrieval at the same token budget:** the 14 history rows are the 14 blocks nearest
-  to the target day among the 90 blocks of ages 2 to 91, with their true ages kept.
+- **F8: an MSA arm trained with ENS history weather**, so that the contrast with the Candidate is
+  like for like and the arm could run in a live service.
+- **F9: similarity retrieval (arm R) at the same token budget:** the 14 history rows are the 14
+  blocks nearest to the target day among the 90 blocks of ages 2 to 91, with their true ages kept.
+- **F7: an explicit estimate of unmetered solar,** as a candidate follow-up and not a commitment.
+  The first form is a historical PV estimate in the history rows (arm H-PV: each history token
+  carries the capacity times a CAMS-driven yield curve, or the history power is grossed up by that
+  estimate). The second form is an explicit PV forecast in the target row (arm T-PV), which earlier
+  experiments with ENS forecast weather argue against. See the solar section above.
 - **The 28-row layout:** 14 target rows and 14 history rows, 1,344 tokens, in one pass per origin.
 - **Era follow-ups,** if the secondary set points to one: neighbour rows in the matrix, training on
   injected permanent changes and temporary moves together, and the three folds 2025-04 to 2025-06,
@@ -1035,14 +1341,16 @@ carries the id as `e00713_`; none exists yet):
   injected banks, the three weather swaps, and the era set.
 - `e00713_known_answer.py` builds the synthetic world and runs KA1 to KA12.
 - `e00713_token_diagnostic.py` is the report-only token diagnostic described under Checks.
-- `e00713_smoke.py` is a smoke job of one tiny fit (six Primaries, a few passes, its own `smoke/` folder)
-  that exercises a crash, a resume, a rebuilt log, a prediction, and a score before the first real fit.
+- `e00713_smoke.py` is a smoke job of one tiny fit (six Primaries, a few passes, its own `smoke/`
+  folder) that exercises a crash, a resume, a rebuilt log, a prediction, and a score before the
+  first real fit.
 - `e00713_score.py` and `e00713_report.py` compute every contrast, interval, and guard, and every
   number and figure of this page.
 - `run.sh` is the memory-capped wrapper, and `chain_seeds.sh` is the copy of experiment 667's chain
   script for seeds 2 to 4.
 
-**Data, never committed, under `data/ml-experiments/00713-msa-axial-attention-demand-network-part-1/`:**
+**Data, never committed, under
+`data/ml-experiments/00713-msa-axial-attention-demand-network-part-1/`:**
 
 - `work/models/<arm>/` will hold the saved state after each stage, and `work/fits/<arm>/` the
   per-seed forecasts (written by this experiment).
@@ -1051,9 +1359,9 @@ carries the id as `e00713_`; none exists yet):
 - `predictions/` will hold the immutable predictions, written with the experiment store.
 
 **Earlier experiments' files read:** the stored Candidate forecasts, pre-trained encoders, fold
-statistics, and extended inputs of
-[experiment 667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md);
-the injected worlds and the
-`none` bank of [experiment 709](../00709-era-signal-in-the-candidate-part-1/result.md); the
-injected bank of experiment 581; and the code of experiments 397, 422, 428, 510, 558, 559, 560, 572,
-574, 578, 581, 606, 610, 632, and 710, imported without edits.
+statistics, and extended inputs of [experiment
+667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md); the
+injected worlds and the `none` bank of [experiment
+709](../00709-era-signal-in-the-candidate-part-1/result.md); the injected bank of experiment 581;
+and the code of experiments 397, 422, 428, 510, 558, 559, 560, 572, 574, 578, 581, 606, 610, 632,
+and 710, imported without edits.
