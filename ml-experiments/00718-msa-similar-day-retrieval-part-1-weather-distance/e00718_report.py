@@ -113,7 +113,7 @@ def render(*, h: dict, s: dict, ro: dict, clean: dict) -> str:
         f"**Reading clean of the exploration's selection (report-only, 95%):** {json.dumps({k: v for k, v in clean.items() if k != 'label'}, default=float)[:400]}",
         "",
     ]
-    out += thresholds_block(n_seeds=h["n_seeds"]) + [""]
+    out += [*thresholds_block(n_seeds=h["n_seeds"]), ""]
     out += ["**Report-only contrasts at 95%** (CRPS point estimates, all 16 Primaries pooled):"]
     for k, v in ro["contrasts"].items():
         out.append(
