@@ -40,6 +40,9 @@ QCOLS: Final = s713.QCOLS
 SUNNY_FOLDS: Final = ("2026-04", "2026-05", "2026-06")
 DARK_FOLDS: Final = ("2025-11", "2025-12", "2026-01", "2026-02")
 TAU: Final = 0.02
+TOY_IDS: Final = (3, *range(7, 19), 24, 25, 26)
+"""The 16 `time_series_id`s of the real Primaries; the self-tests use them so that no code can assume the ids run from 0 to 15."""
+
 DELTA_5: Final = {"six": 0.06, "eight": 0.16}
 DELTA_2: Final = {"six": 0.094, "eight": 0.25}
 FLOOR_5: Final = {"six": 0.034, "eight": 0.090}
@@ -328,7 +331,13 @@ NIGHT_COS_ZENITH_MAX: Final = float(np.sin(np.radians(-5.0)))
 
 
 def cold_night_grid(*, raw: np.ndarray) -> np.ndarray:
-    """Return a (16, G) bool array of the half-hours that the protocol's `cold_nights` slice would hold: the sun more than 5 degrees below the horizon and the temperature at or below 3 C.
+    """Return a (16, G) bool array of the half-hours that F7's cold-night guard reads: the sun more than 5 degrees below the horizon and the temperature at or below 3 C.
+
+    The slice has two departures from the protocol's `cold_nights` slice. The protocol's slice has no
+    month restriction; this guard adds one, to UTC months 12, 1 and 2 (see `cold_night_difference`), to match "cold winter nights".
+    The protocol reads the sun at the half-hour midpoint, while this guard reads the cosine of the zenith
+    at the grid stamp. Both are recorded as departures on the plan page. The temperature is dense column 2,
+    which has not been compared with the protocol's `temperature_c` series.
 
     `raw` is the dense table of experiment 713 (column 2 is the temperature in degrees Celsius, column
     7 the cosine of the zenith at the stamp). The guard reads this re-implementation of the protocol's
@@ -599,7 +608,7 @@ def secondary_s5(
     n_resamples: int = 10_000,
     seed: int = 5,
 ) -> dict:
-    """Return S5: the Spearman correlation between the per-Primary first contrast (solar block, sunny folds) and the PV share, with a bootstrap interval over Primaries."""
+    """Return S5: the Spearman correlation between the per-Primary first contrast (solar block, sunny folds) and the PV share, with a bootstrap interval over the 14 Primaries of the six and the eight."""
     ids = sorted(set(first_by_primary) & set(pv_share))
     x = np.array([pv_share[i] for i in ids])
     y = np.array([first_by_primary[i] for i in ids])
@@ -701,15 +710,19 @@ def audit_trigger_5(
 
 
 def per_primary_table(
-    *, per_seed: dict, averaged: dict, pairs: dict[str, tuple[str, str]], n_seeds: int
+    *, per_seed: dict, averaged: dict, groups: dict, pairs: dict[str, tuple[str, str]], n_seeds: int
 ) -> dict:
-    """Return, for every one of the 16 Primaries, each contrast's CRPS point and 95% month-block interval and the normalised MAE of the median (points of capacity).
+    """Return, for every one of the 16 Primaries, keyed by `time_series_id`, each contrast's CRPS point and 95% month-block interval and the normalised MAE of the median (points of capacity).
 
     Design 7.1 and 11.2: part 2 is scored at every Primary. Each Primary is its own group, so the
     thresholds that belong to the six and the eight do not apply and only the point and the interval are read.
     """
     out: dict = {}
-    for pid in range(16):
+    ids = sorted(
+        {int(i) for g in groups.values() for i in g}
+    )  # the ids come from the groups, which come from the data
+    assert len(ids) == 16, f"the per-Primary table expects 16 Primaries, the groups hold {len(ids)}"
+    for pid in ids:
         groups = {f"p{pid}": np.array([pid])}
         row: dict = {}
         for label, (t, r) in pairs.items():
@@ -873,7 +886,7 @@ def score_part(
         per_seed=per_seed, averaged=averaged, groups=groups, part=part, n_seeds=n_seeds
     )
     out["per_primary"] = per_primary_table(
-        per_seed=per_seed, averaged=averaged, pairs={"first": pairs["first"], "placebo": pairs["placebo"]}, n_seeds=n_seeds
+        per_seed=per_seed, averaged=averaged, groups=groups, pairs={"first": pairs["first"], "placebo": pairs["placebo"]}, n_seeds=n_seeds
     )  # fmt: skip
     out["leave_one_out"] = leave_one_out_tables(
         averaged=averaged, groups=groups, treatment=pairs["first"][0], reference=pairs["first"][1]
@@ -1037,7 +1050,7 @@ def cmd_part(*, part: int, n_seeds: int) -> int:
     )  # fmt: skip
     out["cold_night_difference"] = cold_diff
     out["mask_points"] = mask_points
-    out["extra_contrasts"] = report_only_extra(part=part, star=star, seeds=seeds, truth=truth)
+    out["extra_contrasts"] = report_only_extra(part=part, star=star, truth=truth)
     write(name=f"part{part}", obj=out, score_dir=score_dir_of(part=part))
     print(
         json.dumps(
@@ -1060,7 +1073,12 @@ def cmd_part(*, part: int, n_seeds: int) -> int:
 def extra_pairs(*, part: int, star: str) -> dict[str, tuple[str, str]]:
     """Return the report-only contrasts of design 7.5 that are not counted: nested and cross-arm readings, and every arm against `C`."""
     if part == 1:
-        pairs = {"H-X": ("H", "H-X"), "H-S vs M*": ("H-S", star), "H vs Z": ("H", "Z")}
+        pairs = {
+            "H-X": ("H", "H-X"),
+            "H-S vs M*": ("H-S", star),
+            "H vs Z": ("H", "Z"),
+            "Z vs M*": ("Z", star),
+        }
         arm_list = ("H", "H-S", "H-X", "Z")
     else:
         pairs = {"HT vs M*": ("HT", star), "T vs M*": ("T", star), "HT vs T": ("HT", "T")}
@@ -1068,32 +1086,79 @@ def extra_pairs(*, part: int, star: str) -> dict[str, tuple[str, str]]:
     return {**pairs, **{f"{a} vs C": (a, "C") for a in arm_list}}
 
 
-def report_only_extra(
-    *, part: int, star: str, seeds: tuple[int, ...], truth: np.ndarray | None
-) -> dict:
-    """Return each extra contrast at 95% in both groups, or the reason it could not be read (a missing arm is reported, never guessed)."""
+def cells_present(
+    *, name: str, seeds: tuple[int, ...] = arms.HEADLINE_SEEDS
+) -> set[tuple[str, int]] | None:
+    """Return the (fold, seed) cells that an F7 arm has a forecast file for, or `None` for an arm of experiment 713 (its loader reports a missing file itself)."""
+    if not (name in arms.ARMS or any(name.startswith(b + "-") for b in arms.ARMS)):
+        return None
+    return {
+        (m, sd)
+        for m in arms.ALL_FOLDS
+        for sd in seeds
+        if fit_path(name=name, month=m, seed=sd).exists()
+    }
+
+
+def shared_cells(*, treatment: str, reference: str) -> tuple[tuple[str, ...], tuple[int, ...], str]:
+    """Return the folds and seeds on which both arms of a contrast have files, and a sentence on what is missing.
+
+    The folds are those with at least one common seed, and the seeds are those present in every such
+    fold, so the contrast is paired on one seed set. An arm that exists on 5 folds (`Z`) or at 2 seeds
+    (`H-X`, `T`) therefore gives a contrast on those folds or those seeds, never a silent zero.
+    """
+    cells = {n: cells_present(name=n) for n in (treatment, reference)}
+    known = [c for c in cells.values() if c is not None]
+    common = (
+        set.intersection(*known)
+        if known
+        else {(m, sd) for m in arms.ALL_FOLDS for sd in arms.HEADLINE_SEEDS}
+    )
+    folds = tuple(m for m in arms.ALL_FOLDS if any(c[0] == m for c in common))
+    seeds = tuple(
+        sd for sd in arms.HEADLINE_SEEDS if folds and all((m, sd) in common for m in folds)
+    )
+    missing = [
+        f"{n}: {len(arms.ALL_FOLDS) * len(arms.HEADLINE_SEEDS) - len(c)} of {len(arms.ALL_FOLDS) * len(arms.HEADLINE_SEEDS)} (fold, seed) cells have no file"
+        for n, c in cells.items()
+        if c is not None and len(c) < len(arms.ALL_FOLDS) * len(arms.HEADLINE_SEEDS)
+    ]
+    return folds, seeds, "; ".join(missing)
+
+
+def report_only_extra(*, part: int, star: str, truth: np.ndarray | None) -> dict:
+    """Return each extra contrast at 95% in both groups, on the folds and seeds both arms hold, with what is missing printed and recorded.
+
+    A contrast that cannot be read for want of a common fold or seed is recorded under `not_read` with
+    the reason and printed. A mismatch of keys between two arms that do have files is a real error and is
+    never caught.
+    """
     out: dict = {}
     for label, (t, r) in extra_pairs(part=part, star=star).items():
-        try:
-            names = [t, r]
-            ps, av, groups = load_all(
-                names=names, months=arms.ALL_FOLDS, seeds=dict.fromkeys(names, seeds), truth=truth
+        folds, seeds, missing = shared_cells(treatment=t, reference=r)
+        if not folds or not seeds:
+            reason = f"no fold has a seed set common to {t} and {r} ({missing})"
+            print(f"report-only contrast {label}: NOT READ, {reason}")
+            out[label] = {"not_read": reason}
+            continue
+        names = [t, r]
+        ps, av, groups = load_all(
+            names=names, months=folds, seeds=dict.fromkeys(names, seeds), truth=truth
+        )
+        out[label] = {
+            g: contrast(
+                per_seed=ps, averaged=av, treatment=t, reference=r, group=g, groups=groups,
+                level=LEVEL_SECONDARY, n_seeds=len(seeds),
             )
-            out[label] = {
-                g: contrast(
-                    per_seed=ps,
-                    averaged=av,
-                    treatment=t,
-                    reference=r,
-                    group=g,
-                    groups=groups,
-                    level=LEVEL_SECONDARY,
-                    n_seeds=len(seeds),
-                )
-                for g in GROUPS_COUNTED
-            }
-        except (FileNotFoundError, AssertionError) as err:
-            out[label] = {"not_read": str(err)[:200]}
+            for g in GROUPS_COUNTED
+        }  # fmt: skip
+        out[label]["folds"] = list(folds)
+        out[label]["seeds"] = list(seeds)
+        out[label]["missing"] = missing
+        print(
+            f"report-only contrast {label}: read on {len(folds)} of {len(arms.ALL_FOLDS)} folds and seeds {list(seeds)}"
+            + (f" ({missing})" if missing else "")
+        )
     return out
 
 
@@ -1112,7 +1177,7 @@ def screen_stop_rule(*, first: dict[str, dict], monthly: dict[str, np.ndarray]) 
 
 
 def cmd_screen() -> int:
-    """Part 1's stop rule on the four screen folds, seeds 0 and 1 (every number is interim), with fold 2025-11 left out as a second reading."""
+    """Part 1's stop rule on the four screen folds, seeds 0 and 1 (every number is interim); design section 10 has this one reading and no other."""
     star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     names = ["H", star]
     seeds = pinned_seeds(n_seeds=2, names=["H"], months=arms.SCREEN_FOLDS)
@@ -1139,16 +1204,8 @@ def cmd_screen() -> int:
         "first": first,
         "rule": screen_stop_rule(first=first, monthly=monthly),
     }
-    without = {g: {**first[g], "point": float(np.mean(monthly[g][1:]))} for g in GROUPS_COUNTED}
-    out["rule_without_2025_11"] = screen_stop_rule(
-        first=without, monthly={g: monthly[g][1:] for g in GROUPS_COUNTED}
-    )
     write(name="screen", obj=out, score_dir=score_dir_of(part=1))
-    print(
-        json.dumps(
-            {"rule": out["rule"], "rule_without_2025_11": out["rule_without_2025_11"]}, indent=1
-        )
-    )
+    print(json.dumps({"rule": out["rule"]}, indent=1))
     return 0
 
 
@@ -1220,7 +1277,10 @@ def cmd_secondary(*, part: int, n_seeds: int) -> int:
         int(k): float(v)
         for k, v in both.group_by("time_series_id").agg(pl.col("d").mean()).iter_rows()
     }
-    first_by_primary = {prim_of[k]: v for k, v in first_by_primary.items()}
+    # design 7.5 pools the 14 Primaries of the six and the eight, not the 16
+    pooled_ids = {int(i) for g in ("six", "eight") for i in groups[g]}
+    first_by_primary = {prim_of[k]: v for k, v in first_by_primary.items() if k in pooled_ids}
+    assert len(first_by_primary) == 14, f"S5 pools 14 Primaries, got {len(first_by_primary)}"
     out["S5"] = secondary_s5(
         first_by_primary=first_by_primary, pv_share=capacity_share_of_fold(fold="2026-06")
     )
@@ -1239,7 +1299,7 @@ def synthetic_arm(
     months: tuple[str, ...],
     seeds: tuple[int, ...],
     n_origins: int = 6,
-    primaries: tuple[int, ...] = tuple(range(16)),
+    primaries: tuple[int, ...] = TOY_IDS,
 ) -> dict:
     """Return per-seed rows with losses for a toy arm: `crps = 1 + effect + noise` on every row of the toy panel."""
     rows = []
@@ -1349,7 +1409,7 @@ def selftest() -> int:
         .with_columns(seed=pl.lit(0, dtype=pl.Int64))
         for k, v in per_seed.items()
     }
-    ids = np.arange(16)
+    ids = np.array(TOY_IDS)
     groups = {"six": ids[:6], "eight": ids[6:14], "other": ids[14:]}
     res = contrast(
         per_seed=per_seed,
@@ -1436,10 +1496,10 @@ def selftest() -> int:
 
     grid_start = int(datetime(2026, 1, 1, tzinfo=UTC).timestamp() * 1e6)
     cold_all = np.ones((16, 48 * 120), dtype=bool)
-    diff = cold_night_difference(averaged=averaged, groups=groups, treatment="H", reference="star", cold=cold_all, prim_of={i: i for i in range(16)}, grid_start_us=grid_start)  # fmt: skip
+    diff = cold_night_difference(averaged=averaged, groups=groups, treatment="H", reference="star", cold=cold_all, prim_of={t: i for i, t in enumerate(TOY_IDS)}, grid_start_us=grid_start)  # fmt: skip
     assert all(abs(v + 0.08) < 1e-6 for v in diff.values()), diff
     try:
-        cold_night_difference(averaged=averaged, groups=groups, treatment="H", reference="star", cold=~cold_all, prim_of={i: i for i in range(16)}, grid_start_us=grid_start)  # fmt: skip
+        cold_night_difference(averaged=averaged, groups=groups, treatment="H", reference="star", cold=~cold_all, prim_of={t: i for i, t in enumerate(TOY_IDS)}, grid_start_us=grid_start)  # fmt: skip
     except AssertionError:
         pass
     else:
@@ -1479,10 +1539,11 @@ def selftest() -> int:
     table = per_primary_table(
         per_seed=per_seed,
         averaged=averaged,
+        groups=groups,
         pairs={"first": ("H", "star"), "placebo": ("H", "star")},
         n_seeds=5,
     )
-    assert len(table) == 16 and all(
+    assert sorted(table) == sorted(TOY_IDS) and all(
         abs(r["first"]["point"] + 0.08) < 1e-6 and abs(r["first"]["mae_point"] + 0.07) < 1e-6
         for r in table.values()
     )
@@ -1501,6 +1562,28 @@ def selftest() -> int:
             readings={"six": "gain", "eight": "gain"}, placebo=clean, guards_hold=guards["all_hold"]
         )
         == "supported"
+    )
+    # a contrast with an arm that exists on 5 folds, or at 2 seeds, is read on what both hold and the loss is stated
+    full = {(m, sd) for m in arms.ALL_FOLDS for sd in arms.HEADLINE_SEEDS}
+    held = {
+        "H": full,
+        "Z": {c for c in full if c[0] in arms.ALL_FOLDS[:5]},
+        "T": {c for c in full if c[1] < 2},
+    }
+    real_cells = cells_present
+    globals()["cells_present"] = lambda *, name, seeds=arms.HEADLINE_SEEDS: held.get(name)
+    try:
+        folds_z, seeds_z, note_z = shared_cells(treatment="H", reference="Z")
+        folds_t, seeds_t, note_t = shared_cells(treatment="H", reference="T")
+    finally:
+        globals()["cells_present"] = real_cells
+    assert folds_z == arms.ALL_FOLDS[:5] and len(seeds_z) == 5 and "Z:" in note_z, (
+        folds_z,
+        seeds_z,
+    )
+    assert folds_t == arms.ALL_FOLDS and seeds_t == (0, 1) and "T:" in note_t, (folds_t, seeds_t)
+    print(
+        "report-only contrasts: an arm on 5 folds or at 2 seeds is read on the shared cells and the loss is stated"
     )
     print("selftest passed")
     return 0

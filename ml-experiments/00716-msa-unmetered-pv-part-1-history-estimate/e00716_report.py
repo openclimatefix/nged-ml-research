@@ -186,7 +186,7 @@ def selftest() -> int:
             "verdict": "inconclusive", "closes_line": False, "readings": {"six": "cannot tell", "eight": "cannot tell"}, "placebo_control_readings": {"six": "cannot tell", "eight": "cannot tell"},
             "harmful_placebo": False, "counted:first:six": c, "sensitivity_99_375:first:six": c, "guards": {"all_hold": False}, "secondary_s1_s2": {"S1:six": c}, "secondary_s4": {"S4:six": c},
             "report_only_first": {"mae:six": c, "by_primary": {"5": 0.01}}, "secondary_count_note": "14 secondary readings",
-            "per_primary": {str(i): {k: {"point": 0.01 * i, "lower": -0.1, "upper": 0.1, "mae_point": 0.02} for k in ("first", "placebo")} for i in range(16)},
+            "per_primary": {str(i): {k: {"point": 0.01 * i, "lower": -0.1, "upper": 0.1, "mae_point": 0.02} for k in ("first", "placebo")} for i in (3, *range(7, 19), 24, 25, 26)},
             "audit_trigger_5": {"fires": False}, "cold_night_difference": {"six": 0.0, "eight": 0.0}, "mask_points": None, "extra_contrasts": {"H vs Z": {"six": c, "eight": c}},
         }  # fmt: skip
         (folder / "score" / "part1.json").write_text(json.dumps(fake))
