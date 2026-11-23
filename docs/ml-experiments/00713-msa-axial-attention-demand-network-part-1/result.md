@@ -623,6 +623,33 @@ Candidate's lag code sets the newest visible grid index to the native origin min
 holds no usable power and is not a row. In the newest history row (age 2), columns 0 to 42 are
 visible and columns 43 to 47 are masked.
 
+### Weather look-ahead check
+
+**No weather value in the target row was issued after the forecast origin, and no history row
+carries a weather value valid after it.** The script `e00713_weather_lookahead.py` prints the
+statement row by row, for one origin and one Primary, from the layout alone and with no power read.
+The output below is for the contract origin 2026-03-10 12:00 UTC (native origin 09:00 UTC), Primary
+D5, lead day 1, generated with `e00713_weather_lookahead.py --origin 2026-03-10 --primary D5
+--check-data`. It is saved as
+`data/ml-experiments/briefs/msa_architecture/weather_lookahead_713.txt`.
+
+| Row | Role | Weather source | Issue time or validity against the forecast origin |
+|---|---|---|---|
+| 0 | Target, lead day 1 (valid 2026-03-10 12:00 to 2026-03-11 11:30 UTC) | ECMWF ensemble (ENS) mean and spread of the 00Z run of 2026-03-10; the B1 columns come from trailing windows of the same run and from CAMS of the last complete UTC day before the origin | Run issued 9 h before the native origin and 12 h before the contract origin |
+| 1 to 4 | History, ages 2 to 5 (valid 2026-03-08 12:00 back to 2026-03-05 12:00 UTC, each for 24 h) | ERA5 and CAMS analysis, valid at the token's own time | Valid 1 to 4 days before the origin; could not be built in a live service (lab shortcut) |
+| 5 to 14 | History, ages 6 to 15 (valid 2026-03-04 12:00 back to 2026-02-23 12:00 UTC) | ERA5 and CAMS analysis, valid at the token's own time | Valid 5 to 14 days before the origin; could be built in a live service |
+
+**The newest power reading anywhere in the matrix is stamped 2026-03-09 09:00 UTC, 27 h before the
+contract origin (24 h before the native origin).** In the age-2 row the visible columns are 0 to 42
+and the masked columns are 43 to 47, and rows of ages 3 to 15 are fully visible. The target row
+carries no power at all (the learned masked token). The newest history token is valid 1 day before
+the contract origin, so no history token carries a weather value valid after it.
+
+**The stored run frame passes the data check.** For the native origin 2026-03-10 09:00 UTC, the
+frame `init=2026-03-10.parquet` has a latest `nwp_init_time` of 2026-03-10 00:00 UTC (the
+requirement is at most the native origin minus 9 h) and a `power_fcst_init_time` equal to the native
+origin. The check ran before any score was read.
+
 ### Three checks on history weather
 
 **No neural network is refitted for these checks; each one changes an input at prediction and
