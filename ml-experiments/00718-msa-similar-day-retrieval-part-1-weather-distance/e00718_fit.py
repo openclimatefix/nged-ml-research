@@ -22,6 +22,7 @@ unless `--accept-code-change OLD_HASH` (stage states, repeatable) or `--accept-g
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import resource
@@ -32,6 +33,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 os.environ.setdefault("E00667_PHASE", "train")
+
+from typing import Final
 
 import e00713_inputs as inp  # ty: ignore[unresolved-import]
 import e00713_train as tr  # ty: ignore[unresolved-import]
@@ -74,8 +77,36 @@ def real_loader(month: str, seed: int, device: str) -> Loaded:
     return Loaded(world=world, fingerprint=data.fingerprint, dropped=data.dropped_per_fold)
 
 
-def save_table(*, table: ret.RowTable, path: Path) -> None:
-    """Write a row table atomically, with its digest."""
+TABLE_CODE_FILES: Final = (
+    "e00718_retrieval",
+    "e00718_tables",
+    "e00718_layout",
+    "e00718_build_tables",
+)
+"""The modules whose code decides the contents of a row table."""
+
+
+def table_code_hash() -> str:
+    """Return a hash of the modules that build a row table."""
+    h = hashlib.sha256()
+    for name in TABLE_CODE_FILES:
+        h.update(Path(__file__).with_name(f"{name}.py").read_bytes())
+    return h.hexdigest()[:16]
+
+
+def table_meta(*, arm: str, month: str, fingerprint: str) -> dict[str, str]:
+    """Return the provenance a row table carries: its builder's code hash, phase, arm, month, and the standardiser fingerprint."""
+    return {
+        "builder_hash": table_code_hash(),
+        "phase": "predict",
+        "arm": arm,
+        "month": month,
+        "fingerprint": fingerprint,
+    }
+
+
+def save_table(*, table: ret.RowTable, path: Path, meta: dict[str, str] | None = None) -> None:
+    """Write a row table atomically, with its digest and provenance."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp.npz")
     np.savez(
@@ -88,13 +119,18 @@ def save_table(*, table: ret.RowTable, path: Path) -> None:
         no_weather=table.no_weather,
         distance=table.distance,  # ty: ignore[invalid-argument-type]
         digest=table.digest(),
+        meta=json.dumps(meta or {}, sort_keys=True),
     )
     tmp.rename(path)
 
 
-def load_table(*, path: Path) -> ret.RowTable:
-    """Read a row table and check its digest."""
+def load_table(*, path: Path, expect: dict[str, str] | None = None) -> ret.RowTable:
+    """Read a row table, check its digest, and check that its provenance equals `expect` on every key given."""
     z = np.load(path)
+    if expect is not None:
+        meta = json.loads(str(z["meta"])) if "meta" in z.files else {}
+        wrong = {k: (meta.get(k), v) for k, v in expect.items() if meta.get(k) != v}
+        assert not wrong, f"{path.name} has the wrong provenance (found, expected): {wrong}"
     table = ret.RowTable(
         arm=str(z["arm"]),
         primaries=z["primaries"],
@@ -105,6 +141,8 @@ def load_table(*, path: Path) -> ret.RowTable:
         distance=z["distance"],
     )
     assert table.digest() == str(z["digest"]), f"{path} does not match its digest"
+    if expect is not None and "arm" in expect:
+        assert table.arm == expect["arm"], f"{path.name} holds arm {table.arm}"
     return table
 
 
@@ -214,7 +252,12 @@ def fit(
         check_fingerprint(fingerprint=loaded.fingerprint, data_dir=data_dir, month=month)
     if tables is None:
         tables = {
-            v: load_table(path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v))
+            v: load_table(
+                path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v),
+                expect=None
+                if smoke
+                else table_meta(arm=arm, month=month, fingerprint=loaded.fingerprint),
+            )
             for v in (fb.TABLE_ERA5, fb.TABLE_ENS)
         }
     log.update(

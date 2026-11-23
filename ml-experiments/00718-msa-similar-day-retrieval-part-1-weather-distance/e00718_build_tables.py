@@ -59,14 +59,19 @@ def build(
         arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v)
         for v in (fb.TABLE_ERA5, fb.TABLE_ENS)
     ]
-    if all(p.exists() for p in paths):
-        print(f"{arm} {month}: tables exist, skipped", flush=True)
-        return paths
     pipe = inp.load_pipeline(
         month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
     )
     data = inp.build_fold_data(pipe=pipe, device=device)
     assert data.test_origin_idx is not None
+    meta = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
+    if all(p.exists() for p in paths):
+        for p in (
+            paths
+        ):  # an existing table is kept only when its provenance matches the code and the fold
+            fit_mod.load_table(path=p, expect=meta)
+        print(f"{arm} {month}: tables exist with matching provenance, skipped", flush=True)
+        return paths
     last = int(np.max(data.test_origin_idx)) + lay713.NATIVE_OFFSET_STEPS
     days = days_of_fold(source=data.source, last_origin_idx=last, limit=limit)
     started = time.monotonic()
@@ -77,7 +82,7 @@ def build(
         holidays=lay713.england_bank_holidays(years=range(2019, 2029)),
     )
     for version, path in zip((fb.TABLE_ERA5, fb.TABLE_ENS), paths, strict=True):
-        fit_mod.save_table(table=tables[version], path=path)
+        fit_mod.save_table(table=tables[version], path=path, meta=meta)
     print(
         f"{arm} {month}: {len(days)} days built in {time.monotonic() - started:.0f} s", flush=True
     )

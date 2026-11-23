@@ -124,6 +124,31 @@ def main() -> int:
         lines.append(
             "gate: a fit that is not a smoke fit refuses to start without the known-answer gate file"
         )
+        # table provenance: a table is refused for another month, another fingerprint, or other builder code
+        meta = fit_mod.table_meta(arm=ARM, month=MONTH, fingerprint="f")
+        path = root / "t.npz"
+        fit_mod.save_table(table=tables[next(iter(tables))], path=path, meta=meta)
+        fit_mod.load_table(path=path, expect=meta)
+        for key, value in (
+            ("month", "2026-01"),
+            ("fingerprint", "g"),
+            ("builder_hash", "old"),
+            ("phase", "train"),
+        ):
+            try:
+                fit_mod.load_table(path=path, expect={**meta, key: value})
+                raise SystemExit(f"a table with another {key} was accepted")
+            except AssertionError as err:
+                assert "provenance" in str(err)
+        fit_mod.save_table(table=tables[next(iter(tables))], path=path)
+        try:
+            fit_mod.load_table(path=path, expect=meta)
+            raise SystemExit("a table without provenance was accepted")
+        except AssertionError as err:
+            assert "provenance" in str(err)
+        lines.append(
+            "provenance: a table of another month, fingerprint, builder code, phase, or none is refused"
+        )
     print(*lines, sep="\n")
     print("e00718_check_fit: all checks passed")
     return 0

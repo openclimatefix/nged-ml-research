@@ -175,8 +175,17 @@ def predict(
     assert saved.exists() and saved.read_text() == data.fingerprint, (
         "the standardiser differs from the training phase"
     )
-    tables = {fb.TABLE_ERA5: fit_mod.load_table(path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version="era5")),
-              fb.TABLE_ENS: fit_mod.load_table(path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version=tables_version))}  # fmt: skip
+    expect = fit_mod.table_meta(arm=arm, month=month, fingerprint=data.fingerprint)
+    tables = {
+        fb.TABLE_ERA5: fit_mod.load_table(
+            path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version="era5"),
+            expect=expect,
+        ),
+        fb.TABLE_ENS: fit_mod.load_table(
+            path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version=tables_version),
+            expect=expect,
+        ),
+    }
     source = fb.F9Source(base=data.source, tables=tables)
     model = f9.F9Net(seed=seed).to(device)
     model.load_state_dict(torch.load(state, map_location=device))
