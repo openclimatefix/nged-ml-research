@@ -261,7 +261,50 @@ def mode_table() -> str:
             f"mode {mode}: the host's history does not read the {host_name} array"
         )
         lines.append(f"{mode}: host {host_name}, slots {nbr_name}")
+    lines.append(
+        rewired_injected_check(named=named, src0=src0, scale=scale, table=table, host=host, c=c)
+    )
     return "mode table passed: " + "; ".join(lines)
+
+
+def rewired_injected_check(*, named: dict, src0, scale, table, host: int, c: int) -> str:  # noqa: ANN001
+    """Check that an injected change in a rewired slot leaves a rewired arm's batch unchanged.
+
+    The negative control is mode `predict_injected`, where the same change moves the slot's tokens.
+    """
+    slot_primary = next(
+        q for q in nb.slots_for(table=table, host=host, mode="rewired", seed=0) if q >= 0
+    )
+    assert slot_primary != host
+    touched = named["injected"].clone()
+    touched[slot_primary] = touched[slot_primary] + 2.0
+    batches = {}
+    for mode in ("predict_injected_rewired", "predict_injected"):
+        for tag, injected in (("before", named["injected"]), ("after", touched)):
+            host_arr, nbr_arr, label = fb.arrays_for_mode(
+                mode=mode,
+                named={**named, "injected": injected},  # ty: ignore[invalid-argument-type]
+            )
+            src = fb.F4Source(
+                host=src0.with_power_in(power_in=host_arr), neighbour_power=nbr_arr, mw_scale=scale,
+                table=table, mode="rewired", rewire_seed=0, label=label,
+            )  # fmt: skip
+            batches[mode, tag] = src.assemble(
+                primary=torch.tensor([host]),
+                c_idx=torch.tensor([c]),
+                lead_day=torch.tensor([0]),
+                ensemble=False,
+            )
+    assert fb.ARRAYS_OF_MODE["predict_injected_rewired"] == ("injected", "cleaned")
+    assert tensors_equal(
+        batches["predict_injected_rewired", "before"], batches["predict_injected_rewired", "after"]
+    ), "an injected change at a rewired slot's Primary moved a rewired arm's batch"
+    assert not tensors_equal(
+        batches["predict_injected", "before"], batches["predict_injected", "after"]
+    ), (
+        "negative control failed: the change at the slot's Primary did not move the batch of mode predict_injected"
+    )
+    return f"a change at rewired-slot Primary {slot_primary} leaves mode predict_injected_rewired unchanged (negative control moves it)"
 
 
 def other_checks() -> list[str]:

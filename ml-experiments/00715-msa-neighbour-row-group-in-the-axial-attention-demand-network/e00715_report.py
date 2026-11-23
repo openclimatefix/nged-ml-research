@@ -25,8 +25,21 @@ def fmt(x: object) -> str:
 
 
 def print_waiver() -> bool:
-    """Print experiment 713's gate record, and audit trigger 1 when it is waived; return `waived`."""
-    gate = arms.gate713_summary(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    """Print experiment 713's gate record, and audit trigger 1 when it is waived; return `waived`.
+
+    A missing or refused record is printed, not skipped, and counts as waived (the warm-start states
+    then have no gate to stand on).
+    """
+    try:
+        gate = arms.gate713_summary(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    except AssertionError as err:
+        print(f"Experiment 713's known-answer gate record is refused: {err}")
+        print(
+            "AUDIT TRIGGER 1 FIRED (713 gate record): the warm-start states have no valid gate record."
+        )
+        print()
+        return True
+    failed = " and ".join(gate["failed_checks"])
     print(
         f"Experiment 713's known-answer gate (code hash {gate['code_hash']}): "
         + (
@@ -38,10 +51,11 @@ def print_waiver() -> bool:
     )
     if gate["waived"]:
         print(
-            "AUDIT TRIGGER 1 FIRED: a control of experiment 713 failed (KA3 and KA12). Every F4 warm-start "
-            "state comes from this waived gate, so no era conclusion (S1 to S7, following level shifts, "
-            "the stem arm F4E) is backed by a passing known-answer test. State this beside every verdict, "
-            "headline, and take-home message."
+            f"AUDIT TRIGGER 1 FIRED (713 waiver): a control of experiment 713 failed ({failed}). Every F4 "
+            "warm-start state comes from this waived gate, so no era conclusion (S1 to S7, following level "
+            "shifts, the stem arm F4E) is backed by a passing known-answer test. State this beside every "
+            "verdict, headline, and take-home message. Other firings are reported separately: audit "
+            "trigger 1 (S3) and audit trigger 1 (a failed KN check)."
         )
     print()
     return bool(gate["waived"])

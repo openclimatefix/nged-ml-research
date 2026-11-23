@@ -133,7 +133,8 @@ by a passing known-answer test.** Experiment 713's gate failed two checks at its
 e85b84e2ea04b3cb: KA3 (the follow share of arm `M` on a synthetic world was 0.1418, against a
 threshold of 0.75) and KA12 (arm `G` reached 0.0395, against the threshold of arm `M` minus 0.05,
 which was 0.0918). On 2026-11-23 the maintainer answered "Go ahead with option 1", the option that
-waives KA3 for the real folds and discloses the failure, and confirmed the same waiver for KA12. The
+waives KA3 for the real folds and discloses the failure. The manager relayed the maintainer's "Go
+ahead." to a question that included KA12, so the waiver covers KA3 and KA12. The
 decision is quoted from experiment 713's design amendment 4. No threshold, budget, arm, or decision
 rule changed in experiment 713.
 
@@ -416,7 +417,9 @@ Candidate, M*, F4, and F4-R, with the caveat that NGED's logs may miss events.
 
 **Decision rule and verdict.** Each group is read on N1, with D the point estimate and [L, U] the
 98.75% interval, and τ = 0.03 and δ = 0.094 (six) or 0.25 (eight). The group's reading is the first
-row that holds.
+row that holds. Every verdict carries the statement that experiment 713's known-answer gate was
+waived, so the warm-start states are not backed by a passing known-answer test (see the section on
+the waiver above); the statement does not change how N1 and N2 are scored.
 
 | Order | Group reading | Condition |
 |---|---|---|
@@ -443,7 +446,9 @@ A verdict of `not supported` or `refuted` closes neighbour rows in the axial-att
 
 ## Secondary contrasts on injected events
 
-**Everything in this section is secondary, is read at 95%, and changes no verdict.** More than 20
+**Everything in this section is secondary, is read at 95%, and changes no verdict. Every reading of
+this section also rests on warm-start states from experiment 713's waived known-answer gate, so none
+is backed by a passing known-answer test.** More than 20
 readings are planned, so several false positives are likely, and no secondary reading is quoted
 without that count beside it. Two injected worlds are used: experiment 709's bank (64 passes) and
 experiment 714's second generator (128 passes, 256 permanent changes and 256 temporary moves, of
@@ -524,7 +529,7 @@ and the fit script refuses to run a real fold without it. A failed check fires a
 | KN8, repeat of M* | F4-0 on fold 2025-11, seed 0, against the stored M* forecast: the largest absolute difference of the median is printed. KN8 does not gate the fits | At most 1e-3 of capacity, else the F4-0 reading below |
 | KN9, host-scale power | The host-scale value equals an independent NumPy computation; a synthetic transfer of fixed megawatts gives equal and opposite changes | 1e-5 |
 | KN10, time-shuffle draw | No shuffled row is younger than 16 days, the draw repeats, and no row repeats in a sample | Exact |
-| KN11, injected worlds | (a) The injected panels equal the cleaned power outside the touched Primaries and windows. (b) Before phase 4, F4's prediction path with a stored M* state reproduces experiment 713's stored bank forecasts, and is skipped with a statement if they do not exist | 1e-6 of capacity; 1e-4 of capacity |
+| KN11, injected worlds | (a) The injected panels equal the cleaned power outside the touched Primaries and windows. (b) Before phase 4, F4's prediction path with a stored M* state reproduces experiment 713's stored bank forecasts, and is skipped with a statement if they do not exist. (c) An injected change at a Primary that sits in a rewired slot leaves the assembled batch of a rewired arm unchanged (the mode `predict_injected_rewired`), and moves the batch of the mode `predict_injected` (negative control) | 1e-6 of capacity; 1e-4 of capacity |
 | KN12, weather look-ahead | Experiment 713's gate statement is printed for this experiment | The gate prints PASS |
 | KN13, prediction path on a real fold | F4's `predict` on the stored stage 3 state of M* for fold 2025-11, seed 0, against the stored forecast file | Same keys; at most 1e-6 of capacity |
 
@@ -577,8 +582,10 @@ implementer and reviewer brief must assert that statement, and KN12 prints it.
   generator separates every event; the implementer asserts it on every pass). Experiment 709's
   bank does not have that property, so every bank reading drops the temporary moves whose donor has
   another event's site in a slot, prints the count, and is labelled as carrying the bank's other
-  cues. The rewired slots exclude every touched Primary, and an event whose rewired set holds one is
-  dropped from S1 to S3 for every arm with the count printed.
+  cues. On the injected worlds, the rewired arms `F4-R` and `F4-WR` read the cleaned array in every
+  slot, so no rewired slot shows an injected change, and no event is dropped for its rewired slots (a
+  recorded departure, see the section on leakage in the design). The count of events whose rewired
+  set holds a touched Primary is printed beside the readings.
 - **The training world shares no function with the scoring generators:** the mirror world is built
   on experiment 581's schedule, the bank uses experiment 660's generator, and the second generator is
   experiment 714's.

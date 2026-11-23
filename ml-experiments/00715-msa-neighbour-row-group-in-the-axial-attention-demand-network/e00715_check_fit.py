@@ -50,17 +50,75 @@ def build_folder(*, root: Path) -> None:
     gate = arms.gate_file(data_dir=root)
     gate.parent.mkdir(parents=True, exist_ok=True)
     gate.write_text(json.dumps({"code": arms.code_record()}))
-    gate713 = a713.root(data_dir=root) / "work" / "known_answers_passed.json"
-    gate713.parent.mkdir(parents=True, exist_ok=True)
-    gate713.write_text(
-        json.dumps(
-            {
-                "KA2": {"pass": True}, "KA3": {"pass": False}, "KA12": {"pass": False}, "waived": True,
-                "waiver": {"date": "2026-11-23", "decision_quoted": "Go ahead with option 1"},
-                "code": {"code_hash": a713.code_hash()},
-            }
-        )
-    )  # fmt: skip
+    write_gate713(root=root, record=valid_gate713())
+
+
+def valid_gate713() -> dict:
+    """Return a record shaped like experiment 713's waived gate file (KA3 and KA12 failed, waived)."""
+    return {
+        "KA2": {"pass": True}, "KA3": {"pass": False}, "KA4": {"pass": True}, "KA10": {"pass": True},
+        "KA12": {"pass": False}, "KA5": "text", "KA6": "text", "waived": True,
+        "waiver": {
+            "date": "2026-11-23", "decision_quoted": "Go ahead with option 1",
+            "failed_checks": ["KA12", "KA3"], "thresholds_changed": False,
+        },
+        "code": {"code_hash": a713.code_hash()},
+    }  # fmt: skip
+
+
+def write_gate713(*, root: Path, record: dict) -> Path:
+    """Write `record` as experiment 713's gate file under `root`; return the path."""
+    path = a713.root(data_dir=root) / "work" / "known_answers_passed.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record))
+    return path
+
+
+def gate713_refusals(*, root: Path) -> dict[str, bool]:
+    """Check that `arms.gate713_summary` accepts the waived record and refuses each wrong one, by message."""
+    results = {}
+    write_gate713(root=root, record=valid_gate713())
+    results["j: the waived record of 713 is accepted"] = arms.gate713_summary(data_dir=root)["failed_checks"] == [
+        "KA12", "KA3",
+    ]  # fmt: skip
+
+    def mutate(fn) -> dict:
+        record = valid_gate713()
+        fn(record)
+        return record
+
+    cases = {
+        "a changed 713 code hash": (lambda r: r["code"].update(code_hash="0000000000000000"), "now has hash"),
+        "an extra failed check (KA2)": (lambda r: r["KA2"].update({"pass": False}), "not ['KA12', 'KA3']"),
+        "KA12 passing while waived": (lambda r: r["KA12"].update({"pass": True}), "not ['KA12', 'KA3']"),
+        "KA3 without a `pass` key": (lambda r: r["KA3"].pop("pass"), "has no boolean `pass`"),
+        "a string `waived`": (lambda r: r.update(waived="false"), "not a boolean"),
+        "no code block": (lambda r: r.pop("code"), "has no code block"),
+        "no waiver block": (lambda r: r.pop("waiver"), "does not name the failed checks"),
+        "a waiver that changed a threshold": (lambda r: r["waiver"].update(thresholds_changed=True), "no threshold changed"),
+        "another quoted decision": (lambda r: r["waiver"].update(decision_quoted="ok"), "quote the maintainer's decision"),
+        "a failed check without a waiver": (lambda r: r.update(waived=False), "no waiver"),
+        "an empty record": (lambda r: r.clear(), "has no code block"),
+        "KA5 missing": (lambda r: r.pop("KA5"), "KA5 or KA6 is not recorded"),
+    }  # fmt: skip
+    for name, (fn, expected) in cases.items():
+        write_gate713(root=root, record=mutate(fn))
+        try:
+            arms.gate713_summary(data_dir=root)
+        except AssertionError as err:
+            results[f"j: {name} is refused with the right message"] = expected in str(err)
+        else:
+            results[f"j: {name} is refused with the right message"] = False
+    passing = valid_gate713()
+    passing["KA3"]["pass"] = passing["KA12"]["pass"] = True
+    passing.pop("waived")
+    passing.pop("waiver")
+    write_gate713(root=root, record=passing)
+    results["j: a passed gate with no waiver is accepted"] = not arms.gate713_summary(
+        data_dir=root
+    )["waived"]
+    write_gate713(root=root, record=valid_gate713())
+    return results
 
 
 class Stub:
@@ -185,6 +243,7 @@ def main() -> int:
             (3, 60),
         ]
         results["e: the log records both runs"] = log["stages"][0]["rerun"] is not None
+        results.update(gate713_refusals(root=root))
     for name, ok in results.items():
         print(("PASS" if ok else "FAIL"), name)
     return 0 if all(results.values()) else 1

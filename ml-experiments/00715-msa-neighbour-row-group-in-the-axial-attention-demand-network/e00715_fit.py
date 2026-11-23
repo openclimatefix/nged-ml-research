@@ -27,6 +27,12 @@ hash file, `selection.json`, and the `cache/` folder. **A write by F4 to any oth
 713's folder is not detected.** A failed assertion marks the final log `watch_failed`, and a finished-job
 skip refuses such a log.
 
+**The gate record of experiment 713.** The fit refuses to start unless `arms.gate713_summary` accepts
+experiment 713's gate file: the code block, 713's current code hash, the boolean results of KA2, KA3,
+KA4, KA10, and KA12, and either a pass or the waiver that names exactly KA3 and KA12. The record goes
+into the final fit log as `e00713_gate`, and only the final log carries it; a final log rebuilt from
+the stage logs takes the entry of the run that rebuilt it.
+
 **GPU memory.** `--checkpoint-neighbours` recomputes the neighbour path in the backward pass; the log
 records the flag. Code review 2 estimated the peak at about 6.2 GB per process with the flag and
 9.5 GB without. The first fit of phase 0 measures `peak_gpu_mb`; plan one process per slot, or 7 GB

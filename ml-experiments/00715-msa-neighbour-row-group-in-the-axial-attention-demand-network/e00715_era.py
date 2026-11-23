@@ -14,11 +14,12 @@ Usage:
 **Prediction only.** The onset lies after every fit's cutoff, so every fitted state was trained on
 the real
 power. `predict` loads the stored stage 3 state of an arm, reads the injected panel as the host's history
-and as the neighbour power (mode `predict_injected`: the real neighbours of an injected host carry their
-own injected power too), and forecasts each event's host at the origins 7, 10, 14, and 21 days after
-the
-onset at all 14 lead days. **Every origin day is bounded by the days `ens.run_us` holds**, checked by
-`e00715_batch.check_origin_days`, and an origin outside them is dropped and counted in the log.
+and as the neighbour power (mode `predict_injected`: the real neighbours of an injected host carry
+their own injected power too). The rewired arms `F4-R` and `F4-WR` read the cleaned power in every
+slot (mode `predict_injected_rewired`, design section 9 rule 4 as amended). Each event's host is
+forecast at the origins 7, 10, 14, and 21 days after the onset at all 14 lead days. **Every origin
+day is bounded by the days `ens.run_us` holds**, checked by `e00715_batch.check_origin_days`, and an
+origin outside them is dropped and counted in the log.
 
 **Two worlds.** `g2` is experiment 714's second generator (`00714-*/worlds/g2/<month>_p<n>.npz` and the
 truth parquet). `bank` is experiment 709's bank, read through experiment 713's adapter. A permanent
@@ -190,7 +191,8 @@ def slot_flags(
     `slot_other_event` is true where the real slots of an event's host hold a site of another event
     of the pass (a host, or the recipient of a transfer). `rewired_touched` is true where the
     rewired slots of the host, for any seed of the fits, hold a Primary that carries an injected
-    change in the pass. On the second generator, rule 3 is asserted: no host has such a slot.
+    change in the pass; it drops nothing (see `with_keep`). On the second generator, rule 3 is
+    asserted: no host has such a slot.
     """
     hosts = truth["host"].to_list()
     recipients = (
@@ -348,8 +350,15 @@ def injected_forecasts(
         z = torch.from_numpy(
             ((panel - data.target_mean[:, None]) / data.target_std[:, None]).astype(np.float32)
         ).to(device)
-        named: dict[fb.ArrayName, torch.Tensor] = {"injected": z}
-        host_arr, nbr_arr, label = fb.arrays_for_mode(mode="predict_injected", named=named)
+        rewired = spec is not None and spec.slots == "rewired"
+        assert z.shape == base.neighbour_power.shape, (z.shape, base.neighbour_power.shape)
+        named: dict[fb.ArrayName, torch.Tensor] = {"injected": z, "cleaned": base.neighbour_power}
+        host_arr, nbr_arr, label = fb.arrays_for_mode(
+            mode="predict_injected_rewired" if rewired else "predict_injected", named=named
+        )
+        assert (label == "cleaned") == rewired and (nbr_arr is base.neighbour_power) == rewired, (
+            "a rewired arm must read the cleaned array in every slot, and no other arm may"
+        )
         src = base.with_arrays(host_power_in=host_arr, neighbour_power=nbr_arr, label=label)
         pairs = event_origins(truth=truth, ens_days=ens_days)
         dropped += len(truth) * len(ORIGIN_DAYS) - len(pairs)
@@ -648,12 +657,13 @@ FOLLOW_LEAD_DAYS_RANGE: Final = (FOLLOW_LEAD_DAYS.start, FOLLOW_LEAD_DAYS.stop -
 def with_keep(*, frame: pl.DataFrame, world: str, readings: str) -> pl.DataFrame:
     """Drop the events that design section 9 excludes, for `readings` `s1_s3` or `s4_s7`; return the rest.
 
-    Rule 4 drops an event from S1 to S3 when its rewired slots hold a touched Primary. Rule 3 drops,
-    on the bank, a temporary move whose donor has another event's site in a slot, from every reading.
+    Rule 3 drops, on the bank, a temporary move whose donor has another event's site in a slot, from
+    every reading. Rule 4 drops no event: the rewired arms read the cleaned array in every slot
+    (mode `predict_injected_rewired`), so a touched Primary in a rewired slot shows no injected change,
+    and `rewired_touched` stays in the truth table as the record of how many events the old rule would
+    have dropped.
     """
     keep = pl.lit(True)
-    if readings == "s1_s3":
-        keep = keep & ~pl.col("rewired_touched")
     if world == "bank":
         keep = keep & ~(pl.col("slot_other_event") & (pl.col("truth") == "switch"))
     out = frame.filter(keep)
@@ -960,7 +970,7 @@ def selftest() -> int:
         world="g2",
         readings="s1_s3",
     )
-    assert kept.height == 2
+    assert kept.height == 3, "rule 4 drops no event"
     # visible change: a step of 0.1 from half-hour 480 is visible only up to the origin's newest visible half-hour
     clean = np.zeros((16, 2000))
     panel = clean.copy()

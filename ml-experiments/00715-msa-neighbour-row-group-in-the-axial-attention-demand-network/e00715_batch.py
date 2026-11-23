@@ -29,7 +29,14 @@ import e00715_neighbours as nb
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
 
-Mode = Literal["stage2", "stage3_main", "stage3_mirror", "predict_real", "predict_injected"]
+Mode = Literal[
+    "stage2",
+    "stage3_main",
+    "stage3_mirror",
+    "predict_real",
+    "predict_injected",
+    "predict_injected_rewired",
+]
 ArrayName = Literal["cleaned", "shifted", "mirror", "injected"]
 
 NEIGHBOUR_DROPOUT: Final = 0.15
@@ -44,8 +51,14 @@ ARRAYS_OF_MODE: Final[dict[Mode, tuple[ArrayName, ArrayName]]] = {
     "stage3_mirror": ("mirror", "mirror"),
     "predict_real": ("cleaned", "cleaned"),
     "predict_injected": ("injected", "injected"),
+    "predict_injected_rewired": ("injected", "cleaned"),
 }
-"""For each mode of design section 5.2, the array the host's history reads and the array the neighbour slots read."""
+"""For each mode of design section 5.2, the array the host's history reads and the array the neighbour slots read.
+
+`predict_injected_rewired` is the mode of the rewired arms (`F4-R`, `F4-WR`) on an injected world: a rewired
+arm has no real neighbour, so every rewired slot reads the cleaned array and no slot shows an injected
+change (design section 9 rule 4, as amended).
+"""
 DROP_KEY: Final = 4_150_715
 
 

@@ -290,28 +290,60 @@ def code_record() -> dict:
     }
 
 
-def gate713_summary(*, data_dir: Path) -> dict:
-    """Return what experiment 713's gate file says: the code hash, the failed checks, and the waiver.
+GATE713_CHECKS: Final = ("KA2", "KA3", "KA4", "KA10", "KA12")
+"""The checks of experiment 713's gate that carry a boolean `pass`; KA5 and KA6 are recorded as text."""
+GATE713_WAIVED_FAILURES: Final = ["KA12", "KA3"]
+"""The failed checks the maintainer's waiver covers (design amendment 4 of experiment 713)."""
+GATE713_DECISION: Final = "Go ahead with option 1"
 
-    The file is `work/known_answers_passed.json` in experiment 713's data folder. It exists when the
-    gate passed, or when the maintainer waived a failed gate (`waived` is true). A record that has a
-    failed check and no waiver is refused.
+
+def gate713_summary(*, data_dir: Path) -> dict:
+    """Return what experiment 713's gate file says, and refuse every record that is not the one the waiver names.
+
+    The file is `work/known_answers_passed.json` in experiment 713's data folder. A record is accepted
+    only when it holds the code block, its code hash equals experiment 713's current hash, a boolean
+    `pass` for each of KA2, KA3, KA4, KA10, and KA12, and the text of KA5 and KA6, and either (a) all
+    five checks pass and `waived` is absent or false, or (b) `waived` is true, the failed checks are
+    exactly KA3 and KA12, and the waiver block repeats them, says that no threshold changed, and
+    quotes the maintainer's decision.
     """
     path = a713.root(data_dir=data_dir) / "work" / "known_answers_passed.json"
     assert path.exists(), (
         f"{path} is missing: experiment 713's known-answer gate has neither passed nor been waived"
     )
     record = json.loads(path.read_text())
-    failed = sorted(
-        k
-        for k, v in record.items()
-        if k.startswith("KA") and isinstance(v, dict) and v.get("pass") is False
+    code = record.get("code")
+    assert isinstance(code, dict) and code.get("code_hash"), f"{path} has no code block"
+    assert code["code_hash"] == a713.code_hash(), (
+        f"{path} was written at experiment 713's code hash {code['code_hash']}, and that code now has hash {a713.code_hash()}"
     )
-    waived = bool(record.get("waived", False))
-    assert waived or not failed, f"{path} holds failed checks {failed} and no waiver"
+    for name in GATE713_CHECKS:
+        entry = record.get(name)
+        assert isinstance(entry, dict) and isinstance(entry.get("pass"), bool), (
+            f"{path}: check {name} has no boolean `pass`"
+        )
+    assert "KA5" in record and "KA6" in record, f"{path}: KA5 or KA6 is not recorded"
+    failed = sorted(name for name in GATE713_CHECKS if record[name]["pass"] is False)
+    waived = record.get("waived", False)
+    assert isinstance(waived, bool), f"{path}: `waived` is {waived!r}, not a boolean"
     waiver = record.get("waiver") or {}
+    if waived:
+        assert failed == GATE713_WAIVED_FAILURES, (
+            f"{path} is waived, and its failed checks are {failed}, not {GATE713_WAIVED_FAILURES}"
+        )
+        assert waiver.get("failed_checks") == failed, (
+            f"{path}: the waiver block does not name the failed checks {failed}"
+        )
+        assert waiver.get("thresholds_changed") is False, (
+            f"{path}: the waiver does not state that no threshold changed"
+        )
+        assert waiver.get("decision_quoted") == GATE713_DECISION, (
+            f"{path}: the waiver does not quote the maintainer's decision"
+        )
+    else:
+        assert not failed, f"{path} holds failed checks {failed} and no waiver"
     return {
-        "waived": waived, "failed_checks": failed, "code_hash": (record.get("code") or {}).get("code_hash"),
+        "waived": waived, "failed_checks": failed, "code_hash": code["code_hash"],
         "date": waiver.get("date"), "decision_quoted": waiver.get("decision_quoted"),
         "decision_ka12": waiver.get("decision_ka12"), "path": str(path),
     }  # fmt: skip
