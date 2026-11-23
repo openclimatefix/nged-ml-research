@@ -1,4 +1,4 @@
-# ruff: noqa: E501, T201, PLR0913, PLR0915, PT018
+# ruff: noqa: E501, PLR0915, PT018
 """Experiment 720, rung 0e: V4 and the analyses of section 3 of the addendum, as pure functions.
 
 Every function takes arrays and returns arrays or small tables with no dates and no generator values.
