@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PLR0911, PLR1714
+# ruff: noqa: E501, PLR0911
 """Experiment 718: retrieval of history rows, the placebo draws, and the row tables (design section 2).
 
 A row table holds, for each (Primary, origin day, lead day), the ages of the history rows of one arm,
