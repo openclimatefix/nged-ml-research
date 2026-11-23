@@ -103,6 +103,9 @@ class RowTable:
         ages: (P, D, 14, n_rows) int16 ages, ascending, `ABSENT` where no block fills the row.
         measure: (P, D, 14, n_rows) int8, the measure code of each row.
         no_weather: (P, D, 14) bool, a target row with no weather (the weather rows took the youngest).
+        distance: (P, D, 14, n_rows) float32, the weather distance of each chosen block to the target row
+            (NaN for an absent row, or where the target row has no weather). It is a read-out only: the
+            network never reads it.
     """
 
     arm: str
@@ -111,6 +114,7 @@ class RowTable:
     ages: np.ndarray
     measure: np.ndarray
     no_weather: np.ndarray
+    distance: np.ndarray | None = None
 
     def lookup(self, *, primary: np.ndarray, day: np.ndarray, lead_day: np.ndarray) -> np.ndarray:
         """Return the (N, n_rows) ages of the samples, by Primary index, day number, and lead day."""
@@ -132,8 +136,16 @@ class RowTable:
         """Return the sha256 (16 hex digits) of the arm, the keys, and the contents."""
         h = hashlib.sha256()
         h.update(self.arm.encode())
-        for arr in (self.primaries, self.days, self.ages, self.measure, self.no_weather):
-            h.update(np.ascontiguousarray(arr).tobytes())
+        for arr in (
+            self.primaries,
+            self.days,
+            self.ages,
+            self.measure,
+            self.no_weather,
+            self.distance,
+        ):
+            if arr is not None:
+                h.update(np.ascontiguousarray(arr).tobytes())
         return h.hexdigest()[:16]
 
 
@@ -526,6 +538,7 @@ def build_table(
     )
     meas_out = np.full(ages_out.shape, lay.MEASURE_FIXED, dtype=np.int8)
     no_weather = np.zeros(ages_out.shape[:3], dtype=bool)
+    dist_out = np.full(ages_out.shape, np.nan, dtype=np.float32)
     needs_weather = arm in {"R", "R-A", "U", "U-A", "UX", "U27", "U27-A"}
     use_calendar = (arm == "UX") if with_calendar is None else with_calendar
     for pi, p in enumerate(primaries):
@@ -573,8 +586,12 @@ def build_table(
                     lead_day=lead, primary=int(p), day=int(day),
                 )  # fmt: skip
                 ages_out[pi, di, lead], meas_out[pi, di, lead] = a, m
+                if distance is not None:
+                    got = a >= 0
+                    pos = np.searchsorted(pool_ages, a[got])
+                    dist_out[pi, di, lead][got] = distance[pos]
                 no_weather[pi, di, lead] = nw and needs_weather
     return RowTable(
         arm=arm, primaries=np.asarray(primaries), days=np.asarray(days), ages=ages_out,
-        measure=meas_out, no_weather=no_weather,
+        measure=meas_out, no_weather=no_weather, distance=dist_out,
     )  # fmt: skip

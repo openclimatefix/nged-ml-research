@@ -53,6 +53,24 @@ def share_changed(*, base: ret.RowTable, swapped: ret.RowTable) -> dict[str, flo
     }
 
 
+def mean_distance_by_lead(
+    *, table: ret.RowTable, measure: int | None = lay.MEASURE_WEATHER
+) -> np.ndarray:
+    """Return the mean selected weather distance of each lead day (14,), over the rows chosen by `measure` (None: every row).
+
+    The `era5` table gives stage 1's value and the `ens` table gives stages 2 and 3's, which is the
+    comparison that section 12 asks for. Rows with no distance (absent rows, targets with no weather)
+    are left out.
+    """
+    assert table.distance is not None, "the table holds no distances: rebuild it"
+    d = table.distance.astype(np.float64)
+    if measure is not None:
+        d = np.where(table.measure == measure, d, np.nan)
+    flat = np.moveaxis(d, 2, 0).reshape(lay.N_LEAD_DAYS, -1)
+    count = np.isfinite(flat).sum(axis=1)
+    return np.where(count > 0, np.nansum(flat, axis=1) / np.maximum(count, 1), np.nan)
+
+
 def alpha_by_bucket(*, alpha: torch.Tensor, age_bucket: torch.Tensor) -> np.ndarray:
     """Return the mean total read-out weight of each of the 24 age buckets.
 
@@ -110,8 +128,18 @@ def self_test() -> int:
     )  # fmt: skip
     changed = share_changed(base=base, swapped=shifted)
     assert 0.0 < changed["rows_changed"] < 1.0, changed
+    dist = mean_distance_by_lead(table=base)
+    assert (
+        dist.shape == (lay.N_LEAD_DAYS,)
+        and bool(np.isfinite(dist).all())
+        and bool((dist >= 0).all())
+    )
+    assert base.distance is not None
+    manual = base.distance[:, :, 3][base.measure[:, :, 3] == lay.MEASURE_WEATHER].astype(np.float64)
+    assert abs(dist[3] - manual.mean()) < 1e-9
     lines = [
-        f"swap: no stored forecast changes no row, and a shifted forecast for ages 2 to 5 changes {100 * changed['rows_changed']:.1f}% of rows ({100 * changed['samples_with_a_change']:.1f}% of samples)"
+        f"distance: the mean selected distance by lead day is read from the table ({dist.min():.2f} to {dist.max():.2f} on the synthetic fold)",
+        f"swap: no stored forecast changes no row, and a shifted forecast for ages 2 to 5 changes {100 * changed['rows_changed']:.1f}% of rows ({100 * changed['samples_with_a_change']:.1f}% of samples)",
     ]
     fsource = fb.F9Source(base=source, tables={fb.TABLE_ERA5: base, fb.TABLE_ENS: base})
     primary, c_idx, lead = cb.samples(n=24)

@@ -86,6 +86,7 @@ def save_table(*, table: ret.RowTable, path: Path) -> None:
         ages=table.ages,
         measure=table.measure,
         no_weather=table.no_weather,
+        distance=table.distance,  # ty: ignore[invalid-argument-type]
         digest=table.digest(),
     )
     tmp.rename(path)
@@ -101,6 +102,7 @@ def load_table(*, path: Path) -> ret.RowTable:
         ages=z["ages"],
         measure=z["measure"],
         no_weather=z["no_weather"],
+        distance=z["distance"],
     )
     assert table.digest() == str(z["digest"]), f"{path} does not match its digest"
     return table
