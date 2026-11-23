@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501, PT018, PLR0911, PLR1714
 """Experiment 718, WP1: checks of the retrieval measures, the placebo draws (KR4), and the row tables.
 
 Every check runs on synthetic arrays on the CPU: a grid of 600 days, 3 Primaries with gaps, random
