@@ -732,3 +732,30 @@ def target_doy(*, first_day: int, n_days: int) -> np.ndarray:
     stamp_us = GRID_START_US + grid * STEP_US
     out = pl.Series(stamp_us.reshape(-1)).cast(pl.Datetime("us")).dt.ordinal_day().to_numpy()
     return out.astype(np.float64).reshape(stamp_us.shape)
+
+
+def monthly_mean_temperature(
+    *, raw: np.ndarray, cutoff_idx: int, window_days: int = 730
+) -> np.ndarray:
+    """Return the temperature (16, G) with each token's value replaced by the Primary's mean 2 m temperature of the same calendar month.
+
+    The mean is taken over the `window_days` before `cutoff_idx` (the fold's training days). This is
+    the temperature of the CAMS-rule read-out (design section 7.5), because the history estimate otherwise reads ERA5 temperature, which a live service would not have.
+    """
+    n_primary, n_grid = raw.shape[:2]
+    stamps = GRID_START_US + np.arange(n_grid, dtype=np.int64) * STEP_US
+    month = pl.Series(stamps).cast(pl.Datetime("us")).dt.month().to_numpy()
+    lo = max(0, cutoff_idx - window_days * GRID_STEPS_PER_DAY)
+    out = np.zeros((n_primary, n_grid), dtype=np.float64)
+    for i in range(n_primary):
+        temp = np.asarray(raw[i, :, DRAW_COLUMNS["temperature"]], dtype=np.float64)
+        window = temp[lo:cutoff_idx]
+        window_month = month[lo:cutoff_idx]
+        means = np.array(
+            [
+                np.nanmean(window[window_month == m]) if (window_month == m).any() else np.nan
+                for m in range(1, 13)
+            ]
+        )
+        out[i] = means[month - 1]
+    return out

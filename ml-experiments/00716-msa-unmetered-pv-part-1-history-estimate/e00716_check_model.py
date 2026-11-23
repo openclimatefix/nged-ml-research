@@ -1,4 +1,4 @@
-# ruff: noqa: E501, B023, ISC004
+# ruff: noqa: E501, B023, ISC004, E731
 """Experiment 716: the checks of `e00716_model.py` that need no data (KF1, KF8, the parameter counts; WP2).
 
 Usage: run.sh e00716_check_model.py
@@ -20,7 +20,7 @@ B = 6
 def random_inputs(*, seed: int, b: int = B) -> pvm.PvInputs:
     """Return a random batch with every field of experiment 713's inputs and the four PV tensors."""
     g = torch.Generator().manual_seed(seed)
-    rnd = lambda *shape: torch.randn(*shape, generator=g)  # noqa: E731
+    rnd = lambda *shape: torch.randn(*shape, generator=g)
     visible = torch.rand(b, 14, 48, generator=g) > 0.3
     return pvm.PvInputs(
         primary=torch.randint(0, 16, (b,), generator=g),  # ty: ignore[unknown-argument]

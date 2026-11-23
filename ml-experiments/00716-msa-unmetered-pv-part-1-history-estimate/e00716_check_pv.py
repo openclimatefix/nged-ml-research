@@ -230,12 +230,91 @@ def kf5_capacity() -> list[str]:
     return out
 
 
+def kf3c_target_donor() -> list[str]:
+    """Check `target_estimate` and its `HT-S` donor: identity, donor-only dependence, and missing donors."""
+    rng = np.random.default_rng(5)
+    n_days, first_day = 40, 200
+    n = pv.N_ENS_STEPS
+    hour = (np.arange(n) % 48) / 2.0
+    elevation = np.sin(np.pi * np.clip((hour - 4.0) / 16.0, 0.0, 1.0))
+    day_factor = 0.5 + 0.4 * rng.uniform(size=(n_days, 1))
+    cosz = np.clip(day_factor * elevation[None, :], 0.0, 1.0) - 0.2 * (elevation[None, :] <= 0)
+    clear = pv.clear_sky(cos_zenith=cosz)
+    values = np.zeros((16, n_days, n, 4), dtype=np.float32)
+    azimuth = np.zeros((16, n_days, n, 2), dtype=np.float32)
+    for i in range(16):
+        values[i, ..., 0] = clear * rng.uniform(0.2, 1.0, size=(n_days, 1))
+        values[i, ..., 1] = 0.1 * values[i, ..., 0]
+        values[i, ..., 2] = 9.0
+        values[i, ..., 3] = cosz
+        azimuth[i, ..., 0] = 0.3
+        azimuth[i, ..., 1] = -0.9
+    filled = np.ones((16, n_days, n), dtype=bool)
+    raw = pv.TargetRaw(
+        values=values,
+        azimuth=azimuth,
+        filled=filled,
+        first_day=first_day,
+        run_us=np.ones((16, n_days), np.int64),
+    )
+    doy = pv.target_doy(first_day=first_day, n_days=n_days)
+    scale = np.full(16, 0.8)
+    scale[15] = 0.0
+    std = np.full(16, 0.3)
+    real = pv.target_estimate(raw=raw, doy_of_day=doy, share_scale=scale, target_std=std)
+    same = pv.target_estimate(
+        raw=raw, doy_of_day=doy, share_scale=scale, target_std=std, donor_day=np.arange(n_days)
+    )
+    assert np.array_equal(real.filled, same.filled)
+    assert np.abs(real.p0 - same.p0).max() <= 1e-4, np.abs(real.p0 - same.p0).max()
+    assert not real.filled[15].any() and real.filled[:15].all(), (
+        "an absent Primary must have no target-row estimate"
+    )
+    donor = np.arange(n_days) - 28
+    donor[:28] = np.arange(28) + 28  # the first 28 origin days read the run 28 days later
+    shifted = pv.target_estimate(
+        raw=raw, doy_of_day=doy, share_scale=scale, target_std=std, donor_day=donor
+    )
+    poisoned = raw.values.copy()
+    poisoned[:, 30:, :, 0] = (
+        1e6  # the own-day sky of days 30 and later; days 30 to 39 have donors 2 to 11
+    )
+    raw_p = pv.TargetRaw(
+        values=poisoned, azimuth=azimuth, filled=filled, first_day=first_day, run_us=raw.run_us
+    )
+    shifted_p = pv.target_estimate(
+        raw=raw_p, doy_of_day=doy, share_scale=scale, target_std=std, donor_day=donor
+    )
+    # Day 30's own sky is poisoned, but day 30 reads donor day 2, which is not poisoned: its estimate must not change.
+    assert shifted.filled[:15, 30:].all() and np.array_equal(
+        shifted.p0[:15, 30:], shifted_p.p0[:15, 30:]
+    ), "the HT-S estimate depends on the own-day sky"
+    assert shifted.filled[:15, :12].all() and not shifted.filled[:15, 12:28].any(), (
+        "origins whose later donor lies past the table must be unfilled"
+    )
+    # Negative control: days 2 to 11 serve as donors of days 30 to 39 and are not poisoned; the real estimate of day 30 does change.
+    real_p = pv.target_estimate(raw=raw_p, doy_of_day=doy, share_scale=scale, target_std=std)
+    assert np.abs(real_p.p0[:15, 30:] - real.p0[:15, 30:]).max() > 1.0, (
+        "negative control: poisoning must move the real estimate"
+    )
+    # Donors beyond the table are not filled.
+    short = pv.target_estimate(
+        raw=raw, doy_of_day=doy, share_scale=scale, target_std=std, donor_day=np.arange(n_days) + 35
+    )
+    assert not short.filled[:15, 5:].any() and short.filled[:15, :5].all(), short.filled[:15].sum(
+        axis=(1, 2)
+    )
+    return [
+        "KF3c: the target-row estimate equals itself under an identity donor to 1e-4; a poisoned own-day sky leaves the HT-S estimate unchanged; a missing donor leaves the row unfilled"
+    ]
+
+
 def main() -> int:
     """Run the requested checks and print every line."""
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     lines: list[str] = []
     if which in {"synthetic", "all"}:
-        lines += kf4_estimate() + kf3_placebos()
+        lines += kf4_estimate() + kf3_placebos() + kf3c_target_donor()
     if which in {"capacity", "all"}:
         lines += kf5_capacity()
     print("\n".join(lines))

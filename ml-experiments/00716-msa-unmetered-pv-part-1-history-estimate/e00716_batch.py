@@ -105,6 +105,16 @@ class PvSource:
         return PvSource(source=self.source.with_power_in(power_in=power_in), tables=self.tables)
 
     @property
+    def ens(self) -> bt.EnsTensors | None:
+        """Return the wrapped source's ensemble table (713's `make_samples` reads it)."""
+        return self.source.ens
+
+    @property
+    def steps(self) -> torch.Tensor:
+        """Return the 48 column indices of the wrapped source."""
+        return self.source.steps
+
+    @property
     def power_z(self) -> torch.Tensor:
         """Return the wrapped source's standardised power."""
         return self.source.power_z

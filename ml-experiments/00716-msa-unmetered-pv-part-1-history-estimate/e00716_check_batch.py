@@ -213,7 +213,7 @@ def main() -> int:
     if which == "real":
         import e00716_fit as fit  # ty: ignore[unresolved-import]
 
-        ps = fit.build_pv_source_for_check(month=sys.argv[2])
+        ps = fit.build_pv_source_for_check(month=sys.argv[2])  # ty: ignore[unresolved-attribute]
         lines += kf2_poison(ps=ps, n=64)
     else:
         source, tables = synthetic_source()
