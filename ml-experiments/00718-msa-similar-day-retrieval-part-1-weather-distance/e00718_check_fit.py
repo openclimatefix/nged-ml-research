@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915, E731
+# ruff: noqa: E501, PLR0915, E731, PT017
 """Experiment 718, WP5a: check the fit's resume and refusal rules on the CPU with a tiny synthetic fold.
 
 The checks run `fit` with `smoke=True` (two passes per stage), random encoders, and the row tables of
