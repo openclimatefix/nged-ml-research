@@ -580,3 +580,155 @@ def check_dense_columns(
     err = float(np.abs(dense - rows).max())
     assert err <= atol, f"dense geometry columns differ from the Candidate rows by {err}"
     return f"dense geometry columns equal the Candidate rows to {err:.2e}"
+
+
+# ------------------------------------------------------------------ the raw ENS target table and the target estimates
+
+N_ENS_STEPS: Final = 14 * GRID_STEPS_PER_DAY
+"""Half-hours of the ENS target table per origin day (672)."""
+
+
+@dataclass
+class TargetRaw:
+    """The raw ENS target-row quantities of the Candidate's rows, in `EnsTensors`' (Primary, origin day, position) layout.
+
+    Attributes:
+        values: (16, n_days, 672, 4) float32: ENS-mean shortwave, ENS-spread shortwave (W/m2), 2 m temperature (C), and the cosine of the zenith, from the float32 rows.
+        azimuth: (16, n_days, 672, 2) float32: the sine and cosine of the azimuth.
+        filled: (16, n_days, 672) bool.
+        first_day: The day number (grid index // 48) of day index 0.
+        run_us: (16, n_days) int64: the issue time of the 00Z run behind each row, 0 where absent.
+    """
+
+    values: np.ndarray
+    azimuth: np.ndarray
+    filled: np.ndarray
+    first_day: int
+    run_us: np.ndarray
+
+
+def target_raw_from_rows(
+    *, x: np.ndarray, primary: np.ndarray, origin_idx: np.ndarray, target_idx: np.ndarray,
+    origin_us: np.ndarray, mean: np.ndarray, std: np.ndarray, first_day: int, n_days: int,
+    native_offset_steps: int = 6, ensemble_lead_us: int = 9 * 3_600_000_000,
+) -> TargetRaw:  # fmt: skip
+    """Scatter the Candidate's standardised rows into a raw target table.
+
+    The shortwave, its spread, and the temperature are un-standardised in float64 from the float32
+    rows (experiment 713's device table is float16, which cannot meet the 1e-6 check of KF4), and the
+    geometry columns 14 to 16 are read as they are, as `e00634_common.unit_curve` does.
+    """
+    c_idx = origin_idx + native_offset_steps
+    day = c_idx // GRID_STEPS_PER_DAY - first_day
+    rel = target_idx - c_idx
+    keep = (rel >= 0) & (rel < N_ENS_STEPS) & (day >= 0) & (day < n_days)
+    n_primary = 16
+    values = np.zeros((n_primary, n_days, N_ENS_STEPS, 4), dtype=np.float32)
+    azimuth = np.zeros((n_primary, n_days, N_ENS_STEPS, 2), dtype=np.float32)
+    filled = np.zeros((n_primary, n_days, N_ENS_STEPS), dtype=bool)
+    run_us = np.zeros((n_primary, n_days), dtype=np.int64)
+    p, d, r = primary[keep], day[keep], rel[keep]
+    xk = x[keep]
+    values[p, d, r, 0] = np.clip(un_standardise(x=xk, column=0, mean=mean, std=std), 0.0, None)
+    values[p, d, r, 1] = np.clip(un_standardise(x=xk, column=7, mean=mean, std=std), 0.0, None)
+    values[p, d, r, 2] = un_standardise(x=xk, column=2, mean=mean, std=std)
+    values[p, d, r, 3] = xk[:, 14]
+    azimuth[p, d, r] = xk[:, 15:17]
+    filled[p, d, r] = True
+    run_us[p, d] = origin_us[keep] - ensemble_lead_us
+    return TargetRaw(
+        values=values, azimuth=azimuth, filled=filled, first_day=first_day, run_us=run_us
+    )
+
+
+def merge_target_raw(*, base: TargetRaw, other: TargetRaw) -> TargetRaw:
+    """Return `base` with the filled entries of `other` written over it (the scored rows over the training rows)."""
+    assert base.first_day == other.first_day
+    take = other.filled
+    values = np.where(take[..., None], other.values, base.values)
+    azimuth = np.where(take[..., None], other.azimuth, base.azimuth)
+    run_us = np.where(take.any(axis=-1), other.run_us, base.run_us)
+    return TargetRaw(
+        values=values,
+        azimuth=azimuth,
+        filled=base.filled | take,
+        first_day=base.first_day,
+        run_us=run_us,
+    )
+
+
+def target_estimate(
+    *, raw: TargetRaw, doy_of_day: np.ndarray, share_scale: np.ndarray, target_std: np.ndarray,
+    donor_day: np.ndarray | None = None, u99: float | None = None,
+) -> TargetEstimate:  # fmt: skip
+    """Return the target-row estimate `p0_mean`, `p0_sd` for every filled row of `raw`.
+
+    Args:
+        raw: The raw target table.
+        doy_of_day: (n_days, 672) day of the year of each target half-hour of each origin day.
+        share_scale: (16,) `capacity_mw / power_capacity_mw`, 0 for an absent Primary.
+        target_std: (16,) the fold's standard deviations.
+        donor_day: (n_days,) the donor origin day index of the `HT-S` placebo, or None for the real run.
+            A row whose donor row is missing is not filled in the result.
+        u99: Scaling constant, default the stored one.
+    """
+    n_primary, n_days = raw.filled.shape[:2]
+    p0 = np.zeros((n_primary, n_days, N_ENS_STEPS, 2), dtype=np.float32)
+    filled = np.zeros_like(raw.filled)
+    for i in range(n_primary):
+        if share_scale[i] <= 0.0:
+            continue
+        days = np.nonzero(raw.filled[i].any(axis=1))[0]
+        if len(days) == 0:
+            continue
+        own = raw.values[i, days]  # (D, 672, 4)
+        ghi, sd, temp, cosz = (
+            own[..., 0].astype(np.float64),
+            own[..., 1].astype(np.float64),
+            own[..., 2].astype(np.float64),
+            own[..., 3].astype(np.float64),
+        )
+        ok = raw.filled[i, days]
+        if donor_day is not None:
+            src = donor_day[days]
+            valid = (src >= 0) & (src < n_days)
+            src_c = np.clip(src, 0, n_days - 1)
+            ok = ok & raw.filled[i, src_c] & valid[:, None]
+            donor = raw.values[i, src_c]
+            blocks = (len(days), 14, GRID_STEPS_PER_DAY)
+            res = shifted_target(
+                mean=donor[..., 0].astype(np.float64).reshape(blocks), sd=donor[..., 1].astype(np.float64).reshape(blocks),
+                cos_zenith_donor=donor[..., 3].astype(np.float64).reshape(blocks), cos_zenith_own=cosz.reshape(blocks),
+            )  # fmt: skip
+            ghi, sd = res.mean.reshape(ghi.shape), res.sd.reshape(sd.shape)
+            temp = donor[..., 2].astype(np.float64)
+        flat = ok.reshape(-1)
+        az = raw.azimuth[i, days].reshape(-1, 2).astype(np.float64)
+        geometry = np.stack([cosz.reshape(-1), az[:, 0], az[:, 1]], axis=1)
+        values = np.zeros((flat.size, 2), dtype=np.float32)
+        values[flat] = target_row_pv(
+            ghi=ghi.reshape(-1)[flat], ghi_sd=sd.reshape(-1)[flat], temperature_c=temp.reshape(-1)[flat],
+            geometry=geometry[flat], doy=doy_of_day[days].reshape(-1)[flat],
+            share_scale=np.full(int(flat.sum()), share_scale[i]), target_std=np.full(int(flat.sum()), target_std[i]), u99=u99,
+        )  # fmt: skip
+        p0[i, days] = values.reshape(len(days), N_ENS_STEPS, 2)
+        filled[i, days] = ok
+    return TargetEstimate(p0=p0, filled=filled)
+
+
+GRID_START_US: Final = 1_567_296_000_000_000
+"""2019-09-01 00:00 UTC, the grid start of experiment 422 (checked in `e00713_check_inputs.py`)."""
+STEP_US: Final = 1_800_000_000
+
+
+def target_doy(*, first_day: int, n_days: int) -> np.ndarray:
+    """Return the day of the year (n_days, 672) of every target half-hour of every origin day.
+
+    The target half-hour at position `r` of origin day `d` has grid index `48 d + 24 + r`, where `d`
+    counts days from the grid start and 24 is the contract origin at 12:00 UTC.
+    """
+    day = (first_day + np.arange(n_days, dtype=np.int64))[:, None]
+    grid = day * GRID_STEPS_PER_DAY + 24 + np.arange(N_ENS_STEPS, dtype=np.int64)[None, :]
+    stamp_us = GRID_START_US + grid * STEP_US
+    out = pl.Series(stamp_us.reshape(-1)).cast(pl.Datetime("us")).dt.ordinal_day().to_numpy()
+    return out.astype(np.float64).reshape(stamp_us.shape)

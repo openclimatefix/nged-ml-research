@@ -1,4 +1,4 @@
-# ruff: noqa: E501, B023
+# ruff: noqa: E501, B023, ISC004
 """Experiment 716: the checks of `e00716_model.py` that need no data (KF1, KF8, the parameter counts; WP2).
 
 Usage: run.sh e00716_check_model.py
