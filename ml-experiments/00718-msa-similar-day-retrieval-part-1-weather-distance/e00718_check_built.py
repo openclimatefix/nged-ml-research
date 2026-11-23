@@ -68,8 +68,25 @@ def load_tables(
     return out
 
 
-def kr1a(*, data: inp.FoldData, tables: dict[str, dict], month: str, source) -> str:  # noqa: ANN001
-    """KR1 (a): arm `Z` with `M*`'s stage 3 state reproduces experiment 713's stored forecast of the first scored origins."""
+KR1A_TOLERANCE_GPU: float = 1e-6
+"""The pre-registered tolerance of KR1 (a); the stored forecasts were written on the GPU, so only a GPU run meets it."""
+KR1A_TOLERANCE_CPU_SMOKE: float = 1e-5
+"""The tolerance of the CPU smoke reading of KR1 (a): the CPU path differs from the GPU's by about 6e-6."""
+
+
+def kr1a(
+    *,
+    data: inp.FoldData,
+    tables: dict[str, dict],
+    month: str,
+    source,  # noqa: ANN001
+    device: str = "cpu",
+) -> str:
+    """KR1 (a): arm `Z` with `M*`'s stage 3 state reproduces experiment 713's stored forecast of the first scored origins.
+
+    On the CPU this is a smoke reading at 1e-5. On `cuda` it is the required check, at the pre-registered
+    1e-6.
+    """
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
     import e00713_arms as a713  # ty: ignore[unresolved-import]
@@ -84,6 +101,7 @@ def kr1a(*, data: inp.FoldData, tables: dict[str, dict], month: str, source) -> 
     )
     net = f9.F9Net(seed=0)
     net.load_mstar_state(torch.load(state_path, map_location="cpu"))
+    net.to(device)
     assert data.test_origin_idx is not None
     in_table = np.isin(
         (data.test_origin_idx + lay713.NATIVE_OFFSET_STEPS) // lay713.STEPS_PER_DAY,
@@ -108,8 +126,16 @@ def kr1a(*, data: inp.FoldData, tables: dict[str, dict], month: str, source) -> 
     joined = frame.join(stored, on=keys, suffix="_stored")
     assert joined.height == frame.height > 0, (joined.height, frame.height)
     worst = max(float((joined[c] - joined[f"{c}_stored"]).abs().max()) for c in s713.QCOLS)  # ty: ignore[unresolved-attribute]
-    assert worst <= 1e-5, f"KR1 (a): the largest quantile difference is {worst}"
-    return f"KR1 (a): arm Z with the stored {star} stage 3 state reproduces {joined.height:,} stored forecast rows; the largest difference of a quantile is {worst:.2e}"
+    tolerance = KR1A_TOLERANCE_GPU if device == "cuda" else KR1A_TOLERANCE_CPU_SMOKE
+    label = (
+        "KR1 (a)"
+        if device == "cuda"
+        else "KR1 (a) CPU smoke (the required check runs on the GPU at 1e-6)"
+    )
+    assert worst <= tolerance, (
+        f"{label}: the largest quantile difference is {worst}, above {tolerance}"
+    )
+    return f"{label}: arm Z with the stored {star} stage 3 state reproduces {joined.height:,} stored forecast rows; the largest difference of a quantile is {worst:.2e} (tolerance {tolerance:.0e})"
 
 
 def kr7(*, source, tables: dict[str, dict], arm: str, n: int = 256) -> str:  # noqa: ANN001
@@ -208,6 +234,22 @@ def predict_mode(*, month: str, samples: int, limit: int | None) -> list[str]:
     return lines
 
 
+def kr1a_gpu_mode(*, month: str) -> list[str]:
+    """The required KR1 (a): the stored forecasts reproduced on the GPU to 1e-6, on the built tables."""
+    assert torch.cuda.is_available(), "KR1 (a) at 1e-6 needs the GPU"
+    pipe = inp.load_pipeline(
+        month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=0)
+    )
+    assert pipe.fold.PHASE == "predict"
+    data = inp.build_fold_data(pipe=pipe, device="cuda")
+    source = data.source
+    digest = fit_mod.inputs_digest(source=source, cutoff_idx=data.cutoff_idx)
+    tables = load_tables(
+        month=month, phase="predict", fingerprint=data.fingerprint, digest=digest, limit=None
+    )
+    return [kr1a(data=data, tables=tables, month=month, source=source, device="cuda")]
+
+
 def kr2c_mode(*, month: str, n_days: int, limit: int | None) -> list[str]:
     """KR2 (c): tables rebuilt in the training phase for training days equal the stored tables."""
     cr.cpu_only_cuda_calls()
@@ -255,6 +297,11 @@ def main() -> int:
     parser.add_argument("month")
     parser.add_argument("--samples", type=int, default=1000)
     parser.add_argument("--kr2c", action="store_true")
+    parser.add_argument(
+        "--kr1a-gpu",
+        action="store_true",
+        help="the required KR1 (a) at 1e-6 on the GPU (a short job)",
+    )
     parser.add_argument("--days", type=int, default=12)
     parser.add_argument(
         "--limit-days",
@@ -263,7 +310,9 @@ def main() -> int:
         help="for smoke tests: expect tables built with this --limit-days",
     )
     args = parser.parse_args()
-    if args.kr2c:
+    if args.kr1a_gpu:
+        lines = kr1a_gpu_mode(month=args.month)
+    elif args.kr2c:
         lines = kr2c_mode(month=args.month, n_days=args.days, limit=args.limit_days)
     else:
         lines = predict_mode(month=args.month, samples=args.samples, limit=args.limit_days)

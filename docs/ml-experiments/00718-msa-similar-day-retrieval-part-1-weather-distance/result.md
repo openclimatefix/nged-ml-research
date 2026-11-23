@@ -333,8 +333,10 @@ keep a check independent, or to follow the design where experiment 713's code do
   is NaN or filled after the visibility cap. `e00718_check_built.py` runs KR8, KR3 on 1,000 samples
   per arm over all days, KR7's buckets, and KR1 (a) on a fold's built tables, and `--kr2c` runs KR2
   (c) in a training-phase process. KR1 (a) compares the CPU forecast with a forecast stored from the
-  GPU, so its tolerance is 1e-5, not the design's 1e-6. The candidate-table half of KR9 is not yet
-  run.
+  GPU, so that reading, labelled "CPU smoke", uses a tolerance of 1e-5 (the CPU path differs by about
+  6e-6). The required KR1 (a) keeps the design's 1e-6 and runs on the GPU as a short job
+  (`e00718_check_built.py MONTH --kr1a-gpu`); a pass on every fold is a precondition of the gate. The
+  candidate-table half of KR9 is not yet run.
 
 ## Reviews
 
