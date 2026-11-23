@@ -271,6 +271,7 @@ def main() -> int:
                 data_dir=ML_EXPERIMENTS_DATA_DIR,
                 name="KF7",
                 passed=True,
+                fold="2025-11",
                 detail={"message": str(message)},
             )
         return 0

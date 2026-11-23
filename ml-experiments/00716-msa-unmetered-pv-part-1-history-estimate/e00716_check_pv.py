@@ -510,9 +510,19 @@ def kf4_real(*, month: str = "2025-11") -> list[str]:
         worst = max(worst, float(np.abs(u[pos] - ref).max()))
     assert worst <= 1e-6, f"the dense u differs from e00634_common.unit_curve by {worst}"
     mr, _ = pipe_rows(pipe=pipe)
+    std = mr.base.standardiser  # ty: ignore[unresolved-attribute]
     return [
-        f"KF4 real: the dense u equals e00634_common.unit_curve to {worst:.2e} at every 7th stamp of every Primary",
+        f"KF4 real: the dense u equals e00634_common.unit_curve to {worst:.2e} at every 7th stamp of every Primary, given the same shortwave, temperature and geometry",
         pv.check_dense_columns(raw=raw, x_rows=mr.x, grid_index=mr.target_idx, primary=mr.primary),  # ty: ignore[unresolved-attribute]
+        pv.check_dense_weather(
+            raw=raw,
+            x_rows=mr.x,  # ty: ignore[unresolved-attribute]
+            mean=std.mean,  # ty: ignore[unresolved-attribute]
+            std=std.std,  # ty: ignore[unresolved-attribute]
+            grid_index=mr.target_idx,  # ty: ignore[unresolved-attribute]
+            primary=mr.primary,  # ty: ignore[unresolved-attribute]
+        ),
+        "KF4 real cannot show that the dense shortwave and temperature values are right: both sides of the u comparison read the dense table, and the independent rows hold forecasts, so only the geometry columns are compared for equality and the weather columns for correlation",
     ]
 
 
@@ -556,8 +566,15 @@ def main() -> int:
             "kf14": ("KF14",),
             "kf4real": ("KF4",),
         }
+        if which not in names:
+            print(f"--record: `{which}` is not a recorded check, so no wiring record was written")
         for name in names.get(which, ()):
-            arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name=name, passed=True)
+            arms.write_wiring_record(
+                data_dir=ML_EXPERIMENTS_DATA_DIR,
+                name=name,
+                passed=True,
+                fold=sys.argv[2] if name in arms.FOLD_CHECKS else None,
+            )
         if which == "synthetic":
             arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name="KF6", passed=True)
     return 0

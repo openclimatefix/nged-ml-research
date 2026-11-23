@@ -32,6 +32,7 @@ import e00713_train as tr  # ty: ignore[unresolved-import]
 import e00716_arms as arms
 import e00716_batch as pvb
 import e00716_model as pvm
+import numpy as np
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -437,12 +438,19 @@ def default_loader(arm: str, month: str, seed: int, device: str) -> FitInputs:
     )
 
 
-def build_pv_source_for_check(*, month: str, arm: str = "HT") -> tuple[pvb.PvSource, tr.World]:
-    """Return the real fold's `PvSource` of `arm` on the CPU and 713's `World` around it, for KF2 on real arrays (`e00716_check_batch.py real MONTH`)."""
+def build_pv_source_for_check(
+    *, month: str, arm: str = "HT", phase: str = "train"
+) -> tuple[pvb.PvSource, tr.World, np.ndarray | None]:
+    """Return the real fold's `PvSource` of `arm` on the CPU, 713's `World` around it, and the scored origins, for KF2 on real arrays (`e00716_check_batch.py real MONTH`).
+
+    The scored origins (`test_origin_idx`) exist only in the `predict` phase, whose process must have
+    set `E00667_PHASE=predict` before importing this module; the `train` phase returns `None`.
+    """
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
 
     arms.install_own_cache()
-    pipe = inp.load_pipeline(month=month, phase="train", chain_root=inp.chain_root_of_seed(seed=0))
+    assert os.environ["E00667_PHASE"] == phase, "set E00667_PHASE before importing the pipeline"
+    pipe = inp.load_pipeline(month=month, phase=phase, chain_root=inp.chain_root_of_seed(seed=0))
     data = inp.build_fold_data(pipe=pipe, device="cpu", keep_rows=True)
     source = pvb.PvSource(
         source=data.source, tables=build_pv_tables(pipe=pipe, data=data, arm=arm, device="cpu")
@@ -451,7 +459,7 @@ def build_pv_source_for_check(*, month: str, arm: str = "HT") -> tuple[pvb.PvSou
         source=source, cutoff_idx=data.cutoff_idx, clean=data.clean, target_mean=data.target_mean,
         target_std=data.target_std, month=month, placebo_pool=None,
     )  # fmt: skip
-    return source, world
+    return source, world, data.test_origin_idx
 
 
 def main() -> int:

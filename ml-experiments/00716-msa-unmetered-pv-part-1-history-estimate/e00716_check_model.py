@@ -272,7 +272,7 @@ def main() -> int:
     print("\n".join(lines))
     print("PASS")
     if "--record" in sys.argv:
-        for name in ("KF1", "KF8"):
+        for name in ("KF1", "KF8a"):
             arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name=name, passed=True)
     return 0
 

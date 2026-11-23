@@ -308,19 +308,82 @@ def wiring_file(*, data_dir: Path, name: str) -> Path:
     return root(data_dir=data_dir, arm="Z") / "work" / "wiring" / f"{name}.json"
 
 
+CHECK_FILES: Final = (
+    "e00716_check_batch.py", "e00716_check_pv.py", "e00716_check_model.py", "e00716_check_train.py",
+    "e00716_predict.py",
+)  # fmt: skip
+"""The scripts that write the wiring records (and `e00716_predict.py`, which runs KF7); their sha256 is pinned in every record."""
+FOLD_CHECKS: Final = ("KF2", "KF4", "KF7")
+"""The wiring checks that run on a real fold and must record which one."""
+
+
+def check_file_hashes() -> dict[str, str]:
+    """Return the first 12 hex digits of the sha256 of each check script."""
+    here = Path(__file__).parent
+    return {n: hashlib.sha256((here / n).read_bytes()).hexdigest()[:12] for n in CHECK_FILES}
+
+
+def seal_of(*, body: dict) -> str:
+    """Return the sha256 of a record's contents and its commit: a hand edit of any field breaks it (it is not a secret, so it shows an edit rather than stops one)."""
+    return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()
+
+
 def write_wiring_record(
-    *, data_dir: Path, name: str, passed: bool, detail: dict | None = None
+    *, data_dir: Path, name: str, passed: bool, detail: dict | None = None, fold: str | None = None
 ) -> Path:
-    """Write the record of a wiring check with this folder's code hash (a record written by other code is refused)."""
+    """Write the sealed record of a wiring check: the code hash, the check scripts' hashes, 713's hash, the git state, and the fold it ran on."""
+    assert name not in FOLD_CHECKS or fold, f"{name} runs on a real fold: pass `fold`"
     path = wiring_file(data_dir=data_dir, name=name)
     path.parent.mkdir(parents=True, exist_ok=True)
+    body = {
+        "check": name, "pass": bool(passed), "detail": detail or {}, "fold": fold,
+        "check_file_sha256": check_file_hashes(), **code_record(),
+    }  # fmt: skip
+    record = {**body, "seal": seal_of(body=body)}
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(
-        json.dumps(
-            {"check": name, "pass": bool(passed), "detail": detail or {}, **code_record()},
-            indent=1,
-            default=str,
-        )
-    )
+    tmp.write_text(json.dumps(record, indent=1, default=str))
     tmp.rename(path)
     return path
+
+
+def wiring_problems(*, name: str, record: dict) -> list[str]:
+    """Return why a wiring record cannot be accepted now (empty when it can)."""
+    body = {k: v for k, v in record.items() if k != "seal"}
+    out = []
+    if record.get("seal") != seal_of(body=body):
+        out.append("the record was edited after it was written (its seal does not match)")
+    if not record.get("pass"):
+        out.append("the check did not pass")
+    if record.get("code_hash") != code_hash():
+        out.append("written by other fit code")
+    if record.get("check_file_sha256") != check_file_hashes():
+        out.append("written by other check scripts")
+    if record.get("e00713_code_hash") != arms713.code_hash():
+        out.append("written against other experiment 713 code")
+    if record.get("git_dirty"):
+        out.append("written from a dirty tree")
+    if name in FOLD_CHECKS and not record.get("fold"):
+        out.append("no fold recorded")
+    return [f"wiring record {name}: {x}" for x in out]
+
+
+def artefact_problems(*, what: str, record: dict, files: Sequence[str] | None = None) -> list[str]:
+    """Return why a stored artefact (an `M` log, a job, a pre-check, `world_rung.json`) cannot be used now.
+
+    With `files` the check compares only those modules' sha256 (`world_rung.json` depends on the two
+    world modules alone); otherwise the whole fit-code hash must match. A record from a dirty tree, or
+    with no code record, is refused.
+    """
+    code = record.get("code", record)
+    if "code_hash" not in code:
+        return [f"{what} carries no code record: rebuild it"]
+    out = []
+    if files is None:
+        if code["code_hash"] != code_hash():
+            out.append("written by other fit code")
+    else:
+        now, then = file_hashes(), code.get("file_sha256", {})
+        out += [f"{f} changed since it was written" for f in files if then.get(f) != now[f]]
+    if code.get("git_dirty"):
+        out.append("written from a dirty tree")
+    return [f"{what}: {x}" for x in out]

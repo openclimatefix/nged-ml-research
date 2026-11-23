@@ -582,6 +582,36 @@ def check_dense_columns(
     return f"dense geometry columns equal the Candidate rows to {err:.2e}"
 
 
+def check_dense_weather(
+    *,
+    raw: np.ndarray,
+    x_rows: np.ndarray,
+    mean: np.ndarray,
+    std: np.ndarray,
+    grid_index: np.ndarray,
+    primary: np.ndarray,
+    min_ghi_corr: float = 0.7,
+    min_temp_corr: float = 0.9,
+) -> str:
+    """Check that the dense table's shortwave and temperature columns are the Candidate rows' quantities (KF4, column identity).
+
+    The dense table holds the observed weather (ERA5 and CAMS) and the rows hold the numerical weather
+    prediction at the row's lead, so the two cannot be equal. They must still correlate strongly at the
+    same stamps, which catches a swapped or shifted column. The check cannot show that the dense values
+    are right, only that the columns hold the quantity their index says.
+    """
+    ghi_rows = np.clip(x_rows[:, 0].astype(np.float64) * std[0] + mean[0], 0.0, None)
+    temp_rows = x_rows[:, 2].astype(np.float64) * std[2] + mean[2]
+    ghi_dense = np.asarray(raw[primary, grid_index, 0], dtype=np.float64)
+    temp_dense = np.asarray(raw[primary, grid_index, 2], dtype=np.float64)
+    ok = np.isfinite(ghi_dense) & np.isfinite(temp_dense)
+    c_ghi = float(np.corrcoef(ghi_rows[ok], ghi_dense[ok])[0, 1])
+    c_temp = float(np.corrcoef(temp_rows[ok], temp_dense[ok])[0, 1])
+    assert c_ghi >= min_ghi_corr, f"dense shortwave correlates {c_ghi:.3f} with the rows'"
+    assert c_temp >= min_temp_corr, f"dense temperature correlates {c_temp:.3f} with the rows'"
+    return f"dense weather columns correlate with the Candidate rows' at the same stamps: shortwave {c_ghi:.3f}, temperature {c_temp:.3f}"
+
+
 # ------------------------------------------------------------------ the raw ENS target table and the target estimates
 
 N_ENS_STEPS: Final = 14 * GRID_STEPS_PER_DAY

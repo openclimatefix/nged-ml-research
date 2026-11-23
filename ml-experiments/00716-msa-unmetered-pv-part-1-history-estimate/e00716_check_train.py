@@ -266,7 +266,7 @@ def main() -> int:
     run()
     print("e00716_check_train: all checks passed")
     if "--record" in sys.argv:
-        for name in ("KF13", "KF13b"):
+        for name in ("KF13", "KF13b", "KF8b"):
             arms.write_wiring_record(data_dir=ML_EXPERIMENTS_DATA_DIR, name=name, passed=True)
     return 0
 

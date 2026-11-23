@@ -754,11 +754,23 @@ def precheck_file(*, rung: int) -> Path:
     return work_dir() / f"precheck_rung{rung}.json"
 
 
+def read_checked(*, path: Path, files: tuple[str, ...] | None = None) -> dict:
+    """Read a stored JSON artefact and refuse it when its code record is missing, from a dirty tree, or from other code (`files` limits the comparison to those modules)."""
+    record = json.loads(path.read_text())
+    problems = arms.artefact_problems(what=path.name, record=record, files=files)
+    assert not problems, "; ".join(problems)
+    return record
+
+
+WORLD_FILES: Final = ("e00716_worlds.py", "e00716_world_rung.py")
+"""`world_rung.json` depends on these two modules alone."""
+
+
 def require_precheck(*, rung: int) -> None:
     """Refuse to continue unless the early-stopping pre-check has passed at `rung` (the rung is decided before any PV fit)."""
     path = precheck_file(rung=rung)
     assert path.exists(), f"run the `precheck` command first: {path.name} is missing"
-    record = json.loads(path.read_text())
+    record = read_checked(path=path)
     assert record["rung"] == rung and record["pass"], (
         f"the early-stopping pre-check failed at rung {rung}: step up with `e00716_world_rung.py --after {rung}`"
     )
@@ -872,7 +884,7 @@ def precheck(*, device: str = "cpu") -> int:
         nll = wd.heldout_nll(
             world=world, dense=dense, kind=kind, cutoff_idx=cutoff, target_std=std4
         )
-        history = json.loads(log_path.read_text())["val_history"]
+        history = read_checked(path=log_path)["val_history"]
         out[kind] = early_stopping_precheck(
             nll_naive=nll["naive"], nll_oracle=nll["oracle"], m_val_history=history
         )
@@ -910,9 +922,9 @@ def fit_arms(*, kind: str, seed: int, device: str) -> Path:
     sh_ghi, sh_temp, _, _ = pv.shifted_sky(raw=pseudo_raw(dense=ctx.dense))
     del wr
     start = torch.load(state_path, map_location="cpu")
-    m_log = json.loads(log_path.read_text())
+    m_log = read_checked(path=log_path)
     out: dict = {
-        "kind": kind, "seed": seed, "rung": rung_number, "arms": {},
+        "kind": kind, "seed": seed, "rung": rung_number, "arms": {}, **arms.code_record(),
         "M": {k: m_log[k] for k in ("passes", "best_val", "cap_hit", "val_history")},
     }  # fmt: skip
     cutoff = ctx.data.cutoff_idx  # ty: ignore[unresolved-attribute]
@@ -956,12 +968,13 @@ WIRING_REQUIRED: Final = (
     "KF5",
     "KF6",
     "KF7",
-    "KF8",
+    "KF8a",
+    "KF8b",
     "KF13",
     "KF13b",
     "KF14",
 )
-"""The wiring checks whose records `finish` reads from `work/wiring/` (each check script writes its own)."""
+"""The wiring checks whose records `finish` reads from `work/wiring/` (each check script writes its own). KF8a is the gradient half (`check_model`) and KF8b the optimiser-group half (`check_train`)."""
 
 
 def read_wiring_records() -> tuple[dict[str, dict], list[str]]:
@@ -975,25 +988,25 @@ def read_wiring_records() -> tuple[dict[str, dict], list[str]]:
             continue
         rec = json.loads(path.read_text())
         records[name] = rec
-        if not rec.get("pass"):
-            bad.append(f"wiring check {name} did not pass")
-        elif rec.get("code_hash") != arms.code_hash():
-            bad.append(f"wiring record {name} was written by other code: rerun it")
+        bad += arms.wiring_problems(name=name, record=rec)
     return records, bad
 
 
 def finish() -> int:
     """Aggregate the jobs, run the decision logic, and write `known_answers_passed.json` only if every gating check passes."""
     root = work_root()
-    rung_record = json.loads((root / "world_rung.json").read_text())
+    rung_record = read_checked(path=root / "world_rung.json", files=WORLD_FILES)
     chosen = str(rung_record["rung"])
     require_precheck(rung=int(chosen))
+    for kind in WORLD_ARMS:
+        for seed in SEEDS:
+            read_checked(path=m_files(kind=kind, seed=seed, rung=int(chosen))[1])
     gaps = {k: rung_record["results"][chosen]["gaps"][k]["gap"] for k in ("WH", "WT")}
     metrics, jobs, fixed = {}, {}, {}
     for kind in WORLD_ARMS:
         runs = {}
         for seed in SEEDS:
-            job = json.loads((work_dir() / f"{kind}_s{seed}.json").read_text())
+            job = read_checked(path=work_dir() / f"{kind}_s{seed}.json")
             assert job["rung"] == int(chosen), (
                 f"{kind} seed {seed} was fitted at rung {job['rung']}, not {chosen}"
             )
