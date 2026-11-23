@@ -495,9 +495,16 @@ TargetProvider = Callable[[int, int], tuple[np.ndarray, np.ndarray]]
 """Maps (Primary, origin day number) to the 14 target rows' weather (14, 48, 7) and filled mask (14, 48)."""
 
 
+YoungWeather = Callable[[int, int], "np.ndarray | None"]
+"""Returns the stored-forecast weather of the blocks of ages 2 to 5 for a (Primary, origin day)."""
+YOUNGEST_ANALYSIS_AGE: Final = 6
+"""The live-fair rule reads the analysis from this age on."""
+
+
 def build_table(
     *, arm: str, arrays: PoolArrays, primaries: np.ndarray, days: np.ndarray,
     target_provider: TargetProvider, with_calendar: bool | None = None,
+    young_weather: YoungWeather | None = None,
 ) -> RowTable:  # fmt: skip
     """Build the row table of `arm` for the Primaries and origin days.
 
@@ -508,6 +515,10 @@ def build_table(
         days: (D,) origin day numbers, ascending.
         target_provider: Returns the 14 target rows' weather for a (Primary, day).
         with_calendar: Whether to read the calendar arrays (default: arm `UX`).
+        young_weather: The selection swap's live-fair rule: for a (Primary, day) it returns the
+            (4, 48, 7) float64 weather that the blocks of ages 2 to 5 read in the distance (the
+            stored ensemble forecast), or None to keep the analysis. Ages 6 and above always read
+            the analysis. The default None is the pool of every arm.
     """
     n_rows = lay.ROWS_PER_ARM[arm]
     ages_out = np.full(
@@ -528,6 +539,13 @@ def build_table(
             if needs_weather and len(pool_ages):
                 grid = lay.block_index(contract_idx=c, ages=pool_ages[w_mask])
                 pool_w = arrays.weather[int(p)][grid]
+                young = None if young_weather is None else young_weather(int(p), int(day))
+                if young is not None:
+                    assert young.shape == (4, lay.STEPS_PER_DAY, N_WEATHER)
+                    assert pool_ages[0] == lay.MIN_AGE
+                    n_young = int((pool_ages[w_mask] <= YOUNGEST_ANALYSIS_AGE - 1).sum())
+                    pool_w = pool_w.copy()
+                    pool_w[:n_young] = young[:n_young]
                 pool_dt = arrays.day_type[grid]
             for lead in range(lay.N_LEAD_DAYS):
                 top = c + lay.STEPS_PER_DAY * lead + np.arange(lay.STEPS_PER_DAY)
