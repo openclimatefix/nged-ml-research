@@ -101,6 +101,31 @@ def extract(*, model: f9.F9Net, inputs: f9.F9Inputs) -> dict[str, torch.Tensor]:
     return {**out.attention, "alpha": out.alpha, "target_vector": out.target_vector}
 
 
+def internals_for_case(
+    *, model: f9.F9Net, source: fb.F9Source, primary: int, c_idx: int, lead_day: int
+) -> dict[str, np.ndarray]:
+    """Return the read-out weights, the across-day attention, and the rows of one (Primary, contract origin, lead day) case.
+
+    The arrays are `alpha` (H, 48), `across` (48, heads, 1 + H) of the last block (the target row's
+    query), `ages` (H,), `measure` (H,), `hist_power` (H, 48) in standardised units, and `hist_idx` (H,).
+    """
+    dev = source.device
+    one = lambda v: torch.tensor([v], dtype=torch.long, device=dev)  # noqa: E731
+    batch = source.assemble(
+        primary=one(primary), c_idx=one(c_idx), lead_day=one(lead_day), ensemble=False
+    )
+    got = extract(model=model, inputs=batch.inputs)
+    last = max(int(k.split("_")[1]) for k in got if k.startswith("across_"))
+    return {
+        "alpha": got["alpha"][0].cpu().numpy(),
+        "across": got[f"across_{last}"][0].cpu().numpy(),
+        "ages": batch.ages[0].cpu().numpy(),
+        "measure": batch.measure[0].cpu().numpy(),
+        "hist_power": batch.inputs.hist_power[0].cpu().numpy(),
+        "hist_idx": batch.hist_idx[0, :, 0].cpu().numpy(),
+    }
+
+
 def self_test() -> int:
     """Check the four read-outs on a synthetic fold."""
     source = cb.synthetic_source()
