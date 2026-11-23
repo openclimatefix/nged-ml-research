@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
+import polars as pl
 
 US_PER_HALF_HOUR: Final[int] = 1_800_000_000
 US_PER_DAY: Final[int] = 86_400 * 1_000_000
@@ -129,40 +130,58 @@ def apply_short_history_cut(
     return out
 
 
-def load_panel(*, dense_raw_path: Path) -> Panel:
-    """Read the cleaned power, the CAMS arrays, and the temperature on the dense grid.
+def check_grid_lengths(*, n_grid: int, dense_raw_len: int, cams_len: int) -> int:
+    """Return the length to use, or raise when the arrays do not share the grid's start.
 
-    Needs `PYTHONPATH` to hold the folders of experiments 87, 397, 412, 418, 422, 428, 510, and the
-    like (`run.sh` builds it). It raises when the arrays do not share one grid length.
+    Experiment 87's grid (2019-09-01 to 2026-07-31) has 121,248 half-hours, and the CAMS arrays of
+    experiment 412 have that length. Experiment 713's `dense_raw.npy` is longer (126,624) because
+    experiment 667 moved the grid's end to 2026-11-20, and both grids start on 2019-09-01, so the
+    dense array is cut to the first `n_grid` steps. Any other mismatch raises.
+    """
+    if cams_len != n_grid:
+        msg = f"CAMS arrays have {cams_len} steps, the grid {n_grid}"
+        raise ValueError(msg)
+    if dense_raw_len < n_grid:
+        msg = f"dense_raw has {dense_raw_len} steps, fewer than the grid's {n_grid}"
+        raise ValueError(msg)
+    return n_grid
+
+
+def load_panel(*, dense_raw_path: Path) -> Panel:
+    """Read the cleaned power, the CAMS arrays, and the temperature on experiment 87's grid.
+
+    The power, the unit shape `u`, and the clear-sky index `k` come from experiment 506's loaders
+    (`e00506_data`), which do not import `torch`, and the temperature is column 2 of the first
+    `n_grid` steps of experiment 713's dense array. Nothing on or after the holdout is read as power.
+    Needs the folders of experiments 87 and 506 (`run.sh` builds `PYTHONPATH`).
     """
     import e00087_common as common  # ty: ignore[unresolved-import]
-    import e00412_inputs as inp412  # ty: ignore[unresolved-import]
-    import e00510_common as c510  # ty: ignore[unresolved-import]
+    import e00506_data as data  # ty: ignore[unresolved-import]
 
-    sites = c510.sites()
     stamp = common.grid_times().dt.epoch("us").to_numpy()
-    clean = c510.clean_stack().astype(np.float64) * 100.0
-    u = np.zeros_like(clean)
-    k = np.zeros_like(clean)
-    scale = inp412.u99()
-    for i, s in enumerate(sites):
-        z = np.load(inp412.WORK_DIR / "cams" / f"{s}.npz")
-        if len(z["u"]) != clean.shape[1]:
-            msg = f"CAMS array of {s} has {len(z['u'])} steps, the cleaned power {clean.shape[1]}"
-            raise ValueError(msg)
-        u[i] = z["u"] / scale
-        k[i] = z["k"]
+    primaries = common.series_table().filter(pl.col("substation_type") == "Primary")
+    sites = sorted(
+        primaries["site"].to_list(), key=lambda x: int(x[1:])
+    )  # the Primary-index order of `e00397_prep.primaries()`
     raw = np.load(dense_raw_path, mmap_mode="r")
-    if raw.shape[1] != clean.shape[1] or len(stamp) != clean.shape[1]:
-        msg = (
-            f"grid lengths differ: raw {raw.shape[1]}, power {clean.shape[1]}, stamps {len(stamp)}"
-        )
+    n = len(stamp)
+    n_use = check_grid_lengths(n_grid=n, dense_raw_len=raw.shape[1], cams_len=n)
+    power = np.stack([data.power_points(site=s) for s in sites])
+    u = np.zeros_like(power)
+    k = np.zeros_like(power)
+    for i, s in enumerate(sites):
+        u[i], k[i] = data.cams(site=s)
+    if power.shape[1] != n_use or u.shape[1] != n_use:
+        msg = f"power has {power.shape[1]} steps, grid {n_use}"
         raise ValueError(msg)
-    temp = np.asarray(raw[:, :, 2], dtype=np.float64)
+    if raw.shape[0] != len(sites):
+        msg = f"dense_raw holds {raw.shape[0]} Primaries and the site table {len(sites)}"
+        raise ValueError(msg)
+    temp = np.asarray(raw[:, :n_use, 2], dtype=np.float64)
     return Panel(
         sites,
         stamp,
-        apply_short_history_cut(power_pct=clean, sites=sites, stamp_us=stamp),
+        apply_short_history_cut(power_pct=power, sites=sites, stamp_us=stamp),
         u,
         k,
         temp,
