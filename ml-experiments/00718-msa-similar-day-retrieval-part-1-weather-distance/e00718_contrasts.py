@@ -381,6 +381,10 @@ def _load(
     return per_seed, averaged, groups, star
 
 
+LAST: dict = {}
+"""The dicts of the last self-test, for the report's own self-test."""
+
+
 def self_test() -> int:
     """Run the screen, the headline, the clean-fold reading, and the report-only readings on synthetic scored forecasts."""
     rng = np.random.default_rng(0)
@@ -495,6 +499,7 @@ def self_test() -> int:
     )
     assert "R-STAR" not in ro["contrasts"] and ro["contrasts"]["R-P90"]["all"]["crps"][1] < 0
     assert len(ro["per_primary"]) == 3 * 16
+    LAST.update(headline=h, screen=sc_out, report_only=ro, clean=clean)
     h_two = headline(part=2, per_seed=per_seed, averaged=averaged, groups=ids, star=star, n_seeds=2)
     assert h_two["B1"]["six"]["point"] < 0 and "U-A-STAR" in h_two, (
         "part 2 reads B1 = U - M* and the placebo U-A - M*"
