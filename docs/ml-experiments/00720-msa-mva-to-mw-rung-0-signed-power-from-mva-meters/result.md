@@ -217,8 +217,28 @@ of the fixed code, a results review, a numbers review, and a prose review.
   `f_mva_design_triage.md`, `mva_to_mw_addendum_1.md`, `mva_to_mw_addendum_1_review.md`, and
   `mva_to_mw_addendum_1_triage.md` (read, private): the design that this page condenses.
 - `ml-experiments/00720-msa-mva-to-mw-rung-0-signed-power-from-mva-meters/`: the code, written and
-  unit-checked on the CPU. No script has run on real data. The list of scripts is added with each
-  work package.
+  unit-checked on the CPU on synthetic worlds. No script has run on real data. Each bullet names a
+  script and its step.
+    - `e00720_fold.py` and `e00720_check_loss.py` (rung 0c): the folded mixture loss, the censored
+      branch, the folded and signed quantiles, the fold point in `v` units, and the six known-answer
+      checks.
+    - `e00720_sign.py`, `e00720_worlds.py`, and `e00720_check_sign.py` (rung 0b): the anchored and
+      unanchored sign read-outs, the within-half-hour injected reading, the synthetic hidden-sign
+      world, the metrics, and their checks.
+    - `e00720_hmm.py`, `e00720_fit.py`, and `e00720_check_hmm.py` (rung 0e): the hidden Markov model
+      with pair emissions, Baum-Welch for the unit-count transitions, the two-lobe signed
+      distribution, the Brier reliability and signed CRPS, the cost gate, the demand-mean fit, and
+      the checks (brute force, aliasing toy, oracle simulation, hidden-sign world).
+    - `e00720_rung0b.py`: the driver that scores four read-outs, each with the real and the shifted
+      sky, on one injected world. Its `--run` branch is not wired.
+    - `e00720_census.py` (rungs 0a and 0d) and `e00720_real.py`: the census, the gate table, the
+      fold windows, and the read-only loader of the stored panel.
+    - `e00720_guard.py` and `e00720_check_guard.py`: the anonymisation guard.
+    - `run.sh`: the slot wrapper (8 GB cap, no swap, one thread, 25 GB free check).
+- **Not written yet:** the references of experiments 506 and 674 on the injected rows; the farm and
+  F7 wiring of the real run of rung 0b; V2, K1, and V3 of rung 0e, which need experiment 694's
+  assets; V4 and the analyses of the addendum's section 3; the figure scripts; the table that
+  prints the result. The first real run of each script waits for an Opus code review.
 - Read from earlier experiments: experiments 412, 417, 420, and 405 (injection and gate), 694
   (generator tracker, to rerun on the same segments), and 716 (the PV estimate and the as-of
   capacity table, imported through `PYTHONPATH`).
