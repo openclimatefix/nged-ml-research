@@ -28,6 +28,7 @@ PRIVATE_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / EXPERIMENT_FOLDER / "privat
 
 GENERATOR_MARKERS: Final[tuple[str, ...]] = (
     "unit", "engine", "generator", "farm", "inject", "pv_hat", "pv_component", "n_run", "gas",
+    "hours_run", "running", "p_any", "e_n", "flag", "signed_mean", "p_negative", "n_hat", "state", "gross", "rho",
 )  # fmt: skip
 """Column-name fragments that mark a generator quantity."""
 TIME_MARKERS: Final[tuple[str, ...]] = (
@@ -42,6 +43,8 @@ TIME_MARKERS: Final[tuple[str, ...]] = (
     "fold",
 )
 """Column-name fragments that mark a time axis."""
+ERA_LABELS: Final[frozenset[str]] = frozenset({"era_1", "era_2", "era_3", "era_4"})
+"""The only values an `era` column may hold in a published table: opaque labels, never a date range."""
 PUBLIC_COLUMNS: Final[frozenset[str]] = frozenset(
     {
         "primary", "level", "readout", "sky", "pass", "auc", "recall_at_5pct_false", "false_reverse_rate",
@@ -93,6 +96,11 @@ def refuse_dated_generator_values(*, frame: pl.DataFrame) -> None:
 def public_aggregate(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Return `frame` unchanged when every column is an allowed aggregate, else raise `ValueError`."""
     refuse_dated_generator_values(frame=frame)
+    if "era" in frame.columns:
+        bad = sorted({str(v) for v in frame["era"].to_list()} - ERA_LABELS)
+        if bad:
+            msg = f"era values {bad} are not opaque labels; use one of {sorted(ERA_LABELS)}"
+            raise ValueError(msg)
     extra = [c for c in frame.columns if c not in PUBLIC_COLUMNS]
     if extra:
         msg = (

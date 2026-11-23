@@ -47,6 +47,16 @@ def main() -> int:
     assert guard.hours_band(hours=301.0) == "over 300"
     pooled = guard.pool_bands(monthly_hours=np.array([0.0, 10.0, 60.0, 400.0, 400.0]))
     assert pooled["n_months"].to_list() == [1, 1, 1, 0, 2]
+    for col in ("hours_run", "running_share", "p_any", "e_n", "flag", "signed_mean", "p_negative"):
+        assert raises(
+            fn=guard.refuse_dated_generator_values,
+            frame=pl.DataFrame({"valid_time": [1], col: [0.5]}),
+        ), col
+    assert raises(
+        fn=guard.public_aggregate,
+        frame=pl.DataFrame({"primary": ["D8"], "era": ["a date range"], "f1": [0.5]}),
+    )
+    guard.public_aggregate(frame=pl.DataFrame({"primary": ["D8"], "era": ["era_1"], "f1": [0.5]}))
     p = guard.private_path(name="selftest/guard.txt")
     assert "private" in p.parts
     print(

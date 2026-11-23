@@ -494,12 +494,7 @@ def run_k1_v3(
     }
     periods = {
         "before_connection": (r694.PRE_ROLL, c694.stamp(when=c694.ENGINE_CONNECTED)),
-        "added_back": (
-            c694.stamp(when=c694.ENGINE_CONNECTED),
-            c694.stamp(
-                when=__import__("datetime").datetime(2023, 8, 15, tzinfo=__import__("datetime").UTC)
-            ),
-        ),
+        "added_back": (c694.stamp(when=c694.ENGINE_CONNECTED), added_back_end_index()),
     }
     flagged = total = active = days = 0
     for name, (a, b) in periods.items():
