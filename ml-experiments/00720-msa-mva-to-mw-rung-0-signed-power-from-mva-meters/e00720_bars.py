@@ -85,6 +85,16 @@ def v3_bar(
     }
 
 
+def v3_all_periods(*, periods: dict[str, dict[str, float]]) -> dict[str, Any]:
+    """V3 per period: every control period passes `v3_bar` with its own shares, for the selected `K` and the forced `K = 3`.
+
+    Args:
+        periods: Period label to `flagged_share`, `active_days_per_month`, and `forced_k3_flagged_share`.
+    """
+    per = {name: v3_bar(**vals) for name, vals in periods.items()}
+    return {"periods": per, "passed": bool(per and all(p["passed"] for p in per.values()))}
+
+
 def sign_probability_bar(*, prob: np.ndarray, outcome: np.ndarray) -> dict[str, Any]:
     """Reliability term of the Brier score at most 0.01, and no bin of at least 200 rows off the diagonal by over 0.1."""
     r = hmm.brier_reliability(prob=prob, outcome=outcome)

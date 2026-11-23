@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915, PT018
+# ruff: noqa: E501, PLR0915, PT018, PT017
 """Experiment 720, rung 0e: V2, K1, and V3 against experiment 694's tracker `M2`, on the same series.
 
 The hindsight model (`e00720_hmm` with `K = 3`) and experiment 694's `M2` (`grid_track`, imported and
@@ -35,6 +35,12 @@ COARSE_G: Final[tuple[float, ...]] = (0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5)
 FINE_OFFSETS: Final[tuple[float, ...]] = (-0.25, 0.25)
 N_BINS_V2: Final[int] = 21
 EM_ROUNDS_V2: Final[int] = 2
+MIN_UNIT_MVA: Final[float] = 0.5
+"""The unit size is not searched below this value (the fine offset once chose 0.25, under the coarse grid)."""
+TREND_WINDOW_DAYS: Final[int] = 21
+TREND_QUANTILE: Final[float] = 0.8
+"""The slow trend is the upper quantile of the daily-mean residual over a centred window, less the same
+statistic on the pre-roll: an engine lowers the net reading, so the idle days sit at the upper edge."""
 START_DOW_GRID: Final[int] = 5
 """2022-01-01, the start of experiment 694's grid, was a Saturday (Monday is 0)."""
 
@@ -55,6 +61,36 @@ def to_days(*, a: np.ndarray, first_index: int) -> tuple[np.ndarray, int]:
     return out.reshape(n_days, 48), lead
 
 
+def slow_trend(*, ymat: np.ndarray, f_mat: np.ndarray, calib_rows: np.ndarray) -> np.ndarray:
+    """Return a per-day offset that follows a slow drift of demand without following the engine.
+
+    The daily mean of the residual `ymat - f_mat` is summarised by its upper quantile over a centred
+    window, smoothed over 7 days, and the same statistic on the days of `calib_rows` (the pre-roll,
+    which holds no engine and no trend by construction) is subtracted.
+
+    Args:
+        ymat: `(days, 48)` magnitude of the reading.
+        f_mat: `(days, 48)` the calendar mean fitted on the pre-roll.
+        calib_rows: `(days,)` boolean, the days of the pre-roll.
+    """
+    with np.errstate(all="ignore"):
+        day = np.nanmean(ymat - f_mat, axis=1)
+    n = len(day)
+    half = TREND_WINDOW_DAYS // 2
+    stat = np.full(n, np.nan)
+    for d in range(n):
+        w = day[max(0, d - half) : min(n, d + half + 1)]
+        if np.isfinite(w).sum() >= 5:
+            stat[d] = np.nanquantile(w, TREND_QUANTILE)
+    ok = np.isfinite(stat)
+    if not ok.any():
+        return np.zeros(n)
+    stat = np.where(ok, stat, np.nanmedian(stat))
+    smooth = np.convolve(np.pad(stat, 3, mode="edge"), np.ones(7) / 7.0, mode="valid")
+    base = float(np.nanmean(smooth[calib_rows])) if calib_rows.any() else 0.0
+    return smooth - base
+
+
 @dataclass
 class HindsightFit:
     """The result of one hindsight fit; `flag` and `filt` are `P(n >= 1) > 0.5` smoothed and filtered."""
@@ -71,6 +107,9 @@ class HindsightFit:
     """Smoothed `P(n >= 1)` per half-hour after the pre-roll."""
     e_n: np.ndarray | None = None
     """Smoothed expected unit count per half-hour after the pre-roll."""
+    n_obs: int = 0
+    p_max: np.ndarray | None = None
+    """Largest smoothed unit-count posterior per half-hour after the pre-roll."""
     """Most probable unit count per half-hour after the pre-roll (smoothed)."""
 
 
@@ -113,7 +152,9 @@ def hindsight_fit(
     temp0 = np.zeros(len(dtype_day))
     f_mat = fit.fit_demand_mean(g=ymat, rows=anchors, day_type=dtype_day, temperature=temp0)
     phi, sigma_r = fit.fit_residual(g=ymat, f=f_mat, rows=anchors)
-    f = f_mat.reshape(-1)[lead : lead + len(y)]
+    calib_days = anchors.any(axis=1)
+    trend = slow_trend(ymat=ymat, f_mat=f_mat, calib_rows=calib_days)
+    f = (f_mat + trend[:, None]).reshape(-1)[lead : lead + len(y)]
     p = np.zeros(len(y))
     passes = 0
     last_post: hmm.Posterior | None = None
@@ -121,7 +162,7 @@ def hindsight_fit(
     def spec_for(g: float, trans: np.ndarray | None = None) -> hmm.HmmSpec:
         k = n_max + 1
         base = np.full((k, k), (1.0 - STAY) / max(k - 1, 1))
-        np.fill_diagonal(base, STAY)
+        np.fill_diagonal(base, STAY if k > 1 else 1.0)
         return hmm.HmmSpec(
             grid=hmm.residual_grid(phi=min(phi, 0.97), sigma_r=sigma_r, n_bins=n_bins),
             phi=min(phi, 0.97), sigma_r=sigma_r, unit_size=g, n_max=n_max,
@@ -137,6 +178,15 @@ def hindsight_fit(
         passes += 1
         return post, spec
 
+    if n_max == 0:
+        post0, _ = pass_at(1.0)
+        n0 = len(y) - pre_roll
+        return HindsightFit(
+            flag=np.zeros(n0, dtype=bool), filt=np.zeros(n0, dtype=bool), unit_size=0.0, n_max=0,
+            log_likelihood=post0.log_likelihood, seconds=time.perf_counter() - t0, passes=passes,
+            n_hat=np.zeros(n0, dtype=int), p_any=np.zeros(n0), e_n=np.zeros(n0),
+            n_obs=int(np.isfinite(y[pre_roll:]).sum()),
+        )  # fmt: skip
     scores: dict[float, float] = {}
     for i, g in enumerate(coarse):
         if i == 0 and gate is not None and not np.isfinite(gate.seconds_per_pass):
@@ -149,7 +199,7 @@ def hindsight_fit(
     best = max(scores, key=lambda g: scores[g])
     for off in FINE_OFFSETS:
         g = best + off
-        if g > 0.0 and g not in scores:
+        if g >= MIN_UNIT_MVA and g not in scores:
             scores[g] = pass_at(g)[0].log_likelihood
     best = max(scores, key=lambda g: scores[g])
     trans = None
@@ -160,12 +210,14 @@ def hindsight_fit(
     sm = hmm.summarise(post=last_post, spec=spec)["p_units"]
     n_hat = np.argmax(sm, axis=1)[pre_roll:]
     e_n = (sm * np.arange(sm.shape[1])[None, :]).sum(axis=1)[pre_roll:]
+    p_max = sm.max(axis=1)[pre_roll:]
     fl = hmm.summarise(post=last_post, spec=spec, version="filtered")["p_units"]
     any_s = 1.0 - sm[:, 0]
     any_f = 1.0 - fl[:, 0]
     return HindsightFit(
         flag=(any_s > 0.5)[pre_roll:], filt=(any_f > 0.5)[pre_roll:], unit_size=best, n_max=n_max,
-        log_likelihood=last_post.log_likelihood, seconds=time.perf_counter() - t0, passes=passes, n_hat=n_hat, p_any=any_s[pre_roll:], e_n=e_n,
+        log_likelihood=last_post.log_likelihood, seconds=time.perf_counter() - t0, passes=passes, n_hat=n_hat, p_any=any_s[pre_roll:], e_n=e_n, p_max=p_max,
+        n_obs=int(np.isfinite(y[pre_roll:]).sum()),
     )  # fmt: skip
 
 
@@ -180,44 +232,77 @@ def f1(tp: float, fp: float, fn: float) -> float:
     return 2 * tp / d if d > 0 else 0.0
 
 
-def cluster_bootstrap_f1_difference(
+N_WEEKS: Final[int] = 7
+N_BOOT: Final[int] = 10_000
+EXPECTED_SEGMENTS: Final[int] = 44
+EXPECTED_SCHEDULES: Final[int] = 9
+
+
+def weekly_counts(*, truth: np.ndarray, flag: np.ndarray) -> np.ndarray:
+    """Return `(7, 3)` counts of `(tp, fp, fn)` per week of 336 half-hours, as experiment 694 counts them."""
+    out = np.zeros((N_WEEKS, 3), dtype=int)
+    for w in range(N_WEEKS):
+        sl = slice(w * 336, min((w + 1) * 336, len(truth)))
+        out[w] = f1_counts(truth=truth[sl], flag=flag[sl])
+    return out
+
+
+def build_tensor(
     *,
-    a: dict[str, tuple[int, int, int]],
-    b: dict[str, tuple[int, int, int]],
-    n_boot: int = 4000,
-    seed: int = 720,
+    counts: dict[tuple[str, str, str, int], np.ndarray],
+    scheds: tuple[str, ...],
+    segs: list[tuple[str, str, int]],
+) -> np.ndarray:
+    """Return `(schedule-weeks, segments, 3)` counts: the clusters are schedule-weeks, as in experiment 694."""
+    x = np.zeros((len(scheds) * N_WEEKS, len(segs), 3))
+    for si, sched in enumerate(scheds):
+        for gi, (host, period, index) in enumerate(segs):
+            x[si * N_WEEKS : (si + 1) * N_WEEKS, gi, :] = counts[(sched, host, period, index)]
+    return x
+
+
+def cluster_bootstrap_paired(
+    *, x_a: np.ndarray, x_b: np.ndarray, n_boot: int = N_BOOT, seed: int = 720
 ) -> dict[str, float]:
-    """Return the pooled F1 of `a` minus that of `b` over clusters, with a 95% percentile interval.
+    """Return the pooled F1 of `x_a` minus that of `x_b`, with a 95% interval from experiment 694's two-stage bootstrap.
+
+    Each resample draws schedule-weeks (clusters) with replacement and, inside every drawn cluster,
+    segments with replacement (`e00694_report.cluster_bootstrap`), and the same draw is applied to both
+    arms, so the contrast is paired.
 
     Args:
-        a: Cluster name to summed `(tp, fp, fn)` of the first method (the hindsight model).
-        b: The same clusters for the second method (experiment 694's `M2`).
-        n_boot: Resamples of clusters, with replacement.
+        x_a: `(clusters, segments, 3)` counts of the first method (the hindsight model).
+        x_b: The same cells for the second method (experiment 694's `M2`).
+        n_boot: Number of resamples.
         seed: Random seed.
     """
-    names = sorted(a)
-    if names != sorted(b):
-        msg = "the two methods must cover the same clusters"
+    if x_a.shape != x_b.shape:
+        msg = "the two methods must cover the same clusters and segments"
         raise ValueError(msg)
-    ca = np.array([a[k] for k in names], dtype=float)
-    cb = np.array([b[k] for k in names], dtype=float)
-    point = f1(*ca.sum(0)) - f1(*cb.sum(0))
     rng = np.random.default_rng(seed)
+    n_c, n_s = x_a.shape[:2]
+    both = np.stack([x_a, x_b], axis=2)  # (clusters, segments, 2, 3)
     diffs = np.empty(n_boot)
-    for i in range(n_boot):
-        idx = rng.integers(0, len(names), len(names))
-        diffs[i] = f1(*ca[idx].sum(0)) - f1(*cb[idx].sum(0))
+    chunk = 250
+    for lo in range(0, n_boot, chunk):
+        m = min(chunk, n_boot - lo)
+        ci = rng.integers(n_c, size=(m, n_c))
+        si = rng.integers(n_s, size=(m, n_c, n_s))
+        s = both[ci[:, :, None], si].sum(axis=(1, 2))  # (m, 2, 3)
+        diffs[lo : lo + m] = np.array([f1(*r[0]) - f1(*r[1]) for r in s])
+    tot = both.sum(axis=(0, 1))
     return {
-        "point": float(point),
+        "point": float(f1(*tot[0]) - f1(*tot[1])),
         "lower": float(np.percentile(diffs, 2.5)),
         "upper": float(np.percentile(diffs, 97.5)),
-        "f1_a": f1(*ca.sum(0)),
-        "f1_b": f1(*cb.sum(0)),
-        "n_clusters": float(len(names)),
+        "f1_a": float(f1(*tot[0])),
+        "f1_b": float(f1(*tot[1])),
+        "n_clusters": float(n_c),
+        "n_segments": float(n_s),
     }
 
 
-def false_alarm(*, flag: np.ndarray, first_index_of_flag: int) -> dict[str, float]:
+def false_alarm(*, flag: np.ndarray) -> dict[str, float]:
     """Return the flagged share and the active days (at least 4 flags) per 30 days of an engine-free span."""
     n_days = len(flag) // 48
     blocks = flag[: n_days * 48].reshape(n_days, 48).sum(axis=1) if n_days else np.zeros(0)
@@ -228,29 +313,57 @@ def false_alarm(*, flag: np.ndarray, first_index_of_flag: int) -> dict[str, floa
     }
 
 
-def v2_verdict(
-    *,
-    hind: dict[str, tuple[int, int, int]],
-    m2: dict[str, tuple[int, int, int]],
-    fa: dict[str, float],
-) -> dict[str, Any]:
-    """Return the V2 bar from per-segment counts and the false-alarm statistics of the un-injected segments."""
-    c = cluster_bootstrap_f1_difference(a=hind, b=m2)
+def per_host_false_alarm(*, runs: list[tuple[str, np.ndarray]]) -> dict[str, dict[str, float]]:
+    """Pool un-injected flags per host, as experiment 694's P3 does, and return each host's share and active days a month."""
+    out: dict[str, dict[str, float]] = {}
+    for host in sorted({h for h, _ in runs}):
+        flags = [f for h, f in runs if h == host]
+        flagged, n = sum(int(f.sum()) for f in flags), sum(len(f) for f in flags)
+        act = sum(
+            int((f[: len(f) // 48 * 48].reshape(-1, 48).sum(axis=1) >= 4).sum()) for f in flags
+        )
+        days = sum(len(f) // 48 for f in flags)
+        out[host] = {
+            "flagged_share": flagged / max(n, 1),
+            "active_days_per_month": act / max(days, 1) * 30.0,
+        }
+    return out
+
+
+def worst_host(*, fa: dict[str, dict[str, float]]) -> dict[str, float]:
+    """Return the largest flagged share and the largest active days a month over the hosts (the bar must hold at every host)."""
     return {
-        "contrast": c,
-        "bar": bars.v2_bar(
-            lower=c["lower"],
-            point=c["point"],
-            flagged_share=fa["flagged_share"],
-            active_days_per_month=fa["active_days_per_month"],
-        ),
+        "flagged_share": max(v["flagged_share"] for v in fa.values()),
+        "active_days_per_month": max(v["active_days_per_month"] for v in fa.values()),
     }
+
+
+def v2_verdict(
+    *, x_hind: np.ndarray, x_m2: np.ndarray, fa_hindsight: dict[str, dict[str, float]]
+) -> dict[str, Any]:
+    """Return the V2 bar from the schedule-week tensors and the per-host un-injected false alarms of the hindsight model."""
+    c = cluster_bootstrap_paired(x_a=x_hind, x_b=x_m2)
+    worst = worst_host(fa=fa_hindsight)
+    return {"contrast": c, "bar": bars.v2_bar(lower=c["lower"], point=c["point"], **worst)}
+
+
+def consistency_gate(*, compared: int, mismatches: int, expected: int, label: str) -> None:
+    """Raise `RuntimeError` unless exactly `expected` stored results were compared and every one matched.
+
+    Zero compared results is a failure, not a pass: it means the stored keys did not line up with the rerun.
+    """
+    if compared != expected:
+        msg = f"{label}: compared {compared} stored results, expected {expected}; the rerun is not on the stored segments"
+        raise RuntimeError(msg)
+    if mismatches:
+        msg = f"{label}: {mismatches} of {compared} reruns of M2 differ from the stored results; stop and report"
+        raise RuntimeError(msg)
 
 
 def m2_counts(
     *, yy: np.ndarray, lvl: np.ndarray, units: np.ndarray, offset: int
 ) -> tuple[np.ndarray, np.ndarray]:  # pragma: no cover - needs experiment 694's code
-    """Rerun experiment 694's `M2` on one injected segment; return its flags and its weekly counts.
+    """Rerun experiment 694's `M2` on one injected segment; return its flags and its weekly counts `(7, 4)`.
 
     The weekly counts follow `e00694_run.inject_task` exactly, so they can be compared with the stored
     `inject.pkl`. This calls `grid_track` directly and never one of the pool-based stage functions.
@@ -274,21 +387,45 @@ def unit_recall(*, n_hat: np.ndarray, units: np.ndarray, k: int) -> tuple[int, i
     return int((n_hat[t] == k).sum()), int(t.sum())
 
 
+def select_k(
+    *, y: np.ndarray, first_index: int, **kwargs: Any
+) -> tuple[HindsightFit, dict[int, HindsightFit]]:
+    """Fit `K = 0` to 3 and return the fit with the lowest Bayesian information criterion, and all four fits.
+
+    The criterion is `-2 log L + p ln n` with `p = K (K + 1) + 1` parameters for `K > 0` and 0 for `K = 0`,
+    which is experiment 694's count. `K = 3` is the forced control of V3.
+    """
+    fits = {k: hindsight_fit(y=y, first_index=first_index, n_max=k, **kwargs) for k in (0, 1, 2, 3)}
+
+    def bic(k: int) -> float:
+        n_par = k * (k + 1) + (1 if k > 0 else 0)
+        return -2.0 * fits[k].log_likelihood + n_par * np.log(max(fits[k].n_obs, 2))
+
+    best = min(fits, key=bic)
+    return fits[best], fits
+
+
 def run_v2(
-    *, limit: int | None = None, cap_hours: float = 15.0, fit_kwargs: dict[str, Any] | None = None
+    *,
+    limit: int | None = None,
+    cap_hours: float = 15.0,
+    fit_kwargs: dict[str, Any] | None = None,
+    expected_segments: int = EXPECTED_SEGMENTS,
+    expected_schedules: int = EXPECTED_SCHEDULES,
 ) -> int:  # pragma: no cover - needs the stored panel
     """Run V2, K1, and V3 against experiment 694's stored assets (real data; waits for the code review).
 
-    Reads experiment 694's panel and engine record through its own loaders, runs `grid_track` (M2) on the
-    same segments and injected schedules, fits the hindsight model, compares the rerun of M2 with the
-    stored `inject.pkl` and `k1.pkl`, and writes per-segment counts and the bar tables under the private
-    folder only. Nothing is printed per segment. The cost gate times the first fit and stops the run when
-    the projected total exceeds `cap_hours`.
+    Phase 1 reruns experiment 694's `M2` on every segment (injected with every schedule, and un-injected),
+    on K1, and compares each result with the stored `inject.pkl`, `fa.pkl`, and `k1.pkl`. The run stops
+    before any hindsight fit when the number of compared results is not the expected one or any differs.
+    Phase 2 fits the hindsight model on the same series. All outputs go under the private folder.
+    The cost gate times the first hindsight fit and stops the run when the projection exceeds the cap.
     """
     import pickle
 
     import e00694_common as c694  # ty: ignore[unresolved-import]
     import e00694_run as r694  # ty: ignore[unresolved-import]
+    import e00694_trackers as t694  # ty: ignore[unresolved-import]
     import e00720_guard as guard
     import polars as pl
 
@@ -298,25 +435,28 @@ def run_v2(
     if limit:
         segs = segs[:limit]
     names = list(r694.SCHEDULES)
+    prim = tuple(n for n in names if r694.SCHEDULES[n]["primary"])
+    if len(segs) != expected_segments or len(names) != expected_schedules:
+        msg = f"expected {expected_segments} segments and {expected_schedules} schedules, found {len(segs)} and {len(names)}"
+        raise RuntimeError(msg)
+    seg_keys = [(s.host, s.period, s.index) for s in segs]
     stored = {
         (d["host"], d["period"], d["index"], d["sched"], d["rule"]): d["arms"]["M2"]["counts"]
         for d in pickle.loads(next(c694.DATA_DIR.glob("inject.pkl")).read_bytes())
     }
-    gate = hmm.CostGate(cap_hours=cap_hours)
-    n_fits = (
-        len(segs) * len(names) + 2 + 8
-    )  # injected runs, K1 twice, and V3's two eras (about 5 segment-lengths of steps)
-    hind: dict[str, tuple[int, int, int]] = {}
-    m2: dict[str, tuple[int, int, int]] = {}
-    fa_h = [0, 0, 0, 0]  # flagged outside the window, half-hours outside, active days, days
-    fa_m = [0, 0, 0, 0]
-    rows: list[dict[str, Any]] = []
-    mismatches = compared = 0
-    run_gate = hmm.CostGate(cap_hours=cap_hours)
+    stored_fa = {
+        (d["host"], d["period"], d["index"]): d["arms"]["M2"]
+        for d in pickle.loads(next(c694.DATA_DIR.glob("fa.pkl")).read_bytes())
+    }
+    # ---- phase 1: rerun M2 everywhere and compare with the stored results
+    t_phase1 = time.perf_counter()
+    m2_flag: dict[tuple[str, str, str, int], np.ndarray] = {}
+    wk_m2: dict[tuple[str, str, str, int], np.ndarray] = {}
+    inj_series: dict[tuple[str, str, str, int], np.ndarray] = {}
+    compared = mismatches = 0
     for seg in segs:
         y0 = r694._segment_series(seg=seg)
         for name in names:
-            t_iter = time.perf_counter()
             sched = r694.SCHEDULES[name]
             g, units = sched["g"], sched["units"]
             drive = np.zeros(r694.TOTAL_LEN)
@@ -324,98 +464,128 @@ def run_v2(
             drive[lo : lo + len(g)] = g
             yi = c694.inject_folded(y=y0, g=drive)
             lvl = c694.quantise_spread(spread=c694.causal_spread(y=yi))[r694.PRE_ROLL :]
-            yy = yi[r694.PRE_ROLL :]
-            m2_flag, m2_c = m2_counts(yy=yy, lvl=lvl, units=units, offset=r694.INJECT_OFFSET)
-            key_s = (seg.host, seg.period, seg.index, name, "folded")
-            if key_s in stored:
+            flag, cnt = m2_counts(
+                yy=yi[r694.PRE_ROLL :], lvl=lvl, units=units, offset=r694.INJECT_OFFSET
+            )
+            key = (name, seg.host, seg.period, seg.index)
+            m2_flag[key], wk_m2[key] = flag, cnt[:, :3]
+            inj_series[key] = yi
+            k_s = (seg.host, seg.period, seg.index, name, "folded")
+            if k_s in stored:
                 compared += 1
-                mismatches += int(not np.array_equal(stored[key_s], m2_c))
+                mismatches += int(not np.array_equal(stored[k_s], cnt))
+    consistency_gate(
+        compared=compared,
+        mismatches=mismatches,
+        expected=len(segs) * len(names),
+        label="injected runs",
+    )
+    fa_compared = fa_mismatch = 0
+    unin_flag_m2: dict[tuple[str, str, int], np.ndarray] = {}
+    for seg in segs:
+        y0 = r694._segment_series(seg=seg)
+        lvl0 = c694.quantise_spread(spread=c694.causal_spread(y=y0))[r694.PRE_ROLL :]
+        fl = t694.grid_track(y=y0[r694.PRE_ROLL :], lvl=lvl0).p_any_smooth > 0.5
+        unin_flag_m2[(seg.host, seg.period, seg.index)] = fl
+        st = stored_fa.get((seg.host, seg.period, seg.index))
+        if st is not None:
+            fa_compared += 1
+            fa_mismatch += int(int(fl.sum()) != int(st["flagged"]))
+    consistency_gate(
+        compared=fa_compared, mismatches=fa_mismatch, expected=len(segs), label="un-injected runs"
+    )
+    k1_stored = {
+        d["rule"]: d["arms"]["M2"]
+        for d in pickle.loads(next(c694.DATA_DIR.glob("k1.pkl")).read_bytes())
+    }
+    k1 = k1_series()
+    k1_flag = t694.grid_track(y=k1["yy"], lvl=k1["lvl"]).p_any_smooth > 0.5
+    tp, fp, fn, _ = c694.f1_counts(truth=(k1["units"] > 0)[k1["valid"]], flag=k1_flag[k1["valid"]])
+    consistency_gate(
+        compared=1,
+        mismatches=int((tp, fp, fn) != (k1_stored["folded"]["tp"], k1_stored["folded"]["fp"], k1_stored["folded"]["fn"])),
+        expected=1, label="K1",
+    )  # fmt: skip
+    m2_hours = (time.perf_counter() - t_phase1) / 3600.0
+    # ---- phase 2: the hindsight model on the same series
+    n_fits = len(segs) * len(names) + len(segs) + 1 + 9
+    gate = hmm.CostGate(cap_hours=max(cap_hours - m2_hours, 0.0))
+    wk_h: dict[tuple[str, str, str, int], np.ndarray] = {}
+    rows: list[dict[str, Any]] = []
+    for seg in segs:
+        for name in names:
+            sched = r694.SCHEDULES[name]
+            units = sched["units"]
+            key = (name, seg.host, seg.period, seg.index)
             hf = hindsight_fit(
-                y=yi,
+                y=inj_series[key],
                 first_index=seg.start,
                 pre_roll=r694.PRE_ROLL,
                 gate=gate,
                 projected_fits=n_fits,
                 **fk,
             )
-            win = slice(r694.INJECT_OFFSET, r694.INJECT_OFFSET + len(g))
-            outside = np.ones(len(hf.flag), dtype=bool)
-            outside[win] = False
+            win = slice(r694.INJECT_OFFSET, r694.INJECT_OFFSET + len(units))
             truth = units > 0
-            cluster = f"{seg.host}|{seg.period}|{seg.index}"
-            for store, flag, fa in ((hind, hf.flag, fa_h), (m2, m2_flag, fa_m)):
-                if sched["primary"]:
-                    t = np.array(store.get(cluster, (0, 0, 0))) + np.array(
-                        f1_counts(truth=truth, flag=flag[win])
-                    )
-                    store[cluster] = (int(t[0]), int(t[1]), int(t[2]))
-                fa[0] += int(flag[outside].sum())
-                fa[1] += int(outside.sum())
-                after_start = -(-(r694.INJECT_OFFSET + len(g)) // 48) * 48
-                for part in (flag[: r694.INJECT_OFFSET], flag[after_start:]):
-                    act, days = r694.active_days(flag=part)
-                    fa[2] += act
-                    fa[3] += days
+            wk_h[key] = weekly_counts(truth=truth, flag=hf.flag[win])
             ur = (
                 [unit_recall(n_hat=hf.n_hat[win], units=units, k=k) for k in range(4)]
                 if hf.n_hat is not None
                 else []
             )
+            low_conf = float("nan")
+            if hf.p_max is not None and truth.any():
+                low_conf = float((hf.p_max[win][truth] < 0.7).mean())
             rows.append(
-                {"cluster": cluster, "schedule": name, "primary": bool(sched["primary"]), "unit_size_hat": hf.unit_size, "seconds": hf.seconds,
-                 "f1_hindsight": f1(*f1_counts(truth=truth, flag=hf.flag[win])), "f1_m2": f1(*f1_counts(truth=truth, flag=m2_flag[win])),
+                {"cluster": f"{seg.host}|{seg.period}|{seg.index}", "schedule": name, "primary": bool(sched["primary"]), "unit_size_hat": hf.unit_size, "seconds": hf.seconds,
+                 "f1_hindsight": f1(*f1_counts(truth=truth, flag=hf.flag[win])), "f1_m2": f1(*f1_counts(truth=truth, flag=m2_flag[key][win])),
+                 "low_confidence_running_share": low_conf,
                  **{f"recall_units_{k}": (h / t if t else float("nan")) for k, (h, t) in enumerate(ur)}}
             )  # fmt: skip
-            if np.isnan(run_gate.seconds_per_pass):
-                run_gate.seconds_per_pass = (
-                    time.perf_counter() - t_iter
-                )  # one M2 rerun plus one hindsight fit
-                run_gate.check(n_passes_total=len(segs) * len(names) + 10)
-    mismatch_share = mismatches / max(compared, 1)
-    fa = {
-        "flagged_share": fa_h[0] / max(fa_h[1], 1),
-        "active_days_per_month": fa_h[2] / max(fa_h[3], 1) * 30.0,
-    }
-    fa_m2 = {
-        "flagged_share": fa_m[0] / max(fa_m[1], 1),
-        "active_days_per_month": fa_m[2] / max(fa_m[3], 1) * 30.0,
-    }
-    verdict = v2_verdict(hind=hind, m2=m2, fa=fa)
+    unin_h: list[tuple[str, np.ndarray]] = []
+    unin_m: list[tuple[str, np.ndarray]] = []
+    for seg in segs:
+        hf = hindsight_fit(
+            y=r694._segment_series(seg=seg),
+            first_index=seg.start,
+            pre_roll=r694.PRE_ROLL,
+            gate=gate,
+            projected_fits=n_fits,
+            **fk,
+        )
+        unin_h.append((seg.host, hf.flag))
+        unin_m.append((seg.host, unin_flag_m2[(seg.host, seg.period, seg.index)]))
+    fa_h = per_host_false_alarm(runs=unin_h)
+    fa_m = per_host_false_alarm(runs=unin_m)
+    x_h = build_tensor(counts=wk_h, scheds=prim, segs=seg_keys)
+    x_m = build_tensor(counts=wk_m2, scheds=prim, segs=seg_keys)
+    verdict = v2_verdict(x_hind=x_h, x_m2=x_m, fa_hindsight=fa_h)
     pl.DataFrame(rows).write_csv(guard.private_path(name="v2_fits.csv"))
-    pl.DataFrame(
-        {
-            "cluster": list(hind),
-            "tp": [v[0] for v in hind.values()],
-            "fp": [v[1] for v in hind.values()],
-            "fn": [v[2] for v in hind.values()],
-        }
-    ).write_csv(guard.private_path(name="v2_hindsight_counts.csv"))
-    pl.DataFrame(
-        {
-            "cluster": list(m2),
-            "tp": [v[0] for v in m2.values()],
-            "fp": [v[1] for v in m2.values()],
-            "fn": [v[2] for v in m2.values()],
-        }
-    ).write_csv(guard.private_path(name="v2_m2_counts.csv"))
+    pl.DataFrame([{"host": h, **v} for h, v in fa_h.items()]).write_csv(
+        guard.private_path(name="v2_false_alarm_hindsight_by_host.csv")
+    )
+    pl.DataFrame([{"host": h, **v} for h, v in fa_m.items()]).write_csv(
+        guard.private_path(name="v2_false_alarm_m2_by_host.csv")
+    )
     pl.DataFrame(
         [
             {
                 **verdict["contrast"],
                 **{f"bar_{k}": v for k, v in verdict["bar"].items()},
-                "m2_rerun_mismatch_share": mismatch_share,
-                "fa_flagged_share_hindsight": fa["flagged_share"],
-                "fa_active_days_hindsight": fa["active_days_per_month"],
-                "fa_flagged_share_m2": fa_m2["flagged_share"],
-                "fa_active_days_m2": fa_m2["active_days_per_month"],
+                "m2_reruns_compared": compared,
+                "m2_reruns_mismatched": mismatches,
+                "m2_phase_hours": m2_hours,
             }
         ]
     ).write_csv(guard.private_path(name="v2_bar.csv"))
-    k1v3 = run_k1_v3(gate=gate, n_fits=n_fits, fit_kwargs=fk)
+    k1v3 = run_k1_v3(
+        gate=gate, n_fits=n_fits, fit_kwargs=fk, k1=k1, k1_m2_f1=c694.f1_of(tp=tp, fp=fp, fn=fn)
+    )
     pl.DataFrame([k1v3]).write_csv(guard.private_path(name="k1_v3.csv"))
     print(
         {k: verdict["contrast"][k] for k in ("point", "lower", "upper", "f1_a", "f1_b")},
-        f"M2 rerun differs from the stored counts in {mismatch_share:.3f} of runs",
+        "bar passed:",
+        verdict["bar"]["passed"],
     )
     return 0
 
@@ -440,18 +610,12 @@ def added_back_end_index() -> int:
     return c694.stamp(when=end)
 
 
-def run_k1_v3(
-    *, gate: hmm.CostGate, n_fits: int, fit_kwargs: dict[str, Any] | None = None
-) -> dict[str, Any]:  # pragma: no cover - needs the stored panel
-    """Run K1 (D8's own 44 days with the engine record subtracted) and V3 (D8's two engine-free periods).
+def k1_series() -> dict[str, Any]:  # pragma: no cover - needs the stored panel
+    """Return K1's injected reading `yy` (after the pre-roll), its spread level, the record's units, the valid mask, and the offsets.
 
-    `r694.init()` must have run. K1 is placed on D8's grid exactly as `e00694_run.k1_task` does, scored
-    on the half-hours where the record is valid, and compared with the stored M2 score. V3 fits the
-    hindsight model with `K` forced to 3 on each control period (the strictest form of the control) and
-    reports the flagged share and the active days a month, pooled over the two periods and per period.
+    The record is placed on D8's half-hour grid exactly as `e00694_run.k1_task` does; the half-hours
+    where the record has a gap hold no injection and are not scored.
     """
-    import pickle
-
     import e00694_common as c694  # ty: ignore[unresolved-import]
     import e00694_run as r694  # ty: ignore[unresolved-import]
 
@@ -470,69 +634,95 @@ def run_k1_v3(
     drive = np.zeros(len(y))
     drive[r694.PRE_ROLL :] = g
     yi = c694.inject_folded(y=y, g=drive)
+    lvl = c694.quantise_spread(spread=c694.causal_spread(y=yi))[r694.PRE_ROLL :]
+    return {
+        "y": yi,
+        "yy": yi[r694.PRE_ROLL :],
+        "lvl": lvl,
+        "units": units,
+        "valid": valid,
+        "first_index": t0 - r694.PRE_ROLL,
+    }
+
+
+def run_k1_v3(
+    *,
+    gate: hmm.CostGate,
+    n_fits: int,
+    fit_kwargs: dict[str, Any] | None = None,
+    k1: dict[str, Any],
+    k1_m2_f1: float,
+) -> dict[str, Any]:  # pragma: no cover - needs the stored panel
+    """Score K1 (hindsight F1 against the rerun M2) and V3 (each of D8's two engine-free periods, scored on its own).
+
+    V3 fits `K = 0` to 3 on each control period, picks `K` by the information criterion, and also reports
+    the forced `K = 3` fit. The bar needs every period to pass for both fits.
+    """
+    import e00694_common as c694  # ty: ignore[unresolved-import]
+    import e00694_run as r694  # ty: ignore[unresolved-import]
+
+    kw = fit_kwargs or {}
     hf = hindsight_fit(
-        y=yi,
-        first_index=t0 - r694.PRE_ROLL,
+        y=k1["y"],
+        first_index=k1["first_index"],
         pre_roll=r694.PRE_ROLL,
         gate=gate,
         projected_fits=n_fits,
-        **(fit_kwargs or {}),
+        **kw,
     )
-    truth = units > 0
-    tp, fp, fn = f1_counts(truth=truth[valid], flag=hf.flag[valid])
+    truth = k1["units"] > 0
+    tp, fp, fn = f1_counts(truth=truth[k1["valid"]], flag=hf.flag[k1["valid"]])
     k1_f1 = f1(tp, fp, fn)
-    stored_k1 = next(
-        d
-        for d in pickle.loads(next(c694.DATA_DIR.glob("k1.pkl")).read_bytes())
-        if d["rule"] == "folded"
-    )["arms"]["M2"]
-    m2_stored_f1 = c694.f1_of(tp=stored_k1["tp"], fp=stored_k1["fp"], fn=stored_k1["fn"])
     out: dict[str, Any] = {
         "k1_f1_hindsight": k1_f1,
-        "k1_f1_m2_stored": m2_stored_f1,
+        "k1_f1_m2_rerun": k1_m2_f1,
         **{f"k1_{k}": v for k, v in bars.k1_bar(f1=k1_f1).items()},
     }
+    connected = c694.stamp(when=c694.ENGINE_CONNECTED)
     periods = {
-        "before_connection": (r694.PRE_ROLL, c694.stamp(when=c694.ENGINE_CONNECTED)),
-        "added_back": (c694.stamp(when=c694.ENGINE_CONNECTED), added_back_end_index()),
+        "before_connection": (r694.PRE_ROLL, connected),
+        "added_back": (connected, added_back_end_index()),
     }
-    flagged = total = active = days = 0
+    per: dict[str, dict[str, float]] = {}
     for name, (a, b) in periods.items():
         yy = r694.SERIES["D8"][a - r694.PRE_ROLL : b]
-        h = hindsight_fit(
+        chosen, fits = select_k(
             y=yy,
             first_index=a - r694.PRE_ROLL,
             pre_roll=r694.PRE_ROLL,
             gate=gate,
             projected_fits=n_fits,
-            **(fit_kwargs or {}),  # n_max stays at its default of 3: K is forced
+            **kw,
         )
-        fa = false_alarm(flag=h.flag, first_index_of_flag=a)
-        out[f"v3_{name}_flagged_share"] = fa["flagged_share"]
-        out[f"v3_{name}_active_days_per_month"] = fa["active_days_per_month"]
-        flagged += int(h.flag.sum())
-        total += len(h.flag)
-        act, d = r694.active_days(flag=h.flag)
-        active += act
-        days += d
-    pooled = {
-        "flagged_share": flagged / max(total, 1),
-        "active_days_per_month": active / max(days, 1) * 30.0,
-    }
-    bar = bars.v3_bar(
-        flagged_share=pooled["flagged_share"],
-        active_days_per_month=pooled["active_days_per_month"],
-        forced_k3_flagged_share=pooled["flagged_share"],
-    )
-    out.update({f"v3_{k}": v for k, v in bar.items()})
+        fa_sel = false_alarm(flag=chosen.flag)
+        fa_forced = false_alarm(flag=fits[3].flag)
+        per[name] = {
+            "flagged_share": fa_sel["flagged_share"],
+            "active_days_per_month": max(
+                fa_sel["active_days_per_month"], fa_forced["active_days_per_month"]
+            ),
+            "forced_k3_flagged_share": fa_forced["flagged_share"],
+        }
+        out[f"v3_{name}_k_selected"] = chosen.n_max
+        out[f"v3_{name}_flagged_share"] = fa_sel["flagged_share"]
+        out[f"v3_{name}_forced_k3_flagged_share"] = fa_forced["flagged_share"]
+        out[f"v3_{name}_active_days_per_month_selected"] = fa_sel["active_days_per_month"]
+        out[f"v3_{name}_active_days_per_month_forced"] = fa_forced["active_days_per_month"]
+    out["v3_passed"] = bars.v3_all_periods(periods=per)["passed"]
     return out
 
 
-def selftest() -> int:
-    """Check the machinery on a synthetic host and engine with a known answer."""
-    rng = np.random.default_rng(1)
+def _synthetic_host(
+    *, seed: int, n_days: int, drift: float, engine: bool, pre_days: int = 28
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """Return a synthetic reading, the true unit count, and the grid index of its first half-hour.
+
+    The demand has a daily and a weekly shape, an AR(1) residual, a linear drift of `drift` MVA over the
+    segment (after the pre-roll), and, with `engine`, a run of units of 1.6 MVA after the pre-roll.
+    """
+    rng = np.random.default_rng(seed)
     first = 7 * 48 * 3
-    n = PRE_ROLL + 60 * 48
+    n = (pre_days + n_days) * 48
     idx = np.arange(n)
     h = idx % 48
     dtype = day_types(n=n, first_index=first)
@@ -540,36 +730,60 @@ def selftest() -> int:
     ar = np.zeros(n)
     for t in range(1, n):
         ar[t] = 0.9 * ar[t - 1] + rng.normal(0, 0.08)
+    trend = drift * np.clip((idx - pre_days * 48) / (n_days * 48), 0.0, 1.0)
     units = np.zeros(n, dtype=int)
-    state = 0
-    for t in range(PRE_ROLL + 48 * 10, n):
-        if rng.random() > 0.97:
-            state = int(rng.integers(0, 3))
-        units[t] = state
-    g = 1.6 * units
-    y = np.sqrt(np.maximum(base + ar - g, 0.0) ** 2 + Q_FLOOR_MVA**2) + rng.standard_t(4, n) * 0.05
-    gate = hmm.CostGate(cap_hours=1.0)
-    hf = hindsight_fit(
-        y=y,
-        first_index=first,
-        gate=gate,
-        projected_fits=1,
-        n_max=2,
-        coarse=(1.0, 1.5, 2.0),
-        n_bins=15,
+    if engine:
+        state = 0
+        for t in range(pre_days * 48 + 48 * 10, n):
+            if rng.random() > 0.97:
+                state = int(rng.integers(0, 3))
+            units[t] = state
+    y = (
+        np.sqrt(np.maximum(base + ar + trend - 1.6 * units, 0.0) ** 2 + Q_FLOOR_MVA**2)
+        + rng.standard_t(4, n) * 0.05
     )
-    truth = (units > 0)[PRE_ROLL:]
-    tp, fp, fn = f1_counts(truth=truth, flag=hf.flag)
-    score = f1(tp, fp, fn)
+    return y, units, first
+
+
+def selftest() -> int:
+    """Check the machinery on synthetic hosts with known answers, including seasonal drift of demand."""
+    small: dict[str, Any] = {"coarse": (1.0, 1.6, 2.0), "n_bins": 9}
+    y, units, first = _synthetic_host(seed=1, n_days=60, drift=0.0, engine=True)
+    gate = hmm.CostGate(cap_hours=1.0)
+    hf = hindsight_fit(y=y, first_index=first, gate=gate, projected_fits=1, n_max=2, **small)
+    score = f1(*f1_counts(truth=(units > 0)[PRE_ROLL:], flag=hf.flag))
     assert score > 0.8, score
     assert abs(hf.unit_size - 1.6) <= 0.5, hf.unit_size
-    # the paired contrast machinery with constructed counts
-    a = {f"s{i}": (60, 5, 10) for i in range(30)}
-    b = {f"s{i}": (50, 10, 20) for i in range(30)}
-    c = cluster_bootstrap_f1_difference(a=a, b=b)
-    assert c["lower"] > 0.0
-    assert abs(c["point"] - (f1(60, 5, 10) - f1(50, 10, 20))) < 1e-9
-    same = cluster_bootstrap_f1_difference(a=a, b=a)
+    assert hf.unit_size >= MIN_UNIT_MVA
+    # drift of demand: engine-free segments must stay unflagged
+    drift_shares = {}
+    for drift in (-0.5, -1.0):
+        yd, _, fd = _synthetic_host(seed=2, n_days=120, drift=drift, engine=False)
+        h = hindsight_fit(y=yd, first_index=fd, **small)
+        drift_shares[drift] = false_alarm(flag=h.flag)
+        assert drift_shares[drift]["flagged_share"] < 0.05, (drift, drift_shares[drift])
+        assert drift_shares[drift]["active_days_per_month"] <= 1.0, (drift, drift_shares[drift])
+    # drift together with an engine: still found
+    ye, ue, fe = _synthetic_host(seed=3, n_days=120, drift=-1.0, engine=True)
+    he = hindsight_fit(y=ye, first_index=fe, **small)
+    drift_f1 = f1(*f1_counts(truth=(ue > 0)[PRE_ROLL:], flag=he.flag))
+    assert drift_f1 > 0.7, drift_f1
+    # K by the information criterion: none on an engine-free series, at least one with an engine
+    yq, _, fq = _synthetic_host(seed=4, n_days=40, drift=0.0, engine=False)
+    assert select_k(y=yq, first_index=fq, **small)[0].n_max == 0
+    chosen, _ = select_k(y=y, first_index=first, **small)
+    assert chosen.n_max >= 1, chosen.n_max
+    # schedule-week bootstrap: better counts have a lower bound above 0, identical counts span 0
+    rng = np.random.default_rng(0)
+    xa = np.stack(
+        [[rng.integers(55, 65, 3) * np.array([1, 0.1, 0.15]) for _ in range(8)] for _ in range(35)]
+    )
+    xb = np.stack(
+        [[rng.integers(45, 55, 3) * np.array([1, 0.2, 0.4]) for _ in range(8)] for _ in range(35)]
+    )
+    c = cluster_bootstrap_paired(x_a=xa, x_b=xb, n_boot=1000)
+    assert c["lower"] > 0.0 and c["point"] > 0.05, c
+    same = cluster_bootstrap_paired(x_a=xa, x_b=xa, n_boot=1000)
     assert same["lower"] <= 0.0 <= same["upper"]
     assert bars.v2_bar(
         lower=c["lower"], point=c["point"], flagged_share=0.01, active_days_per_month=0.5
@@ -577,9 +791,21 @@ def selftest() -> int:
     assert not bars.v2_bar(lower=-0.01, point=0.2, flagged_share=0.01, active_days_per_month=0.5)[
         "passed"
     ]
-    fa = false_alarm(flag=np.zeros(480, dtype=bool), first_index_of_flag=0)
-    assert fa["flagged_share"] == 0.0
-    assert fa["active_days_per_month"] == 0.0
+    # the stored-result gate: exact match passes; a mismatch or zero compared results stops the run
+    consistency_gate(compared=396, mismatches=0, expected=396, label="t")
+    for kwargs in ({"compared": 396, "mismatches": 1}, {"compared": 0, "mismatches": 0}):
+        try:
+            consistency_gate(expected=396, label="t", **kwargs)
+        except RuntimeError:
+            continue
+        msg = f"the gate let {kwargs} through"
+        raise AssertionError(msg)
+    fa = per_host_false_alarm(
+        runs=[("A", np.zeros(480, dtype=bool)), ("B", np.ones(480, dtype=bool))]
+    )
+    assert fa["A"]["flagged_share"] == 0.0
+    assert fa["B"]["active_days_per_month"] == 30.0
+    assert worst_host(fa=fa)["flagged_share"] == 1.0
     # the cost gate refuses an over-cap projection
     tiny = hmm.CostGate(cap_hours=1e-9)
     try:
@@ -599,7 +825,7 @@ def selftest() -> int:
         msg = "the cost gate did not stop the fit"
         raise AssertionError(msg)
     print(
-        f"PASS V2 machinery: hindsight F1 {score:.3f}, unit size {hf.unit_size:.2f} (true 1.60) in {hf.seconds:.1f} s and {hf.passes} passes; paired contrast and bars checked; cost gate stops an over-cap run"
+        f"PASS V2 machinery: F1 {score:.3f} with an engine; drift of -0.5 and -1.0 MVA flags {drift_shares[-0.5]['flagged_share']:.3f} and {drift_shares[-1.0]['flagged_share']:.3f} of engine-free half-hours, F1 {drift_f1:.3f} with an engine and drift; K by BIC; schedule-week bootstrap; consistency gate; cost gate"
     )
     return 0
 
@@ -609,8 +835,8 @@ def selftest_694() -> int:
 
     The stub replaces the panel, the schedules, the engine record, the stored pickles, and the private
     folder, so `run_v2` and `run_k1_v3` execute every line on a series of about 70 days with a reduced
-    residual grid. It checks that the stored M2 counts are compared, that a deliberately altered stored
-    count is detected, and that the output files appear under the private folder stub.
+    residual grid. A first run with a deliberately wrong stored count must stop before any hindsight fit.
+    A second run with the correct stored results must write every output.
     """
     import pickle
     import tempfile
@@ -619,6 +845,7 @@ def selftest_694() -> int:
 
     import e00694_common as c694  # ty: ignore[unresolved-import]
     import e00694_run as r694  # ty: ignore[unresolved-import]
+    import e00694_trackers as t694  # ty: ignore[unresolved-import]
     import e00720_guard as guard
     import polars as pl
 
@@ -641,12 +868,15 @@ def selftest_694() -> int:
     r694.SERIES.update(
         {"D3": np.sqrt(host**2 + Q_FLOOR_MVA**2), "D8": np.sqrt((host + 3.0) ** 2 + Q_FLOOR_MVA**2)}
     )
+    real_spread = c694.causal_spread
+    c694.causal_spread = lambda *, y: (
+        np.full(len(y), 0.08) if len(y) < 28 * 48 else real_spread(y=y)
+    )  # a 28-day window is longer than K1's stub series
     r694.init = lambda: None
     seg = r694.Segment(host="D3", period="pre-solar", index=0, start=0)
     r694.segments = lambda: [seg]
     units = np.zeros(n_inj, dtype=int)
-    units[100:160], units[200:260] = 1, 2
-    units[260:300] = 3
+    units[100:160], units[200:260], units[260:300] = 1, 2, 3
     synth = np.roll(units, 40)
     r694.SCHEDULES.clear()
     r694.SCHEDULES.update(
@@ -655,10 +885,9 @@ def selftest_694() -> int:
             "synth0": {"units": synth, "g": synth * 1.6, "primary": False, "k": 3, "u": 1.6},
         }
     )
-    # the stored M2 counts: right for the first schedule, wrong for the second
     y0 = r694._segment_series(seg=seg)
-    stored = []
-    for name, wrong in (("record", False), ("synth0", True)):
+    stored: list[dict[str, Any]] = []
+    for name in r694.SCHEDULES:
         sch = r694.SCHEDULES[name]
         drive = np.zeros(r694.TOTAL_LEN)
         drive[pre + offset : pre + offset + n_inj] = sch["g"]
@@ -672,40 +901,85 @@ def selftest_694() -> int:
                 "index": 0,
                 "sched": name,
                 "rule": "folded",
-                "arms": {"M2": {"counts": counts + (1 if wrong else 0)}},
+                "arms": {"M2": {"counts": counts}},
             }
         )
-    (c694.DATA_DIR / "inject.pkl").write_bytes(pickle.dumps(stored))
-    (c694.DATA_DIR / "k1.pkl").write_bytes(
-        pickle.dumps([{"rule": "folded", "arms": {"M2": {"tp": 40, "fp": 5, "fn": 10, "tn": 100}}}])
-    )
+    lvl0 = c694.quantise_spread(spread=c694.causal_spread(y=y0))[pre:]
+    fl0 = t694.grid_track(y=y0[pre:], lvl=lvl0).p_any_smooth > 0.5
+    fa_stored = [
+        {
+            "host": "D3",
+            "period": "pre-solar",
+            "index": 0,
+            "arms": {"M2": {"flagged": int(fl0.sum())}},
+        }
+    ]
     start = c694.GRID_START
-    rec_t = [start + timedelta(minutes=30 * (20 * 48 + i)) for i in range(n_inj)]
-    rec = pl.DataFrame({"time": rec_t, "power": units * 1.6, "units": units})
+    rec = pl.DataFrame(
+        {
+            "time": [start + timedelta(minutes=30 * (20 * 48 + i)) for i in range(n_inj)],
+            "power": units * 1.6,
+            "units": units,
+        }
+    )
     c694.load_record = lambda: rec
     c694.record_arrays = lambda: (units * 1.6, units)
     c694.ENGINE_CONNECTED = start + timedelta(days=30)
-    (guard.PRIVATE_DIR).mkdir(parents=True, exist_ok=True)
+    guard.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
     (guard.PRIVATE_DIR / "era_dates.json").write_text(
         '{"added_back_end": "' + (start + timedelta(days=45)).date().isoformat() + '"}'
     )
-    code = run_v2(cap_hours=1.0, fit_kwargs={"coarse": (1.2, 1.6, 2.0), "n_bins": 9})
+    k1 = k1_series()
+    k1_fl = t694.grid_track(y=k1["yy"], lvl=k1["lvl"]).p_any_smooth > 0.5
+    tp, fp, fn, tn = c694.f1_counts(truth=(k1["units"] > 0)[k1["valid"]], flag=k1_fl[k1["valid"]])
+    k1_stored = [{"rule": "folded", "arms": {"M2": {"tp": tp, "fp": fp, "fn": fn, "tn": tn}}}]
+
+    def write_stored(*, wrong: bool) -> None:
+        bad = [
+            dict(
+                d,
+                arms={
+                    "M2": {"counts": d["arms"]["M2"]["counts"] + (1 if (wrong and i == 1) else 0)}
+                },
+            )
+            for i, d in enumerate(stored)
+        ]
+        (c694.DATA_DIR / "inject.pkl").write_bytes(pickle.dumps(bad))
+        (c694.DATA_DIR / "fa.pkl").write_bytes(pickle.dumps(fa_stored))
+        (c694.DATA_DIR / "k1.pkl").write_bytes(pickle.dumps(k1_stored))
+
+    kw: dict[str, Any] = {"coarse": (1.2, 1.6, 2.0), "n_bins": 9}
+    write_stored(wrong=True)
+    try:
+        run_v2(cap_hours=1.0, fit_kwargs=kw, expected_segments=1, expected_schedules=2)
+    except RuntimeError as err:
+        assert "differ from the stored" in str(err), err
+        assert not (guard.PRIVATE_DIR / "v2_bar.csv").exists(), (
+            "the bar was written after a mismatch"
+        )
+    else:
+        msg = "a wrong stored count did not stop run_v2"
+        raise AssertionError(msg)
+    write_stored(wrong=False)
+    code = run_v2(cap_hours=1.0, fit_kwargs=kw, expected_segments=1, expected_schedules=2)
     out = {p.name for p in guard.PRIVATE_DIR.iterdir()}
     assert {
         "v2_fits.csv",
         "v2_bar.csv",
         "k1_v3.csv",
-        "v2_m2_counts.csv",
-        "v2_hindsight_counts.csv",
+        "v2_false_alarm_hindsight_by_host.csv",
     } <= out, out
     bar = pl.read_csv(guard.PRIVATE_DIR / "v2_bar.csv")
-    assert abs(bar["m2_rerun_mismatch_share"][0] - 0.5) < 1e-9, bar["m2_rerun_mismatch_share"][0]
-    fits = pl.read_csv(guard.PRIVATE_DIR / "v2_fits.csv")
-    assert fits.height == 2
+    assert bar["m2_reruns_compared"][0] == 2 and bar["m2_reruns_mismatched"][0] == 0
     k = pl.read_csv(guard.PRIVATE_DIR / "k1_v3.csv")
-    assert "v3_passed" in k.columns and "k1_f1_hindsight" in k.columns
+    assert {
+        "v3_passed",
+        "k1_f1_hindsight",
+        "k1_f1_m2_rerun",
+        "v3_before_connection_k_selected",
+    } <= set(k.columns)
     print(
-        f"PASS V2 and K1 and V3 harness against stubbed 694 assets: {fits.height} injected runs, stored-count mismatch detected (0.5), outputs {sorted(out)}"
+        f"PASS V2, K1, and V3 harness against stubbed 694 assets: a wrong stored count stops the run before any fit; the correct run writes {sorted(out)}"
     )
     return code
 

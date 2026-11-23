@@ -18,6 +18,12 @@ def main() -> int:
     assert bars.paired_bar(lower=0.01, point=0.06, min_point=0.05)["passed"]
     assert not bars.paired_bar(lower=-0.01, point=0.06, min_point=0.05)["passed"]
     assert not bars.paired_bar(lower=0.01, point=0.04, min_point=0.05)["passed"]
+    ok_p = {"flagged_share": 0.01, "active_days_per_month": 0.0, "forced_k3_flagged_share": 0.02}
+    assert bars.v3_all_periods(periods={"a": ok_p, "b": ok_p})["passed"]
+    assert not bars.v3_all_periods(
+        periods={"a": ok_p, "b": {**ok_p, "forced_k3_flagged_share": 0.2}}
+    )["passed"]
+    assert not bars.v3_all_periods(periods={})["passed"]
     assert bars.k1_bar(f1=0.78)["passed"]
     assert not bars.k1_bar(f1=0.7)["passed"]
     rng = np.random.default_rng(0)
