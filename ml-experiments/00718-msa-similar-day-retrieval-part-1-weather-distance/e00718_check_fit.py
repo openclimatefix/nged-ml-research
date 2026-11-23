@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PLR0915, E731
 """Experiment 718, WP5a: check the fit's resume and refusal rules on the CPU with a tiny synthetic fold.
 
 The checks run `fit` with `smoke=True` (two passes per stage), random encoders, and the row tables of
@@ -53,7 +53,7 @@ def main() -> int:
         root = Path(tmp)
         stage_file = lambda s: arms.model_file(
             data_dir=root, arm=ARM, month=MONTH, seed=SEED, stage=s, smoke=True
-        )  # noqa: E731
+        )
         # a crash during stage 2
         real = ftr.train_stage
 
@@ -63,7 +63,7 @@ def main() -> int:
                 raise RuntimeError(msg)
             return real(**kwargs)
 
-        ftr.train_stage = crashing
+        ftr.train_stage = crashing  # ty: ignore[invalid-assignment]
         try:
             run_fit(root=root, tables=tables, source=source)
             raise SystemExit("the simulated crash did not propagate")
