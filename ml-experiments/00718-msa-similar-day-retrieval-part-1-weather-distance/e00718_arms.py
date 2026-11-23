@@ -10,6 +10,7 @@ experiment 713 names: its encoders are loaded from the Candidate chain and froze
 import functools
 import hashlib
 import json
+import os
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -283,20 +284,32 @@ def install_own_cache(*, data_dir: Path) -> Path:
         for src in sorted(old.glob("*.npy")):
             dest = own / src.name
             if not dest.exists():
-                tmp = dest.with_name(dest.name + ".tmp")
+                tmp = dest.with_name(f"{dest.name}.{os.getpid()}.tmp")
                 shutil.copy2(src, tmp)
                 tmp.rename(dest)
     inp.CACHE = own
     return own
 
 
-def watched_713_files(*, data_dir: Path) -> dict[str, float]:
-    """Return the modification times of experiment 713's `work` and `cache` files, for the unchanged-files assertion."""
+def watched_713_files(*, data_dir: Path) -> dict[str, tuple[float, int]]:
+    """Return the modification time and size of the files of experiment 713 that F9 reads: cache arrays and stored states.
+
+    Files that experiment 713's own jobs write while F9 runs (logs, new states) are not read by F9
+    and are not watched.
+    """
     base = a713.root(data_dir=data_dir)
-    out: dict[str, float] = {}
-    for folder in (base / "work", base / "cache"):
+    out: dict[str, tuple[float, int]] = {}
+    for folder, pattern in ((base / "work", "*.pt"), (base / "cache", "*.npy")):
         if folder.exists():
-            for path in sorted(folder.rglob("*")):
+            for path in sorted(folder.rglob(pattern)):
                 if path.is_file():
-                    out[str(path)] = path.stat().st_mtime
+                    stat = path.stat()
+                    out[str(path)] = (stat.st_mtime, stat.st_size)
     return out
+
+
+def changed_watched_files(
+    *, before: dict[str, tuple[float, int]], after: dict[str, tuple[float, int]]
+) -> list[str]:
+    """Return the files that existed before the fit and changed or vanished; new files are ignored."""
+    return [k for k, v in before.items() if after.get(k) != v]

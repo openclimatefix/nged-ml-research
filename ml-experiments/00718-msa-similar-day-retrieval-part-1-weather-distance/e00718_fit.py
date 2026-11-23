@@ -293,7 +293,10 @@ def fit(
         log["peak_gpu_mb"] = torch.cuda.max_memory_allocated() / 2**20
     write_json_atomic(obj=log, path=final_log)
     after = arms.watched_713_files(data_dir=data_dir)
-    assert before == after, "a file of experiment 713's work or cache folder changed during the fit"
+    changed = arms.changed_watched_files(before=before, after=after)
+    assert not changed, (
+        f"a file of experiment 713 that this fit reads changed during the fit: {changed[:3]}"
+    )
     return log
 
 

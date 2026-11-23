@@ -56,12 +56,12 @@ MEASURE_LINES = {
 
 TARGET_WEATHER_LINE = (
     "Target-row weather of the distance: stages 2 and 3 and the forecast read the ensemble mean of the "
-    "00Z run of the origin day, issued 3 h 0 min before the native origin; stage 1 reads ERA5 and CAMS at "
+    "00Z run of the origin day, issued at 00:00 UTC, 9 h before the 09:00 native origin; stage 1 reads ERA5 and CAMS at "
     "the target half-hours, which is the lab shortcut of experiment 713's stage 1"
 )
 POOL_WEATHER_LINE = (
     "Pool weather of the distance: the analysis valid at each block's own half-hours. A block of age a "
-    "ends 48 (a - 1) half-hours before the contract origin, so every pool block, for ages 2 and up, "
+    "ends at least 48 (a - 1) + 6 half-hours before the contract origin (54 for age 2), so every pool block, for ages 2 and up, "
     "is valid before the contract origin."
 )
 

@@ -58,7 +58,8 @@ def group_reading(*, c: dict, group: str, n_seeds: int) -> str:
         return "loss"
     if hi < 0 and d <= -TAU and guards:
         return "gain"
-    if hi < 0 and c["seed_guard_4_of_5"]:
+    seeds_for_small_gain = c["seed_guard_4_of_5"] if n_seeds == 5 else c["seed_guard"]
+    if hi < 0 and seeds_for_small_gain:  # 4 of 5 seeds, or both seeds of two (section 7.3 row 4)
         return "small gain"
     delta = DELTA[n_seeds][group]
     if lo > -delta and hi < delta:
@@ -199,7 +200,7 @@ def reachable_thresholds(*, n_seeds: int, level: float = LEVEL) -> list[str]:
     return lines
 
 
-def self_test() -> int:
+def self_test() -> int:  # noqa: PLR0915
     """Check the rules on synthetic contrasts, including each verdict row and the closure rule."""
 
     def c(
@@ -223,6 +224,11 @@ def self_test() -> int:
     assert g5(c(-0.20, 0.05, seeds=False)) == "small gain"
     assert g5(c(-0.20, 0.05, seeds=False, four=False)) == "cannot tell"
     assert g5(c(0.0, 0.03)) == "no detectable difference"
+    two = lambda x: group_reading(c=x, group="six", n_seeds=2)  # noqa: E731
+    assert (
+        two(c(-0.20, 0.05, seeds=False, four=True)) == "cannot tell"
+    )  # one seed of two is not enough
+    assert two(c(-0.20, 0.05, seeds=True)) == "gain"
     assert g5(c(0.0, 0.5)) == "cannot tell"
     assert group_reading(c=c(0.0, 0.08), group="six", n_seeds=2) == "no detectable difference"
     assert group_reading(c=c(0.0, 0.08), group="six", n_seeds=5) == "cannot tell"
