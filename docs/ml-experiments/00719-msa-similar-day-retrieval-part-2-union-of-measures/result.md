@@ -202,9 +202,10 @@ prose review.
 
 - `data/ml-experiments/briefs/msa_architecture/f9_design.md`, `f9_design_review.md`, and
   `f9_design_triage.md` (read, private): the design that this page condenses.
-- `ml-experiments/00719-msa-similar-day-retrieval-part-2-union-of-measures/`: this part's scorer,
-  figures, and report, which import the shared code of experiment 718. Written and unit-checked on
-  the CPU, with no fit run yet.
+- `ml-experiments/00719-msa-similar-day-retrieval-part-2-union-of-measures/`: this part's `run.sh`,
+  which puts the code of experiment 718 on the path. Experiment 718's scripts fit, predict, and score
+  the arms of this part and write under this experiment's data folder. This part's own scorer,
+  figures, and report are not written yet, and no fit has run.
 - Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
   the stored states and forecasts of `M*` and `P`, and the scorer.
 - Written by this experiment (to be created): fitted states under
