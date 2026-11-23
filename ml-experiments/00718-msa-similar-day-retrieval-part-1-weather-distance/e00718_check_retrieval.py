@@ -195,22 +195,34 @@ def check_placebos(*, tables: dict[str, ret.RowTable], arrays: ret.PoolArrays) -
     return lines
 
 
-def check_class_counts(*, arrays: ret.PoolArrays) -> str:
-    """KR4's count of rows per age class equals the treatment's, on samples where no class is exhausted."""
-    r, ra = build(arm="R", arrays=arrays), build(arm="R-A", arrays=arrays)
-    same = total = 0
-    for idx in np.ndindex(r.ages.shape[:3]):
-        t = r.ages[idx].astype(np.int64)
-        p = ra.ages[idx].astype(np.int64)
-        total += 1
-        if (p >= 0).sum() == (t >= 0).sum():
-            ct = np.bincount(lay.age_class(ages=t[t >= 0]), minlength=11)
-            cp = np.bincount(lay.age_class(ages=p[p >= 0]), minlength=11)
-            same += int((ct == cp).all())
-    assert same >= 0.9 * total, (
-        f"only {same} of {total} placebo samples match the treatment's class counts"
-    )
-    return f"R-A: class counts equal the treatment's in {same} of {total} samples (the rest passed a shortfall to an older class)"
+def check_class_counts(*, arrays: ret.PoolArrays) -> list[str]:
+    """KR4: each placebo's count of rows per age class equals its treatment's, where no class is exhausted, and its rows are farther in weather than the treatment's."""
+    lines = []
+    for treatment, placebo in (("R", "R-A"), ("U", "U-A"), ("U27", "U27-A")):
+        r, ra = build(arm=treatment, arrays=arrays), build(arm=placebo, arrays=arrays)
+        same = total = 0
+        for idx in np.ndindex(r.ages.shape[:3]):
+            t = r.ages[idx].astype(np.int64)
+            p = ra.ages[idx].astype(np.int64)
+            total += 1
+            if (p >= 0).sum() == (t >= 0).sum():
+                ct = np.bincount(lay.age_class(ages=t[t >= 0]), minlength=11)
+                cp = np.bincount(lay.age_class(ages=p[p >= 0]), minlength=11)
+                same += int((ct == cp).all())
+        assert same >= 0.9 * total, (
+            f"{placebo}: only {same} of {total} samples match the treatment's class counts"
+        )
+        assert r.distance is not None and ra.distance is not None
+        near = r.distance[r.measure == lay.MEASURE_WEATHER]
+        far = ra.distance[ra.measure == lay.MEASURE_RANDOM]
+        near, far = near[np.isfinite(near)], far[np.isfinite(far)]
+        assert far.mean() > near.mean(), (
+            f"{placebo}'s random rows are not farther than {treatment}'s weather rows"
+        )
+        lines.append(
+            f"{placebo}: class counts equal {treatment}'s in {same} of {total} samples (the rest passed a shortfall to an older class); mean weather distance of the replaced rows {far.mean():.2f} against {near.mean():.2f} for {treatment}'s weather rows"
+        )
+    return lines
 
 
 def check_distance(*, arrays: ret.PoolArrays) -> str:
@@ -323,7 +335,7 @@ def main() -> int:
     tables = {arm: build(arm=arm, arrays=arrays) for arm in ALL_ARMS}
     lines = check_tables(tables=tables, arrays=arrays)
     lines += check_placebos(tables=tables, arrays=arrays)
-    lines.append(check_class_counts(arrays=arrays))
+    lines += check_class_counts(arrays=arrays)
     lines.append(check_distance(arrays=arrays))
     lines += check_no_weather_and_poison(arrays=arrays, power=power)
     lines.append(check_ux(arrays=arrays))

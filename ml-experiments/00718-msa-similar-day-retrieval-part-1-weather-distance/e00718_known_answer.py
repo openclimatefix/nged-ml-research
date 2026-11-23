@@ -48,7 +48,7 @@ THRESHOLDS: Final = {
     "ks3_precondition_slack": 0.02,
     "ks3_floor_fraction": 0.95,
 }
-WS_ARMS: Final = ("Z", "R", "P90", "U", "U-A", "N")
+WS_ARMS: Final = ("Z", "R", "P90", "U", "U-A")
 WN_ARMS: Final = ("Z", "R", "U", "N")
 """`Z` is the last 14 days (`M` in the design's table of checks)."""
 

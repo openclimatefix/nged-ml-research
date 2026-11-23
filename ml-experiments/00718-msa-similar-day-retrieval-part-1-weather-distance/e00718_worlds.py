@@ -214,10 +214,19 @@ def held_out_samples(*, arrays: WorldArrays) -> tr.SampleSet:
 
 
 def held_out_floor(*, arrays: WorldArrays) -> float:
-    """Return the mean absolute `e` of the blocks that the held-out targets cover (the floor of world WN)."""
+    """Return the mean absolute `e` over the held-out targets: each (origin day, lead day) pair counts once, so a block counts as often as pairs reach it.
+
+    The origin on day `d` has contract index `48 d + 24`, whose lead-day-`L` target is block `d + 1 + L`.
+    """
     first = arrays.cutoff // lay713.STEPS_PER_DAY
-    blocks = np.arange(first, first + HELD_OUT_DAYS + lay713.N_LEAD_DAYS)
-    return float(np.abs(arrays.level[np.array(PRIMARIES)][:, blocks]).mean())
+    weights = np.zeros(first + HELD_OUT_DAYS + lay713.N_LEAD_DAYS + 1)
+    for d in range(first, first + HELD_OUT_DAYS):
+        weights[d + 1 : d + 1 + lay713.N_LEAD_DAYS] += 1.0
+    blocks = np.flatnonzero(weights)
+    level = np.abs(arrays.level[np.array(PRIMARIES)][:, blocks])
+    return float(
+        (level * weights[blocks][None, :]).sum() / (weights[blocks].sum() * level.shape[0])
+    )
 
 
 # ------------------------------------------------------------------------------------ references
@@ -254,7 +263,18 @@ def reference_gap(
                         continue
                     w = max(0.0, 1.0 - age / ERA_DAYS)
                     num += w * (
-                        float(np.nanmean(arrays.y[p, lo : lo + lay713.STEPS_PER_DAY])) - 0.5
+                        float(
+                            np.nanmean(
+                                arrays.y[
+                                    p,
+                                    lo : min(
+                                        lo + lay713.STEPS_PER_DAY,
+                                        c - ret.NEWEST_VISIBLE_BEFORE_CONTRACT + 1,
+                                    ),
+                                ]
+                            )
+                        )
+                        - 0.5
                     )
                     den += w
                 est = num / den if den > 0 else 0.0
