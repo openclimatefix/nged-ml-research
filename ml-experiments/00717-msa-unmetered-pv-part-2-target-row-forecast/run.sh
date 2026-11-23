@@ -4,7 +4,9 @@
 # `uv run` inside the scope, because the snap build of uv moves its child out of the capped scope),
 # and the folders of every experiment whose code this one imports on PYTHONPATH.
 #
-# Usage: run.sh e00716_fit.py H 2025-11 0
+# Usage: run.sh e00716_fit.py HT 2025-11 0        (fits of part 2 run part 1's script and write under 00717's data folder)
+#        run.sh e00717_score.py part2 --n-seeds 5
+#        EXTRA_PYTHONPATH=<part 1 checkout>/ml-experiments/00716-... run.sh ...
 #        SLOT_MEM=8G run.sh e00716_check_model.py
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # are set to dummy values here because the contracts package reads them at import. Check `free -g`
@@ -32,5 +34,13 @@ export NGED_S3_BUCKET_ACCESS_KEY="${NGED_S3_BUCKET_ACCESS_KEY:-dummy}"
 export NGED_S3_BUCKET_SECRET="${NGED_S3_BUCKET_SECRET:-dummy}"
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 export POLARS_MAX_THREADS=1 RAYON_NUM_THREADS=1
+if [ -f "$here/$script" ]; then
+    target="$here/$script"
+elif [ -f "$EXTRA_PYTHONPATH/$script" ]; then
+    target="$EXTRA_PYTHONPATH/$script"
+else
+    echo "$script is in neither $here nor $EXTRA_PYTHONPATH" >&2
+    exit 1
+fi
 exec systemd-run --user --scope -q -p MemoryMax="${SLOT_MEM:-12G}" -p MemorySwapMax=0 -p OOMPolicy=continue \
-    "$(dirname "$root")/.venv/bin/python" "$here/$script" "$@"
+    "$(dirname "$root")/.venv/bin/python" "$target" "$@"

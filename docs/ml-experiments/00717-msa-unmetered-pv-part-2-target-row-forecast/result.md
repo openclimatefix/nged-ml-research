@@ -185,6 +185,17 @@ The experiment is planned and has no fitted result yet, so these bullets describ
 - **Measurement:** as experiment 716, on 8 folds and 16 Primaries, with no screen.
 - **Standing practices followed:** as experiment 716.
 
+## Amendments made after the first code review
+
+**The reference regressions, the gating fits, and the cold-night guard are as on the page of part 1.**
+The amendments that part 1's page lists (48 ridge regressions per Primary pooled over the 14 leads, the
+gating fits that mirror the real recipe, and the cold-night guard computed inside the scorer) apply to
+this page unchanged.
+
+**The fits of `HT`, `HT-S`, and `T` run through this folder's `run.sh`,** which finds
+`e00716_fit.py` and `e00716_predict.py` in part 1's folder through `EXTRA_PYTHONPATH`. The fits write
+under this experiment's data folder.
+
 ## Reviews
 
 Two Opus design reviews preceded this page, and the second review's finding S7 changed one verdict
