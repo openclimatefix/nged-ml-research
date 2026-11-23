@@ -35,7 +35,8 @@ def run_part_1_script(*, module: str, takes_part: bool) -> int:
     import runpy
 
     args = sys.argv[1:]
-    if takes_part and args and args[0] != "self-test" and "2" not in args:
+    has_part = len(args) > 1 and args[1] in {"1", "2"}
+    if takes_part and args and args[0] != "self-test" and not has_part:
         args = [args[0], "2", *args[1:]]
     sys.argv = [f"{module}.py", *args]
     runpy.run_module(module, run_name="__main__")
