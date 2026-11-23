@@ -217,8 +217,10 @@ keep a check independent, or to follow the design where experiment 713's code do
   its shortfall to an older class. KR4 also prints the mean weather distance of the replaced rows
   beside the treatment's.
 - With 2 seeds, the reading "small gain" needs both seeds to agree in sign, as design section 7.3
-  states. Experiment 713's scorer accepts 1 seed of 2 for that reading, so this experiment's
-  decision code applies its own rule and leaves experiment 713's scorer unedited.
+  states. Experiment 713's scorer accepts 1 seed of 2 for that reading. This experiment requires
+  both, and the manager approved the stricter rule. The rule can only make a verdict harder to
+  reach, never easier. This experiment's decision code applies it and leaves experiment 713's scorer
+  unedited.
 - Audit trigger 5 (a nested arm beats its container) fires only when the nested arm is better in
   both Primary groups, because the design names no group.
 - The tables of all arms of a fold are built in one pass, and each weather distance is computed once
@@ -270,7 +272,8 @@ exists. Run `e00719_check_import.py` to check the path.
   `e00719_contrasts.py`, `e00719_figures.py`, and `e00719_report.py`, which run experiment 718's
   scripts for this part. Experiment 718's scripts fit, predict, and score the arms of this part
   and write under this experiment's data folder. No fit has run.
-- Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
+- Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-
+  research/pull/402)):
   the stored states and forecasts of `M*` and `P`, and the scorer.
 - Written by this experiment (to be created): fitted states under
   `data/ml-experiments/00719-msa-similar-day-retrieval-part-2-union-of-measures/work/` and
