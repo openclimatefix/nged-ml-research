@@ -258,11 +258,10 @@ prose review.
 
 **Merge order: experiment 713 (pull request 402), then experiment 718, then this experiment.** After
 experiment 718 merges, rebase this branch on `main`: both branches add a row after the row of
-experiment 713 in the theme's `plan.md`, so keep both rows, with 718 first. The scripts of experiment 719 find experiment
-718's
-folder through the environment variable `PART_1_FOLDER`, or as the sibling folder `00718-*`. They
-stop with an error that names the places tried when neither exists. Run `e00719_check_import.py` to
-check the path.
+experiment 713 in the theme's `plan.md`, so keep both rows, with 718 first. The scripts of
+experiment 719 find experiment 718's folder through the environment variable `PART_1_FOLDER`, or as
+the sibling folder `00718-*`. They stop with an error that names the places tried when neither
+exists. Run `e00719_check_import.py` to check the path.
 
 - `data/ml-experiments/briefs/msa_architecture/f9_design.md`, `f9_design_review.md`, and
   `f9_design_triage.md` (read, private): the design that this page condenses.
