@@ -264,8 +264,10 @@ prose review.
 
 - `data/ml-experiments/briefs/msa_architecture/f9_design.md`, `f9_design_review.md`, and
   `f9_design_triage.md` (read, private): the design that this page condenses.
-- `ml-experiments/00718-msa-similar-day-retrieval-part-1-weather-distance/`: the code, written and
-  unit-checked on the CPU, with no fit run yet.
+- `ml-experiments/00718-msa-similar-day-retrieval-part-1-weather-distance/`: the code for both parts
+  (retrieval, network, batches, training, fit, prediction, read-outs, and scoring on stored
+  forecasts), written and unit-checked on the CPU, with no fit run yet. The worlds, the
+  known-answer gate, the counted-contrast scorer, and the figures are not written yet.
 - Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
   the stored states and forecasts of `M*` and `P`, the inputs adapter, the fold statistics, and the
   scorer.
