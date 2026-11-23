@@ -14,7 +14,9 @@ scorer's. A missing file is stated, not skipped.
 import json
 import sys
 
+import e00715_arms as arms
 import e00715_score as s715
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 
 def fmt(x: object) -> str:
@@ -22,8 +24,32 @@ def fmt(x: object) -> str:
     return f"{x:.3f}" if isinstance(x, float) else str(x)
 
 
+def print_waiver() -> bool:
+    """Print experiment 713's gate record, and audit trigger 1 when it is waived; return `waived`."""
+    gate = arms.gate713_summary(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    print(
+        f"Experiment 713's known-answer gate (code hash {gate['code_hash']}): "
+        + (
+            f"WAIVED on {gate['date']}; failed checks {gate['failed_checks']}; decision quoted: "
+            f'"{gate["decision_quoted"]}"; KA12: {gate["decision_ka12"]}'
+            if gate["waived"]
+            else "passed, no waiver"
+        )
+    )
+    if gate["waived"]:
+        print(
+            "AUDIT TRIGGER 1 FIRED: a control of experiment 713 failed (KA3 and KA12). Every F4 warm-start "
+            "state comes from this waived gate, so no era conclusion (S1 to S7, following level shifts, "
+            "the stem arm F4E) is backed by a passing known-answer test. State this beside every verdict, "
+            "headline, and take-home message."
+        )
+    print()
+    return bool(gate["waived"])
+
+
 def main() -> int:
     """Print the tables."""
+    print_waiver()
     head = s715.SCORE_DIR / "headline.json"
     if not head.exists():
         print(f"{head} is missing: run `e00715_score.py headline` first")

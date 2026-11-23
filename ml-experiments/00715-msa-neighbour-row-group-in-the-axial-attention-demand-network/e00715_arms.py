@@ -290,6 +290,33 @@ def code_record() -> dict:
     }
 
 
+def gate713_summary(*, data_dir: Path) -> dict:
+    """Return what experiment 713's gate file says: the code hash, the failed checks, and the waiver.
+
+    The file is `work/known_answers_passed.json` in experiment 713's data folder. It exists when the
+    gate passed, or when the maintainer waived a failed gate (`waived` is true). A record that has a
+    failed check and no waiver is refused.
+    """
+    path = a713.root(data_dir=data_dir) / "work" / "known_answers_passed.json"
+    assert path.exists(), (
+        f"{path} is missing: experiment 713's known-answer gate has neither passed nor been waived"
+    )
+    record = json.loads(path.read_text())
+    failed = sorted(
+        k
+        for k, v in record.items()
+        if k.startswith("KA") and isinstance(v, dict) and v.get("pass") is False
+    )
+    waived = bool(record.get("waived", False))
+    assert waived or not failed, f"{path} holds failed checks {failed} and no waiver"
+    waiver = record.get("waiver") or {}
+    return {
+        "waived": waived, "failed_checks": failed, "code_hash": (record.get("code") or {}).get("code_hash"),
+        "date": waiver.get("date"), "decision_quoted": waiver.get("decision_quoted"),
+        "decision_ka12": waiver.get("decision_ka12"), "path": str(path),
+    }  # fmt: skip
+
+
 def check_code(
     *, earlier: dict, accept: Sequence[str], record: dict, what: str, kind: str = "state"
 ) -> None:

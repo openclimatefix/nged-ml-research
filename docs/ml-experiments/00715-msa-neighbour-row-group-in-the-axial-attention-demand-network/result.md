@@ -42,7 +42,9 @@ decision_rule: >-
   zero and lies inside ±0.094 (six) or ±0.25 (eight); "loss" when the lower end is above zero. The
   verdict `supported` needs a gain in both groups, the upper end of N2 below zero in both groups,
   and the four guards in the section "Decision rule and verdict". The injected-world contrasts are
-  secondary and change no verdict.
+  secondary and change no verdict. Every verdict, headline, and take-home message of this experiment
+  states that the warm-start states of experiment 713 come from a waived known-answer gate, and that
+  no conclusion about following level shifts is backed by a passing known-answer test.
 benchmark: >-
   M* (experiment 713's selected axial-attention arm, stored seeds 0 and 1 of all 8 folds); the
   Candidate (P7+D50 of experiment 667); the month-by-half-hour climatology; the manual heuristic and
@@ -79,7 +81,7 @@ smaller difference is likely to read as a tie.
 the maintainer asked for it by name. The maintainer's instruction overrides the stop rule.** The
 design that preceded this page (follow-up F4 of the axial-attention line, the "era and extensions"
 memo) allowed the experiment to run only if the identifiability audit of
-[experiment 714](https://github.com/openclimatefix/nged-ml-research/pull/404) showed that a partial
+[experiment 714](../00714-msa-era-identifiability-audit-and-frozen-probe/result.md) showed that a partial
 mirror raises discrimination. Experiment 714 set two start conditions and both failed:
 
 - The host's own rows alone reached an AUROC of 0.630 (interval 0.554 to 0.705) at 7 days after the
@@ -95,8 +97,8 @@ its own: if experiment 713's screen stop rule fires (its selected network is 0.1
 worse than the Candidate), a neighbour increment on such a network has no route to production, and
 the work stops to ask. A final verdict of `not supported` for experiment 713 that is a tie with the
 Candidate does not stop this experiment, because it measures the increment over M* and not over the
-Candidate. Experiment 713 and experiment 714 are both open draft pull requests when this page is
-written, so their pages are linked as pull requests.
+Candidate. Experiment 713 is an open draft pull request when this page is written, so its page is
+linked as a pull request.
 
 **The stop-rule count on neighbour and graph inputs is seven `not supported` and one `refuted`.**
 The table also lists three experiments on neighbour inputs that ended neither way (606, 462, and
@@ -122,6 +124,30 @@ mirror is weak in this panel (experiment 459 measured a median leak of about a h
 worlds mirror each move by construction. Experiment 672 advises a retest only on a fleet-scale
 adjacency of about 1,161 Primaries, and this experiment departs from that advice on the
 maintainer's instruction.
+
+## Experiment 713's known-answer gate was waived, and this limits the era conclusions
+
+**Every F4 fit warm-starts from stage 1 states of experiment 713 that were fitted after the
+maintainer waived 713's failed known-answer gate, so no era conclusion of this experiment is backed
+by a passing known-answer test.** Experiment 713's gate failed two checks at its code hash
+e85b84e2ea04b3cb: KA3 (the follow share of arm `M` on a synthetic world was 0.1418, against a
+threshold of 0.75) and KA12 (arm `G` reached 0.0395, against the threshold of arm `M` minus 0.05,
+which was 0.0918). On 2026-11-23 the maintainer answered "Go ahead with option 1", the option that
+waives KA3 for the real folds and discloses the failure, and confirmed the same waiver for KA12. The
+decision is quoted from experiment 713's design amendment 4. No threshold, budget, arm, or decision
+rule changed in experiment 713.
+
+**The waiver changes how three readings of this page are read.** The era secondary set (S1 to S7),
+every statement about whether the network follows a level shift, and every statement about the stem
+arm `F4E` rest on stage 1 states from the waived gate, so each carries this caveat. The two counted
+contrasts N1 and N2 concern forecast skill on real folds, and the waiver does not change how they
+are scored. A null result may also come from the slow learning that 713's gate found: a gap near
+zero cannot separate "the neighbours carry little" from "the training budget stops before the
+read-out learns to use them".
+
+**Experiment 715 has its own known-answer gate (KN6, KN7, KN11(a), and KN12), and it has not run.**
+It must pass on the GPU before the first F4 fit. Each F4 fit log records whether experiment 713's gate
+file is waived, and the report script prints the waiver and fires audit trigger 1.
 
 ## What is compared
 
@@ -676,7 +702,7 @@ and a prose review.
 - Read from experiment 713 ([pull request 402](https://github.com/openclimatefix/nged-ml-research/pull/402)):
   the stored stage 1 and stage 3 states and forecasts of M*, the inputs adapter, the fold statistics,
   and the scorer.
-- Read from experiment 714 ([pull request 404](https://github.com/openclimatefix/nged-ml-research/pull/404)):
+- Read from experiment 714 ([results page](../00714-msa-era-identifiability-audit-and-frozen-probe/result.md)):
   `results/oof_g2_k7.parquet` and `oof_g2_k14.parquet`, and the second generator's passes under
   `worlds/g2/`.
 - Read from experiments 709 and 667: the injected bank (`bank_<month>_p0..p15.pkl`) and the

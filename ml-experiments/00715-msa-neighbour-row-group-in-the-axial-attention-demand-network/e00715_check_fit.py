@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN003, ANN201, D102, D107
+# ruff: noqa: PLR0915, E501, ANN001, ANN003, ANN201, D102, D107
 """Experiment 715: check the fit driver's resume, skip, and code-policy logic with a stub that trains nothing.
 
 Usage: e00715_check_fit.py   (CPU only; run it through `run.sh`)
@@ -50,6 +50,17 @@ def build_folder(*, root: Path) -> None:
     gate = arms.gate_file(data_dir=root)
     gate.parent.mkdir(parents=True, exist_ok=True)
     gate.write_text(json.dumps({"code": arms.code_record()}))
+    gate713 = a713.root(data_dir=root) / "work" / "known_answers_passed.json"
+    gate713.parent.mkdir(parents=True, exist_ok=True)
+    gate713.write_text(
+        json.dumps(
+            {
+                "KA2": {"pass": True}, "KA3": {"pass": False}, "KA12": {"pass": False}, "waived": True,
+                "waiver": {"date": "2026-11-23", "decision_quoted": "Go ahead with option 1"},
+                "code": {"code_hash": a713.code_hash()},
+            }
+        )
+    )  # fmt: skip
 
 
 class Stub:
@@ -109,6 +120,15 @@ def main() -> int:
         gate.unlink()
         results["g: no gate file is refused"] = refused(root=root)
         gate.write_text(gate_text)
+        gate713 = a713.root(data_dir=root) / "work" / "known_answers_passed.json"
+        text713 = gate713.read_text()
+        gate713.unlink()
+        results["g: no gate file of experiment 713 is refused"] = refused(root=root)
+        gate713.write_text(json.dumps({**json.loads(text713), "waived": False}))
+        results["g: a failed gate of experiment 713 without a waiver is refused"] = refused(
+            root=root
+        )
+        gate713.write_text(text713)
         crash = Stub(crash_stage=3)
         try:
             run(root=root, stub=crash)
@@ -147,6 +167,10 @@ def main() -> int:
         )
         stage_log.write_text(original)
         final_log = arms.log_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, kind="fit")
+        logged = json.loads(final_log.read_text()).get("e00713_gate", {})
+        results["i: the final log records 713's waived gate and its failed checks"] = logged.get(
+            "waived"
+        ) is True and logged.get("failed_checks") == ["KA12", "KA3"]
         results["h: the final log records the checkpoint flag"] = (
             json.loads(final_log.read_text()).get("checkpoint_neighbours") is False
         )

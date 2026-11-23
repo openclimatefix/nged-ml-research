@@ -240,8 +240,14 @@ def fit(
         flush=True,
     )
     assert month in spec.folds, f"arm {arm} is not fitted on fold {month}: {spec.folds}"
+    gate713 = arms.gate713_summary(data_dir=data_dir)
+    print(
+        f"experiment 713's gate: waived {gate713['waived']}, failed checks {gate713['failed_checks']}, code hash {gate713['code_hash']}",
+        flush=True,
+    )
     log: dict = {
         "arm": arm, "month": month, "seed": seed, "checkpoint_neighbours": checkpoint_neighbours,
+        "e00713_gate": gate713,
     }  # fmt: skip
     arms.check_code(
         earlier=json.loads(gate.read_text()).get("code", {}), accept=[accept_gate] if accept_gate else [],
