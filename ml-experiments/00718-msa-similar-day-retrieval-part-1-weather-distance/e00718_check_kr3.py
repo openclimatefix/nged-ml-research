@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, FURB171
+# ruff: noqa: E501, PT018, FURB171, ANN001
 """Experiment 718, WP2: check KR3 (the row tables equal an independent recomputation) on a synthetic fold.
 
 The reference (`e00718_retrieval_reference`) is fed the loaded arrays directly from the source, not
@@ -32,7 +32,7 @@ MEASURE_OF = {
 }
 
 
-def raw_arrays(*, source) -> dict:  # noqa: ANN001
+def raw_arrays(*, source) -> dict:
     """Return the loaded arrays as plain NumPy arrays, read from the source and not from `PoolArrays`."""
     holidays: set = set()
     n_grid = source.n_grid
