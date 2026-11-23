@@ -129,7 +129,7 @@ def gate_table(
 def synthetic_arrays(*, seed: int = 0) -> dict:
     """Return a 3-year synthetic panel: an exporter, a non-exporter, a signed Primary with a few negatives."""
     rng = np.random.default_rng(seed)
-    start = int(np.datetime64("2023-06-01T00:30:00", "us").astype(np.int64))
+    start = int(np.datetime64("2022-09-01T00:30:00", "us").astype(np.int64))
     n = 3 * 365 * 48
     stamp = start + np.arange(n, dtype=np.int64) * real.US_PER_HALF_HOUR
     hour, month = hour_month(stamp_us=stamp)

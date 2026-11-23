@@ -1,4 +1,4 @@
-# ruff: noqa: E501, T201, PLR0913, PT018
+# ruff: noqa: E501, PT018
 """Experiment 720: the two earlier references, scored on the same injected worlds as the new read-outs.
 
 Experiment 506's gated solar rule calls a half-hour reverse when the PV estimate `p` (the host's own

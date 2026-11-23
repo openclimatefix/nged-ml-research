@@ -60,12 +60,10 @@ def _safe(a: np.ndarray) -> np.ndarray:
     return np.nan_to_num(a, nan=0.0)
 
 
-def hindsight_rho(*, pw: ProbeWorld, p: np.ndarray) -> np.ndarray:
-    """Return `P(X < 0)` for the scored days from the `K = 0` hidden Markov model.
-
-    The demand mean and residual are fitted on anchor rows of the reference days, and the pass runs
-    over the 7 days before the first scored day and the scored days.
-    """
+def _hindsight_post(
+    *, pw: ProbeWorld, p: np.ndarray
+) -> tuple[hmm.Posterior, hmm.HmmSpec, np.ndarray]:
+    """Fit the `K = 0` model on anchor rows and run it over 7 days before the scored days and the scored days."""
     ref = pw.reference_days
     g = p + pw.v
     anchors = np.zeros_like(pw.v, dtype=bool)
@@ -80,10 +78,46 @@ def hindsight_rho(*, pw: ProbeWorld, p: np.ndarray) -> np.ndarray:
     post = hmm.forward_backward(
         spec=spec, m=reading, f=f_all[days].reshape(-1), p=p[days].reshape(-1), want_xi=False
     )
+    return post, spec, days
+
+
+def hindsight_rho(*, pw: ProbeWorld, p: np.ndarray) -> np.ndarray:
+    """Return `P(X < 0)` for the scored days from the `K = 0` hidden Markov model.
+
+    The demand mean and residual are fitted on anchor rows of the reference days, and the pass runs
+    over the 7 days before the first scored day and the scored days.
+    """
+    post, spec, days = _hindsight_post(pw=pw, p=p)
     pneg = hmm.summarise(post=post, spec=spec)["p_negative"].reshape(len(days), -1)
     out = np.full(pw.v.shape, np.nan)
     out[days] = pneg
     return out[pw.scored_days]
+
+
+def hindsight_bars(*, pw: ProbeWorld, p: np.ndarray) -> dict[str, float | bool]:
+    """Return the sign-probability and signed-CRPS bars of the `K = 0` model, smoothed and filtered, flattened.
+
+    Scored on the gated half-hours of the scored days outside the 2-point dead band.
+    """
+    import e00720_bars as bars
+
+    post, spec, days = _hindsight_post(pw=pw, p=p)
+    x_full = np.full(pw.v.shape, np.nan)
+    x_full[pw.scored_days] = np.where(
+        pw.u[pw.scored_days] >= sign.U_MIN, pw.x_true[pw.scored_days], np.nan
+    )
+    res = bars.both_versions(post=post, spec=spec, x_true=x_full[days].reshape(-1))
+    flat: dict[str, float | bool] = {}
+    for version in ("smoothed", "filtered"):
+        r = res[version]
+        flat[f"{version}_reliability"] = float(r["sign"]["reliability"])
+        flat[f"{version}_max_gap_bin_200"] = float(r["sign"]["max_gap_bin_200"])
+        flat[f"{version}_sign_passed"] = bool(r["sign"]["passed"])
+        flat[f"{version}_crps_soft"] = float(r["crps"]["soft"])
+        flat[f"{version}_crps_passed"] = bool(r["crps"]["passed"])
+    flat["gap_reliability"] = float(res["gap"]["reliability"])
+    flat["gap_crps"] = float(res["gap"]["crps"])
+    return flat
 
 
 def evaluate_world(
@@ -330,6 +364,16 @@ def run_worlds(
                     **ds,
                 }
             )
+        ref_rows.append(
+            {
+                "site": site,
+                "fold": fold_name,
+                "level": level,
+                "scale": scale,
+                "reference": "720_hindsight_bars",
+                **hindsight_bars(pw=pw, p=_safe(pw.p)),
+            }
+        )
         if level == 0.0:
             ref_rows.append(
                 {
