@@ -67,6 +67,10 @@ class HindsightFit:
     seconds: float
     passes: int
     n_hat: np.ndarray | None = None
+    p_any: np.ndarray | None = None
+    """Smoothed `P(n >= 1)` per half-hour after the pre-roll."""
+    e_n: np.ndarray | None = None
+    """Smoothed expected unit count per half-hour after the pre-roll."""
     """Most probable unit count per half-hour after the pre-roll (smoothed)."""
 
 
@@ -155,12 +159,13 @@ def hindsight_fit(
     last_post, spec = pass_at(best, trans=trans)
     sm = hmm.summarise(post=last_post, spec=spec)["p_units"]
     n_hat = np.argmax(sm, axis=1)[pre_roll:]
+    e_n = (sm * np.arange(sm.shape[1])[None, :]).sum(axis=1)[pre_roll:]
     fl = hmm.summarise(post=last_post, spec=spec, version="filtered")["p_units"]
     any_s = 1.0 - sm[:, 0]
     any_f = 1.0 - fl[:, 0]
     return HindsightFit(
         flag=(any_s > 0.5)[pre_roll:], filt=(any_f > 0.5)[pre_roll:], unit_size=best, n_max=n_max,
-        log_likelihood=last_post.log_likelihood, seconds=time.perf_counter() - t0, passes=passes, n_hat=n_hat,
+        log_likelihood=last_post.log_likelihood, seconds=time.perf_counter() - t0, passes=passes, n_hat=n_hat, p_any=any_s[pre_roll:], e_n=e_n,
     )  # fmt: skip
 
 
@@ -505,7 +510,7 @@ def run_k1_v3(
             pre_roll=r694.PRE_ROLL,
             gate=gate,
             projected_fits=n_fits,
-            **{"n_max": 3, **(fit_kwargs or {})},
+            **(fit_kwargs or {}),  # n_max stays at its default of 3: K is forced
         )
         fa = false_alarm(flag=h.flag, first_index_of_flag=a)
         out[f"v3_{name}_flagged_share"] = fa["flagged_share"]
