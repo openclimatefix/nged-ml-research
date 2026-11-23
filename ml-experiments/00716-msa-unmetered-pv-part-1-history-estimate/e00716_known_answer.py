@@ -762,7 +762,7 @@ def read_checked(*, path: Path, files: tuple[str, ...] | None = None) -> dict:
     return record
 
 
-WORLD_FILES: Final = ("e00716_worlds.py", "e00716_world_rung.py")
+WORLD_FILES: Final = arms.WORLD_FILES
 """`world_rung.json` depends on these two modules alone."""
 
 

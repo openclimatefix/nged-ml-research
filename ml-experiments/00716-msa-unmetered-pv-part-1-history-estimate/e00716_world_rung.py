@@ -79,8 +79,16 @@ def run_rungs(
     for number in rungs:
         rung = wd.RUNGS[number - 1]
         path = out_dir / f"rung{number}.json"
-        if path.exists() and not force:
-            record = json.loads(path.read_text())
+        stored = json.loads(path.read_text()) if path.exists() and not force else None
+        problems = (
+            arms.artefact_problems(what=path.name, record=stored, files=arms.WORLD_FILES)
+            if stored is not None
+            else []
+        )
+        if stored is not None and problems:
+            print(f"rung {number}: recomputed ({'; '.join(problems)})", flush=True)
+        if stored is not None and not problems:
+            record = stored
             print(f"rung {number}: read from {path.name}", flush=True)
         else:
             started = time.monotonic()
@@ -99,6 +107,7 @@ def run_rungs(
             record = {
                 "rung": number, "settings": vars(rung), "gaps": gaps, "seconds": round(time.monotonic() - started, 1),
                 "passes": all(g["gap"] >= wd.GAP_MIN for g in gaps.values()),  # ty: ignore[unsupported-operator]
+                "code": arms.code_record(),
             }  # fmt: skip
             tmp = path.with_name(path.name + ".tmp")
             tmp.write_text(json.dumps(record, indent=1, default=str))
@@ -113,6 +122,45 @@ def run_rungs(
         "results": results,
         "stepped_up_after": after or None,
     }
+
+
+def step_up_problems(*, after: int, precheck_path: Path) -> list[str]:
+    """Return why `--after N` is refused: it needs `precheck_rung<N>.json` to exist, to record a failure, and to come from the current world code."""
+    if not precheck_path.exists():
+        return [
+            f"{precheck_path.name} does not exist: the step up follows a failed pre-check at rung {after}"
+        ]
+    record = json.loads(precheck_path.read_text())
+    out = arms.artefact_problems(what=precheck_path.name, record=record, files=arms.WORLD_FILES)
+    if record.get("pass") is not False or record.get("rung") != after:
+        out.append(f"{precheck_path.name} does not record a failed pre-check at rung {after}")
+    return out
+
+
+def selftest_records() -> None:
+    """Check that a rung file with no code record is not reused and that a step up needs a failed pre-check record."""
+    import tempfile
+
+    stale = {"rung": 4, "passes": True, "gaps": {}}
+    assert arms.artefact_problems(what="rung4.json", record=stale, files=arms.WORLD_FILES), (
+        "a rung file with no code record was accepted"
+    )
+    clean = {**arms.code_record(), "git_dirty": False}
+    with tempfile.TemporaryDirectory() as tmp:
+        check = Path(tmp) / "precheck_rung4.json"
+        assert step_up_problems(after=4, precheck_path=check), (
+            "a step up with no pre-check was accepted"
+        )
+        check.write_text(json.dumps({"rung": 4, "pass": True, **clean}))
+        assert step_up_problems(after=4, precheck_path=check), (
+            "a step up after a passed pre-check was accepted"
+        )
+        check.write_text(json.dumps({"rung": 4, "pass": False, **clean}))
+        problems = step_up_problems(after=4, precheck_path=check)
+        assert not problems, problems
+    print(
+        "a step up needs a failed pre-check record of that rung, and a rung file with no code record is not reused"
+    )
 
 
 def selftest() -> int:
@@ -180,7 +228,14 @@ def selftest() -> int:
         out = Path(tmp)
         for n in (1, 2, 3, 4, 5):
             (out / f"rung{n}.json").write_text(
-                json.dumps({"rung": n, "passes": n >= 4, "gaps": {}})
+                json.dumps(
+                    {
+                        "rung": n,
+                        "passes": n >= 4,
+                        "gaps": {},
+                        "code": {**arms.code_record(), "git_dirty": False},
+                    }
+                )
             )
         assert (
             run_rungs(dense=dense, cutoff_idx=0, rungs=[1, 2, 3, 4, 5], out_dir=out, force=False)[
@@ -193,6 +248,7 @@ def selftest() -> int:
         )
         assert stepped["rung"] == 5 and stepped["stepped_up_after"] == 4, stepped
     print("the ladder steps up to rung 5 after a failed pre-check at rung 4")
+    selftest_records()
     print("selftest passed")
     return 0
 
@@ -213,9 +269,14 @@ def main() -> int:
     args = parser.parse_args()
     if args.selftest:
         return selftest()
+    work = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "work"
+    if args.after:
+        problems = step_up_problems(
+            after=args.after, precheck_path=work / f"precheck_rung{args.after}.json"
+        )
+        assert not problems, "; ".join(problems)
     dense = load_dense4()
     cutoff = fold_cutoff_idx(fold=args.fold)
-    work = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "work"
     summary = run_rungs(
         dense=dense,
         cutoff_idx=cutoff,

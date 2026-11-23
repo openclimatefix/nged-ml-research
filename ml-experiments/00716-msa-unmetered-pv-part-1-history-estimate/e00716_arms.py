@@ -98,6 +98,10 @@ def _git(*args: str) -> str:
         return "unavailable"
 
 
+WORLD_FILES: Final = ("e00716_worlds.py", "e00716_world_rung.py")
+"""`world_rung.json` and its rung files depend on these two modules alone."""
+
+
 def code_record() -> dict:
     """Return what a log records about the code: this folder's hash, 713's hash, the git commit, and a dirty flag."""
     return {
