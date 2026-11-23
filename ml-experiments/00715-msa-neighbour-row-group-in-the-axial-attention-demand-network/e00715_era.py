@@ -30,6 +30,7 @@ without the move, which is the cleaned power of the host, as experiment 709 scor
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -277,7 +278,7 @@ def kn11b(*, month: str, seed: int) -> dict:
     forecasts of `M*` (1e-4 of capacity)."""
     star = arms.a713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     folder = era713.BANK713 / f"{star}_{month}_s{seed}"
-    stored = sorted(folder.glob("pass[0-9][0-9].parquet")) if folder.exists() else []
+    stored = pass_files(folder=folder) if folder.exists() else []
     if not stored:
         return {
             "skipped": f"experiment 713 has not stored bank forecasts of {star} for {month} s{seed}"
@@ -525,8 +526,13 @@ def injected_folder(*, world: str, arm: str, month: str, seed: int) -> Path:
 
 
 def pass_files(*, folder: Path) -> list[Path]:
-    """Return the forecast files `pass<NN>.parquet` of a folder, in order."""
-    return sorted(folder.glob("pass[0-9][0-9].parquet"))
+    """Return the forecast files `pass<N>.parquet` of a folder (any number of digits), in index order.
+
+    Experiment 714's second generator stores pass indices up to 110, so a two-digit pattern would
+    skip the passes with three digits.
+    """
+    files = [p for p in folder.glob("pass*.parquet") if re.fullmatch(r"pass\d+", p.stem)]
+    return sorted(files, key=lambda p: int(p.stem.removeprefix("pass")))
 
 
 def mean_gap(*, label: np.ndarray, score: np.ndarray) -> float:
@@ -603,6 +609,10 @@ def read_arm_world(*, world: str, arm: str) -> tuple[pl.DataFrame, pl.DataFrame]
             if not files:
                 print(f"missing: {arm} {world} {month} s{seed} has no injected forecasts")
                 continue
+            expected = len(passes_of(world=world, month=month))
+            assert len(files) == expected, (
+                f"{arm} {world} {month} s{seed}: {len(files)} pass files in {folder}, and the world stores {expected}"
+            )
             real = (
                 s715.load_arm(arm=arm, seeds=(seed,), months=(month,))
                 .select(*KEYS, pl.col("q50").alias("q50_real"))
@@ -751,6 +761,12 @@ def cmd_follow(*, world: str) -> dict:
     ).agg(pl.col("follow").mean())
     base = base.with_columns(label=(pl.col("truth") == "era").cast(pl.Int64))
     result["ceiling"] = "printed by `e00715_era.py ceiling`"
+    events = follow.unique(["month", "pass_id", "event"])
+    touched_events = int(events["rewired_touched"].sum())
+    result["rewired_touched_events"] = {"touched": touched_events, "of": events.height}
+    print(
+        f"{world}: {touched_events} of {events.height} events have a touched Primary in their rewired set; none is dropped (design section 9 rule 4, as amended)"
+    )
 
     def reading(*, a: str, b: str, subset: str | None, k: int, readings: str) -> dict:
         tab = with_keep(frame=base, world=world, readings=readings)
@@ -921,6 +937,20 @@ def selftest() -> int:
         table=pl.DataFrame(rows), arm_a="A", arm_b="B", subset=None, k=14, draws=200
     )
     assert res["diff"] > 0.3 and res["low"] > 0.0, res
+    # pass files: three-digit indices are found and sorted numerically
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        for name in (
+            "pass05.parquet",
+            "pass103.parquet",
+            "pass99.parquet",
+            "pass05_truth.parquet",
+            "log.json",
+        ):
+            (Path(tmp) / name).write_text("")
+        got = [p.name for p in pass_files(folder=Path(tmp))]
+        assert got == ["pass05.parquet", "pass99.parquet", "pass103.parquet"], got
     # slot flags: two events whose hosts are neighbours flag each other; the same set far apart does not
     table = nb.load_table()
     h0 = 0

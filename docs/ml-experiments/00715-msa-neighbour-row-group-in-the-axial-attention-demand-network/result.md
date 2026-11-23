@@ -516,6 +516,8 @@ prediction for F4 and M* (whether the neighbours' rows let F4 forecast a host wi
 
 **Every threshold is fixed now.** The known-answer script writes `work/known_answers_passed.json`,
 and the fit script refuses to run a real fold without it. A failed check fires audit trigger 1.
+KN1 to KN5, KN9, KN10, and KN11(c) run in the `e00715_check_*.py` scripts and are not part of the gate
+record, so the gate file shows only KN6, KN7, KN11(a), and KN12 at the gated code hash.
 
 | Check | What must hold | Threshold |
 |---|---|---|

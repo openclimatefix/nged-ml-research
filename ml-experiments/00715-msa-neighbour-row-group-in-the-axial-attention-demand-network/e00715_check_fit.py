@@ -63,6 +63,7 @@ def valid_gate713() -> dict:
             "failed_checks": ["KA12", "KA3"], "thresholds_changed": False,
         },
         "code": {"code_hash": a713.code_hash()},
+        "known_answer_sha256": arms.GATE713_WAIVED_KA_SHA,
     }  # fmt: skip
 
 
@@ -99,6 +100,7 @@ def gate713_refusals(*, root: Path) -> dict[str, bool]:
         "another quoted decision": (lambda r: r["waiver"].update(decision_quoted="ok"), "quote the maintainer's decision"),
         "a failed check without a waiver": (lambda r: r.update(waived=False), "no waiver"),
         "an empty record": (lambda r: r.clear(), "has no code block"),
+        "a changed known-answer sha256": (lambda r: r.update(known_answer_sha256="0" * 64), "differs from the sha256"),
         "KA5 missing": (lambda r: r.pop("KA5"), "KA5 or KA6 is not recorded"),
     }  # fmt: skip
     for name, (fn, expected) in cases.items():

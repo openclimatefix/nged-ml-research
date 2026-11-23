@@ -295,6 +295,8 @@ GATE713_CHECKS: Final = ("KA2", "KA3", "KA4", "KA10", "KA12")
 GATE713_WAIVED_FAILURES: Final = ["KA12", "KA3"]
 """The failed checks the maintainer's waiver covers (design amendment 4 of experiment 713)."""
 GATE713_DECISION: Final = "Go ahead with option 1"
+GATE713_WAIVED_KA_SHA: Final = "8fa3cfbdac29c6a0930e94e65a9fc7c76a38df8ed38e161609239ced713d76ed"
+"""The sha256 of `e00713_known_answer.py` that the waiver script of experiment 713 pins."""
 
 
 def gate713_summary(*, data_dir: Path) -> dict:
@@ -302,10 +304,11 @@ def gate713_summary(*, data_dir: Path) -> dict:
 
     The file is `work/known_answers_passed.json` in experiment 713's data folder. A record is accepted
     only when it holds the code block, its code hash equals experiment 713's current hash, a boolean
-    `pass` for each of KA2, KA3, KA4, KA10, and KA12, and the text of KA5 and KA6, and either (a) all
-    five checks pass and `waived` is absent or false, or (b) `waived` is true, the failed checks are
-    exactly KA3 and KA12, and the waiver block repeats them, says that no threshold changed, and
-    quotes the maintainer's decision.
+    `pass` for each of KA2, KA3, KA4, KA10, and KA12, the text of KA5 and KA6, a `known_answer_sha256`
+    equal to the sha256 of experiment 713's current `e00713_known_answer.py` (a read-only comparison),
+    and either (a) all five checks pass and `waived` is absent or false, or (b) `waived` is true,
+    the failed checks are exactly KA3 and KA12, and the waiver block repeats them, says that no
+    threshold changed, and quotes the maintainer's decision.
     """
     path = a713.root(data_dir=data_dir) / "work" / "known_answers_passed.json"
     assert path.exists(), (
@@ -323,6 +326,12 @@ def gate713_summary(*, data_dir: Path) -> dict:
             f"{path}: check {name} has no boolean `pass`"
         )
     assert "KA5" in record and "KA6" in record, f"{path}: KA5 or KA6 is not recorded"
+    current_sha = hashlib.sha256(
+        (Path(a713.__file__).parent / "e00713_known_answer.py").read_bytes()
+    ).hexdigest()
+    assert record.get("known_answer_sha256") == current_sha, (
+        f"{path}: its known_answer_sha256 {record.get('known_answer_sha256')} differs from the sha256 {current_sha} of experiment 713's current e00713_known_answer.py"
+    )
     failed = sorted(name for name in GATE713_CHECKS if record[name]["pass"] is False)
     waived = record.get("waived", False)
     assert isinstance(waived, bool), f"{path}: `waived` is {waived!r}, not a boolean"
@@ -330,6 +339,9 @@ def gate713_summary(*, data_dir: Path) -> dict:
     if waived:
         assert failed == GATE713_WAIVED_FAILURES, (
             f"{path} is waived, and its failed checks are {failed}, not {GATE713_WAIVED_FAILURES}"
+        )
+        assert record["known_answer_sha256"] == GATE713_WAIVED_KA_SHA, (
+            f"{path}: the waiver was not written for the known-answer script that the maintainer saw"
         )
         assert waiver.get("failed_checks") == failed, (
             f"{path}: the waiver block does not name the failed checks {failed}"

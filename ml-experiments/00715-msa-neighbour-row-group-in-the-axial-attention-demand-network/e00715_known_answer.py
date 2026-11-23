@@ -30,6 +30,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import traceback
 from collections.abc import Sequence
@@ -493,6 +494,9 @@ def main() -> int:  # noqa: PLR0911
     if args.selftest:
         return selftest()
     assert args.month, "give the fold month, for example 2025-11"
+    assert re.fullmatch(r"\d{4}-\d{2}", args.month) and args.month in arms.ALL_FOLDS, (
+        f"MONTH {args.month!r} is not one of the folds {arms.ALL_FOLDS} (did you mean `--selftest`?)"
+    )
     if args.smoke:
         return smoke(month=args.month)
     if args.kn8:
