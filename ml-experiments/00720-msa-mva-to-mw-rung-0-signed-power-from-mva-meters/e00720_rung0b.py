@@ -201,9 +201,14 @@ def evaluate_world(
         midday[:, MIDDAY_SLOTS[0] : MIDDAY_SLOTS[1]] = True
         for name, rho in results.items():
             metrics = sign.evaluate_sign(rho=rho, x_true=pw.x_true[sd], u=pw.u[sd])
-            metrics["auc_midday"] = sign.evaluate_sign(
-                rho=rho, x_true=pw.x_true[sd], u=pw.u[sd], row_mask=midday
-            )["auc"]
+            mid = sign.evaluate_sign(rho=rho, x_true=pw.x_true[sd], u=pw.u[sd], row_mask=midday)
+            metrics["auc_evaluable"] = (
+                min(metrics["n_import"], metrics["n_reverse"]) >= MIN_CLASS_ROWS
+            )
+            metrics["n_midday_import"] = mid["n_import"]
+            metrics["n_midday_reverse"] = mid["n_reverse"]
+            midday_ok = min(mid["n_import"], mid["n_reverse"]) >= MIN_CLASS_ROWS
+            metrics["auc_midday"] = mid["auc"] if midday_ok else float("nan")
             rows.append(
                 {
                     "world": pw.name,
@@ -216,19 +221,122 @@ def evaluate_world(
     return rows
 
 
-def beats_references(*, rows: list[dict[str, Any]]) -> dict[str, bool]:
-    """Pre-registered check: the anchored read-out beats both references on the pooled and the midday area (real sky).
+MIN_CLASS_ROWS: Final[int] = 30
+"""A pooled or midday area counts only when each class holds at least this many scored half-hours."""
+N_BOOT_REFERENCES: Final[int] = 500
+MIN_EVALUABLE_WORLDS: Final[int] = 6
+"""A level's midday contrast is judged only when at least this many worlds have both classes at midday."""
 
-    Args:
-        rows: Rows of `evaluate_world` for one or more worlds; the mean over worlds is compared.
+
+def paired_auc_difference(
+    *,
+    rho_a: np.ndarray,
+    rho_b: np.ndarray,
+    x_true: np.ndarray,
+    u: np.ndarray,
+    midday_only: bool = False,
+    n_boot: int = N_BOOT_REFERENCES,
+    seed: int = 720,
+) -> dict[str, float]:
+    """Return the area difference `a - b` on one world with a day-block bootstrap (scored days resampled).
+
+    Rows are the gated half-hours outside the dead band, as in `sign.evaluate_sign`. Returns the point
+    difference, the 2.5% and 97.5% bootstrap quantiles, and the counts of each class; the difference is
+    NaN when either class holds fewer than `MIN_CLASS_ROWS` rows.
     """
-    out: dict[str, bool] = {}
-    for ref in REFERENCES:
-        for col in ("auc", "auc_midday"):
-            a = [r[col] for r in rows if r["readout"] == "anchored" and r["sky"] == "real"]
-            b = [r[col] for r in rows if r["readout"] == ref and r["sky"] == "real"]
-            out[f"anchored_beats_{ref}_{col}"] = bool(a and b and np.nanmean(a) > np.nanmean(b))
+    n_days = x_true.shape[0]
+    ok = np.isfinite(rho_a) & np.isfinite(rho_b) & np.isfinite(x_true) & (u >= sign.U_MIN)
+    ok &= np.abs(np.nan_to_num(x_true)) >= sign.DEAD_BAND_POINTS
+    if midday_only:
+        ok[:, : MIDDAY_SLOTS[0]] = False
+        ok[:, MIDDAY_SLOTS[1] :] = False
+    pos = x_true < 0.0
+    n_rev, n_imp = int((ok & pos).sum()), int((ok & ~pos).sum())
+    nan = float("nan")
+    if min(n_rev, n_imp) < MIN_CLASS_ROWS:
+        return {"point": nan, "lower": nan, "upper": nan, "n_reverse": n_rev, "n_import": n_imp}
+
+    def diff(days: np.ndarray) -> float:
+        m = ok[days]
+        p = pos[days][m]
+        return sign.auc(score=rho_a[days][m], positive=p) - sign.auc(
+            score=rho_b[days][m], positive=p
+        )
+
+    point = diff(np.arange(n_days))
+    rng = np.random.default_rng(seed)
+    draws = np.array([diff(rng.integers(0, n_days, n_days)) for _ in range(n_boot)])
+    lo, hi = np.nanquantile(draws, [0.025, 0.975])
+    return {
+        "point": point,
+        "lower": float(lo),
+        "upper": float(hi),
+        "n_reverse": n_rev,
+        "n_import": n_imp,
+    }
+
+
+def reference_bar(
+    *, store: dict[str, np.ndarray], n_boot: int = N_BOOT_REFERENCES
+) -> list[dict[str, Any]]:
+    """Return the pre-registered references bar, one row per reference, area, and injection level.
+
+    The worlds are the injected worlds (levels 1 and 2) at the oracle estimate scale and host scale 1.0, read from
+    `rung0b_rho.npz`'s keys `name|readout`. For each world the paired area difference (anchored minus the
+    reference) has a day-block bootstrap interval. The row's point is the mean over its evaluable worlds, and its
+    interval is the mean of the worlds' interval ends (a conservative stand-in for a joint bootstrap, which the
+    independent worlds would only narrow). The outcome is `beats` when the lower end is above 0, `loses` when the
+    upper end is below 0, `inconclusive` otherwise, and `not_evaluable` when fewer than `MIN_EVALUABLE_WORLDS`
+    worlds hold both classes (midday) or none does (pooled). A world with both classes counts for the pooled area.
+    """
+    names = sorted({k.rsplit("|", 1)[0] for k in store if k.endswith("|x_true")})
+    out: list[dict[str, Any]] = []
+    for level in (1.0, 2.0):
+        sel = [n for n in names if f"|L{level:g}|s1|h1" in n]
+        for ref in REFERENCES:
+            for area in ("pooled", "midday"):
+                parts = [
+                    paired_auc_difference(
+                        rho_a=store[f"{n}|anchored"], rho_b=store[f"{n}|{ref}"], x_true=store[f"{n}|x_true"],
+                        u=store[f"{n}|u"], midday_only=area == "midday", n_boot=n_boot,
+                    )
+                    for n in sel
+                ]  # fmt: skip
+                good = [q for q in parts if np.isfinite(q["point"])]
+                need = MIN_EVALUABLE_WORLDS if area == "midday" else 1
+                row: dict[str, Any] = {
+                    "reference": ref, "area": area, "level": level, "n_worlds": len(sel), "n_evaluable": len(good),
+                    "n_reverse": sum(q["n_reverse"] for q in parts), "n_import": sum(q["n_import"] for q in parts),
+                }  # fmt: skip
+                if len(good) < need:
+                    row |= {
+                        "point": float("nan"),
+                        "lower": float("nan"),
+                        "upper": float("nan"),
+                        "outcome": "not_evaluable",
+                    }
+                else:
+                    lo = float(np.mean([q["lower"] for q in good]))
+                    hi = float(np.mean([q["upper"] for q in good]))
+                    row |= {
+                        "point": float(np.mean([q["point"] for q in good])),
+                        "lower": lo,
+                        "upper": hi,
+                    }
+                    row["outcome"] = "beats" if lo > 0 else "loses" if hi < 0 else "inconclusive"
+                out.append(row)
     return out
+
+
+def references_bar_passed(*, bar: list[dict[str, Any]]) -> bool:
+    """Return whether every pooled row `beats` and no evaluable midday row `loses` (pre-registered rule)."""
+    pooled = [r for r in bar if r["area"] == "pooled"]
+    mid = [r for r in bar if r["area"] == "midday" and r["outcome"] != "not_evaluable"]
+    return (
+        bool(pooled)
+        and all(r["outcome"] == "beats" for r in pooled)
+        and all(r["outcome"] != "loses" for r in mid)
+    )
 
 
 def false_reverse_no_injection(*, pw: ProbeWorld) -> dict[str, float]:
@@ -435,6 +543,7 @@ def run_worlds(
                     "fold": fold_name,
                     "level": level,
                     "scale": scale,
+                    "host_scale": hscale,
                     "reference": f"720_{name}_day",
                     **ds,
                 }
@@ -455,6 +564,7 @@ def run_worlds(
                     "fold": fold_name,
                     "level": level,
                     "scale": scale,
+                    "host_scale": hscale,
                     "reference": "674_day_labeller",
                     **ds,
                 }
@@ -477,6 +587,7 @@ def run_worlds(
                     "fold": fold_name,
                     "level": level,
                     "scale": scale,
+                    "host_scale": hscale,
                     "reference": "720_anchored_false_reverse_gate_open",
                     **false_reverse_no_injection(pw=pw),
                 }
@@ -549,13 +660,70 @@ def run_real(
     np.savez_compressed(str(guard.private_path(name="rung0b_rho.npz")), **store)  # ty: ignore[invalid-argument-type]
     pl.DataFrame(rows).write_csv(guard.private_path(name="rung0b_readouts.csv"))
     pl.DataFrame(ref_rows).write_csv(guard.private_path(name="rung0b_references.csv"))
+    bar = reference_bar(store=store)
+    pl.DataFrame(bar).write_csv(guard.private_path(name="rung0b_reference_bar.csv"))
     print(
-        f"wrote {len(rows)} read-out rows and {len(ref_rows)} reference rows under the private folder"
+        f"wrote {len(rows)} read-out rows and {len(ref_rows)} reference rows under the private folder; references bar passed: {references_bar_passed(bar=bar)}"
     )
     return 0
 
 
-def selftest() -> int:
+def check_references_machinery() -> dict[float, tuple[float, float, float]]:
+    """Check the references bar on exporter worlds with a realistic import share and on a constructed store."""
+    # an exporter world with a realistic import share at gated half-hours: both classes at midday, a reportable bar
+    shares: dict[float, tuple[float, float, float]] = {}
+    for seed, pvf in ((41, 0.4), (42, 0.5)):
+        we = worlds.synthetic_world(n_days=900, capacity=100.0, seed=seed, pv_fraction=pvf)
+        pwe = ProbeWorld(
+            f"synthetic exporter {pvf}", fold.reading_to_magnitude(m=we.reading, q=Q_POINTS), we.p, we.u,
+            we.day_type, we.temperature, we.x, np.arange(0, 540), np.arange(560, 740),
+        )  # fmt: skip
+        keep_e: dict[str, np.ndarray] = {}
+        rows_e = evaluate_world(pw=pwe, keep=keep_e)
+        real_rows = {r["readout"]: r for r in rows_e if r["sky"] == "real"}
+        a = real_rows["anchored"]
+        assert min(a["n_import"], a["n_reverse"]) >= MIN_CLASS_ROWS, (
+            pvf,
+            a["n_import"],
+            a["n_reverse"],
+        )
+        assert min(a["n_midday_import"], a["n_midday_reverse"]) >= MIN_CLASS_ROWS, pvf
+        assert np.isfinite(a["auc_midday"])
+        d = paired_auc_difference(
+            rho_a=keep_e["anchored"], rho_b=keep_e["reference_reading_blind"], x_true=pwe.x_true[pwe.scored_days], u=pwe.u[pwe.scored_days], n_boot=100,
+        )  # fmt: skip
+        assert d["lower"] <= d["point"] <= d["upper"], d
+        shares[pvf] = (
+            round(a["auc"], 3),
+            round(real_rows["reference_reading_blind"]["auc"], 3),
+            round(d["lower"], 3),
+        )
+    # the bar's machinery: a world whose anchored score is the truth beats a coin-flip reference, and a one-class world is not evaluable
+    rng_b = np.random.default_rng(1)
+    xt = rng_b.normal(0, 5, (60, 48))
+    uu = np.full((60, 48), 0.8)
+    good = (xt < 0).astype(float) * 0.8 + 0.1 + rng_b.normal(0, 0.05, xt.shape)
+    junk = rng_b.uniform(0, 1, xt.shape)
+    st = {}
+    for ref in REFERENCES:
+        st["S|f|L1|s1|h1|anchored"] = good
+        st[f"S|f|L1|s1|h1|{ref}"] = junk
+    st["S|f|L1|s1|h1|x_true"] = xt
+    st["S|f|L1|s1|h1|u"] = uu
+    bar = reference_bar(store=st, n_boot=50)
+    assert all(
+        r["outcome"] == "beats" for r in bar if r["level"] == 1.0 and r["area"] == "pooled"
+    ), bar
+    assert all(r["outcome"] == "not_evaluable" for r in bar if r["level"] == 2.0), bar
+    st["S|f|L1|s1|h1|x_true"] = -np.abs(xt) - 3.0  # every row reverse
+    assert all(r["outcome"] == "not_evaluable" for r in reference_bar(store=st, n_boot=50)), (
+        "one class must not be evaluable"
+    )
+    assert not references_bar_passed(bar=reference_bar(store=st, n_boot=50))
+    return shares
+
+
+def selftest() -> int:  # noqa: PLR0915
     """Check `evaluate_world` and `build_probe_world` on synthetic data with known answers."""
     w = worlds.synthetic_world(n_days=900, capacity=100.0, seed=31, pv_fraction=1.0)
     v = fold.reading_to_magnitude(m=w.reading, q=Q_POINTS)
@@ -607,10 +775,25 @@ def selftest() -> int:
     )
     fr_hard = false_reverse_no_injection(pw=pw_hard)
     assert fr_hard["false_reverse_rate"] > 5 * max(fr["false_reverse_rate"], 0.01), (fr, fr_hard)
-    refs_pass = beats_references(rows=rows)
-    assert set(refs_pass) == {
-        f"anchored_beats_{r}_{c}" for r in REFERENCES for c in ("auc", "auc_midday")
-    }
+    # measured, and stated on the page: no false reverse flow at 1.0 and 1.3 times, a clear rise at 2.5 times
+    fr13 = false_reverse_no_injection(
+        pw=ProbeWorld(
+            "x13",
+            pw0.v,
+            1.3 * pw0.p,
+            pw0.u,
+            pw0.day_type,
+            pw0.temperature,
+            pw0.x_true,
+            pw0.reference_days,
+            pw0.scored_days,
+        )
+    )
+    assert fr13["false_reverse_rate"] < 0.01 and fr_hard["false_reverse_rate"] > 0.05, (
+        fr13,
+        fr_hard,
+    )
+    shares = check_references_machinery()
     assert {"reference_reading_blind", "reference_hour_of_day"} <= {r["readout"] for r in rows}
     assert fr["false_reverse_rate"] < 0.01 and fr["n_rows"] > 100, fr
     # plumbing of the injection on a fake panel
@@ -690,6 +873,9 @@ def selftest() -> int:
             ]
         )
         == 20260405
+    )
+    print(
+        f"  exporter worlds, by PV share: anchored area, reading-blind area, lower bound of the difference: {shares}"
     )
     print(
         f"PASS rung 0b driver: anchored beats shifted sky by {by[('anchored', 'real')]['auc'] - by[('anchored', 'shifted')]['auc']:.3f}; hindsight area {by[('hindsight', 'real')]['auc']:.3f}; placebo false reverse {fr['false_reverse_rate']:.4f}; injection plumbing builds {built.scored_days.size} scored days"
