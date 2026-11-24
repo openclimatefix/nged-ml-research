@@ -219,11 +219,12 @@ flatness of the control answers that only for the demand shapes that the control
 
 **Figure 4 shows that Gas A's output is already most of the level it reaches in the first running
 half-hour of a spell.** Top: output as a share of the level reached, by half-hour from the first
-running (start) or idle (stop) half-hour, where 0 is the first half-hour of the new state. Bottom: the share of starts and of stops in each half-hour of the local
-clock. No panel for D8 is drawn, because the tracker places its edges where D8's reading steps. At
-D8 the tracker fits the size of one block of output, and D8's reading cannot show how many separate
-units the engine has. No panel shows the distribution of output while running, because the spacing
-of its peaks would reveal the engine's unit count and unit sizes, which are withheld.
+running (start) or idle (stop) half-hour, where 0 is the first half-hour of the new state. Bottom:
+the share of starts and of stops in each half-hour of the local clock. No panel for D8 is drawn,
+because the tracker places its edges where D8's reading steps. At D8 the tracker fits the size of
+one block of output, and D8's reading cannot show how many separate units the engine has. No panel
+shows the distribution of output while running, because the spacing of its peaks would reveal the
+engine's unit count and unit sizes, which are withheld.
 
 ![Gas A ramp shape and clock times of starts and stops](f4_gas_a_levels_and_ramps.svg)
 
