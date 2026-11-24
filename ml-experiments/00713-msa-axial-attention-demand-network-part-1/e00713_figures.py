@@ -428,8 +428,8 @@ def cmd_events(*, tag: str, out_dir: Path, per_group: int = 3) -> None:
         shade = (
             alt.Chart(band)
             .mark_rect(color=theme.ENSEMBLE_LINE, opacity=0.2)
-            .encode(x="a:T", x2="b:T")
-        )  # ty: ignore[unresolved-attribute]
+            .encode(x="a:T", x2="b:T")  # ty: ignore[unresolved-attribute]
+        )
         chart = alt.layer(shade, lines, truth_line).properties(
             title=alt.TitleParams(
                 [
@@ -494,7 +494,9 @@ def contrast_cells(*, star: str, months: tuple[str, ...], seeds: tuple[int, ...]
         ref = frames["C"].select(*score.KEYS, pl.col("crps").alias("crps_c"))
         for shown, f in frames.items():
             j = f.join(ref, on=list(score.KEYS), how="inner")
-            assert j.height == f.height, f"arm {shown!r} and C hold different keys in {month}"
+            assert j.height == f.height == ref.height, (
+                f"arm {shown!r} and C hold different keys in {month}"
+            )
             cell = (
                 j.group_by("label", "day")
                 .agg(
@@ -583,20 +585,20 @@ def contrast_chart(
         y = alt.Y(f"{by}:N", sort=order, title=None)
         base = alt.Chart(t, width=WIDTH, height=40 * len(order), title=GROUP_TITLE[group])  # ty: ignore[unresolved-attribute]
         layers = [
-            base.mark_rule(strokeWidth=2).encode(
+            base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
                 y=y,
                 x=alt.X(f"{value}_lo:Q", title=x_title),
                 x2=f"{value}_hi:Q",
                 color=colour,
                 yOffset="arm:N",
             ),
-            base.mark_point(filled=True, size=45).encode(
+            base.mark_point(filled=True, size=45).encode(  # ty: ignore[unresolved-attribute]
                 y=y, x=f"{value}:Q", color=colour, yOffset="arm:N"
             ),
         ]
         if value == "diff":
             layers.append(
-                alt.Chart(pl.DataFrame({"z": [0.0]})).mark_rule(color=theme.TEXT).encode(x="z:Q")
+                alt.Chart(pl.DataFrame({"z": [0.0]})).mark_rule(color=theme.TEXT).encode(x="z:Q")  # ty: ignore[unresolved-attribute]
             )  # ty: ignore[unresolved-attribute]
         panels.append(alt.layer(*layers))
     return alt.vconcat(*panels).properties(
@@ -611,14 +613,14 @@ def cmd_contrasts(*, out_dir: Path) -> None:
     # The check against the stored headline: M* minus C pooled over each group's cells.
     for g in ("six", "eight"):
         c = cells.filter((pl.col("arm") == "M*") & (pl.col("group") == g))
-        pooled = c["diff"].sum() / c["n"].sum()
+        pooled = c["diff"].sum() / c["n"].sum()  # ty: ignore[unsupported-operator]
         print(
             f"{star} minus C, {g}, seeds 0 and 1, pooled: {pooled:.4f} (report_only.json holds the 95% figure)"
         )
     for by, what in (("label", "Primary"), ("month", "fold")):
         table = contrast_summary(cells=cells, by=by)
         interval = "months" if by == "label" else "origin days"
-        sub = f"Dot: mean over seeds 0 and 1 of the seed-mean forecast. Line: 95% interval from resampling whole {interval}."
+        sub = f"Dot: mean CRPS of the seed-mean forecast (seeds 0 and 1). Line: 95% interval from resampling whole {interval}.{' Origin days overlap, so this interval is too narrow.' if by == 'month' else ''}"
         save(
             contrast_chart(
                 table=table,

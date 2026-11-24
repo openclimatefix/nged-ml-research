@@ -206,7 +206,7 @@ def heat_chart(
         r, c = np.meshgrid(np.arange(m.shape[0]), np.arange(m.shape[1]), indexing="ij")
         parts.append(
             pl.DataFrame(
-                {"arm": name, "row": r.ravel(), "col": c.ravel() / 2.0, "weight": m.ravel()}
+                {"arm": name, "row": r.ravel() + 1, "col": c.ravel() / 2.0, "weight": m.ravel()}
             )
         )
     data = pl.concat(parts)
@@ -267,7 +267,7 @@ def cmd_figures(*, out_dir: Path, shown: list[str], month: str, seed: int) -> No
                 records.append(
                     {
                         "arm": s,
-                        "age": slot + 1,
+                        "slot": slot,
                         "weight": float(mean[slot]),
                         "same_weekday": float(same[slot]),
                     }
@@ -281,7 +281,10 @@ def cmd_figures(*, out_dir: Path, shown: list[str], month: str, seed: int) -> No
             ),
             legend=alt.Legend(title=None, orient="top"),
         )
-        x = alt.X("age:O", title="History slot (M* and E: age in days minus 1; P: a placebo row)")
+        x = alt.X(
+            "slot:O",
+            title="History slot (M* and E: slot k is the row k+1 days old; P: the k-th placebo row, 16 to 379 days old)",
+        )
         base = alt.Chart(data, width=figs.WIDTH, height=150)
         chart = alt.vconcat(
             base.mark_bar().encode(  # ty: ignore[unresolved-attribute]
