@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 727: prove that a format 2 bundle's `.npz` weights equal its `.pt` weights, and its hashes hold.
+"""Experiment 727: prove that a format 2 bundle's `.npz` and `.pt` weights are equal.
 
 Usage: `python e00727_verify.py BUNDLE_DIR`. For every seed the script loads `seed<N>.pt` with
 `torch.load` and `seed<N>.npz` with `numpy.load`, and requires the same names, shapes, dtypes, and
