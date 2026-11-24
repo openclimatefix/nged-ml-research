@@ -113,10 +113,6 @@ descriptive, and the substations are labelled D3, D5, D8, and D14.
 
 ![Histogram of the drops' durations in day bands](figure_1_history.svg)
 
-![Three shallower drops](figure_2_typical_drops_a.svg)
-
-![Three deeper drops](figure_3_typical_drops_b.svg)
-
 ![Recurrence of the drops](figure_4_recurrence.svg)
 
 ![Neighbour step-up at a drop against chance](figure_6_neighbours.svg)

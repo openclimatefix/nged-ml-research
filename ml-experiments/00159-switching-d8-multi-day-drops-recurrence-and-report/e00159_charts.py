@@ -8,23 +8,18 @@ Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newl
 
 from __future__ import annotations
 
-import pickle
 import sys
 import textwrap
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 
 import altair as alt
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 from e00159_drops import (
-    D8_SERIES,
-    FALSE_ALARM_DIR,
     HALF_HOURS_PER_DAY,
-    NEIGHBOUR_LABELS,
-    NEIGHBOUR_SERIES,
     STEP_FRACTIONS,
     WORK_DIR,
     wilson,
@@ -41,14 +36,7 @@ OUT_DIR: Final[Path] = (
 )
 WIDTH: Final[int] = 640
 WRAP: Final[int] = 95
-SHADE: Final[str] = ocf.DATA_SKY_LIGHT
-NEIGHBOUR_COLOURS: Final[dict[str, str]] = {
-    "D3": ocf.DATA_PURPLE,
-    "D14": ocf.DATA_GREEN,
-    "D5": ocf.BRAND_ORANGE,
-}
 WEEKDAYS: Final[list[str]] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-ZOOM_MARGIN_DAYS: Final[int] = 3
 
 
 def _title(*, text: str, line: str) -> alt.TitleParams:
@@ -59,10 +47,6 @@ def _title(*, text: str, line: str) -> alt.TitleParams:
         fontSize=14,
         subtitleFontSize=11,
     )
-
-
-def _time_axis(*, days: np.ndarray, start: np.datetime64) -> np.ndarray:
-    return start + (days * 86400).astype("timedelta64[s]")
 
 
 def figure_history(*, drops: pl.DataFrame) -> alt.TopLevelMixin:
@@ -92,102 +76,6 @@ def figure_history(*, drops: pl.DataFrame) -> alt.TopLevelMixin:
                 line="Runs of 2 days or longer in which the 24-hour median of metered power minus "
                 "the convex model's expected power is below the drop threshold.",
             ),
-        )
-    )
-
-
-def _zoom_panel(*, arrays: dict, row: dict[str, Any], label: str) -> alt.VConcatChart:
-    first, last = int(row["first_stamp"]), int(row["last_stamp"])
-    margin = ZOOM_MARGIN_DAYS * HALF_HOURS_PER_DAY
-    lo, hi = max(first - margin, 0), min(last + margin, len(arrays[D8_SERIES]["power"]))
-    days = (np.arange(lo, hi) - first) / HALF_HOURS_PER_DAY
-    d8 = arrays[D8_SERIES]
-    frame = pl.DataFrame(
-        {
-            "day": days,
-            "Metered power": d8["power"][lo:hi],
-            "Expected power": d8["expected"][lo:hi],
-            "Residual": d8["resid"][lo:hi],
-        }
-    )
-    domain = [-ZOOM_MARGIN_DAYS, (last - first) / HALF_HOURS_PER_DAY + ZOOM_MARGIN_DAYS]
-    x = alt.X("day:Q", title=None, scale=alt.Scale(domain=domain), axis=alt.Axis(values=[]))
-    shade = pl.DataFrame({"a": [0.0], "b": [(last - first) / HALF_HOURS_PER_DAY]})
-    rect = alt.Chart(shade).mark_rect(color=SHADE, opacity=0.5).encode(x="a:Q", x2="b:Q")  # ty: ignore[unresolved-attribute]
-    long = frame.unpivot(
-        index="day", on=["Metered power", "Expected power"], variable_name="series"
-    )
-    colour = alt.Color(
-        "series:N",
-        scale=alt.Scale(
-            domain=["Metered power", "Expected power"],
-            range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE],
-        ),
-        legend=None if label != "first" else alt.Legend(title=None, orient="top"),
-    )
-    top = (
-        alt.Chart(long)
-        .mark_line(strokeWidth=0.9)
-        .encode(x=x, y=alt.Y("value:Q", title="D8 (MW)"), color=colour)  # ty: ignore[unresolved-attribute]
-    )
-    top = (rect + top).properties(
-        width=WIDTH,
-        height=110,
-        title=alt.TitleParams(
-            text=f"Drop {row['drop']}: {row['duration_days']:.1f} days",
-            anchor="start",
-            fontSize=12,
-        ),
-    )
-    neighbours = pl.DataFrame({"day": days}).with_columns(
-        *[pl.Series(NEIGHBOUR_LABELS[s], arrays[s]["power"][lo:hi]) for s in NEIGHBOUR_SERIES]
-    )
-    nlong = neighbours.unpivot(
-        index="day", on=list(NEIGHBOUR_LABELS.values()), variable_name="neighbour"
-    )
-    bottom = (
-        alt.Chart(nlong)
-        .mark_line(strokeWidth=0.9)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X(
-                "day:Q",
-                title="Days from the drop's start" if label == "last" else None,
-                scale=alt.Scale(domain=domain),
-                axis=alt.Axis(labels=label == "last"),
-            ),
-            y=alt.Y("value:Q", title="Neighbours (MW)"),
-            color=alt.Color(
-                "neighbour:N",
-                scale=alt.Scale(
-                    domain=list(NEIGHBOUR_COLOURS), range=list(NEIGHBOUR_COLOURS.values())
-                ),
-                legend=None if label != "first" else alt.Legend(title=None, orient="top"),
-            ),
-        )
-    )
-    bottom = (rect + bottom).properties(width=WIDTH, height=80)
-    return alt.vconcat(top, bottom, spacing=2).resolve_scale(color="independent")
-
-
-def figure_zoom(
-    *, arrays: dict, drops: pl.DataFrame, picks: list[int], name: str
-) -> alt.TopLevelMixin:
-    """Zoomed drops: metered and expected power, and the three connected neighbours' power."""
-    rows = drops.filter(pl.col("drop").is_in(picks)).sort("drop").to_dicts()
-    panels: list[alt.VConcatChart] = []
-    for k, row in enumerate(rows):
-        label = "first" if k == 0 else "last" if k == len(rows) - 1 else "mid"
-        panels.append(_zoom_panel(arrays=arrays, row=row, label=label))
-    return (
-        alt.vconcat(*panels, spacing=14)
-        .resolve_scale(color="independent")
-        .properties(
-            title=_title(
-                text=name,
-                line="Each drop is shaded, with 3 days either side. Top row: metered and expected "
-                "power of D8. Bottom row: power of the three connected metered neighbours D3, D14, "
-                "and D5.",
-            )
         )
     )
 
@@ -322,41 +210,19 @@ def figure_neighbours(*, drops: pl.DataFrame, placebo: dict[float, float]) -> al
     )
 
 
-def pick_typical(*, drops: pl.DataFrame) -> tuple[list[int], list[int]]:
-    """Six drops spread across depth and duration: three per figure."""
-    ordered = drops.sort("depth_mw")
-    n = ordered.height
-    chosen = [ordered["drop"][int(q * (n - 1))] for q in (0.1, 0.3, 0.5, 0.7, 0.9)]
-    longest = drops.sort("duration_days")["drop"][-1]
-    if longest not in chosen:
-        chosen.append(longest)
-    else:
-        chosen.append(ordered["drop"][int(0.99 * (n - 1))])
-    chosen = sorted({int(c) for c in chosen})
-    return chosen[:3], chosen[3:6]
-
-
 def main() -> None:
     """Draw every figure."""
-    arrays = pickle.loads((FALSE_ALARM_DIR / "arrays.pkl").read_bytes())
     drops = pl.read_parquet(WORK_DIR / "drops.parquet")
     placebo = {float(k): v for k, v in pl.read_parquet(WORK_DIR / "placebo.parquet").iter_rows()}
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    first, second = pick_typical(drops=drops)
     figures = {
         "figure_1_history.svg": figure_history(drops=drops),
-        "figure_2_typical_drops_a.svg": figure_zoom(
-            arrays=arrays, drops=drops, picks=first, name="Three typical drops: the shallower ones"
-        ),
-        "figure_3_typical_drops_b.svg": figure_zoom(
-            arrays=arrays, drops=drops, picks=second, name="Three typical drops: the deeper ones"
-        ),
         "figure_4_recurrence.svg": figure_recurrence(drops=drops),
         "figure_6_neighbours.svg": figure_neighbours(drops=drops, placebo=placebo),
     }
     for name, chart in figures.items():
         guard.save_chart(chart=chart, path=OUT_DIR / name)
-    print(f"wrote {len(figures)} figures; zoom drops {first} and {second}")
+    print(f"wrote {len(figures)} figures")
 
 
 if __name__ == "__main__":
