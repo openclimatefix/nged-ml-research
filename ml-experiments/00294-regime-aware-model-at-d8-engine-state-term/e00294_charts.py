@@ -4,7 +4,6 @@
 uv run --no-sync python ml-experiments/00294-*/e00294_charts.py
 """
 
-import json
 import sys
 import textwrap
 from pathlib import Path
@@ -144,55 +143,6 @@ def headline() -> None:
     _save(chart, name="figure_1_relative_score")
 
 
-def shortfall(*, score: dict) -> None:
-    """Mean error (reading minus forecast) on engine-running and other half-hours."""
-    rows = []
-    for subset, label in (
-        ("running", "Engine running (filtered probability above 0.5)"),
-        ("ordinary", "Other half-hours"),
-    ):
-        for arm, row in score["scores"][f"D8/{subset}"].items():
-            if arm in {"arm1", *LABELS}:
-                rows.append(
-                    {
-                        "subset": label,
-                        "arm": LABELS.get(arm, "Arm 1: single model"),
-                        "err": row["mean_error"] * 0.1,
-                    }
-                )
-    labels = {**LABELS, "arm1": "Arm 1: single model"}
-    colours = {**COLOURS, "arm1": ocf.DATA_GREEN}
-    scale = alt.Scale(domain=[labels[k] for k in labels], range=[colours[k] for k in labels])
-    data = pl.DataFrame(rows)
-    chart = (
-        _chart(data)
-        .mark_bar()
-        .encode(
-            y=alt.Y(
-                "arm:N",
-                sort=[labels[k] for k in ("arm1", *LABELS)],
-                title=None,
-                axis=alt.Axis(labelLimit=240),
-            ),
-            x=alt.X("err:Q", title="Reading minus forecast mean, MW"),
-            color=alt.Color("arm:N", scale=scale, legend=None),
-        )
-        .properties(width=WIDTH - 250, height=170)
-        .facet(
-            row=alt.Row(
-                "subset:N", title=None, header=alt.Header(labelAnchor="start", labelFontSize=12)
-            )
-        )
-        .properties(
-            title=_title(
-                title="Arm 1 over-forecasts by 1.1 MW while the engine runs and under-forecasts by 0.8 MW otherwise",
-                subtitle="D8, scored year. Mean of the reading minus the forecast mean. Zero means no bias.",
-            )
-        )
-    )
-    _save(chart, name="figure_3_shortfall_by_state")
-
-
 def controls() -> None:
     """Arm 3 and the post hoc arm against arm 1 at the three Primaries without an engine."""
     rows = []
@@ -266,9 +216,7 @@ def main() -> None:
     The engine offset per refit and the example weeks are not drawn, because they show the
     inferred engine state or its fitted size on calendar dates.
     """
-    score = json.loads(sc.OUT_PATH.read_text())
     headline()
-    shortfall(score=score)
     controls()
 
 
