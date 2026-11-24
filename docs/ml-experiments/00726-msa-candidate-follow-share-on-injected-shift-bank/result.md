@@ -1,5 +1,5 @@
 ---
-id: "NNNNN"
+id: "00726"
 slug: msa-candidate-follow-share-on-injected-shift-bank
 title: >-
   Does the axial-attention network carry a shift in a Primary's recent power into its forecast
@@ -249,15 +249,15 @@ implementer re-checks that F4's stored second-generator MSA forecasts carry F4's
 `e00715_era.py` has not changed since `ac3e768e4`, and re-pins if either check fails. The log of every
 job records the pinned commit.
 
-**The new files, all under `ml-experiments/<id>-<slug>/`:**
+**The new files, all under `ml-experiments/00726-msa-candidate-follow-share-on-injected-shift-bank/`:**
 
 | File | Does | Source |
 |---|---|---|
-| `e<id>_candidate_panel.py` | Runs one injected panel through the Candidate's saved weights and writes one forecast file per world, fold month, pass, and seed. `--world` selects the panel builder and `--root` the weights' root | A copy of `run_inject` and its helpers from experiment 667's `prevailing/p667_inject.py`, with the source lines and the commit named in the docstring. The changes are the panel builder, the paths, the removal of every table-building call, and the cut of the test rows |
-| `e<id>_msa_panel.py` | Runs the all-shifted, `zero`, and host-only panels through the stored stage 3 state of `M1`, `K`, `E`, or `N` | A copy of the loop of `cmd_bank` in experiment 713's `e00713_era.py`, importing `load_model`, `batch_for`, and `standardised_quantiles` from the frozen checkout |
-| `e<id>_score.py` | The key join, the slices, the follow share, the contrasts, the bootstrap, the verdict table, and the report-only readings | Imports `e00581_bank.event`, reimplements the phase rule of `e00581_tails.event_table`, and imports F4's two functions from the pinned commit |
-| `e<id>_checks.py` | The preflight and the known-answer checks | New |
-| `e<id>_figures.py`, `run.sh` | Figures, and a copy of F4's wrapper with a folder snapshot added | F4's `run.sh` |
+| `e00726_candidate_panel.py` | Runs one injected panel through the Candidate's saved weights and writes one forecast file per world, fold month, pass, and seed. `--world` selects the panel builder and `--root` the weights' root | A copy of `run_inject` and its helpers from experiment 667's `prevailing/p667_inject.py`, with the source lines and the commit named in the docstring. The changes are the panel builder, the paths, the removal of every table-building call, and the cut of the test rows |
+| `e00726_msa_panel.py` | Runs the all-shifted, `zero`, and host-only panels through the stored stage 3 state of `M1`, `K`, `E`, or `N` | A copy of the loop of `cmd_bank` in experiment 713's `e00713_era.py`, importing `load_model`, `batch_for`, and `standardised_quantiles` from the frozen checkout |
+| `e00726_score.py` | The key join, the slices, the follow share, the contrasts, the bootstrap, the verdict table, and the report-only readings | Imports `e00581_bank.event`, reimplements the phase rule of `e00581_tails.event_table`, and imports F4's two functions from the pinned commit |
+| `e00726_checks.py` | The preflight and the known-answer checks | New |
+| `e00726_figures.py`, `run.sh` | Figures, and a copy of F4's wrapper with a folder snapshot added | F4's `run.sh` |
 
 **Each world has two panels, one for the lag columns (`power_lag`) and one for the signal block and
 the neighbour readings (`power_sig`).** In the `e581_host` world (with `--set`) and the `e581_all`
@@ -592,6 +592,6 @@ audit if a trigger fires, a numbers review, and a prose review.
 - Read from experiment 715 (F4) at commit `ac3e768e4`: `e00715_era.py` for `event_crps`,
   `pass_bootstrap_ci`, and `g2_panel`, and its stored second-generator MSA forecasts.
 - To be written by this experiment: the scripts named above under
-  `ml-experiments/<id>-<slug>/`, and forecast files under
-  `data/ml-experiments/<id>-<slug>/candidate/<world>/<month>/` and the MSA equivalents, never
-  committed. No code has been written.
+  `ml-experiments/00726-msa-candidate-follow-share-on-injected-shift-bank/`, and forecast files under
+  `data/ml-experiments/00726-msa-candidate-follow-share-on-injected-shift-bank/candidate/<world>/<month>/`
+  and the MSA equivalents, never committed. No code has been written.
