@@ -95,8 +95,10 @@ take_home_message: >-
   (0.147 points of capacity of CRPS, about 5% of the Candidate's CRPS), and the gain is not shown to
   come from the attention layers, because a simpler learned read-out over the same days does almost
   as well. At the eight substations that report only megavolt-amperes the neural network was no
-  better, the pooled difference rests on two substations, and the neural network is clearly worse at
-  the two short-history substations. The history rows use weather analyses that a live service could
+  better, the pooled difference rests on two substations, and the neural network is worse than the
+  Candidate at
+  the two short-history substations by a derived difference of roughly 1.6 points that has no
+  interval. The history rows use weather analyses that a live service could
   not build for 2 to 5 days before the origin, and the test of whether the neural network follows a
   lasting level shift failed and was waived, so the era results are descriptive only.
 advice:
@@ -112,8 +114,10 @@ advice:
     there as evidence for attention, because `K` and `E` gained about as much as `M1` (experiment
     713, secondary R2).
   - >-
-    Score D15 and D18 beside the two counted groups, because the group readings hid a loss of
-    roughly 1.6 points at those two Primaries (experiment 713, all-16 pooled means).
+    Score D15 and D18 beside the two counted groups, because the group readings hid a derived loss
+    of
+    roughly 1.6 points, without an interval, at those two Primaries (experiment 713, all-16 pooled
+    means).
   - >-
     Diagnose a known-answer gate that fails four runs in a row before running the real folds: the
     follow share of arm `M` stayed at 0.01 to 0.14 against 0.75 (experiment 713, the gate section).
@@ -205,7 +209,8 @@ the eight MVA-only Primaries should be read as an effect on all of them.
 **The neural network is worse than the Candidate at the two report-only Primaries.** From seeds 0
 and 1, the mean CRPS over all 16 Primaries is 4.037 for `C`, 4.191 for `M1`, and 4.218 for `P`.
 Combined with the group results, `M1` minus `C` at D15 and D18 together is roughly +1.6 points
-(computed from the row-weighted group differences, not scored separately). The two short-history
+(a derived difference from the row-weighted group differences, with no interval and not scored
+separately). The two short-history
 Primaries are 2 of 16, and this loss is the reason `production_status` is `not-for-production`.
 
 **The secondary era readings R1 to R3 score the forecasts on experiment 709's injected worlds, and a
@@ -259,7 +264,8 @@ change an input and report H1 again. Swap (a), which gives every history row the
 weather and keeps the 14 trailing-temperature and solar-gain columns, gives `M1` minus `C` of -0.152
 [-0.258, -0.048] at the six signed-MW Primaries and +0.028 [-0.070, +0.125] at the eight MVA-only
 Primaries. Swap (b), which also zeroes those 14 columns, gives -0.109 [-0.236, +0.010] and +0.234
-[+0.079, +0.365], so zeroing the columns costs the neural network about 0.04 points at the six
+[+0.079, +0.365], so zeroing the columns raises the neural network's CRPS by about 0.04 points at
+the six
 signed-MW Primaries and 0.21 at the eight MVA-only Primaries, and the neural network was not trained
 for either swap. Swap (c), the Candidate given reanalysis weather at its lag times, changes the
 Candidate's CRPS by +0.006 [0.000, +0.012] and +0.001 [-0.002, +0.005].
@@ -494,13 +500,14 @@ table of weekday-by-half-hour effects kept its own seed in every run.
 | V3 | Clip norm 10 and lead-day learning rate × 10 | 0 | 0 | 0.586 | 0.787 |
 | V0N | None, no early stopping (400 passes) | 0 | 0 | 0.129 | 0.236 |
 | V2N | Lead-day learning rate × 10, no early stopping (400 passes) | 0 | 0 | 0.820 | 0.395 |
-| R1 | As V2 | 1 | 0 | 0.857 | 0.815 |
-| R2 | As V2 | 2 | 0 | 0.377 | 0.649 |
-| R3 | As V2 | 0 | 1000 | 0.454 | 0.368 |
-| R4 | As V0 | 0 | 1000 | 0.063 | 0.185 |
+| Rep1 | As V2 | 1 | 0 | 0.857 | 0.815 |
+| Rep2 | As V2 | 2 | 0 | 0.377 | 0.649 |
+| Rep3 | As V2 | 0 | 1000 | 0.454 | 0.368 |
+| Rep4 | As V0 | 0 | 1000 | 0.063 | 0.185 |
 
 **Arm `M` reached the 0.75 threshold at the best-validation state on 2 of the 4 runs that used the
-lead-day multiplier (V2 and R1), and missed it on the other 2 (R2 and R3).** The follow share at the
+lead-day multiplier (V2 and Rep1), and missed it on the other 2 (Rep2 and Rep3).** The follow share
+at the
 best-validation state varied from 0.377 to 0.857 across training seeds and worlds, and the
 unmodified baseline gave 0.142 and 0.063. The no-early-stopping runs followed more than 0.9 at some
 passes (0.912 for V0N, 0.929 for V2N), but their best-validation states stayed at 0.129 and 0.820,
@@ -544,6 +551,7 @@ that ambiguity, and a null H2 therefore does not close the line without this cav
 **Operator caution: a full rerun of `e00713_known_answer.py` deletes the gate file, waived or not.**
 The waiver script must be run again after a rerun, and it refuses when the last-run results are not
 those of the amended gate.
+
 **The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
 failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
 are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
@@ -605,11 +613,6 @@ and the manual heuristic and BG2 where stored rows cover the scored keys. The sc
 reference rows are missing.
 
 ## Decision rule
-
-**The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
-failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
-are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
-and take-home message of this experiment carries that fact.**
 
 **Each group is read on H1, with D the point estimate and [L, U] the 98.75% bootstrap interval. The
 group's reading is the first row that holds.** The three guards are the t guard (the t interval on
@@ -700,9 +703,10 @@ power). It assumes the MSA arm is as noisy as the Candidate.
 | 2 | 0.027 | 0.071 (0.034) | 0.094 | 0.25 (0.12) |
 | 5 | 0.017 | 0.045 (0.022) | 0.059 | 0.16 (0.07) |
 
-**One seed of the Candidate failed in fold 2025-11 at the eight MVA-only Primaries** (CRPS 4.19
-against 3.43 for the
-other seed), which doubles the eight MVA-only Primaries' seed noise. The stored arm is used as it
+**One seed of the Candidate failed in fold 2025-11 at the eight MVA-only Primaries** (CRPS 3.955
+against 3.263 for the
+other seed, seeds 0 and 1 over 24 to 240 h), which doubles the eight MVA-only Primaries' seed noise.
+The stored arm is used as it
 is. The figures are
 lower bounds, because they leave out the month-to-month variation of the true difference, which the
 month-block bootstrap and the t guard add. The decision rule uses δ = 0.06 at the six signed-MW
@@ -802,7 +806,7 @@ folds.**
   other map and neither map would ever train. `β_day` starts at 3.0 for the
   same day type, 1.5 for two different Monday-to-Friday day types and for Sunday with a bank
   holiday, and 0 otherwise. A Monday-morning target token therefore starts with about 50% of the
-  weight on the two Monday mornings, 45% on the eight MVA-only Primaries other working-day mornings,
+  weight on the two Monday mornings, 45% on the eight other working-day mornings,
   and 5% on the
   four weekend mornings. The read-out query also takes a map `w_lead` (14 → 32, no bias, default
   random initialisation) of the one-hot lead day, added to `W_q h_0` (amendment 2).
@@ -899,7 +903,8 @@ folds.**
   the threshold of 0.75. The follow share at the final pass, and every 20 passes, is recorded as a
   secondary reading that never gates. If the amended gate fails KA3 at the pre-registered state,
   experiment 713 is reported as failing its gate. Every threshold, the real folds' budgets, and the
-  arm list are unchanged. The amended gate failed KA3 and KA12 (see the status section above).
+  arm list are unchanged. The amended gate failed KA3 and KA12 (see the section on the known-answer
+  gate above).
 - **Shared by all stages.** AdamW with weight decay 1e-3 and gradient clipping at 1.0; batch of 256
   samples; at most 60 passes with patience 8; loss `(weight × nll).sum() / weight.sum()` over finite
   targets. A pass visits every (Primary, origin day) once, with one lead day drawn uniformly,
@@ -944,7 +949,8 @@ folds.**
 - **Headline band.** Leads from 24 h up to but not including 240 h after the 12:00 UTC origin
   (target rows 2 to 10). Day 1 (0 to 24 h), days 11 to 14, and the protocol's days 1 to 10 band
   (0 to 240 h) were planned as report-only readings and are not on this page.
-- **Groups.** The six signed-MW Primaries and the eight MVA-only Primaries, separately. All 16 pooled,
+- **Groups.** The six signed-MW Primaries and the eight MVA-only Primaries, separately. All 16
+  pooled,
   and D15 with D18, are report-only.
 - **Metrics.** CRPS, the normalised MAE of the median, coverage and pinball loss at q01, q05, q95,
   and q99, q05 to q95 coverage and mean band width, threshold-weighted CRPS, and the avoidable
@@ -967,7 +973,8 @@ folds.**
   so the real-event slices undercount. Every statement about following level shifts carries the
   waiver sentence (unsupported by a passing known-answer test; amendment 4).
 - **Figures.** A day-ahead forecast and a full 14-day forecast of one origin, winter and summer, at
-  signed-MW Primaries, for `M*`, `E`, and `C`; per-Primary and per-fold charts of CRPS and of CRPS
+  a signed-MW Primary and an MVA-only Primary, for `M*`, `E`, and `C`; per-Primary and per-fold
+  charts of CRPS and of CRPS
   minus the Candidate's, split by Primary group; logged-event charts; and the injected-world charts.
   The training-log table of mean stopping pass per stage and the count of reruns at the cap is
   printed by `e00713_report.py`.
