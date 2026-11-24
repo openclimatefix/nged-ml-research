@@ -43,8 +43,10 @@ decision_rule: >-
   figure, and the factor applies to hour-to-hour changes only. The sensor audit has three
   conditions. (1) Resolution, report only: the share of hour-ending half-hours on which the CAMS
   clear-sky index does not change (100% expected), and the share of hour-ending half-hours on
-  which `u_clear` does not change (0% expected). The arc term is void if the second share exceeds
-  1%. (2) Arc removal, per farm: the correlation of the farm's `ΔZ̃` with `Δu_clear` over daylight
+  which `u_clear` does not change (0% expected). The arc term is void if the second share exceeds 1%
+  at any one site (the job writes the share of every site), and job W2 then builds no world and is
+  `inconclusive`, row 2 below. (2) Arc removal, per farm: the correlation of the farm's `ΔZ̃` with
+  `Δu_clear` over daylight
   half-hours has a size of at most 0.1. A farm that fails is dropped from every sensor. (3)
   Coherence, per farm and per host sensor: for each host, and each farm of that host's sensor, the
   correlation of the farm's `ΔZ̃` with the mean `ΔZ̃` of the other farms of the same host's
@@ -70,23 +72,29 @@ decision_rule: >-
   Area, export against import stretches, pooled: Point estimate at least 0.85, and lower end of
   the 95% interval above 0.75; at least 0.80 at level 1.0 alone, point estimate. The level 1.0
   point estimate is `not readable` (row 3 below) when either class at level 1.0 holds fewer than
-  30 scorable stretches. Real sensor minus the sensor shifted by 28 days: At least 0.15 in area.
+  30 scorable stretches. Real sensor minus the sensor shifted by 28 days: At least 0.15 in area. The
+  shifted sensor shifts only the fast change `ΔZ̃`, keeps the real sensor's index change, and is
+  read on exactly the stretches and pairs of the area, so the placebo has no void state of its own.
   False export evidence at un-injected D5 and D10: At most 2% of true import stretches. The
   false-export bar at un-injected D5 and D10 passes when at most `floor(0.02 × n)` of the `n`
-  scorable true import stretches give export evidence, and is `void` (not readable, row 3) under
-  30. Transfer check on real import stretches: At un-injected D9, D11, D14, and D16, at least 50%
+  scorable true import stretches give export evidence, and is `void` (not readable, row 3) under 30.
+  The count of each host is reported beside the pooled bar, with no bar of its own. Transfer check
+  on real import stretches: At un-injected D9, D11, D14, and D16, at least 50%
   of true import stretches have `C` below −0.25; void under 100 stretches or with a bootstrap
   standard error above 0.05. D15 dead band: At least 90% of D15's stretches give no evidence,
-  binding only under the condition of section 5.3 of the amendment: when the farm inside D15's
-  polygon is classed "outside every metered Primary" the bar binds as pre-registered, and when the
-  class is embedded or unresolved the bar is report-only. The D15 dead band is `void` and neutral
+  binding only under the condition of section 5.3 of the amendment: when job 1 classes the farm
+  inside D15's polygon "outside every metered Primary" and the farm is not an add-back candidate at
+  D15, the bar binds as pre-registered, and when the class is embedded or unresolved, or the farm is
+  an add-back candidate, the bar is report-only. The D15 dead band is `void` and neutral
   under 30 stretches, and the page reports the share among scorable stretches beside the
   every-stretch share. Recall on D10's real export stretches: At least 0.5 on 30 or more scorable
   stretches; `void` under 30, in which case the verdict rests on the other bars and the page says
   "no bar on real export was read". A recall under 0.5 on 30 or more scorable stretches gives `not
   supported`. Every share of stretches in jobs W2 and W3 has scorable stretches as its
   denominator, except the D15 dead band, which keeps every stretch. Calibration of the likelihood
-  ratio: No bin of at least 100 stretches off the diagonal by more than 0.1. The bootstrap
+  ratio: No bin of at least 100 stretches off the diagonal by more than 0.1. The plan page defines
+  no likelihood ratio, so this bar is void by construction and neutral in every verdict, and the
+  page lists it beside the verdict. The bootstrap
   resamples calendar days with replacement in each of 1,000 draws, and every pair, level, and host
   takes its stretches from the drawn days. A standard error of 0.036 gives a detection limit of
   0.10, the gap between the bar of 0.85 and the record's 0.75. Job W2 verdict: The first row that
@@ -94,8 +102,9 @@ decision_rule: >-
   day count of ruling 2, a known-answer test on synthetic arrays, or the alignment check together
   with a time-stamp defect that a failing test shows. Row 2, `inconclusive` (void before run); no
   injected world is built: After the sensor audit, fewer than 4 qualifying pairs keep a sensor, or
-  fewer than 4 pairs are powered at level 2.0, or the powered pairs sit on fewer than 2 hosts. Row
-  3, `inconclusive` (not readable): Job W2 ran, and the standard error of the pooled area exceeds
+  fewer than 4 pairs are powered at level 2.0, or the powered pairs sit on fewer than 2 hosts, or
+  the arc term is void (a failed sensor audit). Row 3, `inconclusive` (not readable): Job W2 ran,
+  and the standard error of the pooled area exceeds
   0.036, or either class holds fewer than 30 scorable stretches, or the alignment check fails and
   no time-stamp defect is found. Row 4, `supported`: Every binding bar passes with the farm
   sensor. Row 5, `partly supported`: Every binding bar passes except the transfer check (failed or
@@ -109,8 +118,9 @@ decision_rule: >-
   fix and passes after the fix; (2) the fix changes no constant, population, sensor, or bar; (3)
   an Opus review confirms the fix; (4) both sets of outputs are kept, and the page reports both.
   Every read-out that reads the population of a bar runs after its job's verdict file is written.
-  JOB W3 runs only when job W2 is `supported`. Controls, with bars: D12's anchor stretches, where
-  night import fixes the sign, and D3's post-bounce stretches. A control passes when at most
+  JOB W3 runs only when job W2 is `supported`. Controls, with bars: D12's anchor stretches on every
+  day, where night import fixes the sign, and D3's post-bounce stretches on days with exactly one
+  post-bounce stretch. A control passes when at most
   `floor(0.02 × n)` of its `n` scorable stretches give export evidence, and is `void` under 30
   scorable stretches. D12's dark-hour fold ratio is a read-out. Read-outs, no bar. Verdict: the
   first row that matches gives the verdict. (1) A control read on 30 or more scorable stretches
@@ -162,8 +172,10 @@ shows the sign of one Primary's flow. The test of the meter's closure slope, whi
 the hourly change of the meter's remainder on the hourly change of the left-out Primary, read about
 2.0 at D15 where perfect cancellation gives 1, and the cloud-class audit failed. This experiment
 drops the meter route as a source of any label. Experiment 723 tests instead one use of the sky:
-within a stretch of daylight half-hours, does the reading of a Primary move with the sunshine (the
-Primary imports) or against it (the Primary exports)?
+within a stretch of daylight half-hours, does the reading of a Primary move against the sunshine
+(the
+Primary imports, so more sun lowers its reading) or with it (the Primary exports, so more sun raises
+its reading)?
 
 **The terms below are used in every job.**
 
@@ -199,8 +211,12 @@ Primary imports) or against it (the Primary exports)?
 - **Usable pair:** a pair of consecutive daylight half-hours on which the sky index changes by at
   least 0.10 and the reading's fast change is at least 0.2 points.
 - **BSP residual:** the BSP meter minus every other child of the BSP.
-- **Injection level:** the multiple of the host's median absolute signed reading on sunny summer
-  middays before 2025-07-01 at which a farm's output is added.
+- **Injection level:** the multiple of the host's median absolute signed reading on sunny middays
+  before 2025-07-01 at which a farm's output is added. A sunny midday is a half-hour that starts
+  from
+  10:00 to 14:00 UTC, from April to September, with a clear-sky index of at least 0.7. The injected
+  series is the farm's output as a share of the farm's capacity, times the level, times that median
+  (the definition of experiment 720).
 - **Void:** a test is void when its detection limit, 2.8 bootstrap standard errors, exceeds its
   bar, because a slope or area the size of the bar could not be told from zero. A void test is
   reported as void and never read as a pass.
@@ -251,9 +267,9 @@ depend only on the sizes of two changes are allowed. Job W0's estimate is under 
 |---|---|
 | Power table | For each fitted slope of jobs W2 and W3: the row count and the standard deviations of the regressor and of the response, with the standard error predicted as 1.25 times the naive figure. The table is a read-out, because no slope in jobs W2 or W3 carries a bar |
 | Counts at D10 | The export hours and export days, with the base stated, as a recount of the review's 77 hours on 36 days |
-| Sensor audit | The three conditions of the decision rule, the polygon-filtered pair table, the powered pairs, D12's and D15's sensor membership, and job 1's class for the farm inside D15's polygon, as a class only |
+| Sensor audit | The three conditions of the decision rule (condition 1 with the share of every site, so that one broken `u_clear` shows), the polygon-filtered pair table, the powered pairs with each pair's count of reference rows for the injection level, D12's and D15's sensor membership, and job 1's class for the farm inside D15's polygon, as a class only, with whether the farm is an add-back candidate at D15 |
 | Share of pairs that pass | The share of daylight half-hour pairs that pass the usable-pair rule under each sensor, because a mean over 2 or more farms moves less than CAMS at one point |
-| Switching logs | Each sheet's name, column names, and row count; one window per logged event and Primary (the logged start to end, or the calendar day when no end is logged); the mask of the amendment |
+| Switching logs | Each sheet's name, column names, and row count; for each sheet, the columns chosen as substation, start, and end, the rows read, the rows with a parsed start, and the rows matched to a Primary; one window per logged event and Primary (the logged start to end, or the calendar day when no end is logged); the mask of the amendment. A time with no time zone is read as Europe/London. A sheet that has the substation and start columns and rows but matches no Primary stops the job as an input defect |
 | Sky's share at D12, read-out | The squared correlation of the change of the residual that leaves D12 out with D12's farm sensor on lit hours, written as `r²` only and never as a correlation or a slope. A squared correlation carries no direction. The amendment bounds the share at 74% from dark hours alone |
 
 **Job W2 scores the concordance in injected worlds.** Each of the 12 qualifying pairs is injected at
@@ -301,8 +317,9 @@ a hint. The design note for version 2 lists 18 earlier experiments by number: 79
 365, 366, 370, 387, 408, 412, 417, 420, 424, 427, 506, 508, 543, and 674. Experiment 722 is the
 19th. The stored BSP run is not counted. Experiment 722 was the fourth use of BSP closure for a
 sign, and this experiment makes no fifth test of BSP closure: its D15 fits and its pooled fold
-ratios are read-outs. Experiment 724, if approved, is the 21st experiment regardless of which runs
-first; that count is a recommendation and a decision for the maintainer.
+ratios are read-outs. **[Decided by the manager]** Experiment 723 is the 20th experiment and
+experiment 724 is the 21st,
+regardless of which runs first.
 
 **Under every outcome, rung U3 and the build of the untangler proceed, the daylight BSP factor stays
 switched off, and no third experiment on either idea starts without the maintainer's recorded
@@ -336,9 +353,14 @@ GB of free memory before launch.
 
 **The timing gate counts real units of work.** Jobs W0 and W3 make one elapsed-time check each. Job
 W2 times the first world, scored with all four sensor variants (farm, meter, CAMS, and the sensor
-shifted by 28 days), and the first 10 bootstrap draws, and stops when `seconds per world × 32
-worlds + seconds per draw × 1,000` exceeds the cap. A test asserts that the number of worlds scored
-equals the number in the projection. A projection over the cap before a job starts is reported to
+shifted by 28 days), and the first 10 bootstrap draws on the first world's stretches repeated to the
+expected size of the pooled population. It projects the whole job: `seconds per world × 32 worlds +
+seconds per draw × 1,000`, then five more pooled bootstraps in the read-outs, a second scoring of
+every world for the unmasked read-out, and 7 closure-fit bootstraps of 1,000 draws each. The job
+stops when the projection exceeds the cap, and checks the elapsed time again before the pooled
+bootstrap. The job writes the number of worlds it scored, the number it planned, and the name and
+reason of every world it skipped, and a test asserts that no world is scored twice. A projection
+over the cap before a job starts is reported to
 the manager, who may raise the cap, and writes no verdict. A stop after the job has started returns
 `inconclusive`.
 
@@ -349,6 +371,20 @@ the manager, who may raise the cap, and writes no verdict. A stop after the job 
 - **Gate 3:** the maintainer or the manager has ruled on decision 1 below.
 - **Gate 4:** both plan pages match erratum 1, and the must-fix items of the review of the erratum
   are applied.
+
+**Three guards apply to every job.**
+
+- **Row 1 reads the known-answer tests:** job W2 runs this folder's tests on synthetic arrays
+  before it starts, and a failing test makes the verdict `invalid`. The run log holds the count of
+  tests and the code hash.
+- **A rerun keeps both sets of outputs:** a job moves its earlier outputs into `attempt_<n>/`
+  before it writes new ones, and job W2 or W3 refuses to start when its earlier verdict is anything
+  other than `invalid`, unless an environment variable names the manager's approval.
+- **A pair with no injection scale is counted, not dropped:** a pair whose host has fewer than 200
+  reference rows for the injection level, or whose farm has no capacity, gives no world. Job W0
+  counts such pairs, job W2 writes the name, the reason, and the count of reference rows of every
+  skipped world to the verdict file, and the number of worlds scored is compared with the number
+  planned.
 
 **Three reporting fixes apply to every job.**
 
@@ -370,10 +406,54 @@ placebo against a null distribution (the permutation rule), check the CAMS time 
 defining a cloud class (the audit's first condition), and test closure on dark hours. It departs
 from none.
 
+## Rulings before the run
+
+**The design lead ruled on eleven readings before any run, and none of the rulings changes a
+threshold, a bar, or a verdict word.** The rulings answer the first Opus code review of experiment
+723, which found that the plan page left each reading open. Each reading is marked `RULED` in the
+code. The readings that stay marked `PROVISIONAL` are the ones that the review judged unable to flip
+a verdict, apart from one low-risk case: the missing-value rule of the overcast days.
+
+- **[Design lead] Void arc term:** the arc term is void if any one site's share of hour-ending
+  half-hours on which `u_clear` does not change exceeds 1%. Job W0 writes the share of every site.
+  When the arc term is void, job W2 builds no world and the verdict is `inconclusive`, row 2 (a
+  failed sensor audit).
+- **[Design lead] Placebo population:** the placebo shifts only the fast change `ΔZ̃` by 28 days and
+  keeps the real sensor's index change. The placebo is read on exactly the stretches and pairs of
+  the area, so it has no void state.
+- **[Design lead] Injection level:** the reference rows and the farm scaling are experiment 720's
+  definition. A reference row is a half-hour that starts from 10:00 to 14:00 UTC, from April to
+  September, before 2025-07-01, with a clear-sky index of at least 0.7, and a pair needs at least
+  200 such rows. The injected series is the farm's output as a share of the farm's capacity, times
+  the level, times the host's median absolute signed reading on those rows. The code copies the
+  definition from the folder of experiment 720 (see the Files section).
+- **[Design lead] D15 dead band:** the bar binds only when job 1 classes the farm inside D15's
+  polygon outside every metered Primary and the farm is not an add-back candidate at D15. In every
+  other case the bar is report-only.
+- **[Design lead] Calibration bar:** the bar is void by construction, because the plan page defines
+  no likelihood ratio and nobody defines one after the fact. The code records the bar as void, and
+  the page lists it beside the verdict.
+- **[Design lead] Controls of job W3:** D12's anchor stretches are scored on every day, and D3's
+  post-bounce stretches are scored on days with exactly one post-bounce stretch.
+- **[Design lead] Switching-log times:** a time with no time zone is read as Europe/London. A time
+  that carries a zone is converted to UTC.
+- **[Design lead] False-export bar:** the bar stays pooled over un-injected D5 and D10, as the
+  single count in the decision rule reads, and the count of each host is reported beside it with no
+  bar.
+- **[Design lead] Pairs with no injection scale:** a pair whose injection scale is not finite is
+  logged and counted, and is never dropped without a message.
+- **[Design lead] Timing gate:** the projection covers the whole of job W2, including the second
+  scoring for the unmasked read-out and the bootstraps of the read-outs.
+- **[Design lead] Sensor on hour-ending rows:** the CAMS sensor uses the hourly change of the
+  clear-sky index and of the sky's fast change, and the reading's fast change is summed the same
+  way,
+  because the index of experiment 39's frame is held inside each hour.
+
 ## Decisions for the maintainer or the manager
 
 **Ten decisions belong to the maintainer or the manager, and neither the amendment nor its erratum
-takes any of them.** The design amendment is
+takes any of them. The manager has since decided the count in row 1 and the rule in row 7, and the
+rows that carry no marker stay open.** The design amendment is
 `data/ml-experiments/briefs/msa_architecture/mva_untangling_design_v3_amendment_v2.md`, its Opus
 design review is
 `data/ml-experiments/briefs/msa_architecture/mva_untangling_v3_amendment_review.md`, the ruling on
@@ -387,16 +467,63 @@ of the amendment itself has had no Opus review.
 
 | No. | Decision | Recommendation |
 |---|---|---|
-| 1 | [Maintainer or manager] Whether this experiment runs, as the 20th experiment, in the trimmed form of jobs W0, W2, and W3 | Run it: the maintainer asked for the idea by name, and hourly CAMS cannot test it |
+| 1 | [Maintainer or manager] Whether this experiment runs, as the 20th experiment, in the trimmed form of jobs W0, W2, and W3. **[Decided by the manager]** The count: experiment 723 is the 20th experiment and experiment 724 is the 21st | Run it: the maintainer asked for the idea by name, and hourly CAMS cannot test it |
 | 2 | The stop rule (a test is a statistic with at least one outcome that admits) and the outcome table above, which replace the stop rules of the two earlier rungs in version 2 | Adopt both |
 | 3 | Flaw 1: drop the D15 sign test and its placebo, with no replacement test at D10 | Drop them |
 | 4 | Flaw 2: remove every size bar and keep dark-hour closure as a read-out | Remove the bars |
 | 5 | [Maintainer] Flaw 3: adopt the permutation rule for future generator records only, with the gate of 0.5 retained. A separate question is whether future tests set the detection limit against half the gap, as now, or against the full gap | Adopt the rule. The erratum recommends that the claim decides: a claim of presence against a point null takes the full gap, and a test with an outcome that states a size takes half the gap. No gate changes for a record whose result has been read |
 | 6 | Flaw 4 and the within-day hint: remove the day class and audit conditions 3 and 4, adopt the farm sensor as the binding sensor, and admit metered farms outside the host's polygon as injected farms. The farms' output is a private regressor, and no page shows a farm's series | Adopt, and run job W2 on the farm sensor (option 3 of the amendment's section 6) |
-| 7 | [Maintainer] The form of the daylight hints in the later rung: "one factor at most", or one factor with a latent sky measured by two sensors. Needed only if job W2 is `supported` | "One factor at most". The latent-sky form needs the meter sensor, which is the paused daylight BSP factor under another name, and the meter sensor also holds the child's own flow, so it is not a second independent measurement of the sky |
+| 7 | [Maintainer] The form of the daylight hints in the later rung: "one factor at most", or one factor with a latent sky measured by two sensors. Needed only if job W2 is `supported`. **[Decided by the manager]** "One factor at most" | "One factor at most". The latent-sky form needs the meter sensor, which is the paused daylight BSP factor under another name, and the meter sensor also holds the child's own flow, so it is not a second independent measurement of the sky |
 | 8 | The CAMS 15-minute download of 22 or 154 requests | Decline for now; revisit only if the farm sensor fails its audit |
 | 9 | [Maintainer] Whether the build of the first buildable untangler may follow its known-answer test directly, because the hint rung has no hint to test with the BSP factor off and `a` = 0 | Yes. Version 2 gates the build on a rung that is `supported` or `partly supported`, where `partly supported` means that no hint is kept and the model passes alone, and the known-answer test is that case with an empty list of hints. If this experiment later admits the within-day hint, the rung runs then as a paired contrast |
 | 10 | The switching-log repair: `engine="openpyxl"` in this experiment's own code, with no change to `pyproject.toml` | Adopt the repair |
+
+**Two further points are decided, and four decisions stay open.** The verdict word `not built`
+**[Decided by the manager]** applies to experiment 724 where its job 5 stops, and experiment 723
+never uses it: the verdict words of this page are the six of the decision rule. The four open
+decisions below are shared with experiment 724, and the wording of each follows that page. Where a
+decision belongs to experiment 724's build alone, the line says so and takes no position for this
+experiment.
+
+- **11. The power-factor alternatives [Maintainer; open].** Version 2 allows a reported alternative
+  to the assumed reactive floor. Experiment 723 folds with a reactive floor of 2 points and reads no
+  power-factor alternative.
+    - *Design lead's recommendation:* report the alternatives of experiment 724 (the positive-flow
+      mean under `Q` = 0 and under a power factor of 0.97) as two labelled alternatives with no bar,
+      which changes no threshold. Experiment 723's fold keeps the reactive floor of 2 points.
+    - *Opus reviewer's view:* the code review of this experiment records no position on the
+      power-factor alternatives, and the review of experiment 724 asks only that the page list the
+      two alternatives with no bar. This agrees with the recommendation.
+- **12. The compute cap [Manager; open].** Experiment 723's estimate is under 0.1 core-hours in
+  total, and each job has a cap of 1 core-hour. The cap of 5 core-hours for the series is experiment
+  724's.
+    - *Design lead's recommendation:* the erratum recommends 5 core-hours for the series in place of
+      3, with a cap on each job. Experiment 723 keeps its cap of 1 core-hour for each job.
+    - *Opus reviewer's view:* the code review found that the timing gate projected only part of job
+      W2, because it left out the second scoring of every world for the unmasked read-out and the
+      bootstraps of the read-outs. The gate now projects the whole job, and the review judged a real
+      overrun of the cap of 1 core-hour against an estimate of 0.05 unlikely. This agrees with the
+      recommendation.
+- **13. The rows of the scored worlds [Manager; open].** Experiment 723 scores the later span of 413
+  calendar days, from the first day on which both transformers of 2025 have readings, and not the
+  whole fitted span of experiment 724.
+    - *Design lead's recommendation:* take the erratum's whole-span rows for experiment 724, which
+      change no threshold set before data were read, and keep this experiment's later span.
+    - *Opus reviewer's view:* the review of experiment 724 finds the whole-span scoring "sound" and
+      asks for the span to be defined, which this page does through the later span's day count of
+      413. This agrees with the recommendation.
+- **14. The placebo bar [Manager; open].** Experiment 723's bar is the real sensor's area minus the
+  area of the sensor shifted by 28 days, at least 0.15, with the placebo read on exactly the
+  stretches and pairs of the area.
+    - *Design lead's recommendation:* the erratum states the placebo of experiment 724 as a paired
+      interval above 0 with no size. The recommendation that changes no threshold set before data
+      were read is to keep the sizes that were registered: 0.15 here and 0.1 in experiment 724.
+    - *Opus reviewer's view:* the code review found that the first code read the placebo on
+      different stretches from the area, so that a void placebo gave `not supported`, a state that
+      the page does not have, and recommended the same stretches and no void state. The review of
+      the
+      erratum states that the placebo "is read on the same stretches as the area". This agrees with
+      the recommendation.
 
 **The amendment rejects one suggestion of its review, and this experiment makes no request to
 NGED.** The review recommended asking NGED for signed or reactive readings at D12. The maintainer
@@ -481,6 +608,10 @@ published.
   unit tests on synthetic data, skipped without `--run-studies`.
 - `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/run.sh`: the launch
   wrapper, which runs no job without `--go`.
+- `ml-experiments/00720-msa-mva-to-mw-rung-0-signed-power-from-mva-meters/e00720_rung0b.py`: the
+  definition of the injection level's reference rows and of the farm's scaling (function
+  `build_probe_world`), copied into `e00723_world.py` and not imported, because the function needs
+  experiment 720's panel and fold objects.
 - `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/`: the loaders, the holdout guard, and the
   shared helpers of [experiment 722](../00722-msa-mva-bsp-closure-and-fast-hint/result.md), imported
   and not edited.
