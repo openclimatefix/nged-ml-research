@@ -199,7 +199,7 @@ of 1.75 MW is a model fit and not a visible pattern.
 
 ![Output levels of Gas A](figure_5_gas_a_levels.svg)
 
-**Phase B: known answers.** Figure 6 shows one injected segment. Figure 7 gives the scores pooled
+**Phase B: known answers.** Figure 7 gives the scores pooled
 over the engine record and four synthetic schedules, which are built by resampling the record's
 runs. The intervals are 95%, from resampling schedule-weeks and then segments.
 
@@ -213,8 +213,6 @@ runs. The intervals are 95%, from resampling schedule-weeks and then segments.
 "Folded rule" and "signed rule" are the two ways of subtracting the engine's output from a Primary's
 reading. The folded rule subtracts it from the real power behind the reading and reads the result
 back as apparent power. The signed rule subtracts it from the reading directly.
-
-![Injected example](figure_6_injected_example.svg)
 
 ![Known-answer scores](figure_7_known_answer_scores.svg)
 
