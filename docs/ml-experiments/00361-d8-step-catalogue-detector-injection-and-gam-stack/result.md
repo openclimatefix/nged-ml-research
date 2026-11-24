@@ -115,8 +115,8 @@ found. Each "false alarm" panel shows the earliest detected segment (purple) tha
 injected spell, on 5 July 2024. In these panels, pink marks an injected spell that was also
 detected.
 
-Figure B shows only D2. The figure illustrates the result. It does not test it. The study is interim: a detector that rejects
-ordinary demand swings has not been tried.
+Figure B shows only D2. The figure illustrates the result. It does not test it. The
+study is interim: a detector that rejects ordinary demand swings has not been tried.
 
 D8 is a primary substation (Primary) whose power seems to include a dispatchable generator that
 switches on and off. We asked whether a simple rule can find such steps in D8's power, and whether
