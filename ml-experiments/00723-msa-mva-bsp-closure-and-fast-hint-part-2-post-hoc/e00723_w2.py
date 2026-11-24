@@ -530,7 +530,11 @@ def readouts(
     pairs: pl.DataFrame,
     gate: guard.TimingGate,
 ) -> None:
-    """Run the read-outs after the verdict file: areas by sensor and sub-pool, unmasked statistics, fold ratios, closure slopes, and the two D15 fits."""
+    """Run the read-outs after the verdict file.
+
+    The read-outs are areas by sensor and sub-pool, unmasked statistics, fold ratios, closure
+    slopes, and the two D15 fits.
+    """
     out: list[dict[str, Any]] = []
     inj_farm = score.tagged(scores=scores, sensor="farm", roles=("injected",))
     out.append(

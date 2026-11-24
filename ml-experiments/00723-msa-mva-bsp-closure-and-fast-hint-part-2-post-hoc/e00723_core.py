@@ -262,7 +262,10 @@ def expected_concordance(*, rho: float) -> float:
 
 
 def arc_term_void(*, unchanged_share_by_site: Mapping[str, float]) -> bool:
-    """Return True when the arc term is void: any site's share of hour-ending half-hours with an unchanged `u_clear` exceeds 1%.
+    """Return True when the arc term is void.
+
+    The arc term is void when any site's share of hour-ending half-hours with an unchanged
+    `u_clear` exceeds 1%.
 
     RULED: the share is 0% when `u_clear` is healthy. One site above the share voids the arc term,
     so a broken `u_clear` at one site cannot hide under the others. A site whose share cannot be
@@ -326,7 +329,10 @@ def dead_band_bar(
 
 
 def d15_dead_band_binds(*, farm_class: str | None, is_addback_candidate: bool) -> bool:
-    """Return True when job 1 classes the farm inside D15's polygon outside every metered Primary and the farm is not an add-back candidate at D15.
+    """Return True when the D15 dead-band bar binds.
+
+    The bar binds when job 1 classes the farm inside D15's polygon outside every metered Primary
+    and the farm is not an add-back candidate at D15.
 
     RULED: experiment 722's class `outside_or_added_back` merges an outside generator with an
     added-back one, so the bar binds only when the farm is not also an add-back candidate at D15.
@@ -666,7 +672,9 @@ def fit_a_reading(*, lo: float, hi: float) -> str:
 
 
 def fit_b_supports_addback(*, slope: float, farm_coefficient: float) -> bool:
-    """Return True when fit B's slope on D15's change lies in 0.6 to 1.5 and the farm's megawatt coefficient in -1 to 0.
+    """Return True when fit B supports an add-back.
+
+    The slope on D15's change lies in 0.6 to 1.5 and the farm's megawatt coefficient in -1 to 0.
 
     PROVISIONAL: "falls inside" is read as the point estimates.
     """
@@ -679,5 +687,8 @@ def fit_b_supports_addback(*, slope: float, farm_coefficient: float) -> bool:
 
 
 def meter_blind_contradicts(*, area: float) -> bool:
-    """Return True when the blind meter-sensor area at folded D10 is below 0.5, which contradicts the corrected identity."""
+    """Return True when the blind meter-sensor area at folded D10 is below 0.5.
+
+    That area contradicts the corrected identity.
+    """
     return bool(np.isfinite(area) and area < D10_ABSENT_AREA)

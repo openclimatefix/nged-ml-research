@@ -55,7 +55,10 @@ def control_population(*, table: pl.DataFrame, which: str) -> pl.DataFrame:
 
 
 def control_outcome(*, rows: pl.DataFrame) -> tuple[str, dict[str, int]]:
-    """Return a control's outcome and counts: at most `floor(0.02 * n)` of `n` scorable stretches give export evidence."""
+    """Return a control's outcome and counts.
+
+    The control passes when at most `floor(0.02 * n)` of `n` scorable stretches give export evidence.
+    """
     c = rows["c_farm"].to_numpy() if rows.height else np.array([])
     hits = int((c > core.DEAD_BAND).sum())
     return core.false_export_bar(n_export_evidence=hits, n_scorable_import=rows.height), {
@@ -76,7 +79,10 @@ def one_stretch_days(*, table: pl.DataFrame, month_of_day: np.ndarray) -> pl.Dat
 
 
 def shares_of(*, rows: pl.DataFrame, sensor: str) -> dict[str, float]:
-    """Return the shares of stretches with `C` above +0.25, below -0.25, and in the dead band (a stretch with under 8 usable pairs is in the dead band)."""
+    """Return the shares of stretches with `C` above +0.25, below -0.25, and in the dead band.
+
+    A stretch with under 8 usable pairs is in the dead band.
+    """
     n = rows.height
     ev = [
         core.evidence_of(c=c, n_usable=k)

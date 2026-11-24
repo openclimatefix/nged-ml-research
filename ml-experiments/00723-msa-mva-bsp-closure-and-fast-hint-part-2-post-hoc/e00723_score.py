@@ -105,7 +105,8 @@ class WorldScore:
         table: The stretch table (columns of `world.STRETCH_SCHEMA`).
         counts: R1's counts at each filter stage under the farm sensor.
         diagnostics: R3's diagnostics for each sensor.
-        lag: The lag at which the reading's and the farm sensor's fast changes correlate most on anchor stretches, and that correlation.
+        lag: The lag at which the reading's and the farm sensor's fast changes correlate most on
+            anchor stretches, and that correlation.
         scale: The injection scale (1.0 for an un-injected world).
         seconds: Core-seconds the world took.
     """

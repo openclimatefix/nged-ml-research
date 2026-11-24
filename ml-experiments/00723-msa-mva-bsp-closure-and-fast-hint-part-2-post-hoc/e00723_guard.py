@@ -95,6 +95,12 @@ def archive_outputs(
     counts the existing `attempt_*` folders. Files of `private_names` are moved from `private_dir`
     (default: `out_dir/PRIVATE`) into `attempt_<n>/PRIVATE/`.
 
+    Args:
+        names: The public output files to move.
+        private_names: The output files under the private folder to move.
+        out_dir: The experiment's output folder.
+        private_dir: The private folder (default: `out_dir/PRIVATE`).
+
     Returns:
         The attempt folder, or None when there was nothing to move.
     """

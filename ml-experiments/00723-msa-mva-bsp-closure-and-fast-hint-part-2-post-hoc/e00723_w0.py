@@ -1,5 +1,8 @@
 # ruff: noqa: E501, PERF401, PLR0915
-"""Experiment 723, job W0: which tests can be read, whether the sky sensors agree, and what the switching logs mask.
+"""Experiment 723, job W0: sensor audit, power table, and switching-log mask.
+
+Job W0 asks which tests can be read, whether the sky sensors agree, and what the switching logs
+mask.
 
 Run it only through `run.sh --go e00723_w0.py`, after the Opus code review. Job W0 has no
 hypothesis and no verdict.
@@ -650,7 +653,9 @@ def share_pairs(
 
 
 def sky_share_d12(*, ctx: common.Context, membership: dict[str, list[str]]) -> float:
-    """Return `r^2` of the change of the residual that leaves D12 out with D12's farm sensor change, on lit pairs.
+    """Return `r^2` of the residual that leaves D12 out against D12's farm sensor change.
+
+    The change is read on lit pairs.
 
     Only the squared correlation is returned, never the correlation or a slope, because a squared
     correlation carries no direction. The residual holds no reading of D12.

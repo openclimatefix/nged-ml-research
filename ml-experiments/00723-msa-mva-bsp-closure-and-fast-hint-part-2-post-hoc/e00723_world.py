@@ -145,8 +145,8 @@ def trailing_capacity(
     """Return `c_Z` per day: the 95th percentile of `Z / u_clear` over lit half-hours of the trailing 91 days.
 
     The grid may end part-way through its last day (the master grid does), and the missing
-    half-hours are NaN. PROVISIONAL: "trailing" excludes the day itself, and a day with no earlier lit half-hour gets
-    NaN. The result has one value per day.
+    half-hours are NaN. PROVISIONAL: "trailing" excludes the day itself, and a day with no
+    earlier lit half-hour gets NaN. The result has one value per day.
     """
     with np.errstate(divide="ignore", invalid="ignore"):
         ratio = np.where(lit & np.isfinite(z) & (u_clear > 0), z / u_clear, np.nan)
@@ -197,7 +197,10 @@ class SensorChange:
 
 
 def hourly_sum(*, x: np.ndarray) -> np.ndarray:
-    """Return `x[t] + x[t - 1]`, the change over two half-hours when `x` is a half-hour change (NaN in row 0 and where either is NaN)."""
+    """Return `x[t] + x[t - 1]`, the change over two half-hours when `x` is a half-hour change.
+
+    The result is NaN in row 0 and where either term is NaN.
+    """
     out = np.full(x.shape, np.nan)
     out[1:] = x[1:] + x[:-1]
     return out
@@ -466,7 +469,9 @@ def trailing_overcast_median(
     overcast_row: np.ndarray,
     rows: np.ndarray,
 ) -> np.ndarray:
-    """Return, for each row in `rows`, the median change at the same local half-hour and day type on overcast days.
+    """Return, for each row in `rows`, the median change on overcast days.
+
+    The change is taken at the same local half-hour and day type.
 
     The days are those of ages 2 to 91 before the row. NaN where no such day has a change.
     """
@@ -559,7 +564,9 @@ STRETCH_SCHEMA: Final[dict[str, Any]] = {
 def threshold_diagnostics(
     *, dm: np.ndarray, sensor: SensorChange, masked: np.ndarray
 ) -> dict[str, float]:
-    """Return R3's diagnostics for one sensor: the two thresholds, the pass shares, the 99th percentile, and the largest value.
+    """Return R3's diagnostics for one sensor.
+
+    They are the two thresholds, the pass shares, the 99th percentile, and the largest value.
 
     The shares are over daylight pairs (rows where the reading's fast change and the sensor's
     index change both exist), and each threshold alone and both together. A masked row is excluded.
@@ -596,7 +603,10 @@ def threshold_diagnostics(
 
 
 def usable_pairs(*, dm: np.ndarray, sensor: SensorChange, masked: np.ndarray) -> np.ndarray:
-    """Return True at rows `t` where the pair `t - 1`, `t` is usable under the plan page's rule (`t - 2`, `t` for an hourly sensor)."""
+    """Return True at rows `t` where the pair `t - 1`, `t` is usable under the plan page's rule.
+
+    An hourly sensor uses the pair `t - 2`, `t`.
+    """
     dm, masked = align_reading(dm=dm, masked=masked, sensor=sensor)
     return (
         np.isfinite(dm)

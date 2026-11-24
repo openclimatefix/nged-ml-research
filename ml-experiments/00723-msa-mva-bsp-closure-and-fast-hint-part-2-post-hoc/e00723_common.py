@@ -92,6 +92,7 @@ class Context:
         start_row: First grid row of the later span (the start of the first day with both transformers).
         n_days: Days of the later span.
         inside: The metered generators inside each Primary's polygon, by label.
+        cache: Arrays built on first use, by a key that names the array and its host.
     """
 
     topology: data.Topology
@@ -231,7 +232,7 @@ class SkyStage:
 
 
 def load_sky_stage(*, log: guard.ReadLog, inputs: list[Path]) -> SkyStage:
-    """Read the sources that hold no Primary's reading, so that the sensor audit can run before any reading is read."""
+    """Read the sources that hold no Primary's reading, before the sensor audit."""
     inputs += [data.SITE_MAP_PATH, data.METADATA_PATH, data.HIERARCHY_PATH, data.FRAME39_PATH]
     inputs += [
         data.SITES39_PATH,
