@@ -8,6 +8,8 @@ No metered generator's time series is drawn. D-labels are substations.
 """
 
 import json
+import re
+import sys
 import textwrap
 from pathlib import Path
 from typing import Final
@@ -16,6 +18,9 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from e00199_common import DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -83,16 +88,19 @@ def figure_false_alarms() -> None:
         .mark_rule(strokeDash=[4, 3], color="#555555")
         .encode(x="x:Q")
     )
-    (points + rule).properties(
-        width=520,
-        height=300,
-        title=title(
-            "At night, experiment 196's detector is already quiet at five of six Primaries",
-            "Share of night half-hours flagged as an engine running. Dashed line: the 3% bar. "
-            "D3 to D16 and D8's engine-free history: even months, which the noise fit did not "
-            "use. D8 from 2025: all months.",
+    guard.save_chart(
+        chart=(points + rule).properties(
+            width=520,
+            height=300,
+            title=title(
+                "At night, experiment 196's detector is already quiet at five of six Primaries",
+                "Share of night half-hours flagged as an engine running. Dashed line: the 3% bar. "
+                "D3 to D16 and D8's engine-free history: even months, which the noise fit did not "
+                "use. D8 from 2025: all months.",
+            ),
         ),
-    ).save(OUT_DIR / "figure_1_false_alarms_at_night.svg")
+        path=OUT_DIR / "figure_1_false_alarms_at_night.svg",
+    )
 
 
 def figure_known_answers() -> None:
@@ -135,16 +143,19 @@ def figure_known_answers() -> None:
         .mark_rule(strokeDash=[4, 3], color="#555555")
         .encode(x="x:Q")
     )
-    (bars + dots + rule).properties(
-        width=480,
-        height=220,
-        title=title(
-            "The pre-registered edge test removes about half of the injected engine",
-            "Night half-hours in which G2's recorded output was injected into D8's engine-free "
-            "history (K1 and K2 together). Dot: estimate. Line: 95% interval from resampling whole "
-            "days. Dashed line: the 0.83 recall bar.",
+    guard.save_chart(
+        chart=(bars + dots + rule).properties(
+            width=480,
+            height=220,
+            title=title(
+                "The pre-registered edge test removes about half of the injected engine",
+                "Night half-hours in which G2's recorded output was injected into D8's engine-free "
+                "history (K1 and K2 together). Dot: estimate. Line: 95% interval from resampling whole "
+                "days. Dashed line: the 0.83 recall bar.",
+            ),
         ),
-    ).save(OUT_DIR / "figure_2_known_answers_at_night.svg")
+        path=OUT_DIR / "figure_2_known_answers_at_night.svg",
+    )
 
 
 def figure_edge_shapes() -> None:
@@ -165,23 +176,31 @@ def figure_edge_shapes() -> None:
         "unlabelled D8 clean-history step": "Unlabelled steps, D8 engine-free history",
     }
     frame = table.with_columns(label=pl.col("kind").replace(labels), pct=100 * pl.col("sharp"))
-    alt.Chart(frame).mark_bar(color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
-        y=alt.Y("label:N", sort=list(labels.values()), title=None, axis=alt.Axis(labelLimit=300)),
-        x=alt.X(
-            "pct:Q",
-            title="Edges that are one clean half-hour jump (%)",
-            scale=alt.Scale(domain=[0, 100]),
+    guard.save_chart(
+        chart=alt.Chart(frame)
+        .mark_bar(color=ocf.DATA_BLUE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y(
+                "label:N", sort=list(labels.values()), title=None, axis=alt.Axis(labelLimit=300)
+            ),
+            x=alt.X(
+                "pct:Q",
+                title="Edges that are one clean half-hour jump (%)",
+                scale=alt.Scale(domain=[0, 100]),
+            ),
+        )
+        .properties(
+            width=420,
+            height=200,
+            title=title(
+                "An engine's edges are sharp, but so are most unlabelled steps",
+                "Share of edges of at least 1 MW where one half-hour carries at least 80% of the "
+                "step. Switching transfers move in several half-hours; unlabelled steps in D8's "
+                "engine-free history are mostly sharp too.",
+            ),
         ),
-    ).properties(
-        width=420,
-        height=200,
-        title=title(
-            "An engine's edges are sharp, but so are most unlabelled steps",
-            "Share of edges of at least 1 MW where one half-hour carries at least 80% of the "
-            "step. Switching transfers move in several half-hours; unlabelled steps in D8's "
-            "engine-free history are mostly sharp too.",
-        ),
-    ).save(OUT_DIR / "figure_3_edge_shapes.svg")
+        path=OUT_DIR / "figure_3_edge_shapes.svg",
+    )
 
 
 def figure_step5() -> None:
@@ -218,53 +237,72 @@ def figure_step5() -> None:
         .mark_rule(strokeDash=[4, 3], color="#555555")
         .encode(x="x:Q")
     )
-    (bars + dots + zero).properties(
-        width=480,
-        height=170,
-        title=title(
-            "Flagged days at D5, D10, and D11 do not follow the spark spread; D8's engine does",
-            "Share of days with a positive daily spark spread: flagged days minus unflagged days "
-            "matched on calendar month and weekend (positive: the detector flags more on "
-            "profitable days). Dot: median. Line: 95% interval. Top row: D8 while the engine "
-            "was visible (positive control).",
+    guard.save_chart(
+        chart=(bars + dots + zero).properties(
+            width=480,
+            height=170,
+            title=title(
+                "Flagged days at D5, D10, and D11 do not follow the spark spread; D8's engine does",
+                "Share of days with a positive daily spark spread: flagged days minus unflagged days "
+                "matched on calendar month and weekend (positive: the detector flags more on "
+                "profitable days). Dot: median. Line: 95% interval. Top row: D8 while the engine "
+                "was visible (positive control).",
+            ),
         ),
-    ).save(OUT_DIR / "figure_4_flagged_days_follow_spread.svg")
+        path=OUT_DIR / "figure_4_flagged_days_follow_spread.svg",
+    )
 
 
 def figure_hours() -> None:
     """Share of flagged half-hours by UTC hour."""
     data = json.loads((DATA_DIR / "step5.json").read_text())
     rows = []
+    names: dict[str, str] = {}
     for site, r in data.items():
         prof = r["hour_profile_of_flagged_utc"]
         total = sum(prof)
-        rows += [{"site": site, "hour": h, "share": 100 * c / total} for h, c in enumerate(prof)]
-    alt.Chart(pl.DataFrame(rows)).mark_line(point=True).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("hour:Q", title="Hour of the day (UTC)", axis=alt.Axis(values=[0, 6, 12, 18, 24])),
-        y=alt.Y("share:Q", title="Share of the site's flagged half-hours (%)"),
-        color=alt.Color(
-            "site:N",
-            sort=list(data),
-            scale=alt.Scale(
-                range=[
-                    ocf.BRAND_ORANGE,
-                    ocf.DATA_PURPLE,
-                    ocf.DATA_BLUE,
-                    ocf.DATA_SKY,
-                    ocf.DATA_GREEN,
-                ]
+        # The stored keys carry the dates of each era; the chart names each era without them.
+        label = re.sub(r" \d{4}-\d{2} to \d{4}-\d{2}$", "", site)
+        names[site] = "D8 (later era)" if label == "D8" else label
+        rows += [
+            {"site": names[site], "hour": h, "share": 100 * c / total} for h, c in enumerate(prof)
+        ]
+    guard.save_chart(
+        chart=alt.Chart(pl.DataFrame(rows))
+        .mark_line(point=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "hour:Q", title="Hour of the day (UTC)", axis=alt.Axis(values=[0, 6, 12, 18, 24])
             ),
-            legend=alt.Legend(title=None, orient="top", columns=2, labelLimit=300, symbolLimit=0),
+            y=alt.Y("share:Q", title="Share of the site's flagged half-hours (%)"),
+            color=alt.Color(
+                "site:N",
+                sort=list(names.values()),
+                scale=alt.Scale(
+                    range=[
+                        ocf.BRAND_ORANGE,
+                        ocf.DATA_PURPLE,
+                        ocf.DATA_BLUE,
+                        ocf.DATA_SKY,
+                        ocf.DATA_GREEN,
+                    ]
+                ),
+                legend=alt.Legend(
+                    title=None, orient="top", columns=2, labelLimit=300, symbolLimit=0
+                ),
+            ),
+        )
+        .properties(
+            width=520,
+            height=220,
+            title=title(
+                "D8's engine runs in the evening; the flags at D5 and D10 fall at midday",
+                "Share of each site's flagged half-hours by hour of the UTC day, for all rows "
+                "(experiment 196's detector). A flat line is a few long spells.",
+            ),
         ),
-    ).properties(
-        width=520,
-        height=220,
-        title=title(
-            "D8's engine runs in the evening; the flags at D5 and D10 fall at midday",
-            "Share of each site's flagged half-hours by hour of the UTC day, for all rows "
-            "(experiment 196's detector). A flat line is a few long spells.",
-        ),
-    ).save(OUT_DIR / "figure_5_flagged_hours.svg")
+        path=OUT_DIR / "figure_5_flagged_hours.svg",
+    )
 
 
 def main() -> None:
