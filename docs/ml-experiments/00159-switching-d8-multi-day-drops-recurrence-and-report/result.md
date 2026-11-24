@@ -111,7 +111,7 @@ count of drops and the lack of a detectable weekday or hour pattern), one narrow
 neighbour rate), and one failed (the alarms), so the verdict is `partly supported`. The page is
 descriptive, and the substations are labelled D3, D5, D8, and D14.
 
-![D8 power with every drop shaded](figure_1_history.svg)
+![Histogram of the drops' durations in day bands](figure_1_history.svg)
 
 ![Three shallower drops](figure_2_typical_drops_a.svg)
 
@@ -119,11 +119,7 @@ descriptive, and the substations are labelled D3, D5, D8, and D14.
 
 ![Recurrence of the drops](figure_4_recurrence.svg)
 
-![Depth and duration over time](figure_5_depth.svg)
-
 ![Neighbour step-up at a drop against chance](figure_6_neighbours.svg)
-
-![Unexplained alarms against the drops](figure_7_alarms.svg)
 
 ## Results
 
@@ -189,7 +185,7 @@ descriptive, and the substations are labelled D3, D5, D8, and D14.
 - **Audit triggers:** one of the seven audit triggers in the `ml-experiment` skill fires, because
   the result contradicts the written prediction for the alarms (2 of 28 against at least 20). The
   page tests an explanation. 26 of the 28 alarms fall between August 2023 and September 2024, while
-  18 of the 29 drops start in 2025 or later (figure 7), and 27 of the 28 alarms have a jump (0.644
+  18 of the 29 drops start in 2025 or later, and 27 of the 28 alarms have a jump (0.644
   of all half-hours do). The other six triggers do not apply, because the page has no control, no
   nested arm, no planned contrast, and no earlier experiment on the same rows to compare an interval
   with.
