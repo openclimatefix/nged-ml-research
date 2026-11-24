@@ -62,6 +62,17 @@ def test_a_per_point_label_and_a_power_unit_are_refused():
     assert any("power unit" in found for found in guard.problems(chart=unit))
 
 
+def test_a_per_point_label_after_an_axis_title_ending_in_a_bracket_is_refused():
+    labelled = (
+        _chart(_series())
+        .mark_line()
+        .encode(x=alt.X("index:Q", title="Day"), y=alt.Y("power:Q", title="Output (share)"))
+    )
+    assert any("per-point" in found for found in guard.problems(chart=labelled))
+    minus = '<g aria-label="Output (share): \u22123.5; Day: 4" class="mark"></g>'
+    assert any("per-point" in found for found in guard.svg_problems(svg=minus))
+
+
 def test_an_iso_date_in_a_title_is_refused():
     chart = (
         _chart(_series())
@@ -111,7 +122,7 @@ def test_the_four_figure_paths_are_guarded():
     for folder, name in names:
         assert guard.is_guarded(path=Path(folder) / name)
         assert guard.is_guarded(path=(Path(folder) / name).with_suffix(".png"))
-    assert not guard.is_guarded(path=Path("00194-x") / "figure_1.svg")
+    assert not guard.is_guarded(path=Path("00194-x") / "figure_3.svg")
 
 
 @pytest.mark.parametrize("pattern", SCRIPTS)

@@ -20,10 +20,21 @@ import altair as alt
 
 # (experiment folder prefix, file name) of each figure that once held a generator record.
 GUARDED: Final[tuple[tuple[str, str], ...]] = (
+    ("00194-", "figure_1.svg"),
     ("00194-", "figure_2.svg"),
+    ("00194-", "figure_4.svg"),
+    ("00194-", "figure_5.svg"),
     ("00694-", "figure_6_injected_example.svg"),
     ("00694-", "figure_9_d8_running_share.svg"),
+    ("00694-", "figure_5_gas_a_levels.svg"),
     ("00186-", "figure_3_spread_and_drops.svg"),
+    ("00199-", "figure_5_flagged_hours.svg"),
+    ("00198-", "figure_d8_departure_hours.svg"),
+    ("00159-", "figure_1_history.svg"),
+    ("00291-", "figure_2.svg"),
+    ("00291-", "figure_3.svg"),
+    ("00361-", "figure_3_falls_per_month.svg"),
+    ("00196-", "figure_3_flagged_share_by_month.svg"),
 )
 
 _MONTHS: Final[str] = (
@@ -40,9 +51,10 @@ _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
     "a four-digit year": re.compile(r"\b(?:19|20)\d{2}\b"),
     "a power unit": re.compile(r"\b(?:MW|MVA|kW|kVA|GW)\b"),
 }
-# Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`.
+# Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`. The pattern
+# takes a colon and a space before a digit or a U+2212 minus, whatever ends the axis title.
 _PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(
-    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text))[^"]*\w: -?\d'
+    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text|Subtitle text))[^"]*: [\d\u2212]'
 )
 _AXIS_TEXT: Final[re.Pattern[str]] = re.compile(r">([^<>]+)<")
 

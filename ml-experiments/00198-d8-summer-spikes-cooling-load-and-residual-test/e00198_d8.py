@@ -12,7 +12,9 @@ this is a lab shortcut. Writes `d8_results.json` and figures; prints every quote
 """
 
 import pickle
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Final
 
 import altair as alt
@@ -21,6 +23,9 @@ import numpy as np
 import polars as pl
 from plotting import ocf_theme as ocf
 from scipy.stats import rankdata
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 BREAK: Final[datetime] = datetime(2023, 8, 15)
 BEFORE_FIRST: Final[datetime] = datetime(2022, 6, 1)
@@ -150,8 +155,8 @@ def look(*, frame: pl.DataFrame) -> dict:
         )
         .with_columns(
             period=pl.when(pl.col("t0") < BREAK)
-            .then(pl.lit("before 2023-08-15"))
-            .otherwise(pl.lit("after 2023-08-15"))
+            .then(pl.lit("before the engine connected"))
+            .otherwise(pl.lit("after"))
         )
         .drop_nulls()
     )
@@ -180,14 +185,14 @@ def look(*, frame: pl.DataFrame) -> dict:
             ),
         )
     )
-    chart1.save(common.FIGURE_DIR / "figure_d8_power_vs_temperature.svg")
+    guard.save_chart(chart=chart1, path=common.FIGURE_DIR / "figure_d8_power_vs_temperature.svg")
     binned = (
         summer.filter(pl.col("hour").is_between(12, 18))
         .with_columns(
             temp_bin=(pl.col("temp") // 2 * 2 + 1),
             period=pl.when(pl.col("t") < BREAK)
-            .then(pl.lit("before 2023-08-15"))
-            .otherwise(pl.lit("after 2023-08-15")),
+            .then(pl.lit("before the engine connected"))
+            .otherwise(pl.lit("after")),
         )
         .group_by("temp_bin", "period")
         .agg(pl.col("resid").mean().alias("mean_resid"), pl.len().alias("n"))
@@ -218,12 +223,15 @@ def look(*, frame: pl.DataFrame) -> dict:
             ),
         )
     )
-    (
-        chart2
-        + alt.Chart(alt.InlineData(values=[{"y": 0}]))  # ty: ignore[unresolved-attribute]
-        .mark_rule(color="#888", strokeDash=[4, 3])
-        .encode(y="y:Q")
-    ).save(common.FIGURE_DIR / "figure_d8_residual_vs_temperature.svg")
+    guard.save_chart(
+        chart=(
+            chart2
+            + alt.Chart(alt.InlineData(values=[{"y": 0}]))  # ty: ignore[unresolved-attribute]
+            .mark_rule(color="#888", strokeDash=[4, 3])
+            .encode(y="y:Q")
+        ),
+        path=common.FIGURE_DIR / "figure_d8_residual_vs_temperature.svg",
+    )
     hist = pl.concat(
         [
             ups.with_columns(kind=pl.lit("upward (metered above expected)")),
@@ -237,10 +245,10 @@ def look(*, frame: pl.DataFrame) -> dict:
     )
     chart3 = (
         alt.Chart(alt.Data(values=hist.to_dicts()))  # ty: ignore[unresolved-attribute]
-        .mark_bar()
+        .mark_bar(aria=False)
         .encode(
             x=alt.X("hour_bin:O", title="Hour of day (UTC)", axis=alt.Axis(values=[0, 6, 12, 18])),
-            y=alt.Y("n:Q", title="Half-hours with a departure of 1.5 MW or more"),
+            y=alt.Y("n:Q", title="Half-hours with a large departure from expected power"),
             color=alt.Color(
                 "kind:N",
                 title=None,
@@ -254,12 +262,12 @@ def look(*, frame: pl.DataFrame) -> dict:
             height=220,
             title=alt.TitleParams(
                 "When D8's large summer departures happen",
-                subtitle=["June to September 2022 to 2026."],
+                subtitle=["Summer half-hours, all years pooled."],
                 anchor="start",
             ),
         )
     )
-    chart3.save(common.FIGURE_DIR / "figure_d8_departure_hours.svg")
+    guard.save_chart(chart=chart3, path=common.FIGURE_DIR / "figure_d8_departure_hours.svg")
     return out
 
 

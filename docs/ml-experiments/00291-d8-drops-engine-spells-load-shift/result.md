@@ -144,15 +144,16 @@ load-shift alarms of D8 fall inside the engine's spells.
 *Figure 1. The detector flags at least half of the half-hours in 0.96 of D8's drops, in 0.19 of
 matched placebo windows, and in none of the drops' dates at D5, D10, and D11.*
 
-![Histogram of the drops' depths in units of 1.97 MW](figure_2.svg)
+![Histogram of the drops' depths in units of the engine's recorded step](figure_2.svg)
 
 *Figure 2. The depths spread across 0.6 to 2.7 units, with the most drops between 1.0 and 1.25
 units.*
 
-![D8's monthly flag share and left-tail share, with the drops started](figure_3.svg)
+![D8's flag share, left-tail share, and drops started, pooled before and after the shortfall fades](figure_3.svg)
 
 *Figure 3. D8's shortfall fades from March 2026 and no drop starts, but the detector still flags
-39% to 48% of half-hours.*
+39% to 48% of half-hours. The figure pools the months before and
+after the fade.*
 
 ## Results
 
