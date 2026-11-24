@@ -530,8 +530,8 @@ section 8 of the amendment. The second counter counts tests that use BSP closure
 "no fifth test" rule), and this build reads no BSP meter, so the second counter does not move.
 
 **Experiment 724 counts as an experiment that produces a sign label,** because it writes `p_neg` for
-D12 and reads bars on `p_neg`. Recommended, subject to decision 18: experiment 724 is the 21st if
-experiment 723 is approved and the 20th otherwise, regardless of which runs first. The rule that no
+D12 and reads bars on `p_neg`. The manager has decided (decision 18): through experiment 722 there
+were 19 attempts, experiment 723 is the 20th, and experiment 724 is the 21st. The rule that no
 third experiment on either of the two open ideas starts without the maintainer's recorded approval
 is not affected, because this build tests neither the daylight BSP hint nor the within-day hint.
 
@@ -541,8 +541,8 @@ A failed references bar means the untangler's sign is no better than the PV esti
 ## Decisions for the maintainer or manager
 
 **The amendment lists ten decisions (section 10 of `mva_untangling_design_v3_amendment_v2.md`), and
-the table says how each one bears on this build, with the erratum's recommendation where it gives
-one.** None is taken by this page. The marker names who decides.
+the table says how each one bears on this build.** Where the manager has ruled, the row is marked
+**[Decided by the manager]**. This page takes no other decision, and the marker names who decides.
 
 | No. | Decision (amendment's wording, shortened) | Bears on this build as follows |
 |---|---|---|
@@ -550,27 +550,33 @@ one.** None is taken by this page. The marker names who decides.
 | 2 | The stop rule and the outcome table of section 8 | Directly: this build keeps the single-run rule and the count above, and takes "daylight BSP factor off" as given |
 | 3 | Flaw 1: drop the D15 sign test and its placebo | Not concerned, except that D15 is folded here as report only |
 | 4 | Flaw 2: remove every size bar and keep dark-hour closure as a read-out | Not concerned, because this build reads no BSP meter |
-| 5 | Flaw 3: the rule for future generator records, and half the gap or the full gap for the detection limit | Not concerned, because `K` = 0. **[Maintainer]** Erratum recommendation: the claim decides; a claim of presence against a point null takes the full gap, and a test with an outcome that states a size takes half the gap; no gate changes for a record whose result has been read |
+| 5 | Flaw 3: the rule for future generator records, and half the gap or the full gap for the detection limit | Not concerned, because `K` = 0. **[Decided by the manager]** The claim needs the full gap, and half the gap is reported as a secondary figure. The erratum's recommendation, that the claim decides (a claim of presence against a point null takes the full gap, and a test with an outcome that states a size takes half the gap), is applied to this rule; no gate changes for a record whose result has been read |
 | 6 | Flaw 4 and rung U1: remove the day class, adopt the farm sensor, admit metered farms as injected farms | Concerned only through the injected farms of the V1 worlds, which are farms of experiment 39's frame and are not shown |
-| 7 | The form of the daylight hints in rung U4 | Not concerned: the daylight BSP factor stays off and `a` = 0. **[Maintainer]** Erratum recommendation: "one factor at most", because the latent-sky form needs the meter sensor, which is the paused daylight BSP factor under another name, and the meter sensor holds the child's own flow |
+| 7 | The form of the daylight hints in rung U4 | Not concerned: the daylight BSP factor stays off and `a` = 0. **[Decided by the manager]** The rule "one factor at most" is accepted, because the latent-sky form needs the meter sensor, which is the paused daylight BSP factor under another name, and the meter sensor holds the child's own flow |
 | 8 | The CAMS download (decline for now, or approve 22 requests) | Concerned: this build uses the hourly series, which suffices with `a` = 0, so it proceeds on the "decline" default |
-| 9 | Whether the build may follow its known-answer test directly, without a rung U4 that has no hint to test | **[Maintainer]** Erratum recommendation: yes. Version 2 gates the build on a rung U4 that is `supported` or `partly supported`, where `partly supported` means "no hint is kept and the model passes alone", which is the case of an empty list of hints. The build runs when this experiment reaches row 5 or row 6 of the verdict table, and the label `partly supported` in rows 4 and 5 does not meet version 2's gate for rung U6 |
+| 9 | Whether the build may follow its known-answer test directly, without a rung U4 that has no hint to test | **[Decided by the manager]** Yes: rung U4 is skipped when it has no hint to test. Version 2 gates the build on a rung U4 that is `supported` or `partly supported`, where `partly supported` means "no hint is kept and the model passes alone", which is the case of an empty list of hints. The build runs when this experiment reaches row 5 or row 6 of the verdict table, and the label `partly supported` in rows 4 and 5 does not meet version 2's gate for rung U6 |
 | 10 | The switching-log repair: `engine="openpyxl"` in the experiment's own code, with no change to `pyproject.toml` | Directly: the plan uses the repair to set the `transition` flag |
 
-**Eight further decisions came up while planning.** Those that the erratum rules are marked.
+**Eight further decisions came up while planning.** Each is marked with who decides, or with the
+manager's ruling where one exists.
 
 - **11. Delivery form to NGED [Maintainer].** Version 2 section 10 gives three options (no
   delivery, D12 and the five settled Primaries, or all eight MVA-only Primaries), and recommends
   building the first scope privately and deciding after the known-answer scores.
-- **12. The verdict mapping.** Ruled by erratum section 3.1: the six ordered rows in the decision
-  rule, on the smoothed posterior, with the planner's four additions (a void third, the D5 count
-  floor, the filtered line's bars, and a build status beside the known-answer result) that the
-  Opus review requires. The planner reads a stop inside job 5 as `not built` with the
-  known-answer bars kept on the page, and asks the manager to confirm the front-matter verdict
-  word for that case.
-- **13. The rows of the known-answer worlds [Manager].** Ruled by the erratum, which departs from
-  the rows that addendum 1 registered for V1: every half-hour of the fitted span, with the four
+- **12. The verdict mapping [Decided by the manager].** The six ordered rows in the decision
+  rule, on the smoothed posterior, from erratum section 3.1, with the planner's four additions (a
+  void third, the D5 count floor, the filtered line's bars, and a build status beside the
+  known-answer result) that the Opus review requires. The manager accepted the verdict word
+  `not built` for a stop inside job 5, with the known-answer bars kept on the page.
+- **13. The rows of the known-answer worlds [Manager; open].** The erratum departs from the rows
+  that addendum 1 registered for V1 and scores every half-hour of the fitted span, with the four
   folds of experiment 720's rung 0b as a reported subset.
+    - *Design lead's recommendation:* take the erratum's whole-span rows, which change no threshold
+      set before data were read.
+    - *Opus reviewer's view:* the whole-span scoring "is sound, and the span is never defined"; the
+      reviewer asks for a start date, a rule for the era structure at D12 and D22, and a rule for
+      an injected world whose farm record starts later than the host's, which the page now states
+      in `row_set_id`. This agrees with the recommendation.
 - **14. Publication of D12's signed posterior on dates [Maintainer].** Version 2 allows it subject
   to a check that no single metered farm dominates D12's PV. Job 1 of experiment 722 found none,
   but the plan keeps every dated series private until the maintainer confirms, and keeps every
@@ -578,8 +584,14 @@ one.** None is taken by this page. The marker names who decides.
   the metered farms can expose a unit size.
 - **15. The within-third lobe coverage.** Ruled by the erratum: the bar of 80% to 97% within each
   third binds, and a third under 200 scored half-hours is `void`.
-- **16. The compute cap [Manager].** The erratum recommends 5 core-hours in place of 3, with a cap
-  on each job. The estimate with the mixture arms is about 3.4.
+- **16. The compute cap.** The manager accepted the per-job caps of 2.0 core-hours for job 4b and
+  0.1 core-hours for job 5c **[Decided by the manager]**. The cap of 5 core-hours for the series
+  stays open **[Manager; open]**; the estimate with the mixture arms is about 3.4.
+    - *Design lead's recommendation:* the erratum recommends 5 core-hours in place of 3, with a cap
+      on each job.
+    - *Opus reviewer's view:* "the estimate checks, and the cap equals the pessimistic
+      projection"; the reviewer adds that a gate that stops before job 2 should hand the decision
+      to the manager and write no verdict. This agrees with the recommendation.
 - **17. Contract decisions that belong to a human in the production repository [Maintainer].**
   Production code is not touched here, and the following stay open: which unit label a series
   carries when the observation is in MVA and the series is in signed megawatts, and whether the
@@ -587,14 +599,27 @@ one.** None is taken by this page. The marker names who decides.
   series, and how an inferred sign is marked; how the production metrics score a signed series
   against an unsigned observation, and whether the clamp at zero stays for the eight MVA-only
   Primaries; whether the five-number posterior, a quantile set, or a mean with a flag is the stored
-  form; which effective capacity in megawatts normalises D12; whether a fitted `Q` per Primary may
-  replace the assumed small floor; and whether the page's two power-factor alternatives (`Q` = 0
-  and a power factor of 0.97) belong with the stored series.
-- **18. Whether this build counts toward the number of sign experiments [Maintainer].** The erratum
-  recommends yes (the 21st if experiment 723 is approved, the 20th otherwise), and version 2 leaves
-  rung 0b of experiment 720 unnumbered "on top" of the 18.
-- **19. The placebo bar [Manager].** This page restores addendum 1's size of 0.1, which the erratum
-  omitted without comment, and shifts only the clear-sky index.
+  form; which effective capacity in megawatts normalises D12; and whether a fitted `Q` per Primary
+  may replace the assumed small floor. The power-factor alternatives are the open part of this
+  decision that the manager also weighs.
+    - *Design lead's recommendation on the power-factor alternatives:* report `mu_pos` under `Q` = 0
+      and under a power factor of 0.97 as two labelled alternatives with no bar (erratum section
+      3.5), which changes no threshold.
+    - *Opus reviewer's view:* the review records no position on the power-factor alternatives. It
+      checks the arithmetic of the prior and asks only that the page list the two alternatives
+      with no bar, so it does not disagree with the recommendation.
+- **18. Whether this build counts toward the number of sign experiments [Decided by the
+  manager].** Yes. Through experiment 722 there were 19 attempts, experiment 723 is the 20th, and
+  experiment 724 is the 21st.
+- **19. The placebo bar [Manager; open].** This page restores addendum 1's size of 0.1, which the
+  erratum omitted without comment, and shifts only the clear-sky index.
+    - *Design lead's recommendation:* the erratum states the bar as a paired interval above 0 with
+      no size, and records no reason for dropping addendum 1's size of 0.1. The recommendation that
+      changes no threshold set before data were read is to keep the size of 0.1.
+    - *Opus reviewer's view:* the erratum's bar "is sound in its reasoning and is weaker than a bar
+      already registered"; the reviewer asks that the size of 0.1 from addendum 1 be restored,
+      because "leaving the size out without comment would be a silent weakening". This agrees with
+      the recommendation and disagrees with the erratum's wording.
 
 ## Checks
 
