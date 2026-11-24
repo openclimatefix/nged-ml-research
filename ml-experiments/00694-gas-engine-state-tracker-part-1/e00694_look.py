@@ -4,7 +4,8 @@ r"""Phase A: the data look. Draws D8's reading and its differences in four eras;
     OMP_NUM_THREADS=1 PYTHONPATH=src:ml-experiments/00694-gas-engine-state-tracker-part-1 \
         uv run --no-sync python ml-experiments/00694-*/e00694_look.py
 
-Gas A is drawn only as a histogram of output levels as a fraction of its highest output, with no dates. D8 is a substation.
+Gas A is drawn only as a histogram of output levels, as a fraction of its highest output, with
+no dates. D8 is a substation.
 """
 
 import os

@@ -104,7 +104,8 @@ holds both high-shortfall and low-shortfall months.
 
 ![Shortfall share of D8 and three control substations, pooled over three eras](figure_1.svg)
 
-*Figure 1. D8's shortfall share against D3, D5, and D14, pooled over the eras before the shortfall starts, while it lasts, and after it fades (near zero throughout for D3, D5, and D14).*
+*Figure 1. D8's shortfall share against D3, D5, and D14, pooled over the eras before the
+shortfall starts, while it lasts, and after it fades (near zero throughout for D3, D5, and D14).*
 
 ![Shortfall share of D8 and share of half-hours with a G2 reading, before and after the break](figure_2.svg)
 
