@@ -9,7 +9,7 @@ also_relevant_to:
   - demand-inputs
   - production-reference-and-best-guess
   - retraining-and-training-history
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -34,16 +34,19 @@ prediction: >-
   reads a lasting change and is vetoed on temporary moves.
 decision_rule: >-
   Two counted readings, H1 (arm M* minus the Candidate C) and H2 (M* minus the placebo P), each at
-  the six and the eight Primaries, so four readings, each read at 98.75% (Bonferroni across the
+  the six signed-MW Primaries and the eight MVA-only Primaries, so four readings, each read at
+  98.75% (Bonferroni across the
   four), with 5 seeds per arm and whole origin months as bootstrap blocks. Three guards stand beside
   the interval: a t interval on the 8 monthly differences at 98.75% with 7 degrees of freedom, the
   same sign for each of the 5 seeds, and a point estimate of at least twice the seed-noise standard
-  error (0.034 at the six, 0.090 at the eight). The smallest gain worth porting is tau = 0.05
+  error (0.034 at the six signed-MW Primaries, 0.090 at the eight MVA-only Primaries). The
+  smallest gain worth porting is tau = 0.05
   points of CRPS, set above the protocol's 0.03 because the network replaces the whole network and
   its input pipeline. A group reads, in order: clear loss (lower limit above +tau, all guards),
   loss (lower limit above 0, all guards), gain (upper limit below 0, point estimate at or below
   -tau, all guards), small gain (upper limit below 0 and the seed guard holds for 4 of 5 seeds),
-  no detectable difference (interval inside +-delta, delta 0.06 at the six and 0.16 at the eight),
+  no detectable difference (interval inside +-delta, delta 0.06 at the six signed-MW Primaries and
+  0.16 at the eight MVA-only Primaries),
   cannot tell. The verdict is the first that holds of: refuted (clear loss in either group), not
   supported (loss in either group, or no detectable difference in both), supported (gain in both
   groups, H2's upper limit below 0 in both, and the supported guards hold), partly supported (gain
@@ -52,9 +55,7 @@ decision_rule: >-
   secondary and change no verdict. A not supported or refuted verdict closes the last-14-days
   axial line. The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4),
   so any statement about following level shifts and the era set R1 to R3 is unsupported by a passing
-  known-answer test. The 24 screen fits of M1, M2, and M3 ran under the waived gate on 2026-11-23 and
-  their preliminary scores are interim; arm P, the other four folds, and the later phases are still
-  running or not started.
+  known-answer test.
 benchmark: >-
   The Candidate of experiment 667 (P7+D50): stored forecasts for seeds 0 and 1 of every fold, and
   seeds 2 to 4 refitted into a new output root; and the placebo network P.
@@ -63,18 +64,267 @@ metric: >-
   CRPS (twice the mean pinball loss over 11 quantile levels, in points of capacity) on leads of 24
   h up to but not including 240 h after the 12:00 UTC contract origin, with the normalised mean
   absolute error of the median beside it.
+verdict: small gain
+best_arm: >-
+  `M1`, the axial-attention network with frozen pre-trained encoders. At the six signed-MW Primaries
+  it scores 0.147 points of capacity better than the Candidate (98.75% interval -0.262 to -0.020,
+  5 seeds, 8 folds, 24 to 240 h). At the eight MVA-only Primaries it is not detectably different
+  (+0.022, -0.092 to +0.112).
+headline: >-
+  A network that reads the last 14 days as a grid of days by half-hours, with attention across days
+  and within a day, forecast the six signed-MW Primaries better than the Candidate of experiment 667
+  by 0.147 points of capacity of CRPS (98.75% interval -0.262 to -0.020), and beat a placebo fed
+  random past days by 0.140 (-0.253 to -0.033). At the eight MVA-only Primaries it was not
+  detectably different from the Candidate (+0.022, -0.092 to +0.112), and the positive difference
+  comes from one Primary, D8. The known-answer gate failed and was waived.
+lessons: >-
+  The 14 recent days carry information that random past days do not (H2 at both groups), but a
+  fixed read-out over the 14 same-half-hour readings with no trunk attention (arm `K`) is within
+  0.06 points of the full network, and arms `K` and `E` gain as much as `M1` on lasting steps. The
+  gain is therefore not shown to come from attention. At the eight MVA-only Primaries, one Primary
+  sets the sign of the pooled difference, and the q99 pinball loss is worse than the Candidate's.
+take_home_message: >-
+  A neural network that reads a substation's last 14 days of power, weather, and calendar as a grid
+  forecast the six signed-MW Primaries slightly better than the Candidate (0.147 points of
+  capacity, about 5%), and the gain is not shown to come from the attention layers, because a
+  simpler read-out over the same days does almost as well. At the eight MVA-only Primaries the
+  network was no better, and the one difference it showed comes from one substation, so the network
+  is not shown to help the other seven. The experiment failed its test of whether the network
+  follows a lasting level shift, and the maintainer waived the test, so the era results are
+  descriptive only.
+advice:
+  - >-
+    Score a read-out over the 14 same-half-hour readings with no trunk attention (arm `K`) before
+    crediting attention for a gain from recent days, because `K` was within 0.06 points of the full
+    network (experiment 713, M1 minus K).
+  - >-
+    Read a gain at the eight MVA-only Primaries per Primary before pooling, because one Primary,
+    D8, set the sign of the pooled difference and the leave-one-Primary-out test flipped it
+    (experiment 713, H1 guards).
+  - >-
+    Run the control arms (`K`, `E`, `P`) on the injected lasting-step bank before reading a gain
+    there as evidence for attention, because `K` and `E` gained as much as `M1` (experiment 713,
+    secondary R2).
+  - >-
+    Diagnose a known-answer gate that fails four runs in a row before spending the real folds: the
+    follow share of arm `M` stayed at 0.01 to 0.14 against 0.75 (experiment 713, the gate section).
+  - >-
+    Compare an injected-bank follow share across networks only on the same bank and the same
+    origins: the Candidate's stored experiment 667 injections hold experiment 650's events, not
+    experiment 581's bank (experiment 713, limitations).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**Status: planned. The experiment failed its pre-registered known-answer gate on its fourth run, and
-the maintainer waived the gate on 2026-11-23.** The 24 screen fits (arms `M1`, `M2`, and `M3`, on
-the 4 screen folds, with seeds 0 and 1) then ran under the waived gate on 2026-11-23, and
-preliminary scores exist. The screen is complete for `M1`, `M2`, and `M3`. The placebo arm `P`
-(phase 2), the other four folds, and the later phases are still running or not started. The page
-keeps `status: planned` until it is finished, and the experiment carries no verdict word. The screen
-scores are interim, and the plan text below is the plan as committed. The waiver lets the real folds
-run, and it does not turn the failed gate into a pass. Every statement about the era set R1 to R3 or
-about following level shifts is unsupported by a passing known-answer test. No further amendment to
-the gate is planned.
+**Status: finished. Verdict: small gain at the six signed-MW Primaries, no detectable difference at
+the eight MVA-only Primaries. The pre-registered known-answer gate failed and the maintainer waived
+it, so every statement about following level shifts is unsupported by a passing known-answer test.**
+
+We asked whether a neural network that reads the last 14 days of power, weather, and calendar as a
+grid of days by half-hours, with attention across days and within a day, forecasts the demand of 16
+primary substations better than the Candidate of [experiment
+667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md). We also
+asked whether any gain comes from those 14 recent days, by comparing the network with an identical
+copy whose 14 history days are random past days (the placebo). We scored 8 test months (2025-11 to
+2026-06) at lead times of 24 to 240 hours. Across the six signed-MW Primaries, the network was
+better than the Candidate by 0.147 points of capacity (CRPS, lower is better), with an interval that
+excludes zero at the pre-registered level. Across the eight MVA-only Primaries, it was not
+detectably different from the Candidate. At the eight MVA-only Primaries the network beat the
+placebo, so the recent days carry information there too, but the positive difference from the
+Candidate comes from one Primary, D8, and the network is not shown to help the other seven.
+
+## Verdict
+
+**The verdict is "small gain", read from the scorer's pre-registered rule: a small gain at the six
+signed-MW Primaries and no detectable difference at the eight MVA-only Primaries.** Every number is
+the network `M1` minus the reference in CRPS, in points of capacity, over the 24 to 240 h band, from
+5 seeds and 8 test months, with a 98.75% interval from resampling whole months. The 98.75% level is
+the pre-registered Bonferroni correction across the four counted readings.
+
+| Reading | Group | Difference | 98.75% interval | Reading of the rule |
+|---|---|---|---|---|
+| H1: `M1` minus the Candidate `C` | six signed-MW Primaries | -0.147 | -0.262 to -0.020 | small gain |
+| H1: `M1` minus `C` | eight MVA-only Primaries | +0.022 | -0.092 to +0.112 | no detectable difference |
+| H2: `M1` minus the placebo `P` | six signed-MW Primaries | -0.140 | -0.253 to -0.033 | upper limit below zero |
+| H2: `M1` minus `P` | eight MVA-only Primaries | -0.135 | -0.360 to -0.0001 | upper limit just below zero |
+
+**The absolute scores are close.** From seeds 0 and 1 on all 8 folds, the mean CRPS at the six
+signed-MW Primaries is 3.175 for `C`, 3.030 for `M1`, and 3.178 for `P`. At the eight MVA-only
+Primaries it is 3.694 for `C`, 3.724 for `M1`, and 3.891 for `P`. The pre-registered prediction was
+"not supported or inconclusive", with H1 within ±0.06 at the six signed-MW Primaries and within
+±0.16 at the eight MVA-only Primaries, and H2 at most -0.10. The H1 result at the six signed-MW
+Primaries (-0.147) is outside the predicted range, so the prediction failed for that group. H2 met
+its prediction at both groups: the point estimates (-0.140 and -0.135) are below the -0.10 limit,
+and each interval excludes zero.
+
+**The pre-registered guards agree at the six signed-MW Primaries and fail at the eight MVA-only
+Primaries.** At the six signed-MW Primaries all guards hold: the same sign for each of the 5 seeds,
+the t interval on the 8 monthly differences, the noise floor, the leave-one-Primary-out and
+leave-one-month-out signs, and the q01 and q99 tails. At the eight MVA-only Primaries, leaving out
+one Primary flips the sign of H1, and the q99 pinball loss is worse than the Candidate's by an upper
+bound of 0.071 points against a limit of 0.05.
+
+**At the eight MVA-only Primaries the positive H1 difference comes from one Primary, D8.** Leaving
+D8 out, the pooled difference over the other seven Primaries is about -0.004 points (seeds 0 and 1,
+from the stored per-Primary differences), so `M1` is not shown to help the other seven. D8 is also
+the Primary whose removal flips the sign.
+
+**The secondary era readings R1 to R3 are not backed by a passing known-answer test, and the page
+treats them as descriptive.** Era weighting is by pass, not by event (experiment 709 weights by
+event); the audit found the same point estimates either way. The lasting-change gain on the injected
+bank is not specific to attention: arms `K` (no attention in the trunk) and `E` (a convolution stem)
+gain about as much as `M1` against the Candidate.
+
+## What the results mean
+
+**The 14 recent days carry information that a random past day does not, and attention across days
+adds little beyond a fixed read-out over them.** `M1` beats the placebo at both groups (H2), so the
+history rows matter. Arm `K` has no trunk attention and keeps only the read-out and the head, and
+`M1` minus `K` is -0.058 [-0.114, +0.006] at the six signed-MW Primaries and -0.010 [-0.118, +0.106]
+at the eight MVA-only Primaries (95%, seeds 0 and 1). Arm `A`, which removes only the within-day
+attention, is not worse than `M1` (+0.016 and +0.032, both intervals cover zero). The top row alone
+(`N`) is much worse (`M1` minus `N` is -0.364 and -0.486).
+
+**On the era bank, the Candidate does not follow lasting steps, and four arms beat it by about the
+same amount.** On experiment 709's injected worlds, in the 7 to 28 days after a lasting step begins,
+CRPS minus the Candidate's is -3.23 for `M1`, -3.25 for `E`, and -2.75 for `K` (intervals in the
+table below, by pass). The 709 `none` forecasts equal the stored Candidate to 4.7e-06 on the 4 bank
+folds, so the Candidate is not handicapped. After the step ends, the sign reverses: arms that follow
+their history are worse than the Candidate for 7 days (+1.28 for `M1`).
+
+| Era contrast (CRPS, points of capacity, mean over passes) | 0 to 7 d | 7 to 28 d | switch to end + 7 d |
+|---|---|---|---|
+| `M1` minus `C` | -0.575 [-0.867, -0.283] | -3.23 [-3.741, -2.723] | +1.28 [+1.08, +1.491] |
+| `E` minus `C` | -0.722 [-1.029, -0.414] | -3.25 [-3.745, -2.764] | +1.179 [+0.989, +1.378] |
+| `K` minus `C` | -0.704 [-1.069, -0.344] | -2.753 [-3.163, -2.348] | +0.895 [+0.735, +1.061] |
+| `M1` minus `P` | -0.719 [-0.944, -0.503] | -3.521 [-3.898, -3.146] | +1.167 [+0.954, +1.393] |
+| `E` minus `M1` | -0.146 [-0.247, -0.047] | -0.02 [-0.157, +0.126] | -0.101 [-0.151, -0.053] |
+
+R1, read at D8, is `M1` minus `C` +0.249 [-0.025, +0.582] and `E` minus `M1` -0.091 [-0.228,
++0.036], in the same units.
+
+## Figures
+
+**The per-Primary and per-fold charts split the six signed-MW Primaries from the eight MVA-only
+Primaries.** The charts use seeds 0 and 1, so their dots differ from the 5-seed headline. The
+per-Primary intervals resample the 8 months. The per-fold intervals resample origin days, which
+overlap, so they are too narrow.
+
+![CRPS minus the Candidate's, by Primary](contrast_by_label.svg)
+
+![CRPS minus the Candidate's, by fold](contrast_by_month.svg)
+
+![CRPS by Primary](crps_by_label.svg)
+
+![CRPS by fold](crps_by_month.svg)
+
+**Day-ahead and 14-day forecasts of one winter origin at a signed-MW Primary show the bands widening
+with lead time.**
+
+![Day-ahead forecast, winter, D5](series_day_winter_D5.svg)
+
+![14-day forecast, winter, D5](series_fourteen_winter_D5.svg)
+
+![Day-ahead forecast, summer, D12](series_day_summer_D12.svg)
+
+![14-day forecast, summer, D12](series_fourteen_summer_D12.svg)
+
+**Three logged events at signed-MW Primaries and three at MVA-only Primaries show the forecast of
+the next 24 hours from each origin day against the actual.**
+
+![Logged event at D10](event_six_D10_0.svg)
+
+![Logged event at D14](event_six_D14_1.svg)
+
+![Logged event at D5](event_six_D5_2.svg)
+
+![Logged event at D3](event_eight_D3_3.svg)
+
+![Logged event at D19](event_eight_D19_4.svg)
+
+![Logged event at D4](event_eight_D4_5.svg)
+
+**Injected worlds show the networks and the Candidate on a lasting step and on a temporary move,
+with the onset marked.**
+
+![Lasting step](injected_era.svg)
+
+![Temporary move](injected_switch.svg)
+
+## Checks
+
+- **Median minus mean forecast, per site.** At the 11 Primaries the report script prints (`M1`, seed
+  0), the median sits between 0.33 points of capacity below and 0.20 points above the mean forecast,
+  so no spread shifts the forecast.
+- **CRPS and the error of the median disagree at two contrasts.** `E` minus `M1` at the six
+  signed-MW Primaries is 0.000 in CRPS and -0.009 in normalised median error. `M1` minus `C` at the
+  eight MVA-only Primaries is +0.027 in CRPS and -0.035 in median error: the median is slightly
+  better and the upper tail is worse, which matches the failed q99 guard.
+- **Audit triggers.** Triggers 1 to 5 fired and the Opus audit
+  (`briefs/msa_architecture/audit_713.md`, in the private data folder) found no implementation fault
+  that changes a headline number, a reading, or the verdict. Trigger 1 (a control fails) fired
+  because the known-answer gate was waived after KA3 and KA12 failed. Trigger 2 (a result
+  contradicts its prediction) fired for H1 at the six signed-MW Primaries. Trigger 3 fired at the
+  two contrasts above. Trigger 4 fired at the eight MVA-only Primaries (D8). Trigger 5 fired because
+  `M1` does not beat `A` (+0.016 and +0.032). Triggers 6 and 7 were not computed: trigger 6 needs a
+  by-hand comparison with the interval widths of experiments 667 and 709, and trigger 7 is the
+  maintainer's decision.
+- **No weather look-ahead.** `e00713_weather_lookahead.py` lists, for one origin, the weather source
+  and issue time of every row. The target row uses the ECMWF ensemble run of 00Z issued before the
+  origin, and no history token carries weather valid after the contract origin. The audit found no
+  look-ahead and no power leakage across the cutoff. The history rows use ERA5 and CAMS analyses,
+  and the rows of ages 2 to 5 days could not be built in a live service, which limits the result to
+  a research setting.
+- **Scorer edits after the audit.** Three edits followed the audit (the tail-guard month taken inside
+  each join, the swap-(a) and median-error guard flags compared with the sign of H1 instead of a
+  gain, and the Candidate era reference appended once per pass). The era, swaps, and headline
+  scorers were rerun after an Opus code review: no interval, reading, or verdict changed, and two
+  guard flags at the eight MVA-only Primaries changed (swap (a) keeps the sign of H1, and the
+  median error does not move with CRPS).
+- **Seed reproduction.** The Candidate's seed 0 refitted for 2025-11 reproduces the stored forecast
+  to a maximum absolute difference of 7.4e-05 against a threshold of 1e-3. No other fold was
+  checked.
+
+## Limitations disclosed
+
+- **The known-answer gate failed and was waived.** KA3 failed (the follow share of arm `M` is 0.142
+  against 0.75 needed) and KA12 failed on arm `G`. Every statement about following level shifts, and
+  the era secondary readings R1 to R3, is unsupported by a passing known-answer test.
+- **The Candidate-versus-`M1` comparison of follow shares on experiment 581's injected bank was
+  planned and could not be run.** The Candidate's stored files under experiment 667 hold experiment
+  650's random events, not experiment 581's bank, and `M1` keeps origins before the month start on 6
+  of 8 folds, so the two numbers are not on the same origins. A new inject job that passes
+  experiment 581's bank through the Candidate's saved weights would make the comparison, and is a
+  possible later experiment. `M1`'s own follow share is reported with this caveat: after the filter
+  that drops origins with no ensemble row, 24 to 48 of 160 origins per pass are dropped on the 4
+  folds checked.
+- **Era weighting is by pass, not by event.** Experiment 709 weights by event. The audit found the
+  same point estimates either way.
+- **The design's read-out of the weights alpha before and after an injected permanent change (design
+  section 6.5) is not built.** The attention figures show across-day weights by history slot
+  instead.
+- **Further scorer limitations.** (1) The headline scorer needs about 20 GB of host memory. (2) No
+  normalised median-error or band-width contrast stands beside H1 and H2 at the pre-registered
+  level. (3) Audit triggers 1 and 5 print only in part, and `swaps.json` is not printed by the
+  report script. (4) The hash print of design section 5.3 for the Candidate's seeds 2 to 4 is
+  missing. (5) The 17 to 28 day slice of design section 1.10 is not implemented. (6) The era scorer
+  does not enforce the known-answer check KA11, though KA11 passed for all 4 bank months (maximum
+  difference 0.0). (7) The leave-one-Primary-out and leave-one-month-out tests read "does the sign
+  stay negative", which is the right test for a gain and the wrong label for a loss. (8) Arm `G` is
+  not run.
+- **Seed counts.** Arms `A`, `K`, `N`, and `E` have seeds 0 and 1 only, and their contrasts are at
+  95%. The headline arms `M1`, `P`, and `C` have 5 seeds.
+
+## Lessons
+
+- **Read the history rows with a fixed read-out first.** Arm `K`, a read-out over the 14
+  same-half-hour readings with no trunk attention, is within 0.06 points of `M1` at both groups.
+- **Score changes at the eight MVA-only Primaries per Primary before pooling.** One Primary, D8, set
+  the sign of the pooled difference.
+- **Do not credit attention for a lasting-step gain until the control arms are scored.** `K` and `E`
+  gain as much as `M1` on the era bank.
+- **A known-answer gate that the network cannot pass needs diagnosing before the real folds are
+  spent.** The follow share stayed at 0.01 to 0.14 against 0.75 through four gate runs.
 
 ## The known-answer gate has failed four times
 
@@ -180,7 +430,8 @@ they say nothing about the real folds. The options that follow from them, with t
 **On 2026-11-23 the maintainer decided, in these words: "Go ahead with option 1".** Option 1 of
 `gate_options.md` is to waive KA3 for the real folds and disclose the failure. **The waiver changes
 no threshold.** The gate file `work/known_answers_passed.json` is written by a separate script,
-`e00713_waive_gate.py`, with `waived: true`, the failed checks (KA3 and KA12, with their values at the
+`e00713_waive_gate.py`, with `waived: true`, the failed checks (KA3 and KA12, with their values at
+the
 amended gate, commit 94dfb9652), the passed checks (KA2, KA4, KA5, KA6, and KA10), the decision
 quoted above, the date, the code record, and the sha256 of `e00713_known_answer.py`. The script
 refuses to write the file unless the stored last-run results show exactly KA3 and KA12 failing and
@@ -206,59 +457,6 @@ that ambiguity, and a null H2 therefore does not close the line without this cav
 **Operator caution: a full rerun of `e00713_known_answer.py` deletes the gate file, waived or not.**
 The waiver script must be run again after a rerun, and it refuses when the last-run results are not
 those of the amended gate.
-**The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
-failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
-are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
-and take-home message of this experiment carries that fact.**
-
-**The 24 screen fits ran under the waived gate on 2026-11-23, and the rest of the plan is unrun.**
-The screen fits are arms `M1`, `M2`, and `M3` on the 4 screen folds with seeds 0 and 1, and their
-preliminary scores are interim (see the solar section for the one reading made from them). The
-placebo `P` (phase 2), the other four folds, the Candidate refits, and every counted contrast are
-still running or not started. The text below describes the plan as it was committed, with the
-departures that amendments 1 to 4 added, and a reader should take nothing in the plan below as
-evidence.
-
-## What this experiment asks
-
-**This experiment asks whether a neural network that reads the last 14 days of power as a grid of
-days by half-hours forecasts a Primary substation's demand better than the Candidate demand network,
-and whether any gain comes from the recent days themselves.** A Primary substation is one of 16
-NGED substations whose demand the Candidate forecasts. The Candidate is the demand network of
-[experiment 667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)
-(its recipe is called `P7+D50`). The Candidate
-reads two lags of power (the newest same-half-hour reading and the newest same-weekday reading),
-summaries of the neighbouring substations, and weather. The new network, called MSA after the
-multiple sequence alignment that AlphaFold 2 reads, instead lays out the last 14 days as 14 rows of
-48 half-hours, adds one row for the day being forecast, and lets the half-hours attend to each other
-along both axes ([Jumper et al. (2021)](https://doi.org/10.1038/s41586-021-03819-2) introduced the
-axial attention of AlphaFold 2). We train it with the Candidate's three-stage recipe, and we compare
-it with the Candidate and with a placebo network whose 14 history rows are random past days.
-
-**The maintainer named this experiment on 2026-11-20, and the idea has already failed several
-times in pieces.** The ingredients of the idea have 18 earlier verdicts of `not supported` and 3 of
-`refuted`. Attention or sequence networks over the power history alone have 5 verdicts of `not
-supported` (experiments 334, 421, 428, 471, and 568) and 1 of `refuted` (experiment 632). The brief
-that governs this work says to stop and count before proposing a fourth attempt. The count is
-exceeded, so the experiment runs on the maintainer's decision, with the differences from the failed
-attempts listed under "Why this is not a repeat".
-
-**The honest expectation is a tie with the Candidate.** Experiments 585, 581, and 632 each found
-that more history than a day lag and a week lag added little. A tie, a `not supported`, or a
-`refuted` verdict closes the line of work on the last 14 days with axial attention.
-
-**The history rows read ERA5 and CAMS weather, which the Candidate does not.** ERA5 is the European
-Centre for Medium-Range Weather Forecasts (ECMWF) reanalysis of past weather, and CAMS is the
-Copernicus Atmosphere Monitoring Service's solar estimate. ERA5 arrives about 5 days late, so 4 of
-the 14 history rows could not be built in a live service. The maintainer chose this as an explicit
-lab shortcut. Every comparison with the Candidate is therefore a ceiling for a live forecast, and
-three prediction-only checks bracket the effect.
-
-## Verdict
-
-**There is no verdict yet.** The finished page replaces this section with the verdict word and its
-numbers, after the take-home message.
-
 **The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
 failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
 are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
@@ -331,7 +529,8 @@ group's reading is the first row that holds.** The three guards are the t guard 
 the 8 monthly differences of the seed-averaged forecasts, at 98.75% with 7 degrees of freedom,
 excludes zero on the side the bootstrap interval does), the seed guard (the contrast has the same
 sign for each of the 5 seeds taken alone), and the noise-floor guard (the point estimate is at least
-twice the seed-noise standard error at 5 seeds, 0.034 at the six and 0.090 at the eight).
+twice the seed-noise standard error at 5 seeds, 0.034 at the six signed-MW Primaries and 0.090 at
+the eight MVA-only Primaries).
 
 | Order | Group reading | Condition |
 |---|---|---|
@@ -339,7 +538,7 @@ twice the seed-noise standard error at 5 seeds, 0.034 at the six and 0.090 at th
 | 2 | loss | L > 0, and all three guards hold |
 | 3 | gain | U < 0, D ≤ −τ, and all three guards hold |
 | 4 | small gain | U < 0, and the seed guard holds for at least 4 of the 5 seeds |
-| 5 | no detectable difference | L > −δ and U < +δ, with δ = 0.06 at the six and 0.16 at the eight |
+| 5 | no detectable difference | L > −δ and U < +δ, with δ = 0.06 at the six signed-MW Primaries and 0.16 at the eight MVA-only Primaries |
 | 6 | cannot tell | anything else |
 
 **The smallest gain worth porting is τ = 0.05 points of CRPS.** The protocol's highest tier is 0.03,
@@ -363,7 +562,8 @@ research default, so the threshold belongs to this plan.
 direction but falls under the threshold, or is not secured at the threshold, is `small gain` and
 never `inconclusive`. **Reading 5 uses the detectable difference δ and not τ**, because an interval
 inside ±0.05 is out of reach with 5 seeds and 8 months. The write-up words reading 5 as "a
-difference larger than 0.06 (0.16 at the eight) is ruled out; a gain of 0.05 is not".
+difference larger than 0.06 (0.16 at the eight MVA-only Primaries) is ruled out; a gain of 0.05 is
+not".
 
 **The guards for `supported`** are these four: the sign of H1 holds with each Primary left out in
 turn and with each month left out in turn; the q01 and q99 pinball loss of `M*` is within 0.05 of
@@ -385,10 +585,13 @@ difference larger than δ", never as "no difference larger than τ".
 
 ## Detectable effect
 
-**With 5 seeds per arm, the design can detect a difference from the Candidate of about 0.06 points of
+**With 5 seeds per arm, the design can detect a difference from the Candidate of about 0.06 points
+of
 CRPS at the six signed-MW Primaries and 0.07 to 0.16 at the eight MVA-only Primaries, and no
-smaller.** The two stored seeds of the Candidate alone would resolve only 0.09 at the six and 0.11
-to 0.25 at the eight, which is why the Candidate is refitted for seeds 2 to 4. A gain of the size
+smaller.** The two stored seeds of the Candidate alone would resolve only 0.09 at the six signed-MW
+Primaries and 0.11
+to 0.25 at the eight MVA-only Primaries, which is why the Candidate is refitted for seeds 2 to 4. A
+gain of the size
 that experiments 699, 709, and 711 failed to resolve (0.03 to 0.07) may still end `inconclusive` or
 `small gain` here.
 
@@ -404,16 +607,20 @@ power). It assumes the MSA arm is as noisy as the Candidate.
 | Eight MVA-only | 3.704 | 3.694 | +0.059 | 0.285 (0.136 without 2025-11) | 816,768 |
 | D15 and D18 | 8.106 | 8.002 | +0.127 | 0.974 | 203,040 |
 
-| Seeds per arm | Standard error, six | Standard error, eight | Detectable δ, six | Detectable δ, eight |
+| Seeds per arm | Standard error, six signed-MW Primaries | Standard error, eight MVA-only Primaries | Detectable δ, six signed-MW Primaries | Detectable δ, eight MVA-only Primaries |
 |---|---|---|---|---|
 | 2 | 0.027 | 0.071 (0.034) | 0.094 | 0.25 (0.12) |
 | 5 | 0.017 | 0.045 (0.022) | 0.059 | 0.16 (0.07) |
 
-**One seed of the Candidate failed in fold 2025-11 at the eight** (CRPS 4.19 against 3.43 for the
-other seed), which doubles the eight's seed noise. The stored arm is used as it is. The figures are
+**One seed of the Candidate failed in fold 2025-11 at the eight MVA-only Primaries** (CRPS 4.19
+against 3.43 for the
+other seed), which doubles the eight MVA-only Primaries' seed noise. The stored arm is used as it
+is. The figures are
 lower bounds, because they leave out the month-to-month variation of the true difference, which the
-month-block bootstrap and the t guard add. The decision rule uses δ = 0.06 at the six and 0.16 at
-the eight. Known-answer check KA8 requires the implementer's scorer to reproduce the first table.
+month-block bootstrap and the t guard add. The decision rule uses δ = 0.06 at the six signed-MW
+Primaries and 0.16 at
+the eight MVA-only Primaries. Known-answer check KA8 requires the implementer's scorer to reproduce
+the first table.
 
 ## Screen, and the choice of `M*`
 
@@ -427,11 +634,15 @@ screen folds are 2025-11, 2026-01, 2026-03, and 2026-06, with seeds 0 and 1, for
   cutoff, at lead days 1, 2, 4, 7, 10, and 14), averaged over the 4 screen folds and 2 seeds. An
   arm within 0.005 of the best loses to the simpler arm, in the order `M1`, `M2`, `M3`. The
   selection script reads the fit logs only and runs before any MSA forecast is scored.
+- **Result of the selection.** `M*` is `M1`. The mean stage 3 validation loss is 0.4145 for `M1`,
+  0.4121 for `M2`, and 0.4132 for `M3`, all within 0.005 of the best, so the simplest arm wins. The
+  sanity rule and the stop rule did not fire.
 - **Caveat on the selection.** A later fold's validation days fall inside earlier scored months
   (fold 2026-03 holds out days in 2025-11 to 2026-02). Those days are training-window data of the
   later fold, used as every early-stopping set in the recipe uses them. No scored forecast of any
   arm enters the selection.
-- **Order of work after the selection.** Fit `P` on the screen folds; apply the sanity rule and the
+- **Order of work after the selection.** The fits ran in this order: `P` on the screen folds; apply
+  the sanity rule and the
   stop rule; then fit `M*` on the other four folds (2025-12, 2026-02, 2026-04, 2026-05), `P` on
   those four, `A`, `K`, `N`, and `E` on all 8, seeds 2 to 4 of `M*` and `P`, and arm `G` last if the
   compute plan allows.
@@ -447,634 +658,10 @@ screen folds are 2025-11, 2026-01, 2026-03, and 2026-06, with seeds 0 and 1, for
   section. A change after the screen is labelled post hoc and leaves the pre-registered contrasts
   unchanged.
 
-## Does the MSA approach struggle with unmetered solar forecasting?
-
-**Everything in this section is interim.** It reads the stored forecasts of the four screen folds
-(2025-11, 2026-01, 2026-03, and 2026-06), and no reading in it is one of the four counted readings
-or changes any verdict. The known-answer gate was waived (see the status above), so any statement
-here about following level shifts is unsupported by a passing known-answer test. Every CRPS is in
-points of capacity, from seed-averaged forecasts, on the headline band (leads 24 h to under 240 h
-after the 12:00 UTC origin). "The MSA" below means the mean of the three screen arms `M1`, `M2`, and
-`M3` unless one arm is named. A contrast is the MSA's CRPS minus the Candidate's, so a positive
-contrast means the MSA is worse. The solar block is the half-hours stamped 06:00 to 14:30 UTC
-(period end). The analysis was made by a read-only analyst, who fitted nothing.
-
-**The stored scores do not show the MSA neural network struggling with unmetered solar.** Across the
-14 Primaries, the MSA's solar-block contrast does not grow with a Primary's embedded-PV share in any
-of the four folds. On clear days the MSA does relatively better than on cloudy days in 6 of 8
-fold-and-group cells, with one of the other two cells spanning zero. The one solar-shaped signal is
-the eight MVA-only Primaries in fold 2026-06, where the solar block carries most of the loss. In
-that fold the loss sits on the cloudiest third of days, not the clearest, and the pattern matches a
-forecast median that sits lower than the Candidate's at every hour (hypothesis).
-
-### What the 14-day matrix tells the MSA about solar
-
-**The MSA receives no PV capacity and no PV estimate; the network can learn each Primary's solar
-response only from irradiance columns, solar geometry, a Primary embedding, and the 14 history rows
-of net power.** The inputs are those of design section 2.2, read from `e00713_inputs.py`:
-
-- **History rows (ages 2 to 15 days):** net power over capacity, standardised per Primary and
-  visible only 27 h or more before the contract origin. Each history token also carries 7 weather
-  columns at the token's own half-hour from the dense ERA5-and-CAMS table (shortwave irradiance,
-  longwave irradiance, 2 m temperature, 2 m dew point, surface pressure, precipitation, and 10 m
-  wind speed; experiment 437's docstring says the shortwave column of that table is CAMS). The
-  token adds 12 trailing columns (trailing means of temperature and shortwave over 3 h, 6 h, and
-  24 h, with their short-window changes) and 2 CAMS columns, the mean irradiance and clear-sky
-  ratio of the UTC day before the token's day.
-- **Target row:** the 7 ENS-mean columns and 7 ENS-spread columns of the origin day's 00Z run,
-  the same 14 trailing columns built from that ENS run, and CAMS of the last complete UTC day
-  before the origin.
-- **Every token:** 21 date-time columns, among them the cosine of the solar zenith angle and the
-  sine and cosine of the solar azimuth, and two learned embeddings of the Primary.
-
-**A Primary's PV capacity is therefore implicit in the MSA, as in the Candidate.** The network can
-read the size of a Primary's solar dip from how the history rows' net power fell on the sunny
-history days, which the Candidate cannot do beyond its two power lags. The history rows' weather is
-the lab shortcut of design section 4.2, so the MSA sees the history days' actual sunshine, while
-the Candidate reads ENS weather at its lag times.
-
-### Which Primaries carry the most embedded PV
-
-**D12, D22, D5, and D10 carry the largest unmetered-PV share of the 14 Primaries; D4 and D3 carry
-the smallest.** Two independent estimates rank the Primaries almost identically. The first divides
-the calibrated probe capacity of [experiment
-673](../00673-pv-capacity-for-nged-per-primary-with-register-cross-check/result.md)
-(`00673-*/work/deliverable_table.parquet`, MW of AC output, whole summer 2025) by the Primary's
-capacity in `site_map.csv`. The second is a measurement made for this section: the fall in net
-power, in points of capacity, per 1 kW/m² of CAMS irradiance at the Primary's own point. The fit
-uses half-hours stamped 10:00 to 14:30 UTC on valid dates 1 April to 30 June 2026, with power and
-irradiance both demeaned within each cell of (ISO week, half-hour, weekend flag). The 90% interval
-resamples whole days.
-
-| Primary | Group | Probe capacity over Primary capacity, % (p10 to p90) | Net-power fall per 1 kW/m², points (90% interval) |
-|---|---|---|---|
-| D12 | eight | 160 (154 to 166) | −134 (export folds the reading; see below) |
-| D22 | eight | 61 (57 to 64) | 61 (55 to 68) |
-| D5 | six | 52 (50 to 54) | 48 (41 to 55) |
-| D10 | six | 47 (45 to 49) | 65 (59 to 72) |
-| D2 | eight | 36 (35 to 38) | 53 (49 to 56) |
-| D16 | six | 35 (32 to 37) | 52 (47 to 56) |
-| D9 | six | 34 (31 to 38) | 45 (41 to 49) |
-| D14 | six | 33 (32 to 35) | 44 (40 to 48) |
-| D11 | six | 32 (29 to 35) | 40 (37 to 42) |
-| D19 | eight | 27 (25 to 28) | 43 (39 to 48) |
-| D21 | eight | 26 (23 to 28) | 38 (33 to 43) |
-| D8 | eight | 25 (17 to 35) | 29 (19 to 40) |
-| D3 | eight | 20 (19 to 22) | 28 (25 to 30) |
-| D4 | eight | 10 (9 to 12) | 19 (14 to 23) |
-
-**The two estimates rank the 13 Primaries other than D12 almost identically (Spearman 0.95; 0.56
-with D12).** D12 is the exception because its unmetered PV exceeds its demand at a sunny midday. An
-apparent-power meter then reads the export as a positive flow, so more sunshine raises D12's
-reading and the slope comes out negative. The probe's share of 160% says the same thing. The
-uncertainty that matters is larger than either interval. The probe intervals cover one network's
-seed-and-bootstrap spread for one summer, and the MVA shares assume power factor 1 (experiment 673
-gives the conversion-loss interval). The sunshine slope also absorbs any demand that moves with
-sunshine, such as cooling load. Neither estimate tracks capacity growth through the eight folds.
-
-### Does the solar-hour loss track embedded-PV share?
-
-**The MSA's loss is concentrated in the solar block only at the eight in fold 2026-06; at the six in
-June the loss is spread over the whole day.** Figure 1 draws the contrast by half-hour. The group
-contrasts, solar block against the other hours:
-
-| Fold | Six, solar block | Six, other hours | Eight, solar block | Eight, other hours |
-|---|---|---|---|---|
-| 2025-11 | +0.048 | −0.158 | +0.015 | −0.019 |
-| 2026-01 | −0.129 | −0.158 | −0.109 | −0.051 |
-| 2026-03 | +0.040 | −0.146 | −0.139 | −0.157 |
-| 2026-06 | +0.083 | +0.105 | +0.175 | +0.039 |
-
-**The relative weakness of the solar block moves between groups and folds rather than following
-the season.** The six are relatively worse in the solar block in 2025-11 and 2026-03 (by about 0.2
-points against their other hours), which are the darker folds. The eight are relatively worse in
-the solar block only in June (by 0.136). All three arms show the June pattern at the eight: the
-solar-block contrast is +0.164 (`M1`), +0.186 (`M2`), and +0.175 (`M3`).
-
-![Contrast by half-hour of valid time](solar_contrast_by_half_hour.svg)
-
-**Figure 1. Only fold 2026-06 has an MSA loss, and at the eight that loss peaks in the solar
-block.** At the six the June loss runs through the evening and night as well.
-
-**Across the 14 Primaries, the solar-block contrast has no rank correlation with the probe's PV
-share in any fold.** The Spearman correlation, with a 95% interval from 2,000 resamples of origin
-days and Primaries together:
-
-| Fold | Solar-block contrast | Solar block minus other hours |
-|---|---|---|
-| 2025-11 | −0.19 (−0.78 to +0.47) | −0.09 (−0.66 to +0.56) |
-| 2026-01 | −0.16 (−0.69 to +0.52) | +0.57 (−0.31 to +0.89) |
-| 2026-03 | +0.46 (−0.27 to +0.83) | +0.22 (−0.42 to +0.69) |
-| 2026-06 | +0.10 (−0.54 to +0.72) | +0.13 (−0.54 to +0.71) |
-
-**Fourteen Primaries cannot rule out a moderate correlation, but the point estimates do not
-favour one.** Every interval spans zero and is about 1.2 wide. `M1` alone gives the same picture
-(June: +0.11, −0.50 to +0.75). In June the largest solar-block loss is at D22 (+0.72), the second
-highest share, while D12, the highest, gains (−0.18) and D5, the third highest, is near zero
-(+0.08). Figure 2 draws every Primary and fold. The rank correlation mixes the two groups, whose
-meters and contrasts differ, and each group is too small to correlate alone.
-
-![Solar-block contrast against PV share](solar_contrast_vs_pv_share.svg)
-
-**Figure 2. The solar-block contrast does not grow with embedded-PV share in any fold.** The
-x-axis is logarithmic so that D12 fits.
-
-### Clear days against cloudy days
-
-**In 6 of 8 fold-and-group cells the MSA does relatively better on clear days than on cloudy days
-(a correlation, not a test of cause).** The exceptions are both in fold 2025-11, and the six's
-interval there spans zero. Each valid UTC day of each Primary gets the CAMS clear-sky
-index of its daylight hours (summed irradiance over summed clear-sky irradiance, hours with
-clear-sky irradiance above 50 W/m²). The days are split into thirds within each Primary and fold.
-The table gives the solar-block contrast per third, and the clear third minus the cloudy third with
-a 95% interval from resampling origin days:
-
-| Fold | Group | Cloudy third | Middle third | Clear third | Clear minus cloudy |
-|---|---|---|---|---|---|
-| 2025-11 | six | +0.01 | +0.08 | +0.05 | +0.04 (−0.03 to +0.11) |
-| 2025-11 | eight | −0.18 | +0.01 | +0.23 | +0.41 (+0.23 to +0.59) |
-| 2026-01 | six | +0.03 | +0.36 | −0.89 | −0.92 (−1.34 to −0.57) |
-| 2026-01 | eight | +0.06 | +0.03 | −0.50 | −0.57 (−0.76 to −0.40) |
-| 2026-03 | six | +0.59 | −0.10 | −0.51 | −1.09 (−1.31 to −0.87) |
-| 2026-03 | eight | +0.05 | −0.32 | −0.17 | −0.22 (−0.38 to −0.06) |
-| 2026-06 | six | +0.58 | −0.11 | −0.12 | −0.70 (−0.85 to −0.56) |
-| 2026-06 | eight | +0.41 | −0.10 | +0.25 | −0.16 (−0.28 to −0.04) |
-
-**In June the MSA's largest loss sits on the cloudiest third, where both systems already forecast
-too little net demand and the MSA forecasts even less.** The mean error of the median (median minus
-actual, points of capacity, solar block, June, six) is −5.2 for the Candidate and −6.9 for the MSA
-on the cloudy third, and +3.5 and +2.5 on the clear third. At the eight the same figures are −2.1
-and −3.3, and −0.2 and −0.3. The MSA's median sits about 1 to 2 points lower than the Candidate's in
-every third. A lower median hurts where the Candidate is already too low and helps where the
-Candidate is too high. That uniform shift explains the sign of every June third without any
-solar-specific error (hypothesis: the stored quantiles were not shifted and re-scored to confirm
-it).
-
-**A target day duller than its 14-day history window shows the MSA's largest losses in every fold
-at the six (a correlation).** For each origin, the history-window clear-sky index is the mean over
-the UTC days 2 to 15 days before the origin's date. With the valid days split into thirds of
-(valid-day index minus window index), the six's solar-block contrast on the "duller than the
-window" third is +0.02, +0.41, +0.57, and +0.48 in the four folds, against −0.04, −0.89, −0.46, and
-−0.07 on the "sunnier than the window" third. That ordering is what a network copying the history
-rows' solar dip onto a dull target day would produce (hypothesis). The same ordering also follows
-from the uniform low median above, because the duller-than-window days are mostly the cloudy days.
-
-**The daily correlations are mixed in sign and do not single out sunshine.** Spearman between the
-daily solar-block contrast and the daily clear-sky index, days with at least 200 rows: six +0.06,
-−0.20, −0.63, and −0.56, eight +0.60, −0.34, −0.41, and +0.01 (folds in order). Negative means the
-MSA does relatively better on sunnier days.
-
-### What four folds cannot say
-
-- **Season and month are one variable.** The only summer fold is 2026-06. The other three folds
-  have little solar generation, so "solar-block" there mostly means "daylight demand".
-- **June's sunny spell is confounded with the late-June origins.** The sunshine report finds that
-  valid days 20 to 30 June were the sunniest such span of the 7 Junes in the CAMS record. The
-  findings report finds that the loss sits in forecasts issued from 15 June onward. The two cannot
-  be separated within one month.
-- **One month carries the whole loss.** The four folds give one fold with a loss and three with a
-  gain at both groups.
-- **The noise floor limits what a group number can mean.** `e00713_score.NOISE_FLOOR` is 0.034 at
-  the six and 0.090 at the eight, for a whole-band contrast of seed-averaged forecasts. The June
-  whole-band contrast is outside the floor only at the six (`M1` +0.109); at the eight it equals
-  the floor (+0.090). The solar-block subsets above hold about 37% of the rows, so their seed noise
-  is larger than the floor, and no floor exists for a single Primary.
-- **Neither PV-share estimate is per fold.** Both are summer values, so neither can say whether
-  PV grew between the history window and the target week.
-
-### Should an explicit unmetered-PV arm be added now?
-
-**Answer: no arm now; score the four unscreened folds (2025-12, 2026-02, 2026-04, and 2026-05)
-first, and in the meantime write down a history-row PV arm, not a target-row PV forecast, as the
-first candidate.** The stored scores support the experiment manager's timing: no correlation with PV
-share, no clear-day weakness, and a June loss that a uniform median shift can explain. Folds 2026-04
-and 2026-05 add the two sunniest months available before the holdout, which is the evidence the four
-screen folds lack. The experiment manager's reason needs one correction. The earlier experiments
-that found explicit PV did not help net demand tested a PV forecast for the target period, not a PV
-estimate of the past fed to history rows. Experiment F5 is neither arm: the follow-up queue lists F5
-as a contrast-row solar read-out from the sunniest and dullest rows of 60 to 90 days, and marks F5
-"Expected to fail; run last".
-
-**Earlier experiments found that CAMS explains past net demand well, so a historical PV estimate is
-feasible.** Each of the following uses realised irradiance, not a forecast:
-
-- [Experiment 039](../00039-pv-disaggregation-cams-injection/result.md) (`partly
-  supported`): a demand fit minus one CAMS-driven solar shape recovers 0.854 (95% 0.815 to 0.866)
-  of injected solar-farm capacity.
-- [Experiment 046](../00046-embedded-solar-share-of-primary-forecast-error/result.md) (`refuted`): a
-  correction from realised CAMS sunshine improved the XGBoost best guess by about 1 point (about
-  20% of 4.72) from April to September; the same correction from the ENS sunshine forecast
-  improved it by 0.06.
-- [Experiment 289](../00289-summer-gap-weather-input-discriminator/result.md) (`partly
-  supported`): realised sunshine closes 71% of the GAM's April-to-June gap to BG2.
-- [Experiment 639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md) (`partly
-  supported`): with recorded weather, a neural network given a physics solar curve and a probed
-  capacity beats the free network on sunny middays by 0.75 points.
-- [Experiment
-  661](../00661-pv-ens-time-resolution-shortwave-interpolation-audit-and-bias-adapter/result.md)
-  (`refuted`): the explicit term keeps its gain of about 0.8 points with recorded weather, even when
-  that weather is coarsened to 6-hour windows.
-
-**Explicit PV terms built on forecast weather did not help forecast net demand.**
-
-- [Experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md) (`refuted`): with
-  ENS weather the explicit solar network is worse than the free network on sunny middays by 0.37,
-  0.25, and 0.27 points at days 1 to 2, 3 to 5, and 6 to 10. The page stops the explicit-capacity
-  line.
-- [Experiment 501](../00501-explicit-pv-column-from-the-474-capacity-table/result.md) (`refuted`):
-  an explicit PV column from the experiment 474 capacity table moved sunny-midday CRPS by −0.014
-  (98.33% interval −0.027 to +0.000).
-- [Experiment 416](../00416-mdn-explicit-solar-term-better-powered-follow-up/result.md)
-  (`inconclusive`) and [experiment
-  409](../00409-mdn-solar-term-day-of-year-and-anomaly-known-answer/result.md) (`not supported`): an
-  explicit solar term in the pooled mixture density network did not beat free irradiance.
-- [Experiment 031](../00031-embedded-pv-features-primary-demand/result.md) (`inconclusive`): no
-  PV-capacity feature helped the XGBoost stack.
-- [Experiment 504](../00504-neural-demand-leak-free-recent-cams-irradiance-inputs/result.md) (`not
-  supported`): CAMS irradiance a live service could hold (whole days at least 36 hours old) changed
-  CRPS by +0.010 at the six and +0.006 at the eight. That test fed recent sunshine as a summary
-  input to a network without history rows.
-
-**Candidate arm H-PV: a historical PV estimate in the history rows.** The idea is that the MSA's
-read-out averages the 14 history rows' net power at each half-hour, so a sunny window teaches a
-deep dip and a dull window a shallow one. Giving each history token an estimate of its own
-unmetered PV lets the network separate demand from solar in the past.
-
-- **Inputs:** per history token, PV̂ = capacity × a CAMS-driven yield curve. The capacity is a
-  per-fold, as-of value from the probe tables of experiments
-  [649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md) and 673. The yield
-  curve is the physics solar curve of experiment 639. PV̂ enters as one extra history column, or, in
-  a second variant, history power is grossed up to net power plus PV̂.
-- **Leakage and the 27 h rule:** history power already obeys the 27 h rule. Experiment 504 sets the
-  CAMS cutoff at 21:00 UTC on the second day before the origin's date, so the latest wholly
-  available CAMS day ends 57 hours before the 09:00 UTC native origin. In the matrix, that makes PV̂
-  buildable live for the history rows of ages 4 to 15 and for columns 0 to 24 of age 3. Age 2 and
-  columns 25 to 47 of age 3 are not buildable live. The estimate would also read ERA5 temperature,
-  so a read-out that masks the PV̂ columns is still not buildable live while the history weather is
-  the lab shortcut of design section 4.2. Experiment 673's table rests on probes trained to the
-  2026-06 cutoff, so earlier folds need the as-of capacity of their own cutoff.
-- **Cost:** one fitted arm on the four screen folds with 2 seeds, of the order of 12
-  GPU-process-hours by analogy with F3 and F5 (an estimate, not a measurement).
-- **Stored-score evidence that would support H-PV:** after the eight folds are scored, a positive
-  solar-block contrast on target days duller than their history window, larger in April to June
-  and at higher-share Primaries, beyond what a constant median shift explains.
-
-**Candidate arm T-PV: an explicit PV forecast in the target row.** The target row would carry
-PV̂ from the ENS shortwave forecast and the same capacity.
-
-- **Inputs:** ENS-mean and ENS-spread shortwave of the origin's 00Z run, the same capacity table,
-  and the same yield curve.
-- **Leakage:** none beyond the Candidate's, because the run is issued 9 h before the native
-  origin.
-- **Cost:** as H-PV.
-- **Prior evidence:** against, from experiments 644, 501, 416, and 409, which used the same kind
-  of ENS-driven term.
-- **Stored-score evidence that would support T-PV:** a solar-block loss on clear target days that
-  grows with PV share. The four screen folds show the opposite on clear days.
-
-### Numbers checked against the two source reports
-
-**The numbers above were re-derived from the stored forecasts and match the scorer output to 4
-decimals, except for two labels in the source reports that did not verify.** The analyst re-derived
-the group CRPS of `C`, `M1`, `M2`, and `M3` (all 32 values), the June per-Primary contrasts of `M1`,
-the 3-hour block table, the split of origins at 15 June, the split of valid dates at 20 June, the
-June irradiance and clear-sky table for 2020 to 2026, and the daily Spearman values. The two items
-that did not verify, and that this section does not quote:
-
-- **The eight-Primary solar-hour contrast for 2 to 19 June in the sunshine report** is an unweighted
-  mean of daily values. Weighted by rows, it is +0.081, and the 20-to-30 June value is +0.266.
-- **The "signed median error" and "median absolute error" labels in the findings report** name means
-  of per-row errors, not medians. The pooled median of the signed error is +0.71 for the Candidate
-  and −1.03 for `M1` in June, and the pooled median of the absolute error is 2.97 and 3.09. The
-  direction holds in every fold either way: the median of `M1` sits below the Candidate's.
-
-The bootstrap intervals, drift table, load-transfer table, lead-day rows, the experiment 677 ratios,
-the seed pairs, and the ERA5 cross-check of the two source reports were not checked.
-
-## Why this is not a repeat
-
-| Earlier experiment | What it tested | What differs here |
-|---|---|---|
-| 632 (`refuted`) | A 1-D sequence of 672 tokens: two gated recurrent units and three joint self-attention layers over 7 days of history and 7 days of future, scored on ERA5 only, never trained on ENS | A 2-D matrix with the half-hours of each day aligned; attention split by axis; a read-out that starts as a weighted mean of similar days; the full 3-stage recipe on ENS; a placebo for the history; the Candidate as control |
-| 428 (`not supported`) | A convolution-and-attention encoder over days of raw power, feeding a per-row network, built to stop the forecast following load shifts | The whole forecast day is one row of tokens; history rows carry weather and date-time as well as power, so attention can match days on weather |
-| 568 (`not supported`) | Self-attention over the encoder outputs of one row (tokens are encoders, not times) | Tokens are half-hours of days |
-| 709 (`inconclusive`) | An explicit era signal fed to the Candidate | No era signal is built: the 14 history rows are the only source of era information |
-
-**The overlap with experiment 632 is large.** Experiment 632 also gave history tokens their weather
-and date-time embeddings, also masked the newest 24 h of power, and found that three weeks of
-history did no better than one. The differences that could change the result are the aligned
-across-day attention, the similar-day starting point, and the ENS stages.
-
-## Secondary: the era hypothesis
-
-**The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
-failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
-are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
-and take-home message of this experiment carries that fact.**
-
-**Everything in this section is secondary. No reading here is counted among the four counted
-readings, and no reading here can change the verdict.** Each interval is read at 95%. The set holds
-about ten readings, so one false positive among them is likely, and a secondary result is a pointer
-to a follow-up experiment and no more.
-
-**The era hypothesis (maintainer, 2026-11-20): 14 full days at every half-hour, with attention
-across days, let the neural network recognise the era a Primary is in and calibrate the forecast to
-that era.** An era is a lasting state of a Primary's demand. At D8 the era is set by whether a gas
-generator runs and whether a solar farm's output is present. Experiment 709 fed the Candidate an
-explicit era signal and ended `inconclusive`. Its injected bank showed the trap: the arm that
-lowered CRPS most after injected permanent changes (−2.9 points) raised CRPS by 3.9 points at the
-donor Primary after injected temporary moves, because the arm carried a temporary move forward.
-
-**Two arms serve the hypothesis, both fitted on `M*` with seeds 0 and 1 on all 8 folds.** Arm `E`
-adds a 1-D convolution stem over the 48 half-hours of each history row, to detect rapid changes such
-as the steps of a generator turning on. Arm `G` (optional) adds a small recurrent stem in its place
-and is the first item dropped when the compute plan is tight.
-
-| Id | Rows | Contrasts | Interval |
-|---|---|---|---|
-| R1 | D8 alone, real rows, headline band, 8 folds, seeds 0 and 1 | `E` − `M*`, `E` − `C`, `M*` − `C` (and the same three with `G` when fitted) | Month-block bootstrap at 95%, and the t interval on the 8 monthly differences at 95% with 7 degrees of freedom |
-| R2 | Injected permanent changes (experiment 709's "eras"), scored against the injected power, forecast origins 7 to 28 days after the onset | `M*` − `C`, `M*` − `P`, `E` − `M*`, `E` − `P`; also `E` − `M*` for origins 0 to 7 days after the onset | Percentile bootstrap at 95% that resamples whole passes (a fold month and a pass index) |
-| R3 | Injected temporary moves (experiment 709's "switching events"), at the donor Primary, scored against the power without the move, from the onset to 7 days after the end or the month's end | `M*` − `C`, `E` − `C`, `M*` − `P`, `E` − `M*` | As R2 |
-
-**The injected worlds are experiment 709's stored bank, reused without a new draw.** The bank holds
-16 passes for each of the fold months 2025-11, 2026-01, 2026-04, and 2026-06. Each pass injects two
-permanent changes and two temporary moves on the first day of the scored month, so 64 passes give
-128 events of each kind. The permanent kinds are a level step of −10% of capacity, −25%, and +15%,
-and a solar-shaped reduction with a peak of 25% of capacity. A temporary move is a transfer built
-with the generator of experiment 660, mirrored at an electrical neighbour, reverting after a
-duration drawn from the verified events. D8, D15, and D18 are never hosts.
-
-- **Prediction only.** The onset is the fold's cutoff day, so every fitted state was trained on the
-  real power. The era script loads the stored states of `M*`, `E`, `P`, and `K` (and `G` when
-  fitted), replaces the history power with the injected power, and predicts the host and donor
-  Primaries of each pass. Nothing is refitted.
-- **Reference `C` on the bank** is experiment 709's stored arm `none`, the Candidate without an era
-  signal. The implementer first checks that `none` equals experiment 667's stored Candidate on the
-  real rows of the four months. If the two differ, the bank reference is labelled "experiment 709's
-  `none`" and the difference is printed.
-- **Scoring** copies the slices of experiment 709's event losses: the event's CRPS is the mean over
-  its rows and over seeds 0 and 1, against the injected share for a permanent change and the clean
-  share for a temporary move. All 14 lead days are scored.
-- **Real minus placebo.** Arm `P` reads history rows of ages 16 to 379 days, so for origins up to 15
-  days after the onset no placebo row holds injected power, and `M*` − `P` is the effect of reading
-  the injected days. For origins 16 to 28 days after the onset, at most 12 of the 364 pool days are
-  injected, which the write-up states. A report-only slice, origins 17 to 28 days after the onset,
-  is the slice in which all 14 history rows of `M*` lie after the onset.
-
-**Thresholds, fixed now.** Experiment 709 gives the scale: after injected permanent changes its arm
-`none` scores 10.75, its oracle lowers that by 7.4 points, and its placebo moves by 0.06. At D8 the
-Candidate's stored seeds give a CRPS of 7.18 on the headline band and a seed-noise standard error of
-0.064 for a contrast with 2 seeds per arm.
-
-| Reading | Holds when |
-|---|---|
-| "Reads the era" (R2) | `M*` − `C` ≤ −1.0 and `M*` − `P` ≤ −1.0 at origins 7 to 28 days after the onset, both intervals below zero |
-| "The stem adds after a permanent change" (R2) | `E` − `M*` ≤ −0.30 with the interval below zero, at 0 to 7 days or at 7 to 28 days; both are printed |
-| "Harm after a temporary move" (R3) | Arm − `C` above +0.10, or the interval's upper end above +0.20 |
-| "The stem worsens the harm" (R3) | `E` − `M*` above +0.10 with the interval above zero |
-| "Gain at D8" (R1) | The contrast ≤ −0.25, both intervals below zero, the same sign for seed 0 and seed 1, and the same sign with fold 2026-01 left out |
-| "Loss at D8" (R1) | The contrast ≥ +0.25, both intervals above zero |
-
-**Prediction for the era set, written before any fit:** `M*` reads the era and is vetoed on
-temporary moves, because the similar-day read-out can copy recent levels and no input
-tells the network that a neighbour gained what the donor lost. `E` − `M*` is inside ±0.30 in R2.
-
-**What each outcome says.** If `M*` or `E` reads the era and neither is vetoed on temporary moves,
-the injected evidence supports the hypothesis (unsupported by a passing known-answer test; amendment
-4), and the next step is a confirmation with 5 seeds and new passes. If the same arm is vetoed on
-temporary moves, the network follows any level change (unsupported by a passing known-answer test;
-amendment 4) and does not tell a lasting change from a temporary move; the write-up then prints the
-mean of the two changes, as experiment 709 advises. If neither arm reads the era, the hypothesis is
-not supported as stated. If no reading at D8 passes, the design says nothing about D8, because both
-of D8's register connections fall before 2025-11, so no scored origin sees an era begin there.
-
-**Limits.** D8's scored rows contain no era onset. The injected kinds exclude a generator that
-steps on and off within a day. The bank has four fold months and 2 seeds. A veto on temporary moves
-is a reading on the donor Primary only.
-
-## Known-answer checks and the placebo
-
-**Every threshold below is fixed now.** The check script writes `work/known_answers_passed.json`,
-and the fitting script refuses to run a real fold without that file. The synthetic-world fits call
-the training loop directly and bypass the gate. A failed check fires audit trigger 1.
-
-**The synthetic world keeps the real grid, the real ERA5 weather, and the real calendar of four
-Primaries, and replaces the power with a known function.** In shares of capacity,
-`y(p, t) = 0.5 + 0.02 × max(0, 15.5 − T(p, t)) + w(day type of t, half-hour of t) + shift(p, t) +
-noise`. `T` is the ERA5 2 m temperature in °C. `w` is a fixed table of 8 × 48 values drawn once from
-a uniform distribution on −0.10 to +0.10 (seed 0), keyed on the per-token local day type and the
-local half-hour. The noise is Gaussian with standard deviation 0.01. `shift` is zero in world W0. In
-world W1 each Primary has level steps of +0.30 or −0.30 lasting 10 days, starting at random days
-that cover 10% of the history, in the power and so in the inputs and the targets. The training uses
-stage 1 with at most 400 passes (patience 30) and ERA5 as the target row's weather.
-The 400-pass cap and the patience of 30 are a budget for the known-answer fits only (amendment 3).
-Four Primaries give 5,672 stage-1 samples, so a pass is 23 steps and the cap is 9,200 steps. The
-budget does not change the training budget or the patience of any real fold.
-
-| Check | What must hold | Threshold |
-|---|---|---|
-| KA1, untrained read-out | The median of an untrained neural network equals `base` (the weighted mean of similar days) computed independently in NumPy from the same batch, for `M1`, `E`, and `G` | Maximum absolute difference ≤ 1e-5 |
-| KA2, weather and day-type function | In W0, arm `N` after training has a mean absolute error of the median on held-out origins | ≤ 0.02 of capacity, twice the noise |
-| KA3, real history recovers a shift | In W1, the follow share on target tokens inside a step that began at least 3 days before the origin (the trained median on the W1 inputs, minus the trained median on the same inputs with the shift removed from the history power, divided by the step, averaged over the qualifying tokens) | `M` ≥ 0.75. KA3 tests a learned capability: the network must subtract the history days' weather effect, put its weight on the newest rows, and let the median depend on the lead day. Wiring checks that cannot fail on a correct build: `P` ≤ 0.25, `N` exactly 0 |
-| KA4, no harm from history | In W0, `M` minus `N`, mean absolute error of the median | ≤ +0.005 |
-| KA5, poisoned power | Setting every power reading with grid index above `origin_idx − 48` to 1e6, and in a second run to NaN, in a copy of the arrays leaves every model output unchanged, for 64 samples per fold and every test origin, for every arm with history rows | Bit-identical; and the negative control (cap 0) must change the output or raise |
-| KA6, future weather canary | A target row built from the ENS run of day D + 1 must fail the origin-time assertion | The assertion raises |
-| KA7, row layout | The grid indices and per-token day types of 1,000 random samples equal an independent calendar computation with `datetime` and `zoneinfo`; the masked columns of the age-2 row are exactly 43 to 47 | Exact |
-| KA8, stored Candidate | The scorer reproduces the detectable-effect table and the Candidate's export from the per-seed files | 3 decimals; 1e-4 MW or MVA |
-| KA9, placebo draw | No placebo row is younger than 16 days before the origin, the draw is identical on a second call, and no placebo row repeats inside a sample | Exact |
-| KA10, no recency signal where none exists | In W0, the absolute difference between `M` and `P` in mean absolute error of the median. A leak of target-time information through the history rows would make `M` beat `P` | ≤ 0.005. Evaluated only after KA2 passes |
-| KA11, injected bank | The injected power equals the cleaned power outside the injected hosts and windows; experiment 709's `none` event losses are reproduced | 1e-6 of capacity; 3 decimals |
-| KA12, stem on a step | In W1 with steps that begin at a random half-hour, arm `E` and arm `G` each have a follow share at least that of `M` minus 0.05 | Report the values; a lower value fires audit trigger 1. Evaluated only after KA2 passes |
-
-**KA3 tests a learned capability, not the wiring.** An exact copy of the history under the untrained
-prior follows 0.32 of a step. A read-out that averages raw history power cannot reach 0.75 unless
-the network also subtracts the weather effect of each history day, puts its weight on the newest
-rows, and makes the median depend on the lead day and on the age of the step. In the diagnosis of
-the first gate run, a single coefficient per lead day reached a follow share of 0.571, a median that
-follows fully wherever that coefficient exceeds 0.5 reached 0.827, and a network that also reads the
-age of the step from the history rows can reach 1.0. The threshold of 0.75 is therefore reachable,
-and it stays unchanged.
-
-**In the placebo `P`, the 14 history rows of each sample are 14 different 24-hour blocks of the same
-Primary, drawn uniformly from ages 16 to 379 days before the origin.** Each placebo row keeps the
-12:00 UTC start and carries its own power, its own ERA5 and CAMS weather, its own date-time columns,
-and its own per-token day types, so the row is a true past day. The rows are sorted newest first and
-take the age embedding of their slot (2 to 15), so `P` has the parameters of `M*` exactly. The draw
-is a fixed function of (Primary, origin day, placebo seed 0), the same in training and at
-prediction, and the same for every network seed. H2 therefore measures what the 14 most recent days
-add over 14 random days of the past year. The placebo still knows the Primary's level and daily
-shape from a year of history.
-
-## Leakage statement
-
-**No power reading later than 27 h before the contract origin enters any arm.** The history rows
-read ERA5 and CAMS weather at the token's own time, which is an explicit lab shortcut, and the
-target row reads only ECMWF ensemble (ENS) forecasts from the run issued at or before the forecast
-origin.
-
-| Item | Source | Why no information after the origin reaches the forecast |
-|---|---|---|
-| Target row, weather mean and spread | ENS 00Z run of day D (51 members) | Issued 9 h before the native origin. The existing build asserts only `nwp_init_time ≤ power_fcst_init_time`, so this experiment adds its own assertion on every row: `nwp_init_time ≤ o − 9 h` |
-| Target row, B1 columns | Trailing windows of the same ENS run, and CAMS of the last complete UTC day before the origin | The Candidate's own inputs |
-| Target row, power | None: a learned token | No power enters the target row |
-| Target row, date-time and day type | Calendar and solar geometry | Deterministic |
-| History rows, power, and the stems of `E` and `G` | Cleaned power | Visible only at grid index ≤ `origin_idx − 48` (27 h before the contract origin); asserted on every batch and by KA5 |
-| History rows, weather and B1 | ERA5 and CAMS at the token's own time | Lab shortcut (below) |
-| History rows, date-time and day type | Calendar | Deterministic |
-| Placebo rows | Blocks of ages 16 to 379 days | All before the origin; KA9 |
-| Standardiser, target mean and standard deviation, B1 statistics | The Candidate chain's stored fold statistics | Computed on the fold's training region only |
-| Loaded encoders (`M1`, `M2`) | Pre-training of the Candidate chain | Trained on rows before the fold cutoff |
-| Choice of `M*` | Stage 3 validation loss in the fit logs | Validation days lie before each fold's cutoff |
-| Injected bank | Experiment 709's stored worlds | Prediction only; the same 27 h rule applies to the injected power |
-
-**The lab shortcut on history weather.** The history rows read ERA5 and CAMS, which arrive about 5
-days late, so 4 of the 14 history rows (ages 2 to 5) could not be built in a live service. Rows of
-ages 6 to 15 could. The target row is not affected. H2, H3, and the contrasts among MSA arms are not
-affected either, because every MSA arm reads the same ERA5 history. Every H1 score is a ceiling for
-a live forecast.
-
-**The newest usable power is stamped 09:00 UTC on day D − 1, 27 h before the contract origin.** The
-Candidate's lag code sets the newest visible grid index to the native origin minus 48 half-hours (a
-24 h power cap), and the Candidate's script asserts the cap. The 24-hour block of age 1 therefore
-holds no usable power and is not a row. In the newest history row (age 2), columns 0 to 42 are
-visible and columns 43 to 47 are masked.
-
-### Weather look-ahead check
-
-**No weather value in the target row was issued after the forecast origin, and no history row
-carries a weather value valid after it.** The script `e00713_weather_lookahead.py` prints the
-statement row by row, for one origin and one Primary, from the layout alone and with no power read.
-The output below is for the contract origin 2026-03-10 12:00 UTC (native origin 09:00 UTC), Primary
-D5, lead day 1, generated with `e00713_weather_lookahead.py --origin 2026-03-10 --primary D5
---check-data`. It is saved as
-`data/ml-experiments/briefs/msa_architecture/weather_lookahead_713.txt`.
-
-| Row | Role | Weather source | Issue time or validity against the forecast origin |
-|---|---|---|---|
-| 0 | Target, lead day 1 (valid 2026-03-10 12:00 to 2026-03-11 11:30 UTC) | ECMWF ensemble (ENS) mean and spread of the 00Z run of 2026-03-10; the B1 columns come from trailing windows of the same run and from CAMS of the last complete UTC day before the origin | Run issued 9 h before the native origin and 12 h before the contract origin |
-| 1 to 4 | History, ages 2 to 5 (valid 2026-03-08 12:00 back to 2026-03-05 12:00 UTC, each for 24 h) | ERA5 and CAMS analysis, valid at the token's own time | Valid 1 to 4 days before the origin; could not be built in a live service (lab shortcut) |
-| 5 to 14 | History, ages 6 to 15 (valid 2026-03-04 12:00 back to 2026-02-23 12:00 UTC) | ERA5 and CAMS analysis, valid at the token's own time | Valid 5 to 14 days before the origin; could be built in a live service |
-
-**The newest power reading anywhere in the matrix is stamped 2026-03-09 09:00 UTC, 27 h before the
-contract origin (24 h before the native origin).** In the age-2 row the visible columns are 0 to 42
-and the masked columns are 43 to 47, and rows of ages 3 to 15 are fully visible. The target row
-carries no power at all (the learned masked token). The newest history token is valid 1 day before
-the contract origin, so no history token carries a weather value valid after it.
-
-**The stored run frame passes the data check.** For the native origin 2026-03-10 09:00 UTC, the
-frame `init=2026-03-10.parquet` has a latest `nwp_init_time` of 2026-03-10 00:00 UTC (the
-requirement is at most the native origin minus 9 h) and a `power_fcst_init_time` equal to the native
-origin. The check ran before any score was read.
-
-### Three checks on history weather
-
-**No neural network is refitted for these checks; each one changes an input at prediction and
-reports H1 again.**
-
-- **Swap (a): ENS history weather, B1 kept.** The 7 weather columns of every history token come
-  from the Candidate's expected-input table (the ENS run issued at or before the token's time). The
-  14 B1 columns stay as ERA5 and CAMS give them.
-- **Swap (b): ENS history weather, B1 zeroed.** As swap (a), with the 14 B1 columns of every history
-  token set to zero, which is how the Candidate reads its lag times.
-- **Swap (c): the Candidate with ERA5 at its lag times.** The stored Candidate states predict with
-  the ERA5 table attached in place of the ENS table. The forecasts are written into this
-  experiment's data folder, and nothing in experiment 667's folder is changed.
-
-**The `supported` guard uses swap (a) alone**, because swap (a) changes one input. Swap (b) minus
-swap (a) is the effect of the B1 columns, and swap (c) says how much the Candidate would gain from
-the same shortcut. A neural network trained on one weather source and tested on another is outside
-its training distribution in all three, so a small loss is expected and is reported, not tested. An
-MSA arm trained with ENS history weather is a follow-up.
-
-## Compute
-
-**One fit is one chain of three stages for one arm, one fold, and one seed.** Stage 1 (ERA5 and
-CAMS, 2019-09 to the cutoff, about 19,000 pairs of Primary and origin day per pass) takes 4 to 10
-minutes on the GPU, stage 2 (ENS, the 730 days before the cutoff) 2 to 4 minutes, stage 3 1 to 2
-minutes, and prediction (31 origins × 16 Primaries × 14 lead days) under 1 minute. The estimate
-comes from experiment 632, whose sequence network read 672 tokens per sample at width 64 in 5 to 12
-minutes and 2.3 GB of GPU memory. Axial attention compares 45,360 token pairs per sample and block,
-against 451,584 for joint attention over 672 tokens.
-
-| Phase | Fits | GPU-process-hours |
-|---|---|---|
-| 1. Screen: `M1`, `M2`, `M3` × 4 screen folds × seeds 0 and 1 | 24 | 4.8 |
-| 2. `P` × 4 screen folds × seeds 0 and 1 (before the sanity rule and the stop rule) | 8 | 1.6 |
-| 3. `M*` and `P` × the other 4 folds × seeds 0 and 1 | 16 | 3.2 |
-| 4. `A` × 8 folds × seeds 0 and 1 | 16 | 3.2 |
-| 5. `K` × 8 folds × seeds 0 and 1 (about 6 minutes each) | 16 | 1.6 |
-| 6. `N` × 8 folds × seeds 0 and 1 (about 2 minutes each) | 16 | 0.5 |
-| 7. `E` × 8 folds × seeds 0 and 1 | 16 | 3.2 |
-| 8. The Candidate chain, seeds 2 to 4, 8 folds, into a new root | 8 chains | about 6 |
-| 9. `M*` and `P` × 8 folds × seeds 2 to 4 | 48 | 9.6 |
-| 10. Injected bank of the era set: 64 passes × 2 seeds × `M*`, `E`, `P`, `K`, host and donor Primaries only | 0 | about 2.5 |
-| 11. Swaps (a), (b), and (c), the all-history-masked read-out, experiment 581's bank | 0 | about 1 |
-| 12. Known-answer checks, timing runs, and reruns at the 120-pass cap | about 12 | about 2 |
-| Total without arm `G` | 160 MSA fits and 8 Candidate chains | about 39 |
-| 13. Optional: `G` × 8 folds × seeds 0 and 1, and its bank passes | 16 | about 4.4 |
-
-**Ceiling: 42 GPU-process-hours without arm `G` and 46 with it; the session stops and asks the
-manager before crossing either.** At 3 concurrent processes the plan is about 14 to 16 hours of
-wall-clock time. When the plan is tight, the cuts run in this order: drop arm `G`; then run arm `G`
-or arm `E` on the four bank months only, which keeps R2 and R3 and loses R1; then drop arm `K`'s
-bank passes. Phases 1 to 3, 8, and 9 carry the counted readings and are never cut.
-
-**The slot is slot B: 4 cores, 18 GB of GPU memory, and at most 3 concurrent GPU processes, each
-under `MemoryMax=12G` with 1 thread.** The fourth core runs scoring and checks one at a time. Each
-process runs through a `systemd-run` wrapper copied from experiment 710, with the BLAS and Polars
-thread counts set to 1. The first fit prints its host and GPU peaks, and a GPU peak above 5 GB
-halves the batch for every arm before any further fit. Each job has a fixed seed and writes its
-output atomically, so a job whose output exists is skipped and the result does not depend on the
-schedule. The session checks in with the manager before the first fit and before phase 8.
-
-### What is reused, and what is refitted
-
-- **The Candidate's forecasts for seeds 0 and 1 are reused.** They are the per-seed forecast files
-  of the 8 folds in experiment 667's folder, 16 chains of about 0.25 GPU-hours each, so about 4
-  GPU-hours are saved. The recipe matches: monthly cutoffs, cleaned power, the D15 and D18 cut, the
-  ENS 00Z run, the 24 h lag cap, and no widening. KA8 checks the files against experiment 667's
-  export before use, and the scorer prints each file's modification time and hash.
-- **The Candidate chain is refitted for seeds 2 to 4, into a new output root (approved in principle
-  by the manager).** Experiment 667's chain script hard-codes seeds 0 and 1, and a merged script is
-  never edited, so a copy in this experiment's folder runs seeds 2, 3, and 4 with its output root
-  set to this experiment's data folder and the memory cap at 12 GB. The copy states its source and
-  the lines changed. Nothing under experiment 667's folder is written: the implementer lists the
-  modification times of that folder's chain and fold directories before and after the first chain,
-  and asserts they are unchanged. The first chain also reruns seed 0 of one fold into the new root
-  and compares the forecast with the stored seed 0. A maximum absolute difference above 1e-3 of
-  capacity fires audit trigger 1, because it would show that the copied wrapper does not reproduce
-  the stored recipe. This refit costs about 6 GPU-hours and may run before any MSA fit, because it
-  depends on none.
-- **Other stored inputs are reused:** experiment 581's and experiment 709's injected-bank forecasts
-  of the Candidate, experiment 709's injected worlds, the Candidate's pre-trained encoders and fold
-  statistics, and the extended inputs of experiment 667.
-
-## Checks
-
-**These checks run when the experiment runs; none has run yet.** The finished page lists their
-results here, with the median minus the mean forecast per Primary (the prediction files carry the
-mixture mean), the MAE contrast beside each CRPS
-contrast, and which of the seven audit triggers fired. Audit trigger 5 applies: `N`, `K`, or `A`
-beating `M*`, `P` beating `M*`, or `M*` beating `E` or `G`, is a nested arm beating its container.
-
-**A report-only token diagnostic runs on every fitted network.** For each fitted network, on 256
-real samples of one fold at lead days 1 and 7, `e00713_token_diagnostic.py` records three measures
-in its own file, `work/token_diagnostic/<arm>_<month>_s<seed>.json`. The first is the length of each
-part of a token: weather, date-time, Primary, time of day, lead, ensemble spread, day age, and power.
-The second is how far the forecast moves with history power, split into the part through the
-read-out base and the part through the trunk. The third is the distance between the masked-token
-vector and the vector of a token with the power at its Primary's mean level. The diagnostic changes no
-training, no forecast, and no verdict, and it is declared here before the first fit.
-
-**Reviews, in order:** an Opus design review ran before this plan was committed (triage in the pull
-request). An Opus code review of the layout, model, adapter, batch, training, scoring, and Candidate
-seed scripts follows, before any fit. After the runs come a result review, an audit if a trigger
-fires, the write-up, and a prose review.
-
 ## Method
 
-**This section describes the planned design, so it is written in the future tense where a fact
-depends on a fit.** Every setting is fixed now and none is tuned on the scored folds.
+**Every setting below was fixed before the real folds were scored, and none was tuned on the scored
+folds.**
 
 ### Architecture
 
@@ -1127,10 +714,12 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   other map and neither map would ever train. `β_day` starts at 3.0 for the
   same day type, 1.5 for two different Monday-to-Friday day types and for Sunday with a bank
   holiday, and 0 otherwise. A Monday-morning target token therefore starts with about 50% of the
-  weight on the two Monday mornings, 45% on the eight other working-day mornings, and 5% on the
+  weight on the two Monday mornings, 45% on the eight MVA-only Primaries other working-day mornings,
+  and 5% on the
   four weekend mornings. The read-out query also takes a map `w_lead` (14 → 32, no bias, default
   random initialisation) of the one-hot lead day, added to `W_q h_0` (amendment 2).
-- **The head is the Candidate's mixture.** A network `[h_0 (64), base, s, no_history, one-hot lead day
+- **The head is the Candidate's mixture.** A network `[h_0 (64), base, s, no_history, one-hot lead
+  day
   (14)] → 64 → 9` gives 3 mixture weights, 3 means, and 3 log standard
   deviations, initialised as the Candidate's
   head is (output weights zero, means at −0.5, 0, and +0.5), with `base` added to the 3 means. The
@@ -1187,10 +776,12 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   second departure is 300 warm-up steps before a constant rate, because of the attention layers.
 - **A third departure: the MSA network trains on fewer target rows than the Candidate.** The matrix
   holds the target half-hours from the contract origin (12:00 UTC) to the 672nd half-hour after it.
-  On fold 2026-03 the Candidate's training rows include 37,381 rows before the contract origin (leads
+  On fold 2026-03 the Candidate's training rows include 37,381 rows before the contract origin
+  (leads
   0.5 to 2.5 hours) and 175,925 rows after the 672nd half-hour, and the MSA network never trains on
   them. The 730-day window of stages 2 and 3 is cut by origin day, where the Candidate cuts by valid
-  time, which removes up to 14 origin days for the folds whose window starts after 2024-04-01 (2026-05
+  time, which removes up to 14 origin days for the folds whose window starts after 2024-04-01
+  (2026-05
   and 2026-06). The scored rows are identical, so no scored number depends on this difference, and
   nothing leaks.
 - **A fourth departure, made after two failed gate runs: the lead day has two more paths (amendment
@@ -1230,7 +821,8 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   fourteenth of the target half-hours a pass of the Candidate shows. Every fit logs, per stage, the
   pass at which early stopping fired and whether the cap was hit. A stage that ends at the 60-pass
   cap is rerun from its starting state at 120 passes before any score of that arm is read, and the
-  report lists every rerun. A rerun repeats the 60 passes of the first attempt, so a capped stage costs
+  report lists every rerun. A rerun repeats the 60 passes of the first attempt, so a capped stage
+  costs
   up to 180 passes of GPU time in total, and phase 12 of the compute plan covers those reruns.
   Drawing more lead days per pair is not adopted, because it changes the sample weights within an
   origin.
@@ -1278,20 +870,20 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   standard errors of the monthly mean where a t distribution with 7 degrees of freedom needs 3.3,
   and experiment 710's 99.17% interval excluded zero while a t test on the same monthly differences
   gave p = 0.077. The t guard uses the t quantile directly.
-- **Load shifts.** Because the MSA network reads 14 days of power, the page reports four scenarios
-  (all rows; rows outside events and at least 7 days after one; inside events; the 7 days after an
-  event) for `M*`, `E`, `P`, `K`, `N`, `C`, and the climatology, the share of an injected shift that
-  the median follows on experiment 581's bank beside the Candidate's stored bank forecasts, at least
-  6 event plots across both groups, and the caveat that NGED's logs may miss events. Experiment
-  632's sequence network followed 0.40 of a shift against 0.27 for the lag network, so the
-  expectation is that `M*` follows more than `C`.
-  Every statement about following level shifts carries the waiver sentence (unsupported by a passing
-  known-answer test; amendment 4).
-- **Figures.** A day-ahead forecast and a full 14-day forecast of one origin, winter and summer, at a
-  signed-MW and an MVA-only Primary, for `M*` and `C`; the read-out weights by age and day type for
-  `M*` and `P`, and before and after an injected permanent change; and a training-log table of the
-  mean stopping pass per stage and the count of reruns at the cap.
-- **Anonymisation.** Scores and forecasts are of Primaries. The page may say that a gas generator and
+- **Load shifts.** Because the MSA network reads 14 days of power, the page reports the era set on
+  experiment 709's injected worlds (R1 to R3) for `M*`, `E`, `P`, `K`, and the Candidate, and the
+  follow share of `M*` on experiment 581's bank. The follow share of the Candidate on the same bank
+  and origins was not computed (see the limitations). Real logged-event charts for three Primaries
+  of each group show the lead-day-1 forecast of the Candidate and `M*`. NGED's logs may miss events,
+  so the real-event slices undercount. Every statement about following level shifts carries the
+  waiver sentence (unsupported by a passing known-answer test; amendment 4).
+- **Figures.** A day-ahead forecast and a full 14-day forecast of one origin, winter and summer, at
+  signed-MW Primaries, for `M*`, `E`, and `C`; per-Primary and per-fold charts of CRPS and of CRPS
+  minus the Candidate's, split by Primary group; logged-event charts; and the injected-world charts.
+  The training-log table of mean stopping pass per stage and the count of reruns at the cap is
+  printed by `e00713_report.py`.
+- **Anonymisation.** Scores and forecasts are of Primaries. The page may say that a gas generator
+  and
   a solar farm connect at D8, as experiment 709's page does. It never names either generator and
   never plots or tabulates a metered generator's own time series.
 - **Standing practices followed:** monthly refits, cleaned data, the D15 and D18 cut, saved models,
@@ -1303,75 +895,53 @@ depends on a fit.** Every setting is fixed now and none is tuned on the scored f
   recency-weighted held-out set; this design keeps experiment 667's unweighted selection so that the
   MSA arms and the Candidate share one recipe.
 
-## Risks
-
-- **The matrix may add little over the Candidate's lags**, which already read the newest
-  same-half-hour reading and the newest same-weekday reading, with averages of the gap to a
-  lag-free forecast over 1, 3, and 7 days. The most likely result is a tie.
-- **The design cannot resolve a gain smaller than 0.06 at the six.**
-- **The Candidate has inputs the MSA network lacks** (neighbour summaries and table T), and the MSA
-  network has inputs the Candidate lacks (ERA5 history weather, and 14 days of power against 2
-  lags). H1 cannot separate those from the architecture.
-- **The MSA network may follow load shifts more than the Candidate.** The follow share, the four
-  scenarios, and R3 measure it.
-- **About 129,000 parameters on 16 Primaries.** Stage 2 has about 10,000 (Primary, origin) pairs.
-  Stage 1's long history, dropout, and early stopping are the protections, and `M1` against `M3`
-  shows whether the encoders overfit.
-- **Band width can pass for skill.** The MAE of the median and the mean band width stand beside
-  every CRPS contrast.
-- **The era set is small.** R1 is one Primary. R2 and R3 are four fold months, 2 seeds, and injected
-  events that may not resemble a real era.
-
-## Follow-ups, specified and not run
-
-- **F8: an MSA arm trained with ENS history weather**, so that the contrast with the Candidate is
-  like for like and the arm could run in a live service.
-- **F9: similarity retrieval (arm R) at the same token budget:** the 14 history rows are the 14
-  blocks nearest to the target day among the 90 blocks of ages 2 to 91, with their true ages kept.
-- **F7: an explicit estimate of unmetered solar,** as a candidate follow-up and not a commitment.
-  The first form is a historical PV estimate in the history rows (arm H-PV: each history token
-  carries the capacity times a CAMS-driven yield curve, or the history power is grossed up by that
-  estimate). The second form is an explicit PV forecast in the target row (arm T-PV), which earlier
-  experiments with ENS forecast weather argue against. See the solar section above.
-- **The 28-row layout:** 14 target rows and 14 history rows, 1,344 tokens, in one pass per origin.
-- **Era follow-ups,** if the secondary set points to one: neighbour rows in the matrix, training on
-  injected permanent changes and temporary moves together, and the three folds 2025-04 to 2025-06,
-  in which D8's solar connection of 2025-03-24 falls inside the history.
-
 ## Files
 
-**Planned code, in `ml-experiments/00713-msa-axial-attention-demand-network-part-1/`** (each script
-carries the id as `e00713_`; none exists yet):
+**Code, in `ml-experiments/00713-msa-axial-attention-demand-network-part-1/`** (each script carries
+the id as `e00713_`):
 
 - `e00713_layout.py` is pure index arithmetic: sample to grid indices of the 15 rows, the visibility
   mask, per-token day types, and the placebo draw.
 - `e00713_model.py` holds the network, the axial blocks, the two stems, the read-out, the head, and
   the arm switches.
-- `e00713_inputs.py` adapts the Candidate chain's inputs: cleaned power, fold statistics, dense
-  ERA5 and CAMS arrays, ENS target-row arrays, and the validation split.
-- `e00713_batch.py` assembles batches and runs the per-batch assertions and the poisoned-copy check.
-- `e00713_arms.py`, `e00713_train.py`, `e00713_fit.py`, and `e00713_predict.py` define the arms and
-  run the three stages and the prediction; `e00713_select.py` chooses `M*` from the fit logs.
+- `e00713_inputs.py` adapts the Candidate chain's inputs: cleaned power, fold statistics, dense ERA5
+  and CAMS arrays, ENS target-row arrays, and the validation split.
+- `e00713_batch.py` assembles batches and runs the per-batch assertions and the poisoned-copy check;
+  `e00713_check_batch.py`, `e00713_check_inputs.py`, `e00713_check_layout.py`, and
+  `e00713_check_model.py` are the matching checks.
+- `e00713_arms.py`, `e00713_variants.py`, `e00713_train.py`, `e00713_fit.py`, and
+  `e00713_predict.py` define the arms and run the three stages and the prediction;
+  `e00713_select.py` chooses `M*` from the fit logs.
 - `e00713_bank.py`, `e00713_swap_c.py`, and `e00713_era.py` run the prediction-only read-outs: the
   injected banks, the three weather swaps, and the era set.
-- `e00713_known_answer.py` builds the synthetic world and runs KA1 to KA12.
-- `e00713_token_diagnostic.py` is the report-only token diagnostic described under Checks.
-- `e00713_smoke.py` is a smoke job of one tiny fit (six Primaries, a few passes, its own `smoke/`
-  folder) that exercises a crash, a resume, a rebuilt log, a prediction, and a score before the
-  first real fit.
-- `e00713_score.py` and `e00713_report.py` compute every contrast, interval, and guard, and every
-  number and figure of this page.
+- `e00713_known_answer.py` builds the synthetic world and runs KA1 to KA12; `e00713_waive_gate.py`
+  writes the waiver record; `e00713_token_diagnostic.py` is the report-only token diagnostic.
+- `e00713_smoke.py` is a smoke job of one tiny fit that exercises a crash, a resume, a rebuilt log,
+  a prediction, and a score before the first real fit.
+- `e00713_score.py`, `e00713_protocol.py`, and `e00713_report.py` compute every contrast, interval,
+  and guard, and print the numbers of this page; `e00713_weather_lookahead.py` prints the look-ahead
+  check.
+- `e00713_figures.py` and `e00713_attention.py` draw the figures from stored forecasts and, for
+  attention, from a forward pass of the saved weights.
 - `run.sh` is the memory-capped wrapper, and `chain_seeds.sh` is the copy of experiment 667's chain
   script for seeds 2 to 4.
 
 **Data, never committed, under
 `data/ml-experiments/00713-msa-axial-attention-demand-network-part-1/`:**
 
-- `work/models/<arm>/` will hold the saved state after each stage, and `work/fits/<arm>/` the
-  per-seed forecasts (written by this experiment).
-- `candidate_seeds/` will hold the refitted Candidate chains for seeds 2 to 4 (written by this
+- `work/models/<arm>/` holds the saved state after each stage, and `work/fits/<arm>/` the per-seed
+  forecasts (written by this experiment).
+- `work/logs/<arm>/` holds the per-fit stage logs, including the stopping pass of each stage and the
+  GPU peak.
+- `candidate_seeds/` holds the refitted Candidate chains for seeds 2 to 4 (written by this
   experiment).
-- `predictions/` will hold the immutable predictions, written with the experiment store.
+- `bank713/` and `work/bank581/` hold the prediction-only read-outs on experiment 709's injected
+  worlds and on experiment 581's bank; `swap_c/` holds the swap (c) forecasts.
+- `score/` holds `headline.json`, `report_only.json`, `swaps.json`, `era_r1.json`, `era_r2_r3.json`,
+  `screen.json`, and `candidate.json`.
+- `work/known_answers_passed.json` records the waived gate.
+- Briefs and reviews, in the private `data/ml-experiments/briefs/msa_architecture/`: `design.md`,
+  the code reviews, `run_log_713.md`, and `audit_713.md`.
 
 **Earlier experiments' files read:** the stored Candidate forecasts, pre-trained encoders, fold
 statistics, and extended inputs of [experiment
