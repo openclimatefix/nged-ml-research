@@ -466,14 +466,19 @@ published.
   verdict file, and, after the verdict file, runs the two D15 fits and the read-outs.
 - `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_w3.py`: job W3,
   which runs the two controls and the read-outs only after job W2 is `supported`.
-- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_world.py`: the sensors, the folding and injection, the stretch scoring, and the closure
+- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_world.py`:
+  the sensors, the folding and injection, the stretch scoring, and the closure
   fits, as functions of arrays.
-- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_score.py`: the 32 worlds, the scoring of each world, and the evidence counts.
-- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_guard.py`: the output folders, the anonymisation guard, and the run log with the input
+- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_score.py`:
+  the 32 worlds, the scoring of each world, and the evidence counts.
+- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_guard.py`:
+  the output folders, the anonymisation guard, and the run log with the input
   fingerprints.
-- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_common.py`: the launch check, the refusal of a job whose earlier job has not passed, and
+- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/e00723_common.py`:
+  the launch check, the refusal of a job whose earlier job has not passed, and
   the loading of the sensors and readings.
-- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/tests/`: unit tests on synthetic data, skipped without `--run-studies`.
+- `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/tests/`:
+  unit tests on synthetic data, skipped without `--run-studies`.
 - `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/run.sh`: the launch
   wrapper, which runs no job without `--go`.
 - `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/`: the loaders, the holdout guard, and the
