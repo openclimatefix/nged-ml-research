@@ -6,6 +6,7 @@ beside the write-up. Run: `uv run --no-sync python e00722_figure.py <output.svg>
 """
 
 import sys
+import textwrap
 from pathlib import Path
 from typing import Final
 
@@ -24,14 +25,14 @@ PANELS: Final[tuple[tuple[str, str, float, float, str], ...]] = (
     ),
     (
         "2",
-        "Condition 2: share of clear days with a large change, at each of 6 farms",
+        "Condition 2: share of clear days with at least four large changes in farm output, at each of six farms",
         0.0,
         0.05,
         "Pass if at most 0.05",
     ),
     (
         "1",
-        "Condition 1: share of days that are clear, at each of 6 farms",
+        "Condition 1: share of intermittent days with at least four large changes in farm output, at each of six farms",
         0.7,
         1.0,
         "Pass if at least 0.7",
@@ -59,7 +60,7 @@ def build(*, audit: pl.DataFrame) -> alt.VConcatChart:
         The vertically stacked chart.
     """
     panels = []
-    for condition, title, low, high, key in PANELS:
+    for condition, title, low, high, key in sorted(PANELS):
         rows = (
             audit.filter(pl.col("condition").cast(pl.String) == condition)
             .filter(pl.col("scope") == "all_sites" if condition == "4" else pl.lit(True))
@@ -90,7 +91,7 @@ def build(*, audit: pl.DataFrame) -> alt.VConcatChart:
                     scale=alt.Scale(
                         domain=["passes", "fails"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]
                     ),
-                    legend=alt.Legend(title=None, orient="top") if condition == "3" else None,
+                    legend=alt.Legend(title=None, orient="top") if condition == "1" else None,
                 ),
             )
         )
@@ -99,13 +100,13 @@ def build(*, audit: pl.DataFrame) -> alt.VConcatChart:
                 width=WIDTH_PX - 40,
                 height=50,
                 title=alt.TitleParams(
-                    f"{title}. Grey: {key.lower()}.", fontSize=12, anchor="start"
+                    textwrap.wrap(f"{title}. Grey: {key.lower()}.", 95), fontSize=12, anchor="start"
                 ),
             )
         )
     return alt.vconcat(*panels).properties(
         title=alt.TitleParams(
-            "Every condition of the cloud-class audit fails at the sites tested, except the clear-day share",
+            "The cloud-class audit fails conditions 2, 3, and 4 and passes condition 1",
             fontSize=13,
             anchor="start",
         )
