@@ -388,7 +388,10 @@ A follow-on experiment with restated rules is proposed, and it would be labelled
 - `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/e00722_sky.py`, `e00722_data.py`,
   `e00722_d8core.py`, `e00722_guard.py`, `e00722_common.py`, and `e00722_testkit.py`: the cloud
   class and audit, the loaders, the D8 era handling, the holdout guard and output paths, the shared
-  helpers, and the synthetic-array helpers of the tests in `tests/studies/bsp_closure_722/`.
+  helpers, and the synthetic-array helpers of the tests.
+- `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/tests/`: `conftest.py` and six `test_*.py`
+  files (79 tests on synthetic arrays, no real data and no `torch`), which run only with
+  `uv run --no-sync pytest ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint --run-studies`.
 - `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/e00722_figure.py`: draws `figure_1.svg`
   from the class-audit table.
 - `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/run.sh`: the launch wrapper, which runs no
