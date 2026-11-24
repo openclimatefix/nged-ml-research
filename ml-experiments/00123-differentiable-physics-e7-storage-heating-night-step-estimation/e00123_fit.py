@@ -171,8 +171,7 @@ def fit_one(
 
 
 def result_row(*, label: str, info: common.SeriesInfo, result: estimate.SeriesResult) -> dict:
-    """Return one table row for a fit, with the step also in MW."""
-    scale = info.effective_capacity_mw / 100.0
+    """Return one table row for a fit, with the step in points."""
     return {
         "site": info.site,
         "winter_set": label,
@@ -189,7 +188,6 @@ def result_row(*, label: str, info: common.SeriesInfo, result: estimate.SeriesRe
         "step_low": result.step.low,
         "step_high": result.step.high,
         "step_sd": result.step.sd,
-        "step_mw": result.step.value * scale,
         "detectable_interval": result.step.low > 0.0,
     }
 

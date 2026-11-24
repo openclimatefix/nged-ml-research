@@ -148,18 +148,18 @@ it.** The evolving night step (NS-UT) is worse than the fixed one.
 **B0-K gets 15 to 45% of the observed step; NS-U-K and NS-HW-K get most of it.** The table gives,
 over cold winter weekday nights (22:00 to 08:00, daily mean temperature below 8 C, 55 to 59 nights
 per substation in the scored winter, 64 to 65 in the replicate winter), the median observed step
-(half-hour starting 00:30 minus the half-hour starting 00:00) in points and MW, and each forecast's
+(half-hour starting 00:30 minus the half-hour starting 00:00) in points, and each forecast's
 median step minus it, with a 95% interval from resampling nights. This readout includes rows inside
 the switching masks, which every score on the page excludes; excluding them moves the gaps by at
 most 0.5 points.
 
-| Substation | Observed step, points (MW) | B0-K minus observed | NS-U-K minus observed | NS-HW-K minus observed |
+| Substation | Observed step, points | B0-K minus observed | NS-U-K minus observed | NS-HW-K minus observed |
 |---|---|---|---|---|
-| D5 | 7.0 (0.40) | −4.3 (−4.8 to −3.4) | −0.5 (−1.0 to +0.4) | +0.3 (−0.5 to +1.0) |
-| D10 | 11.3 (0.61) | −7.9 (−8.3 to −7.5) | −3.1 (−3.4 to −2.7) | −2.6 (−3.0 to −2.0) |
-| D11 | 3.6 (0.38) | −2.0 (−2.3 to −1.7) | −0.2 (−0.5 to +0.1) | +0.2 (−0.1 to +0.5) |
-| D14 | 1.8 (0.22) | −1.6 (−2.0 to −1.5) | −0.3 (−0.6 to −0.1) | −0.1 (−0.5 to +0.1) |
-| D16 | 7.9 (0.72) | −6.0 (−6.6 to −5.2) | −1.9 (−2.5 to −1.2) | −1.4 (−2.0 to −0.8) |
+| D5 | 7.0 | −4.3 (−4.8 to −3.4) | −0.5 (−1.0 to +0.4) | +0.3 (−0.5 to +1.0) |
+| D10 | 11.3 | −7.9 (−8.3 to −7.5) | −3.1 (−3.4 to −2.7) | −2.6 (−3.0 to −2.0) |
+| D11 | 3.6 | −2.0 (−2.3 to −1.7) | −0.2 (−0.5 to +0.1) | +0.2 (−0.1 to +0.5) |
+| D14 | 1.8 | −1.6 (−2.0 to −1.5) | −0.3 (−0.6 to −0.1) | −0.1 (−0.5 to +0.1) |
+| D16 | 7.9 | −6.0 (−6.6 to −5.2) | −1.9 (−2.5 to −1.2) | −1.4 (−2.0 to −0.8) |
 
 ![Cold winter nights, forecast against observed](figure_2_cold_nights.svg)
 
@@ -231,7 +231,7 @@ per-substation curve is shown.
   needed; NS-HW beat B0 on winter nights with a cold step in 72% against 90%). It was redefined
   after seeing that failure.
 - **Gate 4'' (redefined with a stated effect size and power target) failed.** At 5% false
-  positives (1 to 4% verified), a 4-point step (0.2 to 0.5 MW) is detected on the label's night
+  positives (1 to 4% verified), a 4-point step is detected on the label's night
   rows by NS-U in 14%, NS-HW in 14%, and NS-H in 8% of draws; a 7-point step in 59%, 57%, and 10%.
   On the step's own half-hour: 58%, 65%, and 16% for 4 points. NS-U does not detect a local-clock
   step (5%). Because gate 4'' failed, N2, N3, N4, and the indexing contrast are `not powered`, and

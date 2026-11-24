@@ -444,9 +444,7 @@ def raw_cold_step_rows(*, infos: dict[str, common.SeriesInfo], table: pl.DataFra
             {
                 "site": site,
                 "cold_nights": len(steps),
-                "step_mw": mean,
                 "step_points": mean * 100.0 / info.effective_capacity_mw,
-                "effective_capacity_mw": info.effective_capacity_mw,
             }
         )
     return rows
