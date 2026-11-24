@@ -187,16 +187,14 @@ record reproduces experiment 194's counts exactly (1,704, 137, 133, and 80 half-
 and 3 units, of 2,054). The record holds 55 running spells (experiment 194 counted 56), with a
 median of 4 half-hours. D8's reading has large steps only after the engine connected (Figure 2). The
 fall that follows an engine start grows with the reading before it, as a folded reading predicts
-(Figure 3). From a level below 3 MVA, 626 of 627 merged steps of at least 1.5 MVA in 2023-09 to
-2025-02 are rises. From 8 to 10 MVA, 259 of 260 are falls (Figure 4). No local maximum of the step
-histogram sits at the fitted unit size or at twice that size, so three units of the fitted size is a
-model fit and not a visible pattern.
+(`printed_look.txt`). From a level below 3 MVA, 626 of 627 merged steps of at least 1.5 MVA in
+2023-09 to 2025-02 are rises. From 8 to 10 MVA, 259 of 260 are falls (Figure 4). No local maximum of
+the step histogram sits at the fitted unit size or at twice that size, so three units of the fitted
+size is a model fit and not a visible pattern.
 
 ![D8's reading in four eras](figure_1_d8_reading_by_era.svg)
 
 ![Changes in D8's reading over 1 and 2 half-hours](figure_2_difference_histograms.svg)
-
-![Fall size against the reading before the fall](figure_3_fall_size_by_level.svg)
 
 ![Direction, duration, and timing of large steps](figure_4_step_direction_dwell_hour.svg)
 

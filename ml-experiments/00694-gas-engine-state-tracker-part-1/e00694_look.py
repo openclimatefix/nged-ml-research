@@ -268,49 +268,6 @@ def main() -> None:
     )
     save(chart=fig2, name="figure_2_difference_histograms")
 
-    # ---- Figure 3: merged fall size against the level before the fall
-    rows = []
-    for name, ed in era_data.items():
-        st = ed["steps"]
-        m = st["size"] <= -0.6
-        lev, fall = st["before"][m], -st["size"][m]
-        for lo_l in np.arange(0, 14, 1.0):
-            sel = (lev >= lo_l) & (lev < lo_l + 1.0)
-            if sel.sum() >= 5:
-                rows.append(
-                    {
-                        "era": name,
-                        "level": float(lo_l + 0.5),
-                        "fall": float(np.median(fall[sel])),
-                        "n": int(sel.sum()),
-                    }
-                )
-    frame = pl.DataFrame(rows)
-    pts = (
-        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True, strokeWidth=1.5)
-        .encode(
-            x=alt.X("level:Q", title="Reading before the fall (MVA, 1 MVA bins)"),
-            y=alt.Y(
-                "fall:Q", title="Median size of the fall (MVA)", scale=alt.Scale(domain=[0, 7])
-            ),
-            color=alt.Color(
-                "era:N",
-                scale=alt.Scale(domain=list(ERAS), range=COLOURS),
-                legend=alt.Legend(orient="top", title=None),
-            ),
-        )
-    )
-    fig3 = pts.properties(
-        width=WIDTH,
-        height=220,
-        title=alt.TitleParams(
-            wrap("Size of D8's merged falls against the reading before them."),
-            anchor="start",
-        ),
-    )
-    save(chart=fig3, name="figure_3_fall_size_by_level")
-
     # ---- Figure 4: sign test, dwell, hour of day
     rows = []
     for name, ed in era_data.items():

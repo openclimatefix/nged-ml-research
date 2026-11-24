@@ -568,8 +568,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         depth_in_units=pl.Series(depth / UNIT_MW),
     )
     table.write_parquet(DATA_DIR / "drops_overlap.parquet")
-    # The depth in units stays in the parquet only: beside the depth in MW it gives the unit size.
-    say("\n" + str(table.drop("depth_in_units").with_columns(pl.col(pl.Float64).round(2))))
+    # The depths and steps stay in the parquet only: in MW or in units they give the unit size.
+    shown = table.select("drop", "start_date", "end_date", "night_share")
+    say("\n" + str(shown.with_columns(pl.col(pl.Float64).round(2))))
     (DATA_DIR / "summary.json").write_text(json.dumps(SUMMARY, indent=1))
     (Path(__file__).parent / "printed_report.txt").write_text("\n".join(REPORT) + "\n")
     (DATA_DIR / "printed_report_private.txt").write_text("\n".join(PRIVATE_REPORT) + "\n")

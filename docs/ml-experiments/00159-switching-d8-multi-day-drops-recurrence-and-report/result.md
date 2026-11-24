@@ -12,7 +12,7 @@ size: >-
   of experiment 130 arm B and the logged closures of experiment 37.
 hypothesis: >-
   Descriptive, with no hypothesis test beyond the prediction below. D8 is a Primary substation
-  whose power drops by 3 to 5 MW for days at a time while the convex demand model's forecast does
+  whose power drops for days at a time while the convex demand model's forecast does
   not follow. The experiment lists every such drop, asks whether the drops recur on a pattern, and
   asks whether a connected metered neighbour steps up by a similar amount at the same time (a load
   transfer) or does not (a customer load change or an outage).
@@ -45,8 +45,8 @@ metric: >-
 code: ml-experiments/00159-switching-d8-multi-day-drops-recurrence-and-report/
 verdict: partly supported
 best_arm: >-
-  Not applicable (descriptive). 29 drops of 2 days or longer, median depth 2.7 MW (range 1.2 to
-  5.4) and median duration 3.6 days (range 2.0 to 19.2), 28 of them since July 2023.
+  Not applicable (descriptive). 29 drops of 2 days or longer, median duration 3.6 days (range 2.0
+  to 19.2), 28 of them since July 2023.
 headline: >-
   29 drops. A connected neighbour steps up by half the depth at 8 of 29 (0.28; 0.15 to 0.46) against
   0.21 at random times of the same time of day. 23 of 29 have a logged closure within 24 hours,
@@ -58,7 +58,7 @@ lessons: >-
   10 of 52 near a drop's edge are above chance.
 take_home_message: >-
   D8's multi-day drops are 29 episodes since 2022, nearly all since mid-2023, in which D8's power
-  runs about 2.7 megawatts below the demand regression model's expectation for 2 to 19 days. The
+  runs below the demand regression model's expectation for 2 to 19 days. The
   three connected metered neighbours step up with the drops at a rate not clearly above their rate
   at random times, so the drops do not clearly look like load moved onto them, and they show no
   detectable weekday, hour, bank-holiday, or seasonal pattern. Most of the switching detector's
@@ -84,8 +84,8 @@ adopted_in: none
 
 # Experiment 159: what are D8's multi-day drops, do they recur, and do they look like transfers?
 
-**D8's multi-day drops are 29 episodes in which its power runs about 2.7 megawatts (MW) below what a
-demand regression model expects, for 2 to 19 days. Its three connected neighbours step up with the
+**D8's multi-day drops are 29 episodes in which its power runs below what a demand regression
+model expects, for 2 to 19 days. Its three connected neighbours step up with the
 drops at a rate not clearly above their rate at times chosen at random.** D8 is a Primary
 substation, and D3, D14, and D5 are its connected neighbours with metered power. An earlier analysis
 found that the refit-offset neighbour-count detector (RO-NC), which flags a possible switching event
@@ -124,15 +124,14 @@ descriptive, and the substations are labelled D3, D5, D8, and D14.
   0.090). Of the 29 drops, 28 start on or after 2023-07-01. By start year, 1 drop starts in 2022, 3
   in 2023, 7 in 2024, 15 in 2025, and 3 in 2026. The number of drops depends strongly on the
   threshold: -1.0 MW gives 48 drops, -2.0 MW gives 24, and -2.5 MW gives 15.
-- **Depth and duration:** median depth 2.71 MW (range 1.19 to 5.36) and median duration 3.6 days
-  (range 2.0 to 19.2). Inside drops the median metered power is 3.43 MW against an expected 6.20 MW.
-  Of the half-hours inside drops, 0.435 are below 3 MW, against 0.158 of the half-hours outside
-  drops after the first drop. The Spearman correlation of depth with start time is -0.40 (p =
-  0.032). The correlation arises because the four drops from October 2023 to January 2024 are the
-  deepest (4.9 to 5.4 MW).
+- **Depth and duration:** the median duration is 3.6 days (range 2.0 to 19.2). The depths in MW are
+  withheld. Of the half-hours inside drops, 0.435 are below 3 MW, against 0.158 of the half-hours
+  outside drops after the first drop. The Spearman correlation of depth with start time is -0.40 (p
+  = 0.032). The correlation arises because the four drops from October 2023 to January 2024 are the
+  deepest.
 - **What the power does inside a drop:** the metered power alternates between the expected level and
   0 to 3 MW within each day, as in drop 20, which lasts 19 days. A drop is a run in which the
-  periods at 0 to 3 MW dominate, not a steady 3 MW shift.
+  periods at 0 to 3 MW dominate, not a steady shift.
 - **Recurrence:** the 29 drops show no detectable weekday, hour, or interval pattern. Drop starts
   per weekday, Monday to Sunday, are 3, 5, 7, 3, 1, 5, and 5 (chi-squared p = 0.48). Drop starts per
   6-hour block of the day (00:00 to 06:00, 06:00 to 12:00, 12:00 to 18:00, and 18:00 to 24:00) are
@@ -198,7 +197,7 @@ descriptive, and the substations are labelled D3, D5, D8, and D14.
 - **The neighbour check is crude.** The check compares 6-hour medians, so a transfer spread over a
   day would not show. The random-time comparison matches the time of day of the drop starts, which
   controls for the daily rise of the neighbours' demand. D5 has a median power of 2.96 MW, so D5 can
-  absorb only part of a 5 MW drop.
+  absorb only part of the deepest drops.
 - **A logged closure within 24 hours does not show that the closure caused a drop.** NGED's log
   holds 78 closures touching D8 in 4.5 years, and the random-window rate of 0.449 shows that a
   closure within 24 hours is common.
@@ -216,37 +215,37 @@ model's training data, or shown to NGED's operators as an event.
 
 ## Every drop
 
-| Drop | Start | End | Depth (MW) | Duration (days) | Start weekday and hour | Largest neighbour step-up (MW) | Logged closures within 24 hours |
-|---|---|---|---|---|---|---|---|
-| 1 | 2022-08-09 | 2022-08-23 | 2.0 | 14.2 | Tue 16:00 | +2.2 (D5) | 1 |
-| 2 | 2023-10-21 | 2023-10-25 | 4.9 | 4.3 | Sat 11:30 | +1.4 (D3) | 0 |
-| 3 | 2023-10-26 | 2023-10-28 | 5.0 | 2.2 | Thu 18:30 | -0.1 (D5) | 0 |
-| 4 | 2023-11-29 | 2023-12-02 | 5.0 | 3.9 | Wed 03:30 | +0.5 (D3) | 1 |
-| 5 | 2024-01-17 | 2024-01-19 | 5.4 | 2.2 | Wed 17:00 | +1.6 (D14) | 0 |
-| 6 | 2024-05-27 | 2024-05-30 | 3.6 | 2.2 | Mon 21:30 | +0.3 (D5) | 0 |
-| 7 | 2024-06-12 | 2024-06-15 | 3.8 | 3.8 | Wed 03:00 | -0.2 (D5) | 1 |
-| 8 | 2024-06-16 | 2024-06-24 | 1.8 | 7.8 | Sun 18:30 | +1.5 (D5) | 0 |
-| 9 | 2024-08-28 | 2024-08-30 | 3.5 | 2.0 | Wed 01:00 | -0.9 (D5) | 2 |
-| 10 | 2024-09-30 | 2024-10-02 | 3.2 | 2.5 | Mon 10:30 | +4.0 (D3) | 1 |
-| 11 | 2024-12-10 | 2024-12-13 | 2.9 | 2.9 | Tue 22:30 | -1.4 (D5) | 4 |
-| 12 | 2025-01-19 | 2025-01-23 | 3.0 | 3.3 | Sun 21:00 | -1.3 (D5) | 1 |
-| 13 | 2025-05-07 | 2025-05-10 | 2.3 | 3.3 | Wed 05:00 | +1.3 (D3) | 2 |
-| 14 | 2025-05-18 | 2025-05-23 | 2.7 | 4.3 | Sun 21:30 | -0.4 (D5) | 1 |
-| 15 | 2025-06-05 | 2025-06-07 | 1.6 | 2.1 | Thu 12:30 | +0.2 (D3) | 1 |
-| 16 | 2025-06-13 | 2025-06-15 | 1.4 | 2.0 | Fri 19:30 | +2.1 (D5) | 1 |
-| 17 | 2025-06-17 | 2025-06-21 | 3.0 | 3.6 | Tue 12:00 | -0.2 (D3) | 1 |
-| 18 | 2025-06-28 | 2025-07-01 | 1.2 | 2.9 | Sat 22:30 | +0.1 (D5) | 1 |
-| 19 | 2025-07-05 | 2025-07-13 | 2.4 | 8.3 | Sat 16:30 | +1.4 (D5) | 1 |
-| 20 | 2025-07-16 | 2025-08-04 | 2.4 | 19.2 | Wed 04:00 | +1.7 (D14) | 2 |
-| 21 | 2025-08-06 | 2025-08-15 | 1.9 | 9.4 | Wed 05:00 | +0.7 (D3) | 3 |
-| 22 | 2025-08-16 | 2025-08-30 | 2.3 | 14.2 | Sat 04:00 | +0.0 (D3) | 1 |
-| 23 | 2025-09-23 | 2025-09-25 | 2.1 | 2.6 | Tue 01:00 | -0.6 (D5) | 1 |
-| 24 | 2025-10-11 | 2025-10-16 | 2.4 | 4.2 | Sat 20:30 | -0.3 (D5) | 0 |
-| 25 | 2025-12-15 | 2025-12-22 | 3.2 | 7.0 | Mon 10:00 | +2.8 (D3) | 1 |
-| 26 | 2025-12-28 | 2025-12-31 | 2.9 | 3.2 | Sun 02:30 | -0.4 (D5) | 1 |
-| 27 | 2026-01-11 | 2026-01-13 | 2.1 | 2.1 | Sun 22:00 | -1.4 (D5) | 1 |
-| 28 | 2026-01-15 | 2026-01-18 | 3.1 | 3.6 | Thu 01:00 | -0.4 (D5) | 5 |
-| 29 | 2026-01-27 | 2026-01-31 | 2.7 | 4.8 | Tue 00:30 | -0.7 (D5) | 1 |
+| Drop | Start | End | Duration (days) | Start weekday and hour | Largest neighbour step-up (MW) | Logged closures within 24 hours |
+|---|---|---|---|---|---|---|
+| 1 | 2022-08-09 | 2022-08-23 | 14.2 | Tue 16:00 | +2.2 (D5) | 1 |
+| 2 | 2023-10-21 | 2023-10-25 | 4.3 | Sat 11:30 | +1.4 (D3) | 0 |
+| 3 | 2023-10-26 | 2023-10-28 | 2.2 | Thu 18:30 | -0.1 (D5) | 0 |
+| 4 | 2023-11-29 | 2023-12-02 | 3.9 | Wed 03:30 | +0.5 (D3) | 1 |
+| 5 | 2024-01-17 | 2024-01-19 | 2.2 | Wed 17:00 | +1.6 (D14) | 0 |
+| 6 | 2024-05-27 | 2024-05-30 | 2.2 | Mon 21:30 | +0.3 (D5) | 0 |
+| 7 | 2024-06-12 | 2024-06-15 | 3.8 | Wed 03:00 | -0.2 (D5) | 1 |
+| 8 | 2024-06-16 | 2024-06-24 | 7.8 | Sun 18:30 | +1.5 (D5) | 0 |
+| 9 | 2024-08-28 | 2024-08-30 | 2.0 | Wed 01:00 | -0.9 (D5) | 2 |
+| 10 | 2024-09-30 | 2024-10-02 | 2.5 | Mon 10:30 | +4.0 (D3) | 1 |
+| 11 | 2024-12-10 | 2024-12-13 | 2.9 | Tue 22:30 | -1.4 (D5) | 4 |
+| 12 | 2025-01-19 | 2025-01-23 | 3.3 | Sun 21:00 | -1.3 (D5) | 1 |
+| 13 | 2025-05-07 | 2025-05-10 | 3.3 | Wed 05:00 | +1.3 (D3) | 2 |
+| 14 | 2025-05-18 | 2025-05-23 | 4.3 | Sun 21:30 | -0.4 (D5) | 1 |
+| 15 | 2025-06-05 | 2025-06-07 | 2.1 | Thu 12:30 | +0.2 (D3) | 1 |
+| 16 | 2025-06-13 | 2025-06-15 | 2.0 | Fri 19:30 | +2.1 (D5) | 1 |
+| 17 | 2025-06-17 | 2025-06-21 | 3.6 | Tue 12:00 | -0.2 (D3) | 1 |
+| 18 | 2025-06-28 | 2025-07-01 | 2.9 | Sat 22:30 | +0.1 (D5) | 1 |
+| 19 | 2025-07-05 | 2025-07-13 | 8.3 | Sat 16:30 | +1.4 (D5) | 1 |
+| 20 | 2025-07-16 | 2025-08-04 | 19.2 | Wed 04:00 | +1.7 (D14) | 2 |
+| 21 | 2025-08-06 | 2025-08-15 | 9.4 | Wed 05:00 | +0.7 (D3) | 3 |
+| 22 | 2025-08-16 | 2025-08-30 | 14.2 | Sat 04:00 | +0.0 (D3) | 1 |
+| 23 | 2025-09-23 | 2025-09-25 | 2.6 | Tue 01:00 | -0.6 (D5) | 1 |
+| 24 | 2025-10-11 | 2025-10-16 | 4.2 | Sat 20:30 | -0.3 (D5) | 0 |
+| 25 | 2025-12-15 | 2025-12-22 | 7.0 | Mon 10:00 | +2.8 (D3) | 1 |
+| 26 | 2025-12-28 | 2025-12-31 | 3.2 | Sun 02:30 | -0.4 (D5) | 1 |
+| 27 | 2026-01-11 | 2026-01-13 | 2.1 | Sun 22:00 | -1.4 (D5) | 1 |
+| 28 | 2026-01-15 | 2026-01-18 | 3.6 | Thu 01:00 | -0.4 (D5) | 5 |
+| 29 | 2026-01-27 | 2026-01-31 | 4.8 | Tue 00:30 | -0.7 (D5) | 1 |
 
 Code: `ml-experiments/00159-switching-d8-multi-day-drops-recurrence-and-report/`; every number above
 is printed by `e00159_drops.py` into `printed_report.txt` in that folder, and `e00159_charts.py`

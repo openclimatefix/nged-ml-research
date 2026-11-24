@@ -124,7 +124,7 @@ date: 2026-10-23
 at the half-hour being forecast, and that state is built from the reading being forecast.** D8 is
 one of the 16 Primary substations of National Grid Electricity Distribution (NGED) in the trial. Its
 meter stopped including the output of a gas engine of up to three units, so we take D8's multi-day
-drops in power (2 to 19 days, about 2.7 MW) to be the engine running ([experiment
+drops in power (2 to 19 days) to be the engine running ([experiment
 194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md),
 [experiment 291](../00291-d8-drops-engine-spells-load-shift/result.md)). We asked whether a forecast
 with an extra term for the half-hours when the engine runs beats a forecast without it. Both

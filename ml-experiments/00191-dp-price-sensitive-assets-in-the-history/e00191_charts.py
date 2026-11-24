@@ -118,7 +118,7 @@ def response() -> None:
             width=WIDTH,
             height=200,
             title=alt.TitleParams(
-                "The model finds 1.2 to 1.9 MW of price response at D8 and almost none at the register's Primary",
+                "The model finds price response at D8 and almost none at the register's Primary",
                 subtitle=[
                     "Output that the model takes off net load when all four price indicators are on,",
                     "from each monthly fit of the price-aware model.",

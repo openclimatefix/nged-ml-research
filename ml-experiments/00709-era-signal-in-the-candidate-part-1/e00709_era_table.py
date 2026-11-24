@@ -194,12 +194,9 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         & (pl.col("mw") >= D8_GAS_MW - 0.5)
     )
     solar = assets.filter((pl.col("site") == "D8") & _is_solar())
-    with pl.Config(tbl_rows=30, fmt_str_lengths=60):
-        print("Register rows behind the plan's D8 eras (no customer names):")
-        print("Gas engine listed under another Primary:")
-        print(gas)
-        print("Solar rows listed under D8:")
-        print(solar)
+    print("Register rows behind the plan's D8 eras: [withheld]")
+    print(f"Gas engine rows listed under another Primary: {gas.height}")
+    print(f"Solar rows listed under D8: {solar.height}")
     found_gas = gas.filter(pl.col("connected_date") == D8_GAS_DATE).height > 0
     found_solar = solar.filter(pl.col("connected_date") == D8_SOLAR_DATE).height > 0
     small = solar.filter(pl.col("connected_date").is_null() & pl.col("mw").is_between(0.6, 0.8))
