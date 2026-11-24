@@ -43,8 +43,9 @@ decision_rule: >-
   verdict `supported` needs a gain in both groups, the upper end of N2 below zero in both groups,
   and the four guards in the section "Decision rule and verdict". The injected-world contrasts are
   secondary and change no verdict. Every verdict, headline, and take-home message of this experiment
-  states that the warm-start states of experiment 713 come from a waived known-answer gate, and that
-  no conclusion about following level shifts is backed by a passing known-answer test.
+  states that the warm-start states of experiment 713 come from a waived known-answer gate, that
+  experiment 715's own gate failed KN6 and KN7 and was waived, and that no conclusion about following
+  level shifts is backed by a passing known-answer test.
 benchmark: >-
   M* (experiment 713's selected axial-attention arm, stored seeds 0 and 1 of all 8 folds); the
   Candidate (P7+D50 of experiment 667); the month-by-half-hour climatology; the manual heuristic and
@@ -146,9 +147,48 @@ are scored. A null result may also come from the slow learning that 713's gate f
 zero cannot separate "the neighbours carry little" from "the training budget stops before the
 read-out learns to use them".
 
-**Experiment 715 has its own known-answer gate (KN6, KN7, KN11(a), and KN12), and it has not run.**
-It must pass on the GPU before the first F4 fit. Each F4 fit log records whether experiment 713's gate
-file is waived, and the report script prints the waiver and fires audit trigger 1.
+## Experiment 715's own known-answer gate failed KN6 and KN7, and the maintainer waived both
+
+**Experiment 715's gate passed KN11(a) and KN12 and failed KN6 and KN7, so the screen runs on a
+waived known-answer check and not on a passed one.** The gate ran alone on the GPU on 2026-11-24 at
+code hash e9809f648a885ae1. No threshold and no verdict rule changed. The record in `work/known_answers_passed.json`
+says "waived known-answer check", lists the failed checks and their values, and carries the code
+hash and the sha256 of the known-answer script. Each F4 fit prints that sha256 beside the current
+file's. The report script prints the waiver of experiment 713 only, so a reader of its output
+learns about 715's waiver from this page and from the gate file.
+
+- **KN6 (world W3, with temporary steps mirrored at the partner and permanent steps unmirrored)
+  failed.** The gap between F4's follow share of a permanent step and
+  of a temporary step was 0.0288, against a requirement of at least 0.60. The gap of `F4-R` was
+  0.0412 and the gap of `M` was 0.0044.
+- **KN7 (no harm without events) was not evaluated.** The fit of F4 on experiment 713's world with no
+  shifts ended at the 150-pass cap. The mean absolute error of the median was 0.00939 for F4 and
+  0.01001 for `M`, so F4 minus `M` was -0.0006, inside the limit of +0.005. A fit that ends at the
+  cap counts as a failed check.
+
+**An audit of the failure found no fault in F4's neighbour rows, and three other causes.** The audit
+rebuilt the synthetic world and recounted the events that KN6 scores.
+
+1. **The harness budget is too small.** The synthetic fits train for at most 150 passes with a
+   patience of 8, which is experiment 713's budget before its amendment 3 (400 passes, patience 30).
+   The three fits on the mirror-only world stopped at 42 to 54 passes while their validation loss
+   was still falling.
+2. **KN6's gap rests on three events.** The held-out window holds one permanent step and two
+   temporary steps, so the gap cannot separate a working F4 from a broken one.
+3. **The trunk follows almost none of a permanent step.** At that budget, arm `M` follows 0.019 of a
+   permanent step, as in experiment 713's waived check KA3. A gap of 0.60 is unlikely for any F4
+   built on the same trunk unless the lead-day learning rate is fixed as well.
+
+**The maintainer's note frames how to read the result.** In general, it is hard to discriminate
+between a temporary step and a permanent step. The only two hints are what a Primary substation's
+electrical neighbours do, and the rough shape of the step, although the shape is probably less
+informative. A gate that fails to show F4 separating the two kinds of step therefore does not show
+that the neighbour rows are broken, and a passing screen would not show that they carry the hint.
+
+**The waiver changes how the era readings are read.** The era secondary set (S1 to S7) and every
+statement about whether F4 follows or ignores a level step rest on a gate that failed KN6 and KN7
+and on experiment 713's waived gate. The two counted contrasts N1 and N2 concern forecast skill on
+real folds, and neither waiver changes how they are scored.
 
 ## What is compared
 
