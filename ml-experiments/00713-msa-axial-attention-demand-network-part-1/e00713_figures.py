@@ -5,7 +5,7 @@ Usage:
     e00713_figures.py series OUT_DIR           # day-ahead and 14-day forecasts against actuals
     e00713_figures.py events TAG OUT_DIR       # the Candidate and M* on real logged events, three Primaries per group
     e00713_figures.py injected OUT_DIR         # permanent change and temporary move, onset marked
-    e00713_figures.py contrasts TAG OUT_DIR    # per-Primary and per-fold CRPS contrasts with intervals
+    e00713_figures.py contrasts OUT_DIR        # per-Primary and per-fold CRPS and CRPS minus C, six and eight apart, 24-240 h
 
 These scripts read the stored forecasts of the fits (`work/fits/<arm>/`), the bank forecasts
 (`bank713/`), and the protocol rows (`score/protocol_<TAG>/rows.parquet`). They run after the fits and
@@ -35,10 +35,12 @@ import polars as pl
 from plotting import ocf_theme as theme
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WIDTH: Final = 640
+from studies import charts
+
+WIDTH: Final = charts.PLOT_WIDTH_PX
 COLOUR: Final = {
     "C": theme.DATA_BLUE, "M*": theme.BRAND_ORANGE, "E": theme.DATA_GREEN, "P": theme.DATA_PURPLE,
-    "K": theme.DATA_SKY,
+    "K": theme.DATA_SKY, "A": theme.DATA_AMBER, "N": theme.DATA_DEEP_TEAL,
 }  # fmt: skip
 LIGHT: Final = {
     "C": theme.DATA_BLUE_LIGHT, "M*": theme.BRAND_ORANGE_LIGHT, "E": theme.DATA_GREEN_LIGHT,
@@ -274,11 +276,11 @@ def cmd_injected(*, out_dir: Path) -> None:
             .mark_line(color="#222222", strokeDash=[4, 3], clip=True)
             .encode(x=x, y="truth:Q")
         )
-        rules = [alt.Chart(pl.DataFrame({"d": [0]})).mark_rule(color=theme.GREY_1).encode(x="d:Q")]  # ty: ignore[unresolved-attribute]
+        rules = [alt.Chart(pl.DataFrame({"d": [0]})).mark_rule(color=theme.TEXT).encode(x="d:Q")]  # ty: ignore[unresolved-attribute]
         if end is not None:
             rules.append(
                 alt.Chart(pl.DataFrame({"d": [end]}))  # ty: ignore[unresolved-attribute]
-                .mark_rule(color=theme.GREY_1, strokeDash=[2, 2])
+                .mark_rule(color=theme.ENSEMBLE_LINE, strokeDash=[2, 2])
                 .encode(x="d:Q")
             )
         chart = alt.layer(lines, truth, *rules).properties(
@@ -384,7 +386,10 @@ def cmd_events(*, tag: str, out_dir: Path, per_group: int = 3) -> None:
             )
             daily = (
                 f.group_by("day")
-                .agg(median=pl.col("q50").mean() * 100.0, actual=pl.col("actual").mean())
+                .agg(
+                    median=pl.col("q50").mean() * 100.0,
+                    actual=pl.col("actual").fill_nan(None).mean(),
+                )
                 .sort("day")
             )
             frames.append(daily.with_columns(arm=pl.lit(shown)))
@@ -420,7 +425,11 @@ def cmd_events(*, tag: str, out_dir: Path, per_group: int = 3) -> None:
             .mark_line(color="#222222", strokeDash=[4, 3], clip=True)
             .encode(x=x, y="actual:Q")
         )  # ty: ignore[unresolved-attribute]
-        shade = alt.Chart(band).mark_rect(color=theme.GREY_1, opacity=0.2).encode(x="a:T", x2="b:T")  # ty: ignore[unresolved-attribute]
+        shade = (
+            alt.Chart(band)
+            .mark_rect(color=theme.ENSEMBLE_LINE, opacity=0.2)
+            .encode(x="a:T", x2="b:T")
+        )  # ty: ignore[unresolved-attribute]
         chart = alt.layer(shade, lines, truth_line).properties(
             title=alt.TitleParams(
                 [
@@ -445,90 +454,193 @@ def month_interval(
     return float(values.mean()), float(np.quantile(draws, 0.025)), float(np.quantile(draws, 0.975))
 
 
-def contrast_table(*, rows: pl.DataFrame, arm: str, by: str) -> pl.DataFrame:
-    """Return the mean CRPS difference `arm` minus `C` and its month-block interval, per `by`."""
-    h = rows.filter(pl.col("all")).select(
-        "arm",
-        "label",
-        "month",
-        "time_series_id" if False else "label",
-        "crps",
-        "valid_time" if False else "month",
-    )
-    a = rows.filter((pl.col("arm") == arm) & pl.col("all")).select(
-        "power_fcst_init_time", "valid_time", "label", "month", "crps"
-    )
-    c = rows.filter((pl.col("arm") == "C") & pl.col("all")).select(
-        "power_fcst_init_time", "valid_time", "label", "crps"
-    )
-    del h
-    j = a.join(c, on=["power_fcst_init_time", "valid_time", "label"], suffix="_c").with_columns(
-        diff=pl.col("crps") - pl.col("crps_c")
-    )
+LABEL_ORDER_KEY = lambda label: int(label[1:])  # noqa: E731
+GROUP_TITLE: Final = {"six": "signed-MW Primaries (six)", "eight": "MVA-only Primaries (eight)"}
+CONTRAST_ARMS: Final = ("M*", "P", "E", "K", "N", "A")
+DRAWS: Final = 10_000
+
+
+def contrast_cells(*, star: str, months: tuple[str, ...], seeds: tuple[int, ...]) -> pl.DataFrame:
+    """Return per (arm, month, label, origin day) sums of CRPS and of the CRPS difference from `C`, headline band.
+
+    One fold and one arm are in memory at a time. The seed mean of each arm's quantiles is scored, as
+    in `e00713_score.load_all`, and only the 24 to 240 h rows of the six and the eight are kept.
+    """
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    truth = score.truth_stack()
+    sites = k578.sites()
+    keep = {"six": score.SIX, "eight": score.EIGHT}
+    label_of = dict(zip(sites["time_series_id"].to_list(), sites["label"].to_list(), strict=True))
+    group_of = {label: g for g, labels in keep.items() for label in labels}
     out = []
-    for key in sorted(j[by].unique().to_list()):
-        g = j.filter(pl.col(by) == key)
-        mean, lo, hi = month_interval(
-            month=g["month"].to_numpy(), values=g["diff"].to_numpy().astype(np.float64)
-        )
-        out.append({by: key, "mean": mean, "lo": lo, "hi": hi, "arm": arm})
-    return pl.DataFrame(out)
+    for month in months:
+        frames = {}
+        for shown in ("C", *CONTRAST_ARMS):
+            f = score.seed_average(
+                frame=score.load_arm(
+                    arm=arm_name(shown=shown, star=star), seeds=seeds, months=(month,)
+                )
+            )
+            f = score.add_losses(frame=f, truth=truth)
+            f = f.filter(
+                (pl.col("lead_hours") >= score.HEADLINE_BAND_HOURS[0])
+                & (pl.col("lead_hours") < score.HEADLINE_BAND_HOURS[1])
+            ).select(*score.KEYS, "crps")
+            frames[shown] = f.with_columns(
+                label=pl.col("time_series_id").replace_strict(label_of, return_dtype=pl.String),
+                day=pl.col("power_fcst_init_time").dt.date(),
+            ).filter(pl.col("label").is_in(list(group_of)))
+        ref = frames["C"].select(*score.KEYS, pl.col("crps").alias("crps_c"))
+        for shown, f in frames.items():
+            j = f.join(ref, on=list(score.KEYS), how="inner")
+            assert j.height == f.height, f"arm {shown!r} and C hold different keys in {month}"
+            cell = (
+                j.group_by("label", "day")
+                .agg(
+                    crps=pl.col("crps").sum(),
+                    diff=(pl.col("crps") - pl.col("crps_c")).sum(),
+                    n=pl.len(),
+                )
+                .with_columns(arm=pl.lit(shown), month=pl.lit(month))
+            )
+            out.append(cell)
+    return pl.concat(out).with_columns(
+        group=pl.col("label").replace_strict(group_of, return_dtype=pl.String)
+    )
 
 
-def cmd_contrasts(*, tag: str, out_dir: Path) -> None:
-    rows = pl.read_parquet(score.SCORE_DIR / f"protocol_{tag}" / "rows.parquet")
-    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
-    shown = {
-        a: ("M*" if a == star else a)
-        for a in rows["arm"].unique().to_list()
-        if a not in {"C", "Climatology", "Manual heuristic"}
-    }
-    for by, title, xname in (
-        ("label", "Primary", "Primary"),
-        ("month", "fold (month of the forecast origin)", "Fold"),
-    ):
-        table = pl.concat(
-            [
-                contrast_table(rows=rows, arm=a, by=by).with_columns(arm=pl.lit(shown[a]))
-                for a in shown
-            ]
+def block_interval(
+    *, blocks: np.ndarray, num: np.ndarray, den: np.ndarray
+) -> tuple[float, float, float]:
+    """Return the ratio of sums and a 95% interval from resampling whole blocks (months or origin days)."""
+    labels, inv = np.unique(blocks, return_inverse=True)
+    sums = np.bincount(inv, weights=num)
+    counts = np.bincount(inv, weights=den)
+    pick = np.random.default_rng(713).integers(0, len(labels), size=(DRAWS, len(labels)))
+    draws = sums[pick].sum(axis=1) / counts[pick].sum(axis=1)
+    return (
+        float(sums.sum() / counts.sum()),
+        float(np.quantile(draws, 0.025)),
+        float(np.quantile(draws, 0.975)),
+    )
+
+
+def contrast_summary(*, cells: pl.DataFrame, by: str) -> pl.DataFrame:
+    """Return, per arm, group and `by`, the mean CRPS and the mean difference from `C` with block intervals.
+
+    Per Primary the blocks are the 8 fold months; per fold the blocks are origin days of that fold.
+    """
+    block = "month" if by == "label" else "day"
+    rows = []
+    for (arm, group, key), g in cells.group_by("arm", "group", by):
+        mean_crps, c_lo, c_hi = block_interval(
+            blocks=g[block].cast(pl.String).to_numpy(),
+            num=g["crps"].to_numpy(),
+            den=g["n"].to_numpy().astype(float),
         )
-        order = sorted(table[by].unique().to_list())
-        dom = list(shown.values())
-        colour = alt.Color(
-            "arm:N",
-            scale=alt.Scale(domain=dom, range=[COLOUR.get(a, theme.GREY_2) for a in dom]),
-            legend=alt.Legend(title=None, orient="top"),
+        mean_diff, d_lo, d_hi = block_interval(
+            blocks=g[block].cast(pl.String).to_numpy(),
+            num=g["diff"].to_numpy(),
+            den=g["n"].to_numpy().astype(float),
         )
-        y = alt.Y(f"{by}:N", sort=order, title=xname)
-        base = alt.Chart(table, width=WIDTH, height=max(160, 22 * len(order)))
-        chart = alt.layer(
-            base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
+        rows.append(
+            {
+                "arm": arm,
+                "group": group,
+                by: key,
+                "crps": mean_crps,
+                "crps_lo": c_lo,
+                "crps_hi": c_hi,
+                "diff": mean_diff,
+                "diff_lo": d_lo,
+                "diff_hi": d_hi,
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def contrast_chart(
+    *,
+    table: pl.DataFrame,
+    by: str,
+    value: str,
+    arms_shown: tuple[str, ...],
+    title: list[str],
+    x_title: str,
+) -> alt.TopLevelMixin:
+    """Draw dots and intervals of `value` (`crps` or `diff`), one panel per Primary group, rows of `by`."""
+    table = table.filter(pl.col("arm").is_in(list(arms_shown)))
+    colour = alt.Color(
+        "arm:N",
+        scale=alt.Scale(domain=list(arms_shown), range=[COLOUR[a] for a in arms_shown]),
+        legend=alt.Legend(title=None, orient="top"),
+    )
+    panels = []
+    for group in ("six", "eight"):
+        t = table.filter(pl.col("group") == group)
+        order = sorted(t[by].unique().to_list(), key=LABEL_ORDER_KEY if by == "label" else str)
+        y = alt.Y(f"{by}:N", sort=order, title=None)
+        base = alt.Chart(t, width=WIDTH, height=40 * len(order), title=GROUP_TITLE[group])  # ty: ignore[unresolved-attribute]
+        layers = [
+            base.mark_rule(strokeWidth=2).encode(
                 y=y,
-                x=alt.X(
-                    "lo:Q",
-                    title="CRPS minus the Candidate's (points of capacity; more negative is better)",
-                ),
-                x2="hi:Q",
+                x=alt.X(f"{value}_lo:Q", title=x_title),
+                x2=f"{value}_hi:Q",
                 color=colour,
                 yOffset="arm:N",
             ),
-            base.mark_point(filled=True, size=45).encode(  # ty: ignore[unresolved-attribute]
-                y=y, x="mean:Q", color=colour, yOffset="arm:N"
+            base.mark_point(filled=True, size=45).encode(
+                y=y, x=f"{value}:Q", color=colour, yOffset="arm:N"
             ),
-            alt.Chart(pl.DataFrame({"z": [0.0]})).mark_rule(color=theme.GREY_1).encode(x="z:Q"),  # ty: ignore[unresolved-attribute]
-        ).properties(
-            title=alt.TitleParams(
-                [
-                    f"CRPS difference from the Candidate by {title}",
-                    "Dot: mean. Line: 95% interval from resampling whole months. Zero: same as the Candidate.",
-                ],
-                anchor="start",
-                fontSize=12,
-                subtitleFontSize=11,
-            )
+        ]
+        if value == "diff":
+            layers.append(
+                alt.Chart(pl.DataFrame({"z": [0.0]})).mark_rule(color=theme.TEXT).encode(x="z:Q")
+            )  # ty: ignore[unresolved-attribute]
+        panels.append(alt.layer(*layers))
+    return alt.vconcat(*panels).properties(
+        title=alt.TitleParams(title, anchor="start", fontSize=12, subtitleFontSize=11)
+    )
+
+
+def cmd_contrasts(*, out_dir: Path) -> None:
+    """Draw per-Primary and per-fold CRPS (absolute and as a difference from `C`) in the 24 to 240 h band, six and eight apart."""
+    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    cells = contrast_cells(star=star, months=arms.ALL_FOLDS, seeds=arms.SCREEN_SEEDS)
+    # The check against the stored headline: M* minus C pooled over each group's cells.
+    for g in ("six", "eight"):
+        c = cells.filter((pl.col("arm") == "M*") & (pl.col("group") == g))
+        pooled = c["diff"].sum() / c["n"].sum()
+        print(
+            f"{star} minus C, {g}, seeds 0 and 1, pooled: {pooled:.4f} (report_only.json holds the 95% figure)"
         )
-        save(chart, path=out_dir / f"contrast_by_{by}.svg")
+    for by, what in (("label", "Primary"), ("month", "fold")):
+        table = contrast_summary(cells=cells, by=by)
+        interval = "months" if by == "label" else "origin days"
+        sub = f"Dot: mean over seeds 0 and 1 of the seed-mean forecast. Line: 95% interval from resampling whole {interval}."
+        save(
+            contrast_chart(
+                table=table,
+                by=by,
+                value="diff",
+                arms_shown=CONTRAST_ARMS,
+                title=[f"CRPS minus the Candidate's, by {what}, 24 to 240 h ahead", sub],
+                x_title="Points of capacity; more negative is better than the Candidate",
+            ),
+            path=out_dir / f"contrast_by_{by}.svg",
+        )
+        save(
+            contrast_chart(
+                table=table,
+                by=by,
+                value="crps",
+                arms_shown=("C", "M*", "P"),
+                title=[f"CRPS by {what}, 24 to 240 h ahead", sub],
+                x_title="CRPS, points of capacity (lower is better)",
+            ),
+            path=out_dir / f"crps_by_{by}.svg",
+        )
 
 
 def main() -> int:
@@ -540,10 +652,8 @@ def main() -> int:
     e.add_argument("tag")
     e.add_argument("out_dir", type=Path)
     c = sub.add_parser("contrasts")
-    c.add_argument("tag")
     c.add_argument("out_dir", type=Path)
     args = parser.parse_args()
-    alt.themes.enable("default")
     if args.command == "series":
         cmd_series(out_dir=args.out_dir)
     elif args.command == "injected":
@@ -551,7 +661,7 @@ def main() -> int:
     elif args.command == "events":
         cmd_events(tag=args.tag, out_dir=args.out_dir)
     else:
-        cmd_contrasts(tag=args.tag, out_dir=args.out_dir)
+        cmd_contrasts(out_dir=args.out_dir)
     return 0
 
 

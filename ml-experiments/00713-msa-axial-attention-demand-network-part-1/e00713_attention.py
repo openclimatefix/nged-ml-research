@@ -3,7 +3,7 @@
 
 Usage:
     e00713_attention.py extract ARM MONTH SEED [--device cuda] [--random-init]
-    e00713_attention.py figures OUT_DIR --arms M* E P MONTH SEED
+    e00713_attention.py figures OUT_DIR MONTH SEED [--arms M* E P]
 
 `extract` loads the saved stage 3 weights of ARM (`--random-init` instead builds an untrained network
 with non-zero attention, for a smoke test of the code path; its output is labelled and never
@@ -217,7 +217,7 @@ def heat_chart(
             x=alt.X(
                 "col:O",
                 title=cols,
-                axis=alt.Axis(values=[0, 6, 12, 18, 24, 30, 36, 42], labelAngle=0),
+                axis=alt.Axis(values=[0, 6, 12, 18], labelAngle=0),
             ),
             y=alt.Y("row:O", title=rows, sort="ascending"),
             color=alt.Color(
@@ -245,14 +245,14 @@ def cmd_figures(*, out_dir: Path, shown: list[str], month: str, seed: int) -> No
         frames = {s: m[1:] for s, m in across.items()}
         title = [
             f"Across-day attention of the target row, case {case.replace('_', ' ')}",
-            "Each cell: the weight from the target row's token (x: its half-hour) to the history row (y: slot 1 is age 2, slot 14 is age 15). Mean over 4 heads, last block.",
+            "Each cell: the weight from the target row's token (x: its half-hour) to the history row (y: slot 1 is the nearest history row; for M* and E slot k is the row k+1 days old, for P the slots hold placebo rows 16 to 379 days old). Mean over 4 heads, last block.",
         ]
         figs.save(
             heat_chart(
                 frames=frames,
                 title=title,
                 rows="History row (slot)",
-                cols="Target half-hour (hours after 00:00)",
+                cols="Target half-hour (hours after 12:00 UTC on the origin day)",
             ),
             path=out_dir / f"attention_across_{case}.svg",
         )
@@ -276,10 +276,12 @@ def cmd_figures(*, out_dir: Path, shown: list[str], month: str, seed: int) -> No
         dom = list(loaded)
         colour = alt.Color(
             "arm:N",
-            scale=alt.Scale(domain=dom, range=[figs.COLOUR.get(a, theme.GREY_2) for a in dom]),
+            scale=alt.Scale(
+                domain=dom, range=[figs.COLOUR.get(a, theme.ENSEMBLE_LINE) for a in dom]
+            ),
             legend=alt.Legend(title=None, orient="top"),
         )
-        x = alt.X("age:O", title="History row age (days before the origin day)")
+        x = alt.X("age:O", title="History slot (M* and E: age in days minus 1; P: a placebo row)")
         base = alt.Chart(data, width=figs.WIDTH, height=150)
         chart = alt.vconcat(
             base.mark_bar().encode(  # ty: ignore[unresolved-attribute]
