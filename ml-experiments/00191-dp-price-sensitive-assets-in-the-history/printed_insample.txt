@@ -1,5 +1,5 @@
 
-== D8 (effective capacity 10.38 MW)
+== D8 (effective capacity [withheld])
 cut        rows  a0 MAE  joint MAE  gain%   response MW (all on)  theta (points)
 2025-07-01   4359  11.337    10.811   4.64  [withheld]
 2025-08-01   5845  12.119    11.565   4.57  [withheld]
@@ -15,7 +15,7 @@ cut        rows  a0 MAE  joint MAE  gain%   response MW (all on)  theta (points)
 2026-06-01  20425  13.087    12.739   2.66  [withheld]
 mean in-sample gain 4.11%, last cut 2.66%
 
-== REG (effective capacity 11.71 MW)
+== REG (effective capacity [withheld])
 cut        rows  a0 MAE  joint MAE  gain%   response MW (all on)  theta (points)
 2024-04-01  34891   3.210     3.210   0.00      0.00   [0. 0. 0. 0.]
 2024-05-01  34967   3.173     3.173   0.00      0.00   [0. 0. 0. 0.]
@@ -46,7 +46,7 @@ cut        rows  a0 MAE  joint MAE  gain%   response MW (all on)  theta (points)
 2026-06-01  34446   3.417     3.418  -0.02      0.03   [0.   0.08 0.13 0.  ]
 mean in-sample gain 0.01%, last cut -0.02%
 
-== D5 (effective capacity 5.72 MW)
+== D5 (effective capacity [withheld])
 cut        rows  a0 MAE  joint MAE  gain%   response MW (all on)  theta (points)
 2024-04-01  32398   4.006     4.006   0.00      0.00   [0.   0.08 0.   0.  ]
 2024-05-01  32503   3.975     3.975   0.00      0.01   [0.   0.12 0.   0.  ]

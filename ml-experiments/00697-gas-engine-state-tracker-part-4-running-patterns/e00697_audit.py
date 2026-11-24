@@ -242,9 +242,8 @@ def step_3_labels() -> pl.DataFrame:
             detail=f"{share:.4f}",
         )
         check(
-            name=f"{label}: fitted unit is positive",
+            name=f"{label}: fitted unit [withheld]",
             ok=float(era["M2"]["u"]) > 0.0,
-            detail="[withheld]",
         )
         index = int(era["start"]) + np.arange(n)
         agree = float(np.mean(np.asarray(era["M2"]["flag"]) == (ta[index + PIPELINE_OFFSET] > 0.5)))

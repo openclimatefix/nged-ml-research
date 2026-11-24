@@ -1228,8 +1228,8 @@ phase B.
   `ml-experiments/engine_constants.py` reads the engine's connection date and register size. NGED
   has asked that these values stay out of the repository, so the file is not committed and a rerun
   needs a copy of it.
-- The era table that `e00709_era_table.py` writes keeps its columns and its values: the `source`
-  text of era 1 still names the Primary under which the register lists the gas engine, and
-  `e00712_asof.py` reads that Primary from the text. The script now takes the Primary, the register
-  size, and the connection date from the private file, so a rerun of experiment 709 does not change
-  the output of experiment 712.
+- A rerun of `e00709_era_table.py` changes the `source` and `note` free-text fields of the era table
+  and no other column or value. The `source` text of era 1 still names the Primary under which the
+  register lists the gas engine, and `e00712_asof.py` reads that Primary from the text. The script
+  takes the Primary, the register size, and the connection date from the private file, so a rerun
+  of experiment 709 does not change the output of experiment 712.

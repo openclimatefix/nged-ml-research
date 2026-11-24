@@ -83,7 +83,7 @@ engine's output, and that G2's own telemetry channel (its analogue) does not wor
 design note's calculations from committed code. We call the share of half-hours in which D8's
 metered power sat more than 2.5 MW below the fitted model's expected power the "shortfall share". We
 found the date on which that share jumped. We also checked the same share on three comparison
-Primaries (D3, D5, and the register's Primary).
+Primaries (D3, D5, and D14).
 
 **The design note's numbers reproduce, and its account of D8's drops holds in outline.** While G2's
 output arrived, D8's
@@ -104,9 +104,9 @@ holds both high-shortfall and low-shortfall months.
 
 ![Shortfall share of D8 and three control substations, pooled over three eras](figure_1.svg)
 
-*Figure 1. D8's shortfall share against D3, D5, and the register's Primary, pooled over the eras
+*Figure 1. D8's shortfall share against D3, D5, and D14, pooled over the eras
 before the shortfall starts, while it lasts, and after it fades (near zero throughout for D3, D5,
-and the register's Primary).*
+and D14).*
 
 ![Shortfall share of D8 and share of half-hours with a G2 reading, before and after the break](figure_2.svg)
 
@@ -163,7 +163,7 @@ history. The earlier history includes the era in which the shortfall lasts.*
   (likelihood-ratio set and bootstrap 95% both 2023-08-14 to 2023-08-21).
 - **No control within 30 days:** held, with a caveat. D3 and D5 have no step (0.000). Their best
   split falls on the earliest allowed week, 2023-06-26, 49 days before D8's, because the likelihood
-  is flat and the search returns the first tie. The register's Primary's step is +0.005 at
+  is flat and the search returns the first tie. D14's step is +0.005 at
   2025-09-29.
 - **Two-step fit of D8 over the whole window:** up at 2023-08-14 (0.010 to 0.254), down at
   2026-03-09 (to 0.029).
@@ -205,7 +205,7 @@ history. The earlier history includes the era in which the shortfall lasts.*
   of at least 0.10 (+0.246). D9's usable weeks start in January 2024 and open with a four-week burst
   (weekly shares 0.08, 0.52, 0.65, 0.34 from 2024-01-08), after which the share is near zero, so the
   fit reads a step of -0.198 at 2024-02-26. D18 has 27 usable weeks and one week at 0.301 in October
-  2025, fitted as a step of -0.038. D15 has no usable weeks. The register's Primary's highest week
+  2025, fitted as a step of -0.038. D15 has no usable weeks. D14's highest week
   is 0.074.
 - **ECR price-following assets under the 16 Primaries (connected):** 2 gas or oil engines (one at
   D5; their sizes and dates are withheld) and 3 batteries of 0.65 MW (D11, D2, D9). 2 batteries (0.2

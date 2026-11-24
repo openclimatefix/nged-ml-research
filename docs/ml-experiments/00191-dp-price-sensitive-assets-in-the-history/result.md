@@ -15,7 +15,7 @@ size: >-
   any score is read. Callers: this folder's scripts, which copy the ensemble-driven GAM-K engine of
   experiment 152 and call the reviewed `studies.dp_*` modules unchanged. No new modelling module.
 hypothesis: >-
-  Some of D8's multi-day drops (experiment 159) and the matching shortfalls at its neighbour the
+  Some of D8's multi-day drops (experiment 159) and the matching shortfalls at the
   register's Primary are output of price-following gas generation (experiment 186), which no weather
   input explains and no forecast of the price can reach at a lead of days. Letting the convex demand
   model (GAM-K) see the half-hourly price in its training history, gated by the registered
@@ -107,7 +107,7 @@ advice:
 
 **Take-home message: modelling a price-following asset in the history does not improve the forecast
 at D8 or the register's Primary.** D8 and the register's Primary are two primary substations of
-National Grid Electricity Distribution (NGED) in the Boston area. The register's Primary is the
+National Grid Electricity Distribution (NGED). The register's Primary is the
 Primary under which NGED's Embedded Capacity Register lists a gas engine; its label is read from a
 private file. A price-following asset is a generator or battery whose output follows the electricity
 price. [Experiment 186](../00186-switching-d8-gas-peaker-spark-spread-and-triads/result.md) found
@@ -184,10 +184,9 @@ response does not carry forward to the scored year.
 - **In-sample gain (the ceiling).** On each fit's own training rows the price columns lower D8's
   mean absolute error by 4.1% on average over the 12 fits (2.7% to 4.8%). At the register's Primary
   the in-sample gain is 0.0% and the response is 0 to 0.13 MW. At D5 it is 0.0%.
-- **No-harm check.** The largest rise in quantile score at any of the five decision Primaries (D5,
-  D10, D11, the register's Primary, D16) is 0.011 points, at the register's Primary for H, against
-  the 0.02 limit. With the gate switched on for the whole history at sites with no asset (placebo),
-  D10 rises by 0.009 points for H.
+- **No-harm check.** The largest rise in quantile score at any of the five decision Primaries is
+  0.011 points, for H, against the 0.02 limit. With the gate switched on for the whole history at
+  sites with no asset (placebo), D10 rises by 0.009 points for H.
 - **Tails.** At D8 the reference's q05 quantile lies above 30.8% of readings (nominal 5%), q95 above
   73.1% (nominal 95%), q01 above 20.6% (1%) and q99 above 83.9% (99%). H changes none of them by
   more than 0.5 points. The register's Primary is close to nominal (q05 6.4%, q95 95.1%). The D8
@@ -228,8 +227,10 @@ response does not carry forward to the scored year.
 **The scripts read the connection dates of the registered gas engines and the register's Primary
 from a private file.** `ml-experiments/engine_constants.py` loads them from
 `data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
-out of the repository. The file is not committed, so a rerun needs a copy of it. The printed logs
-show the register's Primary as REG.
+out of the repository. The file is not committed, so a rerun needs a copy of it. The scripts print
+the register's Primary as `[withheld]` through `shown()` in `e00191_common.py`. The committed
+logs of the in-sample, report, and score scripts print it as REG, so a rerun reprints those logs
+with `[withheld]`.
 
 ## Open questions
 

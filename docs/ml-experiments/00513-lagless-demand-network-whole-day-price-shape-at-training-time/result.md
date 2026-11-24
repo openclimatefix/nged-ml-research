@@ -128,7 +128,8 @@ numbers are interim and unaudited until the reviews are recorded in the pull req
   near min-to-max intervals, and the signs are mixed.
 - **Stop rule.** Neither group's point estimate reaches minus the minimum detectable effect, and
   the six's interval includes zero, so P-drop, P-aux, and P-teach did not run.
-- **Known-asset Primaries (D2, D5, D8, D9, D11, D14) against the others, oracle minus control.**
+- **Known-asset Primaries (D2, D5, D8, D9, D11, and the register's Primary) against the others,
+  oracle minus control.**
   Eight: +0.059 against -0.003. Six: -0.027 against -0.089.
 - **Horizon bands, oracle minus control.** Eight: +0.059 (day 1), +0.053 (days 2 to 3), -0.011
   (days 4 to 10). Six: +0.014, -0.020, -0.065.
@@ -300,3 +301,8 @@ generation, per half-hour, so they describe the day's residual demand shape.
 Cleaned data and the D15 and D18 start cut (through experiment 428's rows); rows with no labelled
 event; July 2026 unused; no XGBoost work; metered generators are not shown (this experiment scores
 substations); titles say "load-shift", never "switching"; every interim number is unaudited.
+
+**The slices script reads the name of the register's Primary from a private file.**
+`ml-experiments/engine_constants.py` loads it from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that this name stay out
+of the repository. The file is not committed, so a rerun of `e00513_slices.py` needs a copy of it.

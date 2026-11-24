@@ -25,9 +25,9 @@ SITE_NAMES: Final[dict[str, str]] = {
     "D8": "D8",
     "D3": "D3",
     "D5": "D5",
-    common.REGISTER_PRIMARY: "register's Primary",
+    common.REGISTER_PRIMARY: common.REGISTER_PRIMARY,
 }
-"""Chart label of each site, naming the register's Primary generically."""
+"""Chart label of each site."""
 
 
 def main() -> None:  # noqa: D103

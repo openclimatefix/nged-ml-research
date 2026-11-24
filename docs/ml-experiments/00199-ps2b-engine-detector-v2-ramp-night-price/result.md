@@ -37,7 +37,7 @@ prediction: >-
   this look at G2's edges, so K1 and K2 cannot test it independently) is expected to help little at
   D10 and D11; the false alarms there are an independent test. The price arm cuts false alarms by
   under a tenth, because price moves the chance of running only from 9% to 27%. All three together
-  meet the 196 false-alarm bar at D3, D8 clean history, D10, D11, the register's Primary, and D16.
+  meet the 196 false-alarm bar at D3, D8 clean history, D10, D11, D14, and D16.
   The flagged days at D5 follow the spark spread more than matched unflagged days do; those at D10
   and D11 do not.
 decision_rule: >-
@@ -49,7 +49,7 @@ decision_rule: >-
   version of experiment 196's bar, which that experiment scored on all rows): at most 3% of clean
   night half-hours flagged and at most one false active day a month, an active day being a UTC date
   with 4 or more flagged night half-hours. Bar list, each entry a separate test: D3, D8 clean
-  history (even months, which the noise fit did not use), D10, D11, the register's Primary, D16, D8
+  history (even months, which the noise fit did not use), D10, D11, D14, D16, D8
   2025-03 to 2025-12, and D8 2026-01 to 2026-06. For the two D8 periods the share bar is relaxed to
   3% plus the share of night half-hours below -2.5 MW, capped at 10%, because an engine may be
   present. `supported`: every known-answer threshold passes and every entry of the bar list passes.
@@ -179,16 +179,16 @@ written for this experiment.
 - **K3 (G2 injected into D8's night rows from 2025-03, recall only, descriptive).** v1 recall at 1
   unit 0.92 (0.79 to 0.99); v2 0.36 (0.19 to 0.55). Precision is not meaningful for K3.
 - **False alarms at night (flagged share; false active days a month).** Bar: 3% and 1 day. v1 passes
-  at D3 (0.4%, 0.22), D5 (0.3%, 0.07), D10 (0.1%, 0.04), the register's Primary, D16, and D8's
+  at D3 (0.4%, 0.22), D5 (0.3%, 0.07), D10 (0.1%, 0.04), D14, D16, and D8's
   engine-free history, and fails at D11 (4.6%, 1.08). N fails at D8's engine-free history (2.6%,
   1.45). v2 is 0.0% with 0.00 days at every one of these, and v2 on all rows is also 0.0% at D3, D5,
-  D10, D11, the register's Primary, and D16.
+  D10, D11, D14, and D16.
 - **D8 from 2025-03 (relaxed bar capped at 10%).** v1 flags 36.3% of night half-hours (22.9 days a
   month) in 2025-03 to 2025-12 and 32.5% (18.8) in 2026-01 to 2026-06. N: 33.1% and 30.3%. v2: 16.7%
   (10.6) and 16.5% (9.7). Post hoc lenient: 31.6% and 28.7%. The left tail below -2.5 MW holds 18.8%
   and 11.6% of night half-hours. Both periods fail the bar for every arm.
 - **Price gate.** The gate changes little: at night it removes under 1.5% of D8's flagged half-hours
-  from 2025-03 and none at D3, D10, or the register's Primary. On all rows it cuts D5's false active
+  from 2025-03 and none at D3, D10, or D14. On all rows it cuts D5's false active
   days from 2.02 to 1.72 a month and D10's from 1.05 to 0.90. The gate is only scored where prices
   exist (D8's engine-free history has 576 even-month rows with a price), and K2's price is G2's own
   at the time it recorded the output, a choice that favours the gate.
