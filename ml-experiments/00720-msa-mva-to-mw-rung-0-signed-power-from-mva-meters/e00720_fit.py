@@ -1,4 +1,5 @@
 # ruff: noqa: E501
+"""Experiment 720: fitting the demand mean and the residual of the hindsight model from anchor rows.
 
 All arrays are `(n_days, 48)` in points of capacity. The demand mean `f` is a ridge regression of
 gross demand `g = p + v` on half-hour of day by day type and on temperature (a linear and a hinge
