@@ -186,7 +186,7 @@ descriptive. During the event C2 covers less than C0 at both Primaries (D16 day4
 ## Labelled events (label not verified by the power readings)
 
 These are NGED's labelled events of 3 days or more that fall in a fold month with stored forecasts
-(11 events; the page shows up to 12). The dashed blue line is the observed power minus the labelled
+(11 events; the page draws the 6 at Primaries other than D8). The dashed blue line is the observed power minus the labelled
 depth, which is an estimate of the NRA if the label were right. **NGED's labels are known to be
 imperfect, so a plot where the forecast does not follow the label is not an error.** The status
 comes from [experiment
@@ -194,9 +194,7 @@ comes from [experiment
 only event 55 is verified, and event 146's label has the wrong dates and sign. "Not seen by the
 power rule" is the status that [experiment
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)
-calls "rejected". Events 177, 178, 181, and 182 are the mirrored halves of labelled pairs (the
-partner has the opposite depth on the same dates). Event 179 has no partner. Look at whether the
-orange band moves toward the dashed blue line.
+calls "rejected". Look at whether the orange band moves toward the dashed blue line.
 
 ![D5, labelled event 146](labelled_146_D5_40d.svg)
 
@@ -213,45 +211,20 @@ the window: 14.
 D3, event 115 (+3.22 MW, 7.0 days from 2025-12-15). 580 status: not seen by the power rule. Gate-on
 origin days in the window: 0.
 
-![D8, labelled event 178](labelled_178_D8_7d.svg)
-
-D8, event 178 (-3.22 MW, 7.0 days from 2025-12-15). 580 status: not seen by the power rule. Gate-on
-origin days in the window: 0.
-
 ![D5, labelled event 149](labelled_149_D5_5d.svg)
 
 D5, event 149 (+2.66 MW, 4.8 days from 2026-01-27). 580 status: unpaired step (possible level
 change). Gate-on origin days in the window: 6.
-
-![D8, labelled event 182](labelled_182_D8_5d.svg)
-
-D8, event 182 (-2.66 MW, 4.8 days from 2026-01-27). 580 status: not seen by the power rule. Gate-on
-origin days in the window: 0.
 
 ![D5, labelled event 145](labelled_145_D5_4d.svg)
 
 D5, event 145 (+2.41 MW, 4.2 days from 2025-10-11). 580 status: not seen by the power rule. Gate-on
 origin days in the window: 0.
 
-![D8, labelled event 177](labelled_177_D8_4d.svg)
-
-D8, event 177 (-2.41 MW, 4.2 days from 2025-10-11). 580 status: not seen by the power rule. Gate-on
-origin days in the window: 0.
-
 ![D5, labelled event 147](labelled_147_D5_4d.svg)
 
 D5, event 147 (+3.07 MW, 3.7 days from 2026-01-15). 580 status: not seen by the power rule. Gate-on
 origin days in the window: 18.
-
-![D8, labelled event 181](labelled_181_D8_4d.svg)
-
-D8, event 181 (-3.07 MW, 3.7 days from 2026-01-15). 580 status: not seen by the power rule. Gate-on
-origin days in the window: 0.
-
-![D8, labelled event 179](labelled_179_D8_3d.svg)
-
-D8, event 179 (-2.90 MW, 3.3 days from 2025-12-28). 580 status: not seen by the power rule. Gate-on
-origin days in the window: 0.
 
 ## Injected events
 
