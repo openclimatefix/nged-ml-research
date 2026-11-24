@@ -186,23 +186,58 @@ def recut_by_class(
     }  # fmt: skip
 
 
-def history_majority(*, day_cls: np.ndarray, n_days: int) -> np.ndarray:
-    """Return, per day, the class held by most of the `n_days` days before it (-1 when none is running or idle, or on a tie)."""
-    out = np.full(len(day_cls), -1)
-    for d in range(n_days, len(day_cls)):
-        h = day_cls[d - n_days : d]
-        r, i = int((h == 1).sum()), int((h == 0).sum())
-        out[d] = 1 if r > i else 0 if i > r else -1
+def history_class_before_origin(
+    *, cls_by_day: np.ndarray, origin_day: np.ndarray, first: int = 2, last: int = 15
+) -> np.ndarray:
+    """Return the class held by most of the UTC days `first` to `last` days before each origin's date (-1 on a tie or none).
+
+    This is the history of `reverse_flow_analysis.md` section 4: the 14 UTC days 2 to 15 days before the
+    origin's date. `origin_day` holds each origin's day index on the same axis as `cls_by_day`.
+    """
+    out = np.full(len(origin_day), -1)
+    for i, d in enumerate(origin_day):
+        lo, hi = int(d) - last, int(d) - first + 1
+        if lo < 0 or hi > len(cls_by_day):
+            continue
+        h = cls_by_day[lo:hi]
+        r, n_idle = int((h == 1).sum()), int((h == 0).sum())
+        out[i] = 1 if r > n_idle else 0 if n_idle > r else -1
     return out
 
 
+def monthly_running_hours(*, p_days: np.ndarray, day_month_index: np.ndarray) -> np.ndarray:
+    """Return the hours with `P(n >= 1) > 0.5` in each distinct calendar month (year and month), not summed across years."""
+    return np.array(
+        [
+            float((p_days[day_month_index == m] > RUNNING_P).sum()) / 2.0
+            for m in np.unique(day_month_index)
+        ]
+    )
+
+
+def v2_k1_gate_passed(*, private: Any) -> bool:
+    """Return whether the private V2 and K1 outputs both exist and both bars passed (D8's read-outs are gated on them)."""
+    import polars as pl
+
+    v2p, k1p = private / "v2_bar.csv", private / "k1_v3.csv"
+    if not (v2p.exists() and k1p.exists()):
+        return False
+    return bool(pl.read_csv(v2p)["bar_passed"][0]) and bool(pl.read_csv(k1p)["k1_passed"][0])
+
+
 def run_section3(
-    *, dense_raw: Any = None, cap_hours: float = 15.0, fit_kwargs: dict[str, Any] | None = None
+    *,
+    dense_raw: Any = None,
+    cap_hours: float = 15.0,
+    fit_kwargs: dict[str, Any] | None = None,
+    require_gate: bool = True,
 ) -> int:  # pragma: no cover - needs the stored panel
     """Run the D8 analyses of section 3 and the V4 read-outs on stored assets (waits for the code review).
 
-    Reads experiment 694's panel (through its loaders), the private era file `era_dates.json` (keys
-    `d8_era_start` and `d8_era_end`, ISO dates, never committed), the D8 temperature from experiment 713's
+    Refuses to run unless the private V2 and K1 results passed. Reads experiment 694's panel (through its
+    loaders), the private era file `era_dates.json` (keys `d8_era_start`, `d8_era_end`, and `solar_start`,
+    ISO dates, never committed; the era must end before the farm joins the series, so the reading is
+    `X >= 0` and the recovered gross demand is the reading plus the engine's expected output), the D8 temperature from experiment 713's
     dense array, and experiment 713's stored `M1` forecasts. Every output goes under the private folder.
     Reports of D8 are pooled over the era: no month or date labels leave this function, and the running
     months are reduced to the hour bands of `e00720_guard.pool_bands`.
@@ -217,10 +252,19 @@ def run_section3(
     import e00720_v2 as v2
     import polars as pl
 
+    if require_gate and not v2_k1_gate_passed(private=guard.PRIVATE_DIR):
+        msg = (
+            "D8's read-outs run only after V2 and K1 both passed (private v2_bar.csv and k1_v3.csv)"
+        )
+        raise SystemExit(msg)
     era = json.loads(guard.private_path(name="era_dates.json").read_text())
-    start, end = (
-        datetime.fromisoformat(era[k]).replace(tzinfo=UTC) for k in ("d8_era_start", "d8_era_end")
+    start, end, solar = (
+        datetime.fromisoformat(era[k]).replace(tzinfo=UTC)
+        for k in ("d8_era_start", "d8_era_end", "solar_start")
     )
+    if end > solar:
+        msg = "the era must end before the farm joins the series: until the farm-and-engine variant passes, no signed-power read-out runs there"
+        raise SystemExit(msg)
     r694.init()
     a, b = c694.stamp(when=start), c694.stamp(when=end)
     y = r694.SERIES["D8"][a - r694.PRE_ROLL : b]
@@ -246,7 +290,8 @@ def run_section3(
     weekday = (v2.START_DOW_GRID + day_idx) % 7
     day_type = np.where(weekday == 5, 1, np.where(weekday == 6, 2, 0))
     base = np.datetime64(c694.GRID_START.replace(tzinfo=None), "D")
-    month = ((base + day_idx).astype("datetime64[M]").astype(int)) % 12 + 1
+    month_abs = (base + day_idx).astype("datetime64[M]").astype(int)
+    month = month_abs % 12 + 1
     rows: list[dict[str, Any]] = []
     if dense_raw is not None:
         import e00506_data as data  # ty: ignore[unresolved-import]
@@ -293,9 +338,7 @@ def run_section3(
     pl.DataFrame(
         {"temperature_band": range(len(share_band)), "running_day_share": share_band}
     ).write_csv(guard.private_path(name="d8_running_share_by_temperature.csv"))
-    monthly_hours = np.array(
-        [float((p_days[month == m] > RUNNING_P).sum()) / 2.0 for m in range(1, 13)]
-    )
+    monthly_hours = monthly_running_hours(p_days=p_days, day_month_index=month_abs)
     pl.DataFrame(
         {
             "band": guard.pool_bands(monthly_hours=monthly_hours)["band"],
@@ -307,17 +350,21 @@ def run_section3(
 
 
 def run_m1_recut(
-    *, cls_by_day: np.ndarray, first_day_us: int, ts_id: int, history_days: int = 7
+    *, cls_by_day: np.ndarray, first_day_us: int, ts_id: int
 ) -> dict[str, Any]:  # pragma: no cover - needs the stored forecasts
-    """Re-score experiment 713's stored `M1` forecasts of one Primary by day class (cells pooled across folds).
+    """Re-score experiment 713's stored `M1` minus Candidate forecasts of one Primary by day class, cells pooled across folds.
 
-    `cls_by_day[d]` is the class (1 running, 0 idle, -1 other) of UTC day `first_day_us // US_PER_DAY + d`.
-    The history majority is the class held by most of the `history_days` days before the target day, an
-    assumption the page states. Reads `work/fits/M1/*.parquet` of experiment 713; nothing is written.
+    A cell is one origin and one valid day of the headline band (leads of 24 h up to but not including
+    240 h), as in `reverse_flow_analysis.md` section 4. `cls_by_day[d]` is the class (1 running, 0 idle,
+    -1 other) of UTC day `first_day_us // US_PER_DAY + d`. The history class of a cell is the majority
+    class of the UTC days 2 to 15 days before the origin's date. The measure is the absolute error of
+    `M1`'s median minus the Candidate's, seed 0 of each. Reads `work/fits/M1/*_s0.parquet` of experiment 713
+    and the Candidate's stored seed-0 files of experiment 667; nothing is written.
     """
+    import e00667_export as exp  # ty: ignore[unresolved-import]
     import e00720_real as real
     import polars as pl
-    from ml_core.paths import ML_EXPERIMENTS_DATA_DIR  # ty: ignore[unresolved-import]
+    from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
     root = (
         ML_EXPERIMENTS_DATA_DIR
@@ -326,19 +373,33 @@ def run_m1_recut(
         / "fits"
         / "M1"
     )
-    hist = history_majority(day_cls=cls_by_day, n_days=history_days)
-    frames = [
-        pl.read_parquet(p).filter(pl.col("time_series_id") == ts_id)
-        for p in sorted(root.glob("*_s0.parquet"))
-    ]
-    f = pl.concat(frames)
+    keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
+    parts = []
+    for path in sorted(root.glob("*_s0.parquet")):
+        month = path.name.split("_")[0]
+        m1 = (
+            pl.read_parquet(path)
+            .filter(pl.col("time_series_id") == ts_id)
+            .select(*keys, "lead_hours", m1="q50", actual="actual")
+        )
+        cand = exp.ROOT / f"P7_D50_{month}" / "work" / "fits" / "P5" / f"{month}_d0_s0.parquet"
+        c = pl.read_parquet(cand).filter(pl.col("time_series_id") == ts_id).select(*keys, c="q50")
+        parts.append(m1.join(c, on=keys, how="inner"))
+    f = pl.concat(parts).filter((pl.col("lead_hours") >= 24) & (pl.col("lead_hours") < 240))
     vt = f["valid_time"].dt.epoch("us").to_numpy()
-    day = (vt // real.US_PER_DAY) - (first_day_us // real.US_PER_DAY)
+    origin = f["power_fcst_init_time"].dt.epoch("us").to_numpy()
+    day0 = first_day_us // real.US_PER_DAY
+    day = vt // real.US_PER_DAY - day0
+    origin_day = origin // real.US_PER_DAY - day0
     inside = (day >= 0) & (day < len(cls_by_day))
-    err = np.abs(f["q50"].to_numpy() - f["actual"].to_numpy())[inside]
+    diff = (
+        np.abs(f["m1"].to_numpy() - f["actual"].to_numpy())
+        - np.abs(f["c"].to_numpy() - f["actual"].to_numpy())
+    )[inside]
     hour = ((vt % real.US_PER_DAY) // 3_600_000_000)[inside]
+    hist = history_class_before_origin(cls_by_day=cls_by_day, origin_day=origin_day[inside])
     return recut_by_class(
-        abs_error=err, hour=hour, target_cls=cls_by_day[day[inside]], history_cls=hist[day[inside]]
+        abs_error=diff, hour=hour, target_cls=cls_by_day[day[inside]], history_cls=hist
     )
 
 
@@ -395,8 +456,16 @@ def selftest() -> int:
     err = 0.3 + 0.6 * (t_cls != h_cls) + rng.normal(0, 0.05, 5000)
     rc = recut_by_class(abs_error=err, hour=hr, target_cls=t_cls, history_cls=h_cls)
     assert abs(rc["different"] - 0.9) < 0.05 and abs(rc["same"] - 0.3) < 0.05
-    maj = history_majority(day_cls=np.array([1, 1, 1, 0, 0, 0, 0, 1, 1, 1]), n_days=3)
-    assert maj.tolist()[3] == 1 and maj.tolist()[6] == 0
+    day_cls = np.array([1] * 6 + [0] * 8 + [1] * 10 + [0] * 10)
+    h = history_class_before_origin(cls_by_day=day_cls, origin_day=np.array([16, 21, 5, 22, 30]))
+    assert h.tolist() == [0, 0, -1, -1, 1], (
+        h.tolist()
+    )  # origin 5 has too little history; origin 22 is a tie
+    mw = monthly_running_hours(
+        p_days=np.vstack([np.full((30, 48), 0.9), np.zeros((30, 48))]),
+        day_month_index=np.array([0] * 30 + [12] * 30),
+    )
+    assert mw.tolist() == [720.0, 0.0]  # two Januaries a year apart are two months, not one
     print(
         "PASS section-3 analyses and V4 read-outs: matched profiles, running share, fifths, D12 export bands, class re-cut"
     )
