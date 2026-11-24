@@ -433,7 +433,7 @@ def cmd_events(*, tag: str, out_dir: Path, per_group: int = 3) -> None:
         chart = alt.layer(shade, lines, truth_line).properties(
             title=alt.TitleParams(
                 [
-                    f"Primary {run['label']} ({run['group']}), a logged event of {run['length']} origin days",
+                    f"Primary {run['label']}, {GROUP_PHRASE[run['group']]}: a logged event of {run['length']} origin days",
                     "Dashed black: actual. Coloured: forecast of the next 24 hours from each origin day. Shaded: days with half-hours inside the event.",
                 ],
                 anchor="start",
@@ -441,7 +441,7 @@ def cmd_events(*, tag: str, out_dir: Path, per_group: int = 3) -> None:
                 subtitleFontSize=11,
             )
         )
-        save(chart, path=out_dir / f"event_{run['group']}_{run['label']}_{k}.svg")
+        save(chart, path=out_dir / f"event_{FILE_GROUP[run['group']]}_{run['label']}_{k}.svg")
 
 
 def month_interval(
@@ -455,7 +455,12 @@ def month_interval(
 
 
 LABEL_ORDER_KEY = lambda label: int(label[1:])  # noqa: E731
-GROUP_TITLE: Final = {"six": "signed-MW Primaries (six)", "eight": "MVA-only Primaries (eight)"}
+GROUP_TITLE: Final = {"six": "The six signed-MW Primaries", "eight": "The eight MVA-only Primaries"}
+FILE_GROUP: Final = {"six": "signed_mw", "eight": "mva_only"}
+GROUP_PHRASE: Final = {
+    "six": "one of the six signed-MW Primaries",
+    "eight": "one of the eight MVA-only Primaries",
+}
 CONTRAST_ARMS: Final = ("M*", "P", "E", "K", "N", "A")
 DRAWS: Final = 10_000
 

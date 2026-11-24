@@ -41,8 +41,10 @@ decision_rule: >-
   same sign for each of the 5 seeds, and a point estimate of at least twice the seed-noise standard
   error (0.034 at the six signed-MW Primaries, 0.090 at the eight MVA-only Primaries). The
   smallest gain worth porting is tau = 0.05
-  points of CRPS, set above the protocol's 0.03 because the network replaces the whole network and
-  its input pipeline. A group reads, in order: clear loss (lower limit above +tau, all guards),
+  points of CRPS, set above the protocol's 0.03 because the MSA neural network replaces the
+  Candidate's whole
+  neural network and its input pipeline. A group reads, in order: clear loss (lower limit above
+  +tau, all guards),
   loss (lower limit above 0, all guards), gain (upper limit below 0, point estimate at or below
   -tau, all guards), small gain (upper limit below 0 and the seed guard holds for 4 of 5 seeds),
   no detectable difference (interval inside +-delta, delta 0.06 at the six signed-MW Primaries and
@@ -66,52 +68,59 @@ metric: >-
   absolute error of the median beside it.
 verdict: small gain
 best_arm: >-
-  `M1`, the axial-attention network with frozen pre-trained encoders. At the six signed-MW Primaries
-  it scores 0.147 points of capacity better than the Candidate (98.75% interval -0.262 to -0.020,
-  5 seeds, 8 folds, 24 to 240 h). At the eight MVA-only Primaries it is not detectably different
-  (+0.022, -0.092 to +0.112).
+  `M1`, the axial-attention neural network with frozen pre-trained encoders. At the six signed-MW
+  Primaries it scores 0.147 points of capacity better than the Candidate (98.75% interval -0.262 to
+  -0.020, 5 seeds, 8 folds, 24 to 240 h), though the t guard on monthly differences fails. At the
+  eight MVA-only Primaries it is not detectably different (+0.022, -0.092 to +0.112).
 headline: >-
-  A network that reads the last 14 days as a grid of days by half-hours, with attention across days
-  and within a day, forecast the six signed-MW Primaries better than the Candidate of experiment 667
-  by 0.147 points of capacity of CRPS (98.75% interval -0.262 to -0.020), and beat a placebo fed
-  random past days by 0.140 (-0.253 to -0.033). At the eight MVA-only Primaries it was not
-  detectably different from the Candidate (+0.022, -0.092 to +0.112), and the positive difference
-  comes from one Primary, D8. The known-answer gate failed and was waived.
+  A neural network that reads the last 14 days of power, weather, and calendar as a grid of days by
+  half-hours, with attention across days and within a day, forecast the six signed-MW Primaries
+  better than the Candidate of experiment 667 by 0.147 points of capacity of CRPS (98.75% interval
+  -0.262 to -0.020), and beat a placebo fed random past days by 0.140 (-0.253 to -0.033). At the
+  eight MVA-only Primaries the neural network was not detectably different from the Candidate
+  (+0.022, -0.092 to +0.112), and the pooled difference rests on two Primaries, D8 and D12. The
+  neural network is worse than the Candidate at the two report-only Primaries, D15 and D18. The
+  known-answer gate failed and was waived.
 lessons: >-
-  The 14 recent days carry information that random past days do not (H2 at both groups), but a
-  fixed read-out over the 14 same-half-hour readings with no trunk attention (arm `K`) is within
-  0.06 points of the full network, and arms `K` and `E` gain as much as `M1` on lasting steps. The
-  gain is therefore not shown to come from attention. At the eight MVA-only Primaries, one Primary
-  sets the sign of the pooled difference, and the q99 pinball loss is worse than the Candidate's.
+  The 14 recent days carry information that random past days do not (the placebo contrast H2, in
+  both groups of Primaries). A learned read-out over the 14 same-half-hour readings with no trunk
+  attention (arm `K`) is within 0.06 points of the full neural network `M1` in CRPS, though the
+  trunk attention improves the median error at the six signed-MW Primaries. On injected lasting
+  steps, arms `K` and `E` gain about as much as `M1`, so the gain is not shown to come from
+  attention. At the eight MVA-only Primaries, two Primaries hold the sign of the pooled difference,
+  and the q99 pinball loss is worse than the Candidate's.
 take_home_message: >-
   A neural network that reads a substation's last 14 days of power, weather, and calendar as a grid
-  forecast the six signed-MW Primaries slightly better than the Candidate (0.147 points of
-  capacity, about 5%), and the gain is not shown to come from the attention layers, because a
-  simpler read-out over the same days does almost as well. At the eight MVA-only Primaries the
-  network was no better, and the one difference it showed comes from one substation, so the network
-  is not shown to help the other seven. The experiment failed its test of whether the network
-  follows a lasting level shift, and the maintainer waived the test, so the era results are
-  descriptive only.
+  forecast the six substations that report signed megawatts slightly better than the Candidate
+  (0.147 points of capacity of CRPS, about 5% of the Candidate's CRPS), and the gain is not shown to
+  come from the attention layers, because a simpler learned read-out over the same days does almost
+  as well. At the eight substations that report only megavolt-amperes the neural network was no
+  better, the pooled difference rests on two substations, and the neural network is clearly worse at
+  the two short-history substations. The history rows use weather analyses that a live service could
+  not build for 2 to 5 days before the origin, and the test of whether the neural network follows a
+  lasting level shift failed and was waived, so the era results are descriptive only.
 advice:
   - >-
-    Score a read-out over the 14 same-half-hour readings with no trunk attention (arm `K`) before
-    crediting attention for a gain from recent days, because `K` was within 0.06 points of the full
-    network (experiment 713, M1 minus K).
+    Score a learned read-out over the 14 same-half-hour readings with no trunk attention (arm `K`)
+    before crediting attention for a gain from recent days, because `K` was within 0.06 points of
+    the full neural network in CRPS (experiment 713, M1 minus K).
   - >-
-    Read a gain at the eight MVA-only Primaries per Primary before pooling, because one Primary,
-    D8, set the sign of the pooled difference and the leave-one-Primary-out test flipped it
-    (experiment 713, H1 guards).
+    Read a gain at the eight MVA-only Primaries per Primary before pooling, because leaving out D8
+    or D12 turned the pooled difference negative (experiment 713, H1).
   - >-
-    Run the control arms (`K`, `E`, `P`) on the injected lasting-step bank before reading a gain
-    there as evidence for attention, because `K` and `E` gained as much as `M1` (experiment 713,
-    secondary R2).
+    Run the control arms (`K`, `E`, `P`) on the injected lasting-step worlds before reading a gain
+    there as evidence for attention, because `K` and `E` gained about as much as `M1` (experiment
+    713, secondary R2).
   - >-
-    Diagnose a known-answer gate that fails four runs in a row before spending the real folds: the
+    Score D15 and D18 beside the two counted groups, because the group readings hid a loss of
+    roughly 1.6 points at those two Primaries (experiment 713, all-16 pooled means).
+  - >-
+    Diagnose a known-answer gate that fails four runs in a row before running the real folds: the
     follow share of arm `M` stayed at 0.01 to 0.14 against 0.75 (experiment 713, the gate section).
   - >-
-    Compare an injected-bank follow share across networks only on the same bank and the same
-    origins: the Candidate's stored experiment 667 injections hold experiment 650's events, not
-    experiment 581's bank (experiment 713, limitations).
+    Compare follow shares on an injected bank across forecasters only on the same bank and the same
+    origins: the injected forecasts that experiment 667 stored for the Candidate hold experiment
+    650's random events, not experiment 581's bank (experiment 713, limitations).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -122,77 +131,118 @@ it, so every statement about following level shifts is unsupported by a passing 
 
 We asked whether a neural network that reads the last 14 days of power, weather, and calendar as a
 grid of days by half-hours, with attention across days and within a day, forecasts the demand of 16
-primary substations better than the Candidate of [experiment
-667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md). We also
-asked whether any gain comes from those 14 recent days, by comparing the network with an identical
-copy whose 14 history days are random past days (the placebo). We scored 8 test months (2025-11 to
-2026-06) at lead times of 24 to 240 hours. Across the six signed-MW Primaries, the network was
-better than the Candidate by 0.147 points of capacity (CRPS, lower is better), with an interval that
-excludes zero at the pre-registered level. Across the eight MVA-only Primaries, it was not
-detectably different from the Candidate. At the eight MVA-only Primaries the network beat the
-placebo, so the recent days carry information there too, but the positive difference from the
-Candidate comes from one Primary, D8, and the network is not shown to help the other seven.
+primary substations (Primaries) better than the Candidate, the two-output demand neural network that
+[experiment 667](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)
+backtested over a year. We also asked whether any gain comes from those 14 recent days, by comparing
+the neural network with an identical copy whose 14 history days are random past days (the placebo).
+We scored 8 test months (2025-11 to 2026-06) at lead times of 24 to 240 hours, in continuous ranked
+probability score (CRPS, lower is better) expressed in points of capacity, where one point is 1% of
+a Primary's capacity. The counted readings keep two groups apart: the six signed-MW Primaries, whose
+telemetry records power in megawatts with its sign, and the eight MVA-only Primaries, whose
+telemetry records only apparent power in megavolt-amperes. The remaining two Primaries, D15 and D18,
+are report-only.
+
+**At the six signed-MW Primaries the neural network was better than the Candidate by 0.147 points,
+and at the eight MVA-only Primaries it was not detectably different.** The 98.75% interval of the
+six signed-MW difference is -0.262 to -0.020. The neural network beat the placebo in both groups, so
+the recent days carry information a random past day does not. The result is a research result with
+limits that matter (see "Limitations disclosed"): the neural network is worse than the Candidate at
+D15 and D18, the interval at the six signed-MW Primaries fails the pre-registered t test on monthly
+differences, and the history rows use weather analyses that a live service could not build for the
+days 2 to 5 before the origin.
 
 ## Verdict
 
 **The verdict is "small gain", read from the scorer's pre-registered rule: a small gain at the six
 signed-MW Primaries and no detectable difference at the eight MVA-only Primaries.** Every number is
-the network `M1` minus the reference in CRPS, in points of capacity, over the 24 to 240 h band, from
-5 seeds and 8 test months, with a 98.75% interval from resampling whole months. The 98.75% level is
-the pre-registered Bonferroni correction across the four counted readings.
+the neural network `M1` (the arm with frozen pre-trained weather and date-time encoders, selected on
+the screen folds as `M*`) minus the reference, in points of capacity, over the 24 to 240 h band,
+from 5 seeds and 8 test months, with a 98.75% interval from resampling whole months. The 98.75%
+level is the pre-registered Bonferroni correction across the four counted readings.
 
 | Reading | Group | Difference | 98.75% interval | Reading of the rule |
 |---|---|---|---|---|
-| H1: `M1` minus the Candidate `C` | six signed-MW Primaries | -0.147 | -0.262 to -0.020 | small gain |
-| H1: `M1` minus `C` | eight MVA-only Primaries | +0.022 | -0.092 to +0.112 | no detectable difference |
-| H2: `M1` minus the placebo `P` | six signed-MW Primaries | -0.140 | -0.253 to -0.033 | upper limit below zero |
-| H2: `M1` minus `P` | eight MVA-only Primaries | -0.135 | -0.360 to -0.0001 | upper limit just below zero |
+| H1: `M1` minus the Candidate `C` | the six signed-MW Primaries | -0.147 | -0.262 to -0.020 | small gain |
+| H1: `M1` minus `C` | the eight MVA-only Primaries | +0.022 | -0.092 to +0.112 | no detectable difference |
+| H2: `M1` minus the placebo `P` | the six signed-MW Primaries | -0.140 | -0.253 to -0.033 | upper limit below zero |
+| H2: `M1` minus `P` | the eight MVA-only Primaries | -0.135 | -0.360 to -0.0001 | upper limit just below zero |
 
-**The absolute scores are close.** From seeds 0 and 1 on all 8 folds, the mean CRPS at the six
+**The failed t guard is why the six signed-MW Primaries read "small gain" and not "gain".** The
+point estimate (-0.147) is below -0.05 and the upper limit is below zero, but the t interval on the
+8 monthly differences at 98.75% (-0.325 to +0.043) covers zero. The bootstrap interval resamples
+only 8 months, which the Method section shows is too narrow, so the gain at the six signed-MW
+Primaries is not secured by the more cautious interval. The t guard also fails for the other three
+counted readings, and H2 at both groups is therefore not secured either.
+
+**The mean CRPS of the three headline arms differs by at most 0.2 points within each group.** From
+seeds 0 and 1 on all 8 folds (one per test month), the mean of the monthly means at the six
 signed-MW Primaries is 3.175 for `C`, 3.030 for `M1`, and 3.178 for `P`. At the eight MVA-only
-Primaries it is 3.694 for `C`, 3.724 for `M1`, and 3.891 for `P`. The pre-registered prediction was
-"not supported or inconclusive", with H1 within ±0.06 at the six signed-MW Primaries and within
-±0.16 at the eight MVA-only Primaries, and H2 at most -0.10. The H1 result at the six signed-MW
-Primaries (-0.147) is outside the predicted range, so the prediction failed for that group. H2 met
-its prediction at both groups: the point estimates (-0.140 and -0.135) are below the -0.10 limit,
-and each interval excludes zero.
+Primaries the mean CRPS is 3.694 for `C`, 3.724 for `M1`, and 3.891 for `P`. Pooled over rows, the
+six signed-MW means are 3.203, 3.053, and 3.203, and the eight MVA-only means are 3.704, 3.731, and
+3.893.
 
-**The pre-registered guards agree at the six signed-MW Primaries and fail at the eight MVA-only
-Primaries.** At the six signed-MW Primaries all guards hold: the same sign for each of the 5 seeds,
-the t interval on the 8 monthly differences, the noise floor, the leave-one-Primary-out and
-leave-one-month-out signs, and the q01 and q99 tails. At the eight MVA-only Primaries, leaving out
-one Primary flips the sign of H1, and the q99 pinball loss is worse than the Candidate's by an upper
-bound of 0.071 points against a limit of 0.05.
+**The pre-registered prediction failed for H1 at the six signed-MW Primaries and held for H2.** The
+prediction was "not supported or inconclusive", with H1 within ±0.06 at the six signed-MW Primaries
+and within ±0.16 at the eight MVA-only Primaries, and H2 at most -0.10. H1 at the six signed-MW
+Primaries (-0.147) is outside its range, and the verdict "small gain" is outside the predicted
+verdict. H1 at the eight MVA-only Primaries (+0.022) is inside its range. Both H2 point estimates
+(-0.140 and -0.135) are below -0.10.
 
-**At the eight MVA-only Primaries the positive H1 difference comes from one Primary, D8.** Leaving
-D8 out, the pooled difference over the other seven Primaries is about -0.004 points (seeds 0 and 1,
-from the stored per-Primary differences), so `M1` is not shown to help the other seven. D8 is also
-the Primary whose removal flips the sign.
+**Every pre-registered guard that applies to a gain holds at the six signed-MW Primaries except the
+t guard.** The same sign holds for each of the 5 seeds and the noise floor holds. The four guards
+for a `supported` verdict also hold: leaving out one Primary or one month keeps the sign, the q01
+and q99 pinball losses are within 0.05 points of the Candidate's, the median error moves with CRPS,
+and swap (a) keeps the sign of H1. At the eight MVA-only Primaries, leaving out one Primary flips
+the sign of H1, the t guard and the noise-floor guard fail, and the upper bound of the q99
+pinball-loss difference from the Candidate is 0.071 points, above the limit of 0.05.
 
-**The secondary era readings R1 to R3 are not backed by a passing known-answer test, and the page
-treats them as descriptive.** Era weighting is by pass, not by event (experiment 709 weights by
-event); the audit found the same point estimates either way. The lasting-change gain on the injected
-bank is not specific to attention: arms `K` (no attention in the trunk) and `E` (a convolution stem)
-gain about as much as `M1` against the Candidate.
+**At the eight MVA-only Primaries the pooled difference from the Candidate rests on two Primaries,
+D8 and D12.** Leaving out D8 turns the pooled difference over the other seven MVA-only Primaries to
+-0.004, and leaving out D12 turns it to -0.028 (seeds 0 and 1, 24 to 240 h, rows pooled). The neural
+network is therefore not shown to help the other six MVA-only Primaries, and no pooled reading of
+the eight MVA-only Primaries should be read as an effect on all of them.
+
+**The neural network is worse than the Candidate at the two report-only Primaries.** From seeds 0
+and 1, the mean CRPS over all 16 Primaries is 4.037 for `C`, 4.191 for `M1`, and 4.218 for `P`.
+Combined with the group results, `M1` minus `C` at D15 and D18 together is roughly +1.6 points
+(computed from the row-weighted group differences, not scored separately). The two short-history
+Primaries are 2 of 16, and this loss is the reason `production_status` is `not-for-production`.
+
+**The secondary era readings R1 to R3 score the forecasts on experiment 709's injected worlds, and a
+passing known-answer test does not back them, so the page treats them as descriptive.** Era
+weighting is by pass (one injection run over the panel of 16 Primaries), not by event as experiment
+709 does. The era prediction was that `M1` reads a lasting change and is vetoed on a temporary move.
+`M1` reads the lasting change (-3.23 against the Candidate in the 7 to 28 days after the onset,
+below the -1.0 threshold), and the veto fires: after a temporary move ends, `M1` is worse than the
+Candidate by +1.28 (threshold +0.1). The convolution stem `E` does not add to `M1` in the 7 to 28
+day slice (-0.02 against a threshold of -0.30). The neural network therefore follows any level
+change, a lasting one or a temporary one, and the pre-registered reading is that the era hypothesis
+is not supported as stated.
 
 ## What the results mean
 
-**The 14 recent days carry information that a random past day does not, and attention across days
-adds little beyond a fixed read-out over them.** `M1` beats the placebo at both groups (H2), so the
-history rows matter. Arm `K` has no trunk attention and keeps only the read-out and the head, and
-`M1` minus `K` is -0.058 [-0.114, +0.006] at the six signed-MW Primaries and -0.010 [-0.118, +0.106]
-at the eight MVA-only Primaries (95%, seeds 0 and 1). Arm `A`, which removes only the within-day
-attention, is not worse than `M1` (+0.016 and +0.032, both intervals cover zero). The top row alone
-(`N`) is much worse (`M1` minus `N` is -0.364 and -0.486).
+**The 14 recent days carry information that a random past day does not, and the attention in the
+trunk adds little beyond a learned read-out over those 14 days.** `M1` beats the placebo at both
+groups (H2), though the t guard fails for H2 and the placebo is itself weaker than the Candidate at
+the eight MVA-only Primaries. Arm `K` has no attention in the trunk and keeps only the similar-day
+read-out (a learned weighting of the 14 same-half-hour readings) and the output head. `M1` minus `K`
+in CRPS is -0.058 [-0.114, +0.006] at the six signed-MW Primaries and -0.010 [-0.118, +0.106] at the
+eight MVA-only Primaries (95%, seeds 0 and 1). The median error of the same contrast at the six
+signed-MW Primaries is -0.129 [-0.230, -0.016], so the trunk attention does improve the median
+there. Arm `A`, which removes only the within-day attention, is not worse than `M1`: `M1` minus `A`
+is +0.016 and +0.032, and both intervals cover zero. Arm `N`, which reads only the target day's row
+with no history rows and no power, is much worse (`M1` minus `N` is -0.364 and -0.486).
 
-**On the era bank, the Candidate does not follow lasting steps, and four arms beat it by about the
-same amount.** On experiment 709's injected worlds, in the 7 to 28 days after a lasting step begins,
-CRPS minus the Candidate's is -3.23 for `M1`, -3.25 for `E`, and -2.75 for `K` (intervals in the
-table below, by pass). The 709 `none` forecasts equal the stored Candidate to 4.7e-06 on the 4 bank
-folds, so the Candidate is not handicapped. After the step ends, the sign reverses: arms that follow
-their history are worse than the Candidate for 7 days (+1.28 for `M1`).
+**On experiment 709's injected worlds, the Candidate does not follow a lasting step, and `M1`, `E`,
+and `K` beat it by about the same amount.** The worlds cover 4 test months and seeds 0 and 1. In the
+7 to 28 days after a lasting step begins, CRPS minus the Candidate's is -3.23 for `M1`, -3.25 for
+`E`, and -2.75 for `K`. Experiment 709's forecasts with nothing injected (`none`) match the stored
+Candidate forecasts to within 4.7e-06 on the 4 bank folds, so the Candidate's era scores are its
+ordinary forecasts. The placebo does not beat the Candidate on this bank (`P` minus `C` is about
++0.29 in the same slice). On a temporary move, from the switch to 7 days after the move ends, the
+sign reverses: the arms that follow their history are worse than the Candidate (+1.28 for `M1`).
 
-| Era contrast (CRPS, points of capacity, mean over passes) | 0 to 7 d | 7 to 28 d | switch to end + 7 d |
+| Era contrast (CRPS, points of capacity, mean over injection passes) | Lasting step, 0 to 7 d after onset | Lasting step, 7 to 28 d after onset | Temporary move, switch to 7 d after its end |
 |---|---|---|---|
 | `M1` minus `C` | -0.575 [-0.867, -0.283] | -3.23 [-3.741, -2.723] | +1.28 [+1.08, +1.491] |
 | `E` minus `C` | -0.722 [-1.029, -0.414] | -3.25 [-3.745, -2.764] | +1.179 [+0.989, +1.378] |
@@ -200,15 +250,26 @@ their history are worse than the Candidate for 7 days (+1.28 for `M1`).
 | `M1` minus `P` | -0.719 [-0.944, -0.503] | -3.521 [-3.898, -3.146] | +1.167 [+0.954, +1.393] |
 | `E` minus `M1` | -0.146 [-0.247, -0.047] | -0.02 [-0.157, +0.126] | -0.101 [-0.151, -0.053] |
 
-R1, read at D8, is `M1` minus `C` +0.249 [-0.025, +0.582] and `E` minus `M1` -0.091 [-0.228,
-+0.036], in the same units.
+Era reading R1 at D8, the Primary with logged real events in the era set, is `M1` minus `C` +0.249
+[-0.025, +0.582] and `E` minus `M1` -0.091 [-0.228, +0.036], in the same units.
+
+**Replacing the history weather with forecast-like weather keeps the gain at the six signed-MW
+Primaries.** The three history-weather swaps (95%, seeds 0 and 1) are prediction-only checks that
+change an input and report H1 again. Swap (a), which gives every history row the ensemble forecast
+weather and keeps the 14 trailing-temperature and solar-gain columns, gives `M1` minus `C` of -0.152
+[-0.258, -0.048] at the six signed-MW Primaries and +0.028 [-0.070, +0.125] at the eight MVA-only
+Primaries. Swap (b), which also zeroes those 14 columns, gives -0.109 [-0.236, +0.010] and +0.234
+[+0.079, +0.365], so zeroing the columns costs the neural network about 0.04 points at the six
+signed-MW Primaries and 0.21 at the eight MVA-only Primaries, and the neural network was not trained
+for either swap. Swap (c), the Candidate given reanalysis weather at its lag times, changes the
+Candidate's CRPS by +0.006 [0.000, +0.012] and +0.001 [-0.002, +0.005].
 
 ## Figures
 
-**The per-Primary and per-fold charts split the six signed-MW Primaries from the eight MVA-only
+**The per-Primary and per-fold charts keep the six signed-MW Primaries apart from the eight MVA-only
 Primaries.** The charts use seeds 0 and 1, so their dots differ from the 5-seed headline. The
-per-Primary intervals resample the 8 months. The per-fold intervals resample origin days, which
-overlap, so they are too narrow.
+per-Primary intervals resample the 8 months. The per-fold intervals resample origin days, whose
+24-to-240-hour forecast windows overlap, so the per-fold intervals are too narrow.
 
 ![CRPS minus the Candidate's, by Primary](contrast_by_label.svg)
 
@@ -218,8 +279,8 @@ overlap, so they are too narrow.
 
 ![CRPS by fold](crps_by_month.svg)
 
-**Day-ahead and 14-day forecasts of one winter origin at a signed-MW Primary show the bands widening
-with lead time.**
+**Day-ahead and 14-day forecasts of a winter origin at D5, a signed-MW Primary, and of a summer
+origin at D12, an MVA-only Primary, show the bands widening with lead time.**
 
 ![Day-ahead forecast, winter, D5](series_day_winter_D5.svg)
 
@@ -229,23 +290,24 @@ with lead time.**
 
 ![14-day forecast, summer, D12](series_fourteen_summer_D12.svg)
 
-**Three logged events at signed-MW Primaries and three at MVA-only Primaries show the forecast of
-the next 24 hours from each origin day against the actual.**
+**Three load shifts in NGED's logs at signed-MW Primaries and three at MVA-only Primaries show the
+forecasts of `M*` and the Candidate for the next 24 hours from each origin day against the measured
+power.**
 
-![Logged event at D10](event_six_D10_0.svg)
+![Logged event at D10](event_signed_mw_D10_0.svg)
 
-![Logged event at D14](event_six_D14_1.svg)
+![Logged event at D14](event_signed_mw_D14_1.svg)
 
-![Logged event at D5](event_six_D5_2.svg)
+![Logged event at D5](event_signed_mw_D5_2.svg)
 
-![Logged event at D3](event_eight_D3_3.svg)
+![Logged event at D3](event_mva_only_D3_3.svg)
 
-![Logged event at D19](event_eight_D19_4.svg)
+![Logged event at D19](event_mva_only_D19_4.svg)
 
-![Logged event at D4](event_eight_D4_5.svg)
+![Logged event at D4](event_mva_only_D4_5.svg)
 
-**Injected worlds show the networks and the Candidate on a lasting step and on a temporary move,
-with the onset marked.**
+**Injected worlds show the neural-network arms and the Candidate on a lasting step and on a
+temporary move, with the onset marked.**
 
 ![Lasting step](injected_era.svg)
 
@@ -253,78 +315,103 @@ with the onset marked.**
 
 ## Checks
 
-- **Median minus mean forecast, per site.** At the 11 Primaries the report script prints (`M1`, seed
-  0), the median sits between 0.33 points of capacity below and 0.20 points above the mean forecast,
-  so no spread shifts the forecast.
+- **Median minus mean forecast, per site.** For `M1` at seed 0, averaged over all leads of 0 to 14
+  days, the median sits between 0.96 points of capacity below and 0.20 above the mean forecast at
+  the 14 scored Primaries, and 1.99 below at D15. The report script prints 10 of the 16 Primaries;
+  D12 (-0.96) and D15 (-1.99) are among the hidden rows. The spread shifts the median at D12 and
+  D15, so their CRPS may be affected.
 - **CRPS and the error of the median disagree at two contrasts.** `E` minus `M1` at the six
   signed-MW Primaries is 0.000 in CRPS and -0.009 in normalised median error. `M1` minus `C` at the
   eight MVA-only Primaries is +0.027 in CRPS and -0.035 in median error: the median is slightly
   better and the upper tail is worse, which matches the failed q99 guard.
-- **Audit triggers.** Triggers 1 to 5 fired and the Opus audit
+- **Audit triggers.** Audit triggers 1 to 5 fired. The Opus audit
   (`briefs/msa_architecture/audit_713.md`, in the private data folder) found no implementation fault
   that changes a headline number, a reading, or the verdict. Trigger 1 (a control fails) fired
-  because the known-answer gate was waived after KA3 and KA12 failed. Trigger 2 (a result
-  contradicts its prediction) fired for H1 at the six signed-MW Primaries. Trigger 3 fired at the
-  two contrasts above. Trigger 4 fired at the eight MVA-only Primaries (D8). Trigger 5 fired because
-  `M1` does not beat `A` (+0.016 and +0.032). Triggers 6 and 7 were not computed: trigger 6 needs a
-  by-hand comparison with the interval widths of experiments 667 and 709, and trigger 7 is the
-  maintainer's decision.
+  because the known-answer gate was waived after its checks KA3 (arm `M` must follow an injected
+  level step) and KA12 (arm `G` must follow the step within 0.05 of arm `M`) failed. Trigger 2 (a
+  result contradicts its prediction) fired for H1 at the six signed-MW Primaries. Trigger 3 (CRPS
+  and the error of the median point in different directions) fired at the two contrasts above.
+  Trigger 4 (leaving one Primary out flips a sign) fired at the eight MVA-only Primaries. Trigger 5
+  (a nested arm beats the arm that contains it) fired because arm `A`, which lacks the within-day
+  attention, scores better than `M1` (`M1` minus `A` is +0.016 and +0.032). Trigger 6 needs a
+  by-hand comparison with the interval widths of experiments 667 and 709, which was not done, and
+  trigger 7 (a later experiment's design depends on this unreplicated result) waits on a decision by
+  the maintainer.
 - **No weather look-ahead.** `e00713_weather_lookahead.py` lists, for one origin, the weather source
-  and issue time of every row. The target row uses the ECMWF ensemble run of 00Z issued before the
-  origin, and no history token carries weather valid after the contract origin. The audit found no
-  look-ahead and no power leakage across the cutoff. The history rows use ERA5 and CAMS analyses,
-  and the rows of ages 2 to 5 days could not be built in a live service, which limits the result to
-  a research setting.
-- **Scorer edits after the audit.** Three edits followed the audit (the tail-guard month taken inside
-  each join, the swap-(a) and median-error guard flags compared with the sign of H1 instead of a
-  gain, and the Candidate era reference appended once per pass). The era, swaps, and headline
-  scorers were rerun after an Opus code review: no interval, reading, or verdict changed, and two
-  guard flags at the eight MVA-only Primaries changed (swap (a) keeps the sign of H1, and the
-  median error does not move with CRPS).
+  and issue time of every row. The target row uses the 00Z run of the European Centre for
+  Medium-Range Weather Forecasts (ECMWF) ensemble issued before the origin. No history row carries
+  weather valid after the contract origin. The audit found no look-ahead and no power leakage across
+  the cutoff. The history rows use the ERA5 reanalysis and Copernicus Atmosphere Monitoring Service
+  (CAMS) analyses, and the history rows of ages 2 to 5 days could not be built in a live service, so
+  every H1 reading is a ceiling for a live forecast.
+- **Scorer edits after the audit.** Three edits followed the audit: the tail guard takes each row's
+  month inside each join; the swap-(a) guard flag and the median-error guard flag compare with the
+  sign of H1 rather than with a gain; and the scorer appends the Candidate's era reference once per
+  pass. The era, swaps, and headline scorers were rerun after an Opus code review. No interval,
+  reading, or verdict changed, and two guard flags at the eight MVA-only Primaries changed (swap (a)
+  keeps the sign of H1, and the median error does not move with CRPS).
 - **Seed reproduction.** The Candidate's seed 0 refitted for 2025-11 reproduces the stored forecast
   to a maximum absolute difference of 7.4e-05 against a threshold of 1e-3. No other fold was
   checked.
+- **Capped reruns.** Arm `P` hit the 60-pass stage-1 cap in 4 of its 40 fits and was rerun at the
+  120-pass cap, which makes H2 conservative and leaves H1 untouched.
 
 ## Limitations disclosed
 
-- **The known-answer gate failed and was waived.** KA3 failed (the follow share of arm `M` is 0.142
-  against 0.75 needed) and KA12 failed on arm `G`. Every statement about following level shifts, and
-  the era secondary readings R1 to R3, is unsupported by a passing known-answer test.
-- **The Candidate-versus-`M1` comparison of follow shares on experiment 581's injected bank was
-  planned and could not be run.** The Candidate's stored files under experiment 667 hold experiment
-  650's random events, not experiment 581's bank, and `M1` keeps origins before the month start on 6
-  of 8 folds, so the two numbers are not on the same origins. A new inject job that passes
-  experiment 581's bank through the Candidate's saved weights would make the comparison, and is a
-  possible later experiment. `M1`'s own follow share is reported with this caveat: after the filter
-  that drops origins with no ensemble row, 24 to 48 of 160 origins per pass are dropped on the 4
-  folds checked.
-- **Era weighting is by pass, not by event.** Experiment 709 weights by event. The audit found the
-  same point estimates either way.
-- **The design's read-out of the weights alpha before and after an injected permanent change (design
-  section 6.5) is not built.** The attention figures show across-day weights by history slot
-  instead.
+- **The known-answer gate failed and was waived.** KA3 failed: the follow share of arm `M`, the
+  fraction of an injected level step by which `M` moved its median, is 0.142 against the 0.75
+  needed. KA12 failed on arm `G`. Every statement about following level shifts, and the era readings
+  R1 to R3, is unsupported by a passing known-answer test.
+- **The neural network is worse than the Candidate at D15 and D18, and the page does not score those
+  two Primaries separately.** The 16-Primary pooled means are given in the Verdict section.
+- **The comparison of follow shares between the Candidate and `M1` on experiment 581's bank of
+  injected level steps was planned and could not be run.** The Candidate's stored files under
+  experiment 667 hold experiment 650's random events, not experiment 581's bank. On 6 of 8 folds the
+  forecasts of `M1` on that bank also include origin days before the fold's first day, so the two
+  follow shares would not be on the same origins. A new inject job that passes experiment 581's bank
+  through the Candidate's saved weights would make the comparison, and is a possible later
+  experiment. The follow share of `M1` on that bank is not scored on this page. The filter that
+  drops origins with no ensemble row drops 24 to 48 of 160 origins per pass on all 8 folds.
+- **Era weighting is by pass, not by event.** Experiment 709 weights by event. The audit argues the
+  point estimates agree whenever no pass has an empty slice, and did not compute both weightings.
+- **Several pre-registered report-only readings are not on this page.** These are the climatology,
+  manual heuristic, and BG2 rows; the four load-shift scenarios (all rows, outside events, inside
+  events, and the 7 days after an event); coverage at q01, q05, q95, and q99; mean band width; the
+  day-1 and days 11 to 14 lead bands; the cold-winter-night, winter, and time-of-day slices;
+  threshold-weighted CRPS; avoidable curtailment cost; and the actual GPU hours. The median error
+  appears beside CRPS for the report-only contrasts in `report_only.json` and for the two contrasts
+  named under Checks.
+- **The design's read-out of the across-day attention weights before and after an injected permanent
+  change (design section 6.5) was not built, and no attention maps are drawn.** The attention
+  extract waits for a GPU slot and a code review, and the page does not draw attention maps.
+- **The input sets differ.** The Candidate reads neighbour summaries and a table of expected inputs
+  that the MSA neural network lacks, and the neural network reads 14 days of power and reanalysis
+  history weather. The difference between the groups may come from inputs rather than architecture.
 - **Further scorer limitations.** (1) The headline scorer needs about 20 GB of host memory. (2) No
   normalised median-error or band-width contrast stands beside H1 and H2 at the pre-registered
   level. (3) Audit triggers 1 and 5 print only in part, and `swaps.json` is not printed by the
   report script. (4) The hash print of design section 5.3 for the Candidate's seeds 2 to 4 is
   missing. (5) The 17 to 28 day slice of design section 1.10 is not implemented. (6) The era scorer
-  does not enforce the known-answer check KA11, though KA11 passed for all 4 bank months (maximum
+  does not enforce the known-answer check KA11, though KA11 passed for all 4 bank folds (maximum
   difference 0.0). (7) The leave-one-Primary-out and leave-one-month-out tests read "does the sign
-  stay negative", which is the right test for a gain and the wrong label for a loss. (8) Arm `G` is
-  not run.
+  stay negative", which is the right test for a gain and the wrong label for a loss. (8) Arm `G` was
+  not fitted on the real folds.
 - **Seed counts.** Arms `A`, `K`, `N`, and `E` have seeds 0 and 1 only, and their contrasts are at
   95%. The headline arms `M1`, `P`, and `C` have 5 seeds.
 
 ## Lessons
 
-- **Read the history rows with a fixed read-out first.** Arm `K`, a read-out over the 14
-  same-half-hour readings with no trunk attention, is within 0.06 points of `M1` at both groups.
-- **Score changes at the eight MVA-only Primaries per Primary before pooling.** One Primary, D8, set
-  the sign of the pooled difference.
+- **Score a learned read-out over the history rows, with no trunk attention, before crediting
+  attention.** Arm `K` is within 0.06 points of `M1` at both groups in CRPS, though the trunk
+  attention improves the median error at the six signed-MW Primaries.
+- **Score changes at the eight MVA-only Primaries per Primary before pooling.** Two Primaries, D8
+  and D12, hold the sign of the pooled difference.
 - **Do not credit attention for a lasting-step gain until the control arms are scored.** `K` and `E`
-  gain as much as `M1` on the era bank.
-- **A known-answer gate that the network cannot pass needs diagnosing before the real folds are
-  spent.** The follow share stayed at 0.01 to 0.14 against 0.75 through four gate runs.
+  gain about as much as `M1` on the era bank.
+- **Diagnose a known-answer gate that the neural network keeps failing before running the real
+  folds.** The follow share of arm `M` stayed at 0.01 to 0.14 against 0.75 through four gate runs.
+- **Score the two short-history Primaries, D15 and D18, beside the groups.** Their loss is hidden by
+  the group readings.
 
 ## The known-answer gate has failed four times
 
@@ -542,7 +629,8 @@ the eight MVA-only Primaries).
 | 6 | cannot tell | anything else |
 
 **The smallest gain worth porting is τ = 0.05 points of CRPS.** The protocol's highest tier is 0.03,
-for a new head. The MSA network replaces the whole network and its input pipeline, and a live
+for a new head. The MSA neural network replaces the Candidate's whole neural network and its input
+pipeline, and a live
 service would need a replacement for ERA5 on the 4 newest history rows, so the threshold is set
 above that tier. The experiment is `kind: other`, because the Candidate is not the Primary demand
 research default, so the threshold belongs to this plan.
@@ -603,8 +691,8 @@ power). It assumes the MSA arm is as noisy as the Candidate.
 
 | Group | CRPS of the seed-mean forecast, pooled over rows | The same, mean of the 8 monthly means | Mean over months of seed 0 minus seed 1 | Standard deviation of that difference over 8 months | Half-hours |
 |---|---|---|---|---|---|
-| Six signed-MW | 3.203 | 3.175 | +0.001 | 0.108 | 611,055 |
-| Eight MVA-only | 3.704 | 3.694 | +0.059 | 0.285 (0.136 without 2025-11) | 816,768 |
+| The six signed-MW Primaries | 3.203 | 3.175 | +0.001 | 0.108 | 611,055 |
+| The eight MVA-only Primaries | 3.704 | 3.694 | +0.059 | 0.285 (0.136 without 2025-11) | 816,768 |
 | D15 and D18 | 8.106 | 8.002 | +0.127 | 0.974 | 203,040 |
 
 | Seeds per arm | Standard error, six signed-MW Primaries | Standard error, eight MVA-only Primaries | Detectable δ, six signed-MW Primaries | Detectable δ, eight MVA-only Primaries |
@@ -855,13 +943,14 @@ folds.**
   is read.
 - **Headline band.** Leads from 24 h up to but not including 240 h after the 12:00 UTC origin
   (target rows 2 to 10). Day 1 (0 to 24 h), days 11 to 14, and the protocol's days 1 to 10 band
-  (0 to 240 h) are reported beside it.
-- **Groups.** The six signed-MW and the eight MVA-only Primaries, separately. All 16 pooled, and D15
-  with D18, are report-only.
+  (0 to 240 h) were planned as report-only readings and are not on this page.
+- **Groups.** The six signed-MW Primaries and the eight MVA-only Primaries, separately. All 16 pooled,
+  and D15 with D18, are report-only.
 - **Metrics.** CRPS, the normalised MAE of the median, coverage and pinball loss at q01, q05, q95,
   and q99, q05 to q95 coverage and mean band width, threshold-weighted CRPS, and the avoidable
   curtailment cost (report-only), by lead band, by Primary, and in the cold winter night, winter,
-  and time-of-day slices. The climatology, manual heuristic, and BG2 rows stand beside them.
+  and time-of-day slices. The climatology, manual heuristic, and BG2 rows were planned beside them
+  and are not on this page.
 - **Intervals.** Each contrast uses seed-averaged forecasts (seed mean, then sorted quantiles, as in
   experiment 667), a per-row loss frame paired on run and valid time, and a month-block bootstrap
   with whole origin months as blocks and 100,000 resamples. The bootstrap pairs arms on seed, so
