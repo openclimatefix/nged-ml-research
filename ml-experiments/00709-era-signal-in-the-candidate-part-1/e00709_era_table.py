@@ -4,8 +4,8 @@ The era table (`era_table.parquet`) comes from NGED's Embedded Capacity Register
 `studies.ecr_reader.read_sheet` because `read_ecr` drops the `Date Connected` column, plus the
 telemetry dates of the plan. The table holds no customer name. It lists:
 
-- D8's two register connections (a 6 MW gas engine of 2023-06-13 that the register files under
-  D14's name, and an 8.91 MW solar farm of 2025-03-24) and the undated 0.7 MW solar row, which is
+- D8's two register connections (a gas engine that the register files under another Primary's
+  name, and an 8.91 MW solar farm of 2025-03-24) and the undated 0.7 MW solar row, which is
   *not* an era because it has no date;
 - D8's fade from 2026-03, which only telemetry shows and is unresolved;
 - every other register connection of 1 MW or more since 2019-09 at the 16 Primaries, as
@@ -188,7 +188,7 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
     solar = assets.filter((pl.col("site") == "D8") & _is_solar())
     with pl.Config(tbl_rows=30, fmt_str_lengths=60):
         print("Register rows behind the plan's D8 eras (no customer names):")
-        print("Gas engine of about 6 MW listed under D14:")
+        print("Gas engine listed under another Primary:")
         print(gas)
         print("Solar rows listed under D8:")
         print(solar)
@@ -206,10 +206,11 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
             "primary": "D8", "era_index": 1, "register_date": D8_GAS_DATE,
             "telemetry_date": D8_GAS_TELEMETRY_DATE, "technology": "gas engine",
             "size_mw_register": D8_GAS_MW, "size_mw_telemetry": None,
-            "size_mw_recollection": None, "source": f"{source}, listed under D14's name",
+            "size_mw_recollection": None,
+            "source": f"{source}, listed under another Primary's name",
             "confidence": "register date confirmed" if found_gas else "plan value, not re-found",
-            "note": "D8's reading stopped including the engine's output on 2023-08-15, 63 days "
-            "after the register date (experiment 194). The oracle switches on the telemetry date.",
+            "note": "D8's reading stopped including the engine's output on 2023-08-15 "
+            "(experiment 194). The oracle switches on the telemetry date.",
         },
         {
             "primary": "D8", "era_index": 2, "register_date": D8_SOLAR_DATE,
@@ -250,8 +251,8 @@ def other_register_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         assets: The output of `read_register_assets`.
 
     Returns:
-        One row per connection, numbered by date within each Primary. The 6 MW gas engine that the
-        plan assigns to D8 is left out of D14's rows.
+        One row per connection, numbered by date within each Primary. The gas engine that the
+        plan assigns to D8 is left out of its register Primary's rows.
     """
     kept = assets.filter(
         (pl.col("site") != "D8")

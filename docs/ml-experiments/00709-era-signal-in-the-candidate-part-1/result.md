@@ -383,7 +383,7 @@ and in stages 2 and 3 the older knots are a frozen buffer (`knots_old`) while on
 stage-1 knots already hold the new level would count the step twice. The rule is therefore: for a
 stage-3 row, the anchor of an era is added only when the era's onset lies after the stage-1 cut, or
 when the row's valid time lies after the newest knot (where `tau` is clamped to the newest knot).
-For an era whose onset lies inside the stage-1 history, as at D8's two register dates, the old knots
+For an era whose onset lies inside the stage-1 history, as at D8's two era onsets, the old knots
 after the onset already carry the level, the anchor is zero, and the era vector alone enters. A
 known-answer check injects an era into stage-1 rows, with its anchor, and asserts that the stage-3
 output does not shift by twice the step. The first-difference penalty is unchanged: dropping the
@@ -443,11 +443,11 @@ drops `Date Connected`). Columns: `primary`, `era_index`, `register_date`, `tele
 `technology`, `size_mw_register`, `size_mw_telemetry`, `size_mw_recollection`, `source`,
 `confidence`, and `note`. The table holds no customer name.
 
-**D8's rows use the register's dates.**
+**D8's rows use the register's dates where the register gives one.**
 
 | Era | Register row | Note |
 |---|---|---|
-| 1 | Gas engine, 6 MW, connected 2023-06-13, listed under D14's name | D8's reading stopped including the engine's output on 2023-08-15 (experiment 194), 63 days later. The table stores both dates. |
+| 1 | Gas engine, registered under a different Primary | D8's reading stopped including the engine's output on 2023-08-15 (experiment 194). |
 | 2 | Solar farm, 8.91 MW, connected 2025-03-24 | Telemetry date to be measured in stage 0 |
 | not an era | Solar, 0.7 MW, no connection date | **Unknown.** The row cannot define an era until a date is found. |
 
@@ -465,7 +465,7 @@ the manager. Every size the network reads is measured from telemetry, so the exp
 wait for the answer.
 
 **Other known eras and known switching events.** Register connections of 1 MW or more since 2019-09
-at the other Primaries (for example D14 and D5) enter the table as `register only`. The fade at D8
+at the other Primaries (for example D5) enter the table as `register only`. The fade at D8
 from 2026-03 (experiment 697) enters as `telemetry only, unresolved`. The known switching events are
 the labelled set of experiment 41 (`labelled_set.parquet`, loaded by `e00086_labels.py`) and the
 verified events of experiment 580 (`events_verified.parquet`).
@@ -802,7 +802,7 @@ cut phase E first, then phase D, then L-R and L-hmm from phase B. Phase A needs 
 - **Whether stage 1 rows include D8 before 2023-08-15 is unknown.** The implementer reads
   `e00667_k1.py` and prints the answer. Stage-3-only arms are unaffected.
 - **No metered generator's series is published, with or without its name or identifier.** The
-  solar-shaped injection is built from reanalysis radiation, and the engine's 44-day record is not
+  solar-shaped injection is built from reanalysis radiation, and the engine's record is not
   used. Charts of D8 show the substation's own reading, which may be named, and never overlay a
   generator's output. Connection dates and sizes define eras and may be printed. The
   pre-anonymisation engine label on older pages is not copied.
@@ -873,8 +873,8 @@ quantiles are a mixture of the Candidate's quantiles and a shifted copy; the cla
 `mixer_pre`, and `mixer_ft`; that `chain.sh` of experiment 667 repeats pre-training per monthly
 fold; the origin and weather timing; the noise figures of experiments 693 (0.395), 696 (0.233, about
 0.10), and 699 (0.087, 0.014, copied shares 0.075 to 0.127); the title, hypothesis, verdict, and
-headline of each of the 11 counted experiments, read from each `result.md`; the 6 MW engine row
-dated 2023-06-13 under D14 in `printed_ecr.txt`; the 2023-08-15 entry in `data-processing.md`; the
+headline of each of the 11 counted experiments, read from each `result.md`; the engine row
+in `printed_ecr.txt`; the 2023-08-15 entry in `data-processing.md`; the
 0.02 minimum gain in the demand protocol; experiment 667's 0.5 GPU-hours per fold; the ensemble
 summaries starting 2024-04-01; and the two DOIs, which resolve at doi.org to Fox, Sudderth, Jordan,
 and Willsky (2011), "A sticky HDP-HMM with application to speaker diarization", and Killick,

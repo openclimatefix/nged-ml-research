@@ -12,7 +12,7 @@ for this theme that let a fit decide on its own whether a generator exists, the 
 generators that are absent or unconfirmed. At the 16 Primaries in the study area the register lists
 98 connected generation or storage entries (one technology at one site each), most of them small
 solar. The register omits assets below 50 kW, and in the one case checked, the register names a
-different Primary from the one whose meter records a 6 MW gas engine.
+different Primary from the one whose meter records a gas engine.
 
 ## Pages
 
