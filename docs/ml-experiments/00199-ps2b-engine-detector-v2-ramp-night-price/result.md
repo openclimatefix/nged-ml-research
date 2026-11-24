@@ -42,31 +42,32 @@ prediction: >-
   days do; those at D10 and D11 do not.
 decision_rule: >-
   Fixed before any score is read, and revised once after a Sonnet plan review (no score had been
-  read). The verdict arm is v2 = night evidence (N2) plus edge test (S) plus price gate (P),
-  scored on night rows. Known-answer thresholds, pooled over K1 and K2: recall at 1 unit at least
-  0.83, recall at 2 or 3 units at least 0.80, precision at least 0.80, energy error within 15%. K1
-  and K2 are also reported separately, with day-resampled 95% intervals. False-alarm bar (the
-  night-row version of experiment 196's bar, which that experiment scored on all rows): at most 3%
-  of clean night half-hours flagged and at most one false active day a month, an active day being
-  a UTC date with 4 or more flagged night half-hours. Bar list, each entry a separate test: D3, D8
-  clean history (even months, which the noise fit did not use), D10, D11, D14, D16, D8 2025-03 to
-  2025-12, and D8 2026-01 to 2026-06. For the two D8 periods the share bar is relaxed to 3% plus
-  the share of night half-hours below -2.5 MW, capped at 10%, because an engine may be present.
-  `supported`: every known-answer threshold passes and every entry of the bar list passes. `partly
-  supported`: recall at 1 unit and at 2 or 3 units pass, and either precision or the energy error
-  fails, or exactly one entry of the bar list fails. `not supported`: recall at 1 unit falls under
-  0.83, or two or more entries of the bar list fail. D5 is on the bar list as a secondary line and
-  does not enter the verdict, because the ECR lists a real engine there. We wrote the exception
-  list after experiment 196 had shown D5 failing, before any flagged period of experiment 199 was
-  read, and from the ECR workbook alone (printed_ecr.txt). A Primary is on the list if it has a
-  connected gas or oil engine (CHP or not) or battery of at least 0.5 MW registered within 5 km,
-  connected before 2025-01-01. Only D5 qualifies (a 1.0 MW oil engine 3.25 km away, connected
-  2021-03-11). D11's only battery is 0.2 MW and connected 2026-04-13, and its other nearby plant
-  is a 0.499 MW biomass steam turbine, which is not price-following; D10 has none. PS3 and later
-  stages run only on `supported`, and on `partly supported` only for the Primaries and periods
-  that pass. Each feature's separate value (v1 plus S, v1 plus P, N alone) is reported with the
-  same scores and does not decide the verdict. K3 (G2's record injected into night rows of D8 from
-  2025-03, where an engine may already be present) is descriptive: recall only.
+  read). The verdict arm is v2 = night evidence (N2) plus edge test (S) plus price gate (P), scored
+  on night rows. Known-answer thresholds, pooled over K1 and K2: recall at 1 unit at least 0.83,
+  recall at 2 or 3 units at least 0.80, precision at least 0.80, energy error within 15%. K1 and K2
+  are also reported separately, with day-resampled 95% intervals. False-alarm bar (the night-row
+  version of experiment 196's bar, which that experiment scored on all rows): at most 3% of clean
+  night half-hours flagged and at most one false active day a month, an active day being a UTC date
+  with 4 or more flagged night half-hours. Bar list, each entry a separate test: D3, D8 clean
+  history (even months, which the noise fit did not use), D10, D11, D14, D16, D8 2025-03 to 2025-12,
+  and D8 2026-01 to 2026-06. For the two D8 periods the share bar is relaxed to 3% plus the share of
+  night half-hours below -2.5 MW, capped at 10%, because an engine may be present. `supported`:
+  every known-answer threshold passes and every entry of the bar list passes. `partly supported`:
+  recall at 1 unit and at 2 or 3 units pass, and either precision or the energy error fails, or
+  exactly one entry of the bar list fails. `not supported`: recall at 1 unit falls under 0.83, or
+  two or more entries of the bar list fail. D5 is on the bar list as a secondary line and does not
+  enter the verdict, because the ECR lists a real engine there. We wrote the exception list after
+  experiment 196 had shown D5 failing, before any flagged period of experiment 199 was read, and
+  from the ECR workbook alone (printed_ecr.txt). A Primary is on the list if it has a connected gas
+  or oil engine (CHP or not) or battery of at least 0.5 MW registered within 5 km, connected before
+  2025-01-01. Only D5 qualifies (an oil engine within 5 km, connected before the first flagged
+  period; its size, date, and distance are withheld). D11's only battery is 0.2 MW and connected
+  2026-04-13, and its other nearby plant is a 0.499 MW biomass steam turbine, which is not
+  price-following; D10 has none. PS3 and later stages run only on `supported`, and on `partly
+  supported` only for the Primaries and periods that pass. Each feature's separate value (v1 plus S,
+  v1 plus P, N alone) is reported with the same scores and does not decide the verdict. K3 (G2's
+  record injected into night rows of D8 from 2025-03, where an engine may already be present) is
+  descriptive: recall only.
 benchmark: >-
   Experiment 196's detector (frozen fits_fixed.pkl, wide prior), scored on all
   rows and on night rows.
@@ -187,9 +188,9 @@ written for this experiment.
   and 11.6% of night half-hours. Both periods fail the bar for every arm.
 - **Price gate.** The gate changes little: at night it removes under 1.5% of D8's flagged half-hours
   from 2025-03 and none at D3, D10, or D14. On all rows it cuts D5's false active days from 2.02 to
-  1.72 a month and D10's from 1.05 to 0.90. The gate is only scored from 2023-06 (D8's engine-free
-  history has 576 even-month rows with a price), and K2's price is G2's own at the time it recorded
-  the output, a choice that favours the gate.
+  1.72 a month and D10's from 1.05 to 0.90. The gate is only scored where prices exist (D8's
+  engine-free history has 576 even-month rows with a price), and K2's price is G2's own at the time
+  it recorded the output, a choice that favours the gate.
 - **Flagged periods at D5, D10, and D11 (supporting evidence only, `printed_step5.txt`).**
     - D8 while the engine is visible (2023-09 to 2025-02, positive control): flagged days have a
       positive spark spread +11.1 points more often than matched unflagged days (95% 3.5 to 18.1)
@@ -202,11 +203,12 @@ written for this experiment.
       profile, which suggests a few long spells that are not an engine's evening pattern.
     - D8 from 2025-03: +6.8 points (-4.5 to +18.2), but 482 of 485 days are flagged, so only 3
       unflagged days exist, reused to match 44 flagged days, and the test cannot be read.
-- **ECR (`printed_ecr.txt`; supporting evidence, NGED has not been asked).** D5 has a 1.0 MW oil
-  engine 3.25 km away, connected 2021-03-11, before every flagged period. D10 has no gas, oil, CHP,
-  or battery site within 5 km. D11 has a 0.2 MW battery connected 2026-04-13 and a 0.499 MW biomass
-  steam turbine connected 2014, neither of which is a price-following engine in the flagged period.
-  D5's flags do not follow the spark spread, so the ECR engine and the flagged periods do not match.
+- **ECR (`printed_ecr.txt`; supporting evidence, NGED has not been asked).** D5 has an oil engine
+  within 5 km, connected before every flagged period (size, date, and distance withheld). D10 has no
+  gas, oil, CHP, or battery site within 5 km. D11 has a 0.2 MW battery connected 2026-04-13 and a
+  0.499 MW biomass steam turbine connected 2014, neither of which is a price-following engine in the
+  flagged period. D5's flags do not follow the spark spread, so the ECR engine and the flagged
+  periods do not match.
 
 ## Checks
 
@@ -232,6 +234,11 @@ written for this experiment.
 - **Plan review.** A Sonnet reviewer raised 10 objections to the plan before any score was read; the
   plan was revised for 9 of them (the price in the K2 injections was kept at G2's own recording
   time, flagged as favourable to the gate).
+
+**The scripts read the engine's connection date and recorded unit size from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it.
 
 ## What to try next
 

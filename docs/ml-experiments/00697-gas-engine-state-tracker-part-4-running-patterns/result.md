@@ -345,6 +345,10 @@ gas engine, to separate the band from the evening demand peak. No such experimen
   holidays. Whether the engine holds a STOR agreement is unknown. Their coverage is in
   `printed/signals_download.txt`.
 - Q3a and Q2q are variants that the plan names, split from Q3 and added as a sensitivity.
+- A lookup of NESO's Enduring Auction Capability results asks only for the technology "Gas
+  Reciprocating Engines" and filters by distance on this machine. The lookup found one candidate
+  near D8's supply area. That match does not confirm the engine's identity, and the match stays in
+  the private data folder.
 
 ## Files
 
@@ -375,3 +379,7 @@ gas engine, to separate the band from the evening demand peak. No such experimen
 - Read, from earlier work: experiment 694's tracker and stored false-alarm pass, and [experiment
   695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md)'s
   stored probabilities and host states.
+- `data/ml-experiments/private/engine_constants.json`: the private file from which
+  `ml-experiments/engine_constants.py` reads the engine's recorded unit size. NGED has asked that
+  this value stays out of the repository, so the file is not committed and a rerun needs a copy of
+  it.

@@ -134,7 +134,7 @@ the scored year.
 
 - **The register.** NGED's Embedded Capacity Register (August 2026) lists one connected gas engine
   that is not combined heat and power under the Primaries with metered series. D8 itself lists only
-  solar and a 1.35 MW row of unknown type. D5 has a 1 MW gas engine connected in 2021. Batteries of
+  solar and a 1.35 MW row of unknown type. D5 lists a gas engine. Batteries of
   0.2 to 0.25 MW are connected at D2, D9, and D11 (2024 to 2026), and two more are accepted but not
   connected, at D3 and D16. The demand-side-response sheet holds no rows. The eight other Primaries
   that the register covers list no price-following asset (`printed_ecr.txt`).
@@ -222,6 +222,11 @@ the scored year.
   reference, so the loss comes from the price term, whose coefficients move between 0 and 0.9 points
   from fit to fit. No Opus audit was run, because neither result changes the next step. Triggers 1,
   3, 4, 6, and 7 did not fire.
+
+**The scripts read the connection dates of the registered gas engines from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it.
 
 ## Open questions
 

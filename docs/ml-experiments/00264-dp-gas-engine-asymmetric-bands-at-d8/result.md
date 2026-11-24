@@ -266,6 +266,11 @@ of D8's tails and not from an engine.
   It did not change the stored reference's median or the removal of hand-filtered events before
   fitting.
 
+**The scripts read the engine's recorded unit size, in points of capacity, from a private file.**
+`ml-experiments/engine_constants.py` loads it from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that this value stay out
+of the repository. The file is not committed, so a rerun needs a copy of it.
+
 ## Caveats and what to try next
 
 - **Fit to the year.** The descriptive table that chose arm 2b and the switch thresholds came from the

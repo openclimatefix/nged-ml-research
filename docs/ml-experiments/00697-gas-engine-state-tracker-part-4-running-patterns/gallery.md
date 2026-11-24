@@ -55,9 +55,9 @@ figure, which drew shares from groups of 2 to 18 days.
 ![Days in each holiday and clock-change group](g6_holidays_and_clock_changes.svg)
 
 **G8: the running share and the tracker's fitted block size by month and local half-hour.** Left
-panels: the running share on weekdays. Right panels: the mean fitted block size in MW when flagged,
-where a block is the tracker's fitted size of one unit of output. White cells hold fewer than 15
-days.
+panels: the running share on weekdays. Right panels: the mean fitted block size when flagged, where a
+block is the tracker's fitted size of one unit of output; its size in megawatts is withheld.
+White cells hold fewer than 15 days.
 
 ![Season](g8_season.svg)
 

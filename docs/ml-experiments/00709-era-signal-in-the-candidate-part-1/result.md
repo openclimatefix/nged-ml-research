@@ -1224,3 +1224,7 @@ phase B.
   `interim_bank_rows.csv`), `checks.json`, and `e_667/` (phase E chains).
 - Briefs and reviews: the findings file, the design, and the design review were written under
   `data/ml-experiments/briefs/eras_embedding/` (private).
+- `data/ml-experiments/private/engine_constants.json`: the private file from which
+  `ml-experiments/engine_constants.py` reads the engine's connection date and register size. NGED
+  has asked that these values stay out of the repository, so the file is not committed and a rerun
+  needs a copy of it.

@@ -26,7 +26,7 @@ hypothesis: >-
 prediction: >-
   Written before any result. On K1 (G2's recorded output subtracted from D8's reading in
   2023-07-03 to 2023-08-15) and on K2 (the same record shifted by whole weeks into 9 windows of
-  D8's history from 2022-01 to 2023-05): recall of half-hours with 2 or 3 units running at least
+  D8's engine-free history): recall of half-hours with 2 or 3 units running at least
   0.80, recall at 1 unit at least 0.50, precision at least 0.80, and the reconstructed energy
   within 15% of the injected energy. False alarms: at most 3% of clean half-hours flagged, and at
   most one false active day per month of clean history, on D8's clean history and on each of D3,
@@ -138,7 +138,7 @@ month](figure_3_flagged_share_by_month.svg)
 - **False alarms on D8's clean history.** 0.7% of half-hours flagged (5 false active days in 559
   days, 0.27 a month); on even months, which the noise fit did not use, 0.008%.
 - **False alarms at the other Primaries (share flagged; false active days a month).** D3 0.5%, 0.34;
-  D5 1.7%, 2.02; D10 0.7%, 1.05; D11 3.2%, 1.12; D14 0.3%, 0.30; D16 0.02%, 0.04. D5 has a 1 MW gas
+  D5 1.7%, 2.02; D10 0.7%, 1.05; D11 3.2%, 1.12; D14 0.3%, 0.30; D16 0.02%, 0.04. D5 has a gas
   engine in the Embedded Capacity Register and D11 a small battery, so some flags may be real. The
   pre-registered bars (3% of half-hours; 1 false active day a month) fail at D5 (2.02 days), D10
   (1.05 days), and D11 (3.2% flagged). The audit judged that arguing these Primaries hold real
@@ -205,6 +205,11 @@ month](figure_3_flagged_share_by_month.svg)
 - **Audit finding not accepted.** The code reviewer's claim of a gap-handling bug: a missing
   previous reading already makes the previous error non-finite, which selects the stationary scale.
 
+**The scripts read the engine's connection date and recorded unit size from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it.
+
 ## What to try next
 
 - Re-fit the noise per regime (before and after 2025-03), then repeat the false-alarm and
@@ -212,4 +217,5 @@ month](figure_3_flagged_share_by_month.svg)
 - PS3 can use these labels for 2023-09 to 2025-02 only. Whether the 2026 flags are an engine that is
   back, solar misfit, or noise cannot be told from the residual alone; NGED's answer to question 1
   would settle it.
-- Test whether D5's 1 MW engine and D11's battery are what the detector flags there.
+- Allow two unit sizes together (the unit-size profile has two close peaks) and test whether D5's
+  engine and D11's battery are what the detector flags there.

@@ -68,6 +68,10 @@ advice:
     Do not score a D8 forecasting model on 2026 without scoring the periods before and after March
     2026 separately, because the shortfall share
     falls from 0.29 in January to 0.008 in April (Figure 5).
+  - >-
+    Do not read the Embedded Capacity Register's Primary column as the substation whose meter
+    records an asset, because a gas engine can be registered under one Primary and appear in the
+    readings of another (PS1 register entries).
 ---
 
 # Experiment 194: D8's drops follow one engine whose output stopped being added back
@@ -174,6 +178,9 @@ clear steps.*
   (2023-08-25 to 2023-12-31; the intervals do not overlap), and 0.232 and 0.255 in 2024 to January
   2026. The difference has no consistent sign, and G2's later readings give no record of the engine
   running.
+- **Quantised steps (output rising in equal units, one per running engine unit): not shown.** The
+  histogram has no local peaks at multiples of one unit. Noise in the expected power is wide enough
+  to blur the steps.
 - **2026:** the shortfall share falls from 0.292 in January to 0.070 in March and 0.008 in April
   while G2 has no readings after 2026-01-26. Either the engine stopped running, or NGED resumed
   adding the engine's output to D8's reading. The data cannot tell which.
@@ -196,8 +203,8 @@ clear steps.*
   fit reads a step of -0.198 at 2024-02-26. D18 has 27 usable weeks and one week at 0.301 in October
   2025, fitted as a step of -0.038. D15 has no usable weeks. D14's highest week is 0.074.
 - **ECR price-following assets under the 16 Primaries (connected):** 2 gas or oil engines (one at
-  D5 of 1.00 MW from 2021-03-11) and 3 batteries of 0.65 MW (D11, D2, D9). 2 batteries (0.2 MW
-  each, D16 and D3) are accepted to connect. 9 Primaries have none. The demand-side response
+  D5; their sizes and dates are withheld) and 3 batteries of 0.65 MW (D11, D2, D9). 2 batteries (0.2
+  MW each, D16 and D3) are accepted to connect. 9 Primaries have none. The demand-side response
   register holds no rows. CHP: 2 slots, 1.40 MW, both at D10, none gas or oil engines.
 - **Whole register:** 168 connected gas or oil engines of at least 1 MW each, totalling 1,265.8 MW.
   Engines of this size are therefore not confined to the trial's Primaries.
@@ -217,6 +224,11 @@ clear steps.*
   design's; D8 is measured in apparent power (MVA, not MW), so a dip in apparent power at low demand
   can look like generation. The bootstrap interval resamples weeks within each side of the fitted
   split, so it is narrow by construction; the likelihood-ratio set is the more cautious interval.
+
+**The scripts read the engine's connection date and recorded unit size from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it.
 
 ## What to try next
 

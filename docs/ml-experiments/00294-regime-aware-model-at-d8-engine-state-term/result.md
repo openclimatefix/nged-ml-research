@@ -75,8 +75,8 @@ best_arm: >-
 headline: >-
   A regime-aware forecast gains 24% at D8 when the engine state is read at the target half-hour,
   but that state is built from the reading being forecast. With the state of the last settled day,
-  the coefficient fitted on the contemporaneous state is far too large and the forecast gets 10%
-  worse; the coefficient trained on the day-old state gains 3%.
+  the coefficient fitted on the contemporaneous state is more than 20 times too large and the
+  forecast gets 10% worse; the coefficient trained on the day-old state gains 3%.
 lessons:
   - >-
     The engine's offset is stable across the 12 monthly refits, both per half-hour with one or
@@ -104,8 +104,8 @@ advice:
   - >-
     At D8, train an engine-state coefficient on the state a forecast will actually see, not on
     the contemporaneous state, because the last settled day's state is worth 0.15 MW per unit of
-    probability and the contemporaneous fit gives a much larger value (Results, term out of
-    sample).
+    probability and the contemporaneous fit gives a value more than 20 times larger (Results, term
+    out of sample).
   - >-
     Do not score a regime term with the detector's state at the target half-hour as a forecast
     gain: that state is built from the reading being forecast, and it lowers the quantile score
@@ -219,8 +219,8 @@ readings down during the shaded spells; the others barely move.*
   in range.
 - **The term's value out of sample.** The slope of arm 1's error on the state of the last settled
   day, fitted with an intercept, is 0.15 MW per unit of probability (95% interval -0.06 to 0.32),
-  against a much larger fitted value, so it cannot be told from zero. On the state at the target the
-  slope is clearly positive but circular. The last-day flag (probability above 0.5)
+  against a fitted value more than 20 times larger, so it cannot be told from zero. On the state at
+  the target the slope is clearly positive but circular. The last-day flag (probability above 0.5)
   is set in 65% of engine-running half-hours and 37% of other half-hours.
 - **Arm 1 against arm 2.** Arm 1's quantile score is 17% lower than arm 2's, but arm 1's spread
   comes from D8's own tuning months and arm 2's from donor Primaries.
@@ -251,6 +251,11 @@ D8, all rows.*
   interval width against a sister experiment, and an unreplicated result that a later design depends
   on) did not fire.
 - **Row set.** All arms share the same 97,012 D8 rows (keys joined across arms).
+
+**The scripts read the engine's connection date and recorded unit size from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it.
 
 ## What the next experiment should answer
 

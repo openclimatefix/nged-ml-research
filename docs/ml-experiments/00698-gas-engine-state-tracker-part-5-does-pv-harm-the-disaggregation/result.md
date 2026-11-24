@@ -458,3 +458,7 @@ would separate the farm's roughness from real weather as the cause.
 - Inputs from earlier experiments: experiment 694's panel and D8 era records, experiment 697's
   stored frames, controls, and engine draw, experiment 695's grid helpers, and experiment 39's farm
   frame.
+- `data/ml-experiments/private/engine_constants.json`: the private file from which
+  `ml-experiments/engine_constants.py` reads the engine's recorded unit size. NGED has asked that
+  this value stays out of the repository, so the file is not committed and a rerun needs a copy of
+  it.

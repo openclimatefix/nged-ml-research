@@ -234,17 +234,23 @@ units.*
   therefore do not apply.
 - **Circularity:** the drops and the detector both read D8's residual, so some overlap is built in.
   The controls rule out a shared regional cause, and the placebo rules out a detector that flags
-  everything (0.19), but neither tests the engine directly. D8's own record of the engine is zeros
-  or absent (experiment 194), so we found no independent record. The engine's recorded output exists
-  only for a short period, and no drop falls in it (the first drop after the 2022 one starts on
-  2023-10-21), so that check cannot be run. Experiment 196 also fitted D8's detector parameters and
-  noise on 2023-09 to 2025-12, a window that contains most of the drops, whereas the three controls
-  fit their own noise on their own history.
+  everything (0.19), but neither tests the engine directly. D8's own record of the engine after NGED
+  stopped adding the engine's output to D8's reading is zeros or absent (experiment 194), so we
+  found no independent record. The engine's recorded output exists only for a short period, and no
+  drop falls in it (the first drop after the 2022 one starts on 2023-10-21), so that check cannot be
+  run. Experiment 196 also fitted D8's detector parameters and noise on 2023-09 to 2025-12, a window
+  that contains most of the drops, whereas the three controls fit their own noise on their own
+  history.
 - **Detector reliability:** experiment 196 judged the detector `not supported` after March 2025,
   and 17 of the 28 drops lie there. The period before March 2025, where the detector's
   known-answer test applies, gives 10 of 11 against 0.12.
 - **Reproduction:** arm v1 agrees with the stored probabilities of experiment 196 on every
   half-hour, and the 29 drops are those of experiment 159.
+
+**The scripts read the engine's connection date and recorded unit size from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it.
 
 ## What the next experiment should answer
 
