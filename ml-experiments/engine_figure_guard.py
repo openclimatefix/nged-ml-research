@@ -27,6 +27,7 @@ GUARDED: Final[tuple[tuple[str, str], ...]] = (
     ("00694-", "figure_6_injected_example.svg"),
     ("00694-", "figure_9_d8_running_share.svg"),
     ("00694-", "figure_5_gas_a_levels.svg"),
+    ("00697-", "f4_gas_a_levels_and_ramps.svg"),
     ("00186-", "figure_3_spread_and_drops.svg"),
     ("00199-", "figure_5_flagged_hours.svg"),
     ("00198-", "figure_d8_departure_hours.svg"),

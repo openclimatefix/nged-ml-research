@@ -217,12 +217,13 @@ flatness of the control answers that only for the demand shapes that the control
 
 ![Running share against system price](f3_price.svg)
 
-**Figure 4 shows that Gas A runs at about 1, 2, or 3 times 1.97 MW and reaches its first full level
-within 2 half-hours in 94% of its 54 complete on-spells.** Left: output in running half-hours, with
-rules at multiples of 1.97 MW. Right: output as a share of the level reached. Bottom: starts and
-stops by local clock time. No panel for D8 is drawn, because the tracker places its edges where D8's
-reading steps. At D8 the tracker fits the size of one block of output (1.75, 2.25, or 3.5 MW, by
-era), and D8's reading cannot show how many separate units the engine has.
+**Figure 4 shows that Gas A's output while running clusters at a few levels and that the engine
+reaches its first full level within 2 half-hours in most of its complete on-spells.** Left: output
+in running half-hours, as a fraction of the highest output. Right: output as a share of the level
+reached. Bottom: the share of starts and of stops in each half-hour of the local clock. No panel for
+D8 is drawn, because the tracker places its edges where D8's reading steps. At D8 the tracker fits
+the size of one block of output, and D8's reading cannot show how many separate units the engine
+has.
 
 ![Gas A output levels and ramps](f4_gas_a_levels_and_ramps.svg)
 
