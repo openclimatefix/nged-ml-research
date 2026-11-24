@@ -283,6 +283,22 @@ refit: a CAMS-rule mask, a mask of ages 2 to 5, a look-ahead sensitivity at the 
 Primaries, PV absent, capacity scale of 0.7 and 1.3, the learned gains as a share of their reachable
 range, and the four load-shift scenarios.
 
+**Seeds 2 to 4 run only if a counted treatment contrast gives a reason to continue.** After the
+8-fold, 2-seed reading of the counted contrasts, seeds 2 to 4 run only if, for at least one counted
+treatment contrast, the point estimate is below zero in at least one group (the six signed-MW
+Primaries, the eight MVA-only Primaries). If every counted treatment contrast has a point estimate
+at or above zero in both groups, the experiment is written up at 2 seeds with the pre-registered
+two-seed values, and the page states that the futility rule fired. A clearly positive two-seed
+reading still goes to the 5-seed reading. This rule was added before any treatment score was read.
+No threshold or verdict rule changed. The fit logs of phase 3 already held validation-loss lines
+when this rule was added (five at the time of the edit), and they were not read before the edit.
+
+**Fits run in the order of phases 3, 4, and 5 before phase 6, and the fit logs are read for stopping
+passes only.** Every fit's log summary reports its stopping pass: the stage, the pass number, and
+whether the 60-pass cap or the patience ended the stage. The implementer reports that table to the
+manager, and reads no validation loss and no treatment score from the logs before the two-seed
+scores are read.
+
 ## Known-answer checks
 
 **Every threshold is fixed now and no threshold is tuned to pass.** The wiring checks KF1 (zero
