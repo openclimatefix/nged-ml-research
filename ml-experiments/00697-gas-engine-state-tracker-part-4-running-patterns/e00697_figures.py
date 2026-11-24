@@ -29,7 +29,6 @@ from e00697_analysis import (  # ty: ignore[unresolved-import]
     heat_map,
     overall_bins,
     record_edges,
-    record_levels,
     spell_table,
     usable,
     with_state,
@@ -40,11 +39,11 @@ from e00697_common import (  # ty: ignore[unresolved-import]
     EVENING_LAST,
     MAX_SPELL_LENGTH,
     MIN_DAYS_PER_BIN,
-    UNIT_MW,
     hazard_columns,
     pooled_hazard,
 )
 from e00697_frame import load_frame  # ty: ignore[unresolved-import]
+from engine_figure_guard import save_chart  # ty: ignore[unresolved-import]
 
 WIDTH: Final[int] = 680
 """`CONTENT_WIDTH_PX` of the docs pages."""
@@ -95,7 +94,7 @@ def save(*, chart: alt.TopLevelMixin, name: str) -> None:
     """Write an SVG, optimise it with svgo, and refuse it if it holds a year."""
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     path = DOCS_DIR / f"{name}.svg"
-    chart.save(path)
+    save_chart(chart=chart, path=path)
     subprocess.run([*SVGO, str(path)], check=True, capture_output=True)
     years = YEAR_PATTERN.findall(" ".join(TEXT_NODE.findall(path.read_text())))
     if years:
@@ -369,24 +368,13 @@ def figure_3(*, frames: dict[str, pl.DataFrame]) -> None:
 
 
 def figure_4(*, frames: dict[str, pl.DataFrame]) -> None:
-    """F4: Gas A's output levels, ramp shape, and clock times of starts and stops."""
+    """F4: Gas A's ramp shape and the clock times of its starts and stops.
+
+    Never add a levels-distribution panel (a histogram or density of output while running) here.
+    Evenly spaced peaks show the number of units and their size ratio. The guard checks text, not
+    marks, so it cannot catch them.
+    """
     record = frames["record"]
-    power = np.clip(record["power"].to_numpy(), 0.0, None)
-    running = power[np.rint(power / UNIT_MW) >= 1]
-    hist = pl.DataFrame({"power": running}).with_columns(
-        bin=(pl.col("power") / 0.25).floor() * 0.25
-    )
-    counts = hist.group_by("bin").agg(n=pl.len()).sort("bin")
-    rules = pl.DataFrame({"level": [UNIT_MW * k for k in (1, 2, 3, 4)]})
-    levels = (
-        alt.Chart(counts, title="Gas A output while running")  # ty: ignore[unresolved-attribute]
-        .mark_bar(aria=False, color=BLUE, size=6)
-        .encode(
-            x=alt.X("bin:Q", title="Output (MW), rules at multiples of 1.97 MW"),
-            y=alt.Y("n:Q", title="Half-hours"),
-        )
-        + alt.Chart(rules).mark_rule(aria=False, color=ORANGE).encode(x="level:Q")  # ty: ignore[unresolved-attribute]
-    ).properties(width=220, height=150)
     edges = record_edges(record=record)
     offsets = edges["offsets"]
     ramp = pl.DataFrame(
@@ -403,19 +391,22 @@ def figure_4(*, frames: dict[str, pl.DataFrame]) -> None:
             x=alt.X(
                 "offset:Q",
                 title="Half-hours from the first running (start) or idle (stop) half-hour",
+                axis=alt.Axis(values=list(range(-3, 4))),
             ),
             y=alt.Y("share:Q", title="Share of level", axis=alt.Axis(format=".0%")),
             color=alt.Color(
                 "edge:N", scale=alt.Scale(range=[BLUE, ORANGE]), legend=alt.Legend(title=None)
             ),
         )
-        .properties(width=220, height=150)
+        .properties(width=WIDTH - 140, height=150)
     )
+    starts = np.asarray(edges["start_half_hours"], dtype=float)
+    stops = np.asarray(edges["stop_half_hours"], dtype=float)
     clock = pl.DataFrame(
         {
             "start": np.tile(np.arange(48) / 2, 2),
             "stop": np.tile((np.arange(48) + 1) / 2, 2),
-            "n": list(edges["start_half_hours"]) + list(edges["stop_half_hours"]),  # ty: ignore[invalid-argument-type]
+            "n": list(starts / starts.sum()) + list(stops / stops.sum()),
             "edge": ["Spell start"] * 48 + ["Spell stop"] * 48,
         }
     )
@@ -425,16 +416,15 @@ def figure_4(*, frames: dict[str, pl.DataFrame]) -> None:
         .encode(
             x=alt.X("start:Q", axis=hour_axis(), scale=alt.Scale(domain=[0, 24], nice=False)),
             x2="stop:Q",
-            y=alt.Y("n:Q", title="Spells"),
+            y=alt.Y("n:Q", title="Share of spells", axis=alt.Axis(format=".0%")),
             color=alt.Color(
                 "edge:N", scale=alt.Scale(range=[BLUE, ORANGE]), legend=alt.Legend(title=None)
             ),
         )
         .properties(width=WIDTH - 140, height=130)
     )
-    print(f"F4 summary: {record_levels(record=record)}", flush=True)
     save(
-        chart=alt.vconcat(alt.hconcat(levels, ramp_chart), clock_chart),
+        chart=alt.vconcat(ramp_chart, clock_chart),
         name="f4_gas_a_levels_and_ramps",
     )
 
