@@ -184,7 +184,7 @@ def coefficients(*, score: dict) -> None:
         )
     )
     unit = (
-        _chart(pl.DataFrame({"y": [1.97]}))
+        _chart(pl.DataFrame({"y": [common.UNIT_MW]}))
         .mark_rule(color="#555555", strokeDash=[4, 3])
         .encode(y="y:Q")
     )

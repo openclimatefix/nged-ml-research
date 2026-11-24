@@ -244,7 +244,7 @@ def run_job(job: Job, *, write: bool = True) -> str:
                 seconds=seconds,
             )
         tmp.replace(path)
-    return f"{job.name}: {seconds:.0f} s, K={track.k_max}, unit={track.unit:.2f} MW"
+    return f"{job.name}: {seconds:.0f} s, K={track.k_max}, unit=[withheld]"
 
 
 def load_control(*, job: Job) -> dict[str, np.ndarray]:

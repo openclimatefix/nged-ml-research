@@ -63,9 +63,13 @@ ALARM_PAD: Final[int] = 6
 """An alarm is inside a spell when it lies within 6 half-hours of the spell's ends."""
 NEIGHBOUR_FRACTIONS: Final[tuple[float, ...]] = (0.25, 0.5, 0.75)
 STEP_WINDOW: Final[int] = 12
-UNIT_SENSITIVITY_MW: Final[float] = 1.75
-UNIT_RECORD_MW: Final[float] = 1.93
-"""The unit that the first run of `unit_from_engine_record` estimated; a sensitivity."""
+GATE_RESULTS_196: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate"
+    / "gate_results_fixed.json"
+)
+"""Experiment 196's private gate results; the unit size fitted there is a sensitivity."""
+WITHHELD: Final[str] = "[withheld: engine unit size and quantities in its units]"
 UNIFORM_DISTANCE: Final[float] = 0.25
 TOTAL_FALSE_ALARMS: Final[int] = 148
 D8_D9_FALSE_ALARMS: Final[int] = 61
@@ -74,10 +78,20 @@ REPORT: list[str] = []
 SUMMARY: dict[str, float] = {}
 
 
+PRIVATE_REPORT: list[str] = []
+
+
 def say(text: str = "") -> None:
     """Print a line and keep it for `printed_report.txt`."""
     print(text, flush=True)
     REPORT.append(text)
+
+
+def say_withheld(text: str) -> None:
+    """Print a line that holds the unit size, and keep it only in the private report under `DATA_DIR`."""
+    print(text, flush=True)
+    REPORT.append(WITHHELD)
+    PRIVATE_REPORT.append(text)
 
 
 def wilson(*, k: int, n: int) -> str:
@@ -295,10 +309,12 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     # ---- 3. depth and step sizes -------------------------------------------------------------
     say("\n== Depth against multiples of one engine unit ==")
     g, g_lo, g_hi = unit_from_engine_record(rng=rng)
-    say(
+    say_withheld(
         f"Unit from the engine's recorded output, levels 1 to 3: {g:.2f} MW "
         f"(95% day-resampled interval {g_lo:.2f} to {g_hi:.2f}); the plan fixed {UNIT_MW} MW"
     )
+    unit_record_mw = round(g, 2)
+    unit_sensitivity_mw = float(json.loads(GATE_RESULTS_196.read_text())["wide"]["g"])
     depth = drops["depth_mw"].to_numpy()
     med = lambda x: float(np.nanmedian(x))  # noqa: E731
     onset = np.array(
@@ -316,7 +332,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         ("onset step", np.abs(onset)),
         ("end step", np.abs(end)),
     ):
-        for unit in (UNIT_MW, UNIT_RECORD_MW, UNIT_SENSITIVITY_MW):
+        for unit in (UNIT_MW, unit_record_mw, unit_sensitivity_mw):
             d = distance_to_unit_multiple(x=values[scope], unit=unit)
             mean, lo, hi = bootstrap_mean(x=d, rng=rng)
             sim = np.array(
@@ -328,7 +344,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
                 ]
             )
             clustering[(label, unit)] = (mean, lo, hi)
-            say(
+            say_withheld(
                 f"  {label}, unit {unit} MW: mean distance to the nearest multiple {mean:.3f} units "
                 f"(95% bootstrap {lo:.3f} to {hi:.3f}); uniform spread over the same range "
                 f"{sim.mean():.3f} (95% of draws {np.quantile(sim, 0.025):.3f} to {np.quantile(sim, 0.975):.3f}); "
@@ -359,7 +375,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         say(
             f"  depth clustering in this period ({int(pick.sum())} drops): mean distance {mean:.3f} units (95% bootstrap {lo_ci:.3f} to {hi_ci:.3f}); median depth {np.median(depth[pick]):.2f} MW"
         )
-    say(
+    say_withheld(
         f"Depth in units of {UNIT_MW} MW, sorted: "
         + " ".join(f"{x:.2f}" for x in np.sort(depth[scope] / UNIT_MW))
     )
@@ -555,6 +571,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     say("\n" + str(table.with_columns(pl.col(pl.Float64).round(2))))
     (DATA_DIR / "summary.json").write_text(json.dumps(SUMMARY, indent=1))
     (Path(__file__).parent / "printed_report.txt").write_text("\n".join(REPORT) + "\n")
+    (DATA_DIR / "printed_report_private.txt").write_text("\n".join(PRIVATE_REPORT) + "\n")
 
 
 if __name__ == "__main__":

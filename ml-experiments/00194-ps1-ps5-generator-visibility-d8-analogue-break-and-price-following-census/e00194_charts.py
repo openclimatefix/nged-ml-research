@@ -149,7 +149,7 @@ def main() -> None:  # noqa: D103
     # Figure 4: residual histograms.
     d8 = pl.read_parquet(common.DATA_DIR / "d8_resid.parquet")
     periods = {
-        "1 before the engine (2022-01 to 2023-06-12)": (
+        "1 before the engine": (
             datetime(2022, 1, 1, tzinfo=UTC),
             datetime(2023, 6, 13, tzinfo=UTC),
         ),
