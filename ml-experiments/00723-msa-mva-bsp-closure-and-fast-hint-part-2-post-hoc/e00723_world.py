@@ -372,9 +372,40 @@ def fold(
     return out
 
 
-def inject(*, signed_mw: np.ndarray, farm_mw: np.ndarray, scale: float) -> np.ndarray:
-    """Return the host's signed series with a farm's output added as generation: `X - scale * F`."""
-    return signed_mw - scale * farm_mw
+def farm_norm(*, power_mw: np.ndarray, zenith_deg: np.ndarray, ghi: np.ndarray) -> np.ndarray:
+    """Return a farm's recorded power over its own daylight 99th percentile: the series that is injected.
+
+    RULED: this is experiment 720's `farm_norm` (function `farm_norm` of `e00506_data.py`, in the
+    folder `00506-mva-sign-evidence-dip-depth-and-gated-solar-rule`, which experiment 720's script
+    `e00720_rung0b.py` calls on branch `msa-mva-to-mw-rung-0`), copied here because that function
+    reads a stored frame by path. The series is 0 at night (a zenith of at least
+    `FARM_MAX_ZENITH_DEG`), NaN where the power is missing or is a dropout (0 or less with an
+    irradiance above `FARM_DROPOUT_GHI`), and the power clipped at 0 and divided by the
+    `FARM_NORM_PERCENTILE`th percentile of the daylight power otherwise. The percentile is taken
+    over the arrays given, which end before the holdout. The series is NaN everywhere when no
+    daylight power exists. A grid half-hour with no frame row has a NaN zenith and power, so it is
+    NaN here.
+    """
+    power = np.asarray(power_mw, dtype=float)
+    zenith = np.asarray(zenith_deg, dtype=float)
+    night = zenith >= core.FARM_MAX_ZENITH_DEG
+    daylight = (zenith < core.FARM_MAX_ZENITH_DEG) & np.isfinite(power)
+    if not daylight.any():
+        return np.full(power.shape, np.nan)
+    p99 = float(np.percentile(power[daylight], core.FARM_NORM_PERCENTILE))
+    with np.errstate(invalid="ignore"):
+        dropout = (power <= 0.0) & (np.asarray(ghi, dtype=float) > core.FARM_DROPOUT_GHI)
+    clipped = np.clip(power, 0.0, None) / p99
+    return np.where(night, 0.0, np.where(~np.isfinite(power) | dropout, np.nan, clipped))
+
+
+def inject(*, signed_mw: np.ndarray, farm_norm_series: np.ndarray, scale: float) -> np.ndarray:
+    """Return the host's signed series with a farm's normalised output added as generation: `X - scale * F`.
+
+    `F` is `farm_norm`, so the host's series is NaN wherever the farm's series is NaN (a gap or a
+    dropout). That is experiment 720's masking of the host where the farm is missing.
+    """
+    return signed_mw - scale * farm_norm_series
 
 
 def level_reference_rows(
@@ -401,32 +432,31 @@ def level_reference_rows(
 
 
 def reference_row_count(
-    *, host_signed_mw: np.ndarray, farm_mw: np.ndarray, rows: np.ndarray
+    *, host_signed_mw: np.ndarray, farm_norm_series: np.ndarray, rows: np.ndarray
 ) -> int:
-    """Return the number of reference rows on which both the host's signed series and the farm's output are finite."""
-    return int((rows & np.isfinite(host_signed_mw) & np.isfinite(farm_mw)).sum())
+    """Return the reference rows on which the host's signed series and the farm's normalised output are finite."""
+    return int((rows & np.isfinite(host_signed_mw) & np.isfinite(farm_norm_series)).sum())
 
 
 def injection_scale(
     *,
     host_signed_mw: np.ndarray,
-    farm_mw: np.ndarray,
-    farm_capacity_mw: float,
+    farm_norm_series: np.ndarray,
     rows: np.ndarray,
     level: float,
 ) -> float:
-    """Return the scale `a` such that the injected series `a * F` is `level * median|X| * F / capacity` megawatts.
+    """Return the scale `a` in megawatts, so that the injected series is `a * F`, with `F` the `farm_norm` series.
 
-    RULED (experiment 720's definition): the farm's output is normalised by its capacity and
-    multiplied by `level` times the median absolute signed reading of the host on the reference
-    rows (`level_reference_rows`), so `a = level * median|X| / capacity`. The median is NaN, and
-    so is the scale, when fewer than 200 reference rows have both values or the capacity is not
-    positive. The caller logs and counts every NaN scale.
+    RULED (experiment 720's definition): the injected series is the farm's normalised output
+    (`farm_norm`, between 0 and about 1) times `level` times the median absolute signed reading of
+    the host on the reference rows (`level_reference_rows`). The farm's capacity does not enter.
+    The median is NaN, and so is the scale, when fewer than 200 reference rows have both values.
+    The caller logs and counts every NaN scale.
     """
-    ok = rows & np.isfinite(host_signed_mw) & np.isfinite(farm_mw)
-    if int(ok.sum()) < core.MIN_REFERENCE_ROWS or not farm_capacity_mw > 0:
+    ok = rows & np.isfinite(host_signed_mw) & np.isfinite(farm_norm_series)
+    if int(ok.sum()) < core.MIN_REFERENCE_ROWS:
         return float("nan")
-    return level * float(np.median(np.abs(host_signed_mw[ok]))) / farm_capacity_mw
+    return level * float(np.median(np.abs(host_signed_mw[ok])))
 
 
 def trailing_overcast_median(

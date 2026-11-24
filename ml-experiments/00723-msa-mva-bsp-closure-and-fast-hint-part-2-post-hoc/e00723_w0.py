@@ -78,11 +78,17 @@ END_WORDS: Final[tuple[str, ...]] = ("end", "finish", "restore", "restored", "re
 NOT_TIME_WORDS: Final[tuple[str, ...]] = ("transfer", "transferred", "transferring", "name")
 """Whole words that rule a column out as a start or end time (for example "transferred from")."""
 
-DATETIME_FORMATS: Final[tuple[str, ...]] = (
-    "%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M", "%Y-%m-%d",
-    "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y", "%d-%m-%Y %H:%M:%S", "%d-%m-%Y %H:%M",
+TIMED_FORMATS: Final[tuple[str, ...]] = (
+    "%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M",
+    "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d-%m-%Y %H:%M:%S", "%d-%m-%Y %H:%M",
 )  # fmt: skip
-"""The formats tried, in order, on a text time; each row takes the first format that parses it."""
+"""The text formats that carry a time of day."""
+
+DATE_ONLY_FORMATS: Final[tuple[str, ...]] = ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y")
+"""The text formats that carry a date and no time of day."""
+
+DATETIME_FORMATS: Final[tuple[str, ...]] = (*TIMED_FORMATS, *DATE_ONLY_FORMATS)
+"""The formats tried on a text time; each row takes the first format that parses it, timed formats first."""
 
 
 class SwitchingLogDefectError(RuntimeError):
@@ -123,34 +129,64 @@ def _substation_text(series: pl.Series) -> pl.Series:
     )
 
 
-def _as_datetime(series: pl.Series) -> pl.Series:
-    """Return a column as a naive UTC `Datetime`; a failed parse is null.
+def _as_datetime(series: pl.Series, *, end_of_day: bool = False) -> tuple[pl.Series, pl.Series]:
+    """Return a column as naive UTC times, and a Boolean flag that marks the date-only cells.
 
     RULED: a time with no zone is read as `LOCAL_ZONE` (Europe/London), then converted to UTC. A
     time that carries a zone is converted to UTC. A text time takes the first of
-    `DATETIME_FORMATS` that parses it, row by row.
+    `DATETIME_FORMATS` that parses it, row by row, and a failed parse is null.
+
+    RULED: a date-only cell (no time of day) is that local calendar day. A date-only start is local
+    00:00 of the day. A date-only end (`end_of_day=True`) is local 24:00 of the day, which is local
+    00:00 of the next day, so a date-only end never falls before a start on the same day. A cell is
+    date-only when it is a `Date`, when it is a text with a date-only format, or when it is a
+    zone-free `Datetime` in a column whose every non-null value is exactly midnight (a workbook
+    stores a date as a datetime at midnight, and a column of such values has no time of day). A
+    midnight value inside a column that also holds other times of day is a timed value.
     """
-    if isinstance(series.dtype, pl.Datetime):
-        if series.dtype.time_zone is not None:
-            return series.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+    if isinstance(series.dtype, pl.Datetime) and series.dtype.time_zone is not None:
+        utc = series.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+        return utc, pl.Series([False] * len(series))
+    if series.dtype == pl.Date:
         naive = series.cast(pl.Datetime("us"))
-    elif series.dtype == pl.Date:
+        date_only = naive.is_not_null()
+    elif isinstance(series.dtype, pl.Datetime):
         naive = series.cast(pl.Datetime("us"))
+        at_midnight = naive == naive.dt.truncate("1d")
+        every_midnight = bool(at_midnight.drop_nulls().all()) if naive.drop_nulls().len() else False
+        date_only = naive.is_not_null() & pl.Series([every_midnight] * len(naive))
     else:
         text = pl.DataFrame({"t": series.cast(pl.String, strict=False).str.strip_chars()})
-        naive = text.select(
-            pl.coalesce(
+        parsed = text.select(
+            timed=pl.coalesce(
                 [
-                    pl.col("t").str.to_datetime(fmt, strict=False, time_zone=None)
-                    for fmt in DATETIME_FORMATS
+                    pl.col("t").str.to_datetime(f, strict=False, time_zone=None)
+                    for f in TIMED_FORMATS
                 ]
-            ).cast(pl.Datetime("us"))
-        ).to_series()
-    return (
+            ),
+            dated=pl.coalesce(
+                [
+                    pl.col("t").str.to_datetime(f, strict=False, time_zone=None)
+                    for f in DATE_ONLY_FORMATS
+                ]
+            ),
+        )
+        naive = parsed.select(pl.coalesce("timed", "dated").cast(pl.Datetime("us"))).to_series()
+        date_only = parsed["timed"].is_null() & parsed["dated"].is_not_null()
+    if end_of_day:
+        naive = (
+            pl.DataFrame({"t": naive, "d": date_only})
+            .select(
+                pl.when(pl.col("d")).then(pl.col("t").dt.offset_by("1d")).otherwise(pl.col("t"))
+            )
+            .to_series()
+        )
+    utc = (
         naive.dt.replace_time_zone(LOCAL_ZONE, ambiguous="earliest", non_existent="null")
         .dt.convert_time_zone("UTC")
         .dt.replace_time_zone(None)
     )
+    return utc, date_only
 
 
 def windows_with_diagnostics(
@@ -161,10 +197,19 @@ def windows_with_diagnostics(
     A sheet is used when it has a column whose name holds the whole word "substation" (and not
     "name") and a column with a start word ("start", "from", "begin") that is not a transfer
     column. The end column is the first with an end word ("end", "finish", "restore", "until") and
-    no start word. The window runs from the start to the end, or is the UTC calendar day of the
-    start where the sheet gives no end or the end is missing. A time with no zone is read as
-    Europe/London (RULED). A row whose start cannot be parsed, and a row whose end precedes its
+    no start word. The window runs from the start to the end. Where the sheet gives no end or the
+    end is missing, the window is the UTC calendar day of a timed start, and the local calendar
+    day (Europe/London) of a date-only start. A time with no zone is read as Europe/London, a
+    date-only start is local 00:00, and a date-only end is local 24:00 of its day (RULED; see
+    `_as_datetime`). A row whose start cannot be parsed, and a row whose end precedes its
     start, is skipped and counted.
+
+    Args:
+        sheets: The workbook's sheets by name.
+        numbers: Each Primary's substation number by label.
+
+    Returns:
+        The windows by Primary label, and one diagnostics row per sheet.
 
     Raises:
         SwitchingLogDefectError: A sheet has the two columns and rows but no row matches a Primary.
@@ -185,9 +230,10 @@ def windows_with_diagnostics(
         if sub is None or beg is None:
             continue
         diag["used"] = True
-        begin = _as_datetime(frame[beg])
+        begin, begin_date_only = _as_datetime(frame[beg])
+        day_end, _ = _as_datetime(frame[beg], end_of_day=True)
         finish = (
-            _as_datetime(frame[end])
+            _as_datetime(frame[end], end_of_day=True)[0]
             if end
             else pl.Series([None] * frame.height, dtype=pl.Datetime("us"))
         )
@@ -204,6 +250,8 @@ def windows_with_diagnostics(
             matched_rows.update(idx)
             for i in idx:
                 b_t, e_t = begin[i], finish[i]
+                if e_t is None and begin_date_only[i]:
+                    e_t = day_end[i]  # no end: the local calendar day of the logged date
                 if e_t is not None and e_t < b_t:
                     diag["n_rows_end_before_start"] += 1
                     continue
@@ -427,25 +475,31 @@ def powered_table(
             row["coherence_injected"] = coh
             row["sd_host_points"] = s_h
             ref_rows = score.level_rows(ctx=ctx, host=host)
-            farm_mw = ctx.farm_output(farm=farm)
+            farm_f = ctx.farm_norm(farm=farm)
             n_ref = world.reference_row_count(
-                host_signed_mw=ctx.series[host], farm_mw=farm_mw, rows=ref_rows
+                host_signed_mw=ctx.series[host], farm_norm_series=farm_f, rows=ref_rows
             )
-            ref_ok = ref_rows & np.isfinite(ctx.series[host]) & np.isfinite(farm_mw)
+            # The farm-sign flag reads the farm's recorded output, before the clipping at 0 that
+            # `farm_norm` applies, so that a farm that reads negative for generation shows. Job W2
+            # drops a pair whose flag is set (`common.qualifying_pairs`).
+            raw_mw = ctx.farm_output(farm=farm)
+            ref_ok = ref_rows & np.isfinite(ctx.series[host]) & np.isfinite(raw_mw)
             share_ref = (
-                float(np.median(farm_mw[ref_ok] / ctx.farm_cap[farm])) if n_ref else float("nan")
+                float(np.median(raw_mw[ref_ok] / ctx.farm_cap[farm]))
+                if ref_ok.any()
+                else float("nan")
             )
             row["n_reference_rows"] = n_ref
             row["farm_median_share_reference"] = share_ref
-            row["farm_share_positive"] = bool(np.isfinite(share_ref) and share_ref > 0)
+            row["farm_reads_negative"] = bool(np.isfinite(share_ref) and share_ref <= 0)
             for level in core.LEVELS:
                 scale = world.injection_scale(
-                    host_signed_mw=ctx.series[host], farm_mw=farm_mw,
-                    farm_capacity_mw=ctx.farm_cap[farm], rows=ref_rows, level=level,
+                    host_signed_mw=ctx.series[host], farm_norm_series=farm_f,
+                    rows=ref_rows, level=level,
                 )  # fmt: skip
                 row[f"scale_finite_level_{level}"] = bool(np.isfinite(scale))
                 dz = world.fast_sensor_change(
-                    z=scale * farm_mw / cap * 100.0,
+                    z=scale * farm_f / cap * 100.0,
                     u_clear=ctx.farm_sky[farm].u_clear, lit=audit["lit_of"][farm],
                 )  # fmt: skip
                 s_f = (
@@ -457,10 +511,7 @@ def powered_table(
                 row[f"powered_level_{level}"] = core.is_powered(coherence=coh, dilution_value=d)
         rows.append(row)
     frame = pl.DataFrame(rows, infer_schema_length=None)
-    for level in core.LEVELS:
-        if f"powered_level_{level}" not in frame.columns:
-            frame = frame.with_columns(pl.lit(False).alias(f"powered_level_{level}"))
-    return frame
+    return common.with_pair_columns(frame=frame)
 
 
 def power_table(
@@ -623,8 +674,8 @@ def sky_share_d12(*, ctx: common.Context, membership: dict[str, list[str]]) -> f
 def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:
     """Run job W0; `inputs` and `info` fill the run log as the job reads."""
     common.assert_launch()
-    guard.archive_outputs(
-        names=(*OUTPUTS, "run_log_w0.json"), private_names=(common.W0_WINDOWS_NAME,)
+    info["attempt"] = guard.begin_attempt(
+        job="w0", names=(*OUTPUTS, "run_log_w0.json"), private_names=(common.W0_WINDOWS_NAME,)
     )
     log = guard.ReadLog()
     guard.say("JOB W0 STARTING")
@@ -640,20 +691,17 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     guard.say("later span days:", ctx.n_days, "expected:", core.N_LATER_DAYS, "ok:", later_ok)
     membership: dict[str, list[str]] = audit["membership"]
     pairs = powered_table(ctx=ctx, audit=audit, membership=membership)
-    qual = pairs.filter(pl.col("qualifies"))
-    powered_2 = qual.filter(pl.col("powered_level_2.0"))
-    n_keep = qual.height
-    n_powered = powered_2.height
-    n_hosts = int(powered_2["host"].n_unique()) if n_powered else 0
-    n_nan_scale = int(
-        qual.filter(~pl.col("scale_finite_level_1.0") | ~pl.col("scale_finite_level_2.0")).height
-    )
-    n_farm_share_not_positive = int(qual.filter(~pl.col("farm_share_positive")).height)
+    counts_pairs = common.pair_counts(pairs=pairs)
+    n_keep = counts_pairs["n_qualifying_pairs"]
+    n_powered = counts_pairs["n_powered_pairs_level_2"]
+    n_hosts = counts_pairs["n_powered_hosts"]
+    n_nan_scale = counts_pairs["n_pairs_non_finite_injection_scale"]
+    n_farm_reads_negative = counts_pairs["n_pairs_farm_reads_negative"]
     guard.say(
         "qualifying pairs with a non-finite injection scale:",
         n_nan_scale,
-        "| farm median share not positive:",
-        n_farm_share_not_positive,
+        "| pairs dropped because the farm reads negative:",
+        n_farm_reads_negative,
     )
     void_before = core.void_before_run(
         n_pairs_keeping_sensor=n_keep,
@@ -767,13 +815,14 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     guard.write_public_csv(frame=sheets_frame, name="w0_switching_sheets.csv")
     gate.check(done=1, total=1)
     checks = {
+        "attempt": info["attempt"],
         "later_span_days": ctx.n_days,
         "later_span_ok": later_ok,
         "holdout_clean": log.holdout_clean(),
         "arc_term_void": audit["arc_void"],
         "u_clear_unchanged_share_by_site": audit["u_clear_unchanged_share_by_site"],
         "n_pairs_non_finite_injection_scale": n_nan_scale,
-        "n_pairs_farm_share_not_positive": n_farm_share_not_positive,
+        "n_pairs_farm_reads_negative": n_farm_reads_negative,
         "n_qualifying_pairs": n_keep,
         "n_powered_pairs_level_2": n_powered,
         "n_powered_hosts": n_hosts,

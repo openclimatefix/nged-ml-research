@@ -182,6 +182,15 @@ SUNNY_MIN_K: Final[float] = 0.7
 MIN_REFERENCE_ROWS: Final[int] = 200
 """RULED: a pair whose host has fewer reference rows has no injection scale (experiment 720 raises under 200 rows)."""
 
+FARM_MAX_ZENITH_DEG: Final[float] = 75.0
+"""RULED (experiment 720's `farm_norm`): a half-hour with a sun zenith of at least this is night, and the injected farm's series is 0 there; the 99th percentile is taken over the half-hours below it."""
+
+FARM_DROPOUT_GHI: Final[float] = 100.0
+"""RULED (experiment 720's `farm_norm`): a farm reading of 0 or less with CAMS irradiance above this (W/m2) is a dropout and is NaN."""
+
+FARM_NORM_PERCENTILE: Final[float] = 99.0
+"""RULED (experiment 720's `farm_norm`): the percentile of the farm's own daylight power that scales the injected series to 1."""
+
 VOID_BY_CONSTRUCTION: Final[tuple[str, ...]] = ("calibration",)
 """RULED: bars that no run can read, because the plan page defines no likelihood ratio; they are neutral in every verdict and are listed beside it."""
 
@@ -257,8 +266,9 @@ def arc_term_void(*, unchanged_share_by_site: Mapping[str, float]) -> bool:
 
     RULED: the share is 0% when `u_clear` is healthy. One site above the share voids the arc term,
     so a broken `u_clear` at one site cannot hide under the others. A site whose share cannot be
-    computed (NaN) also voids it, because the audit cannot vouch for that site. An empty mapping is
-    void.
+    computed (NaN) also voids it, because the audit cannot vouch for that site (RULED: the plan
+    page's section "Rulings before the run" records it, and job W2 is then `inconclusive`, row 2).
+    An empty mapping is void.
     """
     if not unchanged_share_by_site:
         return True
@@ -321,7 +331,10 @@ def d15_dead_band_binds(*, farm_class: str | None, is_addback_candidate: bool) -
     RULED: experiment 722's class `outside_or_added_back` merges an outside generator with an
     added-back one, so the bar binds only when the farm is not also an add-back candidate at D15.
     No farm inside the polygon, an embedded or unresolved class, or an add-back candidate makes the
-    bar report-only.
+    bar report-only. In practice the bar is report-only: under experiment 722's class definitions a
+    farm inside D15's polygon whose class is `outside_or_added_back` is also an add-back candidate
+    whenever the generator is subtracted, so the binding condition holds only for a farm that is
+    not subtracted (RULED: the plan page's section "Rulings before the run" says so).
     """
     return farm_class == "outside_or_added_back" and not is_addback_candidate
 

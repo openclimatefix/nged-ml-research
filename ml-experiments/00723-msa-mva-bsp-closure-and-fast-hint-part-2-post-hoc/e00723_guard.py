@@ -78,7 +78,7 @@ def invalidate_outputs(*, names: Sequence[str], out_dir: Path = OUT_DIR) -> list
 
 
 RERUN_APPROVAL_ENV: Final[str] = "E723_RERUN_APPROVED_BY_MANAGER"
-"""Set to any non-empty text, naming the manager's approval, to rerun a job whose verdict is not `invalid`."""
+"""Set to any non-empty text, naming the manager's approval, to rerun a job whose earlier attempt began (whatever its verdict, or none)."""
 
 
 def archive_outputs(
@@ -119,32 +119,63 @@ def archive_outputs(
     return attempt
 
 
-def refuse_rerun(
-    *, verdict_name: str, out_dir: Path = OUT_DIR, env: Mapping[str, str] | None = None
-) -> None:
-    """Raise unless an earlier verdict is absent or `invalid`, or the manager's approval is named.
+def attempt_marker_name(*, job: str) -> str:
+    """Return the file name of a job's attempt marker."""
+    return f"marker_attempt_{job}.json"
 
-    The plan page says that a verdict of `inconclusive` or `not supported` is never rerun, and
-    that a `supported` verdict stands. Only an `invalid` verdict (a code defect) may be rerun
-    without the approval, which `RERUN_APPROVAL_ENV` carries.
+
+def begin_attempt(
+    *,
+    job: str,
+    names: Sequence[str],
+    private_names: Sequence[str] = (),
+    out_dir: Path = OUT_DIR,
+    env: Mapping[str, str] | None = None,
+) -> int:
+    """Start a job's counted attempt: refuse an unapproved rerun, archive earlier outputs, write the marker.
+
+    The marker `marker_attempt_<job>.json` is written before the job reads anything, so a job that
+    crashes, ends `invalid`, or ends with any other verdict leaves the marker, and the next run is
+    refused unless `RERUN_APPROVAL_ENV` names the manager's approval. With the approval the earlier
+    outputs and the old marker move into `attempt_<n>/`, and the new attempt is the old number
+    plus 1.
+
+    Args:
+        job: `w0`, `w2`, or `w3`.
+        names: The job's public outputs, including its run log, which are archived on a rerun.
+        private_names: The job's outputs under `PRIVATE/`, archived on a rerun.
+        out_dir: The experiment's output folder.
+        env: The environment (default `os.environ`), for a test.
+
+    Returns:
+        The attempt number, 1 for the first attempt.
+
+    Raises:
+        JobRefusedError: An earlier attempt of this job began and the approval is not named.
     """
-    path = out_dir / verdict_name
-    if not path.is_file():
-        return
+    marker = out_dir / attempt_marker_name(job=job)
     environment = os.environ if env is None else env
-    if environment.get(RERUN_APPROVAL_ENV, "").strip():
-        return
-    try:
-        verdict = json.loads(path.read_text()).get("verdict")
-    except json.JSONDecodeError:
-        verdict = None
-    if verdict == "invalid":
-        return
-    msg = (
-        f"{verdict_name} already holds the verdict {verdict!r}; a rerun needs the manager's "
-        f"approval, named in the environment variable {RERUN_APPROVAL_ENV}"
-    )
-    raise JobRefusedError(msg)
+    previous = 0
+    if marker.is_file():
+        try:
+            previous = int(json.loads(marker.read_text()).get("attempt", 1))
+        except json.JSONDecodeError, ValueError:
+            previous = 1
+        if not environment.get(RERUN_APPROVAL_ENV, "").strip():
+            msg = (
+                f"attempt {previous} of job {job} already began (it may have crashed, or ended with "
+                f"any verdict); a rerun needs the manager's approval, named in the environment "
+                f"variable {RERUN_APPROVAL_ENV}"
+            )
+            raise JobRefusedError(msg)
+    archive_outputs(
+        names=(*names, marker.name), private_names=private_names, out_dir=out_dir,
+        private_dir=out_dir / "PRIVATE",
+    )  # fmt: skip
+    attempt = previous + 1
+    payload = json.dumps({"job": job, "attempt": attempt}, sort_keys=True)
+    atomic_write(path=marker, write=lambda tmp: tmp.write_text(payload))
+    return attempt
 
 
 def known_answer_tests(

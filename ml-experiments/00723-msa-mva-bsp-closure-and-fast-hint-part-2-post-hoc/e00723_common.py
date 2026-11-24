@@ -172,6 +172,20 @@ class Context:
             raise ValueError(msg)
         return out
 
+    def farm_norm(self, *, farm: str) -> np.ndarray:
+        """Return the injected series of a farm: its power over its own daylight 99th percentile (cached).
+
+        This is experiment 720's `farm_norm`; see `world.farm_norm`. NaN where the farm has a gap
+        or a dropout.
+        """
+        key = ("farm_norm", farm)
+        if key not in self.cache:
+            s = self.farm_sky[farm]
+            self.cache[key] = world.farm_norm(
+                power_mw=self.farm_output(farm=farm), zenith_deg=s.zenith, ghi=s.ghi
+            )
+        return self.cache[key]
+
     def farm_mean_share(self, *, farms: list[str]) -> np.ndarray:
         """Return the sensor series (the mean share of capacity) of the named farms."""
         return world.sensor_series(
@@ -283,3 +297,93 @@ def load_context(
 def assert_later_span(*, n_days: int) -> bool:
     """Return True when the later span holds exactly 413 days; a job treats False as a code defect."""
     return n_days == core.N_LATER_DAYS
+
+
+# ---------------------------------------------------------------------------------------------
+# The pair table that job W0 writes and job W2 reads
+# ---------------------------------------------------------------------------------------------
+PAIR_FLAG_COLUMNS: Final[tuple[str, ...]] = (
+    "qualifies",
+    "farm_reads_negative",
+    *(f"scale_finite_level_{level}" for level in core.LEVELS),
+    *(f"powered_level_{level}" for level in core.LEVELS),
+)
+"""The Boolean columns of the pair table."""
+
+PAIR_MEASURED_COLUMNS: Final[tuple[str, ...]] = (
+    "coherence_injected",
+    "sd_host_points",
+    "n_reference_rows",
+    "farm_median_share_reference",
+    *(f"sd_injected_points_level_{level}" for level in core.LEVELS),
+    *(f"dilution_level_{level}" for level in core.LEVELS),
+)
+"""The numeric columns that only a qualifying pair carries."""
+
+
+def with_pair_columns(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Return the pair table with every column of a qualifying pair present, whether or not any pair qualifies.
+
+    A pair that does not qualify has no injection scale, no farm-sign flag, and no powered flag.
+    The Boolean columns are filled with False and the measured columns with null, and a column
+    that no pair carries (every farm fails the arc condition, for example) is added, so that a
+    table with no qualifying pair still has every column and job W2's row 2 can record the outcome.
+    """
+    out = frame
+    for name in ("host", "farm"):
+        if name not in out.columns:
+            out = out.with_columns(pl.lit(None, dtype=pl.String).alias(name))
+    for name in PAIR_FLAG_COLUMNS:
+        out = (
+            out.with_columns(pl.col(name).cast(pl.Boolean).fill_null(False))
+            if name in out.columns
+            else out.with_columns(pl.lit(False).alias(name))
+        )
+    for name in PAIR_MEASURED_COLUMNS:
+        if name not in out.columns:
+            out = out.with_columns(pl.lit(None, dtype=pl.Float64).alias(name))
+    return out
+
+
+def read_pairs(*, out_dir: Path | None = None) -> pl.DataFrame:
+    """Return job W0's pair table from its CSV, with the Boolean columns typed (a header-only file has none)."""
+    folder = guard.OUT_DIR if out_dir is None else out_dir
+    return with_pair_columns(
+        frame=pl.read_csv(
+            folder / W0_PAIRS_NAME,
+            schema_overrides=dict.fromkeys(PAIR_FLAG_COLUMNS, pl.Boolean),
+            infer_schema_length=None,
+        )
+    )
+
+
+def qualifying_pairs(*, pairs: pl.DataFrame) -> tuple[pl.DataFrame, int]:
+    """Return the pairs that qualify and whose farm does not read negative, and the count dropped.
+
+    A farm whose generation reads negative at its host (a median recorded output on the reference
+    rows of 0 or less) would invert its injection, so the pair does not qualify. The count is the
+    pairs that would otherwise qualify.
+    """
+    full = with_pair_columns(frame=pairs)
+    qual = full.filter(pl.col("qualifies"))
+    kept = qual.filter(~pl.col("farm_reads_negative"))
+    return kept, qual.height - kept.height
+
+
+def pair_counts(*, pairs: pl.DataFrame) -> dict[str, int]:
+    """Return the counts of job W0's check file from the pair table; correct when no pair qualifies.
+
+    The counts are `n_qualifying_pairs` (after the farm-sign rule), `n_powered_pairs_level_2`,
+    `n_powered_hosts`, `n_pairs_non_finite_injection_scale`, and `n_pairs_farm_reads_negative`.
+    """
+    kept, n_negative = qualifying_pairs(pairs=pairs)
+    powered = kept.filter(pl.col("powered_level_2.0"))
+    return {
+        "n_qualifying_pairs": kept.height,
+        "n_powered_pairs_level_2": powered.height,
+        "n_powered_hosts": int(powered["host"].n_unique()) if powered.height else 0,
+        "n_pairs_non_finite_injection_scale": kept.filter(
+            ~pl.col("scale_finite_level_1.0") | ~pl.col("scale_finite_level_2.0")
+        ).height,
+        "n_pairs_farm_reads_negative": n_negative,
+    }

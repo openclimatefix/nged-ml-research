@@ -326,8 +326,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     """Run job W2; `inputs` and `info` fill the run log as the job reads."""
     common.assert_launch()
     w0 = common.require_w0()
-    guard.refuse_rerun(verdict_name=common.W2_VERDICT_NAME)
-    guard.archive_outputs(names=(*OUTPUTS, "run_log_w2.json"))
+    info["attempt"] = guard.begin_attempt(job="w2", names=(*OUTPUTS, "run_log_w2.json"))
     tests = guard.known_answer_tests()
     info["known_answer_tests"] = tests
     guard.say("known-answer tests passed:", tests["passed"], "| tests:", tests["n_tests"])
@@ -345,20 +344,22 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         and w0["holdout_clean"]
     )
     timestamp_defect = not checks722.get("stamp_alignment_ok", True)
-    pairs = pl.read_csv(guard.OUT_DIR / common.W0_PAIRS_NAME)
-    qual = pairs.filter(pl.col("qualifies"))
-    n_keep = qual.height
-    n_powered = int(pairs.filter(pl.col("qualifies") & pl.col("powered_level_2.0")).height)
-    n_hosts = (
-        int(pairs.filter(pl.col("qualifies") & pl.col("powered_level_2.0"))["host"].n_unique())
-        if n_powered
-        else 0
-    )
+    pairs = common.read_pairs()
+    qual, n_farm_reads_negative = common.qualifying_pairs(pairs=pairs)
+    counts = common.pair_counts(pairs=pairs)
+    n_keep = counts["n_qualifying_pairs"]
+    n_powered = counts["n_powered_pairs_level_2"]
+    n_hosts = counts["n_powered_hosts"]
+    if n_farm_reads_negative:
+        guard.say(
+            "pairs dropped because the farm's generation reads negative:", n_farm_reads_negative
+        )
     masked_label = "masked" if w0["mask_available"] else "transfers not masked"
     arc_void = bool(w0["arc_term_void"])
     base = {
         "mask": masked_label, "n_pairs_keeping_sensor": n_keep, "n_powered_pairs_level_2": n_powered,
         "n_powered_hosts": n_hosts, "correctness_ok": correctness_ok, "arc_term_void": arc_void,
+        "n_pairs_dropped_farm_reads_negative": n_farm_reads_negative,
         "known_answer_tests": tests, "void_by_construction": list(core.VOID_BY_CONSTRUCTION),
     }  # fmt: skip
     if correctness_ok and core.void_before_run(

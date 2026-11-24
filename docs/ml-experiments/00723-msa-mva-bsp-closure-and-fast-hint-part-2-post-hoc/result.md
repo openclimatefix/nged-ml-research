@@ -215,8 +215,9 @@ its reading)?
   before 2025-07-01 at which a farm's output is added. A sunny midday is a half-hour that starts
   from
   10:00 to 14:00 UTC, from April to September, with a clear-sky index of at least 0.7. The injected
-  series is the farm's output as a share of the farm's capacity, times the level, times that median
-  (the definition of experiment 720).
+  series is the farm's recorded output divided by the 99th percentile of the farm's own daylight
+  output, with night set to zero, negative values set to zero, and a daylight dropout set to a
+  gap, times the level, times that median (the definition of experiment 720).
 - **Void:** a test is void when its detection limit, 2.8 bootstrap standard errors, exceeds its
   bar, because a slope or area the size of the bar could not be told from zero. A void test is
   reported as void and never read as a pass.
@@ -269,7 +270,7 @@ depend only on the sizes of two changes are allowed. Job W0's estimate is under 
 | Counts at D10 | The export hours and export days, with the base stated, as a recount of the review's 77 hours on 36 days |
 | Sensor audit | The three conditions of the decision rule (condition 1 with the share of every site, so that one broken `u_clear` shows), the polygon-filtered pair table, the powered pairs with each pair's count of reference rows for the injection level, D12's and D15's sensor membership, and job 1's class for the farm inside D15's polygon, as a class only, with whether the farm is an add-back candidate at D15 |
 | Share of pairs that pass | The share of daylight half-hour pairs that pass the usable-pair rule under each sensor, because a mean over 2 or more farms moves less than CAMS at one point |
-| Switching logs | Each sheet's name, column names, and row count; for each sheet, the columns chosen as substation, start, and end, the rows read, the rows with a parsed start, and the rows matched to a Primary; one window per logged event and Primary (the logged start to end, or the calendar day when no end is logged); the mask of the amendment. A time with no time zone is read as Europe/London. A sheet that has the substation and start columns and rows but matches no Primary stops the job as an input defect |
+| Switching logs | Each sheet's name, column names, and row count; for each sheet, the columns chosen as substation, start, and end, the rows read, the rows with a parsed start, and the rows matched to a Primary; one window per logged event and Primary (the logged start to end, or the calendar day when no end is logged; a date with no time is read as the local calendar day, a date-only end as local 24:00); the mask of the amendment. A time with no time zone is read as Europe/London. A sheet that has the substation and start columns and rows but matches no Primary stops the job as an input defect |
 | Sky's share at D12, read-out | The squared correlation of the change of the residual that leaves D12 out with D12's farm sensor on lit hours, written as `r²` only and never as a correlation or a slope. A squared correlation carries no direction. The amendment bounds the share at 74% from dark hours alone |
 
 **Job W2 scores the concordance in injected worlds.** Each of the 12 qualifying pairs is injected at
@@ -378,10 +379,12 @@ the manager, who may raise the cap, and writes no verdict. A stop after the job 
   before it starts, and a failing test makes the verdict `invalid`. The run log holds the count of
   tests and the code hash.
 - **A rerun keeps both sets of outputs:** a job moves its earlier outputs into `attempt_<n>/`
-  before it writes new ones, and job W2 or W3 refuses to start when its earlier verdict is anything
-  other than `invalid`, unless an environment variable names the manager's approval.
+  before it writes new ones. Each job writes an attempt marker with its attempt number before it
+  reads any input, and refuses to start when the marker exists (the earlier attempt crashed or
+  ended with any verdict, `invalid` included), unless an environment variable names the manager's
+  approval.
 - **A pair with no injection scale is counted, not dropped:** a pair whose host has fewer than 200
-  reference rows for the injection level, or whose farm has no capacity, gives no world. Job W0
+  reference rows with a finite injected series for the injection level gives no world. Job W0
   counts such pairs, job W2 writes the name, the reason, and the count of reference rows of every
   skipped world to the verdict file, and the number of worlds scored is compared with the number
   planned.
@@ -408,46 +411,80 @@ from none.
 
 ## Rulings before the run
 
-**The design lead ruled on eleven readings before any run, and none of the rulings changes a
-threshold, a bar, or a verdict word.** The rulings answer the first Opus code review of experiment
-723, which found that the plan page left each reading open. Each reading is marked `RULED` in the
-code. The readings that stay marked `PROVISIONAL` are the ones that the review judged unable to flip
-a verdict, apart from one low-risk case: the missing-value rule of the overcast days.
+**The design lead ruled on every reading below before any run, and none of the rulings changes a
+threshold, a bar, or a verdict word.** The rulings answer the first and second Opus code reviews
+of experiment 723, which found that the plan page left each reading open. Each reading is marked
+`RULED` in the code. The readings that stay marked `PROVISIONAL` are the ones that the reviews
+judged unable to flip a verdict, apart from one low-risk case: the missing-value rule of the
+overcast days.
 
 - **[Design lead] Void arc term:** the arc term is void if any one site's share of hour-ending
-  half-hours on which `u_clear` does not change exceeds 1%. Job W0 writes the share of every site.
+  half-hours on which `u_clear` does not change exceeds 1%. A site whose share cannot be computed
+  (NaN), for example a site with no lit hour-ending half-hour, also voids the arc term, and an
+  empty set of sites is void. Job W0 writes the share of every site.
   When the arc term is void, job W2 builds no world and the verdict is `inconclusive`, row 2 (a
   failed sensor audit).
 - **[Design lead] Placebo population:** the placebo shifts only the fast change `ΔZ̃` by 28 days and
   keeps the real sensor's index change. The placebo is read on exactly the stretches and pairs of
   the area, so it has no void state.
-- **[Design lead] Injection level:** the reference rows and the farm scaling are experiment 720's
+- **[Design lead] Injection level:** the reference rows and the farm series are experiment 720's
   definition. A reference row is a half-hour that starts from 10:00 to 14:00 UTC, from April to
   September, before 2025-07-01, with a clear-sky index of at least 0.7, and a pair needs at least
-  200 such rows. The injected series is the farm's output as a share of the farm's capacity, times
-  the level, times the host's median absolute signed reading on those rows. The code copies the
-  definition from the folder of experiment 720 (see the Files section).
+  200 such rows. The injected series is experiment 720's `farm_norm`: the farm's recorded output
+  divided by the 99th percentile of the farm's own daylight output (a sun zenith under 75
+  degrees, before the holdout), zero at night, with negative values clipped to zero and a
+  daylight dropout (an output of 0 or less with CAMS irradiance above 100 W/m²) set to a gap. The
+  series is multiplied by the level and by the host's median absolute signed reading on the
+  reference rows. The host's series is a gap wherever the farm's series is a gap, as in experiment
+  720; experiment 720 also masked the gaps of all three of its farms in every world of a site, and
+  this experiment masks only the injected farm's own gaps, because the two levels of one pair share
+  one farm. The code copies `farm_norm` from the folder of experiment 720 (see the Files section).
 - **[Design lead] D15 dead band:** the bar binds only when job 1 classes the farm inside D15's
   polygon outside every metered Primary and the farm is not an add-back candidate at D15. In every
-  other case the bar is report-only.
+  other case the bar is report-only. Under experiment 722's class definitions the bar is
+  report-only in practice: a farm inside D15's polygon whose class is `outside_or_added_back` is
+  also an add-back candidate at D15 whenever the farm is subtracted, so the binding condition holds
+  only for a farm that is not subtracted. A reader should not take the D15 dead band for a live
+  test.
 - **[Design lead] Calibration bar:** the bar is void by construction, because the plan page defines
   no likelihood ratio and nobody defines one after the fact. The code records the bar as void, and
   the page lists it beside the verdict.
 - **[Design lead] Controls of job W3:** D12's anchor stretches are scored on every day, and D3's
   post-bounce stretches are scored on days with exactly one post-bounce stretch.
 - **[Design lead] Switching-log times:** a time with no time zone is read as Europe/London. A time
-  that carries a zone is converted to UTC.
+  that carries a zone is converted to UTC. A cell with a date and no time is that local calendar
+  day: a start date-only is local 00:00 of the day, and an end date-only is local 24:00 of the day,
+  so a start on the same day as a date-only end never falls after its end. A start date-only with
+  no end logged is the local calendar day of the logged date. A cell counts as date-only when it is
+  a date, a text with no time, or a workbook datetime at midnight in a column where every value is
+  at midnight. Windows whose end still precedes their start are counted and listed in the check
+  file, and are not masked.
 - **[Design lead] False-export bar:** the bar stays pooled over un-injected D5 and D10, as the
   single count in the decision rule reads, and the count of each host is reported beside it with no
   bar.
 - **[Design lead] Pairs with no injection scale:** a pair whose injection scale is not finite is
   logged and counted, and is never dropped without a message.
+- **[Design lead] Farm that reads negative:** job W0 writes, for each qualifying pair, whether the
+  farm's median recorded output on the reference rows is 0 or less, and job W2 treats such a pair
+  as non-qualifying and logs the count, because the injection would otherwise add import where the
+  world is meant to gain generation.
+- **[Design lead] Reruns:** job W0, job W2, and job W3 each write an attempt marker and an attempt
+  number before they read any input. A later start of the same job is refused, whether the earlier
+  attempt crashed, ended `invalid`, or ended with any other verdict, unless the manager names an
+  approval in `E723_RERUN_APPROVED_BY_MANAGER`. The approval is the one rerun that the decision
+  rule allows without the maintainer.
+- **[Design lead] No qualifying pair:** job W0 writes `w0_checks.json` and the pair table, with
+  every column present, when no pair qualifies, so that job W2's row 2 records the outcome.
 - **[Design lead] Timing gate:** the projection covers the whole of job W2, including the second
   scoring for the unmasked read-out and the bootstraps of the read-outs.
 - **[Design lead] Sensor on hour-ending rows:** the CAMS sensor uses the hourly change of the
   clear-sky index and of the sky's fast change, and the reading's fast change is summed the same
   way,
-  because the index of experiment 39's frame is held inside each hour.
+  because the index of experiment 39's frame is held inside each hour. The CAMS sensor has about
+  half as many candidate pairs per stretch as the farm sensor, so its area is read on its own,
+  smaller set of scorable stretches, which is a different population from the farm sensor's. The
+  prediction of 0.60 to 0.75 for the CAMS sensor refers to that population. The CAMS area enters no
+  bar and no verdict.
 
 ## Decisions for the maintainer or the manager
 
@@ -609,9 +646,14 @@ published.
 - `ml-experiments/00723-msa-mva-bsp-closure-and-fast-hint-part-2-post-hoc/run.sh`: the launch
   wrapper, which runs no job without `--go`.
 - `ml-experiments/00720-msa-mva-to-mw-rung-0-signed-power-from-mva-meters/e00720_rung0b.py`: the
-  definition of the injection level's reference rows and of the farm's scaling (function
+  definition of the injection level's reference rows and of the injection's size (function
   `build_probe_world`), copied into `e00723_world.py` and not imported, because the function needs
-  experiment 720's panel and fold objects.
+  experiment 720's panel and fold objects. The folder is on the branch `msa-mva-to-mw-rung-0`.
+- `ml-experiments/00506-mva-sign-evidence-dip-depth-and-gated-solar-rule/e00506_data.py`: the
+  function `farm_norm`, which experiment 720 calls to build the injected farm series (power over the
+  farm's own daylight 99th percentile, night zero, negative values clipped, daylight dropouts as
+  gaps). It is copied into `e00723_world.py` as `farm_norm` and applied to the arrays of experiment
+  39's frame, and is not imported, because the original reads the frame by path.
 - `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/`: the loaders, the holdout guard, and the
   shared helpers of [experiment 722](../00722-msa-mva-bsp-closure-and-fast-hint/result.md), imported
   and not edited.

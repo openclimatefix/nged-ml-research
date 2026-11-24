@@ -7,8 +7,9 @@ meter sensor, the CAMS sensor, and the farm sensor shifted by 28 days. `score_wo
 stretch table of the world on the later span.
 
 **The injected farm never enters its own world's sensor.** The sensor farms of a world are the
-host's sensor membership less the injected farm. The injected farm's output goes into the host's
-signed series and into the meter sensor's residual, because the BSP meter also receives it.
+host's sensor membership less the injected farm. The injected farm's series (experiment 720's
+`farm_norm`; a gap or dropout is NaN) goes into the host's signed series and into the meter
+sensor's residual, because the BSP meter also receives it.
 """
 
 import time
@@ -79,8 +80,8 @@ class SkippedWorld:
     Attributes:
         name: The world's name.
         reason: `too_few_sensor_farms` (fewer than 2 farms remain in the sensor) or
-            `injection_scale_not_finite` (the host has too few reference rows, or the farm's
-            capacity is not positive).
+            `injection_scale_not_finite` (the host has too few reference rows with a finite value
+            of the farm's injected series).
         n_reference_rows: Reference rows of the injection level with a finite host value and farm
             output; 0 for an un-injected world.
     """
@@ -170,23 +171,19 @@ def score_world(
     residual = ctx.residual(host=host)
     scale = 1.0
     if spec.farm is not None and spec.level is not None:
-        out = ctx.farm_output(farm=spec.farm)
+        out = ctx.farm_norm(farm=spec.farm)
         rows = level_rows(ctx=ctx, host=host)
         scale = world.injection_scale(
-            host_signed_mw=ctx.series[host],
-            farm_mw=out,
-            farm_capacity_mw=ctx.farm_cap[spec.farm],
-            rows=rows,
-            level=spec.level,
+            host_signed_mw=ctx.series[host], farm_norm_series=out, rows=rows, level=spec.level
         )
         if not np.isfinite(scale):
             if skips is not None:
                 n_ref = world.reference_row_count(
-                    host_signed_mw=ctx.series[host], farm_mw=out, rows=rows
+                    host_signed_mw=ctx.series[host], farm_norm_series=out, rows=rows
                 )
                 skips.append(SkippedWorld(spec.name, "injection_scale_not_finite", n_ref))
             return None
-        signed = world.inject(signed_mw=signed, farm_mw=out, scale=scale)
+        signed = world.inject(signed_mw=signed, farm_norm_series=out, scale=scale)
         residual = residual - scale * out
     reading = signed if spec.role == "real" else world.fold(signed_mw=signed, capacity_mw=cap)
     start = ctx.start_row

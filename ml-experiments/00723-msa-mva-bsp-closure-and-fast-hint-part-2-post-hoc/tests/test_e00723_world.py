@@ -126,50 +126,99 @@ def test_fold_is_even_in_the_sign_and_is_at_least_the_floor():
     )
 
 
-def test_injection_scale_follows_experiment_720_the_farm_is_scaled_by_its_capacity():
+def test_farm_norm_is_experiment_720s_scaling_by_the_farms_own_daylight_99th_percentile():
+    n = 2000
+    rng = np.random.default_rng(11)
+    zenith = np.where(
+        np.arange(n) % 48 < 12, 80.0, 40.0
+    )  # the first 12 half-hours of a day are night
+    ghi = np.where(zenith < 75.0, 600.0, 0.0)
+    power = np.where(zenith < 75.0, rng.uniform(1.0, 5.0, n), 0.0)
+    expected_p99 = float(np.percentile(power[zenith < 75.0], 99))
+    out = world.farm_norm(power_mw=power, zenith_deg=zenith, ghi=ghi)
+    day = zenith < 75.0
+    # Daylight is the power over the farm's own daylight 99th percentile, not over its capacity.
+    assert out[day] == pytest.approx(power[day] / expected_p99)
+    assert (out[~day] == 0.0).all()  # night is zero
+    assert (
+        np.nanmax(out) > 1.0
+    )  # the top 1% of daylight exceeds the percentile, with no clipping above
+    # A different capacity changes nothing: the series has no capacity in it.
+    assert world.farm_norm(power_mw=power * 3.0, zenith_deg=zenith, ghi=ghi) == pytest.approx(out)
+
+
+def test_farm_norm_clips_negative_power_to_zero_and_sets_a_daylight_dropout_to_nan():
+    n = 2000
+    zenith = np.where(np.arange(n) % 48 < 12, 80.0, 40.0)
+    ghi = np.where(zenith < 75.0, 600.0, 0.0)
+    power = np.where(zenith < 75.0, 3.0, 0.0)
+    power[12] = -0.5  # daylight, negative, irradiance above 100: a dropout
+    power[13] = np.nan  # a gap
+    ghi[14] = 50.0
+    power[14] = -0.5  # daylight, negative, irradiance below 100: clipped to 0, not a dropout
+    power[2] = -0.4  # night, negative: night is 0
+    power[15] = 0.0  # daylight, zero, irradiance above 100: a dropout
+    out = world.farm_norm(power_mw=power, zenith_deg=zenith, ghi=ghi)
+    assert np.isnan(out[12])
+    assert np.isnan(out[13])
+    assert out[14] == 0.0
+    assert out[2] == 0.0
+    assert np.isnan(out[15])
+    assert out[16] == pytest.approx(1.0)  # every other daylight value is the percentile
+
+
+def test_farm_norm_is_nan_where_the_grid_has_no_frame_row_and_everywhere_without_daylight_power():
+    zenith = np.array([40.0, np.nan, 40.0, 80.0])
+    power = np.array([2.0, np.nan, 2.0, 0.0])
+    out = world.farm_norm(power_mw=power, zenith_deg=zenith, ghi=np.full(4, 600.0))
+    assert np.isnan(out[1])
+    assert out[3] == 0.0
+    assert out[0] == pytest.approx(1.0)
+    none = world.farm_norm(power_mw=np.full(3, np.nan), zenith_deg=np.full(3, 40.0), ghi=np.ones(3))
+    assert np.isnan(none).all()
+
+
+def test_injection_scale_follows_experiment_720_level_times_the_median_times_the_norm():
     rng = np.random.default_rng(3)
     host = rng.normal(-3, 0.2, N)
-    farm = np.abs(rng.normal(4, 0.3, N))
+    norm = np.abs(rng.normal(0.8, 0.1, N))
     rows = np.zeros(N, dtype=bool)
     rows[100:400] = True
-    capacity = 8.0
     for level in core.LEVELS:
         a = world.injection_scale(
-            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=capacity, rows=rows, level=level
+            host_signed_mw=host, farm_norm_series=norm, rows=rows, level=level
         )
-        # The increment is level * median|X| times the farm's output as a share of capacity.
-        increment = a * farm
-        assert increment == pytest.approx(level * np.median(np.abs(host[rows])) * farm / capacity)
-        injected = world.inject(signed_mw=host, farm_mw=farm, scale=a)
+        # The increment is level * median|X| times the farm's normalised series; no capacity enters.
+        assert a * norm == pytest.approx(level * np.median(np.abs(host[rows])) * norm)
+        injected = world.inject(signed_mw=host, farm_norm_series=norm, scale=a)
         assert np.median(injected[rows]) < np.median(host[rows])
 
 
-def test_injection_scale_is_not_finite_with_too_few_reference_rows_or_no_capacity():
+def test_injection_scale_is_not_finite_with_too_few_reference_rows():
     host = np.full(N, -3.0)
-    farm = np.full(N, 4.0)
+    norm = np.full(N, 0.9)
     few = np.zeros(N, dtype=bool)
     few[: core.MIN_REFERENCE_ROWS - 1] = True
     assert np.isnan(
-        world.injection_scale(
-            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=8.0, rows=few, level=1.0
-        )
+        world.injection_scale(host_signed_mw=host, farm_norm_series=norm, rows=few, level=1.0)
     )
     enough = np.zeros(N, dtype=bool)
     enough[: core.MIN_REFERENCE_ROWS] = True
     assert np.isfinite(
-        world.injection_scale(
-            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=8.0, rows=enough, level=1.0
-        )
-    )
-    assert np.isnan(
-        world.injection_scale(
-            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=0.0, rows=enough, level=1.0
-        )
+        world.injection_scale(host_signed_mw=host, farm_norm_series=norm, rows=enough, level=1.0)
     )
     # A farm gap removes reference rows.
-    gap = farm.copy()
+    gap = norm.copy()
     gap[:100] = np.nan
-    assert world.reference_row_count(host_signed_mw=host, farm_mw=gap, rows=enough) == 100
+    assert world.reference_row_count(host_signed_mw=host, farm_norm_series=gap, rows=enough) == 100
+
+
+def test_a_farm_gap_or_dropout_makes_the_injected_host_series_nan_as_in_experiment_720():
+    host = np.full(10, -3.0)
+    norm = np.array([0.5, np.nan, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+    injected = world.inject(signed_mw=host, farm_norm_series=norm, scale=2.0)
+    assert np.isnan(injected[1])
+    assert injected[0] == pytest.approx(-3.0 - 1.0)
 
 
 def test_level_reference_rows_are_experiment_720s_sunny_middays_before_the_cut():

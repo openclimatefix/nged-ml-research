@@ -3,7 +3,7 @@
 
 import json
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import e00723_common as common
@@ -150,23 +150,41 @@ def test_a_rerun_moves_the_earlier_outputs_into_an_attempt_folder(tmp_path):
     assert (second / "a.csv").read_text() == "2"
 
 
-@pytest.mark.parametrize(
-    ("verdict", "refused"),
-    [("supported", True), ("inconclusive", True), ("not supported", True), ("invalid", False)],
-)
-def test_a_rerun_is_refused_unless_the_verdict_is_invalid_or_the_manager_approved(
-    tmp_path, verdict, refused
+def test_the_first_attempt_is_counted_and_a_rerun_after_any_end_is_refused_without_approval(
+    tmp_path,
 ):
-    guard.refuse_rerun(verdict_name="v.json", out_dir=tmp_path, env={})  # no earlier verdict
+    (tmp_path / "PRIVATE").mkdir()
+    names = ("a.csv", "run_log_w0.json")
+    assert guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env={}) == 1
+    marker = tmp_path / guard.attempt_marker_name(job="w0")
+    assert json.loads(marker.read_text()) == {"attempt": 1, "job": "w0"}
+    # The job crashed before it wrote any output: the marker alone refuses the next run.
+    with pytest.raises(guard.JobRefusedError):
+        guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env={})
+    # Another job's marker is separate.
+    assert guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env={}) == 1
+
+
+@pytest.mark.parametrize("verdict", ["supported", "inconclusive", "not supported", "invalid"])
+def test_a_verdict_of_any_kind_including_invalid_is_refused_a_rerun_without_approval(
+    tmp_path, verdict
+):
+    names = ("v.json", "run_log_w2.json")
+    guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env={})
     (tmp_path / "v.json").write_text(json.dumps({"verdict": verdict}))
-    if refused:
-        with pytest.raises(guard.JobRefusedError):
-            guard.refuse_rerun(verdict_name="v.json", out_dir=tmp_path, env={})
-        guard.refuse_rerun(
-            verdict_name="v.json", out_dir=tmp_path, env={guard.RERUN_APPROVAL_ENV: "approved"}
-        )
-    else:
-        guard.refuse_rerun(verdict_name="v.json", out_dir=tmp_path, env={})
+    with pytest.raises(guard.JobRefusedError):
+        guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env={})
+    approved = {guard.RERUN_APPROVAL_ENV: "approved by the manager"}
+    assert guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env=approved) == 2
+    # The earlier outputs and the old marker moved into attempt_1; the new marker counts 2.
+    assert (tmp_path / "attempt_1" / "v.json").is_file()
+    assert (tmp_path / "attempt_1" / guard.attempt_marker_name(job="w2")).is_file()
+    assert not (tmp_path / "v.json").exists()
+    assert json.loads((tmp_path / guard.attempt_marker_name(job="w2")).read_text())["attempt"] == 2
+    # The third attempt needs the approval again.
+    with pytest.raises(guard.JobRefusedError):
+        guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env={})
+    assert guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env=approved) == 3
 
 
 def test_the_known_answer_tests_are_run_and_read_by_row_1(tmp_path):
@@ -315,6 +333,109 @@ def test_the_column_search_uses_whole_words_and_skips_transfer_columns():
     assert diag[0]["end_column"] == "Restored Time"
 
 
+def _utc_row(*, year, month, day, hour=0) -> int:
+    """Return the grid row of `hour` hours after 00:00 UTC of the day (hour may be negative or 24)."""
+    return world.row_of_instant(
+        instant=datetime(year, month, day, tzinfo=UTC) + timedelta(hours=hour)
+    )
+
+
+def test_a_date_only_start_with_no_end_is_that_local_calendar_day_in_summer_and_winter():
+    # Summer: local midnight is 23:00 UTC the day before, so the window is 23:00 to 23:00 UTC.
+    summer = sheet_of(numbers=[10], starts=[datetime(2025, 6, 10)])
+    first, last = w0.windows_from_sheets(sheets={"s": summer}, numbers={"D1": 10})["D1"][0]
+    assert first == _utc_row(year=2025, month=6, day=9, hour=23)
+    assert last == _utc_row(year=2025, month=6, day=10, hour=23)
+    # Winter: local midnight is 00:00 UTC.
+    winter = sheet_of(numbers=[10], starts=[datetime(2025, 1, 15)])
+    first, last = w0.windows_from_sheets(sheets={"s": winter}, numbers={"D1": 10})["D1"][0]
+    assert first == _utc_row(year=2025, month=1, day=15)
+    assert last == _utc_row(year=2025, month=1, day=16)
+    # The same day as a text date and as a Date dtype.
+    for starts in (["2025-06-10"], ["10/06/2025"], [datetime(2025, 6, 10).date()]):
+        sheet = sheet_of(numbers=[10], starts=starts)
+        got = w0.windows_from_sheets(sheets={"s": sheet}, numbers={"D1": 10})["D1"][0]
+        assert got == (
+            _utc_row(year=2025, month=6, day=9, hour=23),
+            _utc_row(year=2025, month=6, day=10, hour=23),
+        )
+
+
+@pytest.mark.parametrize(
+    ("year", "month", "day", "offset_hours"), [(2025, 7, 1, 1), (2025, 1, 6, 0)]
+)
+def test_a_date_only_end_is_local_24_00_so_a_same_day_start_never_ends_before_it_starts(
+    year, month, day, offset_hours
+):
+    # A timed start at 09:00 local with a date-only end on the same day, and a date-only start
+    # with a date-only end on the same day, in summer (offset 1) and in winter (offset 0).
+    sheet = sheet_of(
+        numbers=[10, 10, 10],
+        starts=[
+            datetime(year, month, day, 9, 0),
+            datetime(year, month, day),
+            datetime(year, month, day, 9, 0),
+        ],
+        ends=[
+            datetime(year, month, day),
+            datetime(year, month, day),
+            datetime(year, month, day, 17, 0),
+        ],
+    )
+    # The end column of `sheet` mixes midnight and 17:00, so its midnights are timed ends at 00:00:
+    # row 1 ends before its 09:00 start, and row 2 is a zero-length window; `only_dates` has a column
+    # of midnights alone, which are date-only ends.
+    only_dates = sheet_of(
+        numbers=[10, 10],
+        starts=[datetime(year, month, day, 9, 0), datetime(year, month, day, 9, 0)],
+        ends=[datetime(year, month, day), datetime(year, month, day)],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets={"s": only_dates}, numbers={"D1": 10})
+    assert diag[0]["n_rows_end_before_start"] == 0
+    assert len(wins["D1"]) == 2
+    first, last = wins["D1"][0]
+    assert first == _utc_row(year=year, month=month, day=day, hour=9 - offset_hours)
+    # Local 24:00 of the day is 23:00 UTC in summer and 00:00 UTC of the next day in winter.
+    assert last == _utc_row(year=year, month=month, day=day, hour=24 - offset_hours)
+    # A date-only start with a date-only end on the same day covers the whole local day.
+    both = sheet_of(
+        numbers=[10],
+        starts=[datetime(year, month, day)],
+        ends=[datetime(year, month, day)],
+    )
+    first, last = w0.windows_from_sheets(sheets={"s": both}, numbers={"D1": 10})["D1"][0]
+    assert first == _utc_row(year=year, month=month, day=day, hour=0) - offset_hours * 2
+    assert last == _utc_row(year=year, month=month, day=day, hour=24) - offset_hours * 2
+    # With a column that mixes midnight and other times, a midnight end is a timed end at 00:00.
+    _, diag_mixed = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert diag_mixed[0]["n_rows_end_before_start"] == 1
+
+
+def test_a_date_only_end_in_text_and_a_timed_start_on_the_same_day_is_read_as_the_end_of_that_day():
+    sheet = sheet_of(
+        numbers=[10, 10],
+        starts=["2025-07-01 09:00", "01/07/2025"],
+        ends=["2025-07-01", "01/07/2025"],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert diag[0]["n_rows_end_before_start"] == 0
+    assert wins["D1"][0] == (
+        _utc_row(year=2025, month=7, day=1, hour=8),
+        _utc_row(year=2025, month=7, day=1, hour=23),
+    )
+    assert wins["D1"][1] == (
+        _utc_row(year=2025, month=6, day=30, hour=23),
+        _utc_row(year=2025, month=7, day=1, hour=23),
+    )
+
+
+def test_a_date_only_end_before_the_start_day_is_still_counted():
+    sheet = sheet_of(numbers=[10], starts=[datetime(2025, 7, 3)], ends=[datetime(2025, 7, 1)])
+    wins, diag = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert wins["D1"] == []
+    assert diag[0]["n_rows_end_before_start"] == 1
+
+
 def test_a_window_that_ends_before_it_starts_is_counted_not_silently_dropped():
     sheet = sheet_of(
         numbers=[10, 10],
@@ -410,3 +531,72 @@ def test_the_w0_power_table_columns_follow_the_plan_page():
     )
     assert set(row) == {"n_rows", "sd_response", "sd_regressor", "predicted_se", "detection_limit"}
     assert row["detection_limit"] == pytest.approx(core.DETECTION_SE_MULT * row["predicted_se"])
+
+
+def _pairs(*, qualifies, negative=None, powered=None) -> pl.DataFrame:
+    n = len(qualifies)
+    frame = pl.DataFrame(
+        {
+            "host": ["D5", "D9", "D5", "D10"][:n],
+            "farm": ["F1", "F2", "F3", "F1"][:n],
+            "qualifies": qualifies,
+        }
+    )
+    if negative is not None:
+        frame = frame.with_columns(farm_reads_negative=pl.Series(negative))
+    if powered is not None:
+        frame = frame.with_columns(
+            **{f"powered_level_{lv}": pl.Series(powered) for lv in core.LEVELS},
+            **{f"scale_finite_level_{lv}": pl.Series([True] * n) for lv in core.LEVELS},
+        )
+    return frame
+
+
+def test_w0_counts_a_pair_table_with_no_qualifying_pair_without_crashing(tmp_path):
+    # The table of a run where every farm fails the arc condition: no pair qualifies, so no row
+    # carries the scale, sign, or powered columns.
+    pairs = _pairs(qualifies=[False, False])
+    counts = common.pair_counts(pairs=pairs)
+    assert counts == {
+        "n_qualifying_pairs": 0,
+        "n_powered_pairs_level_2": 0,
+        "n_powered_hosts": 0,
+        "n_pairs_non_finite_injection_scale": 0,
+        "n_pairs_farm_reads_negative": 0,
+    }
+    full = common.with_pair_columns(frame=pairs)
+    for name in (*common.PAIR_FLAG_COLUMNS, *common.PAIR_MEASURED_COLUMNS):
+        assert name in full.columns
+    # The check file writes, and the pair CSV reads back with typed Boolean columns, so job W2's
+    # row 2 can record the outcome.
+    guard.write_public_json(payload=counts, name=common.W0_CHECKS_NAME, out_dir=tmp_path)
+    guard.write_public_csv(frame=full, name=common.W0_PAIRS_NAME, out_dir=tmp_path)
+    back = common.read_pairs(out_dir=tmp_path)
+    assert back["qualifies"].dtype == pl.Boolean
+    assert common.pair_counts(pairs=back) == counts
+    # A table with no row at all, and none of the columns, also counts as zero.
+    assert common.pair_counts(pairs=pl.DataFrame())["n_qualifying_pairs"] == 0
+    empty_csv = pl.DataFrame(schema=dict.fromkeys(common.PAIR_FLAG_COLUMNS, pl.Boolean))
+    empty_csv.write_csv(tmp_path / common.W0_PAIRS_NAME)
+    assert common.read_pairs(out_dir=tmp_path).height == 0
+    assert core.void_before_run(
+        n_pairs_keeping_sensor=0,
+        n_powered_pairs_level_2=0,
+        n_powered_hosts=0,
+        arc_term_void_flag=False,
+    )
+
+
+def test_a_pair_whose_farm_reads_negative_does_not_qualify_and_is_counted():
+    pairs = _pairs(
+        qualifies=[True, True, True, False],
+        negative=[False, True, False, True],
+        powered=[True, True, False, True],
+    )
+    kept, n_dropped = common.qualifying_pairs(pairs=pairs)
+    assert kept["farm"].to_list() == ["F1", "F3"]  # the second pair reads negative
+    assert n_dropped == 1  # the fourth pair did not qualify, so it is not counted
+    counts = common.pair_counts(pairs=pairs)
+    assert counts["n_qualifying_pairs"] == 2
+    assert counts["n_powered_pairs_level_2"] == 1
+    assert counts["n_pairs_farm_reads_negative"] == 1
