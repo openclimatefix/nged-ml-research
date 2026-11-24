@@ -155,33 +155,38 @@ metric: >-
   against import stretches, with 95% intervals from 1,000 bootstrap draws that resample whole
   days; shares of stretches that give export evidence; and detection limits of 2.8 bootstrap
   standard errors. Hour-to-hour regression slopes appear only as read-outs.
-verdict: inconclusive
+verdict: invalid
 production_status: not-for-production
 adopted_in: none
 best_arm: >-
-  none (a pre-registered stop: job W0 found that job W2 is void before run, so no injected world
-  was built and no arm was scored)
+  none (job W0 ran, and the registered day-count check failed, which gives the verdict `invalid`;
+  job W0 also found job W2 void before run, so no injected world was built and no arm was scored)
 headline: >-
-  Job W0 ran once (5.1 core-seconds, one core). Job W2 is void before run under the registered
-  rules, because zero farm-and-Primary pairs qualify (4 are needed), and job W3 did not run. Three
-  more findings would each need a ruling before a rerun: the switching-log workbook could not be
-  read, the arc-term audit failed at every site (16.8% to 18.1% of lit half-hours that end on the
-  hour show no change in the clear-sky solar output, and 56.1% to 58.2% show none in the CAMS
-  clear-sky index, against 0% and 100% expected, the second through a floating-point equality
-  test), and the later span has 420 calendar days, not 413. No sign label was produced.
+  Job W0 ran once (5.1 core-seconds, one core). Under the pre-registered rules the verdict is
+  `invalid`, because the day count of erratum ruling 2 failed (420 calendar days, not 413). The
+  post hoc diagnosis reads 413 as a flaw in the plan, and on that reading job W2 is void before run
+  anyway, because zero farm-and-Primary pairs qualify (4 are needed). Job W3 did not run. Two more
+  findings would each need a ruling before a rerun: the switching-log workbook could not be read,
+  and the arc-term audit failed at every site (16.8% to 18.1% of lit half-hours that end on the hour
+  show no change in the clear-sky solar output, and 56.1% to 58.2% show none in the CAMS clear-sky
+  index, against 0% and 100% expected, the second through a floating-point equality test). No sign
+  label was produced.
 lessons: >-
-  The stop was caused by the number of same-sky farms that survive the coherence floor in the stored
-  farm table, which is a data fact under the registered rules. Two specification flaws (the plan
-  expected 0% from an audit of a clipped clear-sky shape, and took 413 from another experiment's
-  count of days with a usable fit row), one code defect in the workbook read (the real sheets have
-  no header row), and a second code defect in the arc audit (an exact floating-point equality
-  test) would each need a ruling before a rerun. The audit-trigger rule (trigger 2) is met, and an
-  Opus audit is still required before merge.
+  The registered verdict is `invalid` because the day-count check of ruling 2 failed. The post hoc
+  diagnosis reads that failure as a specification flaw, and on that reading the stop is `inconclusive`
+  (void before run), caused by the number of same-sky farms that survive the coherence floor in the
+  stored farm table, which is a data fact under the registered rules. Two specification flaws (the
+  plan expected 0% from an audit of a clipped clear-sky shape, and took 413 from another
+  experiment's count of days with a usable fit row), one code defect in the workbook read (the real
+  sheets have no header row), and a second code defect in the arc audit (an exact floating-point
+  equality test) would each need a ruling before a rerun. Audit trigger 1 and trigger 2 both fired,
+  and the Opus audit before merge is done (section "Audit before merge").
 take_home_message: >-
   We could not tell whether the output of solar farms under the same sky shows which way power flows
   through a substation that reports only a magnitude, because the pre-registered checks stopped the
-  experiment before any test. Each of the six substations with signed readings has two or more
-  same-sky farms in the stored farm table, but after the coherence check only one substation keeps
+  experiment before any test. The registered verdict is `invalid`, because the check on the number of
+  days failed. On the post hoc reading that the count was a flaw in the plan, the experiment is
+  still stopped, because after the coherence check only one substation with signed readings keeps
   two farms in its sky sensor, and injecting one of them leaves one, so no pair qualifies. No sign
   label was produced, and the idea stays paused.
 advice:
@@ -206,29 +211,48 @@ advice:
 ---
 
 **We asked whether the output of solar farms under the same sky shows which way power flows through
-a substation that reports only a magnitude. The experiment stopped before any test, because its
-pre-registered rule voids the test when fewer than 4 farm-and-Primary pairs qualify, and 0
-qualified.** The experiment had three jobs. Job W0 ran checks that read no direction of flow. Job W2
-would have added the recorded output of a real farm to a Primary whose sign is known, hidden the
-sign, and scored how well the farms' output separates export from import. Job W3 would have run
-controls, and runs only if job W2 is `supported`. A Primary substation steps the voltage down to 11
-kilovolts (kV), and a Primary that reports apparent power has no sign, so an exporting Primary shows
-a rise in its reading and not a negative value. No sign label was produced.
+a substation that reports only a magnitude. Under the pre-registered rules the verdict is `invalid`,
+because a registered correctness check failed, and no test of the question ran.** A Primary is a
+substation that steps the voltage down to 11 kilovolts (kV). A Primary that reports apparent power
+in megavolt-amperes (MVA) has no sign, so an exporting Primary shows a rise in its reading and not a
+negative value. A Primary that reports real power in megawatts (MW) has a signed series, and we call
+it a signed-MW Primary. A Primary exports when power flows out of it into the wider electricity
+network, and imports when power flows into it. A sign label states, for a stretch of readings,
+whether the Primary exports or imports. A farm-and-Primary pair is one metered solar farm together
+with one host Primary, and the pair qualifies for job W2 under the rule stated below. No sign label
+was produced.
 
-**The verdict is `inconclusive`, and the experiment is a pre-registered stop, not a failure.** Job
-W0 ran once (attempt 1), took 5.1 core-seconds on one core, and read nothing on or after 2026-07-01.
-Job W2 is "void before run" under the registered rules, which is row 2 of the verdict rule, and job
-W3 did not run. Every bar, threshold, and ruling of the plan stays as written.
+**The experiment had three jobs.** Job W0 ran checks that read no direction of flow. Job W2 would
+have added the recorded output of a real farm to a signed-MW Primary, hidden the sign, and scored how
+well the farms' output separates export from import. Job W3 would have run controls, and runs only if
+job W2 is `supported`.
 
-**The registered stop comes first: zero farm-and-Primary pairs qualify, so job W2 is void before
-run.** A pair qualifies when the farm and the host Primary are under the same sky (correlation of
-the Copernicus Atmosphere Monitoring Service (CAMS) series at least 0.5), the farm lies outside the
-host's service-area polygon, the host is one of the six signed-MW Primaries (D5, D9, D10, D11, D14,
-and D16, which report signed megawatts), and the host's farm sensor keeps at least 2 farms once the
-injected farm is removed. The decision rule voids job W2 when fewer than 4 pairs qualify. The
-other three findings below would each need a ruling before a rerun. The pair count was not
-recomputed with a repaired arc term, so the page does not say what a repair of finding 2 would do to
-the count.
+**The registered verdict is `invalid`, and this is the pre-registered reading of the rules.** The
+verdict rule says that the first row that matches gives the verdict. Row 1, `invalid`, matches when a
+correctness check fails, and the day count of erratum ruling 2 is one of those checks. Job W0
+asserts that the later span has 413 days and calls any other count a code defect. The run counted
+420 calendar days (`later_span_ok` is false), so row 1 matches before row 2 is reached. The
+committed code agrees: its correctness flag includes the day-count check, and its verdict function
+returns `invalid` when that flag is false. Job W0 ran once (attempt 1), took 5.1 core-seconds on one
+core, and read nothing on or after 2026-07-01. Job W3 did not run. Every bar, threshold, and ruling
+of the plan stays as written.
+
+**POST HOC reading: the diagnosis finds that 413 was a flaw in the plan, and on that reading job W2
+is `inconclusive`, row 2.** The diagnosis found that 413 is experiment 722's count of days with a
+usable fit row, and not the length of the span, which the job counts correctly (finding 3). Job W2
+would be void before run on a second ground that does not depend on the day count: fewer than 4
+farm-and-Primary pairs qualify (finding 4), and row 2 of the verdict rule gives that case
+`inconclusive`. This reading was formed after the run. It does not override the registered reading,
+and the verdict of this page stays `invalid`.
+
+**Independently of the day count, zero farm-and-Primary pairs qualify, so job W2 would be void
+before run.** A pair qualifies when the farm and the host Primary are under the same sky
+(correlation of the Copernicus Atmosphere Monitoring Service (CAMS) series at least 0.5), the farm
+lies outside the host's service-area polygon, the host is one of the six signed-MW Primaries (D5,
+D9, D10, D11, D14, and D16), and the host's farm sensor keeps at least 2 farms once the injected
+farm is removed. The decision rule voids job W2 when fewer than 4 pairs qualify. The other findings
+below would each need a ruling before a rerun. The pair count was not recomputed with a repaired arc
+term, so the page does not say what a repair of finding 2 would do to the count.
 
 ## What job W0 found
 
@@ -267,6 +291,15 @@ clip removed. The 1% threshold voids the arc term when any one site exceeds it, 
 The arc-removal condition itself passes for all 6 farms, with correlations of size at most 0.032
 against a bar of 0.1.
 
+**The Opus audit before merge confirmed the diagnosis on stored data, and not only on the synthetic
+sky.** On the stored frame of experiment 39 (26 sites, lit hour-ending pairs with the sun at least 10
+degrees above the horizon at both ends, rows before 2026-07-01), the share of pairs with an unchanged
+`u_clear` runs from 16.8% to 18.2%. Every unchanged pair has both halves at exactly 1.0, the fleet's
+AC limit. On the same rows the CAMS clear-sky index is exactly unchanged on 56.1% to 58.2% and
+unchanged within 1e-12 on 100%. The check read no generator output column. The audit classes the
+first failure as a specification flaw and the second as a code defect, as above (section "Audit
+before merge").
+
 **The second failed expectation is a second code defect.** The report-only share of half-hours on
 which the CAMS clear-sky index does not change is 56.1% to 58.2%, against 100% expected. The audit
 tests exact equality of floating-point values, and the diagnosis found that a synthetic run gives
@@ -274,7 +307,9 @@ tests exact equality of floating-point values, and the diagnosis found that a sy
 
 ### Finding 3: the later span has 420 calendar days, not 413
 
-**The later span has 420 calendar days, and the plan's 413 is a specification flaw.** Experiment
+**The later span has 420 calendar days, and the diagnosis calls the plan's 413 a specification flaw.
+The registered rules call any other count a code defect, and that is why the registered verdict is
+`invalid`.** Experiment
 722's write-up quotes 413 as the number of days on which its closure fit had at least one usable fit
 row (`n_days_used`). The plan copied 413 as the span's calendar length, and the job's assertion of
 413 failed (`later_span_ok` is false). The seven extra days are, by the diagnosis's inference, days
@@ -297,6 +332,22 @@ and D16 keep none. D12 and D15 also keep farms but are not signed hosts. Injecti
 farms leaves a sensor of one farm. No pair qualifies and no host is powered, and the rule needs 4
 pairs on 2 hosts.
 
+**Job W3 could not have scored either control on the farm sensor, and the page's other findings do
+not show it.** A host's farm sensor exists only when the host keeps at least 2 farms. D12 keeps 1
+farm and D3 keeps 0, so D12's anchor-stretch control and D3's post-bounce control have no farm
+sensor under the stored farm table. The same fact is why D12's sky share is NaN: the function that
+computes the share returns NaN when D12 has fewer than 2 farms. Even a `supported` job W2 would
+therefore have led to a job W3 with no scorable control on the farm sensor.
+
+**The reading of the coherence floor that decides the stop is not ruled, and the stop does not
+depend on it.** The code forms each farm's comparison mean from every farm that entered the check, in
+one pass. No ruling of the plan states that reading, and the code marks it neither ruled nor
+provisional. POST HOC, the Opus audit recounted the pairs from the stored single-pass correlations
+with the floor lowered. At 0.5 the count is 0 pairs, as in the file. At 0.45 the count is 4 pairs and
+at 0.40 it is 6 pairs, both on D14 alone, so the rule of at least 2 hosts still voids job W2. A
+second host appears only near a floor of 0.30. A reading that drops the weakest farm and recomputes
+was not tested, because it needs private arrays.
+
 **The amendment's 12 qualifying pairs is a different count.** The 12 equals the same-sky farms
 outside the polygon at the three hosts that hold at least three of them, namely 3 at D10, 6 at D14,
 and 3 at D16, with no coherence floor (recomputed from `w0_pairs.csv`). The coherence floor, which
@@ -307,12 +358,14 @@ the amendment registered, is what removes them.
 **D10's export hours are few, as the plan predicted.** An export hour is an hour-ending row in which
 D10's signed reading is negative. On the base of 10,078 hour-ending rows with a reading at both ends
 in the later span, D10 shows 59 export hours on 22 days. The plan quoted 77 hours on 36 days from a
-review, and the bases of the two counts differ. The share of negative half-hours is 0.79% of all
-half-hours and 1.9% of daylight half-hours. The power table puts the predicted standard error of
-D10's fold ratio on export hours at 3.16 on 59 rows. Its detection limit is 8.85, so the slope
-cannot be read. D15's farm class from experiment 722's job 1 is `unresolved`, so the D15 dead-band
-bar does not bind, and the farm is not an add-back candidate at D15. D12's sky share (`r²`) was not
-computed, and the file holds no value.
+review, and the bases of the two counts differ. These counts, and the power table, come from the 420
+calendar days of the later span and with no switching mask, because the workbook was unread. No
+later page may quote them as figures for a 413-day span or for masked transfers. The share of
+negative half-hours is 0.79% of all half-hours and 1.9% of daylight half-hours. The power table puts
+the predicted standard error of D10's fold ratio on export hours at 3.16 on 59 rows. Its detection
+limit is 8.85, so the slope cannot be read. D15's farm class from experiment 722's job 1 is
+`unresolved`, so the D15 dead-band bar does not bind, and the farm is not an add-back candidate at
+D15. D12's sky share (`r²`) is NaN, because D12 keeps 1 farm and has no farm sensor (finding 4).
 
 ## What the result does not show
 
@@ -327,17 +380,25 @@ The stop rule counts an experiment that holds at least one pre-registered test w
 admit a sign label. Experiment 723 holds such tests, so it is the 20th, but it ran none of them. It
 admitted no hint, set no prior, and licensed no later design.
 
-**The outcome table of the plan gives the row `inconclusive` for job W2.** Under that row the
-within-day hint is paused. The fast gain `a` of the untangler (the weight of the within-day hint in
-the model that would write a series of past signed power for each Primary that reports apparent
-power) stays 0. Rung U3 and the build of the untangler proceed, and no third experiment on either
-idea starts without the maintainer's recorded approval.
+**The outcome table of the plan gives the same untangler result under both verdict words.** Under
+`invalid` and under `inconclusive` alike, the fast gain `a` of the untangler (the weight of the
+within-day hint in the model that would write a series of past signed power for each Primary that
+reports apparent power) stays 0. Rung U3 and the build of the untangler proceed, and no third
+experiment on either idea starts without the maintainer's recorded approval. The two words differ in
+what may be rerun: the outcome table gives `invalid` a rerun as the same attempt under four
+conditions, and gives `inconclusive` a pause.
 
-**Whether a rerun is worth running is a decision for the maintainer.** A rerun of job W0 with the
-three repairs would give a readable workbook summary, an audit that tests what it was meant to test,
-and a span check that passes. The pair count would need recomputing with the repaired arc term. A
-change to the coherence floor, the same-sky bar, or the sensor size, each of which is a
-pre-registered rule, or a different farm table, are the routes we considered that change the count.
+**Whether to rerun is a manager decision, and the manager has ruled that job W0 is not rerun, so
+nothing is rerun by this page.** The registered rules say that `inconclusive` is never rerun. They
+also say that a rerun after `invalid` is the same attempt only when four conditions hold, and
+condition 2 is that the fix changes no constant, population, sensor, or bar. Correcting 413 changes
+a constant, and changing the base of the arc audit changes a condition of the decision rule. A rerun
+of job W0 with the three repairs would therefore be a new attempt, approved by the manager, with
+rule changes made post hoc, under either verdict word. The repairs would give a readable workbook
+summary, an audit that tests what it was meant to test, and a span check that passes. The pair count
+would need recomputing with the repaired arc term. A change to the coherence floor, the same-sky
+bar, or the sensor size, each of which is a pre-registered rule, or a different farm table, are the
+routes we considered that change the count.
 
 ## Checks
 
@@ -345,17 +406,48 @@ pre-registered rule, or a different farm table, are the routes we considered tha
   scores no forecast.
 - **The error of the mean or median forecast beside every quantile-score contrast:** not applicable,
   because no contrast was scored.
-- **Which audit triggers fired:** trigger 2 is met, because the result contradicts its own
+- **Which audit triggers fired:** trigger 1 fired, because two known-answer expectations of the
+  sensor audit failed and so did the day-count check, a registered correctness check. The diagnosis
+  explains each failure (findings 2 and 3). Trigger 2 is met, because the result contradicts its own
   prediction on four counts and the page records an explanation from the private diagnosis for
   each. The plan counted 12 qualifying pairs and the run gave 0 (finding 4). The plan expected 0%
   of `u_clear` unchanged against 16.8% to 18.1% (finding 2), 100% of the CAMS index unchanged
-  against 56.1% to 58.2% (finding 2), and 413 days against 420 (finding 3). Triggers 1, 3, 4, 5, and
+  against 56.1% to 58.2% (finding 2), and 413 days against 420 (finding 3). Triggers 3, 4, 5, and
   6 cannot fire, because no control, contrast, nested arm, leave-one-out check, or interval exists.
   Trigger 7 is not met on the plan's reading: the outcome table fixes the untangler's gain at 0 and
   lets rung U3 proceed under every verdict, so no later design depends on a headline number or sign
-  of this experiment. **An Opus audit is required before merge, and it has not been done.**
+  of this experiment.
+- **The Opus audit before merge was done:** a fresh Opus agent that wrote none of the code, plan,
+  or write-up audited the page, the scripts, and the public outputs, and its findings are applied
+  to this page (section [Audit before merge](#audit-before-merge)).
+- **The launch gates of job W0:** gates 1 to 4 of the section "Compute and pre-run gates" apply to
+  the first run. Gate 1 is evidenced in part: four Opus code reviews were run, and review 4 found no
+  must-fix item and cleared job W0. Commit `209211e9d`, the commit that ran, then applied review 4's
+  two should-fix items (54 lines in `e00723_w0.py`, 29 in `e00723_guard.py`, and 65 test lines), and
+  no review of its own followed before the run. Gate 2 is not evidenced: no file read by the audit
+  holds the "fits starting" message or the manager's reply. Gate 3 is evidenced in part: decision 1
+  of this page is marked as decided by the manager for the count, and no file records a ruling on
+  whether the experiment runs. Gate 4 is evidenced by the commit that applied erratum 1 and the
+  review of the erratum to the plan. The one-core pin is enforced by the launch check, which raises
+  unless the process may use one core, but the run log records neither the core nor the affinity (it
+  records a peak memory of 676 MB). The code is unchanged between commit `209211e9d` and the audited
+  head, which differs only in this page and the theme plan.
 - **The holdout:** no row on or after 2026-07-01 was read (`holdout_clean` is true), and the
   attempt marker shows attempt 1 with no approval for a rerun.
+
+## Audit before merge
+
+**The Opus audit found one must-fix item and eight should-fix items, and this page applies all of
+them.** The must-fix item concerns the verdict. The registered first-match rule gives job W2 row 1,
+`invalid`, because the day-count check failed, so the page reports `invalid` as the registered
+verdict and the `inconclusive` reading as post hoc. The should-fix items are that audit trigger 1
+fired, that job W3 had no scorable control on the farm sensor, that the registered rerun rules
+govern any rerun, that the single-pass reading of the coherence floor is not ruled, that the launch
+gates need reporting, that finding 2 needs a check on stored data, that the D10 counts need their
+base stated, and that the opening must define its terms before using them. The audit recounted the
+pair table from the stored files and agrees with the 0 qualifying pairs. The audit's verdict on
+readiness was that the pull request cannot be marked ready until the verdict is triaged and this
+section is linked.
 
 ## The plan, as registered
 
