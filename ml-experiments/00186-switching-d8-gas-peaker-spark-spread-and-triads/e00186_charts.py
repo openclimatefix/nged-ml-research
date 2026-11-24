@@ -13,7 +13,7 @@ from plotting import ocf_theme as ocf
 from studies.charts import CONTENT_WIDTH_PX
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import engine_figure_guard as guard  # noqa: E402
+import engine_figure_guard as guard
 
 DOCS_DIR: Final[Path] = Path(
     "docs/ml-experiments/00186-switching-d8-gas-peaker-spark-spread-and-triads"

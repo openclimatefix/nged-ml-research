@@ -14,7 +14,7 @@ from plotting import ocf_theme as ocf
 from studies.charts import CONTENT_WIDTH_PX
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import engine_figure_guard as guard  # noqa: E402
+import engine_figure_guard as guard
 
 DOCS_DIR: Final[Path] = Path("docs/ml-experiments/00194-" + common.SLUG)
 WIDTH: Final[int] = CONTENT_WIDTH_PX - 80
@@ -172,14 +172,19 @@ def main() -> None:  # noqa: D103
             {"period": name, "mw": float(bins[i] + 0.25), "share": float(h[i] / arr.size)}
             for i in range(h.size)
         ]
-    fig4 = alt.Chart(pl.DataFrame(hist_rows)).mark_bar(color=ocf.BRAND_ORANGE).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("mw:Q", title="D8 metered minus expected power (MW)"),
-        y=alt.Y("share:Q", title=None),
-        row=alt.Row("period:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left")),
-    ).properties(
-        width=WIDTH - 120,
-        height=70,
-        title="D8's residual gains a long negative tail after G2's output stops arriving (share of half-hours)",
+    fig4 = (
+        alt.Chart(pl.DataFrame(hist_rows))
+        .mark_bar(color=ocf.BRAND_ORANGE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("mw:Q", title="D8 metered minus expected power (MW)"),
+            y=alt.Y("share:Q", title=None),
+            row=alt.Row("period:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left")),
+        )
+        .properties(
+            width=WIDTH - 120,
+            height=70,
+            title="D8's residual gains a long negative tail after G2's output stops arriving (share of half-hours)",
+        )
     )
     guard.save_chart(chart=fig4, path=DOCS_DIR / "figure_4.svg")
 

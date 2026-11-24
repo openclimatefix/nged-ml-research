@@ -22,7 +22,7 @@ import polars as pl
 from e00694_common import DATA_DIR, DOCS_DIR, f1_of
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import engine_figure_guard as guard  # noqa: E402
+import engine_figure_guard as guard
 
 ARMS: Final[tuple[str, ...]] = ("M0", "M1", "M2", "M2-dwell")
 PRIMARY: Final[tuple[str, ...]] = ("record", "synth0", "synth1", "synth2", "synth3")
@@ -473,9 +473,7 @@ def figures(*, fa_rows: list[dict], boots: dict, eras: dict) -> None:
     rows = []
     for number, e in enumerate(eras.values(), start=1):
         for arm in ("M2", "M1"):
-            rows.append(
-                {"era": f"Era {number}", "arm": arm, "share": float(e[arm]["flag"].mean())}
-            )
+            rows.append({"era": f"Era {number}", "arm": arm, "share": float(e[arm]["flag"].mean())})
     fig9 = (
         alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)

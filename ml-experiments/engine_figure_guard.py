@@ -30,7 +30,9 @@ _MONTHS: Final[str] = (
     "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
     "|January|February|March|April|June|July|August|September|October|November|December"
 )
-_DAYS: Final[str] = "Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday"
+_DAYS: Final[str] = (
+    "Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday"
+)
 _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
     "an ISO date or year-month": re.compile(r"\b(?:19|20)\d{2}-\d{2}(?:-\d{2})?\b"),
     "a month name": re.compile(rf"\b(?:{_MONTHS})\b"),
@@ -39,7 +41,9 @@ _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
     "a power unit": re.compile(r"\b(?:MW|MVA|kW|kVA|GW)\b"),
 }
 # Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`.
-_PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text))[^"]*\w: -?\d')
+_PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(
+    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text))[^"]*\w: -?\d'
+)
 _AXIS_TEXT: Final[re.Pattern[str]] = re.compile(r">([^<>]+)<")
 
 
@@ -61,17 +65,9 @@ def _walk(node: Any) -> list[dict[str, Any]]:
     return found
 
 
-def problems(*, chart: alt.TopLevelMixin) -> list[str]:
-    """List what in the chart would identify a generator record; an empty list means it is clean."""
-    spec = chart.to_dict()
+def svg_problems(*, svg: str) -> list[str]:
+    """List what in the SVG text would identify a generator record."""
     found: list[str] = []
-    for node in _walk(spec):
-        if node.get("type") == "temporal" or "timeUnit" in node:
-            found.append("a datetime axis or time unit in the specification")
-            break
-    buffer = io.StringIO()
-    chart.save(buffer, format="svg")
-    svg = buffer.getvalue()
     text = " ".join(_AXIS_TEXT.findall(svg))
     for label, pattern in _FORBIDDEN_TEXT.items():
         if pattern.search(text):
@@ -81,8 +77,20 @@ def problems(*, chart: alt.TopLevelMixin) -> list[str]:
     return found
 
 
+def problems(*, chart: alt.TopLevelMixin) -> list[str]:
+    """List what in the chart would identify a generator record; an empty list means it is clean."""
+    found: list[str] = []
+    for node in _walk(chart.to_dict()):
+        if node.get("type") == "temporal" or "timeUnit" in node:
+            found.append("a datetime axis or time unit in the specification")
+            break
+    buffer = io.StringIO()
+    chart.save(buffer, format="svg")
+    return found + svg_problems(svg=buffer.getvalue())
+
+
 def check_chart(*, chart: alt.TopLevelMixin) -> None:
-    """Raise `GuardError` when the chart shows a date, a datetime axis, a per-point value, or a unit."""
+    """Raise `GuardError` when the chart shows a date, a per-point value, or a power unit."""
     found = problems(chart=chart)
     if found:
         raise GuardError("Refusing to write a chart with " + "; ".join(sorted(set(found))))

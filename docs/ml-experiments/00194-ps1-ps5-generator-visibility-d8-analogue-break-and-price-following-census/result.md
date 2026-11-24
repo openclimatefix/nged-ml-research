@@ -108,7 +108,8 @@ holds both high-shortfall and low-shortfall months.
 
 ![Shortfall share of D8 and share of half-hours with a G2 reading, before and after the break](figure_2.svg)
 
-*Figure 2. Before and after the break, pooled: D8's shortfall share rises once G2's output readings stop arriving.*
+*Figure 2. Before and after the break, pooled: D8's shortfall share rises once G2's output
+readings stop arriving.*
 
 ![G2 running share by price fifth](figure_3.svg)
 
