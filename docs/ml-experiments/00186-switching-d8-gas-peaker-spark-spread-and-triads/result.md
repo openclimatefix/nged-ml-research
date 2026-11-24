@@ -140,7 +140,7 @@ system price.
 
 ![Spark spread around the start and end of the 28 drops](figure_4_event_profile.svg)
 
-![Spark spread and D8's drops over three years](figure_3_spread_and_drops.svg)
+![Share of days that are drop days, by fifth of the spark spread](figure_3_spread_and_drops.svg)
 
 ![Flatness of D8's drops against injected constant blocks](figure_2_flatness.svg)
 

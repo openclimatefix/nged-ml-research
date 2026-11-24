@@ -199,7 +199,7 @@ of 1.75 MW is a model fit and not a visible pattern.
 
 ![Output levels of Gas A](figure_5_gas_a_levels.svg)
 
-**Phase B: known answers.** Figure 6 shows one injected segment. Figure 7 gives the scores pooled
+**Phase B: known answers.** Figure 7 gives the scores pooled
 over the engine record and four synthetic schedules, which are built by resampling the record's
 runs. The intervals are 95%, from resampling schedule-weeks and then segments.
 
@@ -213,8 +213,6 @@ runs. The intervals are 95%, from resampling schedule-weeks and then segments.
 "Folded rule" and "signed rule" are the two ways of subtracting the engine's output from a Primary's
 reading. The folded rule subtracts it from the real power behind the reading and reads the result
 back as apparent power. The signed rule subtracts it from the reading directly.
-
-![Injected example](figure_6_injected_example.svg)
 
 ![Known-answer scores](figure_7_known_answer_scores.svg)
 
@@ -260,7 +258,9 @@ over unit size has a dip at 2.0 MW and further modes beyond it.
 | 2025-03-24 to 2026-02 | 3, 2.25 MW | 0.384 | 3, 1.50 MW | 3, 1.50 MW |
 | 2026-03 to 2026-06 | 2, 3.50 MW | 0.262 | 3, 1.50 MW | 3, 1.75 MW |
 
-![D8 running share by month](figure_9_d8_running_share.svg)
+![D8 running share by era, pooled](figure_9_d8_running_share.svg)
+
+*Figure 9. Eras 1 to 3 are the three rows of the era table above, in order.*
 
 K1 is D8's own 44-day reading with Gas A's record subtracted; it does not decide, because D8's
 reading already holds whatever D8's own engine did, and Gas A is a separate metered engine, so some
@@ -418,7 +418,7 @@ engine responds to something predictable other than price that the climatology c
 - `e00694_look.py`: Phase A figures 1 to 5, and the Phase A printout (`printed_look.txt`).
 - `e00694_run.py`: the false-alarm pass, the injections, K1, the example segment, the real D8 eras,
   and P5. Writes pickles under `data/ml-experiments/00694-gas-engine-state-tracker-part-1/`.
-- `e00694_report.py`: scoring, the cluster bootstrap, the verdict table, figures 6 to 9, and
+- `e00694_report.py`: scoring, the cluster bootstrap, the verdict table, figures 7 to 9, and
   `printed_report.txt`.
 - `data/ml-experiments/briefs/sw_false_alarms/work/arrays.pkl`: the residual panel that [experiment
   196](../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md) stored (a
