@@ -62,7 +62,7 @@ row also carries an explicit forecast of the Primary's unmetered solar output, o
 historical estimate that [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md)
 tests.** The forecast is an as-of capacity times a yield curve, driven by the ENS-mean and
 ENS-spread shortwave irradiance of the 00Z run of the origin day. This page is part 2 of
-follow-up F7. It is the plan: no network has been trained, and every number below is a design
+follow-up F7. It is the plan: no arm has been fitted on the real folds, and every number below is a design
 value or a figure from an earlier experiment. The design is condensed from the private design note
 `f7_design.md`, and the details that this part shares with part 1 (the PV estimate, the as-of
 capacity, the network paths, the training recipe, the known-answer worlds, and the leakage rules)
@@ -75,17 +75,19 @@ its secondary readings (days 1 to 60, days 61 to 236, and pass 60) fail as well.
 KF12 pass. No threshold and no verdict rule changed. An audit of the failure found no implementation
 fault and two method findings. First, the patience-8 rule scored arm `H` at passes 4, 23, and 5 of
 seeds 0, 1, and 2, against global bests at passes 43, 55, and 32, because the history path learns
-slowly. Second, the yardstick of KF9 sits at the oracle ridge: arm `Z` scores 0.0394 on the solar
-block, the naive ridge reference 0.0470, and the oracle ridge 0.0324, so arm `H` needs 0.0321 or
-better to pass. Every statement that the history path recovers the hidden sky from the PV estimate
-is therefore unsupported by a passing known-answer test.
+slowly. Second, the pass mark forces arm `H` below the oracle ridge: arm `H-S` scores 0.0394 on the
+solar block and arm `Z` 0.0397, the naive ridge reference 0.0470, and the oracle ridge 0.0324, so
+arm `H` must score 0.0321 or better, below the oracle ridge's 0.0324. Every statement that the
+history path recovers the hidden sky from the PV estimate is therefore unsupported by a passing
+known-answer test.
 
 **The early-stopping pre-check of the known-answer worlds read one seed of three, and the other
-seeds of arm `M` are noisier than its limit.** The pre-registered pre-check reads arm `M` of seed 0
-only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of 0.0109 in world WH
-and 0.0121 in world WT, against the limit of 0.0225. Seeds 1 and 2 of arm `M` in WH have a last-10
-noise of 0.029 and 0.031, above that limit, so the rung-4 pass depended on seed 0. The numbers
-review checks this reading.
+seeds of arm `M` in world WH are noisier than its limit.** The pre-registered pre-check reads arm
+`M` of seed 0 only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of
+0.0109 in world WH against the limit of 0.0225, and 0.0121 in world WT against the limit of 0.134.
+Seeds 1 and 2 of arm `M` in WH have a last-10 noise of 0.029 and 0.031, above the WH limit, so the
+rung-4 pass in WH depended on seed 0. In WT, seeds 1 and 2 have 0.038 and 0.016, below the WT limit.
+The numbers review checks this reading.
 
 **The honest expectation is a tie.** Six earlier experiments found that an explicit PV term built
 on forecast weather did not help net demand (the table below), and the target tokens already carry
@@ -200,7 +202,8 @@ generator's time series.
 
 ## Method
 
-The experiment is planned and has no fitted result yet, so these bullets describe the design.
+The experiment is planned and has no arm fitted on the real folds yet, so these bullets describe
+the design.
 
 - **The known-answer gate is waived at KF9:** `e00716_waive_gate.py` writes the gate file with
   `waived: true`, the failed check and its values, the code hash, and the sha256 of the last-run
@@ -208,9 +211,9 @@ The experiment is planned and has no fitted result yet, so these bullets describ
   the median of the 5 passes ending at the best pass, is unchanged.
 - **The pre-check reads seed 0 only:** the noise limit of the early-stopping pre-check comes from
   the last 10 validation losses of arm `M` at seed 0. At seeds 1 and 2 of WH the same noise is 0.029
-  and 0.031, above the limit of 0.0225 at rung 4. The diagnostic best pass of the pre-check uses
-  patience 30, the patience that trains arm `M`. An Opus review of the code behind the pre-check
-  (commit 126577d1d) was clean.
+  and 0.031, above the limit of 0.0225 in WH at rung 4. The diagnostic best pass of the pre-check
+  uses patience 30, the patience that trains arm `M`. An Opus review of the code behind the
+  pre-check (commit 126577d1d) was clean.
 - **Architecture and training regime:** experiment 716's, with the target-row paths of this page.
   Every arm starts stages 2 and 3 from the stored stage 1 state of `M*` of the same fold and seed.
 - **Measurement:** as experiment 716, on 8 folds and 16 Primaries, with no screen.
