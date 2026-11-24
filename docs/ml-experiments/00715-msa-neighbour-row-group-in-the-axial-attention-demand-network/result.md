@@ -11,7 +11,8 @@ status: finished
 kind: other
 protocol: demand-v2
 size: >-
-  Complex. (1) It stores per-row forecasts and network weights for 76 to 86 fits; (2) more than one
+  Complex. (1) It stores per-row forecasts and network weights for the 76 to 86 fits of the plan
+  (32 fits ran); (2) more than one
   design defensibly tests the hypothesis (a third attention axis, a summed neighbour group, or a
   larger flattened matrix); (3) it copies training code from experiment 713, and the callers of that
   code cannot be listed without searching the repository; (4) it touches no serving path or
@@ -53,37 +54,40 @@ best_arm: >-
   the six signed-MW Primaries and +0.0085 (-0.0245 to +0.0445) at the eight MVA-only Primaries
   (`score/headline.json`, key `N1`).
 headline: >-
-  Giving the axial-attention network the last 14 days of up to six electrical neighbours did not
-  lower its CRPS at leads of 24 h to 240 h. On 8 folds and 2 seeds, F4 minus M* is +0.0127 points of
-  capacity at the six signed-MW Primaries and +0.0085 at the eight MVA-only Primaries, and both
-  98.75% intervals include zero and lie inside the pre-registered limits of 0.094 and 0.25. F4
-  minus the placebo F4-R is +0.0182 and -0.0028, and both intervals also include zero. The verdict is
-  `not supported` (no detectable difference). Two known-answer checks of this experiment's own
-  gate (KN6 and KN7) failed and were waived, so the page makes no claim about whether F4 follows a
-  level change.
+  The continuous ranked probability score (CRPS) of the axial-attention neural network at leads of
+  24 h to 240 h did not fall when the network was given the last 14 days of up to six electrical
+  neighbours. On 8 folds and 2 seeds, F4 (the network with neighbour rows) minus M* (experiment
+  713's selected network, without neighbour rows) is +0.0127 points of capacity at the six
+  signed-MW Primaries and +0.0085 at the eight MVA-only Primaries. Both 98.75% intervals include
+  zero and lie inside the pre-registered limits of 0.094 and 0.25 points of capacity. F4 minus the
+  placebo F4-R, whose neighbour slots hold Primaries that are not neighbours, is +0.0182 and
+  -0.0028, and both intervals also include zero. The verdict is `not supported` (no detectable
+  difference). Two known-answer checks of this experiment's own gate (KN6 and KN7) failed and were
+  waived, so the page makes no claim about whether F4 follows a level change.
 lessons: >-
   The two seeds disagree in sign on N1 in both groups (seed differences -0.0058 and +0.0342 at the
   six signed-MW Primaries, -0.0153 and +0.0474 at the eight MVA-only Primaries), so the seed guard
   fails and the point estimates are within seed noise. A zero-initialised neighbour path trained for
-  about 12 to 32 passes per stage and ended every stage by patience. The known-answer world could
-  not show that F4 follows a permanent step, because the shared trunk follows 0.019 of one at the
-  synthetic budget, and the gate window held one permanent step.
+  about 9 to 32 passes over the training data in each stage, and patience ended every stage. The
+  known-answer world could not show that F4 follows a permanent step. At the synthetic budget the
+  shared trunk reaches a follow share of 0.019 on a permanent step, and the gate window held one
+  permanent step.
 take_home_message: >-
-  Adding the last 14 days of a Primary substation's electrical neighbours to the axial-attention
-  network did not improve its forecast on this 16-Primary panel: the difference from the network
-  without neighbours is +0.0127 and +0.0085 points of capacity, with intervals that include zero.
-  The experiment cannot say that neighbour rows carry no information, because its known-answer
-  checks of whether F4 follows a level change failed and were waived. The pre-registered rule
-  closes neighbour rows in this network on the 16-Primary panel, and a retest needs fleet-scale
-  adjacency.
+  On this 16-Primary panel, the forecast of the axial-attention neural network did not improve
+  when we added the last 14 days of a Primary substation's electrical neighbours: the difference
+  from the neural network without neighbours is +0.0127 and +0.0085 points of capacity, with
+  intervals that include zero. The experiment cannot say that neighbour rows carry no information,
+  because the known-answer checks of whether F4 follows a level change failed and were waived. The
+  pre-registered rule closes neighbour rows in this neural network on the 16-Primary panel. A
+  retest needs fleet-scale adjacency.
 advice:
   - >-
-    Do not retest neighbour rows in the axial-attention network on the 16-Primary panel; the stop
+    Do not retest neighbour rows in the axial-attention neural network on the 16-Primary panel; the stop
     rule of this experiment requires fleet-scale adjacency of about 1,161 Primaries first.
   - >-
-    Fix the lead-day learning rate of experiment 713's trunk before any new known-answer test of
-    following level changes, because the trunk follows 0.019 of a permanent step at the budget the
-    gate used.
+    Fix the learning rate that experiment 713's shared trunk uses for the lead-day inputs before any
+    new known-answer test of whether the neural network follows level changes. At the budget the
+    gate used, the trunk reaches a follow share of only 0.019 on a permanent step.
 production_status: not-for-production
 adopted_in: none
 benchmark: >-
@@ -120,11 +124,13 @@ smaller difference is likely to read as a tie.
 ## Result
 
 **The neighbour rows did not improve the forecast: F4 minus M\* is +0.0127 and +0.0085 points of
-capacity, and the verdict is `not supported`.** Both 98.75% intervals include zero and lie inside
-the pre-registered limits. The contrasts are the mean difference in CRPS in points of capacity at
-leads from 24 h up to but not including 240 h, on 8 folds (2025-11 to 2026-06) and seeds 0 and 1,
-from the headline scorer `e00715_score.py headline` (`score/headline.json`, keys `N1` and `N2`). A
-positive number means that the first arm is worse.
+capacity, and the verdict is `not supported`.** F4 is the axial-attention neural network with
+neighbour rows, and M\* is experiment 713's selected network without them. Both 98.75% intervals
+include zero and lie inside the pre-registered limits. The contrasts are the mean difference in the
+continuous ranked probability score (CRPS), in points of capacity, at leads from 24 h up to but not
+including 240 h. They cover 8 folds (2025-11 to 2026-06) and seeds 0 and 1, and come from the
+headline scorer `e00715_score.py headline` (`score/headline.json`, keys `N1` and `N2`). A positive
+number means that the first arm is worse.
 
 | Contrast | The six signed-MW Primaries | The eight MVA-only Primaries |
 |---|---|---|
@@ -135,45 +141,62 @@ positive number means that the first arm is worse.
 **The two seeds disagree in sign on N1 in both groups, so the point estimates are within seed noise.**
 The difference of seed 0 and of seed 1 from M\* is -0.0058 and +0.0342 at the six signed-MW
 Primaries, and -0.0153 and +0.0474 at the eight MVA-only Primaries (`score/headline.json`, key
-`seed_differences`). The seed guard fails for N1 in both groups, and it holds for N2 only at the six
-signed-MW Primaries (+0.0081 and +0.0275). The `supported` verdict also needs a gain and the donor
-guard, and N1 shows no gain, so the verdict is `not supported` (`supported_guards_hold` is false).
+`seed_differences`). The seed guard fails for N1 in both groups. The seed guard holds for N2 only at
+the six signed-MW Primaries (+0.0081 and +0.0275). The `supported` verdict also needs a gain and the
+donor guard, and N1 shows no gain, so the verdict is `not supported` (`supported_guards_hold` is
+false).
 
-**The runner first misread N2 at the eight MVA-only Primaries as opening the rule for seeds 2 to 4.**
-N2 is -0.0028 there, and the runner read "at least one counted treatment contrast below zero" as
-satisfied. The manager ruled that a counted treatment contrast means the contrast against the
-baseline (N1), positive in both groups, and that N2 is an ablation. Seeds 2 to 4 were therefore not
-run, and every number on this page rests on 2 seeds.
+**About 99% of the neighbour tokens were visible, and 31% to 48% of the rewired slots
+held a Primary two links from the host.** The visible share of the neighbour tokens is 0.983 to
+0.993 for F4 and 0.978 to 0.993 for F4-R across the 8 folds, and the lowest value is F4-R on 2026-05
+(0.9781). The share of rewired slots two links from the host is 0.48 for seed 0 and 0.31 for seed 1
+(`score/headline.json`, keys `visible_neighbour_share_by_arm_and_fold` and
+`two_link_share_of_the_rewired_slots`).
 
-**The stop rule closes neighbour rows in this network on the 16-Primary panel.** The pre-registered
-rule says that a verdict of `not supported` closes neighbour rows in the axial-attention network on
-the 16-Primary panel, and that a retest needs fleet-scale adjacency (`score/headline.json`, key
-`stop_rule`). The earlier interim screen on 4 folds (2025-11, 2026-01, 2026-03, and 2026-06) read
-`advance`: F4 minus M\* was +0.0103 at the six signed-MW Primaries and +0.0200 at the eight MVA-only
-Primaries, with 2 of 4 folds positive in each group (`score/screen.json`), which is below both
-stop thresholds.
+**Seeds 2 to 4 were not run, because the rule that opens them counts only N1.** The rule needs a
+counted treatment contrast below zero in at least one group. A counted treatment contrast means the
+contrast against the baseline (N1), and N2 is an ablation. This disclosure records a misreading by
+the person who ran the fits: N2 is -0.0028 at the eight MVA-only Primaries, and that person first
+read it as satisfying the rule. The manager corrected the reading before any further fit, and every
+number on this page therefore rests on two seeds.
+
+**The stop rule closes neighbour rows in this neural network on the 16-Primary panel.** The
+pre-registered rule says that a verdict of `not supported` closes neighbour rows in the
+axial-attention neural network on the 16-Primary panel. The rule also says that a retest needs
+fleet-scale adjacency (`score/headline.json`, key `stop_rule`).
+
+**The earlier interim screen read `advance`.** The screen covered 4 folds (2025-11, 2026-01,
+2026-03, and 2026-06). F4 minus M\* was +0.0103 at the six signed-MW Primaries and +0.0200 at the
+eight MVA-only Primaries, with 2 of 4 folds positive in each group (`score/screen.json`). Both
+differences are below the two stop thresholds.
 
 **This experiment's own known-answer gate failed KN6 and KN7, and the maintainer waived both, so the
-page says nothing about whether F4 follows a level change.** The gate passed KN11(a) and KN12. KN6
-gave an F4 gap of 0.0288 between the follow share of a permanent step and of a temporary step,
-against a requirement of at least 0.60. KN7 was not evaluated, because the fit of F4 on the world
-with no shifts ended at its 150-pass cap (`work/known_answers_last_run.json`). An audit of the
-failure found no fault in the neighbour path and three causes: a training budget of 150 passes with
-a patience of 8 (experiment 713 later raised its own to 400 and 30), a KN6 window with one permanent
-step and two temporary steps, and a shared trunk that follows only 0.019 of a permanent step at that
-budget. The maintainer's note frames the limit: in general, it is hard to discriminate between a
-temporary step and a permanent step, and the only two hints are what a Primary substation's
-electrical neighbours do and the rough shape of the step, although the shape is probably less
-informative. The injected-world readings S1 to S7 were not scored, and phase 3 (the mirror arms F4-W
-and F4-WR) and phase 4 (injected-world predictions) were not run.
+page says nothing about whether F4 follows a level change.** The gate passed KN11(a) and KN12.
+KN11(a) checks that the injected worlds equal the cleaned power outside the touched windows, and
+KN12 checks that no weather after the forecast origin reaches the neural network. KN6 gave an F4 gap
+of 0.0288 between the follow share of a permanent step and of a temporary step, against a
+requirement of at least 0.60. KN7 was not evaluated, because the fit of F4 on the world with no
+shifts ended at its 150-pass cap (`work/known_answers_last_run.json`). An audit of the failure found
+no fault in the neighbour path. It found three causes: a training budget of 150 passes with a
+patience of 8 (experiment 713 later raised its own to 400 and 30), a KN6 window with one permanent
+step and two temporary steps, and a shared trunk that reaches a follow share of only 0.019 on a
+permanent step at that budget.
+
+**The maintainer's note frames the limit.** In general, it is hard to discriminate between a
+temporary step and a permanent step. The note names two hints: what a Primary substation's
+electrical neighbours do, and the rough shape of the step. The note judges the shape probably less
+informative.
+
+**The injected-world readings S1 to S7, phase 3, and phase 4 were not scored or run.** Phase 3 holds
+the mirror arms F4-W and F4-WR. Phase 4 holds the injected-world predictions.
 
 **F4-T and F4-0 were dropped.** The time-shuffled placebo (F4-T) and the refit with no neighbour
 path (F4-0) were report-only arms, and the queue review deferred them until a counted contrast
-showed a gain, which it did not. Neither arm has a number on this page.
+showed a gain. No counted contrast did, and neither arm has a number on this page.
 
 **Every fit ended by patience, none reached the 60-pass cap, and none needed the 120-pass rerun.**
-The table lists the passes of stage 2 and stage 3 for seeds 0 and 1 (`work/logs/<arm>/<month>_s<seed>_fit.json`,
-key `stages`).
+The table lists the training passes of stage 2 and stage 3 of each fit for seeds 0 and 1
+(`work/logs/<arm>/<month>_s<seed>_fit.json`, key `stages`).
 
 | Fold | F4 seed 0 | F4 seed 1 | F4-R seed 0 | F4-R seed 1 |
 |---|---|---|---|---|
@@ -186,12 +209,16 @@ key `stages`).
 | 2026-05 | 10, 12 | 13, 20 | 11, 12 | 13, 20 |
 | 2026-06 | 16, 16 | 14, 23 | 16, 16 | 14, 27 |
 
-**The 32 fits took 3.9 GPU-process-hours and one process used at most 8,336 MiB of GPU memory.** The
-total is the sum of the `seconds` fields in the same fit logs. The allocated peak in those logs was
-5.05 to 5.18 GB with checkpointing of the neighbour path, and the maximum of the process total in a
-30-second `nvidia-smi` sampler during the fits was 8,336 MiB. The maintainer raised the F4 limit
-from 6 GB to 9 GB for that reason. The headline scorer's tail guard (q01 and q99 pinball loss) is
-within tolerance in both groups (`score/headline.json`, key `guards`).
+**The 32 fits (F4 and F4-R, 8 folds, seeds 0 and 1) took 3.9 GPU-process-hours.** The total is the
+sum of the `seconds` fields in the same fit logs. The allocated peak in those logs was 5.05 to 5.18
+GB with checkpointing of the neighbour path.
+
+**One process used at most 8,338 MiB of GPU memory.** That is the maximum of the process total in a
+30-second `nvidia-smi` sampler during the fits, reached by F4 on 2026-03 with seed 0. The maintainer
+raised the F4 memory limit from 6 GB to 9 GB because the process total exceeded 6 GB.
+
+**The tail guard of the headline scorer, the q01 and q99 pinball loss, is within tolerance in both
+groups** (`score/headline.json`, key `guards`).
 
 ## Why this runs although its start gate was not met
 
@@ -386,13 +413,13 @@ the neighbour tokens, which the write-up states as a limit.
 The table holds 29 undirected links among the 16 series, and experiments 660, 709, and 714 read the
 same list, so the slots match the links along which the injected worlds mirror their moves. All 16
 Primaries have at least one metered neighbour (degrees: 6 at D10 and D12; 5 at D2, D14, and D21; 4
-at D15, D18, and D22; 3 at D3, D5, D8, and D11; 2 at D4, D16, and D19; 1 at D9). Six Primaries also
-link to substations without readings, and a move to such a substation has no visible mirror. Six
-links join Primaries under different bulk supply points, and each neighbour token carries a flag for
-"same bulk supply point as the host". D15 and D18 share one NGED substation number and are not
-listed as neighbours of each other, and this plan keeps the table as NGED wrote it, because both
-injected-event generators keep D15 and D18 out of every event and no scoring world could test the
-link.
+at D15, D18, and D22; 3 at D3, D5, D8, and D11; 2 at D4, D16, and D19; 1 at D9). Of the 16
+Primaries, 6 also link to substations without readings, and a move to such a substation has no
+visible mirror. Six links join Primaries under different bulk supply points, and each neighbour
+token carries a flag for "same bulk supply point as the host". D15 and D18 share one NGED substation
+number and are not listed as neighbours of each other, and this plan keeps the table as NGED wrote
+it, because both injected-event generators keep D15 and D18 out of every event and no scoring world
+could test the link.
 
 **Each neighbour token is a 32-wide sum of five parts.** The parts are an identity embedding of the
 neighbour (16 × 32), a relation embedding of the link (8 × 32; the index is `4 × same_bsp + 2 ×
@@ -804,10 +831,10 @@ dates and no generator's name, identifier, or series.** SVG exports pass through
   **The counted arms are never taught the mirror rule,** so S1 is expected to be near zero, and F4-W
   carries that question on 4 folds and 2 seeds. - **F4 minus M* compares a refit with a stored
   fit.** KN8 and F4-0 measure the run-to-run difference. - **Skipping stage 1 means the neighbour
-  path never sees data before 2024-04.** - **Eight Primaries report unsigned apparent power,** so a
-  megawatt mirror is approximate at half the panel, and every MVA-only number keeps the label
-  "reactive power assumed zero". - **The rewired slots are not matched on capacity, unit, or
-  distance,** and many sit two links from the host, which pushes N2 towards zero. - **F4 can
+  path never sees data before 2024-04.** - **The eight MVA-only Primaries report unsigned apparent
+  power,** so a megawatt mirror is approximate at half the panel, and every MVA-only number keeps
+  the label "reactive power assumed zero". - **The rewired slots are not matched on capacity, unit,
+  or distance,** and many sit two links from the host, which pushes N2 towards zero. - **F4 can
   forecast a host without readings from its neighbours,** which could account for part of a gain on
   rows after a telemetry outage; the read-out with all host history masked measures it. -
   **Experiment 713's caveats carry over:** ERA5 history weather is a laboratory shortcut, the
