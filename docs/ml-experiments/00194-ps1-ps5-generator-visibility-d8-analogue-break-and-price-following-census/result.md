@@ -18,9 +18,9 @@ hypothesis: >-
 prediction: >-
   The share of D8 half-hours with a residual below -2.5 MW is at most 0.02 in July 2023 and at least
   0.10 in every month from September 2023 to January 2026. The fitted change point of the weekly
-  share lies between 2023-08-10 and 2023-09-10. No control series (D3, D5, and the register's
-  Primary) has a change point within 30 days of it. In PS5, no series other than D8 has a change
-  point of at least 0.10 in share.
+  share lies between 2023-08-10 and 2023-09-10. No control series (D3, D5, D14) has a change point
+  within 30 days of it. In PS5, no series other than D8 has a change point of at least 0.10 in
+  share.
 decision_rule: >-
   Descriptive. PS1: if the prediction holds, the page states that D8's drops follow from a failed
   analogue on an added-back engine. If the change point lies outside the window, or a control shares

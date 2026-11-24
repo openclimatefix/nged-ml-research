@@ -107,7 +107,7 @@ MASK_SHARE_OF_MAXIMUM: Final[float] = 0.25
 largest fitted price output in the fit, provided that largest output is at least
 `MASK_MINIMUM_POINTS`."""
 MASK_MINIMUM_POINTS: Final[float] = 1.0
-"""One point is 1% of the site's effective capacity (0.1 MW at D8). A smaller fitted price effect
+"""One point is 1% of the site's effective capacity. A smaller fitted price effect
 is not material, and masking on it would drop half the training rows."""
 N_MEMBERS: Final[int] = 51
 MIN_WINDOW_HALF_HOURS: Final[int] = 48

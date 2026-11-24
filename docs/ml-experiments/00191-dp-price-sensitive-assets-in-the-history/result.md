@@ -75,8 +75,8 @@ lessons:
     The fitted price response at D8 is non-zero within the training rows, but it does not carry
     forward: out of sample the best arm gains 0.6%, with an interval that includes zero.
   - >-
-    At the register's Primary the fitted price response is 0 to 0.13 MW, so the price indicators
-    find no footprint there.
+    At the register's Primary the fitted price response is 0 to 1.1 points of effective capacity,
+    so the price indicators find no footprint there.
   - >-
     Removing the price-driven half-hours from training (T) and replacing the price by its expected
     value (M) do not help, and persisting yesterday's price (P) hurts D8 by 4.4%.
@@ -164,12 +164,12 @@ response does not carry forward to the scored year.
   training half-hour when the fitted price output there is at least 25% of the largest fitted output
   and that largest output is at least 1 point (1% of the substation's effective capacity). Without
   the 1-point floor the rule dropped half of the register's Primary's training rows for a response
-  of 0.04 MW.
+  of under 0.4 points.
 
 ## Results
 
 - **Absolute scores (D8, scored year, all rows, leads 0.5 to 168 hours).** Reference: mean absolute
-  error 15.18 points (1.6 MW), quantile score 10.95, q05-to-q95 coverage 0.42 (42%). The register's
+  error 15.18 points, quantile score 10.95, q05-to-q95 coverage 0.42 (42%). The register's
   Primary: mean absolute error 3.84, quantile score 2.16, coverage 0.89.
 - **Mean absolute error against the reference, D8.** H -0.64% (-2.53% to +1.11%), M +0.88% (-0.37%
   to +2.28%), P +4.41% (+3.00% to +5.83%), T +3.44% (+0.84% to +6.41%), JB +5.73% (+2.56% to
@@ -183,7 +183,7 @@ response does not carry forward to the scored year.
   number of cuts) at 0 to 24 hours, 1.8% at 24 to 72 hours and 0.4% at 72 to 168 hours.
 - **In-sample gain (the ceiling).** On each fit's own training rows the price columns lower D8's
   mean absolute error by 4.1% on average over the 12 fits (2.7% to 4.8%). At the register's Primary
-  the in-sample gain is 0.0% and the response is 0 to 0.13 MW. At D5 it is 0.0%.
+  the in-sample gain is 0.0% and the response is 0 to 1.1 points. At D5 it is 0.0%.
 - **No-harm check.** The largest rise in quantile score at any of the five decision Primaries is
   0.011 points, for H, against the 0.02 limit. With the gate switched on for the whole history at
   sites with no asset (placebo), D10 rises by 0.009 points for H.

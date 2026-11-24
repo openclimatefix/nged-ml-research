@@ -1,9 +1,9 @@
 # ruff: noqa: E501
-"""Experiment 191: in-sample gain of the price columns, and the fitted price response in MW.
+"""Experiment 191: in-sample gain of the price columns, and the fitted price coefficients in points.
 
 For each monthly fit, the mean absolute error on the fit's own training rows of the model without
-price columns (a0) and with them (joint, at the true price). The price response is the fitted
-output when every indicator is on, in MW (points times the site's effective capacity over 100).
+price columns (a0) and with them (joint, at the true price). The price coefficients are the
+fitted output in points for each indicator; the table prints them in points and never in MW.
 
     uv run --no-sync python ml-experiments/00191-*/e00191_insample.py
 """
@@ -23,9 +23,8 @@ def main() -> None:
         work = engine.masked_cache(cache=cache, site=site)
         grid = engine.build_price_grid(cache=work, site=site, ungated=False)
         fits = pickle.loads((common.FITS_DIR / "gated" / f"{site}.pkl").read_bytes())
-        capacity = work.sites[site].table.effective_capacity_mw
         print(f"\n== {common.shown(site)} (effective capacity [withheld])")
-        print("cut        rows  a0 MAE  joint MAE  gain%   response MW (all on)  theta (points)")
+        print("cut        rows  a0 MAE  joint MAE  gain%   theta (points)")
         gains = []
         for cut_fits in fits:
             _, index = prepare_fit(
@@ -43,11 +42,9 @@ def main() -> None:
             gains.append((a0 - joint) / a0 * 100.0)
             theta = cut_fits.joint.theta_price
             # NGED withholds the fitted response at D8: it is the size of a gas engine's block.
-            response = (
-                "[withheld]"
-                if site == "D8"
-                else f"{theta.sum() * capacity / 100.0:8.2f}   {np.round(theta, 2)}"
-            )
+            # Only the coefficients in points are printed, because with the response in MW as
+            # well the ratio of the two would give the site's effective capacity.
+            response = "[withheld]" if site == "D8" else f"{np.round(theta, 2)}"
             print(
                 f"{cut_fits.cut:%Y-%m-%d} {len(index):6d} {a0:7.3f} {joint:9.3f} "
                 f"{gains[-1]:6.2f}  {response}"

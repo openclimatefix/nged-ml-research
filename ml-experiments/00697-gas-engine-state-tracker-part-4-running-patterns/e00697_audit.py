@@ -242,7 +242,7 @@ def step_3_labels() -> pl.DataFrame:
             detail=f"{share:.4f}",
         )
         check(
-            name=f"{label}: fitted unit [withheld]",
+            name=f"{label}: fitted unit is positive (the value is withheld)",
             ok=float(era["M2"]["u"]) > 0.0,
         )
         index = int(era["start"]) + np.arange(n)
