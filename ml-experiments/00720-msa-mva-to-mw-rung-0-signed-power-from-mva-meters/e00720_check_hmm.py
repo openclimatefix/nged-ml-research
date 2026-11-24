@@ -6,6 +6,7 @@ Run: `python e00720_check_hmm.py`. Every world is synthetic; no real data is rea
 
 import itertools
 import sys
+from typing import Any
 
 import e00720_hmm as hmm
 import e00720_sign as sign
@@ -254,6 +255,34 @@ def check_gaussian_emission_differs() -> None:
     )
 
 
+def check_mixture_alignment_and_bins() -> None:
+    """The mixture's own P(X < 0) equals the posterior's; the 81-bin rule is reachable."""
+    from types import SimpleNamespace
+
+    x = np.linspace(-3.0, 3.0, 13)
+    rng = np.random.default_rng(3)
+    gamma = rng.dirichlet(np.ones(13) * 0.3, size=40)
+    post: Any = SimpleNamespace(smoothed=gamma, filtered=gamma, x_state=x)
+    spec: Any = SimpleNamespace(spacing=0.5, sigma_e=0.4)
+    pi, mu, sigma = hmm.two_lobe_mixture(post=post, spec=spec)
+    target = (gamma * (x < 0)).sum(axis=1)
+    assert (
+        np.abs(hmm.mixture_p_negative(pi=pi, mu=mu, sigma=sigma) - target).max() > 0.01
+    )  # untruncated lobes leak across zero
+    assert np.abs(pi[:, 0] - target).max() < 1e-9
+    q = hmm.truncated_signed_quantiles(pi=pi, mu=mu, sigma=sigma)
+    tau = np.asarray(hmm.fold.TAUS_11)
+    below = (q < 0.0).mean(axis=0)
+    # at every level the share of rows with a negative quantile matches the posterior's mass below zero
+    for k, t in enumerate(tau):
+        expect = float((target > t).mean())
+        assert abs(below[k] - expect) < 0.03, (t, below[k], expect)
+    import e00720_fit as fit
+
+    assert len(fit.k0_spec(phi=0.99, sigma_r=1.0, q=2.0).grid) == 81
+    assert len(fit.k0_spec(phi=0.9, sigma_r=1.0, q=2.0).grid) == 41
+
+
 def main() -> int:
     """Run every check; return 0 when all pass."""
     for check in (
@@ -263,6 +292,7 @@ def main() -> int:
         check_hidden_sign_world,
         check_em_and_cost_gate,
         check_gaussian_emission_differs,
+        check_mixture_alignment_and_bins,
     ):
         check()
     print("rung 0e core (synthetic): all checks passed")

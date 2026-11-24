@@ -7,6 +7,7 @@ the bar, and `passed`. The verdict reads these, so the thresholds live here and 
 
 from typing import Any, Final
 
+import e00720_fold as fold
 import e00720_hmm as hmm
 import numpy as np
 
@@ -145,22 +146,74 @@ def signed_crps_bar(
     return out
 
 
+def anchored_two_lobe_crps(
+    *, rho: np.ndarray, magnitude: np.ndarray, x_true: np.ndarray, width: float
+) -> np.ndarray:
+    """Return the per-row signed CRPS of the anchored read-out converted to the two-lobe form.
+
+    The lobes sit at minus and plus the observed magnitude, with weights `rho` and `1 - rho` and a common
+    standard deviation `width` (the hindsight model's own kernel width), so the two read-outs differ only in
+    how they produce the sign probability.
+    """
+    rho = np.clip(np.nan_to_num(rho, nan=0.5), 1e-9, 1.0 - 1e-9)
+    pi = np.stack([rho, 1.0 - rho], axis=1)
+    mu = np.stack([-magnitude, magnitude], axis=1)
+    sigma = np.full(mu.shape, width)
+    q = fold.signed_quantiles(pi=pi, mu=mu, sigma=sigma)
+    return hmm.signed_crps(quantiles=q, truth=np.nan_to_num(x_true))
+
+
 def both_versions(
-    *, post: hmm.Posterior, spec: hmm.HmmSpec, x_true: np.ndarray, dead_band: float = 2.0
+    *,
+    post: hmm.Posterior,
+    spec: hmm.HmmSpec,
+    x_true: np.ndarray,
+    magnitude: np.ndarray,
+    anchored_rho: np.ndarray | None = None,
+    seed_noise: float | None = None,
+    dead_band: float = 2.0,
 ) -> dict[str, dict[str, Any]]:
-    """Return the sign-probability and signed-CRPS bars for the smoothed and the filtered posterior, and their gap."""
+    """Return the sign-probability and signed-CRPS bars for the smoothed and the filtered posterior, and their gap.
+
+    Args:
+        post: The hindsight model's posterior over the rows.
+        spec: Its spec.
+        x_true: The signed truth (NaN where not scored).
+        magnitude: The observed magnitude `sqrt(m² - Q²)` of each row. The hard-sign reference uses it, so
+            the soft distribution is not asked to beat a reference that knows the true magnitude.
+        anchored_rho: The anchored read-out's `P(X < 0)` on the same rows, for the second half of the CRPS bar.
+        seed_noise: The measured noise of a second seed. While it is `None` the second half is pending, the
+            bar's `passed` reads the first half alone, and `second_half_pending` is true.
+        dead_band: Rows with `|x_true|` under this are not scored.
+
+    Returns:
+        For each version, the sign bar (on the posterior's `P(X < 0)`) and the CRPS bar, plus the sign bar
+        computed on the mixture's own `P(X < 0)` (`sign_mixture`), and the filtered-minus-smoothed gap.
+    """
     ok = np.isfinite(x_true) & (np.abs(x_true) >= dead_band)
     out: dict[str, dict[str, Any]] = {}
     for version in ("smoothed", "filtered"):
         pneg = hmm.summarise(post=post, spec=spec, version=version)["p_negative"]
-        q = hmm.signed_quantiles_of(post=post, spec=spec, version=version)
+        pi, mu, sigma = hmm.two_lobe_mixture(post=post, spec=spec, version=version)
+        q = hmm.truncated_signed_quantiles(pi=pi, mu=mu, sigma=sigma)
         soft = hmm.signed_crps(quantiles=q, truth=np.nan_to_num(x_true))[ok]
         sgn = np.where(pneg > 0.5, -1.0, 1.0)
-        mag = np.abs(np.nan_to_num(x_true))  # hindsight magnitude is nearly observed
-        hard = np.abs(sgn * mag - np.nan_to_num(x_true))[ok]
+        hard = np.abs(sgn * magnitude - np.nan_to_num(x_true))[ok]
+        anchored = None
+        if anchored_rho is not None and seed_noise is not None:
+            anchored = anchored_two_lobe_crps(
+                rho=anchored_rho, magnitude=magnitude, x_true=x_true, width=float(np.median(sigma))
+            )[ok]
+        outcome = (x_true[ok] < 0).astype(float)
         out[version] = {
-            "sign": sign_probability_bar(prob=pneg[ok], outcome=(x_true[ok] < 0).astype(float)),
-            "crps": signed_crps_bar(soft=soft, hard=hard),
+            "sign": sign_probability_bar(prob=pneg[ok], outcome=outcome),
+            "sign_mixture": sign_probability_bar(
+                prob=pi[:, 0][ok], outcome=outcome
+            ),  # truncated lobes: P(X < 0) is pi_0
+            "crps": signed_crps_bar(
+                soft=soft, hard=hard, anchored=anchored, seed_noise=seed_noise or 0.0
+            ),
+            "second_half_pending": seed_noise is None,
         }
     out["gap"] = {
         "reliability": out["filtered"]["sign"]["reliability"]

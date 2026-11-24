@@ -97,7 +97,13 @@ def hindsight_rho(*, pw: ProbeWorld, p: np.ndarray) -> np.ndarray:
     return out[pw.scored_days]
 
 
-def hindsight_bars(*, pw: ProbeWorld, p: np.ndarray) -> dict[str, float | bool]:
+def hindsight_bars(
+    *,
+    pw: ProbeWorld,
+    p: np.ndarray,
+    anchored_rho: np.ndarray | None = None,
+    seed_noise: float | None = None,
+) -> dict[str, float | bool]:
     """Return the sign-probability and signed-CRPS bars of the `K = 0` model, smoothed and filtered, flattened.
 
     Scored on the gated half-hours of the scored days outside the 2-point dead band.
@@ -109,7 +115,20 @@ def hindsight_bars(*, pw: ProbeWorld, p: np.ndarray) -> dict[str, float | bool]:
     x_full[pw.scored_days] = np.where(
         pw.u[pw.scored_days] >= sign.U_MIN, pw.x_true[pw.scored_days], np.nan
     )
-    res = bars.both_versions(post=post, spec=spec, x_true=x_full[days].reshape(-1))
+    mag = np.nan_to_num(pw.v[days]).reshape(-1)  # the observed magnitude, never the truth
+    anch = None
+    if anchored_rho is not None:
+        full = np.full(pw.v.shape, np.nan)
+        full[pw.scored_days] = anchored_rho
+        anch = full[days].reshape(-1)
+    res = bars.both_versions(
+        post=post,
+        spec=spec,
+        x_true=x_full[days].reshape(-1),
+        magnitude=mag,
+        anchored_rho=anch,
+        seed_noise=seed_noise,
+    )
     flat: dict[str, float | bool] = {}
     for version in ("smoothed", "filtered"):
         r = res[version]
@@ -118,6 +137,8 @@ def hindsight_bars(*, pw: ProbeWorld, p: np.ndarray) -> dict[str, float | bool]:
         flat[f"{version}_sign_passed"] = bool(r["sign"]["passed"])
         flat[f"{version}_crps_soft"] = float(r["crps"]["soft"])
         flat[f"{version}_crps_passed"] = bool(r["crps"]["passed"])
+        flat[f"{version}_reliability_mixture_p"] = float(r["sign_mixture"]["reliability"])
+        flat[f"{version}_second_half_pending"] = bool(r["second_half_pending"])
     flat["gap_reliability"] = float(res["gap"]["reliability"])
     flat["gap_crps"] = float(res["gap"]["crps"])
     return flat
@@ -446,7 +467,7 @@ def run_worlds(
                 "scale": scale,
                 "host_scale": hscale,
                 "reference": "720_hindsight_bars",
-                **hindsight_bars(pw=pw, p=_safe(pw.p)),
+                **hindsight_bars(pw=pw, p=_safe(pw.p), anchored_rho=keep.get("anchored")),
             }
         )
         if level == 0.0:

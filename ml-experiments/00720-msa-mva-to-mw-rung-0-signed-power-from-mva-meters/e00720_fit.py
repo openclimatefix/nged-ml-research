@@ -1,4 +1,4 @@
-"""Experiment 720: fitting the demand mean and the residual of the hindsight model from anchor rows.
+# ruff: noqa: E501
 
 All arrays are `(n_days, 48)` in points of capacity. The demand mean `f` is a ridge regression of
 gross demand `g = p + v` on half-hour of day by day type and on temperature (a linear and a hinge
@@ -64,15 +64,16 @@ def fit_demand_mean(
 
 
 def fit_residual(*, g: np.ndarray, f: np.ndarray, rows: np.ndarray) -> tuple[float, float]:
-    """Return `(phi, sigma_r)` from anchor residuals at consecutive half-hours of one day."""
+    """Return `(phi, sigma_r)` from anchor residuals at consecutive half-hours of one day; `phi` is not capped (up to 0.999)."""
     res = np.where(rows & np.isfinite(g), g - f, np.nan)
     a, b = res[:, :-1].reshape(-1), res[:, 1:].reshape(-1)
     ok = np.isfinite(a) & np.isfinite(b)
     if ok.sum() < 50:
         return 0.9, 1.0
-    phi = float(np.clip(np.corrcoef(a[ok], b[ok])[0, 1], 0.0, PHI_MAX))
+    phi_raw = float(np.clip(np.corrcoef(a[ok], b[ok])[0, 1], 0.0, 0.999))
     sd = float(np.nanstd(res))
-    return phi, max(sd * float(np.sqrt(1.0 - phi**2)), 0.05)
+    # the innovation scale uses the capped value; `k0_spec` sees the raw value and repeats at 81 bins above the cap
+    return phi_raw, max(sd * float(np.sqrt(1.0 - min(phi_raw, PHI_MAX) ** 2)), 0.05)
 
 
 def k0_spec(*, phi: float, sigma_r: float, q: float, n_bins: int = 41) -> hmm.HmmSpec:

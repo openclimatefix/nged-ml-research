@@ -268,6 +268,13 @@ def summarise(
     }
 
 
+def mixture_p_negative(*, pi: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> np.ndarray:
+    """Return `P(X < 0)` of a two-component Gaussian mixture, `(T,)`."""
+    from scipy.stats import norm
+
+    return (pi * norm.cdf(-mu / sigma)).sum(axis=1)
+
+
 def two_lobe_mixture(
     *, post: Posterior, spec: HmmSpec, version: str = "smoothed", extra_var: float = 0.0
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -276,6 +283,10 @@ def two_lobe_mixture(
     Component 0 is the negative lobe and component 1 the positive lobe. Each lobe is moment-matched
     to the posterior mass on its side of zero, with variance `d²/12 + σ_e² + extra_var` added.
     Arrays have shape `(T, 2)`. An empty lobe gets weight `1e-12` and the other lobe's mean.
+
+    The Gaussian lobes leak mass across zero (by up to 0.15 in a lobe close to zero), so the mixture's own
+    `P(X < 0)` differs from the weight of the negative lobe. `signed_quantiles_of` therefore truncates each
+    lobe at zero, which keeps `P(X < 0)` equal to the posterior's.
     """
     gamma = post.smoothed if version == "smoothed" else post.filtered
     x = post.x_state
@@ -296,13 +307,39 @@ def two_lobe_mixture(
     empty = out_pi < 1e-9
     other = out_mu[:, ::-1]
     out_mu = np.where(empty, other, out_mu)
-    return out_pi, out_mu, np.sqrt(out_var)
+    sigma = np.sqrt(out_var)
+    return out_pi, out_mu, sigma
+
+
+def truncated_signed_quantiles(*, pi: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> np.ndarray:
+    """Return the 11 signed quantiles of a two-lobe mixture whose lobes are truncated at zero, `(T, 11)`.
+
+    Lobe 0 is the Gaussian `N(mu0, sigma0)` restricted to `x < 0`, and lobe 1 the Gaussian restricted to
+    `x >= 0`, each renormalised, so `P(X < 0)` is exactly `pi[:, 0]`.
+    """
+    from scipy.stats import norm
+
+    a0 = np.maximum(norm.cdf(-mu[:, 0] / sigma[:, 0]), 1e-12)
+    b1 = norm.cdf(-mu[:, 1] / sigma[:, 1])
+    c1 = np.maximum(1.0 - b1, 1e-12)
+
+    def cdf(x: np.ndarray) -> np.ndarray:
+        neg = np.where(x < 0.0, norm.cdf((x - mu[:, 0]) / sigma[:, 0]) / a0, 1.0)
+        pos = np.where(x < 0.0, 0.0, (norm.cdf((x - mu[:, 1]) / sigma[:, 1]) - b1) / c1)
+        return pi[:, 0] * np.minimum(neg, 1.0) + pi[:, 1] * np.clip(pos, 0.0, 1.0)
+
+    n = pi.shape[0]
+    bound = float(np.max(np.abs(mu) + 8.0 * sigma)) + 1.0
+    out = np.empty((n, len(fold.TAUS_11)))
+    for k, tau in enumerate(fold.TAUS_11):
+        out[:, k] = fold._bisect(cdf=cdf, tau=tau, lo=np.full(n, -bound), hi=np.full(n, bound))
+    return out
 
 
 def signed_quantiles_of(*, post: Posterior, spec: HmmSpec, version: str = "smoothed") -> np.ndarray:
-    """Return the 11 signed quantiles of the two-lobe distribution, `(T, 11)`."""
+    """Return the 11 signed quantiles of the two-lobe distribution with lobes truncated at zero, `(T, 11)`."""
     pi, mu, sigma = two_lobe_mixture(post=post, spec=spec, version=version)
-    return fold.signed_quantiles(pi=pi, mu=mu, sigma=sigma)
+    return truncated_signed_quantiles(pi=pi, mu=mu, sigma=sigma)
 
 
 def signed_crps(*, quantiles: np.ndarray, truth: np.ndarray) -> np.ndarray:
