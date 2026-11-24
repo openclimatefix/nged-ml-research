@@ -186,10 +186,10 @@ descriptive. During the event C2 covers less than C0 at both Primaries (D16 day4
 ## Labelled events (label not verified by the power readings)
 
 These are NGED's labelled events of 3 days or more that fall in a fold month with stored forecasts
-(11 events; the page draws the 6 at Primaries other than D8). The dashed blue line is the observed power minus the labelled
-depth, which is an estimate of the NRA if the label were right. **NGED's labels are known to be
-imperfect, so a plot where the forecast does not follow the label is not an error.** The status
-comes from [experiment
+(11 events; the page draws the 6 at Primaries other than D8). The dashed blue line is the observed
+power minus the labelled depth, which is an estimate of the NRA if the label were right.
+**NGED's labels are known to be imperfect, so a plot where the forecast does not follow the label
+is not an error.** The status comes from [experiment
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/):
 only event 55 is verified, and event 146's label has the wrong dates and sign. "Not seen by the
 power rule" is the status that [experiment
