@@ -354,8 +354,8 @@ one run, so a stage that hit the first cap is not trained twice.
   same stored curves that the test above then checks, so the test checks the code and is not
   independent evidence for the rule. Its margins are thin. Arm `HT` in world WT at seed 0 fires at a
   share of descent of 0.061 against 0.05. Arm `H` in world WN at seed 1 sits at 0.048 and 0.66 noise
-  units, just under both thresholds, and it is left out of the quiet set so that the test does not
-  rest on a curve that close to the thresholds. The known-answer curves are single-stage fits that
+  units, just under both thresholds. The plan leaves it out of the quiet set and records no reason for
+  doing so, so the quiet set is chosen after the fact, and the test does not cover that curve. The known-answer curves are single-stage fits that
   train the `HT` gains with the trunk, so they stand in for stage 1 only if `a` and `c` train there.
 Every fit's stopping pass per stage, its flag, and the learned gain of each new path as a share of
 its reachable range are printed and appear in the write-up.
