@@ -460,6 +460,8 @@ overcast days.
   24:00 of that date, so a same-day start never falls after its end. An end at 00:00 on a later date
   than the start stays at 00:00. Second, a start with no logged end covers the local calendar day of
   the start, from local 00:00 to local 24:00, whether the start is timed or not. A start or end
+  in the spring-forward hour, a local time that does not exist, is shifted forward to the next
+  valid instant (local 02:00) and counted, so its row still masks. A start or end
   that parses to a year outside 2000 to 2100 (a two-digit year such as "25" reads as year 25) is an
   error: it is counted as implausible and treated as a missing time. Windows whose end still
   precedes their start are counted and listed in the check file and are not masked, and the file
@@ -481,7 +483,9 @@ overcast days.
   approval. A start that is refused or fails the launch check writes its run log to a separate
   file named `run_log_<job>_refused_<time>.json`, and never overwrites the run log of an earlier
   attempt. The folder of an archived attempt is named `attempt_<job>_<n>`, so each job's attempts
-  are numbered on their own.
+  are numbered on their own. The old marker is copied into that folder and then replaced, never
+  moved, and a start whose archive folder already exists, or whose marker is unreadable, is
+  refused, so a crash part-way through a start cannot reset the counter.
 - **[Design lead] Days dropped by a farm's gaps:** a gap or dropout in the injected farm's series on
   a lit half-hour drops the whole day from the injected world, because the world has no reading
   there. Job W2 writes, for each injected farm, the number of days of the later span that its gaps

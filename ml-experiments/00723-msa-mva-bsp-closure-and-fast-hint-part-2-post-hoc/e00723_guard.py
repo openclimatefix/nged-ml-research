@@ -171,9 +171,13 @@ def begin_attempt(
     approval = ""
     if marker.is_file():
         try:
-            previous = int(json.loads(marker.read_text()).get("attempt", 1))
-        except json.JSONDecodeError, ValueError, TypeError:
-            previous = 1
+            previous = int(json.loads(marker.read_text())["attempt"])
+        except (json.JSONDecodeError, ValueError, TypeError, KeyError) as exc:
+            msg = (
+                f"the attempt marker of job {job} is unreadable or has no attempt number; "
+                "the manager must repair it before the job can start"
+            )
+            raise JobRefusedError(msg) from exc
         approval = environment.get(RERUN_APPROVAL_ENV, "").strip()
         if approval != f"{job}:{previous + 1}":
             msg = (
@@ -182,10 +186,23 @@ def begin_attempt(
                 f"'{job}:{previous + 1}' in the environment variable {RERUN_APPROVAL_ENV}"
             )
             raise JobRefusedError(msg)
-    archive_outputs(
-        names=(*names, marker.name), private_names=private_names, out_dir=out_dir,
-        private_dir=out_dir / "PRIVATE", folder_name=f"attempt_{job}_{previous}",
+    archive = out_dir / f"attempt_{job}_{previous}"
+    if marker.is_file() and archive.exists():
+        msg = (
+            f"the archive folder {archive.name} of job {job} already exists (an earlier start "
+            "stopped part-way); the manager must inspect it before the job can start"
+        )
+        raise JobRefusedError(msg)
+    moved = archive_outputs(
+        names=names, private_names=private_names, out_dir=out_dir,
+        private_dir=out_dir / "PRIVATE", folder_name=archive.name,
     )  # fmt: skip
+    if marker.is_file():
+        # Copy, never move, the old marker, so that a crash before the new marker is written
+        # leaves the counter in place.
+        folder = moved if moved is not None else archive
+        folder.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(marker, folder / marker.name)
     attempt = previous + 1
     payload = json.dumps({"job": job, "attempt": attempt, "approval": approval}, sort_keys=True)
     atomic_write(path=marker, write=lambda tmp: tmp.write_text(payload))

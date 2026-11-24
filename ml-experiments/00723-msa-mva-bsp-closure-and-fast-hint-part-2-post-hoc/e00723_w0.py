@@ -187,19 +187,39 @@ def _parse_local(series: pl.Series) -> tuple[pl.DataFrame, pl.Series]:
     return pl.DataFrame({"local": local, "date_only": date_only.fill_null(False)}), implausible
 
 
-def _local_to_utc(series: pl.Series) -> pl.Series:
-    """Return naive local (Europe/London) times as naive UTC; a time in the spring-forward gap is null."""
-    return (
-        series.dt.replace_time_zone(LOCAL_ZONE, ambiguous="earliest", non_existent="null")
-        .dt.convert_time_zone("UTC")
-        .dt.replace_time_zone(None)
+def _local_to_utc(series: pl.Series) -> tuple[pl.Series, pl.Series]:
+    """Return naive local (Europe/London) times as naive UTC, and a flag for the times that do not exist.
+
+    A local time in the spring-forward hour does not exist. Such a time is shifted forward to the
+    next valid instant, local 02:00 that day (01:00 UTC), and flagged, so that its row still masks.
+    An ambiguous time in the autumn hour takes its earlier reading.
+    """
+    frame = pl.DataFrame({"t": series})
+    exact = frame.select(
+        pl.col("t").dt.replace_time_zone(LOCAL_ZONE, ambiguous="earliest", non_existent="null")
+    ).to_series()
+    gap = exact.is_null() & series.is_not_null()
+    shifted = frame.select(
+        pl.col("t")
+        .dt.truncate("1h")
+        .dt.offset_by("1h")
+        .dt.replace_time_zone(LOCAL_ZONE, ambiguous="earliest", non_existent="null")
+    ).to_series()
+    both = (
+        pl.DataFrame({"a": exact, "b": shifted, "g": gap})
+        .select(pl.when(pl.col("g")).then(pl.col("b")).otherwise(pl.col("a")))
+        .to_series()
     )
+    return both.dt.convert_time_zone("UTC").dt.replace_time_zone(None), gap
 
 
 def window_times(
     *, start: pl.Series, end: pl.Series, end_date_only: pl.Series
-) -> tuple[pl.Series, pl.Series]:
-    """Return the start and end of every window as naive UTC, from naive local start and end cells.
+) -> tuple[pl.Series, pl.Series, pl.Series, pl.Series]:
+    """Return the start and end of every window as naive UTC, and a flag for each that does not exist.
+
+    The flags mark a start or an end that falls in the spring-forward hour and was shifted forward
+    to the next valid instant (see `_local_to_utc`). The inputs are naive local start and end cells.
 
     RULED (design lead): a workbook stores a date as a datetime at midnight, so two per-row rules
     read a date with no time.
@@ -226,7 +246,9 @@ def window_times(
         .then(pl.col("e").dt.truncate("1d").dt.offset_by("1d"))
         .otherwise(pl.col("e")),
     )
-    return _local_to_utc(out["s"]), _local_to_utc(out["e"])
+    start_utc, start_gap = _local_to_utc(out["s"])
+    end_utc, end_gap = _local_to_utc(out["e"])
+    return start_utc, end_utc, start_gap, end_gap
 
 
 def windows_with_diagnostics(
@@ -240,8 +262,10 @@ def windows_with_diagnostics(
     no start word. A time with no zone is read as Europe/London. The window runs from the start to
     the end, with the two per-row rules of `window_times` for a date with no time and for a start
     with no end. A cell that parses to nothing (a text such as "ongoing") is a missing time, and a
-    row whose start cannot be parsed is skipped. The diagnostics count the rows with a start that
-    does not parse, an end that does not parse, a time outside `PLAUSIBLE_YEARS`, an end that
+    row whose start cannot be parsed is skipped. A start or an end in the spring-forward hour (a
+    local time that does not exist) is shifted forward to the next valid instant and counted. The
+    diagnostics count the rows with a start that does not parse, an end that does not parse, a time
+    outside `PLAUSIBLE_YEARS`, a time that does not exist, an end that
     precedes its start (skipped), and a window that lies wholly outside the grid.
 
     Args:
@@ -264,7 +288,7 @@ def windows_with_diagnostics(
         diag: dict[str, Any] = {
             "sheet": sheet_name, "substation_column": sub, "start_column": beg, "end_column": end,
             "n_rows": frame.height, "n_rows_start_parsed": 0, "n_rows_matched": 0,
-            "n_rows_start_not_parsed": 0, "n_rows_end_not_parsed": 0, "n_rows_time_implausible": 0,
+            "n_rows_start_not_parsed": 0, "n_rows_end_not_parsed": 0, "n_rows_time_implausible": 0, "n_rows_time_nonexistent": 0,
             "n_rows_end_before_start": 0, "n_windows_outside_grid": 0, "used": False,
         }  # fmt: skip
         diagnostics.append(diag)
@@ -282,7 +306,7 @@ def windows_with_diagnostics(
                 }
             )
             end_bad = pl.Series([False] * frame.height)
-        begin, finish = window_times(
+        begin, finish, start_gap, end_gap = window_times(
             start=start_cells["local"], end=end_cells["local"], end_date_only=end_cells["date_only"]
         )
         # A start and an end that both survive the rules give the window; compare in UTC.
@@ -297,6 +321,7 @@ def windows_with_diagnostics(
                 (frame[end].is_not_null() & end_cells["local"].is_null() & ~end_bad).sum()
             )
         diag["n_rows_time_implausible"] = int((start_bad | end_bad).sum())
+        diag["n_rows_time_nonexistent"] = int((start_gap | end_gap).sum())
         matched_rows: set[int] = set()
         for label, number in numbers.items():
             idx = [
@@ -307,9 +332,6 @@ def windows_with_diagnostics(
             matched_rows.update(idx)
             for i in idx:
                 b_t, e_t = begin[i], finish[i]
-                if e_t is None:  # an end in the spring-forward gap
-                    diag["n_rows_end_not_parsed"] += 1
-                    continue
                 if e_t < b_t:
                     diag["n_rows_end_before_start"] += 1
                     continue

@@ -748,3 +748,68 @@ def test_a_two_digit_year_is_an_error_and_a_window_outside_the_grid_is_counted()
     assert diag[0]["n_rows_start_not_parsed"] == 0
     assert diag[0]["n_windows_outside_grid"] == 1  # the window of 2001 lies before the grid
     assert len(wins["D1"]) == 1
+
+
+def test_a_time_in_the_spring_forward_hour_is_shifted_to_the_next_valid_instant_and_counted():
+    # On 2025-03-30 local time jumps from 01:00 to 02:00, so 01:30 does not exist; the next valid
+    # instant is local 02:00, which is 01:00 UTC.
+    sheet = sheet_of(
+        numbers=[10, 10],
+        starts=[datetime(2025, 3, 30, 1, 30), datetime(2025, 3, 30, 0, 30)],
+        ends=[datetime(2025, 3, 30, 5, 0), datetime(2025, 3, 30, 1, 45)],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert len(wins["D1"]) == 2  # neither row is dropped
+    assert diag[0]["n_rows_time_nonexistent"] == 2
+    assert diag[0]["n_rows_end_not_parsed"] == 0
+    assert wins["D1"][0] == (
+        _utc_row(year=2025, month=3, day=30, hour=1),
+        _utc_row(year=2025, month=3, day=30, hour=4),
+    )
+    # The end in the gap is local 02:00, which is 01:00 UTC.
+    assert wins["D1"][1] == (
+        _utc_row(year=2025, month=3, day=30, hour=0.5),
+        _utc_row(year=2025, month=3, day=30, hour=1),
+    )
+
+
+def _marker_path(tmp_path: Path) -> Path:
+    return tmp_path / guard.attempt_marker_name(job="w0")
+
+
+def test_a_crash_between_the_archive_and_the_new_marker_does_not_reset_the_counter(
+    tmp_path, monkeypatch
+):
+    names = ("o.csv",)
+    guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env={})
+    (tmp_path / "o.csv").write_text("one")
+    approved = {guard.RERUN_APPROVAL_ENV: "w0:2"}
+
+    def boom(**_: object) -> None:
+        raise OSError("disk full")
+
+    with monkeypatch.context() as m:
+        m.setattr(guard, "atomic_write", boom)
+        with pytest.raises(OSError, match="disk full"):
+            guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env=approved)
+    # The old marker is still in place (it was copied, not moved), so the counter is intact.
+    assert json.loads(_marker_path(tmp_path).read_text())["attempt"] == 1
+    assert (tmp_path / "attempt_w0_1" / _marker_path(tmp_path).name).is_file()
+    # An unapproved start is refused, and an approved one is refused with a JobRefusedError
+    # naming the half-made archive, not a raw FileExistsError.
+    with pytest.raises(guard.JobRefusedError):
+        guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env={})
+    with pytest.raises(guard.JobRefusedError, match="attempt_w0_1"):
+        guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env=approved)
+
+
+@pytest.mark.parametrize(
+    "text", ["{not json", '{"attempt": null}', '{"job": "w0"}', '{"attempt": "x"}']
+)
+def test_a_corrupt_marker_or_a_null_attempt_is_a_refusal_not_a_reset(tmp_path, text):
+    _marker_path(tmp_path).write_text(text)
+    approved = {guard.RERUN_APPROVAL_ENV: "w0:2"}
+    for env in ({}, approved):
+        with pytest.raises(guard.JobRefusedError):
+            guard.begin_attempt(job="w0", names=("o.csv",), out_dir=tmp_path, env=env)
+    assert _marker_path(tmp_path).read_text() == text
