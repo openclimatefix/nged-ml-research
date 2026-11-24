@@ -53,81 +53,89 @@ decision_rule: >-
   with fewer than 20 resampling units, which is every reading here, widens its interval about the
   point estimate by the ratio of the Student t quantile to the normal quantile at 98.33%, with B - 1
   as the degrees of freedom, and by the square root of B / (B - 1), with B the Kish effective number
-  of blocks. The folds are not counted again as degrees of freedom, because the two-stage resampler
-  already carries the fold-level clustering. Both choices were fixed before any rung 1 data were
-  read. G1: signed CRPS on the reverse-flow rows of `W2` (rows whose signed truth is below zero,
-  injected or real), `SG-A` minus `SG-0`, has a point estimate at or below -MDE and an upper
-  interval end below zero. MDE is the minimum detectable effect, the larger of 0.404 points of
-  effective capacity (experiment 420's rotation r1 figure) and the absolute difference between the
-  two seeds of `SG-0` on fold 2026-05, taken as the signed CRPS on the reverse-flow rows of the
-  hidden pair pooled over both Primaries. The MDE is written to a file that refuses to be
-  overwritten before any contrast is compared with a bar. G2: `SG-A` minus its shifted-sky placebo
-  on the same rows has the same bar. G3, no harm in `W0`: signed CRPS over all rows of the hidden
-  pair, `SG-A` minus `P0`, read on the plain `W0` fits (seeds 0 and 1) and on the `SG-A-open` fits
-  (the export gate forced open, seed 0, paired with `P0` seed 0), against three limits on each of
-  the two readings, which makes six limit checks. The recommended limits are +0.10 points pooled
-  over the two Primaries and +0.20 at each Primary, each read against the point estimate (decision
-  8, Option A). They are pending the maintainer's ruling, which also covers the way a limit is read,
-  and no fit runs, and no verdict row binds on G3, until the maintainer rules. A synthetic world
-  precedes the real worlds. `SG-A` passes it when, in both seeds, its sign accuracy outside a
-  2-point dead band is at least 0.95 at the two exporting synthetic Primaries, and, with the export
-  gate forced open, it calls reverse flow on under 1% of sunny midday half-hours at the two other
-  Primaries. Its area under the receiver operating characteristic curve for the sign posterior `ρ`
-  must also exceed that of `SG-A-S` by at least 0.10 (rung 0b's own bar, `V1_AUC_GAP`), on distinct
-  history tokens of the two exporting Primaries whose real shortwave likelihood `u` is at least 0.3
-  and which lie outside the dead band, in each seed. Two checks run before any synthetic fit, and
-  the maintainer confirms the margin (decision 7). The reachability check requires a sky-blind rule
-  that knows the noise-free demand exactly to leave an area at least 0.10 plus 3 standard errors
-  below 1. When it fails, a 5-point day offset of demand noise is added to the world and the check
-  is run once more. The noise check requires 0.10 to be at least 3 standard errors of the area
-  difference, by the correlated form of Hanley and McNeil with an assumed correlation of 0 between
-  the two areas, at the number of distinct days and at assumed areas of 0.95 and 0.85. An area
-  computed on fewer than 30 tokens of either class is `not evaluable`. A stage is flagged `stopped
-  while falling` by the rule of the section on the training budget, which reads the flags of `SG-A`
-  alone. Verdict: the first row that matches, and every combination of readings reaches exactly one
-  row. (0) Stopped, no verdict: later fits stay unrun by design because the manager halts the line
-  (at the quick look's harm stop, or by declining a family of fits), a check before the first fit
-  fails (the Stage 0 test of the flag, the power check of G3, the reachability check after the
-  demand noise has been added, or the noise check of the margin), the maintainer stops the line when
-  Branch B returns decision 2, an area of the synthetic world is `not evaluable`, or decision 2, 3,
-  7, or 8 is still unconfirmed when the first wave would start. A correctness failure found at any
-  time is recorded in the first line of the report. (1) `invalid`: a correctness check fails (the
-  holdout guard, the fold point of the loss, the origin-time weather assertion, the no-two-worlds
-  figure guard, or a known-answer test on synthetic arrays). (2) The synthetic world fails: the line
-  stops before any real-fold fit, and the verdict is `inconclusive` when any fit of `SG-A` hit the
-  400-pass cap, and `not supported` when every fit stopped by patience. (3) `failed`: a fit raised
-  and was not rerun under the rerun rule, or a fit that a counted reading needs is missing although
-  no stop of row 0 or row 2 applies, and no row above applies. (4) `not supported`: G3 fails on the
-  plain fits or on `SG-A-open`, and the line stops under experiment 420's registered rule of no
-  further gates or capacity priors. (5) `supported`: G1, G2, and G3 pass. (6) `inconclusive`: G3 is
-  `unresolved`. (7) `inconclusive`: G3 passes, G1 or G2 misses, and at least one counted stage of an
-  `SG-A` fit in `W2` is flagged, with the counts reported. (8) `not supported`: G3 passes, G1
-  misses, and no counted stage of an `SG-A` fit in `W2` is flagged; the output-only result of `SG-0`
-  is reported. (9) `inconclusive`: G3 passes, G1 passes, G2 misses, and no counted stage of an
-  `SG-A` fit in `W2` is flagged, whether or not the fits of `SG-0` or `SG-A-S` are flagged. The
-  comparators' flags are never read, because an under-trained comparator only makes a contrast
-  easier to pass. Treatment minus `P0` on the reverse-flow rows, `S`, G4 (the folded CRPS at the
-  eight MVA-only Primaries from the same fits), and every share of the gap from `P0` to `S` are
-  read-outs with no bar, and no verdict row rests on them. The futility test decides only whether
-  seeds 2 to 4 run. Their result is a pre-registered secondary read, reported beside the verdict,
-  and it cannot change any verdict, so no decision is read twice. A rerun is the same attempt only
-  when a fit raised or a check that reads no bar statistic fails before the fix and passes after the
-  fix, the fix changes no constant, an Opus review confirms the fix, and both outputs are kept.
-  `inconclusive` and `not supported` are never rerun. Named constants (each a `Final` of
-  `e00721_core.py`, set before any real data are read): 0.404; 0.10 pooled and 0.20 per Primary (the
-  recommended limits of G3, pending decision 8); 0.95 (sign accuracy); 1%; 2 points; 28 days; 0.3
-  (the gate's `u_min` and the likelihood floor of the margin); 400 and 30 (synthetic passes and
-  patience); 98.33%; 2.0 (injection level); 10 days (the block length); 20 (the minimum number of
-  resampling units); 10 passes (the noise window); 150 passes (the cap of the continuation); 0.5 and
-  0.05 (the flag's noise multiple and share of descent); 2% (the plateau false-flag ceiling of the
-  Stage 0 test); 0.80 (the power of the G3 check); 0.10 (the area margin, which does not bind until
-  decision 7 is confirmed); 30 tokens (the smallest class); 0.20 (the harm limit at the quick look);
-  0.20 (Branch B's threshold on the interim G1 point estimates, a separate constant fixed before any
-  data); 3 (the standard errors that the reachability and noise checks require); 0.95 and 0.85 (the
-  assumed areas of the noise check) and 0 (its assumed correlation); 5 points (the demand-noise day
-  offset); 60 and 120 passes with patience 8 (the real-fold budget); 0.7 and 1.3 (the capacity
-  sensitivity); 0.5 (the probability that a supervised sample's history rows are folded); and -4
-  (the head's starting bias).
+  of blocks. Each counted reading uses 20,000 resamples and a fixed generator seed (both named
+  constants below), and the power check of G3 runs once with them. The folds are not counted again
+  as degrees of freedom, because the two-stage resampler already carries the fold-level clustering,
+  and the page applies no fold-count correction on top of the two-stage draw. The resampler and the
+  widening were fixed before any rung 1 data were read. G1: signed CRPS on the reverse-flow rows of
+  `W2` (rows whose signed truth is below zero, injected or real), `SG-A` minus `SG-0`, has a point
+  estimate at or below -MDE and an upper interval end below zero. MDE is the minimum detectable
+  effect, the larger of 0.404 points of effective capacity (experiment 420's rotation r1 figure) and
+  the absolute difference between the two seeds of `SG-0` on fold 2026-05, taken as the signed CRPS
+  on the reverse-flow rows of the hidden pair pooled over both Primaries. The MDE is written to a
+  file that refuses to be overwritten before any contrast is compared with a bar. G2: `SG-A` minus
+  its shifted-sky placebo on the same rows has the same bar. G3, no harm in `W0`: signed CRPS over
+  all rows of the hidden pair, `SG-A` minus `P0`, read on the plain `W0` fits (seeds 0 and 1) and on
+  the `SG-A-open` fits (the export gate forced open, seed 0, paired with `P0` seed 0), against three
+  limits on each of the two readings, which makes six limit checks. The recommended limits are +0.10
+  points pooled over the two Primaries and +0.20 at each Primary, each read against the point
+  estimate (decision 8, Option A). They are pending the maintainer's ruling, which also covers the
+  way a limit is read, and no fit runs, and no verdict row binds on G3, until the maintainer rules.
+  A synthetic world precedes the real worlds. `SG-A` passes it when, in both seeds, its sign
+  accuracy outside a 2-point dead band is at least 0.95 at the two exporting synthetic Primaries,
+  and, with the export gate forced open, it calls reverse flow on under 1% of sunny midday
+  half-hours at the two other Primaries. Its area under the receiver operating characteristic curve
+  for the sign posterior `ρ` must also exceed that of `SG-A-S` by at least 0.10 (rung 0b's own bar,
+  `V1_AUC_GAP`), on distinct history tokens of the two exporting Primaries whose real shortwave
+  likelihood `u` is at least 0.3 and which lie outside the dead band, in each seed. Two checks run
+  before any synthetic fit, and the maintainer confirms the margin (decision 7). The reachability
+  check requires a sky-blind rule that knows the noise-free demand exactly to leave an area at least
+  0.10 plus 3 standard errors below 1. When it fails, a 5-point day offset of demand noise is added
+  to the world and the check is run once more. The noise check requires 0.10 to be at least 3
+  standard errors of the area difference, by the correlated form of Hanley and McNeil with an
+  assumed correlation of 0 between the two areas, at the number of distinct days and at assumed
+  areas of 0.95 and 0.85. An area computed on fewer than 30 tokens of either class is `not
+  evaluable`. A stage is flagged `stopped while falling` by the rule of the section on the training
+  budget, which reads the flags of `SG-A` alone. Verdict: the first row that matches, and every
+  combination of readings reaches exactly one row. (0) Stopped, no verdict: later fits stay unrun by
+  design because the manager halts the line (at the quick look's harm stop, or by declining a family
+  of fits), a check before the first fit fails (the Stage 0 test of the flag, the power check of G3,
+  the reachability check after the demand noise has been added, or the noise check of the margin),
+  the maintainer stops the line when Branch B returns decision 2, the farm injection at the visible
+  Primaries is not built (decision 4), the manager declines further `SG-A` fits at the continuation
+  floor, an area of the synthetic world is `not evaluable`, or decision 1, 2, 3, 7, or 8 is still
+  unconfirmed when the first wave would start. A fit run without its continuation, after the manager
+  allows it at the floor stop, counts as flagged in rows 7 to 9, because its stage cannot be shown
+  to have converged. A correctness failure found at any time is recorded in the first line of the
+  report. (1) `invalid`: a correctness check fails (the holdout guard, the fold point of the loss,
+  the origin-time weather assertion, the no-two-worlds figure guard, or a known-answer test on
+  synthetic arrays). (2) The synthetic world fails: the line stops before any real-fold fit, and the
+  verdict is `inconclusive` when any fit of `SG-A` hit the 400-pass cap, and `not supported` when
+  every fit stopped by patience. (3) `failed`: a fit raised and was not rerun under the rerun rule,
+  or a fit that a counted reading needs is missing although no stop of row 0 or row 2 applies, and
+  no row above applies. (4) `not supported`: G3 fails on the plain fits or on `SG-A-open`, and the
+  line stops under experiment 420's registered rule of no further gates or capacity priors. (5)
+  `supported`: G1, G2, and G3 pass. (6) `inconclusive`: G3 is `unresolved`. (7) `inconclusive`: G3
+  passes, G1 or G2 misses, and at least one counted stage of an `SG-A` fit in `W2` is flagged, with
+  the counts reported. (8) `not supported`: G3 passes, G1 misses, and no counted stage of an `SG-A`
+  fit in `W2` is flagged; the output-only result of `SG-0` is reported. (9) `inconclusive`: G3
+  passes, G1 passes, G2 misses, and no counted stage of an `SG-A` fit in `W2` is flagged, whether or
+  not the fits of `SG-0` or `SG-A-S` are flagged. The comparators' flags are never read, because an
+  under-trained comparator only makes a contrast easier to pass. Treatment minus `P0` on the
+  reverse-flow rows, `S`, G4 (the folded CRPS at the eight MVA-only Primaries from the same fits),
+  and every share of the gap from `P0` to `S` are read-outs with no bar, and no verdict row rests on
+  them. The futility test decides only whether seeds 2 to 4 run. Their result is a pre-registered
+  secondary read, reported beside the verdict, and it cannot change any verdict, so no decision is
+  read twice. A rerun is the same attempt only when a fit raised or a check that reads no bar
+  statistic fails before the fix and passes after the fix, the fix changes no constant, an Opus
+  review confirms the fix, and both outputs are kept. `inconclusive` and `not supported` are never
+  rerun. Named constants (each a `Final` of `e00721_core.py`, set before any real data are read):
+  0.404; 0.10 pooled and 0.20 per Primary (the recommended limits of G3, pending decision 8); 0.95
+  (sign accuracy); 1%; 2 points (the dead band) and 2 points (the reactive floor `Q`), each with its
+  own name; 28 days; 0.3 (the gate's `u_min` and the likelihood floor of the margin); 400 and 30
+  (synthetic passes and patience); 98.33%; 2.0 (injection level); 10 days (the block length); 20
+  (the minimum number of resampling units); 10 passes (the noise window); 150 passes (the cap of the
+  continuation); 0.5 and 0.05 (the flag's noise multiple and share of descent); 2% (the plateau
+  false-flag ceiling of the Stage 0 test); 0.80 (the power of the G3 check); 0.10 (the area margin,
+  which does not bind until decision 7 is confirmed); 30 tokens (the smallest class); 0.20 (the harm
+  limit at the quick look); 0.20 (Branch B's threshold on the interim G1 point estimates, a separate
+  constant fixed before any data); 3 (the standard errors that the reachability and noise checks
+  require); 0.95 and 0.85 (the assumed areas of the noise check) and 0 (its assumed correlation); 5
+  points (the demand-noise day offset); 60 and 120 passes with patience 8 (the real-fold budget);
+  0.7 and 1.3 (the capacity sensitivity); 0.5 (the probability that a supervised sample's history
+  rows are folded); -4 (the head's starting bias); 20,000 (the bootstrap's resamples) and 721 (its
+  generator seed); and 0.6 GPU-process-hours (the continuation floor). The 6 sub-steps of the
+  injection's interpolation come from experiment 720's code.
 benchmark: >-
   `P0` (the network on the folded readings, read as signed) as the low reference; `S` (signed
   readings given) as the ceiling; `SG-0` (experiment 420's output-only recipe on this network) as
@@ -312,9 +320,9 @@ and one of two guards then applies.
   sign head. Every later stage is refitted from that stage's patience-30 state, so each of the two
   extra fits has a G1 point estimate of its own. The quick look compares the two budgets on the
   held-out folded loss of the hidden pair and on the two interim G1 point estimates. If those two
-  estimates differ by more than 0.20 points, a constant fixed here before any data (it is not
-  derived from the MDE, which is written later), decision 2 returns to the maintainer before the
-  rest of `W2` runs, and the result is row 0 if the maintainer stops the line. This reading is
+  estimates differ by more than 0.20 points, decision 2 returns to the maintainer before the rest of
+  `W2` runs, and the result is row 0 if the maintainer stops the line. The 0.20 is a constant fixed
+  here before any data, and it is not derived from the MDE, which is written later. This reading is
   interim and carries no bar, so it adds no look at the verdict. The two extra fits cost about 0.5
   to 0.8 GPU-process-hours. Rows 7 to 9 then read no flag, and the verdict rows treat every `SG-A`
   fit as unflagged.
@@ -345,11 +353,10 @@ one run, so a stage that hit the first cap is not trained twice.
 - **Where the constants came from.** The constants 0.5, 0.05, and the 2% ceiling were chosen on the
   same stored curves that the test above then checks, so the test checks the code and is not
   independent evidence for the rule. Its margins are thin. Arm `HT` in world WT at seed 0 fires at a
-  share of descent of 0.061 against 0.05. Arm `H` in world WN at seed 1, which is outside the quiet
-  set, sits at 0.048 and 0.66 noise units, just under both thresholds. The known-answer curves are
-  single-stage fits that train the `HT` gains with the trunk, so they stand in for stage 1 only if
-  `a` and `c` train there.
-
+  share of descent of 0.061 against 0.05. Arm `H` in world WN at seed 1 sits at 0.048 and 0.66 noise
+  units, just under both thresholds, and it is left out of the quiet set so that the test does not
+  rest on a curve that close to the thresholds. The known-answer curves are single-stage fits that
+  train the `HT` gains with the trunk, so they stand in for stage 1 only if `a` and `c` train there.
 Every fit's stopping pass per stage, its flag, and the learned gain of each new path as a share of
 its reachable range are printed and appear in the write-up.
 
@@ -363,14 +370,17 @@ passes, that is 112 extra passes, or 0.38 GPU-process-hours per fit and 3.0 for 
 continuation of all three stages would cost 0.68 per fit and 5.4 for the eight, which is why the
 continuation runs only in the stage that Stage 0 fixes.
 
-**The floor of 0.6 is enforced between fits, because a running fit cannot ask the manager
-anything.** A started continuation runs until patience 30 or the cap of 150 passes ends it. Before
-each `SG-A` fit in `W2` starts, the session adds up the continuation time of the fits that have
-finished. When that sum has reached 0.6 GPU-process-hours, the line stops at that fit, and the
+**The floor of 0.6 is enforced between fits, because the session cannot pause a running fit to ask
+the manager.** A started continuation runs until patience 30 or the cap of 150 passes ends it.
+Before each `SG-A` fit in `W2` starts, the session adds up the continuation time of the fits that
+have finished. When that sum has reached 0.6 GPU-process-hours, the line stops at that fit, and the
 session asks the manager before the next fit starts. A fit whose continuation is running when the
-sum passes the floor finishes, and the manager is told afterwards. The spend above the floor is the row
-"The continuation above its floor" of the table of conditional items below.
-
+sum passes the floor finishes, and the manager is told afterwards. The worst case before the manager
+is asked is about 0.98 GPU-process-hours of continuation (the floor plus one running continuation),
+a total of about 14.0. If the manager allows further `SG-A` fits without the continuation, each of
+those fits counts as flagged in rows 7 to 9, fixed here before data, because its stage cannot be
+shown to have converged. If the manager declines the fits, the result is row 0. The spend above the
+floor is the row "The continuation above its floor" of the table of conditional items below.
 **The cost of the larger synthetic budget is inside the design's figure of 0.2 GPU-process-hours
 per fit.** Experiment 713's amended gate, at 400 passes and patience 30, took 4,027 s for 8 stage-1
 fits plus its checks, about 0.14 GPU-process-hours per fit (run log of experiment 713). The figure
@@ -487,7 +497,7 @@ reads seeds 0 and 1 together. In words:
 - **The bootstrap.** The two-stage resampler is written in `e00721_score.py`.
   `studies.bootstrap.bootstrap_difference_at_level` draws its units uniformly from one flat list
   keyed by its `month` column, so relabelling `month` with a fold-and-block identifier would give a
-  flat draw over fold-blocks, which is about 0.78 times as wide as the two-stage draw on the
+  flat draw over fold-blocks, which is about 0.77 times as wide as the two-stage draw on the
   seed-pair null (decision 8). No counted reading uses the function, and no file under
   `src/studies/` changes. Each resample draws one seed, then draws folds with replacement, then
   draws blocks of 10 consecutive valid dates with replacement within each drawn fold, across both
@@ -500,14 +510,19 @@ reads seeds 0 and 1 together. In words:
   counts are under the minimum of 20 resampling units that the page requires, so each interval is
   widened about the point estimate. The first factor is the ratio of the Student t quantile to the
   normal quantile at 98.33%, with B - 1 degrees of freedom and B the Kish effective number of
-  blocks, because the reverse-flow rows gather in the sunny blocks: about 1.20 at B of 11 and 1.15
-  at B of 13.8. The second factor is the square root of B / (B - 1), about 1.05 at 11 and 1.04 at
-  13.8. The two factors together are about 1.26 in `W2` and 1.19 in `W0`. The folds are not counted
-  again as degrees of freedom, because the two-stage resampler already carries the fold-level
-  clustering, and a fold-count correction on top would count it twice. The write-up reports the Kish
-  number of the reverse-flow rows, and states beside every interval that the June valid dates of
-  folds 2026-05 and 2026-06 share weather outcomes across two fits. Both choices were fixed before
-  any rung 1 data were read.
+  blocks, because the reverse-flow rows gather in the sunny blocks: about 1.22 at a Kish B of 10.1
+  (the 11 blocks of `W2`) and 1.15 at a Kish B of 13.8 (the 15 blocks of `W0`). The second factor is
+  the square root of B / (B - 1), about 1.05 at 10.1 and 1.04 at 13.8. The two factors together are
+  about 1.29 in `W2` and 1.19 in `W0`, and both are planning figures, because the counted readings
+  use the Kish number of their own reverse-flow rows. The folds are not counted again as degrees of
+  freedom, because the two-stage resampler already carries the fold-level clustering, and the page
+  applies no fold-count correction on top of the two-stage draw. On the seed-pair null such a
+  correction would change the interval by about 3%. Each reading uses 20,000 resamples and the
+  generator seed 721, and the power check of G3 runs once with them, because the 98.33% tails of the
+  resample move by up to 0.1 points at D5 between runs of 4,000 resamples. The write-up reports the
+  Kish number of the reverse-flow rows, and states beside every interval that the June valid dates
+  of folds 2026-05 and 2026-06 share weather outcomes across two fits. The resampler and the
+  widening were fixed before any rung 1 data were read.
 - **G1, the gain from the history sign.** `SG-A` minus `SG-0`, signed CRPS on the reverse-flow rows
   of `W2`. The bar needs a point estimate at or below -MDE and an upper interval end below zero. The
   MDE is the larger of 0.404 points and the difference between the two seeds of `SG-0` on fold
@@ -546,20 +561,21 @@ that gives no verdict. A stop leaves later fits unrun by design, so row 0 comes 
 missing fit, and fits that a stop of row 0 or row 2 leaves unrun never fall in row 3. The stops are
 the manager's halt (the quick look's harm stop, or a declined family of fits), a failed check before
 the first fit (the Stage 0 test of the flag, the power check of G3, the reachability check after the
-demand noise has been added, or the noise check of the margin), a decision of the maintainer (2, 3,
-7, or 8) that is still unconfirmed when the first wave would start, the maintainer's stop when
-Branch B returns decision 2, and an area of the synthetic world that is `not evaluable`. A
-correctness failure found at any time is recorded in the first line of the report, even when row 0
-gives the verdict. Row 2 (the synthetic world fails) is read before row 3 (`failed`), because a
-failed synthetic world leaves the `W2` and `W0` fits unrun, and the stop is the verdict. Row 3 holds
-a fit that raised and was not rerun, or a needed fit that is missing although no stop applies. Row 7
-sits ahead of rows 8 and 9 because a stage of `SG-A` that stopped while its validation loss was
-still falling must make a G1 or G2 miss `inconclusive`, and not `not supported`. Rows 7 to 9 read
-the flags of `SG-A` alone, because an under-trained `SG-0` or `SG-A-S` only makes its contrast
-easier to pass, so a miss with a flagged comparator is a cleaner negative and not an excuse. Row 6
-sits ahead of rows 7 to 9 so that an `unresolved` G3 reads `inconclusive` whatever G1 and G2 say.
-Row 9 holds one case, G1 passing and G2 missing with `SG-A` unflagged, and `SG-0` or `SG-A-S` may be
-flagged.
+demand noise has been added, or the noise check of the margin), a decision of the maintainer (1, 2,
+3, 7, or 8) that is still unconfirmed when the first wave would start, the maintainer's stop when
+Branch B returns decision 2, a farm injection at the visible Primaries that is not built (decision
+4), the manager's decline of further `SG-A` fits at the continuation floor, and an area of the
+synthetic world that is `not evaluable`. A correctness failure found at any time is recorded in the
+first line of the report, even when row 0 gives the verdict. Row 2 (the synthetic world fails) is
+read before row 3 (`failed`), because a failed synthetic world leaves the `W2` and `W0` fits unrun,
+and the stop is the verdict. Row 3 holds a fit that raised and was not rerun, or a needed fit that
+is missing although no stop applies. Row 7 sits ahead of rows 8 and 9 because a stage of `SG-A` that
+stopped while its validation loss was still falling must make a G1 or G2 miss `inconclusive`, and
+not `not supported`. Rows 7 to 9 read the flags of `SG-A` alone, because an under-trained `SG-0` or
+`SG-A-S` only makes its contrast easier to pass, so a miss with a flagged comparator is a cleaner
+negative and not an excuse. Row 6 sits ahead of rows 7 to 9 so that an `unresolved` G3 reads
+`inconclusive` whatever G1 and G2 say. Row 9 holds one case, G1 passing and G2 missing with `SG-A`
+unflagged, and `SG-0` or `SG-A-S` may be flagged.
 
 **Every combination of readings reaches exactly one row.** With every fit run and no stop, G3
 passes, fails, or is `unresolved`. When G3 fails, all 8 cells of G1, G2, and the flag of `SG-A` fall
@@ -882,7 +898,7 @@ is zero. The null is computed with this page's own recipe: valid-date blocks, a 
 resample with one seed per resample, and the widening of the section "Counted readings and verdict
 rows" about the two-seed point estimate (Kish B of 13.8, 12.8 degrees of freedom).
 
-| Null reading | Splits | Upper-end passes | Point estimates over a limit | Upper end minus point estimate (pooled, D5, D10) |
+| Null reading | Splits | Upper-end passes | Point estimates over a limit (at +0.05 pooled) | Upper end minus point estimate (pooled, D5, D10) |
 |---|---|---|---|---|
 | Plain: two seeds against two | 15 | 0 | 3 | 0.34, 0.62, 0.24 |
 | Open: one seed against one | 20 | 0 | 4 | 0.27, 0.52, 0.21 |
@@ -902,26 +918,32 @@ null readings under Option A at two pooled limits, with +0.20 at each Primary.
 
 | Pooled limit | Plain: pass / fail / unresolved | Open: pass / fail / unresolved | Joint pass rate |
 |---|---|---|---|
-| +0.05 | 12 / 0 / 3 | 16 / 0 / 4 | 0.64 |
-| +0.10 | 15 / 0 / 0 | 18 / 0 / 2 | 0.90 |
+| +0.05 | 12 / 0 / 3 | 16 / 0 / 4 | 0.72 (product 0.64) |
+| +0.10 | 15 / 0 / 0 | 18 / 0 / 2 | 0.90 (product 0.90) |
 
 - **Option A (recommended): read G3 as experiment 420 read B4, with +0.10 pooled and +0.20 at each
   Primary.** G3 passes when every point estimate is within its limit, with the interval reported. G3
   fails only when harm is shown: the lower end of the widened interval is above zero and the point
-  estimate is above its limit. Otherwise G3 is `unresolved`. The joint pass rate is the plain rate
-  times the open rate, because the two readings come from different fits. At +0.10 pooled it is 0.90
-  (15 of 15 plain and 18 of 20 open), and at the design note's +0.05 it is 0.64, which misses the
-  0.80 that the power check requires and would stop the line. At the recommended limits the power
-  check passes at 0.90.
+  estimate is above its limit. Otherwise G3 is `unresolved`. The joint pass rate is counted directly
+  over the 60 assignments of the five stored seeds to the roles that the two readings share (`P0`
+  seed 0, `P0` seed 1, `SG-A-open`, and the two `SG-A` seeds). It is 0.90 at +0.10 pooled (the plain
+  reading passes in 15 of 15 and the open reading in 18 of 20) and 0.72 at the design note's +0.05.
+  The product of the plain and the open pass rates is 0.90 and 0.64, and it is a lower bound,
+  because the two readings share `P0` seed 0. The power check computes the direct count. At +0.05
+  the joint rate of 0.72 still misses the 0.80 that the power check requires, so +0.05 would stop
+  the line, and at the recommended limits the power check passes at 0.90.
 
 - **Option B: keep the upper-end reading with wider limits.** The figures in this option are the
-  writer's reading of the null, and no source states them. A limit equal to the mean gap above would
-  pass about half of the null readings on that check. The limit that 80% of the plain null readings
-  meet on each check alone is about 0.42 points pooled, 0.79 at D5, and 0.33 at D10, and the 95th
-  percentiles are about 0.48, 0.87, and 0.38. The joint pass rate at those 80th percentiles is only
-  0.48 (9 of 15 plain, 16 of 20 open). Limits of +0.45 pooled, +0.85 at D5, and +0.40 at D10 give
-  0.82 (13 of 15 plain, 19 of 20 open), so D10's +0.20 would also have to double. The maintainer
-  would have to accept limits of this width as "no harm".
+  writer's reading of the null, and no source states them. They come from bootstrap runs of 20,000
+  resamples, and they move a little between runs, because with 4 folds the fold-level draw has few
+  distinct outcomes and the 98.33% upper end at D5 lands on a jump. A limit equal to the mean gap
+  above would pass about half of the null readings on that check. The limit that 80% of the plain
+  null readings meet on each check alone is about 0.42 points pooled, 0.78 at D5, and 0.32 at D10,
+  and the 95th percentiles are about 0.50, 0.97, and 0.40. Limits of +0.45 pooled, +0.85 at D5, and
+  +0.40 at D10 give a joint pass rate of 0.74 to 0.78 over three runs, which misses 0.80. Limits of
+  +0.50 pooled, +1.00 at D5, and +0.42 at D10 give 0.89 to 0.95 over three runs, so D5's +0.20 would
+  have to rise fivefold and D10's would double. The maintainer would have to accept limits of this
+  width as "no harm".
 
 The power check of Stage 0 restates the 0.80 target of experiment 420's recipe as the joint
 probability over all six limit checks, computed from the seed-pair null under the option the
@@ -946,10 +968,10 @@ This experiment changes no contract and makes no request to NGED.
   folded readings, and the probe's inputs) gets a read-only smoke test in a capped scope that prints
   no values, before the script's first real run.
 - **Gate 2:** "fits starting" to the manager before each family, and a reply.
-- **Gate 3:** the maintainer has confirmed decisions 2, 3, 7, and 8, which set a training budget,
-  bars, a margin, and the reading of G3 that verdict rows read. The first wave may run only after
-  that confirmation and after both Opus code reviews. Decisions 4 to 6 are ruled, or the manager
-  rules that their defaults stand.
+- **Gate 3:** the maintainer has confirmed decisions 1, 2, 3, 7, and 8, which are the relayed
+  approval and the queue reorder, a training budget, bars, a margin, and the reading of G3 that
+  verdict rows read. The first wave may run only after that confirmation and after both Opus code
+  reviews. Decisions 4 to 6 are ruled, or the manager rules that their defaults stand.
 - **Gate 4:** the code-works check and the first synthetic fit have measured their time per pass
   and their memory, and the memory cap is reset from the measured peak before the second fit.
 
