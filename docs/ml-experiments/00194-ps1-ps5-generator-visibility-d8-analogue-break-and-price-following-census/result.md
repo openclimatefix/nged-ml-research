@@ -67,7 +67,7 @@ advice:
   - >-
     Do not score a D8 forecasting model on 2026 without scoring the periods before and after March
     2026 separately, because the shortfall share
-    falls from 0.29 in January to 0.008 in April (Figure 5).
+    falls from 0.29 in January to 0.008 in April.
   - >-
     Do not read the Embedded Capacity Register's Primary column as the substation whose meter
     records an asset, because the 6 MW engine is registered under D14 but appears in D8's readings
@@ -123,7 +123,8 @@ quantised in units of 2 MW.*
 
 ![D8 shortfall share in experiment 191's scored year against the earlier history](figure_5.svg)
 
-*Figure 5. D8's shortfall share pooled over experiment 191's scored year and over the earlier history.*
+*Figure 5. D8's shortfall share pooled over experiment 191's scored year and over the earlier
+history. The earlier history includes the era in which the shortfall lasts.*
 
 ## Reproduction of the design's numbers (PS1)
 
