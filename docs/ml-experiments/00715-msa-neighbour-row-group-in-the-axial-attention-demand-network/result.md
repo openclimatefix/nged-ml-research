@@ -39,7 +39,8 @@ decision_rule: >-
   the change adds 29% more parameters and six slots of half-hourly rows. A group reads "gain" when
   the interval is below zero and the estimate is at or below -0.03; "small gain" when the interval
   is below zero with the seed guard holding; "no detectable difference" when the interval includes
-  zero and lies inside ±0.094 (six) or ±0.25 (eight); "loss" when the lower end is above zero. The
+  zero and lies inside ±0.094 (the six signed-MW Primaries) or ±0.25 (the eight MVA-only
+  Primaries); "loss" when the lower end is above zero. The
   verdict `supported` needs a gain in both groups, the upper end of N2 below zero in both groups,
   and the four guards in the section "Decision rule and verdict". The injected-world contrasts are
   secondary and change no verdict. Every verdict, headline, and take-home message of this experiment
@@ -113,7 +114,7 @@ The table also lists three experiments on neighbour inputs that ended neither wa
 | 651 | A graph layer between the Candidate's encoders and its mixer, on 29 links | `not supported` (the rewired graph did as well) |
 | 672, 675, 676 | Graph networks that pair the donor and the recipient of a transfer | `not supported`, three times |
 | 117 | Physical parameters tied between interconnected substations | `refuted` |
-| 606 | Neighbour summaries (P7, already in the Candidate) | `partly supported`: follow share 0.119 to 0.035, event-free CRPS 0.068 points worse at the six |
+| 606 | Neighbour summaries (P7, already in the Candidate) | `partly supported`: follow share 0.119 to 0.035, event-free CRPS 0.068 points worse at the six signed-MW Primaries |
 | 462 | Mirrored and unmirrored level changes on the lag network | `inconclusive` |
 | 714 | Hand-built mirror features on injected worlds | Neighbour gain +0.052 (−0.014 to +0.130): inconclusive |
 
@@ -192,12 +193,12 @@ real folds, and neither waiver changes how they are scored.
 
 ## What is compared
 
-**Terms used on this page.** "The host" is the Primary whose demand a sample forecasts. "A neighbour"
-is a Primary that NGED's interconnection table lists as interconnected with the host. "The six" are
-the signed-MW Primaries D5, D9, D10, D11, D14, and D16, and "the eight" are the MVA-only Primaries
-D2, D3, D4, D8, D12, D19, D21, and D22. "A temporary move" is a load transfer from a donor Primary
-to a recipient that later reverts, and "a permanent change" is a level change that stays. "The
-network" always means the axial-attention neural network, and never the electricity network.
+**Terms used on this page.** "The host" is the Primary whose demand a sample forecasts. "A
+neighbour" is a Primary that NGED's interconnection table lists as interconnected with the host. The
+six signed-MW Primaries are D5, D9, D10, D11, D14, and D16, and the eight MVA-only Primaries are D2,
+D3, D4, D8, D12, D19, D21, and D22. "A temporary move" is a load transfer from a donor Primary to a
+recipient that later reverts, and "a permanent change" is a level change that stays. "The network"
+always means the axial-attention neural network, and never the electricity network.
 
 **Arms.**
 
@@ -436,30 +437,34 @@ atomic writes, and a check-in with the manager before the first fit.
 whole origin months as blocks and 100,000 resamples. Three guards stand beside each interval: the t
 interval on the 8 monthly differences at 98.75% excludes zero on the same side; the contrast has the
 same sign for seed 0 alone and for seed 1 alone; and the point estimate is at least twice the
-seed-noise standard error at 2 seeds (0.054 at the six and 0.142 at the eight).
+seed-noise standard error at 2 seeds (0.054 at the six signed-MW Primaries and 0.142 at the eight
+MVA-only Primaries).
 
-**Detectable effect.** With 2 seeds per arm the design detects 0.094 points at the six and 0.25 at
-the eight (0.12 at the eight without fold 2025-11). The planning values come from the Candidate's
-two stored seeds, which differ by a monthly standard deviation of 0.108 at the six and 0.285 at the
-eight, so a contrast has standard error 0.027 and 0.071, and the detectable difference is 3.48
+**Detectable effect.** With 2 seeds per arm the design detects 0.094 points at the six signed-MW
+Primaries and 0.25 at the eight MVA-only Primaries (0.12 at the eight MVA-only Primaries without
+fold 2025-11). The planning values come from the Candidate's two stored seeds, which differ by a
+monthly standard deviation of 0.108 at the six signed-MW Primaries and 0.285 at the eight MVA-only
+Primaries, so a contrast has standard error 0.027 and 0.071, and the detectable difference is 3.48
 standard errors. The scorer prints the noise this experiment actually has, and the decision rule
-keeps the pre-registered values whatever it prints. The expected gain is smaller than the
-detectable difference: experiments 699, 709, and 711 could not resolve 0.03 to 0.07 points.
+keeps the pre-registered values whatever it prints. The expected gain is smaller than the detectable
+difference: experiments 699, 709, and 711 could not resolve 0.03 to 0.07 points.
 
 **Report-only contrasts, at 95%:** N1 against the 5 stored seeds of M* (which lowers the seed-noise
-standard error at the six from 0.027 to about 0.023 without a fit); F4 minus F4-0 and F4-0 minus M*;
-F4-R minus M*; F4 minus F4-T; F4E minus F4; F4 minus the Candidate; every contrast for all 16
-Primaries pooled and for D15 with D18; by lead band, by Primary, by the host's count of neighbours,
-with one Primary left out, and with one month left out; and the normalised MAE of the median beside
-every CRPS contrast. Experiment 713's four load-shift scenarios (all rows; rows outside events and at
-least 7 days after an event; rows inside events; the 7 days after an event ends) are scored for the
-Candidate, M*, F4, and F4-R, with the caveat that NGED's logs may miss events.
+standard error at the six signed-MW Primaries from 0.027 to about 0.023 without a fit); F4 minus
+F4-0 and F4-0 minus M*; F4-R minus M*; F4 minus F4-T; F4E minus F4; F4 minus the Candidate; every
+contrast for all 16 Primaries pooled and for D15 with D18; by lead band, by Primary, by the host's
+count of neighbours, with one Primary left out, and with one month left out; and the normalised MAE
+of the median beside every CRPS contrast. Experiment 713's four load-shift scenarios (all rows; rows
+outside events and at least 7 days after an event; rows inside events; the 7 days after an event
+ends) are scored for the Candidate, M*, F4, and F4-R, with the caveat that NGED's logs may miss
+events.
 
 **Decision rule and verdict.** Each group is read on N1, with D the point estimate and [L, U] the
-98.75% interval, and τ = 0.03 and δ = 0.094 (six) or 0.25 (eight). The group's reading is the first
-row that holds. Every verdict carries the statement that experiment 713's known-answer gate was
-waived, so the warm-start states are not backed by a passing known-answer test (see the section on
-the waiver above); the statement does not change how N1 and N2 are scored.
+98.75% interval, and τ = 0.03 and δ = 0.094 (the six signed-MW Primaries) or 0.25 (the eight
+MVA-only Primaries). The group's reading is the first row that holds. Every verdict carries the
+statement that experiment 713's known-answer gate was waived, so the warm-start states are not
+backed by a passing known-answer test (see the section on the waiver above); the statement does not
+change how N1 and N2 are scored.
 
 | Order | Group reading | Condition |
 |---|---|---|
@@ -674,29 +679,27 @@ dates and no generator's name, identifier, or series.** SVG exports pass through
 - **The most likely result is a tie.** The Candidate's neighbour summaries already cut the follow
   share on injected worlds, random neighbours matched real neighbours three times, and the real
   mirror leaks about a half to substations without readings. The null-key share (plot 3) says
-  whether the network ignored its neighbours or read them without a gain.
-- **The design cannot resolve a gain under 0.094 at the six with 2 seeds.** A real gain of 0.03 to
+  whether the network ignored its neighbours or read them without a gain. - **The design cannot
+  resolve a gain under 0.094 at the six signed-MW Primaries with 2 seeds.** A real gain of 0.03 to
   0.07 would end `small gain` or `inconclusive`. No seed is added after a reading of phase 2,
-  because that would be optional stopping.
-- **The neighbour path may stay near zero.** `W_o` starts at zero and has only stages 2 and 3, about
-  10,000 pairs of Primary and origin day, in which to move. A neighbour path that never moved makes
-  F4 equal M* and proves nothing about neighbours.
-- **The counted arms are never taught the mirror rule,** so S1 is expected to be near zero, and F4-W
-  carries that question on 4 folds and 2 seeds.
-- **F4 minus M* compares a refit with a stored fit.** KN8 and F4-0 measure the run-to-run difference.
-- **Skipping stage 1 means the neighbour path never sees data before 2024-04.**
-- **Eight Primaries report unsigned apparent power,** so a megawatt mirror is approximate at half the
-  panel, and every MVA-only number keeps the label "reactive power assumed zero".
-- **The rewired slots are not matched on capacity, unit, or distance,** and many sit two links from
-  the host, which pushes N2 towards zero.
-- **F4 can forecast a host without readings from its neighbours,** which could account for part of a
-  gain on rows after a telemetry outage; the read-out with all host history masked measures it.
-- **Experiment 713's caveats carry over:** ERA5 history weather is a laboratory shortcut, the
-  read-out's day-type prior is hand-set, and unlogged load shifts sit in the history rows.
-- **This experiment depends on experiment 713, which is unmerged.** The branch is cut from experiment
-  713's branch at commit `3ac110652` or later, and the code hash covers every module of experiment
-  713 that F4 imports and experiment 714's second-generator modules, so a later commit cannot change
-  the experiment silently. Any merge that touches one of the 41 recipe folders changes the hash and
+  because that would be optional stopping. - **The neighbour path may stay near zero.** `W_o` starts
+  at zero and has only stages 2 and 3, about 10,000 pairs of Primary and origin day, in which to
+  move. A neighbour path that never moved makes F4 equal M* and proves nothing about neighbours. -
+  **The counted arms are never taught the mirror rule,** so S1 is expected to be near zero, and F4-W
+  carries that question on 4 folds and 2 seeds. - **F4 minus M* compares a refit with a stored
+  fit.** KN8 and F4-0 measure the run-to-run difference. - **Skipping stage 1 means the neighbour
+  path never sees data before 2024-04.** - **Eight Primaries report unsigned apparent power,** so a
+  megawatt mirror is approximate at half the panel, and every MVA-only number keeps the label
+  "reactive power assumed zero". - **The rewired slots are not matched on capacity, unit, or
+  distance,** and many sit two links from the host, which pushes N2 towards zero. - **F4 can
+  forecast a host without readings from its neighbours,** which could account for part of a gain on
+  rows after a telemetry outage; the read-out with all host history masked measures it. -
+  **Experiment 713's caveats carry over:** ERA5 history weather is a laboratory shortcut, the
+  read-out's day-type prior is hand-set, and unlogged load shifts sit in the history rows. - **This
+  experiment depends on experiment 713, which is unmerged.** The branch is cut from experiment 713's
+  branch at commit `3ac110652` or later, and the code hash covers every module of experiment 713
+  that F4 imports and experiment 714's second-generator modules, so a later commit cannot change the
+  experiment silently. Any merge that touches one of the 41 recipe folders changes the hash and
   refuses the warm start until the diff is read.
 
 ## Method
