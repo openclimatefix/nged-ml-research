@@ -402,6 +402,19 @@ def farm_norm(*, power_mw: np.ndarray, zenith_deg: np.ndarray, ghi: np.ndarray) 
     return np.where(night, 0.0, np.where(~np.isfinite(power) | dropout, np.nan, clipped))
 
 
+def days_dropped_by_gaps(*, norm: np.ndarray, lit: np.ndarray, start: int) -> int:
+    """Return the days of the later span that lose a lit half-hour because the farm's series is NaN.
+
+    `day_stretches` skips a day with one lit half-hour that has no finite reading, so one gap or
+    dropout of the injected farm on a lit half-hour drops the whole day from an injected world.
+    `lit` is the farm's own daylight mask.
+    """
+    day = sky.day_of(n=len(norm))
+    hit = lit & ~np.isfinite(norm)
+    hit[:start] = False
+    return int(np.unique(day[hit]).size)
+
+
 def inject(*, signed_mw: np.ndarray, farm_norm_series: np.ndarray, scale: float) -> np.ndarray:
     """Return the host's signed series with a farm's normalised output added as generation: `X - scale * F`.
 

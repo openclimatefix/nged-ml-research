@@ -270,7 +270,7 @@ depend only on the sizes of two changes are allowed. Job W0's estimate is under 
 | Counts at D10 | The export hours and export days, with the base stated, as a recount of the review's 77 hours on 36 days |
 | Sensor audit | The three conditions of the decision rule (condition 1 with the share of every site, so that one broken `u_clear` shows), the polygon-filtered pair table, the powered pairs with each pair's count of reference rows for the injection level, D12's and D15's sensor membership, and job 1's class for the farm inside D15's polygon, as a class only, with whether the farm is an add-back candidate at D15 |
 | Share of pairs that pass | The share of daylight half-hour pairs that pass the usable-pair rule under each sensor, because a mean over 2 or more farms moves less than CAMS at one point |
-| Switching logs | Each sheet's name, column names, and row count; for each sheet, the columns chosen as substation, start, and end, the rows read, the rows with a parsed start, and the rows matched to a Primary; one window per logged event and Primary (the logged start to end, or the calendar day when no end is logged; a date with no time is read as the local calendar day, a date-only end as local 24:00); the mask of the amendment. A time with no time zone is read as Europe/London. A sheet that has the substation and start columns and rows but matches no Primary stops the job as an input defect |
+| Switching logs | Each sheet's name, column names, and row count; for each sheet, the columns chosen as substation, start, and end, the rows read, the rows with a parsed start, and the rows matched to a Primary; one window per logged event and Primary (the logged start to end, or the local calendar day when no end is logged; a date with no time is read by the per-row rules of the ruling on switching-log times); the mask of the amendment. A time with no time zone is read as Europe/London. A sheet that has the substation and start columns and rows but matches no Primary stops the job as an input defect |
 | Sky's share at D12, read-out | The squared correlation of the change of the residual that leaves D12 out with D12's farm sensor on lit hours, written as `r²` only and never as a correlation or a slope. A squared correlation carries no direction. The amendment bounds the share at 74% from dark hours alone |
 
 **Job W2 scores the concordance in injected worlds.** Each of the 12 qualifying pairs is injected at
@@ -378,11 +378,11 @@ the manager, who may raise the cap, and writes no verdict. A stop after the job 
 - **Row 1 reads the known-answer tests:** job W2 runs this folder's tests on synthetic arrays
   before it starts, and a failing test makes the verdict `invalid`. The run log holds the count of
   tests and the code hash.
-- **A rerun keeps both sets of outputs:** a job moves its earlier outputs into `attempt_<n>/`
+- **A rerun keeps both sets of outputs:** a job moves its earlier outputs into `attempt_<job>_<n>/`
   before it writes new ones. Each job writes an attempt marker with its attempt number before it
   reads any input, and refuses to start when the marker exists (the earlier attempt crashed or
-  ended with any verdict, `invalid` included), unless an environment variable names the manager's
-  approval.
+  ended with any verdict, `invalid` included), unless an environment variable names the job and the
+  attempt that the manager approved.
 - **A pair with no injection scale is counted, not dropped:** a pair whose host has fewer than 200
   reference rows with a finite injected series for the injection level gives no world. Job W0
   counts such pairs, job W2 writes the name, the reason, and the count of reference rows of every
@@ -451,14 +451,19 @@ overcast days.
   the page lists it beside the verdict.
 - **[Design lead] Controls of job W3:** D12's anchor stretches are scored on every day, and D3's
   post-bounce stretches are scored on days with exactly one post-bounce stretch.
-- **[Design lead] Switching-log times:** a time with no time zone is read as Europe/London. A time
-  that carries a zone is converted to UTC. A cell with a date and no time is that local calendar
-  day: a start date-only is local 00:00 of the day, and an end date-only is local 24:00 of the day,
-  so a start on the same day as a date-only end never falls after its end. A start date-only with
-  no end logged is the local calendar day of the logged date. A cell counts as date-only when it is
-  a date, a text with no time, or a workbook datetime at midnight in a column where every value is
-  at midnight. Windows whose end still precedes their start are counted and listed in the check
-  file, and are not masked.
+- **[Design lead] Switching-log times:** job W0 reads every cell of the workbook as text and parses
+  each cell on its own, so one text cell such as "ongoing" in a column of dates becomes a missing
+  time, is counted, and cannot make the sheet unreadable. A time with no time zone is read as
+  Europe/London. A time that carries a zone is converted to UTC. The workbook program turns every
+  date into a date and time at midnight, so two per-row rules read a date with no time. First, an
+  end at exactly local 00:00 on a row whose end is not after a start on the same local date is local
+  24:00 of that date, so a same-day start never falls after its end. An end at 00:00 on a later date
+  than the start stays at 00:00. Second, a start with no logged end covers the local calendar day of
+  the start, from local 00:00 to local 24:00, whether the start is timed or not. A start or end
+  that parses to a year outside 2000 to 2100 (a two-digit year such as "25" reads as year 25) is an
+  error: it is counted as implausible and treated as a missing time. Windows whose end still
+  precedes their start are counted and listed in the check file and are not masked, and the file
+  also counts the ends that do not parse and the windows that lie wholly outside the grid.
 - **[Design lead] False-export bar:** the bar stays pooled over un-injected D5 and D10, as the
   single count in the decision rule reads, and the count of each host is reported beside it with no
   bar.
@@ -470,9 +475,18 @@ overcast days.
   world is meant to gain generation.
 - **[Design lead] Reruns:** job W0, job W2, and job W3 each write an attempt marker and an attempt
   number before they read any input. A later start of the same job is refused, whether the earlier
-  attempt crashed, ended `invalid`, or ended with any other verdict, unless the manager names an
-  approval in `E723_RERUN_APPROVED_BY_MANAGER`. The approval is the one rerun that the decision
-  rule allows without the maintainer.
+  attempt crashed, ended `invalid`, or ended with any other verdict, unless the manager sets
+  `E723_RERUN_APPROVED_BY_MANAGER` to the job and the number of the attempt to start, for example
+  `w0:2`. Any other value refuses, so one approval permits one rerun, and the marker records the
+  approval. A start that is refused or fails the launch check writes its run log to a separate
+  file named `run_log_<job>_refused_<time>.json`, and never overwrites the run log of an earlier
+  attempt. The folder of an archived attempt is named `attempt_<job>_<n>`, so each job's attempts
+  are numbered on their own.
+- **[Design lead] Days dropped by a farm's gaps:** a gap or dropout in the injected farm's series on
+  a lit half-hour drops the whole day from the injected world, because the world has no reading
+  there. Job W2 writes, for each injected farm, the number of days of the later span that its gaps
+  drop, beside the number of lit days, in the verdict file, so that a reader can tell a level 1.0 bar
+  left unreadable by dropouts from one left unreadable by too few export stretches.
 - **[Design lead] No qualifying pair:** job W0 writes `w0_checks.json` and the pair table, with
   every column present, when no pair qualifies, so that job W2's row 2 records the outcome.
 - **[Design lead] Timing gate:** the projection covers the whole of job W2, including the second

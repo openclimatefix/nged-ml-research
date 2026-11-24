@@ -578,3 +578,17 @@ def test_weighted_auc_is_imported_from_experiment_722():
         core722.weighted_auc(score=np.array([0.0, 1.0]), label=np.array([0, 1]), w=np.ones(2))
         == 1.0
     )
+
+
+def test_days_dropped_by_farm_gaps_counts_each_day_with_a_lit_gap_once():
+    n = 6 * 48
+    lit = (np.arange(n) % 48 >= 14) & (np.arange(n) % 48 <= 34)
+    norm = np.where(lit, 0.5, 0.0)
+    norm[2 * 48 + 20] = np.nan  # day 2, lit
+    norm[2 * 48 + 22] = np.nan  # day 2 again
+    norm[3 * 48 + 2] = np.nan  # day 3, at night: not lit
+    norm[4 * 48 + 20] = np.nan  # day 4, lit
+    assert world.days_dropped_by_gaps(norm=norm, lit=lit, start=0) == 2
+    assert (
+        world.days_dropped_by_gaps(norm=norm, lit=lit, start=3 * 48) == 1
+    )  # only day 4 is in the span

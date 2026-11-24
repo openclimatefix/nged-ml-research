@@ -354,12 +354,25 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         guard.say(
             "pairs dropped because the farm's generation reads negative:", n_farm_reads_negative
         )
+    farm_gap_days = {
+        f: world.days_dropped_by_gaps(
+            norm=ctx.farm_norm(farm=f),
+            lit=sky.daylight(
+                zenith_deg=ctx.farm_sky[f].zenith, min_elevation_deg=core.DAYLIGHT_ELEVATION_DEG
+            ),
+            start=ctx.start_row,
+        )
+        for f in sorted(set(qual["farm"].to_list()))
+    }
+    n_lit_days = ctx.n_days
     masked_label = "masked" if w0["mask_available"] else "transfers not masked"
     arc_void = bool(w0["arc_term_void"])
     base = {
         "mask": masked_label, "n_pairs_keeping_sensor": n_keep, "n_powered_pairs_level_2": n_powered,
         "n_powered_hosts": n_hosts, "correctness_ok": correctness_ok, "arc_term_void": arc_void,
         "n_pairs_dropped_farm_reads_negative": n_farm_reads_negative,
+        "days_dropped_by_farm_gaps": farm_gap_days,
+        "n_lit_days_of_later_span": n_lit_days,
         "known_answer_tests": tests, "void_by_construction": list(core.VOID_BY_CONSTRUCTION),
     }  # fmt: skip
     if correctness_ok and core.void_before_run(

@@ -20,6 +20,7 @@ import subprocess
 import sys
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
@@ -78,7 +79,7 @@ def invalidate_outputs(*, names: Sequence[str], out_dir: Path = OUT_DIR) -> list
 
 
 RERUN_APPROVAL_ENV: Final[str] = "E723_RERUN_APPROVED_BY_MANAGER"
-"""Set to any non-empty text, naming the manager's approval, to rerun a job whose earlier attempt began (whatever its verdict, or none)."""
+"""The manager's approval of one rerun, written `<job>:<attempt>` (for example `w0:2`), the attempt being the one to start. Any other value refuses the start."""
 
 
 def archive_outputs(
@@ -87,8 +88,9 @@ def archive_outputs(
     private_names: Sequence[str] = (),
     out_dir: Path = OUT_DIR,
     private_dir: Path | None = None,
+    folder_name: str | None = None,
 ) -> Path | None:
-    """Move a job's earlier outputs into `attempt_<n>/`, so that a rerun keeps both sets of outputs.
+    """Move a job's earlier outputs into `attempt_<n>/` (or `folder_name`), keeping all outputs.
 
     Rerun condition 4 of the plan page keeps the outputs of every attempt. Nothing is deleted. A
     file that does not exist is skipped, and no folder is made when no file exists. The numbering
@@ -100,6 +102,8 @@ def archive_outputs(
         private_names: The output files under the private folder to move.
         out_dir: The experiment's output folder.
         private_dir: The private folder (default: `out_dir/PRIVATE`).
+        folder_name: The name of the attempt folder; the default numbers the existing
+            `attempt_*` folders.
 
     Returns:
         The attempt folder, or None when there was nothing to move.
@@ -114,7 +118,7 @@ def archive_outputs(
         for p in out_dir.glob("attempt_*")
         if (m := re.fullmatch(r"attempt_(\d+)", p.name))
     ]
-    attempt = out_dir / f"attempt_{max(taken, default=0) + 1}"
+    attempt = out_dir / (folder_name or f"attempt_{max(taken, default=0) + 1}")
     attempt.mkdir(parents=True)
     for path in present:
         shutil.move(path, attempt / path.name)
@@ -142,9 +146,10 @@ def begin_attempt(
 
     The marker `marker_attempt_<job>.json` is written before the job reads anything, so a job that
     crashes, ends `invalid`, or ends with any other verdict leaves the marker, and the next run is
-    refused unless `RERUN_APPROVAL_ENV` names the manager's approval. With the approval the earlier
-    outputs and the old marker move into `attempt_<n>/`, and the new attempt is the old number
-    plus 1.
+    refused unless `RERUN_APPROVAL_ENV` equals `<job>:<attempt>` for the attempt to start. One
+    approval therefore permits one rerun. With the approval the earlier outputs and the old marker
+    move into `attempt_<job>_<n>/`, `n` being the attempt they belong to, and the approval text is
+    recorded in the new marker.
 
     Args:
         job: `w0`, `w2`, or `w3`.
@@ -157,29 +162,32 @@ def begin_attempt(
         The attempt number, 1 for the first attempt.
 
     Raises:
-        JobRefusedError: An earlier attempt of this job began and the approval is not named.
+        JobRefusedError: An earlier attempt of this job began and the approval does not name this
+            job and the attempt to start.
     """
     marker = out_dir / attempt_marker_name(job=job)
     environment = os.environ if env is None else env
     previous = 0
+    approval = ""
     if marker.is_file():
         try:
             previous = int(json.loads(marker.read_text()).get("attempt", 1))
-        except json.JSONDecodeError, ValueError:
+        except json.JSONDecodeError, ValueError, TypeError:
             previous = 1
-        if not environment.get(RERUN_APPROVAL_ENV, "").strip():
+        approval = environment.get(RERUN_APPROVAL_ENV, "").strip()
+        if approval != f"{job}:{previous + 1}":
             msg = (
                 f"attempt {previous} of job {job} already began (it may have crashed, or ended with "
-                f"any verdict); a rerun needs the manager's approval, named in the environment "
-                f"variable {RERUN_APPROVAL_ENV}"
+                f"any verdict); attempt {previous + 1} needs the manager's approval, the value "
+                f"'{job}:{previous + 1}' in the environment variable {RERUN_APPROVAL_ENV}"
             )
             raise JobRefusedError(msg)
     archive_outputs(
         names=(*names, marker.name), private_names=private_names, out_dir=out_dir,
-        private_dir=out_dir / "PRIVATE",
+        private_dir=out_dir / "PRIVATE", folder_name=f"attempt_{job}_{previous}",
     )  # fmt: skip
     attempt = previous + 1
-    payload = json.dumps({"job": job, "attempt": attempt}, sort_keys=True)
+    payload = json.dumps({"job": job, "attempt": attempt, "approval": approval}, sort_keys=True)
     atomic_write(path=marker, write=lambda tmp: tmp.write_text(payload))
     return attempt
 
@@ -240,6 +248,7 @@ def write_run_log(
     gate: TimingGate,
     extra: Mapping[str, Any] | None = None,
     out_dir: Path = OUT_DIR,
+    name: str | None = None,
 ) -> Path:
     """Write `run_log_<job>.json`: code hash, input fingerprints, peak memory, and core-seconds.
 
@@ -259,7 +268,7 @@ def write_run_log(
         "seed": core.SEED,
         **(extra or {}),
     }
-    return write_public_json(payload=payload, name=f"run_log_{job}.json", out_dir=out_dir)
+    return write_public_json(payload=payload, name=name or f"run_log_{job}.json", out_dir=out_dir)
 
 
 @contextmanager
@@ -274,19 +283,26 @@ def run_log(
     """Write the run log when the block ends, whether it finished or crashed.
 
     The block appends to `inputs` and `info` as it reads sources, so a crashed job still records
-    what it read. The log carries `completed`, which is False after a crash.
+    what it read. The log carries `completed`, which is False after a crash. The job puts its
+    attempt number in `info["attempt"]` once `begin_attempt` has returned. A block that ends
+    without it (a refused or mis-launched start) never began an attempt, so its log goes to
+    `run_log_<job>_refused_<stamp>.json` and the earlier attempt's log stays as it was.
     """
     completed = False
     try:
         yield
         completed = True
     finally:
+        began = "attempt" in info
         write_run_log(
             job=job,
             inputs=inputs,
             gate=gate,
-            extra={**info, "completed": completed},
+            extra={**info, "completed": completed, **({} if began else {"refused": True})},
             out_dir=out_dir,
+            name=None
+            if began
+            else f"run_log_{job}_refused_{datetime.now(UTC).strftime('%H%M%S%f')}.json",
         )
 
 

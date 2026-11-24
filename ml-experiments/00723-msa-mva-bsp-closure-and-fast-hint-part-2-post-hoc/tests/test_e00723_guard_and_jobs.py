@@ -62,7 +62,11 @@ def test_the_run_log_holds_an_input_fingerprint(tmp_path):
     table.write_bytes(b"abc")
     gate = guard.TimingGate()
     with guard.run_log(
-        job="t", gate=gate, inputs=[table, tmp_path / "missing"], info={"x": 1}, out_dir=tmp_path
+        job="t",
+        gate=gate,
+        inputs=[table, tmp_path / "missing"],
+        info={"x": 1, "attempt": 1},
+        out_dir=tmp_path,
     ):
         pass
     import json
@@ -78,7 +82,7 @@ def test_a_crashed_job_still_writes_its_run_log_with_completed_false(tmp_path):
     gate = guard.TimingGate()
     with (
         pytest.raises(RuntimeError),
-        guard.run_log(job="c", gate=gate, inputs=[], info={}, out_dir=tmp_path),
+        guard.run_log(job="c", gate=gate, inputs=[], info={"attempt": 1}, out_dir=tmp_path),
     ):
         raise RuntimeError
     import json
@@ -157,7 +161,7 @@ def test_the_first_attempt_is_counted_and_a_rerun_after_any_end_is_refused_witho
     names = ("a.csv", "run_log_w0.json")
     assert guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env={}) == 1
     marker = tmp_path / guard.attempt_marker_name(job="w0")
-    assert json.loads(marker.read_text()) == {"attempt": 1, "job": "w0"}
+    assert json.loads(marker.read_text()) == {"approval": "", "attempt": 1, "job": "w0"}
     # The job crashed before it wrote any output: the marker alone refuses the next run.
     with pytest.raises(guard.JobRefusedError):
         guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env={})
@@ -174,17 +178,72 @@ def test_a_verdict_of_any_kind_including_invalid_is_refused_a_rerun_without_appr
     (tmp_path / "v.json").write_text(json.dumps({"verdict": verdict}))
     with pytest.raises(guard.JobRefusedError):
         guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env={})
-    approved = {guard.RERUN_APPROVAL_ENV: "approved by the manager"}
+    approved = {guard.RERUN_APPROVAL_ENV: "w2:2"}
     assert guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env=approved) == 2
-    # The earlier outputs and the old marker moved into attempt_1; the new marker counts 2.
-    assert (tmp_path / "attempt_1" / "v.json").is_file()
-    assert (tmp_path / "attempt_1" / guard.attempt_marker_name(job="w2")).is_file()
+    # The earlier outputs and the old marker moved into the job's folder for attempt 1.
+    assert (tmp_path / "attempt_w2_1" / "v.json").is_file()
+    assert (tmp_path / "attempt_w2_1" / guard.attempt_marker_name(job="w2")).is_file()
     assert not (tmp_path / "v.json").exists()
-    assert json.loads((tmp_path / guard.attempt_marker_name(job="w2")).read_text())["attempt"] == 2
-    # The third attempt needs the approval again.
+    marker = json.loads((tmp_path / guard.attempt_marker_name(job="w2")).read_text())
+    assert marker["attempt"] == 2
+    assert marker["approval"] == "w2:2"
+    # The same approval does not permit the third attempt, and a wrong job or number refuses.
+    for value in ("w2:2", "w2:3x", "w0:3", "approved by the manager", "3"):
+        with pytest.raises(guard.JobRefusedError):
+            guard.begin_attempt(
+                job="w2", names=names, out_dir=tmp_path, env={guard.RERUN_APPROVAL_ENV: value}
+            )
+    assert (
+        guard.begin_attempt(
+            job="w2", names=names, out_dir=tmp_path, env={guard.RERUN_APPROVAL_ENV: "w2:3"}
+        )
+        == 3
+    )
+
+
+def test_attempt_folders_are_numbered_per_job(tmp_path):
+    names = ("o.csv",)
+    for job in ("w0", "w2"):
+        guard.begin_attempt(job=job, names=names, out_dir=tmp_path, env={})
+        (tmp_path / "o.csv").write_text(job)
+        guard.begin_attempt(
+            job=job, names=names, out_dir=tmp_path, env={guard.RERUN_APPROVAL_ENV: f"{job}:2"}
+        )
+    assert (tmp_path / "attempt_w0_1" / "o.csv").read_text() == "w0"
+    assert (tmp_path / "attempt_w2_1" / "o.csv").read_text() == "w2"
+
+
+def test_a_crash_then_an_unapproved_retry_leaves_the_crash_log_untouched(tmp_path):
+    gate = guard.TimingGate()
+    names = ("run_log_w0.json",)
+
+    def attempt(*, env: dict[str, str]) -> None:
+        info: dict = {}
+        inputs: list = []
+        with guard.run_log(job="w0", gate=gate, inputs=inputs, info=info, out_dir=tmp_path):
+            info["attempt"] = guard.begin_attempt(job="w0", names=names, out_dir=tmp_path, env=env)
+            info["read"] = "something"
+            raise RuntimeError("crash")
+
+    with pytest.raises(RuntimeError, match="crash"):
+        attempt(env={})
+    log = tmp_path / "run_log_w0.json"
+    before = log.read_bytes()
+    assert json.loads(before)["attempt"] == 1
+    assert json.loads(before)["completed"] is False
     with pytest.raises(guard.JobRefusedError):
-        guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env={})
-    assert guard.begin_attempt(job="w2", names=names, out_dir=tmp_path, env=approved) == 3
+        attempt(env={})
+    assert log.read_bytes() == before  # the refusal did not overwrite the crash log
+    refused = list(tmp_path.glob("run_log_w0_refused_*.json"))
+    assert len(refused) == 1
+    assert json.loads(refused[0].read_text())["refused"] is True
+    # A start that fails the launch check (no attempt began) is logged the same way.
+    with (
+        pytest.raises(guard.JobRefusedError),
+        guard.run_log(job="w0", gate=gate, inputs=[], info={}, out_dir=tmp_path),
+    ):
+        raise guard.JobRefusedError("launch")
+    assert log.read_bytes() == before
 
 
 def test_the_known_answer_tests_are_run_and_read_by_row_1(tmp_path):
@@ -382,9 +441,8 @@ def test_a_date_only_end_is_local_24_00_so_a_same_day_start_never_ends_before_it
             datetime(year, month, day, 17, 0),
         ],
     )
-    # The end column of `sheet` mixes midnight and 17:00, so its midnights are timed ends at 00:00:
-    # row 1 ends before its 09:00 start, and row 2 is a zero-length window; `only_dates` has a column
-    # of midnights alone, which are date-only ends.
+    # `sheet` mixes a midnight end and a 17:00 end in one column, and `only_dates` holds midnights
+    # alone; the per-row rule reads both the same way.
     only_dates = sheet_of(
         numbers=[10, 10],
         starts=[datetime(year, month, day, 9, 0), datetime(year, month, day, 9, 0)],
@@ -406,9 +464,10 @@ def test_a_date_only_end_is_local_24_00_so_a_same_day_start_never_ends_before_it
     first, last = w0.windows_from_sheets(sheets={"s": both}, numbers={"D1": 10})["D1"][0]
     assert first == _utc_row(year=year, month=month, day=day, hour=0) - offset_hours * 2
     assert last == _utc_row(year=year, month=month, day=day, hour=24) - offset_hours * 2
-    # With a column that mixes midnight and other times, a midnight end is a timed end at 00:00.
+    # A midnight end on a row whose end is not after a same-day start is local 24:00, whatever the
+    # other cells of the column hold.
     _, diag_mixed = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
-    assert diag_mixed[0]["n_rows_end_before_start"] == 1
+    assert diag_mixed[0]["n_rows_end_before_start"] == 0
 
 
 def test_a_date_only_end_in_text_and_a_timed_start_on_the_same_day_is_read_as_the_end_of_that_day():
@@ -600,3 +659,92 @@ def test_a_pair_whose_farm_reads_negative_does_not_qualify_and_is_counted():
     assert counts["n_qualifying_pairs"] == 2
     assert counts["n_powered_pairs_level_2"] == 1
     assert counts["n_pairs_farm_reads_negative"] == 1
+
+
+def _workbook(*, tmp_path: Path, rows: list[tuple]) -> dict[str, pl.DataFrame]:
+    """Write a workbook with openpyxl (every date becomes a datetime) and read it as job W0 does."""
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.append(["Substation Number", "Substation Name", "Start Time", "End Time"])
+    for number, start, end in rows:
+        sheet.append([number, "x", start, end])
+    path = tmp_path / "log.xlsx"
+    book.save(path)
+    return w0.read_workbook(path=path)
+
+
+def test_a_workbook_with_a_text_cell_in_a_date_column_is_readable_and_the_cell_is_counted(tmp_path):
+    sheets = _workbook(
+        tmp_path=tmp_path,
+        rows=[
+            (10, datetime(2025, 6, 10, 9, 0), datetime(2025, 6, 10, 12, 0)),
+            (10, datetime(2025, 6, 11, 9, 0), "ongoing"),
+            (10, "not known", datetime(2025, 6, 12)),
+        ],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets=sheets, numbers={"D1": 10})
+    assert len(wins["D1"]) == 2
+    assert diag[0]["n_rows_end_not_parsed"] == 1
+    assert diag[0]["n_rows_start_not_parsed"] == 1
+    # The text end is a missing end: the local calendar day of the start.
+    assert wins["D1"][1] == (
+        _utc_row(year=2025, month=6, day=10, hour=23),
+        _utc_row(year=2025, month=6, day=11, hour=23),
+    )
+
+
+@pytest.mark.parametrize(("month", "day", "offset"), [(6, 10, 1), (1, 15, 0)])
+def test_a_mixed_column_of_dates_and_times_is_read_per_row_in_summer_and_winter(
+    tmp_path, month, day, offset
+):
+    d = lambda h=0, m=0, dd=day: datetime(2025, month, dd, h, m)  # noqa: E731
+    sheets = _workbook(
+        tmp_path=tmp_path,
+        rows=[
+            (10, d(9), d()),  # timed start, date-only end the same day: local 24:00
+            (10, d(), d(17)),  # date-only start, timed end
+            (10, d(), None),  # date-only start with no end: the local day
+            (10, d(9, 30), None),  # timed start with no end: the local day too
+            (10, d(), d()),  # the same date at both ends: the whole local day
+            (10, d(22), d(dd=day + 1)),  # overnight: the end stays at 00:00 of the next day
+        ],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets=sheets, numbers={"D1": 10})
+    assert diag[0]["n_rows_end_before_start"] == 0
+    local_midnight = -offset
+    whole_day = (
+        _utc_row(year=2025, month=month, day=day, hour=local_midnight),
+        _utc_row(year=2025, month=month, day=day, hour=24 + local_midnight),
+    )
+    got = wins["D1"]
+    assert got[0] == (
+        _utc_row(year=2025, month=month, day=day, hour=9 - offset),
+        whole_day[1],
+    )
+    assert got[1] == (
+        whole_day[0],
+        _utc_row(year=2025, month=month, day=day, hour=17 - offset),
+    )
+    assert got[2] == whole_day
+    assert got[3] == whole_day
+    assert got[4] == whole_day
+    assert got[5] == (
+        _utc_row(year=2025, month=month, day=day, hour=22 - offset),
+        _utc_row(year=2025, month=month, day=day + 1, hour=local_midnight),
+    )
+
+
+def test_a_two_digit_year_is_an_error_and_a_window_outside_the_grid_is_counted():
+    sheet = sheet_of(
+        numbers=[10, 10, 10],
+        starts=["10/06/25", "10/06/1999", "01/01/2001"],
+        ends=["10/06/25", "11/06/1999", "02/01/2001"],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert diag[0]["n_rows_time_implausible"] == 2  # a two-digit year reads as year 25
+    assert diag[0]["n_rows_start_parsed"] == 1
+    assert diag[0]["n_rows_start_not_parsed"] == 0
+    assert diag[0]["n_windows_outside_grid"] == 1  # the window of 2001 lies before the grid
+    assert len(wins["D1"]) == 1

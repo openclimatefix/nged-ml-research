@@ -132,32 +132,32 @@ def _substation_text(series: pl.Series) -> pl.Series:
     )
 
 
-def _as_datetime(series: pl.Series, *, end_of_day: bool = False) -> tuple[pl.Series, pl.Series]:
-    """Return a column as naive UTC times, and a Boolean flag that marks the date-only cells.
+PLAUSIBLE_YEARS: Final[tuple[int, int]] = (2000, 2100)
+"""A parsed switching-log time outside these years (a two-digit year read as year 25, for example) is an error."""
 
-    RULED: a time with no zone is read as `LOCAL_ZONE` (Europe/London), then converted to UTC. A
-    time that carries a zone is converted to UTC. A text time takes the first of
-    `DATETIME_FORMATS` that parses it, row by row, and a failed parse is null.
 
-    RULED: a date-only cell (no time of day) is that local calendar day. A date-only start is local
-    00:00 of the day. A date-only end (`end_of_day=True`) is local 24:00 of the day, which is local
-    00:00 of the next day, so a date-only end never falls before a start on the same day. A cell is
-    date-only when it is a `Date`, when it is a text with a date-only format, or when it is a
-    zone-free `Datetime` in a column whose every non-null value is exactly midnight (a workbook
-    stores a date as a datetime at midnight, and a column of such values has no time of day). A
-    midnight value inside a column that also holds other times of day is a timed value.
+def _parse_local(series: pl.Series) -> tuple[pl.DataFrame, pl.Series]:
+    """Return a column as local (Europe/London) naive times with a date-only flag, and the implausible cells.
+
+    The first frame has `local` (naive local time, null when the cell does not parse) and
+    `date_only` (True for a `Date`, and for a text with a date-only format). The second result is a
+    Boolean series that marks a cell that parsed to a year outside `PLAUSIBLE_YEARS`; such a cell is
+    null in `local`. A cell with a zone is converted to local time. A text cell takes the first of
+    `DATETIME_FORMATS` that parses it, timed formats first, and a text that matches none ("ongoing")
+    is null. A workbook read with every cell as text holds a date as `2025-06-10 00:00:00`, which
+    matches a timed format, so a date-only cell of a workbook is a timed midnight here; the rules of
+    `windows_with_diagnostics` read it per row.
     """
+    n = len(series)
     if isinstance(series.dtype, pl.Datetime) and series.dtype.time_zone is not None:
-        utc = series.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
-        return utc, pl.Series([False] * len(series))
-    if series.dtype == pl.Date:
-        naive = series.cast(pl.Datetime("us"))
-        date_only = naive.is_not_null()
+        local = series.dt.convert_time_zone(LOCAL_ZONE).dt.replace_time_zone(None)
+        date_only = pl.Series([False] * n)
+    elif series.dtype == pl.Date:
+        local = series.cast(pl.Datetime("us"))
+        date_only = local.is_not_null()
     elif isinstance(series.dtype, pl.Datetime):
-        naive = series.cast(pl.Datetime("us"))
-        at_midnight = naive == naive.dt.truncate("1d")
-        every_midnight = bool(at_midnight.drop_nulls().all()) if naive.drop_nulls().len() else False
-        date_only = naive.is_not_null() & pl.Series([every_midnight] * len(naive))
+        local = series.cast(pl.Datetime("us"))
+        date_only = pl.Series([False] * n)
     else:
         text = pl.DataFrame({"t": series.cast(pl.String, strict=False).str.strip_chars()})
         parsed = text.select(
@@ -174,22 +174,59 @@ def _as_datetime(series: pl.Series, *, end_of_day: bool = False) -> tuple[pl.Ser
                 ]
             ),
         )
-        naive = parsed.select(pl.coalesce("timed", "dated").cast(pl.Datetime("us"))).to_series()
+        local = parsed.select(pl.coalesce("timed", "dated").cast(pl.Datetime("us"))).to_series()
         date_only = parsed["timed"].is_null() & parsed["dated"].is_not_null()
-    if end_of_day:
-        naive = (
-            pl.DataFrame({"t": naive, "d": date_only})
-            .select(
-                pl.when(pl.col("d")).then(pl.col("t").dt.offset_by("1d")).otherwise(pl.col("t"))
-            )
-            .to_series()
-        )
-    utc = (
-        naive.dt.replace_time_zone(LOCAL_ZONE, ambiguous="earliest", non_existent="null")
+    year = local.dt.year()
+    implausible = (year < PLAUSIBLE_YEARS[0]) | (year > PLAUSIBLE_YEARS[1])
+    implausible = implausible.fill_null(False)
+    local = (
+        pl.DataFrame({"t": local, "bad": implausible})
+        .select(pl.when(pl.col("bad")).then(None).otherwise(pl.col("t")))
+        .to_series()
+    )
+    return pl.DataFrame({"local": local, "date_only": date_only.fill_null(False)}), implausible
+
+
+def _local_to_utc(series: pl.Series) -> pl.Series:
+    """Return naive local (Europe/London) times as naive UTC; a time in the spring-forward gap is null."""
+    return (
+        series.dt.replace_time_zone(LOCAL_ZONE, ambiguous="earliest", non_existent="null")
         .dt.convert_time_zone("UTC")
         .dt.replace_time_zone(None)
     )
-    return utc, date_only
+
+
+def window_times(
+    *, start: pl.Series, end: pl.Series, end_date_only: pl.Series
+) -> tuple[pl.Series, pl.Series]:
+    """Return the start and end of every window as naive UTC, from naive local start and end cells.
+
+    RULED (design lead): a workbook stores a date as a datetime at midnight, so two per-row rules
+    read a date with no time.
+
+    1. An end at exactly local 00:00 on a row whose end is not after a start on the same local date
+       is local 24:00 of that date (the start of the next day). A text end with a date-only format
+       is local 24:00 of its date whatever the start. An end at 00:00 on a later date than the start
+       stays at 00:00.
+    2. A start with no end covers the local calendar day of the start, from local 00:00 to local
+       24:00, whether the start is timed or not.
+
+    A null start gives a null window. A day is added in local time, so a window may last 23 or 25 hours.
+    """
+    frame = pl.DataFrame({"s": start, "e": end, "eo": end_date_only.fill_null(False)})
+    day = pl.col("s").dt.truncate("1d")
+    midnight_end = pl.col("e") == pl.col("e").dt.truncate("1d")
+    same_day_not_after = (pl.col("e").dt.truncate("1d") == day) & (pl.col("e") <= pl.col("s"))
+    extend = pl.col("eo") | (midnight_end & same_day_not_after)
+    out = frame.select(
+        s=pl.when(pl.col("e").is_null()).then(day).otherwise(pl.col("s")),
+        e=pl.when(pl.col("e").is_null())
+        .then(day.dt.offset_by("1d"))
+        .when(extend)
+        .then(pl.col("e").dt.truncate("1d").dt.offset_by("1d"))
+        .otherwise(pl.col("e")),
+    )
+    return _local_to_utc(out["s"]), _local_to_utc(out["e"])
 
 
 def windows_with_diagnostics(
@@ -200,12 +237,12 @@ def windows_with_diagnostics(
     A sheet is used when it has a column whose name holds the whole word "substation" (and not
     "name") and a column with a start word ("start", "from", "begin") that is not a transfer
     column. The end column is the first with an end word ("end", "finish", "restore", "until") and
-    no start word. The window runs from the start to the end. Where the sheet gives no end or the
-    end is missing, the window is the UTC calendar day of a timed start, and the local calendar
-    day (Europe/London) of a date-only start. A time with no zone is read as Europe/London, a
-    date-only start is local 00:00, and a date-only end is local 24:00 of its day (RULED; see
-    `_as_datetime`). A row whose start cannot be parsed, and a row whose end precedes its
-    start, is skipped and counted.
+    no start word. A time with no zone is read as Europe/London. The window runs from the start to
+    the end, with the two per-row rules of `window_times` for a date with no time and for a start
+    with no end. A cell that parses to nothing (a text such as "ongoing") is a missing time, and a
+    row whose start cannot be parsed is skipped. The diagnostics count the rows with a start that
+    does not parse, an end that does not parse, a time outside `PLAUSIBLE_YEARS`, an end that
+    precedes its start (skipped), and a window that lies wholly outside the grid.
 
     Args:
         sheets: The workbook's sheets by name.
@@ -227,22 +264,39 @@ def windows_with_diagnostics(
         diag: dict[str, Any] = {
             "sheet": sheet_name, "substation_column": sub, "start_column": beg, "end_column": end,
             "n_rows": frame.height, "n_rows_start_parsed": 0, "n_rows_matched": 0,
-            "n_rows_start_not_parsed": 0, "n_rows_end_before_start": 0, "used": False,
+            "n_rows_start_not_parsed": 0, "n_rows_end_not_parsed": 0, "n_rows_time_implausible": 0,
+            "n_rows_end_before_start": 0, "n_windows_outside_grid": 0, "used": False,
         }  # fmt: skip
         diagnostics.append(diag)
         if sub is None or beg is None:
             continue
         diag["used"] = True
-        begin, begin_date_only = _as_datetime(frame[beg])
-        day_end, _ = _as_datetime(frame[beg], end_of_day=True)
-        finish = (
-            _as_datetime(frame[end], end_of_day=True)[0]
-            if end
-            else pl.Series([None] * frame.height, dtype=pl.Datetime("us"))
+        start_cells, start_bad = _parse_local(frame[beg])
+        if end:
+            end_cells, end_bad = _parse_local(frame[end])
+        else:
+            end_cells = pl.DataFrame(
+                {
+                    "local": pl.Series([None] * frame.height, dtype=pl.Datetime("us")),
+                    "date_only": pl.Series([False] * frame.height),
+                }
+            )
+            end_bad = pl.Series([False] * frame.height)
+        begin, finish = window_times(
+            start=start_cells["local"], end=end_cells["local"], end_date_only=end_cells["date_only"]
         )
+        # A start and an end that both survive the rules give the window; compare in UTC.
         sub_text = _substation_text(frame[sub])
-        diag["n_rows_start_parsed"] = int(begin.is_not_null().sum())
-        diag["n_rows_start_not_parsed"] = int((frame[beg].is_not_null() & begin.is_null()).sum())
+        start_given = frame[beg].is_not_null()
+        diag["n_rows_start_parsed"] = int(start_cells["local"].is_not_null().sum())
+        diag["n_rows_start_not_parsed"] = int(
+            (start_given & start_cells["local"].is_null() & ~start_bad).sum()
+        )
+        if end:
+            diag["n_rows_end_not_parsed"] = int(
+                (frame[end].is_not_null() & end_cells["local"].is_null() & ~end_bad).sum()
+            )
+        diag["n_rows_time_implausible"] = int((start_bad | end_bad).sum())
         matched_rows: set[int] = set()
         for label, number in numbers.items():
             idx = [
@@ -253,12 +307,16 @@ def windows_with_diagnostics(
             matched_rows.update(idx)
             for i in idx:
                 b_t, e_t = begin[i], finish[i]
-                if e_t is None and begin_date_only[i]:
-                    e_t = day_end[i]  # no end: the local calendar day of the logged date
-                if e_t is not None and e_t < b_t:
+                if e_t is None:  # an end in the spring-forward gap
+                    diag["n_rows_end_not_parsed"] += 1
+                    continue
+                if e_t < b_t:
                     diag["n_rows_end_before_start"] += 1
                     continue
-                out[label].append(world.utc_window_rows(start=b_t, end=e_t))
+                first, last = world.utc_window_rows(start=b_t, end=e_t)
+                if last < 0 or first >= core.N_GRID:
+                    diag["n_windows_outside_grid"] += 1
+                out[label].append((first, last))
         diag["n_rows_matched"] = len(matched_rows)
         if frame.height > 0 and diag["n_rows_start_parsed"] > 0 and not matched_rows:
             msg = (
@@ -267,6 +325,15 @@ def windows_with_diagnostics(
             )
             raise SwitchingLogDefectError(msg)
     return out, diagnostics
+
+
+def read_workbook(*, path: Path) -> dict[str, pl.DataFrame]:
+    """Return every sheet of the switching log with every cell as text.
+
+    `infer_schema_length=0` reads a column as text whatever it holds, so one text cell such as
+    "ongoing" in a column of dates cannot make the workbook unreadable. The windows parse each cell.
+    """
+    return pl.read_excel(path, sheet_id=0, engine="openpyxl", infer_schema_length=0)
 
 
 def windows_from_sheets(
@@ -732,7 +799,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         schema={"sheet": pl.String, "columns": pl.String, "n_columns": pl.Int64, "n_rows": pl.Int64}
     )
     try:
-        sheets = pl.read_excel(data.SWITCHING_LOG_PATH, sheet_id=0, engine="openpyxl")
+        sheets = read_workbook(path=data.SWITCHING_LOG_PATH)
     except Exception as exc:  # noqa: BLE001
         sheets = None
         switching = {"readable": False, "reason": type(exc).__name__}
