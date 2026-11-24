@@ -104,9 +104,9 @@ detected, so every night label stays `not powered` and the verdict is `inconclus
 better.** It is measured in points, which are percent of a substation's effective capacity and not
 MW, after the recent-error filter (a Kalman filter that corrects each forecast with the latest
 metered error) unless stated. All forecasts use observed ERA5 temperature and CAMS irradiance
-instead of weather forecasts, so each number is a ceiling for a live forecast. One point is 0.054
-to 0.117 MW depending on the substation (effective capacity 5.72 MW at D5, 5.40 at D10, 10.78 at
-D11, 11.71 at D14, and 9.12 at D16).
+instead of weather forecasts, so each number is a ceiling for a live forecast. One point is 1% of
+the substation's effective capacity, so a point is a different number of megawatts at each
+substation. The capacities are withheld.
 
 | Code | Meaning |
 |---|---|
@@ -563,7 +563,7 @@ are agreed with the experiment manager.
   the labels it covers stay `not powered`, the verdict stays `inconclusive`, and the gate is not
   redefined again.
     - **Injected steps.** A step of 4 points and a step of 7 points of effective capacity (the sizes
-      seen at D5, D10, and D16; the units bullet below converts to MW) in the half-hour
+      seen at D5, D10, and D16) in the half-hour
       starting 00:30. The night-row noise has a standard deviation of 4.6 to 7.7 points at D5 and
       D10, so 4 points is about one noise standard deviation. Three kinds: a flat step on the UTC
       clock all year (`utc`), a flat step on the local clock all year (`local`), and a
@@ -571,13 +571,10 @@ are agreed with the experiment manager.
       the first smoothed temperature, scaled so the mean over the winter rows of that half-hour
       equals the stated size). A `placebo` has no step.
     - **Units.** The quantile score and every step are in points, that is, percent of the
-      substation's effective capacity, and not in MW. A step of `p` points is `p` times the
-      effective capacity divided by 100 in MW. The effective capacity is a single table value per
-      substation (5.72 MW at D5, 5.40 MW at D10, 10.78 MW at D11, 11.71 MW at D14, and 9.12 MW at
-      D16), so the MW conversion of a step carries the interval of the step in points and no
-      additional interval. A 4-point step is 0.23, 0.22, 0.43, 0.47, and 0.36 MW at D5, D10, D11,
-      D14, and D16, and a 7-point step is 0.40, 0.38, 0.75, 0.82, and 0.64 MW. The measured residual
-      steps of 4.4, 7.3, and 5.4 points at D5, D10, and D16 are 0.25, 0.39, and 0.49 MW.
+      substation's effective capacity, and not in MW. The effective capacity is a single table value
+      per substation, so a conversion of a step to MW carries the interval of the step in points and
+      no additional interval. The MW conversions of the injected and measured steps are withheld,
+      with the capacities.
     - **Statistic.** For an arm, the mean quantile score minus B0's on the label's own rows (BST
       nights for NS-U, winter nights for NS-H and NS-HW), unfiltered, on the same noise.
     - **Critical value.** The 5th percentile of the statistic over 100 placebo draws (20 per
