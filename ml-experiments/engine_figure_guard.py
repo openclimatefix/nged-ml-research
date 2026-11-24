@@ -39,7 +39,7 @@ _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
     "a power unit": re.compile(r"\b(?:MW|MVA|kW|kVA|GW)\b"),
 }
 # Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`.
-_PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(r'aria-label="[^"]*\w: -?\d')
+_PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text))[^"]*\w: -?\d')
 _AXIS_TEXT: Final[re.Pattern[str]] = re.compile(r">([^<>]+)<")
 
 

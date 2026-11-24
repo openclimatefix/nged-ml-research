@@ -1,14 +1,19 @@
 # ruff: noqa: E501
 """Draw the figures for experiment 186 from the tables `e00186_analyse.py` wrote."""
 
+import sys
 from pathlib import Path
 from typing import Final
 
 import altair as alt
 import e00186_common as common
+import numpy as np
 import polars as pl
 from plotting import ocf_theme as ocf
 from studies.charts import CONTENT_WIDTH_PX
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard  # noqa: E402
 
 DOCS_DIR: Final[Path] = Path(
     "docs/ml-experiments/00186-switching-d8-gas-peaker-spark-spread-and-triads"
@@ -63,7 +68,7 @@ def main() -> None:  # noqa: D103
             offset=14,
         ),
     )
-    fig1.save(DOCS_DIR / "figure_1_spread_share.svg")
+    guard.save_chart(chart=fig1, path=DOCS_DIR / "figure_1_spread_share.svg")
 
     flat = pl.read_parquet(common.WORK_DIR / "flatness.parquet").with_columns(
         kind=pl.col("kind").replace({"control": "Injected 2.8 MW blocks", "drop": "D8's 28 drops"})
@@ -100,7 +105,7 @@ def main() -> None:  # noqa: D103
             ),
         )
     )
-    fig2.save(DOCS_DIR / "figure_2_flatness.svg")
+    guard.save_chart(chart=fig2, path=DOCS_DIR / "figure_2_flatness.svg")
 
     days = (
         pl.read_parquet(common.WORK_DIR / "d8_day_table.parquet")
@@ -110,49 +115,52 @@ def main() -> None:  # noqa: D103
             drop=pl.col("drop_share") >= 0.75,
         )
     )
-    drops = pl.read_parquet(common.WORK_DIR / "d8_drops_in_window.parquet")
-    bands = (
-        alt.Chart(drops)
-        .mark_rect(color=ocf.DATA_BLUE_LIGHT, opacity=0.7)
+    # Pooled by fifth of the 7-day mean spread: no dates, no engine-state series.
+    valid = days.filter(pl.col("spread").is_not_null())
+    edges = np.quantile(valid["spread"].to_numpy(), [0.2, 0.4, 0.6, 0.8])
+    fifths = (
+        valid.with_columns(
+            fifth=pl.Series(np.searchsorted(edges, valid["spread"].to_numpy(), side="right") + 1)
+        )
+        .group_by("fifth")
+        .agg(share=pl.col("drop").mean())
+        .sort("fifth")
+    )
+    bars = (
+        alt.Chart(fifths)
+        .mark_bar(color=ocf.DATA_BLUE, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x="start_date:T", x2="end_date:T"
+            x=alt.X(
+                "fifth:O",
+                title="Fifth of the 7-day mean spark spread (1 = lowest)",
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y("share:Q", title="Share of days that are drop days"),
         )
     )
-    line = (
-        alt.Chart(days)
-        .mark_line(color=ocf.BRAND_ORANGE)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("spread:Q", title="Spark spread, 7-day mean (pounds/MWh)"),
-        )
-    )
-    zero = (
-        alt.Chart(pl.DataFrame({"y": [0.0]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(color="grey", strokeDash=[4, 3])
-        .encode(y="y:Q")
-    )
-    (bands + line + zero).properties(
-        width=WIDTH,
+    fig3 = bars.properties(
+        width=WIDTH // 2,
         height=170,
         title=alt.TitleParams(
-            "Spark spread and D8's drops (blue bands)",
+            "Share of days that are drop days, by fifth of the spark spread",
             subtitle=[
-                "System price minus gas fuel cost and operating cost, 40% efficiency, 5 pounds/MWh.",
-                "Above the dashed line a gas plant earns a margin.",
+                "Spark spread: system price minus gas fuel cost and operating cost,",
+                "40% efficiency, 5 pounds/MWh. A higher fifth is a better margin for a gas plant.",
             ],
             fontSize=12,
             subtitleFontSize=10,
             anchor="start",
             offset=14,
         ),
-    ).save(DOCS_DIR / "figure_3_spread_and_drops.svg")
+    )
+    guard.save_chart(chart=fig3, path=DOCS_DIR / "figure_3_spread_and_drops.svg")
 
     prof = pl.read_parquet(common.WORK_DIR / "event_profile.parquet").with_columns(
         anchor=pl.col("anchor").replace(
             {"start": "Around the start of a drop", "end": "Around the end of a drop"}
         )
     )
-    (
+    fig4 = (
         alt.Chart(prof)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
@@ -181,8 +189,8 @@ def main() -> None:  # noqa: D103
                 offset=14,
             ),
         )
-        .save(DOCS_DIR / "figure_4_event_profile.svg")
     )
+    guard.save_chart(chart=fig4, path=DOCS_DIR / "figure_4_event_profile.svg")
 
 
 if __name__ == "__main__":
