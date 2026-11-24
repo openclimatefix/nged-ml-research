@@ -388,6 +388,16 @@ class CostGate:
 
     cap_hours: float = 15.0
     seconds_per_pass: float = float("nan")
+    started: float = field(default_factory=time.perf_counter)
+    """The clock reading when the gate was made; `check_elapsed` compares the time since then with the cap."""
+
+    def check_elapsed(self) -> float:
+        """Return the core-hours used so far, or raise `RuntimeError` when they exceed the cap."""
+        hours = (time.perf_counter() - self.started) / 3600.0
+        if hours > self.cap_hours:
+            msg = f"{hours:.2f} core-hours used, over the cap of {self.cap_hours:.1f}; stop and report"
+            raise RuntimeError(msg)
+        return hours
 
     def measure(self, *, run_one_pass) -> None:  # noqa: ANN001
         """Time one pass of the callable and record the seconds."""

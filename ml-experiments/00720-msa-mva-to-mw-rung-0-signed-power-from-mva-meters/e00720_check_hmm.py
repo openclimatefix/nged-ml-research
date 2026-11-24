@@ -280,6 +280,17 @@ def check_mixture_alignment_and_bins() -> None:
     import e00720_fit as fit
 
     assert len(fit.k0_spec(phi=0.99, sigma_r=1.0, q=2.0).grid) == 81
+    # the fit path: a residual with phi near 0.995 reaches the 81-bin grid through fit_residual
+    rng_f = np.random.default_rng(5)
+    ar_f = np.zeros((60, 48))
+    ar_f[:, 0] = rng_f.normal(0, 1.0, 60)
+    for t in range(1, 48):
+        ar_f[:, t] = 0.995 * ar_f[:, t - 1] + rng_f.normal(0, 0.1, 60)
+    phi_f, sigma_f = fit.fit_residual(
+        g=ar_f, f=np.zeros_like(ar_f), rows=np.ones_like(ar_f, dtype=bool)
+    )
+    assert phi_f > fit.PHI_MAX, phi_f
+    assert len(fit.k0_spec(phi=phi_f, sigma_r=sigma_f, q=2.0).grid) == 81
     assert len(fit.k0_spec(phi=0.9, sigma_r=1.0, q=2.0).grid) == 41
 
 

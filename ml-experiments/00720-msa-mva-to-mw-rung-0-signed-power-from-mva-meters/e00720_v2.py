@@ -31,16 +31,28 @@ import numpy as np
 Q_FLOOR_MVA: Final[float] = 0.14
 PRE_ROLL: Final[int] = 28 * 48
 STAY: Final[float] = 0.97
-COARSE_G: Final[tuple[float, ...]] = (0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5)
+COARSE_G: Final[tuple[float, ...]] = (1.0, 1.5, 2.0, 2.5, 3.0, 3.5)
 FINE_OFFSETS: Final[tuple[float, ...]] = (-0.25, 0.25)
 N_BINS_V2: Final[int] = 21
 EM_ROUNDS_V2: Final[int] = 2
-MIN_UNIT_MVA: Final[float] = 0.5
-"""The unit size is not searched below this value (the fine offset once chose 0.25, under the coarse grid)."""
+MIN_UNIT_MVA: Final[float] = 1.0
+"""The unit size is not searched below this value, so a step of demand smaller than a unit is absorbed by the
+demand mean and never read as an engine. A step of 1 MVA or more cannot be told from an engine that stays on."""
 TREND_WINDOW_DAYS: Final[int] = 21
 TREND_QUANTILE: Final[float] = 0.8
 """The slow trend is the upper quantile of the daily-mean residual over a centred window, less the same
 statistic on the pre-roll: an engine lowers the net reading, so the idle days sit at the upper edge."""
+TREND_REFITS: Final[int] = 1
+"""After the first scan of the unit size, the trend is refitted from the half-hours the model believes are
+free of engine output, and the unit size is searched again near its first value."""
+IDLE_P0: Final[float] = 0.9
+"""A half-hour feeds the refitted trend only when its smoothed `P(n = 0)` is above this value."""
+MIN_IDLE_HALF_HOURS: Final[int] = 12
+"""A day feeds the refitted trend only with at least this many such half-hours."""
+REFIT_OFFSETS: Final[tuple[float, ...]] = (-0.5, -0.25, 0.0, 0.25, 0.5)
+MAX_TREND_SLOPE: Final[float] = 0.03
+"""The first trend moves at most this many MVA per day (3.6 MVA over 120 days), so a spell of engine output
+that lasts days, which looks like a step, cannot pull it down."""
 START_DOW_GRID: Final[int] = 5
 """2022-01-01, the start of experiment 694's grid, was a Saturday (Monday is 0)."""
 
@@ -87,6 +99,55 @@ def slow_trend(*, ymat: np.ndarray, f_mat: np.ndarray, calib_rows: np.ndarray) -
         return np.zeros(n)
     stat = np.where(ok, stat, np.nanmedian(stat))
     smooth = np.convolve(np.pad(stat, 3, mode="edge"), np.ones(7) / 7.0, mode="valid")
+    smooth = rate_limited(a=smooth, max_step=MAX_TREND_SLOPE)
+    base = float(np.nanmean(smooth[calib_rows])) if calib_rows.any() else 0.0
+    return smooth - base
+
+
+def rate_limited(*, a: np.ndarray, max_step: float) -> np.ndarray:
+    """Return `a` followed by a path that moves at most `max_step` per step, the mean of a forward and a backward pass."""
+
+    def one(x: np.ndarray) -> np.ndarray:
+        out = np.empty_like(x)
+        out[0] = x[0]
+        for i in range(1, len(x)):
+            out[i] = out[i - 1] + np.clip(x[i] - out[i - 1], -max_step, max_step)
+        return out
+
+    return 0.5 * (one(a) + one(a[::-1])[::-1])
+
+
+def idle_trend(
+    *, ymat: np.ndarray, f_mat: np.ndarray, p0_mat: np.ndarray, calib_rows: np.ndarray
+) -> np.ndarray:
+    """Return a per-day offset fitted only on half-hours with a high probability of no engine output.
+
+    The daily mean of `ymat - f_mat` over the half-hours with `p0_mat > IDLE_P0` is taken on days that
+    hold at least `MIN_IDLE_HALF_HOURS` of them, smoothed by the median of the days in a centred window,
+    interpolated linearly across the days that hold too few (a long engine spell), smoothed over 7 days,
+    and calibrated on the pre-roll as `slow_trend` is. A spell therefore cannot lower the trend, because
+    the days inside it contribute nothing and the trend bridges them.
+    """
+    resid = ymat - f_mat
+    use = np.isfinite(resid) & (p0_mat > IDLE_P0)
+    cnt = use.sum(axis=1)
+    day = np.where(
+        cnt >= MIN_IDLE_HALF_HOURS,
+        np.where(use, resid, 0.0).sum(axis=1) / np.maximum(cnt, 1),
+        np.nan,
+    )
+    n = len(day)
+    half = TREND_WINDOW_DAYS // 2
+    med = np.full(n, np.nan)
+    for d in range(n):
+        w = day[max(0, d - half) : min(n, d + half + 1)]
+        if np.isfinite(w).sum() >= 3:
+            med[d] = np.nanmedian(w)
+    ok = np.isfinite(med)
+    if not ok.any():
+        return np.zeros(n)
+    med = np.interp(np.arange(n), np.flatnonzero(ok), med[ok])
+    smooth = np.convolve(np.pad(med, 3, mode="edge"), np.ones(7) / 7.0, mode="valid")
     base = float(np.nanmean(smooth[calib_rows])) if calib_rows.any() else 0.0
     return smooth - base
 
@@ -173,6 +234,8 @@ def hindsight_fit(
         g: float, *, want_xi: bool = False, trans: np.ndarray | None = None
     ) -> tuple[hmm.Posterior, hmm.HmmSpec]:
         nonlocal passes
+        if gate is not None:
+            gate.check_elapsed()
         spec = spec_for(g, trans)
         post = hmm.forward_backward(spec=spec, m=y, f=f, p=p, want_xi=want_xi)
         passes += 1
@@ -191,7 +254,13 @@ def hindsight_fit(
     for i, g in enumerate(coarse):
         if i == 0 and gate is not None and not np.isfinite(gate.seconds_per_pass):
             gate.measure(run_one_pass=lambda g=g: pass_at(g))
-            n_passes = projected_fits * (len(coarse) + len(FINE_OFFSETS) + EM_ROUNDS_V2 + 1)
+            n_passes = projected_fits * (
+                len(coarse)
+                + len(FINE_OFFSETS)
+                + TREND_REFITS * (1 + len(REFIT_OFFSETS))
+                + EM_ROUNDS_V2
+                + 1
+            )
             gate.check(n_passes_total=round(n_passes))
             scores[g] = float("nan")  # replaced below
         post, _ = pass_at(g)
@@ -202,6 +271,17 @@ def hindsight_fit(
         if g >= MIN_UNIT_MVA and g not in scores:
             scores[g] = pass_at(g)[0].log_likelihood
     best = max(scores, key=lambda g: scores[g])
+    for _ in range(TREND_REFITS):
+        sm0 = hmm.summarise(post=pass_at(best)[0], spec=spec_for(best))["p_units"][:, 0]
+        p0_mat, _ = to_days(a=sm0, first_index=first_index)
+        trend = idle_trend(ymat=ymat, f_mat=f_mat, p0_mat=p0_mat, calib_rows=calib_days)
+        f = (f_mat + trend[:, None]).reshape(-1)[lead : lead + len(y)]
+        scores = {}
+        for off in REFIT_OFFSETS:
+            g = best + off
+            if g >= MIN_UNIT_MVA:
+                scores[g] = pass_at(g)[0].log_likelihood
+        best = max(scores, key=lambda g: scores[g])
     trans = None
     for _ in range(EM_ROUNDS_V2):
         post, spec = pass_at(best, want_xi=True, trans=trans)
@@ -713,7 +793,14 @@ def run_k1_v3(
 
 
 def _synthetic_host(
-    *, seed: int, n_days: int, drift: float, engine: bool, pre_days: int = 28
+    *,
+    seed: int,
+    n_days: int,
+    drift: float,
+    engine: bool,
+    pre_days: int = 28,
+    spell: bool = False,
+    step: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, int]:
     """Return a synthetic reading, the true unit count, and the grid index of its first half-hour.
 
@@ -731,8 +818,11 @@ def _synthetic_host(
     for t in range(1, n):
         ar[t] = 0.9 * ar[t - 1] + rng.normal(0, 0.08)
     trend = drift * np.clip((idx - pre_days * 48) / (n_days * 48), 0.0, 1.0)
+    trend = trend + step * (idx >= (pre_days + 60) * 48)
     units = np.zeros(n, dtype=int)
-    if engine:
+    if spell:
+        units[(pre_days + 30) * 48 : (pre_days + 51) * 48] = 2  # two units for 21 days
+    elif engine:
         state = 0
         for t in range(pre_days * 48 + 48 * 10, n):
             if rng.random() > 0.97:
@@ -768,6 +858,27 @@ def selftest() -> int:
     he = hindsight_fit(y=ye, first_index=fe, **small)
     drift_f1 = f1(*f1_counts(truth=(ue > 0)[PRE_ROLL:], flag=he.flag))
     assert drift_f1 > 0.7, drift_f1
+    # the trend must not absorb the engine: no drift with an engine, and a long spell of two units
+    out_err = lambda h, u, off: float(np.mean(np.abs(h.unit_size * h.n_hat - 1.6 * u[off:])))  # noqa: E731
+    assert out_err(hf, units, PRE_ROLL) < 0.35, out_err(hf, units, PRE_ROLL)
+    spell_f1, spell_err = {}, {}
+    for drift_s in (0.0, -1.0):
+        ys, us, fs = _synthetic_host(seed=6, n_days=100, drift=drift_s, engine=True, spell=True)
+        hs = hindsight_fit(y=ys, first_index=fs, n_max=2, **small)
+        spell_f1[drift_s] = f1(*f1_counts(truth=(us > 0)[PRE_ROLL:], flag=hs.flag))
+        spell_err[drift_s] = out_err(hs, us, PRE_ROLL)
+        assert spell_f1[drift_s] > 0.95, (drift_s, spell_f1[drift_s])
+        assert spell_err[drift_s] < 0.35, (drift_s, spell_err[drift_s])
+    # a step of demand smaller than a unit must not trip the V3 bars
+    yst, _, fst = _synthetic_host(seed=7, n_days=120, drift=0.0, engine=False, step=-0.7)
+    hst = hindsight_fit(y=yst, first_index=fst, **small)
+    step_fa = false_alarm(flag=hst.flag)
+    assert step_fa["flagged_share"] <= 0.03 and step_fa["active_days_per_month"] <= 1.0, step_fa
+    # the rate limiter follows a slow path and refuses a fast one
+    ramp = np.linspace(0.0, -1.0, 120)
+    assert np.allclose(rate_limited(a=ramp, max_step=MAX_TREND_SLOPE), ramp, atol=1e-6)
+    spell_like = np.r_[np.zeros(40), np.full(21, -3.0), np.zeros(59)]
+    assert rate_limited(a=spell_like, max_step=MAX_TREND_SLOPE).min() > -0.7
     # K by the information criterion: none on an engine-free series, at least one with an engine
     yq, _, fq = _synthetic_host(seed=4, n_days=40, drift=0.0, engine=False)
     assert select_k(y=yq, first_index=fq, **small)[0].n_max == 0
@@ -825,7 +936,7 @@ def selftest() -> int:
         msg = "the cost gate did not stop the fit"
         raise AssertionError(msg)
     print(
-        f"PASS V2 machinery: F1 {score:.3f} with an engine; drift of -0.5 and -1.0 MVA flags {drift_shares[-0.5]['flagged_share']:.3f} and {drift_shares[-1.0]['flagged_share']:.3f} of engine-free half-hours, F1 {drift_f1:.3f} with an engine and drift; K by BIC; schedule-week bootstrap; consistency gate; cost gate"
+        f"PASS V2 machinery: F1 {score:.3f} with an engine; drift of -0.5 and -1.0 MVA flags {drift_shares[-0.5]['flagged_share']:.3f} and {drift_shares[-1.0]['flagged_share']:.3f} of engine-free half-hours, F1 {drift_f1:.3f} with an engine and drift; spell of two units F1 {spell_f1[0.0]:.3f} and {spell_f1[-1.0]:.3f} (output error {spell_err[0.0]:.2f} and {spell_err[-1.0]:.2f} MVA) without and with drift; a 0.7 MVA step flags {step_fa['flagged_share']:.3f}; K by BIC; schedule-week bootstrap; consistency gate; cost gate"
     )
     return 0
 
