@@ -296,7 +296,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     say("\n== Depth against multiples of one engine unit ==")
     g, g_lo, g_hi = unit_from_engine_record(rng=rng)
     say(
-        f"Unit from the engine's recorded output (2023-07-03 to 2023-08-15), levels 1 to 3: {g:.2f} MW "
+        f"Unit from the engine's recorded output, levels 1 to 3: {g:.2f} MW "
         f"(95% day-resampled interval {g_lo:.2f} to {g_hi:.2f}); the plan fixed {UNIT_MW} MW"
     )
     depth = drops["depth_mw"].to_numpy()

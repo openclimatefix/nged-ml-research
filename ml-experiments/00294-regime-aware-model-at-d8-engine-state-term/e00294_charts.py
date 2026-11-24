@@ -193,7 +193,7 @@ def coefficients(*, score: dict) -> None:
         height=220,
         title=_title(
             title="The fitted offset is steady across refits, and is smaller when the state is a day old",
-            subtitle="D8, arm 3's engine column. Each point is one monthly refit on the whole history. Dashed line: one engine unit, 1.97 MW, from the engine's recorded output.",
+            subtitle="D8, arm 3's engine column. Each point is one monthly refit on the whole history. Dashed line: one engine unit.",
         ),
     )
     _save(chart, name="figure_2_engine_offset")

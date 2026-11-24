@@ -18,21 +18,21 @@ Arm N: drops overlapping engine-running states (at least half of night half-hour
   2025-03-01 onward: 10 of 17 (0.59; 0.36 to 0.78); placebo share 0.05
 
 == Depth against multiples of one engine unit ==
-Unit from the engine's recorded output (2023-07-03 to 2023-08-15), levels 1 to 3: 1.93 MW (95% day-resampled interval 1.91 to 1.95); the plan fixed 1.97 MW
-  depth, unit 1.97 MW: mean distance to the nearest multiple 0.287 units (95% bootstrap 0.233 to 0.342); uniform spread over the same range 0.255 (95% of draws 0.203 to 0.307); p for a mean this low 0.8840
-  depth, unit 1.93 MW: mean distance to the nearest multiple 0.277 units (95% bootstrap 0.223 to 0.334); uniform spread over the same range 0.254 (95% of draws 0.203 to 0.303); p for a mean this low 0.8170
-  depth, unit 1.75 MW: mean distance to the nearest multiple 0.230 units (95% bootstrap 0.182 to 0.278); uniform spread over the same range 0.232 (95% of draws 0.179 to 0.286); p for a mean this low 0.4693
-  onset step, unit 1.97 MW: mean distance to the nearest multiple 0.214 units (95% bootstrap 0.159 to 0.273); uniform spread over the same range 0.259 (95% of draws 0.208 to 0.310); p for a mean this low 0.0456
-  onset step, unit 1.93 MW: mean distance to the nearest multiple 0.216 units (95% bootstrap 0.159 to 0.276); uniform spread over the same range 0.254 (95% of draws 0.199 to 0.308); p for a mean this low 0.0842
-  onset step, unit 1.75 MW: mean distance to the nearest multiple 0.222 units (95% bootstrap 0.169 to 0.275); uniform spread over the same range 0.242 (95% of draws 0.190 to 0.295); p for a mean this low 0.2372
-  end step, unit 1.97 MW: mean distance to the nearest multiple 0.258 units (95% bootstrap 0.207 to 0.307); uniform spread over the same range 0.248 (95% of draws 0.195 to 0.302); p for a mean this low 0.6447
-  end step, unit 1.93 MW: mean distance to the nearest multiple 0.259 units (95% bootstrap 0.206 to 0.308); uniform spread over the same range 0.254 (95% of draws 0.200 to 0.308); p for a mean this low 0.5773
-  end step, unit 1.75 MW: mean distance to the nearest multiple 0.239 units (95% bootstrap 0.178 to 0.298); uniform spread over the same range 0.262 (95% of draws 0.209 to 0.313); p for a mean this low 0.1962
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
+[withheld: engine unit size and quantities in its units]
 Noise in a 24-hour median of D8's residual outside drops, 2023-08-15 to 2025-02-28: sd 1.20 MW; middle 95% -4.00 to +1.45 MW
   depth clustering in this period (11 drops): mean distance 0.319 units (95% bootstrap 0.220 to 0.412); median depth 3.63 MW
 Noise in a 24-hour median of D8's residual outside drops, 2025-03-01 onward: sd 0.91 MW; middle 95% -2.23 to +1.61 MW
   depth clustering in this period (17 drops): mean distance 0.266 units (95% bootstrap 0.202 to 0.331); median depth 2.39 MW
-Depth in units of 1.97 MW, sorted: 0.60 0.73 0.83 0.94 0.94 1.05 1.08 1.16 1.16 1.21 1.22 1.24 1.35 1.38 1.46 1.47 1.51 1.53 1.56 1.61 1.64 1.77 1.84 1.94 2.48 2.53 2.56 2.72
+[withheld: engine unit size and quantities in its units]
 Onset steps (MW) median 0.96; end steps (MW) median 1.48
 
 == Timing ==

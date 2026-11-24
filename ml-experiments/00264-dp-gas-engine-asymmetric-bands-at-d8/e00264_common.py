@@ -31,7 +31,7 @@ LOWER_TAILS: Final[tuple[str, ...]] = ("q01", "q05", "q10", "q25")
 UPPER_TAILS: Final[tuple[str, ...]] = ("q75", "q90", "q95", "q99")
 
 UNIT_POINTS: Final[float] = 19.7
-"""One running engine unit (1.97 MW), in points of effective capacity (0.1 MW at D8)."""
+"""One running engine unit, in points of effective capacity (0.1 MW at D8)."""
 DROP_POINTS: Final[float] = -25.0
 """A residual below this (-2.5 MW) counts as a drop."""
 SWITCH_ON_SHARE: Final[float] = 0.05

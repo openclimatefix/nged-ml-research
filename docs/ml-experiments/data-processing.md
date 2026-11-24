@@ -330,9 +330,9 @@ pooled CRPS for July 2026 by 0.68. Applies to experiments. Evidence: [experiment
 steps at D15 and D18 (16 Primaries, origin months 2025-11 to 2026-10, provisional).
 
 **Treat D8's reading as including one gas engine's output until 2023-08-15, and as excluding it
-afterwards (provisional, medium confidence).** The engine connected on 2023-06-13 and its own
-readings carry output from 2023-07-03. While those readings arrived, D8's residual rose by 0.02 MW
-per MW of engine output, where a reading without the output would fall by 1 MW per MW.
+afterwards (provisional, medium confidence).** While the engine's own readings arrived, D8's
+residual rose by 0.02 MW per MW of engine output, where a reading without the output would fall by 1
+MW per MW.
 
 D8's share of half-hours with a residual below -2.5 MW then stepped from 0.010 to 0.257 in the week
 of 2023-08-14 and stayed between 0.10 and 0.46 in every month to January 2026. The share fell from

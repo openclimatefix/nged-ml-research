@@ -12,7 +12,7 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from e00291_common import DATA_DIR, UNIT_MW
+from e00291_common import DATA_DIR
 
 OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -90,7 +90,7 @@ def figure_depth() -> alt.Chart:
             x=alt.X(
                 "depth_in_units:Q",
                 bin=alt.Bin(step=0.25, extent=[0, 3]),
-                title=f"Drop depth in units of {UNIT_MW} MW (the engine's recorded step)",
+                title="Drop depth in units of one engine unit",
                 axis=alt.Axis(values=[0, 1, 2, 3]),
             ),
             y=alt.Y("count()", title="Drops", axis=alt.Axis(tickMinStep=1)),

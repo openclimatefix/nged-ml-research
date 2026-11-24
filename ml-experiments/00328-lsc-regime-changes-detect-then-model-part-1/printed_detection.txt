@@ -84,7 +84,7 @@ rolling_gam 64.0 [(datetime.date(2021, 4, 29), datetime.date(2021, 3, 27)), (dat
 histogram 128.0 [(datetime.date(2023, 10, 19), datetime.date(2023, 8, 17)), (datetime.date(2025, 8, 28), datetime.date(2024, 8, 22))]
 
 ECR connection dates (>= 1 MW, since 2020-06-01) against the chosen detectors' alarms
-  D14 2023-06-13 6.0 MW gas or oil engine, not CHP: rolling_gam +81 d
+  D14 [withheld]
   D5 2021-03-11 1.0 MW gas or oil engine, not CHP: histogram +14 d
   D8 2025-03-24 8.9 MW Solar: no alarm
   (3 assets of 1 MW or more connected since 2020-06-01)

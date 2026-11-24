@@ -19,8 +19,8 @@ size: >-
   forecasts and call reviewed `studies.*` modules unchanged. The maintainer's brief limits the
   reviewers to Sonnet, so the plan and code reviews are Sonnet reviews.
 hypothesis: >-
-  D8's forecast bands are too narrow in both directions, and part of the lower-tail miss is a 6 MW
-  gas engine (probably three units of about 2 MW) that runs in spells and cannot be detected. A
+  D8's forecast bands are too narrow in both directions, and part of the lower-tail miss is a gas
+  engine (probably three units) that runs in spells and cannot be detected. A
   spread that widens as-of, using only residuals already resolved at the forecast origin, and that
   widens most in the direction the engine pushes (net demand falls), gives honest q05 to q95 bands
   at D8 without raising the quantile score at the Primaries that have no engine.
@@ -131,7 +131,7 @@ date: 2026-10-23
 **Widening the forecast band with residuals already seen narrows most of the gap at D8, but the
 gain from modelling a gas engine, beyond simple widening, is not shown.** D8 is a primary substation
 of National Grid Electricity Distribution (NGED). D8's half-hourly power readings appear to include
-the output of a 6 MW gas engine, probably three units of about 2 MW each, which [experiment
+the output of a gas engine, probably three units, which [experiment
 191](../00191-dp-price-sensitive-assets-in-the-history/result.md), [experiment
 198](../00198-d8-summer-spikes-cooling-load-and-residual-test/result.md), and [experiment
 199](../00199-ps2b-engine-detector-v2-ramp-night-price/result.md) could not detect. This experiment
@@ -174,7 +174,7 @@ of D8's tails and not from an engine.
 - **Arm 2** recalibrates the lower quantiles q01 to q25, with a separate correction for each
   combination of four six-hour blocks of the day and four seasons.
 - **Arm 2b** widens both sides by the same method.
-- **Arm 3** is the mixture over 0 to 3 running units of 19.7 points (1.97 MW). Where the visibility
+- **Arm 3** is the mixture over 0 to 3 running units. Where the visibility
   switch is off, arm 3 uses the arm 2b band. The switch turns the engine model on when 5% or more of
   the last 30 days' half-hours had a residual below -25 points (-2.5 MW), and off when the share
   falls below 3%.
@@ -310,8 +310,8 @@ of D8's tails and not from an engine.
   D8 because D8 has no pre-connection rows) at D8 (`time_series_id` 26), and at the placebo sites D10
   (10) and D16 (18). Each row holds `q01` to `q99`, `mean`, `actual`, `lead_hours`, and `run`.
   The files are `data/ml-experiments/00191-*/work/preds/gated/scored_<site>.parquet`.
-- **Units.** One point is 1% of the site's effective capacity, which is 0.1 MW at D8. The engine unit
-  size of 1.97 MW is 19.7 points, and the "drop" threshold of -2.5 MW is -25 points. The placebo
+- **Units.** One point is 1% of the site's effective capacity, which is 0.1 MW at D8. The "drop"
+  threshold of -2.5 MW is -25 points. The placebo
   sites use the same constants in points, because the question there is whether the same algorithm
   with the same settings leaves a site without an engine alone.
 - **Price columns for arm 4 only.** The stored `spread_positive` and `price_p75` flags in the same
@@ -345,7 +345,7 @@ decision rule handles that quarter.
    `(actual - q50) / (q95 - q50)`.
 4. **Mixture over running units (arm 3).** The reading is modelled as the reference's distribution,
    with its spread multiplied by a noise scale `c`, shifted by `delta - k * g`, where `k` is the
-   number of running units (0, 1, 2, or 3), `g` is 1.97 MW (19.7 points), and `delta = g * E[k]`
+   number of running units (0, 1, 2, or 3), `g` is the output of one unit, and `delta = g * E[k]`
    is set per row so that the mixture's mean equals the reference's mean (the reference was trained
    on readings that include the engine). The reference distribution is the piecewise-linear
    cumulative distribution through its 11 quantiles, with an exponential tail beyond q01 and q99

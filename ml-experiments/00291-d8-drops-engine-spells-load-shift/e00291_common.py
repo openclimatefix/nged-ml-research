@@ -23,7 +23,7 @@ GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
 HALF_HOUR: Final[timedelta] = timedelta(minutes=30)
 G2_SERIES: Final[int] = 33
 UNIT_MW: Final[float] = 1.97
-"""One engine unit of G2, from the four output levels 0, 1.96, 3.93 and 5.93 MW."""
+"""One engine unit of G2, from the recorded output levels."""
 N_UNITS: Final[int] = 3
 CLEAN_END: Final[datetime] = datetime(2023, 6, 13, tzinfo=UTC)
 G2_FIRST: Final[datetime] = datetime(2023, 7, 3, tzinfo=UTC)
