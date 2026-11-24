@@ -142,6 +142,11 @@ def report(*, part: int, data_dir: Path = ML_EXPERIMENTS_DATA_DIR) -> int:
             print("\n## Baseline (M* against C, 8 folds):", json.dumps(base, default=float)[:2000])
     show(title="Fit logs", rows=training_log_rows(part=part, data_dir=data_dir))
     gate = read_json(path=arms.gate_file(data_dir=data_dir))
+    if gate is not None and gate.get("waived"):
+        print(
+            "\n## Waived known-answer check:",
+            gate.get("waiver", {}).get("statement", "no statement"),
+        )
     if gate is not None:
         print(
             "\n## Known answers:",
@@ -190,6 +195,18 @@ def selftest() -> int:
             "audit_trigger_5": {"fires": False}, "cold_night_difference": {"six": 0.0, "eight": 0.0}, "mask_points": None, "extra_contrasts": {"H vs Z": {"six": c, "eight": c}},
         }  # fmt: skip
         (folder / "score" / "part1.json").write_text(json.dumps(fake))
+        gate_path = arms.gate_file(data_dir=base)
+        gate_path.parent.mkdir(parents=True, exist_ok=True)
+        gate_path.write_text(
+            json.dumps(
+                {
+                    "KF9": {"pass": False},
+                    "failed": ["KF9"],
+                    "waived": True,
+                    "waiver": {"statement": "Waived known-answer check, not a passed one."},
+                }
+            )
+        )
         import contextlib
         import io
 
@@ -197,6 +214,9 @@ def selftest() -> int:
         with contextlib.redirect_stdout(buffer):
             assert report(part=1, data_dir=base) == 0
         text = buffer.getvalue()
+        assert "Waived known-answer check" in text and '"failed": ["KF9"]' in text, (
+            "the report must print the waiver beside the failed check"
+        )
         assert "All 16 Primaries" in text and text.count("+0.") > 16 and " 15 |" in text, (
             "the 16-Primary table must print every Primary"
         )

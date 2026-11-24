@@ -31,7 +31,8 @@ import e00716_arms as arms
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 GATE_CODE_HASH: Final = "7d6a4381ffe3d298"
-GATE_COMMIT: Final = "126577d1d"
+GATE_COMMITS: Final = ("126577d1d", "e4617f721")
+"""The commits at which the gate ran: the `M` fits, the pre-check, the wiring records, and `WH_s0` at the first, the other eight gating jobs at the second. Both have code hash 7d6a4381ffe3d298."""
 EXPECTED_FAILED: Final = frozenset({"KF9"})
 EXPECTED_PASSED: Final = frozenset({"KF10", "KF11", "KF12"})
 EXPECTED_RECORDED: Final = (
@@ -52,13 +53,14 @@ EXPECTED_KNOWN_ANSWER_SHA256: Final = (
 )
 STATEMENT: Final = (
     "Waived known-answer check, not a passed one. KF9 (arm H-S minus arm H on the solar block in world "
-    "WH, median over seeds 0 to 2) is {value:.5f} against the need of {need:.5f}. The secondary "
+    "WH, the difference of the per-arm medians over seeds 0 to 2) is {value:.5f} against the need of {need:.5f}. The secondary "
     "readings of KF9 do not reach the need either: days 1 to 60 {d1:.5f}, days 61 to 236 {d2:.5f}, "
     "pass 60 {p60:.5f}. KF10, KF11, and KF12 pass. The maintainer waived KF9. The audit of the failure "
     "found no implementation fault and two method findings: the patience-8 rule scored the history "
-    "arm at passes 4, 23, and 5 against global bests at passes 43, 55, and 32, and the yardstick "
-    "of KF9 sits at the oracle ridge (arm Z 0.0394, naive ridge 0.0470, oracle ridge 0.0324, a "
-    "pass needs 0.0321 or better). Every statement that the history path recovers the hidden sky "
+    "arm at passes 4, 23, and 5 against global bests at passes 43, 55, and 32, and the pass mark "
+    "forces arm H below the oracle ridge (arm H-S scores 0.0394 on the solar block and arm Z 0.0397, "
+    "the naive ridge 0.0470, and the oracle ridge 0.0324, so arm H must score 0.0321 or better, "
+    "below the oracle ridge's 0.0324). Every statement that the history path recovers the hidden sky "
     "from the PV estimate is unsupported by a passing known-answer test."
 )
 
@@ -118,7 +120,7 @@ def build_record(
             "failed_checks": sorted(EXPECTED_FAILED),
             "passed_checks": sorted(EXPECTED_PASSED),
             "recorded_checks": list(EXPECTED_RECORDED),
-            "gate_commit": GATE_COMMIT,
+            "gate_commits": list(GATE_COMMITS),
             "thresholds_changed": False,
             "verdict_rules_changed": False,
             "statement": STATEMENT.format(
@@ -244,6 +246,9 @@ def selftest() -> int:
         assert record["last_run_sha256"] == last_sha
         assert record["waiver"]["decision_quoted"] == DECISION
         assert record["waiver"]["failed_checks"] == ["KF9"]
+        assert record["waiver"]["gate_commits"] == ["126577d1d", "e4617f721"]
+        assert "0.0397" in record["waiver"]["statement"]
+        assert "0.0321" in record["waiver"]["statement"]
         assert record["waiver"]["thresholds_changed"] is False
         assert "Waived known-answer check" in record["waiver"]["statement"]
         assert "unsupported by a passing known-answer test" in record["waiver"]["statement"]

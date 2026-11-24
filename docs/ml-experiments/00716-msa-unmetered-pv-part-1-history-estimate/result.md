@@ -69,8 +69,8 @@ separately, so the Primary's meter reads demand minus that generation. The estim
 (in megawatts) times a yield curve between 0 and about 1 that is driven by the CAMS satellite
 irradiance of the token's own half-hour. This page is part 1 of follow-up F7. Part 2 is
 [experiment 717](../00717-msa-unmetered-pv-part-2-target-row-forecast/result.md), which adds an
-explicit PV forecast to the target row. This page is the plan: no code has been fitted, no neural
-network has been trained, and every number below is a design value or a figure from an earlier
+explicit PV forecast to the target row. This page is the plan: no arm has been fitted on the real
+folds, and every number below is a design value or a figure from an earlier
 experiment. The design is condensed from the private design note `f7_design.md` and its two Opus
 reviews.
 
@@ -80,18 +80,19 @@ half the `gap`. Its value is 0.00070 against the need of 0.00729, and its second
 to 60, days 61 to 236, and pass 60) fail as well. KF10, KF11, and KF12 pass. No threshold and no
 verdict rule changed. An audit of the failure found no implementation fault and two method findings.
 First, the patience-8 rule scored arm `H` at passes 4, 23, and 5 of seeds 0, 1, and 2, against
-global bests at passes 43, 55, and 32, because the history path learns slowly. Second, the yardstick
-of KF9 sits at the oracle ridge: arm `Z` scores 0.0394 on the solar block, the naive ridge reference
-0.0470, and the oracle ridge 0.0324, so arm `H` needs 0.0321 or better to pass. Every statement that
-the history path recovers the hidden sky from the PV estimate is therefore unsupported by a passing
-known-answer test.
+global bests at passes 43, 55, and 32, because the history path learns slowly. Second, the pass mark
+forces arm `H` below the oracle ridge: arm `H-S` scores 0.0394 on the solar block and arm `Z`
+0.0397, the naive ridge reference 0.0470, and the oracle ridge 0.0324, so arm `H` must score 0.0321
+or better, below the oracle ridge's 0.0324. Every statement that the history path recovers the
+hidden sky from the PV estimate is therefore unsupported by a passing known-answer test.
 
 **The early-stopping pre-check of the known-answer worlds read one seed of three, and the other
-seeds of arm `M` are noisier than its limit.** The pre-registered pre-check reads arm `M` of seed 0
-only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of 0.0109 in world WH
-and 0.0121 in world WT, against the limit of 0.0225. Seeds 1 and 2 of arm `M` in WH have a last-10
-noise of 0.029 and 0.031, above that limit, so the rung-4 pass depended on seed 0. The numbers
-review checks this reading.
+seeds of arm `M` in world WH are noisier than its limit.** The pre-registered pre-check reads arm
+`M` of seed 0 only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of
+0.0109 in world WH against the limit of 0.0225, and 0.0121 in world WT against the limit of 0.134.
+Seeds 1 and 2 of arm `M` in WH have a last-10 noise of 0.029 and 0.031, above the WH limit, so the
+rung-4 pass in WH depended on seed 0. In WT, seeds 1 and 2 have 0.038 and 0.016, below the WT limit.
+The numbers review checks this reading.
 
 **The honest expectation is a tie.** Each history token already carries CAMS shortwave irradiance
 and solar geometry, so the estimate adds a capacity scale, a physical shape, and units that match
@@ -383,17 +384,19 @@ output of any metered generator, and no page names or plots a metered generator'
 
 ## Method
 
-The experiment is planned and has no fitted result yet, so these bullets describe the design.
+The experiment is planned and has no arm fitted on the real folds yet, so these bullets describe
+the design.
 
 - **The known-answer gate is waived at KF9:** `e00716_waive_gate.py` writes the gate file with
   `waived: true`, the failed check and its values, the code hash, and the sha256 of the last-run
-  file and of `e00716_known_answer.py`. The scoring rule of the known-answer checks, patience 8 and
-  the median of the 5 passes ending at the best pass, is unchanged.
+  file and of `e00716_known_answer.py`. The generated report prints the waiver beside the failed
+  check. The scoring rule of the known-answer checks, patience 8 and the median of the 5 passes
+  ending at the best pass, is unchanged.
 - **The pre-check reads seed 0 only:** the noise limit of the early-stopping pre-check comes from
   the last 10 validation losses of arm `M` at seed 0. At seeds 1 and 2 of WH the same noise is 0.029
-  and 0.031, above the limit of 0.0225 at rung 4. The diagnostic best pass of the pre-check uses
-  patience 30, the patience that trains arm `M`. An Opus review of the code behind the pre-check
-  (commit 126577d1d) was clean.
+  and 0.031, above the limit of 0.0225 in WH at rung 4. The diagnostic best pass of the pre-check
+  uses patience 30, the patience that trains arm `M`. An Opus review of the code behind the
+  pre-check (commit 126577d1d) was clean.
 - **Architecture:** experiment 713's network (width 64, two axial blocks) with the new token path,
   read-out path, and head map of "How the estimate enters the network".
 - **Training regime:** stages 2 and 3 of experiment 713's recipe from the stored stage 1 state of
@@ -421,8 +424,9 @@ regression for each of the 48 half-hours of the target day, with one shared pena
 cross-validation over contiguous blocks of origins, and the 14 lead days pooled. The history features
 carry the same weight at every lead. The naive and the oracle references share this structure.
 The oracle may therefore learn more from the history than a single linear model would, so `gap`
-probably understates how much the estimate tells a neural network, and the KF9 threshold of 0.5 ×
-`gap` is probably easier to meet than a single-model reading would make it.
+probably understates how much the estimate tells a neural network. The audit of KF9 found a second
+effect on the threshold: the naive ridge scores worse than the trained network without the estimate,
+so the threshold of 0.5 × `gap` makes the pass mark for arm `H` lower than the oracle ridge's score.
 
 **The first rung failed on fresh draws on the 60-day window, and the validation window was widened
 before any fit of `M`.** The stored rung-4 pass came from an upper-tail world draw: on the 60
