@@ -32,7 +32,9 @@ PRICE_DIRS: Final[tuple[Path, ...]] = (
 GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
 D8_KEY: Final[int] = 26
 G2_SERIES: Final[int] = 33
-CONTROL_LABELS: Final[tuple[str, ...]] = ("D3", "D5", "D14")
+REGISTER_PRIMARY: Final[str] = engine.engine_string(key="d8_engine_register_primary")
+"""The Primary under which the register lists the gas engine (read from the private file)."""
+CONTROL_LABELS: Final[tuple[str, ...]] = ("D3", "D5", REGISTER_PRIMARY)
 LEFT_TAIL_MW: Final[float] = -2.5
 """A half-hour is in the left tail when the metered minus expected power is below this."""
 G2_UNIT_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw")

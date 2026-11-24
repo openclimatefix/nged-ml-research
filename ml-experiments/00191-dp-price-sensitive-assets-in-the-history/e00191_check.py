@@ -37,7 +37,7 @@ def main() -> None:
         )
         diff = float(np.abs(mine.a0.theta - reference.theta).max())
         print(
-            f"{site}: fit seconds {seconds:.0f}; rows {mine.n_rows}; masked {mine.n_masked}; "
+            f"{common.shown(site)}: fit seconds {seconds:.0f}; rows {mine.n_rows}; masked {mine.n_masked}; "
             f"max |theta_a0 - fit_gam theta| = {diff:.2e}; "
             f"price coefficients {np.round(mine.joint.theta_price, 4)}; "
             f"rows with a gate of 1 and no price: {grid.n_missing}; "

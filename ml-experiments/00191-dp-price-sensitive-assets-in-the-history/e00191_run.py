@@ -32,7 +32,7 @@ def main() -> None:
     jobs = [(site, args.ungated, args.features) for site in args.sites]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for site, written in pool.map(one_site, jobs):
-            print(site, written, flush=True)
+            print(common.shown(site), written, flush=True)
 
 
 if __name__ == "__main__":

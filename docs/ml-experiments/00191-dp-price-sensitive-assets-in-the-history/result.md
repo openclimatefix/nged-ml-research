@@ -100,7 +100,7 @@ advice:
     covers 42% of readings and the q05 quantile sits above 31% of them (Results, tails).
   - >-
     Do not gate a model of the register's Primary on the engine's connection date, because the data
-    shows no price response at the register's Primary (Figure 2).
+    shows no price response at the register's Primary (Results, fitted coefficients).
 ---
 
 # Experiment 191: can price-following assets be modelled in the history so the forecast improves?
@@ -128,8 +128,6 @@ precision (see Checks), and the gas engine's response is visible in the fitted c
 response does not carry forward to the scored year.
 
 ![Mean absolute error of each price-aware arm minus the reference's, at D8 and the register's Primary](figure_1_error_against_reference.svg)
-
-![Fitted price response in MW at each monthly fit, D8 and the register's Primary](figure_2_fitted_price_response.svg)
 
 ## Inputs and arms
 

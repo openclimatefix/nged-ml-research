@@ -139,7 +139,7 @@ def closures_near(*, first: int, last: int) -> list[str]:
     return [f"{row['sheet']} {row['switch']}" for row in hits.iter_rows(named=True)]
 
 
-def main() -> None:  # noqa: PLR0912, PLR0915
+def main() -> None:  # noqa: PLR0915
     """Build the drop table and every figure's input."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     arrays = pickle.loads((FALSE_ALARM_DIR / "arrays.pkl").read_bytes())
@@ -225,22 +225,6 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     say(f"Drops per start year: {years}")
     after_mid_2023 = table.filter(pl.col("start_date") >= date(2023, 7, 1)).height
     say(f"Drops starting on or after 2023-07-01: {after_mid_2023} of {n}")
-
-    # What the power does inside a drop: the share of half-hours spent low.
-    inside_mask = np.zeros(n_stamps, dtype=bool)
-    for first, last in drops:
-        inside_mask[first:last] = True
-    after_first = np.arange(n_stamps) >= drops[0][0]
-    valid = np.isfinite(power)
-    for label, mask in (
-        ("inside drops", inside_mask),
-        ("outside drops, after the first", ~inside_mask & after_first),
-    ):
-        use = mask & valid
-        say(
-            f"Half-hours {label}: below 1 MW {np.mean(power[use] < 1.0):.3f}, below 3 MW "
-            f"{np.mean(power[use] < 3.0):.3f}"
-        )
 
     # Weekday and hour of day.
     for label, col, bins in (
@@ -513,7 +497,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     lines = [
         (
             "| Drop | Start | End | Duration (days) | Start weekday and hour "
-            "| Best neighbour step (MW) | Logged closures within 24 hours |"
+            "| Largest neighbour step-up as a share of the drop's depth "
+            "| Logged closures within 24 hours |"
         ),
         "|---|---|---|---|---|---|---|",
     ]
@@ -524,7 +509,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             f"| {row['drop']} | {row['start_date']} | {row['end_date']} "
             f"| {row['duration_days']:.1f} | {weekday_names[row['start_weekday']]} "
             f"{int(row['start_hour']):02d}:{int(row['start_hour'] % 1 * 60):02d} "
-            f"| {row['best_neighbour_step_mw']:+.1f} ({row['best_neighbour']}) | {n_closures} |"
+            f"| {row['best_neighbour_step_mw'] / row['depth_mw']:+.2f} ({row['best_neighbour']}) "
+            f"| {n_closures} |"
         )
     (Path(__file__).parent / "drops_table.txt").write_text("\n".join(lines) + "\n")
 

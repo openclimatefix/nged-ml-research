@@ -24,7 +24,7 @@ def main() -> None:
         grid = engine.build_price_grid(cache=work, site=site, ungated=False)
         fits = pickle.loads((common.FITS_DIR / "gated" / f"{site}.pkl").read_bytes())
         capacity = work.sites[site].table.effective_capacity_mw
-        print(f"\n== {site} (effective capacity {capacity:.2f} MW)")
+        print(f"\n== {common.shown(site)} (effective capacity {capacity:.2f} MW)")
         print("cut        rows  a0 MAE  joint MAE  gain%   response MW (all on)  theta (points)")
         gains = []
         for cut_fits in fits:

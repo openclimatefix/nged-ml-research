@@ -67,6 +67,13 @@ FITS_DIR: Final[Path] = WORK_DIR / "fits"
 
 REGISTER_PRIMARY: Final[str] = engine.engine_string(key="d8_engine_register_primary")
 """The Primary under which the register lists the gas engine (read from the private file)."""
+
+
+def shown(site: str) -> str:
+    """Return the site's name for stdout and logs, withholding the register's Primary."""
+    return "[withheld]" if site == REGISTER_PRIMARY else site
+
+
 ASSET_SITES: Final[tuple[str, ...]] = ("D8", REGISTER_PRIMARY)
 NO_HARM_SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D16")
 ALL_SITES: Final[tuple[str, ...]] = (*ASSET_SITES, *NO_HARM_SITES)

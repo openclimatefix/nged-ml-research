@@ -21,6 +21,14 @@ WIDTH: Final[int] = CONTENT_WIDTH_PX - 80
 CHANGE: Final[date] = date(2023, 8, 14)
 FALL: Final[date] = date(2026, 3, 9)
 
+SITE_NAMES: Final[dict[str, str]] = {
+    "D8": "D8",
+    "D3": "D3",
+    "D5": "D5",
+    common.REGISTER_PRIMARY: "register's Primary",
+}
+"""Chart label of each site, naming the register's Primary generically."""
+
 
 def main() -> None:  # noqa: D103
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
@@ -41,7 +49,9 @@ def main() -> None:  # noqa: D103
             w.with_columns(era=era)
             .group_by("era")
             .agg(k=pl.col("k").sum(), n=pl.col("n").sum())
-            .with_columns(share=pl.col("k") / pl.col("n"), site=pl.lit(label))
+            .with_columns(
+                share=pl.col("k") / pl.col("n"), site=pl.lit(SITE_NAMES.get(label, label))
+            )
         )
         rows.append(pooled.select("era", "site", "share"))
     fig1 = (
@@ -49,14 +59,14 @@ def main() -> None:  # noqa: D103
         .mark_bar(aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
-                "site:N", title=None, sort=["D8", "D3", "D5", "D14"], axis=alt.Axis(labelAngle=0)
+                "site:N", title=None, sort=list(SITE_NAMES.values()), axis=alt.Axis(labelAngle=0)
             ),
             y=alt.Y("share:Q", title="Share of half-hours in shortfall"),
             color=alt.Color(
                 "site:N",
                 legend=None,
                 scale=alt.Scale(
-                    domain=["D8", "D3", "D5", "D14"],
+                    domain=list(SITE_NAMES.values()),
                     range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY, ocf.DATA_PURPLE],
                 ),
             ),

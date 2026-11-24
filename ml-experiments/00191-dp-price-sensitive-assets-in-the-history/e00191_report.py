@@ -22,7 +22,9 @@ def contrast_table(*, variant: str, sites: tuple[str, ...], cut: str) -> None:
     for site in sites:
         row = report[site][cut]
         base = row["a0"]
-        print(f"{site}: a0 mae {base['ae']:.3f} qs {base['qs']:.3f} cov90 {base['cov90']:.2f}")
+        print(
+            f"{common.shown(site)}: a0 mae {base['ae']:.3f} qs {base['qs']:.3f} cov90 {base['cov90']:.2f}"
+        )
         for arm in ARMS[1:]:
             ae, qs = row[f"{arm}_minus_a0_ae"], row[f"{arm}_minus_a0_qs"]
             print(
@@ -40,7 +42,7 @@ def tails(*, variant: str, sites: tuple[str, ...]) -> None:
         for arm in ("a0", "h"):
             r = report[site]["all"][arm]
             print(
-                f"{site} {arm}: "
+                f"{common.shown(site)} {arm}: "
                 + "  ".join(
                     f"{q}: pin {r[f'pin_{q}']:.3f}, below {r[f'below_{q}']:.3f}"
                     for q in ("q01", "q05", "q95", "q99")
@@ -54,7 +56,10 @@ def median_minus_mean(*, variant: str, sites: tuple[str, ...]) -> None:
     for site in sites:
         frame = score.load(variant=variant, site=site)
         by_arm = frame.group_by("arm").agg((pl.col("q50") - pl.col("mean")).mean().alias("d"))
-        print(site, {r["arm"]: round(r["d"], 3) for r in by_arm.sort("arm").iter_rows(named=True)})
+        print(
+            common.shown(site),
+            {r["arm"]: round(r["d"], 3) for r in by_arm.sort("arm").iter_rows(named=True)},
+        )
 
 
 def against_experiment_155() -> None:

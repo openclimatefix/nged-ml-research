@@ -10,8 +10,6 @@ Total days inside drops: 148.2 of 1642 (0.090)
 First drop: 2022-08-09; last: 2026-01-27
 Drops per start year: {2022: 1, 2023: 3, 2024: 7, 2025: 15, 2026: 3}
 Drops starting on or after 2023-07-01: 28 of 29
-Half-hours inside drops: below 1 MW 0.063, below 3 MW 0.435
-Half-hours outside drops, after the first: below 1 MW 0.015, below 3 MW 0.158
 start weekday counts Mon..Sun [3, 5, 7, 3, 1, 5, 5], chi-squared p = 0.479
 end weekday counts Mon..Sun [3, 3, 3, 4, 5, 8, 3], chi-squared p = 0.539
 start hour counts by 6-hour block (0-6, 6-12, 12-18, 18-24) [11, 3, 5, 10], chi-squared p = 0.104
