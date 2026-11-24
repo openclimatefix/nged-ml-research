@@ -61,8 +61,10 @@ headline: >-
   signed-MW Primaries and +0.0085 at the eight MVA-only Primaries. Both 98.75% intervals include
   zero and lie inside the pre-registered limits of 0.094 and 0.25 points of capacity. F4 minus the
   placebo F4-R, whose neighbour slots hold Primaries that are not neighbours, is +0.0182 and
-  -0.0028, and both intervals also include zero. The verdict is `not supported` (no detectable
-  difference). Two known-answer checks of this experiment's own gate (KN6 and KN7) failed and were
+  -0.0028, and both intervals also include zero. The verdict is `not supported` on overall CRPS (no
+  detectable difference), and the switching question is untested: N1 and N2 did not test whether
+  neighbour rows help the network tell a temporary switching event from a permanent level shift.
+  Two known-answer checks of this experiment's own gate (KN6 and KN7) failed and were
   waived, so the page makes no claim about whether F4 follows a level change.
 lessons: >-
   The two seeds disagree in sign on N1 in both groups (seed differences -0.0058 and +0.0342 at the
@@ -78,12 +80,15 @@ take_home_message: >-
   from the neural network without neighbours is +0.0127 and +0.0085 points of capacity, with
   intervals that include zero. The experiment cannot say that neighbour rows carry no information,
   because the known-answer checks of whether F4 follows a level change failed and were waived. The
-  pre-registered rule closes neighbour rows in this neural network on the 16-Primary panel. A
-  retest needs fleet-scale adjacency.
+  experiment is not supported on overall CRPS, and the switching question is untested. The
+  pre-registered rule closes only further runs of the overall-CRPS neighbour-row contrasts on the
+  16-Primary panel. A retest of those contrasts needs fleet-scale adjacency, and the switching
+  question needs its own experiment.
 advice:
   - >-
-    Do not retest neighbour rows in the axial-attention neural network on the 16-Primary panel; the stop
-    rule of this experiment requires fleet-scale adjacency of about 1,161 Primaries first.
+    Do not rerun the overall-CRPS neighbour-row contrasts in the axial-attention neural network on
+    the 16-Primary panel; the stop rule of this experiment requires fleet-scale adjacency of about
+    1,161 Primaries first. The switching question is a separate experiment.
   - >-
     Fix the learning rate that experiment 713's shared trunk uses for the lead-day inputs before any
     new known-answer test of whether the neural network follows level changes. At the budget the
@@ -123,14 +128,15 @@ smaller difference is likely to read as a tie.
 
 ## Result
 
-**The neighbour rows did not improve the forecast: F4 minus M\* is +0.0127 and +0.0085 points of
-capacity, and the verdict is `not supported`.** F4 is the axial-attention neural network with
-neighbour rows, and M\* is experiment 713's selected network without them. Both 98.75% intervals
-include zero and lie inside the pre-registered limits. The contrasts are the mean difference in the
-continuous ranked probability score (CRPS), in points of capacity, at leads from 24 h up to but not
-including 240 h. They cover 8 folds (2025-11 to 2026-06) and seeds 0 and 1, and come from the
-headline scorer `e00715_score.py headline` (`score/headline.json`, keys `N1` and `N2`). A positive
-number means that the first arm is worse.
+**The neighbour rows did not improve the overall forecast: F4 minus M\* is +0.0127 and +0.0085
+points of capacity, and the verdict is `not supported` on overall CRPS. The switching question is
+untested.** F4 is the axial-attention neural network with neighbour rows, and M\* is experiment
+713's selected network without them. Both 98.75% intervals include zero and lie inside the
+pre-registered limits. The contrasts are the mean difference in the continuous ranked probability
+score (CRPS), in points of capacity, at leads from 24 h up to but not including 240 h. They cover 8
+folds (2025-11 to 2026-06) and seeds 0 and 1, and come from the headline scorer `e00715_score.py
+headline` (`score/headline.json`, keys `N1` and `N2`). A positive number means that the first arm is
+worse.
 
 | Contrast | The six signed-MW Primaries | The eight MVA-only Primaries |
 |---|---|---|
@@ -160,10 +166,15 @@ the person who ran the fits: N2 is -0.0028 at the eight MVA-only Primaries, and 
 read it as satisfying the rule. The manager corrected the reading before any further fit, and every
 number on this page therefore rests on two seeds.
 
-**The stop rule closes neighbour rows in this neural network on the 16-Primary panel.** The
-pre-registered rule says that a verdict of `not supported` closes neighbour rows in the
-axial-attention neural network on the 16-Primary panel. The rule also says that a retest needs
-fleet-scale adjacency (`score/headline.json`, key `stop_rule`).
+**The stop rule closes only further runs of the overall-CRPS neighbour-row contrasts on the
+16-Primary panel, and it does not close the switching question.** The pre-registered rule says that
+a verdict of `not supported` closes neighbour rows in the axial-attention neural network on the
+16-Primary panel, and that a retest needs fleet-scale adjacency (`score/headline.json`, key
+`stop_rule`). The rule is read here as covering N1 and N2 on overall CRPS. N1 and N2 did not test
+the maintainer's question, which is whether neighbour rows help the network tell a temporary
+switching event from a permanent level shift, so that a network trained with synthetic switching
+events keeps a forecast of the normal running arrangement during a switching event. That question is
+untested.
 
 **The earlier interim screen read `advance`.** The screen covered 4 folds (2025-11, 2026-01,
 2026-03, and 2026-06). F4 minus M\* was +0.0103 at the six signed-MW Primaries and +0.0200 at the
@@ -629,8 +640,10 @@ with each Primary and each month left out in turn, that the q01 and q99 pinball 
 that F4 is not worse than M* by more than 0.10 at the donor after temporary moves on the second
 generator. **A gain that F4-R matches is not evidence for electrical neighbours.** The write-up then
 says that any other Primary's rows did as well, and names a regional residual as the likely source.
-A verdict of `not supported` or `refuted` closes neighbour rows in the axial-attention network on the
-16-Primary panel, and a retest then needs the fleet-scale adjacency.
+A verdict of `not supported` or `refuted` closes further runs of the overall-CRPS neighbour-row
+contrasts in the axial-attention network on the 16-Primary panel, and a retest then needs the
+fleet-scale adjacency. The rule does not close the question of whether neighbour rows help the
+network tell a temporary switching event from a permanent level shift.
 
 ## Secondary contrasts on injected events
 
