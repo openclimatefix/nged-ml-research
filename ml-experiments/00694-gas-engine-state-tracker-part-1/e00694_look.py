@@ -150,9 +150,7 @@ def main() -> None:
     say(
         f"Gas A running spells (runs with at least 1 unit): {len(spells)}, median {np.median(spells):.0f} half-hours"
     )
-    say(
-        f"Gas A output per unit: median g/units {np.median(g[units > 0] / units[units > 0]):.3f} MW"
-    )
+    say("Gas A output per unit: median g/units [withheld]")  # the unit size is private
     if counts != EXPECTED_UNIT_COUNTS or len(units) != 2054:
         raise SystemExit("Phase A cannot reproduce experiment 194's counts: stop (verdict invalid)")
 
@@ -187,7 +185,9 @@ def main() -> None:
             for i in range(1, len(hist) - 1)
             if hist[i] >= 8 and hist[i] >= hist[i - 1] and hist[i] >= hist[i + 1]
         ]
-        say(f"  merged-step bins with local maxima (count >= 8): {peaks}")
+        # Where the engine runs, the peaks sit at multiples of its unit size, so they are withheld.
+        shown = peaks if name == "pre-engine" else "[withheld]"
+        say(f"  merged-step bins with local maxima (count >= 8): {shown}")
         for lo_l, hi_l in ((0, 3), (3, 6), (6, 8), (8, 10)):
             m = (steps["before"] >= lo_l) & (steps["before"] < hi_l)
             r_n = int(((sz >= 1.5) & m).sum())
@@ -267,49 +267,6 @@ def main() -> None:
         )
     )
     save(chart=fig2, name="figure_2_difference_histograms")
-
-    # ---- Figure 3: merged fall size against the level before the fall
-    rows = []
-    for name, ed in era_data.items():
-        st = ed["steps"]
-        m = st["size"] <= -0.6
-        lev, fall = st["before"][m], -st["size"][m]
-        for lo_l in np.arange(0, 14, 1.0):
-            sel = (lev >= lo_l) & (lev < lo_l + 1.0)
-            if sel.sum() >= 5:
-                rows.append(
-                    {
-                        "era": name,
-                        "level": float(lo_l + 0.5),
-                        "fall": float(np.median(fall[sel])),
-                        "n": int(sel.sum()),
-                    }
-                )
-    frame = pl.DataFrame(rows)
-    pts = (
-        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True, strokeWidth=1.5)
-        .encode(
-            x=alt.X("level:Q", title="Reading before the fall (MVA, 1 MVA bins)"),
-            y=alt.Y(
-                "fall:Q", title="Median size of the fall (MVA)", scale=alt.Scale(domain=[0, 7])
-            ),
-            color=alt.Color(
-                "era:N",
-                scale=alt.Scale(domain=list(ERAS), range=COLOURS),
-                legend=alt.Legend(orient="top", title=None),
-            ),
-        )
-    )
-    fig3 = pts.properties(
-        width=WIDTH,
-        height=220,
-        title=alt.TitleParams(
-            wrap("Size of D8's merged falls against the reading before them."),
-            anchor="start",
-        ),
-    )
-    save(chart=fig3, name="figure_3_fall_size_by_level")
 
     # ---- Figure 4: sign test, dwell, hour of day
     rows = []

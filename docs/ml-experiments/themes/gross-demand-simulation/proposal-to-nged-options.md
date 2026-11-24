@@ -252,7 +252,7 @@ as such.
 - **Engines.** A hidden Markov detector finds a recorded engine when its output is injected but
   raises too many false alarms at three of six other Primaries ([experiment
   196](../../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)). The
-  fitted unit is 1.4 to 1.5 MW against a recorded 1.97 MW (experiment 294). Gas A ran in 0.170 of
+  fitted unit size is not yet reliable (experiment 294). Gas A ran in 0.170 of
   half-hours in spells with a median of 2 hours over its 44 recorded days ([experiment
   194](../../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)),
   and for load shifts of a day or less the event table finds 0.16 to 0.26 of the injected megawatts
@@ -275,7 +275,7 @@ as such.
   found about as many solar steps as it invents where none exists ([experiment
   215](../../00215-dp-pv-step-scan-real-series-register-match/result.md)). The asset types per
   Primary therefore have to come from the register, and the register's Primary column can name the
-  wrong meter: the 6 MW engine that appears in D8's readings is registered under D14
+  wrong meter: a gas engine that appears in D8's readings is registered under a different Primary
   (asset-inventory page).
 
 **What this means for the proposal: the fit can deliver a register-constrained inventory with
@@ -303,7 +303,7 @@ judgement.
 | 1 | Demand under the assets (calendar, temperature, heating, holidays, clock changes, night step) | No: behavioural, but convex and explicit | Yes, the demand GAM `studies.dp_gam`; the heating slope's interval is about 38% of the slope wide on realistic noise (experiment 113) | Low: needs a weather-scenario driver (ERA5 or a climatological year) in place of a forecast | High: the substation's own profile replaces a cluster's profile in NGED's load set, and the night step is the operator-visible feature |
 | 2 | Solar (rooftop fleet and registered sites) | Yes | Yes: the physics plant curve (experiment 282) and the capacity fit and probe (experiments 129, 649, 673) | Low: scale the curve by the fitted season-year capacity; a register-anchored yearly trajectory is the cheapest January option on the [unmetered PV page](../solar-disaggregation/unmetered-pv-capacity.md) | High: every register name lists solar (77 slots, 33.2 MW), and the summer-peak-generation day is one of NGED's five representative days |
 | 3 | New connections from the register (16 accepted slots, 3.7 MW: 13 solar, 2 storage, 1 wind) | Yes for solar and wind | Partly: the physics plants exist; no code adds a registered asset at its energisation date | Low to medium | Medium to high: this is the DFES pipeline step done per substation; needs NGED to say which connections matter |
-| 4 | Gas engine (unit size, unit count, ramping, minimum on-duration, running-time distribution) | Yes for the plant; no for the dispatch rule | No: the detector is a hidden Markov model with no ramp or minimum-on equation; Gas A's record is 44 days | Medium: the equations are simple, the dispatch rule (price, Triad, Capacity Market) is not, and the fit is weak (unit 1.4 to 1.5 MW against 1.97 MW) | Medium: 2 registered gas or oil slots (7.0 MW) and 8 bioenergy slots (11.1 MW) at 6 register names; the D8 engine is the one large case |
+| 4 | Gas engine (unit size, unit count, ramping, minimum on-duration, running-time distribution) | Yes for the plant; no for the dispatch rule | No: the detector is a hidden Markov model with no ramp or minimum-on equation; Gas A's record is 44 days | Medium: the equations are simple, the dispatch rule (price, Triad, Capacity Market) is not, and the fit of the unit size is weak | Medium: 2 registered gas or oil slots and 8 bioenergy slots (11.1 MW) at 6 register names; the D8 engine is the one large case |
 | 5 | Battery (scheduler with price signals and state of charge, several profiles) | Yes for the plant; the schedule is a choice among optimisers | Partly: `studies.battery_dispatch` holds a daily linear programme and a rank rule; `studies.battery_templates` holds five tariff and merchant schedules; no module runs them forward for a registered battery | Low to medium to run forward; not fittable (real batteries mostly undetected) | Low today: 3 connected slots, 0.65 MW, and 2 accepted, 0.4 MW; rises if NGED's storage pipeline grows |
 | 6 | Wind | Yes | Yes: the physics plant on each ensemble member (experiment 347); capacity estimation was refuted by experiment 617's known-answer test (the decision to park it is not on a merged page and is not re-checked) | Low | Low: 1 connected slot, 1.2 MW, at D9 |
 
@@ -390,7 +390,7 @@ these series.**
 **The controls are the ones the brief lists, and each maps onto an existing repository mechanism.**
 
 - **Register constraints.** The LLM may propose an asset only from the register's rows for that
-  register name and its neighbours (the D8 and D14 case says neighbours are needed), and a solar
+  register name and its neighbours (the D8 engine case says neighbours are needed), and a solar
   term is always present.
 - **Held-out months.** Every move is scored on months the fit has not seen, as the asset-inventory
   page already requires for scenario calibration.
@@ -467,7 +467,7 @@ deliverable in hand.
 | Phase | Deliverable | Effort (person-weeks) | Stop rule |
 |---|---|---|---|
 | 0. Known-answer test of the register-constrained inventory fit | The smallest test of the asset-inventory page, run on the six MW Primaries, written up as a pass or fail against its pre-registered predictions | 2 to 3 (about a day of one-core fits) | The decoy gets 1 MW or more at three or more of the six Primaries |
-| 1. Inventory for the 16 Primaries, shown as inferred | One table per Primary: register rows, fitted season-year solar capacity with interval, any large engine's unit size and running-time distribution, discrepancies between register name and meter (the D8 and D14 kind), and the unregistered solar share against the three registers; one figure per asset | 6 to 10 | NGED cannot act on an inferred list, or the central asset register makes the list a cross-check |
+| 1. Inventory for the 16 Primaries, shown as inferred | One table per Primary: register rows, fitted season-year solar capacity with interval, any large engine's unit size and running-time distribution, discrepancies between register name and meter (the D8 engine kind), and the unregistered solar share against the three registers; one figure per asset | 6 to 10 | NGED cannot act on an inferred list, or the central asset register makes the list a cross-check |
 | 2. Substation profile product | For each Primary and each of NGED's five representative days, a half-hourly profile of demand, solar, and each large asset from the fitted blocks, driven by a climatological weather year, in the layout of the published DFES profiles; a comparison against the DFES cluster profile on held-out months | 6 to 10 | The fitted profile does not beat the cluster profile on held-out months at most Primaries |
 | 3. Scenario blocks | New connections from the register at their energisation dates; an assumed battery scheduler and engine equations labelled "assumed", with parameters checked where the asset is large; long-horizon scenario calibration against a block bootstrap | 8 to 16 | Scenario bands are no narrower than the block bootstrap at the same coverage |
 | 4. Integration and what-ifs | Writing the profiles into NGED's load-set format for the Switch-Level Analyser's boundary nodes; a days-1-to-10 what-if that adds a dormant registered engine to the forecast, scored on known events | 6 to 12 | NGED's planners do not take the load set, or the what-if's simulated step misses the observed step by more than 30% on the known events |
@@ -475,7 +475,7 @@ deliverable in hand.
 **The smallest first deliverable is phase 0 plus the solar rows of phase 1.** The solar rows exist
 in draft: experiment 673's per-Primary table with its register cross-check, and the probe's 2.4 to
 3.9 MW at the six MW Primaries. Shown to NGED as "what we infer sits behind each substation and how
-sure we are", with the 8-of-12 register shortfall and the D8 and D14 placement discrepancy, that
+sure we are", with the 8-of-12 register shortfall and the D8 engine placement discrepancy, that
 table is a deliverable NGED can react to in weeks, and their reaction answers [question
 9's](#9-open-questions-for-the-maintainer) first two questions.
 
@@ -483,7 +483,7 @@ table is a deliverable NGED can react to in weeks, and their reaction answers [q
 
 - The `MPAN to Substation Number` mapping's coverage of unregistered assets, and the connections
   team's own list for the 16 Primaries. If complete, phase 1 shrinks to the unregistered share.
-- Running hours or metering of the engines registered under D14 and D5. If held, the engine block is
+- Running hours or metering of the large engines in the register. If held, the engine block is
   fitted to records rather than inferred.
 - Which representative day and which boundary nodes the Switch-Level Analyser reads for the trial
   area, and in what format. This decides whether phase 4 is a file export or a project.

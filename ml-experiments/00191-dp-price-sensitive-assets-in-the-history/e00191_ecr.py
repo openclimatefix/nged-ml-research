@@ -49,6 +49,28 @@ def asset_class(*, source: str, technology: str, chp: str) -> str | None:
     return None
 
 
+def withhold_gas_engines(frame: pl.DataFrame, *, columns: tuple[str, ...]) -> pl.DataFrame:
+    """Replace the listed columns of each gas-engine row with `[withheld]`, as strings.
+
+    NGED has asked that a gas engine's size, connection date, and distance stay out of the
+    repository, so the printed tables show them for the other asset classes only.
+    """
+    is_engine = pl.col("asset_class").str.starts_with("gas or oil engine")
+    frame = frame.with_columns(
+        pl.when(pl.col("site") == common.REGISTER_PRIMARY)
+        .then(pl.lit("[withheld]"))
+        .otherwise(pl.col("site"))
+        .alias("site")
+    )
+    return frame.with_columns(
+        pl.when(is_engine)
+        .then(pl.lit("[withheld]"))
+        .otherwise(pl.col(column).cast(pl.String))
+        .alias(column)
+        for column in columns
+    )
+
+
 def main() -> None:
     """Print the asset table and store it."""
     to_bng = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True)
@@ -117,16 +139,18 @@ def main() -> None:
         .sort("site", "asset_class", "status")
     )
     with pl.Config(tbl_rows=100, tbl_cols=10, fmt_str_lengths=40):
-        print(summary)
+        print(withhold_gas_engines(summary, columns=("mw",)))
         print("Connected price-following assets: date connected and distance from the substation")
         print(
-            flagged.filter(pl.col("status") == "Connected")
-            .select("site", "asset_class", "mw", "storage_mwh", "connected_date", "distance_km")
-            .sort("site", "connected_date")
+            withhold_gas_engines(
+                flagged.filter(pl.col("status") == "Connected")
+                .select("site", "asset_class", "mw", "storage_mwh", "connected_date", "distance_km")
+                .sort("site", "connected_date"),
+                columns=("mw", "connected_date", "distance_km"),
+            )
         )
-        print("Sites with no price-following asset at all:")
         have = set(flagged["site"].to_list())
-        print(sorted(set(PRIMARY_NAMES) - have))
+        print(f"Sites with no price-following asset at all: {len(set(PRIMARY_NAMES) - have)}")
 
 
 if __name__ == "__main__":

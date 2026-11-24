@@ -353,6 +353,12 @@ state is known.
   count of dropped half-hours per fold, and the check of the median minus the mean at the other
   Primaries.
 
+**The scripts read the engine's values from a private file.** The scripts import experiment 694's
+common module, which reads the engine's connection date and recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
+
 ## Method
 
 ### Architecture

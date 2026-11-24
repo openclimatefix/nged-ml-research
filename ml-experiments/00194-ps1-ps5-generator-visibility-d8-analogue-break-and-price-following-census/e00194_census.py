@@ -19,7 +19,6 @@ import e00194_changepoint as cp
 import e00194_common as common
 import numpy as np
 import polars as pl
-from pyproj import Transformer
 from studies.ecr_reader import ECR_PATH, REGISTER_SHEETS, read_sheet
 from studies.power import scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR
@@ -119,11 +118,9 @@ def cm_metres(*, ref: str) -> tuple[float, float] | None:
     return east0 + int(match.group(2)) * 100.0, north0 + int(match.group(3)) * 100.0
 
 
-def main() -> None:  # noqa: PLR0912, PLR0915
+def main() -> None:  # noqa: PLR0915
     """Print the PS5 census and the register distances."""
     meta = pl.read_parquet(METADATA)
-    to_bng = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True)
-
     say(
         "PS5 (a): series whose `information` field names an added-back generator or a reading that is not working"
     )
@@ -271,11 +268,13 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         .sort("site", "asset_class", "status")
     )
     for r in summary.iter_rows(named=True):
+        if r["asset_class"].startswith("gas or oil engine"):
+            continue  # Withheld: a gas engine's size and connection date are not published.
         say(
             f"  {r['site']}: {r['asset_class']}, {r['status']}: {r['n']} slot(s), {r['mw']:.2f} MW, {r['mwh'] or 0:.2f} MWh, connected {r['first']} to {r['last']}"
         )
     say(
-        f"  Primaries with no price-following asset: {sorted(set(PRIMARY_NAMES) - set(flagged['site'].to_list()))}"
+        f"  Primaries with no price-following asset: {len(set(PRIMARY_NAMES) - set(flagged['site'].to_list()))}"
     )
     conn = flagged.filter(pl.col("status") == "Connected")
     by_class = (
@@ -284,16 +283,14 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         .sort("asset_class")
     )
     for r in by_class.iter_rows(named=True):
+        size = (
+            "[withheld]" if r["asset_class"].startswith("gas or oil engine") else f"{r['mw']:.2f}"
+        )
         say(
-            f"  connected, all 16 Primaries: {r['asset_class']}: {r['n']} slot(s), {r['mw']:.2f} MW, {r['sites']} Primaries"
+            f"  connected, all 16 Primaries: {r['asset_class']}: {r['n']} slot(s), {size} MW, {r['sites']} Primaries"
         )
     big = conn.filter(pl.col("mw") >= 1.0)
-    say(
-        f"  connected price-following slots of at least 1 MW: {big.height}; by site: {big.group_by('site').agg(mw=pl.col('mw').sum()).sort('site').rows()}"
-    )
-    say(
-        f"  those with a connection date after 2023-06-01 (the window that matters for D8's history): {big.filter(pl.col('connected_date') >= date(2023, 6, 1)).select('site', 'mw', 'connected_date').rows()}"
-    )
+    say(f"  connected price-following slots of at least 1 MW: {big.height}; by site: [withheld]")
     chp = table.filter((pl.col("chp") == "Yes") & (pl.col("status") == "Connected"))
     say(
         f"  connected CHP slots under the 16 Primaries: {chp.height}, {chp['mw'].sum():.2f} MW; by site {chp.group_by('site').agg(mw=pl.col('mw').sum()).sort('site').rows()}"
@@ -308,47 +305,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     )
 
     say("\nPS1: register entries near G2 (MW and distance only)")
-    g2 = meta.filter(pl.col("time_series_id") == common.G2_SERIES).row(0, named=True)
-    e, n = to_bng.transform(g2["longitude"], g2["latitude"])
-    ecr_near = (
-        slots.filter(pl.col("east").is_not_null())
-        .with_columns(km=(((pl.col("east") - e) ** 2 + (pl.col("north") - n) ** 2).sqrt() / 1000.0))
-        .filter(pl.col("km") <= 1.0, pl.col("asset_class").is_not_null())
-        .sort("km")
-    )
-    for r in ecr_near.iter_rows(named=True):
-        owner = next(
-            (k for k, v in PRIMARY_NAMES.items() if v.lower() in (r["primary"] or "").lower()),
-            "none of the 16 Primaries",
-        )
-        say(
-            f"  ECR: {r['asset_class']}, {r['mw']:.2f} MW, {r['status']}, connected {r['connected_date']}, {r['km']:.2f} km from G2's coordinates, registered under {owner}"
-        )
-    if ecr_near.height == 0:
-        say("  ECR: no price-following slot within 1 km of G2's coordinates")
-    comp = pl.read_csv(CM_COMPONENTS, encoding="utf8-lossy", infer_schema_length=0)
-    seen = set()
-    for r in comp.iter_rows(named=True):
-        xy = cm_metres(ref=r["OS Grid Reference"] or "")
-        text = f"{r['Primary Fuel of Component']} {r['Generating Technology Class']} {r['Description of CMU Components']}".lower()
-        if xy is None or "gas" not in text or (r["CMU ID"], r["OS Grid Reference"]) in seen:
-            continue
-        km = float(np.hypot(xy[0] - e, xy[1] - n) / 1000.0)
-        if km <= 1.0:
-            seen.add((r["CMU ID"], r["OS Grid Reference"]))
-            say(
-                f"  Capacity Market: gas-fuelled component, connection capacity {r['Connection or DSR Capacity']} MW, {km:.2f} km from G2's coordinates (grid reference is six-figure, so about 0.07 km precision)"
-            )
-    if not seen:
-        say("  Capacity Market: no gas-fuelled component within 1 km of G2's coordinates")
-    # The D8 comparison: the ECR's own Primary for the engine near G2.
-    if ecr_near.height:
-        top = ecr_near.row(0, named=True)
-        owner = next(
-            (k for k, v in PRIMARY_NAMES.items() if v.lower() in (top["primary"] or "").lower()),
-            "another Primary",
-        )
-        say(f"  the nearest ECR price-following slot is registered under Primary {owner}")
+    say("  [withheld]")
     Path(__file__).with_name("printed_census.txt").write_text("\n".join(REPORT) + "\n")
 
 

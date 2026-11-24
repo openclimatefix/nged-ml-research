@@ -21,7 +21,8 @@ from pyproj import Transformer
 D8_LAT: Final[float] = 52.96158981323242
 D8_LON: Final[float] = -0.013620000332593918
 RADIUS_KM: Final[tuple[float, ...]] = (5.0, 10.0, 20.0)
-D8_POSTCODE_AREAS: Final[tuple[str, ...]] = ("PE20", "PE21", "PE22", "PE24", "PE23", "PE25")
+WITHHELD_WITHIN_KM: Final[float] = 10.0
+"""Capacity Market units nearer D8 than this are not printed (NGED withholds the engine's entries)."""
 """Postcode districts around Boston and the Skegness coast, the area D8's 33/11 kV substation serves."""
 GAS_WORDS: Final[tuple[str, ...]] = ("gas", "chp", "reciprocating", "ocgt", "ccgt", "engine")
 REPORT: list[str] = []
@@ -89,21 +90,8 @@ def main() -> None:
     )
     gas = comp.filter(pl.col("text").str.contains("|".join(GAS_WORDS)))
     say(f"\nCapacity Market components rows {len(comp)}; gas-like rows {len(gas)}")
-    pattern = "|".join(rf"\b{p}\b" for p in D8_POSTCODE_AREAS)
-    hits = gas.filter(pl.col("place").str.contains(pattern))
-    say(f"Gas-like Capacity Market components with a postcode in {D8_POSTCODE_AREAS}: {len(hits)}")
-    if len(hits):
-        by = hits.group_by(["Auction Name", "Primary Fuel of Component", "Type"]).agg(
-            n=pl.len(),
-            capacity=pl.col("Connection or DSR Capacity")
-            .str.replace_all(",", "")
-            .cast(pl.Float64, strict=False)
-            .sum(),
-        )
-        for row in by.sort("Auction Name").iter_rows(named=True):
-            say(
-                f"  {row['Auction Name']}: {row['n']} components, fuel {row['Primary Fuel of Component']}, type {row['Type']}, connection capacity {row['capacity']}"
-            )
+    # NGED withholds the engine's register entries, so the components near D8 are not printed.
+    say("[withheld]")
     # Capacity Market gas components with an Ordnance Survey grid reference, within 30 km of D8.
     cmu = pl.read_csv(reg / "cmu.csv", encoding="utf8-lossy", infer_schema_length=0)
     cmu_gas = (
@@ -151,9 +139,6 @@ def main() -> None:
         km = float(np.hypot(xy[0] - d8_e, xy[1] - d8_n) / 1000.0)
         if km <= 30:
             info = cmu_gas.filter(pl.col("CMU ID") == row["CMU ID"]).row(0, named=True)
-            if km < 1.0:
-                text = (row["Description of CMU Components"] or "").replace("\n", " ")[:90]
-                say(f"  description of a unit at {km:.1f} km: {text}")
             near_rows.append(
                 (
                     km,
@@ -170,9 +155,12 @@ def main() -> None:
     say(
         "\nCapacity Market gas-fuelled CM units with a grid reference within 30 km of D8 (unit names withheld):"
     )
+    say("[withheld]")
     for km, tech, mw, td, awarded, valid, term, dec, ref in sorted(
         near_rows, key=lambda r: (r[0], str(r[1:]))
     ):
+        if km < WITHHELD_WITHIN_KM:
+            continue
         say(
             f"  {km:.1f} km from D8 ({ref}): {tech}, connection capacity {mw} MW, {td}; agreement "
             f"awarded {awarded}; years valid {valid}; terminated {term}; decisions {dec}"

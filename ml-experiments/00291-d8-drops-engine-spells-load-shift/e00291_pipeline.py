@@ -81,7 +81,7 @@ def load_series(*, label: str, q: float = Q_FLOOR) -> Series:
 
 
 def clean_mask(*, n: int) -> np.ndarray:
-    """True on D8's engine-free history: before 2023-06-13 and July 2023."""
+    """True on D8's engine-free history (the window set by `CLEAN_END` and July 2023)."""
     m = np.zeros(n, dtype=bool)
     m[: stamp(CLEAN_END)] = True
     m[stamp(datetime(2023, 7, 1, tzinfo=UTC)) : stamp(datetime(2023, 8, 1, tzinfo=UTC))] = True

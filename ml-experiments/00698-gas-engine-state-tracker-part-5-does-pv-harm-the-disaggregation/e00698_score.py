@@ -519,7 +519,7 @@ def print_scores(*, scores: dict) -> None:  # noqa: PLR0912
             if groups is None:
                 continue
             m = metrics(sums=groups["midday"]["0"])
-            fits = ", ".join(f"K={f['k']} unit={f['unit_mw']:.2f}" for f in content["fit"])
+            fits = ", ".join(f"K={f['k']} unit=[withheld]" for f in content["fit"])
             say(
                 f"{host}, {cell}: P {m['precision']:.3f}, R {m['recall']:.3f}, F1 {m['f1']:.3f}, "
                 f"false-flag {m['false_flag']:.3f}; fits: {fits}"

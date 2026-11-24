@@ -514,6 +514,7 @@ def t5_levels(*, frames: dict[str, pl.DataFrame]) -> dict[str, object]:
             share=pl.col("n") / pl.col("n").sum().over("era"),
         )
         .sort("era", "k_path")
+        .with_columns(unit_mw=pl.lit("[withheld]"), block_mw=pl.lit("[withheld]"))
     )
     table(
         title="T5 the tracker's fitted block size in MW among flagged half-hours, by era",

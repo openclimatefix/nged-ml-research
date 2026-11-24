@@ -124,6 +124,9 @@ def main() -> None:
             (pl.col("mw") >= 1.0) & (pl.col("connected_date") >= pl.date(2020, 6, 1))
         )
         for row in ecr.sort("site", "connected_date").iter_rows(named=True):
+            if str(row["asset_class"] or "").startswith("gas or oil engine"):
+                print("  [withheld]")  # NGED withholds a gas engine's size and date
+                continue
             hits = []
             for det, p in chosen.items():
                 a = base.filter(

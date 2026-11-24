@@ -114,7 +114,7 @@ date: 2026-10-23
 
 **An outside prior and an "engine visible" switch did not bring D8's forecast bands close to nominal
 coverage in every quarter, and no other Primary needs them.** D8 is one of six primary substations
-with stored forecasts. Its readings appear to include a 6 MW gas engine of National Grid Electricity
+with stored forecasts. Its readings appear to include a gas engine of National Grid Electricity
 Distribution (NGED) that appears in no measurement we hold and shows only as unexplained drops in
 D8's readings. A forecast band here is the range from the forecast's 5% quantile (q05) to its 95%
 quantile (q95), meant to hold 90% of readings. [Experiment

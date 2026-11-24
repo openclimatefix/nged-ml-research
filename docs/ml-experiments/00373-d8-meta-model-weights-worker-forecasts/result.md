@@ -195,6 +195,12 @@ of each other.**
   later design depends on this result. No audit was run, because the verdict is negative and the
   stop rule ends the work.
 
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
+
 ## Scope and what to try next
 
 - **Not run.** D2, D3, D4 (stop rule), the six decision Primaries, and the replicate year 2024-25

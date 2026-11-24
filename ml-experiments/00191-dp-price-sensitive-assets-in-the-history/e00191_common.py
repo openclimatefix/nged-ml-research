@@ -1,11 +1,15 @@
 """Paths and constants shared by the scripts of experiment 191."""
 
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
 from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 EXPERIMENT_ID: Final[int] = 191
 SLUG: Final[str] = "dp-price-sensitive-assets-in-the-history"
@@ -61,14 +65,23 @@ PART_4_TUNED: Final[Path] = CACHE_DIR.parent / "work" / "tuned.json"
 PREDS_DIR: Final[Path] = WORK_DIR / "preds"
 FITS_DIR: Final[Path] = WORK_DIR / "fits"
 
-ASSET_SITES: Final[tuple[str, ...]] = ("D8", "D14")
+REGISTER_PRIMARY: Final[str] = engine.engine_string(key="d8_engine_register_primary")
+"""The Primary under which the register lists the gas engine (read from the private file)."""
+
+
+def shown(site: str) -> str:
+    """Return the site's name for stdout and logs, withholding the register's Primary."""
+    return "[withheld]" if site == REGISTER_PRIMARY else site
+
+
+ASSET_SITES: Final[tuple[str, ...]] = ("D8", REGISTER_PRIMARY)
 NO_HARM_SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D16")
 ALL_SITES: Final[tuple[str, ...]] = (*ASSET_SITES, *NO_HARM_SITES)
 DONORS: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D19", "D21", "D22")
 CONNECTED: Final[dict[str, datetime]] = {
-    "D8": datetime(2023, 6, 13, tzinfo=UTC),
-    "D14": datetime(2023, 6, 13, tzinfo=UTC),
-    "D5": datetime(2021, 3, 11, tzinfo=UTC),
+    "D8": engine.engine_datetime(key="d8_engine_connected_date"),
+    REGISTER_PRIMARY: engine.engine_datetime(key="d8_engine_connected_date"),
+    "D5": engine.engine_datetime(key="d5_engine_connected_date"),
 }
 """Connection date of the registered gas engine under each Primary (August 2026 ECR). D8 is gated
 on from the engine's date because the engine may feed D8 through the network arrangement."""
@@ -94,7 +107,7 @@ MASK_SHARE_OF_MAXIMUM: Final[float] = 0.25
 largest fitted price output in the fit, provided that largest output is at least
 `MASK_MINIMUM_POINTS`."""
 MASK_MINIMUM_POINTS: Final[float] = 1.0
-"""One point is 1% of the site's effective capacity (0.1 MW at D8). A smaller fitted price effect
+"""One point is 1% of the site's effective capacity. A smaller fitted price effect
 is not material, and masking on it would drop half the training rows."""
 N_MEMBERS: Final[int] = 51
 MIN_WINDOW_HALF_HOURS: Final[int] = 48

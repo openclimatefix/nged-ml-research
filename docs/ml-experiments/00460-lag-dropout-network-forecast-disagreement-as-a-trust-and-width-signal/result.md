@@ -161,17 +161,17 @@ Every number is interim and unaudited by the maintainer.
 
 ![Example forecasts over the whole horizon of one run](figure_6_example_horizon.svg)
 
-![Primary D5 event](figure_7_event_D5_112321.svg)
+![Primary D5 event](figure_7_event_1.svg)
 
-![Primary D5 event](figure_8_event_D5_111746.svg)
+![Primary D5 event](figure_8_event_2.svg)
 
-![Primary D14 event](figure_9_event_D14_106721.svg)
+![Primary D14 event](figure_9_event_3.svg)
 
-![Primary D8 event](figure_10_event_D8_111596.svg)
+![Primary D8 event](figure_10_event_4.svg)
 
-![Primary D12 event](figure_11_event_D12_107836.svg)
+![Primary D12 event](figure_11_event_5.svg)
 
-![Primary D8 event](figure_12_event_D8_110276.svg)
+![Primary D8 event](figure_12_event_6.svg)
 
 ## Results
 

@@ -264,6 +264,12 @@ D8's own earlier months helps, and this experiment tests that finding against pl
       month.
     - Origins are not daily, so "every 7 origins" is 8 to 9 days. The difference is harmless.
 
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
+
 ## Caveats
 
 - **Lead range.** The stored forecasts cover 0.5 to 168 hours; National Grid Electricity
