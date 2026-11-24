@@ -106,9 +106,9 @@ holds both high-shortfall and low-shortfall months.
 
 *Figure 1. D8's weekly shortfall share against D3, D5, and D14 (near zero throughout).*
 
-![Day-by-day shortfall share, G2 daily maximum and G2 reading count](figure_2.svg)
+![Shortfall share of D8 and share of half-hours with a G2 reading, before and after the break](figure_2.svg)
 
-*Figure 2. The break by day: D8's shortfall starts on the day G2's last output reading arrives.*
+*Figure 2. Before and after the break, pooled: D8's shortfall share rises once G2's output readings stop arriving.*
 
 ![G2 running share by price fifth](figure_3.svg)
 
