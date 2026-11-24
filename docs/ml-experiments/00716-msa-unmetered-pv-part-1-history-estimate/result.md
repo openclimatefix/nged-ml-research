@@ -2,7 +2,8 @@
 id: "00716"
 slug: msa-unmetered-pv-part-1-history-estimate
 title: >-
-  Does an estimate of unmetered solar output in each history day help the axial-attention network forecast a Primary's demand?
+  Does an estimate of unmetered solar output in each history day help the axial-attention network
+  forecast a Primary's demand?
 theme: solar-disaggregation
 also_relevant_to:
   - lagged-power-and-error-correction
@@ -32,20 +33,21 @@ prediction: >-
   supported` (no detectable difference) or `inconclusive`. The prediction fails if A1 shows a gain
   or a loss beyond those ranges, or if the interval of A2 excludes zero.
 decision_rule: >-
-  Two counted contrasts, A1 and A2, each at the six and at the eight, so four readings, each read
-  at 98.75% (1 - 0.05/4) from experiment 713's month-block bootstrap, with 713's three guards (a t
-  interval on the 8 monthly differences, the same sign for each seed alone, and a point estimate of
-  at least 0.034 at the six and 0.090 at the eight). The smallest gain worth porting is 0.02 points
-  of capacity, the demand protocol's tier for a new input. A group reads "gain" when the interval
-  is below zero, the estimate is at or below -0.02, and the three guards hold; "small gain" when
-  the interval is below zero with the seed guard holding for at least 4 of 5 seeds; "no detectable
-  difference" when the interval lies inside +-0.06 (six) or +-0.16 (eight); "loss" when the lower
-  end is above zero. The verdict rows are experiment 713's, with A1 in place of H1 and A2 in place
-  of H2. Row 5 (`small gain`) also needs the placebo arm H-S not to be a "loss" against M* in
-  either group; this guard was added before any fit, as a design fix, to make row 5 consistent
-  with rows 3 and 4 (the second Opus design review, finding S7), and it can only turn a `small
-  gain` into `inconclusive`. A `small gain` whose placebo contrast has a point estimate at or above
-  zero reads `inconclusive`. Every verdict, headline, and take-home message states that the
+  Two counted contrasts, A1 and A2, each at the six signed-MW Primaries and at the eight MVA-only
+  Primaries, so four readings, each read at 98.75% (1 - 0.05/4) from experiment 713's month-block
+  bootstrap, with 713's three guards (a t interval on the 8 monthly differences, the same sign for
+  each seed alone, and a point estimate of at least 0.034 at the six signed-MW Primaries and 0.090
+  at the eight MVA-only Primaries). The smallest gain worth porting is 0.02 points of capacity, the
+  demand protocol's tier for a new input. A group reads "gain" when the interval is below zero, the
+  estimate is at or below -0.02, and the three guards hold; "small gain" when the interval is below
+  zero with the seed guard holding for at least 4 of 5 seeds; "no detectable difference" when the
+  interval lies inside +-0.06 (six signed-MW Primaries) or +-0.16 (eight MVA-only Primaries); "loss"
+  when the lower end is above zero. The verdict rows are experiment 713's, with A1 in place of H1
+  and A2 in place of H2. Row 5 (`small gain`) also needs the placebo arm H-S not to be a "loss"
+  against M* in either group; this guard was added before any fit, as a design fix, to make row 5
+  consistent with rows 3 and 4 (the second Opus design review, finding S7), and it can only turn a
+  `small gain` into `inconclusive`. A `small gain` whose placebo contrast has a point estimate at or
+  above zero reads `inconclusive`. Every verdict, headline, and take-home message states that the
   warm-start states of experiment 713 come from a waived known-answer gate (KA3 and KA12 failed),
   and that no conclusion about era recognition or following level shifts is backed by a passing
   known-answer test.
@@ -159,18 +161,19 @@ about era recognition or about following level shifts, and every verdict, headli
 message of this experiment says so. The gate of this experiment (KF1 to KF15 below) is its own and
 is not waived.
 
-## Capacity look-ahead at the eight
+## Capacity look-ahead at the eight MVA-only Primaries
 
 **The as-of capacity of the eight MVA-only Primaries in the seven folds 2025-11 to 2026-05 uses
-information from after the fold's cutoff, in two ways.** The probes' neural networks that
-experiment 662 stored were trained to 2026-03, so folds 2025-11 to 2026-02 look ahead by up to 4
-months. The calibration factors of all seven folds come from data to 2026-06 (experiment 662's page
-says "the calibration at 2026-03 reuses the 2026-06 factors", and the rescale of 0.7858 of
-experiment 673 is measured at the 2026-06 cutoff). Only fold 2026-06 is clean at the eight. The six
-are clean in every fold, because experiment 649 stores one calibration factor per cutoff. The leak
-is one constant per Primary and fold, and carries no day-level information. A2 cancels the
-constant, because both arms of the contrast read the same capacity, and A1 does not. A read-out at
-the six, where the honest capacity is known, measures the effect of a look-ahead of the same kind.
+information from after the fold's cutoff, in two ways.** The probes' neural networks that experiment
+662 stored were trained to 2026-03, so folds 2025-11 to 2026-02 look ahead by up to 4 months. The
+calibration factors of all seven folds come from data to 2026-06 (experiment 662's page says "the
+calibration at 2026-03 reuses the 2026-06 factors", and the rescale of 0.7858 of experiment 673 is
+measured at the 2026-06 cutoff). Only fold 2026-06 is clean at the eight MVA-only Primaries. The six
+signed-MW Primaries are clean in every fold, because experiment 649 stores one calibration factor
+per cutoff. The leak is one constant per Primary and fold, and carries no day-level information. A2
+cancels the constant, because both arms of the contrast read the same capacity, and A1 does not. A
+read-out at the six signed-MW Primaries, where the honest capacity is known, measures the effect of
+a look-ahead of the same kind.
 
 ## What is compared
 
@@ -182,14 +185,14 @@ the six, where the honest capacity is known, measures the effect of a look-ahead
 | `H-S` | History `PV̂` with the sky of the date 28 days earlier | 0 to 4 | Counted placebo |
 | `H-X` | History `PV̂` of another Primary | 0 and 1 | Report-only placebo |
 
-Part 2's arms `HT`, `HT-S`, and `T` use the code of this folder and are scored in
-[experiment 717](../00717-msa-unmetered-pv-part-2-target-row-forecast/result.md). Seeds 2 to 4 need
-experiment 713's phases 8 and 9; without them, the design reads every contrast with two seeds, a
-noise floor of 0.054 at the six and 0.142 at the eight, and a detectable difference of 0.094 and
-0.25. Each placebo keeps the parameters, the training recipe, and the capacity of its treatment and
-changes one property of the PV input. `H` minus `H-S` is what the actual sky of each history day
-adds. `H-S` minus `M*` is what the capacity, the season, and the added parameters add. `H` minus
-`H-X` is what the Primary's own capacity adds.
+Part 2's arms `HT`, `HT-S`, and `T` use the code of this folder and are scored in [experiment
+717](../00717-msa-unmetered-pv-part-2-target-row-forecast/result.md). Seeds 2 to 4 need experiment
+713's phases 8 and 9; without them, the design reads every contrast with two seeds, a noise floor of
+0.054 at the six signed-MW Primaries and 0.142 at the eight MVA-only Primaries, and a detectable
+difference of 0.094 and 0.25. Each placebo keeps the parameters, the training recipe, and the
+capacity of its treatment and changes one property of the PV input. `H` minus `H-S` is what the
+actual sky of each history day adds. `H-S` minus `M*` is what the capacity, the season, and the
+added parameters add. `H` minus `H-X` is what the Primary's own capacity adds.
 
 ## The PV estimate
 
@@ -205,7 +208,7 @@ and the curve has no export limit.
 
 | Primaries | Table | Value | Cutoff rule |
 |---|---|---|---|
-| The six (D5, D9, D10, D11, D14, D16) | experiment 649's `capacity_table.parquet`, probe year 2025 | `cal_p50` | The latest stored cutoff at or before the fold's cutoff |
+| The six signed-MW Primaries (D5, D9, D10, D11, D14, D16) | experiment 649's `capacity_table.parquet`, probe year 2025 | `cal_p50` | The latest stored cutoff at or before the fold's cutoff |
 | D2, D3, D4, D19, D21 | experiment 662's `capacity_table.csv`, method `L0` | `cal_p50 × factor / 0.7858` (experiment 673's rescale) | Cutoff 2026-03 before the 2026-06 fold: look-ahead |
 | D8, D22 | The same table, method `L0` | `cal_p50` | As above |
 | D12 | The same table, method `FA` | `cal_p50` | As above |
@@ -246,9 +249,10 @@ training samples, and of ages 2 to 5 on another 10%, from a generator of its own
 
 ## Counted contrasts and the decision rule
 
-**Part 1 has four counted readings, A1 and A2 at the six and at the eight, so each interval is read
-at 98.75%.** Each contrast is treatment minus reference in CRPS on experiment 713's row set,
-headline band, and 8 folds, from seed-averaged forecasts, through 713's scorer.
+**Part 1 has four counted readings, A1 and A2 at the six signed-MW Primaries and at the eight
+MVA-only Primaries, so each interval is read at 98.75%.** Each contrast is treatment minus reference
+in CRPS on experiment 713's row set, headline band, and 8 folds, from seed-averaged forecasts,
+through 713's scorer.
 
 | Id | Contrast | Question |
 |---|---|---|
@@ -259,24 +263,25 @@ The verdict mapping is the one in the front matter. The verdict `supported` also
 A1 to hold with each Primary and each month left out in turn, the q01 and q99 pinball loss of `H`
 within 0.05 of `M*`, the normalised MAE of the median to move the same way as CRPS, `H` not worse
 than `M*` by more than 0.05 on cold winter nights, and A1 to keep its sign under both masks of the
-read-outs below. **A rule on arm `Z`:** if `Z` minus `M*` on its 5 folds exceeds 0.054 at the six or
-0.142 at the eight in absolute value, audit trigger 1 fires before any A1 is read. **Report-only,
-at 95%:** `H` minus `H-X`, `H-S` minus `M*`, `H` minus `Z`, every arm minus the Candidate, every
-contrast at all 16 Primaries, by lead band, by Primary, with one Primary left out, and with one
-month left out. Each page also reports its contrasts at 99.375% (eight readings across both parts)
-as a labelled sensitivity reading that changes no verdict. **A gain that the placebo matches is not
-evidence for the PV estimate.** Part 1 screens on four folds (2025-11, 2026-01, 2026-05, 2026-06):
-the stop rule is experiment 713's (`H` minus `M*` above +0.15 in both groups, or above +0.10 in both
-and positive in at least 3 of 4 folds in both), and every screen number is labelled interim.
+read-outs below. **A rule on arm `Z`:** if `Z` minus `M*` on its 5 folds exceeds 0.054 at the six
+signed-MW Primaries or 0.142 at the eight MVA-only Primaries in absolute value, audit trigger 1
+fires before any A1 is read. **Report-only, at 95%:** `H` minus `H-X`, `H-S` minus `M*`, `H` minus
+`Z`, every arm minus the Candidate, every contrast at all 16 Primaries, by lead band, by Primary,
+with one Primary left out, and with one month left out. Each page also reports its contrasts at
+99.375% (eight readings across both parts) as a labelled sensitivity reading that changes no
+verdict. **A gain that the placebo matches is not evidence for the PV estimate.** Part 1 screens on
+four folds (2025-11, 2026-01, 2026-05, 2026-06): the stop rule is experiment 713's (`H` minus `M*`
+above +0.15 in both groups, or above +0.10 in both and positive in at least 3 of 4 folds in both),
+and every screen number is labelled interim.
 
 **Secondary readings, read at 95% and changing no verdict (14 in all, so one false positive among
 them is likely):** S1 (A1 helps in the solar block of the sunny folds 2026-04 to 2026-06), S2 (the
-same for A2), S3 (A1 removes the copied dip on days duller than their history window, compared
-with a control that shifts `M*`'s quantiles by `H`'s mean median difference), S4 (no harm in the
-dark folds), and S5 (dose response against experiment 673's PV share). Read-outs at prediction
-with no refit: a CAMS-rule mask, a mask of ages 2 to 5, a look-ahead sensitivity at the six, PV
-absent, capacity scale of 0.7 and 1.3, the learned gains as a share of their reachable range, and
-the four load-shift scenarios.
+same for A2), S3 (A1 removes the copied dip on days duller than their history window, compared with
+a control that shifts `M*`'s quantiles by `H`'s mean median difference), S4 (no harm in the dark
+folds), and S5 (dose response against experiment 673's PV share). Read-outs at prediction with no
+refit: a CAMS-rule mask, a mask of ages 2 to 5, a look-ahead sensitivity at the six signed-MW
+Primaries, PV absent, capacity scale of 0.7 and 1.3, the learned gains as a share of their reachable
+range, and the four load-shift scenarios.
 
 ## Known-answer checks
 
@@ -377,10 +382,10 @@ output of any metered generator, and no page names or plots a metered generator'
   reachable-range read-out test this.
 - **A1 compares a refit with a stored fit.** Arm `Z` measures the run-to-run difference.
 - **The capacity is uncertain and partly looked ahead.** The scale read-out and `H-X` bound the effect.
-- **The eight read apparent power**, so demand plus `p` is not gross demand when PV exceeds demand
-  (at D12).
-- **One summer fold and two spring folds carry the solar evidence**, and the design cannot resolve
-  a gain under 0.06 at the six, although the smallest gain worth porting is 0.02.
+- **The eight MVA-only Primaries read apparent power**, so demand plus `p` is not gross demand when
+  PV exceeds demand (at D12).
+- **One summer fold and two spring folds carry the solar evidence**, and the design cannot resolve a
+  gain under 0.06 at the six signed-MW Primaries, although the smallest gain worth porting is 0.02.
 
 ## Method
 
@@ -478,10 +483,10 @@ and not the weather. The independent rows hold forecasts, so the geometry column
 equality and the weather columns for correlation (0.90 for shortwave and 0.93 for temperature in fold
 2025-11).
 
-**S5 pools the 14 Primaries of the six and the eight, and report-only contrasts are read on the cells
-both arms hold.** An arm that exists on 5 folds (`Z`) or at 2 seeds (`H-X`, `T`) gives a contrast on
-those folds and seeds, and the scorer prints and records which folds, seeds, and cells are missing. A
-contrast with no common cell is recorded as `not_read` with its reason.
+**S5 pools the 14 Primaries, six signed-MW and eight MVA-only,, and report-only contrasts are read
+on the cells both arms hold.** An arm that exists on 5 folds (`Z`) or at 2 seeds (`H-X`, `T`) gives
+a contrast on those folds and seeds, and the scorer prints and records which folds, seeds, and cells
+are missing. A contrast with no common cell is recorded as `not_read` with its reason.
 
 **The `HT-S` exception covers the first 28 days of each fold's own Candidate rows.** KF3 prints the count
 for the first fold, and the count decides whether the exception days include days that have a real
