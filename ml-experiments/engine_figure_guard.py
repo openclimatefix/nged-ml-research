@@ -29,6 +29,7 @@ GUARDED: Final[tuple[tuple[str, str], ...]] = (
     ("00694-", "figure_5_gas_a_levels.svg"),
     ("00186-", "figure_3_spread_and_drops.svg"),
     ("00199-", "figure_5_flagged_hours.svg"),
+    ("00198-", "figure_d8_departure_hours.svg"),
     ("00159-", "figure_1_history.svg"),
     ("00291-", "figure_2.svg"),
     ("00291-", "figure_3.svg"),
@@ -51,7 +52,7 @@ _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
     "a power unit": re.compile(r"\b(?:MW|MVA|kW|kVA|GW)\b"),
 }
 # Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`. The pattern
-# takes any colon and space before a digit or a U+2212 minus, whatever character ends the axis title.
+# takes a colon and a space before a digit or a U+2212 minus, whatever ends the axis title.
 _PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(
     r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text|Subtitle text))[^"]*: [\d\u2212]'
 )
