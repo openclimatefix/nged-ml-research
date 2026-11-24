@@ -94,7 +94,10 @@ row_set_id: >-
   not applicable (no forecast is scored): every half-hour of the fitted span, and no valid time on
   or after 2026-07-01 is read. The fitted span of a Primary runs from the first day of its current
   era to 2026-06-30. An injected world's span is the days on which both the host's reading and the
-  farm's output exist. Job 1 asserts each span's day count, and another count is a code defect. The
+  farm's output exist. Job 1 computes each span's first day, last day, and calendar day count from
+  these definitions, prints the three values, and asserts that the first and last day match the
+  definition. A day count taken from another experiment's table is never asserted, because a count of
+  days that hold a usable fit row is not the calendar length of a span. The
   four folds of experiment 720's rung 0b (2025-12 and 2026-04 to 2026-06) are a reported subset.
 metric: >-
   The reliability term of the Brier score of the probability of reverse flow; the coverage of the
@@ -203,7 +206,7 @@ buildable version under every outcome (erratum ruling 13).
 | Second capacity value | Experiment 673's table: registered PV capacity inside the Primary's polygon, less metered farms | Independent of the Primary's readings; values under `PRIVATE/` only |
 | Sunshine yield, clear-sky yield, and sun elevation | The frame of experiment 39 and the CAMS files of experiment 412 | Hourly index; sufficient with `a` = 0 |
 | Temperature | Recorded temperature for the mean of gross demand | The stored ENS table holds 67 leads, for the later as-of rung |
-| Switching-log windows | The switching-log workbook | Sets the `transition` flag; read with `engine="openpyxl"` (decision 10 below) |
+| Switching-log windows | The switching-log workbook | Sets the `transition` flag; job 1 reads each sheet with openpyxl directly, because the real sheets have no header row (decision 10 and the section on experiment 723 below) |
 | Hindsight model code | Experiment 720, imported unchanged (section "The file plan") | Imported through `PYTHONPATH`, never copied |
 
 **The first scope is D12 and D22 through the model, and D2, D3, D4, D19, and D21 by formula.** D8
@@ -431,6 +434,42 @@ live-fairness checks of version 2 section 8.3 (perturbation, truncation, paramet
 poison) test the as-of posterior, so they do not apply here, and the filtered posterior of this
 experiment is labelled "not live-fair" instead.
 
+## Experiment 723's first job found four facts about the real files
+
+**Experiment 723's first job (W0) read the real files, and each of its four findings bears on this
+plan only where the bullet below says so.** Experiment 723 is on an unmerged branch, so the page does
+not link it. No verdict row, input, or gate of this page reads an output of experiment 723, and the
+plan changes no threshold that was set before data were read.
+
+- **The switching-log workbook has no header row and names each Primary by its sheet name.** A reader
+  that takes the first row of a sheet as the column names raises an error on the real workbook, and a
+  rule that looks for a column named for the substation or for a start time finds none. Only job 1
+  opens the workbook; every later job reads the `transition` flag that job 1 stores. Job 1 reads each
+  sheet with openpyxl directly, holds every cell as text, names the columns by position, and stores
+  the exception's message and traceback if a read fails. This page does not say which sheet name
+  maps to which Primary, which time column counts, or how rows become a window. Where no window rule
+  has been ruled before job 1 runs, job 1 reports "no mask", the `transition` flag is empty, and the
+  smallest valid reading `L` is taken over every row not flagged `no_reading`. The page then lists
+  the missing mask as a limit of the night-import bar and of `L`, and no bar changes.
+- **The clear-sky yield is clipped at the generic fleet's AC limit, so it is flat around midday.**
+  No step of this plan needs the yield to differ between two half-hours of an hour. The PV prior
+  multiplies the yield by a running median of the clear-sky index, the night-import mask needs a
+  yield of 0, the sunny-midday mask applies a threshold, and the shifted-sky placebo moves the index
+  only. This plan runs no audit of the arc term, and job 1 adds none. The code review checks that no
+  function tests the exact equality of two consecutive yields or divides by their difference.
+- **A span is defined by its definition and not by a count.** The count of days on which a fit had
+  a usable row is smaller than the calendar length of the span. The `row_set_id` above states the rule: job 1 derives the days from
+  the definition and takes none from another experiment's table. A count of days with data may be
+  printed beside the calendar count, labelled as such, and is never asserted against it.
+- **Among the six signed-MW Primaries, only one hosts two farms that share the same sky, so
+  experiment 723's count of same-sky pairs falls below its minimum of four.** This build does not
+  count pairs, applies no coherence floor or same-sky bar, and does not run rung U1, so the rule
+  that skips rung U1 when fewer than four pairs exist, as already registered, does not gate it. An
+  injected world needs one metered farm outside the host's polygon whose output shares days with the
+  host's reading. Job 1 records under `PRIVATE/`, before any fit, which farm each host receives. A
+  host that can receive no farm gives a world that cannot be built, which verdict row 2 already
+  reads as `inconclusive`.
+
 ## Compute, launch rules, and gates
 
 **The build needs about 3.4 core-hours on one CPU core and no GPU, and the cap is 5 core-hours.**
@@ -474,15 +513,23 @@ the gate would hand the decision to the manager before job 2.
   each family of fits (the worlds, the shifted-sky worlds, the mixture arms, and the builds at D12
   and D22), with no job started before the manager's reply.
 
-**Four gates close before the first fit.** First, an Opus code review of all new code comes before
+**Five gates close before the first fit.** First, an Opus code review of all new code comes before
 any run that produces numbers the page quotes, because the experiment imports unmerged code, builds
 a new emission integral, and changes a running median. Second, a second Opus review re-reads the
 fixed code before the long runs. The code review checks leakage (the fit never reads a reading on or
 after 2026-07-01), the forward and backward passes against experiment 720's, the integral of the
-five numbers, that the trailing median looks back only, and the `shift_days` trap. Third, decision 9
+five numbers, that the trailing median looks back only, the `shift_days` trap, and that every
+script which reads a file the synthetic tests do not exercise has a real-file smoke test that ran
+(the fifth gate below). Third, decision 9
 is answered before job 5, and the manager approves the cap of 5 core-hours, the whole-span rows,
 and the placebo bar before job 1. Fourth, this page matches erratum 1 and the review's must-fix
-items.
+items. Fifth, any script that reads a file the synthetic tests do not exercise gets a real-file
+smoke test before its first full run. The smoke test is read-only, caps its scope (one sheet, one
+Primary, or one month), prints no value, and reports only structure and counts: the sheets or
+columns found, their types, row counts, and null counts. The files that need one are the
+switching-log workbook, the power table, the CAMS files, the capacity tables, and the metered
+farms' output. Experiment 723's first job failed on a workbook layout that its synthetic tests did
+not have, which is why the rule exists.
 
 ## What the output would change downstream
 
@@ -555,7 +602,7 @@ the table says how each one bears on this build.** Where the manager has ruled, 
 | 7 | The form of the daylight hints in rung U4 | Not concerned: the daylight BSP factor stays off and `a` = 0. **[Decided by the manager]** The rule "one factor at most" is accepted, because the latent-sky form needs the meter sensor, which is the paused daylight BSP factor under another name, and the meter sensor holds the child's own flow |
 | 8 | The CAMS download (decline for now, or approve 22 requests) | Concerned: this build uses the hourly series, which suffices with `a` = 0, so it proceeds on the "decline" default |
 | 9 | Whether the build may follow its known-answer test directly, without a rung U4 that has no hint to test | **[Decided by the manager]** Yes: rung U4 is skipped when it has no hint to test. Version 2 gates the build on a rung U4 that is `supported` or `partly supported`, where `partly supported` means "no hint is kept and the model passes alone", which is the case of an empty list of hints. The build runs when this experiment reaches row 5 or row 6 of the verdict table, and the label `partly supported` in rows 4 and 5 does not meet version 2's gate for rung U6 |
-| 10 | The switching-log repair: `engine="openpyxl"` in the experiment's own code, with no change to `pyproject.toml` | Directly: the plan uses the repair to set the `transition` flag |
+| 10 | The switching-log repair: openpyxl in the experiment's own code, with no change to `pyproject.toml` | Directly: the plan uses the repair to set the `transition` flag. The real workbook has no header row, so job 1 calls openpyxl itself and does not use `pl.read_excel` (section on experiment 723 below) |
 
 **Eight further decisions came up while planning.** Each is marked with who decides, or with the
 manager's ruling where one exists.
