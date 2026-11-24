@@ -68,6 +68,18 @@ value or a figure from an earlier experiment. The design is condensed from the p
 capacity, the network paths, the training recipe, the known-answer worlds, and the leakage rules)
 are on the page of experiment 716.
 
+**Known-answer check KF9 failed and the maintainer waived it, so the gate is a waived known-answer
+check and not a passed one.** The gate is the one of part 1. KF9 asks arm `H` to beat arm `H-S` on
+the solar block of world WH by half the `gap`. Its value is 0.00070 against the need of 0.00729, and
+its secondary readings (days 1 to 60, days 61 to 236, and pass 60) fail as well. KF10, KF11, and
+KF12 pass. No threshold and no verdict rule changed. An audit of the failure found no implementation
+fault and two method findings. First, the patience-8 rule scored arm `H` at passes 4, 23, and 5 of
+seeds 0, 1, and 2, against global bests at passes 43, 55, and 32, because the history path learns
+slowly. Second, the yardstick of KF9 sits at the oracle ridge: arm `Z` scores 0.0394 on the solar
+block, the naive ridge reference 0.0470, and the oracle ridge 0.0324, so arm `H` needs 0.0321 or
+better to pass. Every statement that the history path recovers the hidden sky from the PV estimate
+is therefore unsupported by a passing known-answer test.
+
 **The early-stopping pre-check of the known-answer worlds read one seed of three, and the other
 seeds of arm `M` are noisier than its limit.** The pre-registered pre-check reads arm `M` of seed 0
 only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of 0.0109 in world WH
@@ -190,6 +202,10 @@ generator's time series.
 
 The experiment is planned and has no fitted result yet, so these bullets describe the design.
 
+- **The known-answer gate is waived at KF9:** `e00716_waive_gate.py` writes the gate file with
+  `waived: true`, the failed check and its values, the code hash, and the sha256 of the last-run
+  file and of `e00716_known_answer.py`. The scoring rule of the known-answer checks, patience 8 and
+  the median of the 5 passes ending at the best pass, is unchanged.
 - **The pre-check reads seed 0 only:** the noise limit of the early-stopping pre-check comes from
   the last 10 validation losses of arm `M` at seed 0. At seeds 1 and 2 of WH the same noise is 0.029
   and 0.031, above the limit of 0.0225 at rung 4. The diagnostic best pass of the pre-check uses
