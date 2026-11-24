@@ -74,6 +74,13 @@ network has been trained, and every number below is a design value or a figure f
 experiment. The design is condensed from the private design note `f7_design.md` and its two Opus
 reviews.
 
+**The early-stopping pre-check of the known-answer worlds read one seed of three, and the other
+seeds of arm `M` are noisier than its limit.** The pre-registered pre-check reads arm `M` of seed 0
+only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of 0.0109 in world WH
+and 0.0121 in world WT, against the limit of 0.0225. Seeds 1 and 2 of arm `M` in WH have a last-10
+noise of 0.029 and 0.031, above that limit, so the rung-4 pass depended on seed 0. The numbers
+review checks this reading.
+
 **The honest expectation is a tie.** Each history token already carries CAMS shortwave irradiance
 and solar geometry, so the estimate adds a capacity scale, a physical shape, and units that match
 the power. Six earlier experiments found that an explicit PV term built on forecast weather did not
@@ -366,6 +373,11 @@ output of any metered generator, and no page names or plots a metered generator'
 
 The experiment is planned and has no fitted result yet, so these bullets describe the design.
 
+- **The pre-check reads seed 0 only:** the noise limit of the early-stopping pre-check comes from
+  the last 10 validation losses of arm `M` at seed 0. At seeds 1 and 2 of WH the same noise is 0.029
+  and 0.031, above the limit of 0.0225 at rung 4. The diagnostic best pass of the pre-check uses
+  patience 30, the patience that trains arm `M`. An Opus review of the code behind the pre-check
+  (commit 126577d1d) was clean.
 - **Architecture:** experiment 713's network (width 64, two axial blocks) with the new token path,
   read-out path, and head map of "How the estimate enters the network".
 - **Training regime:** stages 2 and 3 of experiment 713's recipe from the stored stage 1 state of
