@@ -37,7 +37,8 @@ Only the input columns and the raw network outputs (`raw_out_*`) are independent
    `components/step5/standardisers.json`.
 4. **Run the forward pass of `reference_check.py` for each seed**, read out the 13 quantiles, and
    sort them. `reference_check.py` reads `seed<N>.npz` and uses `torch`; production re-implements the
-   forward pass with the library of its choice. Average the seeds' contract-origin values in megawatts, then sort again.
+   forward pass with the library of its choice. Average the seeds' contract-origin values in
+   megawatts, then sort again.
 5. **Relabel the origin from 09:00 to 12:00 UTC, multiply by `capacity_mw`, and keep valid times
    from 12:00 UTC to just before 12:00 UTC 14 days later** (672 half-hours).
 
