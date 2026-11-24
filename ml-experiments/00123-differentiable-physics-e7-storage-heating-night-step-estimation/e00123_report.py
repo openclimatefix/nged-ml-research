@@ -460,7 +460,7 @@ def main() -> None:
     infos = common.series_infos()
     table = pl.read_parquet(common.WORK_DIR / "night_tables.parquet")
     label = f"{stage}: " + ", ".join(str(w) for w in winters)
-    fits = pl.read_parquet(common.WORK_DIR / f"fit_{stage}.parquet")
+    fits = pl.read_parquet(common.WORK_DIR / f"fit_{stage}.parquet").drop("step_mw", strict=False)
     headline = fits.filter(pl.col("winter_set") == label)
     nights = load_stage_nights(table=table, infos=infos, winters=winters)
     raw = pl.DataFrame(
