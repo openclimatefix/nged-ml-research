@@ -512,7 +512,7 @@ def supported_guards(
         for col in ("pin_q01", "pin_q99"):
             d = (
                 paired(treatment=sel[star], reference=sel["C"], metric=col)
-                .with_columns(m=month)
+                .with_columns(m=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"))
                 .group_by("m")
                 .agg(pl.col("d").mean())["d"]
                 .to_numpy()
@@ -520,12 +520,12 @@ def supported_guards(
             upper = d.mean() + stats.t.ppf(0.95, len(d) - 1) * d.std(ddof=1) / np.sqrt(len(d))
             tails[col] = {"upper_95": float(upper), "ok": bool(upper <= 0.05)}
         mae = float(paired(treatment=sel[star], reference=sel["C"], metric="abs_err")["d"].mean())  # ty: ignore[invalid-argument-type]
-        swap = None if swap_a_points is None else bool(swap_a_points[g] < 0)
+        swap = None if swap_a_points is None else bool(np.sign(swap_a_points[g]) == np.sign(full))
         out[g] = {
             "leave_one_primary_out": bool(all(loo_primary)), "leave_one_month_out": bool(all(loo_month)),
             "leave_one_primary_flips_sign": bool(any(flips_primary)),
             "leave_one_month_flips_sign": bool(any(flips_month)),
-            "tails": tails, "mae_moves_with_crps": bool(mae < 0), "swap_a_keeps_sign": swap,
+            "tails": tails, "mae_moves_with_crps": bool(np.sign(mae) == np.sign(full)), "swap_a_keeps_sign": swap,
         }  # fmt: skip
         out[g]["all_hold"] = bool(
             out[g]["leave_one_primary_out"] and out[g]["leave_one_month_out"]
@@ -602,6 +602,7 @@ def cmd_swaps() -> int:
         months=arms.ALL_FOLDS,
         seeds=arms.SCREEN_SEEDS,
         pairs=[
+            (star, "C"),
             (f"{star}-swapa", "C"),
             (f"{star}-swapb", "C"),
             (f"{star}-swapb", f"{star}-swapa"),
@@ -613,7 +614,10 @@ def cmd_swaps() -> int:
     res["guard_swap_a"] = {
         g: {
             "reading": group_reading(c=res[f"{star}-swapa-C:{g}"], group=g),
-            "keeps_h1_sign": bool(res[f"{star}-swapa-C:{g}"]["point"] < 0),
+            "keeps_h1_sign": bool(
+                np.sign(res[f"{star}-swapa-C:{g}"]["point"])
+                == np.sign(res[f"{star}-C:{g}"]["point"])
+            ),
         }
         for g in ("six", "eight")
     }
