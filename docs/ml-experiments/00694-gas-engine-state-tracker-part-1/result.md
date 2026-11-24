@@ -184,7 +184,7 @@ The engine record reproduces experiment 194's counts exactly (1,704, 137, 133, a
 0, 1, 2, and 3 units, of 2,054), and one unit puts out 1.97 MW. The record holds 55 running spells
 (experiment 194 counted 56), with a median of 4 half-hours. D8's reading has steps of about 5 MVA
 only after the engine connected (Figure 2). The fall that follows an engine start grows with the
-reading before it, as a folded reading predicts (Figure 3). From a level below 3 MVA, 626 of 627
+reading before it, (Figure 3). From a level below 3 MVA, 626 of 627
 merged steps of at least 1.5 MVA in 2023-09 to 2025-02 are rises. From 8 to 10 MVA, 259 of 260 are
 falls (Figure 4). No local maximum of the step histogram sits at 1.75 MW or 3.5 MW, so three units
 of 1.75 MW is a model fit and not a visible pattern.

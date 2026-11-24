@@ -144,7 +144,7 @@ load-shift alarms of D8 fall inside the engine's spells.
 *Figure 1. The detector flags at least half of the half-hours in 0.96 of D8's drops, in 0.19 of
 matched placebo windows, and in none of the drops' dates at D5, D10, and D11.*
 
-![Histogram of the drops' depths in units of 1.97 MW](figure_2.svg)
+![Histogram of the drops' depths in units of the engine's recorded step](figure_2.svg)
 
 *Figure 2. The depths spread across 0.6 to 2.7 units, with the most drops between 1.0 and 1.25
 units.*

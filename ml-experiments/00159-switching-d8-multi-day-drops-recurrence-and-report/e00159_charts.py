@@ -134,8 +134,7 @@ def _zoom_panel(*, arrays: dict, row: dict[str, Any], label: str) -> alt.VConcat
         width=WIDTH,
         height=110,
         title=alt.TitleParams(
-            text=f"Drop {row['drop']}: depth {row['depth_mw']:.1f} MW, "
-            f"{row['duration_days']:.1f} days",
+            text=f"Drop {row['drop']}: {row['duration_days']:.1f} days",
             anchor="start",
             fontSize=12,
         ),

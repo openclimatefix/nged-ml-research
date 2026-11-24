@@ -18,17 +18,11 @@ NEW_FIGURES: Final[tuple[tuple[str, str], ...]] = (
     ("00194-x", "figure_5.svg"),
     ("00196-x", "figure_3_flagged_share_by_month.svg"),
     ("00361-x", "figure_3_falls_per_month.svg"),
+    ("00291-x", "figure_2.svg"),
     ("00291-x", "figure_3.svg"),
+    ("00199-x", "figure_5_flagged_hours.svg"),
     ("00159-x", "figure_1_history.svg"),
     ("00694-x", "figure_5_gas_a_levels.svg"),
-)
-SCRIPTS: Final[tuple[str, ...]] = (
-    "00196-*/e00196_report.py",
-    "00361-*/e00361_charts.py",
-    "00291-*/e00291_charts.py",
-    "00159-*/e00159_charts.py",
-    "00294-*/e00294_charts.py",
-    "00694-*/e00694_look.py",
 )
 COMMITTED: Final[tuple[tuple[str, str], ...]] = (
     ("00194-*", "figure_1.svg"),
@@ -36,7 +30,9 @@ COMMITTED: Final[tuple[tuple[str, str], ...]] = (
     ("00194-*", "figure_5.svg"),
     ("00196-*", "figure_3_flagged_share_by_month.svg"),
     ("00361-*", "figure_3_falls_per_month.svg"),
+    ("00291-*", "figure_2.svg"),
     ("00291-*", "figure_3.svg"),
+    ("00199-*", "figure_5_flagged_hours.svg"),
     ("00159-*", "figure_1_history.svg"),
     ("00694-*", "figure_5_gas_a_levels.svg"),
 )
@@ -46,6 +42,10 @@ DELETED: Final[tuple[tuple[str, str], ...]] = (
     ("00294-*", "figure_4_example_weeks.svg"),
     ("00159-*", "figure_5_depth.svg"),
     ("00159-*", "figure_7_alarms.svg"),
+    ("00196-*", "figure_2_unit_size_profile.svg"),
+    ("00182-*", "figure_1.svg"),
+    ("00361-*", "figure_4_d8_demand_with_detected_steps.svg"),
+    ("00361-*", "figure_6_forecasts_with_and_without_steps.svg"),
 )
 
 
@@ -96,20 +96,45 @@ def test_an_undated_pooled_aggregate_is_written_for_each_new_figure(
     assert (target / name).exists()
 
 
-@pytest.mark.parametrize("pattern", SCRIPTS)
-def test_every_writer_in_the_second_batch_of_scripts_goes_through_the_guard(pattern: str):
-    (script,) = ROOT.glob(pattern)
-    tree = ast.parse(script.read_text())
-    saves = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in {"save", "write_image", "to_json"}
-        and not (isinstance(node.func.value, ast.Name) and node.func.value.id == "guard")
+def _guarded_folders() -> list[Path]:
+    """Return every experiment folder whose prefix is named in `GUARDED`."""
+    prefixes = {prefix for prefix, _ in guard.GUARDED}
+    return sorted(
+        folder for prefix in prefixes for folder in ROOT.glob(f"{prefix}*") if folder.is_dir()
+    )
+
+
+def _bare_saves(*, script: Path) -> list[int]:
+    """Return the line of each chart write in a script that does not go through the guard."""
+    lines = []
+    for node in ast.walk(ast.parse(script.read_text())):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        if node.func.attr not in {"save", "write_image", "to_json", "write_html"}:
+            continue
+        target = node.func.value
+        if isinstance(target, ast.Name) and target.id in {"guard", "np", "numpy"}:
+            continue
+        lines.append(node.lineno)
+    return lines
+
+
+def test_every_script_in_a_guarded_experiment_folder_writes_charts_through_the_guard():
+    scripts = [
+        script
+        for folder in _guarded_folders()
+        for script in folder.rglob("*.py")
+        if "tests" not in script.relative_to(folder).parts
     ]
-    assert saves == [], f"{script.name} writes a chart without the guard"
-    assert "guard.save_chart(" in script.read_text()
+    assert len(scripts) > 50  # the glob found the experiment folders
+    bare = {script.name: _bare_saves(script=script) for script in scripts}
+    assert {name: lines for name, lines in bare.items() if lines} == {}
+
+
+def test_the_bare_save_check_flags_a_script_that_writes_without_the_guard(tmp_path: Path):
+    script = tmp_path / "e_demo.py"
+    script.write_text("chart = make()\nchart.save('figure_1.svg')\nnp.save('a.npy', x)\n")
+    assert _bare_saves(script=script) == [2]
 
 
 @pytest.mark.parametrize(("folder", "name"), COMMITTED)
@@ -117,6 +142,13 @@ def test_the_committed_redrawn_figures_pass_the_text_check(folder: str, name: st
     docs = ROOT.parent / "docs" / "ml-experiments"
     (path,) = docs.glob(f"{folder}/{name}")
     assert guard.svg_problems(svg=path.read_text()) == [], path
+
+
+def test_every_guarded_figure_that_exists_passes_the_text_check():
+    docs = ROOT.parent / "docs" / "ml-experiments"
+    for prefix, name in guard.GUARDED:
+        for path in docs.glob(f"{prefix}*/{name}"):
+            assert guard.svg_problems(svg=path.read_text()) == [], path
 
 
 @pytest.mark.parametrize(("folder", "name"), DELETED)

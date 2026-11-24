@@ -13,7 +13,7 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from e00291_common import DATA_DIR, UNIT_MW
+from e00291_common import DATA_DIR
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import engine_figure_guard as guard
@@ -94,7 +94,7 @@ def figure_depth() -> alt.Chart:
             x=alt.X(
                 "depth_in_units:Q",
                 bin=alt.Bin(step=0.25, extent=[0, 3]),
-                title=f"Drop depth in units of {UNIT_MW} MW (the engine's recorded step)",
+                title="Drop depth in units of the engine's recorded step",
                 axis=alt.Axis(values=[0, 1, 2, 3]),
             ),
             y=alt.Y("count()", title="Drops", axis=alt.Axis(tickMinStep=1)),
@@ -102,7 +102,7 @@ def figure_depth() -> alt.Chart:
     )
     rules = (
         alt.Chart(pl.DataFrame({"unit": [1.0, 2.0, 3.0]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3])
+        .mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3], aria=False)
         .encode(x="unit:Q")
     )
     return (hist + rules).properties(
@@ -111,7 +111,7 @@ def figure_depth() -> alt.Chart:
         title=alt.TitleParams(
             "Drop depths spread between whole engine units",
             subtitle=wrapped(
-                "Bars: the 28 drops from 2023-08-15. Dashed lines: 1, 2, and 3 units. If the drops were "
+                "Bars: the 28 drops in scope. Dashed lines: 1, 2, and 3 units. If the drops were "
                 "whole numbers of units, the bars would stand at the lines."
             ),
             anchor="start",

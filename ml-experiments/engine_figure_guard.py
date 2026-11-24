@@ -30,6 +30,7 @@ GUARDED: Final[tuple[tuple[str, str], ...]] = (
     ("00186-", "figure_3_spread_and_drops.svg"),
     ("00199-", "figure_5_flagged_hours.svg"),
     ("00159-", "figure_1_history.svg"),
+    ("00291-", "figure_2.svg"),
     ("00291-", "figure_3.svg"),
     ("00361-", "figure_3_falls_per_month.svg"),
     ("00196-", "figure_3_flagged_share_by_month.svg"),
@@ -51,7 +52,7 @@ _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
 }
 # Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`.
 _PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(
-    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text))[^"]*\w: -?\d'
+    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text|Subtitle text))[^"]*\w: -?\d'
 )
 _AXIS_TEXT: Final[re.Pattern[str]] = re.compile(r">([^<>]+)<")
 

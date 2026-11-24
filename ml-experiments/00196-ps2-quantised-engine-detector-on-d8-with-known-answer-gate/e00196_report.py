@@ -8,7 +8,6 @@ Figure 3 goes through `engine_figure_guard`. D8 is a substation.
 """
 
 import json
-import re
 import sys
 import textwrap
 from datetime import UTC, datetime
@@ -278,50 +277,7 @@ def main() -> None:
     )
     guard.save_chart(chart=chart, path=OUT_DIR / "figure_1_against_step_detectors.svg")
 
-    # Figure 2: profile likelihood of the unit size
-    log = (DATA_DIR / "fit_wide.log").read_text()
-    prof = [
-        (int(i), float(g), float(v))
-        for i, (g, v) in enumerate(
-            [(m[0], m[1]) for m in re.findall(r"g=(\d\.\d+) MW, objective (-?\d+)", log)]
-        )
-    ]
-    per_round = 11
-    rounds = [prof[i : i + per_round] for i in range(0, len(prof), per_round)]
-    pf = pl.DataFrame(
-        [
-            {"round": f"fit {r + 1}", "g": g, "ll": v - max(x[2] for x in rr)}
-            for r, rr in enumerate(rounds)
-            for _, g, v in rr
-        ]
-    )
-    chart2 = (
-        alt.Chart(pf)  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True)
-        .encode(
-            x=alt.X("g:Q", title="Unit size (MW)", scale=alt.Scale(domain=[1, 3.5])),
-            y=alt.Y("ll:Q", title="Log-likelihood minus the best (nats)"),
-            color=alt.Color(
-                "round:N",
-                scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]),
-                legend=alt.Legend(title=None, orient="top"),
-            ),
-        )
-        .properties(
-            width=520,
-            height=220,
-            title=title(
-                "The data prefer a unit of 1.5 to 1.75 MW, and a 2 MW unit fits worse",
-                (
-                    "Log-likelihood of D8's residual from 2023-09 to 2025-12 at each unit size, "
-                    "transitions refitted at each size. Fit 1 is the first detection; fits 2 and 3 "
-                    "follow each re-centring."
-                ),
-            ),
-        )
-    )
-    guard.save_chart(chart=chart2, path=OUT_DIR / "figure_2_unit_size_profile.svg")
-
+    # Figure 2 (log-likelihood by unit size) is not drawn: its axis is the engine's unit size.
     draw_figure_3(base=base, local=local)
     # Figure 4 (one known-answer week of the engine's recorded output) is not drawn: an output
     # series of a metered generator cannot be published, even without dates.

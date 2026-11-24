@@ -287,17 +287,6 @@ def main() -> None:
                     }
                 )
     frame = pl.DataFrame(rows)
-    theory = pl.DataFrame(
-        [
-            {
-                "curve": f"{k} unit{'s' if k > 1 else ''} of 2 MW",
-                "level": float(L),
-                "fall": float(L - abs(L - 2.0 * k)),
-            }
-            for k in (1, 2, 3)
-            for L in np.arange(0.5, 13.5, 0.5)
-        ]
-    )
     pts = (
         alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=1.5)
@@ -313,18 +302,11 @@ def main() -> None:
             ),
         )
     )
-    curves = (
-        alt.Chart(theory)  # ty: ignore[unresolved-attribute]
-        .mark_line(strokeDash=[4, 3], strokeWidth=1.5, color=ocf.BLACK_2)
-        .encode(x="level:Q", y="fall:Q", detail="curve:N")
-    )
-    fig3 = (pts + curves).properties(
+    fig3 = pts.properties(
         width=WIDTH,
         height=220,
         title=alt.TitleParams(
-            wrap(
-                "Size of D8's merged falls against the reading before them. Dashed black: the fall a folded reading would show when k units of 2 MW start, for k = 1, 2, 3 (lowest to highest curve)."
-            ),
+            wrap("Size of D8's merged falls against the reading before them."),
             anchor="start",
         ),
     )
