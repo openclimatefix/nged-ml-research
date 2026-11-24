@@ -382,7 +382,7 @@ def figure_4(*, frames: dict[str, pl.DataFrame]) -> None:
         alt.Chart(counts, title="Gas A output while running")  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False, color=BLUE, size=6)
         .encode(
-            x=alt.X("bin:Q", title="Output (MW), rules at multiples of 1.97 MW"),
+            x=alt.X("bin:Q", title="Output (MW), rules at multiples of the unit size"),
             y=alt.Y("n:Q", title="Half-hours"),
         )
         + alt.Chart(rules).mark_rule(aria=False, color=ORANGE).encode(x="level:Q")  # ty: ignore[unresolved-attribute]

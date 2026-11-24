@@ -227,7 +227,7 @@ def main() -> None:
         .properties(
             title=alt.TitleParams(
                 wrap(
-                    "Change in D8's reading over 1 and 2 half-hours, by era. A peak near 4 to 5 MVA appears only after the engine is connected."
+                    "Change in D8's reading over 1 and 2 half-hours, by era. A large peak appears only after the engine is connected."
                 ),
                 anchor="start",
             )
@@ -256,7 +256,7 @@ def main() -> None:
     theory = pl.DataFrame(
         [
             {
-                "curve": f"{k} unit{'s' if k > 1 else ''} of 2 MW",
+                "curve": f"{k} unit{'s' if k > 1 else ''} of the unit size",
                 "level": float(L),
                 "fall": float(L - abs(L - 2.0 * k)),
             }
@@ -289,7 +289,7 @@ def main() -> None:
         height=220,
         title=alt.TitleParams(
             wrap(
-                "Size of D8's merged falls against the reading before them. Dashed black: the fall a folded reading would show when k units of 2 MW start, for k = 1, 2, 3 (lowest to highest curve)."
+                "Size of D8's merged falls against the reading before them. Dashed black: the fall a folded reading would show when k units of the unit size start, for k = 1, 2, 3 (lowest to highest curve)."
             ),
             anchor="start",
         ),
@@ -416,7 +416,7 @@ def main() -> None:
             width=WIDTH,
             height=150,
             title=alt.TitleParams(
-                wrap("Output levels of Gas A over its 44-day record: three units of about 2 MW."),
+                wrap("Output levels of Gas A over its 44-day record: three units."),
                 anchor="start",
             ),
         )

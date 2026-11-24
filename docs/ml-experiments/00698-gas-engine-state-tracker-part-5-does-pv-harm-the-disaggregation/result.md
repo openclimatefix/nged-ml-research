@@ -131,8 +131,8 @@ smooth solar curve of the same size, at D8 with 8.9 MW of solar between 10:00 an
   net era below.
 - **Tracker:** the grid filter of [experiment
   694](../00694-gas-engine-state-tracker-part-1/result.md) (its `M2` filter). For each half-hour it
-  estimates how many equal blocks of the engine run. A block is 1.75 MW in the fits of the host runs
-  that carry an engine.
+  estimates how many equal blocks of the engine run. A block is the fitted output of one unit in the
+  host runs that carry an engine.
 - **Flag and false-flag share:** the tracker flags a half-hour when its smoothed probability (the
   probability after a backward pass that also uses later readings) that one or more blocks run
   exceeds 0.5. The false-flag share is the share of half-hours with zero injected engine output that
@@ -387,9 +387,8 @@ would separate the farm's roughness from real weather as the cause.
 **Architecture.**
 
 - **Tracker:** experiment 694's `M2` grid filter, run through experiment 697's `track_span`, with
-  the smoothed labels as the headline and the filtered labels beside them. The fitted block is 1.75
-  MW for the three engine seeds of every scored cell, and 2.25 MW or 3.50 MW in step 4's solar-era
-  fits.
+  the smoothed labels as the headline and the filtered labels beside them. The fitted block size is
+  the same for the three engine seeds of every scored cell.
 - **Injected engine:** Gas A's whole local days, drawn at random with no weekday pattern by
   experiment 697's `drive_series` (kind `null`), with the seed recipe of experiment 697.
 - **Injected solar:** at 7.0 MW and 8.9 MW of AC capacity, one of four curves: the farm's
@@ -418,9 +417,10 @@ would separate the farm's roughness from real weather as the cause.
 
 - **Rows:** scorable half-hours from 10:00 to 15:00 local time. Every run of a host is scored on the
   same rows.
-- **Metrics:** F1 against the injected truth (one or more blocks running, at least 0.985 MW), the
-  false-flag share, and the bright-minus-dull flagged share, with thirds of the host's CAMS shape
-  within each cell of local half-hour, weekday class, and month, above 50 W/m2.
+- **Metrics:** F1 against the injected truth (one or more blocks running, at least half of the
+  record's unit output), the false-flag share, and the bright-minus-dull flagged share, with thirds
+  of the host's CAMS shape within each cell of local half-hour, weekday class, and month, above 50
+  W/m2.
 - **Intervals:** one draw of whole ISO weeks (2,000 resamples) serves every run of a host, so each
   contrast is paired. The label-only checks use 1,000 resamples.
 - **Decision rule:** as in the front matter, with the curve gate, the twin's F1, the paired
