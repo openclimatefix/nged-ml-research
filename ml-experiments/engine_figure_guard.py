@@ -20,7 +20,10 @@ import altair as alt
 
 # (experiment folder prefix, file name) of each figure that once held a generator record.
 GUARDED: Final[tuple[tuple[str, str], ...]] = (
+    ("00194-", "figure_1.svg"),
     ("00194-", "figure_2.svg"),
+    ("00194-", "figure_4.svg"),
+    ("00194-", "figure_5.svg"),
     ("00694-", "figure_6_injected_example.svg"),
     ("00694-", "figure_9_d8_running_share.svg"),
     ("00186-", "figure_3_spread_and_drops.svg"),
