@@ -254,7 +254,8 @@ def test_the_era_split_table_divides_each_excess_by_d8s_own_excess():
     assert (table["ratio"] <= table["ratio_hi"]).all()
 
 
-def test_dominance_band_never_reports_a_capacity():
-    assert core.dominance_band(largest_farm_mw=4.0, total_pv_mw=12.0) == "a_third_or_more"
-    assert core.dominance_band(largest_farm_mw=3.0, total_pv_mw=12.0) == "below_a_third"
-    assert core.dominance_band(largest_farm_mw=3.0, total_pv_mw=None) == "unknown"
+def test_the_dominance_flag_never_reports_a_capacity():
+    assert core.dominance_flag(largest_farm_mw=4.0, total_pv_mw=12.0) == "yes"
+    assert core.dominance_flag(largest_farm_mw=3.0, total_pv_mw=12.0) == "no"
+    assert core.dominance_flag(largest_farm_mw=3.0, total_pv_mw=None) == "unknown"
+    assert core.dominance_flag(largest_farm_mw=3.0, total_pv_mw=0.0) == "unknown"

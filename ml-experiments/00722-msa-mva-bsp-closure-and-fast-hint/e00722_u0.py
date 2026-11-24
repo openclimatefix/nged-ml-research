@@ -301,6 +301,7 @@ def addback_stage(
     gens: dict[int, np.ndarray],
     record: np.ndarray,
     du_of: dict[str, np.ndarray],
+    inside_of: dict[str, set[int]],
     engine_id: int | None,
     labels: dict[int, str],
     n_days: int,
@@ -416,6 +417,7 @@ def addback_stage(
                         "joint_label": core.classify_addback(lo=jlo, hi=jhi)
                         if np.isfinite(jlo + jhi)
                         else "not_fitted",
+                        "inside_polygon": ts in inside_of.get(label, set()),
                         "is_engine": ts == engine_id,
                         "engine_corr": engine_corr[ts][0],
                         "engine_overlap_rows": engine_corr[ts][1],
@@ -423,6 +425,7 @@ def addback_stage(
                             corr=engine_corr[ts][0],
                             n_overlap=engine_corr[ts][1],
                             generator_type=g["type"],
+                            inside_engine_polygon=ts in inside_of.get("D8", set()),
                         ),
                         "sign_corr": sign_corr[ts],
                         "sign_ok": core.generation_sign_ok(corr=sign_corr[ts]),
@@ -442,7 +445,16 @@ def addback_stage(
         )
         for (ts,), sub in frame.group_by("generator_id")
     }
+    era_varies = {
+        ts: core.label_varies_by_era(
+            labels_by_primary={p: grp["label"].to_list() for (p,), grp in sub.group_by("primary")}
+        )
+        for (ts,), sub in frame.group_by("generator_id")
+    }
     out = frame.with_columns(
+        label_varies_by_era=pl.col("generator_id").replace_strict(
+            era_varies, return_dtype=pl.Boolean
+        ),
         generator_class=pl.col("generator_id").replace_strict(classes, return_dtype=pl.String),
         joint_generator_class=pl.col("generator_id").replace_strict(
             joint_classes, return_dtype=pl.String
@@ -620,11 +632,17 @@ def stamp_stage(
 def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:  # noqa: PLR0915
     """Run job 1; `inputs` and `info` fill the run log as the job reads."""
     common.assert_environment(env=dict(os.environ))
+    common.assert_one_core()
+    removed = guard.invalidate_outputs(
+        names=[common.CHECKS_NAME, common.U2A_VERDICT_NAME, common.U2B_VERDICT_NAME]
+    )
+    guard.say("stale outputs removed at the start:", len(removed))
     log = guard.ReadLog()
     inputs += [data.SITE_MAP_PATH, data.METADATA_PATH, data.HIERARCHY_PATH]
     info["power_table_delta_version"] = data.power_table_version()
     topology = common.load_topology()
     counts_ok = data.assert_topology(topology=topology)
+    inside_of = data.polygon_membership(topology=topology)
     guard.say("check 1: topology asserted; generator counts as designed:", counts_ok)
     inputs += [data.FRAME39_PATH, data.SITES39_PATH]
     stage = sky_stage(topology=topology, log=log)
@@ -682,6 +700,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         gens=gens,
         record=record,
         du_of=stage["du_of"],
+        inside_of=inside_of,
         engine_id=engine_id,
         labels=labels,
         n_days=n_days,
@@ -721,12 +740,8 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     candidates = {
         p: len(common.addback_candidates(classes=classes, primary=p)) for p in core.BSP_A_UNSIGNED
     }
-    addback_form = core.binding_addback_form(
-        n_candidates=sum(candidates.values()), n_below=below.n_below
-    )
-    guard.say(
-        "add-back candidates by unsigned Primary:", candidates, "| binding form:", addback_form
-    )
+    form_status = {p: core.addback_form_status(n_candidates=n) for p, n in candidates.items()}
+    guard.say("add-back candidates by unsigned Primary:", candidates, "| form status:", form_status)
     # check 5: the BSP meter's coverage, and the readable share of the de-meaned residual change
     rec = np.isfinite(record)
     coverage = float(np.isfinite(bsp_series["A"][rec]).mean()) if rec.any() else 0.0
@@ -748,15 +763,16 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         x=core.change(x=res_d8, lag=core.ENGINE_LAG_HALF_HOURS), key=eng.key, quiet=quiet
     )
     x_engine = core.change(x=record, lag=core.ENGINE_LAG_HALF_HOURS)
-    rows_engine = np.isfinite(x_engine)
-    readable = float(np.isfinite(y_engine[rows_engine]).mean()) if rows_engine.any() else 0.0
-    engine_void = coverage < core.MIN_ENGINE_COVERAGE or readable < core.MIN_ENGINE_COVERAGE
+    engine_void = core.engine_test_void(meter_coverage=coverage)
+    readable, readable_sq = core.engine_readable_shares(response=y_engine, regressor=x_engine)
     key_agreement = float((eng.key[eng.has_row] == eng.frame_key[eng.has_row]).mean())
     guard.say(
         "check 5: BSP A meter coverage of the engine record:",
         round(coverage, 3),
         "| record changes with a finite de-meaned residual change:",
         round(readable, 3),
+        "| their share of the squared change:",
+        round(readable_sq, 3),
         "| calendar key agrees with the frame's key on frame rows:",
         round(key_agreement, 4),
         "| engine test void:",
@@ -808,24 +824,30 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     # check 8
     gap_counts = {p: long_gaps(x=series[p]) for p in ("D2", "D3", "D4", "D19", "D21")}
     guard.say("check 8: gaps longer than one day:", gap_counts)
-    # check 9: the share of the largest embedded PV farm at D12 in D12's PV capacity
-    d12 = classes.filter(
-        (pl.col("primary") == "D12")
-        & (pl.col("label") == "embedded_not_added_back")
-        & (pl.col("generator_type") == "PV")
+    # check 9: does one metered PV farm hold at least a third of D12's PV capacity? Only a flag is public.
+    pv_a = classes.filter(
+        (pl.col("primary") == "D12") & (pl.col("bsp") == "A") & (pl.col("generator_type") == "PV")
     ).unique(subset=["generator_id"])
-    capacities = data.load_effective_capacity(ids=d12["generator_id"].to_list())
-    register_mw = data.register_pv_capacity_mw(primary="D12")
-    band = core.dominance_band(
-        largest_farm_mw=max(capacities.values(), default=0.0), total_pv_mw=register_mw
+    near_d12 = pv_a.filter(
+        pl.col("inside_polygon") | (pl.col("label") != "added_back_or_not_below")
     )
+    capacities = data.load_effective_capacity(ids=near_d12["generator_id"].to_list())
+    d12_pv_mw = data.pv_capacity_mw(site="D12")
+    dominance = core.dominance_flag(
+        largest_farm_mw=max(capacities.values(), default=0.0), total_pv_mw=d12_pv_mw
+    )
+    n_embedded_outside_polygon = pv_a.filter(
+        (pl.col("label") == "embedded_not_added_back") & ~pl.col("inside_polygon")
+    ).height
     guard.say(
-        "check 9: metered PV generators embedded at D12:",
-        d12.height,
-        "dominance band:",
-        band,
-        "register table found:",
-        register_mw is not None,
+        "check 9: metered PV generators near D12:",
+        near_d12.height,
+        "| one farm holds at least a third:",
+        dominance,
+        "| capacity table found:",
+        d12_pv_mw is not None,
+        "| PV labelled embedded at D12 but outside its polygon:",
+        n_embedded_outside_polygon,
     )
     # check 10
     results_path = data.D8_BSP_STUDY_DIR / "event_study_results.csv"
@@ -922,6 +944,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         "engine_test_void": engine_void,
         "engine_record_coverage": coverage,
         "engine_record_readable_share": readable,
+        "engine_record_readable_share_of_squared_change": readable_sq,
         "calendar_key_agrees_with_frame_key": key_agreement,
         "stamp_alignment_ok": stamps["ok"],
         "stamp_alignment": stamps,
@@ -941,13 +964,15 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
             "hint": below.form_hint,
         },
         "addback_candidates_by_unsigned_primary": candidates,
-        "binding_addback_form": addback_form,
+        "addback_form_status_by_primary": form_status,
+        "n_generators_label_varies_by_era": int(per_generator["label_varies_by_era"].sum()),
         "regression_span": "whole grid for every Primary except D8, whose eras use the engine frame",
         "farms_metered_under_a_bsp": len(stage["metered_farms"]),
         "switching_logs": switching,
         "long_gaps": gap_counts,
-        "d12_dominance_band": band,
-        "d12_register_table_found": register_mw is not None,
+        "d12_one_farm_holds_at_least_a_third": dominance,
+        "d12_capacity_table_found": d12_pv_mw is not None,
+        "n_pv_embedded_at_d12_outside_its_polygon": n_embedded_outside_polygon,
         "rows_on_or_after_holdout": log.holdout,
         "ens_temperature_leads": ens_leads,
         "all_holdout_counts_zero": log.holdout_clean(),

@@ -746,23 +746,26 @@ def subtract_generator(
     )
 
 
-ENGINE_LIKE_TYPES: Final[tuple[str, ...]] = ("CHP", "Peaking Plant")
-"""Generator types that the engine record's own series could carry (B4)."""
-
 ENGINE_LIKE_CORR: Final[float] = 0.5
 """A generator whose change correlates with the engine record's at this level or more is engine-like."""
 
+ENGINE_UNLIKE_TYPES: Final[tuple[str, ...]] = ("PV", "Wind")
+"""Types that a gas engine's own series cannot carry; a sparse series of any other type is engine-like."""
 
-def engine_like(*, corr: float, n_overlap: int, generator_type: str) -> bool:
+
+def engine_like(
+    *, corr: float, n_overlap: int, generator_type: str, inside_engine_polygon: bool = False
+) -> bool:
     """Return True when a generator must not be subtracted because it could be the engine's series.
 
-    A generator with `MIN_PAIR_ROWS` or more overlap rows is engine-like when its change
-    correlates with the record's at `ENGINE_LIKE_CORR` or more. A generator with fewer overlap
-    rows cannot be judged, so it is engine-like when its type is one of `ENGINE_LIKE_TYPES`.
+    With `MIN_PAIR_ROWS` or more overlap rows, the generator is engine-like when its change
+    correlates with the record's at `ENGINE_LIKE_CORR` or more. With fewer rows the correlation
+    cannot be judged, and the generator is engine-like when it lies inside the engine Primary's
+    service-area polygon, whatever its type, or when its type is not one of `ENGINE_UNLIKE_TYPES`.
     """
     if n_overlap >= MIN_PAIR_ROWS:
         return bool(np.isfinite(corr) and corr >= ENGINE_LIKE_CORR)
-    return generator_type in ENGINE_LIKE_TYPES
+    return inside_engine_polygon or generator_type not in ENGINE_UNLIKE_TYPES
 
 
 def generator_labels(*, bsp: Sequence[str], ids: Sequence[int]) -> dict[int, str]:
@@ -802,16 +805,52 @@ def addback_regressor(
     return reading - added_back if form == "abs_x_then_plus_a" else reading
 
 
-def binding_addback_form(*, n_candidates: int, n_below: int) -> str:
-    """Return which add-back form binds: `not_needed`, `abs_of_sum`, or `unresolved` (both reported).
+def engine_test_void(*, meter_coverage: float) -> bool:
+    """Return True when the engine test is void: the BSP meter covers under 90% of the record (8.3, check 5).
 
-    With no candidate generator the form cannot change a result. A positive count of half-hours
-    below -2 points rules out the form `|X| + A` when the engine is added back, which leaves
-    `|X + A|`. A zero count leaves both forms open.
+    The share of the record's changes with a readable residual, and the share of their squared size,
+    are reported and never void the test; the test's own detection limit guards its power.
     """
-    if n_candidates == 0:
-        return "not_needed"
-    return "abs_of_sum" if n_below > 0 else "unresolved"
+    return meter_coverage < MIN_ENGINE_COVERAGE
+
+
+def addback_form_status(*, n_candidates: int) -> str:
+    """Return the add-back form status of one unsigned Primary: `not_needed` or `unresolved`.
+
+    A Primary has a candidate when a subtracted generator lies inside its service-area polygon and
+    carries the label `added_back_or_not_below` there. With no candidate the form cannot change a
+    result. Otherwise the data cannot choose between the forms, and both are fitted.
+    """
+    return "unresolved" if n_candidates > 0 else "not_needed"
+
+
+def combine_form_verdicts(*, verdicts: Mapping[str, str]) -> str:
+    """Return the U2b verdict over the add-back forms: the common verdict, else `inconclusive`.
+
+    With one form fitted, its verdict binds. With two, the verdict binds only where the two agree.
+    """
+    distinct = set(verdicts.values())
+    return distinct.pop() if len(distinct) == 1 else "inconclusive"
+
+
+def label_varies_by_era(*, labels_by_primary: Mapping[str, Sequence[str]]) -> bool:
+    """Return True when a generator's add-back label differs between eras at any one Primary."""
+    return any(len(set(labels)) > 1 for labels in labels_by_primary.values())
+
+
+def engine_readable_shares(*, response: np.ndarray, regressor: np.ndarray) -> tuple[float, float]:
+    """Return the share of the regressor's changes whose response is finite, and their share of squares.
+
+    Both shares are reported with no bar. The second weights each change by its squared size, so
+    it says how much of the engine's variation the readable rows carry.
+    """
+    rows = np.isfinite(regressor)
+    if not rows.any():
+        return 0.0, 0.0
+    readable = np.isfinite(response[rows])
+    total = float((regressor[rows] ** 2).sum())
+    carried = float((regressor[rows][readable] ** 2).sum())
+    return float(readable.mean()), carried / total if total > 0 else float("nan")
 
 
 @dataclass(frozen=True)
@@ -840,15 +879,11 @@ def below_count(*, reading_mw: np.ndarray, engine_mw: np.ndarray, capacity_mw: f
     return BelowCount(n_below=n_below, n_total=n_total, share=share, form_hint=hint)
 
 
-def dominance_band(*, largest_farm_mw: float, total_pv_mw: float | None) -> str:
-    """Return `below_a_third`, `a_third_or_more`, or `unknown` for F7's share, never a capacity."""
+def dominance_flag(*, largest_farm_mw: float, total_pv_mw: float | None) -> str:
+    """Return `yes`, `no`, or `unknown` for "one farm holds at least one third", never a capacity."""
     if total_pv_mw is None or not np.isfinite(total_pv_mw) or total_pv_mw <= 0:
         return "unknown"
-    return (
-        "a_third_or_more"
-        if largest_farm_mw / total_pv_mw >= DOMINANT_FARM_SHARE
-        else "below_a_third"
-    )
+    return "yes" if largest_farm_mw / total_pv_mw >= DOMINANT_FARM_SHARE else "no"
 
 
 # ---------------------------------------------------------------------------------------------

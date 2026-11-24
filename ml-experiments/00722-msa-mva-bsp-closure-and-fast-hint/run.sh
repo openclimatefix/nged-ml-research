@@ -13,6 +13,8 @@
 #     `OPENBLAS_NUM_THREADS`, `POLARS_MAX_THREADS`);
 #   - the GPU untouched: `CUDA_VISIBLE_DEVICES=""`, and no job imports `torch`;
 #   - at least 25 GB of memory available at launch, or the wrapper refuses;
+#   - `taskset -c $SLOT_CPU` as well, because `AllowedCPUs` needs a delegated cpuset controller, and
+#     each job fails unless `os.sched_getaffinity` shows exactly one core;
 #   - the venv's Python called directly (never `uv run` inside the scope);
 #   - only this experiment's folder on PYTHONPATH, plus `EXTRA_PYTHONPATH` if set.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
@@ -48,4 +50,4 @@ export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 POLARS_MAX_THR
 export CUDA_VISIBLE_DEVICES=""
 exec systemd-run --user --scope -q \
     -p MemoryMax=12G -p MemorySwapMax=0 -p OOMPolicy=continue -p AllowedCPUs="$SLOT_CPU" \
-    "$(dirname "$root")/.venv/bin/python" "$here/$script" "$@"
+    taskset -c "$SLOT_CPU" "$(dirname "$root")/.venv/bin/python" "$here/$script" "$@"

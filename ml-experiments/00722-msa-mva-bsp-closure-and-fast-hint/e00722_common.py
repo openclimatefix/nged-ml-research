@@ -7,6 +7,7 @@ chooses a generator's class a second time.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Final
 
@@ -29,12 +30,16 @@ CLASS_COLUMNS: Final[frozenset[str]] = frozenset(
     {
         "bsp", "generator", "generator_type", "units", "primary", "era", "label", "coverage",
         "generator_class", "is_engine", "engine_like", "sign_ok", "subtract",
+        "inside_polygon", "label_varies_by_era",
     }
 )  # fmt: skip
 """The columns that jobs 2 and 3 read from job 1's class table."""
 
 U2A_VERDICT_NAME: Final[str] = "u2a_verdict.json"
 """Job 2's verdict file, which job 3 reads."""
+
+U2B_VERDICT_NAME: Final[str] = "u2b_verdict.json"
+"""Job 3's verdict file."""
 
 VARIANTS: Final[tuple[str, ...]] = ("primary", "with_unresolved")
 """Residual variants: the generators of class `outside_or_added_back` only, or those and the unresolved ones."""
@@ -58,6 +63,14 @@ def assert_environment(*, env: dict[str, str]) -> None:
     wrong = {k: env.get(k) for k, v in ENV_DEFAULTS.items() if env.get(k) != v}
     if wrong:
         msg = f"launch through run.sh: these variables are wrong or unset: {sorted(wrong)}"
+        raise JobRefusedError(msg)
+
+
+def assert_one_core() -> None:
+    """Raise unless this process may run on exactly one core (the wrapper pins it)."""
+    allowed = os.sched_getaffinity(0)
+    if len(allowed) != 1:
+        msg = f"launch through run.sh: the process may use {len(allowed)} cores, not one"
         raise JobRefusedError(msg)
 
 
@@ -152,15 +165,16 @@ def generator_ids_to_subtract(*, classes: pl.DataFrame, bsp: str, variant: str) 
 def addback_candidates(*, classes: pl.DataFrame, primary: str) -> list[int]:
     """Return the ids of the generators that may be added back inside one Primary.
 
-    A candidate is labelled `added_back_or_not_below` at the Primary, is of class
-    `outside_or_added_back`, and would otherwise be subtracted. The coefficient cannot tell an
-    outside generator from an added-back one, so every candidate is treated as possibly added back,
-    and the two add-back forms are reported for it.
+    A candidate is subtracted, lies inside the Primary's service-area polygon (column
+    `inside_polygon`), and carries the label `added_back_or_not_below` at the Primary. The
+    coefficient cannot tell an outside generator from an added-back one, and the polygon says
+    which generators could sit below the Primary at all.
     """
     rows = classes.filter(
         (pl.col("primary") == primary)
         & (pl.col("label") == "added_back_or_not_below")
         & pl.col("subtract")
+        & pl.col("inside_polygon")
     ).unique(subset=["generator_id"])
     return sorted(rows["generator_id"].to_list())
 

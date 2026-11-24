@@ -161,18 +161,119 @@ def test_each_addback_form_is_recovered_by_its_own_regressor_only(truth: str):
     assert abs(slope[other] - 1.0) > 0.1
 
 
-def test_the_binding_addback_form():
-    assert core.binding_addback_form(n_candidates=0, n_below=5) == "not_needed"
-    assert core.binding_addback_form(n_candidates=2, n_below=5) == "abs_of_sum"
-    assert core.binding_addback_form(n_candidates=2, n_below=0) == "unresolved"
+def test_the_form_status_and_the_combination_rule():
+    assert core.addback_form_status(n_candidates=0) == "not_needed"
+    assert core.addback_form_status(n_candidates=1) == "unresolved"
+    seen = set()
+    for first in ("supported", "not supported", "inconclusive"):
+        for second in ("supported", "not supported", "inconclusive"):
+            got = core.combine_form_verdicts(verdicts={"f1": first, "f2": second})
+            assert got == (first if first == second else "inconclusive")
+            seen.add(got)
+    assert seen == {"supported", "not supported", "inconclusive"}
+    assert core.combine_form_verdicts(verdicts={"not_needed": "supported"}) == "supported"
+
+
+def test_the_candidate_set_differs_between_two_primaries():
+    rows = []
+    for primary, inside in (("D1", True), ("D2", False)):
+        rows.append(
+            {
+                "primary": primary,
+                "generator_id": 12,
+                "label": "added_back_or_not_below",
+                "subtract": True,
+                "inside_polygon": inside,
+            }
+        )
+    rows.append(
+        {
+            "primary": "D1",
+            "generator_id": 13,
+            "label": "added_back_or_not_below",
+            "subtract": True,
+            "inside_polygon": False,
+        }
+    )
+    rows.append(
+        {
+            "primary": "D1",
+            "generator_id": 14,
+            "label": "embedded_not_added_back",
+            "subtract": False,
+            "inside_polygon": True,
+        }
+    )
+    frame = pl.DataFrame(rows)
+    assert common.addback_candidates(classes=frame, primary="D1") == [12]
+    assert common.addback_candidates(classes=frame, primary="D2") == []
+    assert core.addback_form_status(n_candidates=1) != core.addback_form_status(n_candidates=0)
+
+
+def test_polygon_membership_uses_the_service_area_polygon():
+    square = "POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))"
+    inside = data.inside_polygons(
+        areas={"D8": square, "D3": "POLYGON((5 5, 5 6, 6 6, 6 5, 5 5))"},
+        points={1: (1.0, 1.0), 2: (3.0, 3.0), 3: (5.5, 5.5)},
+    )
+    assert inside == {"D8": {1}, "D3": {3}}
+
+
+def test_the_pv_capacity_comes_from_the_latest_cutoff_of_method_fa():
+    table = pl.DataFrame(
+        {
+            "site": ["D12", "D12", "D12", "D3"],
+            "method": ["FA", "FA", "XX", "FA"],
+            "cutoff": ["2026-05", "2026-06", "2026-06", "2026-06"],
+            "cal_p50": [10.0, 12.0, 99.0, 5.0],
+        }
+    )
+    assert data.pick_pv_capacity_mw(table=table, site="D12") == 12.0
+    assert data.pick_pv_capacity_mw(table=table, site="D99") is None
+
+
+def test_the_engine_test_is_void_on_meter_coverage_only_and_the_readable_shares_have_no_bar():
+    assert not core.engine_test_void(meter_coverage=0.95)
+    assert core.engine_test_void(meter_coverage=0.85)
+    regressor = np.array([3.0, 1.0, 1.0, 1.0, 1.0, np.nan])
+    response = np.array([1.0, np.nan, 1.0, np.nan, 1.0, 1.0])
+    share, share_sq = core.engine_readable_shares(response=response, regressor=regressor)
+    assert share == 0.6
+    assert share_sq == pytest.approx(11 / 13)
+    assert not core.engine_test_void(meter_coverage=1.0)
+
+
+def test_the_label_varies_by_era_flag():
+    assert core.label_varies_by_era(labels_by_primary={"D8": ["a", "b", "a"], "D3": ["a"]})
+    assert not core.label_varies_by_era(labels_by_primary={"D8": ["a", "a"], "D3": ["b"]})
+
+
+def test_stale_outputs_are_deleted_and_the_pin_is_one_core(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    (tmp_path / common.CHECKS_NAME).write_text("{}")
+    assert guard.invalidate_outputs(
+        names=[common.CHECKS_NAME, "absent.json"], out_dir=tmp_path
+    ) == [common.CHECKS_NAME]
+    assert not (tmp_path / common.CHECKS_NAME).exists()
+    with pytest.raises(common.JobRefusedError):
+        common.read_checks(out_dir=tmp_path)
+    monkeypatch.setattr(common.os, "sched_getaffinity", lambda _pid: {3})
+    common.assert_one_core()
+    monkeypatch.setattr(common.os, "sched_getaffinity", lambda _pid: {0, 1})
+    with pytest.raises(common.JobRefusedError):
+        common.assert_one_core()
 
 
 # ---- B4 and B5: engine-like and sign ------------------------------------------------------------
 def test_engine_like_generators_and_the_generation_sign_are_not_subtracted():
+    nan = float("nan")
     assert core.engine_like(corr=0.7, n_overlap=1000, generator_type="PV")
-    assert not core.engine_like(corr=0.1, n_overlap=1000, generator_type="CHP")
-    assert core.engine_like(corr=float("nan"), n_overlap=40, generator_type="CHP")
-    assert not core.engine_like(corr=float("nan"), n_overlap=40, generator_type="PV")
+    assert not core.engine_like(corr=0.1, n_overlap=1000, generator_type="Other")
+    assert core.engine_like(corr=nan, n_overlap=40, generator_type="Other")
+    assert not core.engine_like(corr=nan, n_overlap=40, generator_type="PV")
+    assert not core.engine_like(corr=nan, n_overlap=40, generator_type="Wind")
+    assert core.engine_like(corr=nan, n_overlap=40, generator_type="PV", inside_engine_polygon=True)
     assert core.generation_sign_ok(corr=-0.2)
     assert not core.generation_sign_ok(corr=0.2)
     assert not core.generation_sign_ok(corr=float("nan"))
@@ -216,24 +317,6 @@ def test_the_holdout_counts_separate_rows_read_from_rows_dropped(monkeypatch: py
     assert log.holdout_clean()
     log.record_holdout(name="bad", read_after=3, dropped=0)
     assert not log.holdout_clean()
-
-
-# ---- B7: the dominance band comes from the register table ---------------------------------------
-def test_the_dominance_band_is_unknown_without_the_register_table_and_computed_with_it(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
-    monkeypatch.setattr(data, "ML_EXPERIMENTS_DATA_DIR", tmp_path)
-    assert data.register_pv_capacity_mw(primary="D12") is None
-    folder = tmp_path / "00716-x"
-    folder.mkdir()
-    pl.DataFrame({"primary": ["D12", "D3"], "capacity_mw": [12.0, 5.0]}).write_parquet(
-        folder / "pv_register_capacity.parquet"
-    )
-    total = data.register_pv_capacity_mw(primary="D12")
-    assert total == 12.0
-    assert core.dominance_band(largest_farm_mw=5.0, total_pv_mw=total) == "a_third_or_more"
-    assert core.dominance_band(largest_farm_mw=3.0, total_pv_mw=total) == "below_a_third"
-    assert core.dominance_band(largest_farm_mw=3.0, total_pv_mw=None) == "unknown"
 
 
 # ---- B10 and B12: atomic writes and a run log that survives a crash -----------------------------
@@ -359,6 +442,7 @@ def test_the_addback_stage_classes_sign_engine_and_joint_columns():
         gens=gens,
         record=record,
         du_of={"D1": sky_change, "D2": sky_change},
+        inside_of={"D1": {12}},
         engine_id=None,
         labels={11: "GA1", 12: "GA2"},
         n_days=core.N_GRID // 48 + 1,
@@ -382,6 +466,11 @@ def test_the_addback_stage_classes_sign_engine_and_joint_columns():
     assert by["GA2"]["label"] == "added_back_or_not_below"
     assert by["GA1"]["generator_class"] == "embedded_not_added_back"
     assert by["GA2"]["generator_class"] == "outside_or_added_back"
+    assert by["GA2"]["inside_polygon"]
+    assert not by["GA1"]["inside_polygon"]
+    assert common.addback_candidates(classes=classes, primary="D1") == [12]
+    assert common.addback_candidates(classes=classes, primary="D2") == []
+    assert "label_varies_by_era" in classes.columns
     assert by["GA2"]["sign_ok"]
     assert by["GA2"]["subtract"]
     assert not by["GA1"]["subtract"]

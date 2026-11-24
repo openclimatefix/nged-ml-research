@@ -50,7 +50,10 @@ def test_the_folded_child_test_reads_the_hidden_sign_and_the_placebo_does_not():
         quiet=cal["quiet"],
         day=cal["day"],
         weights=make_weights(n_days=n_days, n_boot=100),
+        near_step=np.zeros(n, dtype=bool),
     )
+    assert out["auc_no_engine_step"][0] == out["auc"][0]
+    assert out["n_scorable_no_engine_step"] == out["n_scorable"]
     assert abs(out["closure"].coef[0] - 1.0) < 0.1
     assert out["auc"][0] > 0.95
     assert out["n_scorable"] > core.D15_MIN_HOURS

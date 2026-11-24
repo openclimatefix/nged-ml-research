@@ -292,6 +292,7 @@ def fit_rows(
 def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:  # noqa: PLR0912, PLR0915
     """Run job 3; `inputs` and `info` fill the run log as the job reads."""
     common.assert_environment(env=dict(os.environ))
+    common.assert_one_core()
     checks = common.read_checks()
     common.require_class_audit(checks=checks)
     common.require_stamps(checks=checks)
@@ -335,15 +336,28 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     )
     start_a = common.both_start(series=series, transformers=core.TWO_TRANSFORMERS_2025)
     rows_idx = np.arange(core.N_GRID)
-    binding_form = checks["binding_addback_form"]
-    forms: tuple[core.AddbackForm, ...] = (
-        core.ADDBACK_FORMS if binding_form == "unresolved" else ("abs_of_sum",)
+    status = checks["addback_form_status_by_primary"]
+    unresolved = [c for c in core.BSP_A_UNSIGNED if status[c] == "unresolved"]
+    forms: tuple[str, ...] = core.ADDBACK_FORMS if unresolved else ("not_needed",)
+    cand_ids = {c: common.addback_candidates(classes=classes, primary=c) for c in unresolved}
+    cand_all = sorted({g for ids_ in cand_ids.values() for g in ids_})
+    added_back = {
+        c: np.sum([power[g] for g in cand_ids[c]], axis=0)
+        if c in cand_ids
+        else np.zeros(core.N_GRID)
+        for c in core.BSP_A_UNSIGNED
+    }
+    common_rows = (
+        np.isfinite(np.sum([power[g] for g in cand_all], axis=0))
+        if cand_all
+        else np.ones(core.N_GRID, dtype=bool)
     )
-    added_back: dict[str, np.ndarray] = {}
-    for c in core.BSP_A_UNSIGNED:
-        cand = common.addback_candidates(classes=classes, primary=c)
-        added_back[c] = np.sum([power[g] for g in cand], axis=0) if cand else np.zeros(core.N_GRID)
-    total_fits = 2 * len(common.VARIANTS) * len(forms) * 6
+    total_fits = len(common.VARIANTS) * (2 + len(forms) * 12) + 1
+    fits_done = [0]
+
+    def tick() -> None:
+        fits_done[0] += 1
+        gate.check(done=fits_done[0], total=total_fits)
 
     def dm(x: np.ndarray) -> np.ndarray:
         return core.demean_matched(x=core.change(x=x, lag=1), key=eng.key, quiet=quiet)
@@ -366,13 +380,11 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     guard.say("FITS STARTING: job 3 (U2b)")
     gate.mark()
     for variant in common.VARIANTS:
-        gens = {
-            b: [
-                power[g]
-                for g in common.generator_ids_to_subtract(classes=classes, bsp=b, variant=variant)
-            ]
+        gen_ids = {
+            b: common.generator_ids_to_subtract(classes=classes, bsp=b, variant=variant)
             for b in ("A", "B")
         }
+        gens = {b: [power[g] for g in ids_] for b, ids_ in gen_ids.items()}
         per_bsp: dict[str, dict[str, Any]] = {}
         for bsp, unsigned, signed, transformers, start in (
             ("A", core.BSP_A_UNSIGNED, core.BSP_A_SIGNED, core.TWO_TRANSFORMERS_2025, start_a),
@@ -422,6 +434,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
                 weights=weights,
                 names=b["names"],
             )
+            tick()
         bsp_b_controls = {
             f"bsp_b_{label}": outcome_of_fit(fit=b_fits["calibration"], name=label, kind="positive")
             for label in core.BSP_B_UNSIGNED
@@ -442,12 +455,29 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
             )
         form_verdicts: dict[str, Any] = {}
         for form in forms:
-            form_label = form if binding_form == "unresolved" else binding_form
+            form_label = form
+            ids_form = (
+                [g for g in gen_ids["A"] if g not in cand_all]
+                if form == "abs_x_then_plus_a"
+                else gen_ids["A"]
+            )
+            response_a = common.spanned_residual(
+                bsp=power[topology.bsp_meter["A"]],
+                series=series,
+                children=core.BSP_A_SIGNED,
+                transformers=core.TWO_TRANSFORMERS_2025,
+                leave_out=None,
+                generators=[power[g] for g in ids_form],
+                start=start_a,
+            )
+            y_form = dm(response_a)
             x_form = np.column_stack(
                 [
                     dm(
                         core.addback_regressor(
-                            reading=series[c], added_back=added_back[c], form=form
+                            reading=series[c],
+                            added_back=added_back[c],
+                            form=cast(core.AddbackForm, form if c in cand_ids else "abs_of_sum"),
                         )
                     )
                     for c in core.BSP_A_UNSIGNED
@@ -488,7 +518,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
             spans = {"later": rows_idx >= start_a, "earlier": rows_idx < start_a}
             fits: dict[tuple[str, str], core.Fit] = {}
             for span, in_span in spans.items():
-                base = a["usable"] & in_span
+                base = a["usable"] & common_rows & in_span
                 for fit_name, sel in (
                     ("calibration", a["cal"]),
                     ("test_one_stretch", t_one),
@@ -497,14 +527,13 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
                 ):
                     use = base & sel
                     fit = core.bootstrap_ols(
-                        y=np.where(use, a["y"], np.nan),
+                        y=np.where(use, y_form, np.nan),
                         x=np.where(use[:, None], x_form, np.nan),
                         day=day,
                         weights=weights,
                         names=a["names"],
                     )
-                    if not fits:
-                        gate.check(done=1, total=total_fits)
+                    tick()
                     fits[(span, fit_name)] = fit
                 shifted_x = x_form.copy()
                 shifted_x[:, 2] = core.shift_rows(
@@ -513,12 +542,13 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
                 for fit_name, sel in (("calibration_shifted", a["cal"]), ("test_shifted", t_one)):
                     use = base & sel
                     fits[(span, fit_name)] = core.bootstrap_ols(
-                        y=np.where(use, a["y"], np.nan),
+                        y=np.where(use, y_form, np.nan),
                         x=np.where(use[:, None], shifted_x, np.nan),
                         day=day,
                         weights=weights,
                         names=a["names"],
                     )
+                    tick()
             cal_bar = outcome_of_fit(
                 fit=fits[("later", "calibration")], name="D12", kind="calibration"
             )
@@ -597,11 +627,12 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
                 "| verdict",
                 verdict,
             )
-        distinct = {v["verdict"] for v in form_verdicts.values()}
         verdicts[variant] = {
-            "verdict": distinct.pop() if len(distinct) == 1 else "inconclusive",
-            "binding_addback_form": binding_form,
-            "form_unresolved": binding_form == "unresolved",
+            "verdict": core.combine_form_verdicts(
+                verdicts={k: v["verdict"] for k, v in form_verdicts.items()}
+            ),
+            "unresolved_primaries": unresolved,
+            "form_unresolved": bool(unresolved),
             "forms": form_verdicts,
         }
         if variant == "primary":
@@ -634,6 +665,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
                 rng=np.random.default_rng(core.SEED + 2),
             )
             guard.write_public_csv(frame=exploratory, name="u2b_d8_exploratory.csv")
+            tick()
             guard.say("D8 exploratory table rows:", exploratory.height)
     guard.write_public_csv(
         frame=pl.DataFrame(results, infer_schema_length=None), name="u2b_results.csv"

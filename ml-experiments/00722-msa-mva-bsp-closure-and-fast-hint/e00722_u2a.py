@@ -50,6 +50,7 @@ def folded_child_test(
     quiet: np.ndarray,
     day: np.ndarray,
     weights: np.ndarray,
+    near_step: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Score one child whose signed series is folded to a magnitude, against its hidden sign.
 
@@ -60,6 +61,8 @@ def folded_child_test(
         quiet: True at quiet half-hours.
         day: The day of each row.
         weights: The master draw of whole days.
+        near_step: True within two half-hours of a change in the engine state. The area under the
+            curve without those rows is reported with no bar.
 
     Returns:
         The closure fits (de-meaned, raw, and all-children), the area under the curve with and
@@ -118,6 +121,14 @@ def folded_child_test(
         day=day,
         weights=weights,
     )
+    quiet_hours = ~near_step if near_step is not None else np.ones(len(flow), dtype=bool)
+    scored_ns = scored & quiet_hours
+    auc_ns = core.bootstrap_auc(
+        score=np.where(scored_ns, table["ratio"], np.nan),
+        label=np.where(scored_ns, table["label"], np.nan),
+        day=day,
+        weights=weights,
+    )
     with_crossing = table["size_ok"]
     sign_at_end = np.where(flow > 0, 1.0, 0.0)
     auc_all = core.bootstrap_auc(
@@ -143,6 +154,8 @@ def folded_child_test(
         "auc": auc,
         "auc_with_crossing": auc_all,
         "auc_raw": auc_raw,
+        "auc_no_engine_step": auc_ns,
+        "n_scorable_no_engine_step": int(scored_ns.sum()),
         "n_scorable_raw": int(scored_raw.sum()),
         "auc_placebo": auc_p,
         "n_scorable": int(scored.sum()),
@@ -237,6 +250,7 @@ def auc_row(
 def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:  # noqa: PLR0915
     """Run job 2; `inputs` and `info` fill the run log as the job reads."""
     common.assert_environment(env=dict(os.environ))
+    common.assert_one_core()
     checks = common.read_checks()
     common.require_stamps(checks=checks)
     log = guard.ReadLog()
@@ -257,6 +271,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     record, record_path, _ = data.load_engine_record(log=log)
     inputs += [record_path]
     quiet = core.quiet_mask(engine_change=eng.change, calendar_ok=eng.has_row)
+    near_step = core.within_distance(flag=eng.change, distance=core.ENGINE_STEP_DROP_HALF_HOURS)
     day = sky.day_of(n=core.N_GRID)
     n_days = int(day.max()) + 1
     weights = core.day_weights(
@@ -349,6 +364,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
             for d, f in eng_res["placebos"].items()
         ]
         d15 = folded_child_test(
+            near_step=near_step,
             flow=series["D15"],
             leave_out_residual=res_d15,
             key=eng.key,
@@ -423,6 +439,16 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
                 form="leave_out",
                 auc=d15["auc_raw"],
                 n=d15["n_scorable_raw"],
+                outcome="report",
+            )
+        )
+        rows.append(
+            auc_row(
+                variant=variant,
+                test="d15_sign_no_engine_step",
+                form="leave_out",
+                auc=d15["auc_no_engine_step"],
+                n=d15["n_scorable_no_engine_step"],
                 outcome="report",
             )
         )

@@ -160,23 +160,34 @@ earlier one.** The jobs of this experiment test a hindsight pathway on past half
 removes a calendar profile and carries no label, and nothing is forecast. The as-of rung that
 follows uses past rows only. The matched key is built from the calendar for every half-hour of the
 grid, so the engine record, which lies outside the engine frame, has a key. The pool of quiet
-half-hours comes from the engine frame's span. Job 1 reports how many record half-hours have a
-finite de-meaned residual change, and the engine test is void below 90%.
+half-hours comes from the engine frame's span.
 
-**Two add-back forms are reported when the data cannot choose between them.** The reading of a
-Primary is either the folded flow plus the added-back output, or the fold of their sum. Job 1
-counts, for each of D3, D8, D12, and D22, the generators that the regression cannot tell from an
-added-back generator, and reports the count of half-hours below -2 points. With no such generator
-the form cannot change a result. A positive count leaves the fold-of-sum form. A zero count leaves
-both open, and job 3 then runs and reports both forms, and the verdict is `inconclusive` unless
-the two forms agree.
+**The engine test is void only when the BSP meter covers under 90% of the record's 44 days (check
+5 of job 1).** Job 1 also reports the share of the record's changes whose de-meaned residual change
+is readable, and the readable changes' share of the squared change. Neither share has a bar,
+because the test's own detection limit guards its power.
+
+**A generator is an add-back candidate at an unsigned Primary only if it lies inside that Primary's
+service-area polygon.** The polygon is the `area_wkt` of the metadata, as in experiment 673, and
+inside a polygon means "possibly below", not electrically below. A candidate is also subtracted
+and carries the label `added_back_or_not_below` at that Primary. The form status is per Primary:
+`not_needed` with no candidate, and `unresolved` otherwise. The count of D8 half-hours whose
+reading minus the engine record lies below -2 points is reported and binds no form.
+
+**At a Primary whose form is unresolved, job 3 fits both forms on the same rows.** Under `|X| + A`
+the regressor is the reading minus the candidate's output, and the response leaves that output out.
+Under `|X + A|` the regressor is the reading, and the response adds the output. The U2b verdict
+is the common verdict when the two fits agree, and `inconclusive` otherwise. With no unresolved
+Primary one fit runs and its verdict binds. Both verdicts and the unresolved Primaries are recorded.
 
 **Generators carry anonymous labels, and the map from label to id stays under `PRIVATE/`.** Public
 tables name a generator `GA1` to `GA8` and `GB1` to `GB5`. The class table also reports the
 sign of each generator's change against the BSP meter's, whether the generator could be the
 engine's own series, and a second fit of every Primary on all well-covered generators and the
 Primary's own sky change together. A generator whose class differs between the two fits is flagged,
-and the second fit has no bar.
+and the second fit has no bar. A report-only column says whether a generator's label changes between
+D8's eras. If any generator sets it, the residual still uses one class for the generator across the
+eras.
 
 **The same-sky pair rule counts the unmetered farms only.** Every host and farm pair is computed
 and each pair says whether the farm is a metered generator under a BSP. Unmetered pairs count
@@ -188,10 +199,25 @@ cutoffs binds on all sites pooled.** The per-site rows are report-only. BSP B's 
 bind on BSP B's calibration fit.
 
 **Constants that the implementation added to section 8 are pre-registered here.** They are
-`MIN_GENERATOR_COVERAGE` 0.8, `ENGINE_IDENTITY_CORR` 0.99, `ENGINE_LIKE_CORR` 0.5 (with
-`ENGINE_LIKE_TYPES` of CHP and Peaking Plant for generators with fewer than 500 overlap rows),
+`MIN_GENERATOR_COVERAGE` 0.8, `ENGINE_IDENTITY_CORR` 0.99, `ENGINE_LIKE_CORR` 0.5,
 `MIN_PAIR_ROWS` 500, `STAMP_MIN_CORR` 0.05, `MIN_QUIET_PER_KEY` 5, `QUIET_PAD_HALF_HOURS` 6,
 `DARK_ELEVATION_DEG` 0, `AUDIT_MIN_FARM_DAYS` 10, and `MIN_FARM_DAY_COVERAGE` 0.9.
+
+**A generator could be the engine's own series by a three-line rule.** With at least 500 overlap
+rows with the record, the generator is engine-like when its change correlates with the record's at
+0.5 or more. With fewer rows, it is engine-like unless its type is PV or Wind. With fewer rows and
+a position inside D8's service-area polygon, it is engine-like whatever its type. An engine-like
+generator is never subtracted.
+
+**Job 1 writes only a flag for the share of one farm in D12's PV capacity.** The capacity is the
+`cal_p50` of experiment 662's capacity table (site D12, method FA, latest cutoff), as experiments
+716 and 717 read it. The farm is the largest metered PV generator that lies inside D12's polygon or
+whose label at D12 is not `added_back_or_not_below`. The public output says whether one farm holds at
+least one third (`yes`, `no`, or `unknown` if the table is missing), and the figures stay private.
+
+**Job 2 also reports, with no bar, the area under the curve without the hours next to an engine
+step.** Job 3 counts its real fits in the timing gate. Job 1 deletes the earlier check file and
+verdict files when it starts, and every job fails unless one core is allowed to it.
 
 **The ratio of the all-children residual to a child's reading is the leave-out ratio minus 1.**
 That identity holds only for the ratio on the child's own change. For the engine test and the D15

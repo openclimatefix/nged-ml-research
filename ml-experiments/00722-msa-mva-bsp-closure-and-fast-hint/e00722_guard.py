@@ -111,6 +111,17 @@ def atomic_write(*, path: Path, write: Callable[[Path], object]) -> Path:
     return path
 
 
+def invalidate_outputs(*, names: Sequence[str], out_dir: Path = OUT_DIR) -> list[str]:
+    """Delete earlier outputs by name, so that a crashed re-run leaves no stale file to trust."""
+    removed = []
+    for name in names:
+        path = out_dir / name
+        if path.is_file():
+            path.unlink()
+            removed.append(name)
+    return removed
+
+
 def write_public_csv(*, frame: pl.DataFrame, name: str, out_dir: Path = OUT_DIR) -> Path:
     """Write an aggregate table to `out_dir/name` after the guard checks it."""
     check_public_frame(frame=frame, name=name)

@@ -20,6 +20,8 @@ import e00722_core as core
 import e00722_guard as guard
 import numpy as np
 import polars as pl
+from shapely import Point, wkt
+from shapely.prepared import prep
 from studies.dp_calendar import LOCAL_TIME_ZONE, calendar_columns
 from studies.power import CLEANED_POWER_DELTA_URI, scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR
@@ -69,8 +71,11 @@ ENGINE_FRAME_PATH: Final[Path] = (
 )
 """Experiment 697's engine-state frame (`start` is the start of the half-hour)."""
 
-PV_REGISTER_GLOB: Final[str] = "0071[67]-*/**/pv_register_capacity*.parquet"
-"""Where experiments 716 and 717 store the register capacity table (columns `primary` and `capacity_mw`)."""
+PV_CAPACITY_TABLE_PATH: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00662-pv-probe-through-the-mva-fold-matched-level-redesign/work/analysis/capacity_table.csv"
+)
+"""Experiment 662's capacity table, which experiments 716 and 717 read for each Primary's PV capacity."""
 
 ENGINE_RECORD_GLOB: Final[str] = "00194-*/g2_window.parquet"
 """Where experiment 194 stored the 44-day independent engine record (private)."""
@@ -550,20 +555,62 @@ def load_effective_capacity(*, ids: list[int]) -> dict[int, float]:
     )
 
 
-def register_pv_capacity_mw(*, primary: str) -> float | None:
-    """Return the register's PV capacity at one Primary in megawatts, or None when the table is missing.
+def pick_pv_capacity_mw(*, table: pl.DataFrame, site: str) -> float | None:
+    """Return a site's PV capacity in megawatts from experiment 662's table, or None when absent.
 
-    The table is the register capacity table of experiments 716 and 717. A missing or ambiguous
-    table, or a Primary with no row, gives None, which job 1 reports as an `unknown` band.
+    The row is the site's, with method `FA`, at the latest cutoff, and the value is `cal_p50`
+    (the choice that experiments 716 and 717 make, with no rescale for D12).
     """
-    hits = sorted(ML_EXPERIMENTS_DATA_DIR.glob(PV_REGISTER_GLOB))
-    if len(hits) != 1:
+    rows = table.filter((pl.col("site") == site) & (pl.col("method") == "FA"))
+    if rows.is_empty():
         return None
-    table = pl.read_parquet(hits[0])
-    if not {"primary", "capacity_mw"} <= set(table.columns):
+    latest = rows.filter(pl.col("cutoff") == rows["cutoff"].max())
+    return float(latest["cal_p50"][0])
+
+
+def pv_capacity_mw(*, site: str) -> float | None:
+    """Return `pick_pv_capacity_mw` on the stored table, or None when the table is missing."""
+    if not PV_CAPACITY_TABLE_PATH.is_file():
         return None
-    rows = table.filter(pl.col("primary") == primary)
-    return float(rows["capacity_mw"].sum()) if rows.height else None
+    return pick_pv_capacity_mw(table=pl.read_csv(PV_CAPACITY_TABLE_PATH), site=site)
+
+
+def inside_polygons(
+    *, areas: dict[str, str], points: dict[int, tuple[float, float]]
+) -> dict[str, set[int]]:
+    """Return, for each Primary label, the ids of the points that lie inside its service-area polygon.
+
+    Args:
+        areas: Each Primary's polygon as well-known text, in longitude and latitude.
+        points: Each metered generator's `(longitude, latitude)` by time series id.
+
+    Returns:
+        The ids inside each polygon (the method of experiment 673). Inside a polygon means
+        geographically possibly below, nothing more.
+    """
+    out: dict[str, set[int]] = {}
+    for label, text in areas.items():
+        polygon = prep(wkt.loads(text))
+        out[label] = {ts for ts, (lon, lat) in points.items() if polygon.contains(Point(lon, lat))}
+    return out
+
+
+def polygon_membership(*, topology: Topology) -> dict[str, set[int]]:
+    """Return the metered generators inside each Primary's service-area polygon, from the metadata."""
+    meta = pl.read_parquet(METADATA_PATH).select(
+        "time_series_id", "area_wkt", "latitude", "longitude"
+    )
+    prim = meta.join(topology.primaries.select("time_series_id", "label"), on="time_series_id")
+    areas = {
+        r["label"]: r["area_wkt"] for r in prim.iter_rows(named=True) if r["area_wkt"] is not None
+    }
+    gens = meta.filter(pl.col("time_series_id").is_in(topology.generators["time_series_id"]))
+    points = {
+        r["time_series_id"]: (float(r["longitude"]), float(r["latitude"]))
+        for r in gens.iter_rows(named=True)
+        if r["latitude"] is not None and r["longitude"] is not None
+    }
+    return inside_polygons(areas=areas, points=points)
 
 
 def ens_temperature_leads() -> tuple[int, int]:
