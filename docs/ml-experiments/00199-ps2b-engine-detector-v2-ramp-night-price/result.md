@@ -68,7 +68,7 @@ decision_rule: >-
   same scores and does not decide the verdict. K3 (G2's record injected into night rows of D8 from
   2025-03, where an engine may already be present) is descriptive: recall only.
 benchmark: >-
-  Experiment 196's detector (frozen fits_fixed.pkl, wide prior, unit size 1.75 MW), scored on all
+  Experiment 196's detector (frozen fits_fixed.pkl, wide prior), scored on all
   rows and on night rows.
 row_set_id: >-
   none (a detector is scored on injected half-hours and on clean history, not on forecasts)
@@ -220,10 +220,10 @@ written for this experiment.
   shows that the positive control works. Trigger 5: v1 on night rows beats N (which holds less
   input) at D8's engine-free history (0.0% against 2.6%).
 - **Edge-test thresholds** (an edge is sharp when one half-hour carries 0.6 of the step, and the
-  step is at least 0.5 of an engine unit, 0.875 MW) came from the look at G2's edges, so K1 and K2
+  step is at least half of an engine unit) came from the look at G2's edges, so K1 and K2
   could not test them independently; the test fails even there.
 - **Lab shortcuts.** We used the expected power in the stored panel, which is driven by ERA5
-  weather, smoothed posterior probabilities, the frozen 1.75 MW unit from experiment 196, noise for
+  weather, smoothed posterior probabilities, the frozen unit size from experiment 196, noise for
   the other Primaries fitted on their whole history. The noise fit saw D8's odd months, so D8's
   engine-free history is scored on even months.
 - **Edge cases.** D3's coordinates are approximate (the night mask moves by minutes). Night is

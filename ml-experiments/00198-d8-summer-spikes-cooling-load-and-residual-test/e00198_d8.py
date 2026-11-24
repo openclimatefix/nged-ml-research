@@ -150,8 +150,8 @@ def look(*, frame: pl.DataFrame) -> dict:
         )
         .with_columns(
             period=pl.when(pl.col("t0") < BREAK)
-            .then(pl.lit("before 2023-08-15"))
-            .otherwise(pl.lit("after 2023-08-15"))
+            .then(pl.lit("before the engine connected"))
+            .otherwise(pl.lit("after"))
         )
         .drop_nulls()
     )
@@ -175,7 +175,7 @@ def look(*, frame: pl.DataFrame) -> dict:
             height=260,
             title=alt.TitleParams(
                 "D8's hottest days do not draw more power",
-                subtitle=["One dot per day, June to September 2022 to 2026."],
+                subtitle=["One dot per day, June to September."],
                 anchor="start",
             ),
         )
@@ -186,8 +186,8 @@ def look(*, frame: pl.DataFrame) -> dict:
         .with_columns(
             temp_bin=(pl.col("temp") // 2 * 2 + 1),
             period=pl.when(pl.col("t") < BREAK)
-            .then(pl.lit("before 2023-08-15"))
-            .otherwise(pl.lit("after 2023-08-15")),
+            .then(pl.lit("before the engine connected"))
+            .otherwise(pl.lit("after")),
         )
         .group_by("temp_bin", "period")
         .agg(pl.col("resid").mean().alias("mean_resid"), pl.len().alias("n"))
@@ -254,7 +254,7 @@ def look(*, frame: pl.DataFrame) -> dict:
             height=220,
             title=alt.TitleParams(
                 "When D8's large summer departures happen",
-                subtitle=["June to September 2022 to 2026."],
+                subtitle=["June to September."],
                 anchor="start",
             ),
         )

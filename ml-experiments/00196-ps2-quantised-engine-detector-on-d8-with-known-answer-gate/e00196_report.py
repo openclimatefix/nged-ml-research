@@ -246,7 +246,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             width=520,
             height=220,
             title=title(
-                "The data prefer a unit of 1.5 to 1.75 MW, and a 2 MW unit fits worse",
+                "The data prefer smaller unit sizes, and the largest size fits worse",
                 (
                     "Log-likelihood of D8's residual from 2023-09 to 2025-12 at each unit size, "
                     "transitions refitted at each size. Fit 1 is the first detection; fits 2 and 3 "

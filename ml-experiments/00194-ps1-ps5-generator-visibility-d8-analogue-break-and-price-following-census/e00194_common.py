@@ -32,7 +32,7 @@ CONTROL_LABELS: Final[tuple[str, ...]] = ("D3", "D5", "D14")
 LEFT_TAIL_MW: Final[float] = -2.5
 """A half-hour is in the left tail when the metered minus expected power is below this."""
 G2_UNIT_MW: Final[float] = 1.97
-"""Output of one engine unit, from the four levels 0, 1.96, 3.93 and 5.93 MW."""
+"""Output of one engine unit, from the four levels in its record."""
 G2_FIRST: Final[datetime] = datetime(2023, 7, 3, tzinfo=UTC)
 G2_LAST: Final[datetime] = datetime(2023, 8, 16, tzinfo=UTC)
 """The weeks in which G2's readings arrive with non-zero values (end exclusive)."""

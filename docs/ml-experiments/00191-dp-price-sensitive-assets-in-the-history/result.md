@@ -19,7 +19,7 @@ hypothesis: >-
   output of price-following gas generation (experiment 186), which no weather input explains and no
   forecast of the price can reach at a lead of days. Letting the convex demand model (GAM-K) see
   the half-hourly price in its training history, gated by the registered connection date of the
-  6 MW gas engine, lets it learn a cleaner baseline for the rest of the demand. The forecast then
+  gas engine, lets it learn a cleaner baseline for the rest of the demand. The forecast then
   improves even when the price is unknown at forecast time.
 prediction: >-
   Written before any score is read. H (hindsight: true price at forecast time, a ceiling that
@@ -28,7 +28,7 @@ prediction: >-
   expected value given the hour, day type and season) or T (the price-driven half-hours masked out
   of training) gains under 1.5% on D8 in all rows, so the pre-registered threshold for a useful
   change is probably missed. I expect the cleaner baseline to give a small gain at most, because
-  D8's series has only 12 monthly refits from 3 to 14 months of history. D14, with a pre-connection
+  D8's series has only 12 monthly refits from 3 to 14 months of history. D14, with a longer
   history to learn the break from, should show a clearer gain from T than D8. P (last settled day's
   price as the input) gains less than M. No decision Primary's score rises by 0.02 points.
 decision_rule: >-
@@ -72,11 +72,11 @@ lessons:
     At D8 the price columns explain 2.7% to 4.8% of the error on the rows they are fitted to, so even
     a perfect price forecast could not have reached the pre-registered 5% bar.
   - >-
-    The fitted price response at D8 is 1.2 to 1.9 MW, the size of a gas engine's block, but it does
-    not carry forward: out of sample the best arm gains 0.6%, with an interval that includes zero.
+    The fitted price response at D8 is non-zero within the training rows, but it does not carry
+    forward: out of sample the best arm gains 0.6%, with an interval that includes zero.
   - >-
-    At D14, where the register places the 6 MW gas engine, the fitted response is 0 to 0.13 MW. The
-    engine's footprint appears at D8, not D14.
+    At D14 the fitted price response is 0 to 0.13 MW, so the price indicators find no footprint
+    there.
   - >-
     Removing the price-driven half-hours from training (T) and replacing the price by its expected
     value (M) do not help, and persisting yesterday's price (P) hurts D8 by 4.4%.
@@ -85,7 +85,7 @@ take_home_message: >-
   A demand model that is given the true price at forecast time, which no live service has here,
   gains only 0.6% at
   D8, and the models that use a price available at forecast time lose 0.9% to 4.4%. The gas engine's
-  response is real enough to fit (1.2 to 1.9 MW at D8 within the training rows), so the remaining
+  response is real enough to fit within the training rows at D8, so the remaining
   D8 error comes from causes that these price indicators do not explain, and NGED's half-hourly
   output for the engine is the data to ask for next.
 advice:
@@ -99,8 +99,8 @@ advice:
     Fit D8's spread on D8's own residuals before adding another input: the q05 to q95 interval covers
     42% of readings and the q05 quantile sits above 31% of them (Results, tails).
   - >-
-    Treat D14 as the site where the register lists a gas engine but the data shows no price response;
-    do not gate a D14 model on the connection date (Figure 2).
+    Do not gate a D14 model on the engine's connection date, because the data shows no price
+    response at D14 (Figure 2).
 ---
 
 # Experiment 191: can price-following assets be modelled in the history so the forecast improves?
@@ -117,7 +117,7 @@ sees the price in its training history, does it learn a cleaner picture of the r
 and does the forecast improve even when the price is unknown at forecast time? We added four price
 indicators to a convex demand model (GAM-K, a generalised additive model with a Kalman filter on
 recent errors), each lowering net load by a fitted, non-negative amount, switched on from the
-connection date of a registered 6 MW gas engine. We tested four arms (H, M, P and T, defined under
+connection date of a registered gas engine. We tested four arms (H, M, P and T, defined under
 Arms) that differ in what stands in for the price at forecast time, and scored the forecasts on the
 year 2025-07 to 2026-06, which no fit had seen. The best arm, H, which uses the true price at
 forecast time and so cannot run live, lowers D8's mean absolute error by 0.6%, with a 95% interval
@@ -133,10 +133,9 @@ the scored year.
 ## Inputs and arms
 
 - **The register.** NGED's Embedded Capacity Register (August 2026) lists one connected gas engine
-  that is not combined heat and power under the Primaries with metered series: 6 MW, connected on
-  2023-06-13, 0.4 km from D14's coordinates and about 0.8 km from D8's. D8 itself lists only solar
-  and a 1.35 MW row of unknown type. D5 has a 1 MW gas engine connected in 2021. Batteries of 0.2 to
-  0.25 MW are connected at D2, D9, and D11 (2024 to 2026), and two more are accepted but not
+  that is not combined heat and power under the Primaries with metered series. D8 itself lists only
+  solar and a 1.35 MW row of unknown type. D5 has a 1 MW gas engine connected in 2021. Batteries of
+  0.2 to 0.25 MW are connected at D2, D9, and D11 (2024 to 2026), and two more are accepted but not
   connected, at D3 and D16. The demand-side-response sheet holds no rows. The eight other Primaries
   that the register covers list no price-following asset (`printed_ecr.txt`).
 - **Reference (A0).** The ensemble-driven convex demand model of [experiment
@@ -182,8 +181,7 @@ the scored year.
 - **By lead, D8, H.** The quantile score falls 2.2% (interval -4.3% to -0.05%, not corrected for the
   number of cuts) at 0 to 24 hours, 1.8% at 24 to 72 hours and 0.4% at 72 to 168 hours.
 - **In-sample gain (the ceiling).** On each fit's own training rows the price columns lower D8's
-  mean absolute error by 4.1% on average over the 12 fits (2.7% to 4.8%). The fitted response, with
-  all four indicators on, is 1.9 MW at the first fit and 1.2 MW at the last. At D14 the in-sample
+  mean absolute error by 4.1% on average over the 12 fits (2.7% to 4.8%). At D14 the in-sample
   gain is 0.0% and the response is 0 to 0.13 MW. At D5 it is 0.0%.
 - **No-harm check.** The largest rise in quantile score at any of the five decision Primaries (D5,
   D10, D11, D14, D16) is 0.011 points, at D14 for H, against the 0.02 limit. With the gate switched

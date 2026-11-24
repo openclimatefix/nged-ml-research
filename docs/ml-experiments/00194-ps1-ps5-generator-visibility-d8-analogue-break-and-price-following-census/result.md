@@ -47,7 +47,7 @@ lessons: >-
   record as a known answer for 44 days only. G2's readings after 2023-08-15 say nothing about
   whether the engine runs. Whether D8 shows the engine from 2026 is a question for NGED.
 take_home_message: >-
-  D8's metered power now falls well below the power a fitted model expects whenever one 6 MW gas
+  D8's metered power now falls well below the power a fitted model expects whenever a gas
   engine runs, because NGED stopped adding the engine's output to D8's reading on 2023-08-15. The
   timing and size of the step, and its absence at three comparison Primaries, support this. The
   engine's own readings give a known answer for only 44 days (2023-07-03 to 2023-08-15), and D8's
@@ -68,16 +68,12 @@ advice:
     Do not score a D8 forecasting model on 2026 without scoring the periods before and after March
     2026 separately, because the shortfall share
     falls from 0.29 in January to 0.008 in April (Figure 5).
-  - >-
-    Do not read the Embedded Capacity Register's Primary column as the substation whose meter
-    records an asset, because the 6 MW engine is registered under D14 but appears in D8's readings
-    (PS1 register distances).
 ---
 
 # Experiment 194: D8's drops follow one engine whose output stopped being added back
 
 **We asked whether the long stretches in which D8 (one of the 16 Primary substations in the trial)
-draws less power than a fitted model expects come from one 6 MW gas engine, labelled G2 on this
+draws less power than a fitted model expects come from one gas engine, labelled G2 on this
 page.** NGED's notes say that G2's output is added to D8's reading, so that D8 shows demand plus the
 engine's output, and that G2's own telemetry channel (its analogue) does not work. We reran the
 design note's calculations from committed code. We call the share of half-hours in which D8's
@@ -117,8 +113,8 @@ readings stop arriving.*
 
 ![D8 residual histograms before, during, and after G2's output weeks](figure_4.svg)
 
-*Figure 4. D8's residual in four periods. The negative tail after August 2023 is broad, not clearly
-quantised in units of 2 MW.*
+*Figure 4. D8's residual in four periods. The negative tail after August 2023 is broad, with no
+clear steps.*
 
 ![D8 monthly shortfall share with experiment 191's scored year](figure_5.svg)
 
@@ -178,19 +174,12 @@ quantised in units of 2 MW.*
   (2023-08-25 to 2023-12-31; the intervals do not overlap), and 0.232 and 0.255 in 2024 to January
   2026. The difference has no consistent sign, and G2's later readings give no record of the engine
   running.
-- **Quantised steps (output rising in units of 2 MW, one per running engine unit): not shown.** The
-  histogram's local peaks are at -4.1 MW and -3.1 MW, where steps of 2 MW would put them at -2, -4,
-  and -6 MW. Noise in the expected power is wide enough to blur 2 MW steps.
 - **2026:** the shortfall share falls from 0.292 in January to 0.070 in March and 0.008 in April
   while G2 has no readings after 2026-01-26. Either the engine stopped running, or NGED resumed
   adding the engine's output to D8's reading. The data cannot tell which.
 - **Experiment 191's window (its constants: D8 data from 2025-04-01, scored runs 2025-07-01 to
   2026-06-30):** in those 12 months, 59% of half-hours fall before February 2026 (shortfall share
   0.292) and 41% from February 2026 onwards (0.061). The window includes the 2026 change.
-- **Register entries near G2 (MW and distance only):** a 6 MW gas engine connected 2023-06-13 at
-  0.00 km in the ECR (under D14 in the register's Primary column); two Capacity Market gas-fuelled
-  components at 0.05 km (six-figure grid reference, so about 0.07 km precision); a connected 10.98
-  MW battery at 0.27 km, registered under none of the 16 Primaries.
 
 ## PS5: census
 
@@ -206,11 +195,10 @@ quantised in units of 2 MW.*
   (weekly shares 0.08, 0.52, 0.65, 0.34 from 2024-01-08), after which the share is near zero, so the
   fit reads a step of -0.198 at 2024-02-26. D18 has 27 usable weeks and one week at 0.301 in October
   2025, fitted as a step of -0.038. D15 has no usable weeks. D14's highest week is 0.074.
-- **ECR price-following assets under the 16 Primaries (connected):** 2 gas or oil engines of 7.00 MW
-  (6.00 MW at D14 from 2023-06-13, 1.00 MW at D5 from 2021-03-11) and 3 batteries of 0.65 MW (D11,
-  D2, D9). 2 batteries (0.2 MW each, D16 and D3) are accepted to connect. 9 Primaries have none. The
-  demand-side response register holds no rows. CHP: 2 slots, 1.40 MW, both at D10, none gas or oil
-  engines.
+- **ECR price-following assets under the 16 Primaries (connected):** 2 gas or oil engines (one at
+  D5 of 1.00 MW from 2021-03-11) and 3 batteries of 0.65 MW (D11, D2, D9). 2 batteries (0.2 MW
+  each, D16 and D3) are accepted to connect. 9 Primaries have none. The demand-side response
+  register holds no rows. CHP: 2 slots, 1.40 MW, both at D10, none gas or oil engines.
 - **Whole register:** 168 connected gas or oil engines of at least 1 MW each, totalling 1,265.8 MW.
   Engines of this size are therefore not confined to the trial's Primaries.
 - **PS5 prediction:** held for sustained upward steps. D9's transient burst fits a step down of more

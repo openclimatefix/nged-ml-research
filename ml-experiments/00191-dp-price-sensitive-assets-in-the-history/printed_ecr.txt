@@ -7,7 +7,7 @@ shape: (7, 6)
 │ str  ┆ str                        ┆ str                 ┆ u32 ┆ f64  ┆ f64         │
 ╞══════╪════════════════════════════╪═════════════════════╪═════╪══════╪═════════════╡
 │ D11  ┆ battery                    ┆ Connected           ┆ 1   ┆ 0.2  ┆ 0.0         │
-│ D14  ┆ gas or oil engine, not CHP ┆ Connected           ┆ 1   ┆ 6.0  ┆ 0.0         │
+│ D14  ┆ gas or oil engine, not CHP ┆ Connected           ┆ 1   ┆ [withheld] ┆ 0.0         │
 │ D16  ┆ battery                    ┆ Accepted to connect ┆ 1   ┆ 0.2  ┆ 0.0         │
 │ D2   ┆ battery                    ┆ Connected           ┆ 1   ┆ 0.2  ┆ 0.0         │
 │ D3   ┆ battery                    ┆ Accepted to connect ┆ 1   ┆ 0.2  ┆ 0.0         │
@@ -22,7 +22,7 @@ shape: (5, 6)
 │ str  ┆ str                        ┆ f64  ┆ f64         ┆ date           ┆ f64         │
 ╞══════╪════════════════════════════╪══════╪═════════════╪════════════════╪═════════════╡
 │ D11  ┆ battery                    ┆ 0.2  ┆ null        ┆ 2026-04-13     ┆ 2.253177    │
-│ D14  ┆ gas or oil engine, not CHP ┆ 6.0  ┆ null        ┆ 2023-06-13     ┆ 0.371956    │
+│ D14  ┆ gas or oil engine, not CHP ┆ [withheld] ┆ null ┆ [withheld] ┆ [withheld] │
 │ D2   ┆ battery                    ┆ 0.2  ┆ null        ┆ 2026-05-01     ┆ null        │
 │ D5   ┆ gas or oil engine, not CHP ┆ 1.0  ┆ null        ┆ 2021-03-11     ┆ 3.250334    │
 │ D9   ┆ battery                    ┆ 0.25 ┆ null        ┆ 2024-04-02     ┆ 1.862435    │

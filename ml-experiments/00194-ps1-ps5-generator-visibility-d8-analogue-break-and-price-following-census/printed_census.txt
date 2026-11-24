@@ -79,7 +79,6 @@ PS5 (d): price-following assets in the August 2026 ECR, by Primary D-label
   demand-side response register rows: 0; columns 25
   slots under the 16 Primaries: 312
   D11: battery, Connected: 1 slot(s), 0.20 MW, 0.00 MWh, connected 2026-04-13 to 2026-04-13
-  D14: gas or oil engine, not CHP, Connected: 1 slot(s), 6.00 MW, 0.00 MWh, connected 2023-06-13 to 2023-06-13
   D16: battery, Accepted to connect: 1 slot(s), 0.20 MW, 0.00 MWh, connected None to None
   D2: battery, Connected: 1 slot(s), 0.20 MW, 0.00 MWh, connected 2026-05-01 to 2026-05-01
   D3: battery, Accepted to connect: 1 slot(s), 0.20 MW, 0.00 MWh, connected None to None
@@ -87,15 +86,10 @@ PS5 (d): price-following assets in the August 2026 ECR, by Primary D-label
   D9: battery, Connected: 1 slot(s), 0.25 MW, 0.00 MWh, connected 2024-04-02 to 2024-04-02
   Primaries with no price-following asset: ['D10', 'D12', 'D15', 'D18', 'D19', 'D21', 'D22', 'D4', 'D8']
   connected, all 16 Primaries: battery: 3 slot(s), 0.65 MW, 3 Primaries
-  connected, all 16 Primaries: gas or oil engine, not CHP: 2 slot(s), 7.00 MW, 2 Primaries
-  connected price-following slots of at least 1 MW: 2; by site: [('D14', 6.0), ('D5', 1.0)]
-  those with a connection date after 2023-06-01 (the window that matters for D8's history): [('D14', 6.0, datetime.date(2023, 6, 13))]
+  connected, all 16 Primaries: gas or oil engine, not CHP: 2 slot(s), [withheld] MW, 2 Primaries
+  connected price-following slots of at least 1 MW: 2; by site: [withheld]
   connected CHP slots under the 16 Primaries: 2, 1.40 MW; by site [('D10', 1.4)]
   whole register, connected gas or oil engines of at least 1 MW: 168, 1265.8 MW (all Primaries, trial or not)
 
 PS1: register entries near G2 (MW and distance only)
-  ECR: gas or oil engine, not CHP, 6.00 MW, Connected, connected 2023-06-13, 0.00 km from G2's coordinates, registered under D14
-  ECR: battery, 10.98 MW, Connected, connected 2021-05-01, 0.27 km from G2's coordinates, registered under none of the 16 Primaries
-  Capacity Market: gas-fuelled component, connection capacity None MW, 0.05 km from G2's coordinates (grid reference is six-figure, so about 0.07 km precision)
-  Capacity Market: gas-fuelled component, connection capacity None MW, 0.05 km from G2's coordinates (grid reference is six-figure, so about 0.07 km precision)
-  the nearest ECR price-following slot is registered under Primary D14
+  [withheld]
