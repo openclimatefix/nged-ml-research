@@ -45,6 +45,18 @@ def main() -> int:
     assert guard.hours_band(hours=50.0) == "1 to 50"
     assert guard.hours_band(hours=120.0) == "51 to 150"
     assert guard.hours_band(hours=301.0) == "over 300"
+    for h, band in (
+        (0.5, "1 to 50"),
+        (50.0, "1 to 50"),
+        (50.5, "51 to 150"),
+        (150.5, "151 to 300"),
+        (300.0, "151 to 300"),
+        (300.5, "over 300"),
+    ):
+        assert guard.hours_band(hours=h) == band, (h, band)
+    assert guard.pool_bands(monthly_hours=np.array([0.0, 0.5, 50.5, 150.5, 300.5]))[
+        "n_months"
+    ].to_list() == [1, 1, 1, 1, 1]
     pooled = guard.pool_bands(monthly_hours=np.array([0.0, 10.0, 60.0, 400.0, 400.0]))
     assert pooled["n_months"].to_list() == [1, 1, 1, 0, 2]
     for col in ("hours_run", "running_share", "p_any", "e_n", "flag", "signed_mean", "p_negative"):

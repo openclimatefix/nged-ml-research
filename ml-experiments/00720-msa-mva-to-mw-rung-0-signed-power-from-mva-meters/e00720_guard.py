@@ -55,12 +55,14 @@ PUBLIC_COLUMNS: Final[frozenset[str]] = frozenset(
 )  # fmt: skip
 """The columns a published aggregate may hold: scores and counts, never a dated or generator value."""
 HOURS_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
-    ("none", 0.0, 0.0),
-    ("1 to 50", 1.0, 50.0),
-    ("51 to 150", 51.0, 150.0),
-    ("151 to 300", 151.0, 300.0),
-    ("over 300", 301.0, float("inf")),
+    ("none", 0.0, 0.5),
+    ("1 to 50", 0.5, 50.5),
+    ("51 to 150", 50.5, 150.5),
+    ("151 to 300", 150.5, 300.5),
+    ("over 300", 300.5, float("inf")),
 )
+"""Half-open bands `[lo, hi)` of hours run in a month. Every half-hourly count is a multiple of 0.5, so 0.5 hours is in
+`1 to 50` and 50.5 hours is in `51 to 150`; no value falls between bands."""
 
 
 def private_path(*, name: str) -> Path:
@@ -113,7 +115,7 @@ def public_aggregate(*, frame: pl.DataFrame) -> pl.DataFrame:
 def hours_band(*, hours: float) -> str:
     """Return the band of hours run in a month."""
     for name, lo, hi in HOURS_BANDS:
-        if lo <= hours <= hi:
+        if lo <= hours < hi:
             return name
     return HOURS_BANDS[-1][0]
 

@@ -40,8 +40,13 @@ prediction: >-
 decision_rule: >-
   Rungs 0a to 0d. `supported` when 0a, 0c, and 0d reproduce their expected results and the anchored
   read-out passes the stop rule of rung 0b (area with the real sky at least 0.1 above the shifted
-  sky, and false reverse flow under 1% of D5's sunny middays with the gate forced open). `partly
-  supported` when the anchored read-out fails and the unanchored control passes. `not supported`
+  sky, and false reverse flow under 1% of D5's sunny middays with the gate forced open) and its
+  references bar (it beats the reading-blind and the hour-of-day references, which do not read the
+  meter, with the lower end of the paired interval above 0 on the pooled area; the bar is in the
+  table in the section "Rung 0e" next to the other bars of rung 0b). `partly supported` when the
+  anchored read-out fails and the unanchored control passes, or when the anchored read-out passes
+  its stop rule and does not beat a reference, because the sign is then no better than the PV
+  estimate or the hour of day alone. `not supported`
   when both fail. `invalid` when a known-answer check of 0c fails. `inconclusive` otherwise. Rung
   0e has its own verdict, read from the bar table in the section "Rung 0e" (V1, the paired V2
   contrast, K1, V3, the Brier reliability term, and the signed CRPS). Both fail gives `not
@@ -118,9 +123,20 @@ Each read-out reports the area under the curve, the recall at a 5% false-reverse
 2-point dead band, the same with the sky shifted by 28 days, and the posterior after one, two, and
 three passes. The no-injection world reports the false-reverse rate on D5's sunny middays with the
 gate forced open. The references are the solar rule of experiment 506 and the labeller of
-experiment 674, run on the same injected rows. The injected capacity that enters `p` is
-estimated as the design specifies, and the contrast is repeated with that capacity scaled by 0.7
-and 1.3. The injection is rebuilt in code, because no earlier experiment stored injected readings.
+experiment 674. The solar rule runs on the same injected rows. The labeller is scored on its own
+days against its own labels, so it is not a paired comparison on this experiment's truth.
+
+Two further references never read the meter, and their definitions are fixed here before any real
+run. The reading-blind reference ranks each half-hour by F7's PV estimate `p`, which is the host's
+estimate plus the injected farm's capacity times the clear-sky yield. The hour-of-day reference
+ranks each half-hour by the mean clear-sky yield of the reference days at that half-hour of the
+day. The anchored read-out must beat both (the bar table below).
+
+The injected capacity that enters `p` is the oracle capacity, which is the injected increment, and
+the contrast is repeated with 0.7 and 1.3 times that capacity. The design's capacity estimated from
+experiment 662's probe is not used. The day type does not include bank holidays, and the trailing
+window of ages 2 to 91 days is not implemented. The injection is rebuilt in code, because no
+earlier experiment stored injected readings.
 
 **Rung 0c checks the folded loss against known answers.** On draws from a known 3-component
 mixture: the folded negative log-likelihood is minimised at the truth and at each sign-reversed
@@ -139,15 +155,20 @@ fold cutoff, from the training window only.
 
 **The census and the gate table matched the prediction.** In the scored folds, 2 of the 8 signed-MW
 Primaries have negative readings: D10 on 0.76% of half-hours and D15 on 69.2%. D5, D9, D11, D14, and
-D16 have none, and D18 has none in the scored folds (it has 0.29% across the training span too, which
-the prediction did not cover). None of the 8 MVA-only Primaries has a negative reading, as expected
-of a meter that cannot show one.
+D16 have none, and D18 has none in the scored folds. D18's training windows each hold 48 negative
+half-hours (0.24% to 0.49% of the window, by fold), which the prediction did not cover. None of the
+8 MVA-only Primaries has a negative reading, as expected of a meter that cannot show one.
 
-**The export gate is open at D8 and D12 in all 8 folds and shut at the other 6 MVA-only Primaries in
-all 8 folds.** The gate is also open at D10 and D15 and shut at the other 6 signed-MW Primaries. The
-gate's Spearman correlation is at most -0.384 where it is open and at least -0.31 where it is shut.
-D22 is the closest shut Primary, at about -0.32. This page publishes no per-generator value for D8 and
-D12 beyond the open gate.
+**The export gate opens when the Spearman correlation exceeds 0.3 or the 1st percentile of the
+reading is under 3 points.** The statistic comes from the sunny summer-midday rows of the training
+window. D12 opens on the correlation (+0.53 to +0.56 across the 8 folds), and D8 opens on the
+percentile (2.29 to 2.47 points, with a correlation between -0.04 and +0.04). Both are open in all
+8 folds, which is the prediction. D10 and D15 are the other two Primaries with an open gate, on a
+negative percentile. The other 12 Primaries are shut in all 8 folds. D22 is the nearest shut
+MVA-only Primary, on the percentile (6.4 points against the 3-point line), and D8 opens by under 1
+point. D2 and D18 have strongly negative correlations (about -0.58 and -0.55) and are shut, because
+the correlation test needs a value above +0.3. This page publishes no per-generator value for D8
+and D12 beyond the open gate.
 
 ## Rung 0e
 
@@ -170,14 +191,24 @@ distribution, smoothed and filtered, stored as 11 signed quantiles and `P(X < 0)
 | V3 (real negative controls at D8) | At most 3% flagged and at most one active day a month in each period, and the forced `K` = 3 control |
 | Sign probability | Reliability term of the Brier score at most 0.01, and no bin of at least 200 half-hours off the diagonal by more than 0.1 |
 | Signed CRPS | Below the hard-sign version's, with a paired interval above zero. The hard-sign version uses the observed magnitude, never the true one. |
-| Rung 0b references | The anchored read-out beats two references that do not read the meter: a reading-blind sign (the sign of the clear-sky index alone) and an hour-of-day sign (the pooled midday sign by hour), on pooled half-hours and on the midday area, with the paired interval above zero |
-| Rung 0b non-exporter check | In a hard world whose farm estimate is 2.5 times too high and which never exports, false reverse flow stays under 1% |
+| Rung 0b references | At injection levels 1 and 2 (oracle capacity, host scale 1), the anchored read-out's area exceeds each of the two references that do not read the meter, with the lower end of a 95% day-block bootstrap interval of the paired difference above 0, on the pooled gated half-hours. Each world has its own interval, and a level's interval is the mean of its worlds' interval ends. The midday area (10:00 to 14:00 UTC) is judged only when at least 6 worlds hold at least 30 import and 30 reverse half-hours there, and then the anchored read-out must not lose (the upper end of the interval stays above 0). A pooled or midday area with fewer than 30 half-hours of either class is `not evaluable`, and it never counts as a pass. |
+| Rung 0b non-exporter check | The stop rule above (false reverse flow under 1% on D5's sunny middays, gate forced open) is read from the rows with host scale 1.0. A synthetic world shows the check can fail: with the PV estimate 2.5 times too high the rate measured 0.19, against 0.00 at 1.0 and 1.3 times. The real run builds no 2.5-times world, because its host scales are 0.7, 1.0, and 1.3. |
 
 **Stop rules.** If V1 fails, the hindsight model is not used at D12. If V2 fails its paired bar, K1,
-or its false-alarm bar, the D8 branch stops. The slow-trend term of the hindsight demand mean (an
-upper quantile of the daily-mean residual over a 21-day centred window, smoothed over 7 days,
-calibrated on the pre-roll) is a change made before any real V2 run, in answer to the review. It is
-tested on synthetic drift of -0.5 and -1 MVA over 120 days before any real run, and the
+or its false-alarm bar, the D8 branch stops. The slow-trend term of the hindsight demand mean is a
+change made before any real V2 run, in answer to two reviews. A first trend is the 0.8 quantile of
+the daily-mean residual over a 21-day centred window, smoothed over 7 days, limited to 0.03 MVA per
+day, and calibrated on the pre-roll. The rate limit stops a spell of engine output, which looks like
+a step, from pulling the trend down. After a first scan of the unit size, the trend is refitted from
+the half-hours with a smoothed `P(n = 0)` above 0.9, on days with at least 12 such half-hours and
+bridged across the other days, and the unit size is searched again near its first value. The unit
+size is never searched below 1 MVA, so a step of demand smaller than a unit is absorbed by the
+demand mean. The synthetic tests are: drift of -0.5 and -1 MVA over 120 days with no engine (nothing
+flagged), an engine with no drift, a spell of two units for 21 days with and without drift (F1 above
+0.95, mean error of unit size times unit count under 0.35 MVA), and a step of -0.7 MVA (under 3%
+flagged). Two limits remain. A persistent step of 1 MVA or more in a Primary's demand cannot be told
+from an engine that stays on, so V3 would flag it. A spell of two units is returned as one unit of
+twice the size, which leaves F1 and the output unchanged and lowers the count accuracy. The
 injected-segment bootstrap resamples the schedule-weeks of experiment 694 (5 primary schedules over
 7 weeks). The number of generator states `K` is chosen by the Bayesian information criterion. A V2
 run stops when the rerun `M2` disagrees with the stored `inject.pkl` on any segment, and zero
@@ -223,44 +254,72 @@ power over 4 sub-steps, causes most of the difference. A fit of one unit size ne
 core-hours at 164 states. Rung 0e on experiment 694's 44 segments (V2) at 164 states would cost
 about 14.6 core-hours, which sits against the cap of 15.
 
-**The reduced grid brings V2 to about 5 core-hours.** The harness runs V2, K1, and V3 on a grid of
-21 residual bins (84 states), a coarse-then-fine profile of the unit size, and 2 Baum-Welch rounds,
-which is 12 passes per fit. A synthetic 148-day segment at that setting took 2.78 s per pass and
-33.4 s per fit, and one rerun of experiment 694's `M2` on the same segment took 7.7 s. One injected
-run (hindsight fit plus `M2` rerun) therefore takes about 41 s. The 44 segments and 9 schedules make
-396 runs, about 4.5 core-hours, and the un-injected fits, K1, and V3 add about 0.5 core-hours.
-`CostGate` times the first run and raises when the projected total exceeds 15 core-hours, so a run
-whose projection is above the cap does not start its second run. The per-pass time at 84 states is
-measured on synthetic data only, so the real projection waits for the first real run's own timing.
+**The reduced grid brings V2 to about 7 core-hours.** The harness runs V2, K1, and V3 on a grid of
+21 residual bins (84 states), a coarse-then-fine profile of the unit size with a trend refit, and 2
+Baum-Welch rounds, which is 17 passes per fit (6 coarse, 2 fine, 6 after the trend refit, 2
+Baum-Welch, 1 final). A synthetic 148-day segment with `K` = 2 took about 39 s per fit. At `K` = 3
+the measured 2.78 s per pass projects to about 47 s per fit, and one rerun of experiment 694's `M2`
+on the same segment took 7.7 s. One injected run (hindsight fit plus `M2` rerun) therefore takes
+about 55 s. The 44 segments and 9 schedules make 396 runs, about 6 core-hours, and the un-injected
+fits, K1, and V3 add about 0.6 core-hours. The fit loop also stops when the elapsed time passes the
+cap. `CostGate` times the first run and raises when the projected total exceeds 15 core-hours, so a
+run whose projection is above the cap does not start its second run. The per-pass time at 84 states
+is measured on synthetic data only, so the real projection waits for the first real run's own
+timing.
+
+## What the synthetic worlds say about the references bar
+
+**On synthetic exporter worlds, the anchored read-out loses to the reading-blind reference.** The
+worlds are the self-test's: gross demand is a smooth function of the half-hour, the day type, and
+the temperature, the farm is 40% or 50% of the demand's capacity scale, and 900 days give both
+classes at midday. The anchored area is 0.86 against 0.96 to 0.98 for the reading-blind reference,
+and the lower end of the paired interval is about -0.22 in both worlds. The hour-of-day reference
+is also ahead. On the self-test's all-export world the anchored area is 0.91 and the reading-blind
+reference is higher still, but that world has 2 import half-hours, so no area from it is evaluable.
+The worlds were not tuned to change this result.
+
+**This is a finding about the design, and a change is proposed here, not adopted.** A likely reason,
+not tested here, is that in these worlds demand varies little around its half-hour profile, so the
+PV estimate alone orders the signs almost perfectly and the anchor adds noise from the dull-sky
+rows. On real data demand varies more, which may favour the anchored read-out. The rung 0b run
+decides that. If the anchored read-out still loses to the reading-blind reference there, the
+maintainer could consider an anchored read-out that takes the PV estimate as its prior and uses the
+anchored gross-demand residual only to move the sign near the zero crossing. That change would need
+its own pre-registration and its own review before any run, and nothing in this experiment depends
+on it. By the decision rule, losing to the reading-blind reference caps the rung 0b verdict at
+`partly supported`.
+
+**The anchored half of the signed-CRPS bar stays pending.** The run gives no seed-noise estimate,
+so the second half of the bar is reported and not judged.
 
 ## Departures from the first report, and status of every rung
 
-**The code departs from the design in these places.** Rung 0b injected worlds use the capacity that
-F7's PV estimate gives as of the origin, with 0.7 and 1.3 times as a sensitivity. Experiment 694's
-injected segments are not about a farm, so they use no capacity. The unanchored control uses a
+**The code departs from the design in these places.** Rung 0b injected worlds use the oracle
+capacity for the injected farm, which is the injected increment, with 0.7 and 1.3 times as a
+sensitivity. The host's own PV estimate is F7's, with the capacity as of the origin. Experiment
+694's injected segments are not about a farm, so they use no capacity. The unanchored control uses a
 symmetric window of 14 neighbours. The anchored read-out relaxes its anchor cut from an unreduced
-share of 0.3 to 0.6 when too few anchor rows exist. The day type may include bank holidays. The pair
-emission runs from the midpoint of the previous and current signed power. On experiment 694's series
-no weather exists, so the demand mean of the hindsight model is calendar only and is fitted on the
-28-day pre-roll. The panel loader is built on the torch-free functions of experiment 506, and it
-cuts the 126,624-step `dense_raw.npy` of experiment 713 to the 121,248 steps of the grid that
-experiment 412's CAMS arrays share. V3 runs only the forced `K` = 3 fit, which is the stricter of
-the two controls. The history class of the `M1` re-cut is the class held by most of the UTC days 2
-to 15 days before the origin's date, as in `reverse_flow_analysis.md` section 4, and the measure is
-`M1` minus the Candidate. The second control period of V3 ends on a date that is read from a private
-file, because the date is an era date. Experiment 716's folder comes in through `EXTRA_PYTHONPATH`
-at commit 126577d1d, and the code stops at the start when the checkout is at any other commit.
-Nothing is merged from that branch.
+share of 0.3 to 0.6 when too few anchor rows exist. The day type does not include bank holidays. The
+pair emission runs from the midpoint of the previous and current signed power. On experiment 694's
+series no weather exists, so the demand mean of the hindsight model is calendar only and is fitted
+on the 28-day pre-roll. The panel loader is built on the torch-free functions of experiment 506, and
+it cuts the 126,624-step `dense_raw.npy` of experiment 713 to the 121,248 steps of the grid that
+experiment 412's CAMS arrays share. V3 runs the fit with `K` chosen by the Bayesian information
+criterion and the forced `K` = 3 control. The history class of the `M1` re-cut is the class held by
+most of the UTC days 2 to 15 days before the origin's date, as in `reverse_flow_analysis.md` section
+4, and the measure is `M1` minus the Candidate. The second control period of V3 ends on a date that
+is read from a private file, because the date is an era date. Experiment 716's folder comes in
+through `EXTRA_PYTHONPATH` at commit 126577d1d, and the code stops at the start when the checkout is
+at any other commit. Nothing is merged from that branch.
 
 **Status of every rung.** Only the census and the gate table (rungs 0a and 0d) have run on real
 data. Each line says which of three states the
 rung is in: done on synthetic data, wired (the real-data branch is written and was exercised against
 stubs), or not run on real data.
 
-- Rungs 0a and 0d (census, gate table): done on synthetic data and run on real data once (the section
-  above). The
-  read-only loader is wired, and its grid-length rule is checked against the shapes of the stored
-  arrays.
+- Rungs 0a and 0d (census, gate table): done on synthetic data and run on real data once (the
+  section above). The read-only loader is wired, and its grid-length rule is checked against the
+  shapes of the stored arrays.
 - Rung 0b (sign posterior): done on synthetic data. The `--run` branch is wired: farm series with a
   union gap mask, the F7 PV estimate and as-of capacity, the references of experiments 506 and 674
   and the two references that do not read the meter, capacity scales of 1, 0.7, and 1.3, the stored

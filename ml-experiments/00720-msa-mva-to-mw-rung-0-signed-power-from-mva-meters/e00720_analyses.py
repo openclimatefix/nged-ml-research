@@ -152,8 +152,9 @@ def recut_by_class(
     """Re-score stored forecasts by the target day's class and the history majority's class, outside the solar block.
 
     Args:
-        abs_error: Absolute error of the median forecast, one value per forecast row.
-        hour: Local hour of the row's valid time.
+        abs_error: The error measure to compare, one value per row or cell (a score difference such as
+            `CRPS(M1) - CRPS(C)` is allowed).
+        hour: UTC hour of the row's valid time.
         target_cls: Class (1 running, 0 idle) of the row's target day.
         history_cls: Class of most history days (1 running, 0 idle).
         solar_block: Hours of the day excluded.
@@ -350,56 +351,69 @@ def run_section3(
 
 
 def run_m1_recut(
-    *, cls_by_day: np.ndarray, first_day_us: int, ts_id: int
+    *,
+    cls_by_day: np.ndarray,
+    first_day_us: int,
+    ts_id: int,
+    solar_block: tuple[int, int] = (10, 15),
 ) -> dict[str, Any]:  # pragma: no cover - needs the stored forecasts
-    """Re-score experiment 713's stored `M1` minus Candidate forecasts of one Primary by day class, cells pooled across folds.
+    """Re-score experiment 713's stored `M1` minus Candidate forecasts of one Primary by day class, as in `reverse_flow_analysis.md` section 4.
 
-    A cell is one origin and one valid day of the headline band (leads of 24 h up to but not including
-    240 h), as in `reverse_flow_analysis.md` section 4. `cls_by_day[d]` is the class (1 running, 0 idle,
-    -1 other) of UTC day `first_day_us // US_PER_DAY + d`. The history class of a cell is the majority
-    class of the UTC days 2 to 15 days before the origin's date. The measure is the absolute error of
-    `M1`'s median minus the Candidate's, seed 0 of each. Reads `work/fits/M1/*_s0.parquet` of experiment 713
-    and the Candidate's stored seed-0 files of experiment 667; nothing is written.
+    The CRPS of each arm is that of the seed-averaged quantiles of seeds 0 and 1 (`e00713_score.seed_average`
+    and `add_losses`), the headline band is leads of 24 h up to but not including 240 h, and a cell is one
+    origin's forecast for one valid day: the mean of `CRPS(M1) - CRPS(C)` over the half-hours of that day
+    outside the solar block (UTC hours). `cls_by_day[d]` is the class (1 running, 0 idle, -1 other) of UTC day
+    `first_day_us // US_PER_DAY + d`. The history class of a cell is the majority class of the UTC days 2 to 15
+    days before the origin's date. Reads the stored forecasts through experiment 713's scorer, one month at a
+    time, and writes nothing.
     """
-    import e00667_export as exp  # ty: ignore[unresolved-import]
+    import e00713_arms as arms  # ty: ignore[unresolved-import]
+    import e00713_score as score  # ty: ignore[unresolved-import]
     import e00720_real as real
     import polars as pl
-    from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-    root = (
-        ML_EXPERIMENTS_DATA_DIR
-        / "00713-msa-axial-attention-demand-network-part-1"
-        / "work"
-        / "fits"
-        / "M1"
+    truth = score.truth_stack()
+    arm_frames: dict[str, pl.DataFrame] = {}
+    for arm in ("M1", "C"):
+        parts = []
+        for month in arms.ALL_FOLDS:
+            raw = score.load_arm(arm=arm, seeds=arms.SCREEN_SEEDS, months=(month,))
+            raw = raw.filter(pl.col("time_series_id") == ts_id)
+            parts.append(score.add_losses(frame=score.seed_average(frame=raw), truth=truth))
+        arm_frames[arm] = pl.concat(parts)
+    keys = list(score.KEYS)
+    both = (
+        arm_frames["M1"]
+        .select(*keys, "lead_hours", m1="crps")
+        .join(arm_frames["C"].select(*keys, c="crps"), on=keys, how="inner")
+        .filter((pl.col("lead_hours") >= 24) & (pl.col("lead_hours") < 240))
     )
-    keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
-    parts = []
-    for path in sorted(root.glob("*_s0.parquet")):
-        month = path.name.split("_")[0]
-        m1 = (
-            pl.read_parquet(path)
-            .filter(pl.col("time_series_id") == ts_id)
-            .select(*keys, "lead_hours", m1="q50", actual="actual")
-        )
-        cand = exp.ROOT / f"P7_D50_{month}" / "work" / "fits" / "P5" / f"{month}_d0_s0.parquet"
-        c = pl.read_parquet(cand).filter(pl.col("time_series_id") == ts_id).select(*keys, c="q50")
-        parts.append(m1.join(c, on=keys, how="inner"))
-    f = pl.concat(parts).filter((pl.col("lead_hours") >= 24) & (pl.col("lead_hours") < 240))
-    vt = f["valid_time"].dt.epoch("us").to_numpy()
-    origin = f["power_fcst_init_time"].dt.epoch("us").to_numpy()
+    vt = both["valid_time"].dt.epoch("us").to_numpy()
+    origin = both["power_fcst_init_time"].dt.epoch("us").to_numpy()
     day0 = first_day_us // real.US_PER_DAY
-    day = vt // real.US_PER_DAY - day0
-    origin_day = origin // real.US_PER_DAY - day0
-    inside = (day >= 0) & (day < len(cls_by_day))
-    diff = (
-        np.abs(f["m1"].to_numpy() - f["actual"].to_numpy())
-        - np.abs(f["c"].to_numpy() - f["actual"].to_numpy())
-    )[inside]
-    hour = ((vt % real.US_PER_DAY) // 3_600_000_000)[inside]
-    hist = history_class_before_origin(cls_by_day=cls_by_day, origin_day=origin_day[inside])
+    hour = (vt % real.US_PER_DAY) // 3_600_000_000
+    outside = (hour < solar_block[0]) | (hour >= solar_block[1])
+    cells = (
+        both.with_columns(
+            valid_day=pl.Series(vt // real.US_PER_DAY - day0),
+            origin_day=pl.Series(origin // real.US_PER_DAY - day0),
+            diff=pl.col("m1") - pl.col("c"),
+        )
+        .filter(pl.Series(outside))
+        .group_by("origin_day", "valid_day")
+        .agg(pl.col("diff").mean())
+    )
+    valid_day = cells["valid_day"].to_numpy()
+    inside = (valid_day >= 0) & (valid_day < len(cls_by_day))
+    hist = history_class_before_origin(
+        cls_by_day=cls_by_day, origin_day=cells["origin_day"].to_numpy()[inside]
+    )
     return recut_by_class(
-        abs_error=diff, hour=hour, target_cls=cls_by_day[day[inside]], history_cls=hist
+        abs_error=cells["diff"].to_numpy()[inside],
+        hour=np.zeros(int(inside.sum()), dtype=int),
+        target_cls=cls_by_day[valid_day[inside]],
+        history_cls=hist,
+        solar_block=solar_block,
     )
 
 
