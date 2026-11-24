@@ -150,8 +150,8 @@ def look(*, frame: pl.DataFrame) -> dict:
         )
         .with_columns(
             period=pl.when(pl.col("t0") < BREAK)
-            .then(pl.lit("before the engine connected"))
-            .otherwise(pl.lit("after"))
+            .then(pl.lit("earlier era"))
+            .otherwise(pl.lit("later era"))
         )
         .drop_nulls()
     )
@@ -186,8 +186,8 @@ def look(*, frame: pl.DataFrame) -> dict:
         .with_columns(
             temp_bin=(pl.col("temp") // 2 * 2 + 1),
             period=pl.when(pl.col("t") < BREAK)
-            .then(pl.lit("before the engine connected"))
-            .otherwise(pl.lit("after")),
+            .then(pl.lit("earlier era"))
+            .otherwise(pl.lit("later era")),
         )
         .group_by("temp_bin", "period")
         .agg(pl.col("resid").mean().alias("mean_resid"), pl.len().alias("n"))

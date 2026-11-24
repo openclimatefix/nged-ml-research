@@ -30,8 +30,8 @@ prediction: >-
   engine and the electricity price, not temperature. An exploratory peek at the stored panel while
   writing this plan (not a test) gave a correlation of 0.13 between D8's daily maximum power and
   the day's maximum ERA5 temperature in June to September. A UK Primary's cooling load is small.
-  Predictions: (1) at D8 before the engine's readings stop carrying output (2022-06-01 to
-  2023-08-14, a date range taken from experiment 194, so no residual is used to choose rows), the
+  Predictions: (1) at D8 before the engine's readings stop carrying output (the earlier era,
+  whose rows are taken from experiment 194, so no residual is used to choose rows), the
   partial Spearman correlation between the summer afternoon residual and the hinge variable max(0,
   T - 20) on days with a day maximum of 22 degrees or more, controlling for day of year, is below
   +0.15; (2) the same correlation is below +0.15 at 5 or 6 of the 6 stored Primaries; (3) C1
@@ -76,8 +76,8 @@ decision_rule: >-
   covers D5, D9, D10, D11, D14, D16, and D18), so D8 uses experiment 159's stored panel (metered
   power, the frozen convex model's expected power, whose freeze date is read from experiment 130
   and printed, and ERA5 temperature) as a lab shortcut: the cooling hinge is fitted by median
-  regression on the residual of summers 2022 and 2023 before the engine connected and scored on
-  summer 2023 after the break and summers 2024 to 2025, as the mean absolute error in MW with a
+  regression on the residual of summers 2022 and 2023 in the earlier era and scored on
+  the later era of summer 2023 and summers 2024 to 2025, as the mean absolute error in MW with a
   2-week-block bootstrap interval, with a sensitivity that adds the ensemble-versus-ERA5
   temperature error as noise. D8 has no error-correction layer, so its gain is not comparable with
   the Primaries' and stays out of the quantile-score verdict. The correlations of prediction (2)
@@ -176,7 +176,7 @@ Forecasts' reanalysis of past weather.
 
 ![D8's daily maximum power against the day's maximum temperature](figure_d8_power_vs_temperature.svg)
 
-![D8's afternoon residual against temperature, before the engine connected and after](figure_d8_residual_vs_temperature.svg)
+![D8's afternoon residual against temperature, in the earlier era and the later era](figure_d8_residual_vs_temperature.svg)
 
 ![The hour of day of D8's large summer departures](figure_d8_departure_hours.svg)
 
