@@ -70,8 +70,9 @@ recorded output to the six, fold the readings into magnitudes, and check whether
 calculation recovers the sign. Third, we fit a switching state-space model that splits a reading
 into demand, solar output, and the number of units of a generator running, and score it against
 answers we know by construction. Nothing here forecasts, so every score is a ceiling for what a
-live service could do. This page is the plan: no script has run on real data, and every number
-below is a design value or a figure from an earlier experiment.
+live service could do. This page is the plan: only the census and the gate table have run on real
+data, and every number below other than the section on those two rungs is a design value or a
+figure from an earlier experiment.
 
 **The honest expectation is that the anchored read-out passes on injected worlds and that the
 generator branch is the part most likely to fail.** Experiment 694's tracker scored an F1 of 0.678
@@ -133,6 +134,20 @@ export share of D12's history windows (70% to 93% of days from March to Septembe
 **Rung 0d is the gate table.** Experiment 420's gate statistic (Spearman correlation of the
 reading with the yield curve on sunny summer-midday rows, and the 1st percentile) per Primary and
 fold cutoff, from the training window only.
+
+## Rungs 0a and 0d on real data
+
+**The census and the gate table matched the prediction.** In the scored folds, 2 of the 8 signed-MW
+Primaries have negative readings: D10 on 0.76% of half-hours and D15 on 69.2%. D5, D9, D11, D14, and
+D16 have none, and D18 has none in the scored folds (it has 0.29% across the training span too, which
+the prediction did not cover). None of the 8 MVA-only Primaries has a negative reading, as expected
+of a meter that cannot show one.
+
+**The export gate is open at D8 and D12 in all 8 folds and shut at the other 6 MVA-only Primaries in
+all 8 folds.** The gate is also open at D10 and D15 and shut at the other 6 signed-MW Primaries. The
+gate's Spearman correlation is at most -0.384 where it is open and at least -0.31 where it is shut.
+D22 is the closest shut Primary, at about -0.32. This page publishes no per-generator value for D8 and
+D12 beyond the open gate.
 
 ## Rung 0e
 
@@ -237,11 +252,13 @@ file, because the date is an era date. Experiment 716's folder comes in through 
 at commit 126577d1d, and the code stops at the start when the checkout is at any other commit.
 Nothing is merged from that branch.
 
-**Status of every rung.** No script has run on real data. Each line says which of three states the
+**Status of every rung.** Only the census and the gate table (rungs 0a and 0d) have run on real
+data. Each line says which of three states the
 rung is in: done on synthetic data, wired (the real-data branch is written and was exercised against
 stubs), or not run on real data.
 
-- Rungs 0a and 0d (census, gate table): done on synthetic data; the real run follows the fixes. The
+- Rungs 0a and 0d (census, gate table): done on synthetic data and run on real data once (the section
+  above). The
   read-only loader is wired, and its grid-length rule is checked against the shapes of the stored
   arrays.
 - Rung 0b (sign posterior): done on synthetic data. The `--run` branch is wired: farm series with a
@@ -291,8 +308,8 @@ of the fixed code, a results review, a numbers review, and a prose review.
   `f_mva_design_triage.md`, `mva_to_mw_addendum_1.md`, `mva_to_mw_addendum_1_review.md`, and
   `mva_to_mw_addendum_1_triage.md` (read, private): the design that this page condenses.
 - `ml-experiments/00720-msa-mva-to-mw-rung-0-signed-power-from-mva-meters/`: the code, written and
-  unit-checked on the CPU on synthetic worlds. No script has run on real data. Each bullet names a
-  script and its step.
+  unit-checked on the CPU on synthetic worlds. Only the census and the gate table have run on real
+  data. Each bullet names a script and its step.
     - `e00720_fold.py` and `e00720_check_loss.py` (rung 0c): the folded mixture loss, the censored
       branch, the folded and signed quantiles, the fold point in `v` units, and the six known-answer
       checks.
