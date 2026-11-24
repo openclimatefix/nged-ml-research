@@ -6,6 +6,7 @@ from pathlib import Path
 import e00720_bars as bars
 import e00720_real as real
 import numpy as np
+import polars as pl
 
 
 def main() -> int:
@@ -38,6 +39,25 @@ def main() -> int:
         except ValueError:
             continue
         msg = "a bad grid length was accepted"
+        raise AssertionError(msg)
+    base = np.datetime64("2019-09-01T00:00") + np.arange(400) * np.timedelta64(30, "m")
+    us = base.astype("datetime64[us]").astype(np.int64)
+    weekday = (
+        pl.Series(us)
+        .cast(pl.Datetime("us", "UTC"))
+        .dt.convert_time_zone("Europe/London")
+        .dt.weekday()
+        .to_numpy()
+        - 1
+    )
+    onehot = np.eye(7)[weekday]
+    assert real.check_dense_raw_alignment(day_of_week_columns=onehot, stamp_us=us) == 400
+    try:
+        real.check_dense_raw_alignment(day_of_week_columns=onehot[48:], stamp_us=us[:352])
+    except ValueError:
+        pass
+    else:
+        msg = "a shifted dense_raw start was accepted"
         raise AssertionError(msg)
     try:
         real.check_f7_commit(module_file=Path(__file__))

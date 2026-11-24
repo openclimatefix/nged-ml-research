@@ -146,6 +146,28 @@ def check_grid_lengths(*, n_grid: int, dense_raw_len: int, cams_len: int) -> int
     return n_grid
 
 
+def check_dense_raw_alignment(*, day_of_week_columns: np.ndarray, stamp_us: np.ndarray) -> int:
+    """Return the number of steps checked after asserting that dense_raw's day-of-week one-hot columns match `stamp_us`.
+
+    `day_of_week_columns` is `dense_raw[0, :n, 14:21]` (Monday first), and the weekday is that of the
+    stamp in Europe/London local time. A shifted start of `dense_raw`, which a length check cannot see,
+    breaks the match on many steps.
+    """
+    weekday = (
+        pl.Series(stamp_us)
+        .cast(pl.Datetime("us", "UTC"))
+        .dt.convert_time_zone("Europe/London")
+        .dt.weekday()
+        .to_numpy()
+        - 1
+    )
+    n_bad = int((np.asarray(day_of_week_columns).argmax(axis=1) != weekday).sum())
+    if n_bad:
+        msg = f"dense_raw's day-of-week columns disagree with the grid stamps on {n_bad} of {len(stamp_us)} steps"
+        raise ValueError(msg)
+    return len(stamp_us)
+
+
 def load_panel(*, dense_raw_path: Path) -> Panel:
     """Read the cleaned power, the CAMS arrays, and the temperature on experiment 87's grid.
 
@@ -176,6 +198,7 @@ def load_panel(*, dense_raw_path: Path) -> Panel:
     if raw.shape[0] != len(sites):
         msg = f"dense_raw holds {raw.shape[0]} Primaries and the site table {len(sites)}"
         raise ValueError(msg)
+    check_dense_raw_alignment(day_of_week_columns=raw[0, :n_use, 14:21], stamp_us=stamp[:n_use])
     temp = np.asarray(raw[:, :n_use, 2], dtype=np.float64)
     return Panel(
         sites,
