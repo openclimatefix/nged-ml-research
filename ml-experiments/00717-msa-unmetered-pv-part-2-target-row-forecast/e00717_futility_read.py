@@ -71,6 +71,29 @@ def read_part(*, part: int) -> dict:
     return out
 
 
+def futility_opens_seeds(*, out: dict, part: int) -> bool:
+    """Return whether the part's counted treatment contrast (A1 or B1) has a point estimate below zero in at least one group.
+
+    A2 and B2 are the placebo contrasts and do not count. The staging rule on the plan pages opens
+    seeds 2 to 4 only when this holds for some counted treatment contrast of either part.
+    """
+    label = LABELS[part]["first"]
+    return any(out[label][group]["point"] < 0 for group in score.GROUPS_COUNTED)
+
+
+def smoke(*, fold: str) -> int:
+    """Load one fold at seed 0 for the arms of both parts and print the row counts; no contrast, no score."""
+    star = m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    names = [star, "H", "H-S"]
+    _, averaged, groups = score.load_all(
+        names=names, months=(fold,), seeds=dict.fromkeys(names, (0,))
+    )
+    for name in names:
+        print(f"smoke {name} {fold} seed 0: {averaged[name].height} rows")
+    print(f"smoke: keys equal across the arms, {len(groups)} Primary groups")
+    return 0
+
+
 def selftest() -> int:
     """Check the pairs and the labels, with no data."""
     for part, labels in LABELS.items():
@@ -81,6 +104,13 @@ def selftest() -> int:
     assert score.pairs_of_part(part=2, star="M*")["first"] == ("HT", "H")
     assert score.pairs_of_part(part=2, star="M*")["placebo"] == ("HT", "HT-S")
     assert len(arms.ALL_FOLDS) == 8
+    fake = {"A1": {"six": {"point": 0.01}, "eight": {"point": 0.02}}}
+    assert futility_opens_seeds(out=fake, part=1) is False
+    fake["A1"]["eight"]["point"] = -0.001
+    assert futility_opens_seeds(out=fake, part=1) is True
+    assert futility_opens_seeds(
+        out={"B1": {"six": {"point": -1.0}, "eight": {"point": 1.0}}}, part=2
+    )
     print("selftest passed")
     return 0
 
@@ -90,13 +120,22 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", nargs="?", choices=("part1", "part2"))
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument(
+        "--smoke", metavar="FOLD", help="load one fold at seed 0 and print row counts only"
+    )
     args = parser.parse_args()
     if args.selftest:
         return selftest()
+    if args.smoke:
+        return smoke(fold=args.smoke)
     assert args.command is not None, "pass part1, part2, or --selftest"
     part = 1 if args.command == "part1" else 2
     out = read_part(part=part)
+    out["futility_opens_seeds"] = futility_opens_seeds(out=out, part=part)
     score.write(name=f"futility_part{part}", obj=out, score_dir=score.score_dir_of(part=part))
+    print(
+        f"INTERIM part {part}: {LABELS[part]['first']} point is below zero in at least one group: {out['futility_opens_seeds']}"
+    )
     for label in LABELS[part].values():
         for group in score.GROUPS_COUNTED:
             c = out[label][group]
