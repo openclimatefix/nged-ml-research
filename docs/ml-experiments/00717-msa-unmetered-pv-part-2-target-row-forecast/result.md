@@ -2,7 +2,8 @@
 id: "00717"
 slug: msa-unmetered-pv-part-2-target-row-forecast
 title: >-
-  Does an explicit forecast of unmetered solar output in the target row help the axial-attention network forecast a Primary's demand?
+  Does an explicit forecast of unmetered solar output in the target row help the axial-attention
+  network forecast a Primary's demand?
 theme: solar-disaggregation
 also_relevant_to:
   - lagged-power-and-error-correction
@@ -30,17 +31,18 @@ prediction: >-
   supported` (no detectable difference) or `inconclusive`. The prediction fails if B1 shows a gain
   or a loss beyond those ranges, or if the interval of B2 excludes zero.
 decision_rule: >-
-  Two counted contrasts, B1 and B2, each at the six and at the eight, so four readings, each read
-  at 98.75% (1 - 0.05/4) from experiment 713's month-block bootstrap, with 713's three guards (a t
-  interval on the 8 monthly differences, the same sign for each seed alone, and a point estimate of
-  at least 0.034 at the six and 0.090 at the eight). The smallest gain worth porting is 0.02 points
-  of capacity, the demand protocol's tier for a new input. The group readings and the six verdict
-  rows are those of experiment 716, with B1 in place of A1 and B2 in place of A2. Row 5 (`small
-  gain`) needs the placebo arm HT-S not to be a "loss" against H in either group; this guard was
-  added before any fit, as a design fix (the second Opus design review, finding S7), and it can only
-  turn a `small gain` into `inconclusive`. A `small gain` whose placebo contrast has a point
-  estimate at or above zero reads `inconclusive`. A verdict of `not supported` or `refuted` adds
-  one to the stop-rule count of explicit PV forecasts in a net-demand forecast and closes the line.
+  Two counted contrasts, B1 and B2, each at the six signed-MW Primaries and at the eight MVA-only
+  Primaries, so four readings, each read at 98.75% (1 - 0.05/4) from experiment 713's month-block
+  bootstrap, with 713's three guards (a t interval on the 8 monthly differences, the same sign for
+  each seed alone, and a point estimate of at least 0.034 at the six signed-MW Primaries and 0.090
+  at the eight MVA-only Primaries). The smallest gain worth porting is 0.02 points of capacity, the
+  demand protocol's tier for a new input. The group readings and the verdict at the six signed-MW
+  Primaries rows are those of experiment 716, with B1 in place of A1 and B2 in place of A2. Row 5
+  (`small gain`) needs the placebo arm HT-S not to be a "loss" against H in either group; this guard
+  was added before any fit, as a design fix (the second Opus design review, finding S7), and it can
+  only turn a `small gain` into `inconclusive`. A `small gain` whose placebo contrast has a point
+  estimate at or above zero reads `inconclusive`. A verdict of `not supported` or `refuted` adds one
+  to the stop-rule count of explicit PV forecasts in a net-demand forecast and closes the line.
   Every verdict, headline, and take-home message states that the warm-start states of experiment 713
   come from a waived known-answer gate, and that the verdict concerns a forecast added to a network
   that already reads the historical estimate.
@@ -197,8 +199,8 @@ generator's time series.
 - **The ENS cloud error defeated the explicit term in experiments 644, 655, and 661.** `HT` reads the
   same forecast. `p0_sd` and the zero-initialised gain let the network discount it.
 - **A nested arm beating its container** (`H` beating `HT`) is audit trigger 5 of experiment 713.
-- **The design cannot resolve a gain under 0.06 at the six**, although the smallest gain worth
-  porting is 0.02.
+- **The design cannot resolve a gain under 0.06 at the six signed-MW Primaries**, although the
+  smallest gain worth porting is 0.02.
 
 ## Method
 
