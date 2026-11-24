@@ -12,6 +12,7 @@ synthetic frames. Each loader that touches a Primary's reading or a generator ap
 """
 
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
@@ -19,7 +20,8 @@ import e00722_core as core
 import e00722_guard as guard
 import numpy as np
 import polars as pl
-from studies.power import scan_power
+from studies.dp_calendar import LOCAL_TIME_ZONE, calendar_columns
+from studies.power import CLEANED_POWER_DELTA_URI, scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR
 
 NGED_DIR: Final[Path] = REPO_DATA_DIR / "NGED"
@@ -66,6 +68,9 @@ ENGINE_FRAME_PATH: Final[Path] = (
     / "00697-gas-engine-state-tracker-part-4-running-patterns/frames/frame_d8.parquet"
 )
 """Experiment 697's engine-state frame (`start` is the start of the half-hour)."""
+
+PV_REGISTER_GLOB: Final[str] = "0071[67]-*/**/pv_register_capacity*.parquet"
+"""Where experiments 716 and 717 store the register capacity table (columns `primary` and `capacity_mw`)."""
 
 ENGINE_RECORD_GLOB: Final[str] = "00194-*/g2_window.parquet"
 """Where experiment 194 stored the 44-day independent engine record (private)."""
@@ -137,6 +142,9 @@ def build_topology(
             `substation_type`.
         hierarchy: Columns `substation_number` and `bsp_substation_number`.
 
+    Returns:
+        The Primaries, the metered generators below each BSP, and each BSP's meter.
+
     Raises:
         TopologyError: When a Primary has no BSP or no meter, or the BSP has no unique meter.
     """
@@ -200,6 +208,9 @@ def build_topology(
 def assert_topology(*, topology: Topology) -> dict[str, bool]:
     """Check 1 of job 1: BSP A holds the nine Primaries and BSP B the seven the design names.
 
+    Args:
+        topology: The joined topology.
+
     Raises:
         TopologyError: On any mismatch, which stops the slice.
 
@@ -244,15 +255,22 @@ def to_grid(*, index: np.ndarray, values: np.ndarray) -> np.ndarray:
 def load_power(*, ids: list[int], log: guard.ReadLog, name: str) -> dict[int, np.ndarray]:
     """Return each series' cleaned power on the master grid (NaN where absent).
 
-    Rows at or after the holdout are not read. `name` goes into the read log.
+    Rows at or after the holdout are not read. `name` goes into the read log, and the log gets the
+    count of rows on or after the holdout that this read returned (which must be 0) and the count
+    of those rows among the requested series that the filter dropped.
     """
     log.record(name=name, kind="primary")
     frame = (
         scan_power()
         .filter(pl.col("time_series_id").is_in(ids) & (pl.col("time") < pl.lit(core.HOLDOUT)))
         .with_columns(grid_index(end_time=pl.col("time")))
-        .select("time_series_id", "i", "power")
+        .select("time", "time_series_id", "i", "power")
         .collect()
+    )
+    log.record_holdout(
+        name=name,
+        read_after=int(frame.filter(pl.col("time") >= pl.lit(core.HOLDOUT)).height),
+        dropped=count_power_after_holdout(ids=ids),
     )
     out: dict[int, np.ndarray] = {}
     for ts in ids:
@@ -261,14 +279,53 @@ def load_power(*, ids: list[int], log: guard.ReadLog, name: str) -> dict[int, np
     return out
 
 
-def count_power_after_holdout() -> int:
-    """Return the number of power rows whose end stamp is on or after the holdout."""
+def count_power_after_holdout(*, ids: list[int]) -> int:
+    """Return the number of power rows of the requested series whose end stamp is on or after the holdout."""
     return int(
         scan_power()
-        .filter(pl.col("time") >= pl.lit(core.HOLDOUT))
+        .filter(pl.col("time_series_id").is_in(ids) & (pl.col("time") >= pl.lit(core.HOLDOUT)))
         .select(pl.len())
         .collect()
         .item()
+    )
+
+
+def power_table_version() -> str:
+    """Return the Delta version of the cleaned power table, or `unavailable` if it cannot be read."""
+    try:
+        from deltalake import DeltaTable
+
+        return str(DeltaTable(CLEANED_POWER_DELTA_URI).version())
+    except Exception:  # noqa: BLE001
+        return "unavailable"
+
+
+def calendar_key() -> np.ndarray:
+    """Return the matched key of every master-grid half-hour from the calendar alone.
+
+    The key is the local half-hour, the local month, and the day type (weekend or bank holiday
+    against other days), the same key that the engine frame holds on its own rows. The engine
+    record lies outside the engine frame, so a key that exists only on the frame's rows would make
+    the engine test unreadable.
+    """
+    end_times = pl.Series(
+        "t",
+        pl.datetime_range(
+            core.GRID_FIRST_END,
+            core.GRID_FIRST_END + timedelta(minutes=30 * (core.N_GRID - 1)),
+            interval="30m",
+            time_zone="UTC",
+            eager=True,
+        ),
+    )
+    cal = calendar_columns(end_times=end_times)
+    month = (
+        end_times.dt.offset_by("-30m").dt.convert_time_zone(LOCAL_TIME_ZONE).dt.month().to_numpy()
+    )
+    return core.matched_key(
+        local_half_hour=cal.half_hour.astype(np.int64),
+        month=month.astype(np.int64),
+        day_type=(cal.day_type != 0).astype(np.int64),
     )
 
 
@@ -308,6 +365,9 @@ def load_sky(
     A Primary's `power` column is never selected. The farms are labelled `F1`, `F2`, ... in a
     fixed order of the site table, and the farm's time series id is returned beside the label.
 
+    Args:
+        log: The read log, which gets the sky read and the holdout counts.
+
     Returns:
         The Primaries' sky by time series id; the farms' sky by label; the farms' capacity in
         megawatts by label; the farms' time series id by label; and the count of frame rows on or
@@ -332,6 +392,12 @@ def load_sky(
         .select(*SKY_COLUMNS, "power")
         .with_columns(grid_index(end_time=pl.col("time")))
         .collect()
+    )
+    log.record_holdout(
+        name="frame_39",
+        read_after=int(subs.filter(pl.col("time") >= pl.lit(core.HOLDOUT)).height)
+        + int(farms.filter(pl.col("time") >= pl.lit(core.HOLDOUT)).height),
+        dropped=n_after,
     )
     site_ids = dict(zip(sites["site"].to_list(), sites["time_series_id"].to_list(), strict=True))
     caps = dict(zip(sites["site"].to_list(), sites["effective_capacity_mw"].to_list(), strict=True))
@@ -360,7 +426,8 @@ class EngineFrame:
         k_path: The smoothed number of units running (NaN where absent).
         era: The era name of each half-hour (empty where absent).
         change: True at the first half-hour with a new engine state (never at an era's first row).
-        key: The matched key of each half-hour (-1 where the frame has no row).
+        key: The calendar matched key of every half-hour of the grid, built from the calendar alone.
+        frame_key: The frame's own matched key (-1 where the frame has no row), kept for a check.
         in_drop: True inside the multi-day drops that experiment 159 flagged.
         n_after_holdout: Frame rows whose end stamp is on or after the holdout.
     """
@@ -370,6 +437,7 @@ class EngineFrame:
     era: np.ndarray
     change: np.ndarray
     key: np.ndarray
+    frame_key: np.ndarray
     in_drop: np.ndarray
     n_after_holdout: int
 
@@ -402,6 +470,11 @@ def load_engine_frame(*, log: guard.ReadLog) -> EngineFrame:
     frame = frame.filter(pl.col("end") < pl.lit(core.HOLDOUT)).with_columns(
         grid_index(end_time=pl.col("end"))
     )
+    log.record_holdout(
+        name="engine_frame",
+        read_after=int(frame.filter(pl.col("end") >= pl.lit(core.HOLDOUT)).height),
+        dropped=n_after,
+    )
     idx = frame["i"].to_numpy()
     has_row = np.zeros(core.N_GRID, dtype=bool)
     ok = (idx >= 0) & (idx < core.N_GRID)
@@ -425,7 +498,8 @@ def load_engine_frame(*, log: guard.ReadLog) -> EngineFrame:
         k_path=k,
         era=era,
         change=engine_changes(k_path=k, has_row=has_row, era=era),
-        key=core.matched_key(local_half_hour=lhh, month=mon, day_type=dtype),
+        key=calendar_key(),
+        frame_key=core.matched_key(local_half_hour=lhh, month=mon, day_type=dtype),
         n_after_holdout=n_after,
     )
 
@@ -448,6 +522,11 @@ def load_engine_record(*, log: guard.ReadLog) -> tuple[np.ndarray, Path, int]:
     frame = frame.filter(pl.col("time") < pl.lit(core.HOLDOUT)).with_columns(
         grid_index(end_time=pl.col("time"))
     )
+    log.record_holdout(
+        name="engine_record",
+        read_after=int(frame.filter(pl.col("time") >= pl.lit(core.HOLDOUT)).height),
+        dropped=n_after,
+    )
     out = to_grid(index=frame["i"].to_numpy(), values=frame["power"].to_numpy().astype(float))
     return out, path, n_after
 
@@ -469,6 +548,22 @@ def load_effective_capacity(*, ids: list[int]) -> dict[int, float]:
             strict=True,
         )
     )
+
+
+def register_pv_capacity_mw(*, primary: str) -> float | None:
+    """Return the register's PV capacity at one Primary in megawatts, or None when the table is missing.
+
+    The table is the register capacity table of experiments 716 and 717. A missing or ambiguous
+    table, or a Primary with no row, gives None, which job 1 reports as an `unknown` band.
+    """
+    hits = sorted(ML_EXPERIMENTS_DATA_DIR.glob(PV_REGISTER_GLOB))
+    if len(hits) != 1:
+        return None
+    table = pl.read_parquet(hits[0])
+    if not {"primary", "capacity_mw"} <= set(table.columns):
+        return None
+    rows = table.filter(pl.col("primary") == primary)
+    return float(rows["capacity_mw"].sum()) if rows.height else None
 
 
 def ens_temperature_leads() -> tuple[int, int]:

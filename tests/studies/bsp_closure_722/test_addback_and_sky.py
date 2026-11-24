@@ -52,7 +52,7 @@ def test_the_below_minus_two_points_count_separates_the_two_forms():
     assert first.form_hint == "no_discrimination"
     assert second.n_below == 2
     assert second.n_total == 4
-    assert second.form_hint == "rules_out_abs_x_plus_a"
+    assert second.form_hint == "rules_out_abs_x_then_plus_a_if_added_back"
 
 
 def test_generator_classes_and_the_subtraction_rule():

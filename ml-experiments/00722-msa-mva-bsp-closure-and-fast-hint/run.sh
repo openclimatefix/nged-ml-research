@@ -27,6 +27,10 @@ fi
 shift
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}"
 : "${SLOT_CPU:?set SLOT_CPU to the one cpu number the manager assigned}"
+if ! [[ "$SLOT_CPU" =~ ^[0-9]+$ ]]; then
+    echo "SLOT_CPU must be exactly one cpu number (got '$SLOT_CPU'); a range or a list pins several cores" >&2
+    exit 64
+fi
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(dirname "$here")"
 script="$1"

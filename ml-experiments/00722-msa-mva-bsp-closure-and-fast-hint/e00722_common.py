@@ -22,6 +22,17 @@ CHECKS_NAME: Final[str] = "u0_checks.json"
 CLASSES_NAME: Final[str] = "u0_generator_classes.parquet"
 """Job 1's generator-class table."""
 
+LABELS_NAME: Final[str] = "u0_generator_labels.parquet"
+"""Job 1's map from anonymous generator label to time series id; it lives under `PRIVATE/`."""
+
+CLASS_COLUMNS: Final[frozenset[str]] = frozenset(
+    {
+        "bsp", "generator", "generator_type", "units", "primary", "era", "label", "coverage",
+        "generator_class", "is_engine", "engine_like", "sign_ok", "subtract",
+    }
+)  # fmt: skip
+"""The columns that jobs 2 and 3 read from job 1's class table."""
+
 U2A_VERDICT_NAME: Final[str] = "u2a_verdict.json"
 """Job 2's verdict file, which job 3 reads."""
 
@@ -57,6 +68,31 @@ def read_checks(*, out_dir: Path = guard.OUT_DIR) -> dict[str, Any]:
         msg = "run job 1 (e00722_u0.py) first: its check file is missing"
         raise JobRefusedError(msg)
     return json.loads(path.read_text())
+
+
+def read_classes(
+    *, out_dir: Path = guard.OUT_DIR, private_dir: Path = guard.PRIVATE_DIR
+) -> pl.DataFrame:
+    """Return job 1's class table with each generator's id joined from the private label map.
+
+    Args:
+        out_dir: The folder that holds the public class table.
+        private_dir: The folder that holds the map from anonymous label to time series id.
+
+    Returns:
+        The class table with a `generator_id` column.
+
+    Raises:
+        JobRefusedError: When a column the jobs read is missing, so that drift between job 1 and
+            the later jobs stops the job instead of changing a result.
+    """
+    classes = pl.read_parquet(out_dir / CLASSES_NAME)
+    missing = CLASS_COLUMNS - set(classes.columns)
+    if missing:
+        msg = f"the class table lacks columns {sorted(missing)}; rerun job 1"
+        raise JobRefusedError(msg)
+    labels = pl.read_parquet(private_dir / LABELS_NAME)
+    return classes.join(labels, on="generator", how="left", validate="m:1", maintain_order="left")
 
 
 def require_class_audit(*, checks: dict[str, Any]) -> None:
@@ -107,8 +143,26 @@ def generator_ids_to_subtract(*, classes: pl.DataFrame, bsp: str, variant: str) 
             & (pl.col("units") == "MW")
             & (pl.col("coverage") >= core.MIN_GENERATOR_COVERAGE)
             & ~pl.col("is_engine")
+            & ~pl.col("engine_like")
+            & pl.col("sign_ok")
         )
     return sorted(rows.filter(keep)["generator_id"].to_list())
+
+
+def addback_candidates(*, classes: pl.DataFrame, primary: str) -> list[int]:
+    """Return the ids of the generators that may be added back inside one Primary.
+
+    A candidate is labelled `added_back_or_not_below` at the Primary, is of class
+    `outside_or_added_back`, and would otherwise be subtracted. The coefficient cannot tell an
+    outside generator from an added-back one, so every candidate is treated as possibly added back,
+    and the two add-back forms are reported for it.
+    """
+    rows = classes.filter(
+        (pl.col("primary") == primary)
+        & (pl.col("label") == "added_back_or_not_below")
+        & pl.col("subtract")
+    ).unique(subset=["generator_id"])
+    return sorted(rows["generator_id"].to_list())
 
 
 def both_start(*, series: dict[str, np.ndarray], transformers: tuple[str, ...]) -> int:

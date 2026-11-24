@@ -69,11 +69,15 @@ def test_the_read_log_proves_the_class_audit_came_before_any_primary_reading():
         never.assert_audit_before_primary_reads()
 
 
-def test_the_timing_gate_stops_a_job_projected_over_the_cap():
-    gate = guard.TimingGate(cap_core_seconds=3600.0)
-    assert gate.check(done=1, total=10, elapsed=100.0) == 1000.0
+def test_the_timing_gate_projects_the_loop_and_counts_setup_once():
+    """B1: a large setup and a small per-unit time must not trip the gate."""
+    gate = guard.TimingGate(cap_core_seconds=3600.0, start=0.0)
+    gate.mark(now=500.0)
+    assert gate.check(done=1, total=10, now=510.0) == 600.0
+    old_style = 510.0 / 1 * 10
+    assert old_style > 3600.0
     with pytest.raises(guard.TimingGateError):
-        gate.check(done=1, total=10, elapsed=400.0)
+        gate.check(done=1, total=10, now=900.0)
 
 
 def test_the_run_log_holds_the_code_hash_input_hashes_memory_and_core_seconds(tmp_path: Path):

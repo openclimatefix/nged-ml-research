@@ -2,7 +2,6 @@
 
 import e00722_core as core
 import e00722_d8core as d8core
-import e00722_guard as guard
 import e00722_u2a as u2a
 import e00722_u2b as u2b
 import numpy as np
@@ -34,7 +33,7 @@ def test_the_engine_test_recovers_minus_one_and_its_circular_placebos_include_ze
     shifted = {d: (f.lo[0], f.hi[0]) for d, f in out["placebos"].items()}
     assert set(shifted) == {7, 14}
     assert all(abs(f.coef[0]) < 0.5 for f in out["placebos"].values())
-    assert np.isclose(out["all_children"].coef[0], m.coef[0] - 0.0, atol=2.0)
+    assert np.isclose(out["all_children"].coef[0], m.coef[0], atol=1e-9)
 
 
 def test_the_folded_child_test_reads_the_hidden_sign_and_the_placebo_does_not():
@@ -51,14 +50,14 @@ def test_the_folded_child_test_reads_the_hidden_sign_and_the_placebo_does_not():
         quiet=cal["quiet"],
         day=cal["day"],
         weights=make_weights(n_days=n_days, n_boot=100),
-        gate=guard.TimingGate(cap_core_seconds=1e9),
-        total_fits=10,
     )
     assert abs(out["closure"].coef[0] - 1.0) < 0.1
     assert out["auc"][0] > 0.95
     assert out["n_scorable"] > core.D15_MIN_HOURS
     assert out["n_crossing_excluded"] > 0
-    assert out["auc_placebo"][0] < 0.8
+    assert out["auc_placebo"][2] <= 0.5 <= out["auc_placebo"][3]
+    assert out["n_scorable_placebo"] >= core.D15_MIN_HOURS
+    assert out["auc_raw"][0] > 0.9
     assert 0.0 < out["reach"] <= 1.0
     all_slope = out["closure_all_children"].coef[0]
     assert all_slope < out["closure"].coef[0]
@@ -76,6 +75,10 @@ def test_the_fast_sky_change_is_zero_in_the_dark_and_nan_without_cams():
     assert got[0] == 0.0
     assert np.isnan(got[1])
     assert got[2] == 0.5
+    lit_missing = u2b.fill_sky_change(du=np.array([np.nan]), zenith=np.array([40.0]))
+    assert np.isnan(lit_missing[0])
+    low_sun = u2b.fill_sky_change(du=np.array([np.nan]), zenith=np.array([85.0]))
+    assert low_sun[0] == 0.0
 
 
 def test_calibration_rows_are_dark_half_hours_and_overcast_days():

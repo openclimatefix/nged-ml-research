@@ -50,8 +50,6 @@ def folded_child_test(
     quiet: np.ndarray,
     day: np.ndarray,
     weights: np.ndarray,
-    gate: guard.TimingGate,
-    total_fits: int,
 ) -> dict[str, Any]:
     """Score one child whose signed series is folded to a magnitude, against its hidden sign.
 
@@ -62,12 +60,12 @@ def folded_child_test(
         quiet: True at quiet half-hours.
         day: The day of each row.
         weights: The master draw of whole days.
-        gate: The timing gate, checked after the first fit.
-        total_fits: The number of fits the job will run, for the projection.
 
     Returns:
         The closure fits (de-meaned, raw, and all-children), the area under the curve with and
-        without the crossing exclusion, the placebo area, the reach, and the counts.
+        without the crossing exclusion, the raw-change area (reported with no bar), the placebo
+        area, the reach, and the counts. The de-meaned closure slope and area bind (the ruling on
+        B9); the raw forms are reported only.
     """
     rows = hour_end_rows(n=len(flow))
     lag = core.HOURLY_LAG_HALF_HOURS
@@ -87,7 +85,6 @@ def folded_child_test(
         weights=weights,
         names=["slope"],
     )
-    gate.check(done=1, total=total_fits)
     raw = core.bootstrap_ols(
         y=masked(x=d_r_raw, rows=rows),
         x=masked(x=d_x_raw, rows=rows),
@@ -107,6 +104,17 @@ def folded_child_test(
     auc = core.bootstrap_auc(
         score=np.where(scored, table["ratio"], np.nan),
         label=np.where(scored, table["label"], np.nan),
+        day=day,
+        weights=weights,
+    )
+    d_m_raw = core.change(x=folded, lag=lag)
+    table_raw = core.hourly_sign_rows(
+        d_residual=d_r_raw, d_folded=d_m_raw, flow=flow, hour_end=rows
+    )
+    scored_raw = table_raw["scorable"]
+    auc_raw = core.bootstrap_auc(
+        score=np.where(scored_raw, table_raw["ratio"], np.nan),
+        label=np.where(scored_raw, table_raw["label"], np.nan),
         day=day,
         weights=weights,
     )
@@ -134,6 +142,8 @@ def folded_child_test(
         "closure_all_children": all_children,
         "auc": auc,
         "auc_with_crossing": auc_all,
+        "auc_raw": auc_raw,
+        "n_scorable_raw": int(scored_raw.sum()),
         "auc_placebo": auc_p,
         "n_scorable": int(scored.sum()),
         "n_crossing_excluded": int(table["crossing"].sum()),
@@ -189,7 +199,7 @@ def fit_row(*, variant: str, test: str, form: str, fit: core.Fit, outcome: str) 
     return {
         "variant": variant,
         "test": test,
-        "form": form,
+        "residual_form": form,
         "estimate": c,
         "se": se,
         "lo": lo,
@@ -213,7 +223,7 @@ def auc_row(
     return {
         "variant": variant,
         "test": test,
-        "form": form,
+        "residual_form": form,
         "estimate": auc[0],
         "se": auc[1],
         "lo": auc[2],
@@ -224,15 +234,16 @@ def auc_row(
     }
 
 
-def main() -> None:  # noqa: PLR0915
-    """Run job 2."""
+def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:  # noqa: PLR0915
+    """Run job 2; `inputs` and `info` fill the run log as the job reads."""
     common.assert_environment(env=dict(os.environ))
     checks = common.read_checks()
     common.require_stamps(checks=checks)
-    gate = guard.TimingGate()
     log = guard.ReadLog()
+    inputs += [data.SITE_MAP_PATH, data.METADATA_PATH, data.HIERARCHY_PATH, data.ENGINE_FRAME_PATH]
+    info["power_table_delta_version"] = data.power_table_version()
     topology = common.load_topology()
-    classes = pl.read_parquet(guard.OUT_DIR / common.CLASSES_NAME)
+    classes = common.read_classes()
     labels_a = core.BSP_A_PRIMARIES
     labels_b = core.BSP_B_PRIMARIES
     ids = [
@@ -244,6 +255,7 @@ def main() -> None:  # noqa: PLR0915
     series = common.label_arrays(topology=topology, power=power)
     eng = data.load_engine_frame(log=log)
     record, record_path, _ = data.load_engine_record(log=log)
+    inputs += [record_path]
     quiet = core.quiet_mask(engine_change=eng.change, calendar_ok=eng.has_row)
     day = sky.day_of(n=core.N_GRID)
     n_days = int(day.max()) + 1
@@ -254,7 +266,10 @@ def main() -> None:  # noqa: PLR0915
     guard.say("FITS STARTING: job 2 (U2a)")
     rows: list[dict[str, Any]] = []
     verdicts: dict[str, Any] = {}
-    total_fits = 2 * 14
+    units_per_variant = 3
+    total_units = units_per_variant * len(common.VARIANTS)
+    units_done = 0
+    gate.mark()
     for variant in common.VARIANTS:
         gens = {
             b: [
@@ -300,7 +315,8 @@ def main() -> None:  # noqa: PLR0915
             day=day,
             weights=weights,
         )
-        gate.check(done=1, total=total_fits)
+        units_done += 1
+        gate.check(done=units_done, total=total_units)
         m = eng_res["main"]
         placebo_ci = {d: (f.lo[0], f.hi[0]) for d, f in eng_res["placebos"].items()}
         engine_outcome = (
@@ -339,16 +355,19 @@ def main() -> None:  # noqa: PLR0915
             quiet=quiet,
             day=day,
             weights=weights,
-            gate=gate,
-            total_fits=total_fits,
         )
+        units_done += 1
+        gate.check(done=units_done, total=total_units)
         cl = d15["closure"]
         closure_outcome = core.d15_closure_bar(
             lo=float(cl.lo[0]), hi=float(cl.hi[0]), se=float(cl.se[0])
         )
         sign_outcome = core.d15_sign_bar(auc=d15["auc"][0], n_hours=d15["n_scorable"])
         placebo_outcome = core.d15_placebo_bar(
-            sign_outcome=sign_outcome, lo=d15["auc_placebo"][2], hi=d15["auc_placebo"][3]
+            sign_outcome=sign_outcome,
+            lo=d15["auc_placebo"][2],
+            hi=d15["auc_placebo"][3],
+            n_hours=d15["n_scorable_placebo"],
         )
         rows.append(
             fit_row(
@@ -400,6 +419,16 @@ def main() -> None:  # noqa: PLR0915
         rows.append(
             auc_row(
                 variant=variant,
+                test="d15_sign_raw",
+                form="leave_out",
+                auc=d15["auc_raw"],
+                n=d15["n_scorable_raw"],
+                outcome="report",
+            )
+        )
+        rows.append(
+            auc_row(
+                variant=variant,
                 test="d15_placebo",
                 form="leave_out",
                 auc=d15["auc_placebo"],
@@ -411,7 +440,7 @@ def main() -> None:  # noqa: PLR0915
             {
                 "variant": variant,
                 "test": "d15_reach",
-                "form": "leave_out",
+                "residual_form": "leave_out",
                 "estimate": d15["reach"],
                 "se": None,
                 "lo": None,
@@ -428,9 +457,9 @@ def main() -> None:  # noqa: PLR0915
             quiet=quiet,
             day=day,
             weights=weights,
-            gate=gate,
-            total_fits=total_fits,
         )
+        units_done += 1
+        gate.check(done=units_done, total=total_units)
         rows.append(
             fit_row(
                 variant=variant,
@@ -504,18 +533,15 @@ def main() -> None:  # noqa: PLR0915
         "core-seconds",
         round(gate.elapsed(), 1),
     )
-    guard.write_run_log(
-        job="u2a",
-        folder=FOLDER,
-        inputs=[
-            data.SITE_MAP_PATH,
-            data.METADATA_PATH,
-            data.HIERARCHY_PATH,
-            data.ENGINE_FRAME_PATH,
-            record_path,
-        ],
-        gate=gate,
-    )
+
+
+def main() -> None:
+    """Run job 2 and write its run log even when the job crashes."""
+    gate = guard.TimingGate()
+    inputs: list[Path] = []
+    info: dict[str, Any] = {}
+    with guard.run_log(job="u2a", folder=FOLDER, gate=gate, inputs=inputs, info=info):
+        run(gate=gate, inputs=inputs, info=info)
 
 
 if __name__ == "__main__":

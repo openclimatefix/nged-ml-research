@@ -13,7 +13,8 @@ import re
 import resource
 import subprocess
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
@@ -66,7 +67,24 @@ def say(*parts: object) -> None:
 
 
 def check_public_frame(*, frame: pl.DataFrame, name: str) -> None:
-    """Raise when a frame about to be written outside `PRIVATE/` holds a timestamp column."""
+    """Raise when a frame about to be written outside `PRIVATE/` holds a timestamp or a generator id.
+
+    A column named `generator_id` is refused, and so is a `time_series_id` column in a frame
+    whose `kind` column holds a generator row. A public table names a generator by its anonymous
+    label (`GA1`, `GB3`), and the map from label to id lives under `PRIVATE/`.
+    """
+    if "generator_id" in frame.columns:
+        msg = f"{name}: a generator id may not be written outside PRIVATE/; use the anonymous label"
+        raise AnonymisationError(msg)
+    if (
+        "time_series_id" in frame.columns
+        and "kind" in frame.columns
+        and frame.filter(pl.col("kind").cast(pl.String) == "generator")["time_series_id"]
+        .is_not_null()
+        .any()
+    ):
+        msg = f"{name}: a generator's time series id may not be written outside PRIVATE/"
+        raise AnonymisationError(msg)
     for column, dtype in frame.schema.items():
         dated = dtype in (pl.Datetime, pl.Date, pl.Time) or isinstance(
             dtype, pl.Datetime | pl.Date | pl.Time
@@ -81,22 +99,28 @@ def check_public_frame(*, frame: pl.DataFrame, name: str) -> None:
             raise AnonymisationError(msg)
 
 
+def atomic_write(*, path: Path, write: Callable[[Path], object]) -> Path:
+    """Write through `write` to `path` plus `.tmp` in the same folder, then rename onto `path`.
+
+    A job that crashes mid-write leaves no half-written file under the real name.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    write(tmp)
+    tmp.replace(path)
+    return path
+
+
 def write_public_csv(*, frame: pl.DataFrame, name: str, out_dir: Path = OUT_DIR) -> Path:
     """Write an aggregate table to `out_dir/name` after the guard checks it."""
     check_public_frame(frame=frame, name=name)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / name
-    frame.write_csv(path)
-    return path
+    return atomic_write(path=out_dir / name, write=frame.write_csv)
 
 
 def write_public_parquet(*, frame: pl.DataFrame, name: str, out_dir: Path = OUT_DIR) -> Path:
     """Write an aggregate table as parquet to `out_dir/name` after the guard checks it."""
     check_public_frame(frame=frame, name=name)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / name
-    frame.write_parquet(path)
-    return path
+    return atomic_write(path=out_dir / name, write=frame.write_parquet)
 
 
 def write_public_json(*, payload: Mapping[str, Any], name: str, out_dir: Path = OUT_DIR) -> Path:
@@ -105,20 +129,14 @@ def write_public_json(*, payload: Mapping[str, Any], name: str, out_dir: Path = 
     if DATE_PATTERN.search(text):
         msg = f"{name}: the payload holds a calendar date"
         raise AnonymisationError(msg)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / name
-    path.write_text(text)
-    return path
+    return atomic_write(path=out_dir / name, write=lambda tmp: tmp.write_text(text))
 
 
 def write_private_parquet(
     *, frame: pl.DataFrame, name: str, private_dir: Path = PRIVATE_DIR
 ) -> Path:
     """Write dated detail under `PRIVATE/`."""
-    private_dir.mkdir(parents=True, exist_ok=True)
-    path = private_dir / name
-    frame.write_parquet(path)
-    return path
+    return atomic_write(path=private_dir / name, write=frame.write_parquet)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -133,6 +151,18 @@ class ReadLog:
     """
 
     entries: list[tuple[int, str, str]] = field(default_factory=list)
+    holdout: dict[str, dict[str, int]] = field(default_factory=dict)
+
+    def record_holdout(self, *, name: str, read_after: int, dropped: int) -> None:
+        """Record, for one input, the rows read on or after the holdout and the rows the filter dropped."""
+        self.holdout[name] = {
+            "read_on_or_after_holdout": int(read_after),
+            "dropped_by_filter": int(dropped),
+        }
+
+    def holdout_clean(self) -> bool:
+        """Return True when no input read a row on or after the holdout."""
+        return all(v["read_on_or_after_holdout"] == 0 for v in self.holdout.values())
 
     def record(self, *, name: str, kind: str) -> None:
         """Append a read."""
@@ -166,24 +196,38 @@ class ReadLog:
 class TimingGate:
     """Stops a job whose projected cost exceeds `cap_core_seconds`.
 
-    `core_seconds` is the process CPU time, which is the core-seconds of a one-core job.
+    `core_seconds` is the process CPU time, which is the core-seconds of a one-core job. The
+    projection is the setup time (start to `mark`) plus the measured time per unit since `mark`
+    times the number of units, so loading data is counted once and never multiplied.
     """
 
     cap_core_seconds: float = core.CORE_SECOND_CAP
     start: float = field(default_factory=time.process_time)
+    loop_start: float | None = None
 
     def elapsed(self) -> float:
         """Return the core-seconds used since the gate started."""
         return time.process_time() - self.start
 
-    def check(self, *, done: int, total: int, elapsed: float | None = None) -> float:
-        """Project the total cost from `done` of `total` equal units, and raise over the cap.
+    def mark(self, *, now: float | None = None) -> None:
+        """Mark the end of the setup and the start of a loop of equal units."""
+        self.loop_start = time.process_time() if now is None else now
+
+    def check(self, *, done: int, total: int, now: float | None = None) -> float:
+        """Project the total cost from `done` of `total` equal units since `mark`, and raise over the cap.
+
+        Args:
+            done: The number of units finished since `mark`.
+            total: The number of units in the loop.
+            now: The process time to use as the present, for a test; the clock when None.
 
         Returns:
-            The projected core-seconds.
+            The projected core-seconds: setup plus the time per unit times `total`.
         """
-        used = self.elapsed() if elapsed is None else elapsed
-        projected = used / max(done, 1) * total
+        current = time.process_time() if now is None else now
+        loop_start = self.start if self.loop_start is None else self.loop_start
+        setup = loop_start - self.start
+        projected = setup + (current - loop_start) / max(done, 1) * total
         if projected > self.cap_core_seconds:
             msg = f"projected {projected:.0f} core-seconds exceeds the cap of {self.cap_core_seconds:.0f}"
             raise TimingGateError(msg)
@@ -207,9 +251,10 @@ def file_fingerprint(*, path: Path) -> str:
 def code_hash(*, folder: Path) -> str:
     """Return a SHA-256 over every `e00722_*.py` file of the experiment folder, in name order."""
     digest = hashlib.sha256()
-    for path in sorted(folder.glob("e00722_*.py")):
-        digest.update(path.name.encode())
-        digest.update(path.read_bytes())
+    for path in [*sorted(folder.glob("e00722_*.py")), folder / "run.sh"]:
+        if path.is_file():
+            digest.update(path.name.encode())
+            digest.update(path.read_bytes())
     return digest.hexdigest()
 
 
@@ -266,3 +311,33 @@ def _relative(path: Path) -> str:
     except ValueError:
         text = path.name
     return DATE_PATTERN.sub("DATE", text)
+
+
+@contextmanager
+def run_log(
+    *,
+    job: str,
+    folder: Path,
+    gate: TimingGate,
+    inputs: list[Path],
+    info: dict[str, Any],
+    out_dir: Path = OUT_DIR,
+) -> Generator[None]:
+    """Write the run log when the block ends, whether it finished or crashed.
+
+    The block appends to `inputs` and `info` as it reads sources, so a crashed job still records
+    what it read. The log carries `completed`, which is False after a crash.
+    """
+    completed = False
+    try:
+        yield
+        completed = True
+    finally:
+        write_run_log(
+            job=job,
+            folder=folder,
+            inputs=inputs,
+            gate=gate,
+            extra={**info, "completed": completed},
+            out_dir=out_dir,
+        )

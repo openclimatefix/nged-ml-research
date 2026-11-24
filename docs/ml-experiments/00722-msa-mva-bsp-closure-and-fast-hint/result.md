@@ -96,11 +96,11 @@ rungs and is reported.
 | Detection limit, engine | 2.8 bootstrap standard errors under 0.5; otherwise void |
 | Detection limit, D15 closure | 2.8 bootstrap standard errors under 0.3; otherwise void |
 | Engine record | Slope interval excludes 0 and lies within −1.3 to −0.7; circular shifts by 7 and 14 days give an interval that includes 0 |
-| D15 closure | Slope of `ΔR⁽⁻¹⁵⁾` on the true `ΔX_15`, hourly: interval within 0.7 to 1.3 |
-| D15 sign | Area under the curve at least 0.85, with the ratio `ΔR⁽⁻¹⁵⁾ / Δm_15` as the score, on hours with `\|Δm_15\|` at least twice the noise scale of `ΔR⁽⁻¹⁵⁾`, crossing hours excluded and counted, at least 200 hours |
-| D15 placebo | D15's de-meaned reading shifted by 7 days: interval of the area includes 0.5 (S3) |
+| D15 closure | Slope of the de-meaned `ΔR⁽⁻¹⁵⁾` on the de-meaned true `ΔX_15`, hourly: interval within 0.7 to 1.3 |
+| D15 sign | Area under the curve at least 0.85, with the de-meaned ratio `ΔR⁽⁻¹⁵⁾ / Δm_15` as the score, on hours with `\|Δm_15\|` at least twice the noise scale of `ΔR⁽⁻¹⁵⁾`, crossing hours excluded and counted, at least 200 hours |
+| D15 placebo | D15's de-meaned reading shifted by 7 days: interval of the area includes 0.5, with at least 200 scorable hours; under 200 hours the placebo is void (S3) |
 | Reach | Share of D15's hours over the size threshold, no bar |
-| Report-only | D10 folded under BSP B |
+| Report-only | D10 folded under BSP B; the closure slope and the area under the curve on raw (not de-meaned) changes, which carry no bar |
 
 **Job 3 (rung U2b) is one joint regression at BSP A.** The response is the half-hour change of the
 BSP meter minus the signed children's physical flows and the outside generators. The regressors are
@@ -139,6 +139,64 @@ post-bounce stretches, and the bars bind on days with exactly one.
   its limit is void.
 - **Measurement:** no row on or after 2026-07-01 is read, and the stdout of every job holds ratios,
   counts, shares, and intervals only.
+
+## Rulings and pre-registered additions
+
+**The D15 closure and sign bars bind on changes de-meaned at matched quiet times.** The whole
+group of Primaries ramps together at night, so a raw change carries the group's daily profile, and
+de-meaning removes it (the same reason as for the engine test). The raw-change closure slope and
+the raw-change area under the curve are reported with no bar.
+
+**A passed sign test whose placebo is void has not had its placebo pass.** The pair then counts as
+unreadable, so the U2a verdict is `inconclusive` unless another test is readable. A failed test of
+any kind still gives `not supported`.
+
+**In U2b, `not supported` takes precedence over a void fit.** A failed calibration fit, a failed
+control, or a test that refutes reverse flow closes the rung even when another fit is void. A void
+calibration fit with no failure is `inconclusive`.
+
+**The matched means pool quiet half-hours from the whole span, so a later half-hour informs an
+earlier one.** The jobs of this experiment test a hindsight pathway on past half-hours, the mean
+removes a calendar profile and carries no label, and nothing is forecast. The as-of rung that
+follows uses past rows only. The matched key is built from the calendar for every half-hour of the
+grid, so the engine record, which lies outside the engine frame, has a key. The pool of quiet
+half-hours comes from the engine frame's span. Job 1 reports how many record half-hours have a
+finite de-meaned residual change, and the engine test is void below 90%.
+
+**Two add-back forms are reported when the data cannot choose between them.** The reading of a
+Primary is either the folded flow plus the added-back output, or the fold of their sum. Job 1
+counts, for each of D3, D8, D12, and D22, the generators that the regression cannot tell from an
+added-back generator, and reports the count of half-hours below -2 points. With no such generator
+the form cannot change a result. A positive count leaves the fold-of-sum form. A zero count leaves
+both open, and job 3 then runs and reports both forms, and the verdict is `inconclusive` unless
+the two forms agree.
+
+**Generators carry anonymous labels, and the map from label to id stays under `PRIVATE/`.** Public
+tables name a generator `GA1` to `GA8` and `GB1` to `GB5`. The class table also reports the
+sign of each generator's change against the BSP meter's, whether the generator could be the
+engine's own series, and a second fit of every Primary on all well-covered generators and the
+Primary's own sky change together. A generator whose class differs between the two fits is flagged,
+and the second fit has no bar.
+
+**The same-sky pair rule counts the unmetered farms only.** Every host and farm pair is computed
+and each pair says whether the farm is a metered generator under a BSP. Unmetered pairs count
+towards the four-pair rule. With too few, the metered pairs are reported apart and rung U1 is
+`inconclusive`.
+
+**The cloud-class audit's condition on class changes between the 10 and 15 degree elevation
+cutoffs binds on all sites pooled.** The per-site rows are report-only. BSP B's four importers
+bind on BSP B's calibration fit.
+
+**Constants that the implementation added to section 8 are pre-registered here.** They are
+`MIN_GENERATOR_COVERAGE` 0.8, `ENGINE_IDENTITY_CORR` 0.99, `ENGINE_LIKE_CORR` 0.5 (with
+`ENGINE_LIKE_TYPES` of CHP and Peaking Plant for generators with fewer than 500 overlap rows),
+`MIN_PAIR_ROWS` 500, `STAMP_MIN_CORR` 0.05, `MIN_QUIET_PER_KEY` 5, `QUIET_PAD_HALF_HOURS` 6,
+`DARK_ELEVATION_DEG` 0, `AUDIT_MIN_FARM_DAYS` 10, and `MIN_FARM_DAY_COVERAGE` 0.9.
+
+**The ratio of the all-children residual to a child's reading is the leave-out ratio minus 1.**
+That identity holds only for the ratio on the child's own change. For the engine test and the D15
+closure, the regressor is the engine record or the signed flow, and the all-children slope is
+fitted directly.
 
 ## Files
 

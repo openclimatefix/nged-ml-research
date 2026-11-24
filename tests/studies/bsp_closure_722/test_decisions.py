@@ -60,9 +60,32 @@ def test_the_d15_bars():
     assert core.d15_sign_bar(auc=0.9, n_hours=250) == "pass"
     assert core.d15_sign_bar(auc=0.8, n_hours=250) == "fail"
     assert core.d15_sign_bar(auc=0.99, n_hours=199) == "void"
-    assert core.d15_placebo_bar(sign_outcome="void", lo=0.4, hi=0.6) == "void"
-    assert core.d15_placebo_bar(sign_outcome="pass", lo=0.4, hi=0.6) == "pass"
-    assert core.d15_placebo_bar(sign_outcome="pass", lo=0.6, hi=0.8) == "fail"
+    assert core.d15_placebo_bar(sign_outcome="void", lo=0.4, hi=0.6, n_hours=300) == "void"
+    assert core.d15_placebo_bar(sign_outcome="pass", lo=0.4, hi=0.6, n_hours=300) == "pass"
+    assert core.d15_placebo_bar(sign_outcome="pass", lo=0.6, hi=0.8, n_hours=300) == "fail"
+
+
+def test_the_d15_placebo_needs_200_scorable_hours():
+    """B8: a placebo on 199 hours is void whatever its interval, and 200 hours is enough."""
+    assert core.d15_placebo_bar(sign_outcome="pass", lo=0.45, hi=0.55, n_hours=199) == "void"
+    assert core.d15_placebo_bar(sign_outcome="pass", lo=0.45, hi=0.55, n_hours=200) == "pass"
+    assert core.d15_placebo_bar(sign_outcome="pass", lo=0.45, hi=0.55, n_hours=0) == "void"
+    assert core.d15_placebo_bar(sign_outcome="fail", lo=0.45, hi=0.55, n_hours=30) == "void"
+
+
+def test_a_passed_sign_test_with_a_void_placebo_is_not_supported():
+    """B8: the pair is unreadable, so the verdict needs another readable test."""
+    only_sign: dict[str, core.Outcome] = {
+        "engine": "void",
+        "d15_closure": "void",
+        "d15_sign": "pass",
+        "d15_placebo": "void",
+    }
+    assert core.verdict_u2a(outcomes=only_sign) == "inconclusive"
+    with_closure: dict[str, core.Outcome] = {**only_sign, "d15_closure": "pass"}
+    assert core.verdict_u2a(outcomes=with_closure) == "supported"
+    failing: dict[str, core.Outcome] = {**only_sign, "engine": "fail"}
+    assert core.verdict_u2a(outcomes=failing) == "not supported"
 
 
 def test_the_u2b_bars():
@@ -83,7 +106,10 @@ def test_u2a_maps_every_combination_to_exactly_one_verdict():
     names = ["engine", "d15_closure", "d15_sign", "d15_placebo"]
     seen = set()
     for outcomes in core.all_outcome_combinations(names=names):
-        values = list(outcomes.values())
+        effective = dict(outcomes)
+        if effective["d15_sign"] == "pass" and effective["d15_placebo"] == "void":
+            effective["d15_sign"] = "void"
+        values = list(effective.values())
         if "fail" in values:
             expected = "not supported"
         elif "pass" in values:

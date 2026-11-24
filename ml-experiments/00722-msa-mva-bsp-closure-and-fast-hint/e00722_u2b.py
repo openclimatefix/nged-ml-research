@@ -58,13 +58,8 @@ M_BOOT_EVENTS: Final[int] = 1000
 # ---------------------------------------------------------------------------------------------
 # Pure helpers (tested on synthetic arrays)
 # ---------------------------------------------------------------------------------------------
-def fill_sky_change(*, du: np.ndarray, zenith: np.ndarray) -> np.ndarray:
-    """Set the fast sky change to 0 where CAMS has a row but the sun is too low for a change.
-
-    A half-hour without any CAMS row (NaN zenith) stays NaN, so that a missing sky is never read
-    as a flat one.
-    """
-    return np.where(np.isfinite(zenith), np.nan_to_num(du, nan=0.0), np.nan)
+fill_sky_change = sky.fill_sky_change
+"""The fast sky change with the dark half-hours set to 0 (see `e00722_sky.fill_sky_change`)."""
 
 
 def calibration_rows(*, zenith: np.ndarray, class_of_row: np.ndarray) -> np.ndarray:
@@ -260,7 +255,13 @@ def outcome_of_fit(*, fit: core.Fit, name: str, kind: str) -> str:
 
 
 def fit_rows(
-    *, variant: str, span: str, fit_name: str, fit: core.Fit, bars: dict[str, str]
+    *,
+    variant: str,
+    span: str,
+    fit_name: str,
+    fit: core.Fit,
+    bars: dict[str, str],
+    addback_form: str,
 ) -> list[dict[str, Any]]:
     """Return one line per regressor of a fit for `u2b_results.csv`."""
     out = []
@@ -269,6 +270,7 @@ def fit_rows(
         out.append(
             {
                 "variant": variant,
+                "addback_form": addback_form,
                 "span": span,
                 "fit": fit_name,
                 "regressor": name,
@@ -287,8 +289,8 @@ def fit_rows(
 # ---------------------------------------------------------------------------------------------
 # The job
 # ---------------------------------------------------------------------------------------------
-def main() -> None:  # noqa: PLR0912, PLR0915
-    """Run job 3."""
+def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:  # noqa: PLR0912, PLR0915
+    """Run job 3; `inputs` and `info` fill the run log as the job reads."""
     common.assert_environment(env=dict(os.environ))
     checks = common.read_checks()
     common.require_class_audit(checks=checks)
@@ -297,10 +299,19 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     if u2a["stops_u2b"]:
         msg = "job 2 returned `not supported`, which stops job 3"
         raise common.JobRefusedError(msg)
-    gate = guard.TimingGate()
     log = guard.ReadLog()
+    inputs += [
+        data.SITE_MAP_PATH,
+        data.METADATA_PATH,
+        data.HIERARCHY_PATH,
+        data.FRAME39_PATH,
+        data.SITES39_PATH,
+        data.ENGINE_FRAME_PATH,
+    ]
+    info["power_table_delta_version"] = data.power_table_version()
+    info["u2a_verdict"] = u2a["verdict"]
     topology = common.load_topology()
-    classes = pl.read_parquet(guard.OUT_DIR / common.CLASSES_NAME)
+    classes = common.read_classes()
     primaries_sky, _, _, _, _ = data.load_sky(log=log)
     label_of = dict(
         zip(topology.primaries["time_series_id"], topology.primaries["label"], strict=True)
@@ -324,6 +335,15 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     )
     start_a = common.both_start(series=series, transformers=core.TWO_TRANSFORMERS_2025)
     rows_idx = np.arange(core.N_GRID)
+    binding_form = checks["binding_addback_form"]
+    forms: tuple[core.AddbackForm, ...] = (
+        core.ADDBACK_FORMS if binding_form == "unresolved" else ("abs_of_sum",)
+    )
+    added_back: dict[str, np.ndarray] = {}
+    for c in core.BSP_A_UNSIGNED:
+        cand = common.addback_candidates(classes=classes, primary=c)
+        added_back[c] = np.sum([power[g] for g in cand], axis=0) if cand else np.zeros(core.N_GRID)
+    total_fits = 2 * len(common.VARIANTS) * len(forms) * 6
 
     def dm(x: np.ndarray) -> np.ndarray:
         return core.demean_matched(x=core.change(x=x, lag=1), key=eng.key, quiet=quiet)
@@ -344,6 +364,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     results: list[dict[str, Any]] = []
     verdicts: dict[str, Any] = {}
     guard.say("FITS STARTING: job 3 (U2b)")
+    gate.mark()
     for variant in common.VARIANTS:
         gens = {
             b: [
@@ -386,83 +407,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
                 "dropped": dropped,
                 "names": (*unsigned, "sky"),
             }
-        # ---- BSP A: joint regression, by span ----
-        a = per_bsp["A"]
-        d12_reading = series["D12"]
-        t_one, counts = stretch_rows(
-            reading=d12_reading,
-            lit=a["si"]["lit"],
-            classes=a["si"]["classes"],
-            month=month,
-            capacity_mw=topology.capacity(label="D12"),
-            want="one",
-        )
-        t_all, _ = stretch_rows(
-            reading=d12_reading,
-            lit=a["si"]["lit"],
-            classes=a["si"]["classes"],
-            month=month,
-            capacity_mw=topology.capacity(label="D12"),
-            want="all",
-        )
-        t_many, _ = stretch_rows(
-            reading=d12_reading,
-            lit=a["si"]["lit"],
-            classes=a["si"]["classes"],
-            month=month,
-            capacity_mw=topology.capacity(label="D12"),
-            want="many",
-        )
-        eligible = (a["si"]["classes"] == sky.CLASS_INTERMITTENT) & np.isin(month, core.TEST_MONTHS)
-        shares = day_count_shares(counts=counts, eligible=eligible)
-        spans = {"later": rows_idx >= start_a, "earlier": rows_idx < start_a}
-        fits: dict[tuple[str, str], core.Fit] = {}
-        for span, in_span in spans.items():
-            base = a["usable"] & in_span
-            for fit_name, sel in (
-                ("calibration", a["cal"]),
-                ("test_one_stretch", t_one),
-                ("test_all_stretches", t_all),
-                ("test_three_or_more", t_many),
-            ):
-                use = base & sel
-                fit = core.bootstrap_ols(
-                    y=np.where(use, a["y"], np.nan),
-                    x=np.where(use[:, None], a["x"], np.nan),
-                    day=day,
-                    weights=weights,
-                    names=a["names"],
-                )
-                if not fits:
-                    gate.check(done=1, total=2 * 2 * 8)
-                fits[(span, fit_name)] = fit
-            shifted_x = a["x"].copy()
-            shifted_x[:, 2] = core.shift_rows(
-                x=a["x"][:, 2], rows=core.PLACEBO_SHIFT_DAYS * core.HALF_HOURS_PER_DAY
-            )
-            for fit_name, sel in (("calibration_shifted", a["cal"]), ("test_shifted", t_one)):
-                use = base & sel
-                fits[(span, fit_name)] = core.bootstrap_ols(
-                    y=np.where(use, a["y"], np.nan),
-                    x=np.where(use[:, None], shifted_x, np.nan),
-                    day=day,
-                    weights=weights,
-                    names=a["names"],
-                )
-        cal_bar = outcome_of_fit(fit=fits[("later", "calibration")], name="D12", kind="calibration")
-        test_bar = outcome_of_fit(fit=fits[("later", "test_one_stretch")], name="D12", kind="test")
-        controls = {
-            "d3_calibration": outcome_of_fit(
-                fit=fits[("later", "calibration")], name="D3", kind="positive"
-            ),
-            "d3_test": outcome_of_fit(
-                fit=fits[("later", "test_one_stretch")], name="D3", kind="positive"
-            ),
-            "shifted_date": outcome_of_fit(
-                fit=fits[("later", "test_shifted")], name="D12", kind="shifted"
-            ),
-        }
-        # ---- BSP B: the four settled importers ----
+        # ---- BSP B: the four settled importers (their controls bind on the calibration fit) ----
         b = per_bsp["B"]
         b_fits = {}
         for fit_name, sel in (
@@ -477,71 +422,188 @@ def main() -> None:  # noqa: PLR0912, PLR0915
                 weights=weights,
                 names=b["names"],
             )
-        for label in core.BSP_B_UNSIGNED:
-            controls[f"bsp_b_{label}"] = outcome_of_fit(
-                fit=b_fits["calibration"], name=label, kind="positive"
-            )
-        verdict = core.verdict_u2b(
-            calibration=cast(core.Outcome, cal_bar),
-            test=cast(core.TestOutcome, test_bar),
-            controls=cast(dict[str, core.Outcome], controls),
-        )
-        # ---- rows ----
-        for (span, fit_name), fit in fits.items():
-            bars: dict[str, str] = {}
-            if span == "later":
-                if fit_name == "calibration":
-                    bars = {"D12": cal_bar, "D3": controls["d3_calibration"]}
-                elif fit_name == "test_one_stretch":
-                    bars = {"D12": test_bar, "D3": controls["d3_test"]}
-                elif fit_name == "test_shifted":
-                    bars = {"D12": controls["shifted_date"]}
-            results += fit_rows(variant=variant, span=span, fit_name=fit_name, fit=fit, bars=bars)
+        bsp_b_controls = {
+            f"bsp_b_{label}": outcome_of_fit(fit=b_fits["calibration"], name=label, kind="positive")
+            for label in core.BSP_B_UNSIGNED
+        }
         for fit_name, fit in b_fits.items():
             bars = (
-                {c: controls[f"bsp_b_{c}"] for c in core.BSP_B_UNSIGNED}
+                {c: bsp_b_controls[f"bsp_b_{c}"] for c in core.BSP_B_UNSIGNED}
                 if fit_name == "calibration"
                 else {}
             )
             results += fit_rows(
-                variant=variant, span="all", fit_name=f"bsp_b_{fit_name}", fit=fit, bars=bars
+                variant=variant,
+                span="all",
+                fit_name=f"bsp_b_{fit_name}",
+                fit=fit,
+                bars=bars,
+                addback_form="not_applicable",
             )
-        cal_fit = fits[("later", "calibration")]
+        form_verdicts: dict[str, Any] = {}
+        for form in forms:
+            form_label = form if binding_form == "unresolved" else binding_form
+            x_form = np.column_stack(
+                [
+                    dm(
+                        core.addback_regressor(
+                            reading=series[c], added_back=added_back[c], form=form
+                        )
+                    )
+                    for c in core.BSP_A_UNSIGNED
+                ]
+                + [core.demean_matched(x=per_bsp["A"]["si"]["du"], key=eng.key, quiet=quiet)]
+            )
+            # ---- BSP A: joint regression, by span ----
+            a = per_bsp["A"]
+            d12_reading = series["D12"]
+            t_one, counts = stretch_rows(
+                reading=d12_reading,
+                lit=a["si"]["lit"],
+                classes=a["si"]["classes"],
+                month=month,
+                capacity_mw=topology.capacity(label="D12"),
+                want="one",
+            )
+            t_all, _ = stretch_rows(
+                reading=d12_reading,
+                lit=a["si"]["lit"],
+                classes=a["si"]["classes"],
+                month=month,
+                capacity_mw=topology.capacity(label="D12"),
+                want="all",
+            )
+            t_many, _ = stretch_rows(
+                reading=d12_reading,
+                lit=a["si"]["lit"],
+                classes=a["si"]["classes"],
+                month=month,
+                capacity_mw=topology.capacity(label="D12"),
+                want="many",
+            )
+            eligible = (a["si"]["classes"] == sky.CLASS_INTERMITTENT) & np.isin(
+                month, core.TEST_MONTHS
+            )
+            shares = day_count_shares(counts=counts, eligible=eligible)
+            spans = {"later": rows_idx >= start_a, "earlier": rows_idx < start_a}
+            fits: dict[tuple[str, str], core.Fit] = {}
+            for span, in_span in spans.items():
+                base = a["usable"] & in_span
+                for fit_name, sel in (
+                    ("calibration", a["cal"]),
+                    ("test_one_stretch", t_one),
+                    ("test_all_stretches", t_all),
+                    ("test_three_or_more", t_many),
+                ):
+                    use = base & sel
+                    fit = core.bootstrap_ols(
+                        y=np.where(use, a["y"], np.nan),
+                        x=np.where(use[:, None], x_form, np.nan),
+                        day=day,
+                        weights=weights,
+                        names=a["names"],
+                    )
+                    if not fits:
+                        gate.check(done=1, total=total_fits)
+                    fits[(span, fit_name)] = fit
+                shifted_x = x_form.copy()
+                shifted_x[:, 2] = core.shift_rows(
+                    x=x_form[:, 2], rows=core.PLACEBO_SHIFT_DAYS * core.HALF_HOURS_PER_DAY
+                )
+                for fit_name, sel in (("calibration_shifted", a["cal"]), ("test_shifted", t_one)):
+                    use = base & sel
+                    fits[(span, fit_name)] = core.bootstrap_ols(
+                        y=np.where(use, a["y"], np.nan),
+                        x=np.where(use[:, None], shifted_x, np.nan),
+                        day=day,
+                        weights=weights,
+                        names=a["names"],
+                    )
+            cal_bar = outcome_of_fit(
+                fit=fits[("later", "calibration")], name="D12", kind="calibration"
+            )
+            test_bar = outcome_of_fit(
+                fit=fits[("later", "test_one_stretch")], name="D12", kind="test"
+            )
+            controls: dict[str, str] = {
+                "d3_calibration": outcome_of_fit(
+                    fit=fits[("later", "calibration")], name="D3", kind="positive"
+                ),
+                "d3_test": outcome_of_fit(
+                    fit=fits[("later", "test_one_stretch")], name="D3", kind="positive"
+                ),
+                "shifted_date": outcome_of_fit(
+                    fit=fits[("later", "test_shifted")], name="D12", kind="shifted"
+                ),
+            }
+            controls.update(bsp_b_controls)
+            verdict = core.verdict_u2b(
+                calibration=cast(core.Outcome, cal_bar),
+                test=cast(core.TestOutcome, test_bar),
+                controls=cast(dict[str, core.Outcome], controls),
+            )
+            # ---- rows ----
+            for (span, fit_name), fit in fits.items():
+                bars: dict[str, str] = {}
+                if span == "later":
+                    if fit_name == "calibration":
+                        bars = {"D12": cal_bar, "D3": controls["d3_calibration"]}
+                    elif fit_name == "test_one_stretch":
+                        bars = {"D12": test_bar, "D3": controls["d3_test"]}
+                    elif fit_name == "test_shifted":
+                        bars = {"D12": controls["shifted_date"]}
+                results += fit_rows(
+                    variant=variant,
+                    span=span,
+                    fit_name=fit_name,
+                    fit=fit,
+                    bars=bars,
+                    addback_form=form_label,
+                )
+            cal_fit = fits[("later", "calibration")]
+            form_verdicts[form_label] = {
+                "verdict": verdict,
+                "calibration": cal_bar,
+                "test": test_bar,
+                "controls": controls,
+                "common_mode_inflation_d12": float(cal_fit.get("D12")[0]),
+                "detection_limit_d12_test": core.detection_limit(
+                    se=fits[("later", "test_one_stretch")].get("D12")[1]
+                ),
+                "day_shares_by_post_bounce_count": shares,
+                "rows_dropped_next_to_engine_steps": {
+                    "A": per_bsp["A"]["dropped"],
+                    "B": per_bsp["B"]["dropped"],
+                },
+                "later_span_starts_after_grid_start": start_a > 0,
+            }
+            guard.say(
+                variant,
+                form_label,
+                "D12 calibration",
+                round(float(cal_fit.get("D12")[0]), 3),
+                "lower end",
+                round(float(cal_fit.get("D12")[2]), 3),
+                cal_bar,
+                "| D12 test (one stretch)",
+                [round(v, 3) for v in fits[("later", "test_one_stretch")].get("D12")],
+                test_bar,
+                "| controls",
+                controls,
+                "| day shares",
+                {k: round(v, 3) for k, v in shares.items()},
+                "| rows dropped next to engine steps",
+                form_verdicts[form_label]["rows_dropped_next_to_engine_steps"],
+                "| verdict",
+                verdict,
+            )
+        distinct = {v["verdict"] for v in form_verdicts.values()}
         verdicts[variant] = {
-            "verdict": verdict,
-            "calibration": cal_bar,
-            "test": test_bar,
-            "controls": controls,
-            "common_mode_inflation_d12": float(cal_fit.get("D12")[0]),
-            "detection_limit_d12_test": core.detection_limit(
-                se=fits[("later", "test_one_stretch")].get("D12")[1]
-            ),
-            "day_shares_by_post_bounce_count": shares,
-            "rows_dropped_next_to_engine_steps": {
-                "A": per_bsp["A"]["dropped"],
-                "B": per_bsp["B"]["dropped"],
-            },
-            "later_span_starts_after_grid_start": start_a > 0,
+            "verdict": distinct.pop() if len(distinct) == 1 else "inconclusive",
+            "binding_addback_form": binding_form,
+            "form_unresolved": binding_form == "unresolved",
+            "forms": form_verdicts,
         }
-        guard.say(
-            variant,
-            "D12 calibration",
-            round(float(cal_fit.get("D12")[0]), 3),
-            "lower end",
-            round(float(cal_fit.get("D12")[2]), 3),
-            cal_bar,
-            "| D12 test (one stretch)",
-            [round(v, 3) for v in fits[("later", "test_one_stretch")].get("D12")],
-            test_bar,
-            "| controls",
-            controls,
-            "| day shares",
-            {k: round(v, 3) for k, v in shares.items()},
-            "| rows dropped next to engine steps",
-            verdicts[variant]["rows_dropped_next_to_engine_steps"],
-            "| verdict",
-            verdict,
-        )
         if variant == "primary":
             by_type: dict[str, list[np.ndarray]] = {}
             for g in (
@@ -591,20 +653,15 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         "core-seconds",
         round(gate.elapsed(), 1),
     )
-    guard.write_run_log(
-        job="u2b",
-        folder=FOLDER,
-        inputs=[
-            data.SITE_MAP_PATH,
-            data.METADATA_PATH,
-            data.HIERARCHY_PATH,
-            data.FRAME39_PATH,
-            data.SITES39_PATH,
-            data.ENGINE_FRAME_PATH,
-        ],
-        gate=gate,
-        extra={"u2a_verdict": u2a["verdict"]},
-    )
+
+
+def main() -> None:
+    """Run job 3 and write its run log even when the job crashes."""
+    gate = guard.TimingGate()
+    inputs: list[Path] = []
+    info: dict[str, Any] = {}
+    with guard.run_log(job="u2b", folder=FOLDER, gate=gate, inputs=inputs, info=info):
+        run(gate=gate, inputs=inputs, info=info)
 
 
 if __name__ == "__main__":

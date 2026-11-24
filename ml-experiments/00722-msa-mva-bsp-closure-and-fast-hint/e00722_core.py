@@ -308,6 +308,9 @@ def quiet_mask(*, engine_change: np.ndarray, calendar_ok: np.ndarray) -> np.ndar
     Args:
         engine_change: True at the first half-hour with a new engine state.
         calendar_ok: True where the engine frame has a row, so that the half-hour has a key.
+
+    Returns:
+        True at the quiet half-hours.
     """
     near = within_distance(flag=engine_change, distance=QUIET_PAD_HALF_HOURS)
     return calendar_ok & ~near
@@ -334,6 +337,9 @@ def demean_matched(*, x: np.ndarray, key: np.ndarray, quiet: np.ndarray) -> np.n
         x: The series (a change, in megawatts).
         key: The matched key of each half-hour; -1 means no key.
         quiet: True at quiet half-hours.
+
+    Returns:
+        The series less its matched quiet-time mean, NaN where the key is -1 or too sparse.
     """
     use = quiet & np.isfinite(x) & (key >= 0)
     n_keys = int(key.max()) + 2 if key.size else 1
@@ -582,12 +588,13 @@ def d15_sign_bar(*, auc: float, n_hours: int) -> Outcome:
     return "pass" if auc >= D15_AUC_MIN else "fail"
 
 
-def d15_placebo_bar(*, sign_outcome: Outcome, lo: float, hi: float) -> Outcome:
+def d15_placebo_bar(*, sign_outcome: Outcome, lo: float, hi: float, n_hours: int) -> Outcome:
     """Return the outcome of the D15 placebo: the interval of the area includes 0.5.
 
-    The placebo is void whenever the sign test is void, so a void test is never read as a pass.
+    The placebo is void whenever the sign test is void, and whenever it has fewer than
+    `D15_MIN_HOURS` scorable hours, so a placebo on a handful of hours never passes on its width.
     """
-    if sign_outcome == "void":
+    if sign_outcome == "void" or n_hours < D15_MIN_HOURS or not np.isfinite(lo + hi):
         return "void"
     return "pass" if interval_includes(lo=lo, hi=hi, value=AUC_NULL) else "fail"
 
@@ -596,9 +603,14 @@ def verdict_u2a(*, outcomes: Mapping[str, Outcome]) -> Verdict:
     """Return the U2a verdict (F2).
 
     `not supported` when any readable test fails; `supported` when at least one test is readable
-    and every readable test and its placebo pass; `inconclusive` when no test is readable.
+    and every readable test and its placebo pass; `inconclusive` when no test is readable. A sign
+    test that passed whose placebo is void has not had its placebo pass, so the pair is unreadable
+    and counts as void.
     """
-    values = list(outcomes.values())
+    effective = dict(outcomes)
+    if effective.get("d15_sign") == "pass" and effective.get("d15_placebo") == "void":
+        effective["d15_sign"] = "void"
+    values = list(effective.values())
     if "fail" in values:
         return "not supported"
     if "pass" in values:
@@ -709,20 +721,97 @@ def generator_class(*, labels: Sequence[AddbackLabel]) -> GeneratorClass:
 
 
 def subtract_generator(
-    *, cls: GeneratorClass, units: str, coverage: float, is_engine: bool
+    *,
+    cls: GeneratorClass,
+    units: str,
+    coverage: float,
+    is_engine: bool,
+    engine_like: bool = False,
+    sign_ok: bool = True,
 ) -> bool:
     """Return True when a generator's output enters a residual.
 
     A generator enters only when it is outside every Primary or added back, is metered in MW (an
     unsigned series cannot be subtracted as if signed), covers at least `MIN_GENERATOR_COVERAGE`
-    of the grid, and is not the engine record's own series.
+    of the grid, is neither the engine record's own series nor shaped like it (`engine_like`), and
+    is positive for generation (`sign_ok`).
     """
     return (
         cls == "outside_or_added_back"
         and units == "MW"
         and coverage >= MIN_GENERATOR_COVERAGE
         and not is_engine
+        and not engine_like
+        and sign_ok
     )
+
+
+ENGINE_LIKE_TYPES: Final[tuple[str, ...]] = ("CHP", "Peaking Plant")
+"""Generator types that the engine record's own series could carry (B4)."""
+
+ENGINE_LIKE_CORR: Final[float] = 0.5
+"""A generator whose change correlates with the engine record's at this level or more is engine-like."""
+
+
+def engine_like(*, corr: float, n_overlap: int, generator_type: str) -> bool:
+    """Return True when a generator must not be subtracted because it could be the engine's series.
+
+    A generator with `MIN_PAIR_ROWS` or more overlap rows is engine-like when its change
+    correlates with the record's at `ENGINE_LIKE_CORR` or more. A generator with fewer overlap
+    rows cannot be judged, so it is engine-like when its type is one of `ENGINE_LIKE_TYPES`.
+    """
+    if n_overlap >= MIN_PAIR_ROWS:
+        return bool(np.isfinite(corr) and corr >= ENGINE_LIKE_CORR)
+    return generator_type in ENGINE_LIKE_TYPES
+
+
+def generator_labels(*, bsp: Sequence[str], ids: Sequence[int]) -> dict[int, str]:
+    """Return the anonymous label of each generator: `GA1`, `GA2`, ... and `GB1`, ... in id order."""
+    labels: dict[int, str] = {}
+    counts: dict[str, int] = {}
+    for letter, ts in sorted(zip(bsp, ids, strict=True)):
+        counts[letter] = counts.get(letter, 0) + 1
+        labels[int(ts)] = f"G{letter}{counts[letter]}"
+    return labels
+
+
+def generation_sign_ok(*, corr: float) -> bool:
+    """Return True when a generator's change is negatively correlated with the BSP's net import change.
+
+    Generation positive means that more generation lowers the meter's import, so a correlation
+    that is not negative says that the series does not follow the generation-positive convention.
+    """
+    return bool(np.isfinite(corr) and corr < 0)
+
+
+AddbackForm = Literal["abs_x_then_plus_a", "abs_of_sum"]
+"""The two add-back forms: the child's folded flow plus the added-back output, or the fold of their sum."""
+
+ADDBACK_FORMS: Final[tuple[AddbackForm, ...]] = ("abs_x_then_plus_a", "abs_of_sum")
+"""Both forms, in the order the tables list them."""
+
+
+def addback_regressor(
+    *, reading: np.ndarray, added_back: np.ndarray, form: AddbackForm
+) -> np.ndarray:
+    """Return the folded flow that the regression of an unsigned child uses under one add-back form.
+
+    Under `abs_x_then_plus_a` the reading is `|X| + A`, so the folded flow is `reading - A`.
+    Under `abs_of_sum` the reading is `|X + A|`, which is the folded quantity itself.
+    """
+    return reading - added_back if form == "abs_x_then_plus_a" else reading
+
+
+def binding_addback_form(*, n_candidates: int, n_below: int) -> str:
+    """Return which add-back form binds: `not_needed`, `abs_of_sum`, or `unresolved` (both reported).
+
+    With no candidate generator the form cannot change a result. A positive count of half-hours
+    below -2 points rules out the form `|X| + A` when the engine is added back, which leaves
+    `|X + A|`. A zero count leaves both forms open.
+    """
+    if n_candidates == 0:
+        return "not_needed"
+    return "abs_of_sum" if n_below > 0 else "unresolved"
 
 
 @dataclass(frozen=True)
@@ -738,15 +827,16 @@ class BelowCount:
 def below_count(*, reading_mw: np.ndarray, engine_mw: np.ndarray, capacity_mw: float) -> BelowCount:
     """Count half-hours with `reading - engine` under -2 points of capacity (F1).
 
-    Form `|X + A|` allows such half-hours and form `|X| + A` forbids them, so a positive count
-    rules out `|X| + A`. A zero count does not choose between the forms.
+    Form `|X + A|` allows such half-hours. Form `|X| + A` forbids them only if the engine is added
+    back in the window, so a positive count rules out `|X| + A` under that condition. A zero count
+    does not choose between the forms.
     """
     ok = np.isfinite(reading_mw) & np.isfinite(engine_mw)
     points = 100.0 * (reading_mw[ok] - engine_mw[ok]) / capacity_mw
     n_below = int((points < ENGINE_BELOW_POINTS).sum())
     n_total = int(ok.sum())
     share = n_below / n_total if n_total else float("nan")
-    hint = "rules_out_abs_x_plus_a" if n_below > 0 else "no_discrimination"
+    hint = "rules_out_abs_x_then_plus_a_if_added_back" if n_below > 0 else "no_discrimination"
     return BelowCount(n_below=n_below, n_total=n_total, share=share, form_hint=hint)
 
 

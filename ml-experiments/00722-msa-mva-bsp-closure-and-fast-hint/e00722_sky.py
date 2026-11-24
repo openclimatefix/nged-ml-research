@@ -114,6 +114,18 @@ def fast_irradiance_change(
     return out
 
 
+def fill_sky_change(*, du: np.ndarray, zenith: np.ndarray) -> np.ndarray:
+    """Set the fast sky change to 0 where CAMS has a row but the sun is too low for a change.
+
+    A half-hour without any CAMS row (NaN zenith) stays NaN, so that a missing sky is never read
+    as a flat one. A half-hour with the sun up (above `DAYLIGHT_ELEVATION_DEG`) whose change is
+    missing also stays NaN, because the sky there is unknown and not flat.
+    """
+    has_sky = np.isfinite(zenith)
+    low_sun = has_sky & ((90.0 - zenith) <= core.DAYLIGHT_ELEVATION_DEG)
+    return np.where(low_sun, np.nan_to_num(du, nan=0.0), np.where(has_sky, du, np.nan))
+
+
 @dataclass(frozen=True)
 class AuditRow:
     """One line of the class audit."""
