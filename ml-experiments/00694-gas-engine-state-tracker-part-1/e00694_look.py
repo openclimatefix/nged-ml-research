@@ -47,7 +47,7 @@ ERAS: Final[dict[str, tuple[datetime, datetime]]] = {
     "pre-engine": (GRID_START, ENGINE_CONNECTED),
     "net": (NET_START, NET_END),
     "net with 11 kV solar": (SOLAR_START, FADE_START),
-    "from 2026-03": (FADE_START, datetime(2026, 7, 1, tzinfo=UTC)),
+    "latest era": (FADE_START, datetime(2026, 7, 1, tzinfo=UTC)),
 }
 COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN, ocf.DATA_PURPLE]
 LINES: list[str] = []
@@ -201,7 +201,6 @@ def main() -> None:
     for i, (name, ed) in enumerate(era_data.items()):
         start = 28 * 48
         seg = ed["y"][start : start + 14 * 48]
-        when = (base + (ed["a"] + start) * np.timedelta64(1800, "s")).astype("datetime64[D]")
         frame = pl.DataFrame({"day": np.arange(len(seg)) / 48.0, "mva": seg})
         panels.append(
             alt.Chart(frame)  # ty: ignore[unresolved-attribute]
@@ -214,7 +213,7 @@ def main() -> None:
                 ),
                 y=alt.Y("mva:Q", title="MVA", scale=alt.Scale(domain=[0, 14])),
             )
-            .properties(width=WIDTH, height=110, title=f"{name}: 14 days from {when}")
+            .properties(width=WIDTH, height=110, title=f"Window {i + 1}, {name}: 14 days")
         )
     fig1 = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
