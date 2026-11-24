@@ -1,14 +1,20 @@
 """Refuse to write a chart that shows a metered generator's record with dates or megawatt values.
 
 NGED has asked that a metered generator's output leaves the private data store only anonymised, and
-a gas engine's record is identifiable from public data once it sits on calendar dates. Four figure
-files held the engine's record or a series inferred from it. Their writers now go through
-`save_chart`, which renders the chart to SVG and raises `GuardError` when the text, the
+a gas engine's record is identifiable from public data once it sits on calendar dates. The figure
+files listed in `GUARDED` held the engine's record or a series inferred from it. Their writers now
+go through `save_chart`, which renders the chart to SVG and raises `GuardError` when the text, the
 accessibility labels, or the chart specification carry a date, a datetime axis, a per-point value,
 or a power unit.
 
 A path listed in `GUARDED` is checked on every write, so a script cannot switch the check off.
 `check_chart` is the same check without writing, for a test.
+
+The check reads text, accessibility labels, and the specification's axes, and never looks at the
+marks. It therefore cannot see evenly spaced peaks, clusters, or rule layers, from which a reader
+could read the number of units an engine has and the ratio of their sizes. A levels-distribution
+panel (a histogram or density of output while the engine runs) is never allowed on a guarded engine
+figure, and no test enforces that.
 """
 
 import io
