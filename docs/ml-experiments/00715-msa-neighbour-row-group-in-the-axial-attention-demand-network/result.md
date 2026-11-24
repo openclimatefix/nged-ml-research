@@ -7,7 +7,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - demand-inputs
   - hierarchy-and-pooling
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -47,6 +47,45 @@ decision_rule: >-
   states that the warm-start states of experiment 713 come from a waived known-answer gate, that
   experiment 715's own gate failed KN6 and KN7 and was waived, and that no conclusion about following
   level shifts is backed by a passing known-answer test.
+verdict: not supported
+best_arm: >-
+  No arm beats M*. F4 minus M* is +0.0127 points of capacity (98.75% interval -0.0215 to +0.0472) at
+  the six signed-MW Primaries and +0.0085 (-0.0245 to +0.0445) at the eight MVA-only Primaries
+  (`score/headline.json`, key `N1`).
+headline: >-
+  Giving the axial-attention network the last 14 days of up to six electrical neighbours did not
+  lower its CRPS at leads of 24 h to 240 h. On 8 folds and 2 seeds, F4 minus M* is +0.0127 points of
+  capacity at the six signed-MW Primaries and +0.0085 at the eight MVA-only Primaries, and both
+  98.75% intervals include zero and lie inside the pre-registered limits of 0.094 and 0.25. F4
+  minus the placebo F4-R is +0.0182 and -0.0028, and both intervals also include zero. The verdict is
+  `not supported` (no detectable difference). Two known-answer checks of this experiment's own
+  gate (KN6 and KN7) failed and were waived, so the page makes no claim about whether F4 follows a
+  level change.
+lessons: >-
+  The two seeds disagree in sign on N1 in both groups (seed differences -0.0058 and +0.0342 at the
+  six signed-MW Primaries, -0.0153 and +0.0474 at the eight MVA-only Primaries), so the seed guard
+  fails and the point estimates are within seed noise. A zero-initialised neighbour path trained for
+  about 12 to 32 passes per stage and ended every stage by patience. The known-answer world could
+  not show that F4 follows a permanent step, because the shared trunk follows 0.019 of one at the
+  synthetic budget, and the gate window held one permanent step.
+take_home_message: >-
+  Adding the last 14 days of a Primary substation's electrical neighbours to the axial-attention
+  network did not improve its forecast on this 16-Primary panel: the difference from the network
+  without neighbours is +0.0127 and +0.0085 points of capacity, with intervals that include zero.
+  The experiment cannot say that neighbour rows carry no information, because its known-answer
+  checks of whether F4 follows a level change failed and were waived. The pre-registered rule
+  closes neighbour rows in this network on the 16-Primary panel, and a retest needs fleet-scale
+  adjacency.
+advice:
+  - >-
+    Do not retest neighbour rows in the axial-attention network on the 16-Primary panel; the stop
+    rule of this experiment requires fleet-scale adjacency of about 1,161 Primaries first.
+  - >-
+    Fix the lead-day learning rate of experiment 713's trunk before any new known-answer test of
+    following level changes, because the trunk follows 0.019 of a permanent step at the budget the
+    gate used.
+production_status: not-for-production
+adopted_in: none
 benchmark: >-
   M* (experiment 713's selected axial-attention arm, stored seeds 0 and 1 of all 8 folds); the
   Candidate (P7+D50 of experiment 667); the month-by-half-hour climatology; the manual heuristic and
@@ -61,14 +100,15 @@ metric: >-
 
 **We ask whether an axial-attention neural network forecasts a Primary substation's demand better
 when it can also read the last 14 days of each electrical neighbour of that Primary.** The network
-is the axial-attention network of [experiment 713](https://github.com/openclimatefix/nged-ml-research/pull/402),
-which attends along the half-hours of a day and along the days of a 14-day window of the host
-Primary's own power. We add a third attention axis over up to six neighbour Primaries, so that each
-history token of the host can look at the neighbours' power at the same day and half-hour. We
-compare the result with experiment 713's stored network, with a placebo whose neighbour slots hold
-Primaries that are not neighbours, and with a refit that has no neighbour path. This page is the
-plan: no code has been written, no neural network has been fitted, and every number below is a
-design value or a figure from an earlier experiment.
+is the axial-attention network of [experiment
+713](https://github.com/openclimatefix/nged-ml-research/pull/402), which attends along the
+half-hours of a day and along the days of a 14-day window of the host Primary's own power. We add a
+third attention axis over up to six neighbour Primaries, so that each history token of the host can
+look at the neighbours' power at the same day and half-hour. We compare the result with experiment
+713's stored network and with a placebo whose neighbour slots hold Primaries that are not
+neighbours. The "Result" section below reports the fits. Every later section is the plan as written
+before the first fit, and the plan's refit with no neighbour path (F4-0) and its time-shuffled
+placebo (F4-T) were not run.
 
 **The honest expectation is a tie.** Seven earlier experiments on neighbour or graph inputs ended
 `not supported` and one ended `refuted`. A hand-built neighbour feature in experiment 714 raised the
@@ -76,6 +116,82 @@ discrimination of temporary moves from permanent changes by +0.052 AUROC with an
 to +0.130. With 2 seeds the design detects, with 80% power, a CRPS difference of 0.094 points of
 capacity at the six signed-MW Primaries and 0.25 points at the eight MVA-only Primaries, and a
 smaller difference is likely to read as a tie.
+
+## Result
+
+**The neighbour rows did not improve the forecast: F4 minus M\* is +0.0127 and +0.0085 points of
+capacity, and the verdict is `not supported`.** Both 98.75% intervals include zero and lie inside
+the pre-registered limits. The contrasts are the mean difference in CRPS in points of capacity at
+leads from 24 h up to but not including 240 h, on 8 folds (2025-11 to 2026-06) and seeds 0 and 1,
+from the headline scorer `e00715_score.py headline` (`score/headline.json`, keys `N1` and `N2`). A
+positive number means that the first arm is worse.
+
+| Contrast | The six signed-MW Primaries | The eight MVA-only Primaries |
+|---|---|---|
+| N1, F4 minus M\* | +0.0127 (-0.0215 to +0.0472) | +0.0085 (-0.0245 to +0.0445) |
+| N2, F4 minus F4-R | +0.0182 (-0.0026 to +0.0501) | -0.0028 (-0.0259 to +0.0183) |
+| Group reading (key `readings`) | no detectable difference | no detectable difference |
+
+**The two seeds disagree in sign on N1 in both groups, so the point estimates are within seed noise.**
+The difference of seed 0 and of seed 1 from M\* is -0.0058 and +0.0342 at the six signed-MW
+Primaries, and -0.0153 and +0.0474 at the eight MVA-only Primaries (`score/headline.json`, key
+`seed_differences`). The seed guard fails for N1 in both groups, and it holds for N2 only at the six
+signed-MW Primaries (+0.0081 and +0.0275). The `supported` verdict also needs a gain and the donor
+guard, and N1 shows no gain, so the verdict is `not supported` (`supported_guards_hold` is false).
+
+**The runner first misread N2 at the eight MVA-only Primaries as opening the rule for seeds 2 to 4.**
+N2 is -0.0028 there, and the runner read "at least one counted treatment contrast below zero" as
+satisfied. The manager ruled that a counted treatment contrast means the contrast against the
+baseline (N1), positive in both groups, and that N2 is an ablation. Seeds 2 to 4 were therefore not
+run, and every number on this page rests on 2 seeds.
+
+**The stop rule closes neighbour rows in this network on the 16-Primary panel.** The pre-registered
+rule says that a verdict of `not supported` closes neighbour rows in the axial-attention network on
+the 16-Primary panel, and that a retest needs fleet-scale adjacency (`score/headline.json`, key
+`stop_rule`). The earlier interim screen on 4 folds (2025-11, 2026-01, 2026-03, and 2026-06) read
+`advance`: F4 minus M\* was +0.0103 at the six signed-MW Primaries and +0.0200 at the eight MVA-only
+Primaries, with 2 of 4 folds positive in each group (`score/screen.json`), which is below both
+stop thresholds.
+
+**This experiment's own known-answer gate failed KN6 and KN7, and the maintainer waived both, so the
+page says nothing about whether F4 follows a level change.** The gate passed KN11(a) and KN12. KN6
+gave an F4 gap of 0.0288 between the follow share of a permanent step and of a temporary step,
+against a requirement of at least 0.60. KN7 was not evaluated, because the fit of F4 on the world
+with no shifts ended at its 150-pass cap (`work/known_answers_last_run.json`). An audit of the
+failure found no fault in the neighbour path and three causes: a training budget of 150 passes with
+a patience of 8 (experiment 713 later raised its own to 400 and 30), a KN6 window with one permanent
+step and two temporary steps, and a shared trunk that follows only 0.019 of a permanent step at that
+budget. The maintainer's note frames the limit: in general, it is hard to discriminate between a
+temporary step and a permanent step, and the only two hints are what a Primary substation's
+electrical neighbours do and the rough shape of the step, although the shape is probably less
+informative. The injected-world readings S1 to S7 were not scored, and phase 3 (the mirror arms F4-W
+and F4-WR) and phase 4 (injected-world predictions) were not run.
+
+**F4-T and F4-0 were dropped.** The time-shuffled placebo (F4-T) and the refit with no neighbour
+path (F4-0) were report-only arms, and the queue review deferred them until a counted contrast
+showed a gain, which it did not. Neither arm has a number on this page.
+
+**Every fit ended by patience, none reached the 60-pass cap, and none needed the 120-pass rerun.**
+The table lists the passes of stage 2 and stage 3 for seeds 0 and 1 (`work/logs/<arm>/<month>_s<seed>_fit.json`,
+key `stages`).
+
+| Fold | F4 seed 0 | F4 seed 1 | F4-R seed 0 | F4-R seed 1 |
+|---|---|---|---|---|
+| 2025-11 | 13, 31 | 12, 23 | 13, 31 | 12, 32 |
+| 2025-12 | 14, 9 | 13, 21 | 14, 23 | 13, 23 |
+| 2026-01 | 12, 12 | 12, 10 | 12, 12 | 11, 10 |
+| 2026-02 | 14, 12 | 13, 16 | 14, 12 | 13, 16 |
+| 2026-03 | 12, 19 | 14, 14 | 12, 19 | 14, 14 |
+| 2026-04 | 17, 14 | 14, 18 | 17, 17 | 16, 18 |
+| 2026-05 | 10, 12 | 13, 20 | 11, 12 | 13, 20 |
+| 2026-06 | 16, 16 | 14, 23 | 16, 16 | 14, 27 |
+
+**The 32 fits took 3.9 GPU-process-hours and one process used at most 8,336 MiB of GPU memory.** The
+total is the sum of the `seconds` fields in the same fit logs. The allocated peak in those logs was
+5.05 to 5.18 GB with checkpointing of the neighbour path, and the maximum of the process total in a
+30-second `nvidia-smi` sampler during the fits was 8,336 MiB. The maintainer raised the F4 limit
+from 6 GB to 9 GB for that reason. The headline scorer's tail guard (q01 and q99 pinball loss) is
+within tolerance in both groups (`score/headline.json`, key `guards`).
 
 ## Why this runs although its start gate was not met
 
@@ -704,7 +820,8 @@ dates and no generator's name, identifier, or series.** SVG exports pass through
 
 ## Method
 
-The experiment is planned and has no fitted result yet, so these bullets describe the design.
+These bullets describe the design as written before the first fit; the "Result" section reports what
+ran.
 
 - **Architecture:** the host's 15 rows × 48 half-hours of experiment 713 (width 64, two axial blocks)
   plus up to six neighbour slots of 14 rows × 48 half-hours (width 32), a neighbour encoder with
@@ -742,7 +859,7 @@ and a prose review.
   `f4_design_triage.md` (read, private): the design, the Opus review, and the triage that this page
   condenses.
 - `ml-experiments/00715-msa-neighbour-row-group-in-the-axial-attention-demand-network/`: the code,
-  written and unit-checked on the CPU, with no fit run yet. `e00715_neighbours.py` holds the
+  written and unit-checked on the CPU, then run for phases 0 to 2. `e00715_neighbours.py` holds the
   neighbour table and the slot draws, `e00715_model.py` the network, `e00715_batch.py` the
   neighbour tensors and masks, `e00715_worlds.py` the mirror world and the synthetic world W3,
   `e00715_arms.py`, `e00715_train.py`, and `e00715_fit.py` the arms and the training, and
@@ -761,6 +878,6 @@ and a prose review.
   Candidate's stored forecasts. Path: `data/ml-experiments/`.
 - Neighbour list: `data/ml-experiments/00383-load-shift-xgboost-oracle-first-part-1/work/neighbours_nged.json`,
   from NGED's `Primary Substation Interconnections.csv`.
-- Written by this experiment (to be created): fitted states under
+- Written by this experiment: fitted states under
   `data/ml-experiments/00715-msa-neighbour-row-group-in-the-axial-attention-demand-network/work/`
   and predictions under `predictions/`, never committed.
