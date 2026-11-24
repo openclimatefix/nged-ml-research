@@ -62,6 +62,17 @@ def test_a_per_point_label_and_a_power_unit_are_refused():
     assert any("power unit" in found for found in guard.problems(chart=unit))
 
 
+def test_a_per_point_label_after_an_axis_title_ending_in_a_bracket_is_refused():
+    labelled = (
+        _chart(_series())
+        .mark_line()
+        .encode(x=alt.X("index:Q", title="Day"), y=alt.Y("power:Q", title="Output (share)"))
+    )
+    assert any("per-point" in found for found in guard.problems(chart=labelled))
+    minus = '<g aria-label="Output (share): \u22123.5; Day: 4" class="mark"></g>'
+    assert any("per-point" in found for found in guard.svg_problems(svg=minus))
+
+
 def test_an_iso_date_in_a_title_is_refused():
     chart = (
         _chart(_series())

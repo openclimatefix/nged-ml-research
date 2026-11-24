@@ -50,9 +50,10 @@ _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
     "a four-digit year": re.compile(r"\b(?:19|20)\d{2}\b"),
     "a power unit": re.compile(r"\b(?:MW|MVA|kW|kVA|GW)\b"),
 }
-# Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`.
+# Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`. The pattern
+# takes any colon and space before a digit or a U+2212 minus, whatever character ends the axis title.
 _PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(
-    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text|Subtitle text))[^"]*\w: -?\d'
+    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text|Subtitle text))[^"]*: [\d\u2212]'
 )
 _AXIS_TEXT: Final[re.Pattern[str]] = re.compile(r">([^<>]+)<")
 

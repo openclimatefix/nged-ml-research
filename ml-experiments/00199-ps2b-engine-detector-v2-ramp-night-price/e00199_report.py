@@ -269,7 +269,7 @@ def figure_hours() -> None:
         ]
     guard.save_chart(
         chart=alt.Chart(pl.DataFrame(rows))
-        .mark_line(point=True, aria=False)
+        .mark_line(point=alt.OverlayMarkDef(aria=False), aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "hour:Q", title="Hour of the day (UTC)", axis=alt.Axis(values=[0, 6, 12, 18, 24])
