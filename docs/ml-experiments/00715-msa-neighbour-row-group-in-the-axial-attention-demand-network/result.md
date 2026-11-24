@@ -171,7 +171,7 @@ rebuilt the synthetic world and recounted the events that KN6 scores.
 
 1. **The harness budget is too small.** The synthetic fits train for at most 150 passes with a
    patience of 8, which is experiment 713's budget before its amendment 3 (400 passes, patience 30).
-   The three fits on the mirror-only world stopped at 42 to 54 passes while their validation loss
+   The three fits on world W3 stopped at 42 to 54 passes while their validation loss
    was still falling.
 2. **KN6's gap rests on three events.** The held-out window holds one permanent step and two
    temporary steps, so the gap cannot separate a working F4 from a broken one.
