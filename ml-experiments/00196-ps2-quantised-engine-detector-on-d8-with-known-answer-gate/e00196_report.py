@@ -1,13 +1,15 @@
+# ruff: noqa: E501
 """Print every number the write-up quotes and draw its figures as SVG.
 
 Afterwards optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
-G2's output is drawn on a days-1-to-7 axis with no calendar dates. D8 is a substation.
+Figure 3 goes through `engine_figure_guard`. D8 is a substation.
 
     OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00196-*/e00196_report.py
 """
 
 import json
 import re
+import sys
 import textwrap
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,15 +24,14 @@ from e00196_common import (
     DATA_DIR,
     FIT_END,
     FIT_START,
-    G2_FIRST,
-    G2_LAST,
     POST_START,
-    g2_output,
     stamp,
 )
 from e00196_hmm import rolling_offset
-from e00196_inject import build
 from e00196_pipeline import load_series
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -98,7 +99,71 @@ def positive_spells() -> None:
         )
 
 
-def main() -> None:  # noqa: PLR0912, PLR0915
+def draw_figure_3(*, base: dict, local: dict) -> None:
+    """Draw the flagged share and left-tail share pooled over four eras; no dates, no power values."""
+    stop = 2023 * 12 + 8
+    solar = 2025 * 12 + 2
+    fall = 2026 * 12 + 1
+    eras = ["Era 1", "Era 2", "Era 3", "Era 4"]
+
+    def era_of(month: int) -> str:
+        if month < stop:
+            return eras[0]
+        if month < solar:
+            return eras[1]
+        return eras[2] if month < fall else eras[3]
+
+    rows = []
+    for variant, r in (("Fixed noise", base), ("Local noise (post hoc)", local)):
+        rows += [
+            {
+                "era": era_of(m["month"] - 1),
+                "series": f"Flagged running: {variant}",
+                "share": m["flag"],
+            }
+            for m in r["monthly"]
+            if m["month"] >= 2022 * 12 + 1
+        ]
+    rows += [
+        {"era": era_of(m["month"] - 1), "series": "Left tail", "share": m["left"]}
+        for m in base["monthly"]
+    ]
+    pooled = pl.DataFrame(rows).group_by("era", "series").agg(share=pl.col("share").mean())
+    names = ["Flagged running: Fixed noise", "Flagged running: Local noise (post hoc)", "Left tail"]
+    chart = (
+        alt.Chart(pooled)
+        .mark_bar(aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("series:N", title=None, sort=names, axis=None),
+            y=alt.Y("share:Q", title="Mean share of half-hours", scale=alt.Scale(domain=[0, 0.7])),
+            color=alt.Color(
+                "series:N",
+                sort=names,
+                scale=alt.Scale(
+                    domain=names, range=[ocf.DATA_BLUE, ocf.DATA_SKY, ocf.BRAND_ORANGE]
+                ),
+                legend=alt.Legend(title=None, orient="top", columns=1, labelLimit=400),
+            ),
+            column=alt.Column(
+                "era:N",
+                title=None,
+                sort=eras,
+                header=alt.Header(labelAngle=0, labelLimit=120, labelFontSize=9),
+            ),
+        )
+        .properties(
+            width=90,
+            height=240,
+            title=title(
+                "The detector over-flags after solar was connected, when the noise is larger",
+                "D8, mean over the months of each era. Era 1: before the engine's readings stop. Era 2: readings stopped. Era 3: solar connected. Era 4: left tail fallen.",
+            ),
+        )
+    )
+    guard.save_chart(chart=chart, path=OUT_DIR / "figure_3_flagged_share_by_month.svg")
+
+
+def main() -> None:
     """Print and draw."""
     base = load("fixed")
     local = load("local")
@@ -256,139 +321,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         )
     ).save(OUT_DIR / "figure_2_unit_size_profile.svg")
 
-    # Figure 3: flagged share and left-tail share by month
-    mrows = []
-    for variant, r in (("Fixed noise", base), ("Local noise (post hoc)", local)):
-        for m in r["monthly"]:
-            y, mo = divmod(m["month"] - 1, 12)
-            if y + 0 >= 2022 * 0 and m["month"] >= 2022 * 12 + 1:
-                mrows.append(
-                    {
-                        "month": f"{y}-{mo + 1:02d}-01",
-                        "series": f"Flagged running: {variant}",
-                        "share": m["flag"],
-                    }
-                )
-    for m in base["monthly"]:
-        y, mo = divmod(m["month"] - 1, 12)
-        mrows.append(
-            {
-                "month": f"{y}-{mo + 1:02d}-01",
-                "series": "Residual below -2.5 MW",
-                "share": m["left"],
-            }
-        )
-    mf = pl.DataFrame(mrows).with_columns(pl.col("month").str.to_date())
-    marks = pl.DataFrame(
-        {
-            "when": ["2023-08-16", "2025-03-24", "2026-02-01"],
-            "label": ["G2 readings stop", "11 kV solar connected", "left tail falls"],
-        }
-    ).with_columns(pl.col("when").str.to_date())
-    line = (
-        alt.Chart(mf)  # ty: ignore[unresolved-attribute]
-        .mark_line()
-        .encode(
-            x=alt.X("month:T", title="Month"),
-            y=alt.Y("share:Q", title="Share of half-hours", scale=alt.Scale(domain=[0, 0.7])),
-            color=alt.Color(
-                "series:N",
-                scale=alt.Scale(
-                    domain=[
-                        "Flagged running: Fixed noise",
-                        "Flagged running: Local noise (post hoc)",
-                        "Residual below -2.5 MW",
-                    ],
-                    range=[ocf.DATA_BLUE, ocf.DATA_SKY, ocf.BRAND_ORANGE],
-                ),
-                legend=alt.Legend(title=None, orient="top", columns=1, labelLimit=400),
-            ),
-        )
-    )
-    rules = alt.Chart(marks).mark_rule(color=GREY, strokeDash=[4, 3]).encode(x="when:T")  # ty: ignore[unresolved-attribute]
-    text = (
-        alt.Chart(marks)  # ty: ignore[unresolved-attribute]
-        .mark_text(angle=270, align="left", dx=-4, dy=-4, fontSize=10, color=GREY)
-        .encode(x="when:T", text="label:N", y=alt.value(0))
-    )
-    (line + rules + text).properties(
-        width=520,
-        height=240,
-        title=title(
-            "The detector over-flags after solar was connected, when the noise is larger",
-            (
-                "D8, share of half-hours per month. Before 2023-06 the engine is absent and the "
-                "detector flags almost nothing. From 2025-03 it flags far more than the left tail "
-                "explains."
-            ),
-        ),
-    ).save(OUT_DIR / "figure_3_flagged_share_by_month.svg")
-
-    # Figure 4: one known-answer week (days 1 to 7, no dates)
-    s = load_series(label="D8")
-    g2 = g2_output(n=len(s.y))
-    inj = build(y=s.y, g2=g2, with_k2=False)
-    np.load(DATA_DIR / "smoothed_wide_fixed.npy")  # uninjected; replaced below by the K1 run
-    import pickle
-
-    from e00196_pipeline import run_loop
-
-    fits = pickle.loads((DATA_DIR / "fits_fixed.pkl").read_bytes())
-    _, post = run_loop(
-        s=s.with_reading(inj.y), noise=fits["noise"], params=fits["fits"]["wide"]["params"]
-    )
-    ek = (post.smoothed * np.arange(4)).sum(axis=1) * fits["fits"]["wide"]["params"].g
-    out = np.nan_to_num(inj.output)
-    weeks = [
-        (w, out[w * 336 : (w + 1) * 336].sum())
-        for w in range(
-            stamp(G2_FIRST) // 336,
-            stamp(G2_LAST) // 336,
-        )
-    ]
-    w = max(weeks, key=lambda x: x[1])[0]
-    sl = slice(w * 336, (w + 1) * 336)
-    wk = pl.DataFrame(
-        {
-            "day": np.arange(336) / 48 + 1,
-            "Injected output (recorded)": out[sl],
-            "Detector's estimate": ek[sl],
-        }
-    ).unpivot(index="day", variable_name="series", value_name="mw")
-    (
-        alt.Chart(wk)  # ty: ignore[unresolved-attribute]
-        .mark_line(interpolate="step-after")
-        .encode(
-            x=alt.X(
-                "day:Q",
-                title="Day of the week (1 to 7)",
-                axis=alt.Axis(values=[1, 2, 3, 4, 5, 6, 7]),
-                scale=alt.Scale(domain=[1, 8]),
-            ),
-            y=alt.Y("mw:Q", title="Engine output (MW)"),
-            color=alt.Color(
-                "series:N",
-                scale=alt.Scale(
-                    domain=["Detector's estimate", "Injected output (recorded)"],
-                    range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE],
-                ),
-                legend=alt.Legend(title=None, orient="top"),
-            ),
-        )
-        .properties(
-            width=520,
-            height=200,
-            title=title(
-                "The detector's estimate follows the injected engine's output",
-                (
-                    "One week in summer 2023 with the most running. Blue: expected number of units "
-                    "running times the fitted unit size. Orange: the recorded output of the "
-                    "metered "
-                    "engine that was subtracted from D8's reading."
-                ),
-            ),
-        )
-    ).save(OUT_DIR / "figure_4_known_answer_week.svg")
+    draw_figure_3(base=base, local=local)
+    # Figure 4 (one known-answer week of the engine's recorded output) is not drawn: an output
+    # series of a metered generator cannot be published, even without dates.
     print("figures written")
 
 

@@ -113,12 +113,10 @@ test are this project's.
 ![The engine detector finds most of the injected engine; the step detectors find a quarter or
 less](figure_1_against_step_detectors.svg)
 
-![One week of injected engine output and the detector's estimate](figure_4_known_answer_week.svg)
-
 ![Log-likelihood by unit size](figure_2_unit_size_profile.svg)
 
-![Share of half-hours flagged and share below -2.5 MW, by
-month](figure_3_flagged_share_by_month.svg)
+![Share of half-hours flagged and in the left tail, mean over four
+eras](figure_3_flagged_share_by_month.svg)
 
 ## Results
 
