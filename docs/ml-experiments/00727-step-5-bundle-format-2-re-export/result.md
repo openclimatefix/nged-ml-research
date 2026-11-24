@@ -135,7 +135,7 @@ not seen experiment 705.** The directory holds these files:
 | Contract-origin quantiles in megawatts, divided by capacity, per seed and seed mean, at the 7 shared levels | 1.1e-5 | 2.3e-6 | 2e-5 |
 | Quantiles with the day lag and the week lag missing, at the 7 shared levels | 2.1e-6 | 3.0e-6 | 2e-5 |
 | `.npz` against `.pt` (names, shapes, dtypes, bytes) | 96 of 96 arrays equal | 96 of 96 arrays equal | exact |
-| Format 2 reference check, all stages | passed in 9 s | passed in 8 s | 1e-5 and 2e-5 |
+| Format 2 reference check, all stages | passed in 9 s | passed in 9 s | 1e-5 and 2e-5 |
 
 - **The comparison with format 1 is the evidence for the new quantiles.** The format 2 reference
   check reports 0 for every quantile stage, because the same read-out wrote the regenerated
