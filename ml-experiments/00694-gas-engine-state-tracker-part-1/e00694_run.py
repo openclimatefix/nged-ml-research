@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from multiprocessing import get_context
+from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
@@ -53,10 +54,13 @@ from e00694_trackers import (
     select_grid,
 )
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
+
 ARMS: Final[tuple[str, ...]] = ("M0", "M1", "M2", "M2-dwell")
 N_WEEKS: Final[int] = 7
 TOTAL_LEN: Final[int] = PRE_ROLL + SEGMENT_LEN
-UNIT_MW: Final[float] = 1.97
+UNIT_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw")
 """One engine unit, from the record's output levels (experiment 196)."""
 N_WORKERS: Final[int] = 24
 

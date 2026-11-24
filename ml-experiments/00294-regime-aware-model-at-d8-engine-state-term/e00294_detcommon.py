@@ -5,6 +5,7 @@ file and is never printed. D8 is the panel's site labelled D8.
 """
 
 import pickle
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -14,6 +15,9 @@ import polars as pl
 from studies.power import scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
+
 SLUG: Final[str] = "regime-aware-model-at-d8-engine-state-term"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"00294-{SLUG}"
 ARRAYS_PATH: Final[Path] = (
@@ -22,10 +26,10 @@ ARRAYS_PATH: Final[Path] = (
 GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
 HALF_HOUR: Final[timedelta] = timedelta(minutes=30)
 G2_SERIES: Final[int] = 33
-UNIT_MW: Final[float] = 1.97
+UNIT_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw")
 """One engine unit of G2, from the recorded output levels."""
 N_UNITS: Final[int] = 3
-CLEAN_END: Final[datetime] = datetime(2023, 6, 13, tzinfo=UTC)
+CLEAN_END: Final[datetime] = engine.engine_datetime(key="d8_engine_connected_date")
 G2_FIRST: Final[datetime] = datetime(2023, 7, 3, tzinfo=UTC)
 G2_LAST: Final[datetime] = datetime(2023, 8, 16, tzinfo=UTC)
 """G2's non-zero readings lie in [G2_FIRST, G2_LAST)."""

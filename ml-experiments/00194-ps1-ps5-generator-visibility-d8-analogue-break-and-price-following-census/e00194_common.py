@@ -6,6 +6,7 @@ this file and is never printed. D8 is key 26 of the stored residual panel.
 """
 
 import pickle
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -14,6 +15,9 @@ import numpy as np
 import polars as pl
 from studies.power import scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 SLUG: Final[str] = "ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"00194-{SLUG}"
@@ -31,8 +35,9 @@ G2_SERIES: Final[int] = 33
 CONTROL_LABELS: Final[tuple[str, ...]] = ("D3", "D5", "D14")
 LEFT_TAIL_MW: Final[float] = -2.5
 """A half-hour is in the left tail when the metered minus expected power is below this."""
-G2_UNIT_MW: Final[float] = 1.97
+G2_UNIT_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw")
 """Output of one engine unit, from the four levels in its record."""
+ENGINE_CONNECTED: Final[datetime] = engine.engine_datetime(key="d8_engine_connected_date")
 G2_FIRST: Final[datetime] = datetime(2023, 7, 3, tzinfo=UTC)
 G2_LAST: Final[datetime] = datetime(2023, 8, 16, tzinfo=UTC)
 """The weeks in which G2's readings arrive with non-zero values (end exclusive)."""

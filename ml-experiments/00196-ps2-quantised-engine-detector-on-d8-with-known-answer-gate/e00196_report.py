@@ -310,7 +310,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         title=title(
             "The detector over-flags after solar was connected, when the noise is larger",
             (
-                "D8, share of half-hours per month. Before 2023-06 the engine is absent and the "
+                "D8, share of half-hours per month. Before the engine connected, the "
                 "detector flags almost nothing. From 2025-03 it flags far more than the left tail "
                 "explains."
             ),

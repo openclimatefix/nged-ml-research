@@ -137,7 +137,7 @@ def main() -> None:
         (
             "before the engine",
             datetime(2022, 1, 1, tzinfo=UTC),
-            datetime(2023, 6, 13, tzinfo=UTC),
+            common.ENGINE_CONNECTED,
         ),
         ("G2 output weeks", common.G2_FIRST, common.G2_LAST),
         (

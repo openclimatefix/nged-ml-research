@@ -21,6 +21,7 @@ Run with the folders of experiments 86 on `PYTHONPATH`:
         uv run --no-sync python ml-experiments/00709-*/e00709_era_table.py
 """
 
+import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -33,6 +34,9 @@ import numpy as np
 import polars as pl
 from studies.ecr_reader import ECR_PATH, REGISTER_SHEETS, read_sheet
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 ERA_TABLE_PATH: Final[Path] = features.DATA_DIR / "era_table.parquet"
 KNOWN_EVENTS_PATH: Final[Path] = features.DATA_DIR / "known_events.parquet"
@@ -55,12 +59,12 @@ PRIMARY_NAMES: Final[dict[str, str]] = {
 }  # fmt: skip
 """Substring of the register's Primary column that identifies each site (as in experiment 191)."""
 
-D8_GAS_DATE: Final[date] = date(2023, 6, 13)
+D8_GAS_DATE: Final[date] = engine.engine_datetime(key="d8_engine_connected_date").date()
 D8_GAS_TELEMETRY_DATE: Final[date] = date(2023, 8, 15)
 D8_SOLAR_DATE: Final[date] = date(2025, 3, 24)
 D8_FADE_DATE: Final[date] = date(2026, 3, 1)
 """The month of the fade; only the month is known, and the plan lists it as telemetry only."""
-D8_GAS_MW: Final[float] = 6.0
+D8_GAS_MW: Final[float] = engine.engine_float(key="d8_engine_register_mw")
 D8_SOLAR_MW: Final[float] = 8.91
 D8_SMALL_SOLAR_MW: Final[float] = 0.7
 D8_SOLAR_RECOLLECTION_MW: Final[float] = 0.7

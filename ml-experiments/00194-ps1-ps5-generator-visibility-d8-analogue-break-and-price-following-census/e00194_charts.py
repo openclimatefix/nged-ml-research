@@ -151,7 +151,7 @@ def main() -> None:  # noqa: D103
     periods = {
         "1 before the engine": (
             datetime(2022, 1, 1, tzinfo=UTC),
-            datetime(2023, 6, 13, tzinfo=UTC),
+            common.ENGINE_CONNECTED,
         ),
         "2 G2 output arrives (2023-07-03 to 08-15)": (common.G2_FIRST, common.G2_LAST),
         "3 after (2023-09 to 2025-12)": (
