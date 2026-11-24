@@ -346,7 +346,29 @@ def run_section3(
             "n_months": guard.pool_bands(monthly_hours=monthly_hours)["n_months"],
         }
     ).write_csv(guard.private_path(name="d8_running_hours_bands.csv"))
-    print("wrote the D8 section-3 tables under the private folder")
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    sites_map = k578.sites()
+    ts_id = int(sites_map.filter(pl.col("label") == "D8")["time_series_id"][0])
+    first_day_us = int(c694.GRID_START.timestamp()) * 1_000_000 + (a // 48) * 86_400_000_000
+    recut = run_m1_recut(cls_by_day=cls, first_day_us=first_day_us, ts_id=ts_id)
+    n_recut = sum(n for _, n in recut["cells"].values())
+    pl.DataFrame(
+        {
+            "target": [t for t, _ in recut["cells"]],
+            "history": [h for _, h in recut["cells"]],
+            "mean_crps_m1_minus_candidate": [m for m, _ in recut["cells"].values()],
+            "n_cells": [n for _, n in recut["cells"].values()],
+        }
+    ).write_csv(guard.private_path(name="d8_m1_recut_by_class.csv"))
+    print(
+        f"wrote the D8 section-3 tables under the private folder; the M1 re-cut holds {n_recut} cells"
+        + (
+            ""
+            if n_recut
+            else " (the class vector of the era does not overlap experiment 713's folds)"
+        )
+    )
     return 0
 
 
@@ -357,12 +379,15 @@ def run_m1_recut(
     ts_id: int,
     solar_block: tuple[int, int] = (10, 15),
 ) -> dict[str, Any]:  # pragma: no cover - needs the stored forecasts
-    """Re-score experiment 713's stored `M1` minus Candidate forecasts of one Primary by day class, as in `reverse_flow_analysis.md` section 4.
+    """Re-score experiment 713's stored `M1` minus Candidate forecasts of one Primary by day class, after `reverse_flow_analysis.md` section 4.
+
+    It departs from section 4 in one place: section 4 scored whole days, and this drops the solar block.
+    Needs `torch` to import experiment 713's scorer (`uv sync --group gpu`, then `uv run --no-sync`; no GPU is used).
 
     The CRPS of each arm is that of the seed-averaged quantiles of seeds 0 and 1 (`e00713_score.seed_average`
     and `add_losses`), the headline band is leads of 24 h up to but not including 240 h, and a cell is one
     origin's forecast for one valid day: the mean of `CRPS(M1) - CRPS(C)` over the half-hours of that day
-    outside the solar block (UTC hours). `cls_by_day[d]` is the class (1 running, 0 idle, -1 other) of UTC day
+    outside the solar block (UTC hours). The two arms must hold equal keys, else the function raises. `cls_by_day[d]` is the class (1 running, 0 idle, -1 other) of UTC day
     `first_day_us // US_PER_DAY + d`. The history class of a cell is the majority class of the UTC days 2 to 15
     days before the origin's date. Reads the stored forecasts through experiment 713's scorer, one month at a
     time, and writes nothing.
@@ -382,12 +407,15 @@ def run_m1_recut(
             parts.append(score.add_losses(frame=score.seed_average(frame=raw), truth=truth))
         arm_frames[arm] = pl.concat(parts)
     keys = list(score.KEYS)
-    both = (
-        arm_frames["M1"]
-        .select(*keys, "lead_hours", m1="crps")
-        .join(arm_frames["C"].select(*keys, c="crps"), on=keys, how="inner")
-        .filter((pl.col("lead_hours") >= 24) & (pl.col("lead_hours") < 240))
-    )
+    band = (pl.col("lead_hours") >= 24) & (pl.col("lead_hours") < 240)
+    m1_frame = arm_frames["M1"].filter(band).select(*keys, "lead_hours", m1="crps")
+    c_frame = arm_frames["C"].filter(band).select(*keys, c="crps")
+    if m1_frame.height != c_frame.height or not m1_frame.select(keys).sort(keys).equals(
+        c_frame.select(keys).sort(keys)
+    ):
+        msg = f"M1 and the Candidate hold different keys: {m1_frame.height} against {c_frame.height} rows"
+        raise AssertionError(msg)
+    both = m1_frame.join(c_frame, on=keys, how="inner")
     vt = both["valid_time"].dt.epoch("us").to_numpy()
     origin = both["power_fcst_init_time"].dt.epoch("us").to_numpy()
     day0 = first_day_us // real.US_PER_DAY

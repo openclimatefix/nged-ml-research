@@ -128,9 +128,9 @@ days against its own labels, so it is not a paired comparison on this experiment
 
 Two further references never read the meter, and their definitions are fixed here before any real
 run. The reading-blind reference ranks each half-hour by F7's PV estimate `p`, which is the host's
-estimate plus the injected farm's capacity times the clear-sky yield. The hour-of-day reference
-ranks each half-hour by the mean clear-sky yield of the reference days at that half-hour of the
-day. The anchored read-out must beat both (the bar table below).
+estimate plus the injected farm's capacity times the CAMS PV yield `u`, which includes the cloud.
+The hour-of-day reference ranks each half-hour by the mean CAMS PV yield `u` of the reference days
+at that half-hour of the day. The anchored read-out must beat both (the bar table below).
 
 The injected capacity that enters `p` is the oracle capacity, which is the injected increment, and
 the contrast is repeated with 0.7 and 1.3 times that capacity. The design's capacity estimated from
@@ -191,7 +191,7 @@ distribution, smoothed and filtered, stored as 11 signed quantiles and `P(X < 0)
 | V3 (real negative controls at D8) | At most 3% flagged and at most one active day a month in each period, and the forced `K` = 3 control |
 | Sign probability | Reliability term of the Brier score at most 0.01, and no bin of at least 200 half-hours off the diagonal by more than 0.1 |
 | Signed CRPS | Below the hard-sign version's, with a paired interval above zero. The hard-sign version uses the observed magnitude, never the true one. |
-| Rung 0b references | At injection levels 1 and 2 (oracle capacity, host scale 1), the anchored read-out's area exceeds each of the two references that do not read the meter, with the lower end of a 95% day-block bootstrap interval of the paired difference above 0, on the pooled gated half-hours. Each world has its own interval, and a level's interval is the mean of its worlds' interval ends. The midday area (10:00 to 14:00 UTC) is judged only when at least 6 worlds hold at least 30 import and 30 reverse half-hours there, and then the anchored read-out must not lose (the upper end of the interval stays above 0). A pooled or midday area with fewer than 30 half-hours of either class is `not evaluable`, and it never counts as a pass. |
+| Rung 0b references | At injection levels 1 and 2 (oracle capacity, host scale 1), the anchored read-out's area exceeds each of the two references that do not read the meter, with the lower end of a 95% day-block bootstrap interval of the paired difference above 0, on the pooled gated half-hours. Each world has its own interval, and a level's interval is the mean of its worlds' interval ends. The midday area (10:00 to 14:00 UTC) is judged only when at least 6 worlds hold at least 30 import and 30 reverse half-hours there, and then the anchored read-out must not lose (the upper end of the interval stays above 0). A pooled or midday area with fewer than 30 half-hours of either class is `not evaluable`, and it never counts as a pass. A pooled area that is `not evaluable` makes the references bar `inconclusive`, and the verdict is not capped by it. |
 | Rung 0b non-exporter check | The stop rule above (false reverse flow under 1% on D5's sunny middays, gate forced open) is read from the rows with host scale 1.0. A synthetic world shows the check can fail: with the PV estimate 2.5 times too high the rate measured 0.19, against 0.00 at 1.0 and 1.3 times. The real run builds no 2.5-times world, because its host scales are 0.7, 1.0, and 1.3. |
 
 **Stop rules.** If V1 fails, the hindsight model is not used at D12. If V2 fails its paired bar, K1,
@@ -201,21 +201,23 @@ the daily-mean residual over a 21-day centred window, smoothed over 7 days, limi
 day, and calibrated on the pre-roll. The rate limit stops a spell of engine output, which looks like
 a step, from pulling the trend down. After a first scan of the unit size, the trend is refitted from
 the half-hours with a smoothed `P(n = 0)` above 0.9, on days with at least 12 such half-hours and
-bridged across the other days, and the unit size is searched again near its first value. The unit
-size is never searched below 1 MVA, so a step of demand smaller than a unit is absorbed by the
-demand mean. The synthetic tests are: drift of -0.5 and -1 MVA over 120 days with no engine (nothing
-flagged), an engine with no drift, a spell of two units for 21 days with and without drift (F1 above
-0.95, mean error of unit size times unit count under 0.35 MVA), and a step of -0.7 MVA (under 3%
-flagged). Two limits remain. A persistent step of 1 MVA or more in a Primary's demand cannot be told
-from an engine that stays on, so V3 would flag it. A spell of two units is returned as one unit of
-twice the size, which leaves F1 and the output unchanged and lowers the count accuracy. The
-injected-segment bootstrap resamples the schedule-weeks of experiment 694 (5 primary schedules over
-7 weeks). The number of generator states `K` is chosen by the Bayesian information criterion. A V2
-run stops when the rerun `M2` disagrees with the stored `inject.pkl` on any segment, and zero
-matched segments is a failure. V3's bar applies to each period separately. The run stops at 15
-core-hours, and the first fit measures the time per pass and stops the run when the projected cost
-exceeds the cap. D8 analyses are restricted to the era before the solar farm registered, unless the
-variant with farm and generator together passes the paired bar.
+bridged across the other days, and the unit size is searched again near its first value. The rate
+limit of 0.03 MVA per day, the `P(n = 0)` threshold of 0.9, and the 12-half-hour day minimum were
+set on synthetic worlds after the first trend failed on them, so they are tuned to those worlds and
+not to real data. The unit size is never searched below 1 MVA, so a step of demand smaller than a
+unit is absorbed by the demand mean. The synthetic tests are: drift of -0.5 and -1 MVA over 120 days
+with no engine (nothing flagged), an engine with no drift, a spell of two units for 21 days with and
+without drift (F1 above 0.95, mean error of unit size times unit count under 0.35 MVA), and a step
+of -0.7 MVA (under 3% flagged). Two limits remain. A persistent step of 1 MVA or more in a Primary's
+demand cannot be told from an engine that stays on, so V3 would flag it. A spell of two units is
+returned as one unit of twice the size, which leaves F1 and the output unchanged and lowers the
+count accuracy. The injected-segment bootstrap resamples the schedule-weeks of experiment 694 (5
+primary schedules over 7 weeks). The number of generator states `K` is chosen by the Bayesian
+information criterion. A V2 run stops when the rerun `M2` disagrees with the stored `inject.pkl` on
+any segment, and zero matched segments is a failure. V3's bar applies to each period separately. The
+run stops at 15 core-hours, and the first fit measures the time per pass and stops the run when the
+projected cost exceeds the cap. D8 analyses are restricted to the era before the solar farm
+registered, unless the variant with farm and generator together passes the paired bar.
 
 ## Anonymisation and disclosures
 
@@ -254,18 +256,20 @@ power over 4 sub-steps, causes most of the difference. A fit of one unit size ne
 core-hours at 164 states. Rung 0e on experiment 694's 44 segments (V2) at 164 states would cost
 about 14.6 core-hours, which sits against the cap of 15.
 
-**The reduced grid brings V2 to about 7 core-hours.** The harness runs V2, K1, and V3 on a grid of
-21 residual bins (84 states), a coarse-then-fine profile of the unit size with a trend refit, and 2
-Baum-Welch rounds, which is 17 passes per fit (6 coarse, 2 fine, 6 after the trend refit, 2
-Baum-Welch, 1 final). A synthetic 148-day segment with `K` = 2 took about 39 s per fit. At `K` = 3
-the measured 2.78 s per pass projects to about 47 s per fit, and one rerun of experiment 694's `M2`
-on the same segment took 7.7 s. One injected run (hindsight fit plus `M2` rerun) therefore takes
-about 55 s. The 44 segments and 9 schedules make 396 runs, about 6 core-hours, and the un-injected
-fits, K1, and V3 add about 0.6 core-hours. The fit loop also stops when the elapsed time passes the
-cap. `CostGate` times the first run and raises when the projected total exceeds 15 core-hours, so a
-run whose projection is above the cap does not start its second run. The per-pass time at 84 states
-is measured on synthetic data only, so the real projection waits for the first real run's own
-timing.
+**The reduced grid brings V2 to about 8.5 core-hours.** The harness runs V2, K1, and V3 on a grid of
+21 residual bins (84 states), a coarse-then-fine profile of the unit size, a trend refit followed by
+a second scan of the whole coarse grid, and 2 Baum-Welch rounds. That is 19 to 20 passes per fit (6
+coarse, 2 fine, 1 posterior, 6 coarse again, 2 fine, 2 Baum-Welch, 1 final), and the cost gate
+projects 20. A synthetic 148-day segment at `K` = 3 took about 62 s per fit (about 3.1 s per pass),
+and one rerun of experiment 694's `M2` on the same segment took 7.7 s. One injected run therefore
+takes about 70 s. The 44 segments and 9 schedules make 396 runs, about 7.7 core-hours, and the
+un-injected fits, K1, and V3 add about 0.8 core-hours. The second scan raised the passes per fit by
+about 18% and fixed a unit size that came back as 1.25 MVA for a 2.0 MVA unit on random schedules of
+61% to 68% duty (it now comes back as 2.0 on six such synthetic segments, with F1 1.000). The fit
+loop also stops when the elapsed time passes the cap. `CostGate` times the first run and raises when
+the projected total exceeds 15 core-hours, so a run whose projection is above the cap does not start
+its second run. The per-pass time at 84 states is measured on synthetic data only, so the real
+projection waits for the first real run's own timing.
 
 ## What the synthetic worlds say about the references bar
 
@@ -278,16 +282,20 @@ is also ahead. On the self-test's all-export world the anchored area is 0.91 and
 reference is higher still, but that world has 2 import half-hours, so no area from it is evaluable.
 The worlds were not tuned to change this result.
 
-**This is a finding about the design, and a change is proposed here, not adopted.** A likely reason,
-not tested here, is that in these worlds demand varies little around its half-hour profile, so the
-PV estimate alone orders the signs almost perfectly and the anchor adds noise from the dull-sky
-rows. On real data demand varies more, which may favour the anchored read-out. The rung 0b run
-decides that. If the anchored read-out still loses to the reading-blind reference there, the
-maintainer could consider an anchored read-out that takes the PV estimate as its prior and uses the
-anchored gross-demand residual only to move the sign near the zero crossing. That change would need
-its own pre-registration and its own review before any run, and nothing in this experiment depends
-on it. By the decision rule, losing to the reading-blind reference caps the rung 0b verdict at
-`partly supported`.
+**This is a finding about the design, and a change is proposed here, not adopted.** A third review
+built 10 harder synthetic exporter worlds: the PV estimate off by 25% a day and 10% a half-hour,
+demand with a 5-point day offset and a slow within-day term, both together, and both at larger
+size (40% and 8 points). In all 10 the anchored read-out loses to the reading-blind reference by
+0.07 to 0.12 in area, with every upper interval end at or below +0.017. More demand variability
+lowers both read-outs together and does not close the gap. The hindsight read-out beats the
+reading-blind reference in every one of the 10 worlds, and its lead grows as the world gets
+harder, so the information is in the reading and the anchored read-out does not extract it. The
+real run would most likely cap rung 0b at `partly supported`. The maintainer could consider an
+anchored read-out that takes the PV estimate as its prior and uses the anchored gross-demand
+residual only to move the sign near the zero crossing. That change would need its own
+pre-registration as a second arm with the same bar, and its own review, before any run. Nothing in
+this experiment depends on it, and the rung 0b real run waits for the maintainer's choice between
+running as is and adding that arm.
 
 **The anchored half of the signed-CRPS bar stays pending.** The run gives no seed-noise estimate,
 so the second half of the bar is reported and not judged.

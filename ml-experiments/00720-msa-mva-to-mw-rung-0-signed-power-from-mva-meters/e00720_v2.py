@@ -44,12 +44,11 @@ TREND_QUANTILE: Final[float] = 0.8
 statistic on the pre-roll: an engine lowers the net reading, so the idle days sit at the upper edge."""
 TREND_REFITS: Final[int] = 1
 """After the first scan of the unit size, the trend is refitted from the half-hours the model believes are
-free of engine output, and the unit size is searched again near its first value."""
+free of engine output, and the whole coarse grid of the unit size is scanned again, with the fine offsets around its winner."""
 IDLE_P0: Final[float] = 0.9
 """A half-hour feeds the refitted trend only when its smoothed `P(n = 0)` is above this value."""
 MIN_IDLE_HALF_HOURS: Final[int] = 12
 """A day feeds the refitted trend only with at least this many such half-hours."""
-REFIT_OFFSETS: Final[tuple[float, ...]] = (-0.5, -0.25, 0.0, 0.25, 0.5)
 MAX_TREND_SLOPE: Final[float] = 0.03
 """The first trend moves at most this many MVA per day (3.6 MVA over 120 days), so a spell of engine output
 that lasts days, which looks like a step, cannot pull it down."""
@@ -257,7 +256,7 @@ def hindsight_fit(
             n_passes = projected_fits * (
                 len(coarse)
                 + len(FINE_OFFSETS)
-                + TREND_REFITS * (1 + len(REFIT_OFFSETS))
+                + TREND_REFITS * (1 + len(coarse) + len(FINE_OFFSETS))
                 + EM_ROUNDS_V2
                 + 1
             )
@@ -276,10 +275,11 @@ def hindsight_fit(
         p0_mat, _ = to_days(a=sm0, first_index=first_index)
         trend = idle_trend(ymat=ymat, f_mat=f_mat, p0_mat=p0_mat, calib_rows=calib_days)
         f = (f_mat + trend[:, None]).reshape(-1)[lead : lead + len(y)]
-        scores = {}
-        for off in REFIT_OFFSETS:
-            g = best + off
-            if g >= MIN_UNIT_MVA:
+        scores = {g: pass_at(g)[0].log_likelihood for g in coarse}
+        top = max(scores, key=lambda g: scores[g])
+        for off in FINE_OFFSETS:
+            g = top + off
+            if g >= MIN_UNIT_MVA and g not in scores:
                 scores[g] = pass_at(g)[0].log_likelihood
         best = max(scores, key=lambda g: scores[g])
     trans = None
@@ -869,6 +869,12 @@ def selftest() -> int:
         spell_err[drift_s] = out_err(hs, us, PRE_ROLL)
         assert spell_f1[drift_s] > 0.95, (drift_s, spell_f1[drift_s])
         assert spell_err[drift_s] < 0.35, (drift_s, spell_err[drift_s])
+    # a high-duty random schedule (about 66%) on the full coarse grid: the unit size must come back, not a smaller alias
+    yh, uh, fh = _synthetic_host(seed=7, n_days=148, drift=-1.0, engine=True)
+    hh = hindsight_fit(y=yh, first_index=fh, n_max=2, n_bins=9)
+    assert 0.6 < (uh > 0)[PRE_ROLL:].mean() < 0.8, (uh > 0)[PRE_ROLL:].mean()
+    assert abs(hh.unit_size - 1.6) <= 0.3, hh.unit_size
+    assert out_err(hh, uh, PRE_ROLL) < 0.35, out_err(hh, uh, PRE_ROLL)
     # a step of demand smaller than a unit must not trip the V3 bars
     yst, _, fst = _synthetic_host(seed=7, n_days=120, drift=0.0, engine=False, step=-0.7)
     hst = hindsight_fit(y=yst, first_index=fst, **small)

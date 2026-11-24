@@ -292,7 +292,7 @@ def reference_bar(
     names = sorted({k.rsplit("|", 1)[0] for k in store if k.endswith("|x_true")})
     out: list[dict[str, Any]] = []
     for level in (1.0, 2.0):
-        sel = [n for n in names if f"|L{level:g}|s1|h1" in n]
+        sel = [n for n in names if n.endswith(f"|L{level:g}|s1|h1")]
         for ref in REFERENCES:
             for area in ("pooled", "midday"):
                 parts = [
@@ -328,8 +328,18 @@ def reference_bar(
     return out
 
 
+def references_outcome(*, bar: list[dict[str, Any]]) -> str:
+    """Return `passed`, `failed`, or `inconclusive`: any pooled row `not_evaluable` gives `inconclusive`, else the bar's pass or fail."""
+    if any(r["area"] == "pooled" and r["outcome"] == "not_evaluable" for r in bar) or not bar:
+        return "inconclusive"
+    return "passed" if references_bar_passed(bar=bar) else "failed"
+
+
 def references_bar_passed(*, bar: list[dict[str, Any]]) -> bool:
-    """Return whether every pooled row `beats` and no evaluable midday row `loses` (pre-registered rule)."""
+    """Return whether every pooled row `beats` and no evaluable midday row `loses` (pre-registered rule).
+
+    A pooled row that is `not_evaluable` makes the bar `inconclusive` rather than failed; see `references_outcome`.
+    """
     pooled = [r for r in bar if r["area"] == "pooled"]
     mid = [r for r in bar if r["area"] == "midday" and r["outcome"] != "not_evaluable"]
     return (
@@ -663,7 +673,7 @@ def run_real(
     bar = reference_bar(store=store)
     pl.DataFrame(bar).write_csv(guard.private_path(name="rung0b_reference_bar.csv"))
     print(
-        f"wrote {len(rows)} read-out rows and {len(ref_rows)} reference rows under the private folder; references bar passed: {references_bar_passed(bar=bar)}"
+        f"wrote {len(rows)} read-out rows and {len(ref_rows)} reference rows under the private folder; references bar: {references_outcome(bar=bar)}"
     )
     return 0
 
@@ -720,6 +730,7 @@ def check_references_machinery() -> dict[float, tuple[float, float, float]]:
         "one class must not be evaluable"
     )
     assert not references_bar_passed(bar=reference_bar(store=st, n_boot=50))
+    assert references_outcome(bar=reference_bar(store=st, n_boot=50)) == "inconclusive"
     return shares
 
 
