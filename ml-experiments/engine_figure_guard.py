@@ -1,14 +1,20 @@
 """Refuse to write a chart that shows a metered generator's record with dates or megawatt values.
 
 NGED has asked that a metered generator's output leaves the private data store only anonymised, and
-a gas engine's record is identifiable from public data once it sits on calendar dates. Four figure
-files held the engine's record or a series inferred from it. Their writers now go through
-`save_chart`, which renders the chart to SVG and raises `GuardError` when the text, the
+a gas engine's record is identifiable from public data once it sits on calendar dates. The figure
+files listed in `GUARDED` held the engine's record or a series inferred from it. Their writers now
+go through `save_chart`, which renders the chart to SVG and raises `GuardError` when the text, the
 accessibility labels, or the chart specification carry a date, a datetime axis, a per-point value,
 or a power unit.
 
 A path listed in `GUARDED` is checked on every write, so a script cannot switch the check off.
 `check_chart` is the same check without writing, for a test.
+
+The check reads text, accessibility labels, and the specification's axes, and never looks at the
+marks. It therefore cannot see evenly spaced peaks, clusters, or rule layers, from which a reader
+could read the number of units an engine has and the ratio of their sizes. A levels-distribution
+panel (a histogram or density of output while the engine runs) is never allowed on a guarded engine
+figure, and no test enforces that.
 """
 
 import io
@@ -20,10 +26,22 @@ import altair as alt
 
 # (experiment folder prefix, file name) of each figure that once held a generator record.
 GUARDED: Final[tuple[tuple[str, str], ...]] = (
+    ("00194-", "figure_1.svg"),
     ("00194-", "figure_2.svg"),
+    ("00194-", "figure_4.svg"),
+    ("00194-", "figure_5.svg"),
     ("00694-", "figure_6_injected_example.svg"),
     ("00694-", "figure_9_d8_running_share.svg"),
+    ("00694-", "figure_5_gas_a_levels.svg"),
+    ("00697-", "f4_gas_a_levels_and_ramps.svg"),
     ("00186-", "figure_3_spread_and_drops.svg"),
+    ("00199-", "figure_5_flagged_hours.svg"),
+    ("00198-", "figure_d8_departure_hours.svg"),
+    ("00159-", "figure_1_history.svg"),
+    ("00291-", "figure_2.svg"),
+    ("00291-", "figure_3.svg"),
+    ("00361-", "figure_3_falls_per_month.svg"),
+    ("00196-", "figure_3_flagged_share_by_month.svg"),
 )
 
 _MONTHS: Final[str] = (
@@ -40,9 +58,10 @@ _FORBIDDEN_TEXT: Final[dict[str, re.Pattern[str]]] = {
     "a four-digit year": re.compile(r"\b(?:19|20)\d{2}\b"),
     "a power unit": re.compile(r"\b(?:MW|MVA|kW|kVA|GW)\b"),
 }
-# Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`.
+# Vega writes `day: 3; MVA: 6.9` into the label of each mark unless `aria=False`. The pattern
+# takes a colon and a space before a digit or a U+2212 minus, whatever ends the axis title.
 _PER_POINT_LABEL: Final[re.Pattern[str]] = re.compile(
-    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text))[^"]*\w: -?\d'
+    r'aria-label="(?!(?:X-axis|Y-axis|Legend|Title text|Subtitle text))[^"]*: [\d\u2212]'
 )
 _AXIS_TEXT: Final[re.Pattern[str]] = re.compile(r">([^<>]+)<")
 

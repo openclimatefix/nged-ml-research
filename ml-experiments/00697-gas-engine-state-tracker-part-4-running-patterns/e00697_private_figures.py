@@ -23,6 +23,7 @@ import polars as pl
 from e00697_analysis import usable, with_state  # ty: ignore[unresolved-import]
 from e00697_common import NIGHT_LAST, PRIVATE_FIGURES_DIR  # ty: ignore[unresolved-import]
 from e00697_frame import load_frame  # ty: ignore[unresolved-import]
+from engine_figure_guard import save_chart  # ty: ignore[unresolved-import]
 
 NIGHT_SHORTFALL_MW: Final[float] = -2.5
 SOLAR_START: Final[date] = date(2025, 3, 24)
@@ -33,7 +34,7 @@ WEEKS_PER_ERA: Final[int] = 2
 def save(*, chart: alt.TopLevelMixin, name: str) -> None:
     """Write an SVG into the private figures folder."""
     PRIVATE_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(PRIVATE_FIGURES_DIR / f"{name}.svg")
+    save_chart(chart=chart, path=PRIVATE_FIGURES_DIR / f"{name}.svg")
     print(f"wrote {name}.svg (private)", flush=True)
 
 

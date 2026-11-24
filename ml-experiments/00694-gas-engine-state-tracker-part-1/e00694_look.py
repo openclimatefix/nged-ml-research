@@ -4,10 +4,12 @@ r"""Phase A: the data look. Draws D8's reading and its differences in four eras;
     OMP_NUM_THREADS=1 PYTHONPATH=src:ml-experiments/00694-gas-engine-state-tracker-part-1 \
         uv run --no-sync python ml-experiments/00694-*/e00694_look.py
 
-Gas A is drawn only as a histogram of output levels, with no dates. D8 is a substation.
+Gas A is drawn only as a histogram of output levels, as a fraction of its highest output, with
+no dates. D8 is a substation.
 """
 
 import os
+import sys
 import textwrap
 from datetime import UTC, datetime
 from pathlib import Path
@@ -35,6 +37,9 @@ from e00694_common import (
     runs_of,
     stamp,
 )
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 from e00694_trackers import U_GRID  # noqa: F401  (kept so a changed grid shows in the printout)
 
 WIDTH: Final[int] = 560
@@ -42,7 +47,7 @@ ERAS: Final[dict[str, tuple[datetime, datetime]]] = {
     "pre-engine": (GRID_START, ENGINE_CONNECTED),
     "net": (NET_START, NET_END),
     "net with 11 kV solar": (SOLAR_START, FADE_START),
-    "from 2026-03": (FADE_START, datetime(2026, 7, 1, tzinfo=UTC)),
+    "latest era": (FADE_START, datetime(2026, 7, 1, tzinfo=UTC)),
 }
 COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN, ocf.DATA_PURPLE]
 LINES: list[str] = []
@@ -94,9 +99,38 @@ def merged_steps(*, y: np.ndarray, lvl: np.ndarray, min_size: float = 0.6) -> di
 def save(*, chart: alt.Chart | alt.VConcatChart, name: str) -> None:
     """Write an SVG beside the write-up."""
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(DOCS_DIR / f"{name}.svg")
+    guard.save_chart(chart=chart, path=DOCS_DIR / f"{name}.svg")
     if png_dir := os.environ.get("PNG_DIR"):
-        chart.save(Path(png_dir) / f"{name}.png", scale_factor=1.0)
+        guard.save_chart(chart=chart, path=Path(png_dir) / f"{name}.png", scale_factor=1.0)
+
+
+def draw_figure_5(*, g: np.ndarray) -> None:
+    """Histogram of Gas A's output as a fraction of its highest recorded output; no time axis, no power unit."""
+    fraction = np.round(g / g.max() / 0.05) * 0.05
+    h = pl.DataFrame({"fraction": fraction}).group_by("fraction").len().sort("fraction")
+    fig5 = (
+        alt.Chart(h)  # ty: ignore[unresolved-attribute]
+        .mark_bar(color=ocf.DATA_BLUE, size=8, aria=False)
+        .encode(
+            x=alt.X(
+                "fraction:Q",
+                title="Gas A output, as a fraction of its highest recorded output",
+                axis=alt.Axis(values=[0, 0.25, 0.5, 0.75, 1], format=".2f"),
+            ),
+            y=alt.Y("len:Q", title="Half-hours (log scale)", scale=alt.Scale(type="symlog")),
+        )
+        .properties(
+            width=WIDTH,
+            height=150,
+            title=alt.TitleParams(
+                wrap(
+                    "Output levels of Gas A: the output clusters at a few levels, one for each number of units running."
+                ),
+                anchor="start",
+            ),
+        )
+    )
+    save(chart=fig5, name="figure_5_gas_a_levels")
 
 
 def main() -> None:
@@ -167,7 +201,6 @@ def main() -> None:
     for i, (name, ed) in enumerate(era_data.items()):
         start = 28 * 48
         seg = ed["y"][start : start + 14 * 48]
-        when = (base + (ed["a"] + start) * np.timedelta64(1800, "s")).astype("datetime64[D]")
         frame = pl.DataFrame({"day": np.arange(len(seg)) / 48.0, "mva": seg})
         panels.append(
             alt.Chart(frame)  # ty: ignore[unresolved-attribute]
@@ -180,7 +213,7 @@ def main() -> None:
                 ),
                 y=alt.Y("mva:Q", title="MVA", scale=alt.Scale(domain=[0, 14])),
             )
-            .properties(width=WIDTH, height=110, title=f"{name}: 14 days from {when}")
+            .properties(width=WIDTH, height=110, title=f"Window {i + 1}, {name}: 14 days")
         )
     fig1 = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
@@ -227,7 +260,7 @@ def main() -> None:
         .properties(
             title=alt.TitleParams(
                 wrap(
-                    "Change in D8's reading over 1 and 2 half-hours, by era. A large peak appears only after the engine is connected."
+                    "Change in D8's reading over 1 and 2 half-hours, by era. A peak near 4 to 5 MVA appears only after the engine is connected."
                 ),
                 anchor="start",
             )
@@ -253,17 +286,6 @@ def main() -> None:
                     }
                 )
     frame = pl.DataFrame(rows)
-    theory = pl.DataFrame(
-        [
-            {
-                "curve": f"{k} unit{'s' if k > 1 else ''} of the unit size",
-                "level": float(L),
-                "fall": float(L - abs(L - 2.0 * k)),
-            }
-            for k in (1, 2, 3)
-            for L in np.arange(0.5, 13.5, 0.5)
-        ]
-    )
     pts = (
         alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=1.5)
@@ -279,18 +301,11 @@ def main() -> None:
             ),
         )
     )
-    curves = (
-        alt.Chart(theory)  # ty: ignore[unresolved-attribute]
-        .mark_line(strokeDash=[4, 3], strokeWidth=1.5, color=ocf.BLACK_2)
-        .encode(x="level:Q", y="fall:Q", detail="curve:N")
-    )
-    fig3 = (pts + curves).properties(
+    fig3 = pts.properties(
         width=WIDTH,
         height=220,
         title=alt.TitleParams(
-            wrap(
-                "Size of D8's merged falls against the reading before them. Dashed black: the fall a folded reading would show when k units of the unit size start, for k = 1, 2, 3 (lowest to highest curve)."
-            ),
+            wrap("Size of D8's merged falls against the reading before them."),
             anchor="start",
         ),
     )
@@ -400,28 +415,7 @@ def main() -> None:
     )
     save(chart=fig4, name="figure_4_step_direction_dwell_hour")
 
-    # ---- Figure 5: Gas A level histogram, no time axis
-    levels = np.round(g / 0.25) * 0.25
-    h = pl.DataFrame({"mw": levels}).group_by("mw").len().sort("mw")
-    fig5 = (
-        alt.Chart(h)  # ty: ignore[unresolved-attribute]
-        .mark_bar(color=ocf.DATA_BLUE, size=8)
-        .encode(
-            x=alt.X(
-                "mw:Q", title="Gas A output (MW, 0.25 MW bins)", axis=alt.Axis(values=[0, 2, 4, 6])
-            ),
-            y=alt.Y("len:Q", title="Half-hours (log scale)", scale=alt.Scale(type="symlog")),
-        )
-        .properties(
-            width=WIDTH,
-            height=150,
-            title=alt.TitleParams(
-                wrap("Output levels of Gas A over its 44-day record: three units."),
-                anchor="start",
-            ),
-        )
-    )
-    save(chart=fig5, name="figure_5_gas_a_levels")
+    draw_figure_5(g=g)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     (DATA_DIR / "printed_look.txt").write_text("\n".join(LINES) + "\n")
 

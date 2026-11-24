@@ -216,14 +216,16 @@ flatness of the control answers that only for the demand shapes that the control
 
 ![Running share against system price](f3_price.svg)
 
-**Figure 4 shows that Gas A runs at about 1, 2, or 3 whole units and reaches its first full level
-within 2 half-hours in 94% of its 54 complete on-spells.** Left: output in running half-hours, with
-rules at multiples of the unit size. Right: output as a share of the level reached. Bottom: starts and
-stops by local clock time. No panel for D8 is drawn, because the tracker places its edges where D8's
-reading steps. At D8 the tracker fits the size of one block of output separately for each
-era, and D8's reading cannot show how many separate units the engine has.
+**Figure 4 shows that Gas A's output is already most of the level it reaches in the first running
+half-hour of a spell.** Top: output as a share of the level reached, by half-hour from the first
+running (start) or idle (stop) half-hour, where 0 is the first half-hour of the new state. Bottom:
+the share of starts and of stops in each half-hour of the local clock. No panel for D8 is drawn,
+because the tracker places its edges where D8's reading steps. At D8 the tracker fits the size of
+one block of output, and D8's reading cannot show how many separate units the engine has. No panel
+shows the distribution of output while running, because the spacing of its peaks would reveal the
+engine's unit count and unit sizes, which are withheld.
 
-![Gas A output levels and ramps](f4_gas_a_levels_and_ramps.svg)
+![Gas A ramp shape and clock times of starts and stops](f4_gas_a_levels_and_ramps.svg)
 
 Eight more exploratory figures (G1 to G6 and G8 to G10, less G7) are on [the gallery
 page](gallery.md). G7, the night share by month, and the dated rasters stay in the private data

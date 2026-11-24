@@ -115,8 +115,8 @@ advice:
     spreads, when comparing band methods: the two differ by 17% in quantile score, with the
     source of the spread confounded with the history (Figure 1, arm 2).
   - >-
-    Test a break indicator at Primaries without an engine before using it: it raised the score
-    by 0.4% at D10 and 0.5% at D11 (Figure 5).
+    Test a break indicator at Primaries without an engine before using it: it raised the score by
+    0.4% at D10 and 0.5% at D11 (Figure 2).
 date: 2026-10-23
 ---
 
@@ -178,24 +178,9 @@ makes arm 3's loss conservative and leaves the post hoc gain at risk.
 *Figure 1. Only the arm that sees the state at the target half-hour (24% better) gains more than the
 post hoc arm trained on the lagged state (3% better). The last-day state, arm 3, is 10% worse.*
 
-![The fitted engine offset of each monthly refit](figure_2_engine_offset.svg)
-
-*Figure 2. The offset per half-hour with the engine on is stable at every refit. Trained on a
-day-old state, the offset is smaller.*
-
-![The mean error of each arm on engine-running half-hours and on other half-hours](figure_3_shortfall_by_state.svg)
-
-*Figure 3. The single model reads 1.1 MW below its forecast while the engine runs and 0.8 MW above
-it otherwise. Only the target-state arm removes both gaps.*
-
-![Three weeks of D8 readings against forecasts](figure_4_example_weeks.svg)
-
-*Figure 4. In December 2025 the forecast that sees the engine state at the target follows the
-readings down during the shaded spells; the others barely move.*
-
 ![The engine term against the single model at D5, D10, and D11](figure_5_controls.svg)
 
-*Figure 5. At the three Primaries without an engine, the arms move the quantile score by -0.9% to
+*Figure 2. At the three Primaries without an engine, the arms move the quantile score by -0.9% to
 +2.0%.*
 
 ## Results

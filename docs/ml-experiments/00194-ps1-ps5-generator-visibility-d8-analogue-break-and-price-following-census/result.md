@@ -67,7 +67,7 @@ advice:
   - >-
     Do not score a D8 forecasting model on 2026 without scoring the periods before and after March
     2026 separately, because the shortfall share
-    falls from 0.29 in January to 0.008 in April (Figure 5).
+    falls from 0.29 in January to 0.008 in April.
   - >-
     Do not read the Embedded Capacity Register's Primary column as the substation whose meter
     records an asset, because a gas engine can be registered under one Primary and appear in the
@@ -102,9 +102,10 @@ holds both high-shortfall and low-shortfall months.
 
 ## Figures
 
-![Weekly shortfall share of D8 and three control substations](figure_1.svg)
+![Shortfall share of D8 and three control substations, pooled over three eras](figure_1.svg)
 
-*Figure 1. D8's weekly shortfall share against D3, D5, and D14 (near zero throughout).*
+*Figure 1. D8's shortfall share against D3, D5, and D14, pooled over the eras before the
+shortfall starts, while it lasts, and after it fades (near zero throughout for D3, D5, and D14).*
 
 ![Shortfall share of D8 and share of half-hours with a G2 reading, before and after the break](figure_2.svg)
 
@@ -120,9 +121,10 @@ readings stop arriving.*
 *Figure 4. D8's residual in four periods. The negative tail after August 2023 is broad, with no
 clear steps.*
 
-![D8 monthly shortfall share with experiment 191's scored year](figure_5.svg)
+![D8 shortfall share in experiment 191's scored year against the earlier history](figure_5.svg)
 
-*Figure 5. Monthly shortfall share. The blue band is the scored year of experiment 191.*
+*Figure 5. D8's shortfall share pooled over experiment 191's scored year and over the earlier
+history. The earlier history includes the era in which the shortfall lasts.*
 
 ## Reproduction of the design's numbers (PS1)
 
