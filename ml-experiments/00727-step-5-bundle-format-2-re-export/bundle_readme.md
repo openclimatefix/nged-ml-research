@@ -48,8 +48,8 @@ CPU by this file's read-out, so only `raw_out_*` and the inputs are independent 
   levels, bisection range and steps, standard-deviation clamp, expected-weather rule, B1 constants,
   and the training provenance (half-life, embargoes, seeds). Training provenance is informational:
   inference does not read it.
-- The 13 quantile levels in `config.json` are NGED's delivery levels: 0.01, 0.02, 0.05, 0.10, 0.20, 0.35, 0.50,
-  0.65, 0.80, 0.90, 0.95, 0.98, and 0.99. Fixture columns are named `q01` to `q99` after them. The
+- The 13 quantile levels in `config.json` are NGED's delivery levels: 0.01, 0.02, 0.05, 0.10, 0.20,
+  0.35, 0.50, 0.65, 0.80, 0.90, 0.95, 0.98, and 0.99. Fixture columns are named `q01` to `q99` after them. The
   read-out bisects the mixture's cumulative distribution function at each level, so any other level
   needs only a change to `quantile_levels` in `config.json`.
 - `primaries.json`: the 16 Primaries in `primary_index` order (0 to 15, the embedding index), with
