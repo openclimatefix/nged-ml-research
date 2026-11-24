@@ -83,7 +83,7 @@ PS5 (d): price-following assets in the August 2026 ECR, by Primary D-label
   D2: battery, Connected: 1 slot(s), 0.20 MW, 0.00 MWh, connected 2026-05-01 to 2026-05-01
   D3: battery, Accepted to connect: 1 slot(s), 0.20 MW, 0.00 MWh, connected None to None
   D9: battery, Connected: 1 slot(s), 0.25 MW, 0.00 MWh, connected 2024-04-02 to 2024-04-02
-  Primaries with no price-following asset: ['D10', 'D12', 'D15', 'D18', 'D19', 'D21', 'D22', 'D4', 'D8']
+  Primaries with no price-following asset: 9
   connected, all 16 Primaries: battery: 3 slot(s), 0.65 MW, 3 Primaries
   connected, all 16 Primaries: gas or oil engine, not CHP: 2 slot(s), [withheld] MW, 2 Primaries
   connected price-following slots of at least 1 MW: 2; by site: [withheld]

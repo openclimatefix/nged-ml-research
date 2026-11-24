@@ -926,9 +926,11 @@ def register_rows_from_era_table(*, era_table: pl.DataFrame) -> tuple[RegisterRo
 
     The real record holds three dated rows of 1 MW or more (design section 3.2). The register file
     and its coordinate match are not read here. A row whose source says it is listed under another
-    Primary is filed under that Primary with the nearest distance band and a watch window
-    there, and it is also shown at its own Primary as `listed under a neighbouring substation`
-    with no window (design section 3.2, the engine of D8).
+    Primary is filed under that Primary (the label that follows `listed under` in the source,
+    which `e00709_era_table.py` writes from the private constants file) with the distance band
+    `under 1 km` and a watch window there. The row is also shown at its own Primary as
+    `listed under a neighbouring substation` with no window (design section 3.2, the engine of
+    D8).
 
     Args:
         era_table: `era_table.parquet`.

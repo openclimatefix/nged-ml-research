@@ -56,6 +56,12 @@ def withhold_gas_engines(frame: pl.DataFrame, *, columns: tuple[str, ...]) -> pl
     repository, so the printed tables show them for the other asset classes only.
     """
     is_engine = pl.col("asset_class").str.starts_with("gas or oil engine")
+    frame = frame.with_columns(
+        pl.when(pl.col("site") == common.REGISTER_PRIMARY)
+        .then(pl.lit("[withheld]"))
+        .otherwise(pl.col("site"))
+        .alias("site")
+    )
     return frame.with_columns(
         pl.when(is_engine)
         .then(pl.lit("[withheld]"))
@@ -143,9 +149,8 @@ def main() -> None:
                 columns=("mw", "connected_date", "distance_km"),
             )
         )
-        print("Sites with no price-following asset at all:")
         have = set(flagged["site"].to_list())
-        print(sorted(set(PRIMARY_NAMES) - have))
+        print(f"Sites with no price-following asset at all: {len(set(PRIMARY_NAMES) - have)}")
 
 
 if __name__ == "__main__":

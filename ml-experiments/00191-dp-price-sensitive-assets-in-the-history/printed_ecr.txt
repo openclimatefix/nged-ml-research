@@ -7,7 +7,7 @@ shape: (7, 6)
 │ str  ┆ str                        ┆ str                 ┆ u32 ┆ f64  ┆ f64         │
 ╞══════╪════════════════════════════╪═════════════════════╪═════╪══════╪═════════════╡
 │ D11  ┆ battery                    ┆ Connected           ┆ 1   ┆ 0.2  ┆ 0.0         │
-│ D14  ┆ gas or oil engine, not CHP ┆ Connected           ┆ 1   ┆ [withheld] ┆ 0.0         │
+│ [withheld] ┆ gas or oil engine, not CHP ┆ Connected           ┆ 1   ┆ [withheld] ┆ 0.0         │
 │ D16  ┆ battery                    ┆ Accepted to connect ┆ 1   ┆ 0.2  ┆ 0.0         │
 │ D2   ┆ battery                    ┆ Connected           ┆ 1   ┆ 0.2  ┆ 0.0         │
 │ D3   ┆ battery                    ┆ Accepted to connect ┆ 1   ┆ 0.2  ┆ 0.0         │
@@ -22,10 +22,9 @@ shape: (5, 6)
 │ str  ┆ str                        ┆ f64  ┆ f64         ┆ date           ┆ f64         │
 ╞══════╪════════════════════════════╪══════╪═════════════╪════════════════╪═════════════╡
 │ D11  ┆ battery                    ┆ 0.2  ┆ null        ┆ 2026-04-13     ┆ 2.253177    │
-│ D14  ┆ gas or oil engine, not CHP ┆ [withheld] ┆ null ┆ [withheld] ┆ [withheld] │
+│ [withheld] ┆ gas or oil engine, not CHP ┆ [withheld] ┆ null ┆ [withheld] ┆ [withheld] │
 │ D2   ┆ battery                    ┆ 0.2  ┆ null        ┆ 2026-05-01     ┆ null        │
 │ D5   ┆ gas or oil engine, not CHP ┆ [withheld] ┆ null        ┆ [withheld] ┆ [withheld] │
 │ D9   ┆ battery                    ┆ 0.25 ┆ null        ┆ 2024-04-02     ┆ 1.862435    │
 └──────┴────────────────────────────┴──────┴─────────────┴────────────────┴─────────────┘
-Sites with no price-following asset at all:
-['D10', 'D12', 'D15', 'D18', 'D19', 'D21', 'D22', 'D4', 'D8']
+Sites with no price-following asset at all: 9

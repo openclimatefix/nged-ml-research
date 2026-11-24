@@ -19,7 +19,7 @@ import altair as alt
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
-from e00694_common import DATA_DIR, DOCS_DIR, f1_of
+from e00694_common import DATA_DIR, DOCS_DIR, SYNTHETIC_UNIT_MW, f1_of
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import engine_figure_guard as guard
@@ -28,6 +28,8 @@ ARMS: Final[tuple[str, ...]] = ("M0", "M1", "M2", "M2-dwell")
 PRIMARY: Final[tuple[str, ...]] = ("record", "synth0", "synth1", "synth2", "synth3")
 RULES: Final[tuple[str, ...]] = ("folded", "signed")
 N_BOOT: Final[int] = 10_000
+P1_HALF_WIDTH_MW: Final[float] = 0.3
+"""Prediction P1: the fitted unit lies within this distance of the synthetic unit size."""
 ALPHA_BONF: Final[float] = 0.05 / 3
 WIDTH: Final[int] = 560
 LINES: list[str] = []
@@ -272,12 +274,10 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     for sched in sorted({r["sched"] for r in inj}):
         sel = [r for r in inj if r["sched"] == sched and r["rule"] == "folded"]
         ks = np.array([r["arms"]["M2"]["k"] for r in sel])
-        us = np.array([r["arms"]["M2"]["u"] for r in sel])
         k1s = np.array([r["arms"]["M1"]["k"] for r in sel])
-        u1s = np.array([r["arms"]["M1"]["u"] for r in sel])
         say(
-            f"{sched}: M2 K counts {np.bincount(ks, minlength=4).tolist()} median u {np.median(us[ks > 0]) if (ks > 0).any() else float('nan'):.2f}"
-            f"  (M1 K counts {np.bincount(k1s, minlength=4).tolist()} median u {np.median(u1s[k1s > 0]) if (k1s > 0).any() else float('nan'):.2f})"
+            f"{sched}: M2 K counts {np.bincount(ks, minlength=4).tolist()} median u [withheld]"
+            f"  (M1 K counts {np.bincount(k1s, minlength=4).tolist()} median u [withheld])"
         )
 
     # ---- K1
@@ -286,7 +286,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         for arm, v in r["arms"].items():
             f = f1_of(tp=v["tp"], fp=v["fp"], fn=v["fn"])
             say(
-                f"{r['rule']:<7} {arm:<9} F1 {f:.3f} tp {v['tp']} fp {v['fp']} fn {v['fn']} K {v['k']} u {v['u']}"
+                f"{r['rule']:<7} {arm:<9} F1 {f:.3f} tp {v['tp']} fp {v['fp']} fn {v['fn']} K {v['k']} u {'None' if v['u'] is None else '[withheld]'}"
             )
 
     # ---- real D8
@@ -294,16 +294,19 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     eras = {e["label"]: e for e in d8}
     for label, e in eras.items():
         say(
-            f"{label}: M2 K {e['M2']['k']} u {e['M2']['u']:.2f}, share flagged {e['M2']['flag'].mean():.3f}; "
-            f"M1 K {e['M1']['k']} u {e['M1']['u']:.2f}, share {e['M1']['flag'].mean():.3f}; "
-            f"M2 without the fold K {e['M2s']['k']} u {e['M2s']['u']:.2f}, share {e['M2s']['flag'].mean():.3f}"
+            f"{label}: M2 K {e['M2']['k']} u [withheld], share flagged {e['M2']['flag'].mean():.3f}; "
+            f"M1 K {e['M1']['k']} u [withheld], share {e['M1']['flag'].mean():.3f}; "
+            f"M2 without the fold K {e['M2s']['k']} u [withheld], share {e['M2s']['flag'].mean():.3f}"
         )
         say(
             f"   M2 transition matrix {np.round(e['M2'].get('transition', np.zeros((1, 1))), 3).tolist()}"
         )
-    p1 = eras["net"]["M2"]["k"] == 3 and 1.7 <= eras["net"]["M2"]["u"] <= 2.3
+    p1 = (
+        eras["net"]["M2"]["k"] == 3
+        and abs(eras["net"]["M2"]["u"] - SYNTHETIC_UNIT_MW) <= P1_HALF_WIDTH_MW
+    )
     drift = abs(eras["net"]["M2"]["u"] - eras["solar"]["M2"]["u"])
-    say(f"P1 (K = 3 and u in [1.7, 2.3] on the net era): {p1}; u drift net to solar {drift:.2f} MW")
+    say(f"P1 (K = 3 and u in [withheld] on the net era): {p1}; u drift net to solar [withheld]")
 
     # ---- P5
     say("\n== P5: held-out predictive log-likelihood on even months of the net era ==")
@@ -316,8 +319,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         say(f"{m_}: n {n}, fold {lf:.1f}, signed {ls:.1f}, difference {lf - ls:+.1f}")
     wins = int(np.sum(np.array(diffs) > 0))
     say(
-        f"fold fits K {p5['fold']['k']} u {p5['fold']['u']:.2f}; signed fits K {p5['signed']['k']} "
-        f"u {p5['signed']['u']:.2f}; total difference {sum(diffs):+.1f}; fold better in {wins} of {len(diffs)} months"
+        f"fold fits K {p5['fold']['k']} u [withheld]; signed fits K {p5['signed']['k']} "
+        f"u [withheld]; total difference {sum(diffs):+.1f}; fold better in {wins} of {len(diffs)} months"
     )
     p5_ok = sum(diffs) > 0 and wins >= 2 * len(diffs) / 3
     say(f"P5 (total above zero and fold better in at least two thirds of months): {p5_ok}")
@@ -346,7 +349,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     say(
         f"\nVERDICT by the pre-registered table: {verdict} "
         f"(stop2 {stop2}, P1 {p1}, P2 all {p2_all}, P2 core {p2_core}, P3 failures {p3_fail}, "
-        f"P4/C1 clears {c1_clears}, P5 {p5_ok}, M0 alone {m0_alone}, u drift {drift:.2f})"
+        f"P4/C1 clears {c1_clears}, P5 {p5_ok}, M0 alone {m0_alone}, u drift [withheld])"
     )
 
     figures(fa_rows=fa_rows, boots=boots, eras=eras)

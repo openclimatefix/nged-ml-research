@@ -65,13 +65,15 @@ PART_4_TUNED: Final[Path] = CACHE_DIR.parent / "work" / "tuned.json"
 PREDS_DIR: Final[Path] = WORK_DIR / "preds"
 FITS_DIR: Final[Path] = WORK_DIR / "fits"
 
-ASSET_SITES: Final[tuple[str, ...]] = ("D8", "D14")
+REGISTER_PRIMARY: Final[str] = engine.engine_string(key="d8_engine_register_primary")
+"""The Primary under which the register lists the gas engine (read from the private file)."""
+ASSET_SITES: Final[tuple[str, ...]] = ("D8", REGISTER_PRIMARY)
 NO_HARM_SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D16")
 ALL_SITES: Final[tuple[str, ...]] = (*ASSET_SITES, *NO_HARM_SITES)
 DONORS: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D19", "D21", "D22")
 CONNECTED: Final[dict[str, datetime]] = {
     "D8": engine.engine_datetime(key="d8_engine_connected_date"),
-    "D14": engine.engine_datetime(key="d8_engine_connected_date"),
+    REGISTER_PRIMARY: engine.engine_datetime(key="d8_engine_connected_date"),
     "D5": engine.engine_datetime(key="d5_engine_connected_date"),
 }
 """Connection date of the registered gas engine under each Primary (August 2026 ECR). D8 is gated

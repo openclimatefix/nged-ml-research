@@ -150,9 +150,7 @@ def main() -> None:
     say(
         f"Gas A running spells (runs with at least 1 unit): {len(spells)}, median {np.median(spells):.0f} half-hours"
     )
-    say(
-        f"Gas A output per unit: median g/units {np.median(g[units > 0] / units[units > 0]):.3f} MW"
-    )
+    say("Gas A output per unit: median g/units [withheld]")  # the unit size is private
     if counts != EXPECTED_UNIT_COUNTS or len(units) != 2054:
         raise SystemExit("Phase A cannot reproduce experiment 194's counts: stop (verdict invalid)")
 
@@ -187,7 +185,9 @@ def main() -> None:
             for i in range(1, len(hist) - 1)
             if hist[i] >= 8 and hist[i] >= hist[i - 1] and hist[i] >= hist[i + 1]
         ]
-        say(f"  merged-step bins with local maxima (count >= 8): {peaks}")
+        # Where the engine runs, the peaks sit at multiples of its unit size, so they are withheld.
+        shown = peaks if name == "pre-engine" else "[withheld]"
+        say(f"  merged-step bins with local maxima (count >= 8): {shown}")
         for lo_l, hi_l in ((0, 3), (3, 6), (6, 8), (8, 10)):
             m = (steps["before"] >= lo_l) & (steps["before"] < hi_l)
             r_n = int(((sz >= 1.5) & m).sum())

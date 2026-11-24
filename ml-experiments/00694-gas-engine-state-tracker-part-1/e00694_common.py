@@ -31,6 +31,8 @@ GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
 N_GRID: Final[int] = 78816
 SOLAR_START: Final[datetime] = datetime(2025, 3, 24, tzinfo=UTC)
 POST_SOLAR_START: Final[datetime] = datetime(2025, 4, 1, tzinfo=UTC)
+SYNTHETIC_UNIT_MW: Final[float] = round(engine.engine_float(key="d8_engine_unit_mw"), 1)
+"""The unit size of the synthetic schedules: the recorded unit size rounded to one decimal."""
 ENGINE_CONNECTED: Final[datetime] = engine.engine_datetime(key="d8_engine_connected_date")
 NET_START: Final[datetime] = datetime(2023, 9, 1, tzinfo=UTC)
 NET_END: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)

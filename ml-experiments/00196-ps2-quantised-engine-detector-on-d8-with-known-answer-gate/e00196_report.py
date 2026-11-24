@@ -166,14 +166,7 @@ def main() -> None:
     """Print and draw."""
     base = load("fixed")
     local = load("local")
-    print(
-        "unit size (gate fit):",
-        base["g"],
-        base["g_path"],
-        "local-noise:",
-        local["g"],
-        local["g_path"],
-    )
+    print("unit size (gate fit): [withheld]")  # NGED withholds the engine's unit size
     for variant, r in (("fixed noise (pre-registered)", base), ("local noise (post hoc)", local)):
         print("==", variant)
         for arm in ("K1", "K2", "synthetic_x0.5", "synthetic_x2.0", "q_0.0", "q_0.5", "q_1.0"):

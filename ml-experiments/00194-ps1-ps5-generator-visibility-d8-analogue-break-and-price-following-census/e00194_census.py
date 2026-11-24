@@ -274,7 +274,7 @@ def main() -> None:  # noqa: PLR0915
             f"  {r['site']}: {r['asset_class']}, {r['status']}: {r['n']} slot(s), {r['mw']:.2f} MW, {r['mwh'] or 0:.2f} MWh, connected {r['first']} to {r['last']}"
         )
     say(
-        f"  Primaries with no price-following asset: {sorted(set(PRIMARY_NAMES) - set(flagged['site'].to_list()))}"
+        f"  Primaries with no price-following asset: {len(set(PRIMARY_NAMES) - set(flagged['site'].to_list()))}"
     )
     conn = flagged.filter(pl.col("status") == "Connected")
     by_class = (

@@ -14,14 +14,14 @@ from studies.dp_gam import TrainingWindow, fit_gam
 
 
 def main() -> None:
-    """Fit D14 at one cut both ways and print the differences."""
+    """Fit the register's Primary at one cut both ways and print the differences."""
     torch_threads = 4
     import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(torch_threads)
     cache = common.load_cache()
     cut = datetime(2025, 7, 1, tzinfo=UTC)
-    for site, ungated in (("D14", False), ("D8", False)):
+    for site, ungated in ((common.REGISTER_PRIMARY, False), ("D8", False)):
         work = engine.masked_cache(cache=cache, site=site)
         grid = engine.build_price_grid(cache=work, site=site, ungated=ungated)
         started = time.monotonic()

@@ -1,7 +1,8 @@
 """Run experiment 191's arms at one or more sites and write the prediction frames.
 
 Run it under `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue` with
-`uv run --no-sync python`, for example with the arguments `--sites D8 D14 [--ungated]`.
+`uv run --no-sync python`, for example with the arguments `--sites D8 <the register's Primary>
+[--ungated]`, where the register's Primary is the label in the private constants file.
 """
 
 import argparse

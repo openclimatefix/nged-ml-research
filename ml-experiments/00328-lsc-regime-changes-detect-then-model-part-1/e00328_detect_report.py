@@ -125,7 +125,7 @@ def main() -> None:
         )
         for row in ecr.sort("site", "connected_date").iter_rows(named=True):
             if str(row["asset_class"] or "").startswith("gas or oil engine"):
-                print(f"  {row['site']} [withheld]")  # NGED withholds a gas engine's size and date
+                print("  [withheld]")  # NGED withholds a gas engine's size and date
                 continue
             hits = []
             for det, p in chosen.items():

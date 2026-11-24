@@ -64,6 +64,8 @@ D8_GAS_TELEMETRY_DATE: Final[date] = date(2023, 8, 15)
 D8_SOLAR_DATE: Final[date] = date(2025, 3, 24)
 D8_FADE_DATE: Final[date] = date(2026, 3, 1)
 """The month of the fade; only the month is known, and the plan lists it as telemetry only."""
+D8_REGISTER_PRIMARY: Final[str] = engine.engine_string(key="d8_engine_register_primary")
+"""The Primary whose register entries hold the engine (read from the private file)."""
 D8_GAS_MW: Final[float] = engine.engine_float(key="d8_engine_register_mw")
 D8_SOLAR_MW: Final[float] = 8.91
 D8_SMALL_SOLAR_MW: Final[float] = 0.7
@@ -187,7 +189,9 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         The rows for era 1 (gas engine), era 2 (solar farm), the undated solar row, and the fade.
     """
     gas = assets.filter(
-        (pl.col("site") == "D14") & _is_gas_engine() & (pl.col("mw") >= D8_GAS_MW - 0.5)
+        (pl.col("site") == D8_REGISTER_PRIMARY)
+        & _is_gas_engine()
+        & (pl.col("mw") >= D8_GAS_MW - 0.5)
     )
     solar = assets.filter((pl.col("site") == "D8") & _is_solar())
     with pl.Config(tbl_rows=30, fmt_str_lengths=60):
@@ -211,7 +215,7 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
             "telemetry_date": D8_GAS_TELEMETRY_DATE, "technology": "gas engine",
             "size_mw_register": D8_GAS_MW, "size_mw_telemetry": None,
             "size_mw_recollection": None,
-            "source": f"{source}, listed under another Primary's name",
+            "source": f"{source}, listed under {D8_REGISTER_PRIMARY}",
             "confidence": "register date confirmed" if found_gas else "plan value, not re-found",
             "note": "D8's reading stopped including the engine's output on 2023-08-15 "
             "(experiment 194). The oracle switches on the telemetry date.",
@@ -264,7 +268,11 @@ def other_register_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         & (pl.col("mw") >= MIN_ERA_MW)
         & (pl.col("connected_date") >= FIRST_ERA_DATE)
     ).filter(
-        ~((pl.col("site") == "D14") & (pl.col("connected_date") == D8_GAS_DATE) & _is_gas_engine())
+        ~(
+            (pl.col("site") == D8_REGISTER_PRIMARY)
+            & (pl.col("connected_date") == D8_GAS_DATE)
+            & _is_gas_engine()
+        )
     )
     kept = kept.sort("site", "connected_date").with_columns(
         era_index=pl.int_range(pl.len(), dtype=pl.Int32).over("site") + 1

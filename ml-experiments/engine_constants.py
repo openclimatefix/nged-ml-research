@@ -40,10 +40,10 @@ def _read(*, path: Path) -> dict[str, Any]:
         )
     try:
         loaded = json.loads(path.read_text())
-    except json.JSONDecodeError as error:
+    except json.JSONDecodeError:
         raise EngineConstantsError(
             f"The private engine-constants file {path} is not JSON."
-        ) from error
+        ) from None
     if not isinstance(loaded, dict):
         raise EngineConstantsError(
             f"The private engine-constants file {path} is not a JSON object."
@@ -69,6 +69,16 @@ def engine_float(*, key: str, path: Path | None = None) -> float:
     return float(value)
 
 
+def engine_string(*, key: str, path: Path | None = None) -> str:
+    """Return the non-empty string stored under `key`."""
+    value, used = _value(key=key, path=path)
+    if not isinstance(value, str) or not value:
+        raise EngineConstantsError(
+            f"The key {key!r} in {used} must be a non-empty string, not {type(value).__name__}."
+        )
+    return value
+
+
 def engine_datetime(*, key: str, path: Path | None = None) -> datetime:
     """Return midnight UTC on the `YYYY-MM-DD` date stored under `key`."""
     value, used = _value(key=key, path=path)
@@ -78,7 +88,5 @@ def engine_datetime(*, key: str, path: Path | None = None) -> datetime:
         )
     try:
         return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=UTC)
-    except ValueError as error:
-        raise EngineConstantsError(
-            f"The key {key!r} in {used} is not a YYYY-MM-DD date."
-        ) from error
+    except ValueError:
+        raise EngineConstantsError(f"The key {key!r} in {used} is not a YYYY-MM-DD date.") from None

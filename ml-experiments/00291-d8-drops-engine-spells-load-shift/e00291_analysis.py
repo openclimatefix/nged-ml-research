@@ -88,8 +88,8 @@ def say(text: str = "") -> None:
 
 
 def say_withheld(text: str) -> None:
-    """Print a line that holds the unit size, and keep it only in the private report under `DATA_DIR`."""
-    print(text, flush=True)
+    """Print a withheld marker, and keep the line that holds the unit size only in the private report."""
+    print(WITHHELD, flush=True)
     REPORT.append(WITHHELD)
     PRIVATE_REPORT.append(text)
 
@@ -373,7 +373,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         d = distance_to_unit_multiple(x=depth[pick], unit=UNIT_MW)
         mean, lo_ci, hi_ci = bootstrap_mean(x=d, rng=rng)
         say(
-            f"  depth clustering in this period ({int(pick.sum())} drops): mean distance {mean:.3f} units (95% bootstrap {lo_ci:.3f} to {hi_ci:.3f}); median depth {np.median(depth[pick]):.2f} MW"
+            f"  depth clustering in this period ({int(pick.sum())} drops): mean distance {mean:.3f} units (95% bootstrap {lo_ci:.3f} to {hi_ci:.3f})"
         )
     say_withheld(
         f"Depth in units of {UNIT_MW} MW, sorted: "
@@ -568,7 +568,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         depth_in_units=pl.Series(depth / UNIT_MW),
     )
     table.write_parquet(DATA_DIR / "drops_overlap.parquet")
-    say("\n" + str(table.with_columns(pl.col(pl.Float64).round(2))))
+    # The depth in units stays in the parquet only: beside the depth in MW it gives the unit size.
+    say("\n" + str(table.drop("depth_in_units").with_columns(pl.col(pl.Float64).round(2))))
     (DATA_DIR / "summary.json").write_text(json.dumps(SUMMARY, indent=1))
     (Path(__file__).parent / "printed_report.txt").write_text("\n".join(REPORT) + "\n")
     (DATA_DIR / "printed_report_private.txt").write_text("\n".join(PRIVATE_REPORT) + "\n")

@@ -47,6 +47,13 @@ def test_a_wrong_type_is_refused_without_echoing_the_value(constants_file: Path)
     with pytest.raises(loader.EngineConstantsError, match="not a YYYY-MM-DD date") as error:
         loader.engine_datetime(key="a_string", path=constants_file)
     assert "text" not in str(error.value)
+    assert error.value.__cause__ is None
+
+
+def test_a_string_is_read_and_a_number_is_refused(constants_file: Path):
+    assert loader.engine_string(key="a_string", path=constants_file) == "text"
+    with pytest.raises(loader.EngineConstantsError, match="non-empty string"):
+        loader.engine_string(key="a_size", path=constants_file)
 
 
 def test_a_boolean_is_not_a_number(tmp_path: Path):
