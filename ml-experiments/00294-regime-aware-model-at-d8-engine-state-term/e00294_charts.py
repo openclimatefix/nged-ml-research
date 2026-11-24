@@ -140,65 +140,6 @@ def headline() -> None:
     _save(chart, name="figure_1_relative_score")
 
 
-def coefficients(*, score: dict) -> None:
-    """The engine coefficient of each monthly refit, in MW, against the recorded unit."""
-    rows = []
-    for r in score["checks"]["coefficients"]["D8"]:
-        if "regF" not in r:
-            continue
-        rows += [
-            {
-                "cut": r["cut"],
-                "series": "Per half-hour with 1+ units running",
-                "mw": r["regF"][1] * 0.1,
-            },
-            {
-                "cut": r["cut"],
-                "series": "Per running unit (expected units)",
-                "mw": r["regU"][1] * 0.1,
-            },
-            {
-                "cut": r["cut"],
-                "series": "On last-day state (trained lagged)",
-                "mw": r["regP"][1] * 0.1,
-            },
-        ]
-    data = pl.DataFrame(rows).with_columns(pl.col("cut").str.to_date())
-    domain = [
-        "Per half-hour with 1+ units running",
-        "Per running unit (expected units)",
-        "On last-day state (trained lagged)",
-    ]
-    colour = alt.Color(
-        "series:N",
-        scale=alt.Scale(domain=domain, range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_PURPLE]),
-        legend=alt.Legend(orient="top", title=None, columns=1),
-    )
-    lines = (
-        _chart(data)
-        .mark_line(point=True)
-        .encode(
-            x=alt.X("cut:T", title="Monthly refit date"),
-            y=alt.Y("mw:Q", title="Fitted offset, MW", scale=alt.Scale(domain=[0, 4])),
-            color=colour,
-        )
-    )
-    unit = (
-        _chart(pl.DataFrame({"y": [1.97]}))
-        .mark_rule(color="#555555", strokeDash=[4, 3])
-        .encode(y="y:Q")
-    )
-    chart = (lines + unit).properties(
-        width=WIDTH,
-        height=220,
-        title=_title(
-            title="The fitted offset is steady across refits, and is smaller when the state is a day old",
-            subtitle="D8, arm 3's engine column. Each point is one monthly refit on the whole history. Dashed line: one engine unit, 1.97 MW, from the engine's recorded output.",
-        ),
-    )
-    _save(chart, name="figure_2_engine_offset")
-
-
 def shortfall(*, score: dict) -> None:
     """Mean error (reading minus forecast) on engine-running and other half-hours."""
     rows = []
@@ -246,74 +187,6 @@ def shortfall(*, score: dict) -> None:
         )
     )
     _save(chart, name="figure_3_shortfall_by_state")
-
-
-def example_weeks() -> None:
-    """Three weeks of D8 readings, forecasts and the engine state (one lead band)."""
-    arms = {
-        "arm1": "Arm 1",
-        "arm3_matched": "Post hoc matched arm",
-        "arm3_hindsight": "State at the target",
-    }
-    frames = {}
-    for key, (c, k) in ((a, sc.D8_ARMS[a]) for a in arms):
-        f = sc.load_arm(config=c, kind=k, site="D8").filter(
-            (pl.col("lead_hours") >= 12) & (pl.col("lead_hours") < 36)
-        )
-        frames[key] = f
-    base = frames["arm1"].filter(
-        (pl.col("valid_time") >= pl.datetime(2025, 12, 1, time_zone="UTC"))
-        & (pl.col("valid_time") < pl.datetime(2025, 12, 22, time_zone="UTC"))
-    )
-    rows = []
-    for key, label in arms.items():
-        f = frames[key].join(base.select("run", "valid_time"), on=["run", "valid_time"])
-        rows += [
-            {"valid_time": t, "mw": m * 0.1, "series": label, "run": int(r)}
-            for t, m, r in zip(f["valid_time"], f["mean"], f["run"], strict=True)
-        ]
-    rows += [
-        {"valid_time": t, "mw": a * 0.1, "series": "Reading", "run": int(r)}
-        for t, a, r in zip(base["valid_time"], base["actual"], base["run"], strict=True)
-    ]
-    shade = (
-        base.select("valid_time", "p_engine_filtered")
-        .with_columns((pl.col("p_engine_filtered") > 0.5).alias("on"))
-        .filter("on")
-        .select("valid_time")
-    )
-    domain = ["Reading", "Arm 1", "Post hoc matched arm", "State at the target"]
-    colour = alt.Color(
-        "series:N",
-        scale=alt.Scale(
-            domain=domain, range=["#222222", ocf.DATA_GREEN, ocf.DATA_PURPLE, ocf.BRAND_ORANGE]
-        ),
-        legend=alt.Legend(orient="top", title=None, columns=2),
-    )
-    lines = (
-        _chart(pl.DataFrame(rows))
-        .mark_line(clip=True, strokeWidth=1.2)
-        .encode(
-            detail="run:N",
-            x=alt.X("valid_time:T", title="Valid time, December 2025", axis=alt.Axis(format="%d")),
-            y=alt.Y("mw:Q", title="D8 power, MW (forecast 12 to 36 hours ahead)"),
-            color=colour,
-        )
-    )
-    bands = (
-        _chart(shade.with_columns((pl.col("valid_time") + pl.duration(minutes=30)).alias("end")))
-        .mark_rect(opacity=0.15, color=ocf.BRAND_ORANGE)
-        .encode(x="valid_time:T", x2="end:T", y=alt.value(0), y2=alt.value(240))
-    )
-    chart = (bands + lines).properties(
-        width=WIDTH,
-        height=240,
-        title=_title(
-            title="Only a forecast that sees the engine state at the target is pulled down during the shaded spells",
-            subtitle="D8, 1 to 21 December 2025. Shading: half-hours when the detector's filtered probability of a running engine exceeds 0.5.",
-        ),
-    )
-    _save(chart, name="figure_4_example_weeks")
 
 
 def controls() -> None:
@@ -384,12 +257,14 @@ def controls() -> None:
 
 
 def main() -> None:
-    """Draw every figure."""
+    """Draw every figure.
+
+    The engine offset per refit and the example weeks are not drawn, because they show the
+    inferred engine state or its fitted size on calendar dates.
+    """
     score = json.loads(sc.OUT_PATH.read_text())
     headline()
-    coefficients(score=score)
     shortfall(score=score)
-    example_weeks()
     controls()
 
 
