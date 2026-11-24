@@ -1,10 +1,11 @@
 # Export bundle of the step-5 demand network (format version 2)
 
 **This directory holds everything that production needs to re-implement the inference of one monthly
-refit of the step-5 network at the 16 Primaries.** The network is arm `k1_5w_sp1` of research
-experiment 677, with three seeds (0, 1, 2). `manifest.json` names which arm of experiment 704 the
-weights come from (`replay`, `proxy`, or `drop`: how the two previous-day CAMS columns are filled),
-the refit month, the training cut-off, the research commit, and the SHA-256 of every other file.
+refit of the step-5 neural network at the 16 Primaries.** The neural network has three seeds (0, 1,
+and 2). `manifest.json` names the arm that the weights come from (`replay` is arm `k1_5w_sp1` of
+research experiment 677; `drop` is arm B of research experiment 704, which sets the two
+previous-day CAMS irradiance columns to zero), the refit month, the training cut-off, the research
+commit, and the SHA-256 of every other file.
 
 **Production re-implements every feature, so the fixtures are the defence against skew.** Each
 fixture origin holds the raw weather inputs, every input column before and after standardisation,
@@ -14,8 +15,11 @@ standardised matrix from the `raw__` columns and reproduces the quantiles with `
 and calendar columns, and the B1 columns are checked only against the fixture files, so production
 must compare its own values of those columns with `input_matrix.parquet`. Run it with
 `python -I reference_check.py` (inputs and raw outputs to 1e-5, quantiles to 2e-5 of capacity,
-because the stored raw outputs come from a GPU pass). The quantile fixtures were regenerated on the
-CPU by this file's read-out, so only `raw_out_*` and the inputs are independent of this file.
+because the stored raw outputs come from a graphics-processing-unit (GPU) pass).
+
+**The check cannot test the quantile fixtures, because `reference_check.py` generated them.** The
+quantile fixtures were regenerated on the CPU by the `quantiles` function of `reference_check.py`.
+Only the input columns and the raw network outputs (`raw_out_*`) are independent of that file.
 
 ## Forecast recipe at one daily origin
 
@@ -32,14 +36,16 @@ CPU by this file's read-out, so only `raw_out_*` and the inputs are independent 
    valid half-hour) with valid time up to 339 hours after the native origin, using
    `components/step5/standardisers.json`.
 4. **Run the forward pass of `reference_check.py` for each seed**, read out the 13 quantiles, and
-   sort them. Average the seeds' contract-origin values in megawatts, then sort again.
+   sort them. `reference_check.py` reads `seed<N>.npz` and uses `torch`; production re-implements the
+   forward pass with the library of its choice. Average the seeds' contract-origin values in megawatts, then sort again.
 5. **Relabel the origin from 09:00 to 12:00 UTC, multiply by `capacity_mw`, and keep valid times
    from 12:00 UTC to just before 12:00 UTC 14 days later** (672 half-hours).
 
 ## Files
 
-- `manifest.json`: format version, `model_release` (an integer, 0 for a bundle that is not a model
-  release), network name, arm, refit month and time, training cut-off,
+- `manifest.json`: format version, `model_release` (an integer: 0 for a bundle that is not a
+  release of the forecasting model, and otherwise the release's number, which production sets),
+  network name, arm, refit month and time, training cut-off,
   research git commit and dirty flags, pinned production-package commit, library versions, source
   paths on the research workstation, seeds, a `components` section, the export checks, and the
   SHA-256 of every file.
@@ -48,10 +54,12 @@ CPU by this file's read-out, so only `raw_out_*` and the inputs are independent 
   levels, bisection range and steps, standard-deviation clamp, expected-weather rule, B1 constants,
   and the training provenance (half-life, embargoes, seeds). Training provenance is informational:
   inference does not read it.
-- The 13 quantile levels in `config.json` are NGED's delivery levels: 0.01, 0.02, 0.05, 0.10, 0.20,
-  0.35, 0.50, 0.65, 0.80, 0.90, 0.95, 0.98, and 0.99. Fixture columns are named `q01` to `q99`
-  after them. The read-out bisects the mixture's cumulative distribution function at each level, so
-  any other level needs only a change to `quantile_levels` in `config.json`.
+    - `quantile_levels` holds the 13 levels that National Grid Electricity Distribution (NGED)
+      delivers: 0.01, 0.02, 0.05, 0.10, 0.20, 0.35, 0.50, 0.65, 0.80, 0.90, 0.95, 0.98, and 0.99.
+      Fixture columns are named `q<percentile>`, from `q01` for 0.01 to `q99` for 0.99.
+    - The read-out bisects the mixture's cumulative distribution function at each level. Any level
+      between 0 and 1 needs a change to `quantile_levels`, and the quantile fixtures must then be
+      regenerated.
 - `primaries.json`: the 16 Primaries in `primary_index` order (0 to 15, the embedding index), with
   `time_series_id`, D-label, unit, H3 resolution-5 cell, latitude, longitude, `effective_capacity_mw`
   and `capacity_mw` (the two are equal; the target and the lags use the first, the output scaling
@@ -67,11 +75,13 @@ CPU by this file's read-out, so only `raw_out_*` and the inputs are independent 
 - `components/step5/expected_weather_rows.parquet`: the expected-weather rows that the fixtures read,
   raw and standardised, with the source run's origin time. The rule that builds every row is in
   `config.json` (`expected_weather.rule`).
-- `components/step5/weights/seed<N>.npz`: the `state_dict` of class `AuxLagMdn` (stage `ft`) as numpy
-  arrays keyed by the `state_dict` names, loadable with `numpy.load`. Production needs no `torch` to
-  read it. `seed<N>.pt` holds the same tensors for the research code and is not read by production.
-  `weights_index.json` lists every tensor's name, shape, and size, and marks the tensors that
-  inference does not use (`mixer_pre.*`, `head.*`).
+- `components/step5/weights/seed<N>.npz`: the tensors of the neural network class `AuxLagMdn` (stage
+  `ft`) as numpy arrays keyed by the tensors' names, loadable with `numpy.load`. Production can read
+  the file without `torch`.
+- `components/step5/weights/seed<N>.pt`: the same tensors as a `torch` `state_dict`, for research
+  code. Production does not read it.
+- `components/step5/weights/weights_index.json`: every tensor's name, shape, and size, and a mark on
+  the tensors that inference does not use (`mixer_pre.*`, `head.*`).
 - `fixtures/step5/origin=<date>/`: one folder per fixture origin (native 09:00 UTC origin):
     - `ens_native.parquet`: the raw 51-member values at the native steps, before interpolation, for
       each Primary's H3 cell.
@@ -85,8 +95,8 @@ CPU by this file's read-out, so only `raw_out_*` and the inputs are independent 
     - `lag_and_expected_rows.parquet`: for each Primary, the 336 half-hours that the lags and the
       expected-weather table read at this origin: the cleaned power (fraction of effective capacity;
       NaN when missing) and the expected-weather row, raw and standardised.
-    - `outputs_native.parquet`: nine raw network outputs and 13 quantiles per seed (fraction of
-      capacity, native 09:00 origin, after the sort), and the seed mean after the sort.
+    - `outputs_native.parquet`: 9 raw network outputs and 13 quantiles per seed (fraction of
+      capacity, native 09:00 origin, sorted into ascending order), and the seed mean after the sort.
     - `outputs_contract.parquet`: the 12:00 contract rows in megawatts: per seed, and the seed mean
       after the sort (672 half-hours per Primary).
     - `outputs_lags_removed.parquet`: the same quantiles with both lags set to the missing
@@ -101,10 +111,12 @@ network gets its own folder `components/<name>/`, its own `components.<name>` en
 its own `fixtures/<name>/`. The Candidate also needs the table T, the neighbour list, and the K1
 step-2 weights; they become further files named in its manifest entry. Files that every component
 shares (`config.json` `shared`, `primaries.json`) stay at the top level, and
-`bundle_format_version` changes only when a file listed here changes meaning.
+`bundle_format_version` changes when a file is added or removed, when a file changes meaning, or
+when the quantile levels change.
 
 ## Fixture origins
 
-The refit month's fixture origins include a Saturday, the Good Friday bank holiday, and an origin
-with a missing week lag at several Primaries. `manifest.json` lists them under `fixture_origins`
-and gives the counts of rows with a missing lag under `export_checks`.
+The fixture origins are chosen to include Saturdays, a bank holiday or a clock change where the
+refit month has one, and an origin with a missing week lag where one exists. `manifest.json` lists
+them under `fixture_origins` and gives the counts of rows with a missing lag under
+`export_checks`.
