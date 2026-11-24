@@ -68,6 +68,13 @@ value or a figure from an earlier experiment. The design is condensed from the p
 capacity, the network paths, the training recipe, the known-answer worlds, and the leakage rules)
 are on the page of experiment 716.
 
+**The early-stopping pre-check of the known-answer worlds read one seed of three, and the other
+seeds of arm `M` are noisier than its limit.** The pre-registered pre-check reads arm `M` of seed 0
+only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of 0.0109 in world WH
+and 0.0121 in world WT, against the limit of 0.0225. Seeds 1 and 2 of arm `M` in WH have a last-10
+noise of 0.029 and 0.031, above that limit, so the rung-4 pass depended on seed 0. The numbers
+review checks this reading.
+
 **The honest expectation is a tie.** Six earlier experiments found that an explicit PV term built
 on forecast weather did not help net demand (the table below), and the target tokens already carry
 ENS shortwave. With 5 seeds the design detects, with 80% power, a CRPS difference of 0.06 points
@@ -183,6 +190,11 @@ generator's time series.
 
 The experiment is planned and has no fitted result yet, so these bullets describe the design.
 
+- **The pre-check reads seed 0 only:** the noise limit of the early-stopping pre-check comes from
+  the last 10 validation losses of arm `M` at seed 0. At seeds 1 and 2 of WH the same noise is 0.029
+  and 0.031, above the limit of 0.0225 at rung 4. The diagnostic best pass of the pre-check uses
+  patience 30, the patience that trains arm `M`. An Opus review of the code behind the pre-check
+  (commit 126577d1d) was clean.
 - **Architecture and training regime:** experiment 716's, with the target-row paths of this page.
   Every arm starts stages 2 and 3 from the stored stage 1 state of `M*` of the same fold and seed.
 - **Measurement:** as experiment 716, on 8 folds and 16 Primaries, with no screen.
