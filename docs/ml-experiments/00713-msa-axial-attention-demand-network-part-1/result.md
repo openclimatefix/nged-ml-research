@@ -78,7 +78,8 @@ headline: >-
   better than the Candidate of experiment 667 by 0.147 points of capacity of CRPS (98.75% interval
   -0.262 to -0.020), and beat a placebo fed random past days by 0.140 (-0.253 to -0.033). At the
   eight MVA-only Primaries the neural network was not detectably different from the Candidate
-  (+0.022, -0.092 to +0.112), and the pooled difference rests on two Primaries, D8 and D12. The
+  (+0.022, -0.092 to +0.112), and, in a 2-seed recomputation, the pooled difference rests on two
+  Primaries, D8 and D12. The
   neural network is worse than the Candidate at the two report-only Primaries, D15 and D18. The
   known-answer gate failed and was waived.
 lessons: >-
@@ -87,7 +88,8 @@ lessons: >-
   attention (arm `K`) is within 0.06 points of the full neural network `M1` in CRPS, though the
   trunk attention improves the median error at the six signed-MW Primaries. On injected lasting
   steps, arms `K` and `E` gain about as much as `M1`, so the gain is not shown to come from
-  attention. At the eight MVA-only Primaries, two Primaries hold the sign of the pooled difference,
+  attention. At the eight MVA-only Primaries, two Primaries hold the sign of the 2-seed pooled
+  difference,
   and the q99 pinball loss is worse than the Candidate's.
 take_home_message: >-
   A neural network that reads a substation's last 14 days of power, weather, and calendar as a grid
@@ -95,7 +97,8 @@ take_home_message: >-
   (0.147 points of capacity of CRPS, about 5% of the Candidate's CRPS), and the gain is not shown to
   come from the attention layers, because a simpler learned read-out over the same days does almost
   as well. At the eight substations that report only megavolt-amperes the neural network was no
-  better, the pooled difference rests on two substations, and the neural network is worse than the
+  better, the 2-seed pooled difference rests on two substations, and the neural network is worse
+  than the
   Candidate at
   the two short-history substations by a derived difference of roughly 1.6 points that has no
   interval. The history rows use weather analyses that a live service could
@@ -107,8 +110,9 @@ advice:
     before crediting attention for a gain from recent days, because `K` was within 0.06 points of
     the full neural network in CRPS (experiment 713, M1 minus K).
   - >-
-    Read a gain at the eight MVA-only Primaries per Primary before pooling, because leaving out D8
-    or D12 turned the pooled difference negative (experiment 713, H1).
+    Read a gain at the eight MVA-only Primaries per Primary before pooling, because in a 2-seed
+    recomputation
+    leaving out D8 or D12 turned the pooled difference negative (experiment 713, H1).
   - >-
     Run the control arms (`K`, `E`, `P`) on the injected lasting-step worlds before reading a gain
     there as evidence for attention, because `K` and `E` gained about as much as `M1` (experiment
@@ -201,10 +205,13 @@ the sign of H1, the t guard and the noise-floor guard fail, and the upper bound 
 pinball-loss difference from the Candidate is 0.071 points, above the limit of 0.05.
 
 **At the eight MVA-only Primaries the pooled difference from the Candidate rests on two Primaries,
-D8 and D12.** Leaving out D8 turns the pooled difference over the other seven MVA-only Primaries to
--0.004, and leaving out D12 turns it to -0.028 (seeds 0 and 1, 24 to 240 h, rows pooled). The neural
-network is therefore not shown to help the other six MVA-only Primaries, and no pooled reading of
-the eight MVA-only Primaries should be read as an effect on all of them.
+D8 and D12, in the 2-seed recomputation.** The 5-seed pooled difference is +0.0221 and the 5-seed
+leave-one-Primary-out guard flips the sign (both in `score/headline.json`), but the file does not
+name the Primary whose removal flips it. A recomputation from the stored forecasts for seeds 0 and 1
+only (24 to 240 h, rows pooled; not stored in a score file) gives a pooled difference of +0.0274.
+Leaving out D8 turns that 2-seed difference to -0.004, and leaving out D12 turns it to -0.028. The
+neural network is therefore not shown to help the other seven MVA-only Primaries, and no pooled
+reading of the eight MVA-only Primaries should be read as an effect on all of them.
 
 **The neural network is worse than the Candidate at the two report-only Primaries.** From seeds 0
 and 1, the mean CRPS over all 16 Primaries is 4.037 for `C`, 4.191 for `M1`, and 4.218 for `P`.
@@ -328,7 +335,8 @@ temporary move, with the onset marked.**
   D15, so their CRPS may be affected.
 - **CRPS and the error of the median disagree at two contrasts.** `E` minus `M1` at the six
   signed-MW Primaries is 0.000 in CRPS and -0.009 in normalised median error. `M1` minus `C` at the
-  eight MVA-only Primaries is +0.027 in CRPS and -0.035 in median error: the median is slightly
+  eight MVA-only Primaries is +0.027 in CRPS and -0.035 in median error (95%, seeds 0 and 1): the
+  median is slightly
   better and the upper tail is worse, which matches the failed q99 guard.
 - **Audit triggers.** Audit triggers 1 to 5 fired. The Opus audit
   (`briefs/msa_architecture/audit_713.md`, in the private data folder) found no implementation fault
@@ -410,8 +418,9 @@ temporary move, with the onset marked.**
 - **Score a learned read-out over the history rows, with no trunk attention, before crediting
   attention.** Arm `K` is within 0.06 points of `M1` at both groups in CRPS, though the trunk
   attention improves the median error at the six signed-MW Primaries.
-- **Score changes at the eight MVA-only Primaries per Primary before pooling.** Two Primaries, D8
-  and D12, hold the sign of the pooled difference.
+- **Score changes at the eight MVA-only Primaries per Primary before pooling.** In a 2-seed
+  recomputation, two
+  Primaries, D8 and D12, hold the sign of the pooled difference (seeds 0 and 1).
 - **Do not credit attention for a lasting-step gain until the control arms are scored.** `K` and `E`
   gain about as much as `M1` on the era bank.
 - **Diagnose a known-answer gate that the neural network keeps failing before running the real
