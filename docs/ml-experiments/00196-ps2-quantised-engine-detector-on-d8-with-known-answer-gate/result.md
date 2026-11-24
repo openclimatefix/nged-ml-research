@@ -123,9 +123,9 @@ month](figure_3_flagged_share_by_month.svg)
 
 - **Row set and detector.** The detector fitted on D8 from 2023-09 to 2025-12 (40,900 half-hours).
   It flags a half-hour when the smoothed probability of at least 1 unit exceeds 0.5. Noise was
-  fitted on odd months of D8's engine-free history (2022-01 to July 2023). No convex
-  demand model was refitted: the expected power is the stored panel's, and each retrain step
-  re-centres it by a monthly offset and an hour-by-day-type profile.
+  fitted on odd months of D8's engine-free history: the months before the engine connected, and
+  July 2023. No convex demand model was refitted: the expected power is the stored panel's, and
+  each retrain step re-centres it by a monthly offset and an hour-by-day-type profile.
 - **K1 (G2's output replayed, 2,054 scored half-hours: 1,704 at 0 units, 137 at 1, 133 at 2, 80 at
   3).** Recall at 2 or 3 units 1.00 (95% 1.00 to 1.00); at 1 unit 0.83 (0.63 to 0.97); precision
   0.84 (0.67 to 0.97); energy error -1.3% (-10% to +13%). All four thresholds pass.
@@ -143,6 +143,9 @@ month](figure_3_flagged_share_by_month.svg)
   pre-registered bars (3% of half-hours; 1 false active day a month) fail at D5 (2.02 days), D10
   (1.05 days), and D11 (3.2% flagged). The audit judged that arguing these Primaries hold real
   assets would be post hoc, so the verdict stands.
+- **Unit size.** The fitted unit size was smaller than the design's unit size in every round, with
+  the design prior and the wide prior alike, so the prediction held only at its lower edge, and the
+  fitted unit size did not vary widely between rounds. The values are not reported here.
 - **Step detectors on the same injections (half-hours inside a found spell, K1 and K2).** RO-NC at
   24 hours: 0.08 and 0.02 alone, 0.00 and 0.00 with the neighbour check; RO-NC at 4 hours: 0.24 and
   0.20 alone, 0.00 and 0.01 with the neighbour check; block detector 0.09 and 0.09. One of five

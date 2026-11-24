@@ -177,6 +177,10 @@ units.*
   0.25, and the prediction needed the interval wholly below 0.25. Depths from 2023-08-15 to
   2025-02-28 (11 drops, median 3.6 MW) give 0.319, and depths from 2025-03 (17 drops, median
   2.4 MW) give 0.266.
+- **Sensitivity to the unit size:** the depths' mean distance and the onset steps' p value both
+  changed when the unit size was set to the fitted value from experiment 196 instead of the planned
+  unit size, so the clustering result depends on the unit size chosen. The values are not reported
+  here.
 - **Steps at the drops' edges:** the onset steps give 0.214 (0.159 to 0.273, p 0.046) at the planned
   unit size. The end steps give 0.258 (0.207 to 0.307).
 - **Possible reason:** the 24-hour median of D8's residual outside the drops (metered power minus
