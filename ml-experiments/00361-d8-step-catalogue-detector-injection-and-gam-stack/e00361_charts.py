@@ -26,7 +26,7 @@ WIDTH: Final[int] = 480
 
 def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(DOCS_DIR / f"{name}.svg")
+    guard.save_chart(chart=chart, path=DOCS_DIR / f"{name}.svg")
     print("wrote", name)
 
 
@@ -121,8 +121,7 @@ def figure_3(*, catalogue: dict) -> None:
         x=alt.X("len:O", title="Detected falls of at least 6 hours in the month", axis=alt.Axis(labelAngle=0)),
         y=alt.Y("months:Q", title="Number of months"),
     ).properties(width=WIDTH, height=180, title=_title("The rule finds 1 to 10 falls a month at D8, and 193 in all", "Months pooled by number of falls; threshold on the 6-hour median of the residual; against 171 rises of the same size"))  # fmt: skip
-    guard.save_chart(chart=chart, path=DOCS_DIR / "figure_3_falls_per_month.svg")
-    print("wrote figure_3_falls_per_month")
+    _save(chart, name="figure_3_falls_per_month")
 
 
 def main() -> None:

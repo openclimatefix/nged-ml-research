@@ -5,6 +5,7 @@ uv run --no-sync python ml-experiments/00294-*/e00294_charts.py
 """
 
 import json
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any, Final
@@ -15,6 +16,9 @@ import e00294_score as sc
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 DOCS_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -52,8 +56,8 @@ def _chart(data: pl.DataFrame) -> Any:
 def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     PNG_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(DOCS_DIR / f"{name}.svg")
-    chart.save(PNG_DIR / f"{name}.png", scale_factor=1.5)
+    guard.save_chart(chart=chart, path=DOCS_DIR / f"{name}.svg")
+    guard.save_chart(chart=chart, path=PNG_DIR / f"{name}.png", scale_factor=1.5)
     print("wrote", name)
 
 

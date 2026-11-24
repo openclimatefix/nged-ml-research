@@ -276,7 +276,7 @@ def main() -> None:
             ),
         )
     )
-    chart.save(OUT_DIR / "figure_1_against_step_detectors.svg")
+    guard.save_chart(chart=chart, path=OUT_DIR / "figure_1_against_step_detectors.svg")
 
     # Figure 2: profile likelihood of the unit size
     log = (DATA_DIR / "fit_wide.log").read_text()
@@ -295,7 +295,7 @@ def main() -> None:
             for _, g, v in rr
         ]
     )
-    (
+    chart2 = (
         alt.Chart(pf)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
@@ -319,7 +319,8 @@ def main() -> None:
                 ),
             ),
         )
-    ).save(OUT_DIR / "figure_2_unit_size_profile.svg")
+    )
+    guard.save_chart(chart=chart2, path=OUT_DIR / "figure_2_unit_size_profile.svg")
 
     draw_figure_3(base=base, local=local)
     # Figure 4 (one known-answer week of the engine's recorded output) is not drawn: an output

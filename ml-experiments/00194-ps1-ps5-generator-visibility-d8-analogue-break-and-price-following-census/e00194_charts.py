@@ -48,7 +48,9 @@ def main() -> None:  # noqa: D103
         alt.Chart(pl.concat(rows))
         .mark_bar(aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("site:N", title=None, sort=["D8", "D3", "D5", "D14"], axis=alt.Axis(labelAngle=0)),
+            x=alt.X(
+                "site:N", title=None, sort=["D8", "D3", "D5", "D14"], axis=alt.Axis(labelAngle=0)
+            ),
             y=alt.Y("share:Q", title="Share of half-hours in shortfall"),
             color=alt.Color(
                 "site:N",

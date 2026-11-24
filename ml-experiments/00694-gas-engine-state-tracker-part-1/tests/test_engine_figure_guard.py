@@ -111,7 +111,7 @@ def test_the_four_figure_paths_are_guarded():
     for folder, name in names:
         assert guard.is_guarded(path=Path(folder) / name)
         assert guard.is_guarded(path=(Path(folder) / name).with_suffix(".png"))
-    assert not guard.is_guarded(path=Path("00194-x") / "figure_1.svg")
+    assert not guard.is_guarded(path=Path("00194-x") / "figure_3.svg")
 
 
 @pytest.mark.parametrize("pattern", SCRIPTS)
