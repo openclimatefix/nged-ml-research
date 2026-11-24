@@ -1,6 +1,8 @@
 # ruff: noqa: ANN001, ANN003
 """The bars, the verdict rules, and the stop rules of experiment 723 on synthetic inputs."""
 
+from typing import Any
+
 import e00723_core as core
 import e00723_score as score
 import numpy as np
@@ -8,7 +10,7 @@ import pytest
 
 
 def inputs(**kw) -> core.W2Inputs:
-    base = {
+    base: dict[str, Any] = {
         "correctness_ok": True, "alignment_ok": True, "timestamp_defect": False,
         "n_pairs_keeping_sensor": 12, "n_powered_pairs_level_2": 8, "n_powered_hosts": 3,
         "pooled_se": 0.03, "n_export_stretches": 100, "n_import_stretches": 100,
@@ -94,10 +96,16 @@ def test_transfer_bar_is_void_under_100_stretches_or_with_a_large_error():
 
 
 def test_dead_band_bar_binds_only_for_an_outside_farm_and_keeps_every_stretch():
-    assert core.d15_dead_band_binds(farm_class="outside_or_added_back")
-    assert not core.d15_dead_band_binds(farm_class="embedded_not_added_back")
-    assert not core.d15_dead_band_binds(farm_class="unresolved")
-    assert not core.d15_dead_band_binds(farm_class=None)
+    assert core.d15_dead_band_binds(farm_class="outside_or_added_back", is_addback_candidate=False)
+    # RULED: an add-back candidate at D15 makes the bar report-only.
+    assert not core.d15_dead_band_binds(
+        farm_class="outside_or_added_back", is_addback_candidate=True
+    )
+    assert not core.d15_dead_band_binds(
+        farm_class="embedded_not_added_back", is_addback_candidate=False
+    )
+    assert not core.d15_dead_band_binds(farm_class="unresolved", is_addback_candidate=False)
+    assert not core.d15_dead_band_binds(farm_class=None, is_addback_candidate=False)
     assert core.dead_band_bar(n_no_evidence=10, n_stretches=50, binds=False) == "report"
     assert core.dead_band_bar(n_no_evidence=29, n_stretches=29, binds=True) == "void"
     assert core.dead_band_bar(n_no_evidence=27, n_stretches=30, binds=True) == "pass"
@@ -204,6 +212,43 @@ def test_void_before_run_rule():
     )
 
 
+@pytest.mark.parametrize(
+    ("shares", "void"),
+    [
+        ({"D5": 0.0, "D9": 0.0, "F1": 0.0}, False),
+        ({"D5": 0.0, "D9": 0.5, "F1": 0.0}, True),
+        ({"D5": 0.0, "F1": 0.01}, False),
+        ({"D5": 0.0, "F1": 0.0101}, True),
+        ({"D5": 0.0, "F1": float("nan")}, True),
+        ({}, True),
+    ],
+)
+def test_the_arc_term_is_void_when_any_sites_unchanged_share_exceeds_1_percent(shares, void):
+    # A healthy run has a share of 0; one broken site is not hidden by the others.
+    assert core.arc_term_void(unchanged_share_by_site=shares) is void
+
+
+def test_a_void_arc_term_is_row_2_and_builds_no_world():
+    assert core.verdict_w2(x=inputs(arc_term_void=True)) == (
+        "inconclusive",
+        "row_2_void_before_run",
+    )
+    assert core.verdict_w2(x=inputs(arc_term_void=False))[0] == "supported"
+    # Row 1 still comes first.
+    assert core.verdict_w2(x=inputs(arc_term_void=True, correctness_ok=False))[0] == "invalid"
+    assert core.void_before_run(
+        n_pairs_keeping_sensor=12,
+        n_powered_pairs_level_2=9,
+        n_powered_hosts=3,
+        arc_term_void_flag=True,
+    )
+
+
+def test_calibration_is_void_by_construction_and_neutral():
+    assert core.VOID_BY_CONSTRUCTION == ("calibration",)
+    assert core.verdict_w2(x=inputs())[0] == "supported"
+
+
 def test_job_w3_verdict_rows():
     ok = {"a": "pass", "b": "pass"}
     assert (
@@ -222,12 +267,23 @@ def test_timing_gate_counts_the_worlds_it_will_score():
     pairs = [(h, f) for h in ("D10", "D14", "D16") for f in ("F1", "F2", "F3", "F4")][:12]
     specs = score.world_specs(qualifying=pairs)
     assert len(specs) == core.N_WORLDS
-    assert len({s.name for s in specs}) == len(specs)
+    assert len({s.name for s in specs}) == len(specs)  # no world is scored twice
     projected = core.project_w2_seconds(
         seconds_per_world=10.0, seconds_per_draw=0.5, n_worlds=len(specs)
     )
-    assert projected == pytest.approx(10.0 * 32 + 0.5 * 1000)
+    assert projected == pytest.approx(
+        10.0 * 32 + 0.5 * 1000 + 0.5 * 1000 * core.N_POOLED_BOOTSTRAPS_AFTER_VERDICT
+    )
     assert not core.over_cap(projected_seconds=projected)
+    # The projection also holds the unmasked rescoring and the seven closure fits.
+    full = core.project_w2_seconds(
+        seconds_per_world=10.0,
+        seconds_per_draw=0.5,
+        n_worlds=32,
+        rescoring=True,
+        seconds_per_ols_draw=0.01,
+    )
+    assert full == pytest.approx(projected + 10.0 * 32 + 0.01 * 1000 * core.N_CLOSURE_FITS)
     assert core.over_cap(
         projected_seconds=core.project_w2_seconds(seconds_per_world=100.0, seconds_per_draw=1.0)
     )

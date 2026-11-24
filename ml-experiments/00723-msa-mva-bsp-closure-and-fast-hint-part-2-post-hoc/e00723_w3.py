@@ -44,14 +44,14 @@ def control_population(*, table: pl.DataFrame, which: str) -> pl.DataFrame:
     """Return the scorable stretches of a control under the farm sensor.
 
     `anchor` is D12's anchor stretches (the first and last stretch of a day) with at least 8
-    usable pairs. `post_bounce` is D3's post-bounce stretches with at least 8 usable pairs.
-    PROVISIONAL: the plan page states no day restriction for the controls, so neither is limited
-    to one-stretch days.
+    usable pairs, on every day. `post_bounce` is D3's post-bounce stretches with at least 8 usable
+    pairs on days with exactly one post-bounce stretch, the population that job W2 calibrates and
+    that the read-outs at D12 use. RULED (design lead).
     """
     enough = pl.col("n_farm") >= core.MIN_USABLE_PAIRS
     if which == "anchor":
         return table.filter(~pl.col("is_post_bounce") & enough)
-    return table.filter(pl.col("is_post_bounce") & enough)
+    return table.filter(pl.col("is_post_bounce") & (pl.col("n_post_bounce_in_day") == 1) & enough)
 
 
 def control_outcome(*, rows: pl.DataFrame) -> tuple[str, dict[str, int]]:
@@ -97,7 +97,8 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     common.assert_launch()
     w0 = common.require_w0()
     common.require_w2_supported()
-    guard.invalidate_outputs(names=OUTPUTS)
+    guard.refuse_rerun(verdict_name=common.W3_VERDICT_NAME)
+    guard.archive_outputs(names=(*OUTPUTS, "run_log_w3.json"))
     log = guard.ReadLog()
     ctx = common.load_context(log=log, inputs=inputs)
     info["power_table_delta_version"] = data.power_table_version()

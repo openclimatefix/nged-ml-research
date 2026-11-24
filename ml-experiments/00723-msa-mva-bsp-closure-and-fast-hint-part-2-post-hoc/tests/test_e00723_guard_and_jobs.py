@@ -1,6 +1,7 @@
 # ruff: noqa: E501, ANN001
 """The guard, the run wrapper, the job order, and the pure helpers of job W0, on synthetic inputs."""
 
+import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -127,6 +128,69 @@ def test_no_script_names_a_home_path_or_a_dated_value():
         assert HOME_PREFIX not in path.read_text(), path.name
 
 
+def test_a_rerun_moves_the_earlier_outputs_into_an_attempt_folder(tmp_path):
+    (tmp_path / "PRIVATE").mkdir()
+    (tmp_path / "a.csv").write_text("1")
+    (tmp_path / "PRIVATE" / "w.parquet").write_text("p")
+    first = guard.archive_outputs(
+        names=("a.csv", "b.csv"), private_names=("w.parquet",), out_dir=tmp_path
+    )
+    assert first == tmp_path / "attempt_1"
+    assert first is not None
+    assert (first / "a.csv").read_text() == "1"
+    assert (first / "PRIVATE" / "w.parquet").read_text() == "p"
+    assert not (tmp_path / "a.csv").exists()
+    # Nothing to move: no folder is made.
+    assert guard.archive_outputs(names=("a.csv",), out_dir=tmp_path) is None
+    (tmp_path / "a.csv").write_text("2")
+    second = guard.archive_outputs(names=("a.csv",), out_dir=tmp_path)
+    assert second == tmp_path / "attempt_2"
+    assert second is not None
+    assert (first / "a.csv").read_text() == "1"
+    assert (second / "a.csv").read_text() == "2"
+
+
+@pytest.mark.parametrize(
+    ("verdict", "refused"),
+    [("supported", True), ("inconclusive", True), ("not supported", True), ("invalid", False)],
+)
+def test_a_rerun_is_refused_unless_the_verdict_is_invalid_or_the_manager_approved(
+    tmp_path, verdict, refused
+):
+    guard.refuse_rerun(verdict_name="v.json", out_dir=tmp_path, env={})  # no earlier verdict
+    (tmp_path / "v.json").write_text(json.dumps({"verdict": verdict}))
+    if refused:
+        with pytest.raises(guard.JobRefusedError):
+            guard.refuse_rerun(verdict_name="v.json", out_dir=tmp_path, env={})
+        guard.refuse_rerun(
+            verdict_name="v.json", out_dir=tmp_path, env={guard.RERUN_APPROVAL_ENV: "approved"}
+        )
+    else:
+        guard.refuse_rerun(verdict_name="v.json", out_dir=tmp_path, env={})
+
+
+def test_the_known_answer_tests_are_run_and_read_by_row_1(tmp_path):
+    (tmp_path / "test_ok.py").write_text("def test_a():\n    assert 1 + 1 == 2\n")
+    ok = guard.known_answer_tests(tests_dir=tmp_path)
+    assert ok["passed"] is True
+    assert ok["n_tests"] == 1
+    assert len(ok["code_hash"]) == 64
+    (tmp_path / "test_bad.py").write_text("def test_b():\n    assert False\n")
+    bad = guard.known_answer_tests(tests_dir=tmp_path)
+    assert bad["passed"] is False
+    text = (FOLDER / "e00723_w2.py").read_text()
+    assert 'tests["passed"]' in text  # job W2's correctness check reads the result
+
+
+def test_job_w2_refuses_a_world_run_after_a_failed_sensor_audit_and_writes_both_counts():
+    text = (FOLDER / "e00723_w2.py").read_text()
+    assert 'arc_void = bool(w0["arc_term_void"])' in text
+    assert "arc_term_void_flag=arc_void" in text
+    for key in ("worlds_scored_equal_planned", "worlds_planned", "worlds_skipped"):
+        assert key in text
+    assert "void_by_construction" in text
+
+
 def test_the_verdict_file_is_written_before_any_read_out_runs():
     text = (FOLDER / "e00723_w2.py").read_text()
     run = text[text.index("def run(") : text.index("def readouts(")]
@@ -180,6 +244,98 @@ def test_sheet_summary_and_windows_from_sheets():
     )
 
 
+def sheet_of(
+    *, numbers, starts, ends=None, number_name="Substation Number", start_name="Start Time"
+):
+    cols = {number_name: numbers, "Substation Name": ["x"] * len(numbers), start_name: starts}
+    if ends is not None:
+        cols["End Time"] = ends
+    return pl.DataFrame(cols)
+
+
+def test_a_substation_number_stored_as_a_float_or_with_a_null_still_matches():
+    start = [datetime(2025, 3, 1, 8, 0)] * 3
+    for numbers in ([10.0, 11.0, None], ["10.0", "11", None], [10, 11, None]):
+        sheet = sheet_of(numbers=numbers, starts=start)
+        wins = w0.windows_from_sheets(sheets={"s": sheet}, numbers={"D1": 10, "D2": 11})
+        assert len(wins["D1"]) == 1
+        assert len(wins["D2"]) == 1
+
+
+def test_a_switching_time_with_no_zone_is_read_as_europe_london():
+    # 08:00 local on a summer day is 07:00 UTC; on a winter day it is 08:00 UTC.
+    summer = sheet_of(
+        numbers=[10], starts=[datetime(2025, 7, 1, 8, 0)], ends=[datetime(2025, 7, 1, 9, 0)]
+    )
+    winter = sheet_of(
+        numbers=[10], starts=[datetime(2025, 1, 6, 8, 0)], ends=[datetime(2025, 1, 6, 9, 0)]
+    )
+    aware = sheet_of(
+        numbers=[10],
+        starts=[datetime(2025, 7, 1, 8, 0, tzinfo=UTC)],
+        ends=[datetime(2025, 7, 1, 9, 0, tzinfo=UTC)],
+    )
+    aware = aware.with_columns(pl.col("Start Time", "End Time").dt.convert_time_zone("UTC"))
+    numbers = {"D1": 10}
+    s_row = w0.windows_from_sheets(sheets={"s": summer}, numbers=numbers)["D1"][0][0]
+    w_row = w0.windows_from_sheets(sheets={"s": winter}, numbers=numbers)["D1"][0][0]
+    a_row = w0.windows_from_sheets(sheets={"s": aware}, numbers=numbers)["D1"][0][0]
+    midnight_s = world.row_of_instant(instant=datetime(2025, 7, 1, tzinfo=UTC))
+    midnight_w = world.row_of_instant(instant=datetime(2025, 1, 6, tzinfo=UTC))
+    assert s_row - midnight_s == 14  # 07:00 UTC
+    assert w_row - midnight_w == 16  # 08:00 UTC
+    assert a_row - midnight_s == 16  # an aware time is kept as UTC
+
+
+def test_text_times_in_mixed_formats_are_all_parsed_and_the_unparsed_are_counted():
+    sheet = sheet_of(
+        numbers=[10, 10, 10, 10],
+        starts=["2025-03-01 08:00:00", "01/04/2025 09:30", "2025-05-01", "not a time"],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert len(wins["D1"]) == 3
+    assert diag[0]["n_rows"] == 4
+    assert diag[0]["n_rows_start_parsed"] == 3
+    assert diag[0]["n_rows_start_not_parsed"] == 1
+    assert diag[0]["n_rows_matched"] == 3
+
+
+def test_the_column_search_uses_whole_words_and_skips_transfer_columns():
+    sheet = pl.DataFrame(
+        {
+            "Substation Number": [10],
+            "Transferred from": [datetime(2025, 1, 1)],
+            "Start Time": [datetime(2025, 3, 1, 8)],
+            "Attended": [datetime(2025, 2, 1)],
+            "Restored Time": [datetime(2025, 3, 1, 12)],
+        }
+    )
+    _, diag = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert diag[0]["start_column"] == "Start Time"
+    assert diag[0]["end_column"] == "Restored Time"
+
+
+def test_a_window_that_ends_before_it_starts_is_counted_not_silently_dropped():
+    sheet = sheet_of(
+        numbers=[10, 10],
+        starts=[datetime(2025, 3, 2, 8), datetime(2025, 3, 1, 8)],
+        ends=[datetime(2025, 3, 1, 8), datetime(2025, 3, 1, 12)],
+    )
+    wins, diag = w0.windows_with_diagnostics(sheets={"s": sheet}, numbers={"D1": 10})
+    assert len(wins["D1"]) == 1
+    assert diag[0]["n_rows_end_before_start"] == 1
+
+
+def test_a_sheet_with_the_columns_and_rows_but_no_match_is_an_input_defect():
+    sheet = sheet_of(numbers=[999], starts=[datetime(2025, 3, 1, 8)])
+    with pytest.raises(w0.SwitchingLogDefectError):
+        w0.windows_from_sheets(sheets={"s": sheet}, numbers={"D1": 10})
+    # A sheet with no substation column is no mask, not a defect.
+    assert w0.windows_from_sheets(sheets={"s": pl.DataFrame({"x": [1]})}, numbers={"D1": 10}) == {
+        "D1": []
+    }
+
+
 def test_a_workbook_with_no_usable_sheet_gives_no_windows():
     wins = w0.windows_from_sheets(sheets={"s": pl.DataFrame({"x": [1]})}, numbers={"D1": 10})
     assert wins == {"D1": []}
@@ -204,11 +360,13 @@ def test_d10_counts_recount_export_hours_with_the_base_stated():
 def test_control_populations_and_outcomes():
     table = pl.DataFrame(
         {
-            "is_post_bounce": [False, False, True, True, True],
-            "n_farm": [10, 7, 10, 12, 9],
-            "c_farm": [0.1, 0.9, -0.5, 0.6, -0.4],
+            "is_post_bounce": [False, False, True, True, True, True],
+            "n_post_bounce_in_day": [2, 2, 1, 1, 1, 2],
+            "n_farm": [10, 7, 10, 12, 9, 11],
+            "c_farm": [0.1, 0.9, -0.5, 0.6, -0.4, -0.3],
         }
     )
+    # D12's anchor stretches on every day; D3's post-bounce stretches on one-stretch days only.
     anchors = w3.control_population(table=table, which="anchor")
     assert anchors.height == 1
     post = w3.control_population(table=table, which="post_bounce")

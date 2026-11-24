@@ -20,6 +20,7 @@ Outputs: `w2_results.csv`, `w2_verdict.json`, `w2_readouts.csv`, `w2_d15_fits.cs
 `run_log_w2.json`. Stdout prints counts, shares, areas, and intervals only.
 """
 
+import time
 from pathlib import Path
 from typing import Any, Final
 
@@ -103,8 +104,8 @@ def evaluate_bars(
 
     The bars: the pooled area (farm sensor), the placebo (the sensor shifted by 28 days), false
     export evidence at un-injected D5 and D10, the transfer check at un-injected D9, D11, D14, and
-    D16, D15's dead band, recall on D10's real export stretches, and calibration (void: the likelihood
-    ratio has no definition on the plan page).
+    D16, D15's dead band, recall on D10's real export stretches, and calibration (void by construction:
+    the likelihood ratio has no definition on the plan page).
     """
     rows: list[dict[str, Any]] = []
     inj = score.tagged(scores=scores, sensor="farm", roles=("injected",))
@@ -114,8 +115,15 @@ def evaluate_bars(
     level_1_readable = (
         level_1["n_export"] >= core.MIN_STRETCHES and level_1["n_import"] >= core.MIN_STRETCHES
     )
-    shifted_rows = score.tagged(scores=scores, sensor="shifted", roles=("injected",))
+    # RULED: the placebo is read on exactly the area's stretches and pairs (the farm sensor's
+    # scorable stretches, the real index change), so it has no void state of its own.
+    shifted_rows = score.tagged(
+        scores=scores, sensor="shifted", roles=("injected",), population_sensor="farm"
+    )
     shifted = score.area_of(rows=shifted_rows, weights=None)
+    if shifted_rows.height != inj.height:
+        msg = "the placebo must be read on the same stretches as the area"
+        raise RuntimeError(msg)
     outcomes: dict[str, str] = {}
     outcomes["area"] = core.area_bar(
         point=pooled["area"],
@@ -123,6 +131,9 @@ def evaluate_bars(
         point_level_1=level_1["area"] if level_1_readable else float("nan"),
     )
     outcomes["placebo"] = core.placebo_bar(real_area=pooled["area"], shifted_area=shifted["area"])
+    if outcomes["placebo"] == "void" and np.isfinite(pooled["area"]):
+        msg = "the placebo has no void state: its population is the area's"
+        raise RuntimeError(msg)
     rows += [
         result_row(
             measure="pooled_area_farm_sensor",
@@ -143,7 +154,10 @@ def evaluate_bars(
             scope="all pairs, both levels",
             outcome=outcomes["placebo"],
             stats=shifted,
-            extra={"gap": pooled["area"] - shifted["area"]},
+            extra={
+                "gap": pooled["area"] - shifted["area"],
+                "n_stretches_without_a_shifted_pair": int((shifted_rows["n_pairs"] == 0).sum()),
+            },
         ),
     ]
     # False export evidence at un-injected D5 and D10 (pooled over the two hosts).
@@ -169,6 +183,23 @@ def evaluate_bars(
             extra={"allowance": core.floor_allowance(n=ev["n"])},
         )
     )
+    # Each host beside the pooled bar, with no bar of its own (RULED: the pooled bar stays).
+    for host in score.UNINJECTED_FALSE_EXPORT_HOSTS:
+        host_ev = score.evidence_counts(rows=imp.filter(pl.col("host") == host))
+        rows.append(
+            result_row(
+                measure="false_export_evidence_by_host",
+                scope=f"un-injected {host}, true import stretches",
+                outcome="report",
+                stats={
+                    **host_ev,
+                    "share": host_ev["n_export_evidence"] / host_ev["n"]
+                    if host_ev["n"]
+                    else float("nan"),
+                },
+                extra={"allowance_if_alone": core.floor_allowance(n=host_ev["n"])},
+            )
+        )
     # Transfer check at un-injected D9, D11, D14, D16.
     tr = un.filter(pl.col("host").is_in(score.TRANSFER_HOSTS) & ~pl.col("is_export"))
     hit = (tr["c"].to_numpy() < -core.DEAD_BAND) if tr.height else np.array([], dtype=bool)
@@ -246,7 +277,9 @@ def evaluate_bars(
             scope="not defined",
             outcome="void",
             stats={},
-            extra={"note": "the plan page does not define the likelihood ratio; neutral when void"},
+            extra={
+                "note": "void by construction: the plan page defines no likelihood ratio, so no run reads this bar; neutral"
+            },
         )
     )
     details = {
@@ -256,11 +289,48 @@ def evaluate_bars(
     return outcomes, rows, details
 
 
+def time_closure_draw(
+    *,
+    ctx: common.Context,
+    windows: dict[str, list[tuple[int, int]]],
+    weights: np.ndarray,
+    n: int = 10,
+) -> float:
+    """Return the core-seconds per bootstrap draw of one closure fit (D10's dark hours), timed on `n` draws.
+
+    The figure includes the fit's setup, so it over-states a draw; the timing gate multiplies it by
+    the 1,000 draws and the 7 closure fits of the read-outs.
+    """
+    quiet = world.core722.quiet_mask(engine_change=ctx.eng.change, calendar_ok=ctx.eng.has_row)
+    day = sky.day_of(n=core.N_GRID) - ctx.start_row // core.HALF_HOURS_PER_DAY
+    rows = world.closure_rows(
+        zenith=ctx.sky_of["D10"].zenith,
+        masked=score.windows_mask(windows=windows, host="D10"),
+        start=ctx.start_row,
+        kind="dark",
+    )
+    t0 = time.process_time()
+    world.closure_fit(
+        response=ctx.residual(host="D10"),
+        regressors={"d10": ctx.series["D10"]},
+        rows=rows,
+        key=ctx.eng.key,
+        quiet=quiet,
+        day=day,
+        weights=weights[:n],
+    )
+    return (time.process_time() - t0) / max(n, 1)
+
+
 def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:
     """Run job W2; `inputs` and `info` fill the run log as the job reads."""
     common.assert_launch()
-    guard.invalidate_outputs(names=OUTPUTS)
     w0 = common.require_w0()
+    guard.refuse_rerun(verdict_name=common.W2_VERDICT_NAME)
+    guard.archive_outputs(names=(*OUTPUTS, "run_log_w2.json"))
+    tests = guard.known_answer_tests()
+    info["known_answer_tests"] = tests
+    guard.say("known-answer tests passed:", tests["passed"], "| tests:", tests["n_tests"])
     checks722 = common722.read_checks()
     log = guard.ReadLog()
     ctx = common.load_context(log=log, inputs=inputs)
@@ -268,7 +338,8 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     info["read_order"] = log.as_list()
     info["holdout"] = log.holdout
     correctness_ok = bool(
-        common.assert_later_span(n_days=ctx.n_days)
+        tests["passed"]
+        and common.assert_later_span(n_days=ctx.n_days)
         and log.holdout_clean()
         and w0["later_span_ok"]
         and w0["holdout_clean"]
@@ -284,12 +355,17 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         else 0
     )
     masked_label = "masked" if w0["mask_available"] else "transfers not masked"
+    arc_void = bool(w0["arc_term_void"])
     base = {
         "mask": masked_label, "n_pairs_keeping_sensor": n_keep, "n_powered_pairs_level_2": n_powered,
-        "n_powered_hosts": n_hosts, "correctness_ok": correctness_ok,
+        "n_powered_hosts": n_hosts, "correctness_ok": correctness_ok, "arc_term_void": arc_void,
+        "known_answer_tests": tests, "void_by_construction": list(core.VOID_BY_CONSTRUCTION),
     }  # fmt: skip
     if correctness_ok and core.void_before_run(
-        n_pairs_keeping_sensor=n_keep, n_powered_pairs_level_2=n_powered, n_powered_hosts=n_hosts
+        n_pairs_keeping_sensor=n_keep,
+        n_powered_pairs_level_2=n_powered,
+        n_powered_hosts=n_hosts,
+        arc_term_void_flag=arc_void,
     ):
         guard.write_public_json(
             payload={
@@ -307,19 +383,24 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     qualifying = sorted(zip(qual["host"].to_list(), qual["farm"].to_list(), strict=True))
     specs = score.world_specs(qualifying=qualifying)
     weights = core.day_weights(n_days=ctx.n_days)
-    guard.say("FITS STARTING: job W2;", len(specs), "worlds")
+    expected = [sp for sp in specs if score.expected_to_score(spec=sp, membership=membership)]
+    n_injected = sum(1 for sp in specs if sp.role == "injected")
+    guard.say("FITS STARTING: job W2;", len(expected), "worlds of", len(specs), "planned")
     scores: list[score.WorldScore] = []
-    skipped: list[str] = []
-    n_worlds_planned = len(specs)
+    skips: list[score.SkippedWorld] = []
+    n_worlds_planned = len(expected)
     gate.mark()
     stopped: str | None = None
+    per_draw = 0.0
+    per_ols_draw = 0.0
     for i, spec in enumerate(specs):
-        s = score.score_world(ctx=ctx, spec=spec, membership=membership, windows=windows)
-        if s is None:
-            skipped.append(spec.name)
-        else:
+        s = score.score_world(
+            ctx=ctx, spec=spec, membership=membership, windows=windows, skips=skips
+        )
+        if s is not None:
             scores.append(s)
         if len(scores) == 1 and s is not None:
+            # The pooled population holds about `n_injected` times the first world's stretches.
             per_draw = score.time_draws(
                 rows=score.tagged(
                     scores=scores,
@@ -327,9 +408,15 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
                     roles=("injected", "uninjected", "d10_folded", "d15_folded"),
                 ),
                 weights=weights,
+                replicate=max(n_injected, 1),
             )
+            per_ols_draw = time_closure_draw(ctx=ctx, windows=windows, weights=weights)
             projected = core.project_w2_seconds(
-                seconds_per_world=s.seconds, seconds_per_draw=per_draw, n_worlds=n_worlds_planned
+                seconds_per_world=s.seconds,
+                seconds_per_draw=per_draw,
+                n_worlds=n_worlds_planned,
+                rescoring=bool(windows),
+                seconds_per_ols_draw=per_ols_draw,
             )
             info["projection_core_seconds"] = projected
             if core.over_cap(projected_seconds=projected, cap_seconds=gate.cap_core_seconds):
@@ -338,9 +425,27 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         if i >= 1 and gate.elapsed() > gate.cap_core_seconds:
             stopped = "the timing gate stopped the job after it had started"
             break
+    n_after_verdict = (
+        per_draw * core.N_BOOT * core.N_POOLED_BOOTSTRAPS_AFTER_VERDICT
+        + per_ols_draw * core.N_BOOT * core.N_CLOSURE_FITS
+        + (sum(s.seconds for s in scores) if windows else 0.0)
+    )
+    if stopped is None and gate.elapsed() + n_after_verdict > gate.cap_core_seconds:
+        stopped = "the timing gate stopped the job before the pooled bootstrap"
+    scored_names = [s.spec.name for s in scores]
+    if len(set(scored_names)) != len(scored_names):
+        msg = "a world was scored twice"
+        raise RuntimeError(msg)
     info["worlds_scored"] = len(scores)
     info["worlds_planned"] = n_worlds_planned
-    info["worlds_skipped_no_sensor"] = skipped
+    info["worlds_skipped"] = [
+        {"name": k.name, "reason": k.reason, "n_reference_rows": k.n_reference_rows} for k in skips
+    ]
+    worlds_equal = bool(
+        stopped is not None
+        or (len(scores) == n_worlds_planned and set(scored_names) == {e.name for e in expected})
+    )
+    info["worlds_scored_equal_planned"] = worlds_equal
     if stopped is not None:
         guard.write_public_json(
             payload={
@@ -368,6 +473,7 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         n_import_stretches=details["pooled"]["n_import"],
         level_1_readable=details["level_1_readable"],
         outcomes=outcomes,
+        arc_term_void=arc_void,
     )
     verdict, row = core.verdict_w2(x=x)
     counts_by_world = {s.spec.name: s.counts for s in scores}
@@ -378,7 +484,12 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     )
     payload = {
         "verdict": verdict, "row": row, "outcomes": outcomes, "void_bars": void_bars,
-        "alignment": align, "worlds_scored": len(scores), "worlds_skipped_no_sensor": skipped,
+        "alignment": align, "worlds_scored": len(scores), "worlds_planned": n_worlds_planned,
+        "worlds_scored_equal_planned": worlds_equal, "worlds_skipped": info["worlds_skipped"],
+        "n_worlds_non_finite_injection_scale": sum(
+            1 for k in skips if k.reason == "injection_scale_not_finite"
+        ),
+        "placebo": details["shifted"],
         "pooled": details["pooled"], "level_1": details["level_1"],
         "timestamp_defect": timestamp_defect, "counts_by_world": counts_by_world, **base,
     }  # fmt: skip
@@ -530,6 +641,7 @@ def closure_readouts(
         regressors: dict[str, np.ndarray],
         extra: np.ndarray | None = None,
         min_elev: float | None = None,
+        contradicts_if_lower_end_above_zero: bool = False,
     ) -> world.core722.Fit:
         masked = score.windows_mask(windows=windows, host=host)
         sel = world.closure_rows(
@@ -562,6 +674,11 @@ def closure_readouts(
                     "hi": float(f.hi[i]),
                     "n_rows": f.n_rows,
                     "n_days": f.n_days,
+                    **(
+                        {"contradicts_identity": bool(f.lo[i] > 0)}
+                        if contradicts_if_lower_end_above_zero
+                        else {}
+                    ),
                 }
             )
         return f
@@ -582,6 +699,7 @@ def closure_readouts(
         regressors={"d10_folded": d10_folded},
         extra=export_h,
         min_elev=30.0,
+        contradicts_if_lower_end_above_zero=True,
     )
     fit(
         name="d10_fold_ratio_import_hours",

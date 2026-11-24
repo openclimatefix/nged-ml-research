@@ -6,9 +6,10 @@ are read, and every value is the one the plan page (`result.md`, section "Decisi
 The functions are pure (numbers and arrays in, outcomes out), so the tests run them on synthetic
 inputs. Nothing here reads a file.
 
-**Provisional definitions.** A few definitions that a job needs are not stated on the plan page.
-Each is a constant or a function marked `PROVISIONAL` and listed in the report that accompanies the
-code, so that the maintainer or the manager can rule on it before the first run.
+**Provisional and ruled definitions.** A few definitions that a job needs are not stated on the
+plan page. Each is a constant or a function marked `PROVISIONAL` (not yet ruled on) or `RULED` (the
+design lead ruled before the run, and the plan page's section "Rulings before the run" lists the
+ruling).
 """
 
 import math
@@ -169,14 +170,20 @@ REACTIVE_SUBSTEPS: Final[int] = 6
 OVERCAST_LOOKBACK_DAYS: Final[tuple[int, int]] = (2, 91)
 """The trailing ages, in days, of the overcast days whose median change is removed from the reading."""
 
-MIDDAY_UTC_HOURS: Final[tuple[float, float]] = (11.0, 14.0)
-"""PROVISIONAL: the UTC half-open interval of "midday" for the injection level's reference rows."""
+MIDDAY_UTC_HOURS: Final[tuple[float, float]] = (10.0, 14.0)
+"""RULED: the UTC half-open interval of the START of a half-hour on the injection level's reference rows (experiment 720's definition)."""
 
-SUMMER_MONTHS: Final[tuple[int, ...]] = (6, 7, 8)
-"""PROVISIONAL: "summer" for the injection level's reference rows."""
+REFERENCE_MONTHS: Final[tuple[int, ...]] = (4, 5, 6, 7, 8, 9)
+"""RULED: April to September, the months of the injection level's reference rows (experiment 720's definition)."""
 
-SUNNY_MIN_K: Final[float] = core722.CLEAR_MIN_K
-"""PROVISIONAL: "sunny" is a clear-sky index of at least the clear-day threshold of experiment 722."""
+SUNNY_MIN_K: Final[float] = 0.7
+"""RULED: a reference row has a clear-sky index of at least this (experiment 720's `SUNNY_K`)."""
+
+MIN_REFERENCE_ROWS: Final[int] = 200
+"""RULED: a pair whose host has fewer reference rows has no injection scale (experiment 720 raises under 200 rows)."""
+
+VOID_BY_CONSTRUCTION: Final[tuple[str, ...]] = ("calibration",)
+"""RULED: bars that no run can read, because the plan page defines no likelihood ratio; they are neutral in every verdict and are listed beside it."""
 
 Outcome = Literal["pass", "fail", "void"]
 Verdict = Literal["supported", "partly supported", "not supported", "inconclusive", "invalid"]
@@ -245,6 +252,19 @@ def expected_concordance(*, rho: float) -> float:
     return 2.0 / math.pi * math.asin(rho)
 
 
+def arc_term_void(*, unchanged_share_by_site: Mapping[str, float]) -> bool:
+    """Return True when the arc term is void: any site's share of hour-ending half-hours with an unchanged `u_clear` exceeds 1%.
+
+    RULED: the share is 0% when `u_clear` is healthy. One site above the share voids the arc term,
+    so a broken `u_clear` at one site cannot hide under the others. A site whose share cannot be
+    computed (NaN) also voids it, because the audit cannot vouch for that site. An empty mapping is
+    void.
+    """
+    if not unchanged_share_by_site:
+        return True
+    return any(not np.isfinite(v) or v > ARC_VOID_SHARE for v in unchanged_share_by_site.values())
+
+
 def arc_removal_ok(*, r: float) -> bool:
     """Return True when the size of a farm's correlation with `d u_clear` is at most 0.1."""
     return bool(np.isfinite(r) and abs(r) <= ARC_REMOVAL_MAX)
@@ -295,13 +315,15 @@ def dead_band_bar(
     return "pass" if n_no_evidence / n_stretches >= D15_NO_EVIDENCE_SHARE else "fail"
 
 
-def d15_dead_band_binds(*, farm_class: str | None) -> bool:
-    """Return True when the farm inside D15's polygon is classed "outside every metered Primary".
+def d15_dead_band_binds(*, farm_class: str | None, is_addback_candidate: bool) -> bool:
+    """Return True when job 1 classes the farm inside D15's polygon outside every metered Primary and the farm is not an add-back candidate at D15.
 
-    PROVISIONAL: no farm inside the polygon, or an embedded or unresolved class, makes the bar
-    report-only.
+    RULED: experiment 722's class `outside_or_added_back` merges an outside generator with an
+    added-back one, so the bar binds only when the farm is not also an add-back candidate at D15.
+    No farm inside the polygon, an embedded or unresolved class, or an add-back candidate makes the
+    bar report-only.
     """
-    return farm_class == "outside_or_added_back"
+    return farm_class == "outside_or_added_back" and not is_addback_candidate
 
 
 def recall_bar(*, n_export_evidence: int, n_scorable_export: int) -> Outcome:
@@ -343,8 +365,8 @@ def calibration_bar(
     The predicted probabilities fall into `n_bins` equal bins on 0 to 1. No bin of at least 100
     stretches may sit off the diagonal (its mean prediction against its export share) by more than
     0.1. The bar is void when no bin holds 100 stretches. The page does not define the likelihood
-    ratio or the probability built from it, so job W2 supplies none and reports the bar void
-    (PROVISIONAL, see the report).
+    ratio or the probability built from it, so job W2 supplies none and the bar is void by
+    construction (RULED: see `VOID_BY_CONSTRUCTION`; nobody defines the ratio after the fact).
     """
     ok = np.isfinite(predicted) & np.isfinite(truth_export)
     p, y = predicted[ok], truth_export[ok]
@@ -380,6 +402,8 @@ class W2Inputs:
         level_1_readable: False when either class at level 1.0 holds under 30 scorable stretches.
         outcomes: The outcome of each bar by name: `area`, `placebo`, `false_export`, `transfer`,
             `d15_dead_band`, `recall`, and `calibration`.
+        arc_term_void: True when job W0's sensor audit voided the arc term (row 2, a failed sensor
+            audit).
     """
 
     correctness_ok: bool
@@ -393,6 +417,7 @@ class W2Inputs:
     n_import_stretches: int
     level_1_readable: bool
     outcomes: Mapping[str, str]
+    arc_term_void: bool = False
 
 
 W2_VERDICT_ROWS: Final[tuple[str, ...]] = (
@@ -407,11 +432,19 @@ W2_VERDICT_ROWS: Final[tuple[str, ...]] = (
 
 
 def void_before_run(
-    *, n_pairs_keeping_sensor: int, n_powered_pairs_level_2: int, n_powered_hosts: int
+    *,
+    n_pairs_keeping_sensor: int,
+    n_powered_pairs_level_2: int,
+    n_powered_hosts: int,
+    arc_term_void_flag: bool = False,
 ) -> bool:
-    """Return True when job W2 is `inconclusive (void before run)` and builds no world."""
+    """Return True when job W2 is `inconclusive (void before run)` and builds no world.
+
+    RULED: a void arc term is a failed sensor audit, which is row 2.
+    """
     return (
-        n_pairs_keeping_sensor < MIN_PAIRS
+        arc_term_void_flag
+        or n_pairs_keeping_sensor < MIN_PAIRS
         or n_powered_pairs_level_2 < MIN_PAIRS
         or n_powered_hosts < MIN_HOSTS
     )
@@ -435,6 +468,7 @@ def verdict_w2(*, x: W2Inputs) -> tuple[Verdict, str]:
         n_pairs_keeping_sensor=x.n_pairs_keeping_sensor,
         n_powered_pairs_level_2=x.n_powered_pairs_level_2,
         n_powered_hosts=x.n_powered_hosts,
+        arc_term_void_flag=x.arc_term_void,
     ):
         return "inconclusive", "row_2_void_before_run"
     unreadable = (
@@ -477,15 +511,38 @@ def verdict_w3(*, control_outcomes: Mapping[str, str], masked: bool) -> tuple[st
     return "controls pass, the read-outs stand", "row_3"
 
 
-def project_w2_seconds(
-    *, seconds_per_world: float, seconds_per_draw: float, n_worlds: int = N_WORLDS
-) -> float:
-    """Return `seconds per world * 32 worlds + seconds per draw * 1,000`, the timing gate's projection.
+N_POOLED_BOOTSTRAPS_AFTER_VERDICT: Final[int] = 5
+"""Pooled-area bootstraps of the read-outs: without D14, the powered sub-pool, the meter sensor, the CAMS sensor, and the unmasked farm sensor."""
 
-    `n_worlds` is the number of worlds the job will score, which is 32 when 12 pairs qualify; a
-    test asserts that the count of worlds scored equals this number.
+N_CLOSURE_FITS: Final[int] = 7
+"""Whole-day bootstraps of the closure fits in job W2's read-outs."""
+
+
+def project_w2_seconds(
+    *,
+    seconds_per_world: float,
+    seconds_per_draw: float,
+    n_worlds: int = N_WORLDS,
+    rescoring: bool = False,
+    seconds_per_ols_draw: float = 0.0,
+) -> float:
+    """Return the timing gate's projection of the whole of job W2.
+
+    The projection is `seconds per world * n_worlds + seconds per draw * 1,000` for the verdict,
+    plus, after it, the read-outs: one more pooled-area bootstrap for each of
+    `N_POOLED_BOOTSTRAPS_AFTER_VERDICT`, one more scoring of every world when `rescoring` is True
+    (the unmasked read-out), and `seconds_per_ols_draw * 1,000 * N_CLOSURE_FITS` for the closure
+    fits. `seconds_per_draw` is timed on rows replicated to the expected size of the pooled
+    population. `n_worlds` is the number of worlds the job will score, which is 32 when 12 pairs
+    qualify; a test asserts that the count of worlds scored equals this number.
     """
-    return seconds_per_world * n_worlds + seconds_per_draw * N_BOOT
+    verdict = seconds_per_world * n_worlds + seconds_per_draw * N_BOOT
+    readouts = (
+        seconds_per_draw * N_BOOT * N_POOLED_BOOTSTRAPS_AFTER_VERDICT
+        + (seconds_per_world * n_worlds if rescoring else 0.0)
+        + seconds_per_ols_draw * N_BOOT * N_CLOSURE_FITS
+    )
+    return verdict + readouts
 
 
 def over_cap(*, projected_seconds: float, cap_seconds: float = CAP_CORE_SECONDS) -> bool:

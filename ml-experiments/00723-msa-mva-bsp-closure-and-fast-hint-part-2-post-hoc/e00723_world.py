@@ -144,14 +144,18 @@ def trailing_capacity(
 ) -> np.ndarray:
     """Return `c_Z` per day: the 95th percentile of `Z / u_clear` over lit half-hours of the trailing 91 days.
 
-    PROVISIONAL: "trailing" excludes the day itself, and a day with no earlier lit half-hour gets
+    The grid may end part-way through its last day (the master grid does), and the missing
+    half-hours are NaN. PROVISIONAL: "trailing" excludes the day itself, and a day with no earlier lit half-hour gets
     NaN. The result has one value per day.
     """
     with np.errstate(divide="ignore", invalid="ignore"):
         ratio = np.where(lit & np.isfinite(z) & (u_clear > 0), z / u_clear, np.nan)
-    if len(ratio) != n_days * core.HALF_HOURS_PER_DAY:
-        msg = "the grid must hold whole days"
+    whole = n_days * core.HALF_HOURS_PER_DAY
+    if len(ratio) > whole or len(ratio) <= whole - core.HALF_HOURS_PER_DAY:
+        msg = "the grid must end inside its last day"
         raise ValueError(msg)
+    # The master grid stops before the holdout, so its last day can be short; pad it with NaN.
+    ratio = np.concatenate([ratio, np.full(whole - len(ratio), np.nan)])
     by_day = [row[np.isfinite(row)] for row in ratio.reshape(n_days, core.HALF_HOURS_PER_DAY)]
     out = np.full(n_days, np.nan)
     for d in range(1, n_days):
@@ -176,10 +180,43 @@ def index_change(
 
 @dataclass(frozen=True)
 class SensorChange:
-    """A sensor's fast change `dz` and index change `dk`, both on the grid (NaN where undefined)."""
+    """A sensor's fast change `dz` and index change `dk`, both on the grid (NaN where undefined).
+
+    A sensor with `hourly` True (the CAMS sensor) holds hourly changes (`t - 2` to `t`) on
+    hour-ending rows, so the reading's fast change and the transfer mask it is paired with are
+    hourly too (`align_reading`).
+    """
 
     dz: np.ndarray
     dk: np.ndarray
+    hourly: bool = False
+
+    def from_row(self, start: int) -> SensorChange:
+        """Return the sensor's changes from grid row `start` on."""
+        return SensorChange(dz=self.dz[start:], dk=self.dk[start:], hourly=self.hourly)
+
+
+def hourly_sum(*, x: np.ndarray) -> np.ndarray:
+    """Return `x[t] + x[t - 1]`, the change over two half-hours when `x` is a half-hour change (NaN in row 0 and where either is NaN)."""
+    out = np.full(x.shape, np.nan)
+    out[1:] = x[1:] + x[:-1]
+    return out
+
+
+def align_reading(
+    *, dm: np.ndarray, masked: np.ndarray, sensor: SensorChange
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the reading's fast change and the transfer mask on the sensor's time step.
+
+    For a half-hourly sensor both are returned unchanged. For an hourly sensor the reading's fast
+    change is the sum of its two half-hour fast changes, and a row is masked when either half-hour
+    change is.
+    """
+    if not sensor.hourly:
+        return dm, masked
+    out_mask = masked.copy()
+    out_mask[1:] |= masked[:-1]
+    return hourly_sum(x=dm), out_mask
 
 
 def farm_sensor(*, z: np.ndarray, u_clear: np.ndarray, lit: np.ndarray) -> SensorChange:
@@ -193,9 +230,13 @@ def farm_sensor(*, z: np.ndarray, u_clear: np.ndarray, lit: np.ndarray) -> Senso
 
 
 def cams_sensor(*, s: Any, lit: np.ndarray) -> SensorChange:
-    """Return the CAMS sensor on hour-ending rows: `du~` and the change of the clear-sky index.
+    """Return the CAMS sensor on hour-ending rows: the hourly `du~` and the hourly change of the clear-sky index.
 
-    `s` is a `Sky` of experiment 722 (`u`, `u_clear`, `ghi`, `ghi_clear`, `zenith`).
+    `s` is a `Sky` of experiment 722 (`u`, `u_clear`, `ghi`, `ghi_clear`, `zenith`). The index of
+    experiment 39's frame is held inside each hour, so its half-hour change on an hour-ending row
+    is 0. The sensor therefore sums the two half-hour changes that end at the row, which is the
+    change from `t - 2` to `t`, and the reading's fast change is summed the same way
+    (`align_reading`). RULED (review finding 5).
     """
     n_days = (len(s.u) + core.HALF_HOURS_PER_DAY - 1) // core.HALF_HOURS_PER_DAY
     k = sky.clear_sky_index(ghi=s.ghi, ghi_clear=s.ghi_clear)
@@ -205,7 +246,11 @@ def cams_sensor(*, s: Any, lit: np.ndarray) -> SensorChange:
     )
     dk = sky.fast_k_change(k=k, lit=lit)
     hour = hour_end_rows(n=len(k))
-    return SensorChange(dz=np.where(hour, du, np.nan), dk=np.where(hour, dk, np.nan))
+    return SensorChange(
+        dz=np.where(hour, hourly_sum(x=du), np.nan),
+        dk=np.where(hour, hourly_sum(x=dk), np.nan),
+        hourly=True,
+    )
 
 
 def meter_sensor(*, residual: np.ndarray, lit: np.ndarray, farm_dk: np.ndarray) -> SensorChange:
@@ -220,10 +265,15 @@ def meter_sensor(*, residual: np.ndarray, lit: np.ndarray, farm_dk: np.ndarray) 
 
 
 def shifted_sensor(*, sensor: SensorChange, days: int = core.PLACEBO_SHIFT_DAYS) -> SensorChange:
-    """Return the sensor shifted `days` days later, so that row `t` reads the sensor of `t - days`."""
+    """Return the sensor's fast change shifted `days` days later, so that row `t` reads `dz` of `t - days`.
+
+    RULED: only `dz` is shifted. The index change `dk` stays the real sensor's, so the usable-pair
+    rule selects the same pairs as the real sensor and the placebo is read on the area's stretches
+    and pairs.
+    """
     rows = days * core.HALF_HOURS_PER_DAY
     return SensorChange(
-        dz=core722.shift_rows(x=sensor.dz, rows=rows), dk=core722.shift_rows(x=sensor.dk, rows=rows)
+        dz=core722.shift_rows(x=sensor.dz, rows=rows), dk=sensor.dk, hourly=sensor.hourly
     )
 
 
@@ -332,13 +382,16 @@ def level_reference_rows(
 ) -> np.ndarray:
     """Return the rows on which an injection level's reference median is taken.
 
-    PROVISIONAL: "sunny summer middays before 2025-07-01" is read as June to August, a half-hour
-    that starts from 11:00 to 14:00 UTC, a clear-sky index of at least 0.85, and a row before
-    `before_row`.
+    RULED (experiment 720's definition, copied from `build_probe_world` in `e00720_rung0b.py` of the
+    folder `00720-msa-mva-to-mw-rung-0-signed-power-from-mva-meters`, because that function needs
+    experiment 720's panel and fold objects): a
+    half-hour that starts from 10:00 to 14:00 UTC, from April to September, with a clear-sky index
+    of at least 0.7, and a row before `before_row`. The caller also requires finite host and farm
+    values (`injection_scale`).
     """
     rows = np.arange(len(k))
     return (
-        np.isin(month, core.SUMMER_MONTHS)
+        np.isin(month, core.REFERENCE_MONTHS)
         & (hour >= core.MIDDAY_UTC_HOURS[0])
         & (hour < core.MIDDAY_UTC_HOURS[1])
         & np.isfinite(k)
@@ -347,21 +400,33 @@ def level_reference_rows(
     )
 
 
-def injection_scale(
-    *, host_signed_mw: np.ndarray, farm_mw: np.ndarray, rows: np.ndarray, level: float
-) -> float:
-    """Return the scale `a` such that the farm's median output on `rows` equals `level` times the host's median |X|.
+def reference_row_count(
+    *, host_signed_mw: np.ndarray, farm_mw: np.ndarray, rows: np.ndarray
+) -> int:
+    """Return the number of reference rows on which both the host's signed series and the farm's output are finite."""
+    return int((rows & np.isfinite(host_signed_mw) & np.isfinite(farm_mw)).sum())
 
-    Returns NaN when either median is missing or the farm's median is not positive.
+
+def injection_scale(
+    *,
+    host_signed_mw: np.ndarray,
+    farm_mw: np.ndarray,
+    farm_capacity_mw: float,
+    rows: np.ndarray,
+    level: float,
+) -> float:
+    """Return the scale `a` such that the injected series `a * F` is `level * median|X| * F / capacity` megawatts.
+
+    RULED (experiment 720's definition): the farm's output is normalised by its capacity and
+    multiplied by `level` times the median absolute signed reading of the host on the reference
+    rows (`level_reference_rows`), so `a = level * median|X| / capacity`. The median is NaN, and
+    so is the scale, when fewer than 200 reference rows have both values or the capacity is not
+    positive. The caller logs and counts every NaN scale.
     """
-    host = host_signed_mw[rows]
-    farm = farm_mw[rows]
-    ok = np.isfinite(host) & np.isfinite(farm)
-    if ok.sum() == 0:
+    ok = rows & np.isfinite(host_signed_mw) & np.isfinite(farm_mw)
+    if int(ok.sum()) < core.MIN_REFERENCE_ROWS or not farm_capacity_mw > 0:
         return float("nan")
-    m_host = float(np.median(np.abs(host[ok])))
-    m_farm = float(np.median(farm[ok]))
-    return level * m_host / m_farm if m_farm > 0 else float("nan")
+    return level * float(np.median(np.abs(host_signed_mw[ok]))) / farm_capacity_mw
 
 
 def trailing_overcast_median(
@@ -469,6 +534,7 @@ def threshold_diagnostics(
     The shares are over daylight pairs (rows where the reading's fast change and the sensor's
     index change both exist), and each threshold alone and both together. A masked row is excluded.
     """
+    dm, masked = align_reading(dm=dm, masked=masked, sensor=sensor)
     ok = np.isfinite(dm) & np.isfinite(sensor.dk) & ~masked
     n = int(ok.sum())
     big_k = ok & (np.abs(sensor.dk) >= core.SIZE_OF_SKY_INDEX_CHANGE)
@@ -500,7 +566,8 @@ def threshold_diagnostics(
 
 
 def usable_pairs(*, dm: np.ndarray, sensor: SensorChange, masked: np.ndarray) -> np.ndarray:
-    """Return True at rows `t` where the pair `t - 1`, `t` is usable under the plan page's rule."""
+    """Return True at rows `t` where the pair `t - 1`, `t` is usable under the plan page's rule (`t - 2`, `t` for an hourly sensor)."""
+    dm, masked = align_reading(dm=dm, masked=masked, sensor=sensor)
     return (
         np.isfinite(dm)
         & np.isfinite(sensor.dz)
@@ -564,8 +631,9 @@ def stretch_table(
             for name in SENSOR_NAMES:
                 if name in sensors:
                     sl = slice(first + 1, last + 1)
+                    dm_s, _ = align_reading(dm=dm, masked=masked, sensor=sensors[name])
                     c, n, _ = sky.concordance(
-                        d_reading=dm[sl], d_sky=sensors[name].dz[sl], usable=usable[name][sl]
+                        d_reading=dm_s[sl], d_sky=sensors[name].dz[sl], usable=usable[name][sl]
                     )
                     row[f"c_{name}"], row[f"n_{name}"] = c, n
                 else:

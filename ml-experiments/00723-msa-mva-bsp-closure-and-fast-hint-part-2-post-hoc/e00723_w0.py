@@ -17,9 +17,11 @@ Outputs (in `data/ml-experiments/00723-*/`): `w0_checks.json`, `w0_sensor_audit.
 Stdout prints counts, shares, and correlations of series only.
 """
 
+import re
 from pathlib import Path
 from typing import Any, Final
 
+import e00722_common as common722  # ty: ignore[unresolved-import]
 import e00722_data as data  # ty: ignore[unresolved-import]
 import e00722_sky as sky  # ty: ignore[unresolved-import]
 import e00723_common as common
@@ -64,62 +66,163 @@ def sheet_summary(*, sheets: dict[str, pl.DataFrame]) -> pl.DataFrame:
     )
 
 
+LOCAL_ZONE: Final[str] = "Europe/London"
+"""RULED: a switching-log time with no time zone is read as local time in this zone."""
+
+START_WORDS: Final[tuple[str, ...]] = ("start", "from", "begin")
+"""Whole words of a column name that mark the start time."""
+
+END_WORDS: Final[tuple[str, ...]] = ("end", "finish", "restore", "restored", "restoration", "until")
+"""Whole words of a column name that mark the end time."""
+
+NOT_TIME_WORDS: Final[tuple[str, ...]] = ("transfer", "transferred", "transferring", "name")
+"""Whole words that rule a column out as a start or end time (for example "transferred from")."""
+
+DATETIME_FORMATS: Final[tuple[str, ...]] = (
+    "%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M", "%Y-%m-%d",
+    "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y", "%d-%m-%Y %H:%M:%S", "%d-%m-%Y %H:%M",
+)  # fmt: skip
+"""The formats tried, in order, on a text time; each row takes the first format that parses it."""
+
+
+class SwitchingLogDefectError(RuntimeError):
+    """Raised when a sheet has a substation column, a start column, and rows, but no row matches a Primary.
+
+    That case is an input defect (row 1 of the verdict table), not "no mask".
+    """
+
+
+def _words(*, name: str) -> set[str]:
+    """Return the lower-case whole words of a column name."""
+    return {w for w in re.split(r"[^a-z0-9]+", name.lower()) if w}
+
+
 def _find(
     *, names: dict[str, str], parts: tuple[str, ...], not_parts: tuple[str, ...] = ()
 ) -> str | None:
+    """Return the first column that has one of `parts` as a whole word and none of `not_parts`."""
     return next(
         (
             v
             for k, v in names.items()
-            if any(p in k for p in parts) and not any(q in k for q in not_parts)
+            if _words(name=k) & set(parts) and not _words(name=k) & set(not_parts)
         ),
         None,
     )
 
 
-def windows_from_sheets(
-    *, sheets: dict[str, pl.DataFrame], numbers: dict[str, int]
-) -> dict[str, list[tuple[int, int]]]:
-    """Return one window per logged event and Primary, in grid rows (first, last).
-
-    A sheet is used when it has a column whose name holds "substation" (and not "name") and a
-    column whose name holds "start", "from", or "begin". The end column is the first whose name
-    holds "end", "finish", "restor", or "until". The window runs from the start to the end, or is
-    the UTC calendar day of the start where the sheet gives no end or the end is missing. A
-    timestamp with no time zone is read as UTC (PROVISIONAL: the workbook has not been read). A
-    row whose start cannot be parsed is skipped.
-    """
-    out: dict[str, list[tuple[int, int]]] = {label: [] for label in numbers}
-    for frame in sheets.values():
-        names = {c.lower(): c for c in frame.columns}
-        sub = _find(names=names, parts=("substation",), not_parts=("name",))
-        beg = _find(names=names, parts=("start", "from", "begin"))
-        end = _find(names=names, parts=("end", "finish", "restor", "until"), not_parts=("start",))
-        if sub is None or beg is None:
-            continue
-        parsed = frame.with_columns(
-            pl.col(sub).cast(pl.String, strict=False).alias("_sub"),
-            _as_datetime(frame[beg]).alias("_beg"),
-            (
-                _as_datetime(frame[end])
-                if end
-                else pl.Series([None] * frame.height, dtype=pl.Datetime)
-            ).alias("_end"),
-        )
-        for label, number in numbers.items():
-            rows = parsed.filter((pl.col("_sub") == str(number)) & pl.col("_beg").is_not_null())
-            for beg_t, end_t in zip(rows["_beg"].to_list(), rows["_end"].to_list(), strict=True):
-                out[label].append(world.utc_window_rows(start=beg_t, end=end_t))
-    return out
+def _substation_text(series: pl.Series) -> pl.Series:
+    """Return the substation column as the text of an integer ("12345.0" and 12345.0 both give "12345")."""
+    return (
+        series.cast(pl.String, strict=False)
+        .str.strip_chars()
+        .cast(pl.Float64, strict=False)
+        .round(0)
+        .cast(pl.Int64, strict=False)
+        .cast(pl.String)
+    )
 
 
 def _as_datetime(series: pl.Series) -> pl.Series:
-    """Return a column as `Datetime`, parsing strings leniently (a failed parse is null)."""
-    if series.dtype == pl.Datetime or isinstance(series.dtype, pl.Datetime):
-        return series.dt.replace_time_zone(None)
-    if series.dtype == pl.Date:
-        return series.cast(pl.Datetime)
-    return series.cast(pl.String, strict=False).str.to_datetime(strict=False, time_zone=None)
+    """Return a column as a naive UTC `Datetime`; a failed parse is null.
+
+    RULED: a time with no zone is read as `LOCAL_ZONE` (Europe/London), then converted to UTC. A
+    time that carries a zone is converted to UTC. A text time takes the first of
+    `DATETIME_FORMATS` that parses it, row by row.
+    """
+    if isinstance(series.dtype, pl.Datetime):
+        if series.dtype.time_zone is not None:
+            return series.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+        naive = series.cast(pl.Datetime("us"))
+    elif series.dtype == pl.Date:
+        naive = series.cast(pl.Datetime("us"))
+    else:
+        text = pl.DataFrame({"t": series.cast(pl.String, strict=False).str.strip_chars()})
+        naive = text.select(
+            pl.coalesce(
+                [
+                    pl.col("t").str.to_datetime(fmt, strict=False, time_zone=None)
+                    for fmt in DATETIME_FORMATS
+                ]
+            ).cast(pl.Datetime("us"))
+        ).to_series()
+    return (
+        naive.dt.replace_time_zone(LOCAL_ZONE, ambiguous="earliest", non_existent="null")
+        .dt.convert_time_zone("UTC")
+        .dt.replace_time_zone(None)
+    )
+
+
+def windows_with_diagnostics(
+    *, sheets: dict[str, pl.DataFrame], numbers: dict[str, int]
+) -> tuple[dict[str, list[tuple[int, int]]], list[dict[str, Any]]]:
+    """Return one window per logged event and Primary in grid rows (first, last), and each sheet's diagnostics.
+
+    A sheet is used when it has a column whose name holds the whole word "substation" (and not
+    "name") and a column with a start word ("start", "from", "begin") that is not a transfer
+    column. The end column is the first with an end word ("end", "finish", "restore", "until") and
+    no start word. The window runs from the start to the end, or is the UTC calendar day of the
+    start where the sheet gives no end or the end is missing. A time with no zone is read as
+    Europe/London (RULED). A row whose start cannot be parsed, and a row whose end precedes its
+    start, is skipped and counted.
+
+    Raises:
+        SwitchingLogDefectError: A sheet has the two columns and rows but no row matches a Primary.
+    """
+    out: dict[str, list[tuple[int, int]]] = {label: [] for label in numbers}
+    diagnostics: list[dict[str, Any]] = []
+    for sheet_name, frame in sheets.items():
+        names = {c.lower(): c for c in frame.columns}
+        sub = _find(names=names, parts=("substation",), not_parts=("name",))
+        beg = _find(names=names, parts=START_WORDS, not_parts=NOT_TIME_WORDS)
+        end = _find(names=names, parts=END_WORDS, not_parts=(*START_WORDS, *NOT_TIME_WORDS))
+        diag: dict[str, Any] = {
+            "sheet": sheet_name, "substation_column": sub, "start_column": beg, "end_column": end,
+            "n_rows": frame.height, "n_rows_start_parsed": 0, "n_rows_matched": 0,
+            "n_rows_start_not_parsed": 0, "n_rows_end_before_start": 0, "used": False,
+        }  # fmt: skip
+        diagnostics.append(diag)
+        if sub is None or beg is None:
+            continue
+        diag["used"] = True
+        begin = _as_datetime(frame[beg])
+        finish = (
+            _as_datetime(frame[end])
+            if end
+            else pl.Series([None] * frame.height, dtype=pl.Datetime("us"))
+        )
+        sub_text = _substation_text(frame[sub])
+        diag["n_rows_start_parsed"] = int(begin.is_not_null().sum())
+        diag["n_rows_start_not_parsed"] = int((frame[beg].is_not_null() & begin.is_null()).sum())
+        matched_rows: set[int] = set()
+        for label, number in numbers.items():
+            idx = [
+                i
+                for i, (sv, b) in enumerate(zip(sub_text.to_list(), begin.to_list(), strict=True))
+                if sv == str(number) and b is not None
+            ]
+            matched_rows.update(idx)
+            for i in idx:
+                b_t, e_t = begin[i], finish[i]
+                if e_t is not None and e_t < b_t:
+                    diag["n_rows_end_before_start"] += 1
+                    continue
+                out[label].append(world.utc_window_rows(start=b_t, end=e_t))
+        diag["n_rows_matched"] = len(matched_rows)
+        if frame.height > 0 and diag["n_rows_start_parsed"] > 0 and not matched_rows:
+            msg = (
+                f"sheet {sheet_name!r} has a substation column and a start column with rows, "
+                "but no row matches a Primary: an input defect"
+            )
+            raise SwitchingLogDefectError(msg)
+    return out, diagnostics
+
+
+def windows_from_sheets(
+    *, sheets: dict[str, pl.DataFrame], numbers: dict[str, int]
+) -> dict[str, list[tuple[int, int]]]:
+    """Return the windows of `windows_with_diagnostics`, without the diagnostics."""
+    return windows_with_diagnostics(sheets=sheets, numbers=numbers)[0]
 
 
 def d10_counts(
@@ -181,14 +284,17 @@ def sensor_audit(*, stage: common.SkyStage) -> dict[str, Any]:
         )
         k_of[name] = sky.clear_sky_index(ghi=s.ghi, ghi_clear=s.ghi_clear)
     audit_rows: list[dict[str, Any]] = []
-    # Condition 1: resolution (report only; the arc term is void if u_clear changes on over 1% of hour-ending half-hours).
+    # Condition 1: resolution. RULED: the arc term is void if any site's share of hour-ending half-hours
+    # on which u_clear does not change exceeds 1% (0% is expected); W2 then builds no world.
     share_u: list[float] = []
+    share_u_names: list[str] = []
     for name, s in {**{h: stage.sky_of[h] for h in hosts}, **stage.farm_sky}.items():
         res = world.resolution_shares(k=k_of[name], u_clear=s.u_clear, lit=lit_of[name])
         share_u.append(res["share_u_clear_unchanged"])
+        share_u_names.append(name)
         audit_rows.append({"condition": 1, "scope": name, "kind": "resolution", **_as_row(res)})
-    unchanged = float(np.nanmean(share_u)) if share_u else float("nan")
-    arc_void = bool((1.0 - unchanged) > core.ARC_VOID_SHARE) if np.isfinite(unchanged) else True
+    unchanged_by_site = dict(zip(share_u_names, share_u, strict=True))
+    arc_void = core.arc_term_void(unchanged_share_by_site=unchanged_by_site)
     # Condition 2: arc removal, per farm.
     farm_dz: dict[str, np.ndarray] = {}
     arc_ok: dict[str, bool] = {}
@@ -252,7 +358,7 @@ def sensor_audit(*, stage: common.SkyStage) -> dict[str, Any]:
         "in_months": in_months,
         "lit_of": lit_of,
         "arc_void": arc_void,
-        "u_clear_unchanged_share": unchanged,
+        "u_clear_unchanged_share_by_site": unchanged_by_site,
     }
 
 
@@ -320,13 +426,26 @@ def powered_table(
             s_h = float(np.nanstd(dm)) if np.isfinite(dm).any() else float("nan")
             row["coherence_injected"] = coh
             row["sd_host_points"] = s_h
+            ref_rows = score.level_rows(ctx=ctx, host=host)
+            farm_mw = ctx.farm_output(farm=farm)
+            n_ref = world.reference_row_count(
+                host_signed_mw=ctx.series[host], farm_mw=farm_mw, rows=ref_rows
+            )
+            ref_ok = ref_rows & np.isfinite(ctx.series[host]) & np.isfinite(farm_mw)
+            share_ref = (
+                float(np.median(farm_mw[ref_ok] / ctx.farm_cap[farm])) if n_ref else float("nan")
+            )
+            row["n_reference_rows"] = n_ref
+            row["farm_median_share_reference"] = share_ref
+            row["farm_share_positive"] = bool(np.isfinite(share_ref) and share_ref > 0)
             for level in core.LEVELS:
                 scale = world.injection_scale(
-                    host_signed_mw=ctx.series[host], farm_mw=ctx.farm_output(farm=farm),
-                    rows=score.level_rows(ctx=ctx, host=host), level=level,
+                    host_signed_mw=ctx.series[host], farm_mw=farm_mw,
+                    farm_capacity_mw=ctx.farm_cap[farm], rows=ref_rows, level=level,
                 )  # fmt: skip
+                row[f"scale_finite_level_{level}"] = bool(np.isfinite(scale))
                 dz = world.fast_sensor_change(
-                    z=scale * ctx.farm_output(farm=farm) / cap * 100.0,
+                    z=scale * farm_mw / cap * 100.0,
                     u_clear=ctx.farm_sky[farm].u_clear, lit=audit["lit_of"][farm],
                 )  # fmt: skip
                 s_f = (
@@ -468,7 +587,7 @@ def share_pairs(
             "cams": world.cams_sensor(s=ctx.sky_of[host], lit=lit),
         }
         for name, s in sensors.items():
-            sp = world.SensorChange(dz=s.dz[start:], dk=s.dk[start:])
+            sp = s.from_row(start)
             rows.append(
                 {
                     "host": host,
@@ -504,7 +623,9 @@ def sky_share_d12(*, ctx: common.Context, membership: dict[str, list[str]]) -> f
 def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> None:
     """Run job W0; `inputs` and `info` fill the run log as the job reads."""
     common.assert_launch()
-    guard.invalidate_outputs(names=OUTPUTS)
+    guard.archive_outputs(
+        names=(*OUTPUTS, "run_log_w0.json"), private_names=(common.W0_WINDOWS_NAME,)
+    )
     log = guard.ReadLog()
     guard.say("JOB W0 STARTING")
     stage = common.load_sky_stage(log=log, inputs=inputs)
@@ -524,8 +645,21 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     n_keep = qual.height
     n_powered = powered_2.height
     n_hosts = int(powered_2["host"].n_unique()) if n_powered else 0
+    n_nan_scale = int(
+        qual.filter(~pl.col("scale_finite_level_1.0") | ~pl.col("scale_finite_level_2.0")).height
+    )
+    n_farm_share_not_positive = int(qual.filter(~pl.col("farm_share_positive")).height)
+    guard.say(
+        "qualifying pairs with a non-finite injection scale:",
+        n_nan_scale,
+        "| farm median share not positive:",
+        n_farm_share_not_positive,
+    )
     void_before = core.void_before_run(
-        n_pairs_keeping_sensor=n_keep, n_powered_pairs_level_2=n_powered, n_powered_hosts=n_hosts
+        n_pairs_keeping_sensor=n_keep,
+        n_powered_pairs_level_2=n_powered,
+        n_powered_hosts=n_hosts,
+        arc_term_void_flag=bool(audit["arc_void"]),
     )
     guard.say(
         "qualifying pairs:",
@@ -546,23 +680,26 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
     )
     try:
         sheets = pl.read_excel(data.SWITCHING_LOG_PATH, sheet_id=0, engine="openpyxl")
+    except Exception as exc:  # noqa: BLE001
+        sheets = None
+        switching = {"readable": False, "reason": type(exc).__name__}
+    if sheets is not None:
         sheets_frame = sheet_summary(sheets=sheets)
+        meta = pl.read_parquet(data.METADATA_PATH).select("time_series_id", "substation_number")
         numbers = {
             r["label"]: int(r["substation_number"])
-            for r in ctx.topology.primaries.join(
-                pl.read_parquet(data.METADATA_PATH).select("time_series_id", "substation_number"),
-                on="time_series_id",
-            ).iter_rows(named=True)
+            for r in ctx.topology.primaries.join(meta, on="time_series_id").iter_rows(named=True)
+            if r["substation_number"] is not None
         }
-        windows = windows_from_sheets(sheets=sheets, numbers=numbers)
+        windows, sheet_diag = windows_with_diagnostics(sheets=sheets, numbers=numbers)
         n_windows = {h: len(w) for h, w in windows.items()}
         switching = {
             "readable": True,
             "n_windows_total": sum(n_windows.values()),
             "n_windows_by_primary": n_windows,
+            "n_primaries_without_a_number": int(ctx.topology.primaries.height - len(numbers)),
+            "sheets": sheet_diag,
         }
-    except Exception as exc:  # noqa: BLE001
-        switching = {"readable": False, "reason": type(exc).__name__}
     mask_available = bool(switching.get("n_windows_total", 0) > 0)
     guard.say(
         "switching logs readable:",
@@ -603,7 +740,16 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         else ctx.classes.head(0)
     )
     d15_class = str(cls_rows["generator_class"][0]) if cls_rows.height else None
-    guard.say("D15's farm inside the polygon, job 1's class:", d15_class)
+    d15_addback = bool(
+        set(common722.addback_candidates(classes=ctx.classes, primary="D15"))
+        & {ctx.farm_id[f] for f in d15_farms}
+    )
+    guard.say(
+        "D15's farm inside the polygon, job 1's class:",
+        d15_class,
+        "| add-back candidate:",
+        d15_addback,
+    )
     # Write.
     membership_frame = pl.DataFrame(
         [
@@ -625,7 +771,9 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         "later_span_ok": later_ok,
         "holdout_clean": log.holdout_clean(),
         "arc_term_void": audit["arc_void"],
-        "u_clear_unchanged_share": audit["u_clear_unchanged_share"],
+        "u_clear_unchanged_share_by_site": audit["u_clear_unchanged_share_by_site"],
+        "n_pairs_non_finite_injection_scale": n_nan_scale,
+        "n_pairs_farm_share_not_positive": n_farm_share_not_positive,
         "n_qualifying_pairs": n_keep,
         "n_powered_pairs_level_2": n_powered,
         "n_powered_hosts": n_hosts,
@@ -634,7 +782,10 @@ def run(*, gate: guard.TimingGate, inputs: list[Path], info: dict[str, Any]) -> 
         "switching_logs": switching,
         "mask_available": mask_available,
         "d15_farm_class": d15_class,
-        "d15_dead_band_binds": core.d15_dead_band_binds(farm_class=d15_class),
+        "d15_add_back_candidate": d15_addback,
+        "d15_dead_band_binds": core.d15_dead_band_binds(
+            farm_class=d15_class, is_addback_candidate=d15_addback
+        ),
         "d12_sky_share_r_squared": r2,
         "d10_counts": counts,
         "core_seconds": round(gate.elapsed(), 1),

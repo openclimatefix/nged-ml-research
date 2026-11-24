@@ -72,6 +72,29 @@ def world_specs(*, qualifying: Sequence[tuple[str, str]]) -> list[WorldSpec]:
     return specs
 
 
+@dataclass(frozen=True)
+class SkippedWorld:
+    """A world that job W2 did not score, with the reason and the evidence for it.
+
+    Attributes:
+        name: The world's name.
+        reason: `too_few_sensor_farms` (fewer than 2 farms remain in the sensor) or
+            `injection_scale_not_finite` (the host has too few reference rows, or the farm's
+            capacity is not positive).
+        n_reference_rows: Reference rows of the injection level with a finite host value and farm
+            output; 0 for an un-injected world.
+    """
+
+    name: str
+    reason: str
+    n_reference_rows: int
+
+
+def expected_to_score(*, spec: WorldSpec, membership: Mapping[str, Sequence[str]]) -> bool:
+    """Return True when the world has a sensor of at least 2 farms once the injected farm is removed."""
+    return len([f for f in membership.get(spec.host, ()) if f != spec.farm]) >= 2
+
+
 @dataclass
 class WorldScore:
     """The result of scoring one world on the later span.
@@ -119,35 +142,50 @@ def score_world(
     spec: WorldSpec,
     membership: Mapping[str, Sequence[str]],
     windows: Mapping[str, Sequence[tuple[int, int]]],
+    skips: list[SkippedWorld] | None = None,
 ) -> WorldScore | None:
-    """Build and score one world; return None when the host has no farm sensor after the injected farm is removed.
+    """Build and score one world; return None, and append the reason to `skips`, when the world cannot be scored.
 
     Args:
         ctx: The inputs.
         spec: The world.
         membership: The farms of each host's sensor, from job W0.
         windows: Each host's switching-log windows in grid rows, from job W0.
+        skips: Receives a `SkippedWorld` for a world that is not scored, so that no world drops
+            out of the pool silently.
 
     Returns:
-        The score, or None when fewer than 2 farms remain in the sensor.
+        The score, or None when fewer than 2 farms remain in the sensor or the injection scale is
+        not finite.
     """
     t0 = time.process_time()
     host = spec.host
     cap = ctx.capacity(host=host)
     farms = [f for f in membership.get(host, ()) if f != spec.farm]
     if len(farms) < 2:
+        if skips is not None:
+            skips.append(SkippedWorld(spec.name, "too_few_sensor_farms", 0))
         return None
     signed = ctx.series[host].copy()
     residual = ctx.residual(host=host)
     scale = 1.0
     if spec.farm is not None and spec.level is not None:
         out = ctx.farm_output(farm=spec.farm)
+        rows = level_rows(ctx=ctx, host=host)
         scale = world.injection_scale(
             host_signed_mw=ctx.series[host],
             farm_mw=out,
-            rows=level_rows(ctx=ctx, host=host),
+            farm_capacity_mw=ctx.farm_cap[spec.farm],
+            rows=rows,
             level=spec.level,
         )
+        if not np.isfinite(scale):
+            if skips is not None:
+                n_ref = world.reference_row_count(
+                    host_signed_mw=ctx.series[host], farm_mw=out, rows=rows
+                )
+                skips.append(SkippedWorld(spec.name, "injection_scale_not_finite", n_ref))
+            return None
         signed = world.inject(signed_mw=signed, farm_mw=out, scale=scale)
         residual = residual - scale * out
     reading = signed if spec.role == "real" else world.fold(signed_mw=signed, capacity_mw=cap)
@@ -165,7 +203,7 @@ def score_world(
         "cams": world.cams_sensor(s=ctx.sky_of[host], lit=lit),
         "shifted": world.shifted_sensor(sensor=farm),
     }
-    sensors = {k: world.SensorChange(dz=v.dz[start:], dk=v.dk[start:]) for k, v in full.items()}
+    sensors = {k: v.from_row(start) for k, v in full.items()}
     stretches = world.stretches_of(
         reading_mw=reading[start:], signed_mw=signed[start:], capacity_mw=cap, lit=lit[start:]
     )
@@ -187,18 +225,34 @@ def score_world(
 # ---------------------------------------------------------------------------------------------
 # Pooled statistics
 # ---------------------------------------------------------------------------------------------
-def tagged(*, scores: Sequence[WorldScore], sensor: str, roles: Sequence[str]) -> pl.DataFrame:
+def tagged(
+    *,
+    scores: Sequence[WorldScore],
+    sensor: str,
+    roles: Sequence[str],
+    population_sensor: str | None = None,
+) -> pl.DataFrame:
     """Return the scorable export and import stretches of the worlds of the given roles, tagged with their world.
 
     A stretch is scorable when it is post-bounce, on a one-stretch day, and holds at least 8 usable
-    pairs under `sensor`. Mixed stretches are excluded. The columns are `world`, `host`, `farm`,
-    `level`, `day`, `c`, `n_pairs`, and `is_export`.
+    pairs under `population_sensor` (default: `sensor`). Mixed stretches are excluded. The columns
+    are `world`, `host`, `farm`, `level`, `day`, `c`, `n_pairs`, and `is_export`.
+
+    RULED (the placebo): the shifted sensor is read on the stretches that are scorable under the
+    farm sensor, so pass `sensor="shifted"` and `population_sensor="farm"`. A stretch on which the
+    shifted sensor has no finite pair scores `c = 0`, a stretch with no evidence, and shows
+    `n_pairs = 0`.
     """
     frames = []
+    pop = sensor if population_sensor is None else population_sensor
     for s in scores:
         if s.spec.role not in roles:
             continue
-        t = world.scorable(table=s.table, sensor=sensor).filter(pl.col("truth") != "mixed")
+        t = (
+            world.scorable(table=s.table, sensor=pop)
+            .filter(pl.col("truth") != "mixed")
+            .with_columns(pl.col(f"c_{sensor}").fill_nan(0.0).fill_null(0.0))
+        )
         frames.append(
             t.select(
                 pl.lit(s.spec.name).alias("world"),
@@ -247,11 +301,19 @@ def area_of(*, rows: pl.DataFrame, weights: np.ndarray | None) -> dict[str, floa
     return {"area": point, "se": se, "lo": lo, "hi": hi, **base}
 
 
-def time_draws(*, rows: pl.DataFrame, weights: np.ndarray, n: int = 10) -> float:
-    """Return the core-seconds per bootstrap draw, timed on the first `n` draws of the rows given."""
+def time_draws(
+    *, rows: pl.DataFrame, weights: np.ndarray, n: int = 10, replicate: int = 1
+) -> float:
+    """Return the core-seconds per bootstrap draw, timed on the first `n` draws of the rows given.
+
+    `replicate` repeats the rows (with the same days) so that a world's few stretches stand in for
+    the pooled population, which holds about that many times as many stretches. The draw's cost
+    grows with the number of stretches, so the timing gate must time a draw at the pooled size.
+    """
     if rows.height == 0:
         return 0.0
-    score, label, day = rows["c"].to_numpy(), rows["is_export"].to_numpy(), rows["day"].to_numpy()
+    big = pl.concat([rows] * max(replicate, 1)) if replicate > 1 else rows
+    score, label, day = big["c"].to_numpy(), big["is_export"].to_numpy(), big["day"].to_numpy()
     present, compact = np.unique(day, return_inverse=True)
     sub = core722.subset_weights(weights=weights[:n], present=present)
     t0 = time.process_time()

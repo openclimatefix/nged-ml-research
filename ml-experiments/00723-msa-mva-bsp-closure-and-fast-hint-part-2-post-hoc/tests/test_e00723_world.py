@@ -2,6 +2,7 @@
 """Sensors, stretches, concordance, injection, and closure fits on synthetic arrays."""
 
 from collections.abc import Sequence
+from types import SimpleNamespace
 
 import e00722_core as core722  # ty: ignore[unresolved-import]
 import e00723_core as core
@@ -70,6 +71,20 @@ def test_the_trailing_capacity_is_the_95th_percentile_of_the_previous_91_days():
     assert c[1:] == pytest.approx(0.5, rel=1e-6)
 
 
+def test_the_trailing_capacity_accepts_the_real_grid_that_ends_part_way_through_its_last_day():
+    n_days = (core.N_GRID + 47) // 48
+    assert core.N_GRID % 48 != 0  # the master grid is one half-hour short of whole days
+    hh = np.arange(core.N_GRID) % 48
+    lit = (hh >= 14) & (hh <= 34)
+    u = np.where(lit, np.sin(np.pi * (hh - 13) / 22.0).clip(0) * 800.0 + 1.0, 0.0)
+    z = np.where(lit, 0.5 * u, 0.0) / 800.0
+    c = world.trailing_capacity(z=z, u_clear=u / 800.0, lit=lit, n_days=n_days)
+    assert len(c) == n_days
+    assert c[1:] == pytest.approx(0.5, rel=1e-6)
+    sensor = world.farm_sensor(z=z, u_clear=u / 800.0, lit=lit)
+    assert len(sensor.dz) == len(sensor.dk) == core.N_GRID
+
+
 def test_coherence_drops_a_farm_that_does_not_follow_the_others():
     rng = np.random.default_rng(2)
     common = rng.normal(0, 1, N)
@@ -90,7 +105,9 @@ def test_the_sensor_shifted_by_28_days_reads_the_sensor_of_28_days_earlier():
     assert shifted.dz[28 * 48] == 0.0
     assert shifted.dz[28 * 48 + 5] == 5.0
     assert np.isnan(shifted.dz[:48]).all()
-    assert shifted.dk[28 * 48 + 3] == 6.0
+    # RULED: only dz is shifted; dk stays the real sensor's, so the usable pairs are the real ones.
+    assert shifted.dk[28 * 48 + 3] == sensor.dk[28 * 48 + 3]
+    assert (shifted.dk == sensor.dk).all()
 
 
 def test_fold_is_even_in_the_sign_and_is_at_least_the_floor():
@@ -109,28 +126,105 @@ def test_fold_is_even_in_the_sign_and_is_at_least_the_floor():
     )
 
 
-def test_injection_scale_matches_the_level_times_the_hosts_median_on_the_reference_rows():
+def test_injection_scale_follows_experiment_720_the_farm_is_scaled_by_its_capacity():
     rng = np.random.default_rng(3)
     host = rng.normal(-3, 0.2, N)
     farm = np.abs(rng.normal(4, 0.3, N))
     rows = np.zeros(N, dtype=bool)
     rows[100:400] = True
+    capacity = 8.0
     for level in core.LEVELS:
-        a = world.injection_scale(host_signed_mw=host, farm_mw=farm, rows=rows, level=level)
+        a = world.injection_scale(
+            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=capacity, rows=rows, level=level
+        )
+        # The increment is level * median|X| times the farm's output as a share of capacity.
+        increment = a * farm
+        assert increment == pytest.approx(level * np.median(np.abs(host[rows])) * farm / capacity)
         injected = world.inject(signed_mw=host, farm_mw=farm, scale=a)
-        assert np.median(a * farm[rows]) == pytest.approx(level * np.median(np.abs(host[rows])))
         assert np.median(injected[rows]) < np.median(host[rows])
 
 
-def test_level_reference_rows_are_sunny_summer_middays_before_the_cut():
+def test_injection_scale_is_not_finite_with_too_few_reference_rows_or_no_capacity():
+    host = np.full(N, -3.0)
+    farm = np.full(N, 4.0)
+    few = np.zeros(N, dtype=bool)
+    few[: core.MIN_REFERENCE_ROWS - 1] = True
+    assert np.isnan(
+        world.injection_scale(
+            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=8.0, rows=few, level=1.0
+        )
+    )
+    enough = np.zeros(N, dtype=bool)
+    enough[: core.MIN_REFERENCE_ROWS] = True
+    assert np.isfinite(
+        world.injection_scale(
+            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=8.0, rows=enough, level=1.0
+        )
+    )
+    assert np.isnan(
+        world.injection_scale(
+            host_signed_mw=host, farm_mw=farm, farm_capacity_mw=0.0, rows=enough, level=1.0
+        )
+    )
+    # A farm gap removes reference rows.
+    gap = farm.copy()
+    gap[:100] = np.nan
+    assert world.reference_row_count(host_signed_mw=host, farm_mw=gap, rows=enough) == 100
+
+
+def test_level_reference_rows_are_experiment_720s_sunny_middays_before_the_cut():
     month = world.month_of_rows(n=N)
     hour = world.utc_hour_of_rows(n=N)
     k = np.full(N, 0.9)
     rows = world.level_reference_rows(k=k, month=month, hour=hour, before_row=N // 2)
+    assert rows.any()
     assert not rows[N // 2 :].any()
-    assert (hour[rows] >= 11).all()
+    assert (hour[rows] >= 10).all()
     assert (hour[rows] < 14).all()
-    assert set(month[rows]) <= set(core.SUMMER_MONTHS)
+    assert set(month[rows]) <= set(core.REFERENCE_MONTHS)
+    assert not world.level_reference_rows(
+        k=np.full(N, 0.69), month=month, hour=hour, before_row=N
+    ).any()
+    assert world.level_reference_rows(k=np.full(N, 0.7), month=month, hour=hour, before_row=N).any()
+
+
+def test_the_cams_sensor_reads_the_hourly_change_of_an_hour_held_index():
+    n = 48 * 4
+    hh = np.arange(n) % 48
+    lit = (hh >= 14) & (hh <= 34)
+    hours = np.arange(n) // 2  # one value per pair of rows, so the odd rows change by 0
+    k_true = 0.3 + 0.4 * ((hours % 5) / 4.0)
+    u_clear = np.where(lit, 0.5, 0.0)
+    s = SimpleNamespace(
+        ghi_clear=np.full(n, 500.0),
+        ghi=k_true * 500.0,
+        u_clear=u_clear,
+        u=k_true * u_clear,
+        zenith=np.full(n, 40.0),
+    )
+    sensor = world.cams_sensor(s=s, lit=lit)
+    assert sensor.hourly
+    hour_rows = world.hour_end_rows(n=n)
+    # On the hour-ending rows that the half-hour change would read as 0, the hourly change is not 0.
+    half = np.full(n, np.nan)
+    half[1:] = k_true[1:] - k_true[:-1]
+    both = hour_rows & lit & np.roll(lit, 1) & np.roll(lit, 2)
+    assert (np.abs(half[both]) < 1e-12).all()
+    assert (np.abs(sensor.dk[both & np.isfinite(sensor.dk)]) > 0.05).any()
+    assert np.isnan(sensor.dk[~hour_rows]).all()
+    # The reading's change and mask are aligned to the same hourly step.
+    dm = np.arange(n, dtype=float)
+    masked = np.zeros(n, dtype=bool)
+    masked[100] = True
+    dm_h, masked_h = world.align_reading(dm=dm, masked=masked, sensor=sensor)
+    assert dm_h[101] == 201.0
+    assert masked_h[100]
+    assert masked_h[101]
+    dm_same, masked_same = world.align_reading(
+        dm=dm, masked=masked, sensor=world.SensorChange(dz=dm, dk=dm)
+    )
+    assert dm_same is dm
+    assert masked_same is masked
 
 
 def test_window_mask_drops_a_change_with_an_end_inside_the_window_or_within_one_hour():
@@ -336,6 +430,47 @@ def test_pooled_area_separates_export_from_import_and_the_bootstrap_resamples_da
     flat = score.area_of(rows=rows.filter(pl.col("level") == 1.0), weights=None)
     assert flat["area"] == 1.0
     assert score.time_draws(rows=rows, weights=core.day_weights(n_days=120, n_boot=20)) >= 0.0
+
+
+def test_the_placebo_is_read_on_the_stretches_and_pairs_of_the_area():
+    # Two stretches; the shifted sensor has no finite pair on the second, so it scores c = 0 there.
+    scores = [
+        fake_score(
+            name="a",
+            role="injected",
+            host="D10",
+            level=1.0,
+            c=[0.8, -0.8],
+            truth=["export", "import"],
+        )
+    ]
+    scores[0].table = scores[0].table.with_columns(
+        pl.Series("c_shifted", [0.3, float("nan")], dtype=pl.Float64),
+        pl.Series("n_shifted", [9, 0], dtype=pl.Int64),
+    )
+    real = score.tagged(scores=scores, sensor="farm", roles=("injected",))
+    placebo = score.tagged(
+        scores=scores, sensor="shifted", roles=("injected",), population_sensor="farm"
+    )
+    assert placebo.height == real.height == 2
+    assert placebo["day"].to_list() == real["day"].to_list()
+    assert placebo["c"].to_list() == [0.3, 0.0]
+    assert placebo["n_pairs"].to_list() == [9, 0]
+
+
+def test_a_world_that_cannot_be_scored_is_skipped_with_its_reason():
+    membership = {"D10": ["F1", "F2", "F3"], "D14": ["F1", "F2"], "D16": []}
+    spec = score.WorldSpec("w", "injected", "D10", "F1", 1.0)
+    assert score.expected_to_score(spec=spec, membership=membership)
+    assert not score.expected_to_score(
+        spec=score.WorldSpec("w", "injected", "D14", "F1", 1.0), membership=membership
+    )
+    assert not score.expected_to_score(
+        spec=score.WorldSpec("u", "uninjected", "D16", None, None), membership=membership
+    )
+    specs = score.world_specs(qualifying=[("D10", "F1"), ("D10", "F2"), ("D14", "F3")])
+    ok = [s for s in specs if score.expected_to_score(spec=s, membership=membership)]
+    assert len({s.name for s in ok}) == len(ok)
 
 
 def test_dead_band_population_keeps_every_stretch_and_alignment_reads_lag_zero():

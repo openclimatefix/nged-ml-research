@@ -12,7 +12,12 @@ names a generator's identifier. Farms carry the labels F1 to F6.
 
 import hashlib
 import json
+import os
+import re
 import resource
+import shutil
+import subprocess
+import sys
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -70,6 +75,108 @@ def write_private_parquet(
 def invalidate_outputs(*, names: Sequence[str], out_dir: Path = OUT_DIR) -> list[str]:
     """Delete earlier outputs by name, so that a crashed re-run leaves no stale file to trust."""
     return guard722.invalidate_outputs(names=names, out_dir=out_dir)
+
+
+RERUN_APPROVAL_ENV: Final[str] = "E723_RERUN_APPROVED_BY_MANAGER"
+"""Set to any non-empty text, naming the manager's approval, to rerun a job whose verdict is not `invalid`."""
+
+
+def archive_outputs(
+    *,
+    names: Sequence[str],
+    private_names: Sequence[str] = (),
+    out_dir: Path = OUT_DIR,
+    private_dir: Path | None = None,
+) -> Path | None:
+    """Move a job's earlier outputs into `attempt_<n>/`, so that a rerun keeps both sets of outputs.
+
+    Rerun condition 4 of the plan page keeps the outputs of every attempt. Nothing is deleted. A
+    file that does not exist is skipped, and no folder is made when no file exists. The numbering
+    counts the existing `attempt_*` folders. Files of `private_names` are moved from `private_dir`
+    (default: `out_dir/PRIVATE`) into `attempt_<n>/PRIVATE/`.
+
+    Returns:
+        The attempt folder, or None when there was nothing to move.
+    """
+    private = out_dir / "PRIVATE" if private_dir is None else private_dir
+    present = [out_dir / n for n in names if (out_dir / n).is_file()]
+    present_private = [private / n for n in private_names if (private / n).is_file()]
+    if not present and not present_private:
+        return None
+    taken = [
+        int(m.group(1))
+        for p in out_dir.glob("attempt_*")
+        if (m := re.fullmatch(r"attempt_(\d+)", p.name))
+    ]
+    attempt = out_dir / f"attempt_{max(taken, default=0) + 1}"
+    attempt.mkdir(parents=True)
+    for path in present:
+        shutil.move(path, attempt / path.name)
+    if present_private:
+        (attempt / "PRIVATE").mkdir()
+        for path in present_private:
+            shutil.move(path, attempt / "PRIVATE" / path.name)
+    return attempt
+
+
+def refuse_rerun(
+    *, verdict_name: str, out_dir: Path = OUT_DIR, env: Mapping[str, str] | None = None
+) -> None:
+    """Raise unless an earlier verdict is absent or `invalid`, or the manager's approval is named.
+
+    The plan page says that a verdict of `inconclusive` or `not supported` is never rerun, and
+    that a `supported` verdict stands. Only an `invalid` verdict (a code defect) may be rerun
+    without the approval, which `RERUN_APPROVAL_ENV` carries.
+    """
+    path = out_dir / verdict_name
+    if not path.is_file():
+        return
+    environment = os.environ if env is None else env
+    if environment.get(RERUN_APPROVAL_ENV, "").strip():
+        return
+    try:
+        verdict = json.loads(path.read_text()).get("verdict")
+    except json.JSONDecodeError:
+        verdict = None
+    if verdict == "invalid":
+        return
+    msg = (
+        f"{verdict_name} already holds the verdict {verdict!r}; a rerun needs the manager's "
+        f"approval, named in the environment variable {RERUN_APPROVAL_ENV}"
+    )
+    raise JobRefusedError(msg)
+
+
+def known_answer_tests(
+    *, tests_dir: Path | None = None, extra_args: Sequence[str] = ()
+) -> dict[str, Any]:
+    """Run this folder's tests in a child process and return `passed`, `n_tests`, and the code hash.
+
+    The tests run on synthetic arrays only. Row 1 of the verdict table reads `passed`
+    (the plan page: "a known-answer test on synthetic arrays"). `extra_args` is for a test of this
+    function.
+    """
+    folder = FOLDER / "tests" if tests_dir is None else tests_dir
+    args = [
+        sys.executable,
+        "-m",
+        "pytest",
+        str(folder),
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        *extra_args,
+    ]
+    if tests_dir is None:
+        args.append("--run-studies")
+    done = subprocess.run(args, capture_output=True, text=True, check=False)
+    passed_match = re.search(r"(\d+) passed", done.stdout)
+    n_tests = int(passed_match.group(1)) if passed_match else 0
+    return {
+        "passed": bool(done.returncode == 0 and n_tests > 0),
+        "n_tests": n_tests,
+        "code_hash": code_hash(),
+    }
 
 
 def code_hash(*, folder: Path = FOLDER) -> str:
