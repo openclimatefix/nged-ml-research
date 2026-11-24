@@ -140,10 +140,10 @@ fold cutoff, from the training window only.
 Primary and returns gross demand, unmetered solar output, and a generator's unit count.** The
 reading is `sqrt(X² + Q²)` with Student-t noise (4 degrees of freedom), `X = D − c p − n g`, the
 demand mean is a regression on calendar and temperature, the residual is a first-order
-autoregression on a 41-value grid (81 when the coefficient would exceed 0.98), and the emission
-sits on the transition so that the within-half-hour averaging of a crossing is exact. The output
-per half-hour is a two-lobe signed distribution, smoothed and filtered, stored as 11 signed
-quantiles and `P(X < 0)`.
+autoregression on a grid of residual values (41 values in the design and 21 in the V2, K1, and V3
+harness; 81 when the coefficient would exceed 0.98), and the emission sits on the transition so that
+the within-half-hour averaging of a crossing is exact. The output per half-hour is a two-lobe signed
+distribution, smoothed and filtered, stored as 11 signed quantiles and `P(X < 0)`.
 
 **Bars, written before any fit.**
 
@@ -154,13 +154,22 @@ quantiles and `P(X < 0)`.
 | K1 | F1 of at least 0.769 |
 | V3 (real negative controls at D8) | At most 3% flagged and at most one active day a month in each period, and the forced `K` = 3 control |
 | Sign probability | Reliability term of the Brier score at most 0.01, and no bin of at least 200 half-hours off the diagonal by more than 0.1 |
-| Signed CRPS | Below the hard-sign version's, with a paired interval above zero |
+| Signed CRPS | Below the hard-sign version's, with a paired interval above zero. The hard-sign version uses the observed magnitude, never the true one. |
+| Rung 0b references | The anchored read-out beats two references that do not read the meter: a reading-blind sign (the sign of the clear-sky index alone) and an hour-of-day sign (the pooled midday sign by hour), on pooled half-hours and on the midday area, with the paired interval above zero |
+| Rung 0b non-exporter check | In a hard world whose farm estimate is 2.5 times too high and which never exports, false reverse flow stays under 1% |
 
 **Stop rules.** If V1 fails, the hindsight model is not used at D12. If V2 fails its paired bar, K1,
-or its false-alarm bar, the D8 branch stops. The run stops at 15 core-hours, and the first fit
-measures the time per pass and stops the run when the projected cost exceeds the cap. D8 analyses
-are restricted to the era before the solar farm registered, unless the variant with farm and
-generator together passes the paired bar.
+or its false-alarm bar, the D8 branch stops. The slow-trend term of the hindsight demand mean (an
+upper quantile of the daily-mean residual over a 21-day centred window, smoothed over 7 days,
+calibrated on the pre-roll) is a change made before any real V2 run, in answer to the review. It is
+tested on synthetic drift of -0.5 and -1 MVA over 120 days before any real run, and the
+injected-segment bootstrap resamples the schedule-weeks of experiment 694 (5 primary schedules over
+7 weeks). The number of generator states `K` is chosen by the Bayesian information criterion. A V2
+run stops when the rerun `M2` disagrees with the stored `inject.pkl` on any segment, and zero
+matched segments is a failure. V3's bar applies to each period separately. The run stops at 15
+core-hours, and the first fit measures the time per pass and stops the run when the projected cost
+exceeds the cap. D8 analyses are restricted to the era before the solar farm registered, unless the
+variant with farm and generator together passes the paired bar.
 
 ## Anonymisation and disclosures
 
@@ -184,67 +193,72 @@ page about D8 is published from this experiment until the maintainer says so.
 
 ## Compute
 
-**The design estimates about 3 core-hours for rungs 0a to 0d and 5 to 15 core-hours for rung 0e, with
-a hard cap of 15 core-hours for rung 0e and a projected-cost gate.** One job runs at a time in a
-`systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0` scope with 1 BLAS thread and the
+**The design estimates about 3 core-hours for rungs 0a to 0d and 5 to 15 core-hours for rung 0e,
+with a hard cap of 15 core-hours for rung 0e and a projected-cost gate.** One job runs at a time in
+a `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0` scope with 1 BLAS thread and the
 virtual environment's Python called directly. No GPU is used.
 
 ## Measured cost of the hidden Markov model
 
 **One forward-backward pass at 164 states over a 122,000-half-hour series took 158.5 s on 1 core,
 about 93 times the 1.7 s the addendum estimated.** The peak resident memory was 540 MB. The pair
-emission, which integrates the path between the midpoint of the previous and the current signed power
-over 4 sub-steps, causes most of the difference. A fit of one unit size needs about 50 passes (a
-profile over unit size, then the Baum-Welch rounds), so one whole-span era costs about 2.2 core-hours
-at 164 states. Rung 0e on experiment 694's 44 segments (V2) at 164 states would cost about 14.6
-core-hours, which sits against the cap of 15.
+emission, which integrates the path between the midpoint of the previous and the current signed
+power over 4 sub-steps, causes most of the difference. A fit of one unit size needs about 50 passes
+(a profile over unit size, then the Baum-Welch rounds), so one whole-span era costs about 2.2
+core-hours at 164 states. Rung 0e on experiment 694's 44 segments (V2) at 164 states would cost
+about 14.6 core-hours, which sits against the cap of 15.
 
-**The reduced grid brings V2 to about 4 core-hours.** The harness runs V2, K1, and V3 on a grid of 21
-residual bins (84 states), a coarse-then-fine profile of the unit size, and 2 Baum-Welch rounds, which
-is 12 passes per fit. A synthetic 148-day segment at that setting took 2.78 s per pass and 33.4 s per
-fit, and one rerun of experiment 694's `M2` on the same segment took 7.7 s. One injected run (hindsight
-fit plus `M2` rerun) therefore takes about 41 s. The 44 segments and 8 schedules make 352 runs, about
-4.0 core-hours, and K1 and V3 add about 0.1 core-hours. `CostGate` times the first run and raises when
-the projected total exceeds 15 core-hours, so a run whose projection is above the cap does not start
-its second run. The per-pass time at 84 states is measured on synthetic data only, so the real
-projection waits for the first real run's own timing.
+**The reduced grid brings V2 to about 5 core-hours.** The harness runs V2, K1, and V3 on a grid of
+21 residual bins (84 states), a coarse-then-fine profile of the unit size, and 2 Baum-Welch rounds,
+which is 12 passes per fit. A synthetic 148-day segment at that setting took 2.78 s per pass and
+33.4 s per fit, and one rerun of experiment 694's `M2` on the same segment took 7.7 s. One injected
+run (hindsight fit plus `M2` rerun) therefore takes about 41 s. The 44 segments and 9 schedules make
+396 runs, about 4.5 core-hours, and the un-injected fits, K1, and V3 add about 0.5 core-hours.
+`CostGate` times the first run and raises when the projected total exceeds 15 core-hours, so a run
+whose projection is above the cap does not start its second run. The per-pass time at 84 states is
+measured on synthetic data only, so the real projection waits for the first real run's own timing.
 
 ## Departures from the first report, and status of every rung
 
-**The code departs from the design in these places.** Injected worlds use the oracle capacity, with
-0.7 and 1.3 times as a sensitivity, instead of a capacity estimated from a probe. The unanchored
-control uses a symmetric window of 14 neighbours. The anchored read-out relaxes its anchor cut from
-an unreduced share of 0.3 to 0.6 when too few anchor rows exist. The day type may include bank
-holidays. The pair emission runs from the midpoint of the previous and current signed power. On
-experiment 694's series no weather exists, so the demand mean of the hindsight model is calendar
-only and is fitted on the 28-day pre-roll. The panel loader is built on the torch-free functions of
-experiment 506, and it cuts the 126,624-step `dense_raw.npy` of experiment 713 to the 121,248 steps
-of the grid that experiment 412's CAMS arrays share. V3 runs only the forced `K` = 3 fit, which is
-the stricter of the two controls. The history majority of the `M1` re-cut is the class held by most of
-the 7 days before the target day, an assumption the review should check. The second control period of
-V3 ends on a date that is read from a private file, because the date is an era date. Experiment
-716's folder comes in through `EXTRA_PYTHONPATH`, and nothing is merged from that branch.
+**The code departs from the design in these places.** Rung 0b injected worlds use the capacity that
+F7's PV estimate gives as of the origin, with 0.7 and 1.3 times as a sensitivity. Experiment 694's
+injected segments are not about a farm, so they use no capacity. The unanchored control uses a
+symmetric window of 14 neighbours. The anchored read-out relaxes its anchor cut from an unreduced
+share of 0.3 to 0.6 when too few anchor rows exist. The day type may include bank holidays. The pair
+emission runs from the midpoint of the previous and current signed power. On experiment 694's series
+no weather exists, so the demand mean of the hindsight model is calendar only and is fitted on the
+28-day pre-roll. The panel loader is built on the torch-free functions of experiment 506, and it
+cuts the 126,624-step `dense_raw.npy` of experiment 713 to the 121,248 steps of the grid that
+experiment 412's CAMS arrays share. V3 runs only the forced `K` = 3 fit, which is the stricter of
+the two controls. The history class of the `M1` re-cut is the class held by most of the UTC days 2
+to 15 days before the origin's date, as in `reverse_flow_analysis.md` section 4, and the measure is
+`M1` minus the Candidate. The second control period of V3 ends on a date that is read from a private
+file, because the date is an era date. Experiment 716's folder comes in through `EXTRA_PYTHONPATH`
+at commit 126577d1d, and the code stops at the start when the checkout is at any other commit.
+Nothing is merged from that branch.
 
 **Status of every rung.** No script has run on real data. Each line says which of three states the
 rung is in: done on synthetic data, wired (the real-data branch is written and was exercised against
 stubs), or not run on real data.
 
-- Rungs 0a and 0d (census, gate table): done on synthetic data. The read-only loader is wired, and its
-  grid-length rule is checked against the shapes of the stored arrays.
+- Rungs 0a and 0d (census, gate table): done on synthetic data; the real run follows the fixes. The
+  read-only loader is wired, and its grid-length rule is checked against the shapes of the stored
+  arrays.
 - Rung 0b (sign posterior): done on synthetic data. The `--run` branch is wired: farm series with a
-  union gap mask, the F7 PV estimate and as-of capacity, the references of experiments 506 and 674,
-  oracle and 0.7 and 1.3 capacity scales, the Brier and signed-CRPS bars of the hindsight read-out
-  (smoothed and filtered), and a cost gate. A fake panel exercises the whole world loop. Not run on
-  real data.
+  union gap mask, the F7 PV estimate and as-of capacity, the references of experiments 506 and 674
+  and the two references that do not read the meter, capacity scales of 1, 0.7, and 1.3, the stored
+  per-row posterior, the Brier and signed-CRPS bars of the hindsight read-out (smoothed and
+  filtered), and a cost gate. A fake panel exercises the whole world loop. Not run on real data.
 - Rung 0c (known-answer checks of the folded loss): done; six checks pass.
 - Rung 0e V2, K1, and V3: wired against experiment 694's assets. A stub of those assets exercises
   every line, including the comparison of the rerun `M2` with the stored `inject.pkl` and `k1.pkl`,
-  the paired cluster bootstrap, and the private outputs. Not run on real data. The variants "unit size
-  scaled to the host" and "farm and engine injected together" are not wired.
+  the paired cluster bootstrap, and the private outputs. Not run on real data. The variants "unit
+  size scaled to the host" and "farm and engine injected together" are not wired.
 - Rung 0e V4 and the section 3 analyses: the pure functions (matched running and idle profiles,
   running share by group, price fifths, export-day bands, class re-cut of stored forecasts) are done
   on synthetic data, and `run_section3` and `run_m1_recut` are wired but were never run, not even
-  against stubs. The system-price fifths and the cleaner series in the MSA network are not wired.
+  against stubs. `run_section3` refuses to run unless V2 and K1 both passed. The system-price fifths
+  and the cleaner series in the MSA network are not wired.
 - Figure and report scripts: done on synthetic tables. Every chart goes to the private folder unless
   its table passes the public-aggregate guard, and the guard refuses a profile table and a dated
   generator table.
@@ -290,20 +304,20 @@ of the fixed code, a results review, a numbers review, and a prose review.
       distribution, the Brier reliability and signed CRPS, the cost gate, the demand-mean fit, and
       the checks (brute force, aliasing toy, oracle simulation, hidden-sign world).
     - `e00720_rung0b.py`: the driver that scores four read-outs, each with the real and the shifted
-      sky, on one injected world. Its `--run` branch is not wired.
+      sky, on one injected world. Its `--run` branch is wired and not run on real data.
     - `e00720_census.py` (rungs 0a and 0d) and `e00720_real.py`: the census, the gate table, the
       fold windows, and the read-only loader of the stored panel.
     - `e00720_guard.py` and `e00720_check_guard.py`: the anonymisation guard.
     - `e00720_v2.py` and `e00720_check_bars.py` (rung 0e): the hindsight fit on one 694 segment, the
       paired cluster bootstrap against `M2`, the false-alarm statistics, and the bar functions of
       `e00720_bars.py`.
-    - `e00720_references.py`: experiment 506's gated rule and experiment 674's day labels on the same
-      worlds. `e00720_analyses.py`: V4 and the section 3 functions. `e00720_figures.py` and
+    - `e00720_references.py`: experiment 506's gated rule and experiment 674's day labels on the
+      same worlds. `e00720_analyses.py`: V4 and the section 3 functions. `e00720_figures.py` and
       `e00720_report.py`: the charts and the report, private by default.
     - `run.sh`: the slot wrapper (8 GB cap, no swap, one thread, 25 GB free check).
-- **Not wired:** the price fifths, the cleaner series in the MSA network, and the V2 variants with the
-  unit size scaled to the host and with a farm and an engine together. The first real run of each
-  script waits for an Opus code review.
+- **Not wired:** the price fifths, the cleaner series in the MSA network, and the V2 variants with
+  the unit size scaled to the host and with a farm and an engine together. The first real run of
+  each script waits for an Opus code review.
 - Read from earlier experiments: experiments 412, 417, 420, and 405 (injection and gate), 694
   (generator tracker, to rerun on the same segments), and 716 (the PV estimate and the as-of
   capacity table, imported through `PYTHONPATH`).
