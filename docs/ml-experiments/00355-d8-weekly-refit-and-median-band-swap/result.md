@@ -177,3 +177,9 @@ gap.
   weekly
   equalled monthly on six other Primaries, so a null is the prior.
 - **Compute.** CPU only, 6 spawned workers, one thread each, `MemoryMax=16G`.
+
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.

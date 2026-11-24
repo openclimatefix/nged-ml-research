@@ -166,8 +166,8 @@ a larger fitted size. That change is consistent with experiment 194's finding th
 from D8's reading in 2026, but the count model does not show it.
 
 **On the one schedule of small units we tried, the tracker almost never finds the units.** M2's F1
-on the injected small units is 0.12, and it chose "no engine" in 31 of 44 segments. On that schedule,
-M2 chose at least one unit in only 13 of 44 segments.
+on the injected small units is 0.12, and it chose "no engine" in 31 of 44 segments. On that
+schedule, M2 chose at least one unit in only 13 of 44 segments.
 
 All five pre-registered probes (P1 to P5) hold at their pre-registered reading.
 
@@ -234,17 +234,17 @@ dwell of 2 half-hours lowers the pooled F1 under both rules, but on the record a
 slightly higher than M2 (0.686 against 0.678 folded, 0.679 against 0.675 signed), so the pooled loss
 comes from the synthetic schedules.
 
-**Schedule by schedule (M2, folded rule), the tracker finds engines of the record's unit size and
-of larger units, and it misses smaller units.**
+**Schedule by schedule (M2, folded rule), the tracker finds engines of about the record's unit size
+and of larger units, and it misses smaller units.**
 
 | Schedule | Units and size | M2 F1 | Segments where M2 chose K = 0 |
 |---|---|---|---|
 | Gas A record | 3 units of the record's size | 0.678 | 0 of 44 |
-| Synthetic, seeds 0 to 3 | 3 units of the record's size | 0.835 to 0.889 | 0 of 176 |
+| Synthetic, seeds 0 to 3 | 3 units of about the record's size | 0.835 to 0.889 | 0 of 176 |
 | Synthetic, seed 4 | 3 units of a smaller size | 0.116 | 31 of 44 |
 | Synthetic, seed 5 | 3 units of a larger size | 0.872 | 0 of 44 |
-| Synthetic, seed 6 | 1 unit of the record's size | 0.695 | 6 of 44 |
-| Synthetic, seed 7 | 2 units of the record's size | 0.858 | 0 of 44 |
+| Synthetic, seed 6 | 1 unit of about the record's size | 0.695 | 6 of 44 |
+| Synthetic, seed 7 | 2 units of about the record's size | 0.858 | 0 of 44 |
 
 Where the tracker finds the engine, the fitted unit size is near the true size on the coarse grid.
 For the record, 36 of 44 segments choose a size on the grid below the true size. The audit found
@@ -277,11 +277,11 @@ positives, 66 false negatives), M1 0.731, M2-dwell 0.709, and M0 0.534.
   +0.156 and +0.213 (signed). C2 stays positive (+0.006 to +0.034) under the folded rule and
   negative (-0.007 to -0.039) under the signed rule. No sign changes.
 - **Triggers that fired, and the audit.** Trigger 1 (a known-answer test fails): the real record
-  alone misses the F1 bar (0.678 folded, 0.675 signed), the small-unit schedule scores 0.12, and K1 scores
-  0.77. Trigger 5 (a simpler arm beats the arm that contains it, or a control moves the score): M1
-  beats M2 under the signed rule, and the fold barely changes D8's fit. Trigger 7 (a later design
-  depends on the result): the inventory project would. A fresh Sonnet agent audited the experiment
-  with its own scoring code, and its report is in the private
+  alone misses the F1 bar (0.678 folded, 0.675 signed), the small-unit schedule scores 0.12, and K1
+  scores 0.77. Trigger 5 (a simpler arm beats the arm that contains it, or a control moves the
+  score): M1 beats M2 under the signed rule, and the fold barely changes D8's fit. Trigger 7 (a
+  later design depends on the result): the inventory project would. A fresh Sonnet agent audited the
+  experiment with its own scoring code, and its report is in the private
   `data/ml-experiments/briefs/e694_audit/` folder.
 - **Audit findings and how each was triaged.**
     - **Accepted: the stored counts replicate exactly.** The audit's own injection, window offsets,
@@ -389,9 +389,9 @@ climatology cannot reproduce.
   size and compared by the Bayesian information criterion. Then 5 rounds of expectation-maximisation
   fit the transition matrix, with a prior of 5 pseudo-counts.
 - The synthetic schedules resample the record's runs (a unit level and a duration) with replacement.
-  Seeds 0 to 3 give 3 units of the record's size and decide the pooled score. Seeds 4 to 7 give 3
-  units of a smaller size, 3 units of a larger size, 1 unit of the record's size, and 2 units of the
-  record's size, and are reported only.
+  Seeds 0 to 3 give 3 units of about the record's size and decide the pooled score. Seeds 4 to 7
+  give 3 units of a smaller size, 3 units of a larger size, 1 unit of about the record's size, and 2
+  units of about the record's size, and are reported only.
 - Segments: 28 days of history for the spread, then 120 tracked days, with the schedule injected
   from day 38. The first period ("pre-solar") has 3 consecutive segments per Primary from
   2022-01-01, before the 11 kV solar connected near D8. The second period ("solar") has 3 from

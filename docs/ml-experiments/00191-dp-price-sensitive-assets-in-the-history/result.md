@@ -9,26 +9,26 @@ status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00191-dp-price-sensitive-assets-in-the-history/ only (public price files are
-  reused from experiments 185 and 186; nothing is downloaded). Serving path: not touched. Degradation
-  rule: not touched. Designs: more than one is defensible (which price features, how a masked row is
-  chosen, what stands in for the unknown price), so this plan fixes one of each before any score is
-  read. Callers: this folder's scripts, which copy the ensemble-driven GAM-K engine of experiment 152
-  and call the reviewed `studies.dp_*` modules unchanged. No new modelling module.
+  reused from experiments 185 and 186; nothing is downloaded). Serving path: not touched.
+  Degradation rule: not touched. Designs: more than one is defensible (which price features, how a
+  masked row is chosen, what stands in for the unknown price), so this plan fixes one of each before
+  any score is read. Callers: this folder's scripts, which copy the ensemble-driven GAM-K engine of
+  experiment 152 and call the reviewed `studies.dp_*` modules unchanged. No new modelling module.
 hypothesis: >-
-  Some of D8's multi-day drops (experiment 159) and the matching shortfalls at its neighbour D14 are
-  output of price-following gas generation (experiment 186), which no weather input explains and no
-  forecast of the price can reach at a lead of days. Letting the convex demand model (GAM-K) see
-  the half-hourly price in its training history, gated by the registered connection date of the
-  gas engine, lets it learn a cleaner baseline for the rest of the demand. The forecast then
-  improves even when the price is unknown at forecast time.
+  Some of D8's multi-day drops (experiment 159) and the matching shortfalls at its neighbour the
+  register's Primary are output of price-following gas generation (experiment 186), which no weather
+  input explains and no forecast of the price can reach at a lead of days. Letting the convex demand
+  model (GAM-K) see the half-hourly price in its training history, gated by the registered
+  connection date of the gas engine, lets it learn a cleaner baseline for the rest of the demand.
+  The forecast then improves even when the price is unknown at forecast time.
 prediction: >-
-  Written before any score is read. H (hindsight: true price at forecast time, a ceiling that
-  cannot be forecast) lowers D8's mean absolute error over all rows by at least 5% against A0, and
-  more on high-spread half-hours. M (the same fit, with the price features replaced by their
-  expected value given the hour, day type and season) or T (the price-driven half-hours masked out
-  of training) gains under 1.5% on D8 in all rows, so the pre-registered threshold for a useful
-  change is probably missed. I expect the cleaner baseline to give a small gain at most, because
-  D8's series has only 12 monthly refits from 3 to 14 months of history. D14, with a longer
+  Written before any score is read. H (hindsight: true price at forecast time, a ceiling that cannot
+  be forecast) lowers D8's mean absolute error over all rows by at least 5% against A0, and more on
+  high-spread half-hours. M (the same fit, with the price features replaced by their expected value
+  given the hour, day type and season) or T (the price-driven half-hours masked out of training)
+  gains under 1.5% on D8 in all rows, so the pre-registered threshold for a useful change is
+  probably missed. I expect the cleaner baseline to give a small gain at most, because D8's series
+  has only 12 monthly refits from 3 to 14 months of history. The register's Primary, with a longer
   history to learn the break from, should show a clearer gain from T than D8. P (last settled day's
   price as the input) gains less than M. No decision Primary's score rises by 0.02 points.
 decision_rule: >-
@@ -37,19 +37,19 @@ decision_rule: >-
   Contrasts, all on the quantile score (twice the mean pinball loss over 11 quantiles, in points of
   effective capacity) and on the mean absolute error of the mean forecast: C1 = H minus A0 at D8,
   all rows. C2 = M minus A0, and C3 = T minus A0, at D8, all rows. C4 = P minus A0 at D8. The same
-  four at D14. Each interval is the 95% month-block bootstrap (12 calendar months of the scored
-  year, 20,000 resamples), Bonferroni-corrected to the 99.4% level across the eight contrasts per
-  site pair. `supported`: C1 is at or below -5% of A0's mean absolute error at D8 with the interval
-  wholly below zero (the upper bound), and at least one of C2 or C3 is at or below -1.5% with its
-  interval wholly below zero and the no-harm check passes (no decision Primary's quantile score rises
-  by 0.02 points or more). `partly supported`: the first half holds and the second does not.
-  `not supported` otherwise. `inconclusive` when the interval of every contrast includes zero.
-  The 1.5% threshold is set by cost: the fix adds an asset register, a price feed and a second
-  fit to the weather layer, which a smaller gain does not justify.
+  four at the register's Primary. Each interval is the 95% month-block bootstrap (12 calendar months
+  of the scored year, 20,000 resamples), Bonferroni-corrected to the 99.4% level across the eight
+  contrasts per site pair. `supported`: C1 is at or below -5% of A0's mean absolute error at D8 with
+  the interval wholly below zero (the upper bound), and at least one of C2 or C3 is at or below
+  -1.5% with its interval wholly below zero and the no-harm check passes (no decision Primary's
+  quantile score rises by 0.02 points or more). `partly supported`: the first half holds and the
+  second does not. `not supported` otherwise. `inconclusive` when the interval of every contrast
+  includes zero. The 1.5% threshold is set by cost: the fix adds an asset register, a price feed and
+  a second fit to the weather layer, which a smaller gain does not justify.
 benchmark: >-
   A0 at the same site, the same rows and leads; climatology and the manual heuristic for absolute
-  skill; where the site has them, experiment 136's stored arm A2 and experiment 155's arm D at D14,
-  as a check on A0 (A0 omits T-all, the night offset and recipe R).
+  skill; where the site has them, experiment 136's stored arm A2 and experiment 155's arm D at the
+  register's Primary, as a check on A0 (A0 omits T-all, the night offset and recipe R).
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Quantile score and mean absolute error of the mean forecast in points of effective capacity, over
@@ -61,74 +61,75 @@ verdict: not supported
 production_status: not-for-production
 adopted_in: none
 best_arm: >-
-  None. At D8 the hindsight arm H (true price at forecast time) scores -0.64% of the reference's mean
-  absolute error (95% interval -2.53% to +1.11%), against a pre-registered bar of -5%.
+  None. At D8 the hindsight arm H (true price at forecast time) scores -0.64% of the reference's
+  mean absolute error (95% interval -2.53% to +1.11%), against a pre-registered bar of -5%.
 headline: >-
-  Letting the model see the price in its history does not improve the forecast at D8 or D14. The
-  ceiling that uses the true price at forecast time gains 0.6% at D8, and every arm that could run
-  live is no better than a model with no price input.
+  Letting the model see the price in its history does not improve the forecast at D8 or the
+  register's Primary. The ceiling that uses the true price at forecast time gains 0.6% at D8, and
+  every arm that could run live is no better than a model with no price input.
 lessons:
   - >-
-    At D8 the price columns explain 2.7% to 4.8% of the error on the rows they are fitted to, so even
-    a perfect price forecast could not have reached the pre-registered 5% bar.
+    At D8 the price columns explain 2.7% to 4.8% of the error on the rows they are fitted to, so
+    even a perfect price forecast could not have reached the pre-registered 5% bar.
   - >-
     The fitted price response at D8 is non-zero within the training rows, but it does not carry
     forward: out of sample the best arm gains 0.6%, with an interval that includes zero.
   - >-
-    At D14 the fitted price response is 0 to 0.13 MW, so the price indicators find no footprint
-    there.
+    At the register's Primary the fitted price response is 0 to 0.13 MW, so the price indicators
+    find no footprint there.
   - >-
     Removing the price-driven half-hours from training (T) and replacing the price by its expected
     value (M) do not help, and persisting yesterday's price (P) hurts D8 by 4.4%.
 take_home_message: >-
-  Modelling a price-following asset in the history does not make the forecast better at D8 or D14.
-  A demand model that is given the true price at forecast time, which no live service has here,
-  gains only 0.6% at
-  D8, and the models that use a price available at forecast time lose 0.9% to 4.4%. The gas engine's
-  response is real enough to fit within the training rows at D8, so the remaining
-  D8 error comes from causes that these price indicators do not explain, and NGED's half-hourly
-  output for the engine is the data to ask for next.
+  Modelling a price-following asset in the history does not make the forecast better at D8 or the
+  register's Primary. A demand model that is given the true price at forecast time, which no live
+  service has here, gains only 0.6% at D8, and the models that use a price available at forecast
+  time lose 0.9% to 4.4%. The gas engine's response is real enough to fit within the training rows
+  at D8, so the remaining D8 error comes from causes that these price indicators do not explain, and
+  NGED's half-hourly output for the engine is the data to ask for next.
 advice:
   - >-
-    Do not add half-hourly price indicators to the demand model for D8 or D14: the hindsight ceiling
-    gains 0.6% at D8 and loses 0.5% at D14 (Figure 1).
+    Do not add half-hourly price indicators to the demand model for D8 or the register's Primary:
+    the hindsight ceiling gains 0.6% at D8 and loses 0.5% at the register's Primary (Figure 1).
   - >-
     Ask NGED for the half-hourly output of the gas engine registered near D8, because the price
-    columns reach at most 4.8% of the error even on their own training rows (Results, in-sample gain).
+    columns reach at most 4.8% of the error even on their own training rows (Results, in-sample
+    gain).
   - >-
-    Fit D8's spread on D8's own residuals before adding another input: the q05 to q95 interval covers
-    42% of readings and the q05 quantile sits above 31% of them (Results, tails).
+    Fit D8's spread on D8's own residuals before adding another input: the q05 to q95 interval
+    covers 42% of readings and the q05 quantile sits above 31% of them (Results, tails).
   - >-
-    Do not gate a D14 model on the engine's connection date, because the data shows no price
-    response at D14 (Figure 2).
+    Do not gate a model of the register's Primary on the engine's connection date, because the data
+    shows no price response at the register's Primary (Figure 2).
 ---
 
 # Experiment 191: can price-following assets be modelled in the history so the forecast improves?
 
 **Take-home message: modelling a price-following asset in the history does not improve the forecast
-at D8 or D14.** D8 and D14 are two primary substations of National Grid Electricity Distribution
-(NGED) in the Boston area. A price-following asset is a generator or battery whose output follows
-the electricity price. [Experiment
-186](../00186-switching-d8-gas-peaker-spark-spread-and-triads/result.md) found that D8's multi-day
-drops in demand look partly like a gas engine that runs when the spark spread is positive. The spark
-spread is the system price minus the gas cost of generating one MWh of electricity. In the data we
-have, a price is not forecastable days ahead, so we asked a narrower question: if the demand model
-sees the price in its training history, does it learn a cleaner picture of the rest of the demand,
-and does the forecast improve even when the price is unknown at forecast time? We added four price
-indicators to a convex demand model (GAM-K, a generalised additive model with a Kalman filter on
-recent errors), each lowering net load by a fitted, non-negative amount, switched on from the
-connection date of a registered gas engine. We tested four arms (H, M, P and T, defined under
-Arms) that differ in what stands in for the price at forecast time, and scored the forecasts on the
-year 2025-07 to 2026-06, which no fit had seen. The best arm, H, which uses the true price at
-forecast time and so cannot run live, lowers D8's mean absolute error by 0.6%, with a 95% interval
-that includes zero. The pre-registered bar was a 5% fall, so the verdict is `not supported`. The
-reference demand model reproduces experiment 152 to numerical precision (see Checks), and the gas
-engine's response is visible in the fitted coefficients, but the response does not carry forward to
-the scored year.
+at D8 or the register's Primary.** D8 and the register's Primary are two primary substations of
+National Grid Electricity Distribution (NGED) in the Boston area. The register's Primary is the
+Primary under which NGED's Embedded Capacity Register lists a gas engine; its label is read from a
+private file. A price-following asset is a generator or battery whose output follows the electricity
+price. [Experiment 186](../00186-switching-d8-gas-peaker-spark-spread-and-triads/result.md) found
+that D8's multi-day drops in demand look partly like a gas engine that runs when the spark spread is
+positive. The spark spread is the system price minus the gas cost of generating one MWh of
+electricity. In the data we have, a price is not forecastable days ahead, so we asked a narrower
+question: if the demand model sees the price in its training history, does it learn a cleaner
+picture of the rest of the demand, and does the forecast improve even when the price is unknown at
+forecast time? We added four price indicators to a convex demand model (GAM-K, a generalised
+additive model with a Kalman filter on recent errors), each lowering net load by a fitted,
+non-negative amount, switched on from the connection date of a registered gas engine. We tested four
+arms (H, M, P and T, defined under Arms) that differ in what stands in for the price at forecast
+time, and scored the forecasts on the year 2025-07 to 2026-06, which no fit had seen. The best arm,
+H, which uses the true price at forecast time and so cannot run live, lowers D8's mean absolute
+error by 0.6%, with a 95% interval that includes zero. The pre-registered bar was a 5% fall, so the
+verdict is `not supported`. The reference demand model reproduces experiment 152 to numerical
+precision (see Checks), and the gas engine's response is visible in the fitted coefficients, but the
+response does not carry forward to the scored year.
 
-![Mean absolute error of each price-aware arm minus the reference's, at D8 and D14](figure_1_error_against_reference.svg)
+![Mean absolute error of each price-aware arm minus the reference's, at D8 and the register's Primary](figure_1_error_against_reference.svg)
 
-![Fitted price response in MW at each monthly fit, D8 and D14](figure_2_fitted_price_response.svg)
+![Fitted price response in MW at each monthly fit, D8 and the register's Primary](figure_2_fitted_price_response.svg)
 
 ## Inputs and arms
 
@@ -142,11 +143,12 @@ the scored year.
   152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md) (fitted solar capacity,
   monthly refits on a 24-month window, shared Kalman filter, spread fitted on tuning months), with
   no price input. At D8 it has 12 monthly fits from 3 to 14 months of history, because the series is
-  valid only from 2025-04-01. At D14 it has 27 fits. It is not the best-guess stack of [experiment
+  valid only from 2025-04-01. At the register's Primary it has 27 fits. It is not the best-guess
+  stack of [experiment
   155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the winter night
   offset and the 14-day error profile are absent, because D8 has no tuning months to fit the offset
-  on. At D14 the reference's mean absolute error is 3.84 points against 3.69 for the best-guess
-  stack.
+  on. At the register's Primary the reference's mean absolute error is 3.84 points against 3.69 for
+  the best-guess stack.
 - **Arms.** H uses the true price at forecast time (a ceiling). M uses the expected indicator given
   the half-hour of the day, day type and quarter. P uses the last settled day's indicator at the
   same half-hour, the only price known at the 09:00 UTC origin. T removes the half-hours that the
@@ -163,34 +165,36 @@ the scored year.
 - **Masking rule (fixed after one coefficient check, before any score was read).** T drops a
   training half-hour when the fitted price output there is at least 25% of the largest fitted output
   and that largest output is at least 1 point (1% of the substation's effective capacity). Without
-  the 1-point floor the rule dropped half of D14's training rows for a response of 0.04 MW.
+  the 1-point floor the rule dropped half of the register's Primary's training rows for a response
+  of 0.04 MW.
 
 ## Results
 
 - **Absolute scores (D8, scored year, all rows, leads 0.5 to 168 hours).** Reference: mean absolute
-  error 15.18 points (1.6 MW), quantile score 10.95, q05-to-q95 coverage 0.42 (42%). D14: mean
-  absolute error 3.84, quantile score 2.16, coverage 0.89.
+  error 15.18 points (1.6 MW), quantile score 10.95, q05-to-q95 coverage 0.42 (42%). The register's
+  Primary: mean absolute error 3.84, quantile score 2.16, coverage 0.89.
 - **Mean absolute error against the reference, D8.** H -0.64% (-2.53% to +1.11%), M +0.88% (-0.37%
   to +2.28%), P +4.41% (+3.00% to +5.83%), T +3.44% (+0.84% to +6.41%), JB +5.73% (+2.56% to
   +8.66%). The quantile score gives the same signs: H -1.04%, M +1.00%, P +5.36%, T +4.56%.
-- **Mean absolute error against the reference, D14.** H +0.49% (+0.23% to +0.78%), M +0.02%, P
-  +0.16%, T +0.14%, JB -0.13% (-0.54% to +0.24%).
+- **Mean absolute error against the reference, the register's Primary.** H +0.49% (+0.23% to
+  +0.78%), M +0.02%, P +0.16%, T +0.14%, JB -0.13% (-0.54% to +0.24%).
 - **High-spread half-hours (spark spread above zero), D8.** The reference's error is 16.37 points
   against 13.96 on other half-hours. H -0.74%, M +1.08%, P +3.73%, T +5.27%. No arm is significantly
   better where the price signal should be strongest.
 - **By lead, D8, H.** The quantile score falls 2.2% (interval -4.3% to -0.05%, not corrected for the
   number of cuts) at 0 to 24 hours, 1.8% at 24 to 72 hours and 0.4% at 72 to 168 hours.
 - **In-sample gain (the ceiling).** On each fit's own training rows the price columns lower D8's
-  mean absolute error by 4.1% on average over the 12 fits (2.7% to 4.8%). At D14 the in-sample
-  gain is 0.0% and the response is 0 to 0.13 MW. At D5 it is 0.0%.
+  mean absolute error by 4.1% on average over the 12 fits (2.7% to 4.8%). At the register's Primary
+  the in-sample gain is 0.0% and the response is 0 to 0.13 MW. At D5 it is 0.0%.
 - **No-harm check.** The largest rise in quantile score at any of the five decision Primaries (D5,
-  D10, D11, D14, D16) is 0.011 points, at D14 for H, against the 0.02 limit. With the gate switched
-  on for the whole history at sites with no asset (placebo), D10 rises by 0.009 points for H.
+  D10, D11, the register's Primary, D16) is 0.011 points, at the register's Primary for H, against
+  the 0.02 limit. With the gate switched on for the whole history at sites with no asset (placebo),
+  D10 rises by 0.009 points for H.
 - **Tails.** At D8 the reference's q05 quantile lies above 30.8% of readings (nominal 5%), q95 above
   73.1% (nominal 95%), q01 above 20.6% (1%) and q99 above 83.9% (99%). H changes none of them by
-  more than 0.5 points. D14 is close to nominal (q05 6.4%, q95 95.1%). The D8 spread comes from six
-  other Primaries and is far too narrow for D8, so D8's quantile scores are weaker evidence than its
-  mean absolute errors.
+  more than 0.5 points. The register's Primary is close to nominal (q05 6.4%, q95 95.1%). The D8
+  spread comes from six other Primaries and is far too narrow for D8, so D8's quantile scores are
+  weaker evidence than its mean absolute errors.
 - **Post hoc: settlement-day indicators.** Replacing the half-hourly indicators by the settlement
   day's mean price and spread lowers nothing: D8 H +2.23% (+0.42% to +4.28%), M +2.40%, P +3.83%, T
   +5.75%.
@@ -217,16 +221,17 @@ the scored year.
   sign in every contrast of the main tables.
 - **Audit triggers.** Trigger 2 fired: H gained 0.6% against a pre-registered 5%. The explanation
   was tested and is the in-sample figure: even on the rows the price columns are fitted to they
-  explain at most 4.8%. Trigger 5 fired: at D14 H, which contains the reference, is 0.49% worse than
-  the reference. JB, which keeps the base fit and drops the price term, is within 0.13% of the
-  reference, so the loss comes from the price term, whose coefficients move between 0 and 0.9 points
-  from fit to fit. No Opus audit was run, because neither result changes the next step. Triggers 1,
-  3, 4, 6, and 7 did not fire.
+  explain at most 4.8%. Trigger 5 fired: at the register's Primary H, which contains the reference,
+  is 0.49% worse than the reference. JB, which keeps the base fit and drops the price term, is
+  within 0.13% of the reference, so the loss comes from the price term, whose coefficients move
+  between 0 and 0.9 points from fit to fit. No Opus audit was run, because neither result changes
+  the next step. Triggers 1, 3, 4, 6, and 7 did not fire.
 
-**The scripts read the connection dates of the registered gas engines from a private file.**
-`ml-experiments/engine_constants.py` loads them from
+**The scripts read the connection dates of the registered gas engines and the register's Primary
+from a private file.** `ml-experiments/engine_constants.py` loads them from
 `data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
-out of the repository. The file is not committed, so a rerun needs a copy of it.
+out of the repository. The file is not committed, so a rerun needs a copy of it. The printed logs
+show the register's Primary as REG.
 
 ## Open questions
 

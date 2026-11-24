@@ -120,7 +120,7 @@ the prediction failed, and the verdict is `partly supported`: one of the two tes
 rule held.
 
 **We asked whether D8's drops coincide with a gas engine running.** A drop is a stretch of 2 to 19
-days in which D8's metered power sat about 2.7 MW below the power that the fitted expected-power
+days in which D8's metered power sat below the power that the fitted expected-power
 model of experiment
 [159](../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md) predicted. That
 experiment found 29 drops. The first, in 2022, falls before the detector's window (experiments
@@ -176,8 +176,7 @@ after the fade.*
 - **Depths:** the mean distance of the 28 depths from the nearest multiple of one unit is 0.287
   units (0.233 to 0.342) at the planned unit size. A uniform spread gives
   0.25, and the prediction needed the interval wholly below 0.25. Depths from 2023-08-15 to
-  2025-02-28 (11 drops, median 3.6 MW) give 0.319, and depths from 2025-03 (17 drops, median
-  2.4 MW) give 0.266.
+  2025-02-28 (11 drops) give 0.319, and depths from 2025-03 (17 drops) give 0.266.
 - **Sensitivity to the unit size:** the depths' mean distance and the onset steps' p value both
   changed when the unit size was set to the fitted value from experiment 196 instead of the planned
   unit size, so the clustering result depends on the unit size chosen. The values are not reported
@@ -251,7 +250,10 @@ after the fade.*
 **The scripts read the engine's connection date and recorded unit size from a private file.**
 `ml-experiments/engine_constants.py` loads them from
 `data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
-out of the repository. The file is not committed, so a rerun needs a copy of it.
+out of the repository. The file is not committed, so a rerun needs a copy of it. The analysis also
+reads experiment 196's private gate results (`gate_results_fixed.json`) for the sensitivity unit
+size, and writes the lines that hold the unit size to a private report in its data folder, not to
+`printed_report.txt`.
 
 ## What the next experiment should answer
 

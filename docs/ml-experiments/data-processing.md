@@ -345,10 +345,10 @@ whether it applies to production awaits NGED's answer. Evidence:
 **Give a forecast the engine state it will have at forecast time, and train the engine term on that
 same lagged state (provisional, medium confidence).** *Applies to: experiments.* D8's engine
 detector gives a state for each half-hour that is built from that half-hour's own reading. A
-coefficient fitted on that contemporaneous state is 3.6 MW per half-hour with one or more units
-running, but the state of the last settled day is worth 0.15 MW (interval -0.06 to 0.32) out of sample,
+coefficient fitted on that contemporaneous state is more than 20 times what the state of the last
+settled day is worth out of sample (0.15 MW; interval -0.06 to 0.32),
 so applying the contemporaneous coefficient to the lagged state makes the quantile score 10% worse.
-Trained on the lagged state, the coefficient is 0.9 to 1.0 MW and the score is 3% better than a
+Trained on the lagged state, the coefficient is smaller and the score is 3% better than a
 model without the term ([experiment
 294](00294-regime-aware-model-at-d8-engine-state-term/result.md)).
 
