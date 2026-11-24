@@ -1,5 +1,5 @@
 ---
-id: "NNNNN"
+id: "00725"
 slug: msa-live-buildable-history-weather
 title: >-
   Does the axial-attention demand network still forecast better than the Candidate when every
@@ -567,16 +567,15 @@ review, and a prose review.
 ## Files
 
 **This page names experiment 713 and experiment 667 in plain text, because their pages are not yet on
-`main`.** The id `NNNNN` is a placeholder that the ML Research Manager replaces when they allocate
-the id, in the folder names, the front matter, and the row on the theme's plan page.
+`main`.**
 
 - `data/ml-experiments/briefs/msa_architecture/f8_design.md` and `f8_design_review.md` (read,
   private): the design that this page condenses.
-- `ml-experiments/NNNNN-msa-live-buildable-history-weather/` (to be created): `run.sh`, the rule,
+- `ml-experiments/00725-msa-live-buildable-history-weather/` (to be created): `run.sh`, the rule,
   the cache builder, `LiveSource`, the fit, the prediction, the checks, the scorer, the figures, and
   the report script, none of which exists yet.
 - Read from experiment 713: the stored states, the stored forecasts of `M*`, the scorer, and the code
   at the frozen checkout.
 - Written by this experiment (to be created): fitted states under
-  `data/ml-experiments/NNNNN-msa-live-buildable-history-weather/work/` and predictions under
+  `data/ml-experiments/00725-msa-live-buildable-history-weather/work/` and predictions under
   `predictions/`, never committed.
