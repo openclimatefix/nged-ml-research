@@ -391,7 +391,7 @@ def figure_event(*, site: str, onset: int, end: int, number: int) -> None:
         width=WIDTH - 110, height=190,
         title=alt.TitleParams([f"Primary {site} ({group}), real event, {month} forecasts, 12 to 36 h ahead", "Orange band: B-mix 90% interval. Lines: medians. Shaded: the event."], anchor="start"),
     )  # fmt: skip
-    chart.save(FIGURE_DIR / f"figure_{number}_event_{site}_{onset}.svg")
+    chart.save(FIGURE_DIR / f"figure_{number}_event_{number - 6}.svg")
 
 
 def main() -> None:
