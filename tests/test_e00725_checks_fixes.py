@@ -1,11 +1,14 @@
 # ruff: noqa: E501
 """Tests of experiment 725's KL5 grid length, the KL8 statement for rule `Z`, and the GPU-process pattern of `run.sh`."""
 
+import dataclasses
 import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+import e00725_checks as ck
+import e00725_rule as rule
 import e00725_sources as src
 import e00725_weather_lookahead as wl
 import pytest
@@ -16,7 +19,9 @@ RUN_SH = (
 )
 
 
-def test_cache_grid_is_the_extended_grid_not_the_default_grid() -> None:
+def test_cache_grid_is_the_extended_grid_not_the_default_grid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The cache has 126,624 half-hours (to 2026-11-20 23:30), the grid that `redirect` sets; the default grid has 121,248."""
     ext = pytest.importorskip("e00667_extend")
     common = pytest.importorskip("e00087_common")
@@ -66,3 +71,67 @@ def test_gpu_process_pattern_matches_interpreters_only() -> None:
 def test_run_sh_is_valid_bash() -> None:
     """The script parses."""
     assert subprocess.run(["bash", "-n", str(RUN_SH)], check=False).returncode == 0
+
+
+CONTRACT = datetime(2026, 3, 10, 12, tzinfo=UTC)
+
+
+def test_kl8_l_and_e_fail_with_one_negative_margin() -> None:
+    """A single margin of -0.5 h fails `L` and `E`."""
+    for name in ("L", "E"):
+        lines = wl.lines_for(contract=CONTRACT, rule_name=name)  # ty: ignore[invalid-argument-type]
+        assert ck.kl8_arm_passes(name=name, lines=lines)[0]
+        bad = [dataclasses.replace(lines[0], margin_hours=-0.5), *lines[1:]]
+        passes, negative = ck.kl8_arm_passes(name=name, lines=bad)
+        assert not passes
+        assert len(negative) == 1
+
+
+def test_kl8_z_needs_its_negative_lines() -> None:
+    """`Z` passes while it shows negative lines, and fails when they are filtered out (the check can detect a look-ahead)."""
+    lines = wl.lines_for(contract=CONTRACT, rule_name="Z")
+    assert ck.kl8_arm_passes(name="Z", lines=lines)[0]
+    kept = [x for x in lines if x.margin_hours >= 0]
+    assert not ck.kl8_arm_passes(name="Z", lines=kept)[0]
+
+
+def test_every_negative_z_line_overlaps_the_cells_that_the_live_rule_changes() -> None:
+    """Each negative line of `Z` holds at least one cell whose source `L` changes, so the look-ahead lies in the changed cells."""
+    changed = rule.changed_cells(rule="L")
+    negative = [x for x in wl.lines_for(contract=CONTRACT, rule_name="Z") if x.margin_hours < 0]
+    assert negative
+    for line in negative:
+        columns = list(wl.GROUPS[line.group])
+        block = changed[line.age - rule.FIRST_AGE, line.first : line.last + 1][:, columns]
+        assert block.any(), line.text
+
+
+def test_run_sh_exports_the_environment(tmp_path: Path) -> None:
+    """`run.sh` sets the frozen checkout first on PYTHONPATH, the dummy NGED variables, and one thread for every library."""
+    text = RUN_SH.read_text()
+    assert 'export PYTHONPATH="$EXTRA_PYTHONPATH:$here"' in text
+    for name in (
+        "DATA_PATH_INTERNAL", "NGED_S3_BUCKET_URL", "NGED_S3_BUCKET_ACCESS_KEY", "NGED_S3_BUCKET_SECRET",
+        "OMP_NUM_THREADS=1", "MKL_NUM_THREADS=1", "OPENBLAS_NUM_THREADS=1", "POLARS_MAX_THREADS=1", "RAYON_NUM_THREADS=1",
+    ):  # fmt: skip
+        assert f"export {name}" in text or f" {name}" in text, name
+    assert text.index("export PYTHONPATH") < text.index("exec systemd-run")
+    assert text.index("load average") < text.index("GB available") or text.index(
+        "MAX_LOAD_WAIT_S"
+    ) < text.index("MIN_AVAILABLE_GB")
+    # run the script's exports for real, with `exec systemd-run` replaced by a printout of the environment
+    fake = text.replace("exec systemd-run", "env | sort; exit 0 #")
+    script = tmp_path / "run.sh"
+    script.write_text(fake)
+    frozen = tmp_path / "00713-frozen"
+    frozen.mkdir()
+    out = subprocess.run(
+        ["bash", str(script), "e00725_fit.py", "L"], capture_output=True, text=True, check=False,
+        env={"PATH": "/usr/bin:/bin", "DATA_PATH_INTERNAL": "/d", "EXTRA_PYTHONPATH": str(frozen), "MIN_AVAILABLE_GB": "0", "MAX_LOAD": "100000"},
+    )  # fmt: skip
+    env = dict(line.split("=", 1) for line in out.stdout.splitlines() if "=" in line)
+    assert env["PYTHONPATH"].startswith(str(frozen) + ":")
+    assert env["DATA_PATH_INTERNAL"] == "/d"
+    assert env["NGED_S3_BUCKET_URL"] == "https://example.com"
+    assert env["OMP_NUM_THREADS"] == env["MKL_NUM_THREADS"] == env["OPENBLAS_NUM_THREADS"] == "1"
+    assert env["POLARS_MAX_THREADS"] == env["RAYON_NUM_THREADS"] == "1"

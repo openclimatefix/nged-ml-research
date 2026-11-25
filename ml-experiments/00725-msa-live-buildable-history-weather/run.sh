@@ -22,11 +22,6 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$(dirname "$here")"
 script="$1"
 shift
-available_gb=$(free -g | awk '/^Mem:/ {print $7}')
-if [ "${available_gb:-0}" -lt "${MIN_AVAILABLE_GB:-25}" ]; then
-    echo "only ${available_gb} GB available; wait until ${MIN_AVAILABLE_GB:-25} GB is free" >&2
-    exit 1
-fi
 # Wait (up to MAX_LOAD_WAIT_S, default 1 hour) until the 1-minute load average is below MAX_LOAD.
 waited=0
 while [ "$(awk '{print int($1)}' /proc/loadavg)" -ge "${MAX_LOAD:-24}" ]; do
@@ -37,6 +32,12 @@ while [ "$(awk '{print int($1)}' /proc/loadavg)" -ge "${MAX_LOAD:-24}" ]; do
     sleep 30
     waited=$((waited + 30))
 done
+# The memory check runs after the load wait, so that it reads the memory of the moment the job starts.
+available_gb=$(free -g | awk '/^Mem:/ {print $7}')
+if [ "${available_gb:-0}" -lt "${MIN_AVAILABLE_GB:-25}" ]; then
+    echo "only ${available_gb} GB available; wait until ${MIN_AVAILABLE_GB:-25} GB is free" >&2
+    exit 1
+fi
 gpu_job=no
 big_job=no
 case "$script" in
@@ -59,6 +60,21 @@ fi
 # 9 GB for a fit, a prediction, a per-fold check, and KL3r (experiment 713's pipeline peaks at 6.4 to 7.4 GB
 # on the host); 4 GB for the cache step and the other checks. SLOT_MEM overrides both.
 if [ "$big_job" = yes ]; then default_mem=9G; else default_mem=4G; fi
+# The frozen checkout's folder goes first, so that no other copy of experiment 713 is imported. The other
+# experiment folders that F8 imports (437, 560, 562, 667, and the rest) come after it, minus any 00713-*.
+export PYTHONPATH="$EXTRA_PYTHONPATH:$here"
+for d in "$root"/00*/; do
+    case "$d" in
+    */00713-*/) ;;
+    *) export PYTHONPATH="$PYTHONPATH:${d%/}" ;;
+    esac
+done
+export DATA_PATH_INTERNAL
+export NGED_S3_BUCKET_URL="${NGED_S3_BUCKET_URL:-https://example.com}"
+export NGED_S3_BUCKET_ACCESS_KEY="${NGED_S3_BUCKET_ACCESS_KEY:-dummy}"
+export NGED_S3_BUCKET_SECRET="${NGED_S3_BUCKET_SECRET:-dummy}"
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+export POLARS_MAX_THREADS=1 RAYON_NUM_THREADS=1
 python_bin="$(dirname "$root")/.venv/bin/python"
 if [ -n "${MEMORY_PEAK_FILE:-}" ]; then
     # the scope's peak memory (page cache included) is written before the scope ends

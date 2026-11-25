@@ -831,6 +831,17 @@ def kl5(*, phase: str, data_dir: Path) -> dict:
     return result
 
 
+def kl8_arm_passes(*, name: str, lines: Sequence) -> tuple[bool, list[str]]:
+    """Return whether the look-ahead statement of one arm passes, and its negative-margin lines.
+
+    `L` and `E` pass only with no negative margin. Arm `Z` (the lab-analysis arm, "as `M*`") reads the analysis
+    in every cell, so its negative margins are by definition (design sections 0 and 3); it passes only if it
+    still shows them, which proves that the statement can detect a look-ahead.
+    """
+    negative = [x.text for x in lines if x.margin_hours < 0]
+    return (bool(negative) if name == "Z" else not negative), negative
+
+
 def kl8(*, data_dir: Path) -> dict:
     """Check KL8: print the look-ahead statements for `L`, `Z`, and `E` and require no negative margin and a PASS on the stored run frame."""
     import e00725_weather_lookahead as wl
@@ -839,11 +850,10 @@ def kl8(*, data_dir: Path) -> dict:
     out: dict = {"pass": True}
     for name in rule.RULES:
         print("\n".join(wl.statement(contract=contract, rule_name=name)), flush=True)  # ty: ignore[invalid-argument-type]
-        negative = [
-            x.text for x in wl.lines_for(contract=contract, rule_name=name) if x.margin_hours < 0
-        ]  # ty: ignore[invalid-argument-type]
-        out[name] = {"negative_margins": negative}
-        out["pass"] &= not negative
+        lines = wl.lines_for(contract=contract, rule_name=name)  # ty: ignore[invalid-argument-type]
+        passes, negative = kl8_arm_passes(name=name, lines=lines)
+        out[name] = {"negative_margins": negative, "negative_expected": name == "Z"}
+        out["pass"] &= passes
     ok, text = wl.check_data(contract=contract)
     print("\n".join(text), flush=True)
     out["stored_run_frame"] = {"pass": ok, "text": text}
