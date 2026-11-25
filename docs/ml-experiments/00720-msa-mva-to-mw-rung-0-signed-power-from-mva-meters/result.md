@@ -172,7 +172,8 @@ and are not shown here.
 stops the generator branch, so K1 and V3 were not fitted, the section 3 analyses (which refuse to
 run unless V2 and K1 both pass) did not run, and the hindsight model is not used on a real
 generator's history. Experiment 724 imports this experiment's hidden Markov code and its V2, K1,
-and V3 harness. The maintainer has put experiment 724 on hold.
+and V3 harness. The maintainer has closed the plan of experiment 724 as parked. The stop rule
+closed only the hand-built hindsight approach, not the neural untangler of experiment 729.
 
 **One reading is a hypothesis, not a finding: the model's demand mean may absorb a demand swing as
 generator units.** On experiment 694's segments no weather exists, so the model's demand mean uses
@@ -223,8 +224,8 @@ does not restate the checks' numbers.
   because the scores are F1 and the area under a curve.
 - **Audit triggers:** trigger 2 fired, because the result contradicts the prediction that the paired
   contrast's lower bound sits above 0, and the one explanation offered (the demand mean has no
-  weather input) is untested. No audit has run. Trigger 7 may also apply, because experiment 724's
-  design imports this code. Triggers 1 and 3 to 6 did not fire, since no control ran and no quantile
+  weather input) is untested. No audit has run. Trigger 7 may also apply, because the plan of
+  experiment 724, which the maintainer has closed as parked, imports this code. Triggers 1 and 3 to 6 did not fire, since no control ran and no quantile
   score or leave-one-site-out exists.
 - **Consistency gate:** the rerun of M2 agreed with experiment 694's stored output on all 396
   reruns, and none disagreed.
