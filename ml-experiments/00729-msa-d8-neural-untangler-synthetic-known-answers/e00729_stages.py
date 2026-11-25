@@ -1227,10 +1227,13 @@ def stage_series(*, ctx: Context, arch: str, log: Log) -> list[Path]:
     test = banks.load_bank(path=bank_path(kind="test"))
     holidays = ctx.cal.holidays
     rows = score.rows_from_segments(segments=test.segments, holidays=holidays)
-    sets = real_sets(ctx=ctx)
-    real_rows = score.rows_from_segments(segments=sets["r1"], holidays=holidays)
+    cal = ctx.table.calendar
+    r1_use = np.isin(cal.dates, ctx.cal.dates[ctx.day_split == "test"])
+    # The same set R1 as `real_sets`, built alone so that the metered engine record is not loaded.
+    r1 = real.real_segments(cal=cal, use=r1_use, reading=cal.reading, truth=cal.reading)
+    real_rows = score.rows_from_segments(segments=r1, holidays=holidays)
     written = series.write_series_figures(
-        arch=arch, test_segments=test.segments, rows=rows, real_segments=sets["r1"],
+        arch=arch, test_segments=test.segments, rows=rows, real_segments=r1,
         real_rows=real_rows, out_dir=paths.data_root() / "figures", log=log,
     )  # fmt: skip
     log(f"wrote {len(written)} time-series figures")

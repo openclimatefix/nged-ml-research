@@ -496,13 +496,19 @@ each arm drops below zero where the black line does, and whether P(X<0) crosses 
 
 **Figure 5 shows a day on which the reading comes close to zero.** The rule keeps days with at least
 4 half-hours of reading under 0.3 MVA and takes the day with the median number of such half-hours.
-The folded reading cannot show the sign there, so look for P(X<0) staying near 0.5 and for the band
-spanning both signs.
+The folded reading cannot show the sign there. P(X<0) is the mass of the arm's two-lobe distribution
+below zero, and the two lobes sit at plus and minus nearly the same size when the reading is small,
+so the mass goes to 0.5 by construction whatever the arm has learned about the sign. A P(X<0) near
+0.5 on this day therefore does not show that an arm is uncertain by its own judgement. Look at
+whether the band spans both signs and whether the median follows the truth.
 
-**Figures 6 and 7 show the harm on import days.** Figure 6 is the no-injection day with the median
-of arm D's largest P(X<0) of the day, and figure 7 is the all-import day with the largest mean of
-arm D's signed CRPS minus P0f's. P0f appears as a grey line with P(X<0) near zero. Look for the size
-of the probability of reverse flow that arm D invents on days when the truth never goes below zero.
+**Figures 6 and 7 show the harm on import days.** Figure 6 is the all-import day of the no-injection
+worlds with the median of arm D's largest P(X<0) of the day, and figure 7 is the all-import day with
+the largest mean of arm D's signed CRPS minus P0f's. P0f is a dashed grey line and puts no weight
+on reverse flow (its lobe probability is zero), and its P(X<0) is the mass of the lower lobe below
+zero, which is near zero while the reading is far above zero and rises towards 0.5 as the reading
+nears zero. Compare the size of the probability that arm D places on reverse flow with that of P0f
+on the same half-hours.
 
 **Figure 8 shows a month with real BSP steps.** The rule keeps engine and engine-and-solar days in a
 BSP month with reverse flow and takes the day with the median depth. The bottom row holds the
@@ -511,9 +517,13 @@ two arms differ where the steps occur.
 
 **Figures 9 and 10 put the other output heads beside arm D on a window already shown.** Figure 9
 uses the window of figure 1 for the 11-quantile arm D-quantile, and P(X<0) of that arm is read off
-by linear interpolation of its 11 quantiles. Figure 10 uses the window of figure 5 for the sign-only
-arm D-sign. Look for the width of the bands and for how far P(X<0) sits from 0.5 where the reading
-is small.
+by linear interpolation of its 11 quantiles, made non-decreasing as in the scoring. Figure 10 uses
+the window of figure 5 for the sign-only arm D-sign. The stored output of D-sign is a probability of
+reverse flow with the two lobes at plus and minus the reading with the reactive floor removed, and
+the figure plots the mixture's mass below zero. That mass goes to 0.5 by construction where the
+reading is under about 0.15 MVA, whatever the sign logit, so a value near 0.5 there is not evidence
+about the sign head. Look at the width of the bands, and at how far P(X<0) sits from 0.5 where the
+reading is larger.
 
 **Figures 11 and 12 show real days before the engine was connected, with no truth line.** On these
 days D8 imports, so the reading is the answer. Figure 11 takes the day with the median of arm D's

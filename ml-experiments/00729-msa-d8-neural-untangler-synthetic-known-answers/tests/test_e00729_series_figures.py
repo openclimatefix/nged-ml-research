@@ -39,7 +39,10 @@ def invented_segments() -> list[SimpleNamespace]:
             else np.zeros(48)
         )
         base_demand = 5.0 + 0.1 * k + 0.05 * hh
-        x = np.tile(base_demand - engine - solar, (N_DAYS + 2, 1))
+        x = (
+            np.tile(base_demand - engine - solar, (N_DAYS + 2, 1))
+            + 0.37 * np.arange(N_DAYS + 2)[:, None]
+        )
         r = np.sqrt(x**2 + Q**2)
         r[0] = r[-1] = np.nan
         out.append(
@@ -156,27 +159,96 @@ def test_the_picking_rules_choose_days_of_the_right_kind(world: World) -> None:
     assert largest.min_x >= 0
 
 
-def test_window_data_spans_96_half_hours_with_context_either_side(world: World) -> None:
+def test_window_data_puts_each_day_half_in_its_place(world: World) -> None:
     segments, rows = world
-    window = series.window_data(
-        seg=segments[1], date=int(rows.date[rows.seg == 1][0]), with_truth=True
-    )
+    seg = segments[1]
+    date = int(rows.date[rows.seg == 1][48])
+    day = 2  # the second base day of the segment (dense index)
+    window = series.window_data(seg=seg, date=date, with_truth=True)
     assert window.truth.shape == window.reading.shape == window.bsp_step.shape == (96,)
-    assert np.isfinite(window.truth).all()
-    real = series.window_data(
-        seg=segments[1], date=int(rows.date[rows.seg == 1][0]), with_truth=False
-    )
+    assert np.array_equal(window.truth[:24], seg.x[day - 1, 24:])
+    assert np.array_equal(window.truth[24:72], seg.x[day])
+    assert np.array_equal(window.truth[72:], seg.x[day + 1, :24])
+    assert np.array_equal(window.reading[24:72], seg.r[day])
+    steps = np.diff(np.r_[seg.bsp[day - 1, 24:], seg.bsp[day], seg.bsp[day + 1, :24]])
+    assert np.array_equal(window.bsp_step[1:], steps)
+    real = series.window_data(seg=seg, date=date, with_truth=False)
     assert np.isnan(real.truth).all()
+    assert np.array_equal(real.reading, window.reading)
 
 
 def test_a_quantile_forecast_gives_a_probability_from_its_quantiles(world: World) -> None:
     _, rows = world
-    pred = {"q": np.tile(np.linspace(-1, 1, 11), (rows.n, 1))}
-    f = series.forecast_on(pred=pred, index=np.arange(5))
-    assert np.allclose(f.p_neg, 0.5)
+    asym = {"q": np.tile(np.linspace(-1, 3, 11), (rows.n, 1))}
+    f = series.forecast_on(pred=asym, index=np.arange(5))
+    assert np.allclose(f.p_neg, 0.25)
     assert np.allclose(f.lower, -1)
-    assert np.allclose(f.upper, 1)
-    assert np.allclose(f.median, 0)
+    assert np.allclose(f.upper, 3)
+    assert np.allclose(f.median, 1)
+    above = series.forecast_on(
+        pred={"q": np.tile(np.linspace(1, 3, 11), (rows.n, 1))}, index=np.arange(3)
+    )
+    below = series.forecast_on(
+        pred={"q": np.tile(np.linspace(-3, -1, 11), (rows.n, 1))}, index=np.arange(3)
+    )
+    assert np.allclose(above.p_neg, 0.0)
+    assert np.allclose(below.p_neg, 1.0)
+
+
+def test_a_crossing_quantile_row_is_made_non_decreasing_before_interpolation(world: World) -> None:
+    _, rows = world
+    row = np.linspace(-1, 1, 11)
+    row[4] = 5.0  # a crossing: the accumulated row stays at 5.0 from level 0.4 on
+    f = series.forecast_on(pred={"q": np.tile(row, (rows.n, 1))}, index=np.arange(2))
+    assert np.allclose(f.p_neg, np.interp(0.0, np.maximum.accumulate(row), core.QUANTILE_LEVELS))
+
+
+def test_a_lobe_forecast_gives_the_mass_below_zero_not_the_stored_probability(world: World) -> None:
+    del world
+    n = 4
+    far = {
+        "p": np.full(n, 0.15),
+        "mu_i": np.full(n, 20.0),
+        "s_i": np.full(n, 0.5),
+        "mu_r": np.full(n, -20.0),
+        "s_r": np.full(n, 0.5),
+    }
+    f = series.forecast_on(pred=far, index=np.arange(n))
+    assert np.allclose(f.p_neg, 0.15, atol=1e-6)
+    near = {**far, "mu_i": np.zeros(n), "mu_r": np.zeros(n), "p": np.full(n, 0.9)}
+    assert np.allclose(series.forecast_on(pred=near, index=np.arange(n)).p_neg, 0.5)
+    half = {**far, "p": np.full(n, 0.5)}
+    f_half = series.forecast_on(pred=half, index=np.arange(n))
+    assert (f_half.lower < -15).all()
+    assert (f_half.upper > 15).all()
+    assert (np.abs(f_half.median) < 21).all()
+
+
+def test_the_largest_harm_rule_takes_the_planted_day_and_plain_import_needs_import(
+    world: World,
+) -> None:
+    _, rows = world
+    days = series.complete_days(rows=rows)
+    imports = [d for d in days if d.min_x >= 0]
+    planted = imports[len(imports) // 2]
+    harm = np.zeros(rows.n)
+    harm[planted.index] = 1.0
+    picked = series.pick_scenarios(days=days, d_p_neg=np.zeros(rows.n), d_harm=harm)
+    assert picked["largest_harm"] is not None
+    assert (picked["largest_harm"].seg, picked["largest_harm"].date) == (planted.seg, planted.date)
+    from dataclasses import replace
+
+    negative = [replace(d, min_x=-1.0) if core.WORLD_TYPES[d.world] == "none" else d for d in days]
+    assert (
+        series.pick_scenarios(days=negative, d_p_neg=np.zeros(rows.n), d_harm=harm)["plain_import"]
+        is None
+    )
+
+
+def test_a_stored_prediction_of_the_wrong_length_is_refused(world: World) -> None:
+    _, rows = world
+    with pytest.raises(series.leak.CorrectnessFailureError):
+        series.load_prediction(arm="D", arch="bilstm", name="test", n_rows=rows.n + 1)
 
 
 def test_the_figures_are_written_without_a_calendar_date_and_under_500_kb(

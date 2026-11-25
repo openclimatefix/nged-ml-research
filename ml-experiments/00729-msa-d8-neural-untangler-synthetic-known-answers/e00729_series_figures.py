@@ -30,6 +30,7 @@ import e00729_baselines as base
 import e00729_core as core
 import e00729_dist as dist
 import e00729_figures as figures
+import e00729_leakage as leak
 import e00729_paths as paths
 import e00729_score as score
 import numpy as np
@@ -65,7 +66,7 @@ ARM_LABELS: Final = {
     "Dsign": "D-sign (sign only)",
 }  # fmt: skip
 SERIES_COLOURS: Final = {
-    TRUTH_NAME: "#000000", READING_NAME: "#8C8C8C",
+    TRUTH_NAME: "#000000", READING_NAME: "#ADADAD",
     ARM_LABELS["P0f"]: "#555555", ARM_LABELS["A"]: figures.SKY, ARM_LABELS["B"]: figures.BLUE,
     ARM_LABELS["C"]: figures.GREEN, ARM_LABELS["D"]: figures.ORANGE,
     ARM_LABELS["Dq"]: figures.PURPLE, ARM_LABELS["Dsign"]: figures.PURPLE,
@@ -211,7 +212,7 @@ RULES: Final = {
     "solar_midday": "a solar-only day with reverse flow whose solar output is centred between 10:00 and 14:00 UTC; the day with the median depth of reverse flow",
     "engine_and_solar": "an engine-and-solar day with reverse flow in which both outputs reach at least 2 points; the day with the median depth of reverse flow",
     "ambiguous": "a day with at least 4 half-hours of reading under 0.3 MVA; the day with the median number of such half-hours",
-    "plain_import": "a day of the no-injection worlds; the day with the median of arm D's largest P(X<0) of the day",
+    "plain_import": "an all-import day of the no-injection worlds; the day with the median of arm D's largest P(X<0) of the day",
     "largest_harm": "a day of the test bank on which every half-hour is import; the day with the largest mean of arm D's signed CRPS minus P0f's",
     "bsp": "an engine or engine-and-solar day in a BSP month with reverse flow; the day with the median depth of reverse flow",
     "quantile_head": "the day of the evening-engine figure",
@@ -258,7 +259,7 @@ def pick_scenarios(
         if d.has_bsp and world_is(day=d, names=("engine", "both")) and reverses(day=d)
     ]  # fmt: skip
     low = [d for d in days if d.n_low >= MIN_LOW_READING_HALF_HOURS]
-    none = [d for d in days if world_is(day=d, names=("none",))]
+    none = [d for d in days if world_is(day=d, names=("none",)) and d.min_x >= 0]
     imports = [d for d in days if d.min_x >= 0]
     return {
         "evening_engine": run_centred(names=("engine",), bounds=EVENING_CENTROID_HH, solar=False),
@@ -332,8 +333,10 @@ def lobes_of(*, pred: Mapping[str, np.ndarray]) -> dist.Lobes:
 def forecast_on(*, pred: Mapping[str, np.ndarray], index: np.ndarray) -> Forecast:
     """Summarise a stored prediction on selected rows.
 
-    A quantile prediction gives P(X<0) by linear interpolation of its 11 quantiles, which is 0
-    below the 5% quantile and 1 above the 95% quantile.
+    A quantile prediction is made non-decreasing across its levels, as scoring does, and gives
+    P(X<0) by linear interpolation of its 11 quantiles, which is 0 below the 5% quantile and 1
+    above the 95% quantile. A two-lobe prediction gives P(X<0) as the mixture's mass below zero,
+    which tends to 0.5 as the reading nears zero whatever the stored lobe probability `p`.
 
     Args:
         pred: The stored arrays (`p`, `mu_i`, ... or `q`).
@@ -343,7 +346,7 @@ def forecast_on(*, pred: Mapping[str, np.ndarray], index: np.ndarray) -> Forecas
         The 5%, 50%, and 95% quantiles and P(X<0) of each row.
     """
     if "q" in pred:
-        q = np.asarray(pred["q"])[index]
+        q = np.maximum.accumulate(np.asarray(pred["q"])[index], axis=1)
         levels = np.asarray(core.QUANTILE_LEVELS)
         p = np.array([np.interp(0.0, row, levels, left=0.0, right=1.0) for row in q])
         mid = list(core.QUANTILE_LEVELS).index(0.5)
@@ -360,10 +363,27 @@ def prediction_path(*, arm: str, arch: str, name: str) -> Path:
     return paths.data_root() / "predictions" / f"{arm}_{arch}_s{SEED}" / f"{name}.npz"
 
 
-def load_prediction(*, arm: str, arch: str, name: str) -> dict[str, np.ndarray]:
-    """Read one stored prediction file as float64 arrays."""
+def load_prediction(*, arm: str, arch: str, name: str, n_rows: int) -> dict[str, np.ndarray]:
+    """Read one stored prediction file as float64 arrays and check its length.
+
+    Args:
+        arm: The arm.
+        arch: The architecture.
+        name: The stored set ("test" or "real_r1").
+        n_rows: The number of scored rows that the file must cover.
+
+    Returns:
+        The stored arrays.
+
+    Raises:
+        CorrectnessFailureError: When a stored array does not have `n_rows` rows.
+    """
     with np.load(prediction_path(arm=arm, arch=arch, name=name)) as f:
-        return {k: f[k].astype(np.float64) for k in f.files}
+        pred = {k: f[k].astype(np.float64) for k in f.files}
+    if any(len(v) != n_rows for v in pred.values()):
+        msg = f"the stored prediction of arm {arm} ({name}) does not match the scored rows"
+        raise leak.CorrectnessFailureError(msg)
+    return pred
 
 
 def wrap(*, text: str, width: int = WRAP_CHARS) -> list[str]:
@@ -374,7 +394,7 @@ def wrap(*, text: str, width: int = WRAP_CHARS) -> list[str]:
 def x_encoding() -> alt.X:
     """Return the shared x encoding: hours from the scored day's midnight, labelled as hour of day."""
     return alt.X(
-        "hour:Q", title="Hour of day, UTC (the scored day is the white middle part)",
+        "hour:Q", title="Hour of day, UTC (the scored day is the unshaded middle part)",
         scale=alt.Scale(domain=[-HOURS_BEFORE, 24 + HOURS_AFTER], nice=False),
         axis=alt.Axis(values=[-12, -6, 0, 6, 12, 18, 24, 30, 36], labelExpr="(datum.value + 24) % 24", grid=False),
     )  # fmt: skip
@@ -396,6 +416,17 @@ def colour_encoding(*, names: Sequence[str], legend: bool) -> alt.Color:
         "series:N",
         scale=alt.Scale(domain=list(names), range=[SERIES_COLOURS[n] for n in names]),
         legend=alt.Legend(orient="top", columns=2, title=None, labelLimit=360) if legend else None,
+    )
+
+
+def dash_encoding(*, names: Sequence[str]) -> alt.StrokeDash:
+    """Return the dash encoding: P0f is dashed, as a backup to its colour, and every other series is solid."""
+    return alt.StrokeDash(
+        "series:N",
+        scale=alt.Scale(
+            domain=list(names), range=[[6, 3] if n == ARM_LABELS["P0f"] else [1, 0] for n in names]
+        ),
+        legend=None,
     )
 
 
@@ -421,15 +452,14 @@ def window_chart(
     scored = np.arange(48) / 2.0
     names = [TRUTH_NAME, READING_NAME, *(ARM_LABELS[a] for a in forecasts)]
     names = [n for n in names if n != TRUTH_NAME or np.isfinite(window.truth).any()]
-    parts = [
-        pl.DataFrame({"hour": hours, "series": READING_NAME, "value": window.reading}),
-        pl.DataFrame({"hour": hours, "series": TRUTH_NAME, "value": window.truth}),
-    ]
+    parts = [pl.DataFrame({"hour": hours, "series": READING_NAME, "value": window.reading})]
+    if np.isfinite(window.truth).any():
+        parts.append(pl.DataFrame({"hour": hours, "series": TRUTH_NAME, "value": window.truth}))
     parts += [
         pl.DataFrame({"hour": scored, "series": ARM_LABELS[a], "value": f.median})
         for a, f in forecasts.items()
     ]
-    lines = pl.concat(parts).filter(pl.col("value").is_finite())
+    lines = pl.concat(parts).with_columns(pl.col("value").fill_nan(None))
     band_frame = pl.concat(
         [
             pl.DataFrame(
@@ -458,9 +488,12 @@ def window_chart(
         .mark_area(opacity=0.14, aria=False)
         .encode(x=x, y="lower:Q", y2="upper:Q", color=quiet)  # ty: ignore[unresolved-attribute]
         + alt.Chart(lines)
-        .mark_line(aria=False, strokeWidth=1.6)
+        .mark_line(aria=False, strokeWidth=1.6, invalid=None)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=x, y=alt.Y("value:Q", title="Signed power (points of capacity)"), color=shared
+            x=x,
+            y=alt.Y("value:Q", title="Signed power (points of capacity)"),
+            color=shared,
+            strokeDash=dash_encoding(names=names),
         )
     ).properties(width=PLOT_WIDTH_PX, height=TOP_HEIGHT_PX)
     half = (
@@ -471,7 +504,7 @@ def window_chart(
     middle = (
         context_shade()
         + alt.Chart(prob)
-        .mark_line(aria=False, strokeWidth=1.6)
+        .mark_line(aria=False, strokeWidth=1.6, invalid=None)
         .encode(  # ty: ignore[unresolved-attribute]
             x=x,
             y=alt.Y(
@@ -481,6 +514,7 @@ def window_chart(
                 axis=alt.Axis(values=[0, 0.5, 1]),
             ),
             color=quiet,
+            strokeDash=dash_encoding(names=names),
         )
         + half
     ).properties(width=PLOT_WIDTH_PX, height=STRIP_HEIGHT_PX)
@@ -562,7 +596,9 @@ def forecasts_for(
     out = {}
     for arm in spec.arms:
         pred = (
-            p0f_prediction(r=r) if arm == "P0f" else load_prediction(arm=arm, arch=arch, name=name)
+            p0f_prediction(r=r)
+            if arm == "P0f"
+            else load_prediction(arm=arm, arch=arch, name=name, n_rows=len(r))
         )
         out[arm] = forecast_on(pred=pred, index=index)
     return out
@@ -592,7 +628,7 @@ def write_series_figures(
     Returns:
         The written paths (run `svgo` on each before committing).
     """
-    d_pred = load_prediction(arm="D", arch=arch, name="test")
+    d_pred = load_prediction(arm="D", arch=arch, name="test", n_rows=rows.n)
     d_lobes = lobes_of(pred=d_pred)
     p0f = lobes_of(pred=p0f_prediction(r=rows.r))
     d_p = dist.prob_negative(lobes=d_lobes)
@@ -603,7 +639,9 @@ def write_series_figures(
     picked["sign_head"] = picked["ambiguous"]
     real_picked: dict[str, Day | None] = {}
     if real_segments is not None and real_rows is not None:
-        d_real = lobes_of(pred=load_prediction(arm="D", arch=arch, name="real_r1"))
+        d_real = lobes_of(
+            pred=load_prediction(arm="D", arch=arch, name="real_r1", n_rows=real_rows.n)
+        )
         real_picked = pick_real(
             days=complete_days(rows=real_rows), d_p_neg=dist.prob_negative(lobes=d_real)
         )
