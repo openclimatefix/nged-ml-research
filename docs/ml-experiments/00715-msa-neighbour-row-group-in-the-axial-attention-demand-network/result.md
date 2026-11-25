@@ -792,8 +792,8 @@ test, feeds the scorer an oracle that follows a flat permanent step exactly. On 
 events, the oracle reads about 1.056 instead of 1.000. By origin day 7, 10, 14, and 21, the readings
 are 1.093, 1.062, 1.042, and 1.026.
 
-**Two kinds of reading in this page are affected.** The absolute era follow shares, including those
-quoted in the Result section and in the known-answer checks, are inflated by about 3% to 9%, with the
+**Two kinds of reading in this page are affected.** The absolute era follow shares are
+inflated by about 3% to 9%, with the
 larger bias at the earlier origins. The gap reading S4 is inflated by about the same proportion,
 because the gap is a difference of follow shares. The AUROC readings S1 to S3 compare how arms rank
 permanent against temporary events, so they move little.
