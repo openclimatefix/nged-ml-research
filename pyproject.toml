@@ -617,6 +617,8 @@ include = [
     "ml-experiments/00654-two-output-network-end-to-end-with-end-detector/e00654_final.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
+    "ml-experiments/00730-msa-d8-sign-detector-with-demand-head-and-masking/*.py",
+    "ml-experiments/00730-msa-d8-sign-detector-with-demand-head-and-masking/tests/*.py",
 ]
 
 [tool.ty.overrides.rules]
