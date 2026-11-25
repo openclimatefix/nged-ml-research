@@ -214,6 +214,34 @@ def check_private_folder_is_creatable() -> str:
     return f"PRIVATE folder exists: {folder.is_dir()}"
 
 
+def check_rescore_inputs() -> str:
+    """Return flags for the three stored quick-look prediction files (columns, shapes, and equal row sets; no value)."""
+    root = DATA / "00721-msa-mva-to-mw-rung-1-hidden-sign-fits-of-the-network" / "predictions"
+    frames = {}
+    for arm in ("P0", "SG-0", "SG-A"):
+        path = root / f"{arm}__W2__2026-05__s0.parquet"
+        if not path.exists():
+            return f"{arm} predictions present: False"
+        frames[arm] = (
+            pl.read_parquet_schema(path),
+            pl.scan_parquet(path).select(pl.len()).collect().item(),
+        )
+    need = (
+        "time_series_id",
+        "power_fcst_init_time",
+        "valid_time",
+        "fold",
+        "seed",
+        "actual",
+        "reading",
+        *QCOLS,
+    )
+    return (
+        f"predictions present: True, columns present: {all(c in s for s, _ in frames.values() for c in need)}, "
+        f"equal row counts: {len({n for _, n in frames.values()}) == 1}, rows: {next(iter(frames.values()))[1]}"
+    )
+
+
 CHECKS: tuple[tuple[str, Callable[[], str]], ...] = (
     ("dense raw array", check_dense_raw),
     ("grid and sites", check_grid_and_sites),
@@ -228,6 +256,7 @@ CHECKS: tuple[tuple[str, Callable[[], str]], ...] = (
     ("synthetic world on the real grid", check_synthetic_world_on_the_real_grid),
     ("M1 power-check files", check_m1_power_check_files),
     ("probe inputs", check_probe_inputs),
+    ("rescore inputs", check_rescore_inputs),
     ("PRIVATE folder", check_private_folder_is_creatable),
 )
 
