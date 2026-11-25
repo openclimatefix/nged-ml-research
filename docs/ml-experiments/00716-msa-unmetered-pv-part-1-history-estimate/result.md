@@ -288,8 +288,10 @@ range, and the four load-shift scenarios.
 treatment contrast, the point estimate is below zero in at least one group (the six signed-MW
 Primaries, the eight MVA-only Primaries). If every counted treatment contrast has a point estimate
 at or above zero in both groups, the experiment is written up at 2 seeds with the pre-registered
-two-seed values, and the page states that the futility rule fired. A clearly positive two-seed
-reading still goes to the 5-seed reading. This rule was added before any treatment score was read.
+two-seed values, and the page states that the futility rule fired. A reading with a point
+estimate below zero is the only one that opens seeds 2 to 4, and the ablation contrasts (A2 and
+B2) never open them. Interim, 2 seeds: the counted points of A1 (-0.0045 and -0.0177) are below zero in both groups,
+so the rule opened seeds 2 to 4. This rule was added before any treatment score was read.
 No threshold or verdict rule changed. The fit logs of phase 3 already held validation-loss lines
 when this rule was added (five at the time of the edit), and they were not read before the edit.
 
