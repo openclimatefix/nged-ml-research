@@ -23,6 +23,7 @@ import e00730_core as core
 import e00730_leakage as leak
 import e00730_score as score
 import e00730_signed as signed
+import e00730_sky as sky
 import numpy as np
 
 if TYPE_CHECKING:
@@ -53,7 +54,7 @@ def real_context() -> stages729.Context:
 def bank_inputs(*, ctx: stages729.Context) -> banks.BankInputs:
     """Return the bank build's inputs from a context."""
     months = {s: ctx.months(split=s) for s in ("training", "validation", "test")}
-    return banks.BankInputs(cal=ctx.cal, months=months, use=ctx.use)
+    return banks.BankInputs(cal=sky.fill_sky_gaps(cal=ctx.cal), months=months, use=ctx.use)
 
 
 def real_gate_inputs(*, ctx: stages729.Context) -> banks.GateInputs:
@@ -699,13 +700,20 @@ def stage_gallery(
     train0 = banks729.load_bank(path=banks.bank_path(root=root, kind="train", seed=0))
     segments = [*test.segments, *train0.segments]
     summary = banks.read_json(path=root / "banks" / "summary.json")
-    components = {
-        f"{k}/{n}": float(v)
-        for k, shares in summary["components"]["shares"].items()
-        if not k.endswith("/fallback")
-        for n, v in shares.items()
-        if isinstance(v, int | float) and not isinstance(v, bool)
-    }
+    components: dict[str, dict[str, float]] = {}
+    bounded: dict[str, float] = {}
+    for k, shares in summary["components"]["shares"].items():
+        if k.endswith("/fallback"):
+            continue
+        values = {
+            n: float(v)
+            for n, v in shares.items()
+            if isinstance(v, int | float) and not isinstance(v, bool) and np.isfinite(v)
+        }
+        if k.endswith(("/solar_metered_zero", "/solar_zeroed_sunup")):
+            bounded.update({f"{k}/{n}": v for n, v in values.items()})
+        else:
+            components[k] = values
     near = {}
     for world in ("none", "engine", "solar", "both"):
         parts = [s.r[1:-1].reshape(-1) for s in segments if s.world == world]
@@ -716,6 +724,7 @@ def stage_gallery(
         shares_synthetic=near,
         shares_real=shares_real,
         component_shares=components,
+        bounded_shares=bounded,
         hourly_synthetic=near_zero_by_hour(reading_days=np.concatenate(by_hour)),
         hourly_real=hourly_real,
     )

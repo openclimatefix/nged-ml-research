@@ -375,6 +375,8 @@ The banks stage counts, per world type, bank, source, and season:
   demand, so that a change that stops the simulator subtracting a component fails the check;
 - the share of base days of BSP-month segments whose synthetic BSP differs from the real meter at
   every half-hour where the engine or solar output is above zero;
+- the share of mid-day half-hours with zero output on source-S2 solar days, at most 1% (the bound
+  of "A sky-gap bug found in the gallery, fixed after the first gate pass");
 - the share of no-injection half-hours whose truth equals the base demand; and
 - the share of half-hours whose reading is at least the reactive floor.
 
@@ -392,6 +394,108 @@ from the rebuilt banks on the CPU (see "Figures planned"). The session, which is
 checks each panel against a written list of what the panel must show, and the maintainer reads the
 same gallery in the write-up. The check is in the gate list of "Compute, stop line, and gates",
 before the "fits starting" line.
+
+### A sky-gap bug found in the gallery, fixed after the first gate pass
+
+**The synthetic world gallery found a bug in experiment 729's simulator after the realism gate had
+passed, and the gate is rerun once on the repaired banks without a re-tune.** Gate attempt 2 had
+passed on the re-tuned ranges. Reading the G2 panels, the design lead saw the solar output drop to
+zero for one to four half-hours in the middle of a clear day, at the half-hours where the clear-sky
+index line is also broken. The cause is in experiment 729's `farm_set`: where the CAMS irradiance is
+missing on a sun-up half-hour, `np.nan_to_num` replaces the global, direct, and diffuse irradiance
+by zero, after the day was accepted with up to 6% of its sun-up half-hours missing. The source-S2
+draw then outputs zero there. The source-S1 draw copies a metered farm's power with the same
+`nan_to_num`. Counts on the stored banks and the real farm table, taken before any repair:
+
+- On clear days (median clear-sky index above 0.8), the share of mid-day half-hours (08:00 to 17:00
+  UTC) with zero S2 output was 0.6% in spring, 0.9% in summer, 3.4% in autumn, and 5.0% in winter.
+  Of the S2 mid-day half-hours, 7.6% were zeroed, and 41% of S2 solar days held at least one.
+- In S2, 240 of 242 zeroed half-hours in winter, 72 of 72 in spring, 64 of 64 in summer, and 232
+  of 254 in autumn were half-hours where D8's clear-sky index is missing.
+- On S1 clear days the zeroed share was 6.4% in winter, 4.1% in spring, 2.7% in summer, and 4.5% in
+  autumn. In spring and summer most of these are genuine metered zeros, which the 5% metered-zero
+  bound already covers.
+- On the real farm table, the missing-irradiance runs at sun-up (zenith under 80 degrees) were 844
+  runs of 1 half-hour, 402 runs of 2, 6 runs of 3, and 36 runs of 4, and no run was longer. The
+  missing-power runs of the metered farms were 492 runs of 1 half-hour, 225 of 2, 5 of 3, and 10
+  of 4.
+
+**The repair is `fill_sky_gaps` in `e00730_sky.py`, in this experiment's code only, and it runs on the
+calendar before the banks are built.** Experiment 729's code is not edited. Its rules are fixed
+here, before the repaired banks exist:
+
+- A gap is a half-hour with zero irradiance (or missing power) whose solar zenith is below 80
+  degrees. Dawn, dusk, and night are never touched, and a test covers dawn and dusk.
+- For S2 a run of at most 4 half-hours (2 hours) is filled by linear interpolation of the global
+  irradiance divided by the cosine of the zenith, between the nearest positive half-hours on both
+  sides of the same day, and multiplied back by the cosine. A run that touches the first or last
+  sun-up half-hour is filled by holding the clearness of its one positive neighbour. The direct and
+  diffuse parts are derived again from the filled global irradiance with the Erbs model.
+- A run longer than 4 half-hours, or with no positive neighbour, is never filled with zero: the
+  farm-day's sky becomes NaN and the farm-day leaves the set of days with a sky, which is the
+  treatment of a day with no satellite sky.
+- For S1 a run of at most 3 half-hours of missing metered power is filled the same way over the
+  power. A longer run removes the farm-day from the days with metered power. Genuine metered zeros
+  are left as they are. On the real record this removes 10 farm-days with metered power of 4,485,
+  and no farm-day with a sky.
+
+**A bound, fixed before the repaired banks exist, fails the banks and the smoke test if zeroed
+half-hours remain.** The share of mid-day half-hours (10:00 to 14:00 UTC, where the sun is above 10
+degrees of elevation all year) with zero output, on source-S2 solar days that kept their drawn
+source, must be at most 1% in every bank. On the banks before the repair this share was 1.1% in the
+test bank, 1.4% in the shifted bank, and 1.1% in the training banks of seeds 0 and 1. The smoke test
+reads the real farm table and fails if more than 1% of the sun-up half-hours of days with a sky have
+zero irradiance after the repair (it is 1.3% before and 0.0% after). S1 is not in this bound,
+because its genuine metered zeros are covered by the metered-zero bound.
+
+**The repair changes the synthetic worlds, so the run marker carries the repair's version and the
+guard allows one fresh gate attempt.** The marker's new entry, `sky_gap_fill`, names the zenith limit
+and the two gap limits. The `banks` stage then rebuilds only after the manager moves the earlier
+run's banks, `limits.json`, and `scores` to `superseded_run_2`, and refuses if anything else of the
+earlier run is left, if a fit or `margin.json` exists, or if the marker differs in another entry.
+The ranges override of the one permitted re-tune stays in place, and the re-tune stays spent: the
+gate has one attempt on the repaired banks, and if it fails the line stops at verdict row 0. The
+changed functions and their AST hashes (SHA-256 of `ast.dump` of the function without its
+docstring, first 12 hexadecimal digits) are:
+
+| File | Function | Hash |
+|---|---|---|
+| `e00730_sky.py` | `gap_runs` | `e8ee39eee1cd` |
+| `e00730_sky.py` | `day_of_year` | `c5cbb512bdcb` |
+| `e00730_sky.py` | `sun_up_zero_mask` | `2de711c8d83a` |
+| `e00730_sky.py` | `zeroed_sky_share` | `3bbda0c39eb9` |
+| `e00730_sky.py` | `fill_run` | `8fd17d5f96bd` |
+| `e00730_sky.py` | `fill_sky_gaps` | `82024a2c4813` |
+| `e00730_banks.py` | `run_marker_payload` | `15a3bbc4939b` |
+| `e00730_banks.py` | `zeroed_sunup_share` | `090d05b7bae9` |
+| `e00730_banks.py` | `component_checks` | `aed6c7d8bd7e` |
+| `e00730_banks.py` | `sky_fix_rebuild_blocked` | `f259f14016f3` |
+| `e00730_banks.py` | `gate_attempts_allowed` | `280f898261fc` |
+| `e00730_banks.py` | `_guard_banks` | `e7ae127396e8` |
+| `e00730_banks.py` | `stage_gate` | `04b8f89f2ae5` |
+| `e00730_stages.py` | `bank_inputs` | `06184af15845` |
+| `e00730_stages.py` | `stage_gallery` | `950397bd5f03` |
+| `e00730_gallery.py` | `run_plateaus` | `09d1c8a6b7c5` |
+| `e00730_gallery.py` | `check_levels` | `fec0d160c5fa` |
+| `e00730_gallery.py` | `check_fold` | `60e04eef5eff` |
+| `e00730_figures.py` | `extreme_index_day` | `e0220a7cd41f` |
+| `e00730_figures.py` | `solar_index_chart` | `e5226306a8b1` |
+| `e00730_figures.py` | `solar_gallery` | `86cd3ae032b1` |
+| `e00730_figures.py` | `aggregate_gallery` | `d1af8b1f5947` |
+| `e00730_figures.py` | `engine_gallery` | `9dd8ab8c98ff` |
+| `e00730_figures.py` | `bsp_fold_base_gallery` | `5a219638d110` |
+
+**The same gallery reading changed four gallery checks and panels, with no change to a bar.** The
+G1 check on units counted every ramp value as a level, so it compared the number of steady
+plateaus inside a run instead (one unit has one plateau per run; several units have a run with two
+plateaus at least 2 points apart). The G5 check compared the folded reading with the truth by
+`allclose`, which fails for any reactive term, so it now checks that the reading squared minus the
+truth squared lies between the square of the floor and the square of the largest reactive term. The
+G2 panels now show the clearest and the cloudiest day of each season by the clear-sky index, compare
+the output as a share of the draw's solar capacity, and draw the clear-sky index on its own axis
+at the right. The G9 panel shows the lowest share of each check group (32 groups) against the bar,
+and the metered-zero and zeroed-sun-up shares in a second panel against their bounds, because the
+earlier panel drew 468 bars and drew the bounded shares against a bar of 0.99.
 
 ## The sign output and how it is scored
 
@@ -1097,8 +1201,9 @@ bank of seed 0. Every panel carries days 1 and 2 of its window on the axis, neve
 - G1, engine days: a weekday with an evening run, a weekday with a morning run, a weekend day, a day
   at part load, a run with a ramp of 2 half-hours, a day with one unit and a day with several units,
   a day with a trip, and a multi-day spell, each showing the engine output beside the base demand.
-- G2, S2 solar days: a clear day and a cloudy day in each of the four seasons, each showing the
-  solar output beside the CAMS clear-sky index at the farm site and at D8.
+- G2, S2 solar days: the clearest day and the cloudiest day of each of the four seasons by the
+  clear-sky index, each showing the solar output (as a share of the draw's capacity) beside the
+  CAMS clear-sky index at D8 on a second axis.
 - G3, S1 solar days: the same eight single-day panels for source S1, and a day that fell back from
   S1 to S2, in the private folder only; and the published aggregate panels, which show for each
   season the 10%, 50%, and 90% bands of the daily shape of S1 output at a drawn capacity and the
@@ -1118,8 +1223,9 @@ bank of seed 0. Every panel carries days 1 and 2 of its window on the axis, neve
   of G8 confirms only that the panel was drawn and the synthetic shares are finite; the design
   lead compares the real and the synthetic shares by eye. No real metered generator's series
   appears.
-- G9, the component checks: the share of segments with output where output must exist, per
-  component, world type, source, and split, against its bar.
+- G9, the component checks: the lowest share of segments with output where output must exist, for
+  each check group (component, bank, and seed), against its bar, and the metered-zero and
+  zeroed-sun-up shares against their bounds.
 
 **The gallery passes when each panel shows what a written list requires of the panel.** The list,
 in `e00730_core.py`, says for example that the engine output of G1's ramp panel rises over 2

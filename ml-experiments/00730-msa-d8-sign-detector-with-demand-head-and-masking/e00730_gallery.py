@@ -50,13 +50,35 @@ def check_part_load(*, engine: np.ndarray, unit_sizes: Sequence[float]) -> bool:
     return bool((engine > 0.0).any() and engine.max() < float(sum(unit_sizes)))
 
 
-def check_levels(*, one_unit: np.ndarray, several: np.ndarray, tol: float = 1e-6) -> bool:
-    """Check that the several-unit day has more distinct non-zero levels than the one-unit day."""
+def run_plateaus(*, engine: np.ndarray, min_step: float = 2.0) -> int:
+    """Return the most distinct steady levels inside one contiguous run of output.
 
-    def levels(a: np.ndarray) -> int:
-        return len(np.unique(np.round(a[a > tol] / max(tol, 1e-3), 0)))
+    A level is a value that two half-hours in a row share, and two levels are distinct when they
+    differ by at least `min_step` points, so that the panel shows the step. A day of one unit has
+    one level in each run, because a run holds one unit at one share of its size. A day of
+    several units has a run with two or more levels whenever two units run together at different
+    shares.
+    """
+    best = 0
+    pos = engine > 0.0
+    start = None
+    for i in range(len(engine) + 1):
+        if i < len(engine) and pos[i]:
+            start = i if start is None else start
+            continue
+        if start is not None:
+            run = engine[start:i]
+            steady = run[1:][np.abs(np.diff(run)) < 1e-6]
+            levels = np.unique(np.round(steady, 2))
+            count = 0 if levels.size == 0 else 1 + int((np.diff(levels) >= min_step).sum())
+            best = max(best, count)
+            start = None
+    return best
 
-    return levels(several) > levels(one_unit)
+
+def check_levels(*, one_unit: np.ndarray, several: np.ndarray) -> bool:
+    """Check that a one-unit day has one level per run, and a several-unit day more in a run."""
+    return run_plateaus(engine=one_unit) == 1 and run_plateaus(engine=several) >= 2
 
 
 def check_trip(*, engine: np.ndarray) -> bool:
@@ -84,7 +106,11 @@ def check_clear(*, solar: np.ndarray, mid: slice) -> bool:
 
 
 def check_cloudy(*, cloudy: np.ndarray, clear_same_season: np.ndarray) -> bool:
-    """Check that a cloudy day's peak solar output is below the clear day's of its season."""
+    """Check that a cloudy day's peak output is below the clear day's of its season.
+
+    Both arrays are in the same unit; the gallery divides each by the segment's solar capacity
+    first, because the capacity differs from one draw to the next.
+    """
     return bool(cloudy.max() < clear_same_season.max())
 
 
@@ -93,12 +119,16 @@ def check_aggregate_bands(*, q10: np.ndarray, q50: np.ndarray, q90: np.ndarray) 
     return bool(np.all(q10 <= q50) and np.all(q50 <= q90))
 
 
-def check_fold(*, reading: np.ndarray, truth: np.ndarray, floor: float, far: float) -> bool:
-    """Check the folded reading: never below the floor, and equal to the truth far from zero."""
-    far_rows = np.abs(truth) >= far
-    return bool(
-        (reading >= floor - 1e-9).all() and np.allclose(reading[far_rows], np.abs(truth[far_rows]))
-    )
+def check_fold(*, reading: np.ndarray, truth: np.ndarray, floor: float, q_max: float) -> bool:
+    """Check that the reading is the signed truth folded with a reactive floor.
+
+    The meter reads `sqrt(x**2 + q**2)`, so `reading**2 - truth**2` is `q**2` and lies between
+    the square of the floor and the square of the largest reactive term `q_max`. Far from zero the
+    reading then equals the truth up to `q**2 / (2 |x|)`, and near zero it sits at the floor.
+    """
+    q2 = reading.astype(float) ** 2 - truth.astype(float) ** 2
+    slack = 1e-3 * (1.0 + reading.astype(float) ** 2)
+    return bool(np.all(q2 >= floor**2 - slack) and np.all(q2 <= q_max**2 + slack))
 
 
 def check_base_equals_truth(*, truth: np.ndarray, base: np.ndarray) -> bool:

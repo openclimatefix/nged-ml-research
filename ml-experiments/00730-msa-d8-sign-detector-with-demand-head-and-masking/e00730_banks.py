@@ -29,6 +29,7 @@ import e00729_score as score729
 import e00729_sim as sim729
 import e00729_stages as stages729
 import e00730_core as core
+import e00730_sky as sky
 import numpy as np
 
 Log = Callable[[str], None]
@@ -178,7 +179,11 @@ def write_retune_override(*, root: Path) -> Path:
 
 def run_marker_payload() -> dict:
     """Return what the run marker must hold for the code as it is now."""
-    return {"experiment": "00730", **stages729.run_marker_payload()}
+    return {
+        "experiment": "00730",
+        **stages729.run_marker_payload(),
+        "sky_gap_fill": sky.SKY_FILL_VERSION,
+    }
 
 
 # --------------------------------------------------------------------------- files and the guard
@@ -270,6 +275,44 @@ def guard_run(*, root: Path, stage: str) -> None:
         raise RuntimeError(msg)
 
 
+SKY_FIX_FOLDER: Final = "superseded_run_2"
+"""Where the banks, `limits.json`, and `scores` of the run before the sky-gap fix are moved."""
+
+
+def _differs_only_in_sky_fill(
+    *, expected: Mapping[str, object], current: Mapping[str, object]
+) -> bool:
+    """Return whether the two markers differ, and only in the `sky_gap_fill` entry."""
+    rest = {k: v for k, v in expected.items() if k != "sky_gap_fill"}
+    return expected != current and rest == {k: v for k, v in current.items() if k != "sky_gap_fill"}
+
+
+def sky_fix_rebuild_blocked(*, root: Path) -> str | None:
+    """Return why `banks` may not rebuild after the sky-gap fix, or None when it may.
+
+    The rebuild needs the earlier run's banks, `limits.json`, and `scores` moved to
+    `superseded_run_2` by hand, and nothing else of the earlier run in `root` (the gallery's
+    `figures` are overwritten). The ranges override stays, and no new re-tune is allowed.
+    """
+    if not (root / SKY_FIX_FOLDER).is_dir() or not any((root / SKY_FIX_FOLDER).iterdir()):
+        return f"move the banks, limits.json, and scores to {SKY_FIX_FOLDER} first"
+    left = [n for n in (*SUPERSEDED_NAMES, "limits.json") if n != "figures" and (root / n).exists()]
+    if left:
+        return f"{', '.join(left)} must be moved to {SKY_FIX_FOLDER}"
+    return None
+
+
+def gate_attempts_allowed(*, root: Path) -> int:
+    """Return how many gate attempts the banks now in use may have.
+
+    A run has two attempts, with one re-tune between them. A run that starts after the re-tune
+    was spent (the ranges override exists and `superseded_run_2` exists) has one attempt and no
+    re-tune.
+    """
+    spent = (root / RANGES_OVERRIDE_FILE).exists() and (root / SKY_FIX_FOLDER).exists()
+    return 1 if spent else GATE_ATTEMPTS
+
+
 def _guard_banks(*, root: Path, expected: dict, current: dict | None) -> None:
     """Apply the `banks` stage's rules of `guard_run`."""
     if current == expected:
@@ -300,6 +343,12 @@ def _guard_banks(*, root: Path, expected: dict, current: dict | None) -> None:
             "move the outputs to superseded_run_N yourself"
         )
         raise RuntimeError(msg)
+    if _differs_only_in_sky_fill(expected=expected, current=current):
+        why = sky_fix_rebuild_blocked(root=root)
+        if why is not None:
+            msg = f"`banks` may not rebuild after the sky-gap fix: {why}"
+            raise RuntimeError(msg)
+        return
     why = stages729.retune_allowed(root=root, expected=expected, current=current)
     if why is not None:
         msg = f"`banks` may not rebuild under a changed marker: {why} (verdict row 0 applies)"
@@ -747,6 +796,36 @@ def fallback_counts(*, bank: banks729.Bank) -> dict[str, float]:
     }
 
 
+MIDDAY_WINDOW: Final = slice(20, 28)
+"""Half-hours 10:00 to 14:00 UTC, where the sun is above 10 degrees of elevation all year in GB."""
+
+
+def zeroed_sunup_share(*, bank: banks729.Bank) -> float:
+    """Return the share of mid-day half-hours with zero solar output on source-S2 solar days.
+
+    A solar day counts when the segment drew source S2, the day is a base day that kept its drawn
+    source, and some half-hour of the day has output. A zero at mid-day on such a day is a sky gap
+    that was filled with zero (experiment 729's `farm_set`), because the sun is up.
+
+    Args:
+        bank: Any bank.
+
+    Returns:
+        The share, or NaN when the bank holds no such day.
+    """
+    zero = total = 0
+    for s in bank.segments:
+        if s.world not in ("solar", "both") or s.source != "S2":
+            continue
+        for d in np.flatnonzero(s.cal_index >= 0):
+            if s.s1_fallback[d] or s.solar[d].max() <= 0.0:
+                continue
+            window = s.solar[d, MIDDAY_WINDOW]
+            zero += int((window <= 1e-9).sum())
+            total += window.size
+    return zero / total if total else float("nan")
+
+
 def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.Calendar) -> dict:
     """Run every component check on the evaluation banks and the training bank of seed 0.
 
@@ -800,6 +879,10 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
                     for k, n in counts.items()
                     if n < MIN_CASES and not k.startswith(("weekday", "quiet"))
                 ]
+        zeroed = zeroed_sunup_share(bank=bank)
+        shares[f"{name}/solar_zeroed_sunup"] = {"S2": zeroed}
+        if np.isfinite(zeroed) and zeroed > sky.MAX_ZEROED_SHARE:
+            short.append(f"{name}/solar/zeroed_sunup_share/S2")
         exact = none_and_fold_shares(bank=bank)
         shares[f"{name}/exact"] = exact
         short += [f"{name}/exact/{k}" for k, v in exact.items() if v < core.EXACT_SHARE]
@@ -1066,8 +1149,9 @@ def stage_gate(*, root: Path, gate_inputs: GateInputs, log: Log) -> dict:
     if earlier and read_json(path=earlier[-1])["pass"]:
         msg = "the gate already passed; it is not run again"
         raise RuntimeError(msg)
-    if len(earlier) >= GATE_ATTEMPTS:
-        msg = f"the gate has used its {GATE_ATTEMPTS} attempts"
+    allowed = gate_attempts_allowed(root=root)
+    if len(earlier) >= allowed:
+        msg = f"the gate has used its {allowed} attempts"
         raise RuntimeError(msg)
     attempt = len(earlier) + 1
     verify_banks_digest(root=root)
@@ -1077,7 +1161,7 @@ def stage_gate(*, root: Path, gate_inputs: GateInputs, log: Log) -> dict:
     out["attempt"] = attempt
     write_json(path=scores / "gate.json", payload=out)
     write_json(path=scores / f"gate_attempt{attempt}.json", payload=out)
-    if not out["pass"] and (attempt >= GATE_ATTEMPTS or out["bsp_failed"]):
+    if not out["pass"] and (attempt >= allowed or out["bsp_failed"]):
         msg = "the realism gate failed after its one re-tune, or attempt 1 failed a BSP check"
         raise StoppedError(msg)
     return out

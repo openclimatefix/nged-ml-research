@@ -26,6 +26,7 @@ import numpy as np
 import pytest
 from fixture730 import make_root, write_choices, write_predictions, write_real
 from test_e00730_stages import fit_invented_baselines
+from world730 import make_calendar
 
 HERE = Path(__file__).resolve().parent
 CODE = HERE.parent
@@ -303,14 +304,14 @@ def test_s5_g8_draws_the_share_by_utc_hour_and_a_world_without_readings_fails(wo
     out = figures.GalleryResult()
     figures.aggregate_gallery(
         shares_synthetic={"none": 0.1, "engine": 0.2}, shares_real={"none": 0.1, "engine": 0.3},
-        component_shares={"a": 1.0}, out=out, hourly_synthetic=by_hour, hourly_real=by_hour,
+        component_shares={"a": {"x": 1.0}}, out=out, hourly_synthetic=by_hour, hourly_real=by_hour,
     )  # fmt: skip
     assert out.results["G8_realism"]
     assert "vconcat" in out.public["G8_realism"].to_dict()
     empty = figures.GalleryResult()
     figures.aggregate_gallery(
         shares_synthetic={"none": float("nan")}, shares_real={"none": 0.1},
-        component_shares={"a": 1.0}, out=empty,
+        component_shares={"a": {"x": 1.0}}, out=empty,
     )  # fmt: skip
     assert not empty.results["G8_realism"]
     del root
@@ -646,3 +647,54 @@ def test_the_retune_refuses_unless_one_share_failure_and_no_fit(tmp_path: Path, 
     with pytest.raises(expected):
         banks.write_retune_override(root=tmp_path)
     assert not (tmp_path / banks.RANGES_OVERRIDE_FILE).exists()
+
+
+def test_g9_draws_one_point_per_group_and_checks_bounded_shares_against_their_bounds() -> None:
+    groups = {f"g{i}": {f"n{j}": 1.0 for j in range(20)} for i in range(40)}
+    out = figures.GalleryResult()
+    figures.aggregate_gallery(
+        shares_synthetic={"none": 0.1}, shares_real={"none": 0.1}, component_shares=groups,
+        bounded_shares={"test/solar_metered_zero/test/S1": 0.02, "test/solar_zeroed_sunup/S2": 0.0},
+        out=out,
+    )  # fmt: skip
+    assert out.results["G9_components"]
+    assert out.notes["G9_components"] == "40 groups, 2 bounded shares"
+    spec = out.public["G9_components"].to_dict()
+    assert len(spec["vconcat"]) == 2
+    low = {**groups, "g3": {**groups["g3"], "n1": 0.5}}
+    bad = figures.GalleryResult()
+    figures.aggregate_gallery(
+        shares_synthetic={"none": 0.1}, shares_real={"none": 0.1}, component_shares=low, out=bad
+    )
+    assert not bad.results["G9_components"]
+    over = figures.GalleryResult()
+    figures.aggregate_gallery(
+        shares_synthetic={"none": 0.1}, shares_real={"none": 0.1}, component_shares=groups,
+        bounded_shares={"test/solar_zeroed_sunup/S2": 0.05}, out=over,
+    )  # fmt: skip
+    assert not over.results["G9_components"]
+
+
+def test_g2_picks_the_extreme_index_days_and_draws_the_index_on_its_own_axis() -> None:
+    cal = make_calendar()
+    segments = []
+    for k, level in enumerate((0.3, 0.9, 0.6)):
+        seg = sim.simulate_segment(
+            cal=cal, month="2022-03", use=np.ones(len(cal.dates), dtype=bool), world="solar",
+            rng=np.random.default_rng(k),
+        )  # fmt: skip
+        seg.csi[:] = level
+        seg.cosz[:] = 0.8
+        seg.solar[:] = np.maximum(seg.solar, 1.0)
+        segments.append(seg)
+    clear = figures.extreme_index_day(segments=segments, season="spring", clearest=True)
+    cloudy = figures.extreme_index_day(segments=segments, season="spring", clearest=False)
+    assert clear is not None
+    assert cloudy is not None
+    assert clear[0] is segments[1]
+    assert cloudy[0] is segments[0]
+    assert figures.extreme_index_day(segments=segments, season="winter", clearest=True) is None
+    chart = figures.solar_index_chart(
+        solar=np.linspace(0, 1, 96), index=np.full(96, 0.9), title="t"
+    )
+    assert chart.to_dict()["resolve"]["scale"]["y"] == "independent"

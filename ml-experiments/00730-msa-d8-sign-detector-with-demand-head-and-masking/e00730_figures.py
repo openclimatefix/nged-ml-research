@@ -21,9 +21,11 @@ import altair as alt
 import e00729_core as core729
 import e00729_figures as figures729
 import e00729_sim as sim729
+import e00730_banks as banks
 import e00730_core as core
 import e00730_gallery as gallery
 import e00730_masks as masks
+import e00730_sky as sky
 import numpy as np
 import polars as pl
 
@@ -235,8 +237,16 @@ def engine_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) ->
         engine_panel(seg=hit[0], day=hit[1], title="G1: part load") if hit else None,
         "found" if hit else "no part-load day",
     )
-    one = find(lambda s, d: s.params.get("n_units", 0) == 1 and day_of(s, d).max() > 0)
-    many = find(lambda s, d: s.params.get("n_units", 0) > 1 and day_of(s, d).max() > 0)
+    one = find(
+        lambda s, d: (
+            s.params.get("n_units", 0) == 1 and gallery.run_plateaus(engine=day_of(s, d)) == 1
+        )
+    )
+    many = find(
+        lambda s, d: (
+            s.params.get("n_units", 0) > 1 and gallery.run_plateaus(engine=day_of(s, d)) >= 2
+        )
+    )
     ok = bool(one and many and gallery.check_levels(one_unit=day_of(*one), several=day_of(*many)))
     chart = None
     if one and many:
@@ -268,6 +278,76 @@ def engine_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) ->
     record("G1_spell", spell is not None, spell_chart, "found" if spell else "no spell")
 
 
+def day_mean_index(*, seg: sim729.Segment, day: int) -> float:
+    """Return the mean clear-sky index over a day's sun-up half-hours, NaN when under 10 are finite."""
+    c = seg.csi[day][seg.cosz[day] > 0.2]
+    c = c[np.isfinite(c)]
+    return float(c.mean()) if c.size >= 10 else float("nan")
+
+
+def extreme_index_day(
+    *, segments: Sequence[sim729.Segment], season: str, clearest: bool
+) -> tuple[sim729.Segment, int] | None:
+    """Return the clearest (or cloudiest) day of a season by the clear-sky index, or None.
+
+    A day counts when the solar output is above zero on it and a two-day window starts there.
+    """
+    best, hit = None, None
+    for seg in segments:
+        for day in range(1, seg.engine.shape[0] - 2):
+            if season_of_segment(seg=seg, day=day) != season or seg.solar[day].max() <= 0:
+                continue
+            value = day_mean_index(seg=seg, day=day)
+            if not np.isfinite(value):
+                continue
+            if best is None or (value > best if clearest else value < best):
+                best, hit = value, (seg, day)
+    return hit
+
+
+def solar_index_chart(*, solar: np.ndarray, index: np.ndarray, title: str) -> alt.LayerChart:
+    """Return solar output (left axis) and the clear-sky index (right axis) over a 96-half-hour window."""
+    n = len(solar)
+    data = pl.DataFrame(
+        {
+            "hour": np.arange(n) / 2.0,
+            "solar": np.asarray(solar, dtype=float),
+            "index": np.asarray(index, dtype=float),
+        }
+    )
+    x = alt.X("hour:Q", title="Hours from the start of day 1 (UTC)", axis=HOUR_AXIS)
+    left = (
+        alt.Chart(data)
+        .mark_line(aria=False, color=BLUE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=x,
+            y=alt.Y(
+                "solar:Q",
+                title="Solar output (blue; share of capacity)",
+                axis=alt.Axis(titleColor=BLUE),
+            ),
+        )
+    )
+    right = (
+        alt.Chart(data)
+        .mark_line(aria=False, color=ORANGE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=x,
+            y=alt.Y(
+                "index:Q",
+                title="Clear-sky index (orange)",
+                axis=alt.Axis(titleColor=ORANGE, orient="right"),
+                scale=alt.Scale(domain=[0.0, 1.2]),
+            ),
+        )
+    )
+    return (
+        alt.layer(left, right)
+        .resolve_scale(y="independent")
+        .properties(width=WIDTH_PX, height=130, title=alt.TitleParams(title, anchor="start"))
+    )
+
+
 def solar_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> None:
     """Draw G2 (source S2 in detail) and G3 (S1 as aggregates, single days to the private set)."""
     s2 = [s for s in segments if s.world in ("solar", "both") and s.source == "S2"]
@@ -277,21 +357,15 @@ def solar_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> 
     for kind in ("clear", "cloudy"):
         charts = []
         for season in core.COMPONENT_SEASONS:
-
-            def keep(s: sim729.Segment, d: int, season: str = season, kind: str = kind) -> bool:
-                if season_of_segment(seg=s, day=d) != season or s.solar[d].max() <= 0:
-                    return False
-                c = float(np.nanmean(s.csi[d][s.cosz[d] > 0.2]))
-                return c > 0.8 if kind == "clear" else c < 0.5
-
-            hit = first_day(segments=s2, keep=keep)
+            hit = extreme_index_day(segments=s2, season=season, clearest=kind == "clear")
             if hit is None:
                 clear_ok &= kind != "clear"
                 cloudy_ok &= kind != "cloudy"
                 continue
             seg, day = hit
             found += 1
-            solar = day_window(seg=seg, day=day, name="solar")
+            capacity = float(seg.params["solar_capacity_points"])
+            solar = day_window(seg=seg, day=day, name="solar") / capacity
             if kind == "clear":
                 clear_by_season[season] = solar
                 clear_ok &= gallery.check_clear(solar=seg.solar[day], mid=slice(20, 32))
@@ -301,12 +375,10 @@ def solar_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> 
                     cloudy=solar, clear_same_season=ref
                 )
             charts.append(
-                window_chart(
-                    series={
-                        "solar output": solar,
-                        "clear-sky index": day_window(seg=seg, day=day, name="csi"),
-                    },
-                    title=f"G2: a {kind} {season} day, source S2",
+                solar_index_chart(
+                    solar=solar,
+                    index=day_window(seg=seg, day=day, name="csi"),
+                    title=f"G2: the {'clearest' if kind == 'clear' else 'cloudiest'} {season} day by clear-sky index, source S2",
                 )
             )
         if charts:
@@ -402,9 +474,9 @@ def bsp_fold_base_gallery(*, segments: Sequence[sim729.Segment], out: GalleryRes
             title="G5: the folded reading and the signed truth",
             height=110,
         )
-        floor = seg.params["q_mva"] / core729.CAPACITY_MVA * core729.POINTS * seg.params["q_factor"]
+        q_max = seg.params["q_mva"] / core729.CAPACITY_MVA * core729.POINTS
         ok = gallery.check_fold(
-            reading=r, truth=x, floor=float(floor), far=3.0 * core729.QHAT_POINTS
+            reading=r, truth=x, floor=float(q_max * seg.params["q_factor"]), q_max=float(q_max)
         )
     else:
         ok = False
@@ -498,7 +570,8 @@ def hourly_share_chart(*, synthetic: np.ndarray, real: np.ndarray) -> alt.Chart:
 
 def aggregate_gallery(
     *, shares_synthetic: Mapping[str, float], shares_real: Mapping[str, float] | None,
-    component_shares: Mapping[str, float], out: GalleryResult,
+    component_shares: Mapping[str, Mapping[str, float]], out: GalleryResult,
+    bounded_shares: Mapping[str, float] | None = None,
     hourly_synthetic: np.ndarray | None = None, hourly_real: np.ndarray | None = None,
 ) -> None:  # fmt: skip
     """Draw G8 (real against simulated aggregates, when the real aggregates are supplied) and G9.
@@ -520,36 +593,69 @@ def aggregate_gallery(
             out.public["G8_realism"] = pairs
     out.results["G8_realism"] = bool(shares_real) and gallery.check_shares(shares=shares_synthetic)
     out.notes["G8_realism"] = "drawn" if shares_real else "real aggregates not supplied"
-    data = pl.DataFrame({"check": list(component_shares), "share": list(component_shares.values())})
+    minimum = {group: min(values.values()) for group, values in component_shares.items() if values}
+    data = pl.DataFrame({"group": list(minimum), "share": list(minimum.values())})
     bar = (
         alt.Chart(pl.DataFrame({"x": [core.MIN_OUTPUT_SHARE]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color=ORANGE, strokeDash=[4, 3], aria=False)
         .encode(x="x:Q")
     )  # ty: ignore[unresolved-attribute]
-    bars = (
+    points = (
         alt.Chart(data)  # ty: ignore[unresolved-attribute]
-        .mark_bar(color=BLUE, aria=False)
+        .mark_point(color=BLUE, filled=True, size=40, aria=False)
         .encode(
             x=alt.X(
                 "share:Q",
-                title="Share of segments with output (bar in orange)",
-                scale=alt.Scale(domain=[0.9, 1.0]),
+                title="Lowest share of segments with output in the group (bar in orange)",
+                scale=alt.Scale(domain=[0.95, 1.001]),
             ),
-            y=alt.Y("check:N", title=None),
+            y=alt.Y("group:N", title=None, sort=None, axis=alt.Axis(labelLimit=260)),
         )
     )  # ty: ignore[unresolved-attribute]
-    out.public["G9_components"] = (bars + bar).properties(
-        width=WIDTH_PX - 200, height=14 * max(len(data), 1)
+    panels = [(points + bar).properties(width=WIDTH_PX - 260, height=12 * max(len(data), 1))]
+    bounded_ok = True
+    if bounded_shares:
+        rows = [
+            {"check": name, "share": value, "bound": bound_of(name=name)}
+            for name, value in bounded_shares.items()
+        ]
+        bounded_ok = all(value <= bound_of(name=name) for name, value in bounded_shares.items())
+        bound_data = pl.DataFrame(rows)
+        dots = (
+            alt.Chart(bound_data)  # ty: ignore[unresolved-attribute]
+            .mark_point(color=BLUE, filled=True, size=40, aria=False)
+            .encode(
+                x=alt.X(
+                    "share:Q", title="Share of excluded or zeroed half-hours (bound in orange)"
+                ),
+                y=alt.Y("check:N", title=None, sort=None, axis=alt.Axis(labelLimit=260)),
+            )
+        )  # ty: ignore[unresolved-attribute]
+        ticks = (
+            alt.Chart(bound_data)  # ty: ignore[unresolved-attribute]
+            .mark_tick(color=ORANGE, thickness=2, aria=False)
+            .encode(x="bound:Q", y=alt.Y("check:N", sort=None))
+        )  # ty: ignore[unresolved-attribute]
+        panels.append((dots + ticks).properties(width=WIDTH_PX - 260, height=12 * len(rows)))
+    out.public["G9_components"] = alt.vconcat(*panels)
+    out.results["G9_components"] = bool(
+        minimum and gallery.check_shares(shares=minimum, bar=core.MIN_OUTPUT_SHARE) and bounded_ok
     )
-    out.results["G9_components"] = gallery.check_shares(
-        shares=component_shares, bar=core.MIN_OUTPUT_SHARE
+    out.notes["G9_components"] = (
+        f"{len(minimum)} groups, {len(bounded_shares or {})} bounded shares"
     )
-    out.notes["G9_components"] = f"{len(component_shares)} shares"
+
+
+def bound_of(*, name: str) -> float:
+    """Return the upper bound of a bounded share, from the end of its check name."""
+    return sky.MAX_ZEROED_SHARE if "zeroed_sunup" in name else banks.METERED_ZERO_MAX_SHARE
 
 
 def build_gallery(
     *, segments: Sequence[sim729.Segment], shares_synthetic: Mapping[str, float],
-    shares_real: Mapping[str, float] | None, component_shares: Mapping[str, float],
+    shares_real: Mapping[str, float] | None,
+    component_shares: Mapping[str, Mapping[str, float]],
+    bounded_shares: Mapping[str, float] | None = None,
     hourly_synthetic: np.ndarray | None = None, hourly_real: np.ndarray | None = None,
 ) -> GalleryResult:  # fmt: skip
     """Draw the whole gallery from the segments of the test bank and the training bank of seed 0."""
@@ -562,6 +668,7 @@ def build_gallery(
         shares_synthetic=shares_synthetic,
         shares_real=shares_real,
         component_shares=component_shares,
+        bounded_shares=bounded_shares,
         out=out,
         hourly_synthetic=hourly_synthetic,
         hourly_real=hourly_real,

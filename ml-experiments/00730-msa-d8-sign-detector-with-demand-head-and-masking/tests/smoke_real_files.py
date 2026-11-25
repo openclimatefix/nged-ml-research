@@ -227,6 +227,27 @@ def check_clear_day_counts() -> str:
     )
 
 
+def check_sky_gaps() -> str:
+    """Print the zeroed sun-up share of the farms' sky before and after `fill_sky_gaps`.
+
+    The bound is `sky.MAX_ZEROED_SHARE`, pre-registered on the plan page. The line prints shares
+    and counts of farm-days only.
+    """
+    import e00730_sky as sky
+
+    ctx = stages.real_context()
+    before = sky.zeroed_sky_share(farms=ctx.cal.farms)
+    filled = sky.fill_sky_gaps(cal=ctx.cal)
+    after = sky.zeroed_sky_share(farms=filled.farms)
+    lost_sky = int(ctx.cal.farms.sky_ok.sum() - filled.farms.sky_ok.sum())
+    lost_power = int(ctx.cal.farms.power_ok.sum() - filled.farms.power_ok.sum())
+    return (
+        f"zeroed sun-up share of sky_ok farm-days {before:.4f} before, {after:.4f} after; "
+        f"farm-days leaving sky_ok {lost_sky}, leaving power_ok {lost_power}; "
+        f"bound {sky.MAX_ZEROED_SHARE} met: {after <= sky.MAX_ZEROED_SHARE}"
+    )
+
+
 def check_grid_dates() -> str:
     """Check that experiment 87's grid gives one UTC day per half-hour for the removal mask."""
     import e00087_common as common
@@ -245,6 +266,7 @@ CHECKS: dict[str, Callable[[], str]] = {
     "S2 solar on clear days": check_s2_solar,
     "bank S2 solar": check_bank_s2,
     "clear base days by season": check_clear_day_counts,
+    "sky gaps filled": check_sky_gaps,
 }
 
 

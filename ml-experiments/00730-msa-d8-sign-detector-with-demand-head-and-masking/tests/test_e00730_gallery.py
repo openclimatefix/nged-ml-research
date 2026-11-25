@@ -55,11 +55,13 @@ def test_weather_and_fold_checks() -> None:
     assert gallery.check_aggregate_bands(q10=np.zeros(3), q50=np.ones(3), q90=np.full(3, 2.0))
     assert not gallery.check_aggregate_bands(q10=np.ones(3), q50=np.zeros(3), q90=np.full(3, 2.0))
     truth = np.array([-10.0, -0.1, 0.1, 10.0])
-    assert gallery.check_fold(
-        reading=np.array([10.0, 0.5, 0.5, 10.0]), truth=truth, floor=0.5, far=5.0
+    folded = np.sqrt(truth**2 + 0.5**2)
+    assert gallery.check_fold(reading=folded, truth=truth, floor=0.5, q_max=0.5)
+    assert not gallery.check_fold(
+        reading=np.array([10.0, 0.1, 0.5, 10.0]), truth=truth, floor=0.5, q_max=0.5
     )
     assert not gallery.check_fold(
-        reading=np.array([10.0, 0.1, 0.5, 10.0]), truth=truth, floor=0.5, far=5.0
+        reading=np.array([12.0, 0.5, 0.5, 10.0]), truth=truth, floor=0.5, q_max=0.5
     )
     assert gallery.check_base_equals_truth(truth=clear, base=clear)
     reading = np.ones(96)
@@ -77,3 +79,16 @@ def test_s1_is_published_only_as_seasonal_bands() -> None:
     assert set(bands) == set(core.COMPONENT_SEASONS)
     for q in bands.values():
         assert gallery.check_aggregate_bands(q10=q[0], q50=q[1], q90=q[2])
+
+
+def test_levels_count_plateaus_inside_a_run_not_every_ramp_value() -> None:
+    one = np.zeros(48)
+    one[10:14] = [2.0, 4.0, 5.0, 5.0]  # a ramp, then one steady level
+    one[30:36] = 3.0  # a second run at another share of the one unit
+    several = np.zeros(48)
+    several[10:20] = [2.0, 4.0, 4.0, 4.0, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
+    assert gallery.run_plateaus(engine=one) == 1
+    assert gallery.run_plateaus(engine=several) == 2
+    assert gallery.check_levels(one_unit=one, several=several)
+    assert not gallery.check_levels(one_unit=several, several=one)
+    assert gallery.run_plateaus(engine=np.zeros(48)) == 0
