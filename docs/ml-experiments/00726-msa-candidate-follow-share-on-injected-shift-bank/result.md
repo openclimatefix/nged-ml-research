@@ -455,8 +455,9 @@ files:** with experiment 667's paths, the copied `_done` would make KC2 pass by 
   F4's scorer), in points of capacity. Reading 7's safe-side half is implemented, and its coverage
   half is not yet. Reading 3 has no breakdown by length, and the clip diagnostics are not yet
   joined to it.
-- No figures script and no code for phase 5 (the attention extraction) exist yet. Both need code
-  and a review before phase 1 or the phase is cut.
+- Phase 5 (the attention extraction) is cut. It is the first cut in the order of cuts below, and
+  no code for it exists. The write-up therefore has no attention maps from this experiment. The
+  figures script is still to be written before the write-up.
 
 ## Leakage and disclosures
 
