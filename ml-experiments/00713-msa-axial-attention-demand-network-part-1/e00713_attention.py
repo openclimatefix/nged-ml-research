@@ -390,7 +390,7 @@ CASE_LABELS: Final = {
         "One forecast: Primary D5, one origin in the 2026-01 test month, lead day 1, seed 0.",
     ),
 }
-ARM_COLOUR: Final = {"M*": theme.BRAND_ORANGE, "E": theme.DATA_DEEP_TEAL, "P": theme.DATA_PURPLE}
+ARM_COLOUR: Final = {"M*": theme.DATA_BLUE, "E": theme.BRAND_ORANGE, "P": "#6B6B6B"}
 UNIFORM_SHARE: Final = 2 / 14
 
 
