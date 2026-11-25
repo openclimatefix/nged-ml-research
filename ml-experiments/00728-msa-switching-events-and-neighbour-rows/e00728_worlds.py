@@ -19,6 +19,23 @@ weather-only reference with `e00714_common.build_reference`.
 
 **The counted event set** (design section 2.2) is `g2`'s temporary moves of visible depth with a
 metered mirror. `counted_moves` reads the truth tables of `g2` and applies the filter.
+
+**Three flagged points for the reviewer.**
+
+- *The reference error is partly in-sample.* `reference_error` scores the reference over the days of
+  the stored window that lie before the fold month, and experiment 714 fitted the reference on days
+  that overlap them (`fit_reference` reads `[month_day - 758, month_day - 28)`). The in-sample error
+  is smaller than the out-of-sample error, so the visible depth is lower than a held-out reference
+  error would give, and more `g2` moves pass the filter. The design says "over the fold's training
+  span", and the function follows the design.
+- *The donor step ignores experiment 714's cap of 0.6.* `donor_step` recovers the donor's step of a
+  move that `g2` scored at the receiving Primary from the recipient's step. The generator caps the
+  recipient's step at 0.6 of the recipient's capacity, so for a capped row the recovered donor step
+  is too small. No rule changes if a count differs from 81: the gate prints every count.
+- *The MVA-only floor.* The training world floors the history of an MVA-only host at zero for a
+  temporary move (as experiment 715 floors a recipient), and keeps the shifted target of an MVA-only
+  Primary at or above zero for permanent changes by the redraw limit. D15 and D18 have no reference
+  error, so their visible depth is the floor of 0.10 alone.
 """
 
 from dataclasses import dataclass
