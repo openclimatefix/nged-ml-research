@@ -236,8 +236,7 @@ chosen before the plots were drawn.** The band is the 5% to 95% range of arm `HT
 the median forecasts of `HT` and `H` and the actual. The bands widen with the lead. **A caveat
 applies to D19 and D21: the as-of capacity factors of the fold 2026-05 look ahead of the forecast
 origin at both Primaries, so the solar estimate of arm `H` carries information that a live service
-would not have.** D8, D12, and D22 are not shown, for the same reason. The charts were checked by
-reading the SVG source and were not rendered to an image in this session.
+would not have.** D8, D12, and D22 are not shown, for the same reason. The charts were rendered with headless Chromium and read for labels, overlaps, and units.
 
 ## Attention maps
 
@@ -564,12 +563,14 @@ whether audit trigger 4 or 3 needs an audit.
   `37e8cae474a3d63b3a49fdda3b4917a2337eef9b3deb86de0abd3a230c001f77`. It ran once, with a result of
   PASS: a largest difference of 0 in every column and
   identical row order, for one fold and 2 seeds of arm `HT`.
-- `.../e00717_report.py` and `.../e00717_figures.py`: print the numbers of the final page from
-  the score files (the report stops at the extra contrasts, see "Planned tables that do not
-  exist"), and draw the contrast and by-fold charts from `score/part2.json`.
-- `.../e00717_plots.py`: draws the forecast examples at D11, D19, and D21 from the stored
-  forecasts of arms `HT` and `H`, and the validation-loss curves from the fit logs. It scores
-  nothing.
+- `.../e00717_report.py`: prints the numbers of the final page from the score files. It stops
+  at the report-only extra contrasts, see "Planned tables that do not exist".
+- `.../e00717_figures.py`: draws a contrast chart and a by-fold chart from `score/part2.json`. The
+  page's `contrasts.svg` and `b1_by_fold.svg` come from `e00717_plots.py` instead, because the
+  charts of `e00717_figures.py` were wider than the text column.
+- `.../e00717_plots.py`: draws `contrasts.svg` and `b1_by_fold.svg` from `score/part2.json`, the
+  forecast examples at D11, D19, and D21 from the stored forecasts of arms `HT` and `H`, and the
+  validation-loss curves from the fit logs. It scores nothing.
 - `.../e00717_futility_read.py`: reads the interim 2-seed contrasts and writes
   `score/futility_part2.json`. `.../e00717_s1_read.py` writes the report-only
   `score/s1_interim.json`.
