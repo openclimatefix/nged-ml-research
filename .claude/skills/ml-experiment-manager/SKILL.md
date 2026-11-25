@@ -40,18 +40,18 @@ slot.
 
 ## Compute slots
 
-**Split the machine into named slots, each a share of cores and GPU memory, and keep a ledger.** The
-workstation has one 48 GB GPU and 32 cores. Five slots (A to E), with 2 cores reserved for the
-system, let several sessions fit at once. The cores of the slots and the reserve should sum to the
-machine's 32 cores. The ledger at the time of writing books 40, which works only because the slots
-rarely run flat out together, so check `uptime` before starting a large fit. A ledger row holds the
-slot, the holder's session id, the GPU share, the cores, and the start date.
+**Split the machine into named slots, each a share of cores and GPU memory, and keep a ledger.**
+Size the slots from the machine's own core count and GPU memory, and keep 2 cores for the system.
+Check `uptime` before starting a large fit, because slots rarely run flat out together. A ledger row
+holds the slot, the holder's session id, the GPU share, the cores, and the start date.
 
 - **Tell every session to run independent work in parallel inside its slot.** The `ml-experiment`
   skill's "Use the compute the slot gives you" section says how. A session that fits many small
   models one at a time leaves its cores and the GPU idle.
-- **A session stays inside its slot.** It sets `n_jobs` and `nthread` to its core quota, runs one
-  GPU fit at a time, and asks the manager before exceeding either.
+- **A session stays inside its slot.** It sets `n_jobs` and `nthread` to its core quota, runs no more
+  concurrent GPU fits than its slot's GPU memory allows (one unless the brief says otherwise), and
+  asks the manager before exceeding either. State every GPU-memory limit as the per-process total
+  that `nvidia-smi` shows, which is about 3 GB above PyTorch's allocated peak.
 - **A session releases its slot when its fits end, not when its PR merges.** It reports the release
   in one line. Scoring and write-up need little compute.
 - **Check the ledger's holder before assigning a slot.** Writing a new holder over a slot another
@@ -91,11 +91,9 @@ slot, the holder's session id, the GPU share, the cores, and the start date.
   the thread-count column `nlwp`, names the offending processes and their thread counts, so message
   the owning session instead of guessing. Raise a quota only below a load of about 24 on 32 cores,
   because 28 to 33 means the machine is full.
-- **Estimate a job's peak memory before the run, from column widths and row counts, and load one
-  fold or one seed at a time.** A scorer that loads every seed at once scales with the seed count,
-  so a loader sized on a short run can exceed its cap at the full seed count. Two jobs that each fit
-  under the free memory alone can die together when they overlap, so start one memory-heavy job at a
-  time while less than 25 GB is free.
+- **Start one memory-heavy job at a time while less than 25 GB is free.** Two jobs that each fit
+  under the free memory alone can die together when they overlap. The `ml-experiment` skill's
+  "Standing practices" section says how a session estimates peak memory and streams its scoring.
 - **Check that a quota can change without losing work.** A multiprocessing pool has its size fixed
   when it starts, so raising a quota means a restart. Ask the session whether its results are
   skip-if-exists before telling it to restart, and whether the sweep is parallel at all: a solver in
@@ -162,23 +160,25 @@ merge rules, and the local CI checks. Tell every planner to read
   opens a draft plan PR and goes idle holds its slot and delays the series.
 - **Say in the brief what the session may not decide.** Without that statement in the brief, a
   session launched an Opus audit on its own. State the Opus rule, the memory cap, the three thread
-  variables, and that shared code stays inside the experiment folder.
+  variables, and that shared code stays inside the experiment folder. Where the brief lets a
+  sub-agent run anything, name the input files, the memory cap, and the scope command.
+- **Before approving a first fit, check that the plan shows the synthetic world gallery and the
+  real-file smoke check** that the `ml-experiment` skill's "Standing practices" section requires,
+  for any experiment that uses a synthetic data generator.
 - **Tell the session to take its experiment id with `reserve_experiment`.** An id counts as taken
   once a `data/ml-experiments/.ids/<id>` marker, a `data/ml-experiments/<id>-*` folder, or a
   `docs/ml-experiments/<id>-*` page exists, because `reserve_experiment` reads all three. Two briefs
   that name the same expected id collide. If the classifier denies a session's reservation, the
   manager allocates the id in the state log, writes it into the brief, and treats the denial as a
-  permission denial.
+  permission denial. Until the maintainer writes the `.ids/<id>` marker, every session takes its id
+  from the manager, because `reserve_experiment` cannot see the state log.
 - **A script that runs phases must refuse to start a phase before that phase's review marker
-  exists.** Ask the session to write the marker check into the script.  Disclose any such breach in
+  exists.** Ask the session to write the marker check into the script. Disclose any such breach in
   the PR body and in `result.md`, treat the outputs as unreviewed until the review passes, and start
   no later phase before the review passes.
-- **Any edit to a reviewed script gets its hash recorded and a diff-limited re-check before the
-  script runs again.** A change to a reviewed script's loader first gets a read-only equivalence
-  check.
-- **Every job writes its device (CPU or GPU) and its start and end time to a per-phase time log.**
-  The manager checks the session's GPU-process-hour sum against the experiment's stop line. A total
-  rebuilt afterwards from scratch logs in `/tmp` can be lost or incomplete.
+- **Check the rules in the `ml-experiment` skill's "Standing practices" section** for edits to a
+  reviewed script (hash and diff-limited re-check) and for the per-phase time log. The manager
+  compares the session's GPU-process-hour sum with the experiment's stop line.
 - **Name sessions after their role.** A title beginning "Design:" or "Discuss:" marks an interactive
   session; every other session the manager creates is a worker.
 
@@ -226,7 +226,7 @@ state with `gh pr view`, and the log files in the experiment's data folder.
   headRefOid,state` with `git log origin/main` and the branch tip. Merge only after a real green run
   on the final head, and push one more commit if `ci` is stuck on "skipping".
 - **Read the head sha from `gh`, never from a session's message.** Sessions have sent shas with
-  typos, and a stale sha fails the merge.  A `mergeStateStatus` of `UNKNOWN` with `ci` at `SUCCESS`
+  typos, and a stale sha fails the merge. A `mergeStateStatus` of `UNKNOWN` with `ci` at `SUCCESS`
   is a finished run; `BLOCKED` with no checks listed means `ci` has not started.
 - **A session's own leftover processes slow its own experiment.** Run `ps` before concluding that a
   method is slow.
@@ -243,7 +243,8 @@ state with `gh pr view`, and the log files in the experiment's data folder.
   maintainer asked a Discuss, Design, or similar top-level session to run may start without a
   further yes in the manager's chat.
 - **The manager marks every worker's PR ready (`gh pr ready <N>`),** after reading the head sha from
-  `gh` and checking the diff scope and the closing keywords.
+  `gh` and checking the diff scope and the closing keywords. The brief tells the worker never to run
+  `gh pr ready` itself, so the step is never a worker's denied command.
 - **Merge with the full head sha.** `gh pr merge <N> --merge` with `--match-head-commit` refuses an
   abbreviated sha, so pass all 40 characters. Read the sha from `gh pr view <N> --json headRefOid`.
 - **Check the closing keywords in the commits the PR adds, not in the whole history.** Search
@@ -253,11 +254,10 @@ state with `gh pr view`, and the log files in the experiment's data folder.
   `pyproject.toml` and to disclose the added lines in the PR body. Treat those lines as the only
   accepted change outside the experiment folders. A local `ty` warning about an unused ignore on
   those lines has the same cause, so ignore it.
-- **A diff outside those paths, such as a change under `src/` or `packages/`, stops at a reviewed PR
-  for the maintainer.** Tell a session
-  that wants shared code in `src/studies` to keep the code inside its own experiment folder
-  and to say in `result.md` that moving it needs the maintainer's review.
-
+- **A diff outside `ml-experiments/` and `docs/ml-experiments/`, such as a change under `src/` or
+  `packages/`, stops at a reviewed PR for the maintainer.** Tell a session that wants shared code in
+  `src/studies` to keep the code inside its own experiment folder and to say in `result.md` that
+  moving it needs the maintainer's review.
 - **Before archiving any session, ask it which sub-agents are still running, and wait for them.**
   Archiving strands them: they lose their transcripts and can no longer be messaged.
 - **After a merge,** archive the worker session with `archive_session`, release its slots in the
@@ -308,9 +308,7 @@ identifier.
   keep routine status out of chat.
 - **Say what the data supports.** State the scope of a finding (the series, the year, the number of
   seeds) and do not call a result final before its scoring has finished.
-- **Correct an error as soon as the manager finds it,** and say what changed. Errors to avoid
-  include reporting every slot free while one was held, merging before an instruction to check had
-  arrived, and sending one experiment's instruction to another.
+- **Correct an error as soon as the manager finds it,** and say what changed.
 - **When the maintainer asks for the open decisions, give each one's context and a recommendation.**
   "Go ahead with your recommendations" covers the steps in them, including merging the research PRs
   that touch only `ml-experiments/` and `docs/ml-experiments/`. It covers nothing the
@@ -338,8 +336,6 @@ instruction allows Opus:
 
 ## Traps
 
-- **Worktrees share one data folder.** Only one session may re-run a published script, or the others
-  overwrite its evidence.
 - **Keep the plan current.** Each experiment's PRs update the owning theme's Research plan page and
   the `result.md` front matter, which generates every table; a stale "Not yet merged" cell misleads
   the next reader. Run a refresh worker after each big batch. Write a "state and next steps" page
@@ -358,9 +354,8 @@ instruction allows Opus:
   hours; and that the count of regular files and symlinks matches. Write the remaining candidates to
   a note for later. Use `find` and `comm` for tens of thousands of paths, never a per-file shell
   loop.
-- **Run the local CI checks before every push.** Each lint failure adds a rerun of about 6 minutes.
-  The failures that recur are line length in docstrings and markdown (MD013), `pydoclint` DOC201 (a
-  missing `Returns:` section), and an SVG without a final newline.
+- **Run the local CI checks before every push,** as the `ml-experiment` skill's "Merging" section
+  lists them. Each lint failure adds a rerun of about 6 minutes.
 - **Check anonymisation before every merge.** Published pages, charts, and PR bodies show aggregates
   only for NGED's metered generators: no generator name, identifier, size, dates, or register
   values. Substations may be named.

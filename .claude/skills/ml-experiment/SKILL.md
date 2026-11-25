@@ -70,6 +70,9 @@ degradation rule, so an experiment never touches either.
   manager, use Opus only when the experiment is very complex or the result is very surprising,
   because two Opus reviews per experiment use too much quota.
 
+**Smoke-test the reviewed code on a small input before the first fit whose numbers you will
+quote.** A small run catches a crash or a silent zero before the full run spends its compute.
+
 Either size then runs the triggers in "Audit before merge", below, and gets an audit if one fires.
 
 Work in a worktree, and run the CI steps listed in "Merging", below, before each push. Make one
@@ -100,7 +103,9 @@ human review.
   earlier experiment or study, `studies.*`, and the other reviewed packages, and nothing in `src/`
   or any other package imports it. Run a script that imports from another folder with that folder
   on `PYTHONPATH`, because only the script's own folder is on `sys.path` otherwise. An example is
-  `PYTHONPATH=ml-experiments/<earlier-folder> uv run --no-sync python <script>`. An experiment has
+  `PYTHONPATH=ml-experiments/<earlier-folder> .venv/bin/python <script>`. Run every Python command
+  inside a memory-capped `systemd-run` scope, as the `ml-experiment-manager` skill's "Compute
+  slots" section describes. An experiment has
   no tests of its own scripts; the machinery it calls is tested in `src/studies/`.
   **Commit every script that wrote a stored file or produced a number the page publishes.** That
   includes the code that built a cached input table which a later experiment reads, and the
@@ -129,9 +134,8 @@ experiment's own branch, and do not open a pull request for it. Its front matter
 number, or `none`). `kind` is `change` (the experiment asks whether a research default plus x
 beats the research default) or `other`, and it is required from id 320 up. `promoted_to` is always
 optional, needs `kind: change`, and names the version of the research default that the
-experiment created, such as "Primary demand research default 2". The field name keeps the word
-"promoted" although the rule avoids it. Every result has the same front matter, so a later session
-finds results with `grep` over `docs/ml-experiments/*/result.md`.
+experiment created, such as "Primary demand research default 2". Every result has the same front
+matter, so a later session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 **`theme` names exactly one theme folder under `docs/ml-experiments/themes/`, and `also_relevant_to`
 lists the other themes the result bears on (an empty list if none).** The experiment appears in the
@@ -254,8 +258,7 @@ practice itself.** State in the plan which of them the experiment follows.
   Save each fit's loss history in the experiment's data folder beside the model, so that the plot
   needs no refit. Leave the plot out, and say so in one line, when the experiment fits no model,
   reuses stored models for prediction only, or fits a closed-form model with no iterations.
-- **Open every pull request as a draft**, run the local checks, and mark it ready only when the
-  reviews are triaged.
+- **Open every pull request as a draft.** "Merging" says when the pull request becomes ready.
 - **Show that every input with a valid time carries only what was known at the forecast origin.**
   Show it for weather, capacity factors, and every other such input, in the plan and by a test. A
   score whose weather input looks ahead is voided. State any other look-ahead on the page, with the
@@ -263,6 +266,8 @@ practice itself.** State in the plan which of them the experiment follows.
 - **Stream scoring one fold or one seed at a time, and state the expected peak memory in the plan.**
   A scorer that loads every seed at once scales with the seed count. Estimate the peak from column
   widths and row counts, run it under a memory-capped scope, and record the measured peak.
+- **Send the manager a "fits starting" line** with the fit count, the projected GPU-process-hours,
+  the memory caps, and the cores.
 - **Write a per-phase time log** with each job's device (CPU or GPU), start time, and end time. Sum
   it into GPU-process-hours after each phase, and stop at the GPU-hours line the plan sets and ask
   the manager (or the maintainer, when no manager runs).
@@ -279,6 +284,16 @@ practice itself.** State in the plan which of them the experiment follows.
   experiment's follow share (the share of an injected load shift that the forecast copies) by 3% to
   9%. For any measure of how a forecast follows an event, include a test with a mid-day onset and an
   oracle check of the share.
+- **Show a "synthetic world gallery" in every plan and write-up of an experiment that simulates
+  data.** Simulated data includes a dispatchable generator, solar output, steps in bulk supply point
+  demand, and real days with simulated events added. The gallery is plenty of plots of each
+  simulated component's own output in a variety of scenarios, each component shown separately,
+  beside real-data aggregates where publishing is allowed (never a metered generator's real series).
+  Show the gallery in the plan before the first fit, and again in the write-up. Also run a smoke
+  check on the data files the fits read: each simulated component must be nonzero in the rows where
+  that component should produce output. One run had silently zero solar output in 37.5% of its test
+  rows, because a threshold in its cloud-cover rule could never be met, and no unit test, gate, or
+  leakage check caught it.
 - **Check anonymisation before the PR leaves draft.** Published numbers for NGED's metered
   generators are aggregates only, with no generator name, identifier, size, dates, or register
   values.
@@ -288,9 +303,7 @@ practice itself.** State in the plan which of them the experiment follows.
 **Run independent work in parallel, up to the slot's budget of cores and GPU memory.** Series,
 seeds, arms, folds, and refits that do not read each other's output can run side by side. A job that
 fits many small models, such as one per series or one tiny update per day, cannot keep a GPU or many
-cores busy one model at a time. Fitting 16 series one after another at about a quarter of the slot's
-cores and almost no GPU took 3.3 hours, where running 4 to 8 series at a time would have taken under
-an hour.
+cores busy one model at a time.
 
 - **Check utilisation in the first minutes of a long run.** Look at `uptime`, `nvidia-smi`, and the
   job's own CPU use. If the job uses well under its quota and will run for more than about 30
@@ -564,24 +577,18 @@ experiment, such as a control arm or a scoring rule, in this skill and not on th
 ## Audit before merge
 
 **A review that checks the printed numbers against the stored predictions cannot catch a method that
-is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.** In
-one experiment, the numbers review confirmed every printed number, yet an audit afterwards found
-that the residual spread shifted each forecast by the previous year's bias, which reversed two of
-the headline conclusions. Three failed controls had been explained away instead of investigated.
+is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.**
 
 **An audit is triggered when any of these holds:**
 
 1. **A control fails:** a positive control, a known-answer test, or a placebo.
 2. **A result contradicts its own prediction or an earlier experiment's finding,** and the
-   experiment's session has not tested an explanation and recorded it in the write-up. A solar
-   offset that improved the score by only 0.010 points, against a predicted gain of 0.10 to 0.15
-   points and an earlier experiment's gain of 0.152 points, is an example.
+   experiment's session has not tested an explanation and recorded it in the write-up.
 3. **The quantile-score contrast and the same contrast on the error of the mean or median forecast
    point in different directions.**
-4. **Leaving one site out flips the sign or the verdict of a planned contrast.** One planned
-   contrast was −0.20 with a site and +0.13 without it. A site scoring more than twice the median
-   across sites is a prompt to run the leave-one-out check, not a trigger, because with five sites
-   that ratio is noisy.
+4. **Leaving one site out flips the sign or the verdict of a planned contrast.** A site scoring
+   more than twice the median across sites is a prompt to run the leave-one-out check, not a
+   trigger.
 5. **A nested arm beats the arm that contains it,** such as an arm with the same model given less
    input, **or a control that should change nothing moves the score by more than its own paired
    interval's half-width.**
@@ -619,7 +626,8 @@ requires. The experiment either waits for that PR or records the unchecked prope
 ## Merging
 
 **An experiment's PR may be merged without waiting for the maintainer when all four hold:** the diff
-touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews its
+touches only `ml-experiments/` and `docs/ml-experiments/` (plus the `[[tool.ty.overrides]]` lines
+for `torch` in `pyproject.toml`, disclosed in the PR body); the experiment has had the reviews its
 size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
 --check`; any audit a trigger in "Audit before merge" calls for has run, with its findings triaged
 in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
@@ -646,11 +654,14 @@ recurring failures are line length in docstrings and markdown (MD013), `pydoclin
 **Open the pull request as a draft, and mark it ready only when you are ready to merge.** CI does
 not run on a draft pull request, so pushes to a draft cost no CI minutes. Open the pull request with
 `gh pr create --draft`. When the local checks pass and the reviews are triaged, run `gh pr ready N`,
-which starts CI once. When a manager session is running, leave the PR as a draft and report its head
-sha instead, because the manager marks it ready and merges it. Wait for the `ci` check to pass
+which starts CI once. A session working under a manager leaves the pull request as a draft and
+reports its head sha. The manager marks the pull request ready and merges it. If the auto-mode
+classifier denies `gh pr ready`, treat the denial as a permission denial: report it to the
+maintainer and do not work around it. Without a manager, wait for the `ci` check to pass
 before you merge. Every later push to a ready pull request runs CI again, so batch the fixes into
-one commit. If `ci` shows "skipping" after the ready-for-review click, the draft gate has raced the
-ready event and `ci` will never run. Push one more commit, and merge only after a real green run on
+one commit. If `ci` shows "skipping" after the ready-for-review click, the draft-time run has
+cancelled the ready-time run through the concurrency group, and a skipped check does not block the
+merge. Push one more commit, and merge only after a real green run on
 the final head.
 
 **Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its
