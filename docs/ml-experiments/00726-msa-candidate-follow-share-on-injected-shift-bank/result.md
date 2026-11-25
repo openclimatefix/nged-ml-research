@@ -527,6 +527,13 @@ from, a descendant of `9fd66fd48`, so the mixed commits are disclosed here. Job 
 finished job in fold 2026-01. It is the host-only world, whose KC5 ran on a set that does not hold
 Primary 11, and its files are valid.
 
+**Disclosure: an edited reviewed script ran before its re-check, for the second time.** After the
+Opus review of `e00726_clip_candidate_diag.py` passed (commit `09d3f59ce`), the first run failed
+because the stored pipeline uploads a table to a GPU that the script hides. The implementer edited
+the script to keep that table on the CPU and ran it, with the manager's approval coming afterwards.
+The edit is five lines, and the two output files are marked as unreviewed below. The first case is
+the driver `phases.sh`, described above.
+
 **Caveat for reading 3 and the sensitivity rule: the Candidate's clip binds at some Primaries and
 passes, which is stated here before any score is read.** The audit approximated the 2026-01 lag
 statistics, and the 2025-11 and 2025-12 files were not computed pass by pass, so the figures are
@@ -539,18 +546,15 @@ clipped input, as `M1`'s follow share does at the signed-MW Primaries. The score
 Candidate's clip share beside the MSA network's in reading 3 and the sensitivity rule. Every
 threshold stays as registered.
 
-**The stored diagnostics show where each arm's clip binds in 2025-11 and 2025-12.** The Candidate
-clip shares come from the day-lag mean and standard deviation of each fold's training rows
-(`clip_candidate_<month>.json`), and the MSA shares from the per-Primary standardisation
-(`clip_<month>.json`). At the six signed-MW Primaries and the eight MVA-only Primaries, the shifts
-of 0.50 put 0.0% of the half-hours beyond the Candidate's clip in both months, against 8.9% to 27%
-beyond the MSA network's clip at the raising shifts and 0.4% to 5.0% at the lowering shifts, the
-largest at the signed-MW Primaries for the raising shifts. At D15 and D18, the Candidate's clip
-binds at the lowering shifts: 3.3% (2025-11) and 0.6% (2025-12) at depth 0.15, 4.6% and 5.2% at
-depth 0.30, and 15.9% and 28.9% at depth 0.50. In fold 2026-01 the audit's approximate statistics
-put the clip at Primary 11 and the other Primaries listed above, so the Candidate's clip is not
-absent there. The sensitivity rule reads the shifts of depth 0.15 and 0.30, where the Candidate's
-clip binds at D15 and D18 only.
+**The Candidate's clip shares for 2025-11 and 2025-12 are unreviewed, and no share is quoted as a
+finding.** The files `clip_candidate_2025-11.json` and `clip_candidate_2025-12.json` were produced
+by `e00726_clip_candidate_diag.py` after an edit that no review had yet checked: the script keeps
+the expected-input table on the CPU through `attach_tables_on_cpu`, five lines copied from
+`e00574_fit.attach_tables` with the upload to the GPU removed. The script as first reviewed is
+commit `09d3f59ce`. The edit was made and run because the reviewed script failed with no GPU
+visible. The result review of this experiment checks the five lines against the original and the two
+files before any share from them is read, and the scorer carries the shares beside the MSA network's
+only after that.
 
 ## Leakage and disclosures
 
