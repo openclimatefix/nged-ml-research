@@ -156,15 +156,17 @@ def take(*, array: np.ndarray, index: np.ndarray) -> np.ndarray:
 
 
 def visible_change(
-    *, injected: np.ndarray, clean: np.ndarray, onset_day: int, origin_day: int
+    *, injected: np.ndarray, clean: np.ndarray, onset_hh: int, origin_day: int
 ) -> float:
     """Return the mean injected change over the half-hours the origin can read since the onset.
 
-    The change is `injected - clean` over `[48 onset_day, newest visible]`, NaN where no finite
-    half-hour exists (experiment 715's `visible_change`).
+    The change is `injected - clean` over `[onset_hh, newest visible]`, NaN where no finite
+    half-hour exists. The window starts at the onset half-hour, as experiment 714's generator
+    places it, and not at midnight of the onset day: the half-hours before the onset carry no
+    change and would dilute the mean.
     """
     newest = newest_visible(origin_day=origin_day)
-    lo = onset_day * PER_DAY
+    lo = onset_hh
     if newest < lo:
         return float("nan")
     d = injected[lo : newest + 1] - clean[lo : newest + 1]
@@ -192,7 +194,7 @@ def rows_for_event(
         event_id: The event's identifier (month, pass, and row of the truth table).
         primary: The scored Primary's index.
         event: The event's row of the truth table: `truth` (`era` or `switch`), `kind` (the shape),
-            `mirror_state`, `onset_day`, `end_day`.
+            `mirror_state`, `onset_day`, `onset_hh`, `end_day`.
         injected: (G,) the Primary's injected power over capacity on the grid, NaN outside its stored
             window.
         clean: (G,) the Primary's unswitched power over capacity on the grid.
@@ -207,7 +209,9 @@ def rows_for_event(
     pieces = []
     for k in ORIGIN_DAYS:
         origin = onset + k
-        change = visible_change(injected=injected, clean=clean, onset_day=onset, origin_day=origin)
+        change = visible_change(
+            injected=injected, clean=clean, onset_hh=int(event["onset_hh"]), origin_day=origin
+        )
         newest = newest_visible(origin_day=origin)
         in_force = newest >= onset * PER_DAY and (end_day < 0 or newest < end_day * PER_DAY)
         for lead in LEAD_DAYS:

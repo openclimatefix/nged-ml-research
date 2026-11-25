@@ -150,6 +150,7 @@ def make_rows(*, truth: str, end_day: int) -> pl.DataFrame:
         "kind": "flat",
         "mirror_state": "none",
         "onset_day": 100,
+        "onset_hh": 100 * 48,
         "end_day": end_day,
     }
     return sc.rows_for_event(event_id="e0", primary=0, event=event, injected=injected, clean=clean)
@@ -166,6 +167,33 @@ def test_truth_oracle_scores_zero_and_follows_only_permanent_changes() -> None:
         assert reading.max_abs_score < 1e-12
         got = reading.follow_permanent if truth == "era" else reading.follow_temporary
         assert abs(got - expect) < 1e-9, (truth, got)
+
+
+def test_follow_share_divides_by_the_change_since_the_onset_half_hour() -> None:
+    """A mid-day onset gives a flat permanent change's oracle follow share of 1, not 1.06."""
+    clean = np.full(48 * 400, 0.5)
+    injected = clean.copy()
+    onset_hh = 100 * 48 + 25
+    injected[onset_hh:] += 0.2
+    event = {
+        "truth": "era", "kind": "flat", "mirror_state": "none", "onset_day": 100,
+        "onset_hh": onset_hh, "end_day": -1,
+    }  # fmt: skip
+    rows = sc.rows_for_event(event_id="m", primary=0, event=event, injected=injected, clean=clean)
+    reading = sc.read_oracle(
+        injected=sc.truth_oracle(rows=rows, world="injected"),
+        real=sc.truth_oracle(rows=rows, world="real"),
+    )
+    assert abs(reading.follow_permanent - 1.0) < 1e-9, reading.follow_permanent
+    old = [
+        sc.visible_change(injected=injected, clean=clean, onset_hh=100 * 48, origin_day=100 + k)
+        for k in sc.ORIGIN_DAYS
+    ]  # the old window, from midnight of the onset day
+    new = [
+        sc.visible_change(injected=injected, clean=clean, onset_hh=onset_hh, origin_day=100 + k)
+        for k in sc.ORIGIN_DAYS
+    ]
+    assert np.mean(np.array(new) / np.array(old)) > 1.03  # the midnight start dilutes by 3% or more
 
 
 def test_persistence_oracle_follows_a_move_in_force_and_scores_worse() -> None:
@@ -366,6 +394,7 @@ def test_rows_past_the_grid_end_are_nan_and_counted() -> None:
         "kind": "transfer",
         "mirror_state": "full",
         "onset_day": 100,
+        "onset_hh": 100 * 48,
         "end_day": 120,
     }
     rows = sc.rows_for_event(
@@ -386,6 +415,7 @@ def test_follow_share_ignores_nan_truth() -> None:
         "kind": "flat",
         "mirror_state": "none",
         "onset_day": 100,
+        "onset_hh": 100 * 48,
         "end_day": -1,
     }
     rows = sc.rows_for_event(event_id="y", primary=0, event=event, injected=injected, clean=clean)
