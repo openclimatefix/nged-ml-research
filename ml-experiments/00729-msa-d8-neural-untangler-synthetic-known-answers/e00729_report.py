@@ -27,12 +27,36 @@ def contrast_lines(*, contrasts: Mapping[str, Mapping[str, Mapping[str, float]]]
         "|---|---|---|---|---|---|---|---|",
     ]
     for name, readings in contrasts.items():
+        shown = f"{name} (report only)" if name in core.REPORT_ONLY_CONTRASTS else name
         for label, r in readings.items():
+            if r.get("void"):
+                lines.append(f"| {shown} | {label} | void | void | void | 0 | | |")
+                continue
             lines.append(
-                f"| {name} | {label} | {fmt(value=r['point'])} | {fmt(value=r['lower'])} | "
+                f"| {shown} | {label} | {fmt(value=r['point'])} | {fmt(value=r['lower'])} | "
                 f"{fmt(value=r['upper'])} | {int(r['n_rows'])} | {fmt(value=r['kish_blocks'], digits=1)} | "
                 f"{fmt(value=r['kish_segments'], digits=1)} |"
             )
+    return lines
+
+
+def ambiguity_lines(*, ambiguity: Mapping[str, Mapping]) -> list[str]:
+    """Return one table row per arm, group, and band of the ambiguity read-out (report only)."""
+    lines = [
+        "| System | Group | Band | Rows | Mean P(X<0) | Observed share | Reliability | Sharpness | Confident share |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for system, groups in ambiguity.items():
+        for group, bands in groups.items():
+            for band, m in bands.items():
+                if m["n"] == 0:
+                    lines.append(f"| {system} | {group} | {band} | 0 | | | | | |")
+                    continue
+                lines.append(
+                    f"| {system} | {group} | {band} | {int(m['n'])} | {fmt(value=m['mean_forecast'])} | "
+                    f"{fmt(value=m['frequency'])} | {fmt(value=m['reliability'], digits=4)} | "
+                    f"{fmt(value=m['sharpness'])} | {fmt(value=m['confident_share'])} |"
+                )
     return lines
 
 
@@ -80,9 +104,13 @@ def render_report(
     out.append(f"- BSP steps: {gate['bsp']}.")
     if timing is not None:
         out += ["", f"Timing gate: {timing}."]
-    out += ["", "## Contrasts (points of capacity; negative is a gain)", ""]
+    out += ["", "## Contrasts (points of capacity; negative is a gain; C13 is report only)", ""]
     out += contrast_lines(contrasts=verdict["contrasts"])
     out += ["", "## Scores", "", *score_lines(tables=tables["tables"])]
+    out += [
+        "", "## Ambiguity read-out (synthetic test rows; report only, no bar)", "",
+        *ambiguity_lines(ambiguity=tables.get("ambiguity", {})),
+    ]  # fmt: skip
     out += ["", "## Bars and harm checks", ""]
     out.append(f"- Sign calibration: {verdict['calibration']}")
     out.append(
@@ -132,8 +160,13 @@ def write_figures(
         ),
         "figure_5_contrasts.svg": figures.contrast_chart(
             readings={
-                n: (r["all"]["point"], r["all"]["lower"], r["all"]["upper"])
+                f"{n} (report only)" if n in core.REPORT_ONLY_CONTRASTS else n: (
+                    r["all"]["point"],
+                    r["all"]["lower"],
+                    r["all"]["upper"],
+                )
                 for n, r in verdict["contrasts"].items()
+                if not r["all"].get("void")
             },
             margin=verdict["margin"],
         ),

@@ -17,6 +17,7 @@ import e00729_core as core  # noqa: E402
 import e00729_data as data  # noqa: E402
 import e00729_leakage as leak  # noqa: E402
 import e00729_paths as paths  # noqa: E402
+import e00729_report as report  # noqa: E402
 import e00729_stages as stages  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
@@ -88,6 +89,13 @@ def test_the_stages_run_end_to_end_on_invented_arrays(monkeypatch, tmp_path) -> 
     assert summary["injected_share"]["test"] == pytest.approx(
         7 / 8
     )  # quota of 8 test draws: 1 without injection
+    assert summary["digests_unchanged"] is None  # no earlier summary to compare with
+    first_digests = dict(summary["digests"])
+    again = stages.stage_banks(ctx=ctx, train_seeds=core.ARCH_SEEDS, log=logs.append)
+    assert again["digests"] == first_digests
+    assert again["digests_unchanged"] is True
+    assert (tmp_path / "banks" / "summary_before.json").exists()
+    assert any("digests unchanged from the earlier summary: True" in line for line in logs)
     gate = stages.stage_gate(ctx=ctx, log=logs.append)
     assert "void" in gate["bsp"]
     assert gate["bsp"]["n_synthetic_stretches"] == gate["bsp"]["n_finite_fits"]
@@ -133,6 +141,40 @@ def test_the_stages_run_end_to_end_on_invented_arrays(monkeypatch, tmp_path) -> 
     assert any(p.name == "figure_6_windows.svg" for p in written)
     assert all(p.exists() for p in written)
 
+    # the report-only arm D-sign: a missing fit voids C13 and leaves the verdict untouched
+    verdict_row = record["row"]
+    tables = stages.read_json(path=tmp_path / "scores" / "tables.json")
+    text = report.render_report(
+        verdict=record,
+        tables=tables,
+        gate=stages.read_json(path=tmp_path / "scores" / "gate.json"),
+        timing=None,
+    )
+    assert "C13 (report only)" in text
+    assert "Ambiguity read-out" in text
+    assert "| Dsign | reading |" in text
+    for seed in core.ARCH_SEEDS:
+        (tmp_path / "fits" / f"Dsign_dae_s{seed}.json").rename(
+            tmp_path / "fits" / f"Dsign_dae_s{seed}.moved"
+        )
+    (tmp_path / "fits" / "Dsign_dae_s0.failed.json").write_text("{}")
+    assert "Dsign_dae_s0" not in stages.needed_job_names()
+    assert not stages.needed_fits_failed()
+    voided = stages.stage_score(ctx=ctx, n_resamples=40, log=logs.append)
+    assert voided["row"] == verdict_row
+    assert voided["contrasts"]["C13"]["all"]["void"] is True
+    assert "Dsign" not in stages.read_json(path=tmp_path / "scores" / "tables.json")["ambiguity"]
+    assert "| C13 (report only) | all | void |" in report.render_report(
+        verdict=voided,
+        tables=stages.read_json(path=tmp_path / "scores" / "tables.json"),
+        gate=stages.read_json(path=tmp_path / "scores" / "gate.json"),
+        timing=None,
+    )
+    for seed in core.ARCH_SEEDS:
+        (tmp_path / "fits" / f"Dsign_dae_s{seed}.moved").rename(
+            tmp_path / "fits" / f"Dsign_dae_s{seed}.json"
+        )
+    (tmp_path / "fits" / "Dsign_dae_s0.failed.json").unlink()
     # a failure record of a needed fit without a fit record reads row 2
     (tmp_path / "fits" / "A_dae_s0.json").rename(tmp_path / "fits" / "A_dae_s0.moved")
     (tmp_path / "fits" / "A_dae_s0.failed.json").write_text("{}")

@@ -176,3 +176,71 @@ def test_the_ambiguity_readout_reports_reliability_and_sharpness_per_band() -> N
     assert far["frequency"] == pytest.approx(0.5)
     assert out["truth_magnitude"]["QHAT_1_to_3"] == {"n": 0.0}
     assert amb["n"] + far["n"] == rows.n
+
+
+def test_the_wind_speed_follows_the_temperature_path_of_experiment_39s_frame(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    t0 = datetime(2022, 3, 1, tzinfo=UTC)
+    n_steps = 96
+    hourly = np.linspace(0.0, 47.0, 49) ** 1.3  # a curved series, so a shift of a half-hour shows
+    # the frame: one row per half-hour, labelled by its end, taking the hour stamped at (end + 29 min)
+    # truncated to the hour; the loader then places the rows by their start and interpolates
+    ends = [t0 + timedelta(minutes=30 * (p + 1)) for p in range(n_steps)]
+    hour_of_row = [int((e + timedelta(minutes=29) - t0).total_seconds() // 3600) for e in ends]
+    frame = pl.DataFrame(
+        {"time": ends, "temperature_2m": [float(hourly[h]) for h in hour_of_row]}
+    ).with_columns(start=pl.col("time") - pl.duration(minutes=30))
+    temperature = data.hourly_to_half_hour(
+        values=data._grid(frame=frame, t0=t0, n_steps=n_steps, column="temperature_2m")
+    )
+    stamps = [t0 + timedelta(minutes=30 * h) for h in range(n_steps + 1)]
+    features = pl.DataFrame(
+        {
+            "time_series_id": [core.D8_SERIES_ID] * len(stamps),
+            "valid_time": stamps,
+            "wind_speed_10m": [
+                float(hourly[h // 2]) if h % 2 == 0 else -1.0 for h in range(len(stamps))
+            ],
+            "precipitation": [0.0] * len(stamps),
+        }
+    )
+    path = tmp_path / "era5.parquet"
+    features.write_parquet(path)
+    monkeypatch.setattr(data, "ERA5_FEATURES", path)
+    wind, _ = data.era5_wind_and_precipitation(t0=t0, n_steps=n_steps)
+    assert np.allclose(wind, temperature)
+    # pin the alignment itself: the first half-hour of hour 10 leans on hour 9, the second on hour 11
+    assert wind[20] == pytest.approx(0.75 * hourly[10] + 0.25 * hourly[9])
+    assert wind[21] == pytest.approx(0.75 * hourly[10] + 0.25 * hourly[11])
+
+
+def test_the_precipitation_of_a_half_hour_is_the_accumulation_of_the_hour_that_contains_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    t0 = datetime(2022, 3, 1, tzinfo=UTC)
+    stamps = [t0 + timedelta(minutes=30 * h) for h in range(97)]
+    features = pl.DataFrame(
+        {
+            "time_series_id": [core.D8_SERIES_ID] * 97,
+            "valid_time": stamps,
+            "wind_speed_10m": [1.0] * 97,
+            "precipitation": [(h // 2) / 3600.0 if h % 2 == 0 else 9.0 for h in range(97)],
+        }
+    )
+    path = tmp_path / "era5.parquet"
+    features.write_parquet(path)
+    monkeypatch.setattr(data, "ERA5_FEATURES", path)
+    _, rain = data.era5_wind_and_precipitation(t0=t0, n_steps=96)
+    # the half-hours 00:00 and 00:30 of hour 5 lie in the hour that ends at 06:00
+    assert rain[10] == rain[11] == pytest.approx(6.0)
+    assert rain[0] == rain[1] == pytest.approx(1.0)
+
+
+def test_the_target_stack_holds_the_folded_reading_not_the_truth_magnitude() -> None:
+    s, _ = seg(world="both")
+    targets = arms.target_stack(seg=s)
+    assert np.array_equal(targets[4], np.nan_to_num(s.r.reshape(-1)).astype(np.float32))
+    on = np.isfinite(s.r.reshape(-1)) & (s.valid.reshape(-1))
+    assert not np.allclose(targets[4][on], np.abs(s.x.reshape(-1))[on], atol=1e-4)
+    assert (targets[4][on] >= np.abs(s.x.reshape(-1))[on] - 1e-4).all()

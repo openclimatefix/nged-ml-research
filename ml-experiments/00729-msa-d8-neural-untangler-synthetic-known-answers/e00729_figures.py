@@ -99,7 +99,9 @@ def dot_chart(
 def contrast_chart(
     *, readings: Mapping[str, tuple[float, float, float]], margin: float
 ) -> alt.Chart:
-    """Return the 12 contrasts as points with intervals, and the margin m as dashed rules.
+    """Return the 12 counted contrasts and the report-only C13 as points with intervals.
+
+    The margin m is drawn as dashed rules.
 
     Args:
         readings: For each contrast name, (point, lower, upper) in points of capacity.
@@ -136,7 +138,7 @@ def contrast_chart(
         width=WIDTH_PX,
         height=22 * len(names),
         title=alt.TitleParams(
-            "The 12 contrasts at the Bonferroni level; the orange lines mark zero and minus m",
+            "The 12 counted contrasts (and the report-only C13) at the Bonferroni level; the orange lines mark zero and minus m",
             anchor="start",
         ),
     )

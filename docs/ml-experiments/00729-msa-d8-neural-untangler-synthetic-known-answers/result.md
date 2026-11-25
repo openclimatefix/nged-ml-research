@@ -528,6 +528,13 @@ pinball loss, and the same reliability of P(X<0) as every other arm. The head le
 to the reading and learns only the sign, so the contrast C13 shows what learning the magnitude
 adds to learning the sign.
 
+**D-sign's P(X<0) is the mixture's mass below zero, so it sits near 0.5 where the reading is
+small.** The sigmoid of the logit is the weight P of the reverse-flow lobe, and the scored
+probability of reverse flow is the mass of the whole mixture below zero. Where the reading is under
+about 0.15 MVA, the two lobes lie within a few spreads of zero and overlap, so the mass below zero
+is pulled toward 0.5 whatever P is. That pull shapes the lowest reading bands of the ambiguity
+read-out and the reliability of P(X<0) that the write-up reports beside C13.
+
 **The quantile head outputs the 11 quantiles 0.05, 0.1, 0.2 to 0.9 in steps of 0.1, and 0.95**,
 sorted, and is trained by the pinball loss ([Koenker and Bassett
 (1978)](https://doi.org/10.2307/1913643)). Its CRPS is computed from the piecewise-linear
@@ -723,13 +730,19 @@ scores on reverse flow.
 |---|---|---|
 | 0 | The line stops before C1 is read: the manager halts it; the timing projection exceeds the budget and the manager declines; the realism gate fails after its one re-tune; the reachability counts are short; or a review gate has not passed when a fit would start | Stopped, no verdict (`inconclusive` in the front matter) |
 | 1 | A correctness check fails (the leakage checks below, the holdout guard, the private cut, or a known-answer unit test of the fold, the CRPS, or the bootstrap) | `invalid` |
-| 2 | A fit that a counted reading needs raised and was not rerun under the rerun rule | `failed` |
+| 2 | A fit that a counted reading needs raised and was not rerun under the rerun rule (arm D-sign is no such fit) | `failed` |
 | 3 | H1 or H2 fails | `not supported` |
 | 4 | C1 at or below −m with an upper end below zero, and the calibration and lobe bars pass | `supported` |
 | 5 | C1 as in row 4, and the calibration or lobe bar fails | `partly supported` |
 | 6 | C1's upper end below zero and its point above −m | `small gain` |
 | 7 | C1's interval includes zero and its half-width is at least m | `inconclusive` |
 | 8 | Every other case | `not supported` |
+
+**A failed or missing D-sign fit makes C13 `void` and leaves the verdict untouched.** Arm D-sign is
+report-only, so no counted reading needs its fit. When any seed of arm D-sign has no fit record,
+the scoring stage reports C13 as `void` (no point and no interval), leaves arm D-sign out of the
+tables and the ambiguity read-out, and reads the verdict rows from the other arms alone. A failed
+D-sign fit is therefore not row 2.
 
 **The harm checks compare arm D with P0f on import half-hours, because the lobe-width floor
 penalises every arm on every row.** A Gaussian lobe with a spread of 0.5 points scores a CRPS of
@@ -961,9 +974,10 @@ Real-day panels carry no calendar dates.
 - **The timing gate projects the 32 ladder fits at the slowest architecture's time per epoch,**
   because the chosen architecture is not known at that point.
 - **The ERA5 wind speed and precipitation are read from the stored hourly features of D8's grid
-  cell, the file that holds the temperature.** The wind speed is instantaneous, so both half-hours
-  of an hour share the whole hour's value and the same linear interpolation as the temperature
-  applies. The precipitation is an accumulation over the hour that ends at its stamp, so each
+  cell, the file that holds the temperature.** The wind speed is instantaneous, so it takes
+  the temperature's path exactly: the same placement of the hourly values on the half-hour grid as
+  experiment 39's frame uses, then the same linear interpolation, and a test pins the two to equal
+  values. The precipitation is an accumulation over the hour that ends at its stamp, so each
   half-hour takes the accumulation of the hour that contains it, in millimetres an hour (the file's
   kilograms per square metre per second times 3,600). A missing value would enter as zero without a
   mask, as the temperature does, and the stored record has none over the base years.
@@ -972,6 +986,10 @@ Real-day panels carry no calendar dates.
   cannot be loaded by the new code. The weather fields enter no random draw and no digest, so the
   rebuilt banks hold the same readings, truths, engines, and solar outputs, and every bank digest
   is unchanged. The realism gate reads only the readings, so the gate does not run again.
+- **The `banks` stage prints whether the digests are unchanged.** It copies the earlier
+  `banks/summary.json` to `banks/summary_before.json` before it builds, and logs "digests unchanged
+  from the earlier summary" with true, false, or none (no earlier summary), so a rebuild after a
+  change that should not touch a draw proves it.
 - **The sign head's reading row is a target row, never an input.** The target stack holds the
   folded reading as its fifth row so that the sign head's decoder can place its two lobes, and no
   input window reads that row.

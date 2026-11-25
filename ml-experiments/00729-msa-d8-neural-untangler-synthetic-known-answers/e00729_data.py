@@ -88,14 +88,46 @@ def hourly_to_half_hour(*, values: np.ndarray) -> np.ndarray:
     return np.stack([first, second], axis=1).reshape(-1)
 
 
+def frame_hour_grid(*, hourly: np.ndarray, n_steps: int) -> np.ndarray:
+    """Place an hourly series on the half-hour grid as experiment 39's frame places temperature.
+
+    The frame labels a half-hour by its end `T` and takes the hourly value stamped at `(T + 29
+    minutes)` truncated to the hour. A half-hour that starts at `p` half-hours after midnight ends
+    at `30 (p + 1)` minutes, so it takes the hour `(30 (p + 1) + 29) // 60`. `hourly_to_half_hour`
+    then reads every second position of this grid, which makes the temperature and the wind speed
+    the same function of the hourly series.
+
+    Args:
+        hourly: Hourly values from the grid's first instant, `(n_steps // 2 + 1,)`, with NaN
+            where missing.
+        n_steps: The number of half-hours of the grid (even).
+
+    Returns:
+        The values at the half-hour positions of the grid, `(n_steps,)`.
+    """
+    hour = (30 * (np.arange(n_steps) + 1) + 29) // 60
+    return hourly[hour]
+
+
+def hourly_on_grid(
+    *, valid_time: pl.Series, values: pl.Series, t0: datetime, n_steps: int
+) -> np.ndarray:
+    """Return an hourly series as an array indexed by whole hours from `t0` (NaN where missing)."""
+    out = np.full(n_steps // 2 + 1, np.nan)
+    hour = ((valid_time - t0).dt.total_seconds() // 3600).to_numpy().astype(np.int64)
+    ok = (hour >= 0) & (hour < len(out))
+    out[hour[ok]] = values.cast(pl.Float64).to_numpy()[ok]
+    return out
+
+
 def era5_wind_and_precipitation(*, t0: datetime, n_steps: int) -> tuple[np.ndarray, np.ndarray]:
     """Return ERA5 10 m wind speed and precipitation at D8's grid cell on the half-hour grid.
 
     The file holds the hourly ERA5 values at the whole hours and, between them, interpolated values
-    that are ignored here. Wind speed is an instantaneous value, so it is treated like the 2 m
-    temperature: the two half-hours of an hour share the whole hour's value, and
-    `hourly_to_half_hour` interpolates it. Precipitation is an accumulation over the hour that ends
-    at its stamp, so each half-hour takes the accumulation of the hour that contains it.
+    that are ignored here. The wind speed is an instantaneous value and takes exactly the path of
+    the 2 m temperature: `frame_hour_grid`, then `hourly_to_half_hour`. Precipitation is an
+    accumulation over the hour that ends at its stamp, so each half-hour takes the accumulation of
+    the hour that contains it, with no interpolation.
 
     Args:
         t0: The first instant of the grid (midnight UTC).
@@ -116,17 +148,14 @@ def era5_wind_and_precipitation(*, t0: datetime, n_steps: int) -> tuple[np.ndarr
         )
         .select("valid_time", "wind_speed_10m", "precipitation")
     )
-    n_hours = n_steps // 2
-    hour = ((frame["valid_time"] - t0).dt.total_seconds() // 3600).to_numpy().astype(np.int64)
-    ok = (hour >= 0) & (hour <= n_hours)
-    wind_h = np.full(n_hours + 1, np.nan)
-    rain_h = np.full(n_hours + 1, np.nan)
-    wind_h[hour[ok]] = frame["wind_speed_10m"].cast(pl.Float64).to_numpy()[ok]
-    rain_h[hour[ok]] = (
-        frame["precipitation"].cast(pl.Float64).to_numpy()[ok] * MM_PER_HOUR_PER_KG_M2_S
+    wind_h = hourly_on_grid(
+        valid_time=frame["valid_time"], values=frame["wind_speed_10m"], t0=t0, n_steps=n_steps
     )
-    wind = hourly_to_half_hour(values=np.repeat(wind_h[:n_hours], 2))
-    rain = np.repeat(rain_h[1 : n_hours + 1], 2)
+    rain_h = hourly_on_grid(
+        valid_time=frame["valid_time"], values=frame["precipitation"], t0=t0, n_steps=n_steps
+    )
+    wind = hourly_to_half_hour(values=frame_hour_grid(hourly=wind_h, n_steps=n_steps))
+    rain = np.repeat(rain_h[1 : n_steps // 2 + 1], 2) * MM_PER_HOUR_PER_KG_M2_S
     return wind, rain
 
 

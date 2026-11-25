@@ -264,3 +264,87 @@ def test_the_sign_arm_decodes_to_the_two_lobe_format_and_fits_on_cpu(monkeypatch
     assert (flat["mu_i"] >= 0).all()
     assert np.allclose(flat["mu_i"], -flat["mu_r"])
     assert ((flat["p"] > 0) & (flat["p"] < 1)).all()
+
+
+def sign_world() -> tuple[list[sim.Segment], list[arms.PreparedSegment], sim.Calendar]:
+    cal = make_calendar()
+    use = np.array([str(d)[:7] == "2022-03" for d in cal.dates])
+    segs = [
+        sim.simulate_segment(
+            cal=cal, month="2022-03", use=use, world=w, rng=np.random.default_rng(i)
+        )
+        for i, w in enumerate(["both", "engine", "solar"])
+    ]
+    prepared = arms.prepare_segments(
+        segments=segs, spec=arms.ARM_SPECS["Dsign"], holidays=cal.holidays,
+        stats=arms.InputStats(10.0, 3.0, 5.0, 2.0),
+    )  # fmt: skip
+    return segs, prepared, cal
+
+
+def expected_magnitudes(
+    *, segs: list[sim.Segment], prepared: list[arms.PreparedSegment]
+) -> np.ndarray:
+    """Return sqrt(max(r^2 - QHAT^2, 0)) of the valid half-hours, in the order of `Rows`."""
+    out = []
+    for pick_seg, day in arms.all_picks(prepared=prepared):
+        seg = segs[prepared[pick_seg].source_index]
+        keep = seg.valid[day] & np.isfinite(seg.x[day])
+        out.append(
+            np.sqrt(np.maximum(seg.r[day][keep].astype(np.float64) ** 2 - core.QHAT_POINTS**2, 0.0))
+        )
+    return np.concatenate(out)
+
+
+def test_the_stored_sign_lobes_sit_at_the_folded_reading_less_the_reactive_floor() -> None:
+    segs, prepared, _ = sign_world()
+    spec = arms.ARM_SPECS["Dsign"]
+    net = nets.build_net(arch="dae", c_in=arms.n_channels(spec=spec), steps=spec.steps, n_out=1)
+    flat = train.predictions(net=net, prepared=prepared, spec=spec, device="cpu")
+    want = expected_magnitudes(segs=segs, prepared=prepared)
+    assert np.allclose(flat["mu_i"], want, atol=1e-3)
+    assert np.allclose(flat["mu_r"], -want, atol=1e-3)
+    truth = np.concatenate([
+        s.x[d][s.valid[d] & np.isfinite(s.x[d])] for s, d in
+        ((segs[prepared[i].source_index], day) for i, day in arms.all_picks(prepared=prepared))
+    ])  # fmt: skip
+    assert not np.allclose(flat["mu_i"], np.abs(truth), atol=1e-2)
+
+
+def test_the_validation_score_places_the_sign_lobes_at_the_reading(monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(core, "EPOCH_WINDOWS", 32)
+    monkeypatch.setattr(core, "BATCH_SIZE", 16)
+    segs, prepared, _ = sign_world()
+    spec = arms.ARM_SPECS["Dsign"]
+    seen: list[np.ndarray] = []
+    original = train.decode
+
+    def spy(*, raw: np.ndarray, spec: arms.ArmSpec, reading: np.ndarray) -> dict[str, np.ndarray]:
+        seen.append(reading.copy())
+        return original(raw=raw, spec=spec, reading=reading)
+
+    monkeypatch.setattr(train, "decode", spy)
+    train.fit(
+        spec=spec, arch="dae", seed=0, train=prepared, val=prepared, device="cpu", max_epochs=1
+    )
+    picks = arms.all_picks(prepared=prepared)
+    expected = np.stack([
+        np.nan_to_num(segs[prepared[i].source_index].r[day]) for i, day in picks
+    ]).astype(np.float32)  # fmt: skip
+    assert len(seen) == 1
+    assert np.allclose(seen[0], expected)
+    assert not np.allclose(seen[0], np.abs(np.stack([
+        np.nan_to_num(segs[prepared[i].source_index].x[day]) for i, day in picks
+    ])), atol=1e-4)  # fmt: skip
+
+
+def test_the_training_batches_carry_the_reading_in_the_fifth_target_row() -> None:
+    segs, prepared, _ = sign_world()
+    spec = arms.ARM_SPECS["Dsign"]
+    picks = arms.all_picks(prepared=prepared)[:6]
+    _, t = arms.make_batch(
+        prepared=prepared, picks=picks, spec=spec, rng=np.random.default_rng(0), training=True
+    )
+    assert t.shape[1] == 5
+    for k, (i, day) in enumerate(picks):
+        assert np.allclose(t[k, 4], np.nan_to_num(segs[prepared[i].source_index].r[day]), atol=1e-5)

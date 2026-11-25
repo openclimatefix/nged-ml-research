@@ -317,6 +317,9 @@ CONTRASTS: Final = {
 """Each contrast as (arm minus arm); a negative difference is a gain."""
 REPORT_ONLY_CONTRASTS: Final = ("C13",)
 """Contrasts that enter no verdict row and are not among the `N_CONTRASTS` counted ones."""
+REPORT_ONLY_ARMS: Final = ("Dsign",)
+"""Arms that only a report-only contrast reads: a failed or missing fit voids the contrast and does
+not make verdict row 2."""
 BSP_CONTRASTS: Final = ("C4", "C12")
 PINBALL_CONTRASTS: Final = ("C6",)
 """Contrasts read on the 11-quantile pinball loss, not on signed CRPS."""

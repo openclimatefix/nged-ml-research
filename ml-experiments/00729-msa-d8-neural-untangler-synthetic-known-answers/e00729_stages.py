@@ -9,6 +9,7 @@ The stages that need torch import `e00729_train` inside the function.
 
 import json
 import re
+import shutil
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -152,6 +153,11 @@ def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
     Returns:
         The summary written to `banks/summary.json` (hashes, counts, reachability).
     """
+    summary_path = paths.data_root() / "banks" / "summary.json"
+    before_path = summary_path.with_name("summary_before.json")
+    earlier = read_json(path=summary_path)["digests"] if summary_path.exists() else None
+    if earlier is not None:
+        shutil.copy2(summary_path, before_path)
     built: dict[str, banks.Bank] = {}
     for kind, split in (("validation", "validation"), ("test", "test"), ("shifted", "test")):
         built[kind] = banks.build_bank(
@@ -185,8 +191,12 @@ def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
     )
     log(f"smallest engine unit after the size cap: {min_unit:.1f} points")
     rows = score.rows_from_segments(segments=built["test"].segments, holidays=ctx.cal.holidays)
+    digests = {k: b.digest for k, b in built.items()}
+    unchanged = None if earlier is None else all(earlier.get(k) == v for k, v in digests.items())
+    log(f"digests unchanged from the earlier summary: {unchanged}")
     summary = {
-        "digests": {k: b.digest for k, b in built.items()},
+        "digests": digests,
+        "digests_unchanged": unchanged,
         "reachability": score.reachability(rows=rows),
         "n_segments": {k: len(b.segments) for k, b in built.items()},
         "injected_share": {b.kind: banks.injected_share(bank=b) for b in evaluation},
@@ -200,7 +210,7 @@ def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
         "closure_day_on_base_day": ctx.closure_on_base,
         "leakage_pass": True,
     }
-    write_json(path=paths.data_root() / "banks" / "summary.json", payload=summary)
+    write_json(path=summary_path, payload=summary)
     return summary
 
 
@@ -651,17 +661,33 @@ def segment_p_any(*, segments: Sequence[sim.Segment]) -> np.ndarray:
 
 
 def needed_job_names() -> set[str]:
-    """Return the fits whose predictions a counted reading reads: every arm at seeds 0 to 2.
+    """Return the fits whose predictions a counted reading reads: every counted arm at seeds 0 to 2.
 
-    The margin also reads arm D at the other seeds. The architecture's choice has been made by then,
+    The report-only arm D-sign is left out, so its failure cannot make verdict row 2. The margin
+    also reads arm D at the other seeds. The architecture's choice has been made by then,
     so the architecture is read from `selection.json`; before it exists, no fit is needed.
     """
     path = paths.data_root() / "selection.json"
     if not path.exists():
         return set()
     arch = read_json(path=path)["chosen"]
-    names = {job_name(arm=a, arch=arch, seed=s) for a in core.ARMS for s in core.ARCH_SEEDS}
+    counted = [a for a in core.ARMS if a not in core.REPORT_ONLY_ARMS]
+    names = {job_name(arm=a, arch=arch, seed=s) for a in counted for s in core.ARCH_SEEDS}
     return names | {job_name(arm="D", arch=arch, seed=s) for s in core.MARGIN_SEEDS}
+
+
+def arm_fitted(*, arm: str, arch: str, seeds: Sequence[int]) -> bool:
+    """Return whether every seed of an arm has a fit record (and so stored predictions)."""
+    return all((fit_dir() / f"{job_name(arm=arm, arch=arch, seed=s)}.json").exists() for s in seeds)
+
+
+def void_reading() -> dict[str, float | bool]:
+    """Return the record of a contrast that could not be read: `void` is true and no number is set."""
+    nan = float("nan")
+    return {
+        "void": True, "point": nan, "lower": nan, "upper": nan, "kish_blocks": nan,
+        "kish_segments": nan, "widening": nan, "n_rows": 0,
+    }  # fmt: skip
 
 
 def needed_fits_failed() -> bool:
@@ -784,7 +810,7 @@ def fit_digests(*, arch: str, seeds: Sequence[int]) -> dict[str, dict[str, str]]
     return out
 
 
-def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:
+def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:  # noqa: PLR0915
     """Score every arm and baseline on the test, validation, and shifted banks and read the verdict.
 
     The margin file must exist before this stage reads any test contrast.
@@ -825,14 +851,22 @@ def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:
             p_any=segment_p_any(segments=test_bank.segments),
         )
         metrics["M2"] = score.lobe_metrics(lobes=m2, x=rows.x)
+    report_only_missing = {
+        a for a in core.REPORT_ONLY_ARMS if not arm_fitted(arm=a, arch=arch, seeds=seeds)
+    }
     for arm in core.ARMS:
-        metrics[arm] = arm_metrics(arm=arm, arch=arch, name="test", x=rows.x, seeds=seeds)
+        if arm not in report_only_missing:
+            metrics[arm] = arm_metrics(arm=arm, arch=arch, name="test", x=rows.x, seeds=seeds)
     masks = score.subset_masks(rows=rows)
     bsp = score.bsp_months(rows=rows)
     readings: dict[str, dict[str, dict]] = {}
     for cname, (a, b) in core.CONTRASTS.items():
         metric = "pinball" if cname in core.PINBALL_CONTRASTS else "crps"
         readings[cname] = {}
+        if a in report_only_missing or b in report_only_missing:
+            readings[cname] = {"all": void_reading()}
+            log(f"contrast {cname} is void: a report-only arm has no complete fit")
+            continue
         for label, subset, months in contrast_plan()[cname]:
             r = score.contrast(
                 rows=rows, a=getattr(metrics[a], metric), b=getattr(metrics[b], metric),
