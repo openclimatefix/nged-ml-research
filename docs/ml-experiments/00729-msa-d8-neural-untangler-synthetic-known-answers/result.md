@@ -652,9 +652,8 @@ arm D's excess over P0f measures only what the neural network adds on import hal
 placed on reverse flow, and a lobe centred away from P0's point.
 
 **The limit is half of the margin's floor, spread over the import share of the synthetic world.**
-The
-smallest gain that C1 counts as support is m, at least 0.25 points over all rows. Harm of h points
-on every import half-hour lowers the overall gain by h × (1 − s), where s is the share of
+The smallest gain that C1 counts as support is m, at least 0.25 points over all rows. Harm of h
+points on every import half-hour lowers the overall gain by h × (1 − s), where s is the share of
 reverse-flow half-hours. The limit lets the harm consume at most half of the smallest countable gain:
 h ≤ 0.125 / (1 − s). In the synthetic world's own mix (no injection 0.15, engine only 0.30, solar
 only 0.20, engine and solar 0.35), `e00729_plan_calcs.py` draws 3,000 segments from the parameter
@@ -663,14 +662,23 @@ solar-only worlds, 0.091 in engine-and-solar worlds). The limit is then 0.125 / 
 On the real held-out base days every half-hour is import, so s = 0 and the limit is 0.125 points.
 One limit serves both checks, rounded down to 0.12 points.
 
-**The limit is fixed before any fit and before any score, and it does not depend on the simulation.
-The figures in this derivation (s = 0.051, the limit of 0.132, and the rounded 0.12) are unreviewed
-until the Opus code review of the experiment's code passes (see "Reviews and pre-run gates").**
+**The code review re-derived s as 0.059, and the limit of 0.12 points stays.** The review ran the
+simulator's own engine on invented base demand and an independent clear-sky solar model, and found s
+= 0.059 overall (0.084 in engine-only worlds, 0.007 in solar-only worlds, 0.092 in engine-and-solar
+worlds), against the script's 0.051. The script's engine is simpler: runs start at UTC rather than
+local time, stop at midnight, use one output share for all units, and have no ramps or trips. The
+formula 0.125 / (1 − s) is at least 0.125 for any s at or above zero, so the registered 0.12 is
+stricter than the formula for every s: it is the formula's smallest value rounded down to two
+decimals, which keeps the check no looser than the formula even where s is larger than the script
+found. The same review found 5.5% of half-hours as reverse flow outside the dead band, against the
+script's 4.7%, so the reachability counts below have more margin than the plan states.
+
+**The limit is fixed before any fit and before any score, and it does not depend on the simulation.**
 The training mix is randomised, and the limit is derived on the fixed test mix, which scores the
 harm checks. The one data input is D8's base readings, which the calculation script read to estimate
 s, and no score exists. The simulation is approximate: solar output is a clear-sky shape times a
 random cloud factor, and engine runs follow the parameter table without trips or ramps. A share s
-between 0.03 and 0.08 would move the limit only between 0.129 and 0.136 points, so the rounded 0.12
+between 0.03 and 0.10 would move the formula only between 0.129 and 0.139 points, so the rounded 0.12
 holds across that range. The same simulation gives 4.7% of half-hours as reverse flow outside the
 dead band of 2 points, which is about 4,400 of the 92,000 half-hours of the test banks (8 months ×
 30 days × 8 draws × 48 half-hours) and about 1,100 of the 23,000 in the two BSP test months.
@@ -755,7 +763,10 @@ seed floor, the GPU projection, and the harm limit. It reads the private engine-
 apply the cut but prints no engine size, date, series identifier, or per-day real value, and it
 prints split counts and shares only. The harm limit of 0.12 points, the simulated import share, the
 cell-gap range of 4.5% to 11%, and every other number it produced stay unreviewed until the Opus
-code review of the experiment's code passes. No further script runs before its review.
+code review of the experiment's code passes. The first Opus code review has since re-derived the
+import share and the sunshine-cell gap method (see "The limit is half of the margin's floor"); the
+fixes it asked for are in the code, and a re-review of the fixes is still open. No further script
+runs before that re-review.
 
 ## Standing practices and earlier advice
 
@@ -857,6 +868,40 @@ Real-day panels carry no calendar dates.
 - **The margin file refuses to be overwritten,** so that m is fixed once, before any test score.
 - **M2 runs on a continuous series of folded readings, with the causal spread,** and its running
   probability is multiplied by the climatology's sign probability.
+- **Every evaluation bank has its own seed space, and its worlds are assigned by quota.** The
+  validation bank takes root 729,250, the test bank 729,000, and the shifted bank 729,500, so no two
+  banks share a draw. Each bank's world types are assigned by quota across the whole bank, so the
+  realised mix is the planned mix up to rounding (10, 19, 13, and 22 segments of 64 for the test
+  bank). B1, B2, and M2 take the bank's realised share of injected segments as the prior pi.
+- **The BSP half of the realism gate uses stretches of one month, not the record's length.** The
+  record spans more days than one synthetic segment, which is one month. The code cuts the real
+  record and every engine-only synthetic segment into stretches of the longest length that a
+  segment can hold; the real standard error and residual standard deviation are the medians over the
+  real stretches, and the real slope's interval comes from the whole record. No registered bar
+  changes. The zero steps of the record form their own size bin, and the five quintile bins are
+  taken over its non-zero steps, because most steps are zero. A gate with no usable synthetic
+  stretch is recorded as `void` and does not pass.
+- **K1's running label is the record's own `units >= 1`.** Half-hours without a record row are left
+  out of K1, and the result holds the error ratio and the F1 scores only, never the raw mean of the
+  record or a count of running half-hours.
+- **The switching logs are read with the column heuristic of experiment 722.** A closure runs from
+  its start to its end, and the days within 24 hours of either are dropped from the base. The summary
+  records whether the workbook loaded.
+- **The code computes B1's climatology directly.** The sign prior needs the empirical distribution of
+  base demand in each (month, half-hour, weekend) cell, so the code builds it from the training days
+  without smoothing over neighbouring cells, and does not call `ClimatologyForecaster`.
+- **M2 reads each segment as one continuous series.** A missing half-hour is filled by linear
+  interpolation before the tracker runs, and M2 is scored on every test segment, with the engine-only
+  segments as the listed benchmark.
+- **A steps series is NaN across a gap of days.** The first half-hour of a day whose previous day is
+  not in the record has no step.
+- **The engine size cap can push a unit below the 10-point draw range.** The code records each
+  segment's smallest unit and the banks stage logs the smallest value over all segments.
+- **A fit that raises is recorded and not retried.** It writes `fits/<name>.failed.json`, and the
+  scoring stage then reads verdict row 2. A correctness error inside the scoring stage reads row 1.
+- **The bank-level leakage checks run on every segment of every evaluation bank,** and the CAMS check
+  compares D8's half-hourly series with each farm's on the same interpolation, failing when more
+  than half of the daytime half-hours are identical.
 - **Printed output holds counts, shares, and flags only,** never a month, a date, an engine size, a
   series identifier, or a register value, and the months come from the rule applied to the private
   base calendar when a stage runs.
@@ -925,10 +970,14 @@ edited.
 - `e00729_real.py`: R1, K1, K2, R2, and R3.
 - `e00729_leakage.py`: the leakage assertions of verdict row 1.
 - `e00729_stages.py`, `e00729_cli.py`, `e00729_report.py`, `e00729_figures.py`, and `run.sh`: the
-  stage orchestration, the command line, the printed report, the figures, and the launch wrapper.
+  stage orchestration (including the `figures` stage, which writes figures 1, 2, and 6), the command
+  line, the printed report (which writes the other figures, among them figure 8), the figure code,
+  and the launch wrapper.
 - `ml-experiments/00729-msa-d8-neural-untangler-synthetic-known-answers/tests/`: tests on synthetic
-  arrays only; the tests that need `torch` skip in CI. `smoke_real_files.py` opens each real file
-  once and prints flags only; it is run by hand once, after the code review.
+  arrays only; the tests that need `torch` skip in CI. `test_e00729_stages_end_to_end.py` runs the
+  stages (banks, gate, tiny CPU fits, margin, scoring, verdict, figures) on invented arrays, with
+  the day table, the metered record, and the private cut replaced. `smoke_real_files.py` opens each
+  real file once and prints flags only; it is run by hand once, after the code review.
 - `data/ml-experiments/00729-msa-d8-neural-untangler-synthetic-known-answers/`: written. It will
   hold `banks/`, `networks/`, `predictions/`, `scores/`, `margin.json`, `verdict.json`, the run
   logs, and a `PRIVATE/` folder for anything dated, which already holds `splits.md` (the month
