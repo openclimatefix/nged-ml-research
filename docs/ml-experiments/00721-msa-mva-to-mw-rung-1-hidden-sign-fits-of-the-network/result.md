@@ -37,8 +37,8 @@ prediction: >-
   open) is the second likeliest, because three earlier fits invented reverse flow at D5. `SG-A`
   passes the synthetic world on sign accuracy and on the false-call rate, and its area under the
   curve is higher under the real sky than under the shifted sky. The probability that `SG-A` fails
-  one of the synthetic world's bars is near one in three. The predicted verdict is `not supported` or
-  `inconclusive`. The prediction fails if `SG-A` passes G1, G2, and G3, or if either of the two
+  one of the synthetic world's bars is near one in three. The predicted verdict is `not supported`
+  or `inconclusive`. The prediction fails if `SG-A` passes G1, G2, and G3, or if either of the two
   ranges above misses.
 decision_rule: >-
   Counted readings G1, G2, and G3. Each is read at 98.33% (1 - 0.05 / 3) from a two-stage block
@@ -840,17 +840,17 @@ the maintainer confirms it.
   found the quoted words only inside plan reviews 2 and 3, so this page is its only record until the
   manager saves it with its time. The manager has asked the maintainer to confirm the relayed
   ruling, and on 2026-11-24 the maintainer approved rung 1 at about 14 GPU-process-hours in the
-  manager's chat. The confirmation of the queue reorder is still pending. On the sign-experiment
-  count the manager ruled "count it as the 22nd, count honestly", and the section "The count of sign
-  experiments" states the range.
-- **2. The real-fold budget [Decided by the manager; reserved for the maintainer, so Gate 3 stays
-  closed until the maintainer confirms].** Experiment 713's recipe (patience 8) scores the
-  checkpoint, and a measurement of the learning that the budget cut off guards G1 (the training
-  budget section). G1 is read under a budget known to under-train the history path.
-- **3. The borrowed bars [Decided by the manager; reserved for the maintainer, so Gate 3 stays
-  closed until the maintainer confirms].** The harm stop of 0.20 (read on import rows) and the
-  level of 98.33% are accepted, because each is pre-registered on this page and covered by the Opus
-  plan reviews. The third borrowed bar, the area margin of the synthetic world, is decision 7.
+  manager's chat. On 2026-11-24 the maintainer approved the queue reorder (F4, F7, rung 1, F9) in
+  the manager's chat. On the sign-experiment count the manager ruled "count it as the 22nd, count
+  honestly", and the section "The count of sign experiments" states the range.
+- **2. The real-fold budget [Decided by the manager; confirmed by the maintainer on 2026-11-24].**
+  Experiment 713's recipe (patience 8) scores the checkpoint, and a measurement of the learning that
+  the budget cut off guards G1 (the training budget section). G1 is read under a budget known to
+  under-train the history path.
+- **3. The borrowed bars [Decided by the manager; confirmed by the maintainer on 2026-11-24].** The
+  harm stop of 0.20 (read on import rows) and the level of 98.33% are accepted, because each is
+  pre-registered on this page and covered by the Opus plan reviews. The third borrowed bar, the area
+  margin of the synthetic world, is decision 7.
 
 | No. | Open decision | Recommendation |
 |---|---|---|
@@ -957,8 +957,8 @@ null readings under Option A at two pooled limits, with +0.20 at each Primary.
 
 The power check of Stage 0 restates the 0.80 target of experiment 420's recipe as the joint
 probability over all six limit checks, computed from the seed-pair null under the option the
-maintainer picks. The first wave waits for the ruling (Gate 3), so no fit runs and no verdict row
-binds on G3 until the maintainer rules.
+maintainer picks. The maintainer ruled for Option A on 2026-11-24, so the verdict rows read G3
+under that reading.
 
 **The contract decisions stay with a human in the production repository.** They are the unit label
 of a signed forecast at an MVA series, the sign convention, the clamp at zero for the eight, the
@@ -981,10 +981,11 @@ This experiment changes no contract and makes no request to NGED.
 - **Gate 3:** the maintainer has confirmed decisions 1, 2, 3, 7, and 8, which are the relayed
   approval and the queue reorder, a training budget, bars, a margin, and the reading of G3 that
   verdict rows read. On 2026-11-24 the maintainer confirmed the approval (decision 1), the margin
-  (decision 7), and Option A for G3 (decision 8). The queue reorder (decision 1) and decisions 2 and
-  3 are not recorded as confirmed. The first wave may run only after that confirmation and after
-  both Opus code reviews. Decisions 4 to 6 are ruled, or the manager rules that their defaults
-  stand.
+  (decision 7), and Option A for G3 (decision 8). On 2026-11-24 the maintainer also confirmed the
+  queue reorder (decision 1), the real-fold budget with patience 8 (decision 2), and the borrowed
+  bars (decision 3). Gate 3 is therefore open from the quota reset on 2026-11-25. The first wave may
+  run only after both Opus code reviews. Decisions 4 to 6 are ruled, or the manager rules that their
+  defaults stand.
 - **Gate 4:** the code-works check and the first synthetic fit have measured their time per pass
   and their memory, and the memory cap is reset from the measured peak before the second fit.
 
