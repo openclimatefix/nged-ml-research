@@ -10,6 +10,7 @@ for folder in (HERE, HERE.parent / "00581-robust-multiweek-lag-encoder-x3"):
 
 import e00581_bank as bank  # ty: ignore[unresolved-import]
 import e00726_checks as chk
+import e00726_clip_candidate_diag as diag
 import e00726_common as com
 import e00726_score as sc
 import numpy as np
@@ -400,6 +401,19 @@ def candidate_clip(*, stats: tuple[float, float] | None) -> list[dict]:
         passes=[0],
         candidate_stats=stats,
     )
+
+
+def test_clip_candidate_script_skips_a_month_with_a_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(com, "data_root", lambda: tmp_path)
+    (tmp_path / "diagnostics").mkdir()
+    (tmp_path / "diagnostics" / "clip_candidate_2025-11.json").write_text("[]")
+    assert diag.main(argv=["--month", "2025-11"]) == "skipped"
+    assert (tmp_path / "diagnostics" / "clip_candidate_2025-11.json").read_text() == "[]"
+    assert not (tmp_path / "diagnostics" / "clip_candidate_2025-12.json").exists()
+    with pytest.raises(SystemExit):
+        diag.main(argv=["--month", "2026-01"])
 
 
 def test_clip_diagnostic_counts_the_candidates_clip() -> None:

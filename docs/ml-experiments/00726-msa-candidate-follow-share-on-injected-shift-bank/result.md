@@ -684,6 +684,10 @@ audit if a trigger fires, a numbers review, and a prose review.
   709](../00709-era-signal-in-the-candidate-part-1/result.md): the bank and its stored forecasts. Read
   from [experiment 714](../00714-msa-era-identifiability-audit-and-frozen-probe/result.md): the second
   event generator.
+- `e00726_clip_candidate_diag.py` writes the Candidate's clip share (`clip_candidate_<month>.json`)
+  for fold months 2025-11 and 2025-12, whose all-shifted Candidate jobs finished before
+  `write_clip_diagnostic` existed. It builds the month as `run_jobs` does, forecasts nothing, uses
+  the CPU only, and skips a month whose file exists.
 - Read from experiment 715 (F4) at commit `ac3e768e4`: `e00715_era.py` for `event_crps`,
   `pass_bootstrap_ci`, and `g2_panel`, and its stored second-generator MSA forecasts.
 - To be written by this experiment: the scripts named above under
