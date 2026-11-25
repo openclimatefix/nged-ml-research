@@ -17,10 +17,12 @@ the 12 GB default of `run.sh` is ample.
 
 import argparse
 import sys
+from datetime import UTC, datetime
 
 import e00716_arms as arms  # ty: ignore[unresolved-import]
 import e00716_score as score  # ty: ignore[unresolved-import]
 import e00717_guard as guard
+import polars as pl
 from e00713_arms import m_star  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -74,11 +76,41 @@ def smoke(*, fold: str) -> int:
     return 0
 
 
+def check_holds_rule() -> None:
+    """Call the reviewed `secondary_s1_s2` on tiny synthetic frames with a stubbed `contrast`, so a reversed "holds" rule fails here."""
+    stamp = datetime(2026, 5, 3, 9, 0, tzinfo=UTC)
+    frame = pl.DataFrame({"power_fcst_init_time": [stamp], "valid_time": [stamp]})
+    frames = {"H": frame, "M*": frame}
+    cases = [  # (point, upper, must hold)
+        (-0.06, -0.01, True),
+        (-0.05, -0.001, True),
+        (-0.04, -0.01, False),
+        (-0.06, 0.01, False),
+        (0.06, 0.08, False),
+    ]
+    real = score.contrast
+    try:
+        for point, upper, expected in cases:
+            score.contrast = lambda *, p=point, u=upper, **_kw: {
+                "point": p,
+                "lower": p - 0.1,
+                "upper": u,
+            }  # ty: ignore[invalid-assignment]
+            out = score.secondary_s1_s2(
+                per_seed=frames, averaged=frames, groups={}, pairs={"A1": ("H", "M*")}, n_seeds=2
+            )
+            for group in score.GROUPS_COUNTED:
+                assert out[f"A1:{group}"]["holds"] is expected, (point, upper, expected)
+    finally:
+        score.contrast = real
+
+
 def selftest() -> int:
     """Check the constants S1 reads, with no data."""
     assert set(score.SUNNY_FOLDS) == {"2026-04", "2026-05", "2026-06"}
     assert tuple(score.SOLAR_BLOCK_MINUTES) == (360, 870), score.SOLAR_BLOCK_MINUTES
     assert score.LEVEL_SECONDARY == 95.0
+    check_holds_rule()
     print("selftest passed")
     return 0
 
