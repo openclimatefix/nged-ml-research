@@ -21,6 +21,9 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+import e00721_paths  # noqa: F401
+
+# isort: split
 import e00721_core as core
 import numpy as np
 import polars as pl
@@ -104,6 +107,33 @@ def check_capacity_probe_files() -> str:
     return f"662 data folder present: {folder is not None}, holds files: {folder is not None and any(folder.rglob('*'))}"
 
 
+def check_as_of_capacity_tables() -> str:
+    """Return whether experiment 716's as-of capacity function reads its stored tables for the 16 Primaries.
+
+    The check prints booleans and a count, never a capacity.
+    """
+    import e00716_pv as pv  # ty: ignore[unresolved-import]
+    import e00720_real as real  # ty: ignore[unresolved-import]
+
+    caps = pv.capacity_table(fold="2026-05", sites=[*real.SIGNED_SIX, *real.MVA_ONLY])
+    return f"capacities read: {len(caps)}, all finite: {all(c.mw >= 0.0 for c in caps)}"
+
+
+def check_real_modules_import() -> str:
+    """Return whether the real loader and the driver import, and the probe provider names a missing file."""
+    import e00721_driver  # noqa: F401
+    import e00721_real as real
+
+    provider = real.ProbeProvider(
+        root=Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments" / "nonexistent-721"
+    )
+    try:
+        provider.capacity_mw(world="W2", fold="2026-05")
+    except real.ProbeFileMissingError as exc:
+        return f"modules import: True, a missing probe file raises with its name: {'W2_2026-05.json' in str(exc)}"
+    return "modules import: True, a missing probe file raises: False"
+
+
 CHECKS: tuple[tuple[str, Callable[[], str]], ...] = (
     ("dense raw array", check_dense_raw),
     ("grid and sites", check_grid_and_sites),
@@ -112,6 +142,8 @@ CHECKS: tuple[tuple[str, Callable[[], str]], ...] = (
     ("stored 713 forecasts", check_stored_713_forecasts),
     ("stage 0 curves", check_stage0_curves),
     ("capacity probe folder", check_capacity_probe_files),
+    ("as-of capacity tables", check_as_of_capacity_tables),
+    ("real modules", check_real_modules_import),
 )
 
 
