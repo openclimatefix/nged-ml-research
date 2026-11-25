@@ -99,7 +99,8 @@ D15, and 0.14% and 0.06% at D18.
   reverse flow.** A detector validated on D15 or D10 says little about a Primary with both patterns.
 - **Real examples are too few to score a detector, so evidence must come from synthetic reverse flow
   or from other sources.** [Experiment
-  79](../00079-pvdis-7-mw-at-mva-only-primaries/result.md) found no reverse flow at 7 of the 8 MVA-only Primaries, and [experiment
+  79](../00079-pvdis-7-mw-at-mva-only-primaries/result.md) found no
+  reverse flow at 7 of the 8 MVA-only Primaries, and [experiment
   110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md) fitted a power
   factor only where reverse flow reached at least 0.5% of training rows. The signed-MW Primaries add
   D15 and, weakly, D10 to the Primaries with usable reverse flow.
