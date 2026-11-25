@@ -49,7 +49,10 @@ def paired_bar(*, lower: float, point: float, min_point: float) -> dict[str, Any
 def v2_bar(
     *, lower: float, point: float, flagged_share: float, active_days_per_month: float
 ) -> dict[str, Any]:
-    """V2: paired F1 gain over experiment 694's M2 with lower bound above 0 and a gain of 0.05, plus the false-alarm bars."""
+    """V2: paired F1 gain over experiment 694's M2, plus the false-alarm bars.
+
+    The gain passes when its lower bound is above 0 and the gain is at least 0.05.
+    """
     gain = paired_bar(lower=lower, point=point, min_point=V2_MIN_GAIN_F1)
     fa = (
         flagged_share <= V3_MAX_FLAGGED_SHARE
@@ -87,10 +90,13 @@ def v3_bar(
 
 
 def v3_all_periods(*, periods: dict[str, dict[str, float]]) -> dict[str, Any]:
-    """V3 per period: every control period passes `v3_bar` with its own shares, for the selected `K` and the forced `K = 3`.
+    """V3 per period: every control period passes `v3_bar` with its own shares.
+
+    The bar holds for the selected `K` and for the forced `K = 3`.
 
     Args:
-        periods: Period label to `flagged_share`, `active_days_per_month`, and `forced_k3_flagged_share`.
+        periods: Period label to `flagged_share`, `active_days_per_month`, and
+            `forced_k3_flagged_share`.
 
     Returns:
         A dictionary with `periods` (each period's `v3_bar` result) and `passed` (true when there is
@@ -101,7 +107,11 @@ def v3_all_periods(*, periods: dict[str, dict[str, float]]) -> dict[str, Any]:
 
 
 def sign_probability_bar(*, prob: np.ndarray, outcome: np.ndarray) -> dict[str, Any]:
-    """Reliability term of the Brier score at most 0.01, and no bin of at least 200 rows off the diagonal by over 0.1."""
+    """Reliability term of the Brier score and bin gaps of the sign probability.
+
+    The reliability term must be at most 0.01, and no bin of at least 200 rows may be off the
+    diagonal by over 0.1.
+    """
     r = hmm.brier_reliability(prob=prob, outcome=outcome)
     return {
         **r,
@@ -120,13 +130,17 @@ def signed_crps_bar(
     rng: np.random.Generator | None = None,
     n_boot: int = 2000,
 ) -> dict[str, Any]:
-    """Signed CRPS below the hard-sign version's with a paired interval above zero, and no worse than the anchored read-out by more than `seed_noise`.
+    """Signed CRPS below the hard-sign version's, with a paired interval above zero.
+
+    Where an anchored read-out is given, the signed CRPS must also be no worse than the anchored
+    read-out's by more than `seed_noise`.
 
     Args:
         soft: Per-row CRPS of the two-lobe distribution.
         hard: Per-row absolute error of the hard-sign version (the same rows).
         anchored: Per-row CRPS of the anchored read-out in two-lobe form, same rows, or `None`.
-        seed_noise: The difference a second seed of the treatment moves the score (a measured number).
+        seed_noise: The difference a second seed of the treatment moves the score (a measured
+            number).
         rng: Random generator for the bootstrap over rows.
         n_boot: Number of resamples.
 
@@ -159,9 +173,9 @@ def anchored_two_lobe_crps(
 ) -> np.ndarray:
     """Return the per-row signed CRPS of the anchored read-out converted to the two-lobe form.
 
-    The lobes sit at minus and plus the observed magnitude, with weights `rho` and `1 - rho` and a common
-    standard deviation `width` (the hindsight model's own kernel width), so the two read-outs differ only in
-    how they produce the sign probability.
+    The lobes sit at minus and plus the observed magnitude, with weights `rho` and `1 - rho` and a
+    common standard deviation `width` (the hindsight model's own kernel width), so the two read-outs
+    differ only in how they produce the sign probability.
     """
     rho = np.clip(np.nan_to_num(rho, nan=0.5), 1e-9, 1.0 - 1e-9)
     pi = np.stack([rho, 1.0 - rho], axis=1)
@@ -181,22 +195,28 @@ def both_versions(
     seed_noise: float | None = None,
     dead_band: float = 2.0,
 ) -> dict[str, dict[str, Any]]:
-    """Return the sign-probability and signed-CRPS bars for the smoothed and the filtered posterior, and their gap.
+    """Return the sign-probability and signed-CRPS bars for the smoothed and the filtered posterior.
+
+    The result also holds the gap between the two posteriors.
 
     Args:
         post: The hindsight model's posterior over the rows.
         spec: Its spec.
         x_true: The signed truth (NaN where not scored).
-        magnitude: The observed magnitude `sqrt(m² - Q²)` of each row. The hard-sign reference uses it, so
-            the soft distribution is not asked to beat a reference that knows the true magnitude.
-        anchored_rho: The anchored read-out's `P(X < 0)` on the same rows, for the second half of the CRPS bar.
-        seed_noise: The measured noise of a second seed. While it is `None` the second half is pending, the
-            bar's `passed` reads the first half alone, and `second_half_pending` is true.
+        magnitude: The observed magnitude `sqrt(m² - Q²)` of each row. The hard-sign reference uses
+            it, so the soft distribution is not asked to beat a reference that knows the true
+            magnitude.
+        anchored_rho: The anchored read-out's `P(X < 0)` on the same rows, for the second half of
+            the CRPS bar.
+        seed_noise: The measured noise of a second seed. While it is `None` the second half is
+            pending, the bar's `passed` reads the first half alone, and `second_half_pending` is
+            true.
         dead_band: Rows with `|x_true|` under this are not scored.
 
     Returns:
-        For each version, the sign bar (on the posterior's `P(X < 0)`) and the CRPS bar, plus the sign bar
-        computed on the mixture's own `P(X < 0)` (`sign_mixture`), and the filtered-minus-smoothed gap.
+        For each version, the sign bar (on the posterior's `P(X < 0)`) and the CRPS bar, plus the
+        sign bar computed on the mixture's own `P(X < 0)` (`sign_mixture`), and the
+        filtered-minus-smoothed gap.
     """
     ok = np.isfinite(x_true) & (np.abs(x_true) >= dead_band)
     out: dict[str, dict[str, Any]] = {}

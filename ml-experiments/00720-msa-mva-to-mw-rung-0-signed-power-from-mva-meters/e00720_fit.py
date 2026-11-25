@@ -68,7 +68,10 @@ def fit_demand_mean(
 
 
 def fit_residual(*, g: np.ndarray, f: np.ndarray, rows: np.ndarray) -> tuple[float, float]:
-    """Return `(phi, sigma_r)` from anchor residuals at consecutive half-hours of one day; `phi` is not capped (up to 0.999)."""
+    """Return `(phi, sigma_r)` from anchor residuals at consecutive half-hours of one day.
+
+    `phi` is not capped (up to 0.999).
+    """
     res = np.where(rows & np.isfinite(g), g - f, np.nan)
     a, b = res[:, :-1].reshape(-1), res[:, 1:].reshape(-1)
     ok = np.isfinite(a) & np.isfinite(b)

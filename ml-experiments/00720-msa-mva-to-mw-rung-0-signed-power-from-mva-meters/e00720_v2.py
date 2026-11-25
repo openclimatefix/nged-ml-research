@@ -107,7 +107,11 @@ def slow_trend(*, ymat: np.ndarray, f_mat: np.ndarray, calib_rows: np.ndarray) -
 
 
 def rate_limited(*, a: np.ndarray, max_step: float) -> np.ndarray:
-    """Return `a` followed by a path that moves at most `max_step` per step, the mean of a forward and a backward pass."""
+    """Return a rate-limited version of `a`.
+
+    The path moves at most `max_step` per step, and the result is the mean of a forward and a
+    backward pass.
+    """
 
     def one(x: np.ndarray) -> np.ndarray:
         out = np.empty_like(x)
@@ -351,11 +355,13 @@ def build_tensor(
 def cluster_bootstrap_paired(
     *, x_a: np.ndarray, x_b: np.ndarray, n_boot: int = N_BOOT, seed: int = 720
 ) -> dict[str, float]:
-    """Return the pooled F1 of `x_a` minus that of `x_b`, with a 95% interval from experiment 694's two-stage bootstrap.
+    """Return the pooled F1 of `x_a` minus that of `x_b`.
+
+    The result carries a 95% interval from experiment 694's two-stage bootstrap.
 
     Each resample draws schedule-weeks (clusters) with replacement and, inside every drawn cluster,
-    segments with replacement (`e00694_report.cluster_bootstrap`), and the same draw is applied to both
-    arms, so the contrast is paired.
+    segments with replacement (`e00694_report.cluster_bootstrap`), and the same draw is applied to
+    both arms, so the contrast is paired.
 
     Args:
         x_a: `(clusters, segments, 3)` counts of the first method (the hindsight model).
@@ -408,7 +414,10 @@ def false_alarm(*, flag: np.ndarray) -> dict[str, float]:
 
 
 def per_host_false_alarm(*, runs: list[tuple[str, np.ndarray]]) -> dict[str, dict[str, float]]:
-    """Pool un-injected flags per host, as experiment 694's P3 does, and return each host's share and active days a month."""
+    """Pool un-injected flags per host, as experiment 694's P3 does.
+
+    The result holds each host's share and active days a month.
+    """
     out: dict[str, dict[str, float]] = {}
     for host in sorted({h for h, _ in runs}):
         flags = [f for h, f in runs if h == host]
@@ -425,7 +434,10 @@ def per_host_false_alarm(*, runs: list[tuple[str, np.ndarray]]) -> dict[str, dic
 
 
 def worst_host(*, fa: dict[str, dict[str, float]]) -> dict[str, float]:
-    """Return the largest flagged share and the largest active days a month over the hosts (the bar must hold at every host)."""
+    """Return the largest flagged share and the largest active days a month over the hosts.
+
+    The bar must hold at every host.
+    """
     return {
         "flagged_share": max(v["flagged_share"] for v in fa.values()),
         "active_days_per_month": max(v["active_days_per_month"] for v in fa.values()),
@@ -435,7 +447,10 @@ def worst_host(*, fa: dict[str, dict[str, float]]) -> dict[str, float]:
 def v2_verdict(
     *, x_hind: np.ndarray, x_m2: np.ndarray, fa_hindsight: dict[str, dict[str, float]]
 ) -> dict[str, Any]:
-    """Return the V2 bar from the schedule-week tensors and the per-host un-injected false alarms of the hindsight model."""
+    """Return the V2 bar from the schedule-week tensors.
+
+    The bar also uses the per-host un-injected false alarms of the hindsight model.
+    """
     c = cluster_bootstrap_paired(x_a=x_hind, x_b=x_m2)
     worst = worst_host(fa=fa_hindsight)
     return {"contrast": c, "bar": bars.v2_bar(lower=c["lower"], point=c["point"], **worst)}
@@ -705,7 +720,9 @@ def added_back_end_index() -> int:
 
 
 def k1_series() -> dict[str, Any]:  # pragma: no cover - needs the stored panel
-    """Return K1's injected reading `yy` (after the pre-roll), its spread level, the record's units, the valid mask, and the offsets.
+    """Return K1's injected reading `yy` (after the pre-roll) and its spread level.
+
+    The result also holds the record's units, the valid mask, and the offsets.
 
     The record is placed on D8's half-hour grid exactly as `e00694_run.k1_task` does; the half-hours
     where the record has a gap hold no injection and are not scored.
@@ -747,10 +764,12 @@ def run_k1_v3(
     k1: dict[str, Any],
     k1_m2_f1: float,
 ) -> dict[str, Any]:  # pragma: no cover - needs the stored panel
-    """Score K1 (hindsight F1 against the rerun M2) and V3 (each of D8's two engine-free periods, scored on its own).
+    """Score K1 (hindsight F1 against the rerun M2).
 
-    V3 fits `K = 0` to 3 on each control period, picks `K` by the information criterion, and also reports
-    the forced `K = 3` fit. The bar needs every period to pass for both fits.
+    V3 is scored too: each of D8's two engine-free periods is scored on its own.
+
+    V3 fits `K = 0` to 3 on each control period, picks `K` by the information criterion, and also
+    reports the forced `K = 3` fit. The bar needs every period to pass for both fits.
     """
     import e00694_common as c694  # ty: ignore[unresolved-import]
     import e00694_run as r694  # ty: ignore[unresolved-import]

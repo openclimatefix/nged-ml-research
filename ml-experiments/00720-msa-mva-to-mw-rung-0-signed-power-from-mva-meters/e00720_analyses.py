@@ -26,7 +26,9 @@ TEMP_EDGES: Final[tuple[float, ...]] = (5.0, 10.0, 15.0)
 
 
 def classify_days(*, p_any: np.ndarray) -> np.ndarray:
-    """Return 1 for a running day (at least 4 half-hours above 0.5), 0 for an idle day (none above 0.05), else -1.
+    """Return 1 for a running day, 0 for an idle day, else -1.
+
+    A running day has at least 4 half-hours above 0.5. An idle day has none above 0.05.
 
     Args:
         p_any: `P(n >= 1)` per half-hour, `(days, 48)`.
@@ -152,11 +154,13 @@ def recut_by_class(
     history_cls: np.ndarray,
     solar_block: tuple[int, int] = (10, 15),
 ) -> dict[str, Any]:
-    """Re-score stored forecasts by the target day's class and the history majority's class, outside the solar block.
+    """Re-score stored forecasts by the target day's class and the history majority's class.
+
+    The re-scoring covers only the hours outside the solar block.
 
     Args:
-        abs_error: The error measure to compare, one value per row or cell (a score difference such as
-            `CRPS(M1) - CRPS(C)` is allowed).
+        abs_error: The error measure to compare, one value per row or cell (a score difference such
+            as `CRPS(M1) - CRPS(C)` is allowed).
         hour: UTC hour of the row's valid time.
         target_cls: Class (1 running, 0 idle) of the row's target day.
         history_cls: Class of most history days (1 running, 0 idle).
@@ -193,10 +197,13 @@ def recut_by_class(
 def history_class_before_origin(
     *, cls_by_day: np.ndarray, origin_day: np.ndarray, first: int = 2, last: int = 15
 ) -> np.ndarray:
-    """Return the class held by most of the UTC days `first` to `last` days before each origin's date (-1 on a tie or none).
+    """Return the class held by most of the UTC days before each origin's date.
 
-    This is the history of `reverse_flow_analysis.md` section 4: the 14 UTC days 2 to 15 days before the
-    origin's date. `origin_day` holds each origin's day index on the same axis as `cls_by_day`.
+    The days run from `first` to `last` days before the date. The class is -1 on a tie or when there
+    are no days.
+
+    This is the history of `reverse_flow_analysis.md` section 4: the 14 UTC days 2 to 15 days before
+    the origin's date. `origin_day` holds each origin's day index on the same axis as `cls_by_day`.
     """
     out = np.full(len(origin_day), -1)
     for i, d in enumerate(origin_day):
@@ -210,7 +217,10 @@ def history_class_before_origin(
 
 
 def monthly_running_hours(*, p_days: np.ndarray, day_month_index: np.ndarray) -> np.ndarray:
-    """Return the hours with `P(n >= 1) > 0.5` in each distinct calendar month (year and month), not summed across years."""
+    """Return the hours with `P(n >= 1) > 0.5` in each distinct calendar month.
+
+    A month is a year and a month, so the hours are not summed across years.
+    """
     return np.array(
         [
             float((p_days[day_month_index == m] > RUNNING_P).sum()) / 2.0
@@ -220,7 +230,10 @@ def monthly_running_hours(*, p_days: np.ndarray, day_month_index: np.ndarray) ->
 
 
 def v2_k1_gate_passed(*, private: Any) -> bool:
-    """Return whether the private V2 and K1 outputs both exist and both bars passed (D8's read-outs are gated on them)."""
+    """Return whether the private V2 and K1 outputs both exist and both bars passed.
+
+    D8's read-outs are gated on this.
+    """
     import polars as pl
 
     v2p, k1p = private / "v2_bar.csv", private / "k1_v3.csv"
@@ -236,15 +249,18 @@ def run_section3(
     fit_kwargs: dict[str, Any] | None = None,
     require_gate: bool = True,
 ) -> int:  # pragma: no cover - needs the stored panel
-    """Run the D8 analyses of section 3 and the V4 read-outs on stored assets (waits for the code review).
+    """Run the D8 analyses of section 3 and the V4 read-outs on stored assets.
 
-    Refuses to run unless the private V2 and K1 results passed. Reads experiment 694's panel (through its
-    loaders), the private era file `era_dates.json` (keys `d8_era_start`, `d8_era_end`, and `solar_start`,
-    ISO dates, never committed; the era must end before the farm joins the series, so the reading is
-    `X >= 0` and the recovered gross demand is the reading plus the engine's expected output), the D8 temperature from experiment 713's
-    dense array, and experiment 713's stored `M1` forecasts. Every output goes under the private folder.
-    Reports of D8 are pooled over the era: no month or date labels leave this function, and the running
-    months are reduced to the hour bands of `e00720_guard.pool_bands`.
+    The run waits for the code review.
+
+    Refuses to run unless the private V2 and K1 results passed. Reads experiment 694's panel
+    (through its loaders), the private era file `era_dates.json` (keys `d8_era_start`, `d8_era_end`,
+    and `solar_start`, ISO dates, never committed; the era must end before the farm joins the
+    series, so the reading is `X >= 0` and the recovered gross demand is the reading plus the
+    engine's expected output), the D8 temperature from experiment 713's dense array, and experiment
+    713's stored `M1` forecasts. Every output goes under the private folder. Reports of D8 are
+    pooled over the era: no month or date labels leave this function, and the running months are
+    reduced to the hour bands of `e00720_guard.pool_bands`.
     """
     import json
     from datetime import UTC, datetime
@@ -382,18 +398,22 @@ def run_m1_recut(
     ts_id: int,
     solar_block: tuple[int, int] = (10, 15),
 ) -> dict[str, Any]:  # pragma: no cover - needs the stored forecasts
-    """Re-score experiment 713's stored `M1` minus Candidate forecasts of one Primary by day class, after `reverse_flow_analysis.md` section 4.
+    """Re-score experiment 713's stored `M1` minus Candidate forecasts of one Primary by day class.
 
-    It departs from section 4 in one place: section 4 scored whole days, and this drops the solar block.
-    Needs `torch` to import experiment 713's scorer (`uv sync --group gpu`, then `uv run --no-sync`; no GPU is used).
+    The day classes follow `reverse_flow_analysis.md` section 4.
 
-    The CRPS of each arm is that of the seed-averaged quantiles of seeds 0 and 1 (`e00713_score.seed_average`
-    and `add_losses`), the headline band is leads of 24 h up to but not including 240 h, and a cell is one
-    origin's forecast for one valid day: the mean of `CRPS(M1) - CRPS(C)` over the half-hours of that day
-    outside the solar block (UTC hours). The two arms must hold equal keys, else the function raises. `cls_by_day[d]` is the class (1 running, 0 idle, -1 other) of UTC day
-    `first_day_us // US_PER_DAY + d`. The history class of a cell is the majority class of the UTC days 2 to 15
-    days before the origin's date. Reads the stored forecasts through experiment 713's scorer, one month at a
-    time, and writes nothing.
+    It departs from section 4 in one place: section 4 scored whole days, and this drops the solar
+    block. Needs `torch` to import experiment 713's scorer (`uv sync --group gpu`, then `uv run
+    --no-sync`; no GPU is used).
+
+    The CRPS of each arm is that of the seed-averaged quantiles of seeds 0 and 1
+    (`e00713_score.seed_average` and `add_losses`), the headline band is leads of 24 h up to but not
+    including 240 h, and a cell is one origin's forecast for one valid day: the mean of `CRPS(M1) -
+    CRPS(C)` over the half-hours of that day outside the solar block (UTC hours). The two arms must
+    hold equal keys, else the function raises. `cls_by_day[d]` is the class (1 running, 0 idle, -1
+    other) of UTC day `first_day_us // US_PER_DAY + d`. The history class of a cell is the majority
+    class of the UTC days 2 to 15 days before the origin's date. Reads the stored forecasts through
+    experiment 713's scorer, one month at a time, and writes nothing.
     """
     import e00713_arms as arms  # ty: ignore[unresolved-import]
     import e00713_score as score  # ty: ignore[unresolved-import]

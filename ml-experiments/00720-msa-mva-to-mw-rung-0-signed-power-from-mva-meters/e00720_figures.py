@@ -1,16 +1,18 @@
 # ruff: noqa: E501
-"""Experiment 720: the figure scripts. Every figure goes to the private folder unless it is a pooled aggregate.
+"""Experiment 720: the figure scripts.
 
-Each function builds a chart from a private table and writes an SVG. `write_chart` is the only writer.
-It runs `e00720_guard.refuse_dated_generator_values` on the table the chart was drawn from, and it
-writes to a publishable folder only when the table also passes `e00720_guard.public_aggregate` (pooled
-scores and counts, no dates, no generator values). A chart of a generator's inferred state or profile
-carries generator columns, so the guard refuses to publish it and the chart stays private. Charts use
-`plotting.ocf_theme` colours, are 680 px wide (the text column), have no calendar dates on any axis, and
-turn off per-point accessibility text.
+Every figure goes to the private folder unless it is a pooled aggregate.
 
-`python e00720_figures.py --selftest` draws each chart from synthetic tables into a temporary folder and
-checks that the guard refuses a dated generator table and a column outside the allow-list.
+Each function builds a chart from a private table and writes an SVG. `write_chart` is the only
+writer. It runs `e00720_guard.refuse_dated_generator_values` on the table the chart was drawn from,
+and it writes to a publishable folder only when the table also passes
+`e00720_guard.public_aggregate` (pooled scores and counts, no dates, no generator values). A chart
+of a generator's inferred state or profile carries generator columns, so the guard refuses to
+publish it and the chart stays private. Charts use `plotting.ocf_theme` colours, are 680 px wide
+(the text column), have no calendar dates on any axis, and turn off per-point accessibility text.
+
+`python e00720_figures.py --selftest` draws each chart from synthetic tables into a temporary folder
+and checks that the guard refuses a dated generator table and a column outside the allow-list.
 """
 
 import argparse
@@ -137,9 +139,12 @@ def paired_f1_chart(*, per_cluster: pl.DataFrame) -> alt.Chart:
 
 
 def profile_chart(*, profile: pl.DataFrame) -> alt.Chart:
-    """Mean half-hourly profile difference, running minus idle days, matched and unmatched (private).
+    """Mean half-hourly profile difference, running minus idle days (private).
 
-    Columns: `half_hour`, `matched`, `unmatched`, `profile`. Hour axis labelled at 0, 6, 12, 18, 24 and carries no date.
+    The chart shows the matched and the unmatched difference.
+
+    Columns: `half_hour`, `matched`, `unmatched`, `profile`. Hour axis labelled at 0, 6, 12, 18, 24
+        and carries no date.
     """
     long = profile.unpivot(
         index=["half_hour", "profile"],

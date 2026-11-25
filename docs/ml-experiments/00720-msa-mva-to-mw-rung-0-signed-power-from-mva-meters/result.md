@@ -324,13 +324,14 @@ experiment ran, to satisfy the docstring linter. No executable code changed: the
 every edited file, compared with the docstrings removed, are identical before and after. The list
 gives each file's git blob hash (first 10 hexadecimal digits) before and after the edit.
 
-- `e00720_analyses.py`: `dea70ecd2e` to `fb3c35a6c5`
-- `e00720_bars.py`: `3031a6f91d` to `b29daa4a1f`
-- `e00720_figures.py`: `f6fa9a68dc` to `0f33280d3d`
-- `e00720_fit.py`: `1de281c8c6` to `bba39ed666`
+- `e00720_analyses.py`: `dea70ecd2e` to `d75401f403`
+- `e00720_bars.py`: `3031a6f91d` to `c19a8a3395`
+- `e00720_figures.py`: `f6fa9a68dc` to `ecacdaf9dc`
+- `e00720_fit.py`: `1de281c8c6` to `76b5ab9850`
 - `e00720_hmm.py`: `90c825aef7` to `c61499c517`
-- `e00720_real.py`: `e7ea5ddb21` to `c0d0530c82`
-- `e00720_references.py`: `9541b70fc6` to `0f18ee08e3`
-- `e00720_rung0b.py`: `2799d4851b` to `15cb990439`
+- `e00720_real.py`: `e7ea5ddb21` to `4d22c55bc3`
+- `e00720_references.py`: `9541b70fc6` to `bfd0c038bf`
+- `e00720_report.py`: `cd14890c0c` to `3ca033f0cb`
+- `e00720_rung0b.py`: `2799d4851b` to `366343c3ba`
 - `e00720_sign.py`: `426038548e` to `df1acfed64`
-- `e00720_v2.py`: `df116b4580` to `be5e5a2575`
+- `e00720_v2.py`: `df116b4580` to `6f12db14a2`

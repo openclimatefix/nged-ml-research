@@ -147,11 +147,13 @@ def check_grid_lengths(*, n_grid: int, dense_raw_len: int, cams_len: int) -> int
 
 
 def check_dense_raw_alignment(*, day_of_week_columns: np.ndarray, stamp_us: np.ndarray) -> int:
-    """Return the number of steps checked after asserting that dense_raw's day-of-week one-hot columns match `stamp_us`.
+    """Return the number of steps checked after asserting the one-hot day-of-week columns.
 
-    `day_of_week_columns` is `dense_raw[0, :n, 14:21]` (Monday first), and the weekday is that of the
-    stamp in Europe/London local time. A shifted start of `dense_raw`, which a length check cannot see,
-    breaks the match on many steps.
+    The assertion is that the day-of-week one-hot columns of `dense_raw` match `stamp_us`.
+
+    `day_of_week_columns` is `dense_raw[0, :n, 14:21]` (Monday first), and the weekday is that of
+    the stamp in Europe/London local time. A shifted start of `dense_raw`, which a length check
+    cannot see, breaks the match on many steps.
     """
     weekday = (
         pl.Series(stamp_us)

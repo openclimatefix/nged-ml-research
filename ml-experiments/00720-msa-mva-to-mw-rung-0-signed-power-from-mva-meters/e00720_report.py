@@ -1,12 +1,14 @@
 # ruff: noqa: E501, PT018
-"""Experiment 720: the report script. Reads the private tables, writes tables and figures, prints nothing dated.
+"""Experiment 720: the report script.
+
+Reads the private tables, writes tables and figures, and prints nothing dated.
 
 Inputs (all under the private folder, written by `e00720_rung0b.py --run`, `e00720_v2.py --run`, and
 `e00720_analyses.py`): `rung0b_readouts.csv`, `rung0b_references.csv`, `v2_bar.csv`, `k1_v3.csv`,
-`v2_fits.csv`, `d8_running_vs_idle_profiles.csv`. Outputs: a markdown report and the figures under the
-private folder, and with `--publish-dir` a pooled table of the sign read-outs, which passes
-`e00720_guard.public_aggregate` or is not written. Any table that holds a generator profile, a state, or a
-date is never published.
+`v2_fits.csv`, `d8_running_vs_idle_profiles.csv`. Outputs: a markdown report and the figures under
+the private folder, and with `--publish-dir` a pooled table of the sign read-outs, which passes
+`e00720_guard.public_aggregate` or is not written. Any table that holds a generator profile, a
+state, or a date is never published.
 """
 
 import argparse

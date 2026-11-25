@@ -281,13 +281,15 @@ def reference_bar(
 ) -> list[dict[str, Any]]:
     """Return the pre-registered references bar, one row per reference, area, and injection level.
 
-    The worlds are the injected worlds (levels 1 and 2) at the oracle estimate scale and host scale 1.0, read from
-    `rung0b_rho.npz`'s keys `name|readout`. For each world the paired area difference (anchored minus the
-    reference) has a day-block bootstrap interval. The row's point is the mean over its evaluable worlds, and its
-    interval is the mean of the worlds' interval ends (a conservative stand-in for a joint bootstrap, which the
-    independent worlds would only narrow). The outcome is `beats` when the lower end is above 0, `loses` when the
-    upper end is below 0, `inconclusive` otherwise, and `not_evaluable` when fewer than `MIN_EVALUABLE_WORLDS`
-    worlds hold both classes (midday) or none does (pooled). A world with both classes counts for the pooled area.
+    The worlds are the injected worlds (levels 1 and 2) at the oracle estimate scale and host scale
+    1.0, read from `rung0b_rho.npz`'s keys `name|readout`. For each world the paired area difference
+    (anchored minus the reference) has a day-block bootstrap interval. The row's point is the mean
+    over its evaluable worlds, and its interval is the mean of the worlds' interval ends (a
+    conservative stand-in for a joint bootstrap, which the independent worlds would only narrow).
+    The outcome is `beats` when the lower end is above 0, `loses` when the upper end is below 0,
+    `inconclusive` otherwise, and `not_evaluable` when fewer than `MIN_EVALUABLE_WORLDS` worlds hold
+    both classes (midday) or none does (pooled). A world with both classes counts for the pooled
+    area.
     """
     names = sorted({k.rsplit("|", 1)[0] for k in store if k.endswith("|x_true")})
     out: list[dict[str, Any]] = []
@@ -329,7 +331,11 @@ def reference_bar(
 
 
 def references_outcome(*, bar: list[dict[str, Any]]) -> str:
-    """Return `passed`, `failed`, or `inconclusive`: any pooled row `not_evaluable` gives `inconclusive`, else the bar's pass or fail."""
+    """Return `passed`, `failed`, or `inconclusive`.
+
+    Any pooled row that is `not_evaluable` gives `inconclusive`, and otherwise the result is the
+    bar's pass or fail.
+    """
     if any(r["area"] == "pooled" and r["outcome"] == "not_evaluable" for r in bar) or not bar:
         return "inconclusive"
     return "passed" if references_bar_passed(bar=bar) else "failed"

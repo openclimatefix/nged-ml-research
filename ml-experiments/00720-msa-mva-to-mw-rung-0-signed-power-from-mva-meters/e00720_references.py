@@ -84,7 +84,11 @@ def rule_metrics(
 
 
 def day_call_from_rho(*, rho: np.ndarray, u: np.ndarray, min_rows: int = 2) -> np.ndarray:
-    """Return a day-level call: at least `min_rows` gated half-hours with `rho > 0.5` (the labeller's own count is 2)."""
+    """Return a day-level call from the sign probabilities.
+
+    The call is true when at least `min_rows` gated half-hours have `rho > 0.5` (the labeller's own
+    count is 2).
+    """
     gated = (u >= U_GATE) & np.isfinite(rho)
     return ((rho > 0.5) & gated).sum(axis=1) >= min_rows
 
@@ -135,7 +139,11 @@ def day_scores(
 
 
 def read_674_labels(*, work: Path | None = None, arm: str = "B"):  # noqa: ANN201
-    """Read experiment 674's stored known-answer day labels (`site`, `level`, `date`, `cls`) and its own truth columns (`any_negative`, `crossing`); read-only."""
+    """Read experiment 674's stored known-answer day labels (read-only).
+
+    The columns are `site`, `level`, `date`, and `cls`, and experiment 674's own truth columns
+    `any_negative` and `crossing`.
+    """
     import polars as pl
 
     if work is None:
