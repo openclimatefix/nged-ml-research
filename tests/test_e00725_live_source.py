@@ -137,3 +137,42 @@ def test_placebo_batch_raises() -> None:
             primary=torch.tensor([0]), c_idx=torch.tensor([C_IDX]), lead_day=torch.tensor([0]),
             ensemble=False, ages=torch.arange(2, 16)[None], age_exists=torch.ones((1, 14), dtype=torch.bool),
         )  # fmt: skip
+
+
+def make_live_with_ens_table(*, back_days: int | None) -> lb.LiveSource:
+    """Return a `LiveSource` whose parent has an ensemble table, with half-hours 18 to 47 of origin day `C_DAY` unfilled for Primary 0."""
+    n_rel = 48 * 14
+    weather = torch.full((16, N_DAYS, n_rel, 21), 2.0, dtype=torch.float16)
+    filled = torch.ones((16, N_DAYS, n_rel), dtype=torch.bool)
+    filled[0, C_DAY, 18:48] = False
+    weather[~filled] = 0.0  # the parent's table holds zero weather where the row does not exist
+    ens = bt.EnsTensors(
+        weather=weather, spread=torch.zeros((16, N_DAYS, n_rel, 7), dtype=torch.float16),
+        filled=filled, first_day=0, run_us=None,
+    )  # fmt: skip
+    base = make_base()
+    base.ens = ens
+    n = torch.arange(GRID)
+    return lb.build_live_source(
+        base=base, rule_name="L", phase="train",
+        ens_z=torch.full((16, GRID, 19), ENS_VALUE, dtype=torch.float16),
+        ens_found=torch.ones((16, GRID), dtype=torch.bool),
+        ens_origin=(n - 12)[None, :].expand(16, -1).clone(),
+        cams_days=torch.full((16, N_DAYS + 5, 2), SUMMARY_VALUE),
+        day0=0, grid_start_us=0, target_summary_back_days=back_days,
+    )  # fmt: skip
+
+
+def test_moved_summary_is_written_only_where_the_ensemble_row_exists() -> None:
+    """T3 keeps the parent's zero at an unfilled half-hour, and equals the parent's weather everywhere else but the two summary columns."""
+    kwargs = {
+        "primary": torch.tensor([0, 3]), "c_idx": torch.tensor([C_IDX, C_IDX]),
+        "lead_day": torch.tensor([0, 0]), "ensemble": True,
+    }  # fmt: skip
+    parent = make_live_with_ens_table(back_days=None).assemble(**kwargs).inputs.top_weather
+    moved = make_live_with_ens_table(back_days=3).assemble(**kwargs).inputs.top_weather
+    assert moved[0, :18, 19:21].eq(SUMMARY_VALUE).all()
+    assert moved[0, 18:, 19:21].eq(0.0).all()  # unfilled: the parent's zero
+    assert moved[1, :, 19:21].eq(SUMMARY_VALUE).all()  # Primary 3 has no gap
+    assert torch.equal(moved[..., :19], parent[..., :19])
+    assert torch.equal(moved[0, 18:], parent[0, 18:])

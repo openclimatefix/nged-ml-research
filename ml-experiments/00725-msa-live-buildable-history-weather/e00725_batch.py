@@ -214,7 +214,13 @@ class LiveSource(bt.Source):
             day = out.c_idx // lay.STEPS_PER_DAY - self.target_summary_back_days
             slot = (self.grid_day0 + day - self.day0).clamp(0, self.cams_days.shape[1] - 1)
             summary = self.cams_days[inputs.primary, slot].half().float()
-            top[..., CAMS_COLUMN_SLICE] = summary[:, None, :]
+            # a half-hour with no ensemble row keeps the parent's zero (the parent's weather is zero where `filled` is false)
+            ens_day = (out.c_idx // lay.STEPS_PER_DAY - self.ens.first_day)[:, None]
+            rel = lay.STEPS_PER_DAY * kwargs["lead_day"][:, None] + self.steps
+            filled = self.ens.filled[inputs.primary[:, None], ens_day, rel]
+            top[..., CAMS_COLUMN_SLICE] = torch.where(
+                filled[..., None], summary[:, None, :], top[..., CAMS_COLUMN_SLICE]
+            )
         return bt.Assembled(
             inputs=replace(inputs, hist_weather=hist, top_weather=top), target=out.target,
             target_idx=out.target_idx, hist_idx=out.hist_idx, c_idx=out.c_idx,
