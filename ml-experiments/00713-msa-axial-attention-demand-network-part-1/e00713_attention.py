@@ -343,7 +343,7 @@ def heat_chart(
     data = pl.concat(parts)
     return (
         alt.Chart(data, width=WIDTH_HEAT, height=140)  # ty: ignore[unresolved-attribute]
-        .mark_rect()
+        .mark_rect(aria=False)
         .encode(
             x=alt.X(
                 "col:O",
@@ -370,7 +370,28 @@ def heat_chart(
 
 WIDTH_HEAT: Final = 600
 WIDTH_BARS: Final = 600
-TITLE_CHARS: Final = 100
+TITLE_CHARS: Final = 115
+
+
+CASE_LABELS: Final = {
+    "d8_steps": (
+        "case_a",
+        "Case A: an origin chosen on its next-day power",
+        "One forecast: one Primary other than D5, one origin in the 2026-01 test month, lead day 1, seed 0.",
+    ),
+    "clear_day": (
+        "case_b",
+        "Case B: a clear day",
+        "One forecast: Primary D5, one origin in the 2026-01 test month, lead day 1, seed 0.",
+    ),
+    "dull_day": (
+        "case_c",
+        "Case C: a dull day",
+        "One forecast: Primary D5, one origin in the 2026-01 test month, lead day 1, seed 0.",
+    ),
+}
+ARM_COLOUR: Final = {"M*": theme.BRAND_ORANGE, "E": theme.DATA_DEEP_TEAL, "P": theme.DATA_PURPLE}
+UNIFORM_SHARE: Final = 2 / 14
 
 
 def cmd_figures(*, out_dir: Path, shown: list[str], month: str, seed: int) -> None:
@@ -379,14 +400,15 @@ def cmd_figures(*, out_dir: Path, shown: list[str], month: str, seed: int) -> No
         s: np.load(attention_file(arm=figs.arm_name(shown=s, star=star), month=month, seed=seed))
         for s in shown
     }
-    for case in ("d8_steps", "clear_day", "dull_day"):
+    for case, (file_stem, label, scope) in CASE_LABELS.items():
         across = {
             s: z[f"{case}/across"].mean(axis=1).T for s, z in loaded.items()
         }  # (15, 48): rows 0..14 -> keep history 1..14
         frames = {s: m[1:] for s, m in across.items()}
         title = [
-            f"Across-day attention of the target row, case {case.replace('_', ' ')}",
-            "Each cell: the weight from the target row's token (x: its half-hour) to the history row (y: slot 1 is the nearest history row; for M* and E slot k is the row k+1 days old, for P the slots hold placebo rows 16 to 379 days old). Mean over 4 heads, last block. The weight left over falls on the target row itself, which is not drawn.",
+            f"Across-day attention of the target row. {label}",
+            scope,
+            "Each cell: the weight from the target row's token (x: its half-hour) to the history row (y: slot k is the row that starts k+1 days before the forecast origin for M* and E, and a placebo row 16 to 379 days old for P). M* is the selected arm M1. Mean over 4 heads, last block. The weight left over falls on the target row itself, which is not drawn.",
         ]
         figs.save(
             heat_chart(
@@ -395,56 +417,71 @@ def cmd_figures(*, out_dir: Path, shown: list[str], month: str, seed: int) -> No
                 rows="History row (slot)",
                 cols="Target half-hour (hours after 12:00 UTC on the origin day)",
             ),
-            path=out_dir / f"attention_across_{case}.svg",
+            path=out_dir / f"attention_across_{file_stem}.svg",
         )
     for lead in (1, 7):
         records = []
+        shares = []
         for s, z in loaded.items():
             mean, same = (
                 z[f"summary_lead{lead}/mean_weight"],
                 z[f"summary_lead{lead}/same_weekday_weight"],
             )
+            shares.append({"arm": s, "share": float(same.sum() / mean[1:].sum())})
             for slot in range(1, 15):
-                records.append(
-                    {
-                        "arm": s,
-                        "slot": slot,
-                        "weight": float(mean[slot]),
-                        "same_weekday": float(same[slot]),
-                    }
-                )
+                records.append({"arm": s, "slot": slot, "weight": float(mean[slot])})
         data = pl.DataFrame(records)
         dom = list(loaded)
         colour = alt.Color(
             "arm:N",
             scale=alt.Scale(
-                domain=dom, range=[figs.COLOUR.get(a, theme.ENSEMBLE_LINE) for a in dom]
+                domain=dom, range=[ARM_COLOUR.get(a, theme.ENSEMBLE_LINE) for a in dom]
             ),
             legend=alt.Legend(title=None, orient="top"),
         )
-        x = alt.X(
-            "slot:O",
-            title="History slot (see the note above)",
+        x = alt.X("slot:O", title="History slot (see the note above)", axis=alt.Axis(labelAngle=0))
+        top = alt.Chart(data, width=WIDTH_BARS, height=150)
+        top_bars = top.mark_bar().encode(  # ty: ignore[unresolved-attribute]
+            x=x,
+            xOffset="arm:N",
+            y=alt.Y("weight:Q", title="Mean attention weight"),
+            color=colour,
         )
-        base = alt.Chart(data, width=WIDTH_BARS, height=150)
+        top_rule = (
+            alt.Chart(pl.DataFrame({"y": [1 / 15], "label": ["uniform over 15 rows (1/15)"]}))
+            .mark_rule(color="#222222", strokeDash=[4, 3])
+            .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+        )
+        bottom = alt.Chart(pl.DataFrame(shares), width=WIDTH_BARS, height=110)
+        bottom_bars = bottom.mark_bar().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("arm:N", title=None, sort=dom, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y(
+                "share:Q",
+                title="Share on target-weekday rows",
+                axis=alt.Axis(format="%"),
+                scale=alt.Scale(domain=[0, 0.3]),
+            ),
+            color=colour,
+        )
+        bottom_rule = (
+            alt.Chart(pl.DataFrame({"y": [UNIFORM_SHARE]}))
+            .mark_rule(color="#222222", strokeDash=[4, 3])
+            .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+        )
+        bottom_text = (
+            alt.Chart(pl.DataFrame({"y": [UNIFORM_SHARE], "t": ["14.3% = 2 of 14 rows"]}))
+            .mark_text(align="right", dx=-4, dy=-6, fontSize=10, x=WIDTH_BARS)
+            .encode(y="y:Q", text="t:N")  # ty: ignore[unresolved-attribute]
+        )
         chart = alt.vconcat(
-            base.mark_bar().encode(  # ty: ignore[unresolved-attribute]
-                x=x,
-                xOffset="arm:N",
-                y=alt.Y("weight:Q", title="Mean attention weight"),
-                color=colour,
-            ),
-            base.mark_bar().encode(  # ty: ignore[unresolved-attribute]
-                x=x,
-                xOffset="arm:N",
-                y=alt.Y("same_weekday:Q", title="Weight on a row with the target's weekday"),
-                color=colour,
-            ),
+            alt.layer(top_bars, top_rule),
+            alt.layer(bottom_bars, bottom_rule, bottom_text),
         ).properties(
             title=title_params(
                 title=[
-                    f"Mean across-day attention by history slot, lead day {lead}",
-                    "Top: all rows. Bottom: only the weight that falls on a row with the same weekday as the target. Mean over Primaries, test origins, half-hours, and heads. For M* and E, slot k is the row k+1 days old; for P, slot k is the k-th placebo row, 16 to 379 days old.",
+                    f"Across-day attention by history slot, lead day {lead}",
+                    "2026-01 test month, seed 0, mean over all 16 Primaries, every test origin, 48 half-hours, and 4 heads. Top: mean weight per slot; the dashed rule is a uniform spread over the 15 rows. Bottom: the share of the history weight on the 2 rows with the target's weekday; the dashed rule is 2 of 14 rows.",
+                    "For M* (the selected arm M1) and E, slot k is the row that starts k+1 days before the forecast origin; for P, slot k is the k-th placebo row, 16 to 379 days old.",
                 ]
             )
         )
