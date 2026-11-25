@@ -73,6 +73,8 @@ class ComponentRows:
         engine: The true engine output in points.
         csi: The CAMS clear-sky index (NaN where missing).
         night: True where the sun is down at D8.
+        fallback: True on a day that left its drawn solar source because no metered farm had a
+            satellite sky (`Segment.s1_fallback`); the day holds zero solar output.
     """
 
     seg: np.ndarray
@@ -85,6 +87,7 @@ class ComponentRows:
     engine: np.ndarray
     csi: np.ndarray
     night: np.ndarray
+    fallback: np.ndarray
 
     def __len__(self) -> int:
         """Return the number of half-hours."""
@@ -102,7 +105,19 @@ def segment_rows(*, segments: Sequence[sim.Segment]) -> ComponentRows:
     """Build the rows of a list of segments: the valid half-hours of the base days, in scoring order."""
     cols: dict[str, list[np.ndarray]] = {
         k: []
-        for k in ("seg", "day", "date", "hh", "world", "source", "solar", "engine", "csi", "night")
+        for k in (
+            "seg",
+            "day",
+            "date",
+            "hh",
+            "world",
+            "source",
+            "solar",
+            "engine",
+            "csi",
+            "night",
+            "fallback",
+        )
     }
     for k, s in enumerate(segments):
         for d in np.flatnonzero(s.cal_index >= 0):
@@ -120,6 +135,7 @@ def segment_rows(*, segments: Sequence[sim.Segment]) -> ComponentRows:
             cols["engine"].append(s.engine[d][hh])
             cols["csi"].append(s.csi[d][hh])
             cols["night"].append(s.cosz[d][hh] <= 0.0)
+            cols["fallback"].append(np.full(n, bool(s.s1_fallback[d])))
     return ComponentRows(**{k: np.concatenate(v) for k, v in cols.items()})
 
 
@@ -187,6 +203,10 @@ def head_metrics(
 ) -> dict[str, float]:
     """Return the scalar metrics of one head at one seed (all in points of capacity).
 
+    The coverage of the 90% interval is reported over half-hours with true output only, because
+    the interval's lower end is clipped at zero and every zero-truth half-hour lies inside it.
+    The source-S1 error leaves out the days that fell back to no solar output.
+
     Args:
         head: "solar" or "engine".
         rows: The test rows.
@@ -203,7 +223,6 @@ def head_metrics(
         "mae_all": mae(pred=mu, truth=truth),
         "mae_nonzero": mae(pred=mu[nonzero], truth=truth[nonzero]),
         "correlation": correlation(a=mu, b=truth),
-        "coverage_90": float(np.mean((truth >= lo) & (truth <= hi))),
         "coverage_90_nonzero": float(np.mean(((truth >= lo) & (truth <= hi))[nonzero])) if nonzero.any() else float("nan"),
     }  # fmt: skip
     for w, name in enumerate(WORLD_NAMES):
@@ -217,8 +236,10 @@ def head_metrics(
         out["monotone_share"] = monotone_share(rows=rows, values=mu)
         out["monotone_share_truth"] = monotone_share(rows=rows, values=truth)
         for src, code in (("s1", 1), ("s2", 2)):
-            sel = rows.source == code
+            sel = (rows.source == code) & ~rows.fallback
             out[f"mae_source_{src}"] = mae(pred=mu[sel], truth=truth[sel])
+        s2 = rows.source == 2
+        out["fallback_share_s2"] = float(np.mean(rows.fallback[s2])) if s2.any() else float("nan")
     return out
 
 
@@ -281,7 +302,6 @@ def markdown_table(*, summaries: Mapping[str, Mapping[str, Mapping[str, float]]]
         ),
         *((f"mae_world_{w}", f"MAE, {w} worlds (points)") for w in WORLD_NAMES),
         ("correlation", "Correlation of head mean with true output"),
-        ("coverage_90", "Coverage of the 90% interval, all half-hours"),
         ("coverage_90_nonzero", "Coverage of the 90% interval, half-hours with true output"),
         ("f1_running", "F1 of the running flag (head mean above 10 points)"),
         ("night_mean", "Mean head output at night (points)"),
@@ -293,6 +313,10 @@ def markdown_table(*, summaries: Mapping[str, Mapping[str, Mapping[str, float]]]
         ("monotone_share_truth", "The same share for the true output"),
         ("mae_source_s1", "MAE, source S1 half-hours (points)"),
         ("mae_source_s2", "MAE, source S2 half-hours (points)"),
+        (
+            "fallback_share_s2",
+            "Share of source S2 half-hours on days with no farm sky (zero output)",
+        ),
     ):
         row(label, key)
     return "\n".join(lines) + "\n"

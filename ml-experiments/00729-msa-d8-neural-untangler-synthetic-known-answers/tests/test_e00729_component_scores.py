@@ -34,7 +34,7 @@ def segment(
         world=world, source=source, dates=dates, cal_index=cal_index,
         valid=np.ones((n + 2, 48), dtype=bool), x=np.ones((n + 2, 48)),
         solar=solar, engine=np.tile(engine, (n + 2, 1)), csi=csi,
-        cosz=np.tile(cosz, (n + 2, 1)),
+        cosz=np.tile(cosz, (n + 2, 1)), s1_fallback=np.zeros(n + 2, dtype=bool),
     )  # fmt: skip
 
 
@@ -71,7 +71,8 @@ def test_a_perfect_head_has_zero_error_full_coverage_and_correlation_one() -> No
         head="engine", rows=rows, mu=rows.engine.copy(), sd=np.full(len(rows), 0.5)
     )
     assert out["mae_all"] == 0.0 and out["mae_nonzero"] == 0.0
-    assert out["coverage_90"] == 1.0 and np.isclose(out["correlation"], 1.0)
+    assert out["coverage_90_nonzero"] == 1.0 and "coverage_90" not in out
+    assert np.isclose(out["correlation"], 1.0)
     assert out["f1_running"] == 1.0
     assert out["mae_world_engine"] == 0.0
 
@@ -107,6 +108,36 @@ def test_the_solar_head_metrics_report_night_output_and_the_cams_check() -> None
     out2 = comp.head_metrics(head="solar", rows=rows, mu=flipped, sd=np.full(len(rows), 1.0))
     assert out2["monotone_share"] < 0.5
     assert "mae_source_s1" in out and "mae_source_s2" in out
+
+
+def test_coverage_counts_only_half_hours_with_true_output() -> None:
+    rows = comp.segment_rows(segments=segments())
+    # A head that predicts zero with no spread covers every zero-truth half-hour and no other.
+    out = comp.head_metrics(
+        head="engine", rows=rows, mu=np.zeros(len(rows)), sd=np.zeros(len(rows))
+    )
+    assert out["coverage_90_nonzero"] == 0.0
+
+
+def test_source_s1_error_leaves_out_fallback_days_and_the_s2_share_is_reported() -> None:
+    segs = segments()
+    s1 = segs[2]
+    s1.s1_fallback = s1.s1_fallback.copy()
+    s1.s1_fallback[1] = True
+    rows = comp.segment_rows(segments=segs)
+    assert rows.fallback.sum() == 48
+    mu = rows.solar.copy()
+    mu[(rows.source == 1) & rows.fallback] += 7.0
+    out = comp.head_metrics(head="solar", rows=rows, mu=mu, sd=np.full(len(rows), 1.0))
+    assert out["mae_source_s1"] == 0.0
+    assert out["fallback_share_s2"] == 0.0
+    segs[4].s1_fallback = segs[4].s1_fallback.copy()
+    segs[4].s1_fallback[1] = True
+    rows = comp.segment_rows(segments=segs)
+    out = comp.head_metrics(
+        head="solar", rows=rows, mu=rows.solar.copy(), sd=np.full(len(rows), 1.0)
+    )
+    assert np.isclose(out["fallback_share_s2"], 1 / 8)
 
 
 def test_ranks_average_ties() -> None:

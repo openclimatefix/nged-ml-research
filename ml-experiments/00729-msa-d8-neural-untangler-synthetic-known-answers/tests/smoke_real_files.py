@@ -148,13 +148,14 @@ def check_day_table() -> str:
 
 CLEAR_DAY_CSI = 0.7
 """A base day is clear when D8's mean CAMS clear-sky index over its sun-up half-hours is at least this."""
-MIN_S2_OUTPUT_SHARE = 0.9
-"""At least this share of S2 solar-world segments with a clear day must hold solar output.
+MIN_S2_OUTPUT_SHARE = 0.99
+"""At least this share of clear base days in S2 solar-world segments must hold solar output.
 
-The expected share is 1.0: the sky is present on every real day of the frame, so a segment of
-source S2 has zero output only if the sky rule breaks. 0.9 leaves room for a few segments that hold
-no base day with sky and fails a rule that silences half of them."""
+The expected share is 1.0: the sky is present on every clear day, so a day of source S2 has zero
+output only if the sky rule breaks. 0.99 fails a rule that silences even a few percent of days."""
 N_S2_DRAWS = 8
+MAX_NO_SKY_SHARE = 0.02
+"""At most this share of all base days may have no farm with a satellite sky."""
 
 
 def clear_days(*, cal: object) -> np.ndarray:
@@ -185,6 +186,8 @@ def check_s2_solar_on_clear_days() -> str:
     clear = clear_days(cal=cal)
     sky_any = cal.farms.sky_ok.any(axis=0)
     assert sky_any[clear].all(), "a clear base day has no farm with a satellite sky"
+    no_sky_share = float(1.0 - sky_any.mean())
+    assert no_sky_share <= MAX_NO_SKY_SHARE, "too many base days have no farm with a sky"
     drawn = zero_clear = 0
     for seed in range(200):
         out, _, source, _ = sim.draw_solar(
@@ -202,22 +205,23 @@ def check_s2_solar_on_clear_days() -> str:
     assert drawn == N_S2_DRAWS, "too few S2 draws"
     assert zero_clear == 0, "an S2 draw left a clear base day with zero solar output"
     return (
-        f"has clear base days: {bool(clear.any())}, every clear base day has a farm with a sky: {bool(sky_any[clear].all())}, "
+        f"has clear base days: {bool(clear.any())}, share of base days with no farm sky is at most {MAX_NO_SKY_SHARE}: {no_sky_share <= MAX_NO_SKY_SHARE}, every clear base day has a farm with a sky: {bool(sky_any[clear].all())}, "
         f"no S2 draw has a clear base day with zero output: {zero_clear == 0}"
     )
 
 
 def check_bank_s2_solar() -> str:
-    """Check the stored test bank: S2 solar-world segments with a clear day hold solar output.
+    """Check the stored test bank: clear base days of S2 solar-world segments hold solar output.
 
     Prints a flag that the bank is absent before the first bank build, and fails when a bank
-    exists and the share of such segments with output is under `MIN_S2_OUTPUT_SHARE`.
+    exists and the share of such days with output is under `MIN_S2_OUTPUT_SHARE`. Run it once
+    before `banks` (after moving the first run's outputs away) and again after `banks`.
 
     Returns:
         A line of flags (booleans only).
 
     Raises:
-        AssertionError: When the share is under `MIN_S2_OUTPUT_SHARE`.
+        AssertionError: When the share of days is under `MIN_S2_OUTPUT_SHARE`.
     """
     import e00729_banks as banks
     import e00729_stages as stages
@@ -226,17 +230,20 @@ def check_bank_s2_solar() -> str:
     if not path.exists():
         return "test bank present: False"
     bank = banks.load_bank(path=path)
-    chosen = []
+    with_output = total = 0
     for seg in bank.segments:
         if seg.source != "S2" or seg.world not in ("solar", "both"):
             continue
-        on = seg.cal_index >= 0
-        if bool(clear_days(cal=seg)[on].any()):
-            chosen.append(bool((seg.solar[on] > 0).any()))
-    share = float(np.mean(chosen)) if chosen else float("nan")
-    assert chosen, "no S2 solar-world segment with a clear day"
-    assert share >= MIN_S2_OUTPUT_SHARE, "S2 solar-world segments are silent"
-    return f"test bank present: True, share of S2 solar-world segments with output is at least {MIN_S2_OUTPUT_SHARE}: {share >= MIN_S2_OUTPUT_SHARE}"
+        days = (seg.cal_index >= 0) & clear_days(cal=seg)
+        total += int(days.sum())
+        with_output += int((seg.solar[days].max(axis=1) > 0).sum())
+    assert total, "no clear base day in an S2 solar-world segment"
+    share = with_output / total
+    assert share >= MIN_S2_OUTPUT_SHARE, "S2 solar-world days are silent"
+    return (
+        "test bank present: True, share of clear S2 solar-world base days with output is at least "
+        f"{MIN_S2_OUTPUT_SHARE}: {share >= MIN_S2_OUTPUT_SHARE}"
+    )
 
 
 CHECKS: dict[str, Callable[[], str]] = {
