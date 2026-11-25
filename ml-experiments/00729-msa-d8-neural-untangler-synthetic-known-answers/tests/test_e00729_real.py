@@ -10,13 +10,17 @@ def test_f1_counts_each_kind_of_error() -> None:
     truth = np.array([True, True, False, False])
     assert real.f1_score(truth=truth, flag=truth) == 1.0
     assert real.f1_score(truth=truth, flag=~truth) == 0.0
-    assert real.f1_score(truth=truth, flag=np.array([True, False, True, False])) == pytest.approx(0.5)
+    assert real.f1_score(truth=truth, flag=np.array([True, False, True, False])) == pytest.approx(
+        0.5
+    )
     assert real.f1_score(truth=~truth & False, flag=~truth & False) == 0.0
 
 
 def k1(*, head: np.ndarray, record: np.ndarray, m2: np.ndarray | None = None) -> dict:
     running = record > core.K1_RUNNING_POINTS
-    return real.k1_engine_head(head_median=head, record=record, running=running, m2_flag=running if m2 is None else m2)
+    return real.k1_engine_head(
+        head_median=head, record=record, running=running, m2_flag=running if m2 is None else m2
+    )
 
 
 def record_of(n_run: int) -> np.ndarray:
@@ -76,7 +80,9 @@ def test_group_summaries_split_by_label() -> None:
     out = real.r3_sign_by_group(p_neg=np.array([0.9, 0.1, 0.1, 0.1]), groups=groups)
     assert out["a"] == pytest.approx(0.5)
     assert out["b"] == 0.0
-    r2 = real.r2_by_group(median=np.array([20.0, 40.0, 20.0, 20.0]), reading=np.full(4, 20.0), groups=groups)
+    r2 = real.r2_by_group(
+        median=np.array([20.0, 40.0, 20.0, 20.0]), reading=np.full(4, 20.0), groups=groups
+    )
     assert r2["a"] == pytest.approx(0.5)
     assert r2["b"] == 1.0
 

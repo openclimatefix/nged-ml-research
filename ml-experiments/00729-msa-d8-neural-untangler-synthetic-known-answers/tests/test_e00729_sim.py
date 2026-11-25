@@ -10,7 +10,10 @@ from synthetic_world import make_calendar
 def engine(*, seed: int, n_days: int = 31) -> tuple[np.ndarray, dict[str, float]]:
     rec: dict[str, float] = {}
     out = sim.draw_engine(
-        rng=np.random.default_rng(seed), utc_offset=np.zeros(n_days), quiet_day=np.arange(n_days) % 7 >= 5, record=rec
+        rng=np.random.default_rng(seed),
+        utc_offset=np.zeros(n_days),
+        quiet_day=np.arange(n_days) % 7 >= 5,
+        record=rec,
     )
     return out, rec
 
@@ -67,7 +70,12 @@ def test_fold_is_the_square_root_of_the_squares_and_never_below_the_floor() -> N
 
 def test_synthetic_bsp_subtracts_beta_times_the_injection_and_keeps_missing() -> None:
     real = np.array([[1.0, np.nan, 3.0]])
-    out = sim.synthetic_bsp(bsp_real=real, engine=np.array([[10.0, 10.0, 0.0]]), solar=np.array([[0.0, 5.0, 4.0]]), beta=0.5)
+    out = sim.synthetic_bsp(
+        bsp_real=real,
+        engine=np.array([[10.0, 10.0, 0.0]]),
+        solar=np.array([[0.0, 5.0, 4.0]]),
+        beta=0.5,
+    )
     assert out[0, 0] == pytest.approx(-4.0)
     assert np.isnan(out[0, 1])
     assert out[0, 2] == pytest.approx(1.0)
@@ -79,10 +87,16 @@ def test_hourly_style_noise_has_the_requested_autocorrelation_and_sd() -> None:
     assert np.corrcoef(noise[:-1], noise[1:])[0, 1] == pytest.approx(0.9, abs=0.02)
 
 
-def segment(*, world: str, seed: int = 0, cal: sim.Calendar | None = None, use: np.ndarray | None = None) -> sim.Segment:
+def segment(
+    *, world: str, seed: int = 0, cal: sim.Calendar | None = None, use: np.ndarray | None = None
+) -> sim.Segment:
     cal = cal or make_calendar()
     return sim.simulate_segment(
-        cal=cal, month="2022-03", use=np.ones(len(cal.dates), dtype=bool) if use is None else use, world=world, rng=np.random.default_rng(seed)
+        cal=cal,
+        month="2022-03",
+        use=np.ones(len(cal.dates), dtype=bool) if use is None else use,
+        world=world,
+        rng=np.random.default_rng(seed),
     )
 
 
@@ -159,8 +173,25 @@ def test_synthetic_bsp_keeps_the_real_noise_where_nothing_is_injected() -> None:
 
 def test_real_segment_carries_the_given_reading_and_truth() -> None:
     cal = make_calendar()
-    seg = sim.real_segment(cal=cal, month="2022-03", use=np.ones(len(cal.dates), dtype=bool), reading=cal.reading, truth=cal.reading * 0.5)
+    seg = sim.real_segment(
+        cal=cal,
+        month="2022-03",
+        use=np.ones(len(cal.dates), dtype=bool),
+        reading=cal.reading,
+        truth=cal.reading * 0.5,
+    )
     on = seg.cal_index >= 0
     assert np.allclose(seg.r[on], cal.reading[seg.cal_index[on]], atol=1e-4)
     assert np.allclose(seg.x[on], 0.5 * seg.r[on], atol=1e-4)
     assert seg.engine.sum() == 0.0
+
+
+def test_hourly_index_interpolates_linearly_to_half_hours() -> None:
+    import e00729_data as data
+
+    hourly = np.array([4.0, 4.0, 8.0, 8.0, np.nan, np.nan, 8.0, 8.0])
+    out = data.hourly_to_half_hour(values=hourly)
+    assert out[:2] == pytest.approx([4.0, 0.75 * 4.0 + 0.25 * 8.0])
+    assert out[2:4] == pytest.approx([0.75 * 8.0 + 0.25 * 4.0, 8.0])  # next hour missing keeps v
+    assert np.isnan(out[4:6]).all()
+    assert out[6:] == pytest.approx([8.0, 8.0])  # previous hour missing keeps v

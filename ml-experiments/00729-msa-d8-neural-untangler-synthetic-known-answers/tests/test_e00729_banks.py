@@ -11,7 +11,13 @@ from synthetic_world import make_calendar
 def build(*, kind: str, seed: int | None, months: list[str] | None = None) -> banks.Bank:
     cal = make_calendar()
     use = {m: np.array([str(d)[:7] == m for d in cal.dates]) for m in ("2022-03", "2022-04")}
-    return banks.build_bank(cal=cal, kind=kind, seed=seed, months=months or ["2022-03", "2022-04"], month_use=use)  # ty: ignore[invalid-argument-type]
+    return banks.build_bank(
+        cal=cal,
+        kind=kind,  # ty: ignore[invalid-argument-type]
+        seed=seed,
+        months=months or ["2022-03", "2022-04"],
+        month_use=use,  # ty: ignore[invalid-argument-type]
+    )  # ty: ignore[invalid-argument-type]
 
 
 def test_training_roots_never_meet_evaluation_roots() -> None:
@@ -28,14 +34,18 @@ def test_bank_sizes_and_world_mix_for_each_kind() -> None:
     test = build(kind="test", seed=None)
     assert len(train.segments) == 2 * core.SEGMENT_DRAWS_TRAIN
     assert len(test.segments) == 2 * core.SEGMENT_DRAWS_EVAL
-    assert all(core.NONE_SHARE_RANGE[0] <= v <= core.NONE_SHARE_RANGE[1] for v in train.none_share.values())
+    assert all(
+        core.NONE_SHARE_RANGE[0] <= v <= core.NONE_SHARE_RANGE[1] for v in train.none_share.values()
+    )
     assert all(v == core.TEST_MIX["none"] for v in test.none_share.values())
     shifted = build(kind="shifted", seed=None)
     assert all(v == core.SHIFTED_NONE_SHARE for v in shifted.none_share.values())
 
 
 def test_training_banks_randomise_the_none_share_between_months_and_seeds() -> None:
-    shares = {(s, m): v for s in (0, 1, 2) for m, v in build(kind="train", seed=s).none_share.items()}
+    shares = {
+        (s, m): v for s in (0, 1, 2) for m, v in build(kind="train", seed=s).none_share.items()
+    }
     assert len({round(v, 6) for v in shares.values()}) == 6
 
 
@@ -115,12 +125,23 @@ def test_size_matched_weights_give_each_quintile_an_equal_share() -> None:
 
 
 def test_bsp_gate_each_condition_can_fail() -> None:
-    synthetic = [banks.StepFit(-0.8, se, sd) for se, sd in zip(np.linspace(0.01, 0.02, 50), np.linspace(3, 5, 50), strict=True)]
-    good = banks.bsp_gate(real=banks.StepFit(-0.76, 0.015, 4.0), real_ci=(-0.9, -0.6), synthetic=synthetic)
+    synthetic = [
+        banks.StepFit(-0.8, se, sd)
+        for se, sd in zip(np.linspace(0.01, 0.02, 50), np.linspace(3, 5, 50), strict=True)
+    ]
+    good = banks.bsp_gate(
+        real=banks.StepFit(-0.76, 0.015, 4.0), real_ci=(-0.9, -0.6), synthetic=synthetic
+    )
     assert good["pass"]
-    assert not banks.bsp_gate(real=banks.StepFit(-0.2, 0.015, 4.0), real_ci=(-0.3, -0.1), synthetic=synthetic)["pass"]
-    assert not banks.bsp_gate(real=banks.StepFit(-0.76, 0.05, 4.0), real_ci=(-0.9, -0.6), synthetic=synthetic)["pass"]
-    assert not banks.bsp_gate(real=banks.StepFit(-0.76, 0.015, 9.0), real_ci=(-0.9, -0.6), synthetic=synthetic)["pass"]
+    assert not banks.bsp_gate(
+        real=banks.StepFit(-0.2, 0.015, 4.0), real_ci=(-0.3, -0.1), synthetic=synthetic
+    )["pass"]
+    assert not banks.bsp_gate(
+        real=banks.StepFit(-0.76, 0.05, 4.0), real_ci=(-0.9, -0.6), synthetic=synthetic
+    )["pass"]
+    assert not banks.bsp_gate(
+        real=banks.StepFit(-0.76, 0.015, 9.0), real_ci=(-0.9, -0.6), synthetic=synthetic
+    )["pass"]
 
 
 def test_shares_by_world_read_only_the_named_worlds() -> None:

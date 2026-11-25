@@ -1,3 +1,4 @@
+# ruff: noqa: E501, SIM300
 """Known-answer tests of the constants, the split rule, the world mix, the margin file, and the verdict table."""
 
 import json
@@ -50,13 +51,18 @@ def test_split_rule_skips_short_months_and_numbers_the_rest() -> None:
 
 
 def test_day_splits_drop_the_two_day_margin() -> None:
-    splits = {"2023-01": "training", "2023-02": "test", "2023-03": "validation", "2023-04": "training"}
+    splits = {
+        "2023-01": "training",
+        "2023-02": "test",
+        "2023-03": "validation",
+        "2023-04": "training",
+    }
     days = [
         date(2023, 1, 28), date(2023, 1, 29), date(2023, 1, 30), date(2023, 2, 10),
         date(2023, 2, 27), date(2023, 3, 1), date(2023, 3, 10), date(2023, 3, 30),
         date(2023, 4, 2), date(2023, 4, 3), date(2023, 5, 1),
     ]  # fmt: skip
-    out = core.assign_day_splits(days=days, splits=splits)
+    out = core.assign_day_splits(days=days, splits=splits)  # ty: ignore[invalid-argument-type]
     assert out == [
         "training", "training", "dropped", "test", "test", "dropped", "validation", "validation",
         "dropped", "training", "dropped",
@@ -121,7 +127,9 @@ def test_margin_file_refuses_to_be_overwritten(tmp_path: Path) -> None:
 def test_architecture_rule_prefers_fewer_weights_within_the_tie() -> None:
     scores = {"dae": 1.10, "unet": 1.00, "bilstm": 1.05}
     weights = {"dae": 100_000, "unet": 1_000_000, "bilstm": 500_000}
-    assert core.choose_architecture(scores=scores, weights=weights) == "dae"  # within 0.125 of the best
+    assert (
+        core.choose_architecture(scores=scores, weights=weights) == "dae"
+    )  # within 0.125 of the best
     scores["dae"] = 1.20
     assert core.choose_architecture(scores=scores, weights=weights) == "bilstm"
     scores["bilstm"] = 1.30
@@ -147,16 +155,20 @@ def test_kish_number_and_widening() -> None:
 def test_kish_matches_experiment_721_when_present() -> None:
     e721 = pytest.importorskip("e00721_core")
     counts = [3.0, 7.0, 1.0, 9.0]
-    assert core.kish_number(weights=counts) == pytest.approx(e721.kish_effective_number(counts=counts))
+    assert core.kish_number(weights=counts) == pytest.approx(
+        e721.kish_effective_number(counts=counts)
+    )
 
 
-def _inputs(*, point: float = -0.5, lower: float = -0.8, upper: float = -0.2, **kw: object) -> core.VerdictInputs:
+def _inputs(
+    *, point: float = -0.5, lower: float = -0.8, upper: float = -0.2, **kw: object
+) -> core.VerdictInputs:
     base: dict = {
         "stopped": False, "invalid": False, "failed": False, "h1_pass": True, "h2_pass": True,
         "c1": core.Reading(point, lower, upper), "margin": 0.25, "calibration_pass": True,
         "lobe_pass": True,
     }  # fmt: skip
-    return core.VerdictInputs(**{**base, **kw})
+    return core.VerdictInputs(**{**base, **kw})  # ty: ignore[invalid-argument-type]
 
 
 @pytest.mark.parametrize(

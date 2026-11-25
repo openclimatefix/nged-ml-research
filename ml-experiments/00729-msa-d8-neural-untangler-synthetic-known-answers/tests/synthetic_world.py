@@ -4,7 +4,9 @@ import e00729_sim as sim
 import numpy as np
 
 
-def make_calendar(*, n_days: int = 62, n_farms: int = 3, seed: int = 0, bsp: bool = True) -> sim.Calendar:
+def make_calendar(
+    *, n_days: int = 62, n_farms: int = 3, seed: int = 0, bsp: bool = True
+) -> sim.Calendar:
     """Return a calendar of `n_days` consecutive days from 2022-03-01 with invented values.
 
     Args:
@@ -23,7 +25,9 @@ def make_calendar(*, n_days: int = 62, n_farms: int = 3, seed: int = 0, bsp: boo
     reading = demand[None, :] + rng.normal(0, 1.0, (n_days, 48))
     sun = np.clip(np.sin(np.pi * (hh - 12) / 24.0), 0.0, None)
     farm_power = np.clip(sun[None, None, :] * rng.uniform(0.3, 1.0, (n_farms, n_days, 1)), 0, None)
-    ghi = 800.0 * sun[None, None, :] * rng.uniform(0.3, 1.0, (n_farms, n_days, 1)) + 1e-3 * rng.random((n_farms, n_days, 48))
+    ghi = 800.0 * sun[None, None, :] * rng.uniform(
+        0.3, 1.0, (n_farms, n_days, 1)
+    ) + 1e-3 * rng.random((n_farms, n_days, 48))
     farms = sim.FarmSet(
         power=farm_power,
         power_ok=np.ones((n_farms, n_days), dtype=bool),

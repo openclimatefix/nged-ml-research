@@ -45,7 +45,7 @@ def base_days() -> pl.DataFrame:
         DATA / "00697-gas-engine-state-tracker-part-4-running-patterns/frames/frame_d8.parquet"
     ).select("start", "era")
     era_end = frame.filter(pl.col("era") == "net")["start"].min()
-    cut = min(era_end, ec.engine_datetime(key="d8_engine_connected_date"))
+    cut = min(era_end, ec.engine_datetime(key="d8_engine_connected_date"))  # ty: ignore[invalid-argument-type]
     raw = scan_power().filter(pl.col("time_series_id").is_in([D8_ID, BSP_ID])).collect()
     raw = raw.with_columns(start=pl.col("time") - pl.duration(minutes=30))
     d8 = raw.filter(pl.col("time_series_id") == D8_ID).filter(pl.col("start") < cut)

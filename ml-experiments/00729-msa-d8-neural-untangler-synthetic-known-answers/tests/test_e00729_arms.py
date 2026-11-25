@@ -10,9 +10,17 @@ from synthetic_world import make_calendar
 STATS = arms.InputStats(10.0, 3.0)
 
 
-def seg(*, world: str = "both", seed: int = 1, bsp: bool = True) -> tuple[sim.Segment, sim.Calendar]:
+def seg(
+    *, world: str = "both", seed: int = 1, bsp: bool = True
+) -> tuple[sim.Segment, sim.Calendar]:
     cal = make_calendar(bsp=bsp)
-    s = sim.simulate_segment(cal=cal, month="2022-03", use=np.ones(len(cal.dates), dtype=bool), world=world, rng=np.random.default_rng(seed))
+    s = sim.simulate_segment(
+        cal=cal,
+        month="2022-03",
+        use=np.ones(len(cal.dates), dtype=bool),
+        world=world,
+        rng=np.random.default_rng(seed),
+    )
     return s, cal
 
 
@@ -36,7 +44,11 @@ def test_every_arm_differs_from_its_parent_in_one_way() -> None:
     d = arms.ARM_SPECS["D"]
     for name in ("Dq", "D24", "E", "F", "G1", "G2"):
         spec = arms.ARM_SPECS[name]
-        diffs = [f for f in ("cams", "bsp", "calendar", "lags", "steps", "head", "aux", "mask_training") if getattr(spec, f) != getattr(d, f)]
+        diffs = [
+            f
+            for f in ("cams", "bsp", "calendar", "lags", "steps", "head", "aux", "mask_training")
+            if getattr(spec, f) != getattr(d, f)
+        ]
         assert len(diffs) == 1, name
 
 
@@ -85,7 +97,9 @@ def test_lag_channels_hold_the_earlier_days_own_folded_reading_not_the_scored_da
     spec = arms.ARM_SPECS["F"]
     stack = arms.segment_stack(seg=s, spec=spec, holidays=cal.holidays, stats=STATS)
     day = 20
-    w, _ = arms.build_window(stack=stack, targets=arms.target_stack(seg=s), dense_day=day, spec=spec)
+    w, _ = arms.build_window(
+        stack=stack, targets=arms.target_stack(seg=s), dense_day=day, spec=spec
+    )
     base = arms.n_channels(spec=arms.ARM_SPECS["D"])
     start = arms.window_start(dense_day=day, spec=spec)
     for k, lag in enumerate(core.LAG_DAYS):
@@ -94,7 +108,9 @@ def test_lag_channels_hold_the_earlier_days_own_folded_reading_not_the_scored_da
         assert not np.allclose(got, w[0])
         assert w[base + 2 * k + 1].sum() > 0
     # the lagged day's output is its own: engine and solar differ between the days
-    assert not np.allclose(s.engine[day], s.engine[day - 7]) or not np.allclose(s.solar[day], s.solar[day - 7])
+    assert not np.allclose(s.engine[day], s.engine[day - 7]) or not np.allclose(
+        s.solar[day], s.solar[day - 7]
+    )
 
 
 def test_lag_outside_the_month_is_masked_with_zeros() -> None:
@@ -171,7 +187,9 @@ def test_sampler_takes_half_of_the_windows_from_segments_with_real_bsp() -> None
     with_bsp, cal = seg(bsp=True)
     without, _ = seg(bsp=False, seed=2)
     spec = arms.ARM_SPECS["A"]
-    prep = arms.prepare_segments(segments=[with_bsp, without, without], spec=spec, holidays=cal.holidays, stats=STATS)
+    prep = arms.prepare_segments(
+        segments=[with_bsp, without, without], spec=spec, holidays=cal.holidays, stats=STATS
+    )
     picks = arms.sample_picks(prepared=prep, n=1000, rng=np.random.default_rng(0))
     assert len(picks) == 1000
     share = np.mean([prep[i].has_bsp for i, _ in picks])
@@ -183,7 +201,9 @@ def test_sampler_takes_half_of_the_windows_from_segments_with_real_bsp() -> None
 
 def test_all_picks_cover_every_base_day_once_in_order() -> None:
     s, cal = seg()
-    prep = arms.prepare_segments(segments=[s, s], spec=arms.ARM_SPECS["A"], holidays=cal.holidays, stats=STATS)
+    prep = arms.prepare_segments(
+        segments=[s, s], spec=arms.ARM_SPECS["A"], holidays=cal.holidays, stats=STATS
+    )
     picks = arms.all_picks(prepared=prep)
     assert len(picks) == 2 * 31
     assert picks == sorted(picks)

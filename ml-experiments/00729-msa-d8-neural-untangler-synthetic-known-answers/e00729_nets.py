@@ -10,7 +10,7 @@ from typing import Final
 
 import e00729_core as core
 import torch  # ty: ignore[unresolved-import]
-import torch.nn.functional as F  # noqa: N812
+import torch.nn.functional as F  # noqa: N812  # ty: ignore[unresolved-import]
 from e00729_arms import AuxType, HeadType
 from torch import nn  # ty: ignore[unresolved-import]
 

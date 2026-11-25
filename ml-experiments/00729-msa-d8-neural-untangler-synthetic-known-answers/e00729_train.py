@@ -258,7 +258,7 @@ def save_predictions(*, arrays: dict[str, np.ndarray], path: Path) -> None:
     """Save decoded predictions atomically as a compressed `.npz`."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp.npz")
-    np.savez_compressed(tmp, **{k: v.astype(np.float32) for k, v in arrays.items()})
+    np.savez_compressed(tmp, **{k: v.astype(np.float32) for k, v in arrays.items()})  # ty: ignore[invalid-argument-type]
     tmp.replace(path)
 
 

@@ -20,7 +20,10 @@ def numeric_crps(*, p: float, mu_i: float, s_i: float, mu_r: float, s_r: float, 
         return (cdf(z) - (1.0 if z >= y else 0.0)) ** 2
 
     lo, hi = -80.0, 80.0
-    return sum(integrate.quad(f, a, b, points=[y] if a < y < b else None, limit=200)[0] for a, b in [(lo, y), (y, hi)])
+    return sum(
+        integrate.quad(f, a, b, points=[y] if a < y < b else None, limit=200)[0]
+        for a, b in [(lo, y), (y, hi)]
+    )
 
 
 @pytest.mark.parametrize("y", [-12.0, -3.0, 0.2, 6.0, 30.0])
@@ -91,16 +94,22 @@ def test_reliability_term_zero_for_calibrated_and_positive_for_overconfident() -
     prob = rng.uniform(0, 1, 20_000)
     calibrated = rng.uniform(size=prob.size) < prob
     rel = dist.reliability_term(prob=prob, observed=calibrated)
-    assert rel["reliability"] < 0.002
-    assert rel["max_gap"] < 0.1
+    assert rel["reliability"] < 0.002  # ty: ignore[unsupported-operator]
+    assert rel["max_gap"] < 0.1  # ty: ignore[unsupported-operator]
     bad = dist.reliability_term(prob=np.full(1000, 0.9), observed=np.arange(1000) % 2 == 0)
     assert bad["reliability"] == pytest.approx(0.16, abs=1e-6)
     assert bad["max_gap"] == pytest.approx(0.4, abs=1e-6)
-    assert bad["reliability"] > core.RELIABILITY_BAR
+    assert bad["reliability"] > core.RELIABILITY_BAR  # ty: ignore[unsupported-operator]
 
 
 def test_lobe_coverage_picks_the_lobe_on_the_true_side() -> None:
-    d = dist.Lobes(np.zeros(2), np.array([5.0, 5.0]), np.array([0.5, 0.5]), np.array([-5.0, -5.0]), np.array([0.5, 0.5]))
+    d = dist.Lobes(
+        np.zeros(2),
+        np.array([5.0, 5.0]),
+        np.array([0.5, 0.5]),
+        np.array([-5.0, -5.0]),
+        np.array([0.5, 0.5]),
+    )
     y = np.array([5.5, -5.0])
     assert dist.lobe_covers(lobes=d, y=y).tolist() == [True, True]
     assert dist.lobe_covers(lobes=d, y=np.array([7.0, -3.0])).tolist() == [False, False]

@@ -18,19 +18,27 @@ def seg_of(*, world: str = "both", source_s1: bool = True) -> tuple[sim.Segment,
     cal = make_calendar()
     use = np.array([str(d)[:7] == "2022-03" for d in cal.dates])
     for seed in range(40):
-        s = sim.simulate_segment(cal=cal, month="2022-03", use=use, world=world, rng=np.random.default_rng(seed))
+        s = sim.simulate_segment(
+            cal=cal, month="2022-03", use=use, world=world, rng=np.random.default_rng(seed)
+        )
         if not source_s1 or s.source == "S1":
             return s, cal
     return s, cal
 
 
 def test_split_integrity_passes_a_clean_split_and_fails_each_violation() -> None:
-    days = [date(2022, 1, d) for d in (1, 15, 31)] + [date(2022, 2, d) for d in (1, 15)] + [date(2022, 3, 15)]
+    days = (
+        [date(2022, 1, d) for d in (1, 15, 31)]
+        + [date(2022, 2, d) for d in (1, 15)]
+        + [date(2022, 3, 15)]
+    )
     months = {"2022-01": "training", "2022-02": "test", "2022-03": "training"}
-    good = core.assign_day_splits(days=days, splits=months)
+    good = core.assign_day_splits(days=days, splits=months)  # ty: ignore[invalid-argument-type]
     leak.assert_split_integrity(days=days, day_splits=good, month_split=months)
     with pytest.raises(leak.CorrectnessFailureError):
-        leak.assert_split_integrity(days=[*days, days[0]], day_splits=[*good, "training"], month_split=months)
+        leak.assert_split_integrity(
+            days=[*days, days[0]], day_splits=[*good, "training"], month_split=months
+        )
     bad = list(good)
     bad[2] = "training"  # 31 January is within 2 days of February's test month
     with pytest.raises(leak.CorrectnessFailureError):
@@ -139,7 +147,9 @@ def test_cut_record_and_holdout_checks() -> None:
     leak.assert_cut_applied(base_dates=d, cut_day=np.datetime64("2022-03-01"))
     with pytest.raises(leak.CorrectnessFailureError):
         leak.assert_cut_applied(base_dates=d, cut_day=np.datetime64("2022-02-01"))
-    leak.assert_record_not_base(record_days=np.array(["2023-01-01"], dtype="datetime64[D]"), base_dates=d)
+    leak.assert_record_not_base(
+        record_days=np.array(["2023-01-01"], dtype="datetime64[D]"), base_dates=d
+    )
     with pytest.raises(leak.CorrectnessFailureError):
         leak.assert_record_not_base(record_days=d[:1], base_dates=d)
     leak.assert_before_holdout(dates=np.array(["2026-06-30"], dtype="datetime64[D]"))
@@ -149,7 +159,15 @@ def test_cut_record_and_holdout_checks() -> None:
 
 def test_calendar_memorisation_check_fails_on_a_month_row(monkeypatch) -> None:  # noqa: ANN001
     leak.assert_no_calendar_memorisation(specs=arms.ARM_SPECS)
-    monkeypatch.setattr(arms, "stack_names", lambda *, spec: [*arms.stack_names.__wrapped__(spec=spec), "month_sin"] if hasattr(arms.stack_names, "__wrapped__") else ["r", "month_sin"])
+    monkeypatch.setattr(
+        arms,
+        "stack_names",
+        lambda *, spec: (
+            [*arms.stack_names.__wrapped__(spec=spec), "month_sin"]
+            if hasattr(arms.stack_names, "__wrapped__")
+            else ["r", "month_sin"]
+        ),
+    )
     with pytest.raises(leak.CorrectnessFailureError):
         leak.assert_no_calendar_memorisation(specs=arms.ARM_SPECS)
 

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Tests of the scored rows, the per-row metrics, the two-way bootstrap, the Kish widening, and the bars."""
 
 import e00729_banks as banks
@@ -13,7 +14,13 @@ from synthetic_world import make_calendar
 def make_rows(*, kind: str = "test") -> score.Rows:
     cal = make_calendar()
     use = {m: np.array([str(d)[:7] == m for d in cal.dates]) for m in ("2022-03", "2022-04")}
-    bank = banks.build_bank(cal=cal, kind=kind, seed=None, months=["2022-03", "2022-04"], month_use=use)  # ty: ignore[invalid-argument-type]
+    bank = banks.build_bank(
+        cal=cal,
+        kind=kind,  # ty: ignore[invalid-argument-type]
+        seed=None,
+        months=["2022-03", "2022-04"],
+        month_use=use,  # ty: ignore[invalid-argument-type]
+    )  # ty: ignore[invalid-argument-type]
     return score.rows_from_segments(segments=bank.segments, holidays=cal.holidays)
 
 
@@ -55,7 +62,13 @@ def test_p0_scores_the_absolute_error_and_p0f_adds_the_floor() -> None:
 
 def test_constant_difference_has_a_zero_width_interval_at_that_value() -> None:
     rows = make_rows()
-    r = score.contrast(rows=rows, a=np.full(rows.n, 1.3), b=np.full(rows.n, 1.0), keep=np.ones(rows.n, dtype=bool), n_resamples=500)
+    r = score.contrast(
+        rows=rows,
+        a=np.full(rows.n, 1.3),
+        b=np.full(rows.n, 1.0),
+        keep=np.ones(rows.n, dtype=bool),
+        n_resamples=500,
+    )
     assert r.reading.point == pytest.approx(0.3)
     assert r.reading.lower == pytest.approx(0.3)
     assert r.reading.upper == pytest.approx(0.3)
@@ -77,8 +90,12 @@ def test_interval_covers_the_true_mean_and_widens_with_noise() -> None:
     rows = make_rows()
     rng = np.random.default_rng(3)
     keep = np.ones(rows.n, dtype=bool)
-    small = score.contrast(rows=rows, a=rng.normal(0.5, 0.1, rows.n), b=np.zeros(rows.n), keep=keep, n_resamples=1000)
-    large = score.contrast(rows=rows, a=rng.normal(0.5, 3.0, rows.n), b=np.zeros(rows.n), keep=keep, n_resamples=1000)
+    small = score.contrast(
+        rows=rows, a=rng.normal(0.5, 0.1, rows.n), b=np.zeros(rows.n), keep=keep, n_resamples=1000
+    )
+    large = score.contrast(
+        rows=rows, a=rng.normal(0.5, 3.0, rows.n), b=np.zeros(rows.n), keep=keep, n_resamples=1000
+    )
     assert small.reading.lower < 0.5 < small.reading.upper
     assert (large.reading.upper - large.reading.lower) > (small.reading.upper - small.reading.lower)
 
@@ -97,14 +114,25 @@ def test_fewer_than_twenty_units_widen_the_interval_and_twenty_do_not() -> None:
     diff = np.random.default_rng(1).normal(0, 1, rows.n)
     r = score.contrast(rows=rows, a=diff, b=np.zeros(rows.n), keep=keep, n_resamples=1000)
     assert r.widening > 1.0
-    assert r.reading.point - r.reading.lower == pytest.approx(r.widening * (r.reading.point - r.raw_lower))
-    assert r.reading.upper - r.reading.point == pytest.approx(r.widening * (r.raw_upper - r.reading.point))
+    assert r.reading.point - r.reading.lower == pytest.approx(
+        r.widening * (r.reading.point - r.raw_lower)
+    )
+    assert r.reading.upper - r.reading.point == pytest.approx(
+        r.widening * (r.raw_upper - r.reading.point)
+    )
 
 
 def test_bsp_months_are_found_from_the_rows() -> None:
     rows = make_rows()
     assert score.bsp_months(rows=rows) == [0, 1]
-    r = score.contrast(rows=rows, a=np.ones(rows.n), b=np.zeros(rows.n), keep=np.ones(rows.n, dtype=bool), months=[1], n_resamples=100)
+    r = score.contrast(
+        rows=rows,
+        a=np.ones(rows.n),
+        b=np.zeros(rows.n),
+        keep=np.ones(rows.n, dtype=bool),
+        months=[1],
+        n_resamples=100,
+    )
     assert r.n_rows == (rows.month == 1).sum()
 
 
@@ -135,7 +163,7 @@ def test_sign_calibration_bin_bar_can_fail_alone() -> None:
     p = np.full(n, 0.5)
     p[: int(0.25 * n)] = 0.78  # a bin of many rows is off the diagonal by far
     res = score.sign_calibration(rows=rows, p_neg=p)
-    assert res["max_gap"] > 0.1
+    assert res["max_gap"] > 0.1  # ty: ignore[unsupported-operator]
     assert not res["pass"]
 
 
@@ -153,12 +181,20 @@ def test_harm_check_fails_each_way() -> None:
     same = score.harm_check(d=p0f, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=False)
     assert same["pass"]
     worse = score.RowMetrics(**{**p0f.__dict__, "crps": p0f.crps + 0.2})
-    assert not score.harm_check(d=worse, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=False)["pass"]
+    assert not score.harm_check(d=worse, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=False)[
+        "pass"
+    ]
     sloppy = score.RowMetrics(**{**p0f.__dict__, "mae": p0.mae + 0.3})
-    assert not score.harm_check(d=sloppy, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=False)["pass"]
+    assert not score.harm_check(d=sloppy, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=False)[
+        "pass"
+    ]
     alarmist = score.RowMetrics(**{**p0f.__dict__, "p_neg": np.full(rows.n, 0.9)})
-    assert score.harm_check(d=alarmist, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=False)["pass"]
-    assert not score.harm_check(d=alarmist, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=True)["pass"]
+    assert score.harm_check(d=alarmist, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=False)[
+        "pass"
+    ]
+    assert not score.harm_check(d=alarmist, p0f_metrics=p0f, p0_metrics=p0, keep=keep, real=True)[
+        "pass"
+    ]
 
 
 def test_reachability_counts_reverse_rows_outside_the_dead_band() -> None:

@@ -115,7 +115,7 @@ def build_context(*, closure_days: frozenset[date] = frozenset()) -> Context:
     leak.assert_cut_applied(base_dates=cal.dates, cut_day=cut_day)
     leak.assert_before_holdout(dates=table.calendar.dates)
     leak.assert_cams_differs(cal=cal)
-    return Context(table, cal, month_split, day_split, use, stats, cut_day)
+    return Context(table, cal, month_split, day_split, use, stats, cut_day)  # ty: ignore[invalid-argument-type]
 
 
 def bank_path(*, kind: str, seed: int | None = None) -> Path:

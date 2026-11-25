@@ -120,13 +120,13 @@ def contrast_chart(
     base = alt.Chart(data).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("contrast:N", sort=names, title=None)
     )
-    bars = base.mark_rule(color=BLUE, strokeWidth=3).encode(
+    bars = base.mark_rule(color=BLUE, strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "lower:Q", title="Difference in signed CRPS (points of capacity; negative is a gain)"
         ),
         x2="upper:Q",
     )
-    dots = base.mark_circle(color=BLUE, size=60).encode(x="point:Q")
+    dots = base.mark_circle(color=BLUE, size=60).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
     rules = (
         alt.Chart(pl.DataFrame({"x": [0.0, -margin], "kind": ["no difference", "margin m"]}))
         .mark_rule(strokeDash=[4, 3], color=ORANGE)
@@ -146,7 +146,7 @@ def reliability_chart(*, mean_forecast: Sequence[float], frequency: Sequence[flo
     """Return the reliability diagram of P(X < 0): observed frequency against forecast, by bin."""
     data = pl.DataFrame({"forecast": mean_forecast, "observed": frequency}).drop_nulls()
     diagonal = (
-        alt.Chart(pl.DataFrame({"a": [0.0, 1.0], "b": [0.0, 1.0]}))
+        alt.Chart(pl.DataFrame({"a": [0.0, 1.0], "b": [0.0, 1.0]}))  # ty: ignore[unresolved-attribute]
         .mark_line(color=GREY, strokeDash=[4, 3])
         .encode(x="a:Q", y="b:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -256,16 +256,16 @@ def band_chart(
     )
     x = alt.X("hour:Q", title="Hours from midnight UTC", axis=alt.Axis(values=[0, 6, 12, 18, 24]))
     band = (
-        alt.Chart(data).mark_area(opacity=0.3, color=ORANGE).encode(x=x, y="lower:Q", y2="upper:Q")
+        alt.Chart(data).mark_area(opacity=0.3, color=ORANGE).encode(x=x, y="lower:Q", y2="upper:Q")  # ty: ignore[unresolved-attribute]
     )  # ty: ignore[unresolved-attribute]
     med = (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_line(color=ORANGE)
         .encode(x=x, y=alt.Y("median:Q", title="Signed power (points)"))
     )  # ty: ignore[unresolved-attribute]
     tru = alt.Chart(data).mark_line(color=BLUE).encode(x=x, y="truth:Q")  # ty: ignore[unresolved-attribute]
     strip = (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_rect()
         .encode(
             x=x,

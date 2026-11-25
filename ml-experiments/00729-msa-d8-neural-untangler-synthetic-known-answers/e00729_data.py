@@ -97,7 +97,7 @@ def private_cut() -> datetime:
 
     eras = pl.read_parquet(ERA_FRAME, columns=["start", "era"])
     net_start = eras.filter(pl.col("era") == ERA_NET)["start"].min()
-    return min(net_start, ec.engine_datetime(key="d8_engine_connected_date")).replace(tzinfo=UTC)  # ty: ignore[unresolved-attribute]
+    return min(net_start, ec.engine_datetime(key="d8_engine_connected_date")).replace(tzinfo=UTC)  # ty: ignore[unresolved-attribute, invalid-argument-type]
 
 
 def era_of_days(*, days: np.ndarray) -> np.ndarray:
