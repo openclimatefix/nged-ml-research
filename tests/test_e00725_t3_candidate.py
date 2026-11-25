@@ -146,7 +146,7 @@ def test_table_report_does_not_count_a_nan_on_both_sides_as_a_change() -> None:
 
 
 def test_the_scorer_accepts_the_candidate_arm_only_with_its_log(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`T3-C` is a F8 arm whose forecast counts only when the log of its passed checks exists beside it."""
     score = pytest.importorskip("e00725_score")
