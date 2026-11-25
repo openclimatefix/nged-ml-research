@@ -1,3 +1,4 @@
+# ruff: noqa: E501, D103
 """Experiment 713: prove that the attention code changes no fit, forecast, or score. Reads only; no GPU.
 
 Prints the code hash of the fit modules now and the code hash recorded in every stored stage 3 log of the
