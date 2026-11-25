@@ -244,9 +244,10 @@ arm that carries the headline (the hindsight model on V2) and then the differenc
   its capacity `c`, and `n` units of size `g` running), and `Q` is a reactive floor (0.14 MVA in
   the V2 harness, and 2 points of capacity in rung 0b). The demand mean is a regression on the
   calendar, and on temperature where a series has weather. The residual is a first-order
-  autoregression on a grid of residual values (21 values in the V2 harness, so 84 states), and the emission sits on the transition so that the averaging within a
-  half-hour is exact. The output per half-hour is a two-lobe signed distribution, smoothed
-  and filtered, stored as 11 signed quantiles and the probability that `X` is negative.
+  autoregression on a grid of residual values (21 values in the V2 harness, so 84 states), and
+  the emission sits on the transition so that the averaging within a half-hour is exact. The output
+  per half-hour is a two-lobe signed distribution, smoothed and filtered, stored as 11 signed
+  quantiles and the probability that `X` is negative.
 - **Architecture, trend:** a slow trend term keeps a drift of demand from reading as units. It is
   the 0.8 quantile of the daily-mean residual over a 21-day centred window, smoothed over 7 days and
   limited to 0.03 MVA a day. After a first scan of the unit size, the trend is refitted from the
