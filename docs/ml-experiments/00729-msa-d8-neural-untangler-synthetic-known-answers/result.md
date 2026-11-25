@@ -737,6 +737,45 @@ have, and fewer steps of 15% to 30%.** The real shares are 0.30, 0.25, and 0.45 
 distributions agree in the smallest bin, and the difference of 0.10 in each of the other two bins
 is larger than the 5% rounding of the figure.
 
+## The solar and engine heads against the true series
+
+**The solar head of arm G1 and the engine head of arm G2 are scored against the true synthetic
+output, and the stage that does so has not run yet.** The script `e00729_component_scores.py`
+(stage `components`) reads the stored test predictions of arms G1 and G2 at seeds 0 to 2, the stored
+test bank, and the first stored training bank. It fits nothing, scores no new network output, and
+reads no real file. Every head is a Gaussian with a mean and a standard deviation per half-hour, so
+the 90% interval is the mean plus and minus 1.645 standard deviations, with its lower end clipped at
+zero. Errors are in points of D8's capacity.
+
+**The table will hold the following measures for each head, as the mean over seeds 0 to 2 with the
+smallest and largest seed beside it.** The numbers are interim until the stage has run, and none is
+written here.
+
+- The mean absolute error over all half-hours, over the half-hours where the true output is not
+  zero, and over each of the four world types.
+- The mean absolute error of two predictors that need no network, for context: the all-zero
+  predictor, and a climatology predictor that takes the mean true output of each (season,
+  half-hour) cell of the first training bank.
+- The correlation of the head mean with the true output, and the coverage of the 90% interval.
+- For the engine head, the F1 of the running flag, which is the head mean above 10 points, against
+  the true label of a running engine (true engine output above zero), and so the same flag as K1.
+- For the solar head, the mean and the largest output at night, which should be about zero, and the
+  share of (segment, half-hour) groups in which the head rises with the CAMS clear-sky index, with
+  the same share for the true output beside it. That share is descriptive and has no bar.
+
+**The figures show four days of each head and a binned comparison of head and truth.** Each day is
+picked by a fixed rule that the caption states, and no day carries a calendar date. The solar days
+of source S1 are built from the metered farms' output, so they go to a private folder and are not
+published; a solar day of source S2 may be published. The binned plots show the mean head output and
+its 10th to 90th percentile in bins of true output, and keep only bins of at least 100 half-hours.
+
+**A count of the stored banks, made while preparing this section, found no simulated day of source S2
+with solar output.** In the first training bank, 194 segments of the solar and both worlds use
+source S2, and none of them holds any solar output. The same holds for the 8 such segments of the
+validation bank and the 24 such segments of the test bank. Every base day of those segments carries
+the flag that the day took no data. The solar head is therefore scored on days of source S1 only, in
+effect, until the cause is found.
+
 ## Checks
 
 **Two audit triggers fired, and no audit has run.** Trigger 2 fired because C1, C4, C6, and C13
@@ -1774,6 +1813,9 @@ edited.
 - `e00729_leakage.py`: the leakage assertions of verdict row 1.
 - `e00729_gate_calibration.py`: the offline calibration behind the one permitted re-tune of the
   simulator ranges; it prints share ratios only and reads no network output and no score.
+- `e00729_component_scores.py`: the component table and the head figures (stage `components`). It
+  reads stored predictions of arms G1 and G2 and the stored banks, and writes solar days of source S1
+  only to `PRIVATE/components`.
 - `e00729_event_figures.py`: the event-generator figures (stage `events`). It draws simulated engine
   and solar days, and compares aggregates of the simulated draws with aggregates of the real engine
   record. It writes real series only to `PRIVATE/event_generator`.

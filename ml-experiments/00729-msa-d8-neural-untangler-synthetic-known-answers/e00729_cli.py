@@ -1,10 +1,10 @@
-# ruff: noqa: E402, E501, PLR0912, PLR0915
+# ruff: noqa: E402, E501, PLR0912, PLR0911, PLR0915
 """Experiment 729: the command line. Run it through `run.sh`, never directly.
 
     SLOT_CPU=<n> run.sh --go e00729_cli.py <stage> [options]
 
 Stages, in the order of the plan: `banks`, `gate`, `timing`, `screen`, `choose`, `ladder`,
-`margin`, `score`, `report`, `figures`, `series`, `events`. `fit` runs one named fit.
+`margin`, `score`, `report`, `figures`, `series`, `events`, `components`. `fit` runs one named fit.
 Every stage prints counts and scores only.
 """
 
@@ -70,6 +70,7 @@ def main(argv: list[str]) -> int:
             "figures",
             "series",
             "events",
+            "components",
             "fit",
         ),
     )
@@ -110,6 +111,11 @@ def main(argv: list[str]) -> int:
         return 0
     if args.stage == "events":
         for p in stages.stage_events(log=log):
+            log(f"wrote a figure: {report.figures.optimise_command(path=p)}")
+        return 0
+    if args.stage == "components":
+        arch = stages.read_json(path=paths.data_root() / "selection.json")["chosen"]
+        for p in stages.stage_components(arch=arch, log=log):
             log(f"wrote a figure: {report.figures.optimise_command(path=p)}")
         return 0
     ctx = stages.build_context()

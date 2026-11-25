@@ -4,7 +4,7 @@
 # The wrapper starts nothing by default: it needs `--go` before the script name, so that a stray
 # invocation only prints this help.
 #
-# Usage:  SLOT_CPU=<one cpu number> run.sh --go e00729_cli.py <banks|gate|timing|screen|choose|ladder|margin|score|report|figures|series|fit> <arguments>
+# Usage:  SLOT_CPU=<one cpu number> run.sh --go e00729_cli.py <banks|gate|timing|screen|choose|ladder|margin|score|report|figures|series|events|components|fit> <arguments>
 #         SLOT_CPU=<n> FITS_STARTING=1 run.sh --go ...     prints the "fits starting" line for the manager
 #         SLOT_CPU=<n> LAST_FIT_ENDED=1 run.sh --go ...    prints the "last fit ended" line for the manager
 #
@@ -20,7 +20,7 @@
 #   - for a command that uses the GPU (no `--device cpu`, and `CUDA_VISIBLE_DEVICES` not empty): the
 #     `nvidia-smi` totals leave room for 6 GB under the total of 36 GB, at most one other GPU process
 #     (of this experiment or another, counted together) holds the GPU, and a lock file allows one worker
-#     of this experiment at a time. `banks`, `gate`, `choose`, `margin`, `score`, `report`, `figures`, `series`, and `events` run on the CPU and skip both checks;
+#     of this experiment at a time. `banks`, `gate`, `choose`, `margin`, `score`, `report`, `figures`, `series`, `events`, and `components` run on the CPU and skip both checks;
 #   - this folder on PYTHONPATH: `e00729_paths.py` adds the folders of experiments 721, 694, 700,
 #     697, 39, 194, and 722 (the code this experiment imports) from this checkout.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
@@ -74,7 +74,7 @@ uses_gpu=1
 [ -z "${CUDA_VISIBLE_DEVICES+x}" ] || [ -n "${CUDA_VISIBLE_DEVICES}" ] || uses_gpu=0
 for arg in "$@"; do [ "$arg" = "cpu" ] && uses_gpu=0; done
 # these stages read files and compute on the CPU only: no GPU check and no GPU lock
-case "${1:-}" in banks | gate | choose | margin | score | report | figures | series | events) uses_gpu=0 ;; esac
+case "${1:-}" in banks | gate | choose | margin | score | report | figures | series | events | components) uses_gpu=0 ;; esac
 lock_prefix=""
 if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
     used_mb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '{s+=$1} END {print s+0}')

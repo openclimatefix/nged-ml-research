@@ -1260,3 +1260,37 @@ def stage_events(*, log: Log) -> list[Path]:
     )  # fmt: skip
     log(f"wrote {len(written)} published event-generator figures")
     return written
+
+
+def stage_components(*, arch: str, log: Log) -> list[Path]:
+    """Write the component table and the head figures from stored predictions of arms G1 and G2.
+
+    The stage reads the stored test bank, the first training bank, and the stored test predictions
+    of seeds 0 to 2. It fits nothing, scores nothing new, and reads no real file.
+
+    Args:
+        arch: The chosen architecture.
+        log: Receives one line per file written.
+
+    Returns:
+        The published figures (run `svgo` on each before committing).
+    """
+    import e00729_component_scores as comp
+
+    test = banks.load_bank(path=bank_path(kind="test"))
+    train = banks.load_bank(path=bank_path(kind="train", seed=0))
+    predictions = {
+        head: {
+            seed: load_predictions(arm=arm, arch=arch, seed=seed, name="test")
+            for seed in core.ARCH_SEEDS
+        }
+        for head, arm in comp.HEADS.items()
+    }
+    root = paths.data_root()
+    written = comp.write_component_outputs(
+        test_segments=test.segments, train_segments=train.segments, predictions=predictions,
+        out_dir=root / "figures", private_dir=paths.private_dir() / "components",
+        scores_dir=root / "scores", log=log,
+    )  # fmt: skip
+    log(f"wrote {len(written)} published component figures")
+    return written
