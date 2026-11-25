@@ -13,8 +13,10 @@ verdict: not supported
 kind: other
 size: >-
   Anything else. (1) It stores about 50 fitted neural networks, synthetic training and test banks,
-  per-half-hour predictions, and score tables, all private; (2) more than one design defensibly tests
-  the hypothesis (three neural-network architectures, three output heads, and a ladder of inputs), so
+  per-half-hour predictions, and score tables, all private; (2) more than one design defensibly
+  tests
+  the hypothesis (three neural-network architectures, three output heads, and a ladder of inputs),
+  so
   all are arms with a pre-registered selection rule; (3) it imports experiment 694's tracker as a
   baseline and reads the stored frame of experiment 39 and the engine window of experiment 194,
   whose callers cannot be named without searching the repository; (4) it touches no serving path or
@@ -34,7 +36,8 @@ hypothesis: >-
 prediction: >-
   Written before any code exists. Arm D on the chosen architecture beats the better of the two
   demand-climatology rules (B1, B2) by 1 to 4 points of D8's capacity in signed CRPS over all
-  synthetic test half-hours, and almost all of the gain sits on reverse-flow half-hours. On the input
+  synthetic test half-hours, and almost all of the gain sits on reverse-flow half-hours. On the
+  input
   ladder, adding sunshine (C3) and adding the bulk supply point steps (C4) each lower the signed
   CRPS by at least 0.3 points. The C3 gain rests on solar source S1, whose output shares no
   satellite product with the sunshine input. The C4 gain sits mostly in the worlds with an engine.
@@ -42,7 +45,8 @@ prediction: >-
   CRPS by under 0.2 points. The
   quantile head (C6) has an 11-quantile pinball loss at least 0.2 points higher than the two-lobe
   head. The 48-hour window has a signed CRPS lower than the 24-hour window (C11). The sign-only arm
-  D-sign, which outputs one probability of reverse flow per half-hour and fixes its two lobes at plus
+  D-sign, which outputs one probability of reverse flow per half-hour and fixes its two lobes at
+  plus
   and minus the reading with the reactive floor removed, is a simpler function that may receive less
   supervisory signal. D-sign scores a signed CRPS higher than arm D (C13, a loss) by 0.01 to 0.10
   points, always below the 0.25-point floor of the margin m, and its reliability term of P(X<0) is
@@ -75,13 +79,15 @@ benchmark: >-
   P0 (the reading read as signed import) and P0f (P0's point forecast given the same lobe-width
   floor as the neural networks, the reference for the harm checks); B1 (a demand climatology of D8's
   base days that sets the probability of reverse flow to the world's injected share times the
-  probability that demand lies below the reading); B2 (the same rule with a regression of base demand
+  probability that demand lies below the reading); B2 (the same rule with a regression of base
+  demand
   on calendar and temperature);
   experiment 694's M2 tracker on the engine-only test segments; arm A (the reading alone) as the
   no-hint neural network.
 row_set_id: >-
   e00729_synthetic_d8_v1: the 48 half-hours of each UTC day of 8 held-out calendar months of D8's
-  base days, each carried by 8 independent synthetic segment draws, scored in the middle of a 48-hour
+  base days, each carried by 8 independent synthetic segment draws, scored in the middle of a
+  48-hour
   window. Real checks read the same months without injection, the metered engine record's days, and
   D8's eras up to 2026-06-30. No valid time on or after 2026-07-01 is read. No forecast is made.
 metric: >-
@@ -93,26 +99,29 @@ metric: >-
 best_arm: >-
   No arm. Arm D-quantile has the lowest import score of the neural networks (0.227 points against
   P0f's 0.118), and arm D, the headline arm, scores +0.258 points above P0f on import rows against a
-  limit of 0.12. Against B* on all rows, arm D is 33.878 points better (interval -40.018 to -27.593).
+  limit of 0.12. Against B* on all rows, arm D is 33.878 points better (interval -40.018 to
+  -27.593).
 headline: >-
   Arm D beats the demand-climatology rule B* by 33.878 points of D8's capacity in signed CRPS on
   synthetic days (interval -40.018 to -27.593), but it scores 0.258 points above the point reading
   P0f on synthetic import half-hours, against a pre-registered limit of 0.12 points, so the
   verdict is not supported.
 lessons: >-
-  The neural network separates reverse flow from import far better than the climatology rules, and
-  the gain is measured on a synthetic world only. The two-lobe head with its 0.5-point floor
-  scores worse than the reading on import half-hours, and so do the sign-only and 11-quantile
-  heads, although both beat arm D on every subset. The BSP steps did not lower the score (C4 is
-  +0.149 points). The sign calibration bar fails on one bin, and no real signed truth exists for
-  D8. Every number is interim until the result review.
+  The neural network beats the demand-climatology rule B1 by 33.878 points, almost all of it on
+  import half-hours where B1 puts a probability near 0.40 on reverse flow, and the gain is measured
+  on a synthetic world only. The two-lobe head with its 0.5-point floor scores worse than the
+  reading on import half-hours, and so do the sign-only and 11-quantile heads, although both score
+  lower than arm D on the point means. The BSP steps did not lower the score (C4 is +0.149 points).
+  The sign calibration bar fails on four bins, and no real signed truth exists for D8. Every number
+  is interim.
 take_home_message: >-
   A neural network trained on synthetic days finds the direction of D8's power flow much better
-  than rules built from D8's past demand, but it adds error on the half-hours when D8 imports
-  power, which are almost all of them. The harm check set in advance fails, so the experiment does
-  not support using this network, and no real signed record exists to confirm the gain. The
-  sign-only and quantile versions score better than the headline network and still fall short of
-  simply reading the meter on import half-hours.
+  than rules built from D8's past demand, but the neural network adds error on the half-hours when
+  D8 imports power, and D8 imports on almost all half-hours. The harm check set in advance fails,
+  so the experiment does not support using this neural network, and no real signed record exists to
+  confirm the gain. The sign-only and quantile versions score lower than the headline neural
+  network on the point means and still fall short of simply reading the meter on import
+  half-hours.
 advice:
   - >-
     Check the harm on import half-hours against the reading with the same lobe floor before reading
@@ -123,15 +132,16 @@ advice:
     (C1, Table 3).
   - >-
     Test an output head other than the two-lobe head with a 0.5-point floor on the same synthetic
-    banks before choosing a head, because the sign-only head and the 11-quantile head beat arm D on
-    every subset of rows (C6, C13).
+    banks before choosing a head, because the sign-only head and the 11-quantile head score lower
+    than arm D on the point means of all, import, and reverse-flow rows (C6, C13, Table 3).
   - >-
-    Do not expect the bulk supply point steps to lower the score once sunshine is an input of a
-    synthetic-day network, because C4 is +0.149 points and C12 is +0.100 points.
+    Do not expect the bulk supply point steps to lower the score when they are added to the
+    sunshine inputs of a synthetic-day neural network, because C4 is +0.149 points (interval 0.068
+    to 0.455).
   - >-
     Report the calibration of P(X<0) by reading band, because arm D over-states reverse flow in the
-    bins from 0.1 to 0.8 and no arm tells the sign where the reading is under 0.3 MVA (the ambiguity
-    read-out, Table 5).
+    bins from 0.1 to 0.8 and no arm is sure of the sign where the reading is under 1 MVA (the
+    ambiguity read-out, Table 5).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -157,38 +167,44 @@ synthetic data in the spirit of domain randomisation ([Tobin et al.
 (2017)](https://doi.org/10.1109/IROS.2017.8202133)).
 
 **We tested a neural network that rebuilds the sign of D8's power from the magnitude the meter
-shows.** The network learned only from synthetic days, for which the answer is known. On held-out
-synthetic days, the network found the sign far better than the best rule that ignores the shape of
-the day. On the half-hours where D8 imports power, which are almost all of them, the network scored
-worse than simply reading the meter, by more than the limit we set before the first fit. The rules
-of the plan therefore give the verdict `not supported`. Every number below is interim until the
-result review.
+shows.** The neural network learned only from synthetic days, for which the answer is known. On
+held-out synthetic days, the neural network scored far better than the best rule that ignores the
+shape of the day, mostly because the rule gives ordinary import half-hours a high probability of
+reverse flow. On the half-hours where D8 imports power, which are almost all half-hours, the neural
+network scored worse than simply reading the meter, by more than the limit we set before the first
+fit. The rules of the plan therefore give the verdict `not supported`. Every number below is
+interim.
 
 ## Result
 
 **The verdict is `not supported`, and verdict row 3 sets it: the harm check on import half-hours
 (H1) fails while the real-day check (H2) passes.** On the synthetic test half-hours where D8 imports
-power, arm D scores a signed CRPS of 0.376 points and the reference P0f scores 0.118 points. The
+power, arm D scores a signed continuous ranked probability score (CRPS) of 0.376 points and the
+reference P0f scores 0.118 points. The
 excess is +0.258 points against the pre-registered limit of 0.12 points. The normalised error of the
-median is also 0.379 points above P0f's, against its limit of 0.25 points. Both limits fail. All
-numbers in this section come from the printed report, `verdict.json`, or `tables.json` of the run,
-and each table names its source. The manager ruled that no simulator range is re-tuned and no
-network is refitted after this reading.
+median is also 0.379 points above P0f's, against its limit of 0.25 points. Both limits fail. The
+manager ruled that no simulator range is re-tuned and no neural network is refitted after this
+reading.
 
 ### What this means
 
-**Within the synthetic world the network separates reverse flow from import much better than the
-demand-climatology rules, and the same network adds error where D8 only imports.** C1, arm D minus
-B\*, is −33.878 points of D8's capacity (interval −40.018 to −27.593), so the gain over the
-climatology rules is large. Each half-hour of arm D carries two Gaussian lobes with a spread of at
-least 0.5 points, and P0f carries the same floor, so the excess measures what the network adds on
-import half-hours. This experiment did not test why the network adds it. The sign-only arm D-sign
-and the 11-quantile arm D-quantile score lower than arm D on every subset of rows, yet their import
-scores (0.265 and 0.227) remain above P0f's 0.118. Those two comparisons are report-only and are not
-a verdict reading. They show that the choice of head changes the import loss, and they do not show
-which head to use.
+**Within the synthetic world the neural network scores far better than the demand-climatology rule
+B1, and the neural network adds error where D8 only imports.** C1, arm D minus B\*, is −33.878
+points of D8's capacity (interval −40.018 to −27.593). Almost all of that gain sits on import
+half-hours: import rows give 33.65 points of it and reverse-flow rows 0.23 points. C1 is large
+because B1 puts a mean P(X<0) of 0.398 on ordinary half-hours above 3 MVA (Table 5), where the
+observed share is 0.011. On reverse-flow half-hours arm D scores 18.385 points against 28.550 for
+B\*. Each half-hour of arm D carries two Gaussian lobes with a spread of at least 0.5 points, and
+P0f carries the same floor, so the excess over P0f measures what the neural network adds on import
+half-hours. This experiment did not test why the neural network adds that error. On the point means,
+the sign-only arm D-sign and the 11-quantile arm D-quantile score lower than arm D on all rows,
+import rows, and reverse-flow rows, yet their import scores (0.265 and 0.227) remain above P0f's
+0.118. Only C6 and C13 have intervals, and both are on all rows. No interval exists on import or
+reverse-flow rows, and arm D averages 5 seeds where D-sign and D-quantile average 3. Both
+comparisons are report-only and are not a verdict reading. The point means do not show which head to
+use.
 
-**The limits of the result are four.**
+**The result has four limits.**
 
 - **The gains are measured on the synthetic world only.** The simulators are our descriptions of the
   engine and the solar farm, and the realism gate checks two shares and a bulk supply point (BSP)
@@ -198,13 +214,14 @@ which head to use.
   record.
 - **The two-lobe head with its 0.5-point floor loses on import half-hours.** Arm D scores 0.258
   points above P0f there, and every other neural network also scores above P0f.
-- **The experiment does not say what to do next.** The options it leaves open are a different output
+- **The experiment does not say what to do next.** The options left open are a different output
   head, a different loss weight on import half-hours, and accepting the harm in exchange for the
-  gain on reverse flow. The result review chooses among them.
+  gain on reverse flow. The result review chooses among these options.
 
 ### The bars and harm checks
 
-**Table 1 lists each bar with its reading.** Source: the "Bars and harm checks" section of the
+**Table 1 gives each bar's reading: H1 and the sign calibration bar fail, and the other checks
+pass.** Source: the "Bars and harm checks" section of the
 printed report, and `verdict.json`.
 
 *Table 1. Bars and harm checks.*
@@ -220,16 +237,22 @@ printed report, and `verdict.json`.
 | Sign calibration, reliability term | 0.000507 | at most 0.01 | pass |
 | Sign calibration, largest gap in a bin of at least 200 half-hours | 0.130 | at most 0.1 | fail |
 | Lobe coverage | 0.987 | at least 0.85 | pass; mean lobe width 3.245 points |
-| Reachability, reverse-flow half-hours | 2,019 in all, 303 in the BSP months | the plan's counts | pass |
+| Reachability, reverse-flow half-hours | 2,019 in all, 303 in the BSP months | at least 2,000 in all and 200 in the BSP months | pass |
 
-**The sign calibration bar fails on one bin, and row 3 sits before the rows that read it.** The bin
-of forecast probabilities near 0.35 holds 700 half-hours, with a mean forecast of 0.348 and an
-observed share of 0.219 (Figure 6 shows the bins). In the bins from 0.1 to 0.8 the observed share is
-below the mean forecast, so the network over-states the probability of reverse flow in that range.
+**The reachability count clears its limit by 19 half-hours.** The 2,019 reverse-flow half-hours are
+under half the plan's projection of about 4,400, and the 303 in the BSP months are under a third of
+the projected 1,100.
+
+**The sign calibration bar fails on four bins, and row 3 sits before the rows that read it.** Four
+bins of at least 200 half-hours have a gap above 0.1: the bins of forecast probability 0.2 to 0.3
+(739 half-hours, mean forecast 0.249, observed share 0.129, gap 0.120), 0.3 to 0.4 (700, 0.348,
+0.219, gap 0.130), 0.5 to 0.6 (890, 0.549, 0.440, gap 0.108), and 0.6 to 0.7 (362, 0.639, 0.536,
+gap 0.103). Figure 6 shows the bins. In the bins from 0.1 to 0.8 the observed share is below the
+mean forecast, so the neural network over-states the probability of reverse flow in that range.
 
 ### The 12 counted contrasts and the report-only contrast
 
-**Only C1 sets a verdict word, and C1's interval lies far below the margin m of 0.250 points.**
+**Only C1 sets a verdict word, and C1's interval lies far below −m (−0.250 points).**
 Table 2 lists every contrast. A negative difference is a gain of the first arm. C6 is read on the
 pinball loss and the others on the signed CRPS. The BSP contrasts C4 and C12 are read on the two BSP
 test months, and by world type. Source: the "Contrasts" table of the printed report.
@@ -260,9 +283,13 @@ test months, and by world type. Source: the "Contrasts" table of the printed rep
 | C12 | H minus A | bsp_both | 0.172 | -0.172 | 0.900 |
 | C13 (report only) | D-sign minus D | all | -0.340 | -0.749 | -0.099 |
 
-**Six pre-registered predictions did not hold.** C1 is a gain of 33.878 points against a predicted 1
+**At least eight pre-registered predictions did not hold.** The plan predicted that almost all of
+C1's gain sits on reverse-flow half-hours, and the opposite holds (see "What this means"). C1 is a
+gain of 33.878 points against a predicted 1
 to 4 points, because B1 scores 34.664 points over all rows (Table 3), far worse than every neural
-network, so the size of C1 depends on a weak yardstick. C4, the BSP steps added to arm B, is +0.149
+network, so the size of C1 depends on a weak yardstick. The prediction that the D-sign reliability
+term is within 0.005 of arm D's is not read in the report. C4, the BSP steps added to arm B, is
++0.149
 points (interval 0.068 to 0.455), a loss, against a predicted gain of at least 0.3 points. C6 shows
 the 11-quantile head 0.307 points better than the two-lobe head on the pinball loss, where the plan
 predicted it at least 0.2 points worse. C13 shows D-sign 0.340 points better than arm D (interval
@@ -279,11 +306,13 @@ not shown. C5 is −0.059 points, inside the predicted range of under 0.2.
 
 ### Scores of every arm and baseline
 
-**Every arm of the ladder beats B\* by more than 30 points over all rows, and no arm beats P0f on
+**Every arm beats B\* by more than 30 points over all rows, and no neural network beats P0f on
 import rows.** Table 3 gives the signed CRPS and the normalised error of the median, in points of
-D8's capacity, on all rows, import rows, and reverse-flow rows. P0 and P0f are the signed reading
-used as a point forecast. P0f has the same 0.5-point lobe floor as the neural networks. Source: the
-"Scores" table of the printed report.
+D8's capacity, on all rows, import rows, and reverse-flow rows. P0 and P0f use the signed reading as
+a point forecast. P0f has the same 0.5-point lobe floor as the neural networks. M2 is scored on all
+94,080 rows, including solar worlds, although the plan scored M2 on the engine-only segments because
+M2 has no solar term (a departure from the plan; the M2 figures are as scored). Source: the "Scores"
+table of the printed report.
 
 *Table 3. Signed CRPS and normalised error of the median, in points of D8's capacity.*
 
@@ -315,7 +344,8 @@ M2, and 112.405 for P0f.
 
 ![Signed CRPS of the arms and baselines](figure_4_scores.svg)
 
-*Figure 2. Signed CRPS of the arms A to H and the baselines on all, import, and reverse-flow rows
+*Figure 2. Signed CRPS of P0f, B\*, and the arms A, B, C, D, and H on all, import, and reverse-flow
+rows
 (smaller is better).*
 
 **The q05 and q95 coverage of every neural network is at least 0.94, consistent with the plan's note
@@ -325,11 +355,13 @@ coverage of the arms, 0.943.
 
 ### The architecture screen, B\*, and the margin
 
-**The bidirectional long short-term memory network (bilstm) was chosen on the validation months, and
+**The bidirectional long short-term memory neural network (bilstm) was chosen on the validation
+months, and
 B1 was chosen as B\*.** Source: the header of the printed report, and `verdict.json`. B1 is the
 demand climatology that sets the probability of reverse flow to the world's injected share times the
 probability that demand lies below the reading. The margin m is 0.250 points, the floor of its rule.
-Figure 3 shows the validation scores of the three architectures.
+On the validation months, arm D scores 0.868 points with the bilstm, 0.941 with the U-net, and 3.083
+with the denoising autoencoder (3 seeds each; source: `selection.json`). Figure 3 shows the scores.
 
 ![Validation signed CRPS of the three architectures](figure_9_architectures.svg)
 
@@ -343,7 +375,10 @@ ranges.** Source: "Realism gate" in the printed report. Table 4 gives the share 
 regression passed on all three parts (slope overlap, standard error inside, standard deviation
 inside), with 8 finite fits, 8 synthetic stretches used of 19, and 1 real stretch of 1,488
 half-hours. The real slope lies 7.427 standard deviations below the placebo slopes
-(`real_slope_z_vs_placebo` = −7.427). The pass is a check at the level of the readings only.
+(`real_slope_z_vs_placebo` = −7.427). The shares pass narrowly: the synthetic share over the real
+share is 0.59 for net daily minima, 0.61 for solar daily minima, and 0.56 for solar half-hours,
+against a lower edge of 0.5. The gate checks these shares and the BSP step slope, and it checks no
+other feature of the synthetic days.
 
 *Table 4. Real and synthetic shares in the realism gate.*
 
@@ -360,12 +395,12 @@ solar series.*
 **The timing gate projects 1.102 GPU-process-hours at the epoch cap and 0.386 at early stopping,
 against a budget of 10.0.** Source: "Timing gate" in the printed report. The gate measured 0.350
 seconds per epoch for the denoising autoencoder, 0.409 for the U-net, and 0.437 for the bilstm. The
-GPU hours that the 50 fits actually spent are not in the three files.
+50 fits spent 1.107 GPU-process-hours in all, the sum of the `seconds` of their fit records.
 
 ### Real-day checks
 
 **H2, K1, and K2 pass; R2 and R3 are reports with no bar.** Source: `verdict.json`, key `real`. All
-figures are aggregates.
+numbers in this list are aggregates.
 
 - **K1, the engine head against the metered engine record:** the head's mean absolute error is 0.432
   times that of an all-zero engine (bar: at most 0.5), its running F1 is 0.781 against 0.678 for M2
@@ -377,10 +412,10 @@ figures are aggregates.
   0.02).
 - **R2, re-fold consistency:** the share of half-hours whose re-folded median lies within 2 points
   of the reading is 0.930 in the net era, 0.795 in the solar era, 0.723 in the fade era, and 0.999
-  on the K2 days. The network is trained to re-fold, so R2 is nearly guaranteed.
+  on the K2 days. The neural network is trained to re-fold, so R2 is nearly guaranteed.
 - **R3, the share of half-hours with P(X<0) above 0.5 by era:** 0.040 in the net era, 0.157 in the
   solar era, and 0.217 in the fade era. Figure 5 gives the share by UTC hour. The reading says where
-  the network places reverse flow and does not show that reverse flow occurred.
+  the neural network places reverse flow and does not show that reverse flow occurred.
 
 ![Real eras by UTC hour](figure_8_eras.svg)
 
@@ -389,17 +424,19 @@ half-hours with a reading below 1.0 MVA.*
 
 ### The shifted-mix read-out and the ambiguity read-out
 
-**Arm D did not memorise the training mix.** On the shifted bank, where 50% of the segments carry no
-injection against 85% in the test banks, arm D scores a signed CRPS of 0.741 points with a
+**The shifted-mix read-out shows no sign that arm D memorised the training mix.** On the shifted
+bank, which has an injected share of 0.50 against 0.85 in the test banks, arm D scores a signed CRPS
+of 0.741 points with a
 reliability term of 0.0000943, a largest bin gap of 0.0863, and 0.0218 of half-hours with P(X<0)
 above 0.5. B\* scores 13.405 points with a reliability term of 0.0747 and a largest gap of 0.437.
 Source: `verdict.json`, key `shifted`.
 
-**Where the reading is under 1 MVA, the arms cannot tell the sign, and the report shows which arm
-admits that.** Table 5 gives B\*, arm D, and D-sign by reading band, from the "Ambiguity read-out"
+**Where the reading is under 1 MVA, no arm is sure of the sign, and B\* is the arm that is confident
+and wrong.** Table 5 gives B\*, arm D, and D-sign by reading band, from the "Ambiguity read-out"
 table of the printed report. "Confident share" is the share of half-hours with P under 0.1 or over
 0.9. In the band under 0.3 MVA, 0.463 of the half-hours are reverse flow. B\* is confident on 0.810
-of them with a mean P of 0.096, so it is confidently wrong. Arm D has a mean P of 0.529 and is
+of those half-hours with a mean P of 0.096, so B\* is confidently wrong. Arm D has a mean P of 0.529
+and is
 confident on 0.003. D-sign has a mean P of 0.482. By the truth's size, the observed share of reverse
 flow is 0.437 where |X| is under 1 times the reactive floor Q̂ of 0.1 MVA, 0.474 for 1 to 3, 0.402
 for 3 to 10, and 0.017 above 10. The ambiguity read-out has no bar.
@@ -425,6 +462,14 @@ for 3 to 10, and 0.017 above 10. The ambiguity read-out has no bar.
 
 *Figure 6. The reliability diagram of arm D's P(X<0): forecast probability against the observed
 share of reverse flow.*
+
+### Reviews and pre-run gates
+
+**The planner ran `e00729_plan_calcs.py` before the Opus plan review, the review re-derived the
+numbers the script produced, and no verdict row changed.** The plan paragraph that records the
+breach is unchanged in "The plan as registered". Figures 1, 2, and 6 of the planned list were not
+written by the run, and figures 3, 4, 5, 7, 8, and 9 are in this section. The Opus result review
+(the run's first review of this section) found no leakage and confirmed verdict row 3.
 
 ## Checks
 
@@ -482,8 +527,7 @@ engine connects.** A read-only check written for this plan counted the pre-engin
 40 of 48 half-hours, and none has a half-hour below 1.0 MVA; the median daily minimum is 5.7 MVA. In
 the net era, 17% of days have a daily minimum below 1.0 MVA, and the lowest daily minima are 0.03
 MVA. In the solar era the share rises to 56% of days, and to 87% to 97% in May to August. The lowest
-half-hours sit in a one-half-hour V-shaped dip. That dip is what folding through zero predicts, but
-a
+half-hours sit in a one-half-hour V-shaped dip. That dip is what folding through zero predicts, but a
 net flow that approaches zero without crossing it would give the same dip, so the reading alone
 cannot show reverse flow.
 
@@ -518,8 +562,7 @@ it, as [data-processing](../data-processing.md) records. Two consequences follow
 194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)
 placed the engine at D8 from the timing of D8's shortfall and warned that the register's Primary
 column does not name the meter that sees a generator. [Experiment
-722](../00722-msa-mva-bsp-closure-and-fast-hint/result.md) found a slope of the BSP residual's
-2-hour
+722](../00722-msa-mva-bsp-closure-and-fast-hint/result.md) found a slope of the BSP residual's 2-hour
 change on the record's change of -0.85 (95% interval -1.16 to -0.39), close to the expected -1 but
 void on its detection limit of 0.54 against a bar of 0.5. Experiment 723's plan keeps that reading
 void and replaces the two-placebo rule with a permutation rule over circular day shifts for future
@@ -541,14 +584,12 @@ read on the two test months that the meter covers.
 the end of the pre-engine era label. The second is the engine's connection date in the private
 constants file, read through `ml-experiments/engine_constants.py`. The page never states which
 boundary binds or how many days the cut removes. Half-hours that the `substation_zero` rule flags
-are dropped, and the count dropped per split is reported. Days within 24 hours of a logged closure
-at
+are dropped, and the count dropped per split is reported. Days within 24 hours of a logged closure at
 D8 are dropped if the switching logs load, and the count is reported.
 
 **Whole calendar months are held out, because D8's demand has changed since the pre-engine era.** A
 rule chooses the months, `e00729_core.py` applies the rule to the private base calendar, and neither
-this page nor the repository's code lists a month. The explicit list is in `PRIVATE/splits.md` of
-the
+this page nor the repository's code lists a month. The explicit list is in `PRIVATE/splits.md` of the
 experiment's data folder. The rule has four steps:
 
 - A base month is a calendar month with at least 20 base days.
@@ -614,8 +655,7 @@ injected solar.** Each segment draws one source:
 - **Source S2 (the other half):** the satellite irradiance of the Copernicus Atmosphere Monitoring
   Service (CAMS) at one of the farm sites, not at D8, on the same base day, through a plane-of-array
   solar model with a drawn tilt (10° to 40°), azimuth (120° to 240°), and ratio of direct-current to
-  alternating-current rating (1.0 to 1.4, with clipping), times a drawn capacity and a
-  multiplicative
+  alternating-current rating (1.0 to 1.4, with clipping), times a drawn capacity and a multiplicative
   noise with a half-hour autocorrelation of 0.9 and a standard deviation of 0.05.
 
 A segment with solar draws a capacity log-uniform from 60 to 400 points. Solar output is never
@@ -654,8 +694,7 @@ Q²).
 
 **The synthetic BSP meter is the real BSP A meter of the same base day plus the injection's
 effect.**
-It is BSP_real − β (E + S), with β drawn per segment from 0.6 to 1.0, so the BSP noise from the
-other
+It is BSP_real − β (E + S), with β drawn per segment from 0.6 to 1.0, so the BSP noise from the other
 eight Primaries and the outside generators is real and has the same structure in training and test.
 The neural network reads the half-hour change of this series.
 
@@ -665,8 +704,7 @@ neural network real pre-engine days whose answer is the reading itself.
 
 **The training mix is randomised, so that C1 does not measure knowledge of the fixed 85%.** Each
 bank
-of 32 segment draws (one month, one seed) draws its own share of no-injection segments from a
-uniform
+of 32 segment draws (one month, one seed) draws its own share of no-injection segments from a uniform
 range of 0.05 to 0.60, which makes the injected share of a bank range from 0.40 to 0.95. The other
 three world types share the remainder in the proportions 0.30 : 0.20 : 0.35. The test mix of 0.15
 and the shifted mix below (0.50) both lie inside the range. The baselines B1 and B2 receive the
@@ -711,8 +749,7 @@ cleaner nor noisier than the real noise.
 **The gate is not independent evidence about the BSP simulator.** The range of β was set from the
 same record that the gate tests, and check K1 reads the same record. A pass therefore shows that the
 simulator's BSP noise has the right size around an engine step, and does not validate β. The record
-holds an engine and no solar farm, so β for solar has no real validation at all. The write-up
-reports
+holds an engine and no solar farm, so β for solar has no real validation at all. The write-up reports
 the BSP gain (C4 and C12) separately for engine-only worlds, solar-only worlds, and engine-and-solar
 worlds, so that a reader can see how much of the gain rests on the solar value of β.
 
@@ -729,8 +766,7 @@ the share of days with a daily minimum below 1.0 MVA was 0.144 against 0.172 (ra
 the range), and the share of half-hours below 1.0 MVA was 0.042 against 0.0119 (ratio 3.5, outside
 0.5 to 2.0). In engine-and-solar worlds against the real solar era, the share of days was 0.215
 against 0.536 (ratio 0.40, outside), and the share of half-hours was 0.049 against 0.045 (ratio 1.1,
-inside). The BSP-step conditions passed, with 7 finite synthetic fits. The synthetic engine
-therefore
+inside). The BSP-step conditions passed, with 7 finite synthetic fits. The synthetic engine therefore
 holds the reading at the floor for too many consecutive half-hours in the net era, and too few
 solar-era days reach the floor. The gate read no network output and no score.
 
@@ -754,8 +790,7 @@ frequency and size, and solar capacity), and the set that kept every ratio furth
 Every other range, and every registered bar, is unchanged. Spells at constant output held the
 reading at the floor for long stretches, so they are rarer and shorter, and the engine runs on more
 days; larger solar capacities make more solar-era days cross the floor. The offline shares of the
-chosen set were 0.70 and 1.2 times the real net-era shares (days, half-hours) and 0.64 and 0.63
-times
+chosen set were 0.70 and 1.2 times the real net-era shares (days, half-hours) and 0.64 and 0.63 times
 the real solar-era shares. A second failure of the gate ends the line at verdict row 0.
 
 **The gate passed on attempt 2, and the gate has now used both of its runs.** The 129 candidate
@@ -799,8 +834,7 @@ window's position in every arm.
 
 **The ladder is cumulative, so the BSP gain depends on the order of the inputs.** In arm C the BSP
 steps join an input set that already holds sunshine, and the steps may carry less information once
-sunshine is known. Arm H adds the BSP steps to arm A with no sunshine, so that C12 (H minus A) is
-the
+sunshine is known. Arm H adds the BSP steps to arm A with no sunshine, so that C12 (H minus A) is the
 BSP gain in the other order. A BSP gain that shows in C12 and not in C4 means that sunshine already
 carries the information. Neither order is a result about which input matters most.
 
@@ -855,15 +889,13 @@ fit's score on months it never touched. The test months carry every counted read
 each
 lobe.** The import lobe is a Gaussian with a positive mean and the reverse-flow lobe a Gaussian with
 a negative mean, in the manner of a mixture density network ([Bishop
-(1994)](https://publications.aston.ac.uk/id/eprint/373/)). Each spread is 0.5 points plus a
-softplus,
+(1994)](https://publications.aston.ac.uk/id/eprint/373/)). Each spread is 0.5 points plus a softplus,
 so no lobe collapses. The loss is the negative log likelihood. The signed CRPS of the mixture is
 computed exactly ([Grimit et al. (2006)](https://doi.org/10.1256/qj.05.235)).
 
 **The 0.5-point floor sets a lower limit on every score.** A Gaussian lobe of spread 0.5 points
 whose
-mean is exact scores a CRPS of 0.5 × (2 × 0.399 − 0.564) = 0.117 points. No arm can score below
-about
+mean is exact scores a CRPS of 0.5 × (2 × 0.399 − 0.564) = 0.117 points. No arm can score below about
 0.12 points on a half-hour where its lobe is right, and the harm checks therefore use P0f (see
 "Baselines") and not P0.
 
@@ -897,8 +929,7 @@ loss.
 
 **Five rules that learn nothing from a day's shape set the bar for the neural networks.**
 
-- **P0** reads the reading as signed import: X = sqrt(max(R² − Q̂², 0)), with Q̂ = 0.1 MVA, as a
-  point
+- **P0** reads the reading as signed import: X = sqrt(max(R² − Q̂², 0)), with Q̂ = 0.1 MVA, as a point
   distribution.
 - **P0f** is P0's point X̂ given the same lobe-width floor as the neural networks: a Gaussian
   centred on X̂ with a spread of 0.5 points. P0f is the reference for the harm checks H1 and H2 and
@@ -991,11 +1022,9 @@ written to `margin.json`, which refuses to be overwritten.
 
 **A shifted-mix read-out tests whether arm D has learned the training mix.** A second test bank is
 built once from a separate seed space with 50% of its segments carrying no injection (an injected
-share of 0.50, against 0.85 in the test banks), with the same months and draws. The read-out
-reports,
+share of 0.50, against 0.85 in the test banks), with the same months and draws. The read-out reports,
 for arm D and for B\* with the prior set to 0.50, the signed CRPS, the reliability term and diagram
-of P(X<0), and the share of half-hours with P(X<0) above 0.5. A neural network that had memorised
-the
+of P(X<0), and the share of half-hours with P(X<0) above 0.5. A neural network that had memorised the
 injected share would over-predict reverse flow in this bank, and its reliability term would rise
 well above its value on the test banks. The read-out enters no verdict row. The harm limit does not
 change: it is derived from the test mix (section "Verdict table"), and the shifted bank has a
@@ -1019,16 +1048,12 @@ reading cannot tell the sign (a truth under Q̂), and sits near 0 or 1 where the
 - **Sign calibration:** the reliability term of the Brier score of arm D's P(X<0), outside the dead
   band, is at most 0.01, and no bin of at least 200 half-hours sits off the diagonal by more than
   0.1 (the bars of experiment 724's plan). The reliability term is the mean squared gap between a
-  forecast probability and the observed frequency, so 0.01 is a root-mean-square gap of 0.1, the
-  same
-  size as the bin bar. A calibrated forecast's term is about 0.0013 or less from sampling noise
-  alone
-  (10 bins, probabilities at worst 0.5, 64 segments of 30 days counted as independent), so the bar
-  is
+  forecast probability and the observed frequency, so 0.01 is a root-mean-square gap of 0.1, the same
+  size as the bin bar. A calibrated forecast's term is about 0.0013 or less from sampling noise alone
+  (10 bins, probabilities at worst 0.5, 64 segments of 30 days counted as independent), so the bar is
   about 8 times the noise.
 - **Lobe coverage:** the 5% to 95% range of the lobe on the true side covers the truth on at least
-  85% of half-hours. The floor makes coverage easy: in the plan's simulation, P0's magnitude with
-  the
+  85% of half-hours. The floor makes coverage easy: in the plan's simulation, P0's magnitude with the
   floor alone covers the true magnitude on 99.8% of half-hours, and on 97.7% of reverse-flow
   half-hours. The 85% bar therefore detects a collapsed or biased lobe and says nothing about
   sharpness, and the write-up reports the mean width of the range beside the coverage. A lobe that
@@ -1041,8 +1066,7 @@ reading cannot tell the sign (a truth under Q̂), and sits near 0 or 1 where the
 - **R1, false alarms on real pre-engine days, a weak check.** The real test months, with no
   injection, have a known answer: X equals the reading. H2 reads arm D's signed CRPS minus P0f's on
   these half-hours and the share of half-hours with P(X<0) above 0.5. These days never read below
-  1.0 MVA, so the neural network meets no reading near the fold. A pass shows that the neural
-  network
+  1.0 MVA, so the neural network meets no reading near the fold. A pass shows that the neural network
   does not invent reverse flow far from zero, and says nothing about readings near zero. R1 and H2
   are weak checks.
 - **K1, the engine head against the metered engine record.** On the record's days, the record's
@@ -1059,8 +1083,7 @@ reading cannot tell the sign (a truth under Q̂), and sits near 0 or 1 where the
 - **R2, re-fold consistency on the real net, solar, and fade eras, a report with no bar.** Arm D's
   output is folded with Q̂ and compared with the reading, and the report gives the share of
   half-hours on which the folded median lies within 2 points of the reading in each era, and on the
-  K2 days. The neural network is trained to re-fold, so R2 is nearly guaranteed and enters no
-  verdict
+  K2 days. The neural network is trained to re-fold, so R2 is nearly guaranteed and enters no verdict
   row.
 - **R3, descriptions with no bar.** The share of half-hours with P(X<0) above 0.5 by era and month
   and by era and local hour, set beside the share of days whose daily minimum is below 1.0 MVA; the
@@ -1114,13 +1137,11 @@ placed on reverse flow, and a lobe centred away from P0's point.
 **The limit is half of the margin's floor, spread over the import share of the synthetic world.**
 The smallest gain that C1 counts as support is m, at least 0.25 points over all rows. Harm of h
 points on every import half-hour lowers the overall gain by h × (1 − s), where s is the share of
-reverse-flow half-hours. The limit lets the harm consume at most half of the smallest countable
-gain:
+reverse-flow half-hours. The limit lets the harm consume at most half of the smallest countable gain:
 h ≤ 0.125 / (1 − s). In the synthetic world's own mix (no injection 0.15, engine only 0.30, solar
 only 0.20, engine and solar 0.35), `e00729_plan_calcs.py` draws 3,000 segments from the parameter
 tables of this page on D8's base readings, and s = 0.051 (0.059 in engine-only worlds, 0.010 in
-solar-only worlds, 0.091 in engine-and-solar worlds). The limit is then 0.125 / 0.949 = 0.132
-points.
+solar-only worlds, 0.091 in engine-and-solar worlds). The limit is then 0.125 / 0.949 = 0.132 points.
 On the real held-out base days every half-hour is import, so s = 0 and the limit is 0.125 points.
 One limit serves both checks, rounded down to 0.12 points.
 
@@ -1135,14 +1156,12 @@ decimals, which keeps the check no looser than the formula even where s is large
 found. The same review found 5.5% of half-hours as reverse flow outside the dead band, against the
 script's 4.7%, so the reachability counts below have more margin than the plan states.
 
-**The limit is fixed before any fit and before any score, and it does not depend on the
-simulation.**
+**The limit is fixed before any fit and before any score, and it does not depend on the simulation.**
 The training mix is randomised, and the limit is derived on the fixed test mix, which scores the
 harm checks. The one data input is D8's base readings, which the calculation script read to estimate
 s, and no score exists. The simulation is approximate: solar output is a clear-sky shape times a
 random cloud factor, and engine runs follow the parameter table without trips or ramps. A share s
-between 0.03 and 0.10 would move the formula only between 0.129 and 0.139 points, so the rounded
-0.12
+between 0.03 and 0.10 would move the formula only between 0.129 and 0.139 points, so the rounded 0.12
 holds across that range. The same simulation gives 4.7% of half-hours as reverse flow outside the
 dead band of 2 points, which is about 4,400 of the 92,000 half-hours of the test banks (8 months ×
 30 days × 8 draws × 48 half-hours) and about 1,100 of the 23,000 in the two BSP test months.
@@ -1194,8 +1213,7 @@ architecture that the validation rule chooses.
 **The GPU projection is about 1.17 GPU-process-hours at the epoch cap, from a timing gate that
 measured 0.35 to 0.44 seconds an epoch.** The timing gate runs 5 epochs of each architecture on arm
 D and projects the GPU-process-hours from the measured time per epoch. At those times, the 47 fits
-of the plan before arm D-sign take 1.10 GPU-process-hours at the cap of 200 epochs. Arm D-sign adds
-3
+of the plan before arm D-sign take 1.10 GPU-process-hours at the cap of 200 epochs. Arm D-sign adds 3
 fits, which the projection prices at the slowest architecture's 0.44 seconds an epoch (D-sign's
 single output makes it no slower), so the 50 fits take about 1.17 GPU-process-hours at the cap
 (1.10 plus 3 × 200 × 0.44 / 3600 = 0.07). An early stop near 70 epochs takes about 0.41. The plan's
@@ -1222,16 +1240,23 @@ is saved in the experiment's data folder.
 
 ## Reviews and pre-run gates
 
-**Disclosed breach of the first-run rule: the planner ran `e00729_plan_calcs.py` before the Opus
-plan review, the review re-derived the numbers, and no verdict row changed.** The script applies the
-split rule to D8's private base calendar and writes the month lists to the private
-`PRIVATE/splits.md`. It then simulates 3,000 synthetic segments on D8's pre-engine readings, and
-prints the reverse-flow share, the dead-band share, P0's and P0f's scores on import half-hours, the
-lobe coverage of the floor alone, the share of base days with metered farms, the arithmetic of the
-bootstrap widening, the seed floor, the GPU projection, and the harm limit. It reads the private
-engine-connection date to apply the cut but prints no engine size, date, series identifier, or
-per-day real value. The Opus review re-derived the import share and the sunshine-cell gap method
-(see "The limit is half of the margin's floor"), and the harm limit of 0.12 points stayed.
+**Disclosed breach of the first-run rule: the planner ran `e00729_plan_calcs.py` before any Opus
+code review, and every number it produced is unreviewed.** The script applies the split rule to D8's
+private base calendar and writes the month lists to the private `PRIVATE/splits.md`. It then
+simulates 3,000 synthetic segments on D8's pre-engine readings. From the simulation it prints the
+reverse-flow share (all half-hours, outside the 2-point dead band, and by world type), the dead-band
+share, P0's median error on import half-hours, P0f's CRPS on import half-hours, and the lobe
+coverage of the floor alone. The script also counts the share of base days on which at least 1 and
+at least 3 metered farms have data, and prints the identical share and the median gap between the
+CAMS series at each farm and at D8. Last, it prints the arithmetic of the bootstrap widening, the
+seed floor, the GPU projection, and the harm limit. It reads the private engine-connection date to
+apply the cut but prints no engine size, date, series identifier, or per-day real value, and it
+prints split counts and shares only. The harm limit of 0.12 points, the simulated import share, the
+cell-gap range of 4.5% to 11%, and every other number it produced stay unreviewed until the Opus
+code review of the experiment's code passes. The first Opus code review has since re-derived the
+import share and the sunshine-cell gap method (see "The limit is half of the margin's floor"); the
+fixes it asked for are in the code, and a re-review of the fixes is still open. No further script
+runs before that re-review.
 
 ## Standing practices and earlier advice
 
@@ -1263,12 +1288,8 @@ already stored, and the sign-only arm D-sign is a report-only contrast.
 
 ## Figures planned
 
-**Figures 3, 4, 5, 7, 8, and 9 of this list are in the Result section; figures 1, 2, and 6 were not
-written by the run.**
-
 **Every figure is safe to publish: synthetic series in detail, real series as aggregates only.** No
-figure shows the metered engine record, an engine-head output on a real day, or a date of the
-engine.
+figure shows the metered engine record, an engine-head output on a real day, or a date of the engine.
 Real-day panels carry no calendar dates.
 
 1. D8's reading by era: the share of days with a daily minimum below 1.0 MVA by month, and the
@@ -1292,8 +1313,7 @@ Real-day panels carry no calendar dates.
   MVA, and a floor that keeps the reading clear of zero does not fit it.
 - **The engine head's real check subtracts the record from D8's reading (K1),** because D8's reading
   is gross demand on the record's days; the unchanged days become a placebo (K2).
-- **The BSP coefficient β is drawn from 0.6 to 1.0,** because the step test found a response below
-  1.
+- **The BSP coefficient β is drawn from 0.6 to 1.0,** because the step test found a response below 1.
 - **Arm D carries wind speed and precipitation,** from the stored ERA5 features of D8's grid cell,
   because this is a reconstruction and coincident observed weather is legitimate.
 - **Arm D-sign is report-only,** because it enters no verdict row, and the Bonferroni level stays at
@@ -1387,8 +1407,7 @@ Real-day panels carry no calendar dates.
   `missing`, or `unreadable`) and whether any closure day fell on a base day. The banks stage
   raises a row-1 error when the split derived with the closure days differs from the private file,
   or when the file is missing, and the smoke test prints the flag with and without closure days.
-- **The code computes B1's climatology directly.** The sign prior needs the empirical distribution
-  of
+- **The code computes B1's climatology directly.** The sign prior needs the empirical distribution of
   base demand in each (month, half-hour, weekend) cell, so the code builds it from the training days
   without smoothing over neighbouring cells, and does not call `ClimatologyForecaster`.
 - **M2 starts at the first day of each month, without the plan's 28 days of injected history.** The
@@ -1399,16 +1418,14 @@ Real-day panels carry no calendar dates.
 - **The first test score is marked by a file** that the scoring stage creates once; the choice
   files of the architecture, B*, and the margin must be older than it, and B* is written once.
 - **M2 reads each segment as one continuous series.** A missing half-hour is filled by linear
-  interpolation before the tracker runs, and M2 is scored on every test segment, with the
-  engine-only
+  interpolation before the tracker runs, and M2 is scored on every test segment, with the engine-only
   segments as the listed benchmark.
 - **A segment shorter than 28 days gives M2's causal spread its own median.** Experiment 694's
   causal spread fails on a series shorter than 28 days, because a lag of 28 days reaches before
   its first half-hour. A local copy skips those lags and equals 694's function on a series of 28
   days or more (a test checks 28 and 60 days). Where fewer than 7 earlier days exist on a shorter
   series, the spread is 1.4826 times the series' own median absolute lag-1 difference, at least 0.03
-  MVA, and is then quantised as before. The fill uses days after the half-hour it fills, so it
-  mildly
+  MVA, and is then quantised as before. The fill uses days after the half-hour it fills, so it mildly
   favours M2, which is conservative against the neural networks. The K1 pseudo-segments are longer
   than 28 days and pass through unchanged.
 - **A steps series is NaN across a gap of days.** The first half-hour of a day whose previous day is
@@ -1417,8 +1434,7 @@ Real-day panels carry no calendar dates.
   segment's smallest unit and the banks stage logs the smallest value over all segments.
 - **A fit that raises is recorded and not retried.** It writes `fits/<name>.failed.json`, and the
   scoring stage then reads verdict row 2. A correctness error inside the scoring stage reads row 1.
-- **The bank-level leakage checks run on every segment of every evaluation bank,** and the CAMS
-  check
+- **The bank-level leakage checks run on every segment of every evaluation bank,** and the CAMS check
   compares D8's half-hourly series with each farm's on the same interpolation, failing when more
   than half of the daytime half-hours are identical.
 - **Printed output holds counts, shares, and flags only,** never a month, a date, an engine size, a
@@ -1501,8 +1517,8 @@ edited.
   stages (banks, gate, tiny CPU fits, margin, scoring, verdict, figures) on invented arrays, with
   the day table, the metered record, and the private cut replaced. `smoke_real_files.py` opens each
   real file once and prints flags only; it is run by hand once, after the code review.
-- `data/ml-experiments/00729-msa-d8-neural-untangler-synthetic-known-answers/`: written. It
-  holds `banks/`, `networks/`, `predictions/`, `scores/`, `margin.json`, `verdict.json`, the run
+- `data/ml-experiments/00729-msa-d8-neural-untangler-synthetic-known-answers/`: written. It will
+  hold `banks/`, `networks/`, `predictions/`, `scores/`, `margin.json`, `verdict.json`, the run
   logs, and a `PRIVATE/` folder for anything dated, which already holds `splits.md` (the month
   lists). The two read-only checks written for this plan, `reverse_flow_check.md` and
   `engine_metering_check.md`, are there too and are never published.
