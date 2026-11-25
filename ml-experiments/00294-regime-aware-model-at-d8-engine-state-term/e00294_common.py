@@ -1,11 +1,15 @@
 """Paths and constants shared by the scripts of experiment 294 (copied from experiment 191)."""
 
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
 from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 EXPERIMENT_ID: Final[int] = 294
 SLUG: Final[str] = "regime-aware-model-at-d8-engine-state-term"
@@ -47,7 +51,7 @@ BREAK: Final[datetime] = datetime(2023, 8, 15, tzinfo=UTC)
 D8_FIRST_DAY: Final[datetime] = datetime(2025, 4, 1, tzinfo=UTC)
 """Experiment 191's first D8 day (the series changed meaning after 8.91 MW of solar connected)."""
 STATE_GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
-UNIT_MW: Final[float] = 1.97
+UNIT_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw")
 """One engine unit, from the engine's recorded output levels (experiment 194)."""
 
 FIRST_RUN: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)

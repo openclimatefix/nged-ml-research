@@ -2,7 +2,7 @@
 """Known-answer test of the mixture fit: simulate readings with known unit probabilities.
 
 The base distribution is a normal with standard deviation 6 points (noise scale 1 against a
-reference whose quantiles are those of that normal), engine units of 19.7 points, and a unit
+reference whose quantiles are those of that normal), engine units of a fixed size in points, and a unit
 probability that is higher in the evening hour block. The fit must recover the noise scale and the
 evening/other contrast. A second run uses no engine and must give a mean P(k >= 1) near zero.
 

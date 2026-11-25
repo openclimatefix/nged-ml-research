@@ -50,11 +50,11 @@ Weekly step fits (weeks with at least 168 half-hours, before 2026-01-01; thresho
 Sensitivity: capacity-scaled threshold (0.241 x the site's capacity, i.e. -2.5 MW at D8)
   D8: capacity 10.38 MW, threshold -2.50 MW, overall share 0.210
   D8 (scaled): change point (first week of new regime) 2023-08-14; share 0.010 before, 0.257 after (step +0.246); likelihood-ratio set 2023-08-14 to 2023-08-14; block-bootstrap 95% 2023-08-14 to 2023-08-21; 140 weeks
-  D3: capacity 12.86 MW, threshold -3.10 MW, overall share 0.000
+  D3: capacity and threshold [withheld], overall share 0.000
   D3 (scaled): change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step -0.000); likelihood-ratio set 2023-06-26 to 2024-05-13; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
-  D5: capacity 5.72 MW, threshold -1.38 MW, overall share 0.002
+  D5: capacity and threshold [withheld], overall share 0.002
   D5 (scaled): change point (first week of new regime) 2025-11-10; share 0.001 before, 0.008 after (step +0.007); likelihood-ratio set 2025-11-10 to 2025-11-10; block-bootstrap 95% 2023-07-03 to 2025-11-10; 140 weeks
-  D14: capacity 11.71 MW, threshold -2.82 MW, overall share 0.001
+  D14: capacity and threshold [withheld], overall share 0.001
   D14 (scaled): change point (first week of new regime) 2025-09-29; share 0.000 before, 0.005 after (step +0.005); likelihood-ratio set 2025-09-22 to 2025-09-29; block-bootstrap 95% 2023-06-26 to 2025-11-10; 140 weeks
 
 Two-step fit of D8 over the whole window (up then down), weeks with at least 168 half-hours

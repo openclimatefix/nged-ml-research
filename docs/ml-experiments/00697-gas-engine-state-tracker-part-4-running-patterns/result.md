@@ -90,13 +90,12 @@ advice:
 ---
 
 **This experiment asks whether the gas engine behind D8, one of the 16 Primary substations that this
-research forecasts, runs to a schedule that follows the working week.** The engine is a gas engine
-with a long-term capacity contract. We read the engine from D8's half-hourly reading with the
-**tracker** of [experiment 694](../00694-gas-engine-state-tracker-part-1/result.md), a filter that
-infers from the reading alone how many of the engine's units are running in each half-hour. A unit is
-one block of output, of about 2 MW, that the engine adds or drops as a whole. The **running share**
-is the share of half-hours in a group that the tracker flags as running. No meter on the engine behind
-D8 is used.
+research forecasts, runs to a schedule that follows the working week.** We read the gas engine from
+D8's half-hourly reading with the **tracker** of [experiment
+694](../00694-gas-engine-state-tracker-part-1/result.md), a filter that infers from the reading
+alone how many of the engine's units are running in each half-hour. A unit is one block of output
+that the engine adds or drops as a whole. The **running share** is the share of half-hours in a
+group that the tracker flags as running. No meter on the engine behind D8 is used.
 
 **The question is measured as Q1, the weekday-minus-weekend running share from 16:00 to 19:00 local
 time.** That window is the **red band**: the hours in which NGED's Distribution Use of System
@@ -217,14 +216,16 @@ flatness of the control answers that only for the demand shapes that the control
 
 ![Running share against system price](f3_price.svg)
 
-**Figure 4 shows that Gas A runs at about 1, 2, or 3 times 1.97 MW and reaches its first full level
-within 2 half-hours in 94% of its 54 complete on-spells.** Left: output in running half-hours, with
-rules at multiples of 1.97 MW. Right: output as a share of the level reached. Bottom: starts and
-stops by local clock time. No panel for D8 is drawn, because the tracker places its edges where D8's
-reading steps. At D8 the tracker fits the size of one block of output (1.75, 2.25, or 3.5 MW, by
-era), and D8's reading cannot show how many separate units the engine has.
+**Figure 4 shows that Gas A's output is already most of the level it reaches in the first running
+half-hour of a spell.** Top: output as a share of the level reached, by half-hour from the first
+running (start) or idle (stop) half-hour, where 0 is the first half-hour of the new state. Bottom:
+the share of starts and of stops in each half-hour of the local clock. No panel for D8 is drawn,
+because the tracker places its edges where D8's reading steps. At D8 the tracker fits the size of
+one block of output, and D8's reading cannot show how many separate units the engine has. No panel
+shows the distribution of output while running, because the spacing of its peaks would reveal the
+engine's unit count and unit sizes, which are withheld.
 
-![Gas A output levels and ramps](f4_gas_a_levels_and_ramps.svg)
+![Gas A ramp shape and clock times of starts and stops](f4_gas_a_levels_and_ramps.svg)
 
 Eight more exploratory figures (G1 to G6 and G8 to G10, less G7) are on [the gallery
 page](gallery.md). G7, the night share by month, and the dated rasters stay in the private data
@@ -241,8 +242,8 @@ folder.
   0.80 to 0.90 elsewhere. The six D values above include the one against D2's control, which is the
   weakest of the six.
 - **The audit passed with 0 failed checks.** It asserts the row counts, the era lengths, the shares
-  of half-hours flagged in the net, solar, and fade eras (0.268, 0.384, and 0.262), the 1.75, 2.25,
-  and 3.5 MW block sizes, and 0 flags among 253,440 half-hours in 44 segments (separate stretches of
+  of half-hours flagged in the net, solar, and fade eras (0.268, 0.384, and 0.262), the fitted block
+  sizes, and 0 flags among 253,440 half-hours in 44 segments (separate stretches of
   readings, at 8 Primaries) of experiment 694's stored false-alarm pass. The stored host reproduction
   (experiment 695, host D4) gives an F1 score of 0.785 and a precision of 0.998.
 - **The smoothed labels match experiment 695's stored probabilities except in the fade era.** They
@@ -268,8 +269,8 @@ folder.
   Elexon APX Market Index Data is the within-day half-hourly price, not the day-ahead auction. Its
   table has 20 half-hours with a missing price, set to missing where the price and the volume were
   both 0 (`printed/signals_download.txt`).
-- **We looked for combined heat and power and found no sign of it.** The sources were the public
-  Capacity Market register entry for the engine, NESO's reserve results by technology, and public web
+- **We looked for combined heat and power and found no sign of it.** The sources were public
+  registers of generating plant, NESO's reserve results by technology, and public web
   searches for the operator and the site. None mentions a heat supply, and no permit or planning
   text was found. That is not evidence either way, and this experiment did not measure whether D8 has
   a heat load.
@@ -287,8 +288,7 @@ gas engine, to separate the band from the evening demand peak. No such experimen
 **Architecture and inputs:**
 
 - The tracker is experiment 694's M2 grid filter (a filter over a grid of demand levels and numbers
-  of units running) on D8's apparent-power reading. The eras fit different block sizes: 1.75 MW
-  (net), 2.25 MW (solar), and 3.5 MW (fade).
+  of units running) on D8's apparent-power reading. The eras fit different block sizes.
 - The label sets are Ts (the smoothed flag, which carries the verdict), Tf (the filtered flag), Ta
   (experiment 695's stored probabilities, used as a mean probability), and Tc (experiment 695's
   fixed-lag states, in the table of labels only).
@@ -348,9 +348,9 @@ gas engine, to separate the band from the evening demand peak. No such experimen
   `printed/signals_download.txt`.
 - Q3a and Q2q are variants that the plan names, split from Q3 and added as a sensitivity.
 - A lookup of NESO's Enduring Auction Capability results asks only for the technology "Gas
-  Reciprocating Engines" and filters by distance on this machine. The lookup found one post code
-  within 5 km of D8's supply area. That match does not confirm the engine's identity, and the match
-  stays in the private data folder.
+  Reciprocating Engines" and filters by distance on this machine. The lookup found one candidate
+  near D8's supply area. That match does not confirm the engine's identity, and the match stays in
+  the private data folder.
 
 ## Files
 
@@ -372,8 +372,7 @@ gas engine, to separate the band from the evening demand peak. No such experimen
   of each control.
 - `e00697_figures.py`, `e00697_private_figures.py`: the published figures and the private dated ones.
 - `e00697_signals_download.py`, `e00697_signals.py`, `e00697_lookups.py`: the extra signals (with
-  `printed/signals_download.txt` and `printed/signals_checks.txt`), their panels, and the register
-  lookup.
+  `printed/signals_download.txt` and `printed/signals_checks.txt`) and their panels.
 - `printed/`: the audit, the tables, the verdict, the controls log, and the signal checks, as
   printed by the scripts.
 - `data/ml-experiments/00697-gas-engine-state-tracker-part-4-running-patterns/`: private. It holds
@@ -382,3 +381,7 @@ gas engine, to separate the band from the evening demand peak. No such experimen
 - Read, from earlier work: experiment 694's tracker and stored false-alarm pass, and [experiment
   695](../00695-gas-engine-state-tracker-part-2-cleaned-target-and-climatology-add-back/result.md)'s
   stored probabilities and host states.
+- `data/ml-experiments/private/engine_constants.json`: the private file from which
+  `ml-experiments/engine_constants.py` reads the engine's recorded unit size. NGED has asked that
+  this value stays out of the repository, so the file is not committed and a rerun needs a copy of
+  it.

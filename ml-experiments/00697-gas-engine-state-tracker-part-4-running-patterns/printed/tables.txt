@@ -974,14 +974,14 @@ shape: (8, 6)
 │ ---   ┆ ---    ┆ ---     ┆ ---  ┆ ---      ┆ ---   │
 │ str   ┆ i64    ┆ f64     ┆ u32  ┆ f64      ┆ f64   │
 ╞═══════╪════════╪═════════╪══════╪══════════╪═══════╡
-│ fade  ┆ 1      ┆ 3.500   ┆ 868  ┆ 3.500    ┆ 0.625 │
-│ fade  ┆ 2      ┆ 3.500   ┆ 521  ┆ 7.000    ┆ 0.375 │
-│ net   ┆ 1      ┆ 1.750   ┆ 377  ┆ 1.750    ┆ 0.054 │
-│ net   ┆ 2      ┆ 1.750   ┆ 1596 ┆ 3.500    ┆ 0.230 │
-│ net   ┆ 3      ┆ 1.750   ┆ 4971 ┆ 5.250    ┆ 0.716 │
-│ solar ┆ 1      ┆ 2.250   ┆ 500  ┆ 2.250    ┆ 0.084 │
-│ solar ┆ 2      ┆ 2.250   ┆ 4935 ┆ 4.500    ┆ 0.830 │
-│ solar ┆ 3      ┆ 2.250   ┆ 513  ┆ 6.750    ┆ 0.086 │
+│ fade  ┆ 1      ┆ [withheld]   ┆ 868  ┆ [withheld]    ┆ 0.625 │
+│ fade  ┆ 2      ┆ [withheld]   ┆ 521  ┆ [withheld]    ┆ 0.375 │
+│ net   ┆ 1      ┆ [withheld]   ┆ 377  ┆ [withheld]    ┆ 0.054 │
+│ net   ┆ 2      ┆ [withheld]   ┆ 1596 ┆ [withheld]    ┆ 0.230 │
+│ net   ┆ 3      ┆ [withheld]   ┆ 4971 ┆ [withheld]    ┆ 0.716 │
+│ solar ┆ 1      ┆ [withheld]   ┆ 500  ┆ [withheld]    ┆ 0.084 │
+│ solar ┆ 2      ┆ [withheld]   ┆ 4935 ┆ [withheld]    ┆ 0.830 │
+│ solar ┆ 3      ┆ [withheld]   ┆ 513  ┆ [withheld]    ┆ 0.086 │
 └───────┴────────┴─────────┴──────┴──────────┴───────┘
 
 D8's reading does not give a unit count: the tracker's count is a block size.

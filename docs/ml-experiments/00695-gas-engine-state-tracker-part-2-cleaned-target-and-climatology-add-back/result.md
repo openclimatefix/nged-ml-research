@@ -368,6 +368,12 @@ tracker (AH) scores 0.203 points better than the causal one (A1), and AH scores 
   correlation of engine state with forecast error, the climatology row on the cleaned series, and
   the per-fold count of dropped half-hours were not run; none can change the branch.
 
+**The scripts read the engine's values from a private file.** The scripts import experiment 694's
+common module, which reads the engine's connection date and recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
+
 ## Method
 
 ### Architecture

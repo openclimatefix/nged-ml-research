@@ -500,3 +500,8 @@ stored predictions reused, and fitted networks saved.
   committed `review_triage.md` records what the reviews of the design changed.
 - [Experiment 709](../00709-era-signal-in-the-candidate-part-1/result.md): the stored signals,
   forecasts, and injected bank that the stored arms read.
+- Experiment 712 reads the era table of experiment 709 and takes the Primary under which the
+  register lists the gas engine from the `source` text of era 1. The era table's format is
+  unchanged, although experiment 709 now reads that Primary from the private file
+  `data/ml-experiments/private/engine_constants.json`, so a rerun of experiment 709 does not change
+  the output of experiment 712.

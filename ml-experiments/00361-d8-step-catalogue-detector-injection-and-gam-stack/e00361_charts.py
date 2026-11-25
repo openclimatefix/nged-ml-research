@@ -5,6 +5,7 @@ uv run --no-sync python ml-experiments/00361-*/e00361_charts.py
 """
 
 import json
+import sys
 import textwrap
 from pathlib import Path
 from typing import Final
@@ -14,6 +15,9 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
+
 SLUG: Final[str] = "00361-d8-step-catalogue-detector-injection-and-gam-stack"
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / SLUG
 DOCS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / SLUG
@@ -22,7 +26,7 @@ WIDTH: Final[int] = 480
 
 def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(DOCS_DIR / f"{name}.svg")
+    guard.save_chart(chart=chart, path=DOCS_DIR / f"{name}.svg")
     print("wrote", name)
 
 
@@ -111,12 +115,12 @@ def figure_2(*, scores: dict) -> None:
 
 
 def figure_3(*, catalogue: dict) -> None:
-    """Detected falls in power at D8 per month."""
-    frame = pl.DataFrame(catalogue["per_month"])
-    chart = alt.Chart(frame).mark_bar(color=ocf.BRAND_ORANGE).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("month:O", title="Month", axis=alt.Axis(labelAngle=-90, labelOverlap="parity")),
-        y=alt.Y("len:Q", title="Detected falls of at least 6 hours"),
-    ).properties(width=WIDTH, height=180, title=_title("The rule finds 1 to 10 falls a month at D8, and 193 in all", "Threshold 1.5 MW on the 6-hour median of the residual; against 171 rises of the same size"))  # fmt: skip
+    """Months of the history by how many falls the rule found in them; no dates."""
+    counts = pl.DataFrame(catalogue["per_month"]).group_by("len").agg(months=pl.len()).sort("len")
+    chart = alt.Chart(counts).mark_bar(color=ocf.BRAND_ORANGE, aria=False).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X("len:O", title="Detected falls of at least 6 hours in the month", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("months:Q", title="Number of months"),
+    ).properties(width=WIDTH, height=180, title=_title("The rule finds 1 to 10 falls a month at D8, and 193 in all", "Months pooled by number of falls; threshold on the 6-hour median of the residual; against 171 rises of the same size"))  # fmt: skip
     _save(chart, name="figure_3_falls_per_month")
 
 

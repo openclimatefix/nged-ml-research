@@ -174,6 +174,12 @@ replaced, to match the plan.
   +0.023 to +0.075). The trigger comparing quantile-score and mean-error contrasts cannot fire. The
   verdict rests on the D8 stop rule, which no leave-one-out result changes, so no audit was run.
 
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
+
 ## What to try next
 
 - Look for the rest of D8's gap in the median forecast, for example the stored median's bias on
