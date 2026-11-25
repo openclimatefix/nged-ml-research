@@ -566,3 +566,14 @@ def test_jobs_are_grouped_so_that_each_process_serves_one_fold_month() -> None:
     assert all(cli.pipeline_fold(job=j) == m for m, js in groups.items() for j in js)
     first = cli.group_by_pipeline_fold(jobs=fit.wave_jobs(wave=4))
     assert next(iter(first)) == core.MDE_FOLD
+
+
+def test_the_caps_are_read_when_the_fit_runs_so_the_end_to_end_pass_can_shorten_them(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(core, "REAL_FOLD_CAP_FIRST", 5)
+    monkeypatch.setattr(core, "REAL_FOLD_CAP_RERUN", 6)
+    result = fit.run_fit_with_flag(
+        fit=_Curve(list(1.0 - 0.001 * np.arange(400))), continuation=False
+    )
+    assert len(result.val_history) == 6

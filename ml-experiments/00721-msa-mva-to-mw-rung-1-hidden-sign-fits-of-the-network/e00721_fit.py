@@ -334,7 +334,7 @@ def fit_patience(
 
 
 def run_fit_with_flag(
-    *, fit: Trainable, continuation: bool, first_cap: int = core.REAL_FOLD_CAP_FIRST, rerun_cap: int = core.REAL_FOLD_CAP_RERUN,
+    *, fit: Trainable, continuation: bool, first_cap: int | None = None, rerun_cap: int | None = None,
 ) -> FitResult:  # fmt: skip
     """Fit one real-fold stage with patience 8 and, with `continuation`, go on to patience 30.
 
@@ -345,6 +345,10 @@ def run_fit_with_flag(
     run then goes on at patience 30 up to 150 passes in all, and its better state is kept apart and
     never passed on. The flag reads the whole curve.
     """
+    first_cap = (
+        core.REAL_FOLD_CAP_FIRST if first_cap is None else first_cap
+    )  # read at call time: the end-to-end pass overrides the constants
+    rerun_cap = core.REAL_FOLD_CAP_RERUN if rerun_cap is None else rerun_cap
     run = PatienceRun(fit=fit)
     started = time.monotonic()
     run.advance(max_passes=first_cap, patience=core.REAL_FOLD_PATIENCE)
