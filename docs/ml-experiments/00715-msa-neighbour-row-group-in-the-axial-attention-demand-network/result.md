@@ -178,8 +178,9 @@ because phase 4 did not run.
 **The page has no figures, because no plot was drawn.** The plan lists 10 plots, and none of them
 could be drawn from the fits that ran: the attention maps and the null-key share need a forward
 pass with attention returned, and the event charts need the injected-world forecasts of phase 4.
-Plots 7 and 8 (a forecast example and the contrasts by fold and by Primary) need no new fit, and a
-script that draws them is written and waits for a code review.
+Plots 7 and 8 (a forecast example and the contrasts by Primary and by fold) need no new fit. A
+script that draws them, and one extra report-only figure of the contrasts by lead band, is written.
+It has not run, and it waits for a second code review.
 
 **Readings listed in the plan were not computed.** The report-only contrasts (N1 against the 5
 stored seeds of M\*, F4 minus the Candidate, the contrasts by lead band and by Primary), the
