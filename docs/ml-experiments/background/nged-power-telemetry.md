@@ -35,7 +35,7 @@ count
   its whole network.** The 398 MVA sites are 23% of the 1,728 sites. Only the 1,330 MW sites report
   the sign of the flow, and the rows of the 398 MVA sites need the dark-row rule below. NGED gave
   both counts as rough numbers (NGED reply, November 2026; rough; provisional), and the counts cover
-  every site, not only the Primaries that the write-ups label D1 to D22.
+  the whole network, not only the Primaries.
 - **Use an MVA Primary for demand only on dark rows.** The rule, its evidence, and the row counts
   are in the [data-processing page](../data-processing.md#decide-which-rows-are-demand) (exp 103; 8
   MVA Primaries; established).
