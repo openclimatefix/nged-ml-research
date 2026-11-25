@@ -324,6 +324,7 @@ def draw_solar(
         sky = sky_of(farms=farms, farm=sky_farm, days=np.array([day]))
         poa = plane_of_array_w_m2(sky=sky, tilt_deg=tilt, azimuth_deg=azimuth, tracker=False)
         unit = ac_power_mw(poa_w_m2=poa, dc_capacity_mw=ratio, ac_capacity_mw=1.0)
+        unit = np.where(farms.zenith[sky_farm, day] >= core.SUN_UP_ZENITH_DEG, 0.0, unit)
         out[i] = capacity * unit * (1.0 + noise[i])
     return np.clip(np.nan_to_num(out), 0.0, None), fallback, "S1" if use_s1 else "S2", primary
 
@@ -403,7 +404,7 @@ def simulate_segment(
         The segment.
     """
     first_of = np.datetime64(f"{month}-01", "D")
-    nxt = (first_of.astype("datetime64[M]") + 1).astype("datetime64[D]")
+    nxt = (first_of.astype("datetime64[M]") + np.timedelta64(1, "M")).astype("datetime64[D]")
     n_cal = int((nxt - first_of).astype(int))
     dates = first_of - np.timedelta64(1, "D") + np.arange(n_cal + 2)
     pos = np.searchsorted(cal.dates, dates)
@@ -469,7 +470,7 @@ def real_segment(
         A segment whose `r` is `reading`, whose `x` is `truth`, and whose engine and solar are zero.
     """
     first_of = np.datetime64(f"{month}-01", "D")
-    nxt = (first_of.astype("datetime64[M]") + 1).astype("datetime64[D]")
+    nxt = (first_of.astype("datetime64[M]") + np.timedelta64(1, "M")).astype("datetime64[D]")
     n_cal = int((nxt - first_of).astype(int))
     dates = first_of - np.timedelta64(1, "D") + np.arange(n_cal + 2)
     pos = np.clip(np.searchsorted(cal.dates, dates), 0, len(cal.dates) - 1)
