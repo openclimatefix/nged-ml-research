@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E402, E501, I001, PT018
+# ruff: noqa: ANN001, D103, D205, D209, E402, E501, I001, PT018
 """Experiment 726: run injected panels through the stored stage 3 state of an MSA arm (GPU).
 
 **Source.** The loop is a copy of `cmd_bank` in experiment 713's `e00713_era.py` (frozen checkout
@@ -96,7 +96,8 @@ def origins_of_candidate(*, month: str) -> np.ndarray:
 
 
 def weather_statement(*, month: str) -> None:
-    """Check KW: print experiment 713's look-ahead statement and its data check for the first origin of the month."""
+    """Check KW: print experiment 713's look-ahead statement and its data check for the first origin
+    of the month."""
     y, m = (int(v) for v in month.split("-"))
     contract = datetime(y, m, 10, 12, tzinfo=UTC)
     print("\n".join(wl.statement(contract=contract, primary="D5")), flush=True)
@@ -174,7 +175,8 @@ def forecast_pass(
 
 
 def check_km3(*, data, device: str) -> None:
-    """Check KM3 (input half): the history power of an origin inside a window equals the clipped standardised shifted panel.
+    """Check KM3 (input half): the history power of an origin inside a window equals the clipped
+    standardised shifted panel.
 
     The panel is pass 0's. The follow-share half of KM3 runs in `e00726_checks.py` on the stored files.
     """

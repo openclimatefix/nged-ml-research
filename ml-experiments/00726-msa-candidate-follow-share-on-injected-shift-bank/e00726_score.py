@@ -1,10 +1,11 @@
-# ruff: noqa: ANN003, E501, PERF401
+# ruff: noqa: ANN003, D205, D209, E501, PERF401
 """Experiment 726: the follow share, the counted contrasts T1 and L1, the verdict, and the readings.
 
 Usage:
     e00726_score.py counted [--draws 20000] [--plan five|two]   # T1 and L1 in both groups, and the verdict
     e00726_score.py report                                       # report-only readings, read at 95%
-    e00726_score.py s6                                           # F4's reading S6 on experiment 714's second generator
+    e00726_score.py s6                                           # F4's reading S6 on experiment
+        714's second generator
 
 Everything above `main` is plain numpy and polars, so the unit tests run it on synthetic frames.
 The commands read stored forecast files only. Experiment 581's phase rule is reimplemented with
@@ -183,7 +184,8 @@ def assert_same_origin(
 
 
 def expected_pairs_of(*, month: str, lead_lo: float, lead_hi: float) -> pl.DataFrame:
-    """Return the (Primary, origin) pairs of origin days 0 to 20 in the Candidate's stored forecast of seed 0."""
+    """Return the (Primary, origin) pairs of origin days 0 to 20 in the Candidate's stored forecast
+    of seed 0."""
     stored = restrict_rows(
         frame=com.read_forecast(
             path=com.root_of_seed(seed=0).stored_fit(month=month, seed=0), columns=("q50",)
@@ -763,7 +765,8 @@ def sensitivity_rows(
     months: Sequence[str],
     clip: pl.DataFrame,
 ) -> list[dict]:
-    """Return T1 and L1 on the depths 0.15 and 0.30 alone, per group, at 95% (the pre-registered sensitivity reading)."""
+    """Return T1 and L1 on the depths 0.15 and 0.30 alone, per group, at 95% (the pre-registered
+    sensitivity reading)."""
     rows = []
     for tag, slice_name in (("T1", com.SLICE_AFTER), ("L1", com.SLICE_LASTING)):
         for group in ("six_signed_mw", "eight_mva"):

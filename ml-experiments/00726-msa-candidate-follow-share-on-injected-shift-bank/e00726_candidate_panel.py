@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, ANN202, D102, D103, D107, E402, E501, I001, PLR0911, PT018
+# ruff: noqa: ANN001, ANN201, ANN202, D102, D103, D107, D205, D209, E402, E501, I001, PLR0911, PT018
 """Experiment 726: run an injected panel of power through the Candidate's saved weights (GPU).
 
 **Source.** This file is a copy of `run_inject` and its helpers in experiment 667's
@@ -28,7 +28,8 @@ training phase reads), `FoldSignals.__init__`, `_block`, `_test_rows`, `test_blo
 6. **Training-only parts.** The E3 patch, the synthetic-training noise plan, the cross-fit, and the
    label head are not copied: they act on the fine-tune and the tables, which this file never runs.
 
-Usage: python e00726_candidate_panel.py WORLD --root e667|seeds713 --month MONTH --seeds S ... [--passes R ...]
+Usage: python e00726_candidate_panel.py WORLD --root e667|seeds713 --month MONTH --seeds S ...
+    [--passes R ...]
 [--sets K ...] [--primary P] [--device cuda]
 
 Run it through `run.sh`, which sets `E00667_PHASE=predict`, the thread limits, and the memory cap.
@@ -246,7 +247,8 @@ def forecast_window(
     *, model, test, mr, device: str, fs: FoldSignals, lo: int, hi: int, power_lag, power_sig,
     lag_x, keep: np.ndarray,
 ):  # fmt: skip
-    """Return the forecast frame of the kept origins in [lo, hi), with the extra columns built from the given power.
+    """Return the forecast frame of the kept origins in [lo, hi), with the extra columns built from
+    the given power.
 
     `keep` is the cut of the scorer's rows. It is applied here, to the subset that `test_block`
     receives, and never to `test`, whose length `FoldSignals` checks against the stored table.
@@ -281,7 +283,8 @@ def generator_view(*, clean: np.ndarray, month: str) -> np.ndarray:
 
 
 def contaminate_year(*, clean: np.ndarray, month: str, r: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return (`clean` plus pass `r`'s own shifts, that plus the receivers' mirrored shifts); experiment 667's world."""
+    """Return (`clean` plus pass `r`'s own shifts, that plus the receivers' mirrored shifts);
+    experiment 667's world."""
     nb_of, cap, is_mw = c650.world()
     ms = c650.month_start_idx(month=month)
     own, mirror, _events = gen650.build(
@@ -300,7 +303,8 @@ def contaminate_year(*, clean: np.ndarray, month: str, r: int) -> tuple[np.ndarr
 
 
 def bank709_panel(*, clean: np.ndarray, month: str, index: int) -> np.ndarray:
-    """Return experiment 709's bank panel of pass `index`, as `e00709_cand.run_bank` builds it: the cleaned power plus the pass's change."""
+    """Return experiment 709's bank panel of pass `index`, as `e00709_cand.run_bank` builds it: the
+    cleaned power plus the pass's change."""
     path = com.folder_of(prefix="00709") / "worlds" / f"bank_{month}_p{index}.pkl"
     with path.open("rb") as handle:
         parts = pickle.load(handle)  # our own stored bank

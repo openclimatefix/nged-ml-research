@@ -1,11 +1,13 @@
-# ruff: noqa: D103, E501, I001, PIE808, PERF401
+# ruff: noqa: D103, D205, D209, E501, I001, PIE808, PERF401
 """Experiment 726: the preflight KP and the known-answer checks of the design (section 6).
 
 Usage (every command reads or writes files only; none loads a network):
-    e00726_checks.py kp                      # CPU preflight: files, paths, colouring, checkouts; writes candidate/sets.json
+    e00726_checks.py kp                      # CPU preflight: files, paths, colouring, checkouts;
+        writes candidate/sets.json
     e00726_checks.py kc4 --month 2026-01     # the all-shifted and host-only panels (needs E00667_PHASE=predict)
     e00726_checks.py kw --month 2026-01      # experiment 713's weather statement and data check
-    e00726_checks.py compare kc1|kc2|kc3|kc6|km1|km4|km2|km3 [...]   # file comparisons after the GPU jobs
+    e00726_checks.py compare kc1|kc2|kc3|kc6|km1|km4|km2|km3 [...]   # file comparisons after the
+        GPU jobs
     e00726_checks.py selftest                # KS1, KS2, KS3 on synthetic frames
 
 KM2, KM3, and KC6 print PASS or FAIL only (`com.blind_report`), because their values measure how
@@ -154,7 +156,8 @@ def check_kc3() -> bool:
 
 
 def check_kc6(*, month: str, seed: int, r: int, primary: int, set_index: int) -> bool:
-    """KC6: the forecast of a Primary the shift cannot reach equals the stored forecast, and the cut equals the uncut file."""
+    """KC6: the forecast of a Primary the shift cannot reach equals the stored forecast, and the cut
+    equals the uncut file."""
     import e00578_common as k578  # ty: ignore[unresolved-import]
 
     nb_of, _labels, ids = com.neighbour_lists()
@@ -528,7 +531,8 @@ def selftest_ks1() -> bool:
 
 
 def selftest_ks2() -> bool:
-    """KS2: the origin days of each slice for pass 0 and pass 13 of fold 2026-01 equal the table of section 2."""
+    """KS2: the origin days of each slice for pass 0 and pass 13 of fold 2026-01 equal the table of
+    section 2."""
     month, ok = "2026-01", True
     primary_of_id = {1000 + p: p for p in range(16)}
     ms = com.month_start_us(month=month)

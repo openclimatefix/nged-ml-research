@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PIE808
+# ruff: noqa: D205, E501, PT018, PIE808
 """Experiment 726: constants, paths, panels, slices, and checkout assertions shared by every script.
 
 This module imports no neural-network library. Everything here is plain numpy, polars, and the
@@ -100,7 +100,8 @@ def base_root() -> Path:
 
 
 def data_root() -> Path:
-    """Return the folder that jobs write under: `smoke/` of this experiment's folder when `E00726_SMOKE` is set.
+    """Return the folder that jobs write under: `smoke/` of this experiment's folder when
+    `E00726_SMOKE` is set.
 
     The smoke test writes there, so phase 1 never treats a smoke file as a finished job.
     """

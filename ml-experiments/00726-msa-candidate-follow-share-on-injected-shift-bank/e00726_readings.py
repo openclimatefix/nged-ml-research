@@ -1,9 +1,12 @@
-# ruff: noqa: D103, E501
-"""Experiment 726: the report-only readings 7 (coverage), 8 (CRPS), and 10 (experiment 709's level-step eras).
+# ruff: noqa: D103, D205, E501
+"""Experiment 726: the report-only readings 7 (coverage), 8 (CRPS), and 10 (experiment 709's
+level-step eras).
 
 Usage (CPU only, stored files only; run through `run.sh cpu`):
-    e00726_readings.py level10     # reading 10: M1 minus C and K minus C on experiment 709's true level steps
-    e00726_readings.py coverage    # reading 7 (the share of unshifted readings on the safe side) and reading 8 (CRPS)
+    e00726_readings.py level10     # reading 10: M1 minus C and K minus C on experiment 709's true
+        level steps
+    e00726_readings.py coverage    # reading 7 (the share of unshifted readings on the safe side)
+        and reading 8 (CRPS)
 
 None of these readings changes the verdict (design 5.4); each is read at 95%.
 
