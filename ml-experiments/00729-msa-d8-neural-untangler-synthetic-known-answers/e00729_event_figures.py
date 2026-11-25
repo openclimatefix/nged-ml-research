@@ -42,6 +42,9 @@ FLOOR_SHARE: Final = 0.10
 """Running output is positive output of at least this share of the 99.9th percentile of positive output.
 
 The reference output is the 99th percentile of running output, so idle noise cannot set it."""
+MIN_PUBLISHED_EVENTS: Final = 100
+"""A real-against-simulated chart is published only when at least this many real events lie behind it."""
+SKIP_MESSAGE: Final = "chart skipped: too few real events"
 SHARE_STEP: Final = 0.05
 """Every published real and simulated share is rounded to a multiple of this step, so that the
 record's length and the count in each bin cannot be solved from the bars."""
@@ -167,7 +170,7 @@ def event_stats(
     Args:
         days: The output in any unit, with NaN for a missing half-hour.
         dates: The calendar day of each row, `datetime64[D]` (only the weekday is used).
-        reference: The reference output; the 99th percentile of positive output when None.
+        reference: The reference output; the 99th percentile of running output (`reference_level`) when None.
 
     Returns:
         The statistics. An engine that never runs counts its days with no run, no start, no step,
@@ -272,7 +275,8 @@ def grouped_shares(
         lower: The lower edges of the bins.
 
     Returns:
-        The groups, the real shares, and the simulated shares, each rounded to `SHARE_STEP`.
+        The groups, the real shares, and the simulated shares, each rounded to `SHARE_STEP`. The
+        rounded shares of one set need not sum to 1.
     """
     rc = bin_counts(values=real, lower=lower)
     sc = bin_counts(values=sim_values, lower=lower)
@@ -646,35 +650,42 @@ def wrap_text(text: str, *, width: int) -> list[str]:
     return textwrap.wrap(text, width=width)
 
 
-def hour_values(*, probability: np.ndarray) -> list[float | None]:
-    """Return the 24 hourly values plus a closing value at hour 24, with None for a blank hour."""
-    values = [None if np.isnan(v) else float(v) for v in probability]
-    return [*values, values[-1]]
+def hour_points(*, probability: np.ndarray) -> tuple[list[float], list[float | None]]:
+    """Return two points per hour, `(h, v)` and `(h + 1, v)`, with None for a blank hour.
+
+    Drawn with linear interpolation and broken paths, a blank hour is a true gap and each other
+    hour is a flat segment from `h` to `h + 1`.
+    """
+    xs: list[float] = []
+    ys: list[float | None] = []
+    for h, v in enumerate(probability):
+        value = None if np.isnan(v) else float(v)
+        xs += [float(h), float(h + 1)]
+        ys += [value, value]
+    return xs, ys
 
 
 def hour_chart(*, real: EventStats, sim_stats: EventStats) -> alt.VConcatChart:
     """Return the run probability by UTC hour, weekday above weekend, real record against simulated draws."""
     panels = []
     for kind in ("weekday", "weekend"):
-        frame = pl.concat(
-            [
+        parts = []
+        for name, s in (("Real record", real), ("Simulated draws", sim_stats)):
+            xs, ys = hour_points(
+                probability=s.published_probability(kind=kind, blank_sparse=name == "Real record")
+            )
+            parts.append(
                 pl.DataFrame(
-                    {
-                        "hour": np.arange(25, dtype=float),
-                        "source": name,
-                        "share": hour_values(
-                            probability=s.published_probability(
-                                kind=kind, blank_sparse=name == "Real record"
-                            )
-                        ),
-                    }
+                    {"hour": xs, "order": range(len(xs)), "source": name, "share": ys},
+                    schema_overrides={"share": pl.Float64},
                 )
-                for name, s in (("Real record", real), ("Simulated draws", sim_stats))
-            ]
-        )
+            )
+        frame = pl.concat(parts)
         panels.append(
             alt.Chart(frame)
-            .mark_line(aria=False, strokeWidth=2, interpolate="step-after", invalid=None)
+            .mark_line(
+                aria=False, strokeWidth=2, interpolate="linear", invalid="break-paths-show-domains"
+            )
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "hour:Q",
@@ -682,6 +693,7 @@ def hour_chart(*, real: EventStats, sim_stats: EventStats) -> alt.VConcatChart:
                     scale=alt.Scale(domain=[0, 24], nice=False),
                     axis=alt.Axis(values=[0, 6, 12, 18, 24], grid=False),
                 ),
+                order=alt.Order("order:Q"),
                 y=alt.Y(
                     "share:Q",
                     title=f"Share of {kind} half-hours running",
@@ -701,7 +713,7 @@ def hour_chart(*, real: EventStats, sim_stats: EventStats) -> alt.VConcatChart:
         title=alt.TitleParams(
             "How often the engine is running, by hour of day",
             subtitle=wrap_text(
-                f"Running means output of at least {RUN_SHARE:.0%} of the engine's own reference output, the 99th percentile of its running output. Shares are rounded to {SHARE_STEP:.0%}, and a real hour with fewer than {MIN_REAL_EVENTS} running half-hours is left blank. Saturday and Sunday are the weekend; the simulated draws take bank holidays as weekdays and use the UK clock offset.",
+                f"Running means output of at least {RUN_SHARE:.0%} of the engine's own reference output, the 99th percentile of its running output. Shares are rounded to {SHARE_STEP:.0%}, and a real hour with 1 to {MIN_REAL_EVENTS - 1} running half-hours is left blank (a gap in the real line). Saturday and Sunday are the weekend; the simulated draws take bank holidays as weekdays and use the UK clock offset.",
                 width=95,
             ),
             anchor="start",
@@ -815,12 +827,33 @@ def distributions(*, real: EventStats, sim_stats: EventStats) -> list[Distributi
     ]
 
 
-def aggregate_charts(*, real: EventStats, sim_stats: EventStats) -> dict[str, alt.TopLevelMixin]:
-    """Return the published real-against-simulated charts, keyed by file name."""
-    out: dict[str, alt.TopLevelMixin] = {
-        "events_03_hour_of_day.svg": hour_chart(real=real, sim_stats=sim_stats)
-    }
+def aggregate_charts(
+    *, real: EventStats, sim_stats: EventStats, log: Callable[[str], None]
+) -> dict[str, alt.TopLevelMixin]:
+    """Return the published real-against-simulated charts, keyed by file name.
+
+    A chart is left out, with one generic log line, when the real events behind it number fewer
+    than `MIN_PUBLISHED_EVENTS`: running half-hours for the hour-of-day chart, and values for the
+    others.
+
+    Args:
+        real: The statistics of the real record.
+        sim_stats: The pooled statistics of the simulated draws.
+        log: Receives "chart skipped: too few real events" for each chart left out.
+
+    Returns:
+        The charts that pass the floor.
+    """
+    out: dict[str, alt.TopLevelMixin] = {}
+    running = sum(float(v.sum()) for v in real.run_half_hours.values())
+    if running >= MIN_PUBLISHED_EVENTS:
+        out["events_03_hour_of_day.svg"] = hour_chart(real=real, sim_stats=sim_stats)
+    else:
+        log(SKIP_MESSAGE)
     for i, dist_ in enumerate(distributions(real=real, sim_stats=sim_stats), start=4):
+        if len(dist_.real) < MIN_PUBLISHED_EVENTS:
+            log(SKIP_MESSAGE)
+            continue
         groups, rs, ss = grouped_shares(real=dist_.real, sim_values=dist_.sim, lower=dist_.lower)
         labels = group_labels(lower=dist_.lower, groups=groups, unit=dist_.unit)
         out[f"events_{i:02d}_{dist_.key}.svg"] = share_chart(
@@ -877,7 +910,7 @@ def write_event_figures(
         )
     real_grid, real_dates = real_days(record=record)
     real = event_stats(days=real_grid, dates=real_dates)
-    published.update(aggregate_charts(real=real, sim_stats=simulated_stats(draws=draws)))
+    published.update(aggregate_charts(real=real, sim_stats=simulated_stats(draws=draws), log=log))
     written = []
     for name, chart in published.items():
         figures.save_svg(chart=chart, path=out_dir / name)

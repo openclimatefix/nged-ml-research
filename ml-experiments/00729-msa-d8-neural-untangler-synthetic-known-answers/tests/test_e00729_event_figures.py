@@ -1,10 +1,12 @@
 # ruff: noqa: E501, PT018
 """Tests of the event-generator figures on invented engine records and segments."""
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
 import e00729_event_figures as ev
+import e00729_figures as figures
 import numpy as np
 import polars as pl
 
@@ -145,10 +147,10 @@ def test_hour_probabilities_are_rounded_and_sparse_real_hours_are_blank() -> Non
     assert real[17] == 1.0 and real[0] == 0.0
     ok = real[~np.isnan(real)]
     assert np.allclose(ok / ev.SHARE_STEP, np.round(ok / ev.SHARE_STEP))
-    assert (
-        ev.hour_values(probability=real)[-1] == real[-1]
-        and len(ev.hour_values(probability=real)) == 25
-    )
+    xs, ys = ev.hour_points(probability=real)
+    assert len(xs) == len(ys) == 48
+    assert xs[:4] == [0.0, 1.0, 1.0, 2.0]
+    assert ys[10] is None and ys[11] is None
 
 
 def test_uk_clock_offset_changes_on_the_last_sundays_of_march_and_october() -> None:
@@ -260,3 +262,104 @@ def test_write_event_figures_keeps_real_series_out_of_the_published_files(tmp_pa
     published_text = " ".join(p.read_text() for p in written) + " ".join(messages)
     assert "2030-01-" not in published_text
     assert "S1" not in published_text and "metered farms" not in published_text
+
+
+def odd_length_stats() -> tuple[ev.EventStats, ev.EventStats]:
+    """Return real stats with a sparse hour 5 (2 running half-hours) and unrounded simulated stats."""
+    n = 17
+    dates = START + np.arange(n) * ONE_DAY
+    real_days_ = evening_engine(n_days=n)
+    real_days_[0, 10:12] = 30.0
+    sim_days = evening_engine(n_days=n)
+    sim_days[:5, 20] = 30.0
+    return (
+        ev.event_stats(days=real_days_, dates=dates),
+        ev.event_stats(days=sim_days, dates=dates),
+    )
+
+
+def chart_rows(chart: object, *, panel: int) -> list[dict]:
+    spec = chart.to_dict()  # ty: ignore[unresolved-attribute]
+    return spec["datasets"][spec["vconcat"][panel]["data"]["name"]]
+
+
+def test_the_hour_chart_data_blank_the_sparse_real_hour_and_round_every_value() -> None:
+    real, sim = odd_length_stats()
+    rows = chart_rows(ev.hour_chart(real=real, sim_stats=sim), panel=0)
+    real_rows = [r for r in rows if r["source"] == "Real record"]
+    sim_rows = [r for r in rows if r["source"] == "Simulated draws"]
+    assert min(r["hour"] for r in rows) == 0.0 and max(r["hour"] for r in rows) == 24.0
+    assert [
+        r["share"] for r in real_rows if 5.0 <= r["hour"] <= 6.0 and r["order"] in (10, 11)
+    ] == [None, None]
+    assert all(r["share"] is not None for r in real_rows if r["order"] not in (10, 11))
+    for r in (*real_rows, *sim_rows):
+        if r["share"] is not None:
+            assert abs(r["share"] / ev.SHARE_STEP - round(r["share"] / ev.SHARE_STEP)) < 1e-9
+    assert any(r["share"] is not None and r["share"] > 0 for r in sim_rows)
+    assert (
+        sim.run_probability(kind="weekday")[10]
+        != ev.quantise(values=sim.run_probability(kind="weekday"))[10]
+    )
+
+
+def line_paths(svg: str, *, colour: str) -> list[str]:
+    paths = re.findall(r'<path[^>]*?d="([^"]+)"[^>]*?stroke="' + colour + '"', svg)
+    paths += re.findall(r'<path[^>]*?stroke="' + colour + r'"[^>]*?d="([^"]+)"', svg)
+    return paths
+
+
+def test_a_blank_real_hour_is_a_true_gap_in_the_rendered_chart(tmp_path: Path) -> None:
+    real, sim = odd_length_stats()
+    out = tmp_path / "hour.svg"
+    figures.save_svg(chart=ev.hour_chart(real=real, sim_stats=sim), path=out)
+    paths = line_paths(out.read_text(), colour=figures.ORANGE)
+    broken = [d for d in paths if d.count("M") >= 2]
+    assert len(broken) >= 1
+    width = figures.WIDTH_PX - 100
+    xs = [float(x) for x, _ in re.findall(r"(-?\d+\.?\d*)[ ,](-?\d+\.?\d*)", broken[0])]
+    px = width / 24.0
+    assert not [x for x in xs if 5 * px + 1 < x < 6 * px - 1]
+    assert [x for x in xs if x < 5 * px - 1]
+    assert [x for x in xs if x > 6 * px + 1]
+    assert [x for x in xs if 4 * px + 1 < x < 5 * px - 1 or abs(x - 4 * px) < 1]
+
+
+def test_draw_engines_passes_the_uk_clock_offset(monkeypatch) -> None:  # noqa: ANN001
+    seen = []
+
+    def fake(*, rng, utc_offset, quiet_day, record) -> np.ndarray:  # noqa: ANN001
+        seen.append(np.asarray(utc_offset).copy())
+        record["n_units"] = 1.0
+        return np.zeros((ev.N_DAYS_PER_DRAW, 48))
+
+    monkeypatch.setattr(ev.sim, "draw_engine", fake)
+    ev.draw_engines(n=52)
+    assert any((o == 1.0).any() for o in seen)
+    assert any((o == 0.0).all() for o in seen)
+    for i, o in enumerate(seen):
+        assert np.array_equal(o, ev.uk_utc_offset(dates=ev.draw_dates(i=i)))
+
+
+def test_a_chart_is_skipped_below_the_floor_of_real_events() -> None:
+    small = ev.event_stats(days=evening_engine(n_days=10), dates=START + np.arange(10) * ONE_DAY)
+    messages: list[str] = []
+    assert ev.aggregate_charts(real=small, sim_stats=small, log=messages.append) == {}
+    assert messages == [ev.SKIP_MESSAGE] * 5
+
+
+def test_every_chart_is_published_above_the_floor() -> None:
+    big = ev.event_stats(days=evening_engine(n_days=1000), dates=START + np.arange(1000) * ONE_DAY)
+    messages: list[str] = []
+    charts = ev.aggregate_charts(real=big, sim_stats=big, log=messages.append)
+    assert len(charts) == 5 and messages == []
+
+
+def test_only_the_distributions_above_the_floor_are_published() -> None:
+    days = evening_engine(n_days=300)
+    stats = ev.event_stats(days=days, dates=START + np.arange(300) * ONE_DAY)
+    assert len(stats.weekly_starts) < ev.MIN_PUBLISHED_EVENTS <= len(stats.run_lengths_h)
+    messages: list[str] = []
+    charts = ev.aggregate_charts(real=stats, sim_stats=stats, log=messages.append)
+    assert len(charts) == 4 and messages == [ev.SKIP_MESSAGE]
+    assert "events_06_starts.svg" not in charts

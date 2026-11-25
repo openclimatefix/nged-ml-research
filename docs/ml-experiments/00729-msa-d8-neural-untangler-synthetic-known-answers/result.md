@@ -652,7 +652,7 @@ day. Arms at seed 0; band 5% to 95%.*
 
 ## The event generator against real data
 
-**Seven figures show what the engine simulator draws and how its aggregates compare with the real
+**Up to seven figures show what the engine simulator draws and how its aggregates compare with the real
 engine record.** The script `e00729_event_figures.py` (stage `events`) draws 400 engines from the
 simulator, each of 30 invented days that start on a Monday with Saturday and Sunday as the quiet
 days, with fixed seeds and no network output. The figures cover the simulated engine, simulated
@@ -667,12 +667,14 @@ generators, so no published figure shows a real series, a real size, a real date
 The five aggregates are shares. Each divides the output by the series' own reference output, so no
 absolute size can be recovered. Each share is rounded to the nearest 5%, for the real record and the
 simulated draws alike, so the bar heights do not reveal the record's length or the count in a bin.
-The four bar charts use coarse bins, and a bin with fewer than 5 real events is merged with its
-neighbour, so no bin shows a single real run. The hour-of-day chart cannot merge hours, so it leaves
-blank each real hour with 1 to 4 running half-hours. The same normalisation and rounding apply to the
-simulated draws, and the simulated bins follow the real merges. The solar figure shows only source S2,
-the PV model driven by CAMS, because source S1 is the metered farms' output. Real engine days beside
-simulated days, and the S1 days, are written to a private folder and are not published.
+The rounded shares of one chart sum to about 1, and can differ from 1 by the rounding. The four bar
+charts use coarse bins, and a bin with fewer than 5 real events is merged with its neighbour, so no
+bin shows a single real run. The hour-of-day chart cannot merge hours, so it leaves a gap in the real
+line at each real hour with 1 to 4 running half-hours. The same normalisation and rounding apply to
+the simulated draws, and the simulated bins follow the real merges. A chart is published only when at
+least 100 real events lie behind it (running half-hours for the hour-of-day chart, and runs, steps,
+blocks of 7 days, or days for the others); otherwise the stage leaves the chart out and the page
+omits it.
 
 **Definitions of the five aggregates.** The reference output is the 99th percentile of running
 output, and running output is positive output of at least 10% of the 99.9th percentile of positive
