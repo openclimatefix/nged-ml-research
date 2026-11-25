@@ -254,8 +254,7 @@ practice itself.** State in the plan which of them the experiment follows.
   Save each fit's loss history in the experiment's data folder beside the model, so that the plot
   needs no refit. Leave the plot out, and say so in one line, when the experiment fits no model,
   reuses stored models for prediction only, or fits a closed-form model with no iterations.
-- **Open every pull request as a draft**, run the local checks, and mark it ready only when the
-  reviews are triaged.
+- **Open every pull request as a draft.** "Merging" says when it becomes ready.
 - **Show that every input with a valid time carries only what was known at the forecast origin.**
   Show it for weather, capacity factors, and every other such input, in the plan and by a test. A
   score whose weather input looks ahead is voided. State any other look-ahead on the page, with the
@@ -279,6 +278,14 @@ practice itself.** State in the plan which of them the experiment follows.
   experiment's follow share (the share of an injected load shift that the forecast copies) by 3% to
   9%. For any measure of how a forecast follows an event, include a test with a mid-day onset and an
   oracle check of the share.
+- **Show a "synthetic world gallery" in every plan and write-up of an experiment that uses a
+  synthetic data generator** (an engine, solar, BSP steps, folded readings, or base days with
+  injections). The gallery is plenty of plots of each generator's own output in a variety of
+  scenarios, each source on its own, beside real-data aggregates where publishing is allowed (never a
+  metered generator's real series). Show it in the plan before the first fit, and again in the
+  write-up. Also run a smoke check on the real files that each simulated component is nonzero where
+  it should be. One run had silently zero solar output in 37.5% of its test rows, because a sky-rule
+  threshold could never be met, and no unit test, gate, or leakage check caught it.
 - **Check anonymisation before the PR leaves draft.** Published numbers for NGED's metered
   generators are aggregates only, with no generator name, identifier, size, dates, or register
   values.
@@ -288,9 +295,7 @@ practice itself.** State in the plan which of them the experiment follows.
 **Run independent work in parallel, up to the slot's budget of cores and GPU memory.** Series,
 seeds, arms, folds, and refits that do not read each other's output can run side by side. A job that
 fits many small models, such as one per series or one tiny update per day, cannot keep a GPU or many
-cores busy one model at a time. Fitting 16 series one after another at about a quarter of the slot's
-cores and almost no GPU took 3.3 hours, where running 4 to 8 series at a time would have taken under
-an hour.
+cores busy one model at a time.
 
 - **Check utilisation in the first minutes of a long run.** Look at `uptime`, `nvidia-smi`, and the
   job's own CPU use. If the job uses well under its quota and will run for more than about 30
@@ -565,23 +570,19 @@ experiment, such as a control arm or a scoring rule, in this skill and not on th
 
 **A review that checks the printed numbers against the stored predictions cannot catch a method that
 is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.** In
-one experiment, the numbers review confirmed every printed number, yet an audit afterwards found
-that the residual spread shifted each forecast by the previous year's bias, which reversed two of
-the headline conclusions. Three failed controls had been explained away instead of investigated.
+one experiment, the numbers review confirmed every printed number, yet an audit found a method
+fault that reversed two headline conclusions.
 
 **An audit is triggered when any of these holds:**
 
 1. **A control fails:** a positive control, a known-answer test, or a placebo.
 2. **A result contradicts its own prediction or an earlier experiment's finding,** and the
-   experiment's session has not tested an explanation and recorded it in the write-up. A solar
-   offset that improved the score by only 0.010 points, against a predicted gain of 0.10 to 0.15
-   points and an earlier experiment's gain of 0.152 points, is an example.
+   experiment's session has not tested an explanation and recorded it in the write-up.
 3. **The quantile-score contrast and the same contrast on the error of the mean or median forecast
    point in different directions.**
-4. **Leaving one site out flips the sign or the verdict of a planned contrast.** One planned
-   contrast was −0.20 with a site and +0.13 without it. A site scoring more than twice the median
-   across sites is a prompt to run the leave-one-out check, not a trigger, because with five sites
-   that ratio is noisy.
+4. **Leaving one site out flips the sign or the verdict of a planned contrast.** A site scoring
+   more than twice the median across sites is a prompt to run the leave-one-out check, not a
+   trigger.
 5. **A nested arm beats the arm that contains it,** such as an arm with the same model given less
    input, **or a control that should change nothing moves the score by more than its own paired
    interval's half-width.**
@@ -646,8 +647,9 @@ recurring failures are line length in docstrings and markdown (MD013), `pydoclin
 **Open the pull request as a draft, and mark it ready only when you are ready to merge.** CI does
 not run on a draft pull request, so pushes to a draft cost no CI minutes. Open the pull request with
 `gh pr create --draft`. When the local checks pass and the reviews are triaged, run `gh pr ready N`,
-which starts CI once. When a manager session is running, leave the PR as a draft and report its head
-sha instead, because the manager marks it ready and merges it. Wait for the `ci` check to pass
+which starts CI once. A worker session in the cloud harness cannot mark a PR ready (the
+`ready_for_review` call returns 404), and a session under a manager leaves the PR as a draft and
+reports its head sha, because the manager marks it ready and merges it. Wait for the `ci` check to pass
 before you merge. Every later push to a ready pull request runs CI again, so batch the fixes into
 one commit. If `ci` shows "skipping" after the ready-for-review click, the draft gate has raced the
 ready event and `ci` will never run. Push one more commit, and merge only after a real green run on

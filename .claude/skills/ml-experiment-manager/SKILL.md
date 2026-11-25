@@ -163,6 +163,9 @@ merge rules, and the local CI checks. Tell every planner to read
 - **Say in the brief what the session may not decide.** Without that statement in the brief, a
   session launched an Opus audit on its own. State the Opus rule, the memory cap, the three thread
   variables, and that shared code stays inside the experiment folder.
+- **Before approving a first fit, check that the plan shows the synthetic world gallery and the
+  real-file smoke check** that the `ml-experiment` skill's "Standing practices" section requires,
+  for any experiment that uses a synthetic data generator.
 - **Tell the session to take its experiment id with `reserve_experiment`.** An id counts as taken
   once a `data/ml-experiments/.ids/<id>` marker, a `data/ml-experiments/<id>-*` folder, or a
   `docs/ml-experiments/<id>-*` page exists, because `reserve_experiment` reads all three. Two briefs
@@ -170,7 +173,7 @@ merge rules, and the local CI checks. Tell every planner to read
   manager allocates the id in the state log, writes it into the brief, and treats the denial as a
   permission denial.
 - **A script that runs phases must refuse to start a phase before that phase's review marker
-  exists.** Ask the session to write the marker check into the script.  Disclose any such breach in
+  exists.** Ask the session to write the marker check into the script. Disclose any such breach in
   the PR body and in `result.md`, treat the outputs as unreviewed until the review passes, and start
   no later phase before the review passes.
 - **Any edit to a reviewed script gets its hash recorded and a diff-limited re-check before the
@@ -226,7 +229,7 @@ state with `gh pr view`, and the log files in the experiment's data folder.
   headRefOid,state` with `git log origin/main` and the branch tip. Merge only after a real green run
   on the final head, and push one more commit if `ci` is stuck on "skipping".
 - **Read the head sha from `gh`, never from a session's message.** Sessions have sent shas with
-  typos, and a stale sha fails the merge.  A `mergeStateStatus` of `UNKNOWN` with `ci` at `SUCCESS`
+  typos, and a stale sha fails the merge. A `mergeStateStatus` of `UNKNOWN` with `ci` at `SUCCESS`
   is a finished run; `BLOCKED` with no checks listed means `ci` has not started.
 - **A session's own leftover processes slow its own experiment.** Run `ps` before concluding that a
   method is slow.
@@ -255,9 +258,8 @@ state with `gh pr view`, and the log files in the experiment's data folder.
   those lines has the same cause, so ignore it.
 - **A diff outside those paths, such as a change under `src/` or `packages/`, stops at a reviewed PR
   for the maintainer.** Tell a session
-  that wants shared code in `src/studies` to keep the code inside its own experiment folder
-  and to say in `result.md` that moving it needs the maintainer's review.
-
+  that wants shared code in `src/studies` to keep the code inside its own experiment folder and to
+  say in `result.md` that moving it needs the maintainer's review.
 - **Before archiving any session, ask it which sub-agents are still running, and wait for them.**
   Archiving strands them: they lose their transcripts and can no longer be messaged.
 - **After a merge,** archive the worker session with `archive_session`, release its slots in the
@@ -358,9 +360,8 @@ instruction allows Opus:
   hours; and that the count of regular files and symlinks matches. Write the remaining candidates to
   a note for later. Use `find` and `comm` for tens of thousands of paths, never a per-file shell
   loop.
-- **Run the local CI checks before every push.** Each lint failure adds a rerun of about 6 minutes.
-  The failures that recur are line length in docstrings and markdown (MD013), `pydoclint` DOC201 (a
-  missing `Returns:` section), and an SVG without a final newline.
+- **Run the local CI checks before every push,** as the `ml-experiment` skill's "Merging" section
+  lists them. Each lint failure adds a rerun of about 6 minutes.
 - **Check anonymisation before every merge.** Published pages, charts, and PR bodies show aggregates
   only for NGED's metered generators: no generator name, identifier, size, dates, or register
   values. Substations may be named.
