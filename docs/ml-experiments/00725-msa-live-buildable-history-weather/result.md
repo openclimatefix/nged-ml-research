@@ -571,6 +571,33 @@ after both reviews. Still to come: an Opus code review of each new script before
 review of the fixed code, the wiring checks, a result review, an audit if a trigger fires, a numbers
 review, and a prose review.
 
+### The moved summary of `T3` is written only where the ensemble row exists
+
+**`LiveSource` writes the moved CAMS day summary of read-out `T3` into the target row only at the
+half-hours whose ensemble row exists.** The parent source holds zero weather where the row does not
+exist, and the last training origin of 5 folds (2025-12, 2026-01, 2026-03, 2026-04, and 2026-06) has
+half-hours 18 to 47 unfilled. The known-answer check of `T3` compares a batch with the summary moved
+back by one day against the unmoved batch, so a summary written at an unfilled half-hour made that
+check fail in those 5 folds.
+
+**A read-only comparison of the code before and after the change found no difference on a filled
+half-hour.** On the predict phase of folds 2025-11, 2026-04, 2026-01, and 2026-02, every sample is
+bit-identical. The two folds 2026-01 and 2026-02 hold 2,832 samples, and the maximum absolute
+difference over every tensor of every sample is 0.0. On the train phase of folds 2026-04, 2026-01,
+and 2025-12, 40 of 42 samples are bit-identical, and the 2 that differ are the fold's last origin at
+lead days 0 and 6. Their 78 differing half-hours are all unfilled, and only the target row's weather
+differs.
+
+| Hash | Before the change | After the change |
+|---|---|---|
+| `own_files_hash` (fit modules) | `f2c4e81c5a521927` | `2bd6286cad125ae6` |
+| `checks_hash` (check and fit modules) | `f78faf11b97f94d5` | `9b4b6cddf6122323` |
+| `code_hash` (stored states, gate) | `dad2fdbd70a1b0fb` | `d8a361ef74c85258` |
+
+**The stored `L`, `Z`, and `E` states are read with the old `code_hash` named in
+`--accept-code-change`, because the changed branch never runs in an `L`, `Z`, or `E` fit.** The
+wiring checks run again under the new `checks_hash`.
+
 ## Files
 
 **This page names experiment 713 and experiment 667 in plain text, because their pages are not yet on
