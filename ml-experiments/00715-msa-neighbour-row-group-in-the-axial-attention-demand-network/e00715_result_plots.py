@@ -169,7 +169,9 @@ def plot8() -> Path:
         "difference:Q",
         title="CRPS difference (points of capacity)",
         scale=alt.Scale(
-            domain=[-limit, 0, limit], range=[ocf.DATA_BLUE, "#FFFFFF", ocf.BRAND_ORANGE]
+            domain=[-limit, 0, limit],
+            range=[ocf.DATA_BLUE, "#FFFFFF", ocf.BRAND_ORANGE],
+            interpolate="lab",
         ),
         legend=alt.Legend(orient="top", gradientLength=200),
     )
@@ -190,7 +192,11 @@ def plot8() -> Path:
         .mark_bar(color="#888888", aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("primary:N", sort=order, title=None, axis=alt.Axis(labels=False, ticks=False)),
-            x=alt.X("neighbours:Q", title="Neighbours", axis=alt.Axis(values=[0, 2, 4, 6])),
+            x=alt.X(
+                "neighbours:Q",
+                title="Neighbour rows per Primary",
+                axis=alt.Axis(values=[0, 2, 4, 6]),
+            ),
         )
         .properties(width=70, height=height, title="Neighbours")
     )
@@ -311,7 +317,7 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
                 "Solid lines: median forecast of F4 (thin orange line, with its 5% to 95% band) and of M* (wide blue line); seed 0.",
                 "Dashed grey line: cleaned demand. Day 0 is the forecast origin (the first of the fold);",
                 "no calendar date is shown. The day-ahead forecast is days 0.5 to 1.5 (leads of 12 h to 36 h).",
-                *DEFINITIONS,
+                *DEFINITIONS[:2],
             ],
         )
     )
@@ -376,7 +382,14 @@ def lead_bands() -> Path:
         base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lower:Q", title="CRPS difference (points of capacity)"), x2="upper:Q"
         ),
-        base.mark_point(filled=True, size=60, aria=False).encode(x="point:Q"),  # ty: ignore[unresolved-attribute]
+        base.mark_point(filled=True, size=60, aria=False).encode(  # ty: ignore[unresolved-attribute]
+            x="point:Q",
+            shape=alt.Shape(
+                "contrast:N",
+                title=None,
+                scale=alt.Scale(domain=list(COLOURS), range=["circle", "diamond"]),
+            ),
+        ),
     ).properties(width=WIDTH_PX - 220, height=130)
     chart = layer.facet(
         data=frame,
