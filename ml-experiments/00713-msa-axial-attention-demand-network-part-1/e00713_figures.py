@@ -48,9 +48,15 @@ LIGHT: Final = {
 }  # fmt: skip
 CASES: Final = (
     # (season, fold month, origin day within the month, Primary label)
-    ("winter", "2026-01", 13, "D5"), ("winter", "2026-01", 13, "D12"), ("winter", "2026-01", 13, "D8"),
-    ("summer", "2026-06", 16, "D5"), ("summer", "2026-06", 16, "D12"), ("summer", "2026-06", 16, "D8"),
-)  # fmt: skip
+    ("winter", "2026-01", 13, "D5"),
+    ("summer", "2026-06", 16, "D19"),
+)
+# Hosts allowed for a series chart. No table records which Primary a metered generator connects to,
+# so the evidence is circumstantial (experiment 722 found no metered generator inside D11, D19, or
+# D21 and NGED's monitor-direction file marks no reverse power flow there; D5 is a signed-MW Primary
+# already on this page). D8, D12, and D22 are refused.
+ALLOWED_SERIES_HOSTS: Final = ("D5", "D11", "D19", "D21")
+REFUSED_SERIES_HOSTS: Final = ("D8", "D12", "D22")
 ARMS_SHOWN: Final = ("C", "M*", "E")
 
 
@@ -166,6 +172,9 @@ def forecast_chart(*, data: pl.DataFrame, horizon_hours: float, title: list[str]
 def cmd_series(*, out_dir: Path) -> None:
     star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     truth = score.truth_stack()
+    for _, _, _, label in CASES:
+        assert label not in REFUSED_SERIES_HOSTS, f"{label} is refused as a series host"
+        assert label in ALLOWED_SERIES_HOSTS, f"{label} is not in {ALLOWED_SERIES_HOSTS}"
     for season, month, day, label in CASES:
         data = pl.concat(
             [
