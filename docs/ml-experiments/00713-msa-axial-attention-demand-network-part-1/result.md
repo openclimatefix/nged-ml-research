@@ -292,16 +292,17 @@ per-Primary intervals resample the 8 months. The per-fold intervals resample ori
 
 ![CRPS by fold](crps_by_month.svg)
 
-**Day-ahead and 14-day forecasts of a winter origin at D5, a signed-MW Primary, and of a summer
-origin at D12, an MVA-only Primary, show the bands widening with lead time.**
+**Day-ahead and 14-day forecasts of a winter origin (January 2026) at D5, a signed-MW Primary, and
+of a summer origin (June 2026) at D19, an MVA-only Primary, show the median and the 50% and 90%
+bands of the Candidate, `M*`, and `E` against the measured power.**
 
 ![Day-ahead forecast, winter, D5](series_day_winter_D5.svg)
 
 ![14-day forecast, winter, D5](series_fourteen_winter_D5.svg)
 
-![Day-ahead forecast, summer, D12](series_day_summer_D12.svg)
+![Day-ahead forecast, summer, D19](series_day_summer_D19.svg)
 
-![14-day forecast, summer, D12](series_fourteen_summer_D12.svg)
+![14-day forecast, summer, D19](series_fourteen_summer_D19.svg)
 
 **Three load shifts in NGED's logs at signed-MW Primaries and three at MVA-only Primaries show the
 forecasts of `M*` and the Candidate for the next 24 hours from each origin day against the measured
