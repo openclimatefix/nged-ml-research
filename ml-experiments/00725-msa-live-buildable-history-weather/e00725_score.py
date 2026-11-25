@@ -59,9 +59,22 @@ GROUPS: Final = ("six", "eight")
 # ----------------------------------------------------------------------------------------- loading
 
 
+def arm_ready(*, arm: str, month: str, seed: int) -> bool:
+    """Return whether an F8 arm's forecast exists, and for `T3-C` whether the log of its passed checks exists too."""
+    if arm == t3c.ARM:
+        return (
+            t3c.log_file(month=month, seed=seed).exists()
+            and t3c.fit_file(month=month, seed=seed).exists()
+        )
+    return cm.fit_file(data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed).exists()
+
+
 def arm_file(*, arm: str, month: str, seed: int) -> Path:
     """Return the per-seed forecast file of an F8 arm; `T3-C` is the stored Candidate's prediction on moved inputs."""
     if arm == t3c.ARM:
+        assert t3c.log_file(month=month, seed=seed).exists(), (
+            f"{arm} {month} seed {seed}: no log, so the checks of the prediction did not pass"
+        )
         return t3c.fit_file(month=month, seed=seed)
     return cm.fit_file(data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed)
 
@@ -298,7 +311,7 @@ def available(*, arm: str, months: tuple[str, ...], seeds: tuple[int, ...]) -> b
     if arm not in F8_ARMS:
         return True
     return all(
-        arm_file(arm=arm, month=m, seed=s).exists() for m in months for s in seeds
+        arm_ready(arm=arm, month=m, seed=s) for m in months for s in seeds
     )  # fmt: skip
 
 
@@ -334,7 +347,8 @@ def cmd_report_only() -> int:
         )
     out["note_T3"] = (
         "T3: the target row's CAMS day summary of UTC day D - 3 in all three arms (T3-C is the stored Candidate); "
-        "no arm was trained on the moved summary."
+        "no arm was trained on the moved summary. T3-C also rebuilds the Candidate's lag-free table from the moved "
+        "inputs, so a scored row can read an earlier origin's median that keeps its own D - 1 summary."
     )
     write(name="report_only", obj=out)
     return 0

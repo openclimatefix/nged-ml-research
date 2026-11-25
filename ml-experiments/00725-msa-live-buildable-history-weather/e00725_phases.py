@@ -129,18 +129,27 @@ def predict_jobs(*, arm: str, months: tuple[str, ...], seeds: tuple[int, ...]) -
 
 
 def t3_candidate_jobs(*, months: tuple[str, ...], seeds: tuple[int, ...]) -> list[Job]:
-    """Return one job per fold and seed that predicts the stored Candidate with the target-row summary moved to D - 3."""
-    return [
-        Job(
-            kind="predict",
-            script="e00725_t3_candidate.py",
-            args=(t3c.ARM, month, str(seed)),
-            output=t3c.fit_file(month=month, seed=seed),
-            gpu=True,
-        )
-        for month in months
-        for seed in seeds
-    ]
+    """Return, for every fold and seed, the `table` job and then the `fit` job that predict the stored Candidate with the target-row summary moved to D - 3.
+
+    The `fit` job's output is the log that the job writes after its checks passed, not the forecast file.
+    """
+    jobs = []
+    for month in months:
+        for seed in seeds:
+            for step, output in (
+                ("table", t3c.table_file(month=month, seed=seed)),
+                ("fit", t3c.log_file(month=month, seed=seed)),
+            ):
+                jobs.append(
+                    Job(
+                        kind="fit" if step == "table" else "predict",
+                        script="e00725_t3_candidate.py",
+                        args=(t3c.ARM, month, str(seed), "--step", step),
+                        output=output,
+                        gpu=True,
+                    )
+                )
+    return jobs
 
 
 def check_jobs() -> list[Job]:
@@ -340,10 +349,12 @@ def run_chain(*, chain: list[Job], device: str, lock: threading.Lock, failures: 
 
 
 def chains_of(*, jobs: list[Job]) -> list[list[Job]]:
-    """Group GPU fit and predict jobs into chains: one chain per (arm, fold, seed), the fit first."""
+    """Group GPU fit and predict jobs into chains: one chain per (arm, fold, seed), the fit first (one chain per fold for `T3-C`)."""
     chains: dict[tuple[str, ...], list[Job]] = {}
     for job in jobs:
-        chains.setdefault(tuple(job.args[:3]), []).append(job)
+        # the two seeds of a `T3-C` fold share one folder, so they form one chain and never run at once
+        key = tuple(job.args[:2] if job.script == "e00725_t3_candidate.py" else job.args[:3])
+        chains.setdefault(key, []).append(job)
     return list(chains.values())
 
 
