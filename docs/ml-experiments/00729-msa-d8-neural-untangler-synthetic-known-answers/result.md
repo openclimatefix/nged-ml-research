@@ -650,6 +650,41 @@ therefore comes where the window starts after a run of zero reading, and it neve
 real day before the engine was connected; the day with the largest of arm D's largest P(X<0) of the
 day. Arms at seed 0; band 5% to 95%.*
 
+## The event generator against real data
+
+**Seven figures show what the engine simulator draws and how its aggregates compare with the real
+engine record.** The script `e00729_event_figures.py` (stage `events`) draws 400 engines from the
+simulator, each of 30 invented days that start on a Monday with Saturday and Sunday as the quiet
+days, with fixed seeds and no network output. The figures cover the simulated engine, simulated
+solar output, and five aggregates of the simulated draws laid over the same aggregates of the real
+engine record. The stage reads the real engine record and changes no file that it reads.
+
+**The real engine series stay private.** The metered engine and the metered solar farms are NGED
+generators, so no published figure shows a real series, a real size, a real date, or a real count.
+The five aggregates are shares. Each divides the output by the series' own 99th percentile of
+positive output, so no absolute size can be recovered. Each uses coarse bins, and a bin with fewer
+than 5 real events is merged with its neighbour, so no bin shows a single real run. The same
+normalisation, bins, and merges apply to the simulated draws. The solar figure shows only source S2,
+the PV model driven by CAMS, because source S1 is the metered farms' output. Real engine days beside
+simulated days, and the S1 days, are written to a private folder and are not published.
+
+**Definitions of the five aggregates.** A half-hour is running when the output is at least 15% of the
+reference output. A run is a stretch of running half-hours, and its length counts only where the run
+starts and ends inside a stretch of complete days. A ramp is a change of at least 5% of the
+reference output between two neighbouring half-hours. A start is the first half-hour of a run, and
+the starts are counted in blocks of 7 complete consecutive days. The daily energy is the day's
+output summed, as a share of the reference output for 24 hours. Weekdays and weekends come from the
+calendar, and the simulated draws treat bank holidays as weekdays.
+
+**Figures E1 and E2 show simulated days only.** Figure E1 shows twelve kinds of simulated engine day
+from the randomised simulator, each picked by a fixed rule from the first draw that fits and
+preferring a draw no earlier kind used. The caption names the ranges from which the simulator draws.
+Figure E2 shows the clearest and cloudiest simulated S2 day of each season. The figures take no
+random number to pick a panel.
+
+**Findings from the aggregate plots are written after the run.** The page adds no finding until the
+stage has run and the figures have been read.
+
 ## Checks
 
 **Two audit triggers fired, and no audit has run.** Trigger 2 fired because C1, C4, C6, and C13
@@ -1687,6 +1722,9 @@ edited.
 - `e00729_leakage.py`: the leakage assertions of verdict row 1.
 - `e00729_gate_calibration.py`: the offline calibration behind the one permitted re-tune of the
   simulator ranges; it prints share ratios only and reads no network output and no score.
+- `e00729_event_figures.py`: the event-generator figures (stage `events`). It draws simulated engine
+  and solar days, and compares aggregates of the simulated draws with aggregates of the real engine
+  record. It writes real series only to `PRIVATE/event_generator`.
 - `e00729_stages.py`, `e00729_cli.py`, `e00729_report.py`, `e00729_figures.py`, and `run.sh`: the
   stage orchestration (including the `figures` stage, which writes figures 1, 2, and 6), the command
   line, the printed report (which writes the other figures, among them figure 8), the figure code,

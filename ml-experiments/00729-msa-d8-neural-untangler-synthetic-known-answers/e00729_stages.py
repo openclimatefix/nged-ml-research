@@ -1238,3 +1238,25 @@ def stage_series(*, ctx: Context, arch: str, log: Log) -> list[Path]:
     )  # fmt: skip
     log(f"wrote {len(written)} time-series figures")
     return written
+
+
+def stage_events(*, log: Log) -> list[Path]:
+    """Write the event-generator figures: simulated days, and the real engine record as aggregates.
+
+    The metered engine record is read only. Real series go only to `PRIVATE/event_generator`.
+
+    Args:
+        log: Receives one line per figure, with names only.
+
+    Returns:
+        The published figures (run `svgo` on each before committing).
+    """
+    import e00729_event_figures as events
+
+    test = banks.load_bank(path=bank_path(kind="test"))
+    written = events.write_event_figures(
+        segments=test.segments, record=data.metered_record(), out_dir=paths.data_root() / "figures",
+        private_dir=paths.private_dir() / "event_generator", log=log,
+    )  # fmt: skip
+    log(f"wrote {len(written)} published event-generator figures")
+    return written

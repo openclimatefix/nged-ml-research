@@ -4,7 +4,7 @@
     SLOT_CPU=<n> run.sh --go e00729_cli.py <stage> [options]
 
 Stages, in the order of the plan: `banks`, `gate`, `timing`, `screen`, `choose`, `ladder`,
-`margin`, `score`, `report`, `figures`, `series`. `fit` runs one named fit. Every stage prints counts and scores only.
+`margin`, `score`, `report`, `figures`, `series`, `events`. `fit` runs one named fit. Every stage prints counts and scores only.
 """
 
 import argparse
@@ -68,6 +68,7 @@ def main(argv: list[str]) -> int:
             "report",
             "figures",
             "series",
+            "events",
             "fit",
         ),
     )
@@ -105,6 +106,10 @@ def main(argv: list[str]) -> int:
         return 0
     if args.stage == "choose":
         log(f"architecture chosen: {stages.stage_choose_architecture()['chosen']}")
+        return 0
+    if args.stage == "events":
+        for p in stages.stage_events(log=log):
+            log(f"wrote a figure: {report.figures.optimise_command(path=p)}")
         return 0
     ctx = stages.build_context()
     if args.stage == "banks":
