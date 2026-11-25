@@ -123,6 +123,59 @@ def apply_ranges_override(*, root: Path) -> None:
         core729.RANGES[name] = tuple(value)
 
 
+RETUNED_RANGES: Final = {
+    "spells_per_30_days": (0.0, 1.0),
+    "spell_days": (2, 3),
+    "no_run_share": (0.05, 0.5),
+    "solar_capacity_points": (20.0, 250.0),
+}
+"""The ranges of the one permitted re-tune, chosen offline by `e00730_gate_calibration.py`.
+
+The registered values are 0 to 2 spells per 30 days, spells of 2 to 19 days, 0.2 to 0.7 of days
+with no engine run, and a solar capacity of 5 to 150 points. Every other range is unchanged.
+"""
+
+
+def write_retune_override(*, root: Path) -> Path:
+    """Write the override file of the one permitted re-tune and return its path.
+
+    The re-tune needs exactly one gate attempt, which failed its share checks and passed its BSP
+    checks, and no earlier override.
+
+    Args:
+        root: The experiment's data folder.
+
+    Returns:
+        The path of the override file.
+
+    Raises:
+        StoppedError: When the gate has not failed exactly once on its share checks alone.
+        RuntimeError: When an override file exists already, or fits or `margin.json` exist.
+    """
+    path = root / RANGES_OVERRIDE_FILE
+    if path.exists():
+        msg = "the ranges override exists already: the one re-tune is used"
+        raise RuntimeError(msg)
+    fitted = [
+        n
+        for n in ("fits", "networks", "predictions")
+        if (root / n).exists() and any((root / n).iterdir())
+    ]
+    if fitted or (root / "margin.json").exists():
+        msg = "fits or margin.json exist: the re-tune must come before any fit"
+        raise RuntimeError(msg)
+    attempts = sorted((root / "scores").glob("gate_attempt*.json"))
+    if len(attempts) != 1:
+        msg = f"{len(attempts)} gate attempts exist and the re-tune needs exactly 1 (verdict row 0)"
+        raise StoppedError(msg)
+    attempt = read_json(path=attempts[0])
+    if attempt["pass"] or attempt["bsp_failed"]:
+        msg = "the re-tune needs attempt 1 to fail its share checks and pass its BSP checks"
+        raise StoppedError(msg)
+    write_json(path=path, payload=RETUNED_RANGES)
+    return path
+
+
 def run_marker_payload() -> dict:
     """Return what the run marker must hold for the code as it is now."""
     return {"experiment": "00730", **stages729.run_marker_payload()}

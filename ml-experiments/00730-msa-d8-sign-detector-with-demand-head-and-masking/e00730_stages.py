@@ -266,8 +266,8 @@ def write_invalid_verdict(*, root: Path, rule: str = "a correctness check failed
 def stage_names() -> Sequence[str]:
     """Return the stage names of the command line, in the order of the plan."""
     return (
-        "banks", "gallery", "gate", "timing", "pretrain", "screen", "choose", "margin-fits",
-        "margin", "styles", "choose-style",
+        "banks", "gallery", "gate", "retune", "timing", "pretrain", "screen", "choose",
+        "margin-fits", "margin", "styles", "choose-style",
         "later", "refit729", "fit", "real", "score", "report", "figures", "series", "components",
     )  # fmt: skip
 

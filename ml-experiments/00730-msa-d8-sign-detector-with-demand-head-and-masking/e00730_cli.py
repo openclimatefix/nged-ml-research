@@ -110,6 +110,8 @@ def dispatch(*, args: argparse.Namespace, root: Path) -> int:
     elif stage == "gate":
         ctx = stages.real_context()
         banks.stage_gate(root=root, gate_inputs=stages.real_gate_inputs(ctx=ctx), log=log)
+    elif stage == "retune":
+        log(f"wrote {banks.write_retune_override(root=root)}")
     elif stage == "gallery":
         ctx = stages.real_context()
         stages.stage_gallery(

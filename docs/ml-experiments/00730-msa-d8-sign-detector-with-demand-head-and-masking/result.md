@@ -302,13 +302,42 @@ the synthetic stretches. The test bank must hold at least 2,000 reverse-flow hal
 dead band, and at least 200 in the two BSP test months.
 
 **The registered ranges are tested first, and one re-tune of the share checks is allowed.** If
-attempt 1 fails its share checks, the ranges may be re-tuned once by experiment 729's offline
-calibration, `e00729_gate_calibration.py`, run with this experiment's root: it builds small banks
-for candidate range sets on a seed that no fit and no gate uses, and reads only the four share ratios,
-no BSP slope, no network output, and no score. The re-tuned ranges are recorded on the page, the
-banks are rebuilt, and the gate runs once more. **If attempt 2 fails, or attempt 1 fails a BSP
-check, the line stops at verdict row 0 and the manager is told.** No other freedom exists: no bar,
-no world mix, and no BSP coefficient range changes.
+attempt 1 fails its share checks, the ranges may be re-tuned once by an offline calibration,
+`e00730_gate_calibration.py`, which follows experiment 729's `e00729_gate_calibration.py`: it builds
+small banks for candidate range sets on a seed that no fit and no gate uses (training seed 9), and
+reads only the four share ratios, no BSP slope, no network output, and no score. The re-tuned
+ranges are recorded on the page, the banks are rebuilt, and the gate runs once more. **If attempt
+2 fails, or attempt 1 fails a BSP check, the line stops at verdict row 0 and the manager is told.**
+No other freedom exists: no bar, no world mix, and no BSP coefficient range changes.
+
+**Attempt 1 failed its share checks, and this is the plan's one re-tune.** Attempt 1 used the
+registered ranges. The BSP-step checks passed (the result was not void). The engine-only worlds
+failed the half-hour share: the reading was below 1.0 MVA in 4.19% of synthetic half-hours against
+1.19% of real net-era half-hours, 3.5 times the real share, where the pass band is 0.5 to 2.0 times.
+The day share passed (0.144 against 0.172, 0.84 times), and so did both solar-era shares (0.60 times
+for days, 1.29 times for half-hours). Multi-day spells at constant output hold the reading at the
+floor for long runs of consecutive half-hours, so the re-tune makes them rarer and shorter and lets
+the engine run on more days. These four ranges change, and every other range is unchanged:
+
+| Range | Registered (attempt 1) | Re-tuned (attempt 2) |
+|---|---|---|
+| Multi-day spells per 30 days | 0 to 2 | 0 to 1 |
+| Length of a multi-day spell | 2 to 19 days | 2 to 3 days |
+| Share of days with no engine run | 0.2 to 0.7 | 0.05 to 0.5 |
+| Solar capacity (log-uniform) | 5 to 150 points | 20 to 250 points |
+
+**The solar capacity range moves although the solar checks passed at attempt 1.** With the new
+engine ranges alone, the solar-era day share falls from 0.60 times to 0.52 times the real share,
+which is too close to the 0.5 lower bound to rely on, because fewer long spells leave fewer
+solar-era days below 1.0 MVA. A larger solar capacity restores the margin. The offline calibration
+(two grids of 17 and 18 candidate range sets, on small banks of training seed 9) gave the chosen
+set these ratios to the real shares, in the order days and half-hours: engine-only worlds 0.70 and
+1.36, engine-and-solar worlds 0.82 and 0.91. All four lie inside 0.5 to 2.0. A test-kind bank
+under the chosen set held 3,191 reverse-flow half-hours outside the dead band and 426 in the two
+BSP test months, above the minimums of 2,000 and 200. Attempt 2 reports the ratios of the rebuilt
+banks, which differ from these because the rebuilt banks are larger. The `retune` stage writes the
+four ranges to `ranges_override.json` once, and refuses unless exactly one gate attempt exists,
+that attempt failed its share checks only, and no fit exists.
 
 **Every simulated component is checked for output where output must exist before the gate reads
 the banks.** The solar and BSP checks are stated per day, never per segment, because a segment of a
@@ -949,7 +978,7 @@ transformer took more than about 5.3 seconds an epoch and the screen chose it.
 |---|---|
 | Building the training banks of 5 seeds, the validation, test, and shifted banks, and the component checks | under 30 minutes (experiment 729 measured under 15 minutes for the bank build) |
 | The realism gate, each attempt | under 15 minutes |
-| One re-tune by experiment 729's offline calibration, if attempt 1 fails its shares | up to 2 hours (experiment 729's calibration tried 129 candidate range sets) |
+| The one re-tune, by `e00730_gate_calibration.py`, after attempt 1 failed its shares | under 5 minutes (2 grids of 17 and 18 candidate range sets) |
 | The synthetic world gallery | under 30 minutes |
 | The pre-training rows of 16 Primaries and D8's encoder input table | under 1 hour |
 | The B1 baseline, the margin, the limits, scoring 59 fits, the demand and ambiguity read-outs, and the bootstrap of 20,000 resamples over 7 counted and 22 report-only contrasts | about 1.5 hours |
@@ -1233,8 +1262,7 @@ as merged:**
 - `e00729_core.py` (the split rule, the registered ranges, the reactive floor, the floor of 0.5
   points, and the bootstrap constants), `e00729_sim.py` (the engine and solar simulators, the fold,
   the synthetic BSP, and `Segment`), `e00729_banks.py` (building, hashing, saving, and loading the
-  banks, and the gate's functions), `e00729_gate_calibration.py` (the one permitted re-tune, run with
-  this experiment's root), and `e00729_leakage.py` (the bank checks);
+  banks, and the gate's functions), and `e00729_leakage.py` (the bank checks);
 - `e00729_arms.py` (the channel stack, the windows, `mask_span`, and the sampler),
   `e00729_nets.py` (`BiLstm`, `UNet1d`, the two-lobe head, `sign_bce`, `sign_lobes`, and the
   auxiliary Gaussian), `e00729_train.py` (`fit`, for the refits of arms A, D, and D-sign), and
@@ -1274,6 +1302,8 @@ and the pre-training mixer), `e00397_models.mlp`, experiment 428's `build_fold`,
   causal protocol, the demand read-out, the ambiguity read-out, and the contrasts.
 - `e00730_real.py`: H2, K1, K2, R2, and R3.
 - `e00730_leakage.py`: the new assertions of verdict row 1.
+- `e00730_gate_calibration.py`: the offline calibration behind the one permitted re-tune, which
+  prints share ratios only.
 - `e00730_stages.py`, `e00730_cli.py`, `e00730_report.py`, `e00730_figures.py`,
   `e00730_series_figures.py`, and `run.sh`: the stage orchestration, the command line, the printed
   report, the figures, the time series figures, and the launch wrapper.

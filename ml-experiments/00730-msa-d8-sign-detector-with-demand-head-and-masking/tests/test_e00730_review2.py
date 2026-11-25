@@ -4,10 +4,12 @@ import ast
 import copy
 import importlib
 import inspect
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import e00729_banks as banks729
+import e00729_core as core729
 import e00729_score as score729
 import e00729_sim as sim
 import e00729_train as train729
@@ -607,3 +609,40 @@ def test_a_small_engine_season_passes_a_pooled_short_bank_fails_and_a_silent_one
         seg.engine[:] = 0.0
     out = banks.component_checks(banks_by_name={"test": silent}, cal=cal)
     assert any("/engine/" in k for k in out["short"])
+
+
+def _failed_attempt(*, root: Path, passed: bool = False, bsp_failed: bool = False) -> None:
+    (root / "scores").mkdir(parents=True, exist_ok=True)
+    (root / "scores" / "gate_attempt1.json").write_text(
+        json.dumps({"pass": passed, "bsp_failed": bsp_failed})
+    )
+
+
+def test_the_retune_writes_the_override_once_after_one_share_failure(tmp_path: Path) -> None:
+    _failed_attempt(root=tmp_path)
+    try:
+        path = banks.write_retune_override(root=tmp_path)
+        written = json.loads(path.read_text())
+        assert {k: tuple(v) for k, v in written.items()} == banks.RETUNED_RANGES
+        assert set(written) <= set(core729.RANGES)
+        with pytest.raises(RuntimeError, match="exists already"):
+            banks.write_retune_override(root=tmp_path)
+        banks.apply_ranges_override(root=tmp_path)
+        assert core729.RANGES["spell_days"] == (2, 3)
+    finally:
+        banks.apply_ranges_override(root=tmp_path / "none")
+
+
+@pytest.mark.parametrize("case", ["passed", "bsp", "no attempt", "fits", "second attempt"])
+def test_the_retune_refuses_unless_one_share_failure_and_no_fit(tmp_path: Path, case: str) -> None:
+    if case != "no attempt":
+        _failed_attempt(root=tmp_path, passed=case == "passed", bsp_failed=case == "bsp")
+    if case == "fits":
+        (tmp_path / "fits").mkdir()
+        (tmp_path / "fits" / "a.json").write_text("{}")
+    if case == "second attempt":
+        (tmp_path / "scores" / "gate_attempt2.json").write_text("{}")
+    expected = RuntimeError if case == "fits" else banks.StoppedError
+    with pytest.raises(expected):
+        banks.write_retune_override(root=tmp_path)
+    assert not (tmp_path / banks.RANGES_OVERRIDE_FILE).exists()
