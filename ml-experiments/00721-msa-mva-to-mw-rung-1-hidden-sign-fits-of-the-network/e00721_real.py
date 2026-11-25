@@ -444,10 +444,7 @@ def build_real_arm_world(
     )  # fmt: skip
     gate[roles["unfolded"]] = 0.0
     if spec.sign_head:
-        shut = [sites[i] for i in np.nonzero(supervised & (gate < 0.5))[0]]
-        assert not shut, (
-            f"the export gate is shut at the supervised Primaries {shut}: their sign labels would be discarded"
-        )
+        assert_gate_open_at_supervised(gate=gate, supervised=supervised, sites=sites)
     tworld = jobs.tr.World(
         source=sources[1], cutoff_idx=cutoff, clean=a["target"], target_mean=mean, target_std=std, month=job.fold, placebo_pool=None,
     )  # fmt: skip
@@ -507,11 +504,22 @@ def synthetic_inputs(*, gi: GridInputs, seed: int, day_offset_points: float) -> 
     }  # fmt: skip
 
 
+def assert_gate_open_at_supervised(
+    *, gate: np.ndarray, supervised: np.ndarray, sites: list[str]
+) -> None:
+    """Raise `AssertionError` when the export gate is shut at a Primary whose sign labels train the head."""
+    shut = [sites[i] for i in np.nonzero(supervised & (gate < 0.5))[0]]
+    assert not shut, (
+        f"the export gate is shut at the supervised Primaries {shut}: their sign labels would be discarded"
+    )
+
+
 def synthetic_score_origins(*, n_grid: int) -> np.ndarray:
     """Return the contract origins (12:00 UTC, every day) of the synthetic fit's scored months.
 
-    The days run from 2026-03-01 until the last origin whose 10 days of targets end before the
-    2026-07-01 holdout. The synthetic arrays have no real label, so any origin in the range is scored.
+    The days run from 2026-03-01 until the last origin whose 10 days of targets (the lead window's
+    upper bound) end before the 2026-07-01 holdout. The synthetic arrays have no real label, so any
+    origin in the range is scored.
     """
     import e00721_stage0 as stage0
 
@@ -520,9 +528,25 @@ def synthetic_score_origins(*, n_grid: int) -> np.ndarray:
         (np.datetime64(core.HOLDOUT_START_ISO, "us").astype(np.int64) - lay.GRID_START_US)
         // lay.STEP_US
     )
-    last = min(stop, holdout) - lay.STEPS_PER_DAY * lay.N_LEAD_DAYS
+    reserve = int(core.LEAD_MAX_HOURS_EXCLUSIVE * 2)
+    last = min(stop, holdout) - reserve
     days = np.arange(start // lay.STEPS_PER_DAY, last // lay.STEPS_PER_DAY)
     return (days * lay.STEPS_PER_DAY + 24).astype(np.int64)
+
+
+def synthetic_token_span(*, n_grid: int) -> tuple[int, int]:
+    """Return the grid range `[start, stop)` of the sign tokens that the synthetic gate scores.
+
+    The tokens are the history tokens of the scored origins that lie at or after the cutoff: the
+    range starts at the first scored origin's month start and stops one step after the newest
+    visible token of the last origin (the origin minus the native offset and the power cap). Stage 0
+    counts the days per class on exactly this range.
+    """
+    import e00721_stage0 as stage0
+
+    origins = synthetic_score_origins(n_grid=n_grid)
+    start, _ = stage0.synthetic_scored_span(n_grid=n_grid)
+    return start, int(origins.max()) - lay.NATIVE_OFFSET_STEPS - lay.POWER_CAP_STEPS + 1
 
 
 def build_synthetic_arm_world(

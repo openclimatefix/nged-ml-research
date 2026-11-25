@@ -172,7 +172,7 @@ def check_synthetic_world_on_the_real_grid() -> str:
         fold=core.SYNTH_PIPELINE_FOLD, seed=0, phase="train", with_farms=False
     )
     parts = real.synthetic_inputs(gi=gi, seed=0, day_offset_points=0.0)
-    span = stage0.synthetic_scored_span(n_grid=real.N_GRID_87)
+    span = real.synthetic_token_span(n_grid=real.N_GRID_87)
     tok = stage0.exporter_tokens(parts=parts, span=span)
     out = wd.reachability_check(**tok)
     return f"synthetic world built: True, reachability evaluable: {bool(out['evaluable'])}, exporters export: {bool((tok['x_true'] < 0).any())}"

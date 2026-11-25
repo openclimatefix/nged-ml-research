@@ -71,6 +71,22 @@ def probe_path(*, data_dir: Path, world: str, fold: str) -> Path:
     return real.ProbeProvider(root=fit.data_root(data_dir=data_dir)).path(world=world, fold=fold)
 
 
+def hidden_standardisation(
+    *, y: np.ndarray, keep: np.ndarray, primary: np.ndarray, hidden: tuple[int, ...],
+    target_mean: np.ndarray, target_std: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:  # fmt: skip
+    """Return the per-Primary mean and standard deviation, with the hidden Primaries' own series.
+
+    Each hidden Primary is standardised with the mean and standard deviation of the folded reading that
+    the probe estimates, over the rows that are kept. The other Primaries keep the fold's values.
+    """
+    mean, std = target_mean.copy(), target_std.copy()
+    for p in hidden:
+        own = (primary == p) & keep
+        mean[p], std[p] = float(y[own].mean()), float(y[own].std())
+    return mean, std
+
+
 def probe_capacity(*, fold: str, device: str) -> dict[str, float]:
     """Pretrain the fold's network on the un-injected folded readings and return `{"D5": mw, "D10": mw}`.
 
@@ -112,10 +128,10 @@ def probe_capacity(*, fold: str, device: str) -> dict[str, float]:
         del site
     y = np.where(np.isfinite(y), y, 0.0)
     # standardise each Primary with the mean and standard deviation of the series it is asked to estimate
-    t_mean, t_std = rows.target_mean.copy(), rows.target_std.copy()
-    for p in hidden.values():
-        own = (pre.primary == p) & keep
-        t_mean[p], t_std[p] = float(y[own].mean()), float(y[own].std())
+    t_mean, t_std = hidden_standardisation(
+        y=y, keep=keep, primary=pre.primary, hidden=tuple(hidden.values()),
+        target_mean=rows.target_mean, target_std=rows.target_std,
+    )  # fmt: skip
     night_pts, rho = visible_night_and_rho(
         pre=pre, y=y, rows=rows, keep=keep, k=k, k621=k621, e649=fit662.E649
     )

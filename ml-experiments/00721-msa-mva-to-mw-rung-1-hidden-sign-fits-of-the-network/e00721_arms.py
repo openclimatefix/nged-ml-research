@@ -167,10 +167,11 @@ def signed_expected_history(
         shift: `(B,)` the Primary's mean over standard deviation, so that `v = z + shift`.
 
     Returns:
-        `z_exp = (1 - 2 rho) v - shift` and `4 rho (1 - rho) v²`.
+        `z_exp = z - 2 rho v`, which equals `(1 - 2 rho) v - shift` and is exactly `z` at `rho = 0`, and
+        `4 rho (1 - rho) v²`.
     """
     v = z + shift[:, None, None]
-    z_exp = ((1.0 - 2.0 * rho) * v - shift[:, None, None]).clamp(-POWER_CLIP, POWER_CLIP)
+    z_exp = (z - 2.0 * rho * v).clamp(-POWER_CLIP, POWER_CLIP)
     return z_exp, 4.0 * rho * (1.0 - rho) * v**2
 
 

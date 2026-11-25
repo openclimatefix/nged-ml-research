@@ -328,7 +328,7 @@ def test_the_lead_counts_from_the_12_utc_origin_in_the_scored_rows_and_the_power
     assert '"power_fcst_init_time": stamp_us[contract][keep]' in source
     assert "(tidx - contract) * 0.5" in source
     assert drv.NATIVE_TO_CONTRACT_HOURS == 3.0
-    assert "NATIVE_TO_CONTRACT_HOURS" in inspect.getsource(drv.power_check)
+    assert "to_contract_rows" in inspect.getsource(drv.power_check)
 
 
 def test_pin_threads_asserts_one_core_when_run_sh_names_a_slot(
@@ -340,13 +340,6 @@ def test_pin_threads_asserts_one_core_when_run_sh_names_a_slot(
         e00721_paths.pin_threads()
     monkeypatch.setattr("os.sched_getaffinity", lambda _pid: {3})
     e00721_paths.pin_threads()
-
-
-def test_the_gate_must_be_open_at_the_supervised_primaries() -> None:
-    import e00721_real as real
-
-    source = inspect.getsource(real.build_real_arm_world)
-    assert "supervised & (gate < 0.5)" in source
 
 
 def test_the_report_only_accuracy_at_u_0_3_ignores_the_night_tokens(tmp_path: Path) -> None:

@@ -547,10 +547,11 @@ reads seeds 0 and 1 together. In words:
   about 3.23 standard deviations, or about 0.47. The page keeps 0.404 as a fixed constant. That MDE
   sits below the 0.47 that the same recipe gives at 98.33%, so G1's point-estimate bar is easier to
   pass than its level implies. The interval bar is unchanged.
-- **Treatment minus `P0`, a read-out.** The signed CRPS of each arm minus that of `P0` on the
-  reverse-flow rows is reported with its interval and carries no bar, because experiment 420 found
-  the ungated reference scored the same as its arm A on those rows (6.99 against 6.98), so any arm
-  that can go below zero beats `P0`. No verdict row rests on it.
+- **Treatment minus `P0`, a read-out.** The signed CRPS of `SG-A` minus that of `P0` on the
+  reverse-flow rows, at seed 0 (`P0` in `W2` is fitted at seed 0 only), is reported with its
+  interval and carries no bar, because experiment 420 found the ungated reference scored the same as
+  its arm A on those rows (6.99 against 6.98), so any arm that can go below zero beats `P0`. No
+  verdict row rests on it.
 - **G2, the sky carries the gain.** `SG-A` minus `SG-A-S` on the same rows, with the same bar.
 - **G3, no invented reverse flow, is an open decision.** In `W0`, `SG-A` minus `P0` over all rows of
   the hidden pair, on the plain fits (seeds 0 and 1) and on `SG-A-open` (seed 0, paired with `P0`
@@ -567,9 +568,10 @@ reads seeds 0 and 1 together. In words:
   write-up reports each gate decision per world and fold, because the gate is expected to stay shut
   at the un-injected pair, and a shut gate passes G3 by construction.
 - **G4, the eight MVA-only Primaries.** The folded CRPS of each arm at the eight, from the same
-  fits, with its interval and no bar. G4 is read at seed 0, and the seed-1 fits are reported beside
-  it where they exist. The design note's two-seed detectable difference of 0.25 points therefore
-  does not apply to G4, and this page states no one-seed figure.
+  fits, with its interval and no bar. G4 is read at seed 0, as `S`, `SG-0`, and `SG-A` each minus
+  `P0`. Seed-1 fits of `SG-0` and `SG-A` exist, but `P0` in `W2` has no seed 1 to pair them with, so
+  no seed-1 figure is reported. The design note's two-seed detectable difference of 0.25 points
+  therefore does not apply to G4, and this page states no one-seed figure.
 
 **The verdict table is strictly first-match, and it reads in this order.** Row 0 holds every stop
 that gives no verdict. A stop leaves later fits unrun by design, so row 0 comes before the row for a
@@ -668,7 +670,7 @@ fast results justifies.
 | Wave | What runs | Fits | GPU-process-hours | Running total |
 |---|---|---|---|---|
 | 1 | Code-works check: one tiny run that trains, scores, and writes to a scratch folder, plus one full-size real batch that measures the GPU and host memory peaks and checks the scored-state assertion. No number from it is quoted | 0 counted | 0.2 | 0.2 |
-| 1 | Synthetic world, seed 0: `SG-A`, `SG-A-S`, on the pipeline of fold 2026-03, trained before 2026-03-01 and scored on March to June 2026 (about 0.02 GPU-process-hours more scoring per fit than a one-month span, re-measured at the code-works check; the projection stays) | 2 | 0.4 | 0.6 |
+| 1 | Synthetic world, seed 0: `SG-A`, `SG-A-S`, on the pipeline of fold 2026-03, trained before 2026-03-01 and scored on origins from March to 20 June 2026, with sign tokens to mid-June (about 0.02 GPU-process-hours more scoring per fit than a one-month span, re-measured at the code-works check; the projection stays) | 2 | 0.4 | 0.6 |
 | 1 | Quick look: `W2`, fold 2026-05, seed 0: `P0`, `SG-0`, `SG-A`, with the continuation (Branch A: 0.6 to 0.7) or the budget check (Branch B: 1.1 to 1.4, from 0.6 plus the two extra fits of 0.5 to 0.8). Nothing reads G3 or the flag yet | 3, plus 2 in Branch B | 0.6 to 0.7 (A); 1.1 to 1.4 (B) | 1.2 to 1.3 (A); 1.7 to 2.0 (B) |
 | 2 | Synthetic world, seed 1, then the rest of `W2`, seed 0: `P0` 3, `S` 4, `SG-0` 3, `SG-A` 3, `SG-A-S` 4 | 19 | 3.8 | 5.0 to 5.1 (A); 5.5 to 5.8 (B) |
 | 3 | `W0`, seed 0: `P0`, `S`, `SG-0`, `SG-A`, and `SG-A-open`, 4 folds each | 20 | 4.0 | 9.0 to 9.1 (A); 9.5 to 9.8 (B) |
@@ -1093,18 +1095,20 @@ which audit triggers fired.
 - **Gap rows:** every signed Primary drops the half-hours at which any farm has a gap, in both
   worlds.
 - **Synthetic fold and scored span:** the synthetic fit trains on data before 2026-03-01 (after the
-  purge) and scores the never-trained tokens of March to June 2026, all before the 2026-07-01
-  holdout, whose guard is kept. A one-month span cannot pass the noise check, because the check
-  needs about 92 distinct days per class and a month holds at most 30. The distinct days per class
-  with `u` of at least 0.3 outside the dead band, as export days and import days, are 21 and 24 in
-  March, 28 and 29 in April, 29 and 30 in May, and 29 and 29 in June, so 107 and 112 over the four
-  months, which gives 3 standard errors of 0.092 or less against the margin of 0.10. Stage 0 runs
-  the reachability check and the noise check on exactly that scored set, with each exporter's own
+  purge) and scores origins from 2026-03-01 to 2026-06-20 12:00 UTC, the last origin whose 10 days
+  of targets end before the 2026-07-01 holdout, whose guard is kept. The scored sign tokens are the
+  never-trained history tokens from 2026-03-01 00:00 to 2026-06-19 09:00 UTC, so they end in
+  mid-June. A one-month span cannot pass the noise check, because the check needs about 92 distinct
+  days per class and a month holds at most 30. The distinct days per class with `u` of at least 0.3
+  outside the dead band, as export days and import days, are 96 and 101 at day offset 0 (seeds 0 and
+  1), 95 and 101 at offset 5 for seed 0, and 94 and 101 at offset 5 for seed 1, which give 3
+  standard errors of 0.0970, 0.0974, and 0.0979 against the margin of 0.10. Stage 0 runs the
+  reachability check and the noise check on exactly that scored set, with each exporter's own
   capacity, and the margin and the noise-check rule are unchanged. The synthetic fit replaces the
   power with synthetic power, so the real folds 2026-04 to 2026-06 and their training windows are
   untouched. The extra cost is about 3 more months of scoring (prediction) in each of the 4
-  synthetic fits and about 1% less training data, an estimate of about 0.1 GPU-process-hours in
-  all that the code-works check re-measures; the projection stays at about 13.6 until then.
+  synthetic fits and about 1% less training data, an estimate of about 0.1 GPU-process-hours in all
+  that the code-works check re-measures; the projection stays at about 13.6 until then.
 - **Synthetic Primaries:** D9 and D11 export and D2 and D3 never export. The world uses the real
   grid of the fold 2026-03 pipeline, the real calendar with England's bank holidays, the real 2 m
   temperature, and the real shortwave likelihood `u`, in experiment 713's fixed demand table `w`.

@@ -132,9 +132,11 @@ SIGN_HEAD_STAGE: Final = 1
 """The one stage in which the sign head trains (Branch A). In stages 2 and 3 the head is frozen: no
 cross-entropy, no gradient, and no parameter in any optimiser group."""
 SYNTH_PIPELINE_FOLD: Final = "2026-03"
+"""The month whose pipeline supplies the synthetic world's grid, weather, and cutoff (not one of `FOLDS`)."""
 SYNTH_SCORED_MONTHS: Final = ("2026-03", "2026-04", "2026-05", "2026-06")
-"""The synthetic fit trains before 2026-03-01 (after the purge) and scores the never-trained March to June 2026."""
-"""The real fold whose pipeline supplies the synthetic world's grid, weather, and cutoff."""
+"""The synthetic fit trains before 2026-03-01 (after the purge). Its scored origins run from 2026-03-01
+to the last origin whose 10 days of targets end before the 2026-07-01 holdout, so its sign tokens end
+in mid-June."""
 SYNTH_EXPORTERS: Final = ("D9", "D11")
 """The synthetic world's two exporting Primaries (their real sky and temperature are used)."""
 SYNTH_NON_EXPORTERS: Final = ("D2", "D3")

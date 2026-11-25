@@ -109,6 +109,17 @@ def exporter_tokens(*, parts: dict, span: tuple[int, int] | None = None) -> dict
     }  # fmt: skip
 
 
+def class_days(*, day: np.ndarray, x_true: np.ndarray, u: np.ndarray) -> tuple[int, int]:
+    """Return the distinct days that hold an export token and an import token, on the margin's tokens.
+
+    A token counts when `u` is at least 0.3 and its signed power lies outside the dead band. Stage 0
+    and the code-works check of the synthetic tokens both call this function.
+    """
+    ok = (u >= core.U_MIN) & (np.abs(x_true) * 100.0 >= core.DEAD_BAND_POINTS)
+    rev = x_true < 0.0
+    return len(np.unique(day[ok & rev])), len(np.unique(day[ok & ~rev]))
+
+
 def run_stage0(*, data_dir: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     """Run the four steps and write `synthetic_world.json` and `stage0.json` under the data root."""
     root = fit.data_root(data_dir=data_dir)
@@ -116,7 +127,7 @@ def run_stage0(*, data_dir: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     gi = real.load_grid_inputs(
         fold=core.SYNTH_PIPELINE_FOLD, seed=0, phase="train", with_farms=False
     )
-    span = synthetic_scored_span(n_grid=real.N_GRID_87)
+    span = real.synthetic_token_span(n_grid=real.N_GRID_87)
     offset, reach_rows = 0.0, []
     for offset in (0.0, 5.0):
         rows = []
@@ -134,11 +145,7 @@ def run_stage0(*, data_dir: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     for seed in seeds:
         parts = real.synthetic_inputs(gi=gi, seed=seed, day_offset_points=offset)
         tok = exporter_tokens(parts=parts, span=span)
-        ok = (tok["u"] >= core.U_MIN) & (np.abs(tok["x_true"]) * 100.0 >= core.DEAD_BAND_POINTS)
-        rev = tok["x_true"] < 0.0
-        day_counts.append(
-            (len(np.unique(tok["day"][ok & rev])), len(np.unique(tok["day"][ok & ~rev])))
-        )
+        day_counts.append(class_days(day=tok["day"], x_true=tok["x_true"], u=tok["u"]))
     noise = score.noise_check(
         n_days_pos=float(min(c[0] for c in day_counts)),
         n_days_neg=float(min(c[1] for c in day_counts)),

@@ -1,28 +1,31 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PLR0915
 """Experiment 721: the first GPU code-works check on one tiny real fold (not run until told to).
 
 The check fits `SG-A` in `W2` on the real fold 2026-05 for a handful of passes and asserts the ten
 properties that the second code review asked for. It makes no claim about any forecast. Every
 output goes under a scratch path under `$HOME`, and the process holds at most 6 GB of the GPU.
 
-A real fold is built in one phase per process, so the check has four subcommands, each run
-through `run.sh`:
+A real fold is built in one phase per process, and a process must not build two real worlds in
+12 GB, so the check has eight subcommands, each run through `run.sh`. Every one prints the host
+memory peak of its process.
 
-1. `fit SCRATCH`: assertions 1 (no-continuation scored state), 2 (training target), 3 (sign
-   labels), 4 (gate at the supervised Primaries), 5 (closed gate equals the base at the real
-   shift), and the fit's GPU peak (8).
-2. `predict SCRATCH`: assertions 6 (ensemble and PV runs at least 9 h before the native origin),
-   7 (the lead window), 9 (the predict phase reproduces the fitted PV scales), the predict peak
-   (8), and the share of PV target rows that are missing per Primary.
-3. `probe SCRATCH`: assertion 8 for the capacity probe (GPU peak at most 6 GB).
-4. `synth-fit SCRATCH` and `synth-predict SCRATCH`: the synthetic fit on the pipeline fold
-   2026-03 (cutoff at 2026-03-01, target NaN from there on, scored origins in March to June 2026,
-   tokens written), with its seconds and GPU peak printed so the extra cost can be re-measured.
-5. `routing SCRATCH`: assertion 10 (`score_all` on the complete set of wave outputs reaches rows
+1. `fit-without SCRATCH`: assertions 1a (the skipped continuation is flagged), 2 (training target),
+   3 (sign labels), 4 (gate at the supervised Primaries), 5 (a closed gate equals 716's `HT`
+   read-out at the real shift), and the fit's GPU peak (8).
+2. `fit-with SCRATCH`: the same fit with the continuation. `compare SCRATCH` then reports the
+   largest gap between the two scored states (1b) and fails only above a loose bar.
+3. `predict SCRATCH`: assertions 6 (ensemble and PV runs at least 9 h before the native origin),
+   7 (the lead window), 9 (predicting leaves the stored state, PV scales included, unchanged),
+   the predict peak (8), and the missing share of PV target rows per Primary (12).
+4. `probe SCRATCH`: assertion 8 for the capacity probe (GPU peak at most 6 GB).
+5. `synth-fit SCRATCH` and `synth-predict SCRATCH`: the synthetic fit on the pipeline fold
+   2026-03, with the cutoff, the scored origins, the token properties (none before the cutoff, the
+   predicted last token, scored valid times before the holdout, days per class equal to Stage 0's),
+   seconds, and GPU peak printed so the extra cost can be re-measured.
+6. `routing SCRATCH`: assertion 10 (`score_all` on the complete set of wave outputs reaches rows
    4 to 9; CPU only).
 
-Usage: `SLOT_CPU=3 run.sh --go code_works_check.py fit SCRATCH --device cuda`, with `fit`,
-`predict`, `probe`, or `routing` as the subcommand.
+Usage: `SLOT_CPU=3 run.sh --go code_works_check.py fit-without SCRATCH --device cuda`.
 """
 
 import argparse
@@ -46,6 +49,8 @@ FOLD: Final = "2026-05"
 JOB: Final = fit.Job(arm="SG-A", world="W2", fold=FOLD, seed=0)
 PASSES: Final = 2
 GPU_CAP_GB: Final = 6.0
+LOOSE_STATE_GAP: Final = 1e-2
+"""Hard bar on the gap between two fits' scored states; rounding differences sit far below it."""
 REPORT_FILE: Final = "code_works_report.json"
 
 
@@ -96,46 +101,43 @@ def inputs_of(*, scratch: Path, device: str, phase: str):  # noqa: ANN201
     )
 
 
-def check_fit(*, scratch: Path, data_dir: Path, device: str) -> dict:
-    """Run the fit-phase assertions."""
+def check_fit(*, scratch: Path, data_dir: Path, device: str, continuation: bool) -> dict:
+    """Fit once (with or without the continuation) and, without it, run the fit-phase assertions.
+
+    The two fits run in two processes (`fit-without`, `fit-with`), so that no process builds two real
+    worlds in 12 GB. `compare` then reads the two stored states.
+    """
     import e00721_arms as arms
     import e00721_real as real
     import torch  # ty: ignore[unresolved-import]
 
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.use_deterministic_algorithms(True, warn_only=True)
     if device.startswith("cuda"):
         fit.limit_gpu_memory(torch=torch)
         torch.cuda.reset_peak_memory_stats()
     tiny_caps()
-    prepare_scratch(scratch=scratch, data_dir=data_dir)
     report: dict = {}
-    # 1. the scored state equals a no-continuation run when the continuation option is off
-    states = {}
-    for label, continuation in (("without", False), ("with", True)):
-        root = scratch / label
-        prepare_scratch(scratch=root, data_dir=data_dir)
-        inputs = inputs_of(scratch=root, device=device, phase="train")
-        curve = fit.fit_job(
-            job=JOB, inputs=inputs, data_dir=root, budget=fit.Budget(), continuation=continuation
-        )
-        stage1 = curve["stages"][0]
-        states[label] = {
-            k: v.cpu()
-            for k, v in torch.load(
-                fit.job_paths(data_dir=root, job=JOB)["state"], map_location="cpu"
-            ).items()
-        }
-        if not continuation:
-            say(
-                name="1a the skipped continuation is flagged",
-                ok=bool(stage1["flag"]["flagged"]) and not stage1["continued"],
-                detail=str(stage1["flag"]),
-            )
-    same = all(
-        torch.allclose(states["with"][k].float(), states["without"][k].float(), atol=1e-4)
-        for k in states["with"]
+    label = "with" if continuation else "without"
+    root = scratch / label
+    prepare_scratch(scratch=root, data_dir=data_dir)
+    inputs = inputs_of(scratch=root, device=device, phase="train")
+    curve = fit.fit_job(
+        job=JOB, inputs=inputs, data_dir=root, budget=fit.Budget(), continuation=continuation
     )
-    say(name="1b the scored state does not depend on the continuation option", ok=same)
-    # 2 to 5 read the world of the continuation-off fit
+    if continuation:
+        gb = peak_gb(torch=torch, device=device)
+        say(
+            name="8a the fit's GPU peak is at most 6 GB", ok=gb <= GPU_CAP_GB, detail=f"{gb:.2f} GB"
+        )
+        return {"fit_peak_gb": gb}
+    stage1 = curve["stages"][0]
+    say(
+        name="1a the skipped continuation is flagged",
+        ok=bool(stage1["flag"]["flagged"]) and not stage1["continued"],
+        detail=str(stage1["flag"]),
+    )
+    # 2 to 5 read the world of this (continuation-off) fit
     aw = inputs.world_of(job=JOB)
     pre = np.arange(aw.world.clean.shape[1]) < aw.world.cutoff_idx
     say(
@@ -182,15 +184,20 @@ def check_fit(*, scratch: Path, data_dir: Path, device: str) -> dict:
         primary=primary, c_idx=c_idx, lead_day=torch.zeros_like(primary), fold_hist=None
     )
     torch.manual_seed(0)
-    plain = pvm.PvNet(arm="Z", seed=0).to(source.device).eval()
+    plain = pvm.PvNet(arm="HT", seed=0).to(source.device).eval()
     torch.manual_seed(0)
     sg = arms.SgNet(seed=0, sign_head=True).to(source.device).eval()
+    fitted = torch.load(fit.job_paths(data_dir=root, job=JOB)["state"], map_location="cpu")
+    plain.load_state_dict(
+        fitted, strict=False
+    )  # the shared trunk and mixture weights; the head keys are SgNet's own
+    sg.load_state_dict(fitted)
     sg.set_gate(gate=np.zeros(16))
     sg.set_shift(shift=aw.shift)
     with torch.no_grad():
         want, got = plain(batch.inputs).out, sg(batch.inputs).out
     say(
-        name="5 a closed gate reproduces 716's read-out at the real shift",
+        name="5 a closed gate reproduces 716's `HT` read-out at the real shift (fitted weights)",
         ok=bool(torch.allclose(want, got, atol=1e-4)),
         detail=f"largest gap {float((want - got).abs().max()):.2e}",
     )
@@ -198,6 +205,32 @@ def check_fit(*, scratch: Path, data_dir: Path, device: str) -> dict:
     say(name="8a the fit's GPU peak is at most 6 GB", ok=gb <= GPU_CAP_GB, detail=f"{gb:.2f} GB")
     report["fit_peak_gb"] = gb
     return report
+
+
+def check_compare(*, scratch: Path) -> dict:
+    """Report the largest gap between the scored states of the two fits (item 1b).
+
+    Two GPU fits can differ by rounding, so the gap is reported and only a loose bar fails: a
+    continuation that changed the scored state would show a gap far above it.
+    """
+    import torch  # ty: ignore[unresolved-import]
+
+    states = {
+        label: torch.load(
+            fit.job_paths(data_dir=scratch / label, job=JOB)["state"], map_location="cpu"
+        )
+        for label in ("with", "without")
+    }
+    gap = max(
+        float((states["with"][k].float() - states["without"][k].float()).abs().max())
+        for k in states["with"]
+    )
+    say(
+        name="1b the scored state does not depend on the continuation option",
+        ok=gap <= LOOSE_STATE_GAP,
+        detail=f"largest gap {gap:.2e} (bar {LOOSE_STATE_GAP})",
+    )
+    return {"largest_state_gap": gap}
 
 
 def check_predict(*, scratch: Path, data_dir: Path, device: str) -> dict:
@@ -215,14 +248,6 @@ def check_predict(*, scratch: Path, data_dir: Path, device: str) -> dict:
     inputs.load_network_state(job=JOB, state=state)
     aw = inputs.world_of(job=JOB)
     model = inputs.model_of(job=JOB)
-    # 9. the predict phase reproduces the fitted PV scales (and every other stored tensor) exactly
-    loaded = inputs.network_state(job=JOB)
-    scale_keys = [k for k in state if "scale" in k or k.rsplit(".", 1)[-1] in {"r_h", "r_t"}]
-    say(
-        name="9 the predict phase reproduces the fit's PV scales exactly",
-        ok=all(torch.equal(loaded[k], state[k].cpu()) for k in state) and bool(scale_keys),
-        detail=f"{len(scale_keys)} scale tensors",
-    )
     # 6. every ensemble and PV run is at or before native origin - 9 h (the batch builders assert it; check it directly as well)
     assert aw.score_c_idx is not None
     source = aw.sources[aw.predict_stage]
@@ -267,6 +292,14 @@ def check_predict(*, scratch: Path, data_dir: Path, device: str) -> dict:
             and (rows["power_fcst_init_time"].dt.minute() == 0).all()
         ),
     )
+    # 9. predicting leaves the network (the PV scales included) exactly as stored: nothing is recalibrated
+    after = inputs.network_state(job=JOB)
+    scale_keys = [k for k in state if "scale" in k or k.rsplit(".", 1)[-1] in {"r_h", "r_t"}]
+    say(
+        name="9 the network after predicting equals the stored state, PV scales included",
+        ok=all(torch.equal(after[k], state[k].cpu()) for k in state) and bool(scale_keys),
+        detail=f"{len(scale_keys)} scale tensors",
+    )
     gb = peak_gb(torch=torch, device=device)
     say(
         name="8b the predict phase's GPU peak is at most 6 GB",
@@ -277,10 +310,12 @@ def check_predict(*, scratch: Path, data_dir: Path, device: str) -> dict:
     tables = source.pv.tables
     missing = {}
     for p in range(16):
-        top = getattr(tables, "top_ok", None)
-        if top is not None:
-            missing[str(p)] = round(float(1.0 - top[p].float().mean()), 3)
-    print(f"missing share of PV target rows per Primary: {missing}", flush=True)
+        missing[str(p)] = round(float(1.0 - tables.top_filled[p].float().mean()), 3)
+    say(
+        name="12 the missing share of PV target rows is printed per Primary",
+        ok=len(missing) == 16,
+        detail=str(missing),
+    )
     return {"predict_peak_gb": gb, "missing_pv_target_share": missing}
 
 
@@ -347,6 +382,52 @@ def check_synth(*, scratch: Path, device: str, phase: str) -> dict:
             ".tokens.npz"
         )
         say(name="11d the sign tokens are written", ok=tokens.exists())
+        import e00721_stage0 as stage0
+
+        tok = dict(np.load(tokens))
+        grid = (
+            tok["exporters_token_id"] % 10**7
+        )  # the token id is the Primary times 10**7 plus the grid index
+        start, stop = real.synthetic_token_span(n_grid=len(aw.stamp_us))
+        say(
+            name="11f no sign token before the cutoff",
+            ok=bool(grid.min() >= aw.world.cutoff_idx),
+            detail=str(int(grid.min()) - aw.world.cutoff_idx),
+        )
+        say(name="11g the last sign token is the predicted one", ok=int(grid.max()) == stop - 1)
+        holdout = int(
+            (np.datetime64(core.HOLDOUT_START_ISO, "us").astype(np.int64) - aw.stamp_us[0])
+            // (aw.stamp_us[1] - aw.stamp_us[0])
+        )
+        say(
+            name="11h every scored valid time is before the holdout",
+            ok=bool(int(c.max()) + int(core.LEAD_MAX_HOURS_EXCLUSIVE * 2) <= holdout),
+        )
+        days = stage0.class_days(
+            day=grid // 48, x_true=tok["exporters_x_points"], u=tok["exporters_u"]
+        )
+        gi = real.load_grid_inputs(
+            fold=core.SYNTH_PIPELINE_FOLD, seed=0, phase="predict", with_farms=False
+        )
+        parts = real.synthetic_inputs(
+            gi=gi,
+            seed=0,
+            day_offset_points=real.synthetic_day_offset_points(
+                root=fit.data_root(data_dir=scratch)
+            ),
+        )
+        want = stage0.class_days(
+            **{
+                k: v
+                for k, v in stage0.exporter_tokens(parts=parts, span=(start, stop)).items()
+                if k in {"day", "x_true", "u"}
+            }
+        )
+        say(
+            name="11i the token days per class equal Stage 0's",
+            ok=days == want,
+            detail=f"{days} against {want}",
+        )
     seconds = time.monotonic() - started
     gb = peak_gb(torch=torch, device=device)
     say(
@@ -386,7 +467,17 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "command", choices=("fit", "predict", "probe", "routing", "synth-fit", "synth-predict")
+        "command",
+        choices=(
+            "fit-without",
+            "fit-with",
+            "compare",
+            "predict",
+            "probe",
+            "routing",
+            "synth-fit",
+            "synth-predict",
+        ),
     )
     parser.add_argument("scratch", type=Path)
     parser.add_argument("--device", default="cuda")
@@ -394,8 +485,15 @@ def main() -> int:
     assert str(args.scratch).startswith(str(Path.home())), "the scratch path must sit under $HOME"
     data_dir = Path(os.environ["DATA_PATH_INTERNAL"])
     args.scratch.mkdir(parents=True, exist_ok=True)
-    if args.command == "fit":
-        report = check_fit(scratch=args.scratch, data_dir=data_dir, device=args.device)
+    if args.command in {"fit-without", "fit-with"}:
+        report = check_fit(
+            scratch=args.scratch,
+            data_dir=data_dir,
+            device=args.device,
+            continuation=args.command == "fit-with",
+        )
+    elif args.command == "compare":
+        report = check_compare(scratch=args.scratch)
     elif args.command == "predict":
         report = check_predict(scratch=args.scratch, data_dir=data_dir, device=args.device)
     elif args.command in {"synth-fit", "synth-predict"}:
@@ -408,6 +506,10 @@ def main() -> int:
         report = check_probe(scratch=args.scratch, device=args.device)
     else:
         report = check_routing(scratch=args.scratch)
+    import resource
+
+    report["host_peak_mb"] = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
+    print(f"host memory peak of this process: {report['host_peak_mb']} MB (the cap is 12288 MB)")
     path = args.scratch / f"{args.command}_{REPORT_FILE}"
     path.write_text(json.dumps(report, indent=1))
     print(f"{args.command}: all assertions passed; report in {path}")

@@ -220,6 +220,25 @@ def seed_difference_points(*, data_dir: Path, hidden_ids: dict[str, int]) -> flo
     return float(joined.select((pl.col("crps") - pl.col("crps_b")).mean()).item())
 
 
+def to_contract_rows(*, frame: pl.DataFrame, series_ids: list[int]) -> pl.DataFrame:
+    """Return the rows of a stored `M1` file with the origin relabelled to 12:00 UTC and the page's lead window.
+
+    The stored file's origin is the native 09:00 UTC. The page's lead counts from the 12:00 UTC origin,
+    as experiment 713's `to_contract_shares` does, so the origin moves by 3 hours and the lead falls
+    by 3 hours before the 24 up to 240 hour window and the holdout are applied.
+    """
+    shift = datetime.timedelta(hours=NATIVE_TO_CONTRACT_HOURS)
+    return frame.with_columns(
+        power_fcst_init_time=pl.col("power_fcst_init_time") + shift,
+        lead_hours=pl.col("lead_hours") - NATIVE_TO_CONTRACT_HOURS,
+    ).filter(
+        pl.col("time_series_id").is_in(series_ids),
+        pl.col("lead_hours") >= core.LEAD_MIN_HOURS,
+        pl.col("lead_hours") < core.LEAD_MAX_HOURS_EXCLUSIVE,
+        pl.col("valid_time").dt.replace_time_zone(None) < HOLDOUT_START.replace(tzinfo=None),
+    )
+
+
 def power_check(*, m1_dir: Path, folds: Sequence[str], series_ids: dict[str, int]) -> dict:
     """Return the power check of G3 from experiment 713's stored `M1` seeds at D5 and D10.
 
@@ -234,22 +253,7 @@ def power_check(*, m1_dir: Path, folds: Sequence[str], series_ids: dict[str, int
             if not path.exists():
                 msg = f"the power check needs {path}"
                 raise FileNotFoundError(msg)
-            # the stored file's origin is the native 09:00 UTC; the page's lead counts from the 12:00 UTC origin
-            df = (
-                pl.read_parquet(path)
-                .with_columns(
-                    power_fcst_init_time=pl.col("power_fcst_init_time")
-                    + datetime.timedelta(hours=3),
-                    lead_hours=pl.col("lead_hours") - NATIVE_TO_CONTRACT_HOURS,
-                )
-                .filter(
-                    pl.col("time_series_id").is_in(list(series_ids.values())),
-                    pl.col("lead_hours") >= core.LEAD_MIN_HOURS,
-                    pl.col("lead_hours") < core.LEAD_MAX_HOURS_EXCLUSIVE,
-                    pl.col("valid_time").dt.replace_time_zone(None)
-                    < HOLDOUT_START.replace(tzinfo=None),
-                )
-            )
+            df = to_contract_rows(frame=pl.read_parquet(path), series_ids=list(series_ids.values()))
             frames_[(fold, seed)] = score.with_crps(frame=df.with_columns(fold=pl.lit(fold)))
     return score.power_check_g3(frames=frames_, id_d5=series_ids["D5"], id_d10=series_ids["D10"])
 
