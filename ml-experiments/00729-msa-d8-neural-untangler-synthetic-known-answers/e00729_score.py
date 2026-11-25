@@ -257,6 +257,7 @@ class CellTable:
     Attributes:
         sums: One `(n_blocks, n_segments)` array of summed differences per month.
         counts: One array of row counts per month, the same shape.
+        months: The month indices that the arrays follow.
     """
 
     sums: list[np.ndarray]
