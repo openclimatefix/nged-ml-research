@@ -651,9 +651,10 @@ def breakdown_rows(
 
     Each row carries the clip diagnostics of its (group, sign, depth) cell: `beyond_clip` is the
     share of the cell's shifted half-hours beyond 5 standard deviations (the input clip binds
-    there) and `out_of_range` is the share above capacity or below zero. The diagnostics do not
-    depend on the shift length, so rows of one cell and different lengths repeat the same shares.
-    A cell with no diagnostic row carries `nan`.
+    there) and `out_of_range` is the share above capacity or below zero. The diagnostics are pooled
+    over the four lengths, so rows of one cell and different lengths repeat the same shares. They
+    count every shifted half-hour of each window, not only the history half-hours that `M1` sees at
+    the counted origins. A cell with no diagnostic row carries `nan`.
     """
     lookup = {(r["group"], r["sign"], round(r["depth"], 2)): r for r in clip.iter_rows(named=True)}
     rows = []
@@ -679,6 +680,73 @@ def breakdown_rows(
     return rows
 
 
+def pooled_clip(
+    *, clip: pl.DataFrame, group: str, signs: Sequence[int], depths: Sequence[float]
+) -> dict[str, float]:
+    """Return the clip shares of one group pooled by half-hours over the given signs and depths."""
+    sel = clip.filter(
+        pl.col("group") == group,
+        pl.col("sign").is_in(list(signs)),
+        pl.col("depth").round(2).is_in([round(d, 2) for d in depths]),
+    )
+    n = float(sel["n_half_hours"].sum()) if sel.height else 0.0
+    if n == 0:
+        return {"beyond_clip": float("nan"), "out_of_range": float("nan")}
+    return {
+        k: float(np.sum(sel[k].to_numpy() * sel["n_half_hours"].to_numpy()) / n)
+        for k in ("beyond_clip", "out_of_range")
+    }
+
+
+def sign_rows(
+    *,
+    events: pl.DataFrame,
+    groups: Mapping[str, Sequence[int]],
+    months: Sequence[str],
+    clip: pl.DataFrame,
+) -> list[dict]:
+    """Return reading 3's sign rows: M1 minus C for the passes that raise and that lower the power (95%)."""
+    rows = []
+    for slice_name in (com.SLICE_AFTER, com.SLICE_LASTING):
+        for group in ("six_signed_mw", "eight_mva"):
+            for sign in (1, -1):
+                stats = contrast(
+                    events=events, a="M1", b="C_host", slice_name=slice_name,
+                    primaries=groups[group], months=months, sign=sign,
+                    draws=REPORT_DRAWS, ci_level=REPORT_LEVEL,
+                )  # fmt: skip
+                rows.append(
+                    {"slice": slice_name, "group": group, "sign": sign,
+                     **{k: stats[k] for k in ("D", "low", "high", "n_events")},
+                     **pooled_clip(clip=clip, group=group, signs=(sign,), depths=(0.15, 0.30, 0.50))}
+                )  # fmt: skip
+    return rows
+
+
+def sensitivity_rows(
+    *,
+    events: pl.DataFrame,
+    groups: Mapping[str, Sequence[int]],
+    months: Sequence[str],
+    clip: pl.DataFrame,
+) -> list[dict]:
+    """Return T1 and L1 on the depths 0.15 and 0.30 alone, per group, at 95% (the pre-registered sensitivity reading)."""
+    rows = []
+    for tag, slice_name in (("T1", com.SLICE_AFTER), ("L1", com.SLICE_LASTING)):
+        for group in ("six_signed_mw", "eight_mva"):
+            stats = contrast(
+                events=events, a="M1", b="C_host", slice_name=slice_name,
+                primaries=groups[group], months=months, max_depth=0.30,
+                draws=REPORT_DRAWS, ci_level=REPORT_LEVEL,
+            )  # fmt: skip
+            rows.append(
+                {"contrast": tag, "group": group,
+                 **{k: stats[k] for k in ("D", "low", "high", "n_events")},
+                 **pooled_clip(clip=clip, group=group, signs=(1, -1), depths=(0.15, 0.30))}
+            )  # fmt: skip
+    return rows
+
+
 # ---------------------------------------------------------------- the report-only readings
 
 
@@ -689,6 +757,9 @@ def run_report() -> int:
     n_sets = len(com.read_sets())
     months = com.FOLD_MONTHS
     base: dict[str, Any] = {"primary_of_id": primary_of_id, "n_sets": n_sets}
+    clip = clip_by_cell(
+        diagnostics=read_clip_diagnostics(months=months)
+    )  # fail early if a month is missing
     # reading 1, 4, 5, 6, 7: absolute follow shares of C host-only and M1 at five seeds
     five = collect(nets=(C_HOST, M1), seeds=com.SEEDS_ALL, months=months, passes=range(com.N_PASSES),
                    levels=("q05", "q50", "q95"), **base)  # fmt: skip
@@ -701,13 +772,25 @@ def run_report() -> int:
                     for n in ("C_host", "M1")}}
             )  # fmt: skip
     print_table(title="Reading 1: absolute follow shares at q50 (five seeds)", rows=rows)
-    clip = clip_by_cell(diagnostics=read_clip_diagnostics(months=months))
     rows = breakdown_rows(events=five.events, groups=groups, months=months, clip=clip)
+    by_sign = sign_rows(events=five.events, groups=groups, months=months, clip=clip)
+    sensitivity = sensitivity_rows(events=five.events, groups=groups, months=months, clip=clip)
+    print_table(
+        title="Reading 3: M1 minus C by slice, group, and sign (all depths and lengths)",
+        rows=by_sign,
+    )
+    print_table(
+        title="Reading 3: M1 minus C on the depths 0.15 and 0.30 alone (no 0.50 shifts)",
+        rows=sensitivity,
+    )
     print_table(
         title="Reading 3: M1 minus C by slice, group, sign, depth, and length, with the clip diagnostics",
         rows=rows,
     )
-    com.write_json_atomic(obj=rows, path=com.data_root() / "scores" / "reading3.json")
+    com.write_json_atomic(
+        obj={"by_sign": by_sign, "without_050": sensitivity, "by_depth_and_length": rows},
+        path=com.data_root() / "scores" / "reading3.json",
+    )
     rows = []
     for level in ("q05", "q95"):
         for slice_name in (com.SLICE_AFTER, com.SLICE_LASTING):

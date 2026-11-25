@@ -613,3 +613,76 @@ def test_breakdown_rows_join_the_clip_diagnostics() -> None:
     assert empty["n_events"] == 0 and np.isnan(empty["D"])
     other = next(r for r in rows if r["group"] == "eight_mva" and r["sign"] == -1)
     assert np.isnan(other["out_of_range"])
+
+
+def test_make_extra_reads_the_unshifted_columns_for_the_base_and_signs_the_fall() -> None:
+    import e00726_readings as rd
+
+    step_us = 1_800_000_000
+    n = 4
+    clean = np.full((2, 50), 0.5)
+    base_q = np.array([0.30 + 0.04 * k for k in range(11)])  # q05 = 0.34, q95 = 0.66 (index 1, 9)
+    data = {
+        "primary": [0] * n,
+        "sign": [1, 1, -1, -1],
+        "depth": [0.3] * n,
+        "valid_time": pl.Series([10 * step_us] * n).cast(pl.Datetime("us", "UTC")),
+    }
+    for j, q in enumerate(com.QCOLS):
+        data[f"M1:{q}:b"] = [base_q[j]] * n
+        data[f"M1:{q}:s"] = [base_q[j] + 0.4] * n  # the shifted forecast sits 0.4 above the base
+    rows = pl.DataFrame(data)
+    extra = rd.make_extra(clean=clean, grid=0, step=step_us, nets=("M1",))
+    out = extra(rows, MONTH, 0)
+    # the unshifted power 0.5 is inside the base interval and below the shifted q05 (0.74)
+    assert out["M1|cov90_base"].to_list() == [1.0] * n
+    assert out["M1|cov90"].to_list() == [0.0] * n
+    assert out["M1|cov90_fall"].to_list() == [1.0] * n
+    # safe side: for sign +1 the power must be at or above the shifted q05 (0.74): not safe; for sign -1
+    # it must be at or below the shifted q95 (1.06): safe
+    assert out["M1|safe"].to_list() == [0.0, 0.0, 1.0, 1.0]
+    assert out["M1|safe_base"].to_list() == [1.0] * n
+    assert out["M1|safe_fall"].to_list() == [1.0, 1.0, 0.0, 0.0]
+
+
+def test_pooled_clip_and_the_sign_and_sensitivity_rows() -> None:
+    diag = pl.DataFrame(
+        [
+            {"depth": d, "sign": s, "group": "six_signed_mw", "n_half_hours": 100,
+             "beyond_clip": 0.0, "out_of_range": 0.5 if (d == 0.5 and s == 1) else 0.0, "month": MONTH}
+            for d in (0.15, 0.30, 0.50) for s in (1, -1)
+        ]
+    )  # fmt: skip
+    clip = sc.clip_by_cell(diagnostics=diag)
+    assert sc.pooled_clip(clip=clip, group="six_signed_mw", signs=(1,), depths=(0.15, 0.30, 0.50))[
+        "out_of_range"
+    ] == pytest.approx(1 / 6)
+    assert (
+        sc.pooled_clip(clip=clip, group="six_signed_mw", signs=(1, -1), depths=(0.15, 0.30))[
+            "out_of_range"
+        ]
+        == 0.0
+    )
+    assert np.isnan(
+        sc.pooled_clip(clip=clip, group="eight_mva", signs=(1,), depths=(0.5,))["out_of_range"]
+    )
+    events = pl.DataFrame(
+        [
+            {"primary": p, "depth": dep, "sign": sg, "length_days": 15, "slice": com.SLICE_AFTER,
+             "month": MONTH, "pass_r": r, "M1|q50": 0.6 if dep < 0.5 else 1.0, "C_host|q50": 0.2}
+            for r, (dep, sg) in enumerate([(0.15, 1), (0.30, -1), (0.50, 1)]) for p in range(3)
+        ]
+    )  # fmt: skip
+    groups = {"six_signed_mw": [0, 1, 2], "eight_mva": [3]}
+    signed = sc.sign_rows(events=events, groups=groups, months=[MONTH], clip=clip)
+    assert len(signed) == 8
+    plus = next(
+        r
+        for r in signed
+        if r["slice"] == com.SLICE_AFTER and r["group"] == "six_signed_mw" and r["sign"] == 1
+    )
+    assert plus["n_events"] == 6 and plus["D"] == pytest.approx((0.4 * 3 + 0.8 * 3) / 6)
+    sens = sc.sensitivity_rows(events=events, groups=groups, months=[MONTH], clip=clip)
+    assert len(sens) == 4
+    t1 = next(r for r in sens if r["contrast"] == "T1" and r["group"] == "six_signed_mw")
+    assert t1["n_events"] == 6 and t1["D"] == pytest.approx(0.4)

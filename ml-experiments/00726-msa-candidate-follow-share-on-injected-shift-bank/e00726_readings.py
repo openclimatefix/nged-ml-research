@@ -15,13 +15,16 @@ days after the onset, at lead 24 to 120 hours, and averages the seeds 0 and 1 be
 **Reading 7, safe side.** For a pass that raises the power the unshifted reading is wrongly high
 if the forecast follows, so the safe side is "the unshifted power is at or above the shifted q05";
 for a pass that lowers the power it is "at or below the shifted q95". The reading prints the share
-of rows on the safe side for the Candidate and for `M1`, in each counted slice.
+of rows on the safe side for the Candidate and for `M1`, in each counted slice. `safe_base` is the
+same share for the unshifted forecast at the same keys, and `safe_fall` is `safe_base - safe`.
+Experiment 581 found that a follow ratio of 0.1 to 0.2 hid a fall of this share from 0.94 to 0.77.
 
 **Reading 7, coverage.** `cov90` is the share of rows whose unshifted power lies between the shifted
 forecast's q05 and q95 (nominal 0.90), `cov90_base` is the same share for the unshifted forecast of
-the same network at the same keys, and `cov90_fall` is `cov90_base - cov90`. Experiment 581 found a
-fall in coverage from 0.94 to 0.77 behind a follow ratio of 0.1 to 0.2. The reading prints the
-level of each network and the difference `M1 minus C` of each column.
+the same network at the same keys, and `cov90_fall` is `cov90_base - cov90`. The reading prints
+the level of each network and the difference `M1 minus C` of each column, with a column that says
+which sign of that difference favours `M1`. Every quantile is the mean over the seeds, sorted across
+levels, as in the follow share.
 
 **Reading 8, CRPS.** The CRPS is the project's quantile score (twice the pinball loss averaged over
 the 11 levels), in points of capacity, as in F4's `event_crps`. It is computed against the
@@ -41,7 +44,14 @@ import numpy as np
 import polars as pl
 from studies.eval_protocol.metrics import quantile_score
 
-METRICS: Final = ("safe", "cov90", "cov90_base", "cov90_fall", "crps_clean", "crps_shifted")
+METRICS: Final = (
+    "safe", "safe_base", "safe_fall", "cov90", "cov90_base", "cov90_fall", "crps_clean", "crps_shifted",
+)  # fmt: skip
+POSITIVE_MEANS: Final = {
+    "safe": "M1 better", "safe_base": "M1 better", "safe_fall": "M1 worse", "cov90": "M1 better",
+    "cov90_base": "M1 better", "cov90_fall": "M1 worse", "crps_clean": "M1 worse", "crps_shifted": "M1 worse",
+}  # fmt: skip
+CLEAN_GUARD_TOLERANCE: Final = 1e-6
 """The per-row columns of readings 7 and 8 for each network."""
 SEEDS_10: Final = (0, 1)
 N_PASSES_10: Final = 16
@@ -165,7 +175,7 @@ def run_level10() -> int:
 
 
 def make_extra(
-    *, clean: np.ndarray, grid: int, step: int, primary_of_id: dict[int, int], nets: tuple[str, ...]
+    *, clean: np.ndarray, grid: int, step: int, nets: tuple[str, ...]
 ) -> Callable[[pl.DataFrame, str, int], pl.DataFrame]:
     """Return the row hook that adds the safe-side flag and the CRPS columns of each network."""
 
@@ -190,6 +200,12 @@ def make_extra(
             q_b = np.column_stack([rows[f"{net}:{q}:b"].to_numpy() for q in com.QCOLS]).astype(
                 np.float64
             )
+            safe_base = np.where(sign > 0, actual >= q_b[:, 1], actual <= q_b[:, 9]).astype(
+                np.float64
+            )
+            safe_base[~np.isfinite(actual)] = np.nan
+            new[f"{net}|safe_base"] = safe_base
+            new[f"{net}|safe_fall"] = safe_base - safe
             cov_shifted = interval_coverage(lower=q05, upper=q95, actual=actual)
             cov_base = interval_coverage(lower=q_b[:, 1], upper=q_b[:, 9], actual=actual)
             new[f"{net}|cov90"] = cov_shifted
@@ -204,17 +220,44 @@ def make_extra(
     return extra
 
 
+def check_clean_guard(
+    *, clean: np.ndarray, grid: int, step: int, primary_of_id: dict[int, int]
+) -> float:
+    """Raise unless the cleaned power at each key equals experiment 709's stored `clean_share` of one bank file.
+
+    This is the one check that the truth of readings 7 and 8 sits at the right Primary and half-hour.
+    """
+    bank, _base = bank_files(net="C", month=com.BANK_FOLDS[0], seed=0, r=0)
+    frame = com.normalise_frame(frame=pl.read_parquet(bank, columns=[*com.KEYS, "clean_share"]))
+    frame = frame.filter(pl.col("time_series_id").is_in(list(primary_of_id)))
+    prim = np.array([primary_of_id[int(t)] for t in frame["time_series_id"].to_list()])
+    idx = ((frame["valid_time"].dt.epoch("us").to_numpy() - grid) // step).astype(np.int64)
+    mine = clean[prim, idx].astype(np.float64)
+    stored = frame["clean_share"].to_numpy().astype(np.float64)
+    both = np.isfinite(mine) & np.isfinite(stored)
+    com.require(bool(both.any()), "the clean-power guard found no finite row")
+    worst = float(np.abs(mine[both] - stored[both]).max())
+    com.require(
+        worst <= CLEAN_GUARD_TOLERANCE, f"cleaned power differs from clean_share by {worst}"
+    )
+    print(
+        f"clean-power guard: max |difference| {worst:.2e} over {int(both.sum())} rows", flush=True
+    )
+    return worst
+
+
 def run_coverage() -> int:
     primary_of_id, labels = sc.site_table()
     e = com.prime_pipeline(month="2026-01")
     clean = e.c.clean_stack()
     grid, step = e.c.prep422.GRID_START_US, e.c.prep422.STEP_US
+    check_clean_guard(clean=clean, grid=grid, step=step, primary_of_id=primary_of_id)
     nets = ("C_host", "M1")
     cols = [f"{n}|{m}" for n in nets for m in METRICS]
     got = sc.collect(
         nets=(sc.C_HOST, sc.M1), seeds=com.SEEDS_ALL, months=com.FOLD_MONTHS, passes=range(com.N_PASSES),
         primary_of_id=primary_of_id, n_sets=len(com.read_sets()), levels=com.QCOLS,
-        extra=make_extra(clean=clean, grid=grid, step=step, primary_of_id=primary_of_id, nets=nets),
+        extra=make_extra(clean=clean, grid=grid, step=step, nets=nets),
         extra_columns=cols,
     )  # fmt: skip
     groups = sc.group_primaries(labels=labels)
@@ -226,10 +269,11 @@ def run_coverage() -> int:
                                     months=com.FOLD_MONTHS, level=metric, draws=sc.REPORT_DRAWS, ci_level=sc.REPORT_LEVEL)  # fmt: skip
                 levels = {n: sc.level_of(events=got.events, net=n, slice_name=slice_name, primaries=groups[group],
                                          months=com.FOLD_MONTHS, level=metric) for n in nets}  # fmt: skip
-                out.append({"slice": slice_name, "group": group, "metric": metric, **levels,
+                out.append({"slice": slice_name, "group": group, "metric": metric,
+                            "positive_means": POSITIVE_MEANS[metric], **levels,
                             **{f"M1 minus C {k}": stats[k] for k in ("D", "low", "high", "n_events")}})  # fmt: skip
     sc.print_table(
-        title="Readings 7 (safe side) and 8 (CRPS, share of capacity), M1 and C host-only, 95%",
+        title="Readings 7 (safe-side share and 90% interval coverage, as shares) and 8 (CRPS, in points of capacity), M1 and C host-only, 95%",
         rows=out,
     )
     com.write_json_atomic(obj=out, path=com.data_root() / "scores" / "reading7_8.json")
@@ -240,7 +284,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("level10", "coverage"))
     args = parser.parse_args()
-    return run_level10() if args.command == "level10" else run_coverage()
+    status = run_level10() if args.command == "level10" else run_coverage()
+    print(f"peak memory of this process: {com.peak_memory()}", flush=True)
+    return status
 
 
 if __name__ == "__main__":
