@@ -75,9 +75,10 @@ def with_world_target(*, source: bt.Source, power_z: torch.Tensor) -> bt.Source:
 
 
 def pad_to_grid(*, a: np.ndarray, n_grid: int) -> np.ndarray:
-    """Return `a` with its last axis extended with NaN to `n_grid` steps (experiment 87's grid is shorter than 713's).
+    """Return `a` with its last axis extended with NaN to `n_grid` steps.
 
-    Both grids start at 2019-09-01 00:00 with 30-minute steps, so index `i` is the same half-hour in both.
+    Experiment 87's grid is shorter than experiment 713's. Both grids start at 2019-09-01 00:00
+    with 30-minute steps, so index `i` is the same half-hour in both.
     """
     n = a.shape[-1]
     assert n <= n_grid, (n, n_grid)

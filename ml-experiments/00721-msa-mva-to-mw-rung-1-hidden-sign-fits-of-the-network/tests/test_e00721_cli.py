@@ -1,5 +1,9 @@
 # ruff: noqa: E501
-"""Tests of the command-line entry's pure parts, the driver's MDE and power-check steps, and the synthetic world on a real-style grid."""
+"""Tests of the command-line entry's pure parts, the driver's steps, and the synthetic world.
+
+The driver's steps are the MDE step and the power check. The synthetic world sits on a real-style
+grid.
+"""
 
 import datetime
 import json

@@ -11,10 +11,10 @@ import harm by lead band (24 to 48 h, 48 to 120 h, and 120 to 240 h) and by hour
 One fold means the fold stage of the two-stage resampler is degenerate (the one fold is drawn every
 time), so every interval is a block-only interval. The fold has fewer than 20 blocks of 10 valid
 dates, so each interval is also widened by the page's rule (`lower` and `upper`; the raw interval is
-kept as `raw_lower` and `raw_upper`). Every reading is interim, post hoc (chosen after the harm stop), and has no bar. With 4 resampling
-units each interval is a rough guide only, and a widened interval that spans zero is no evidence of
-no harm. The script writes no
-prediction and no fit. It prints aggregates only.
+kept as `raw_lower` and `raw_upper`). Every reading is interim, post hoc (chosen after the harm
+stop), and has no bar. With 4 resampling units each interval is a rough guide only, and a widened
+interval that spans zero is no evidence of no harm. The script writes no prediction and no fit. It
+prints aggregates only.
 
 Usage: `CUDA_VISIBLE_DEVICES= SLOT_CPU=<n> run.sh --go e00721_rescore.py [--n-resamples 20000]`
 Output: `<data root>/rescore/rescore.json` and `<data root>/rescore/rescore.md`.
