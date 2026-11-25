@@ -22,6 +22,7 @@ from dataclasses import dataclass
 import e00721_paths  # noqa: F401
 
 # isort: split
+import e00713_batch as bt  # ty: ignore[unresolved-import]
 import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00716_batch as pvb  # ty: ignore[unresolved-import]
 import e00721_arms as arms
@@ -40,6 +41,7 @@ class SgAssembled:
         hist_idx: Grid index of each history token.
         c_idx: The contract origin index of each sample.
         hist_sign: `(B, 14, 48)` 1 where the folded history token was an export, 0 an import, NaN unknown.
+        target_u: `(B, 48)` the shortwave likelihood `u` at each target token (the page's `u < u_min` rule).
     """
 
     inputs: arms.SgInputs
@@ -48,6 +50,37 @@ class SgAssembled:
     hist_idx: torch.Tensor
     c_idx: torch.Tensor
     hist_sign: torch.Tensor
+    target_u: torch.Tensor
+
+
+def with_world_target(*, source: bt.Source, power_z: torch.Tensor) -> bt.Source:
+    """Return experiment 713's source with the world's standardised power as its target and its history.
+
+    The source that experiment 713's pipeline builds holds 713's own cleaned power, which at the
+    hidden pair is the real signed reading. Every array of the world (the injection, the folding,
+    the gap rows) is therefore swapped in here, and nothing else in the source changes.
+
+    Args:
+        source: 713's source (weather, date-time, day types, and ensemble table are kept).
+        power_z: `(16, G)` the world's standardised target, on 713's grid, NaN where absent.
+    """
+    assert power_z.shape == source.power_z.shape, (power_z.shape, source.power_z.shape)
+    return bt.Source(
+        power_z=power_z, dense_weather=source.dense_weather, dense_datetime=source.dense_datetime,
+        day_type=source.day_type, ens=source.ens,
+    )  # fmt: skip
+
+
+def pad_to_grid(*, a: np.ndarray, n_grid: int) -> np.ndarray:
+    """Return `a` with its last axis extended with NaN to `n_grid` steps (experiment 87's grid is shorter than 713's).
+
+    Both grids start at 2019-09-01 00:00 with 30-minute steps, so index `i` is the same half-hour in both.
+    """
+    n = a.shape[-1]
+    assert n <= n_grid, (n, n_grid)
+    out = np.full((*a.shape[:-1], n_grid), np.nan, dtype=np.float64)
+    out[..., :n] = a
+    return out
 
 
 class SgSource:
@@ -126,10 +159,12 @@ class SgSource:
         hist_sign = torch.where(
             labelled, self.sign_grid[p3, out.hist_idx], torch.full_like(hist_power, float("nan"))
         )
+        top = out.target_idx.clamp(0, self.u_grid.shape[1] - 1)
+        target_u = self.u_grid[primary[:, None], top]
         values = dict(inp.__dict__)
         values.update(hist_power=hist_power)
         sg = arms.SgInputs(**values, hist_u=hist_u)
         return SgAssembled(
             inputs=sg, target=out.target, target_idx=out.target_idx, hist_idx=out.hist_idx,
-            c_idx=out.c_idx, hist_sign=hist_sign,
+            c_idx=out.c_idx, hist_sign=hist_sign, target_u=target_u,
         )  # fmt: skip

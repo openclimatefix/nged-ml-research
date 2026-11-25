@@ -32,13 +32,43 @@ ARM_SPECS: Final = core.ARM_SPECS
 ArmSpec = core.ArmSpec
 
 POWER_CLIP: Final = 5.0
-"""History is clipped to plus or minus 5 standard deviations before the sign step."""
-SKY_WEATHER_COLUMNS: Final = (0, 15, 16, 17, 18, 19, 20)
-"""Weather columns that carry the sky: the shortwave mean and the six B1 solar columns."""
-SKY_DATETIME_COLUMNS: Final = (0, 1, 2)
-"""Datetime columns that carry the sun's position."""
-SKY_SPREAD_COLUMNS: Final = (0,)
-"""Spread columns that carry the shortwave spread."""
+"""History is clipped to plus or minus 5 standard deviations before the sign step, and the signed
+expected history is clipped to plus or minus 5 in `v` units after it (the design's clip)."""
+WEATHER_NAMES: Final = (
+    "shortwave", "longwave", "temperature_2m", "dew_point_temperature_2m", "pressure_surface",
+    "precipitation", "wind_speed_10m",
+)  # fmt: skip
+"""The 7 weather columns of experiment 87's `WEATHER`, columns 0 to 6 of the network's weather input."""
+B1_NAMES: Final = (
+    "t_mean_3h", "t_mean_6h", "t_mean_24h", "t_change_3h", "t_change_6h", "t_min_day",
+    "t_max_day", "t_cold_snap_days", "sw_mean_3h", "sw_mean_6h", "sw_mean_24h", "csi_change_3h",
+    "cams_prev_day_a", "cams_prev_day_b",
+)  # fmt: skip
+"""The 14 B1 columns, columns 7 to 20 of the network's weather input (12 grid columns of experiment
+632's `B1_GRID_NAMES`, then the two `cams_prev_day_*` columns)."""
+DATETIME_NAMES: Final = (
+    "cos_zenith", "sin_azimuth", "cos_azimuth", "sin_hour", "cos_hour", "sin_hour_2", "cos_hour_2",
+    "dow_1", "dow_2", "dow_3", "dow_4", "dow_5", "dow_6", "dow_7", "covid", "christmas_inside",
+    "christmas_days", "christmas_tent", "bank_holiday", "nearest_days", "nearest_inside",
+)  # fmt: skip
+"""The 21 date-time columns, in the order of experiment 397's `feature_matrix` columns 14 to 34."""
+SKY_WEATHER_NAMES: Final = (
+    "shortwave", "longwave", "precipitation", "sw_mean_3h", "sw_mean_6h", "sw_mean_24h",
+    "csi_change_3h", "cams_prev_day_a", "cams_prev_day_b",
+)  # fmt: skip
+"""The weather columns that carry the sky: the design's shortwave and B1 solar-gain columns, and the
+longwave and precipitation columns (which carry cloud)."""
+SKY_DATETIME_NAMES: Final = ("cos_zenith", "sin_azimuth", "cos_azimuth")
+"""The solar-geometry columns. The hour columns stay: the design keeps the time-of-day embedding."""
+SKY_SPREAD_NAMES: Final = ("shortwave", "longwave", "precipitation")
+"""The ensemble-spread columns (the 7 weather standard deviations) that carry the sky."""
+SKY_WEATHER_COLUMNS: Final = tuple(
+    i for i, n in enumerate((*WEATHER_NAMES, *B1_NAMES)) if n in SKY_WEATHER_NAMES
+)
+SKY_DATETIME_COLUMNS: Final = tuple(
+    i for i, n in enumerate(DATETIME_NAMES) if n in SKY_DATETIME_NAMES
+)
+SKY_SPREAD_COLUMNS: Final = tuple(i for i, n in enumerate(WEATHER_NAMES) if n in SKY_SPREAD_NAMES)
 CENSOR_TOLERANCE: Final = 1e-4
 """A reading within this relative margin of the floor `Q` is censored."""
 SAFE_X: Final = 1e-6
@@ -99,6 +129,29 @@ def blank_sky(*, inp: SgInputs) -> SgInputs:
     )
 
 
+def blind_where_open(*, inp: SgInputs, gate_open: torch.Tensor) -> SgInputs:
+    """Return the batch with the sky zeroed for the samples whose Primary's export gate is open.
+
+    The design: "In the `SG` arms, a per-Primary input mask zeroes the shortwave column, the B1
+    solar-gain columns, and the solar-geometry columns of the tokens that feed the head, so the sky
+    enters only through `p`, `p_0`, and `ρ`." A gate-shut Primary is routed through arm `HT` unchanged.
+
+    Args:
+        inp: The batch.
+        gate_open: `(B,)` bool, whether each sample's Primary has its export gate open.
+    """
+    blind = blank_sky(inp=inp)
+
+    def pick(kept: torch.Tensor, zeroed: torch.Tensor) -> torch.Tensor:
+        return torch.where(gate_open.view(-1, *([1] * (kept.dim() - 1))), zeroed, kept)
+
+    return replace(
+        inp, top_weather=pick(inp.top_weather, blind.top_weather), hist_weather=pick(inp.hist_weather, blind.hist_weather),
+        top_datetime=pick(inp.top_datetime, blind.top_datetime), hist_datetime=pick(inp.hist_datetime, blind.hist_datetime),
+        top_spread=pick(inp.top_spread, blind.top_spread),
+    )  # fmt: skip
+
+
 def signed_expected_history(
     *, z: torch.Tensor, rho: torch.Tensor, shift: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -113,7 +166,8 @@ def signed_expected_history(
         `z_exp = (1 - 2 rho) v - shift` and `4 rho (1 - rho) v²`.
     """
     v = z + shift[:, None, None]
-    return (1.0 - 2.0 * rho) * v - shift[:, None, None], 4.0 * rho * (1.0 - rho) * v**2
+    v_exp = ((1.0 - 2.0 * rho) * v).clamp(-POWER_CLIP, POWER_CLIP)
+    return v_exp - shift[:, None, None], 4.0 * rho * (1.0 - rho) * v**2
 
 
 class SgNet(pvm.PvNet):
@@ -133,6 +187,13 @@ class SgNet(pvm.PvNet):
         self.register_buffer("v_shift", torch.zeros(mdl.N_PRIMARIES))
         self.last_rho: torch.Tensor | None = None
         self.rho_live: torch.Tensor | None = None
+
+    def forward(self, inp: SgInputs, *, return_attention: bool = False) -> mdl.MsaOutput:  # ty: ignore[invalid-method-override]
+        """Return the raw mixture outputs, with the sky zeroed at the gate-open Primaries (every `SG` arm)."""
+        gate_open = self.export_gate[inp.primary] > 0.5
+        return super().forward(
+            blind_where_open(inp=inp, gate_open=gate_open), return_attention=return_attention
+        )
 
     def set_gate(self, *, gate: np.ndarray, force_open: bool = False) -> None:
         """Set the per-Primary export gate `e_i` (all ones when forced open)."""
@@ -217,6 +278,26 @@ def folded_nll(
     ).sum(-1)
     log_mass = torch.log(mass.clamp_min(1e-12))
     return -torch.where(censored, log_mass, log_density)
+
+
+def truncated_nll(
+    *, out: torch.Tensor, reading_z: torch.Tensor, shift: torch.Tensor
+) -> torch.Tensor:
+    """Return the restriction-R1 negative log-likelihood of each target token, shape `(B, 48)`.
+
+    The design's "Target loss below the likelihood gate": at a gate-open Primary, where `u < u_min`,
+    the target loss is the mixture's density on `y >= 0` divided by `P(X >= 0)`, so the loss is the
+    plain negative log-density plus `log P(X >= 0)`. Zero in `v` units is `-shift` in `z` units.
+
+    Args:
+        out: Raw mixture outputs `(B, 48, 9)`.
+        reading_z: The reading in standardised units, `(B, 48)`.
+        shift: `(B,)` mean over standard deviation of each sample's Primary.
+    """
+    log_w, mean, std = mdl.base_models.mixture_parts(out=out, components=mdl.m559.COMPONENTS)
+    mean_v = mean + shift[:, None, None]
+    mass = (log_w.exp() * _normal_cdf(z=mean_v / std)).sum(-1)
+    return mdl.per_token_nll(out=out, target=reading_z) + torch.log(mass.clamp_min(1e-12))
 
 
 def folded_quantiles(

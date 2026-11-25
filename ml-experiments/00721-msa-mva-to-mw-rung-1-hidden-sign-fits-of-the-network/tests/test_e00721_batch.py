@@ -29,9 +29,9 @@ def _arm_world(*, arm: str, world: str = "W2") -> trn.ArmWorld:
 
 def test_sky_columns_are_the_shortwave_the_solar_gain_and_the_geometry_columns() -> None:
     cols = real.sky_columns()
-    assert cols["weather"] == (0, 15, 16, 17, 18, 19, 20)
+    assert cols["weather"] == (0, 1, 5, 15, 16, 17, 18, 19, 20)
     assert cols["datetime"] == (0, 1, 2)
-    assert cols["spread"] == (0,)
+    assert cols["spread"] == (0, 1, 5)
     assert cols["weather"] == arms.SKY_WEATHER_COLUMNS
 
 

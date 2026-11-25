@@ -64,6 +64,7 @@ def job_paths(*, data_dir: Path, job: Job) -> dict[str, Path]:
         "state": root.with_suffix(".pt"),
         "curve": root.with_suffix(".curve.json"),
         "predictions": data_root(data_dir=data_dir) / "predictions" / f"{job.key}.parquet",
+        "continuation_state": root.with_suffix(".continuation.pt"),
         "done": root.with_suffix(".done.json"),
     }
 
@@ -79,6 +80,11 @@ def atomic_write_bytes(*, path: Path, payload: bytes) -> None:
 def atomic_write_json(*, path: Path, body: dict) -> None:
     """Write `body` as JSON atomically."""
     atomic_write_bytes(path=path, payload=json.dumps(body, indent=1, sort_keys=True).encode())
+
+
+def fit_key(*, arm: str, world: str, fold: str, seed: int) -> str:
+    """Return the file stem of a job."""
+    return Job(arm=arm, world=world, fold=fold, seed=seed).key
 
 
 def synthetic_jobs(*, seed: int) -> list[Job]:
@@ -122,7 +128,9 @@ def wave_jobs(*, wave: int) -> list[Job]:
     if wave == 4:
         w2 = [j for j in real_jobs(world="W2", seed=1) if j.arm in ("SG-0", "SG-A", "SG-A-S")]
         w0 = [j for j in real_jobs(world="W0", seed=1) if j.arm in ("SG-A", "P0")]
-        return w2 + w0
+        # Stage 5 of the page: "`SG-0` seed 1 on fold 2026-05 runs first and writes the MDE file".
+        first = fit_key(arm="SG-0", world="W2", fold=core.MDE_FOLD, seed=1)
+        return sorted(w2 + w0, key=lambda j: j.key != first)
     msg = f"wave {wave} is not one of 1 to 4"
     raise ValueError(msg)
 
@@ -159,27 +167,56 @@ def limit_gpu_memory(*, torch: object, device: int = 0) -> None:
     torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_MEMORY_BYTES / total), device)  # ty: ignore[unresolved-attribute]
 
 
+class ContinuationFloorReachedError(RuntimeError):
+    """The continuation time of the finished fits has reached the floor: the session asks the manager before the next `SG-A` fit in `W2`."""
+
+
 @dataclass
 class Budget:
-    """The continuation floor: 0.6 GPU-process-hours stay unspent for the flag's continuation.
+    """The GPU-hour tallies that every process reads from the stored curve files.
 
     Attributes:
-        spent_hours: GPU-process-hours used so far.
+        spent_hours: GPU-process-hours of all finished fits.
+        continuation_hours: GPU-process-hours of the continuations of the finished fits.
         cap_hours: The experiment's cap.
-        floor_hours: The hours that fits other than continuations may not touch.
+        floor_hours: The page's floor on the continuation: "before each `SG-A` fit in `W2` starts, the
+            session adds up the continuation time of the fits that have finished. When that sum has
+            reached 0.6 GPU-process-hours, the line stops at that fit". A continuation that is running
+            when the sum passes the floor finishes.
     """
 
     spent_hours: float = 0.0
+    continuation_hours: float = 0.0
     cap_hours: float = core.GPU_HOURS_CAP
     floor_hours: float = core.CONTINUATION_FLOOR_GPU_HOURS
 
-    def may_start_fit(self, *, expected_hours: float = core.GPU_HOURS_PER_FIT) -> bool:
-        """Return whether an ordinary fit may start and still leave the floor."""
-        return self.spent_hours + expected_hours <= self.cap_hours - self.floor_hours
+    @classmethod
+    def from_files(cls, *, data_dir: Path) -> Budget:
+        """Return the tallies of every stored curve file (the processes of a wave share nothing else)."""
+        folder = data_root(data_dir=data_dir) / "fits"
+        spent = cont = 0.0
+        for path in sorted(folder.glob("*.curve.json")):
+            body = json.loads(path.read_text())
+            spent += float(body.get("hours", 0.0))
+            cont += float(body.get("continuation_hours", 0.0))
+        return cls(spent_hours=spent, continuation_hours=cont)
 
-    def may_continue(self, *, expected_hours: float) -> bool:
-        """Return whether a continuation may run (it may use the floor)."""
+    def may_start_fit(self, *, expected_hours: float = core.GPU_HOURS_PER_FIT) -> bool:
+        """Return whether an ordinary fit may start under the cap."""
         return self.spent_hours + expected_hours <= self.cap_hours
+
+    def floor_reached(self) -> bool:
+        """Return whether the continuation time of the finished fits has reached the floor."""
+        return self.continuation_hours >= self.floor_hours
+
+    def check_before_continued_fit(self) -> None:
+        """Raise when the floor is reached, before an `SG-A` fit in `W2` starts."""
+        if self.floor_reached():
+            msg = (
+                f"the continuations of the finished fits took {self.continuation_hours:.2f} GPU-process-hours, "
+                f"which reaches the floor of {self.floor_hours}: ask the manager before the next SG-A fit in W2"
+            )
+            raise ContinuationFloorReachedError(msg)
 
 
 # --------------------------------------------------------------------------- the fit loop
@@ -190,22 +227,28 @@ class FitResult:
     """A fit's validation curve and its two scored states.
 
     Attributes:
-        val_history: Validation loss after each pass (the patience-8 stop included).
-        stop_pass_p8: Pass at which a patience of 8 stops.
+        val_history: Validation loss after each pass (the continuation's passes included).
+        stop_pass_p8: Last pass (0-based) of the patience-8 run.
         best_pass_p8: Pass of the patience-8 best.
-        best_state_p8: The state at that pass.
+        best_state_p8: The state at that pass (the state that is scored and passed on).
+        best_state_p30: The state at the continuation's best pass, saved apart and never passed on.
         continued: Whether a continuation ran (Branch A).
         flag: The flag result's dictionary, if the flag was evaluated.
-        rerun_of_cap: Whether the stage was rerun at the higher cap.
+        rerun_of_cap: Whether the stage went on from the cap of 60 passes to the cap of 120.
+        continuation_seconds: Measured seconds of the continuation's passes.
+        seconds_per_pass: Measured seconds per pass of the patience-8 run.
     """
 
     val_history: list[float] = field(default_factory=list)
     stop_pass_p8: int = -1
     best_pass_p8: int = -1
     best_state_p8: dict | None = None
+    best_state_p30: dict | None = None
     continued: bool = False
     flag: dict | None = None
     rerun_of_cap: bool = False
+    continuation_seconds: float = 0.0
+    seconds_per_pass: float = 0.0
 
 
 class Trainable(Protocol):
@@ -224,64 +267,90 @@ class Trainable(Protocol):
         """Load a state."""
 
 
+class PatienceRun:
+    """One run of a trainable that keeps its history, its best pass, and its best state.
+
+    A pass is an improvement when it beats the best so far by more than 1e-5 (the rule of
+    `core.replay_stop` and of experiment 713's loop), so the best pass and the best state are the
+    ones the stop rule uses. `advance` can be called again with a larger cap or a longer patience, and
+    the run goes on from where it stopped, so a stage that hit its cap is not trained twice.
+    """
+
+    def __init__(self, *, fit: Trainable) -> None:
+        """Hold the trainable and an empty history."""
+        self.fit = fit
+        self.hist: list[float] = []
+        self.best = float("inf")
+        self.best_pass = -1
+        self.best_state: dict | None = None
+
+    def stale(self) -> int:
+        """Return the passes since the best pass."""
+        return len(self.hist) - 1 - self.best_pass
+
+    def advance(self, *, max_passes: int, patience: int) -> None:
+        """Train until `patience` passes bring no improvement, or until `max_passes` passes in all."""
+        while len(self.hist) < max_passes and not (self.hist and self.stale() >= patience):
+            self.fit.train_pass()
+            loss = self.fit.validate()
+            self.hist.append(loss)
+            if loss < self.best - 1e-5:
+                self.best, self.best_pass, self.best_state = (
+                    loss,
+                    len(self.hist) - 1,
+                    self.fit.get_state(),
+                )
+
+    def hit_cap(self, *, cap: int, patience: int) -> bool:
+        """Return whether the run ended at `cap` passes with its patience not yet used up."""
+        return len(self.hist) >= cap and self.stale() < patience
+
+
 def fit_patience(
-    *, fit: Trainable, max_passes: int, patience: int, history: list[float] | None = None
+    *, fit: Trainable, max_passes: int, patience: int
 ) -> tuple[list[float], int, dict | None]:  # fmt: skip
     """Train until `patience` passes bring no improvement, or until `max_passes`.
 
-    The improvement threshold is the one of `core.replay_stop`. Returns the history, the best pass
-    (0-based), and a copy of the state at the best pass.
+    Returns the history, the best pass (0-based, by the 1e-5 improvement rule), and a copy of the
+    state at the best pass.
     """
-    hist = list(history or [])
-    best, best_pass, best_state = (
-        (min(hist), int(np.argmin(hist)), None) if hist else (float("inf"), -1, None)
-    )
-    start = len(hist)
-    for _ in range(start, max_passes):
-        fit.train_pass()
-        loss = fit.validate()
-        hist.append(loss)
-        if loss < best - 1e-5:
-            best, best_pass, best_state = loss, len(hist) - 1, fit.get_state()
-        if len(hist) - 1 - best_pass >= patience:
-            break
-    return hist, best_pass, best_state
+    run = PatienceRun(fit=fit)
+    run.advance(max_passes=max_passes, patience=patience)
+    return run.hist, run.best_pass, run.best_state
 
 
 def run_fit_with_flag(
-    *, fit: Trainable, max_passes: int, continuation: bool, budget: Budget | None = None,
-    hours_per_pass: float = 0.0,
+    *, fit: Trainable, continuation: bool, first_cap: int = core.REAL_FOLD_CAP_FIRST, rerun_cap: int = core.REAL_FOLD_CAP_RERUN,
 ) -> FitResult:  # fmt: skip
-    """Fit with patience 8 and, with `continuation`, continue a curve stopped while falling.
+    """Fit one real-fold stage with patience 8 and, with `continuation`, go on to patience 30.
 
-    The scored state is always the patience-8 best, so that a continuation changes the flag and no
-    score.
-    The continuation runs in stage 1 for `SG-A` in `W2` (Branch A) at patience 30 up to 150 passes
-    more,
-    and only when the budget's floor allows it.
+    The page's rules, in one run: the stage trains for at most 60 passes, and "a stage that hits the
+    cap of 60" goes on to at most 120 in the same run (the passes after pass 60 do not change the
+    passes before it, so this is the rerun of the page without training the stage twice). The scored
+    state is the patience-8 best. With `continuation` (Branch A: stage 1 of `SG-A` in `W2`), the same
+    run then goes on at patience 30 up to 150 passes in all, and its better state is kept apart and
+    never passed on. The flag reads the whole curve.
     """
-    hist, best_pass, best_state = fit_patience(
-        fit=fit, max_passes=max_passes, patience=core.REAL_FOLD_PATIENCE
-    )
+    run = PatienceRun(fit=fit)
+    started = time.monotonic()
+    run.advance(max_passes=first_cap, patience=core.REAL_FOLD_PATIENCE)
+    raised = run.hit_cap(cap=first_cap, patience=core.REAL_FOLD_PATIENCE)
+    if raised:
+        run.advance(max_passes=rerun_cap, patience=core.REAL_FOLD_PATIENCE)
+    seconds_per_pass = (time.monotonic() - started) / max(len(run.hist), 1)
     result = FitResult(
-        val_history=hist,
-        stop_pass_p8=len(hist) - 1,
-        best_pass_p8=best_pass,
-        best_state_p8=best_state,
-    )
+        val_history=list(run.hist), stop_pass_p8=len(run.hist) - 1, best_pass_p8=run.best_pass, best_state_p8=run.best_state,
+        rerun_of_cap=raised, seconds_per_pass=seconds_per_pass,
+    )  # fmt: skip
     if not continuation:
         return result
-    expected = hours_per_pass * core.CONTINUATION_CAP_PASSES
-    if budget is not None and not budget.may_continue(expected_hours=expected):
-        result.flag = {"evaluated": False, "reason": "budget floor"}
-        return result
-    fit_hist, _, _ = fit_patience(
-        fit=fit, max_passes=min(len(hist) + core.CONTINUATION_CAP_PASSES, max_passes + core.CONTINUATION_CAP_PASSES),
-        patience=core.CONTINUATION_PATIENCE, history=hist,
-    )  # fmt: skip
+    cont_started = time.monotonic()
+    run.advance(max_passes=core.CONTINUATION_CAP_PASSES, patience=core.CONTINUATION_PATIENCE)
+    result.continuation_seconds = time.monotonic() - cont_started
     result.continued = True
-    result.val_history = fit_hist
-    flag = core.stopped_while_falling(val_history=fit_hist)
+    result.val_history = list(run.hist)
+    result.best_state_p30 = run.best_state
+    flag = core.stopped_while_falling(val_history=run.hist, p8_cap=rerun_cap)
     result.flag = {"evaluated": True, **asdict(flag)}
     return result
 
@@ -314,15 +383,20 @@ class JobInputs(Protocol):
         """Return the sign tokens of a synthetic fit, or `None` for any other job."""
 
 
+def continuation_wanted(*, job: Job, stage: int) -> bool:
+    """Return whether the continuation and the flag run: stage 1 of `SG-A` in `W2` (Branch A)."""
+    return stage == core.SIGN_HEAD_STAGE and job.arm == "SG-A" and job.world == "W2"
+
+
 def run_stage(
-    *, job: Job, stage: int, inputs: JobInputs, continuation: bool, budget: Budget
+    *, job: Job, stage: int, inputs: JobInputs, continuation: bool
 ) -> tuple[FitResult, Trainable]:  # fmt: skip
     """Fit one stage and return the result with the trainable.
 
-    On a real fold, a stage that ends at the cap is rerun from its start state at the rerun cap.
+    A stage trains in one run: a real-fold stage that ends at the cap of 60 goes on to 120 in the same
+    run, and the continuation, when it runs, goes on from there to 150 in all.
     """
     trainable = inputs.build_trainable(job=job, stage=stage)
-    start = trainable.get_state()
     if job.world == "synthetic":
         hist, best_pass, best_state = fit_patience(
             fit=trainable, max_passes=core.SYNTH_MAX_PASSES, patience=core.SYNTH_PATIENCE
@@ -330,25 +404,13 @@ def run_stage(
         return FitResult(
             val_history=hist, stop_pass_p8=len(hist) - 1, best_pass_p8=best_pass, best_state_p8=best_state,
         ), trainable  # fmt: skip
-    flag_wanted = continuation and stage == 1 and job.arm == "SG-A" and job.world == "W2"
-    result = run_fit_with_flag(
-        fit=trainable, max_passes=core.REAL_FOLD_CAP_FIRST, continuation=flag_wanted, budget=budget
-    )
-    ran_to_cap = (
-        result.stop_pass_p8 + 1 >= core.REAL_FOLD_CAP_FIRST
-        and result.stop_pass_p8 - result.best_pass_p8 < core.REAL_FOLD_PATIENCE
-    )
-    if ran_to_cap:
-        trainable.set_state(start)
-        trainable = inputs.build_trainable(job=job, stage=stage)
-        again = run_fit_with_flag(
-            fit=trainable,
-            max_passes=core.REAL_FOLD_CAP_RERUN,
-            continuation=flag_wanted,
-            budget=budget,
-        )
-        again.rerun_of_cap = True
-        return again, trainable
+    wanted = continuation_wanted(job=job, stage=stage)
+    result = run_fit_with_flag(fit=trainable, continuation=continuation and wanted)
+    if wanted and not continuation:
+        result.flag = {
+            "evaluated": False,
+            "reason": "the manager allowed this fit without its continuation",
+        }
     return result, trainable
 
 
@@ -369,22 +431,37 @@ def fit_job(
         msg = f"{job.key} does not start: {'; '.join(problems)}"
         raise RuntimeError(msg)
     if not budget.may_start_fit():
-        msg = f"{job.key} does not start: the continuation floor of {budget.floor_hours} hours would be spent"
+        msg = f"{job.key} does not start: the cap of {budget.cap_hours} GPU-process-hours would be passed"
         raise RuntimeError(msg)
+    if continuation and any(
+        continuation_wanted(job=job, stage=st) for st in inputs.stages(job=job)
+    ):
+        budget.check_before_continued_fit()
     started = time.monotonic()
     stage_records = []
+    continuation_hours = 0.0
     for stage in inputs.stages(job=job):
         t0 = time.monotonic()
         result, trainable = run_stage(
-            job=job, stage=stage, inputs=inputs, continuation=continuation, budget=budget
+            job=job, stage=stage, inputs=inputs, continuation=continuation
         )
         if result.best_state_p8 is not None:
             trainable.set_state(result.best_state_p8)
+        if result.best_state_p30 is not None:
+            import io as _io
+
+            import torch as _torch  # ty: ignore[unresolved-import]
+
+            buf = _io.BytesIO()
+            _torch.save({k: v.cpu() for k, v in result.best_state_p30.items()}, buf)
+            atomic_write_bytes(path=paths["continuation_state"], payload=buf.getvalue())
+        continuation_hours += result.continuation_seconds / 3600.0
         stage_records.append(
             {
                 "stage": stage, "val_history": result.val_history, "best_pass_p8": result.best_pass_p8,
                 "stop_pass_p8": result.stop_pass_p8, "continued": result.continued, "flag": result.flag,
                 "seconds": time.monotonic() - t0, "passes": len(result.val_history), "rerun": result.rerun_of_cap,
+                "seconds_per_pass": result.seconds_per_pass, "continuation_seconds": result.continuation_seconds,
             }
         )  # fmt: skip
         log(
@@ -399,8 +476,10 @@ def fit_job(
     atomic_write_bytes(path=paths["state"], payload=buffer.getvalue())
     hours = (time.monotonic() - started) / 3600.0
     budget.spent_hours += hours
+    budget.continuation_hours += continuation_hours
     curve = {
-        "job": job.key, "stages": stage_records, "hours": hours,
+        "job": job.key, "stages": stage_records, "hours": hours, "continuation_hours": continuation_hours,
+        "hours_per_pass": hours / max(sum(r["passes"] for r in stage_records), 1),
         "flag": next((r["flag"] for r in stage_records if r["flag"] is not None), None),
         "val_history": stage_records[0]["val_history"], "best_pass_p8": stage_records[0]["best_pass_p8"],
     }  # fmt: skip

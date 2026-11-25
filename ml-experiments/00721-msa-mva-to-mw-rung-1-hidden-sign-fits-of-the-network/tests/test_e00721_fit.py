@@ -57,36 +57,56 @@ def test_cap_stops_a_fit_that_keeps_improving() -> None:
 
 
 def test_continuation_flags_and_keeps_the_patience_8_state_for_scoring() -> None:
-    result = fit.run_fit_with_flag(
-        fit=_CurveFit(_falling_after_stall()), max_passes=60, continuation=True
-    )
+    result = fit.run_fit_with_flag(fit=_CurveFit(_falling_after_stall()), continuation=True)
     assert result.continued
     assert result.flag is not None
     assert result.flag["flagged"]
     assert result.best_pass_p8 == 19
     assert result.best_state_p8 == {"pass": 20}
-    assert len(result.val_history) > result.stop_pass_p8 + 1
+    assert result.best_state_p30 != result.best_state_p8
+    assert result.stop_pass_p8 < len(result.val_history) - 1
+    assert len(result.val_history) <= core.CONTINUATION_CAP_PASSES
+
+
+def test_the_continuation_never_exceeds_150_passes_in_total() -> None:
+    result = fit.run_fit_with_flag(
+        fit=_CurveFit(list(1.0 - 0.001 * np.arange(400))), continuation=True
+    )
+    assert len(result.val_history) == core.CONTINUATION_CAP_PASSES
+
+
+def test_a_capped_stage_goes_on_to_120_in_one_run_and_is_not_trained_twice() -> None:
+    trainable = _CurveFit(list(1.0 - 0.001 * np.arange(400)))
+    result = fit.run_fit_with_flag(fit=trainable, continuation=False)
+    assert result.rerun_of_cap
+    assert len(result.val_history) == core.REAL_FOLD_CAP_RERUN
+    assert trainable.i == core.REAL_FOLD_CAP_RERUN  # each pass trained once
 
 
 def test_no_continuation_means_no_flag() -> None:
-    result = fit.run_fit_with_flag(
-        fit=_CurveFit(_falling_after_stall()), max_passes=60, continuation=False
-    )
+    result = fit.run_fit_with_flag(fit=_CurveFit(_falling_after_stall()), continuation=False)
     assert not result.continued
     assert result.flag is None
 
 
-def test_the_floor_blocks_ordinary_fits_but_not_a_continuation() -> None:
-    budget = fit.Budget(spent_hours=13.5)
-    assert not budget.may_start_fit()
-    assert budget.may_continue(expected_hours=0.4)
-    assert not budget.may_continue(expected_hours=0.6)
-    skipped = fit.run_fit_with_flag(
-        fit=_CurveFit(_falling_after_stall()), max_passes=60, continuation=True,
-        budget=fit.Budget(spent_hours=13.9), hours_per_pass=0.01,
-    )  # fmt: skip
-    assert skipped.flag == {"evaluated": False, "reason": "budget floor"}
-    assert not skipped.continued
+def test_the_floor_is_tallied_from_stored_curve_files_across_processes(tmp_path: Path) -> None:
+    folder = fit.data_root(data_dir=tmp_path) / "fits"
+    folder.mkdir(parents=True)
+    for i, hours in enumerate((0.3, 0.35)):
+        body = {"hours": 1.0, "continuation_hours": hours}
+        (folder / f"job{i}.curve.json").write_text(json.dumps(body))
+    budget = fit.Budget.from_files(data_dir=tmp_path)
+    assert budget.spent_hours == pytest.approx(2.0)
+    assert budget.continuation_hours == pytest.approx(0.65)
+    assert budget.floor_reached()
+    with pytest.raises(fit.ContinuationFloorReachedError):
+        budget.check_before_continued_fit()
+    assert not fit.Budget(continuation_hours=0.59).floor_reached()
+
+
+def test_the_cap_blocks_a_fit_that_would_pass_14_hours() -> None:
+    assert fit.Budget(spent_hours=13.0).may_start_fit(expected_hours=0.5)
+    assert not fit.Budget(spent_hours=13.9).may_start_fit(expected_hours=0.5)
 
 
 def test_waves_hold_the_page_job_counts() -> None:

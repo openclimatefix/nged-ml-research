@@ -60,6 +60,7 @@ class ArmWorld:
         score_primaries: The Primaries whose rows are scored.
         train_primaries: The Primaries that make the training pairs, or `None` for all 16.
         stamp_us: `(G,)` the microsecond stamp of every grid index.
+        k_grid: `(16, G)` the clear-sky index, for the sunny-midday flag of the synthetic world's sign tokens.
         exporters: The synthetic world's exporting Primaries (empty elsewhere).
         non_exporters: The synthetic world's non-exporting Primaries (empty elsewhere).
         log: Facts that the stages record for the job's log (the scale of the PV paths).
@@ -85,24 +86,49 @@ class ArmWorld:
     score_primaries: tuple[int, ...] = ()
     train_primaries: tuple[int, ...] | None = None
     stamp_us: np.ndarray | None = None
+    k_grid: np.ndarray | None = None
     exporters: tuple[int, ...] = ()
     non_exporters: tuple[int, ...] = ()
     log: dict = field(default_factory=dict)
 
 
+def effective_gate(*, aw: ArmWorld) -> np.ndarray:
+    """Return `(16,)` the export gate the arm uses: the Primary's own gate, or all ones for `SG-A-open`."""
+    return (
+        np.ones(len(aw.gate)) if aw.spec.force_gate_open else np.asarray(aw.gate, dtype=np.float64)
+    )
+
+
 def token_loss(
-    *, out: torch.Tensor, target: torch.Tensor, primary: torch.Tensor, aw: ArmWorld, folded_arm: bool
+    *, out: torch.Tensor, target: torch.Tensor, primary: torch.Tensor, target_u: torch.Tensor, aw: ArmWorld,
+    folded_arm: bool,
 ) -> torch.Tensor:  # fmt: skip
-    """Return the negative log-likelihood `(B, 48)` of each target token (NaN targets give a finite number)."""
+    """Return the negative log-likelihood `(B, 48)` of each target token (NaN targets give a finite number).
+
+    The loss follows the design's gate rule (section 2.2 and the page's "The loss at a gate-open Primary
+    is the folded likelihood"). A `P0` or `S` token takes the plain mixture likelihood. In an `SG` arm:
+
+    - at a Primary whose reading is a folded magnitude and whose export gate is open, a token with
+      `u >= u_min` takes the folded likelihood, and a token with `u < u_min` takes restriction R1
+      (the mixture density on `y >= 0` over `P(X >= 0)`);
+    - at a gate-shut Primary, "`e_i = 0`, `ρ` is zero, the loss is the plain likelihood";
+    - at a Primary whose target is signed (the four visible signed Primaries, D15 and D18), the loss is plain.
+    """
     z = torch.nan_to_num(target)
     plain = mdl.per_token_nll(out=out, target=z)
     if not folded_arm:
         return plain
     dev = out.device
     ft = torch.as_tensor(aw.folded_target, device=dev)[primary][:, None]
+    gate_open = (
+        torch.as_tensor(effective_gate(aw=aw), dtype=out.dtype, device=dev)[primary][:, None] > 0.5
+    )
     shift = torch.as_tensor(aw.shift, dtype=out.dtype, device=dev)[primary]
     q_v = torch.as_tensor(aw.q_v, dtype=out.dtype, device=dev)[primary]
-    return torch.where(ft, arms.folded_nll(out=out, reading_z=z, shift=shift, q_v=q_v), plain)
+    folded = arms.folded_nll(out=out, reading_z=z, shift=shift, q_v=q_v)
+    r1 = arms.truncated_nll(out=out, reading_z=z, shift=shift)
+    sunny = target_u >= core.U_MIN
+    return torch.where(ft & gate_open, torch.where(sunny, folded, r1), plain)
 
 
 def sign_cross_entropy(*, model: torch.nn.Module, batch: sgb.SgAssembled) -> torch.Tensor:
@@ -199,6 +225,10 @@ class StageTrainable:
         self.cut = tr.target_end(world=aw.world, stage=stage)
         self.folded_arm = aw.spec.loss == "folded"
         self.fold_probability = core.FOLD_HISTORY_SIGN_PROB if aw.spec.sign_head else 0.0
+        self.train_head = bool(aw.spec.sign_head and stage == core.SIGN_HEAD_STAGE)
+        head = getattr(model, "pv_sign_lin", None)
+        if head is not None:
+            head.requires_grad_(self.train_head)
         torch.manual_seed(aw.seed * 7 + stage)
         self.optimiser = torch.optim.AdamW(
             pvt.param_groups(model=model, stage=stage, encoders="random")
@@ -244,15 +274,11 @@ class StageTrainable:
             ) * torch.isfinite(b.target)
             out = model(b.inputs).out
             nll = token_loss(
-                out=out,
-                target=b.target,
-                primary=b.inputs.primary,
-                aw=aw,
-                folded_arm=self.folded_arm,
-            )
-            loss = (w * nll).sum() / w.sum().clamp_min(
-                1e-9
-            ) + core.SIGN_CE_WEIGHT * sign_cross_entropy(model=model, batch=b)
+                out=out, target=b.target, primary=b.inputs.primary, target_u=b.target_u, aw=aw, folded_arm=self.folded_arm,
+            )  # fmt: skip
+            loss = (w * nll).sum() / w.sum().clamp_min(1e-9)
+            if self.train_head:
+                loss = loss + core.SIGN_CE_WEIGHT * sign_cross_entropy(model=model, batch=b)
             self.step += 1
             for g in self.optimiser.param_groups:
                 g["lr"] = g["base_lr"] * (
@@ -282,8 +308,8 @@ class StageTrainable:
                         lead=np.full(len(sel), lead_day, dtype=np.int64), cut=self.cut,
                     )  # fmt: skip
                     nll = token_loss(
-                        out=self.model(b.inputs).out, target=b.target, primary=b.inputs.primary, aw=self.aw,
-                        folded_arm=self.folded_arm,
+                        out=self.model(b.inputs).out, target=b.target, primary=b.inputs.primary, target_u=b.target_u,
+                        aw=self.aw, folded_arm=self.folded_arm,
                     )  # fmt: skip
                     ok = torch.isfinite(b.target)
                     total += float(nll[ok].sum())
@@ -381,51 +407,73 @@ def predict_rows(
 
 
 def sign_tokens_of(
-    *, model: torch.nn.Module, aw: ArmWorld, samples: tr.SampleSet, primaries: tuple[int, ...], max_pairs: int = 400,
+    *, model: torch.nn.Module, aw: ArmWorld, primaries: tuple[int, ...], c_idx: np.ndarray, cutoff_idx: int, batch: int = 128,
 ) -> dict[str, np.ndarray]:  # fmt: skip
-    """Return `rho`, the true sign, the signed power in points, `u`, and a token id of each token.
+    """Return `rho`, the true sign, the signed power in points, `u`, a token id, and a sunny-midday flag of each token.
 
-    The tokens are the distinct history tokens of `primaries`.
+    The tokens are the history tokens of `primaries` that the network never trained on: a token counts
+    only when its own half-hour is at or after the fold's cutoff, where the fit phase held every value at
+    NaN, so neither its label nor its reading entered any training batch. The origins are every origin
+    in `c_idx` (all dates of the scored window), and every Primary in `primaries` is read at each origin,
+    so no exporter and no date is favoured. The history is folded, and the truth is read here and never
+    in training. A token appears once per origin that reads it, and the scorer keeps the distinct ones.
 
-    The tokens come from the held-out pairs, with the history folded. The truth is read here and never in
-    training.
+    Args:
+        model: The fitted network, in the state of the predict phase (no calibration is rerun here).
+        aw: The arm's world.
+        primaries: The Primaries whose tokens are read.
+        c_idx: The contract origins to read.
+        cutoff_idx: The fold's cutoff grid index.
+        batch: Samples per forward pass.
     """
+    import e00721_worlds as wd
+
     model.eval()
     source = aw.sources[aw.predict_stage]
-    idx = np.nonzero(samples.is_val & np.isin(samples.primary, np.array(primaries)))[0][:max_pairs]
-    rho, x, u, tid, prim = [], [], [], [], []
+    dev = source.device
+    prim_all = np.repeat(np.array(primaries), len(c_idx))
+    c_all = np.tile(np.asarray(c_idx), len(primaries))
+    cols: dict[str, list[np.ndarray]] = {
+        k: [] for k in ("rho", "x_points", "u", "token_id", "primary", "sunny")
+    }
     with torch.no_grad():
-        for start in range(0, len(idx), aw.batch_size):
-            sel = idx[start : start + aw.batch_size]
-            b = batch_for(
-                source=source, samples=samples, index=sel, lead=np.zeros(len(sel), dtype=np.int64), cut=10**9,
-                fold_hist=np.ones(len(sel), dtype=bool),
-            )  # fmt: skip
+        for start in range(0, len(prim_all), batch):
+            p = to_device(a=prim_all[start : start + batch], dev=dev)
+            c = to_device(a=c_all[start : start + batch], dev=dev)
+            b = source.assemble(
+                primary=p,
+                c_idx=c,
+                lead_day=torch.zeros_like(p),
+                fold_hist=torch.ones_like(p, dtype=torch.bool),
+            )
             model(b.inputs)
             r = getattr(model, "last_rho", None)
             if r is None:
                 continue
             gi = b.hist_idx.cpu().numpy()
-            pr = (
-                b.inputs.primary.cpu()
-                .numpy()[:, None, None]
-                .repeat(gi.shape[1], 1)
-                .repeat(gi.shape[2], 2)
+            pr = p.cpu().numpy()[:, None, None].repeat(gi.shape[1], 1).repeat(gi.shape[2], 2)
+            vis = (
+                b.inputs.hist_visible.cpu().numpy()
+                & (gi >= cutoff_idx)
+                & np.isfinite(aw.signed_truth[pr, gi])
             )
-            vis = b.inputs.hist_visible.cpu().numpy() & (
-                b.inputs.hist_u.cpu().numpy() >= core.U_MIN
+            hour, month = (
+                wd.hour_month(valid_us=aw.stamp_us[gi])
+                if aw.stamp_us is not None
+                else (np.zeros_like(gi), np.zeros_like(gi))
             )
-            rho.append(r.cpu().numpy()[vis])
-            x.append(aw.signed_truth[pr, gi][vis] * 100.0)
-            u.append(b.inputs.hist_u.cpu().numpy()[vis])
-            tid.append((pr.astype(np.int64) * 10**7 + gi)[vis])
-            prim.append(pr[vis])
-    if not rho:
-        return {k: np.zeros(0) for k in ("rho", "x_points", "u", "token_id", "primary")}
-    return {
-        "rho": np.concatenate(rho), "x_points": np.concatenate(x), "u": np.concatenate(u),
-        "token_id": np.concatenate(tid), "primary": np.concatenate(prim),
-    }  # fmt: skip
+            k_ok = aw.k_grid[pr, gi] >= wd.SUNNY_K if aw.k_grid is not None else np.zeros_like(vis)
+            del month
+            sunny = (hour >= wd.MIDDAY_HOURS[0]) & (hour < wd.MIDDAY_HOURS[1]) & k_ok
+            cols["rho"].append(r.cpu().numpy()[vis])
+            cols["x_points"].append(aw.signed_truth[pr, gi][vis] * 100.0)
+            cols["u"].append(b.inputs.hist_u.cpu().numpy()[vis])
+            cols["token_id"].append((pr.astype(np.int64) * 10**7 + gi)[vis])
+            cols["primary"].append(pr[vis])
+            cols["sunny"].append(sunny[vis])
+    if not cols["rho"]:
+        return {k: np.zeros(0) for k in cols}
+    return {k: np.concatenate(v) for k, v in cols.items()}
 
 
 def timing_record(*, started: float) -> float:

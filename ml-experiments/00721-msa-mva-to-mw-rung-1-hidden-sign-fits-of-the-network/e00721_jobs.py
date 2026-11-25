@@ -69,6 +69,8 @@ class WorldInputs:
         self.worlds: dict[str, trn.ArmWorld] = {}
         self.models: dict[str, torch.nn.Module] = {}
         self.samples: dict[tuple[str, int], tr.SampleSet] = {}
+        self.loaded: set[str] = set()
+        """Jobs whose fitted weights were loaded: the predict phase, in which nothing is recalibrated or retrained."""
 
     def world_of(self, *, job: fit.Job) -> trn.ArmWorld:
         """Return the job's `ArmWorld`, built on first use."""
@@ -91,6 +93,9 @@ class WorldInputs:
 
     def build_trainable(self, *, job: fit.Job, stage: int) -> trn.StageTrainable:
         """Return the stage's trainable; the first stage also sets the scale of the PV paths."""
+        assert job.key not in self.loaded, (
+            f"{job.key}: the predict phase never builds a trainable (it would recalibrate the PV scales)"
+        )
         aw = self.world_of(job=job)
         model = self.model_of(job=job)
         key = (job.key, stage)
@@ -130,26 +135,36 @@ class WorldInputs:
     def load_network_state(self, *, job: fit.Job, state: dict) -> None:
         """Load `state` into the job's network."""
         self.model_of(job=job).load_state_dict(state)
+        self.loaded.add(job.key)
 
     def sign_tokens(self, *, job: fit.Job) -> dict[str, np.ndarray] | None:
         """Return the sign tokens of a synthetic `SG-A` fit, or `None` for any other job.
 
-        The tokens are the exporters' `ρ`, and the non-exporters' `ρ` with the gate forced open.
+        The tokens are the exporters' `ρ`, and the non-exporters' `ρ` with the gate forced open, on
+        tokens that no training batch read. This method rebuilds no sample set and reruns no
+        calibration, so the loaded network's weights and PV scales are the fitted ones.
         """
         aw = self.world_of(job=job)
         if job.world != "synthetic" or not aw.spec.sign_head:
             return None
+        assert aw.score_c_idx is not None
         model = self.model_of(job=job)
-        key = (job.key, 1)
-        samples = (
-            self.samples[key]
-            if key in self.samples
-            else self.build_trainable(job=job, stage=1).samples
+        exp = trn.sign_tokens_of(
+            model=model,
+            aw=aw,
+            primaries=aw.exporters,
+            c_idx=aw.score_c_idx,
+            cutoff_idx=aw.world.cutoff_idx,
         )
-        exp = trn.sign_tokens_of(model=model, aw=aw, samples=samples, primaries=aw.exporters)
         old = model.export_gate.clone()
         model.set_gate(gate=np.ones(16), force_open=True)
-        non = trn.sign_tokens_of(model=model, aw=aw, samples=samples, primaries=aw.non_exporters)
+        non = trn.sign_tokens_of(
+            model=model,
+            aw=aw,
+            primaries=aw.non_exporters,
+            c_idx=aw.score_c_idx,
+            cutoff_idx=aw.world.cutoff_idx,
+        )
         model.export_gate.copy_(old)
         return {f"exporters_{k}": v for k, v in exp.items()} | {
             f"open_{k}": v for k, v in non.items()

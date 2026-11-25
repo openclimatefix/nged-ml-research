@@ -49,6 +49,10 @@ VISIBLE_SIGNED: Final = ("D9", "D11", "D14", "D16")
 """The four signed-MW Primaries that stay visible and supervise the sign head."""
 MVA_ONLY: Final = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
 """The eight MVA-only Primaries (G4)."""
+UNFOLDED_SIGNED: Final = ("D15", "D18")
+"""The two short-history Primaries whose stored readings are signed (negative on some half-hours).
+The page names no folding for them: they train and score on the readings as stored, with the plain
+likelihood, no export gate, and no sign labels."""
 SIGN_SUPERVISION_EXCLUDED: Final = (*HIDDEN_PAIR, "D15")
 """Primaries kept out of the sign head's supervision in every world and stage."""
 
@@ -122,7 +126,19 @@ CONTINUATION_FLOOR_GPU_HOURS: Final = 0.6
 GPU_HOURS_PER_FIT: Final = 0.2
 GPU_HOURS_CAP: Final = 14.0
 SIGN_CE_WEIGHT: Final = 1.0
-"""Weight of the cross-entropy between `ρ` and the true sign (the page names the loss and not its weight)."""
+"""Weight of the cross-entropy between `ρ` and the true sign, added to the stage 1 loss only (Branch
+A). The design lead accepted 1.0 as a named constant, listed on the page."""
+SIGN_HEAD_STAGE: Final = 1
+"""The one stage in which the sign head trains (Branch A). In stages 2 and 3 the head is frozen: no
+cross-entropy, no gradient, and no parameter in any optimiser group."""
+SYNTH_PIPELINE_FOLD: Final = "2026-04"
+"""The real fold whose pipeline supplies the synthetic world's grid, weather, and cutoff."""
+SYNTH_EXPORTERS: Final = ("D9", "D11")
+"""The synthetic world's two exporting Primaries (their real sky and temperature are used)."""
+SYNTH_NON_EXPORTERS: Final = ("D2", "D3")
+"""The synthetic world's two Primaries that never export."""
+CONTINUATION_NEEDS: Final = "SG-A in W2, stage 1"
+"""The one fit and stage in which the continuation and the flag run (Branch A)."""
 N_INJECTION_SUBSTEPS: Final = 6
 """Sub-steps of the within-half-hour interpolation. Experiment 720's code owns the number; this copy
 is asserted equal in a test."""
@@ -314,7 +330,7 @@ class FlagResult:
     stop30: int
 
 
-def stopped_while_falling(*, val_history: Sequence[float]) -> FlagResult:
+def stopped_while_falling(*, val_history: Sequence[float], p8_cap: int | None = None) -> FlagResult:
     """Return the flag of one stage from its whole validation curve.
 
     `val_history` is the curve of the continued run (the run that patience 8 stops and patience 30
@@ -325,10 +341,13 @@ def stopped_while_falling(*, val_history: Sequence[float]) -> FlagResult:
     the
     passes before it. The stage is flagged when the gap exceeds 0.5 times the noise and is at least
     5%
-    of the descent.
+    of the descent. `p8_cap` is the cap of the patience-8 run (120 on a real fold), so that a stage
+    still improving at its cap has the patience-8 best of its first 120 passes.
     """
     curve = list(val_history)[:CONTINUATION_CAP_PASSES]
-    stop8, best8 = replay_stop(val_history=curve, patience=REAL_FOLD_PATIENCE)
+    stop8, best8 = replay_stop(
+        val_history=curve if p8_cap is None else curve[:p8_cap], patience=REAL_FOLD_PATIENCE
+    )
     stop30, best30 = replay_stop(val_history=curve, patience=CONTINUATION_PATIENCE)
     gap = best8 - best30
     noise = noise_of_curve(val_history=curve[:stop8])
