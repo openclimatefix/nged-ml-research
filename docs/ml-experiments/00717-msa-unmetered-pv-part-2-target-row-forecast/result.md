@@ -140,18 +140,19 @@ known-answer worlds, and the leakage rules) are on the page of experiment 716.
 
 **The verdict is `not supported`, taken from the pre-registered mapping and applied as written.**
 Each of the two counted contrasts is read in two groups of Primaries: the six signed-MW Primaries,
-whose power is metered in signed megawatts, and the eight MVA-only Primaries, which are metered
-only in megavolt-amperes (MVA). Arm `H` is the network without the target-row forecast, arm `HT` is the network with it, and arm `HT-S` is the placebo
-network that reads the forecast issued earlier, as the section "What is compared" describes. B1 is
-arm `HT` minus arm `H`, and B2 is arm `HT` minus arm `HT-S`. Each of the four counted readings is
-"no detectable difference", because its 98.75% interval lies inside plus or minus 0.06 points of
-capacity (six signed-MW Primaries) or 0.16 (eight MVA-only Primaries). The verdict function of
-experiment 716 maps four such readings to `not supported`, and `closes_line` is true, so the verdict
-adds one to the stop-rule count and closes the line. The prediction written before any fit held: B1
-lies inside its ranges, and the interval of B2 includes zero in both groups. The warm-start states
-of experiment 713 come from a waived known-answer gate, and the verdict concerns a forecast added to
-a network that already reads the historical estimate. Every number in this section comes from
-`score/part2.json` or `score/secondary_part2.json` in the data folder of this experiment.
+whose power is metered in signed megawatts, and the eight MVA-only Primaries, which are metered only
+in megavolt-amperes (MVA). Arm `H` is the network without the target-row forecast, arm `HT` is the
+network with it, and arm `HT-S` is the placebo network that reads the forecast issued earlier, as
+the section "What is compared" describes. B1 is arm `HT` minus arm `H`, and B2 is arm `HT` minus arm
+`HT-S`. Each of the four counted readings is "no detectable difference", because its 98.75% interval
+lies inside plus or minus 0.06 points of capacity (six signed-MW Primaries) or 0.16 (eight MVA-only
+Primaries). The verdict function of experiment 716 maps four such readings to `not supported`, and
+`closes_line` is true, so the verdict adds one to the stop-rule count and closes the line. The
+prediction written before any fit held: B1 lies inside its ranges, and the interval of B2 includes
+zero in both groups. The warm-start states of experiment 713 come from a waived known-answer gate,
+and the verdict concerns a forecast added to a network that already reads the historical estimate.
+Every number in this section comes from `score/part2.json` or `score/secondary_part2.json` in the
+data folder of this experiment.
 
 | Contrast | Group | Point | Interval (98.75%) | Seeds with the sign of the point |
 |---|---|---|---|---|
