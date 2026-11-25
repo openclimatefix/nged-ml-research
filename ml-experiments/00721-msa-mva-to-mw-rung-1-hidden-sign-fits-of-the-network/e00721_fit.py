@@ -427,7 +427,8 @@ def run_stage(
     if wanted and not continuation:
         result.flag = {
             "evaluated": False,
-            "reason": "the manager allowed this fit without its continuation",
+            "flagged": True,
+            "reason": "the manager allowed this fit without its continuation: its stage cannot be shown to have converged",
         }
     return result, trainable
 

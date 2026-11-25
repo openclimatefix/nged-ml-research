@@ -74,7 +74,7 @@ def _write_all_waves(*, root: Path, flag_sg_a: bool) -> list[fit.Job]:
         p["predictions"].parent.mkdir(parents=True, exist_ok=True)
         p["curve"].parent.mkdir(parents=True, exist_ok=True)
         _prediction_rows(fold=j.fold, seed=j.seed, offset=0.0).write_parquet(p["predictions"])
-        stages = [{"stage": 1, "val_history": [1.0, 0.9], "flag": None}]
+        stages: list[dict] = [{"stage": 1, "val_history": [1.0, 0.9], "flag": None}]
         if j.world != "synthetic":
             stages += [
                 {"stage": 2, "val_history": [1.0], "flag": None},
@@ -373,3 +373,19 @@ def test_run_sh_counts_every_gpu_process_and_skips_the_gpu_for_the_cpu_commands(
     text = (Path(__file__).parent.parent / "run.sh").read_text()
     assert "$((ours + others)) -ge 2" in text
     assert "stage0 | quicklook | score" in text
+
+
+def test_the_real_no_continuation_path_writes_a_flagged_entry_that_the_driver_counts(
+    tmp_path: Path,
+) -> None:
+    class _Inputs:
+        def build_trainable(self, *, job: fit.Job, stage: int) -> _Curve:
+            del job, stage
+            return _Curve([1.0 - 0.02 * i for i in range(30)] + [0.4] * 40)
+
+    job = fit.Job(arm="SG-A", world="W2", fold="2026-05", seed=0)
+    result, _ = fit.run_stage(job=job, stage=1, inputs=_Inputs(), continuation=False)  # ty: ignore[invalid-argument-type]
+    assert result.flag is not None
+    assert result.flag["flagged"] is True
+    assert result.continued is False
+    assert result.best_state_p30 is None

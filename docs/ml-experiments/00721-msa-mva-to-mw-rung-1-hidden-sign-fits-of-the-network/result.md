@@ -213,6 +213,10 @@ MVA-only Primaries against the stored network. This page covers rung 1 only.
   pair with no injection, and is the placebo that must show no invented reverse flow. Both worlds
   carry the same injection of the two other farms' output at the four visible Primaries, in the
   readings of every arm.
+  The visible Primaries D11 and D16 carry the same farms as the hidden pair D5 and D10 (by experiment
+  506's farm map), so the sign head learns the sign of farms whose output it later reads at the hidden
+  pair. A hidden-sign result is therefore a ceiling on what a sign head learns where no labelled
+  Primary shares a farm with the hidden pair.
 - **Export gate:** the per-Primary switch of experiment 420, set once per refit from the readings,
   that allows a Primary to export at all.
 - **Sign posterior `ρ`:** the probability that a history token exported, from the gross-demand
@@ -1061,6 +1065,8 @@ which audit triggers fired.
   parameters sit in experiment 716's new-parameter group for stage 1 only. In stages 2 and 3 the head
   is frozen: it takes no sign step, no cross-entropy, and no gradient, and none of its parameters is
   in an optimiser group.
+  The signed-expected history still reads the frozen head's `ρ` values in stages 2 and 3, but `ρ` is
+  detached there, so the frozen head passes no gradient to the trunk through `ρ`.
 - **Probe jobs:** the probe's pretraining job for each world and fold runs on the GPU (about 30
   seconds each, about 4 minutes for the 8 jobs, in a 6 GB process) and the regression that reads
   the capacity runs on the CPU. The probe runner sequences before the `W2` and `W0` fits.
@@ -1074,7 +1080,9 @@ which audit triggers fired.
   the longwave and precipitation columns and their ensemble spreads are blanked at a gate-open Primary,
   because both carry cloud.
 - **Sign read-outs:** the sign accuracy uses every distinct token outside the dead band, with no
-  restriction on `u`, because the page states none. The area uses tokens with `u` of at least 0.3. The
+  restriction on `u`, because the page states none, and the bar stays as stated. A report-only
+  read-out gives the same accuracy at `u` of at least 0.3, because night tokens are trivially right
+  and inflate the pre-registered figure. The area uses tokens with `u` of at least 0.3. The
   false-call rate counts sunny midday half-hours (10:00 to 14:00 UTC with a clear-sky index of at
   least 0.7) of the two non-exporting Primaries, with the gate forced open.
 - **Widening:** a reading widens its interval only when it has fewer than 20 resampling units.
@@ -1092,6 +1100,9 @@ which audit triggers fired.
   all four train on the folded reading. The page does not state this, so it is a choice. In `W2` and
   `W0` only the four visible signed Primaries carry a sign label, and the sign cross-entropy has
   weight 1.0, a value that the page does not state either.
+  The two non-exporting synthetic Primaries carry labels too, but their export gate is 0 in training,
+  so their labels give the head no gradient. They read the sky in training, and the check of the
+  false-call rate blinds them to the sky when it forces their gate open at prediction.
 - **Process split:** `e00721_cli.py` runs the fit, the predict, and the score phases as separate
   processes. The score phase writes the MDE file from the seed difference of `SG-0` in `W2` on fold
   2026-05, then runs the power check of G3 over experiment 713's stored `M1` seeds 0 to 4.

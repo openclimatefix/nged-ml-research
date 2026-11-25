@@ -143,7 +143,7 @@ def check_pipeline_panel_and_clipped_farms() -> str:
     import e00721_real as real
     import e00721_worlds as wd
 
-    gi = real.load_grid_inputs(fold="2026-05", seed=0, phase="train")
+    gi = real.load_grid_inputs(fold=core.SYNTH_PIPELINE_FOLD, seed=0, phase="train")
     n87 = len(gi.panel.stamp_us)
     holdout = gi.stamp_us[: len(gi.panel.stamp_us)] >= int(
         np.datetime64(core.HOLDOUT_START_ISO, "us").astype(np.int64)
