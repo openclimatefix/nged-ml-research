@@ -11,9 +11,10 @@ status: finished
 kind: other
 protocol: demand-v2
 size: >-
-  Complex. (1) It planned about 61 fits and ran 48, storing per-row forecasts and neural network
-  weights for each; (2) more than one rule for the history weather defensibly tests the hypothesis,
-  and the page fixes one; (3) it subclasses the data source of experiment 713, and the callers of
+  Complex. (1) It planned about 61 fits, including the phase 0 smoke fit, and ran 48 scored fits
+  plus the smoke fit (49 in all), storing per-row forecasts and neural network weights for each;
+  (2) more than one rule for the history weather defensibly tests the hypothesis, and the page fixes
+  one; (3) it subclasses the data source of experiment 713, and the callers of
   that class cannot be listed without searching the repository; (4) it touches no serving path or
   degradation rule; (5) it changes no contract. Full set of reviews: plan, code (Opus, each new
   script, twice), results, write-up, prose.
@@ -69,13 +70,15 @@ lessons: >-
   (not triggered), arm `E`, and the `T3` read-out of how much of L1 rests on the target row's CAMS
   day summary were not run, and no `T3` number is quoted.
 take_home_message: >-
-  The axial-attention demand network still forecasts better than the Candidate at the 6 primary
-  substations that report signed megawatts when its history rows read only weather that a live
-  service holds at the forecast origin. The gain is small, 0.152 points of CRPS, and it matches the
-  gain of the laboratory version of the network that reads analysis weather, to within 0.005. At the
-  8 that report unsigned apparent power, neither network differs detectably from the Candidate. The
-  target row still reads a satellite irradiance summary that a live service may not hold, and the
-  read-out that would bound that effect was not run because the experiment was parked.
+  Experiment 713's axial-attention demand network still forecasts better than the Candidate at the
+  six signed-MW Primaries (the 6 primary substations that report signed megawatts) when its history
+  rows read only weather that a live service holds at the forecast origin. The gain is small, 0.152
+  points of CRPS, and it matches the gain of the laboratory version of the network that reads
+  analysis weather, to within 0.005. At the eight MVA-only Primaries (the 8 that report unsigned
+  apparent power in megavolt-amperes), neither network differs detectably from the Candidate.
+  Experiment 713's known-answer gate was waived, and the target row still reads a CAMS day summary
+  that a live service may not hold. The read-out that would bound that effect was not run, because
+  the experiment was parked.
 advice:
   - >-
     Treat live-buildable weather history as free for experiment 713's network: refitting on it
@@ -100,32 +103,43 @@ advice:
 production_status: not-for-production
 adopted_in: none
 ---
-**Live-buildable weather history cost the axial-attention demand network nothing that we could
-measure.** The network ("the MSA") is experiment 713's axial-attention neural network for Primary
-substation demand. Experiment 713's selected arm `M*` reads ERA5 and CAMS analysis weather in its
-history rows, and a live service does not hold those analyses for the newest rows. We refitted the
-network as arm `L` on history weather that a live service holds at the forecast origin, and compared
-`L` with the Candidate `C` of experiment 667 (L1) and with `M*` (L2), on five seeds and 8 monthly
-folds, at 98.75% month-block bootstrap intervals in points of capacity of CRPS (lower is better).
-`L` gave a small gain over `C` at the six signed-MW Primaries and no detectable difference from
-`M*`. At the eight MVA-only Primaries, `L` showed no detectable difference from `C` or from `M*`.
+**Weather history that can be built live gave the demand forecast about the same skill as laboratory
+weather history, and a small gain over the Candidate at the six signed-MW Primaries.** The
+experiment asks whether experiment 713's neural network for substation demand, the axial-attention
+network ("the MSA"), keeps its lead when its inputs hold only data that a live service has at the
+forecast origin, which is the time at which the forecast is made. The network reads 14 days of
+history rows, and each history row holds the weather and power of one day. Experiment 713's selected
+arm `M*` fills the weather in those rows with analysis weather, which is weather reconstructed after
+the event from ERA5 (the European Centre for Medium-Range Weather Forecasts' reanalysis) and CAMS
+(the Copernicus Atmosphere Monitoring Service's satellite irradiance estimate). A live service does
+not yet hold that analysis weather for the newest rows. We refitted the network as arm `L`, whose
+history rows hold only weather that a live service holds at the forecast origin. The Candidate `C`
+is the stored model of experiment 667. L1 is `L` minus `C`, and L2 is `L` minus `M*`, both in CRPS
+(continuous ranked probability score) points of capacity, where lower is better. Each contrast uses
+5 seeds and 8 monthly folds. Each interval is a 98.75% month-block bootstrap interval, which
+resamples whole months of forecasts 100,000 times and reports the middle 98.75% of the resampled
+differences.
 
-**The pre-registered rule gives the verdict `small gain`, read from L1 alone.** "The six signed-MW
-Primaries" are the 6 Primary substations whose telemetry is signed megawatts, and "the eight
-MVA-only Primaries" are the 8 whose telemetry is unsigned apparent power in megavolt-amperes (MVA).
+**The two groups of Primary substations are read separately.** "The six signed-MW Primaries" are the
+6 Primary substations whose telemetry is signed megawatts, and "the eight MVA-only Primaries" are
+the 8 whose telemetry is unsigned apparent power in megavolt-amperes (MVA). At the six signed-MW
+Primaries, `L` gave a small gain over `C` and no detectable difference from `M*`. At the eight
+MVA-only Primaries, `L` showed no detectable difference from `C` or from `M*`.
+
+**The pre-registered rule gives the verdict `small gain`, read from L1 alone.**
 
 | Contrast (five seeds, 8 folds) | Six signed-MW Primaries | Eight MVA-only Primaries |
 |---|---|---|
 | L1: `L` minus `C` | -0.1522 [-0.2694, -0.0241], 5 of 5 seeds negative: small gain | +0.0287 [-0.0882, +0.1130]: no detectable difference |
 | L2: `L` minus `M*` | -0.0050 [-0.0102, +0.0008], 3 of 5 seeds negative: no detectable difference | +0.0066 [-0.0095, +0.0350]: no detectable difference |
 
-**The reading is "small gain" and not "gain", because the t interval over the 8 monthly differences
-includes zero.** At the six signed-MW Primaries, the t interval of L1 is -0.3316 to +0.0397, and the
-contrast is negative in 7 of 8 months (2026-06 is +0.1307). The 95% upper bound of the q01 pinball
-loss of `L` minus `C` is +0.0505, above the limit of 0.05, so a guard for `supported` also fails. At
-the eight MVA-only Primaries, leaving out one Primary flips the sign of L1. All four point estimates
-fell inside the ranges that the plan predicted before any fit, and the predicted verdict was `small
-gain` or `inconclusive`.
+**The reading is "small gain" and not "gain", because the t guard fails.** The t interval over the
+8 monthly differences is -0.3316 to +0.0397 at the six signed-MW Primaries, so it includes zero. The
+contrast is negative in 7 of 8 months (2026-06 is +0.1307). The guards for `supported` also fail:
+the 95% upper bound of the q01 pinball loss of `L` minus `C` at the six signed-MW Primaries is
++0.0505, above the limit of 0.05, and at the eight MVA-only Primaries leaving out one Primary flips
+the sign of L1. All four point estimates fell inside the ranges that the plan predicted before any
+fit, and the predicted verdict was `small gain` or `inconclusive`.
 
 **Two limits apply to every number on this page.** Experiment 713's known-answer gate failed two of
 its checks and the maintainer waived it, so no arm here makes a statement about following level
@@ -189,10 +203,11 @@ figure.
 
 ## Compute
 
-**The experiment spent 3.54 GPU-process-hours recorded, against a reporting ceiling of 12.0 and
-projections of 6.04 (phase 0) and 5.34 (after phase 1).** The projection of 5.34 is in
-`work/projection.json`, and the 6.04 comes from the manager's brief and is not in a stored file. The
-spend is lower than the projections because phases 5 and 7 did not run and phase 4 stopped early.
+**The experiment spent 3.54 GPU-process-hours, as recorded in `work/gpu_hours.json`, against a
+reporting ceiling of 12.0 and projections of 6.04 (phase 0) and 5.34 (after phase 1).** The
+projection of 5.34 is in `work/projection.json`, and the 6.04 comes from the manager's brief and is
+not in a stored file. The spend is lower than the projections because phases 5 and 7 did not run and
+phase 4 stopped early.
 
 **The two tallies differ because `e00725_phases.py hours` skips the wiring-check jobs.** The raw sum
 of `work/gpu_hours.json` is 12,728 s, or 3.5356 h: 2.0246 h of fits, 1.1589 h of predictions, and
@@ -200,8 +215,9 @@ of `work/gpu_hours.json` is 12,728 s, or 3.5356 h: 2.0246 h of fits, 1.1589 h of
 with `--device cuda`. The `hours` command sums every key except those that contain " CHECK ", which
 gives 3.1835 h. Phase 6 (1.44 h) and the smoke fit (149.6 s) are in both tallies. The exact figure
 is 3.54 h, the file's sum, because the check jobs held a GPU. Both tallies miss work run outside the
-runner or after its last write: the `T3-M` prediction of fold 2025-12, seed 1 (about 60 s, whose
-output exists), the one-off `T3-C` fit and prediction (about 109 s of GPU time), and the read-only
+runner or after its last write: the `T3-M` prediction of fold 2025-12, seed 1 (52.8 s in
+`work/logs/T3-M/2025-12_s1_predict.json`, whose output exists), the one-off `T3-C` prediction
+(49.6 s in `t3_candidate/2025-11/log_s0.json`; its fit time is not in that file), and the read-only
 comparison runs of Fix A. We did not time the comparison runs, and estimate them at well under 0.2
 h.
 
@@ -241,11 +257,20 @@ The wiring checks ran again under the new `checks_hash` and passed.
 - **Reproduction:** `Z` equals `M*` to 0.0 on best validation loss and on CRPS, and the check
   passed. The across-seed standard deviation of fold 2025-11's CRPS is 0.0759 at the six signed-MW
   Primaries and 0.0627 at the eight MVA-only Primaries.
-- **Look-ahead statement (KL8):** `L` and `E` show no negative margin, and `Z` shows negative
-  margins of up to 111 h by design.
+- **Look-ahead statement (KL8):** `L` and the inputs of `E` show no negative margin, and `Z` shows
+  negative margins of up to 111 h by design. The read of `E` is the wiring-check read of the `E`
+  inputs, because `E` was never fitted.
 - **Experiment 713's work folder:** its hash was unchanged before and after every phase.
-- **Guards for `supported`:** not met, as stated under the table. They changed no verdict word,
-  because the verdict is `small gain`.
+- **Guards for `supported`:** not met. The q01 pinball guard fails at the six signed-MW Primaries,
+  and the leave-one-Primary-out guard fails at the eight MVA-only Primaries. The t guard fails the
+  "gain" reading at the six signed-MW Primaries. None of the three changes the verdict word, because
+  the verdict is `small gain`.
+- **Not produced or not run:** the attention-map plots, the forecast time-series plots, `T3`, and
+  `L` minus `E`. "What was not run" says why.
+- **Host memory:** the largest peak in `work/memory_peak/` is 7,993,483,264 B (7.99 GB), from the
+  prediction of `Z` for fold 2026-06, seed 1 (`e00725_predict.py_Z_2026-06_1.txt`). The peak of
+  6,639,824,896 B is the `T3-M` prediction for fold 2025-12, seed 1, and is not the largest. Fits,
+  predictions, and per-fold checks ran under `run.sh`'s 9 GB scope (`MemoryMax=9G`).
 - **Median minus mean per site:** not computed.
 
 ## Method
