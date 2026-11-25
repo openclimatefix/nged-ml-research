@@ -139,9 +139,9 @@ known-answer worlds, and the leakage rules) are on the page of experiment 716.
 ## Result
 
 **The verdict is `not supported`, taken from the pre-registered mapping and applied as written.**
-Each of the two counted contrasts is read in two groups of Primaries: the six whose power is metered
-in signed megawatts, and the eight metered only in megavolt-amperes (MVA). Arm `H` is the network
-without the target-row forecast, arm `HT` is the network with it, and arm `HT-S` is the placebo
+Each of the two counted contrasts is read in two groups of Primaries: the six signed-MW Primaries,
+whose power is metered in signed megawatts, and the eight MVA-only Primaries, which are metered
+only in megavolt-amperes (MVA). Arm `H` is the network without the target-row forecast, arm `HT` is the network with it, and arm `HT-S` is the placebo
 network that reads the forecast issued earlier, as the section "What is compared" describes. B1 is
 arm `HT` minus arm `H`, and B2 is arm `HT` minus arm `HT-S`. Each of the four counted readings is
 "no detectable difference", because its 98.75% interval lies inside plus or minus 0.06 points of
