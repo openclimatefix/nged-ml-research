@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 715: plots 7 and 8 of the plan and one report-only extra figure, drawn from stored files, with no fit.
+"""Experiment 715: plots 7 and 8 and one report-only extra figure, drawn from stored files.
 
 Usage, through `run.sh`, never `uv run` (set `DATA_PATH_INTERNAL` first, and put the frozen
 experiment 713 folder on `EXTRA_PYTHONPATH`, as for the scorer):
