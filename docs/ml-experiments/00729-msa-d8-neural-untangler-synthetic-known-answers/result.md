@@ -652,15 +652,13 @@ day. Arms at seed 0; band 5% to 95%.*
 
 ## The event generator against real data
 
-**Up to seven figures show what the engine simulator draws and how its aggregates compare with the real
-engine record.** The script `e00729_event_figures.py` (stage `events`) draws 400 engines from the
-simulator, each of 30 invented days that start on a Monday with Saturday and Sunday as the quiet
-days, with fixed seeds and no network output. The figures cover the simulated engine, simulated
-solar output, and five aggregates of the simulated draws laid over the same aggregates of the real
-engine record. The stage reads the real engine record and changes no file that it reads. Each draw
-starts on a Monday, with the 400 starts spread over the 52 weeks of a year, takes the UK clock offset
-of each day, and has Saturday and Sunday as its quiet days, so the simulated hour-of-day curves are
-shifted by an hour in summer as the real engine's clock may be.
+**Three figures are published: the simulated engine days, the hour-of-day run probability against
+the real record, and the ramp sizes against the real record.** The script `e00729_event_figures.py`
+(stage `events`) draws 400 engines from the simulator with fixed seeds and no network output. Each
+draw has 30 invented days that start on a Monday, with the 400 starts spread over the 52 weeks of a
+year. Each draw takes the UK clock offset of each day and has Saturday and Sunday as its quiet days,
+so the simulated hour-of-day curves shift by an hour in summer as the real engine's clock may. The
+stage reads the real engine record and changes no file that it reads.
 
 **The real engine series stay private.** The metered engine and the metered solar farms are NGED
 generators, so no published figure shows a real series, a real size, a real date, or a real count.
@@ -688,14 +686,56 @@ reference output for 24 hours; the lowest bin holds every day under 0.5%, includ
 import. An engine that never runs counts its days with no run, no start, and zero energy. Weekdays
 and weekends come from the calendar, and the simulated draws treat bank holidays as weekdays.
 
-**Figures E1 and E2 show simulated days only.** Figure E1 shows twelve kinds of simulated engine day
-from the randomised simulator, each picked by a fixed rule from the first draw that fits and
-preferring a draw no earlier kind used. The caption names the ranges from which the simulator draws.
-Figure E2 shows the clearest and cloudiest simulated S2 day of each season. The figures take no
-random number to pick a panel.
+**Figure E1 shows twelve kinds of simulated engine day.** Each panel is three consecutive days from
+the randomised simulator, picked by a fixed rule: the first draw that fits the kind of day, preferring
+a draw that no earlier kind used. The label describes the first day of the panel. The caption names
+the ranges from which the simulator draws, and the panels hold simulated output only.
 
-**Findings from the aggregate plots are written after the run.** The page adds no finding until the
-stage has run and the figures have been read.
+![Twelve kinds of simulated engine day](events_01_engine_days.svg)
+
+*Figure E1. Twelve kinds of simulated engine day, in points of D8's capacity, three days per panel,
+with the hour of day in UTC. Ranges drawn from: 1 to 4 units of 10 to 50 points each (at most 120
+points in all); evening, morning, and midday run starts and lengths; ramps of 0 to 4 half-hours;
+weekend factor 0.1 to 0.8. The full ranges are in the figure subtitle.*
+
+**Figure E2, the simulated solar days, is not published.** The stage found no simulated day of
+source S2 (the PV model driven by CAMS) with solar output in the stored test bank, so the figure
+has nothing to show. Source S1 is the metered farms' output, and its days stay private.
+
+**Three of the four bar charts are left out because too few real events lie behind them.** The
+run-length chart, the starts-per-week chart, and the daily-energy chart each fell under the floor of
+100 real events. The page gives no count. The hour-of-day chart and the ramp chart passed the floor
+and follow.
+
+![Share of half-hours running, by hour of day, real record and simulated draws](events_03_hour_of_day.svg)
+
+*Figure E3. Share of half-hours with the engine running, by UTC hour, for weekdays (top) and weekends
+(bottom). Orange is the real record and blue is the pooled simulated draws, both rounded to 5%. A gap
+in the orange line is an hour with 1 to 4 running half-hours in the real record.*
+
+**On weekdays, the real engine runs in a larger share of half-hours between 04:00 and 15:00 UTC than
+the pooled simulated draws do, and both lines peak between 15:00 and 20:00 UTC.** The orange line
+stands at 0.15 to 0.35 from 04:00 to 15:00 UTC, with a peak of 0.35 near 07:00, while the blue line
+stands at 0.05 to 0.2 over the same hours. Both lines reach about 0.35 to 0.4 between 15:00 and 19:00
+UTC. The blue line is the mean of 400 draws, so the figure does not show whether individual draws
+cover the real morning share.
+
+**On weekends, the real record shows almost no running, and the pooled simulated draws show more.**
+The orange line is at 0 where it is drawn, with gaps where the real hour is blank, and the blue line
+stands at 0.05 to 0.2 with its peak between 16:00 and 19:00 UTC. The figure shows the pooled mean,
+so it does not show whether the lowest weekend factor of the simulator (0.1 of the weekday
+probability) covers the real weekends.
+
+![Share of half-hour steps in three size bins, real record and simulated draws](events_05_ramp.svg)
+
+*Figure E4. Share of half-hour steps of at least 5% of the reference output in three size bins. Orange
+is the real record and blue is the pooled simulated draws, both rounded to 5%.*
+
+**The real record has more steps of 30% or more of the reference output than the simulated draws
+have, and fewer steps of 15% to 30%.** The real shares are 0.30, 0.25, and 0.45 for the bins 0.05 to
+0.15, 0.15 to 0.3, and 0.3 and above, and the simulated shares are 0.30, 0.35, and 0.35. The two
+distributions agree in the smallest bin, and the difference of 0.10 in each of the other two bins
+is larger than the 5% rounding of the figure.
 
 ## Checks
 
