@@ -8,7 +8,7 @@ title: >-
 theme: solar-disaggregation
 also_relevant_to:
   - demand-inputs
-status: planned
+status: finished
 kind: other
 size: >-
   Complex. (1) The experiment stores 64 fits (network weights and per-row forecasts, all
@@ -157,6 +157,43 @@ metric: >-
   characteristic curve of the history-token sign posterior, with a 2-point dead band; the share of
   the gap from `P0` to `S` that each treatment recovers; q01 coverage on reverse-flow rows. Sign
   accuracy and area are descriptive in the real worlds and carry bars only in the synthetic world.
+verdict: inconclusive
+production_status: not-for-production
+adopted_in: none
+best_arm: >-
+  none (verdict row 0, stopped with no verdict; the front-matter schema has no value for verdict row
+  0, so `inconclusive` stands in for row 0)
+headline: >-
+  Wave 1 (fold 2026-05, world `W2`, seed 0) hit the pre-registered harm stop: on the half-hours when
+  the true flow is an import, `SG-A` scored worse than `P0` by 0.426 points of capacity at D5 and
+  1.245 points at D10, against a stop of 0.20. The stop is verdict row 0 (stopped, no verdict).
+  Every number is interim and post hoc. The control `SG-0`, which has no sign head, scored worse
+  than `P0` by 0.492 and 0.952 points, so the harm is more likely to come from the shared signed
+  read-out than from the sign head.
+lessons: >-
+  On one fold (2026-05), world `W2`, and seed 0, both signed arms gained 18.5 to 19.7 points on the
+  reverse-flow rows and lost 0.4 to 1.2 points on the import rows. Every number here is interim and
+  post hoc. The losses sit in the daylight hours of the target time (09 to 13 UTC) and grow with
+  lead at both D5 and D10. The sign head changes little: `SG-A` minus `SG-0` is +0.121 points pooled
+  on import rows, where a positive difference is worse, and its raw interval spans zero. On
+  reverse-flow rows the same difference is −1.19 points. With one fold, the intervals have 4
+  resampling units, so they are a rough guide only.
+take_home_message: >-
+  We stopped the first wave of fits because the neural network that infers the sign of power flow
+  made the forecast worse on half-hours when the substation imports power, by more than the stop
+  that we fixed before any fit. The same neural network forecast reverse flow better by 18.5 to 19.7
+  points, but any arm that can go below zero does that, so the gain is no evidence for the sign
+  head. We therefore have no verdict, and the loss more likely lies in how the signed output is read
+  than in the sign head itself (one fold, one seed).
+advice:
+  - >-
+    Check the import rows of a signed read-out before its reverse-flow gain is read, because, on one
+    fold and one seed, both signed arms gained 18.5 to 19.7 points on reverse flow and lost 0.4 to
+    1.2 points on import rows (interim, post hoc; section "Result of the first wave").
+  - >-
+    Read a daylight-hour split beside any pooled import-row figure, because, in the one fold read,
+    the loss of `SG-A` sits at 09 to 13 UTC and is near zero overnight (interim, post hoc; section
+    "Result of the first wave").
 ---
 
 **We ask whether a forecasting neural network can learn the direction of power flow through a
@@ -168,8 +205,71 @@ that do report a signed value in megawatts (MW), add the recorded output of a re
 each so that they export on sunny middays, and compare a network that has a sign-inference
 component with the same network without the component. The score is the signed forecast error on
 the half-hours when the true flow is an export. Every score is a ceiling, because the history rows
-read recorded weather that a live forecast would not have. This page is the plan: nothing has been
-fitted, and the code does not exist yet.
+read recorded weather that a live forecast would not have. The page was a plan before any fit. The
+section "Result of the first wave" records the first wave, which
+stopped at the pre-registered harm stop.
+
+## Result of the first wave
+
+**Verdict row 0 applies: the first wave stopped at the pre-registered harm stop, so the experiment
+has no verdict.** Every number in this section is interim and post hoc, because each comes from one
+fold (2026-05), one world (`W2`), and seed 0. No counted reading (G1, G2, or G3) was read. The
+front-matter `verdict` of `inconclusive` stands in for row 0 only because the page schema has no
+value for "stopped, no verdict". The harm stop is a pre-registered limit of 0.20 points of capacity
+on the import rows, read at the quick look. This page does not revisit that limit.
+
+**On import rows, the point estimates put both signed arms worse than `P0` at both hidden
+Primaries.** Import rows are the scored half-hours whose signed truth is at or above zero. The quick
+look found `SG-A` minus `P0` of +0.426 points at D5 (8,072 rows) and +1.245 points at D10 (8,818
+rows), Both point estimates exceed the stop of 0.20. A positive difference is harm. Pooled means the
+import rows of D5 and D10 scored together. A re-score read the same stored forecasts a second time,
+on the CPU, with the unchanged scoring code, and reproduced the quick look's numbers before adding
+intervals.
+
+| Interim, post hoc, import rows | D5 | D10 | Pooled |
+|---|---|---|---|
+| `SG-A` minus `P0`, point | +0.426 | +1.245 | +0.854 |
+| `SG-A` minus `P0`, raw interval | [+0.166, +0.556] | [+0.384, +2.098] | [+0.302, +1.354] |
+| `SG-A` minus `P0`, widened interval | [−0.224, +0.751] | [−1.104, +3.573] | [−0.561, +2.139] |
+| `SG-0` minus `P0`, point | +0.492 | +0.952 | +0.732 |
+| `SG-A` minus `SG-0`, point | −0.066 | +0.293 | +0.121 |
+
+**The intervals are a rough guide only.** One fold gives 4 resampling units (blocks of 10 valid
+dates), and the Kish effective number of blocks is 3.3 to 3.8. The raw intervals use the plan's
+two-stage resampler, with 20,000 resamples and generator seed 721. With one fold, the fold stage of
+the resampler draws the same fold every time. The widened intervals apply the plan's rule for fewer
+than 20 resampling units. Every widened interval above spans zero. A widened interval that spans
+zero is no evidence that the harm is absent.
+
+**The control without a sign head is also worse than `P0`, which points to the shared signed
+read-out more than to the sign head.** `SG-0` minus `P0` is +0.492 at D5 and +0.952 at D10, and
+`SG-A` minus `SG-0` is +0.121 points pooled (raw interval [−0.020, +0.243]). Both signed arms read
+the sign from the network's output alone (the recipe of experiment 420). On this fold and seed,
+`SG-0` carries 0.732 of the pooled 0.854 points, so the shared read-out is the likelier cause. No
+arm varies the read-out alone, so the cause is untested.
+
+**The harm sits in the daylight hours of the target time and grows with lead at both Primaries.**
+Pooled `SG-A` minus `P0` on import rows is +4.5 to +6.8 points at 09 to 13 UTC and within ±0.8
+points at 18 to 07 UTC. The hour split carries a point estimate and a row count and no interval. By
+lead band from the 12:00 UTC origin, the difference at D10 is +0.84 (24 to 48 h), +1.10 (48 to 120
+h), and +1.42 points (120 to 240 h). At D5 the difference is +0.27, +0.34, and +0.51 points.
+
+**Both signed arms gained 18.5 to 19.7 points on reverse-flow rows.** `SG-A` minus `P0` is −19.73
+points and `SG-0` minus `P0` is −18.53 points on 5,345 rows. `SG-A` minus `SG-0` is −1.19 points.
+Over all 22,235 rows the differences are −4.09 for `SG-A` and −3.90 for `SG-0`. Experiment 420 found
+that its ungated reference scored as well as its gated arm on reverse rows (6.99 against 6.98). An
+arm that can go below zero therefore beats `P0` on reverse-flow rows. This gain does not count
+towards G1.
+
+**Stage 0 passed, the synthetic world was fitted and not scored, and no later wave ran.** The flag
+test passed, the noise check required 0.0970 against a margin of 0.10, and reachability gave an area
+of 0.526 against a bound of 0.776. Wave 1 had no scoring step for the synthetic world, and no
+counted reading was computed. The five wave 1 fits took about 1.2 GPU-process-hours of fit time (1.3
+hours of wall time), plus 0.2 for the code-works check.
+
+**The splits by lead band and valid hour were chosen after the harm stop and feed no counted
+reading.** The splits are descriptive. Any later plan would need to pre-register what it reads from
+the splits.
 
 **Rung 1 is the second rung of a ladder that starts with experiment 720.** Rung 0 (experiment 720)
 tests, on the CPU and without a neural network, whether the sign can be recovered in hindsight.
