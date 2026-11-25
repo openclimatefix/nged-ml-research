@@ -224,7 +224,8 @@ def check_rescore_inputs() -> str:
     for arm in ("P0", "SG-0", "SG-A"):
         path = root / f"{arm}__W2__2026-05__s0.parquet"
         if not path.exists():
-            return f"{arm} predictions present: False"
+            msg = f"{arm} predictions are missing at {path}"
+            raise FileNotFoundError(msg)
         frames[arm] = (
             pl.read_parquet_schema(path),
             pl.scan_parquet(path).select(pl.len()).collect().item(),
@@ -239,8 +240,12 @@ def check_rescore_inputs() -> str:
         "reading",
         *QCOLS,
     )
+    missing = [c for s, _ in frames.values() for c in need if c not in s]
+    if missing:
+        msg = f"stored predictions lack the columns {sorted(set(missing))}"
+        raise ValueError(msg)
     return (
-        f"predictions present: True, columns present: {all(c in s for s, _ in frames.values() for c in need)}, "
+        f"predictions present: True, columns present: True, "
         f"equal row counts: {len({n for _, n in frames.values()}) == 1}, rows: {next(iter(frames.values()))[1]}"
     )
 

@@ -11,10 +11,12 @@ import harm by lead band (24 to 48 h, 48 to 120 h, and 120 to 240 h) and by hour
 One fold means the fold stage of the two-stage resampler is degenerate (the one fold is drawn every
 time), so every interval is a block-only interval. The fold has fewer than 20 blocks of 10 valid
 dates, so each interval is also widened by the page's rule (`lower` and `upper`; the raw interval is
-kept as `raw_lower` and `raw_upper`). Every reading is interim and has no bar. The script writes no
+kept as `raw_lower` and `raw_upper`). Every reading is interim, post hoc (chosen after the harm stop), and has no bar. With 4 resampling
+units each interval is a rough guide only, and a widened interval that spans zero is no evidence of
+no harm. The script writes no
 prediction and no fit. It prints aggregates only.
 
-Usage: `SLOT_CPU=<n> run.sh --go e00721_rescore.py [--n-resamples 20000]`
+Usage: `CUDA_VISIBLE_DEVICES= SLOT_CPU=<n> run.sh --go e00721_rescore.py [--n-resamples 20000]`
 Output: `<data root>/rescore/rescore.json` and `<data root>/rescore/rescore.md`.
 """
 
@@ -49,8 +51,10 @@ ROW_CLASSES: Final = {
 }
 """Row restrictions on the signed truth, as the quick look defines import and reverse-flow rows."""
 NOTE: Final = (
-    "interim, no bar; one fold, so the fold stage of the two-stage resampler is degenerate and the "
-    "interval is block-only; widened because the fold has fewer than 20 blocks"
+    "interim, post hoc (chosen after the harm stop), no bar; one fold, so the fold stage of the "
+    "two-stage resampler is degenerate and the interval is block-only; widened because the fold has "
+    "fewer than 20 blocks; with so few resampling units the interval is a rough guide only, and a "
+    "widened interval that spans zero is no evidence of no harm"
 )
 
 
@@ -134,7 +138,7 @@ def format_markdown(*, result: dict) -> str:
         for section in ("rows", "lead_bands"):
             for key, r in body[section].items():
                 lines.append(
-                    f"- {key}: {r['point']:+.3f} [{r['lower']:+.3f}, {r['upper']:+.3f}] (raw [{r['raw_lower']:+.3f}, {r['raw_upper']:+.3f}]), {r['n_rows']} rows, {r['n_blocks']} blocks"
+                    f"- {key}: {r['point']:+.3f} [{r['lower']:+.3f}, {r['upper']:+.3f}] (raw [{r['raw_lower']:+.3f}, {r['raw_upper']:+.3f}]), {r['n_rows']} rows, {r['n_blocks']} blocks, {r['n_units']} units, kish_b {r['kish_b']:.1f}"
                 )
         for key, hours in body["hours"].items():
             cells = ", ".join(
