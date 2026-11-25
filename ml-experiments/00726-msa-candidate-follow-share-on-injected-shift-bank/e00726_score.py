@@ -20,7 +20,7 @@ quantile finite, no repeated key, and no in-month origin with origin day 0 to 20
 
 import argparse
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,6 +37,9 @@ LEVEL: Final = 98.75
 SPLIT_LIMIT: Final = 0.025
 """A contrast whose seeds 0-1 and seeds 2-4 estimates differ by more than this reads `cannot tell`."""
 DRAWS: Final = 20_000
+REPORT_LEVEL: Final = 95.0
+"""The report-only readings are read at 95% (design 5.4)."""
+REPORT_DRAWS: Final = 5_000
 PlanType = Literal["five", "two"]
 Reading = Literal[
     "cannot tell",
@@ -231,6 +234,8 @@ def collect(
     n_sets: int,
     levels: Sequence[str] = ("q50",),
     band: tuple[float, float] = com.LEAD_BAND_COUNTED,
+    extra: Callable[[pl.DataFrame, str, int], pl.DataFrame] | None = None,
+    extra_columns: Sequence[str] = (),
 ) -> Collected:
     """Return one row per event and slice, and per origin day, with every network's mean follow share.
 
@@ -275,7 +280,9 @@ def collect(
                 r=r,
                 primary_of_id=primary_of_id,
             )
-            follow_cols = [f"{n}|{q}" for n in names for q in levels]
+            if extra is not None:
+                rows = extra(rows, month, r)
+            follow_cols = [f"{n}|{q}" for n in names for q in levels] + list(extra_columns)
             for slice_name in com.SLICES:
                 part = rows.filter(pl.col(slice_name))
                 if part.is_empty():
@@ -303,11 +310,11 @@ def collect(
 
 
 def month_pass_arrays(
-    *, rows: pl.DataFrame, value: str, months: Sequence[str]
+    *, rows: pl.DataFrame, value: str, months: Sequence[str], n_passes: int = com.N_PASSES
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (sums, counts) of `value` per (fold month, pass): the event sums and the event counts."""
-    sums = np.zeros((len(months), com.N_PASSES))
-    counts = np.zeros((len(months), com.N_PASSES))
+    sums = np.zeros((len(months), n_passes))
+    counts = np.zeros((len(months), n_passes))
     agg = rows.group_by("month", "pass_r").agg(pl.col(value).sum().alias("s"), pl.len().alias("n"))
     for month, r, s, n in agg.iter_rows():
         if month in months:
@@ -366,6 +373,8 @@ def contrast(
     sign: int | None = None,
     length: int | None = None,
     draws: int | None = DRAWS,
+    ci_level: float = LEVEL,
+    n_passes: int = com.N_PASSES,
 ) -> dict:
     """Return the mean paired difference `a` minus `b` of the event follow shares, with its interval.
 
@@ -379,15 +388,17 @@ def contrast(
         sel = sel.filter(pl.col("sign") == sign)
     if length is not None:
         sel = sel.filter(pl.col("length_days") == length)
-    sel = sel.with_columns(diff=pl.col(f"{a}|{level}") - pl.col(f"{b}|{level}"))
+    sel = sel.with_columns(diff=pl.col(f"{a}|{level}") - pl.col(f"{b}|{level}")).drop_nulls("diff")
     present = [m for m in months if m in set(sel["month"].to_list())]
     out = {"n_events": sel.height, "D": float("nan"), "low": float("nan"), "high": float("nan")}
     if not present:
         return out
-    sums, counts = month_pass_arrays(rows=sel, value="diff", months=present)
+    sums, counts = month_pass_arrays(rows=sel, value="diff", months=present, n_passes=n_passes)
     out["D"] = point_estimate(sums=sums, counts=counts)
     if draws:
-        out["low"], out["high"] = bootstrap_interval(sums=sums, counts=counts, draws=draws)
+        out["low"], out["high"] = bootstrap_interval(
+            sums=sums, counts=counts, draws=draws, level=ci_level
+        )
     return out
 
 
@@ -399,7 +410,7 @@ def level_of(*, events: pl.DataFrame, net: str, slice_name: str, primaries: Sequ
         sel = sel.filter(pl.col("depth") <= filters["max_depth"] + 1e-9)
     if "sign" in filters:
         sel = sel.filter(pl.col("sign") == filters["sign"])
-    sel = sel.with_columns(diff=pl.col(f"{net}|{level}"))
+    sel = sel.with_columns(diff=pl.col(f"{net}|{level}")).drop_nulls("diff")
     present = [m for m in months if m in set(sel["month"].to_list())]
     if not present:
         return float("nan")
@@ -430,6 +441,10 @@ def read_cell(
     split-seed difference of the contrast may not exceed `SPLIT_LIMIT`. Under the two-seed plan both
     single seeds must carry the sign of D, and no split-seed guard applies.
     """
+    if not all(np.isfinite(v) for v in (d, low, high, d_without_050, *single)):
+        return "cannot tell"
+    if plan == "five" and (split_difference is None or not np.isfinite(split_difference)):
+        return "cannot tell"
     n_seeds = len(single)
     need = 4 if plan == "five" else 2
     assert n_seeds == (5 if plan == "five" else 2), (plan, n_seeds)
@@ -611,11 +626,11 @@ def run_report() -> int:
             for sign in (1, -1):
                 for depth in (0.15, 0.30, 0.50):
                     kw: dict[str, Any] = {"events": five.events, "a": "M1", "b": "C_host", "slice_name": slice_name,
-                          "primaries": groups[group], "months": months, "draws": None, "sign": sign}  # fmt: skip
+                          "primaries": groups[group], "months": months, "draws": REPORT_DRAWS, "ci_level": REPORT_LEVEL, "sign": sign}  # fmt: skip
                     sel = five.events.filter(pl.col("depth").round(2) == depth)
                     kw["events"] = sel
                     rows.append({"slice": slice_name, "group": group, "sign": sign, "depth": depth,
-                                 **{k: v for k, v in contrast(**kw).items() if k in {"D", "n_events"}}})  # fmt: skip
+                                 **{k: v for k, v in contrast(**kw).items() if k in {"D", "low", "high", "n_events"}}})  # fmt: skip
     print_table(title="Reading 3: M1 minus C by sign and depth", rows=rows)
     rows = []
     for level in ("q05", "q95"):
@@ -651,7 +666,7 @@ def run_report() -> int:
             rows.append({"slice": slice_name, "group": group, "left_out": "2025-11",
                          **{k: v for k, v in contrast(events=five.events, a="M1", b="C_host", slice_name=slice_name,
                                                       primaries=groups[group], months=[m for m in months if m != "2025-11"],
-                                                      draws=None).items() if k in {"D", "n_events"}}})  # fmt: skip
+                                                      draws=REPORT_DRAWS, ci_level=REPORT_LEVEL).items() if k in {"D", "low", "high", "n_events"}}})  # fmt: skip
     print_table(title="Reading 5: counted cells with fold 2025-11 left out", rows=rows)
     # reading 6: other lead bands
     for name in ("120-240h", "24-240h"):
@@ -666,7 +681,7 @@ def run_report() -> int:
         )
         rows = [{"band": name, "slice": s, "group": g,
                  **{k: v for k, v in contrast(events=other.events, a="M1", b="C_host", slice_name=s,
-                                              primaries=groups[g], months=months, draws=None).items() if k in {"D", "n_events"}}}
+                                              primaries=groups[g], months=months, draws=REPORT_DRAWS, ci_level=REPORT_LEVEL).items() if k in {"D", "low", "high", "n_events"}}}
                 for s in (com.SLICE_AFTER, com.SLICE_LASTING) for g in ("six_signed_mw", "eight_mva")]  # fmt: skip
         print_table(title=f"Reading 6: M1 minus C, lead band {name}", rows=rows)
     # reading 2 and 9: attribution on the four bank folds at two seeds, and the Candidate's all-shifted world
@@ -686,7 +701,7 @@ def run_report() -> int:
             for g in ("six_signed_mw", "eight_mva"):
                 rows.append({"a": a, "b": b, "slice": s, "group": g,
                              **contrast(events=two.events, a=a, b=b, slice_name=s, primaries=groups[g],
-                                        months=bank_months, draws=DRAWS // 4)})  # fmt: skip
+                                        months=bank_months, draws=REPORT_DRAWS, ci_level=REPORT_LEVEL)})  # fmt: skip
     print_table(
         title="Readings 2 and 9: attribution and the Candidate's all-shifted world (4 bank folds, 2 seeds)",
         rows=rows,
@@ -698,6 +713,42 @@ def run_report() -> int:
 
 
 # ---------------------------------------------------------------- reading S6 on the second generator
+
+
+F4_CODE_HASH: Final = "e9809f648a885ae1"
+"""The code hash that F4's `g2` folders carry in their logs (design Re-check)."""
+
+
+def check_f4_pin(*, f4_dir: Path) -> None:
+    """Raise unless `e00715_era.py` at the F4 branch head equals the file at the pinned commit."""
+    import subprocess
+
+    prefix = subprocess.run(
+        ["git", "rev-parse", "--show-prefix"],
+        cwd=f4_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    rel = f"{prefix}e00715_era.py"
+    pinned = subprocess.run(
+        ["git", "show", f"{com.HEAD_F4}:{rel}"],
+        cwd=f4_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    for ref in ("origin/msa-f4-neighbour-rows", "msa-f4-neighbour-rows"):
+        head = subprocess.run(
+            ["git", "show", f"{ref}:{rel}"], cwd=f4_dir, capture_output=True, text=True, check=False
+        )
+        if head.returncode == 0:
+            com.require(
+                head.stdout == pinned, f"e00715_era.py at {ref} differs from {com.HEAD_F4}: re-pin"
+            )
+            print(f"F4 pin: e00715_era.py at {ref} equals the file at {com.HEAD_F4}", flush=True)
+            return
+    com.require(False, "no F4 branch head found to compare with the pinned commit")
 
 
 def run_s6() -> int:
@@ -715,32 +766,51 @@ def run_s6() -> int:
 
     ids = k578.sites().sort("primary")["time_series_id"].to_numpy()
     f4_root = f4_arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR) / "work" / "injected" / "g2"
-    rows, skipped = [], []
+    check_f4_pin(f4_dir=com.module_folder(name="e00715_era"))
+    rows, skipped, keys = [], [], list(com.KEYS)
     for month in com.BANK_FOLDS:
         for seed in com.SEEDS_TWO:
-            for folder in sorted(f4_root.glob(f"*_{month}_s{seed}")):
+            folders = sorted(f4_root.glob(f"*_{month}_s{seed}"))
+            for folder in folders:
+                log = (folder / "log.json").read_text()
+                com.require(
+                    F4_CODE_HASH in log, f"{folder} was not written by code hash {F4_CODE_HASH}"
+                )
+            by_pass: dict[int, dict[str, Path]] = {}
+            for folder in folders:
                 arm = folder.name.removesuffix(f"_{month}_s{seed}")
                 for path in f4.pass_files(folder=folder):
-                    r = int(path.stem.removeprefix("pass"))
-                    mine_path = com.candidate_output(world="g2", month=month, r=r, seed=seed)
-                    if not mine_path.exists():
-                        skipped.append((arm, month, seed, r))
-                        continue
-                    events = pl.read_parquet(path.with_name(path.stem + "_truth.parquet"))
-                    theirs = com.normalise_frame(frame=pl.read_parquet(path))
-                    cand = com.normalise_frame(
-                        frame=pl.read_parquet(mine_path, columns=[*com.KEYS, *com.QCOLS])
-                    )
-                    keys = list(com.KEYS)
-                    truth = theirs.select(*keys, "truth_share", "clean_share")
-                    cand = cand.join(truth, on=keys, how="inner")
-                    theirs = theirs.join(cand.select(keys), on=keys, how="inner")
-                    for label, frame in ((arm, theirs), ("C", cand)):
-                        rows += [
-                            {"arm": label, "month": month, "seed": seed, "pass_id": path.stem, **x}
-                            for x in f4.event_crps(forecast=frame, events=events, ids=ids)
-                        ]
-    print(f"skipped {len(skipped)} arm passes with no Candidate file: {skipped[:5]}", flush=True)
+                    by_pass.setdefault(int(path.stem.removeprefix("pass")), {})[arm] = path
+            for r, arms_of in sorted(by_pass.items()):
+                mine_path = com.candidate_output(world="g2", month=month, r=r, seed=seed)
+                if not mine_path.exists():
+                    skipped.append((month, seed, r))
+                    continue
+                frames = {
+                    arm: com.normalise_frame(frame=pl.read_parquet(path))
+                    for arm, path in arms_of.items()
+                }
+                cand = com.normalise_frame(
+                    frame=pl.read_parquet(mine_path, columns=[*keys, *com.QCOLS])
+                )
+                common = cand.select(keys)
+                for frame in frames.values():
+                    common = common.join(frame.select(keys), on=keys, how="inner")
+                first = next(iter(frames.values()))
+                cand = cand.join(common, on=keys, how="inner").join(
+                    first.select(*keys, "truth_share", "clean_share"), on=keys, how="inner"
+                )
+                any_path = next(iter(arms_of.values()))
+                events = pl.read_parquet(any_path.with_name(any_path.stem + "_truth.parquet"))
+                scored = {"C": cand} | {
+                    arm: frame.join(common, on=keys, how="inner") for arm, frame in frames.items()
+                }
+                for label, frame in scored.items():
+                    rows += [
+                        {"arm": label, "month": month, "seed": seed, "pass_id": f"pass{r:02d}", **x}
+                        for x in f4.event_crps(forecast=frame, events=events, ids=ids)
+                    ]
+    print(f"skipped {len(skipped)} passes with no Candidate file: {skipped[:5]}", flush=True)
     crps = pl.DataFrame(rows)
     out = []
     for arm in sorted(set(crps["arm"].to_list()) - {"C"}):
@@ -768,11 +838,11 @@ def main() -> int:
     sub.add_parser("report")
     sub.add_parser("s6")
     args = parser.parse_args()
-    if args.command == "counted":
-        return run_counted(draws=args.draws, plan=args.plan)
-    if args.command == "report":
-        return run_report()
-    return run_s6()
+    run = {"counted": lambda: run_counted(draws=args.draws, plan=args.plan) if args.command == "counted" else 0,
+           "report": run_report, "s6": run_s6}[args.command]  # fmt: skip
+    status = run()
+    print(f"peak memory of this process: {com.peak_memory()}", flush=True)
+    return status
 
 
 if __name__ == "__main__":

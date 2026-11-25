@@ -49,7 +49,7 @@ _p.add_argument("--mask-history", action="store_true")
 _p.add_argument("--check-km3", action="store_true")
 _p.add_argument("--device", default="cuda")
 MINE = _p.parse_args()
-assert os.environ.get("E00667_PHASE") == "predict", "set E00667_PHASE=predict (run.sh does)"
+com.require(os.environ.get("E00667_PHASE") == "predict", "set E00667_PHASE=predict (run.sh does)")
 if MINE.world == "host":
     assert MINE.sets is not None and len(MINE.sets) == 1, "world host needs one --sets value"
 passes = (
@@ -216,7 +216,7 @@ def run() -> None:
     com.cap_gpu(device=device)
     outs = {
         r: com.msa_output(
-            world=MINE.world if MINE.world != "host" else f"host_k{MINE.sets[0]}",
+            world=MINE.world if MINE.world != "host" else com.msa_host_world(k=MINE.sets[0]),
             arm=ARM_NAME, month=month, seed=seed, r=r,
         )
         for r in passes
@@ -236,6 +236,12 @@ def run() -> None:
         "standardiser differs from the training phase"
     )
     assert not spec.placebo
+    import e00650_common as c650  # ty: ignore[unresolved-import]
+
+    com.require(
+        data.cutoff_idx == c650.month_start_idx(month=month),
+        "the fold's cutoff index differs from experiment 650's month start index",
+    )
     model = bank713.load_model(
         spec=spec, arm=MINE.arm, month=month, seed=seed, device=device, data_dir=data_dir
     )
@@ -281,15 +287,17 @@ def run() -> None:
             flush=True,
         )
     if MINE.world == "all" and MINE.arm == "M1" and not MINE.mask_history:
+        diagnostic = com.clip_diagnostic(
+            clean=data.clean,
+            target_mean=mean,
+            target_std=std,
+            month_start_idx=data.cutoff_idx,
+            labels=labels,
+        )
+        for row in diagnostic:
+            print(f"clip {month} {row}", flush=True)
         com.write_json_atomic(
-            obj=com.clip_diagnostic(
-                clean=data.clean,
-                target_mean=mean,
-                target_std=std,
-                month_start_idx=data.cutoff_idx,
-                labels=labels,
-            ),
-            path=com.data_root() / "diagnostics" / f"clip_{month}.json",
+            obj=diagnostic, path=com.data_root() / "diagnostics" / f"clip_{month}.json"
         )
     com.write_json_atomic(
         obj=com.job_record(

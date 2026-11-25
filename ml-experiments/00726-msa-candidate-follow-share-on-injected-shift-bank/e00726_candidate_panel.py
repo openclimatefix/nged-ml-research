@@ -62,16 +62,16 @@ WORLD, MONTH = MINE.world, MINE.month
 ROOT = com.candidate_root(tag=MINE.root)
 for _seed in MINE.seeds:
     ROOT.require_seed(seed=_seed)
-assert os.environ.get("E00667_PHASE") == "predict", "set E00667_PHASE=predict (run.sh does)"
+com.require(os.environ.get("E00667_PHASE") == "predict", "set E00667_PHASE=predict (run.sh does)")
 os.environ["E00667_MONTH"] = MONTH
 
 e = com.prime_pipeline(month=MONTH)  # imports e00574_fit with the argv of this fold month
 import e00578_common as k578  # ty: ignore[unresolved-import]
+import e00650_common as c650  # ty: ignore[unresolved-import]
 import e00598_signals as s598  # ty: ignore[unresolved-import]
 import e00613_nbmodel as mymodel  # ty: ignore[unresolved-import]
 import e00613_nbsignals as sig  # ty: ignore[unresolved-import]
 import e00650_bank as gen650  # ty: ignore[unresolved-import]
-import e00650_common as c650  # ty: ignore[unresolved-import]
 import e00581_bank as bank  # ty: ignore[unresolved-import]
 import e00667_fold as fold  # ty: ignore[unresolved-import]
 import torch  # ty: ignore[unresolved-import]
@@ -94,6 +94,7 @@ e.WORK = ROOT.root / f"{DIR}_{MONTH}"
 e.W = e.WORK / "work"
 assert e.SPEC.tag == "P5" and e.SPEC.sched == "3sE" and e.SPEC.lags == "24h" and e.SPEC.frozen
 LAG_FIRST, LAG_WIDTH = 37, 8
+KC5_RELATIVE_TOLERANCE = 1e-5
 LEAD_OF = {"day": 43, "week": 44}
 
 
@@ -146,6 +147,15 @@ def world() -> s598.Neighbours:
 NB = world()
 NB_READ = NB  # arm `P7+D50` is not the shuffled `-p` arm
 GRID, STEP = e.c.prep422.GRID_START_US, e.c.prep422.STEP_US
+_nb650, _cap650, _mw650 = c650.world()
+com.require(
+    {int(k): sorted(v) for k, v in NB.of.items()} == {int(k): sorted(v) for k, v in _nb650.items()},
+    "the Candidate's neighbour lists differ from `c650.world()`, which the colouring used",
+)
+com.require(
+    c650.month_start_idx(month=MONTH) == (com.month_start_us(month=MONTH) - GRID) // STEP,
+    "the month start index of experiment 650 differs from the Candidate's grid",
+)
 _build_month_p5 = e.k.build_month
 
 
@@ -416,11 +426,27 @@ def kc5(*, panels: Panels, test, clean: np.ndarray) -> None:
     )  # fmt: skip
     moved = np.abs(panels.x[rows, LAG_FIRST] - base[:, 0]) > 1e-9
     stray = int((moved & ok & ~in_window).sum())
-    n_in = int((in_window & ok).sum())
-    caught = int((moved & in_window & ok).sum())
-    passed = stray == 0 and (n_in == 0 or caught / n_in > 0.9)
+    sel = in_window & ok
+    n_in = int(sel.sum())
+    caught = int((moved & sel).sum())
+    # the shifted lag column moves by one constant per Primary times the shift of the lag index
+    # (the constant is 1, or the Primary's scale where `block_of` standardises the lag)
+    delta = (panels.power_lag[prim[sel], lag_idx[sel]] - clean[prim[sel], lag_idx[sel]]).astype(
+        np.float64
+    )
+    moved_by = panels.x[rows, LAG_FIRST][sel].astype(np.float64) - base[sel, 0].astype(np.float64)
+    ratio = moved_by / delta
+    constants: dict[int, float] = {}
+    spread_ok = True
+    for pr in np.unique(prim[sel]):
+        r_p = ratio[prim[sel] == pr]
+        constants[int(pr)] = float(r_p.mean())
+        spread_ok &= bool(np.ptp(r_p) <= KC5_RELATIVE_TOLERANCE * max(1.0, abs(r_p.mean())))
+    passed = stray == 0 and n_in > 0 and caught == n_in and spread_ok
     print(
-        f"KC5 {'PASS' if passed else 'FAIL'} (rows moved outside a window: {stray}; rows inside: {n_in})",
+        f"KC5 {'PASS' if passed else 'FAIL'} (rows moved outside a window: {stray}; rows inside: "
+        f"{n_in}; moved: {caught}; constant per Primary: {constants}; float32 relative tolerance "
+        f"{KC5_RELATIVE_TOLERANCE})",
         flush=True,
     )
     assert passed, "KC5: the Candidate's lag column does not read the shifted panel"
@@ -455,9 +481,9 @@ def job_list() -> list[tuple[int, int | None, int]]:
         sets = [None]
     return [
         (r, k, seed)
-        for seed in MINE.seeds
         for r in passes
         for k in sets
+        for seed in MINE.seeds
         if not com.job_done(out=com.candidate_output(world=WORLD, month=MONTH, r=r, seed=seed, k=k))
     ]
 

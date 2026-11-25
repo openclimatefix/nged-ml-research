@@ -14,8 +14,8 @@
 #   - the virtual environment's interpreter, called directly, so `uv` never re-syncs it;
 #   - at least 25 GB of free memory and a load average below 24 before the job starts;
 #   - for `gpu`, at most two GPU processes at once, each capped at GPU_CAP_GB (6) of GPU memory;
-#   - a before and after snapshot of experiment 667's folder and experiment 713's stored Candidate
-#     seeds and work folders: the job fails if either snapshot differs.
+#   - a before and after snapshot of the folders of experiments 581, 650, 667, 709, 713, 714, and
+#     715 (names, sizes, times, and a hash of the stored fits): the job fails if the snapshot differs.
 set -euo pipefail
 
 mode="${1:?usage: run.sh cpu|gpu script.py [args]}"
@@ -38,20 +38,26 @@ if [ "$load" -ge 24 ]; then
   exit 3
 fi
 
-# every earlier experiment's folder is on the path, because a script may import any of them
+# the frozen checkouts come first, so a copy of experiment 713 or 715 on this branch can never shadow them
 pythonpath="$here"
+if [ -n "${EXTRA_PYTHONPATH:-}" ]; then
+  pythonpath="$here:$EXTRA_PYTHONPATH"
+fi
 for d in "$repo"/ml-experiments/00*/; do
   pythonpath="$pythonpath:${d%/}"
 done
-pythonpath="$pythonpath:${EXTRA_PYTHONPATH:-}"
+unset PYTHONOPTIMIZE  # the gates are exceptions, but `assert`s elsewhere must stay live
+export PYTHONDONTWRITEBYTECODE=1  # no job writes `__pycache__` into a frozen checkout
 
 snapshot() {
-  # names, sizes, and modification times; set SNAPSHOT_HASH=1 to add a hash of the stored fits
+  # names, sizes, and times of every folder this experiment reads, directories included, plus a
+  # hash of the stored fits of experiments 667 and 713; set SNAPSHOT_HASH=0 to skip the hashes
   {
-    find "$data"/00667-*/ -type f -printf '%p %s %T@\n' 2>/dev/null
-    find "$data"/00713-*/candidate_seeds "$data"/00713-*/work -type f -printf '%p %s %T@\n' 2>/dev/null
-    if [ "${SNAPSHOT_HASH:-0}" = 1 ]; then
-      find "$data"/00667-*/ -path '*/fits/*' -name '*.parquet' -print0 2>/dev/null | xargs -0 -r sha256sum
+    find "$data"/00581-* "$data"/00650-* "$data"/00667-* "$data"/00709-* "$data"/00713-* \
+      "$data"/00714-* "$data"/00715-* -printf '%y %p %s %T@\n' 2>/dev/null
+    if [ "${SNAPSHOT_HASH:-1}" = 1 ]; then
+      find "$data"/00667-*/ "$data"/00713-*/ -path '*/fits/*' -name '*.parquet' -print0 2>/dev/null \
+        | xargs -0 -r sha256sum
     fi
   } | LC_ALL=C sort | sha256sum | cut -d' ' -f1
 }
@@ -95,7 +101,7 @@ status=$?
 set -e
 after="$(snapshot)"
 if [ "$before" != "$after" ]; then
-  echo "FAIL: experiment 667's folder or experiment 713's stored Candidate seeds changed during $script" >&2
+  echo "FAIL: a folder of experiments 581 to 715 changed during $script" >&2
   exit 5
 fi
 exit "$status"

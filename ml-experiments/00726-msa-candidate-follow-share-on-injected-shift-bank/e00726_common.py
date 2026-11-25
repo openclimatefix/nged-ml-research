@@ -233,6 +233,11 @@ def root_of_seed(*, seed: int) -> CandidateRoot:
     return candidate_root(tag="e667" if seed in {0, 1} else "seeds713")
 
 
+def msa_host_world(*, k: int) -> str:
+    """Return the folder name of the MSA host-only world for set `k`, shared by the writer and the reader."""
+    return f"host_k{k}"
+
+
 def msa_fit_file(*, arm: str, month: str, seed: int) -> Path:
     """Return experiment 713's stored forecast of `arm` on the unshifted panel."""
     return ML_EXPERIMENTS_DATA_DIR / NAME_713 / "work" / "fits" / arm / f"{month}_s{seed}.parquet"
@@ -586,13 +591,31 @@ def follow_share(
 # ---------------------------------------------------------------- checkouts and hashes
 
 
+def require(condition: object, message: str) -> None:
+    """Raise `RuntimeError` unless `condition` holds; unlike `assert`, `PYTHONOPTIMIZE` cannot remove it."""
+    if not condition:
+        raise RuntimeError(message)
+
+
+def peak_memory() -> dict[str, float]:
+    """Return this process's peak host memory in GB and, when torch is loaded, its peak GPU memory in GB."""
+    import resource
+
+    out = {"host_peak_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20}
+    torch = sys.modules.get("torch")
+    if torch is not None and torch.cuda.is_available():
+        out["gpu_allocated_peak_gb"] = torch.cuda.max_memory_allocated() / 2**30
+        out["gpu_reserved_peak_gb"] = torch.cuda.max_memory_reserved() / 2**30
+    return out
+
+
 def git_state(*, folder: Path) -> tuple[str, bool]:
     """Return (HEAD sha, whether `folder` has uncommitted changes) of the checkout holding `folder`."""
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=folder, capture_output=True, text=True, check=True
     ).stdout.strip()
     dirty = subprocess.run(
-        ["git", "status", "--porcelain", "--", "."],
+        ["git", "status", "--porcelain", "--untracked-files=no"],
         cwd=folder,
         capture_output=True,
         text=True,
@@ -628,10 +651,10 @@ def assert_frozen_713() -> dict:
     import e00713_arms as arms  # ty: ignore[unresolved-import]
 
     folder = Path(arms.__file__).resolve().parent
-    assert arms.code_hash() == CODE_HASH_713, (arms.code_hash(), CODE_HASH_713)
+    require(arms.code_hash() == CODE_HASH_713, f"code hash {arms.code_hash()}, not {CODE_HASH_713}")
     head, dirty = git_state(folder=folder)
-    assert head.startswith(HEAD_713), f"experiment 713's checkout is at {head}, not {HEAD_713}"
-    assert not dirty, f"experiment 713's checkout {folder} is not clean"
+    require(head.startswith(HEAD_713), f"experiment 713's checkout is at {head}, not {HEAD_713}")
+    require(not dirty, f"experiment 713's checkout {folder} is not clean")
     return {"code_hash": arms.code_hash(), "head": head, "dirty": dirty, "folder": str(folder)}
 
 
@@ -639,8 +662,8 @@ def assert_pinned_f4() -> dict:
     """Assert that `e00715_era` resolves from a clean checkout at the pinned F4 commit; return the record."""
     folder = module_folder(name="e00715_era")
     head, dirty = git_state(folder=folder)
-    assert head.startswith(HEAD_F4), f"F4's checkout is at {head}, not {HEAD_F4}"
-    assert not dirty, f"F4's checkout {folder} is not clean"
+    require(head.startswith(HEAD_F4), f"F4's checkout is at {head}, not {HEAD_F4}")
+    require(not dirty, f"F4's checkout {folder} is not clean")
     return {"head": head, "dirty": dirty, "folder": str(folder)}
 
 
@@ -652,6 +675,7 @@ def job_record(*, extra: Mapping[str, object] | None = None) -> dict:
         "commit_726": head,
         "dirty_726": dirty,
         "resolved_hashes": resolved_recipe_hashes(),
+        "peaks": peak_memory(),
         **(extra or {}),
     }
 
@@ -699,8 +723,8 @@ def prime_pipeline(*, month: str) -> Any:
     set before any module that reads them is imported, so this function sets the month and
     asserts the phase.
     """
-    assert os.environ.get("E00667_PHASE") == "predict", "set E00667_PHASE=predict (run.sh does)"
-    assert os.environ.get("E00667_MONTH", month) == month, "E00667_MONTH names another month"
+    require(os.environ.get("E00667_PHASE") == "predict", "set E00667_PHASE=predict (run.sh does)")
+    require(os.environ.get("E00667_MONTH", month) == month, "E00667_MONTH names another month")
     os.environ["E00667_MONTH"] = month
     os.environ["E00667_ROOT"] = str(data_root())
     sys.argv = ["e00574_fit.py", "fit", "--arm", "P5", "--months", month, "--seeds", "0"]

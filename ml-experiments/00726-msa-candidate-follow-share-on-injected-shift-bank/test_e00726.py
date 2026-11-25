@@ -371,3 +371,150 @@ def test_collect_and_contrast_on_stored_like_files(
         == 0
     )
     del tmp_path, monkeypatch
+
+
+SETS = [list(range(4 * k, 4 * k + 4)) for k in range(4)]
+
+
+def write_stored_like(
+    *, root: Path, factors: dict[int, float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Write stored-like files for `C_host` (4 set files per pass) and `M1` under `root`.
+
+    The shifted median of seed `s` equals the base median plus `factors[s]` times the signed depth,
+    on all 11 quantiles. The base files stand in for the stored fits.
+    """
+    ids = {1000 + p: p for p in range(N_SITES)}
+    keys = frame_for(r=0, days=range(21))
+    base_q = np.array([0.30 + 0.01 * k for k in range(11)])
+
+    def with_q(frame: pl.DataFrame, shift: np.ndarray) -> pl.DataFrame:
+        return frame.with_columns(
+            [pl.Series(q, base_q[j] + shift) for j, q in enumerate(com.QCOLS)]
+        )
+
+    zero = np.zeros(keys.height)
+    base = with_q(keys, zero)
+    for seed in factors:
+        (root / "base").mkdir(parents=True, exist_ok=True)
+        base.write_parquet(root / "base" / f"C_s{seed}.parquet")
+        base.write_parquet(root / "base" / f"M1_s{seed}.parquet")
+    monkeypatch.setattr(com, "data_root", lambda: root / "mine")
+    monkeypatch.setattr(
+        com, "msa_fit_file", lambda *, arm, month, seed: root / "base" / f"{arm}_s{seed}.parquet"
+    )
+    monkeypatch.setattr(
+        com.CandidateRoot,
+        "stored_fit",
+        lambda self, *, month, seed: root / "base" / f"C_s{seed}.parquet",
+    )
+    monkeypatch.setattr(com, "read_sets", lambda: SETS)
+    for r in (0, 13):
+        ev = com.event_columns(frame=keys, month=MONTH, r=r, primary_of_id=ids)
+        signed = ev["sign"].to_numpy() * ev["depth"].to_numpy()
+        # event_columns drops nothing here, but keep the row order of `keys`
+        assert ev.height == keys.height
+        for seed, factor in factors.items():
+            shifted = with_q(ev.select(*com.KEYS), factor * signed)
+            out = com.msa_output(world="all", arm="M1", month=MONTH, seed=seed, r=r)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            shifted.write_parquet(out)
+            for k, members in enumerate(SETS):
+                part = shifted.filter(pl.col("time_series_id").is_in([1000 + p for p in members]))
+                path = com.candidate_output(world="e581_host", month=MONTH, r=r, seed=seed, k=k)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                part.write_parquet(path)
+
+
+@pytest.mark.parametrize(("factors", "want"), [({0: 0.30, 1: 0.44}, 0.37), ({0: 0.0, 1: 0.0}, 0.0)])
+def test_collect_returns_the_known_follow_share(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, factors: dict[int, float], want: float
+) -> None:
+    write_stored_like(root=tmp_path, factors=factors, monkeypatch=monkeypatch)
+    ids = {1000 + p: p for p in range(N_SITES)}
+    got = sc.collect(
+        nets=(sc.C_HOST, sc.M1),
+        seeds=tuple(factors),
+        months=[MONTH],
+        passes=[0, 13],
+        primary_of_id=ids,
+        n_sets=4,
+    )
+    for net in ("C_host", "M1"):
+        for slice_name in com.SLICES:
+            level = sc.level_of(
+                events=got.events,
+                net=net,
+                slice_name=slice_name,
+                primaries=list(range(16)),
+                months=[MONTH],
+            )
+            assert level == pytest.approx(want, abs=1e-5), (net, slice_name)
+    swapped = sc.contrast(
+        events=got.events, a="M1", b="C_host", slice_name=com.SLICE_AFTER, primaries=list(range(16)),
+        months=[MONTH], draws=None,
+    )  # fmt: skip
+    assert swapped["D"] == pytest.approx(0.0, abs=1e-5)
+
+
+def test_host_only_world_with_a_lost_set_file_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_stored_like(root=tmp_path, factors={0: 0.37}, monkeypatch=monkeypatch)
+    com.candidate_output(world="e581_host", month=MONTH, r=0, seed=0, k=2).unlink()
+    ids = {1000 + p: p for p in range(N_SITES)}
+    with pytest.raises((AssertionError, OSError)):
+        sc.collect(
+            nets=(sc.C_HOST, sc.M1),
+            seeds=(0,),
+            months=[MONTH],
+            passes=[0],
+            primary_of_id=ids,
+            n_sets=4,
+        )
+
+
+def test_msa_host_world_path_is_shared_by_writer_and_reader() -> None:
+    assert chk.km4_host_path(month=MONTH, set_index=2) == com.msa_output(
+        world=com.msa_host_world(k=2), arm="M1", month=MONTH, seed=0, r=0
+    )
+    assert "host_k2" in str(chk.km4_host_path(month=MONTH, set_index=2))
+
+
+def test_expected_inputs_ask_only_for_files_that_exist_by_design(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(com, "folder_of", lambda *, prefix: tmp_path / prefix)
+    files = {str(p) for p in chk.expected_inputs()}
+    assert not any(
+        "/fits/K/" in f and f.endswith(("_s2.parquet", "_s3.parquet", "_s4.parquet")) for f in files
+    )
+    assert not any(
+        "/fits/E/" in f and f.endswith(("_s2.parquet", "_s3.parquet", "_s4.parquet")) for f in files
+    )
+    assert any("stage3" in f for f in files) and any("sha256" in f for f in files)
+    assert any("dense_raw" in f for f in files) and any("B1" in f for f in files)
+
+
+def test_read_cell_with_a_missing_value_cannot_tell() -> None:
+    nan = float("nan")
+    assert cell(0.10, 0.06, 0.14, split=nan) == "cannot tell"
+    assert cell(nan, 0.06, 0.14) == "cannot tell"
+    assert cell(0.10, 0.06, 0.14, no050=nan) == "cannot tell"
+
+
+def test_gates_raise_without_assert() -> None:
+    with pytest.raises(RuntimeError):
+        com.require(False, "x")
+    com.require(True, "x")
+
+
+def test_crps_from_quantiles_is_zero_for_a_perfect_point_forecast_and_grows_with_error() -> None:
+    import e00726_readings as rd
+
+    q = np.tile(np.linspace(0.4, 0.6, 11), (3, 1))
+    actual = np.array([0.5, 0.5, 0.9])
+    crps = rd.crps_from_quantiles(quantiles=q, actual=actual)
+    assert crps[0] == pytest.approx(crps[1]) and crps[2] > crps[0]
+    sharp = rd.crps_from_quantiles(quantiles=np.full((1, 11), 0.5), actual=np.array([0.5]))
+    assert sharp[0] == pytest.approx(0.0)

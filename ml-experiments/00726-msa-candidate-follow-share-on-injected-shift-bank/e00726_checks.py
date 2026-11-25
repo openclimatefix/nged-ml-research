@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, I001, PIE808
+# ruff: noqa: D103, E501, I001, PIE808, PERF401
 """Experiment 726: the preflight KP and the known-answer checks of the design (section 6).
 
 Usage (every command reads or writes files only; none loads a network):
@@ -136,12 +136,17 @@ def check_kc3() -> bool:
             / f"pass{r:02d}.parquet"
         )
         stored = restrict_to(frame=com.read_forecast(path=stored_path), like=mine, month=month)
-        keys = mine.select(list(com.KEYS)).join(
-            stored.select(list(com.KEYS)), on=list(com.KEYS), how="inner"
+        lost = stored.select(list(com.KEYS)).join(
+            mine.select(list(com.KEYS)), on=list(com.KEYS), how="anti"
         )
-        mine, stored = (f.join(keys, on=list(com.KEYS), how="inner") for f in (mine, stored))
+        print(
+            f"KC3 {month} r{r} s{seed}: {stored.height} stored keys, {lost.height} not in this run's file",
+            flush=True,
+        )
+        ok &= lost.is_empty()
+        mine = mine.join(stored.select(list(com.KEYS)), on=list(com.KEYS), how="inner")
         ok &= report(
-            name="KC3", case=f"{month} r{r} s{seed} (shared keys)", **_cmp(mine, stored, TOL)
+            name="KC3", case=f"{month} r{r} s{seed} (every stored key)", **_cmp(mine, stored, TOL)
         )
     return ok
 
@@ -175,19 +180,20 @@ def check_kc6(*, month: str, seed: int, r: int, primary: int, set_index: int) ->
     )[1]
     members = com.read_sets()[set_index]
     cut = read_mine(
-        path=com.candidate_output(world="kc6_set", month=month, r=r, seed=seed, k=set_index),
-        month=month,
-    )
-    uncut = read_mine(
         path=com.candidate_output(world="e581_host", month=month, r=r, seed=seed, k=set_index),
         month=month,
     )
+    uncut = read_mine(
+        path=com.candidate_output(world="kc6_set", month=month, r=r, seed=seed, k=set_index),
+        month=month,
+    )
+    uncut = restrict_to(frame=uncut, like=cut, month=month)
     member_ids = [int(ids[p]) for p in members]
     cut_same, cut_worst, _ = compare_frames(
         mine=cut.filter(pl.col("time_series_id").is_in(member_ids)),
         stored=uncut.filter(pl.col("time_series_id").is_in(member_ids)),
     )
-    passed = unreached_ok and moved > TOL and bool(cut_same and cut_worst <= TOL)
+    passed = unreached_ok and moved > TOL and cut.height > 0 and bool(cut_same and cut_worst <= TOL)
     del k578
     return com.blind_report(
         name="kc6",
@@ -205,7 +211,7 @@ def check_kc6(*, month: str, seed: int, r: int, primary: int, set_index: int) ->
 def check_km1() -> bool:
     ok = True
     for month in KM_MONTHS:
-        for arm in ("M1", "K", "E", "N"):
+        for arm in ("M1", "K", "E", "N", "M1-nohist"):
             mine = read_mine(
                 path=com.msa_output(world="zero", arm=arm, month=month, seed=0, r=0), month=month
             )
@@ -218,12 +224,15 @@ def check_km1() -> bool:
     return ok
 
 
+def km4_host_path(*, month: str, set_index: int) -> Path:
+    """Return the file of `M1` in the host-only world for one set, the path the MSA command writes."""
+    return com.msa_output(world=com.msa_host_world(k=set_index), arm="M1", month=month, seed=0, r=0)
+
+
 def check_km4(*, month: str, set_index: int) -> bool:
     _nb, _labels, ids = com.neighbour_lists()
     members = [int(ids[p]) for p in com.read_sets()[set_index]]
-    host = read_mine(
-        path=com.msa_output(world="host", arm="M1", month=month, seed=0, r=0), month=month
-    )
+    host = read_mine(path=km4_host_path(month=month, set_index=set_index), month=month)
     everything = read_mine(
         path=com.msa_output(world="all", arm="M1", month=month, seed=0, r=0), month=month
     )
@@ -309,10 +318,27 @@ def check_km3() -> bool:
 # ---------------------------------------------------------------- the preflight
 
 
+ARM_SEEDS: Final = {"M1": (0, 1, 2, 3, 4), "K": (0, 1), "E": (0, 1), "N": (0,)}
+"""The seeds at which experiment 713 stored each arm (`K` and `E` have seeds 0 and 1 only)."""
+
+
+def bank709_pairs() -> list[tuple[str, int, int]]:
+    """Return the (month, pass, seed) cases of the KC3 comparison."""
+    return list(KC3_CASES)
+
+
 def expected_inputs() -> list[Path]:
-    """Return every stored file that the GPU jobs read."""
-    files: list[Path] = []
+    """Return every stored file that a job or a check reads, per root, arm, seed, and fold month."""
+    e713 = com.ML_EXPERIMENTS_DATA_DIR / com.NAME_713
+    files: list[Path] = [
+        e713 / "cache" / f"{n}.npy" for n in ("dense_raw", "dense_b1_grid", "dense_b1_cams")
+    ]
     for month in com.FOLD_MONTHS:
+        files.append(e713 / "work" / "standardiser" / f"{month}.sha256")
+        for tag in ("e667", "seeds713"):
+            files.append(
+                com.candidate_root(tag=tag).chain(month=month) / "stats" / "B1" / f"{month}.npz"
+            )
         for seed in com.SEEDS_ALL:
             root = com.root_of_seed(seed=seed)
             files += [
@@ -320,7 +346,26 @@ def expected_inputs() -> list[Path]:
                 root.table_file(month=month, seed=seed),
                 root.stored_fit(month=month, seed=seed),
             ]
-            files += [com.msa_fit_file(arm=arm, month=month, seed=seed) for arm in ("M1", "K", "E")]
+        for arm, seeds in ARM_SEEDS.items():
+            for seed in seeds:
+                files += [
+                    com.msa_fit_file(arm=arm, month=month, seed=seed),
+                    com.msa_model_file(arm=arm, month=month, seed=seed),
+                ]
+    for month in KM_MONTHS:
+        files.append(com.msa_fit_file(arm="M1-nohist", month=month, seed=0))
+    for month, r, seed in KC2_CASES:
+        files.append(com.root_of_seed(seed=seed).stored_inject(month=month, r=r, seed=seed))
+    e709 = com.folder_of(prefix="00709")
+    for month, r, seed in KC3_CASES:
+        files += [
+            e709 / "worlds" / f"bank_{month}_p{r}.pkl",
+            e709 / "bank" / f"none_{month}_s{seed}" / f"pass{r:02d}.parquet",
+        ]
+    e714 = com.folder_of(prefix="00714")
+    for month in com.BANK_FOLDS:
+        found = sorted((e714 / "worlds" / "g2").glob(f"{month}_p*.npz"))
+        files += found or [e714 / "worlds" / "g2" / f"{month}_p<none found>.npz"]
     return files
 
 
@@ -363,36 +408,34 @@ def check_kp(*, strict: bool) -> bool:
 
 
 def check_g2_copy() -> bool:
-    """Compare the body of the copied `g2_panel` with F4's, line by line, ignoring blank lines and comments."""
+    """Compare the lines from the import to the write of the generator's power with F4's, and the return line."""
     f4_file = com.module_folder(name="e00715_era") / "e00715_era.py"
     mine_file = Path(__file__).resolve().parent / "e00726_candidate_panel.py"
+    first = "import e00714_generator2 as g2"
+    last = "out[:, lo : lo + n] = gen.power.power"
 
-    def body(text: str) -> list[str]:
-        start = text.index("def g2_panel(")
-        block = text[start:].split("\n\n\n", maxsplit=1)[0]
-        lines = [x.strip() for x in block.splitlines()[1:]]
-        in_doc, out = False, []
-        for line in lines:
-            if line.startswith(('"""', "'''")) and not in_doc:
-                in_doc = not line.endswith(('"""', "'''")) or len(line) == 3
-                continue
-            if in_doc:
-                in_doc = not line.endswith(('"""', "'''"))
-                continue
-            if line and not line.startswith("#"):
-                out.append(line)
-        return out
+    def core(text: str) -> list[str]:
+        block = text[text.index("def g2_panel(") :].split("\n\n\n", maxsplit=1)[0]
+        lines = [
+            x.strip() for x in block.splitlines() if x.strip() and not x.strip().startswith("#")
+        ]
+        return lines[lines.index(first) : lines.index(last) + 1]
 
-    a, b = body(f4_file.read_text()), body(mine_file.read_text())
+    a, b = core(f4_file.read_text()), core(mine_file.read_text())
     diff = [
-        d
-        for d in difflib.unified_diff(a, b, lineterm="", n=0)
+        d for d in difflib.unified_diff(a, b, lineterm="", n=0)
         if d[:1] in "+-" and d[:3] not in {"+++", "---"}
+    ]  # fmt: skip
+    returns = "return out, list(gen.touched)" in [
+        x.strip() for x in mine_file.read_text().splitlines()
     ]
-    print(f"KP g2_panel copy: {len(diff)} differing lines", flush=True)
+    print(
+        f"KP g2_panel copy: {len(a)} lines compared, {len(diff)} differ, return line ok: {returns}",
+        flush=True,
+    )
     for d in diff[:10]:
         print(f"  {d}", flush=True)
-    return not diff
+    return not diff and returns and bool(a)
 
 
 def check_kc4(*, month: str) -> bool:
