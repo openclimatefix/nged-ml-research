@@ -69,7 +69,9 @@ GPU-process-hours stands.
   events and counts events smaller than 2 times the reference error. **Closed: keep as designed.**
   The counted set is defined by the 0.10-of-capacity floor alone only if the floor of 60 still holds
   after the reference-error term. Otherwise the experiment stops as written, and the floor is not
-  loosened after the fact.
+  loosened after the fact. The maintainer confirmed this reading on 2026-11-25. The gate prints
+  the count after each step of the filter, and a pooled count below 60 or a fold month below 8 ends
+  the line with no waiver.
 - **(b) Whether to accept that the experiment probably ends at 2 seeds.** T1 can be above zero, and
   the futility rule then fires unless T2 is below zero in a group. The verdict on A1 would then
   rest on 2 seeds and at most 81 events. **Closed: accepted.**
