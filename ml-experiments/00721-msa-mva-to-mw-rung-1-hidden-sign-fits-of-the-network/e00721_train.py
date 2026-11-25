@@ -341,9 +341,9 @@ def predict_rows(
 
     One row per (Primary, origin, target half-hour) with a finite signed truth or reading and a lead
     of 24 up to but not including 240 hours after the 12:00 UTC contract origin, which is the
-    `power_fcst_init_time` column. The columns are the keys of `e00721_score.KEYS`, `actual` (signed truth, or the reading where
-    the sign is unknown), `reading`, `q01` to `q99` (the signed mixture) and `fq01` to `fq99` (the folded
-    reading's quantiles), all in capacity fractions.
+    `power_fcst_init_time` column. The columns are the keys of `e00721_score.KEYS`, `actual` (signed
+    truth, or the reading where the sign is unknown), `reading`, `q01` to `q99` (the signed mixture),
+    and `fq01` to `fq99` (the folded reading's quantiles), all in capacity fractions.
     """
     import e00721_score as score
 
