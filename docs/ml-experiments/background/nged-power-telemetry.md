@@ -31,6 +31,11 @@ count
 - **A series is metered in MW (signed active power) or in MVA (apparent power, never negative).**
   Read the unit from the `units` column. Eight of the 16 Primaries are metered only in MVA, so solar
   output behind one of them appears as demand in daylight (disk).
+- **NGED reports 398 MVA-metered (non-directional) sites and 1,330 MW-metered (directional) sites in
+  its whole network.** The 398 MVA sites are 23% of the 1,728 sites. Only the 1,330 MW sites report
+  the sign of the flow, and the rows of the 398 MVA sites need the dark-row rule below. NGED gave
+  both counts as rough numbers (NGED reply, November 2026; rough; provisional), and the counts cover
+  every site, not only the Primaries that the write-ups label D1 to D22.
 - **Use an MVA Primary for demand only on dark rows.** The rule, its evidence, and the row counts
   are in the [data-processing page](../data-processing.md#decide-which-rows-are-demand) (exp 103; 8
   MVA Primaries; established).
