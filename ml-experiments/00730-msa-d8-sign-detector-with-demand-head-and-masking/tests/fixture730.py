@@ -71,6 +71,14 @@ def write_predictions(root: Path, rows, *, arch: str = "bilstm", style: str = "K
                         "p": np.clip((rows.x < 0) * 0.7 + rng.uniform(0, 0.3, size), 0, 1)[:size],
                         "demand_mu": rows.x * 0 + 50.0 + rng.normal(size=size),
                     }
+                    if arm in core.REFIT_729_ARMS:
+                        m = np.sqrt(np.maximum(rows.r**2 - core729.QHAT_POINTS**2, 0.0))
+                        arrays |= {
+                            "mu_i": m + rng.normal(scale=0.2, size=size),
+                            "s_i": np.full(size, 0.6),
+                            "mu_r": -m + rng.normal(scale=0.2, size=size),
+                            "s_r": np.full(size, 0.6),
+                        }
                     folder.mkdir(parents=True, exist_ok=True)
                     np.savez(folder / f"{name}.npz", **arrays)
                 for k in core.CAUSAL_K:

@@ -687,3 +687,104 @@ def attention_chart(*, attention: np.ndarray, title: str) -> alt.Chart:
         )
         .properties(width=WIDTH_PX - 80, height=200, title=alt.TitleParams(title, anchor="start"))
     )
+
+
+def brier_dot_chart(*, scores: Mapping[str, Mapping[str, float]]) -> alt.Chart:
+    """Return figure 2: the Brier score of every arm and baseline on all, import, reverse, and bands."""
+    subsets = list(next(iter(scores.values())))
+    return figures729.dot_chart(
+        scores=scores,
+        rows=subsets,
+        title="Brier score of P(X<0) by row subset and reading band (smaller is better)",
+        x_title="Brier score",
+    )
+
+
+def signed_crps_dot_chart(*, scores: Mapping[str, Mapping[str, float]]) -> alt.Chart:
+    """Return figure 9: the signed CRPS of P0f, B1, A, D, and D-sign on all, import, and reverse rows."""
+    return figures729.dot_chart(
+        scores=scores,
+        rows=list(next(iter(scores.values()))),
+        title="Signed CRPS of experiment 729's readings, redone (smaller is better)",
+        x_title="Signed CRPS (points of capacity)",
+    )
+
+
+def harm_detection_chart(
+    *,
+    by_arm: Mapping[str, Mapping[str, Mapping[str, float]]],
+    limit: float,
+    bar: float = core.DETECTION_BAR,
+) -> alt.VConcatChart:
+    """Return figure 5: the harm and detection numbers by world type and reading band.
+
+    Args:
+        by_arm: For each arm, `harm` and `detection`, each a mapping of a group to its number.
+        limit: The harm limit L, drawn on the top panel.
+        bar: The detection bar, drawn on the bottom panel.
+
+    Returns:
+        Two stacked panels of staggered dots with a reference rule each.
+    """
+    panels = []
+    for key, ref, title in (
+        ("harm", limit, "Harm: mean P(X<0) on decidable import rows (smaller is better)"),
+        (
+            "detection",
+            bar,
+            "Detection: mean P(X<0) on decidable reverse-flow rows (larger is better)",
+        ),
+    ):
+        scores = {arm: v[key] for arm, v in by_arm.items()}
+        dots = figures729.dot_chart(
+            scores=scores,
+            rows=list(next(iter(scores.values()))),
+            title=title,
+            x_title="Mean P(X<0)",
+        )
+        rule = (
+            alt.Chart(pl.DataFrame({"x": [ref]}))  # ty: ignore[unresolved-attribute]
+            .mark_rule(strokeDash=[4, 3], color=GREY, aria=False)
+            .encode(x="x:Q")
+        )
+        panels.append(dots + rule)
+    return alt.vconcat(*panels)
+
+
+def real_eras_chart(
+    *, above_half: Mapping[str, float], demand_above: Mapping[str, float]
+) -> alt.Chart:
+    """Return figure 10: shares of real half-hours by UTC hour and era.
+
+    Args:
+        above_half: The share with P(X<0) above 0.5, keyed `era/hour`.
+        demand_above: The share with the demand output above the reading, keyed `era/hour`.
+
+    Returns:
+        One line panel per era with the two shares against the UTC hour.
+    """
+    rows = [
+        {"era": k.rsplit("/", 1)[0], "hour": int(k.rsplit("/", 1)[1]), "share": v, "kind": kind}
+        for kind, series in (
+            ("P(X<0) above 0.5", above_half),
+            ("demand output above the reading", demand_above),
+        )
+        for k, v in series.items()
+    ]
+    return (
+        alt.Chart(pl.DataFrame(rows))
+        .mark_line(point=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "hour:Q", title="UTC hour of the day", axis=alt.Axis(values=[0, 6, 12, 18, 24])
+            ),
+            y=alt.Y("share:Q", title="Share of half-hours"),
+            color=alt.Color(
+                "kind:N",
+                scale=alt.Scale(range=[ORANGE, BLUE]),
+                legend=alt.Legend(orient="top", title=None),
+            ),
+        )
+        .properties(width=WIDTH_PX // 2 - 40, height=110)
+        .facet(facet=alt.Facet("era:N", title=None), columns=2)
+    )

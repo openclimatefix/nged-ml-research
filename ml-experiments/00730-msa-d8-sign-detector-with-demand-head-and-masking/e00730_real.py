@@ -8,8 +8,10 @@ aggregate over half-hours.
 import e00730_paths  # noqa: F401
 
 # isort: split
+import e00729_baselines as base
 import e00730_core as core
 import e00730_score as score
+import e00730_signed as signed
 import numpy as np
 
 
@@ -53,3 +55,32 @@ def false_alarm_shares(*, p: np.ndarray) -> dict[str, float]:
 def share_by(*, values: np.ndarray, groups: np.ndarray) -> dict[str, float]:
     """Return the share of True `values` in each group, as plain floats (aggregates only)."""
     return {str(g): float(np.mean(values[groups == g])) for g in np.unique(groups)}
+
+
+def k1_against_baselines(
+    *, rows: object, p: np.ndarray, mu: np.ndarray, climatology: base.Climatology, pi: float
+) -> dict[str, float]:
+    """Return K1's scores beside B1's and the demand output's error beside the climatology's.
+
+    Args:
+        rows: The K1 rows (`x`, `r`, and `features`).
+        p: SD*'s P(X<0) on them.
+        mu: SD*'s demand output on them, in points.
+        climatology: Experiment 729's fitted demand climatology.
+        pi: The injected share of the test bank, B1's prior.
+
+    Returns:
+        B1's Brier score and log loss, the demand output's mean absolute error against the
+        reading, and the demand climatology's.
+    """
+    f = rows.features  # ty: ignore[unresolved-attribute]
+    x, r = rows.x, rows.r  # ty: ignore[unresolved-attribute]
+    b1 = np.clip(pi * climatology.prob_below(r=f.r, f=f), 0.0, 1.0)
+    clim = signed.demand_climatology(climatology=climatology, features=f)
+    return {
+        "brier_b1": float(score.row_brier(p=b1, x=x).mean()),
+        "log_loss_b1": float(score.row_log_loss(p=b1, x=x).mean()),
+        "log_loss_p0": float(score.row_log_loss(p=np.zeros_like(p), x=x).mean()),
+        "demand_mae": float(np.abs(mu - r).mean()),
+        "demand_mae_climatology": float(np.abs(clim - r).mean()),
+    }

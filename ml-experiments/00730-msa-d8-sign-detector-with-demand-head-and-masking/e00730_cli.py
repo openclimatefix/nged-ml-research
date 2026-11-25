@@ -145,13 +145,19 @@ def dispatch(*, args: argparse.Namespace, root: Path) -> int:
     elif stage == "real":
         ctx = stages.real_context()
         rows, era = stages.real_inputs(ctx=ctx)
-        stages.stage_real(root=root, real_rows=rows, era_of_row=era, log=log)
+        stages.stage_real(
+            root=root, real_rows=rows, era_of_row=era,
+            baselines=stages.real_baselines(ctx=ctx), log=log,
+        )  # fmt: skip
     elif stage == "score":
         ctx = stages.real_context()
-        stages.stage_score(root=root, holidays=ctx.cal.holidays, log=log)
+        stages.stage_score(
+            root=root, holidays=ctx.cal.holidays, baselines=stages.real_baselines(ctx=ctx), log=log
+        )
     elif stage == "series":
         ctx = stages.real_context()
-        table, windows = stages.series_inputs(root=root, holidays=ctx.cal.holidays, real_rows=None)
+        rows, _ = stages.real_inputs(ctx=ctx)
+        table, windows = stages.series_inputs(root=root, holidays=ctx.cal.holidays, real_rows=rows)
         stages.stage_series(root=root, table=table, windows=windows, log=log)
     return 0
 

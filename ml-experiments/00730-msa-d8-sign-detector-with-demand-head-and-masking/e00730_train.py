@@ -323,7 +323,8 @@ def masked_demand(
 ) -> dict[str, np.ndarray]:
     """Return the demand output on every valid half-hour with the fixed masks of `style`.
 
-    The masks depend on the style and the pick's index alone, so every arm sees the same masks.
+    The mask of a window depends on the style and the window id (segment and base day) alone, so
+    every arm sees the same masks, whatever the order of the picks.
 
     Args:
         net: The network.
@@ -337,11 +338,8 @@ def masked_demand(
         flattened over the valid half-hours in `Rows` order.
     """
     picks = arms729.all_picks(prepared=prepared)
-    hidden = np.stack(
-        [
-            masks.fixed_hidden(style=style, index=i, utc_offset=float(prepared[s].offsets[d]))
-            for i, (s, d) in enumerate(picks)
-        ]
+    hidden = masks.fixed_hidden_for_picks(
+        style=style, picks=picks, offsets=[p.offsets for p in prepared]
     )
     decoded, t, _ = predict(
         net=net, prepared=prepared, spec=spec, device=device, hidden=hidden, picks=picks

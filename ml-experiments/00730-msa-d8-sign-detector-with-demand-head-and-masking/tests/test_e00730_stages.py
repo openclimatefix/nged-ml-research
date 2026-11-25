@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import e00729_banks as banks729
+import e00729_baselines as base
 import e00729_score as score729
 import e00730_banks as banks
 import e00730_core as core
@@ -16,6 +17,14 @@ ALL_STAGES = (
     "gallery", "pretrain", "timing", "screen", "styles", "later", "refit729", "score", "real",
     "report", "figures", "series", "components", "choose", "margin",
 )  # fmt: skip
+
+
+def fit_invented_baselines(rows: score729.Rows) -> tuple:
+    """Fit the climatology and the regression on the rows' own reading (invented)."""
+    return (
+        base.Climatology.fit(demand=rows.features.r, f=rows.features),
+        base.Regression.fit(demand=rows.features.r, f=rows.features),
+    )
 
 
 def lines() -> list[str]:
@@ -181,10 +190,24 @@ def test_score_real_report_figures_and_series_on_invented_predictions(world: tup
     write_predictions(root, rows)
     real_rows = dict.fromkeys(("r1", "k1", "k2", "eras"), rows)
     era = np.array(["net", "solar"])[np.arange(rows.n) % 2]
-    real = stages.stage_real(root=root, real_rows=real_rows, era_of_row=era, log=lambda _: None)
+    baselines = fit_invented_baselines(rows)
+    real = stages.stage_real(
+        root=root, real_rows=real_rows, era_of_row=era, baselines=baselines, log=lambda _: None
+    )
     assert set(real) == {"h2", "k1", "k2", "r2", "r3"}
     assert real["k1"]["status"] in {"pass", "fail", "void"}
-    verdict = stages.stage_score(root=root, holidays=holidays, n_resamples=200, log=lambda _: None)
+    assert {"brier_b1", "log_loss_b1", "demand_mae", "demand_mae_climatology"} <= set(real["k1"])
+    assert real["r2"]["share_demand_above_by_era_and_hour"]
+    verdict = stages.stage_score(
+        root=root, holidays=holidays, n_resamples=200, baselines=baselines, log=lambda _: None
+    )
+    signed = verdict["signed"]
+    assert {"R1_crps", "R1_log_loss", "R2", "R3", "R4", "R5", "R6", "T1", "figure9"} <= set(signed)
+    assert set(signed["T1"]) == {"S", "SD*", "D-sign", "A", "D"}
+    assert set(signed["figure9"]) == {"P0f", "B1", "A", "D", "D-sign"}
+    assert isinstance(signed["R4"]["pass"], bool)
+    assert set(verdict["figure2"]) >= {"P0", "S", "SD*"}
+    assert set(verdict["figure5"]) == {"S", "SD*"}
     assert 0 <= verdict["row"] <= 8
     assert set(verdict["contrasts"]) <= set(core.CONTRASTS)
     assert not verdict["h2_pending"]
@@ -198,9 +221,15 @@ def test_score_real_report_figures_and_series_on_invented_predictions(world: tup
     assert "2022-" not in text
     written = stages.stage_figures(root=root, log=lambda _: None)
     assert written
-    table, windows = stages.series_inputs(root=root, holidays=holidays, real_rows=None)
+    table, windows = stages.series_inputs(root=root, holidays=holidays, real_rows=real_rows)
+    assert table.real.any()  # ty: ignore[unresolved-attribute]
+    assert len(windows) == len(table.world)  # ty: ignore[unresolved-attribute]
     paths = stages.stage_series(root=root, table=table, windows=windows, log=lambda _: None)
     assert paths
+    assert {"S14", "S15"} <= {p.stem for p in paths}
+    assert {"brier_by_subset", "signed_crps", "harm_detection", "real_eras"} <= {
+        p.stem for p in written
+    }
     assert not any(p.parent.name == "S1" for p in paths)
     assert all(p.stem in {f"S{i}" for i in range(1, 17)} for p in paths)
 

@@ -9,6 +9,7 @@ channel is built from hourly values and the second half-hour of an hour would ot
 next hour. No function here needs torch.
 """
 
+from collections.abc import Sequence
 from typing import Final
 
 import e00730_paths  # noqa: F401
@@ -135,6 +136,47 @@ def fixed_hidden(*, style: str, index: int, utc_offset: float) -> np.ndarray:
     """Return the fixed mask of window `index` under `style`."""
     return hidden_positions(
         style=style, rng=fixed_rng(style=style, index=index), utc_offset=utc_offset
+    )
+
+
+WINDOW_ID_STRIDE: Final = 100_000
+"""Base days per segment that a window id leaves room for."""
+
+
+def window_id(*, segment: int, day: int) -> int:
+    """Return the id of the window of base day `day` in segment `segment`.
+
+    The id depends on the window alone, so a window gets the same fixed mask whatever the order of
+    the picks that a bank lists.
+    """
+    if not 0 <= day < WINDOW_ID_STRIDE:
+        msg = f"base day {day} lies outside 0..{WINDOW_ID_STRIDE - 1}"
+        raise ValueError(msg)
+    return segment * WINDOW_ID_STRIDE + day
+
+
+def fixed_hidden_for_picks(
+    *, style: str, picks: Sequence[tuple[int, int]], offsets: Sequence[Sequence[float] | np.ndarray]
+) -> np.ndarray:
+    """Return the fixed masks `(len(picks), 96)` of the picks (segment, day), by window id.
+
+    Args:
+        style: The masking style.
+        picks: The (segment, base day) of each window.
+        offsets: For each segment, the UTC offset in hours of each of its base days.
+
+    Returns:
+        One row per pick, in the order of `picks`.
+    """
+    return np.stack(
+        [
+            fixed_hidden(
+                style=style,
+                index=window_id(segment=s, day=d),
+                utc_offset=float(offsets[s][d]),
+            )
+            for s, d in picks
+        ]
     )
 
 

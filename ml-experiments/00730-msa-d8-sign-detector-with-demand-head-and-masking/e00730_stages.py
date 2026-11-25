@@ -22,6 +22,7 @@ import e00730_banks as banks
 import e00730_core as core
 import e00730_leakage as leak
 import e00730_score as score
+import e00730_signed as signed
 import numpy as np
 
 TEST_MARKER: Final = "test_started"
@@ -629,6 +630,17 @@ def load_p(
     return score.seed_mean(p_by_seed=ps)
 
 
+def load_preds(
+    *, root: Path, arm: str, arch: str, seeds: Sequence[int], name: str
+) -> list[dict[str, np.ndarray]]:
+    """Return the stored predictions of an arm on one set, one dictionary per seed."""
+    out = []
+    for seed in seeds:
+        z = np.load(root / "predictions" / job_name(arm=arm, arch=arch, seed=seed) / f"{name}.npz")
+        out.append({k: z[k] for k in z.files})
+    return out
+
+
 def real_h2_passed(*, root: Path) -> bool | None:
     """Return the H2 verdict of `scores/real.json`, or None when the real stage has not run."""
     path = root / "scores" / "real.json"
@@ -636,7 +648,12 @@ def real_h2_passed(*, root: Path) -> bool | None:
 
 
 def stage_score(
-    *, root: Path, holidays: np.ndarray, n_resamples: int = core.N_RESAMPLES, log: Log
+    *,
+    root: Path,
+    holidays: np.ndarray,
+    n_resamples: int = core.N_RESAMPLES,
+    baselines: tuple[object, object] | None = None,
+    log: Log,
 ) -> dict:
     """Score the test bank: the counted contrasts, the checks, the report-only readings, verdict.
 
@@ -647,6 +664,8 @@ def stage_score(
         root: The data folder.
         holidays: Bank-holiday dates (the rows' features).
         n_resamples: Resamples of every contrast.
+        baselines: Experiment 729's fitted climatology and regression (from `fit_baselines`), or
+            None to leave out the readings that need B1 (R2 to R6, T1, and figures 2 and 9).
         log: Receives progress lines.
 
     Returns:
@@ -696,6 +715,14 @@ def stage_score(
         for arm, v in p.items()
     }
     result["report_only"] = report_only(rows=rows, per_row=per_row, n_resamples=n_resamples)
+    result["signed"] = signed_stage(
+        root=root, rows=rows, p=p, test=test, arch=arch, style=style, baselines=baselines,
+        n_resamples=n_resamples,
+    )  # fmt: skip
+    result["figure2"] = signed.brier_by_subset(rows=rows, p_by_arm={"P0": np.zeros(rows.n), **p})
+    result["figure5"] = {
+        arm: signed.harm_detection_by_group(rows=rows, p=p[arm]) for arm in ("S", "SD*") if arm in p
+    }
     result["causal"] = causal_readout(
         root=root, rows=rows, arch=arch, p_s=p["S"], n_resamples=n_resamples
     )
@@ -705,6 +732,51 @@ def stage_score(
     banks.write_json(path=root / "scores" / "verdict.json", payload=result)
     log(f"verdict row {result['row']}: {result['verdict']}")
     return result
+
+
+def signed_stage(
+    *,
+    root: Path,
+    rows: score729.Rows,
+    p: Mapping[str, np.ndarray],
+    test: banks729.Bank,
+    arch: str,
+    style: str,
+    baselines: tuple[object, object] | None,
+    n_resamples: int,
+) -> dict:
+    """Return R2 to R6, the signed R1, T1, and figure 9's data (empty without the baselines)."""
+    if baselines is None:
+        return {"skipped": "no fitted baselines were passed"}
+    clim, reg = baselines
+    metrics = dict(
+        stages729.baseline_metrics(
+            rows=rows, climatology=clim, regression=reg, pi=banks729.injected_share(bank=test)
+        )
+    )
+    seeds = core.ARCH_SEEDS
+    for arm, a in (
+        ("S", arch),
+        ("SD*", arch),
+        *((r, core.REFIT_729_ARCH) for r in core.REFIT_729_ARMS),
+    ):
+        name = f"SD-{style}" if arm == "SD*" else arm
+        try:
+            preds = load_preds(root=root, arm=name, arch=a, seeds=seeds, name="test")
+        except FileNotFoundError:
+            continue
+        metrics[arm] = signed.arm_signed_metrics(preds=preds, rows=rows)
+    out = signed.signed_readout(rows=rows, metrics=metrics, n_resamples=n_resamples)
+    if "S" in p and "D-sign" in p:
+        out["R1_log_loss"] = score.contrast_dict(
+            reading=score.report_only_contrast(
+                rows=rows,
+                a=score.row_log_loss(p=p["S"], x=rows.x),
+                b=score.row_log_loss(p=p["D-sign"], x=rows.x),
+                n_resamples=n_resamples,
+            )
+        )
+    return out
 
 
 def report_only(
@@ -780,6 +852,7 @@ def stage_real(
     root: Path,
     real_rows: Mapping[str, score729.Rows],
     era_of_row: np.ndarray,
+    baselines: tuple[object, object] | None = None,
     log: Log,
 ) -> dict:
     """Read H2, K1, K2, R2, and R3 from the stored real predictions and write `scores/real.json`.
@@ -788,6 +861,9 @@ def stage_real(
         root: The data folder.
         real_rows: The rows of the real sets `r1`, `k1`, `k2`, and `eras`, from the pseudo-segments.
         era_of_row: The era label of each row of the `eras` set.
+        baselines: Experiment 729's fitted climatology and regression. With them, K1 also reports
+            B1's scores and the demand error against the demand climatology, and K1 passes only
+            where both of its bars hold. Without them, K1 reads the Brier bar alone.
         log: Receives progress lines.
 
     Returns:
@@ -811,10 +887,28 @@ def stage_real(
     decidable_import = (k1.r >= core.DECIDABLE_READING_POINTS) & (k1.x >= 0)
     n_reverse = int(((k1.x < 0) & (k1.r >= core.DECIDABLE_READING_POINTS)).sum())
     k1_rec = real.k_reading(p=p_k1, x=k1.x, p0=0.0)
+    if baselines is not None:
+        mu_k1 = np.mean(
+            [
+                z["demand_mu"]
+                for z in load_preds(
+                    root=root, arm=arm, arch=arch, seeds=core.ARCH_SEEDS, name="real_k1"
+                )
+            ],
+            axis=0,
+        )
+        test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
+        k1_rec |= real.k1_against_baselines(
+            rows=k1, p=p_k1, mu=mu_k1, climatology=baselines[0],
+            pi=banks729.injected_share(bank=test),
+        )  # fmt: skip
     if n_reverse < core.K1_MIN_REVERSE_DECIDABLE:
         k1_status = "void"
     else:
-        k1_status = "pass" if k1_rec["brier"] < k1_rec["brier_p0"] else "fail"
+        bars = [k1_rec["brier"] < k1_rec["brier_p0"]]
+        if "demand_mae" in k1_rec:
+            bars.append(k1_rec["demand_mae"] < k1_rec["demand_mae_climatology"])
+        k1_status = "pass" if all(bars) else "fail"
     k2_rec = score.harm_from_p(p=p_k2, limit=limits.harm_limit)
     z = np.load(root / "predictions" / job_name(arm=arm, arch=arch, seed=0) / "real_eras.npz")
     above = z["demand_mu"] > eras.r if "demand_mu" in z.files else np.zeros(eras.n, dtype=bool)
@@ -830,6 +924,7 @@ def stage_real(
         "k2": {**k2_rec, "status": "pass" if k2_rec["pass"] else "fail"},
         "r2": {
             "share_demand_above_reading": real.share_by(values=above, groups=era_of_row),
+            "share_demand_above_by_era_and_hour": real.share_by(values=above, groups=era_hour),
             "share_p_above_half": real.share_by(values=p_eras > 0.5, groups=era_of_row),
         },
         "r3": {
@@ -879,6 +974,28 @@ def stage_figures(*, root: Path, log: Log) -> list[Path]:
         )
         figures.save_svg(chart=chart, path=folder / "causal.svg")
         written.append(folder / "causal.svg")
+    figure_data = (
+        ("brier_by_subset.svg", v.get("figure2"), figures.brier_dot_chart),
+        ("signed_crps.svg", v.get("signed", {}).get("figure9"), figures.signed_crps_dot_chart),
+    )
+    for fname, data, draw in figure_data:
+        if data:
+            figures.save_svg(chart=draw(scores=data), path=folder / fname)
+            written.append(folder / fname)
+    if v.get("figure5"):
+        limit = core.read_limits_file(path=root / "limits.json").harm_limit
+        chart = figures.harm_detection_chart(by_arm=v["figure5"], limit=limit)
+        figures.save_svg(chart=chart, path=folder / "harm_detection.svg")
+        written.append(folder / "harm_detection.svg")
+    real_path = root / "scores" / "real.json"
+    if real_path.exists():
+        r = banks.read_json(path=real_path)
+        chart = figures.real_eras_chart(
+            above_half=r["r3"]["share_by_era_and_hour"],
+            demand_above=r["r2"]["share_demand_above_by_era_and_hour"],
+        )
+        figures.save_svg(chart=chart, path=folder / "real_eras.svg")
+        written.append(folder / "real_eras.svg")
     log(f"{len(written)} figures written")
     return written
 
@@ -1006,6 +1123,11 @@ def fit_one(
 # --------------------------------------------------------------------------- real rows and windows
 
 
+def real_baselines(*, ctx: stages729.Context) -> tuple[object, object]:
+    """Return experiment 729's climatology and regression, fitted on the training base days."""
+    return stages729.fit_baselines(ctx=ctx)
+
+
 def real_inputs(*, ctx: stages729.Context) -> tuple[dict, np.ndarray]:
     """Return the rows of the real sets and the era of each row of the `eras` set (real data)."""
     sets = real_sets(ctx=ctx)
@@ -1099,5 +1221,77 @@ def series_inputs(
         }
         for i in range(n)
     }  # fmt: skip
-    del real_rows
+    if real_rows is not None:
+        table, windows = add_real_windows(
+            table=table, windows=windows, rows=real_rows["r1"], root=root, arch=arch, style=style
+        )
     return table, windows
+
+
+def add_real_windows(
+    *,
+    table: object,
+    windows: dict[str, dict[str, np.ndarray]],
+    rows: score729.Rows,
+    root: Path,
+    arch: str,
+    style: str,
+) -> tuple[object, dict[str, dict[str, np.ndarray]]]:
+    """Append one window per real held-out pre-engine day (the rows of set `r1`) to the table.
+
+    The real windows carry the reading, SD*'s and S's P(X<0), and SD*'s demand output. They have
+    no clean demand and no causal probability, so those arrays are NaN.
+
+    Args:
+        table: The `WindowTable` of the synthetic windows.
+        windows: The synthetic windows' arrays by index.
+        rows: The rows of the real set `r1`.
+        root: The data folder.
+        arch: The chosen architecture.
+        style: The chosen masking style.
+
+    Returns:
+        The extended table and windows.
+    """
+    import dataclasses
+
+    import e00730_series_figures as sf
+
+    seeds = core.ARCH_SEEDS
+    p_s = load_p(root=root, arm="S", arch=arch, seeds=seeds, name="real_r1", x=rows.x)
+    arm = f"SD-{style}"
+    p_sd = load_p(root=root, arm=arm, arch=arch, seeds=seeds, name="real_r1", x=rows.x)
+    preds = load_preds(root=root, arm=arm, arch=arch, seeds=seeds, name="real_r1")
+    mu = np.mean([z["demand_mu"] for z in preds], axis=0)
+    keys = rows.seg.astype(np.int64) * 1_000_000 + rows.date.astype(np.int64)
+    _, key = np.unique(keys, return_inverse=True)
+    n = int(key.max()) + 1 if key.size else 0
+    sc = lambda v: _scatter(keys=key, hh=rows.hh, values=v, n=n)  # noqa: E731
+    reading, a_s, a_sd, a_mu = sc(rows.r), sc(p_s), sc(p_sd), sc(mu)
+    truth = sc(rows.x)
+    dec = sc((rows.r >= core.DECIDABLE_READING_POINTS).astype(float)) > 0
+    near_zero_points = core.DECIDABLE_READING_POINTS * 0.3
+    extra = sf.WindowTable(
+        world=np.full(n, "real"), solar_run=np.zeros(n, dtype=bool),
+        solar_out=np.zeros(n, dtype=bool), source=np.full(n, "none"),
+        depth=np.nanmax(-truth, axis=1),
+        near_zero=(np.abs(np.nan_to_num(reading, nan=1e9)) < near_zero_points).sum(axis=1),
+        evening=np.zeros(n, dtype=bool), sd_max_p=np.nanmax(a_sd, axis=1),
+        sd_mean_p=np.nan_to_num(np.nanmean(np.where(dec, a_sd, np.nan), axis=1), nan=-1.0),
+        gain=np.zeros(n), real=np.ones(n, dtype=bool),
+    )  # fmt: skip
+    merged = sf.WindowTable(
+        **{
+            f.name: np.concatenate([getattr(table, f.name), getattr(extra, f.name)])
+            for f in dataclasses.fields(extra)
+        }
+    )
+    offset = len(table.world)  # ty: ignore[unresolved-attribute]
+    nan = np.full(48, np.nan)
+    out = dict(windows)
+    for i in range(n):
+        out[str(offset + i)] = {
+            "truth": truth[i], "reading": reading[i], "demand": nan, "demand_mean": a_mu[i],
+            "p_S": a_s[i], "p_SD*": a_sd[i], "p_SD*-C": nan,
+        }  # fmt: skip
+    return merged, out
