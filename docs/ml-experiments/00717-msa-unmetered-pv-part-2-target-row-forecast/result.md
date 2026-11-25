@@ -81,16 +81,19 @@ lessons: >-
   groups
   (4 of 5 and 2 of 5 seeds share the sign of B1). Arm HT is worse than H at the two Primaries with a
   short history (+0.136 [+0.018, +0.269], report-only, 95%). The 5-seed run of the loader of part 1
-  needed more than 16 GB, and a per-fold loader fixed it without changing a value. Arms HT and
+  needed an estimated 14 to 17 GB (estimated from row counts and column widths, not measured), and a
+  per-fold loader fixed it without changing a value. Arms HT and
   HT-S stopped by patience in every one of 80 fits, so the null result is not a training-budget
   artefact at the 60-pass cap.
 take_home_message: >-
   Telling the demand network what the sky will do tomorrow, as an explicit solar forecast built
   from the installed capacity and the morning weather forecast, did not make its forecasts of
-  substation demand any more accurate on the 16 Primaries tested. The network already sees the
-  forecast weather and a record of past solar output, so the extra input is redundant. A forecast
-  of solar output from a different source of information, not another route for the same weather
-  forecast, is the only remaining way to test this idea.
+  substation demand more accurate on the 16 Primaries tested (differences of -0.0068 and -0.0007
+  points of capacity, intervals including zero). The network already reads the forecast weather and
+  an estimate of past solar output, which may explain why the extra input added nothing, but this
+  experiment did not test that explanation. Six earlier experiments with other designs of an
+  explicit solar term found no gain either, so the next test should use a source of solar
+  information that is not derived from the same weather forecast.
 advice:
   - >-
     Do not add an explicit target-row solar forecast built from the as-of capacity and ENS
@@ -106,7 +109,8 @@ advice:
     (section "Result").
   - >-
     Load one fold at a time and keep only the seven columns that the bootstrap reads when scoring 5
-    seeds of 16 Primaries, because the unpatched loader needs more than 16 GB (section "Files").
+    seeds of 16 Primaries, because the unpatched loader needs an estimated 14 to 17 GB (section
+    "Files").
 production_status: not-for-production
 adopted_in: none
 ---
@@ -189,7 +193,8 @@ and -0.0027 [-0.0247, +0.0235] at 120 h to 240 h. At the eight MVA-only Primarie
 -0.0012, and -0.0010, with intervals of about plus or minus 0.03 to 0.035. All intervals include
 zero. The pooled reading over all 16 Primaries is +0.0140 [-0.0037, +0.0311].
 
-**Secondary readings S1 to S5 (95%, one of 14, so one false positive is likely) read as a tie.**
+**Secondary readings S1 to S5 (95%, one of 14, so one false positive is likely) mostly read as a
+tie, and four of them have intervals that exclude zero.**
 S1 and S2 are B1 and B2 on the solar block (06:00 to 14:30 UTC) of the three sunny folds, 2026-04
 to 2026-06. S4 is B1 on the whole band of the four dark folds, 2025-11 to 2026-02.
 
@@ -199,7 +204,8 @@ to 2026-06. S4 is B1 on the whole band of the four dark folds, 2025-11 to 2026-0
 | S2: `HT` minus `HT-S`, solar block, sunny folds | -0.0420 [-0.0482, -0.0278] | -0.0036 [-0.0430, +0.0555] | No, No |
 | S4: `HT` minus `H`, dark folds | -0.0043 [-0.0356, +0.0435] | -0.0072 [-0.0553, +0.0392] | Yes, Yes |
 
-**S1 at the six signed-MW Primaries excludes zero but is 0.007 points, far below the 0.05 that
+**The four intervals that exclude zero change no verdict. S1 at the six signed-MW Primaries excludes
+zero but is 0.007 points, far below the 0.05 that
 the reading needs, and S2 at the same Primaries excludes zero with a point of -0.042, still above
 the -0.05 that it needs, so neither holds.** S2's interval is narrow because the seeds agree. S3
 (the gap between the dull and the sunny third of days) is -0.0393 [-0.0617, -0.0154] at the
@@ -255,12 +261,25 @@ look-ahead caveat for D19 and D21 applies. No attention extraction was run for a
   MVA-only Primaries it is +0.0048 [-0.0564, +0.0635] against a CRPS contrast of -0.0007, so the
   two point in different directions, and both intervals include zero. That is audit trigger 3 on
   its wording, with no verdict at stake.
-- **Which audit triggers fired.** Trigger 5 (a nested arm beats its container) did not fire
-  (`audit_trigger_5.fires` is false). The control `HT-S` minus `H` moved the score by less than its
-  own interval's half-width. Trigger 4 (leaving one site out flips the sign) fires on its wording
-  at the eight MVA-only Primaries, where the point is -0.0007, with no change of verdict. No audit
-  was run, and the experiment manager decides whether one is needed. Triggers 1, 2, and 6 did not
-  apply, and trigger 7 was not assessed.
+- **Audit triggers: the skill requires an audit before merge when any trigger holds.** Trigger 1
+  fires, and triggers 3, 4, and 5 are reported in the next three bullets.
+- **Trigger 1 fires.** The known-answer check KF9 failed and the maintainer waived it, the same kind
+  of waived check that experiment 713 counted as trigger 1.
+- **Trigger 3 fires nominally at the eight MVA-only Primaries.** The median-error contrast is
+  +0.0048 [-0.0564, +0.0635] against a CRPS contrast of -0.0007, and both intervals include zero. A
+  read-only audit is running.
+- **Trigger 4 fires on its wording at the eight MVA-only Primaries,** where the B1 point is -0.0007
+  and leaving out D4, D12, D21, D2, or D8 changes its sign. The audit is running.
+- **Trigger 5 (a nested arm beats its container) does not fire for the counted groups,** because
+  `audit_trigger_5.fires` is false and `HT-S` minus `H` moved the score by less than its own
+  interval's half-width. Whether `HT` being worse than `H` at D15 and D18, pooled at +0.136 [+0.018,
+  +0.269], counts as trigger 5 in a group outside the counted readings is part of the audit that is
+  running.
+- **Trigger 6 is not computed.** It compares a headline interval with the same contrast in a sister
+  experiment, and experiment 716's `part1.json` does not exist yet. Trigger 2 does not apply,
+  because the result matches its prediction, and trigger 7 was not assessed.
+- **The audit has not finished, and the decision about it is with the manager.** The result of the
+  running audit, with every leave-one-out number, will go on this page.
 - **Cold nights.** The cold-night difference is +0.0011 at the six signed-MW Primaries and -0.0406
   at the eight MVA-only Primaries (`cold_night_difference` in `part2.json`). The guard of
   `supported` for the six signed-MW Primaries holds, and for the eight MVA-only Primaries the
@@ -304,7 +323,9 @@ seeds of arm `M` in world WH are noisier than its limit.** The pre-registered pr
 0.0109 in world WH against the limit of 0.0225, and 0.0121 in world WT against the limit of 0.134.
 Seeds 1 and 2 of arm `M` in WH have a last-10 noise of 0.029 and 0.031, above the WH limit, so the
 rung-4 pass in WH depended on seed 0. In WT, seeds 1 and 2 have 0.038 and 0.016, below the WT limit.
-The numbers review checks this reading.
+A fresh numbers review checked this reading against the stored tables of part 1 and found no
+mismatch in the page's quotations of them. These values are copied from the page of experiment 716
+and are not re-derived here.
 
 **The expectation, written before any fit, was a tie, and the result was a tie.** Six earlier
 experiments found that an explicit PV term built
@@ -484,7 +505,9 @@ before any fit of `M`.** The stored rung-4 pass came from an upper-tail world dr
 validation days, 3 of 10 fresh draws reached 0.010 and the mean was 0.0087. Before any fit of `M`,
 and with those values known, the `gap` and KF9 to KF12 were moved to the 236 days after the cutoff
 and the rung rule gained a condition on the mean over draws 0 to 7. The world itself was not
-changed. The change turns rung 5 from a fail into a pass (0.0099 on the 60 days at draw 0, 0.0147 in
+changed. The rung 5 values below are copied from the page of experiment 716 and not re-derived here,
+because `world_rung.json` stops at rung 4. The change turns rung 5 from a fail into a pass (0.0099
+on the 60 days at draw 0, 0.0147 in
 WH and 0.1163 in WT on the 236 days), so a failed early-stopping pre-check at rung 4 leads to rung 5
 and not to a stop. Rung 4 is chosen: WH's eight draws on the 236 days have a mean of 0.0129, and
 WT's have a mean of 0.1123. A second failure of the pre-check after the step up to rung 5 goes to
@@ -524,17 +547,23 @@ two stages that each fit trains, and stage 3 is the second).
 The forecasts `HT-cams` and `HT-convention` (all 40 fold-seed cells), and `HT-nopv`, `HT-lookahead`,
 `HT-scale0.7`, and `HT-scale1.3` (8 folds, seed 0) are stored under `work/fits/`.
 
-**GPU time: 23.7 GPU-process-hours are counted for F7 as a whole, and part 2's arms took 8.4.**
-The figure sums the start and end times of every GPU job in the F7 run logs (22.5 hours),
-the two known-answer fits of arm `M` in worlds WH and WT at seed 0 (1.1 hours, from file times),
-the KF7 check (0.02 hours), and the attention extraction (about 1 minute, which runs on the GPU).
+**GPU time: 23.6 GPU-process-hours are counted for F7 as a whole, and part 2's arms took 8.4.**
+The 23.6 hours are the sum of these jobs, which ran under GPU settings:
+
+- the start-to-end times of the GPU jobs in the F7 run logs, 22.4 hours, after leaving out
+  the CPU baseline-scoring run of `f7w_chain.log` (about 0.1 hours);
+- the two known-answer fits of arm `M` in worlds WH and WT at seed 0, 1.13 hours, from file times;
+- the KF7 check, 0.02 hours;
+- the attention extraction, 0.02 hours.
+
 Part 2's share is arm `HT` 5.0, arm `HT-S` 2.4, and arm `T` 1.0 hours. The total stays under the
-manager's stop line of 26. If the rebuild of the known-answer world ladder (about 1.2 hours of
-wall time) ran on the GPU, the total is 26.1 hours. The code of that ladder
-(`e00716_world_rung.py` and `e00716_worlds.py`) names no device, so it is taken to run on the
-CPU, but the run log records no device, so the device of the ladder rebuild is unconfirmed. The
-run logs live in the workstation's `/tmp`, not in the data folder, and the figure is a sum over
-them.
+manager's stop line of 26. Two further items are not counted because their device is
+unconfirmed: the four runs of the known-answer world ladder (1.22 hours, from the seconds stored in
+`world_rung/rung1.json` to `rung4.json`) and the rebuild of that ladder (about 1.2 hours of wall
+time). Neither run log records a device, and the code of the ladder (`e00716_world_rung.py` and
+`e00716_worlds.py`) names none, so both are taken to run on the CPU. If both ran on the GPU, the
+total is 23.6 + 1.22 + 1.2 = 26.0 hours, so the range is 23.6 to 26.0 hours. The run logs live in
+the workstation's `/tmp`, not in the data folder, and the figures are sums over them.
 
 **Anonymisation.** The page names no metered generator and gives no capacity in megawatts. The
 forecast examples show Primaries and count days from the origin.
@@ -543,9 +572,10 @@ forecast examples show Primaries and count days from the origin.
 
 Two Opus design reviews preceded this page, and the second review's finding S7 changed one verdict
 rule before any fit, as the decision rule states. Code reviews of the scripts and a read of the
-lean-loader diff took place before the final scoring. Still to come: a fresh numbers review of this
-page against the stored tables, a write-up review, a prose review, and the manager's decision on
-whether audit trigger 4 or 3 needs an audit.
+lean-loader diff took place before the final scoring. A fresh numbers review then checked every
+contrast, interval, seed count, secondary reading, fit count, and SHA-256 value on this page against
+the stored tables, and found them correct. Still to come: the result of the running read-only audit
+of triggers 3, 4, and 5, a write-up review, and a prose review.
 
 ## Files
 
@@ -553,7 +583,8 @@ whether audit trigger 4 or 3 needs an audit.
   `HT`, `HT-S`, and `H` with the scoring code of experiment 716 (contrasts B1 and B2, guards,
   verdict, secondary read-outs). It also holds `load_all_lean`, which replaces part 1's loader
   with one that loads one fold at a time and keeps 7 columns per per-seed row, because the
-  5-seed run of the unpatched loader needs more than 16 GB. SHA-256 of the file as committed with
+  5-seed run of the unpatched loader needs an estimated 14 to 17 GB (estimated from row counts
+  and column widths, not measured). SHA-256 of the file as committed with
   the patch: `adfc8a4f0af7f2d1168e81ae786c94e323aadbbfb6acf40ec3f4ecae6a7c6648`. It ran the final
   5-seed
   scoring of part 2 (`score/part2.json` and `score/secondary_part2.json`).
