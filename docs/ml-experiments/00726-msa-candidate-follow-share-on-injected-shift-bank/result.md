@@ -459,6 +459,11 @@ files:** with experiment 667's paths, the copied `_done` would make KC2 pass by 
   half-hour of each window, not only the history half-hours that `M1` sees at the counted origins, and
   "below zero" at the six signed-MW Primaries can be real reverse flow. The coverage readings use
   the seed-mean quantiles.
+- Four known nits are accepted as fail-safe. The MSA command writes `clip_<month>.json` only after
+  its pass loop, so a rerun with no pass left never writes it, and `report` then raises. The
+  `coverage` command reads five seeds and takes no `--plan` option, so it raises under the two-seed
+  plan. No test covers the clean-power guard of readings 7 and 8. The constant
+  `CLEAN_GUARD_TOLERANCE` sits between `METRICS` and its docstring in `e00726_readings.py`.
 - Phase 5 (the attention extraction) is cut. It is the first cut in the order of cuts below, and
   no code for it exists. The write-up therefore has no attention maps from this experiment. The
   figures script is still to be written before the write-up.
