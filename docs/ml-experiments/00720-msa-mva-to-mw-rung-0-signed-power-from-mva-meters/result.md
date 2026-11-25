@@ -241,11 +241,11 @@ arm that carries the headline (the hindsight model on V2) and then the differenc
 - **Architecture:** the hindsight model is a hidden Markov model for the readings of one Primary.
   The reading is `sqrt(X² + Q²)` with Student-t noise (4 degrees of freedom), where `X` is the
   signed power, `D − c p − n g` (demand `D`, the F7 estimate `p` of unmetered solar output scaled by
-  its capacity `c`, and `n` units of size `g` running), and `Q` is a reactive floor of 2 points of
-  capacity. The demand mean is a regression on the calendar, and on temperature where a series has
-  weather. The residual is a first-order autoregression on a grid of residual values (21 values in
-  the V2 harness, so 84 states), and the emission sits on the transition so that the averaging
-  within a half-hour is exact. The output per half-hour is a two-lobe signed distribution, smoothed
+  its capacity `c`, and `n` units of size `g` running), and `Q` is a reactive floor (0.14 MVA in
+  the V2 harness, and 2 points of capacity in rung 0b). The demand mean is a regression on the
+  calendar, and on temperature where a series has weather. The residual is a first-order
+  autoregression on a grid of residual values (21 values in the V2 harness, so 84 states), and the emission sits on the transition so that the averaging within a
+  half-hour is exact. The output per half-hour is a two-lobe signed distribution, smoothed
   and filtered, stored as 11 signed quantiles and the probability that `X` is negative.
 - **Architecture, trend:** a slow trend term keeps a drift of demand from reading as units. It is
   the 0.8 quantile of the daily-mean residual over a 21-day centred window, smoothed over 7 days and
