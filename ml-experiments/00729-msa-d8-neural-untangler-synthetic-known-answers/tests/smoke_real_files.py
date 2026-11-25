@@ -55,7 +55,7 @@ def check_era5_weather() -> str:
         f"wind speed within 0 to 40 m/s: {bool(frame['wind_speed_10m'].is_between(0.0, 40.0).all())}, "
         f"precipitation never negative: {bool((frame['precipitation'] >= 0.0).all())}, "
         f"precipitation unit is kg per square metre per second (mean annual total of 300 to 1,500 mm): "
-        f"{300.0 <= float(frame['precipitation'].cast(pl.Float64).mean() or 0.0) * data.MM_PER_HOUR_PER_KG_M2_S * 8766.0 <= 1500.0}"
+        f"{300.0 <= float(frame['precipitation'].cast(pl.Float64).to_numpy().mean()) * data.MM_PER_HOUR_PER_KG_M2_S * 8766.0 <= 1500.0}"
     )
 
 
