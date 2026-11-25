@@ -129,7 +129,7 @@ def test_solar_is_zero_at_night_and_capped_by_the_capacity_range() -> None:
         seg = segment(world="solar", seed=seed, cal=cal)
         on = seg.cal_index >= 0
         assert seg.solar[on][:, 0:6].max() == 0.0
-        assert seg.solar.max() <= 1.2 * 150.0 * 1.0001 + 1e-6 or seg.source == "S2"
+        assert seg.solar.max() <= 1.2 * 400.0 * 1.0001 + 1e-6 or seg.source == "S2"
 
 
 def test_both_solar_sources_occur() -> None:

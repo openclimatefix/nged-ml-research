@@ -240,15 +240,15 @@ spells. Each segment draws one parameter set:
 |---|---|
 | Number of units | 1 to 4 |
 | Size of one unit | 10 to 50 points; total capped at 120 points |
-| Share of days with no run | 0.2 to 0.7 |
+| Share of days with no run | 0.05 to 0.5 |
 | Weekday evening run (start 15:00 to 17:30 local, 2 to 6 hours) | probability 0.3 to 0.9 a day |
 | Weekday morning run (start 05:30 to 08:30 local, 1 to 8 hours) | probability 0.1 to 0.6 a day |
 | Midday run (start 10:00 to 14:00 local, 1 to 4 hours) | probability 0 to 0.3 a day |
 | Weekend and bank-holiday factor on each run probability | 0.1 to 0.8 |
-| Multi-day spell (2 to 19 days, at part or full output) | 0 to 2 per 30 days |
+| Multi-day spell (2 to 6 days, at part or full output) | 0 to 0.5 per 30 days |
 | Units running in a run | 1 to all, drawn per run |
 | Output of a running unit | 0.6 to 1.0 of its size |
-| Ramp to full output | 0 to 2 half-hours |
+| Ramp to full output | 0 to 4 half-hours |
 | Trip of one unit, per running half-hour | probability 0 to 0.02, lasting 1 to 4 half-hours |
 | Start and stop times | continuous, so a half-hour that holds a switch carries a partial mean |
 
@@ -269,7 +269,7 @@ injected solar.** Each segment draws one source:
   alternating-current rating (1.0 to 1.4, with clipping), times a drawn capacity and a multiplicative
   noise with a half-hour autocorrelation of 0.9 and a standard deviation of 0.05.
 
-A segment with solar draws a capacity log-uniform from 5 to 150 points. Solar output is never
+A segment with solar draws a capacity log-uniform from 60 to 400 points. Solar output is never
 negative and is zero when the sun is below the horizon. The stored CAMS index changes once an hour
 ([experiment 722](../00722-msa-mva-bsp-closure-and-fast-hint/result.md)), so S2 and every CAMS input
 interpolate the hourly index linearly to half-hours.
@@ -370,6 +370,39 @@ failure stops the line (verdict row 0). The test banks must also hold at least 2
 half-hours outside a dead band of 2 points, and at least 200 in the two BSP test months, or the line
 stops at row 0. The plan's simulation expects about 4,400 and about 1,100, so the counts have a
 margin of about 2 and 5 (section "Verdict table").
+
+**Gate attempt 1 failed its share checks and passed its BSP-step checks.** The first run of the gate
+on the training bank of seed 0 gave these shares. In engine-only worlds against the real net era,
+the share of days with a daily minimum below 1.0 MVA was 0.144 against 0.172 (ratio 0.84, inside
+the range), and the share of half-hours below 1.0 MVA was 0.042 against 0.0119 (ratio 3.5, outside
+0.5 to 2.0). In engine-and-solar worlds against the real solar era, the share of days was 0.215
+against 0.536 (ratio 0.40, outside), and the share of half-hours was 0.049 against 0.045 (ratio 1.1,
+inside). The BSP-step conditions passed, with 7 finite synthetic fits. The synthetic engine therefore
+holds the reading at the floor for too many consecutive half-hours in the net era, and too few
+solar-era days reach the floor. The gate read no network output and no score.
+
+**The one permitted re-tune changed five ranges, chosen offline from 129 candidate range sets.**
+`e00729_gate_calibration.py` builds small synthetic banks for each candidate, on a training-bank
+seed that no fit and no gate uses, and prints the four shares (days and half-hours, engine-only
+and engine-and-solar worlds) as ratios to the real shares. It ran on the CPU, read D8's base
+readings to build the synthetic worlds, and read no network output and no score, because no fit
+existed. It tried 8 candidates, then 73 (spells, solar capacity, and ramps), then 48 (engine
+frequency and size, and solar capacity), and the set that kept every ratio furthest inside 0.5 to
+2.0 was taken. The ranges changed from attempt 1 are these:
+
+| Range | Attempt 1 | Re-tune |
+|---|---|---|
+| Share of days with no run | 0.2 to 0.7 | 0.05 to 0.5 |
+| Multi-day spells per 30 days | 0 to 2 | 0 to 0.5 |
+| Length of a multi-day spell | 2 to 19 days | 2 to 6 days |
+| Ramp to full output | 0 to 2 half-hours | 0 to 4 half-hours |
+| Solar capacity (log-uniform) | 5 to 150 points | 60 to 400 points |
+
+Every other range, and every registered bar, is unchanged. Spells at constant output held the
+reading at the floor for long stretches, so they are rarer and shorter, and the engine runs on more
+days; larger solar capacities make more solar-era days cross the floor. The offline shares of the
+chosen set were 0.70 and 1.2 times the real net-era shares (days, half-hours) and 0.64 and 0.63 times
+the real solar-era shares. A second failure of the gate ends the line at verdict row 0.
 
 ## Arms and architectures
 
@@ -985,6 +1018,8 @@ edited.
   bars, and the harm and reachability checks.
 - `e00729_real.py`: R1, K1, K2, R2, and R3.
 - `e00729_leakage.py`: the leakage assertions of verdict row 1.
+- `e00729_gate_calibration.py`: the offline calibration behind the one permitted re-tune of the
+  simulator ranges; it prints share ratios only and reads no network output and no score.
 - `e00729_stages.py`, `e00729_cli.py`, `e00729_report.py`, `e00729_figures.py`, and `run.sh`: the
   stage orchestration (including the `figures` stage, which writes figures 1, 2, and 6), the command
   line, the printed report (which writes the other figures, among them figure 8), the figure code,
