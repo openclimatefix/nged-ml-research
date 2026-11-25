@@ -251,3 +251,27 @@ def test_the_pv_scales_are_state_dict_buffers_under_the_names_the_check_reads() 
         float(state[k]) == 1.0 for k in keys
     )  # the uncalibrated start; `calibrate_scale` sets them
     assert cwc.pv_scale_keys(state={"trunk.weight": 0, "scale_like": 0}) == []
+
+
+# --------------------------------------------------------------------------- wave1.sh
+
+
+def test_wave1_script_names_the_jobs_of_wave_1_in_order_without_retries() -> None:
+    script = Path(__file__).parent.parent / "wave1.sh"
+    assert subprocess.run(["bash", "-n", str(script)], check=False).returncode == 0
+    text = script.read_text()
+    assert not any(word in text for word in ("until ", "while ", "retry", "sleep"))
+    listed = subprocess.run(
+        [str(script), "--list"], capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    steps = [line.split(" ", 1)[1].split() for line in listed]
+    assert [s[0] for s in steps][:2] == ["stage0", "probe"]
+    assert steps[-1] == ["quicklook"]
+    fits = [dict(zip(s[1::2], s[2::2], strict=False)) for s in steps if s[0] == "fit"]
+    predicts = [dict(zip(s[1::2], s[2::2], strict=False)) for s in steps if s[0] == "predict"]
+    keys = [
+        fit.Job(arm=f["--arm"], world=f["--world"], fold=f["--fold"], seed=int(f["--seed"])).key
+        for f in fits
+    ]
+    assert keys == [j.key for j in fit.wave_jobs(wave=1)]
+    assert fits == predicts
