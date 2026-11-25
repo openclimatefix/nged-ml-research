@@ -1207,6 +1207,115 @@ repeating. The test and validation months are defined by the rule above, and the
 in experiment 729's private `PRIVATE/splits.md`. Printed output holds counts, shares, flags, and
 scores only, never a month, a date, an engine size, a series identifier, or a register value.
 
+## Synthetic world gallery
+
+**The gallery shows the output of every synthetic generator in the rebuilt banks, and each panel
+shows what the written list requires.** The panels are drawn from the test bank and the training
+bank of seed 0 before any fit. Every window carries its hours from the start of day 1 on the axis
+and no calendar date. Source S1 (the metered farms) appears only as seasonal aggregates, and no real
+generator series appears. The gallery found two faults when it was first drawn: the first run showed
+zero solar output for one to four half-hours in the middle of clear S2 days (see "A sky-gap bug
+found in the gallery, fixed after the first gate pass"), and the first render of G1 drew one window
+for five different engine features. The panels below are the third gallery run, on the repaired
+banks, with every automatic check passing and the design lead's reading recorded beside them.
+
+### G1: engine days
+
+**Each engine feature is a small multiple of 3 draws from different segments, and the draws differ
+in size, timing, and shape.** The evening and morning runs start from zero output and end inside
+their block. The ramp panels show a run that reaches its level over at least 2 half-hours. The trip
+panels show output that drops to zero for one to four half-hours inside a block and returns to the
+same level. The part-load panels keep the output under the sum of the unit sizes, which is drawn as
+a green line. The weekend panels start on a Saturday or Sunday with output. The units panel holds 3
+draws of one unit and 3 of several units; the several-unit draws show a run with two levels, and
+some one-unit days also show two levels where two runs overlap. The spell panel shows 5 days around
+a spell of 2 to 3 whole days at constant output.
+
+![G1: an evening run, 3 draws](gallery_g1_evening.svg)
+
+![G1: a morning run, 3 draws](gallery_g1_morning.svg)
+
+![G1: a run with a ramp, 3 draws](gallery_g1_ramp.svg)
+
+![G1: a trip inside a run, 3 draws](gallery_g1_trip.svg)
+
+![G1: part load, with the sum of the unit sizes, 3 draws](gallery_g1_part_load.svg)
+
+![G1: a weekend day, 3 draws](gallery_g1_weekend.svg)
+
+![G1: one unit (3 draws), then several units (3 draws)](gallery_g1_units.svg)
+
+![G1: a multi-day spell in a 5-day window, 3 draws](gallery_g1_spell.svg)
+
+### G2 and G3: solar output
+
+**In source S2 the solar output follows the clear-sky index, with no zero notch inside a day.** The
+panels show the clearest and the cloudiest day of each season by the clear-sky index. The output is
+plotted as a share of the drawn solar capacity, and the index sits on its own axis at the right. On
+the clearest days the output is a smooth arch that reaches about the drawn capacity in spring,
+summer, and autumn and a smaller share in winter. On the cloudiest days the output is low and varies
+with the index. The index is missing at the first and last sun-up half-hour of a day, so its line is
+broken there while the output continues.
+
+![G2: the clearest day of each season by the clear-sky index, source S2](gallery_g2_clear.svg)
+
+![G2: the cloudiest day of each season by the clear-sky index, source S2](gallery_g2_cloudy.svg)
+
+**In source S1 the 10%, 50%, and 90% bands of the daily shape are ordered in every season, and the
+90% band peaks near midday.** The bands are daily shapes at a drawn capacity, so their height spans
+the capacity range. The 10% band stays near zero because some days carry little or no output. No
+single S1 day is published.
+
+![G3: source S1, 10%, 50%, and 90% bands of the daily shape by season](gallery_g3_aggregate.svg)
+
+### G4 to G7: the synthetic meter and the masks
+
+**The synthetic BSP steps follow the real meter's steps and carry the injected steps in addition.**
+The panel draws the half-hour steps of the synthetic BSP meter beside the steps of the engine and
+solar injection. The BSP steps are noisy because the real meter's own variation stays in them, and
+the largest injection steps appear in the BSP steps as well.
+
+![G4: the synthetic BSP meter steps beside the injection steps](gallery_g4_bsp.svg)
+
+**The folded reading equals the signed truth where the truth is far from zero and sits at the
+reactive floor where the truth crosses zero.** Through the reverse-flow spell the reading mirrors
+the truth's magnitude, drops toward the floor at the crossing, and rises again, so the sign is
+hidden exactly where the truth is negative.
+
+![G5: the folded reading and the signed truth](gallery_g5_fold.svg)
+
+**On a day with no injection the signed truth equals the base demand.** The two lines coincide.
+
+![G6: a day with no injection](gallery_g6_base.svg)
+
+**Each masking style hides a different span of the reading channel, shaded grey, and the clean
+demand stays visible as the target.** Style K hides several short spans, style W hides one long
+span, style R hides one short span, and the causal cut hides every half-hour from its cut to the end
+of the window.
+
+![G7: the masked reading beside the clean demand for each style and for the causal cut](gallery_g7_masks.svg)
+
+### G8 and G9: realism and component checks
+
+**The synthetic share of half-hours below 1 MVA matches the real share only in sum: by hour of day,
+the synthetic share at midday is about twice the real one.** In the engine-only worlds the synthetic
+share is 0.0145 against 0.0119 in the real net era, and in the engine-and-solar worlds it is 0.043
+against 0.045 in the real solar era. By hour of day the synthetic share peaks near 0.038 between
+10:00 and 12:00 UTC, and the real share is near 0.02 at those hours. The real share peaks near 0.03
+at 08:00 UTC, where the synthetic share is also near 0.03. The realism gate compares only the daily
+and half-hourly shares per era, and those pass, so the gate's bands do not detect this difference in
+shape. No real series appears.
+
+![G8: real and synthetic shares of half-hours below 1 MVA, by world and by UTC hour](gallery_g8_realism.svg)
+
+**Every group of component checks has a lowest share of at least 0.99, and every bounded share is
+inside its bound.** The upper panel draws one point per check group (component, bank, and seed)
+against the bar of 0.99. The lower panel draws the excluded metered-zero shares against their bound
+of 0.05 and the zeroed mid-day shares against their bound of 0.01. The zeroed mid-day share is 0 in
+every bank.
+
+![G9: the component checks against their bar and bounds](gallery_g9_components.svg)
+
 ## Figures planned
 
 **Every published figure is safe to publish: synthetic series in detail, except those built from
