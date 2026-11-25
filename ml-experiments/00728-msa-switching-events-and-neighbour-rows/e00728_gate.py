@@ -19,8 +19,9 @@ holds fewer than 8, GH4 prints the floor-only count beside it and stops. The gat
 the floor-only set.**
 
 **What the harness approximates.** The training draws of GH5 and GH7 use the 709 panel's power as
-the cleaned power (`ctx.panel.power`) and a training span of the 730 days that end 28 days before the
-fold month. The fits use experiment 713's cleaned power and its own span, so the draws of the fits
+the cleaned power (`ctx.panel.power`) truncated at the first half-hour of the fold month (the
+training world reads nothing later) and a training span of the 730 days that end 28 days before
+the fold month. The fits use experiment 713's cleaned power and its own span, so the draws of the fits
 differ in their NaN pattern and in their onsets. The checks test the generator, not the fits' arrays.
 
 **GH5's rule, written before any real number was seen.** The draws are 50 per fold month, 400 in

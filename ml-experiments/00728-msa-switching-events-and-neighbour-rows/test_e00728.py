@@ -74,6 +74,28 @@ def test_training_world_is_deterministic_and_seeded() -> None:
     assert not np.array_equal(a.history, c.history, equal_nan=True)
 
 
+def test_training_world_ignores_power_after_the_end() -> None:
+    """Changing the cleaned power after `end` changes neither the arrays nor the event table."""
+    rng = np.random.default_rng(0)
+    clean = 0.5 + 0.05 * rng.standard_normal((nb.N_PRIMARIES, N_GRID))
+    mva = np.arange(nb.N_PRIMARIES) % 2 == 0
+    end = LAST + 100
+
+    def draw(power: np.ndarray) -> wd.TrainingWorld:
+        return wd.training_world(
+            clean=power, end=end, first=FIRST, last=LAST, world_seed=9, table=ring_table(),
+            capacity_mw=np.full(nb.N_PRIMARIES, 30.0), mva_only=mva,
+            vis=np.full(nb.N_PRIMARIES, 0.12),
+        )  # fmt: skip
+
+    changed = clean.copy()
+    changed[:, end:] = -5.0
+    a, b = draw(clean), draw(changed)
+    assert wd.world_hash(world=a) == wd.world_hash(world=b)
+    assert a.events == b.events
+    assert a.history.shape[1] == end
+
+
 def test_mirror_classes_and_sign_balance() -> None:
     """A third of temporary moves have each mirror class, and the sign does not depend on the kind."""
     world, _, _ = small_world(seed=5)

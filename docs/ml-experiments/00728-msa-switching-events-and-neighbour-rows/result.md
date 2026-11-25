@@ -118,7 +118,9 @@ real data was printed.** They are recorded here so that the commit order shows t
   two permanent changes to the MVA-only Primaries, where the floor test turns away most falls. The
   share of permanent changes among the events was then about 0.34 at the MVA-only Primaries and 0.22
   at the other Primaries, a cue that the group predicts the kind. Redrawing at the event's own
-  Primary removes the flow.
+  Primary removes the flow. A permanent change at a Primary that already holds two redraws its
+  onset until the draws run out and the change is dropped. That wastes time. The code leaves it as
+  it is, because a change would alter the redraw random stream.
 - **The first placement of a permanent change draws its onset as if the change lasted 28 days.** The
   onset is uniform over the schedule except its last 28 days, and the change then runs to the end of
   the training grid. A temporary move draws its onset over the schedule less its own length. The two
