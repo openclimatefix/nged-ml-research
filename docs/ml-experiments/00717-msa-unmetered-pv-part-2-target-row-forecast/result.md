@@ -261,25 +261,38 @@ look-ahead caveat for D19 and D21 applies. No attention extraction was run for a
   MVA-only Primaries it is +0.0048 [-0.0564, +0.0635] against a CRPS contrast of -0.0007, so the
   two point in different directions, and both intervals include zero. That is audit trigger 3 on
   its wording, with no verdict at stake.
-- **Audit triggers: the skill requires an audit before merge when any trigger holds.** Trigger 1
-  fires, and triggers 3, 4, and 5 are reported in the next three bullets.
+- **Audit triggers: the skill requires an audit before merge when any trigger holds, so a read-only
+  audit of triggers 3, 4, and 5 was run, and it found no flip.** Trigger 1 fires, triggers 3 and 4
+  fire on their wording, and trigger 5 fires on its wording in a report-only reading. A Sonnet-sized
+  agent that did not write the code recomputed each reading with the scorer's own functions, 100,000
+  resamples, 5 seeds, and no GPU, following the manager's ruling (b) to audit these triggers instead
+  of waiving them.
 - **Trigger 1 fires.** The known-answer check KF9 failed and the maintainer waived it, the same kind
   of waived check that experiment 713 counted as trigger 1.
-- **Trigger 3 fires nominally at the eight MVA-only Primaries.** The median-error contrast is
-  +0.0048 [-0.0564, +0.0635] against a CRPS contrast of -0.0007, and both intervals include zero. A
-  read-only audit is running.
-- **Trigger 4 fires on its wording at the eight MVA-only Primaries,** where the B1 point is -0.0007
-  and leaving out D4, D12, D21, D2, or D8 changes its sign. The audit is running.
-- **Trigger 5 (a nested arm beats its container) does not fire for the counted groups,** because
-  `audit_trigger_5.fires` is false and `HT-S` minus `H` moved the score by less than its own
-  interval's half-width. Whether `HT` being worse than `H` at D15 and D18, pooled at +0.136 [+0.018,
-  +0.269], counts as trigger 5 in a group outside the counted readings is part of the audit that is
-  running.
+- **Trigger 3 fires nominally at the eight MVA-only Primaries, and it cannot change the verdict.**
+  B1 on CRPS is -0.00074 [-0.0422, +0.0385] at 98.75%. B1 on the normalised MAE of the median is
+  +0.00480, with [-0.0564, +0.0635] at 95% and [-0.0726, +0.0780] at 98.75%. Both match `part2.json`
+  exactly. The verdict rule counts CRPS only, and even if the MAE counted, its interval includes
+  zero and lies inside the limit of 0.16. The per-seed CRPS differences are +0.024, -0.037, +0.028,
+  -0.012, and +0.027, so the sign is noise.
+- **Trigger 4 fires on its wording at the eight MVA-only Primaries, and no leave-one-out reading
+  flips the verdict.** B1 at those Primaries, leaving out each Primary in turn (98.75%): D3 -0.00203
+  [-0.0487, +0.0429], D19 -0.00236 [-0.0486, +0.0403], D4 +0.00054 [-0.0452, +0.0437], D12 +0.00275
+  [-0.0360, +0.0349], D22 -0.01401 [-0.0518, +0.0213], D21 +0.00086 [-0.0444, +0.0441], D2 +0.00002
+  [-0.0464, +0.0455], and D8 +0.00830 [-0.0221, +0.0438]. The points match the stored
+  `leave_one_out.eight.without_primary` values to 15 digits. Every interval includes zero and lies
+  inside plus or minus 0.16, and the largest interval end is +0.0455 (D2 left out).
+- **Trigger 5 (a nested arm beats its container) does not fire for the counted groups, and fires on
+  its wording at D15 and D18 as a report-only reading.** Arm `H` is nested in `HT`, and `H` beats
+  `HT` at those two Primaries: +0.136 [+0.018, +0.269] at 95%. The scorer's `audit_trigger_5` tests
+  only the two counted groups at 98.75% and is false, so the reading does not count toward the
+  verdict. The reading is weak: it covers only two Primaries, it is a 95% report-only interval among
+  many cuts, and its month-block t interval of -0.025 to +0.290 includes zero, with 3 of 5 seeds
+  sharing the sign. The second clause of the trigger (a control that should change nothing) did not
+  fire.
 - **Trigger 6 is not computed.** It compares a headline interval with the same contrast in a sister
   experiment, and experiment 716's `part1.json` does not exist yet. Trigger 2 does not apply,
   because the result matches its prediction, and trigger 7 was not assessed.
-- **The audit has not finished, and the decision about it is with the manager.** The result of the
-  running audit, with every leave-one-out number, will go on this page.
 - **Cold nights.** The cold-night difference is +0.0011 at the six signed-MW Primaries and -0.0406
   at the eight MVA-only Primaries (`cold_night_difference` in `part2.json`). The guard of
   `supported` for the six signed-MW Primaries holds, and for the eight MVA-only Primaries the
@@ -574,8 +587,9 @@ Two Opus design reviews preceded this page, and the second review's finding S7 c
 rule before any fit, as the decision rule states. Code reviews of the scripts and a read of the
 lean-loader diff took place before the final scoring. A fresh numbers review then checked every
 contrast, interval, seed count, secondary reading, fit count, and SHA-256 value on this page against
-the stored tables, and found them correct. Still to come: the result of the running read-only audit
-of triggers 3, 4, and 5, a write-up review, and a prose review.
+the stored tables, and found them correct. A read-only audit of triggers 3, 4, and 5 followed and
+found no flip. Still to come: a write-up
+review and a prose review.
 
 ## Files
 
