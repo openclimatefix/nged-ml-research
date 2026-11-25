@@ -139,6 +139,21 @@ def limit_gpu_memory(*, device: str) -> None:
         torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_LIMIT_GB / total), device)
 
 
+def max_diff_to_stored(*, stored: pl.DataFrame, q: np.ndarray, valid: np.ndarray) -> float:
+    """Return the max abs difference between the stored quantiles and the case's, matched on valid time."""
+    assert stored.height == len(valid), (
+        f"the stored forecast has {stored.height} rows for the case's {len(valid)} valid times"
+    )
+    stored = stored.with_columns(v=pl.col("valid_time").dt.epoch("us")).sort("v")
+    order = {int(v): i for i, v in enumerate(valid)}
+    rows = [order[int(v)] for v in stored["v"].to_list()]
+    worst = float(np.abs(stored.select(QCOLS).to_numpy() - q[rows]).max())
+    assert worst <= SCORED_ATOL, (
+        f"the extract's quantiles differ from the scored forecast by {worst}"
+    )
+    return worst
+
+
 def check_against_scored(
     *, res: mdl.MsaOutput, batch: object, data: inp.FoldData, p: int, c: int, arm: str,
     month: str, seed: int,
@@ -164,18 +179,12 @@ def check_against_scored(
         .filter(
             (pl.col("time_series_id") == int(ids[p]))
             & (pl.col("power_fcst_init_time").dt.epoch("us") == origin)
+            & pl.col("valid_time").dt.epoch("us").is_in(valid.tolist())
         )
         .select("valid_time", *QCOLS)
         .collect()
     )
-    stored = stored.with_columns(v=pl.col("valid_time").dt.epoch("us")).sort("v")
-    assert stored.height > 0, "the case's origin is not in the stored forecast"
-    order = {int(v): i for i, v in enumerate(valid)}
-    rows = [order[int(v)] for v in stored["v"].to_list()]
-    worst = float(np.abs(stored.select(QCOLS).to_numpy() - q[rows]).max())
-    assert worst <= SCORED_ATOL, (
-        f"the extract's quantiles differ from the scored forecast by {worst}"
-    )
+    worst = max_diff_to_stored(stored=stored, q=q, valid=valid)
     print(f"case matches the scored forecast: max abs difference {worst:.2e}", flush=True)
 
 
@@ -320,7 +329,7 @@ def title_params(*, title: list[str] | str) -> alt.TitleParams:
 
 
 def heat_chart(
-    *, frames: dict[str, np.ndarray], title: list[str], rows: str, cols: str
+    *, frames: dict[str, np.ndarray], title: str | list[str], rows: str, cols: str
 ) -> alt.Chart:
     parts = []
     for name, m in frames.items():

@@ -13,7 +13,8 @@ if [ "${1:-}" = "--random-init" ]; then
     shift
 fi
 # Enforce the manager's launch rules: fewer than two other GPU processes, and a one-minute load under 24.
-others=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -c . || true)
+apps=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader) || { echo "nvidia-smi failed" >&2; exit 1; }
+others=$(printf '%s\n' "$apps" | grep -c . || true)
 if [ "$others" -ge 2 ]; then
     echo "$others other GPU processes are running; wait until fewer than two" >&2
     exit 1
