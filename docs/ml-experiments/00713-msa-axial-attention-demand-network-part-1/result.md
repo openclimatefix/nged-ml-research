@@ -601,14 +601,26 @@ report script prints the waiver and fires audit trigger 1 (a control fails).
 docstring lines of the experiment's scripts were rewrapped, and the fits were run at the old
 hash.** The hash is the first 16 characters of a SHA-256 over the bytes of the fit modules
 (`arms.FIT_CODE_FILES`) and the hashes of the imported recipe modules, so any edit to a docstring
-changes it. The gate file and the stage 3 logs of arms `M1`, `E`, and `P` (the logs the proof
-script `e00713_attention_proof.py` reads) record e85b84e2ea04b3cb. The
-rewrap changed docstring text only: the abstract syntax tree of each changed script, with its
+changes it. The gate file and the stage 3 logs of arms `M1`, `E`, and `P` record e85b84e2ea04b3cb.
+The rewrap changed docstring text only: the abstract syntax tree of each changed script, with its
 docstrings removed, is identical before and after (proof script and output in
-`briefs/msa_architecture/lint_rewrap_proof/` in the private data folder). The fit, predict, and
-attention-extract scripts would now refuse to resume or read the stored states without
-`--accept-code-change e85b84e2ea04b3cb`, and `e00713_waive_gate.py` would refuse to write the
-waiver again, because it pins the old hash.
+`briefs/msa_architecture/lint_rewrap_proof/` in the private data folder). Ten docstrings were
+reworded, not only rewrapped, because their first sentence was too long for one line: the module
+docstrings of `e00713_smoke.py` and `e00713_token_diagnostic.py`, and the docstrings of
+`contrast_cells` and `cmd_contrasts` in `e00713_figures.py`, `cmd_headline` and `cmd_swaps` in
+`e00713_score.py`, `audit_triggers` and `median_minus_mean` in `e00713_report.py`,
+`limit_gpu_memory` in `e00713_attention.py`, and `run_frame_timing` in `e00713_inputs.py`. Each
+keeps its meaning.
+
+**No fit was rerun, and four scripts now refuse the stored states.** `e00713_attention.py extract`
+hard-codes no accepted old hash and has no `--accept-code-change` flag, so it refuses outright.
+`e00713_fit.py` checks the gate file first, so a resume needs `--accept-gate-change
+e85b84e2ea04b3cb` as well as `--accept-code-change e85b84e2ea04b3cb`. `e00713_predict.py` refuses
+a stage 3 log with another code hash unless `--accept-code-change` names the old hash.
+`e00713_waive_gate.py` would refuse to write the waiver again, because it pins the old hash and
+also pins the sha256 of `e00713_known_answer.py`, which changed from 8fa3cfbdac29 to b90bd59cf987.
+`e00713_attention_proof.py` now exits with status 1, and all 48 stage 3 logs it reads print
+DIFFERS.
 
 **Option 1 as written covers KA3 only, and the waiver covers KA12 as well.** KA12 also failed at the
 amended gate: arm `G` followed 0.0395 against the limit of arm `M` minus 0.05 = 0.0918, so the stem
