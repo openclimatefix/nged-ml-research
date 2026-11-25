@@ -55,28 +55,28 @@ on a second synthetic world that the training never saw. This page is the plan: 
 has been fitted, no GPU has been used, no code has been written, and every number below is a design
 value or a figure from an earlier experiment.
 
-## Open decisions for the maintainer
+## Decisions of the maintainer
 
-**Three decisions belong to the maintainer, and no fit and no code run for experiment 728 until the
-maintainer answers (a), (b), and (c).** The three decisions are stated below as the design states
-them. The "recommended default" of each decision is the manager's recommendation and is not an
-answer. The ceiling of 18 GPU-process-hours stands.
+**The maintainer has answered decisions (a), (b), and (c), and all three are closed.** The three
+decisions are stated below as the design states them, each followed by the answer. The ceiling of 18
+GPU-process-hours stands.
 
 - **(a) What happens if the reference-error term takes the pooled count below the floor of 60.**
   The count of usable switching events is 81 before the reference-error term of the visible-depth
   definition, and the count after the term is not known until the harness rebuilds the reference.
   The design stops the experiment before any GPU job if the count falls below 60. The alternative
   is to define the counted set of `g2` by the floor of 0.10 of capacity alone, which keeps all 81
-  events and counts events smaller than 2 times the reference error. Recommended default: define
-  the counted set by the 0.10-of-capacity floor alone only if the floor of 60 still holds, and
-  otherwise stop as written. No loosening after the fact.
+  events and counts events smaller than 2 times the reference error. **Closed: keep as designed.**
+  The counted set is defined by the 0.10-of-capacity floor alone only if the floor of 60 still holds
+  after the reference-error term. Otherwise the experiment stops as written, and the floor is not
+  loosened after the fact.
 - **(b) Whether to accept that the experiment probably ends at 2 seeds.** T1 can be above zero, and
   the futility rule then fires unless T2 is below zero in a group. The verdict on A1 would then
-  rest on 2 seeds and at most 81 events. Recommended default: accept.
+  rest on 2 seeds and at most 81 events. **Closed: accepted.**
 - **(c) Whether the three values set in the latest revision of the design stand.** The values are
   GH4's floors of 60 pooled events and 8 events per fold month, and the cap of two permanent
   changes per Primary within +-0.50 of capacity. No measurement stands behind any of the three.
-  Recommended default: confirm as written.
+  **Closed: the three values stand as written.**
 
 **Unconfirmed assumptions, stated as the design states them.** The implementer confirms each one
 before the plan commit.
