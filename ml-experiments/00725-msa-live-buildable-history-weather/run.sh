@@ -41,7 +41,7 @@ fi
 gpu_job=no
 big_job=no
 case "$script" in
-e00725_fit.py | e00725_predict.py) gpu_job=yes big_job=yes ;;
+e00725_fit.py | e00725_predict.py | e00725_t3_candidate.py) gpu_job=yes big_job=yes ;;
 e00725_checks.py)
     [ "${1:-}" = fold ] && gpu_job=yes && big_job=yes
     [ "${1:-}" = kl3r ] && big_job=yes
@@ -51,7 +51,7 @@ if [ "$gpu_job" = yes ]; then
     # KL3r, the cache step, and the other checks run on the CPU outside the GPU slot. Only the
     # interpreter processes count (a command line that starts with a python binary), so this shell,
     # the shell of the caller, and `sh -c` wrappers never match.
-    running=$(pgrep -fc "^[^ ]*/python[0-9.]* [^ ]*/e00725_(fit|predict)[.]py|^[^ ]*/python[0-9.]* [^ ]*/e00725_checks[.]py fold" || true)
+    running=$(pgrep -fc "^[^ ]*/python[0-9.]* [^ ]*/e00725_(fit|predict|t3_candidate)[.]py|^[^ ]*/python[0-9.]* [^ ]*/e00725_checks[.]py fold" || true)
     if [ "${running:-0}" -ge "${MAX_GPU_PROCESSES:-2}" ]; then
         echo "${running} F8 GPU processes already run (limit ${MAX_GPU_PROCESSES:-2})" >&2
         exit 1

@@ -17,7 +17,7 @@ every fit runs in a capped scope of its own, and it never runs more than two GPU
 - 1: `L` on the quick-look folds, seeds 0 and 1, and the `S` predictions; then the quick look.
 - 2: `L` on the other 4 folds, seeds 0 and 1, and the `S` predictions.
 - 3: `Z` on the quick-look folds, seeds 0 and 1, less the phase 0 fit; then the rule on `Z` and the two-seed reading.
-- 4: the `T3` predictions of the stored `M*` and of `L` (target-row summary moved to D - 3).
+- 4: the `T3` predictions of the stored `M*`, of `L`, and of the stored Candidate (target-row summary moved to D - 3).
 - 5: the budget probe, only if `decisions/probe_flag.json` says so (cut to fold 2025-11 if the projection says so).
 - 6: `L` on 8 folds, seeds 2 to 4, unless `decisions/futility.json` says the futility rule fired.
 - 7: `E` on the quick-look folds, seeds 0 and 1, unless the projection cut it.
@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import Final
 
 import e00725_common as cm
+import e00725_t3_candidate as t3c
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 HERE: Final = Path(__file__).resolve().parent
@@ -127,6 +128,21 @@ def predict_jobs(*, arm: str, months: tuple[str, ...], seeds: tuple[int, ...]) -
     return [predict_job(arm=arm, month=m, seed=s) for m in months for s in seeds]
 
 
+def t3_candidate_jobs(*, months: tuple[str, ...], seeds: tuple[int, ...]) -> list[Job]:
+    """Return one job per fold and seed that predicts the stored Candidate with the target-row summary moved to D - 3."""
+    return [
+        Job(
+            kind="predict",
+            script="e00725_t3_candidate.py",
+            args=(t3c.ARM, month, str(seed)),
+            output=t3c.fit_file(month=month, seed=seed),
+            gpu=True,
+        )
+        for month in months
+        for seed in seeds
+    ]
+
+
 def check_jobs() -> list[Job]:
     """Return the wiring-check jobs of phase 0, in order."""
     checks = cm.work(data_dir=ML_EXPERIMENTS_DATA_DIR) / "checks"
@@ -202,6 +218,7 @@ def phase_jobs(*, phase: int) -> list[Job]:
         return [
             *predict_jobs(arm="T3-M", months=cm.ALL_FOLDS, seeds=cm.TWO_SEEDS),
             *predict_jobs(arm="T3-L", months=cm.ALL_FOLDS, seeds=cm.TWO_SEEDS),
+            *t3_candidate_jobs(months=cm.ALL_FOLDS, seeds=cm.TWO_SEEDS),
         ]  # fmt: skip
     if phase == 5:
         months = probe_months()

@@ -30,6 +30,7 @@ from typing import Final
 
 import e00725_common as cm
 import e00725_frozen as fz
+import e00725_t3_candidate as t3c
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -45,7 +46,7 @@ LEVEL: Final = sc713.LEVEL
 REPORT_LEVEL: Final = 95.0
 NOISE_FLOOR: Final = {2: {"six": 0.054, "eight": 0.142}, 5: {"six": 0.034, "eight": 0.090}}
 DELTA: Final = {2: {"six": 0.094, "eight": 0.25}, 5: {"six": 0.06, "eight": 0.16}}
-F8_ARMS: Final = ("L", "Z", "E", "S", "T3-M", "T3-L", "L-P", "Z-P")
+F8_ARMS: Final = ("L", "Z", "E", "S", "T3-M", "T3-L", "T3-C", "L-P", "Z-P")
 AUDIT_BIG: Final = 0.15
 AUDIT_MODERATE: Final = 0.10
 LS_BAND: Final = 0.02
@@ -58,6 +59,13 @@ GROUPS: Final = ("six", "eight")
 # ----------------------------------------------------------------------------------------- loading
 
 
+def arm_file(*, arm: str, month: str, seed: int) -> Path:
+    """Return the per-seed forecast file of an F8 arm; `T3-C` is the stored Candidate's prediction on moved inputs."""
+    if arm == t3c.ARM:
+        return t3c.fit_file(month=month, seed=seed)
+    return cm.fit_file(data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed)
+
+
 def load_arm(*, arm: str, seeds: tuple[int, ...], months: tuple[str, ...]) -> pl.DataFrame:
     """Return an arm's per-seed rows in contract origin and capacity shares, with a `seed` column.
 
@@ -68,7 +76,7 @@ def load_arm(*, arm: str, seeds: tuple[int, ...], months: tuple[str, ...]) -> pl
     parts = []
     for month in months:
         for seed in seeds:
-            path = cm.fit_file(data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed)
+            path = arm_file(arm=arm, month=month, seed=seed)
             frame = pl.read_parquet(path, columns=[*sc713.KEYS, *sc713.QCOLS]).with_columns(
                 seed=pl.lit(seed, dtype=pl.Int64)
             )
@@ -290,8 +298,7 @@ def available(*, arm: str, months: tuple[str, ...], seeds: tuple[int, ...]) -> b
     if arm not in F8_ARMS:
         return True
     return all(
-        cm.fit_file(data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=m, seed=s).exists()
-        for m in months for s in seeds
+        arm_file(arm=arm, month=m, seed=s).exists() for m in months for s in seeds
     )  # fmt: skip
 
 
@@ -301,7 +308,7 @@ def cmd_report_only() -> int:
         ("S", "C", cm.ALL_FOLDS), ("S", STAR, cm.ALL_FOLDS), ("L", "S", cm.ALL_FOLDS),
         ("L", "Z", cm.QUICK_FOLDS), ("Z", STAR, cm.QUICK_FOLDS), ("L", "E", cm.QUICK_FOLDS),
         ("E", "C", cm.QUICK_FOLDS), ("T3-L", "T3-M", cm.ALL_FOLDS), ("T3-L", STAR, cm.ALL_FOLDS),
-        ("T3-M", STAR, cm.ALL_FOLDS),
+        ("T3-M", STAR, cm.ALL_FOLDS), ("T3-L", "T3-C", cm.ALL_FOLDS), ("T3-C", "C", cm.ALL_FOLDS),
     ]  # fmt: skip
     out: dict = {"level": REPORT_LEVEL, "skipped": []}
     for t, r, months in plan:
@@ -326,7 +333,8 @@ def cmd_report_only() -> int:
             all(abs(out["L-S"][g]["point"]) <= LS_BAND for g in GROUPS)
         )
     out["note_T3"] = (
-        "T3 for the Candidate is not produced by this folder: only the T3-L against T3-M reading is printed."
+        "T3: the target row's CAMS day summary of UTC day D - 3 in all three arms (T3-C is the stored Candidate); "
+        "no arm was trained on the moved summary."
     )
     write(name="report_only", obj=out)
     return 0

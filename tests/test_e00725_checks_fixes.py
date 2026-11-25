@@ -64,6 +64,7 @@ def test_gpu_process_pattern_matches_interpreters_only() -> None:
     assert pattern.search(python + "e00725_fit.py L 2025-11 0")
     assert pattern.search(python + "e00725_predict.py L 2025-11 0")
     assert pattern.search(python + "e00725_checks.py fold 2025-11 train --device cuda")
+    assert pattern.search(python + "e00725_t3_candidate.py T3-C 2025-11 0 --device cuda")
     assert not pattern.search(python + "e00725_checks.py kl3r 2025-11")
     assert not pattern.search(python + "e00725_sources.py train")
     for shell in (
