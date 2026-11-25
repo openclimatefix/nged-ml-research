@@ -60,5 +60,13 @@ export NGED_S3_BUCKET_ACCESS_KEY="${NGED_S3_BUCKET_ACCESS_KEY:-dummy}"
 export NGED_S3_BUCKET_SECRET="${NGED_S3_BUCKET_SECRET:-dummy}"
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 export POLARS_MAX_THREADS=1 RAYON_NUM_THREADS=1
+python_bin="$(dirname "$root")/.venv/bin/python"
+if [ -n "${MEMORY_PEAK_FILE:-}" ]; then
+    # the scope's peak memory (page cache included) is written before the scope ends
+    mkdir -p "$(dirname "$MEMORY_PEAK_FILE")"
+    exec systemd-run --user --scope -q -p MemoryMax="${SLOT_MEM:-9G}" -p MemorySwapMax=0 -p OOMPolicy=continue \
+        sh -c '"$@"; status=$?; cat "/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)/memory.peak" > "$MEMORY_PEAK_FILE" 2>/dev/null; exit $status' \
+        sh "$python_bin" "$here/$script" "$@"
+fi
 exec systemd-run --user --scope -q -p MemoryMax="${SLOT_MEM:-9G}" -p MemorySwapMax=0 -p OOMPolicy=continue \
-    "$(dirname "$root")/.venv/bin/python" "$here/$script" "$@"
+    "$python_bin" "$here/$script" "$@"

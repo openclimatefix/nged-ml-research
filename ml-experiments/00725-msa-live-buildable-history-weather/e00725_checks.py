@@ -679,7 +679,11 @@ def run_fold(*, month: str, phase: str, device: str, data_dir: Path, only: set[s
         else:
             assert results["KL3"]["n_exempt_cells"] == 0, "KL3: a scored origin has exempt cells"
     if run("T3"):
-        results["T3_known_answer"] = t3_known_answer(live=lw.live, picks=two_origin_picks)
+        try:
+            results["T3_known_answer"] = t3_known_answer(live=lw.live, picks=two_origin_picks)
+        except AssertionError as error:
+            # T3 is report-only: the failure is recorded and gates phase 4, not the fold check
+            results["T3_known_answer"] = {"pass": False, "error": str(error)}
     if run("KL4"):
         results["KL4"] = kl4(live=lw.live, picks=picks[:TRAIN_SAMPLES])
     if run("KL6") and phase == "train":
@@ -698,9 +702,13 @@ def run_fold(*, month: str, phase: str, device: str, data_dir: Path, only: set[s
             )
         if run("KL1"):
             results["KL1_forecast"] = kl1_forecast(lw=lw, data_dir=data_dir, month=month)
-    results["pass"] = all(v.get("pass", True) for v in results.values() if isinstance(v, dict))
+    results["pass"] = all(
+        v.get("pass", True)
+        for k, v in results.items()
+        if isinstance(v, dict) and k != "T3_known_answer"
+    )
     path = checks_dir(data_dir=data_dir) / f"{month}_{phase}.json"
-    cm.write_json_atomic(obj=results, path=path)
+    cm.write_check_json(obj=results, path=path)
     print(json.dumps(results, indent=1, default=str)[:4000], flush=True)
     return results
 
@@ -731,7 +739,7 @@ def kl3r_fold(*, month: str, data_dir: Path, n_primaries: int) -> dict:
         "origins": origins,
         **pz.kl3r(lw=lw, samples=chosen, phase="train", scratch=scratch),
     }
-    cm.write_json_atomic(obj=result, path=checks_dir(data_dir=data_dir) / f"{month}_kl3r.json")
+    cm.write_check_json(obj=result, path=checks_dir(data_dir=data_dir) / f"{month}_kl3r.json")
     print(json.dumps(result, indent=1), flush=True)
     return result
 
@@ -804,7 +812,7 @@ def kl5(*, phase: str, data_dir: Path) -> dict:
         },
         "one_sided_nan_cells": one_sided_nan, "worst_abs_difference": worst,
     }  # fmt: skip
-    cm.write_json_atomic(obj=result, path=checks_dir(data_dir=data_dir) / f"kl5_{phase}.json")
+    cm.write_check_json(obj=result, path=checks_dir(data_dir=data_dir) / f"kl5_{phase}.json")
     print(json.dumps(result, indent=1), flush=True)
     assert result["pass"], f"KL5: stored B1 columns differ from the ft series: {worst}"
     return result
@@ -827,7 +835,7 @@ def kl8(*, data_dir: Path) -> dict:
     print("\n".join(text), flush=True)
     out["stored_run_frame"] = {"pass": ok, "text": text}
     out["pass"] &= ok
-    cm.write_json_atomic(obj=out, path=checks_dir(data_dir=data_dir) / "kl8.json")
+    cm.write_check_json(obj=out, path=checks_dir(data_dir=data_dir) / "kl8.json")
     assert out["pass"], "KL8: a negative margin or a failed run-frame check"
     return out
 
@@ -838,7 +846,7 @@ def pure(*, data_dir: Path) -> dict:
         date(2025, 10, 28), date(2025, 11, 8), date(2026, 3, 31), date(2026, 6, 20),
     )]  # fmt: skip
     result = kl2_pure(contracts=contracts)
-    cm.write_json_atomic(obj=result, path=checks_dir(data_dir=data_dir) / "pure.json")
+    cm.write_check_json(obj=result, path=checks_dir(data_dir=data_dir) / "pure.json")
     return result
 
 
@@ -856,6 +864,9 @@ def collect(*, data_dir: Path, folds: Sequence[str]) -> dict:
         assert path.exists(), f"{path} is missing: run the check first"
         content = json.loads(path.read_text())
         assert content.get("pass"), f"{name} did not pass"
+        assert content.get("checks_hash") == cm.checks_hash(), (
+            f"{name} was written by other check code than the code that is running: rerun it"
+        )
         record[name] = content
     record["KL1_forecast_present"] = any(
         "KL1_forecast" in record.get(f"{m}_predict.json", {}) for m in folds

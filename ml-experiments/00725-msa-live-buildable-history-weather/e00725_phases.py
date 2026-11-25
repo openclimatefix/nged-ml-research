@@ -30,6 +30,8 @@ After each job it adds the job's seconds to `work/gpu_hours.json`.
 
 import argparse
 import json
+import os
+import re
 import statistics
 import subprocess
 import sys
@@ -79,8 +81,12 @@ class Job:
         return f"{self.script} {' '.join(self.args)}"
 
     def done(self) -> bool:
-        """Return whether the job's output exists."""
-        return self.output is not None and self.output.exists()
+        """Return whether the job's output exists, and for a check job whether the code that wrote it is current."""
+        if self.output is None:
+            return False
+        if self.kind == "check":
+            return cm.check_output_current(path=self.output)
+        return self.output.exists()
 
 
 def fit_job(*, arm: str, month: str, seed: int, smoke: bool = False) -> Job:
@@ -238,8 +244,11 @@ def gate_for(*, phase: int) -> None:
             f"the reproduction check ended `{repro['outcome']}`: the experiment stops until the manager "
             "writes decisions/repro_cleared.json"
         )
-        assert projection_file().exists(), (
-            "run `e00725_phases.py project` first (arm E is cut before phase 1)"
+        projection = read_json(path=projection_file())
+        assert projection, "run `e00725_phases.py project` first (arm E is cut before phase 1)"
+        assert float(projection["total"]) <= cm.CEILING_GPU_PROCESS_HOURS, (
+            f"the projection of {projection['total']} GPU-process-hours is above the ceiling of "
+            f"{cm.CEILING_GPU_PROCESS_HOURS}: ask the manager"
         )
     if phase == 2:
         audit = read_json(path=decisions / "quick_audit.json")
@@ -251,6 +260,14 @@ def gate_for(*, phase: int) -> None:
         assert "Z" not in cut_arms, (
             "the projection cut arm Z to the reproduction fit: phase 3 does not run"
         )
+    if phase == 4:
+        folder = cm.work(data_dir=ML_EXPERIMENTS_DATA_DIR) / "checks"
+        for month in cm.ALL_FOLDS:
+            for ph in ("train", "predict"):
+                t3 = read_json(path=folder / f"{month}_{ph}.json").get("T3_known_answer", {})
+                assert t3.get("pass"), (
+                    f"the T3 known-answer check of {month} {ph} has not passed: {t3}"
+                )
     if phase == 5:
         flag = read_json(path=decisions / "probe_flag.json")
         assert flag, "run `e00725_score.py probe-flag` first"
@@ -277,7 +294,11 @@ def run_job(*, job: Job, device: str) -> int:
     if job.script == "e00725_checks.py" and job.args[:1] == ("fold",):
         cmd += ["--device", device]
     print("RUN", " ".join(cmd), flush=True)
-    return subprocess.run(cmd, check=False).returncode
+    peak_dir = cm.work(data_dir=ML_EXPERIMENTS_DATA_DIR) / "memory_peak"
+    peak_dir.mkdir(parents=True, exist_ok=True)
+    label = re.sub(r"[^A-Za-z0-9_.-]+", "_", job.name)
+    env = {**os.environ, "MEMORY_PEAK_FILE": str(peak_dir / f"{label}.txt")}
+    return subprocess.run(cmd, check=False, env=env).returncode
 
 
 def add_seconds(*, job: Job, seconds: float, lock: threading.Lock) -> None:

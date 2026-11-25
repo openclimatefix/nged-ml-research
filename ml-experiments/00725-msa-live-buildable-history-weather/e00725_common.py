@@ -228,6 +228,21 @@ def checks_hash() -> str:
     return h.hexdigest()[:16]
 
 
+def write_check_json(*, obj: dict, path: Path) -> None:
+    """Write a check result with the `checks_hash` of the code that produced it."""
+    write_json_atomic(obj={**obj, "checks_hash": checks_hash()}, path=path)
+
+
+def check_output_current(*, path: Path) -> bool:
+    """Return whether a check result exists and carries the `checks_hash` of the code that is running."""
+    if not path.exists():
+        return False
+    try:
+        return json.loads(path.read_text()).get("checks_hash") == checks_hash()
+    except json.JSONDecodeError:
+        return False
+
+
 def assert_gate_checks_hash(*, gate: dict) -> None:
     """Refuse a wiring gate that was written by other check code than the code that is running."""
     assert gate.get("checks_hash") == checks_hash(), (
