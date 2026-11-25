@@ -225,8 +225,8 @@ does not restate the checks' numbers.
 - **Audit triggers:** trigger 2 fired, because the result contradicts the prediction that the paired
   contrast's lower bound sits above 0, and the one explanation offered (the demand mean has no
   weather input) is untested. No audit has run. Trigger 7 may also apply, because the plan of
-  experiment 724, which the maintainer has closed as parked, imports this code. Triggers 1 and 3 to 6 did not fire, since no control ran and no quantile
-  score or leave-one-site-out exists.
+  experiment 724, which the maintainer has closed as parked, imports this code. Triggers 1 and 3
+  to 6 did not fire, since no control ran and no quantile score or leave-one-site-out exists.
 - **Consistency gate:** the rerun of M2 agreed with experiment 694's stored output on all 396
   reruns, and none disagreed.
 - **Reviews:** an Opus agent reviewed the design and its addendum, and four Opus code reviews
