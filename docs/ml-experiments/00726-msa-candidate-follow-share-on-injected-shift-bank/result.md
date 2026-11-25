@@ -413,6 +413,8 @@ sign rule, which applies only to cells that would otherwise read rows 2 to 4.
     and 1. The reading needs no GPU, because every forecast it uses is stored.
 11. F4's reading S6 on the second event generator of experiment 714: each arm minus `C` after
     temporary moves, on F4's keys, with the Candidate's second-generator files of this experiment.
+    Reading S6 is a single-fold reading: it uses 1 fold (2025-11), 1 seed (seed 0), and 32 passes,
+    and every quotation of it must say so.
 
 ## Known-answer checks
 
@@ -451,8 +453,11 @@ files:** with experiment 667's paths, the copied `_done` would make KC2 pass by 
   command: the `zero` world of arm `N`, and of `M1` with `--mask-history`, at seed 0 on the first fold
   month and one more. A second row compares the masked `M1`'s zero world with experiment 713's
   stored forecast at 1e-4.
-- Experiment 715's `g2` forecasts exist for fold 2025-11 and seed 0 only, so reading S6 covers one
-  fold and one seed.
+- Experiment 715's second-generator forecasts exist for fold 2025-11 and seed 0 only. Reading S6
+  therefore uses 1 of the 4 bank folds and 1 of the 2 seeds, and the scorer skips every other
+  fold without printing a message. Producing the missing forecasts would be new GPU work on
+  experiment 715's F4 arm, which nobody has approved. The Candidate's second-generator files exist
+  for all 4 bank folds and both seeds.
 - Reading 8 uses the project's quantile score (twice the pinball loss over the 11 levels, as in
   F4's scorer), in points of capacity. Reading 7 has two halves: the safe-side share and the
   coverage of the central 90% interval, with the fall from the unshifted forecast. Reading 3 is
@@ -596,9 +601,9 @@ about 2.3 minutes (unverified).
 | 1. `C` on the 8 fold months and 24 passes: the host-only world at seeds 0 to 4, and the all-shifted world at seeds 0 and 1 in the same processes | 40 | 0.9 to 1.3 |
 | 2. `M1` on the all-shifted world: 8 fold months, seeds 0 to 4 | 40 | 1.3 to 1.7 |
 | 3. `K` and `E` on the all-shifted world: the 4 bank folds, seeds 0 and 1 | 16 | 0.5 to 0.7 |
-| 4. `C` on the second generator's world for S6: the 4 bank folds, seeds 0 and 1, 32 passes | 8 | 0.2 to 0.3 |
+| 4. `C` on the second generator's world for S6: the 4 bank folds, seeds 0 and 1 in one job per fold, 32 passes | 4 | 0.2 to 0.3 |
 | 5. Attention extraction of `M1` on shifted and unshifted history, for the figures | 6 | 0.1 to 0.2 |
-| **Total** | **About 135** | **About 3.5 to 4.6** |
+| **Total** | **About 131** | **About 3.5 to 4.6** |
 
 **The plan is fixed before phase 0: 5 seeds of `C` and `M1`, 8 fold months, and 24 passes, with `K`
 and `E` on the 4 bank folds at seeds 0 and 1.** Phase 0 prints pass or fail and the time projection
