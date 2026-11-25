@@ -13,6 +13,10 @@ import pytest
 
 e00721_paths.pin_threads()
 
+# The modules below import experiment 713's code, which main does not hold, so skip without it.
+pytest.importorskip("torch")
+pytest.importorskip("e00713_model")
+
 import e00721_arms as arms  # noqa: E402
 import e00721_cli as cli  # noqa: E402
 import e00721_driver as drv  # noqa: E402

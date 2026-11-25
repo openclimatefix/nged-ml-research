@@ -63,6 +63,9 @@ def with_world_target(*, source: bt.Source, power_z: torch.Tensor) -> bt.Source:
     Args:
         source: 713's source (weather, date-time, day types, and ensemble table are kept).
         power_z: `(16, G)` the world's standardised target, on 713's grid, NaN where absent.
+
+    Returns:
+        A source with the same weather, date-time, day-type, and ensemble arrays and the new target.
     """
     assert power_z.shape == source.power_z.shape, (power_z.shape, source.power_z.shape)
     return bt.Source(
