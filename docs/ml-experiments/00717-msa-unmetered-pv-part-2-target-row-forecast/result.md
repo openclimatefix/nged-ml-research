@@ -354,22 +354,35 @@ review, an audit if a trigger fires, a write-up review, and a prose review.
 ## Files
 
 - `ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/e00717_score.py`: scores arms
-`HT`, `HT-S`, and `H` with the scoring code of experiment 716 (contrasts B1 and B2, guards, verdict,
-secondary read-outs). It is reviewed and not yet run on the final forecasts. -
-`.../e00717_report.py` and `.../e00717_figures.py`: print every number the final page quotes from
-the score files, and draw the contrast and by-fold charts from `score/part2.json`. -
-`.../e00717_futility_read.py`: reads the interim 2-seed contrasts and writes
-`score/futility_part2.json`. `.../e00717_s1_read.py` writes the report-only `score/s1_interim.json`.
+  `HT`, `HT-S`, and `H` with the scoring code of experiment 716 (contrasts B1 and B2, guards,
+  verdict, secondary read-outs). It also holds `load_all_lean`, which replaces part 1's loader
+  with one that loads one fold at a time and keeps 7 columns per per-seed row, because the
+  5-seed run of the unpatched loader needs more than 16 GB. SHA-256 of the file as committed with
+  the patch: `adfc8a4f0af7f2d1168e81ae786c94e323aadbbfb6acf40ec3f4ecae6a7c6648`. It has not yet
+  been run on the final forecasts.
+- `.../e00717_check_lean_loader.py`: a read-only check that writes no file. For one fold and
+  seeds 0 and 1 of one arm, it prints the largest absolute difference between the two loaders in
+  every column that the contrast reads, the row counts, and whether the row order is identical.
+  The expected result is a difference of at most 1e-12 and identical order. SHA-256:
+  `f85c68ec8ec2e2047cec3465f0ad9c5230801be823131165f24a50c9cdffc9f1`. It has not been run yet.
+- `.../e00717_report.py` and `.../e00717_figures.py`: print every number the final page quotes
+  from the score files, and draw the contrast and by-fold charts from `score/part2.json`.
+- `.../e00717_futility_read.py`: reads the interim 2-seed contrasts and writes
+  `score/futility_part2.json`. `.../e00717_s1_read.py` writes the report-only
+  `score/s1_interim.json`.
 - `.../e00717_guard.py` and `.../run.sh`: refuse a stale copy of part 1's code, and run a command
-with one thread per numerical library and a memory cap. -
-`ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/`: the network, batches, training,
-and predictions (`e00716_fit.py`, `e00716_predict.py`, `e00716_score.py`), imported and not edited,
-as described on [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md). -
-`data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/work/fits/<arm>/`: the stored
-forecasts, one parquet file per fold and seed (written by this experiment, read by the scorer).
-`work/logs/<arm>/` holds the fit, stage, and predict logs, and `work/models/` the network states.
-Never committed. - `data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/score/`:
-the interim files `futility_part2.json` and `s1_interim.json`, both written by this experiment. -
-`data/ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/work/fits/H/` and
-`work/attention/`: arm `H` forecasts and the attention maps, written by experiment 716 and read
-here. - `data/ml-experiments/briefs/msa_architecture/f7_design.md` and its reviews (read, private).
+  with one thread per numerical library and a memory cap.
+- `ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/`: the network, batches,
+  training, and predictions (`e00716_fit.py`, `e00716_predict.py`, `e00716_score.py`), imported
+  and not edited, as described on
+  [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md).
+- `data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/work/fits/<arm>/`: the
+  stored forecasts, one parquet file per fold and seed (written by this experiment, read by the
+  scorer). `work/logs/<arm>/` holds the fit, stage, and predict logs, and `work/models/` the
+  network states. Never committed.
+- `data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/score/`: the interim
+  files `futility_part2.json` and `s1_interim.json`, both written by this experiment.
+- `data/ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/work/fits/H/` and
+  `work/attention/`: arm `H` forecasts and the attention maps, written by experiment 716 and read
+  here.
+- `data/ml-experiments/briefs/msa_architecture/f7_design.md` and its reviews (read, private).
