@@ -13,6 +13,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Final
 
 import e00729_arms as arms
 import e00729_banks as banks
@@ -27,7 +28,8 @@ import e00729_sim as sim
 import numpy as np
 
 Log = Callable[[str], None]
-SPLIT_ROW = re.compile(r"^\|\s*\d+\s*\|\s*\d+\s*\|\s*(\d{4}-\d{2})\s*\|\s*(\w+)\s*\|")
+SPLIT_ROW = re.compile(r"^\|\s*\d+\s*\|\s*\w+\s*\|\s*(\d{4}-\d{2})\s*\|\s*(\w+)\s*\|")
+"""A row of `splits.md`. The position column holds `None` for a lockdown month."""
 SIMULATOR_SOURCES = ("e00729_sim.py", "e00729_banks.py")
 
 
@@ -53,6 +55,7 @@ class Context:
         use: For each split, for each month, the mask over `cal` of days a segment may use.
         stats: Temperature standardisation from the training days.
         cut_day: The private cut as a day (never printed).
+        closure_loaded: Whether the switching logs loaded and their closure days were dropped.
     """
 
     table: data.DayTable
@@ -62,6 +65,7 @@ class Context:
     use: dict[str, dict[str, np.ndarray]]
     stats: arms.InputStats
     cut_day: np.datetime64
+    closure_loaded: bool = False
 
     def months(self, *, split: str) -> list[str]:
         """Return the months of a split."""
@@ -78,11 +82,11 @@ def parse_private_splits(*, path: Path) -> dict[str, str]:
     return out
 
 
-def build_context(*, closure_days: frozenset[date] = frozenset()) -> Context:
+def build_context() -> Context:
     """Load the days, derive the split from the rule, and check it against the private file.
 
-    Args:
-        closure_days: Days within 24 hours of a logged closure at D8 (empty when no log loads).
+    The switching logs are loaded when they can be, and the days within 24 hours of a logged closure
+    at D8 are dropped from the base.
 
     Returns:
         The context.
@@ -90,6 +94,7 @@ def build_context(*, closure_days: frozenset[date] = frozenset()) -> Context:
     Raises:
         CorrectnessFailureError: When the derived split differs from `PRIVATE/splits.md`.
     """
+    closure_days, closure_loaded = data.load_closure_days()
     table = data.load_day_table(closure_days=closure_days)
     cal = data.select_days(cal=table.calendar, mask=table.is_base)
     months, n_days, bsp_days = data.month_table(cal=cal)
@@ -115,7 +120,7 @@ def build_context(*, closure_days: frozenset[date] = frozenset()) -> Context:
     leak.assert_cut_applied(base_dates=cal.dates, cut_day=cut_day)
     leak.assert_before_holdout(dates=table.calendar.dates)
     leak.assert_cams_differs(cal=cal)
-    return Context(table, cal, month_split, day_split, use, stats, cut_day)  # ty: ignore[invalid-argument-type]
+    return Context(table, cal, month_split, day_split, use, stats, cut_day, closure_loaded)  # ty: ignore[invalid-argument-type]
 
 
 def bank_path(*, kind: str, seed: int | None = None) -> Path:
@@ -126,6 +131,8 @@ def bank_path(*, kind: str, seed: int | None = None) -> Path:
 
 def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
     """Build the validation, test, shifted-mix, and training banks, and run the leakage checks.
+
+    The bank-level checks run on every segment of every evaluation bank, because they are cheap.
 
     Args:
         ctx: The context.
@@ -151,28 +158,35 @@ def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
         banks.save_bank(bank=b, path=bank_path(kind="train", seed=seed))
         built[f"train_s{seed}"] = b
         log(f"built the training bank of seed {seed}: {len(b.segments)} segments")
-    leak.assert_seed_spaces(
-        train_seeds=train_seeds, evaluation=[built[k] for k in ("validation", "test", "shifted")]
-    )
+    evaluation = [built[k] for k in ("validation", "test", "shifted")]
+    leak.assert_seed_spaces(train_seeds=train_seeds, evaluation=evaluation)
+    leak.assert_banks_independent(evaluation=evaluation)
     every = [s for b in built.values() for s in b.segments]
     leak.assert_parameter_ranges(segments=every)
     folder = Path(__file__).parent
     leak.assert_simulator_source_clean(paths=[folder / n for n in SIMULATOR_SOURCES])
-    for seg in built["test"].segments[:: max(1, len(built["test"].segments) // 40)]:
-        leak.assert_bsp_construction(seg=seg, cal=ctx.cal)
-        leak.assert_s1_same_day(seg=seg, cal=ctx.cal)
+    for bank in evaluation:
+        for seg in bank.segments:
+            leak.assert_bsp_construction(seg=seg, cal=ctx.cal)
+            leak.assert_s1_same_day(seg=seg, cal=ctx.cal)
     leak.assert_no_calendar_memorisation(specs=arms.ARM_SPECS)
+    min_unit = min(
+        float(s.params["min_unit_points"]) for s in every if "min_unit_points" in s.params
+    )
+    log(f"smallest engine unit after the size cap: {min_unit:.1f} points")
     rows = score.rows_from_segments(segments=built["test"].segments, holidays=ctx.cal.holidays)
     summary = {
         "digests": {k: b.digest for k, b in built.items()},
         "reachability": score.reachability(rows=rows),
         "n_segments": {k: len(b.segments) for k, b in built.items()},
+        "injected_share": {b.kind: banks.injected_share(bank=b) for b in evaluation},
+        "min_unit_points_after_cap": min_unit,
         "dropped_half_hours": {
             s: int(ctx.table.dropped_half_hours[ctx.table.is_base][ctx.day_split == s].sum())
             for s in ("training", "validation", "test")
         },
         "dropped_days_by_guard": int((ctx.day_split == "dropped").sum()),
-        "closure_log_loaded": False,
+        "closure_log_loaded": ctx.closure_loaded,
         "leakage_pass": True,
     }
     write_json(path=paths.data_root() / "banks" / "summary.json", payload=summary)
@@ -181,6 +195,12 @@ def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
 
 def stage_gate(*, ctx: Context, log: Log) -> dict:
     """Run the realism gate on folded aggregates and the BSP step relation, and write `gate.json`.
+
+    The record spans more days than one synthetic segment (one month), so the BSP half of the gate
+    cuts the real record and every engine-only synthetic segment into stretches of one common
+    length, the longest that a segment can hold. The real standard error and residual standard
+    deviation are the medians over the real stretches; the real slope's interval comes from the
+    whole record. A gate that finds no synthetic stretch is `void`, which does not pass.
 
     Args:
         ctx: The context.
@@ -211,70 +231,111 @@ def stage_gate(*, ctx: Context, log: Log) -> dict:
         }  # fmt: skip
         log(f"gate {label}: pass {ok}")
     record = data.metered_record()
-    day_axis = cal_all.dates
-    rec = data.record_by_day(record=record, days=day_axis)
+    rec = data.record_by_day(record=record, days=cal_all.dates)
     days = np.flatnonzero(np.isfinite(rec).any(axis=1))
-    d_eng = real_step(values=rec[days])
-    d_bsp = real_step(values=cal_all.bsp[days])
+    d_eng = real_step(values=rec[days], days=cal_all.dates[days])
+    d_bsp = real_step(values=cal_all.bsp[days], days=cal_all.dates[days])
     fit = banks.step_fit(d_bsp=d_bsp, d_eng=d_eng)
     ci = (fit.slope - 1.96 * fit.se, fit.slope + 1.96 * fit.se)
-    placebo = placebo_slopes(rec=rec[days], bsp=cal_all.bsp[days])
+    placebo = placebo_slopes(rec=rec[days], bsp=cal_all.bsp[days], days=cal_all.dates[days])
     edges = banks.real_bin_edges(d_eng=d_eng)
-    synthetic = synthetic_stretches(
-        bank=test, length=int(np.isfinite(rec[days]).sum()), edges=edges
+    shares = banks.real_bin_shares(d_eng=d_eng, edges=edges)
+    synthetic, length = synthetic_stretches(
+        bank=test, record_length=len(d_eng), edges=edges, shares=shares
     )
-    gate = banks.bsp_gate(real=fit, real_ci=ci, synthetic=synthetic)
+    real_fits = banks.chunk_fits(d_bsp=d_bsp, d_eng=d_eng, length=length)
+    real_ref = banks.StepFit(
+        fit.slope,
+        float(np.nanmedian([f.se for f in real_fits])) if real_fits else float("nan"),
+        float(np.nanmedian([f.resid_sd for f in real_fits])) if real_fits else float("nan"),
+    )
+    gate = banks.bsp_gate(real=real_ref, real_ci=ci, synthetic=synthetic)
     out["bsp"] = {
         **gate, "real_slope_z_vs_placebo": float((fit.slope - np.mean(placebo)) / np.std(placebo)),
-        "n_synthetic_stretches": len(synthetic),
+        "n_synthetic_stretches": len(synthetic), "n_real_stretches": len(real_fits),
+        "stretch_half_hours": length,
     }  # fmt: skip
     passes.append(bool(gate["pass"]))
+    out["void"] = bool(gate["void"])
     out["pass"] = all(passes)
+    log(f"gate BSP steps: pass {gate['pass']}, void {gate['void']}")
     write_json(path=paths.data_root() / "scores" / "gate.json", payload=out)
     return out
 
 
-def real_step(*, values: np.ndarray) -> np.ndarray:
-    """Return the half-hour steps of consecutive days' values, flattened (NaN across gaps)."""
+def real_step(*, values: np.ndarray, days: np.ndarray) -> np.ndarray:
+    """Return the half-hour steps of the days' values, flattened.
+
+    A step is NaN where either half-hour is missing and at the first half-hour of a day whose
+    previous calendar day is not in `days`, so that no step spans a gap.
+
+    Args:
+        values: The values, `(n_days, 48)`.
+        days: The calendar day of each row, as `datetime64[D]`, sorted.
+
+    Returns:
+        The steps, `(n_days * 48,)`.
+    """
+    flat = values.reshape(-1)
+    out = np.full_like(flat, np.nan)
+    out[1:] = flat[1:] - flat[:-1]
+    first = np.ones(len(days), dtype=bool)
+    first[1:] = (days[1:] - days[:-1]).astype(int) != 1
+    out[np.flatnonzero(first) * 48] = np.nan
+    return out
+
+
+def placebo_slopes(*, rec: np.ndarray, bsp: np.ndarray, days: np.ndarray) -> np.ndarray:
+    """Return the slopes with the record shifted by 3 to 20 whole days either way (circular)."""
+    lo, hi = core.GATE_PLACEBO_SHIFTS
+    slopes = []
+    d_bsp = real_step(values=bsp, days=days)
+    for shift in [*range(lo, hi + 1), *range(-hi, -lo + 1)]:
+        shifted = np.roll(rec, shift, axis=0)
+        slopes.append(banks.step_fit(d_bsp=d_bsp, d_eng=real_step(values=shifted, days=days)).slope)
+    return np.asarray(slopes)
+
+
+def synthetic_stretches(
+    *, bank: banks.Bank, record_length: int, edges: np.ndarray, shares: np.ndarray
+) -> tuple[list[banks.StepFit], int]:
+    """Fit the size-matched BSP regression on the engine-only segments of a bank.
+
+    Each segment is one month, so a stretch is as long as the record or as the shortest engine-only
+    segment, whichever is smaller; the real record is cut to the same length by the caller.
+
+    Args:
+        bank: The test bank.
+        record_length: The real record's length in half-hours.
+        edges: The real record's size-bin edges.
+        shares: The real record's share of steps per size bin.
+
+    Returns:
+        The fits (one per stretch) and the common stretch length in half-hours.
+    """
+    steps = []
+    for seg in bank.segments:
+        if seg.world != "engine":
+            continue
+        eng = np.where(seg.cal_index[:, None] >= 0, seg.engine, np.nan)
+        steps.append((step_flat(values=eng), step_flat(values=seg.bsp)))
+    if not steps:
+        return [], record_length
+    length = min(record_length, *(len(e) for e, _ in steps))
+    fits = []
+    for d_e, d_b in steps:
+        fits.extend(
+            banks.chunk_fits(d_bsp=d_b, d_eng=d_e, length=length, edges=edges, shares=shares)
+        )
+    return fits, length
+
+
+def step_flat(*, values: np.ndarray) -> np.ndarray:
+    """Return the half-hour steps of a dense `(days, 48)` array (NaN where a half-hour is missing)."""
     flat = values.reshape(-1)
     out = np.full_like(flat, np.nan)
     out[1:] = flat[1:] - flat[:-1]
     return out
-
-
-def placebo_slopes(*, rec: np.ndarray, bsp: np.ndarray) -> np.ndarray:
-    """Return the slopes with the record shifted by 3 to 20 whole days either way (circular)."""
-    lo, hi = core.GATE_PLACEBO_SHIFTS
-    slopes = []
-    d_bsp = real_step(values=bsp)
-    for shift in [*range(lo, hi + 1), *range(-hi, -lo + 1)]:
-        shifted = np.roll(rec, shift, axis=0)
-        slopes.append(banks.step_fit(d_bsp=d_bsp, d_eng=real_step(values=shifted)).slope)
-    return np.asarray(slopes)
-
-
-def synthetic_stretches(*, bank: banks.Bank, length: int, edges: np.ndarray) -> list[banks.StepFit]:
-    """Fit the size-matched BSP regression on engine-only segments cut into stretches of `length`."""
-    fits = []
-    for seg in bank.segments:
-        if seg.world != "engine":
-            continue
-        eng = np.where(seg.cal_index[:, None] >= 0, seg.engine, np.nan).reshape(-1)
-        bsp = seg.bsp.reshape(-1)
-        for a in range(0, len(eng) - length + 1, length):
-            e, b = eng[a : a + length], bsp[a : a + length]
-            d_e = np.full_like(e, np.nan)
-            d_e[1:] = e[1:] - e[:-1]
-            d_b = np.full_like(b, np.nan)
-            d_b[1:] = b[1:] - b[:-1]
-            if np.isfinite(d_e).sum() < 100:
-                continue
-            fits.append(
-                banks.step_fit(
-                    d_bsp=d_b, d_eng=d_e, weights=banks.size_matched_weights(d_eng=d_e, edges=edges)
-                )
-            )
-    return fits
 
 
 # --------------------------------------------------------------------------- fits and predictions
@@ -306,7 +367,7 @@ def real_sets(*, ctx: Context) -> dict[str, list[sim.Segment]]:
     r1_use = np.isin(cal.dates, test_dates)
     rec = data.record_by_day(record=data.metered_record(), days=cal.dates)
     k_days = np.isfinite(rec).any(axis=1)
-    folded, x = real.folded_record_days(reading=reading, record=np.nan_to_num(rec))
+    folded, x = real.folded_record_days(reading=reading, record=rec)
     era_use = np.isin(ctx.table.era, [data.ERA_NET, data.ERA_SOLAR, data.ERA_FADE])
     leak.assert_record_not_base(record_days=cal.dates[k_days], base_dates=ctx.cal.dates)
     return {
@@ -380,8 +441,44 @@ def run_fit(
             arrays=train.predictions(net=net, prepared=prep, spec=spec, device=device),
             path=folder / f"real_{set_name}.npz",
         )
-    write_json(path=record_path, payload=result.as_dict())
-    return result.as_dict()
+    digests = {
+        "validation": val_bank.digest,
+        "test": banks.load_bank(path=bank_path(kind="test")).digest,
+        "shifted": banks.load_bank(path=bank_path(kind="shifted")).digest,
+    }
+    payload = {**result.as_dict(), "digests": digests}
+    write_json(path=record_path, payload=payload)
+    return payload
+
+
+def run_fit_or_record_failure(
+    *, ctx: Context, arm: str, arch: str, seed: int, device: str, log: Log
+) -> dict | None:
+    """Run one fit; when it raises, write `fits/<name>.failed.json` and return None (no retry).
+
+    A failed fit makes the verdict row 2 (`failed`) at the scoring stage. A correctness error is not
+    caught here, because it must stop the line as row 1.
+
+    Args:
+        ctx: The context.
+        arm: The arm.
+        arch: The architecture.
+        seed: The seed.
+        device: "cuda" or "cpu".
+        log: Receives progress lines.
+
+    Returns:
+        The fit record, or None when the fit failed.
+    """
+    try:
+        return run_fit(ctx=ctx, arm=arm, arch=arch, seed=seed, device=device, log=log)
+    except leak.CorrectnessFailureError:
+        raise
+    except Exception as error:  # noqa: BLE001
+        name = job_name(arm=arm, arch=arch, seed=seed)
+        write_json(path=fit_dir() / f"{name}.failed.json", payload={"error": type(error).__name__})
+        log(f"fit {name} failed with {type(error).__name__}; it is not retried")
+        return None
 
 
 def stage_choose_architecture() -> dict:
@@ -508,7 +605,100 @@ def contrast_plan() -> dict[str, list[tuple[str, str, str]]]:
     return plan
 
 
+def segment_p_any(*, segments: Sequence[sim.Segment]) -> np.ndarray:
+    """Return experiment 694's M2 probability that an engine unit runs, in `Rows` order.
+
+    M2 reads each segment as one continuous series of folded readings (a missing half-hour is filled
+    by linear interpolation, because the tracker's 48-step lags need an unbroken series), and the
+    probabilities are then picked out at the valid half-hours that `rows_from_segments` scores.
+
+    Args:
+        segments: The segments (synthetic, or the real K1 pseudo-segments).
+
+    Returns:
+        P(an engine unit runs) at each scored half-hour.
+    """
+    out = []
+    for seg in segments:
+        base_days = np.flatnonzero(seg.cal_index >= 0)
+        y = seg.r[base_days[0] : base_days[-1] + 1].reshape(-1)
+        ok = np.isfinite(y)
+        idx = np.arange(len(y))
+        filled = np.interp(idx, idx[ok], y[ok]) if ok.any() else np.zeros(len(y))
+        p_any = base.m2_p_any(reading_points=filled).reshape(-1, 48)
+        for d in base_days:
+            keep = seg.valid[d] & np.isfinite(seg.x[d])
+            out.append(p_any[d - base_days[0]][keep])
+    return np.concatenate(out)
+
+
+def terminal_verdict(
+    *, root: Path, stopped: bool = False, invalid: bool = False, failed: bool = False
+) -> dict:
+    """Write and return a verdict record for a line that ended before the counted readings.
+
+    Args:
+        root: The experiment's data folder.
+        stopped: Row 0 applies.
+        invalid: Row 1 applies (a correctness check failed).
+        failed: Row 2 applies (a fit raised).
+
+    Returns:
+        The record, also written to `verdict.json`.
+    """
+    nan = float("nan")
+    inputs = core.VerdictInputs(
+        stopped=stopped, invalid=invalid, failed=failed, h1_pass=False, h2_pass=False,
+        c1=core.Reading(nan, nan, nan), margin=nan, calibration_pass=False, lobe_pass=False,
+    )  # fmt: skip
+    row = core.verdict_row(v=inputs)
+    record = {"row": row, "verdict": core.VERDICT_WORDS[row], "terminal": True}
+    write_json(path=root / "verdict.json", payload=record)
+    return record
+
+
 def stage_score(*, ctx: Context, n_resamples: int = core.N_RESAMPLES, log: Log) -> dict:
+    """Score every arm and baseline, read the verdict, and route a failure to its verdict row.
+
+    A fit that failed makes row 2. A correctness error raised while scoring makes row 1.
+
+    Args:
+        ctx: The context.
+        n_resamples: The bootstrap resamples per reading.
+        log: Receives progress lines.
+
+    Returns:
+        The verdict record, also written to `verdict.json`.
+    """
+    root = paths.data_root()
+    if any(fit_dir().glob("*.failed.json")):
+        log("a fit failed: verdict row 2")
+        return terminal_verdict(root=root, failed=True)
+    try:
+        return score_everything(ctx=ctx, n_resamples=n_resamples, log=log)
+    except leak.CorrectnessFailureError:
+        log("a correctness check failed while scoring: verdict row 1")
+        return terminal_verdict(root=root, invalid=True)
+
+
+def fit_digests(*, arch: str, seeds: Sequence[int]) -> dict[str, dict[str, str]]:
+    """Return the bank digests that each stored fit recorded, and those of the bank files."""
+    out = {
+        f"{arm}_s{s}": read_json(path=fit_dir() / f"{job_name(arm=arm, arch=arch, seed=s)}.json")[
+            "digests"
+        ]
+        for arm in core.ARMS
+        for s in seeds
+        if (fit_dir() / f"{job_name(arm=arm, arch=arch, seed=s)}.json").exists()
+    }
+    out["baselines"] = {
+        kind: banks.load_bank(path=bank_path(kind=kind)).digest
+        for kind in ("validation", "test", "shifted")
+    }
+    return out
+
+
+def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:
     """Score every arm and baseline on the test, validation, and shifted banks and read the verdict.
 
     The margin file must exist before this stage reads any test contrast.
@@ -524,14 +714,13 @@ def stage_score(*, ctx: Context, n_resamples: int = core.N_RESAMPLES, log: Log) 
     root = paths.data_root()
     margin = core.read_margin_file(path=root / "margin.json")
     arch = read_json(path=root / "selection.json")["chosen"]
-    clim, reg = fit_baselines(ctx=ctx)
     seeds = core.ARCH_SEEDS
-    rows_val = score.rows_from_segments(
-        segments=banks.load_bank(path=bank_path(kind="validation")).segments,
-        holidays=ctx.cal.holidays,
-    )
+    leak.assert_hashes_match(digests_by_arm=fit_digests(arch=arch, seeds=seeds))
+    clim, reg = fit_baselines(ctx=ctx)
+    val_bank = banks.load_bank(path=bank_path(kind="validation"))
+    rows_val = score.rows_from_segments(segments=val_bank.segments, holidays=ctx.cal.holidays)
     val_b = baseline_metrics(
-        rows=rows_val, climatology=clim, regression=reg, pi=core.TEST_MIX_INJECTED
+        rows=rows_val, climatology=clim, regression=reg, pi=banks.injected_share(bank=val_bank)
     )
     bstar = core.choose_baseline(
         b1=float(val_b["B1"].crps.mean()), b2=float(val_b["B2"].crps.mean())
@@ -539,13 +728,26 @@ def stage_score(*, ctx: Context, n_resamples: int = core.N_RESAMPLES, log: Log) 
     write_json(
         path=root / "scores" / "bstar.json", payload={"bstar": bstar, "chosen_on": "validation"}
     )
-    rows = score.rows_from_segments(
-        segments=banks.load_bank(path=bank_path(kind="test")).segments, holidays=ctx.cal.holidays
+    leak.assert_choices_before_test(
+        events=[
+            *(["architecture"] if (root / "selection.json").exists() else []),
+            *(["bstar"] if (root / "scores" / "bstar.json").exists() else []),
+            *(["margin"] if (root / "margin.json").exists() else []),
+            "test_score",
+        ]
     )
-    base_m = baseline_metrics(
-        rows=rows, climatology=clim, regression=reg, pi=core.TEST_MIX_INJECTED
-    )
+    test_bank = banks.load_bank(path=bank_path(kind="test"))
+    rows = score.rows_from_segments(segments=test_bank.segments, holidays=ctx.cal.holidays)
+    pi_test = banks.injected_share(bank=test_bank)
+    base_m = baseline_metrics(rows=rows, climatology=clim, regression=reg, pi=pi_test)
     metrics: dict[str, score.RowMetrics] = {**base_m, "Bstar": base_m[bstar]}
+    if paths.sibling_available(prefix="00694-"):
+        m2 = base.m2_lobes(
+            f=rows.features,
+            prob_below=clim.prob_below(r=rows.features.r, f=rows.features),
+            p_any=segment_p_any(segments=test_bank.segments),
+        )
+        metrics["M2"] = score.lobe_metrics(lobes=m2, x=rows.x)
     for arm in core.ARMS:
         metrics[arm] = arm_metrics(arm=arm, arch=arch, name="test", x=rows.x, seeds=seeds)
     masks = score.subset_masks(rows=rows)
@@ -580,12 +782,17 @@ def stage_score(*, ctx: Context, n_resamples: int = core.N_RESAMPLES, log: Log) 
     }
     write_json(
         path=root / "scores" / "tables.json",
-        payload={"tables": tables, "coverage": coverage, "lobe_width_mean": float(d.width.mean())},
-    )
+        payload={
+            "tables": tables, "coverage": coverage, "lobe_width_mean": float(d.width.mean()),
+            "realised_injected_share": pi_test,
+        },
+    )  # fmt: skip
     shifted = shifted_read_out(ctx=ctx, arch=arch, clim=clim, reg=reg, bstar=bstar)
     gate = read_json(path=root / "scores" / "gate.json")
     reach = score.reachability(rows=rows)
-    real_out = stage_real(ctx=ctx, arch=arch, metrics=metrics, clim=clim, log=log)
+    real_out = stage_real(
+        ctx=ctx, arch=arch, metrics=metrics, clim=clim, reg=reg, bstar=bstar, log=log
+    )
     c1 = readings["C1"]["all"]
     verdict_in = core.VerdictInputs(
         stopped=not (gate["pass"] and reach["pass"]),
@@ -609,10 +816,9 @@ def shifted_read_out(
     *, ctx: Context, arch: str, clim: base.Climatology, reg: base.Regression, bstar: str
 ) -> dict:
     """The shifted-mix read-out: arm D and B* on the 50%-injected bank (enters no verdict row)."""
-    rows = score.rows_from_segments(
-        segments=banks.load_bank(path=bank_path(kind="shifted")).segments, holidays=ctx.cal.holidays
-    )
-    pi = 1.0 - core.SHIFTED_NONE_SHARE
+    bank = banks.load_bank(path=bank_path(kind="shifted"))
+    rows = score.rows_from_segments(segments=bank.segments, holidays=ctx.cal.holidays)
+    pi = banks.injected_share(bank=bank)
     bm = baseline_metrics(rows=rows, climatology=clim, regression=reg, pi=pi)[bstar]
     d = arm_metrics(arm="D", arch=arch, name="shifted", x=rows.x, seeds=core.ARCH_SEEDS)
     out = {}
@@ -627,12 +833,50 @@ def shifted_read_out(
     return out
 
 
+def flag_grid(*, rows: score.Rows, flagged: np.ndarray, day_dates: np.ndarray) -> np.ndarray:
+    """Place per-row flags on the calendar's `(days, 48)` grid (False where no row exists)."""
+    lookup = {int(d): i for i, d in enumerate(day_dates.astype("datetime64[D]").astype(int))}
+    grid = np.zeros((len(day_dates), 48), dtype=bool)
+    for date_int, hh, flag in zip(rows.date, rows.hh, flagged, strict=True):
+        grid[lookup[int(date_int)], int(hh)] = bool(flag)
+    return grid
+
+
+def r3_extras(
+    *, rows: score.Rows, p_neg: np.ndarray, cal: sim.Calendar
+) -> dict[str, float | dict[str, float]]:
+    """R3's two further readings: sign changes beside near-zero half-hours, and the BSP level.
+
+    Args:
+        rows: The era rows.
+        p_neg: Arm D's P(X < 0) on those rows.
+        cal: The calendar.
+
+    Returns:
+        The mean over the months' shares of sign changes that sit next to a half-hour below
+        1.0 MVA, and the BSP residual level on flagged half-hours against the others.
+    """
+    shares = []
+    for seg in np.unique(rows.seg):
+        on = rows.seg == seg
+        shares.append(real.near_zero_neighbour_share(p_neg=p_neg[on], reading=rows.r[on]))
+    finite = [v for v in shares if np.isfinite(v)]
+    flagged = flag_grid(rows=rows, flagged=p_neg > 0.5, day_dates=cal.dates)
+    on_days = np.isin(cal.dates.astype("datetime64[D]").astype(int), np.unique(rows.date))
+    return {
+        "sign_change_near_zero_share": float(np.mean(finite)) if finite else float("nan"),
+        "bsp_residual": real.bsp_residual_level(bsp=cal.bsp[on_days], flagged=flagged[on_days]),
+    }
+
+
 def stage_real(
     *,
     ctx: Context,
     arch: str,
     metrics: dict[str, score.RowMetrics],
     clim: base.Climatology,
+    reg: base.Regression,
+    bstar: str,
     log: Log,
 ) -> dict:
     """Run R1 (H2), K1, K2, R2, and R3 from the stored real-set predictions (aggregates only)."""
@@ -646,24 +890,33 @@ def stage_real(
     h2 = real.r1_false_alarms(d=d_r1, p0f_metrics=p0f_m, p0_metrics=p0_m)
     rows_k1 = score.rows_from_segments(segments=sets["k1"], holidays=cal.holidays)
     rows_k2 = score.rows_from_segments(segments=sets["k2"], holidays=cal.holidays)
-    rec_days = data.record_by_day(record=data.metered_record(), days=cal.dates)
-    rec_rows = record_values_for_rows(segments=sets["k1"], record=rec_days, cal=cal)
+    rec_rows = record_values_for_rows(
+        segments=sets["k1"], record=data.record_by_day(record=data.metered_record(), days=cal.dates)
+    )
+    units_rows = record_values_for_rows(
+        segments=sets["k1"],
+        record=data.record_by_day(record=data.metered_record(), days=cal.dates, column="units"),
+    )
     aux = [load_predictions(arm="G2", arch=arch, seed=s, name="real_k1") for s in core.ARCH_SEEDS]
     head = real.gaussian_mixture_median(
         mu=np.stack([a["aux_mu"] for a in aux]), sigma=np.stack([a["aux_s"] for a in aux])
     )
-    running = rec_rows > core.FLOOR_POINTS
-    p_any = base.m2_p_any(reading_points=rows_k1.r)
-    k1 = real.k1_engine_head(
-        head_median=head, record=rec_rows, running=running, m2_flag=p_any > 0.5
+    running = np.nan_to_num(units_rows) >= 1
+    m2_flag = (
+        segment_p_any(segments=sets["k1"]) > 0.5
+        if paths.sibling_available(prefix="00694-")
+        else np.zeros(len(rec_rows), dtype=bool)
     )
+    k1 = real.k1_engine_head(head_median=head, record=rec_rows, running=running, m2_flag=m2_flag)
     d_k1 = arm_metrics(arm="D", arch=arch, name="real_k1", x=rows_k1.x, seeds=core.ARCH_SEEDS)
-    b1_k1 = score.lobe_metrics(
-        lobes=real.b_star_on_rows(rows=rows_k1, climatology=clim, pi=core.TEST_MIX_INJECTED),
+    b_k1 = score.lobe_metrics(
+        lobes=real.b_star_on_rows(
+            rows=rows_k1, model=clim if bstar == "B1" else reg, pi=core.TEST_MIX_INJECTED
+        ),
         x=rows_k1.x,
     )
     k1["crps_d"] = float(d_k1.crps.mean())
-    k1["crps_bstar"] = float(b1_k1.crps.mean())
+    k1["crps_bstar"] = float(b_k1.crps.mean())
     aux2 = [load_predictions(arm="G2", arch=arch, seed=s, name="real_k2") for s in core.ARCH_SEEDS]
     head2 = real.gaussian_mixture_median(
         mu=np.stack([a["aux_mu"] for a in aux2]), sigma=np.stack([a["aux_s"] for a in aux2])
@@ -679,19 +932,164 @@ def stage_real(
         "r3": {
             "share_above_half_by_era": real.r3_sign_by_group(p_neg=d_e.p_neg, groups=eras),
             "share_above_half_by_era_and_hour": real.r3_sign_by_group(p_neg=d_e.p_neg, groups=np.array([f"{e}_{h // 2}" for e, h in zip(eras, rows_e.hh, strict=True)])),
+            "share_below_1mva_by_era_and_hour": {
+                f"{e}_{h}": float(np.mean(rows_e.r[(eras == e) & (rows_e.hh // 2 == h)] < real.NEAR_ZERO_POINTS))
+                for e in np.unique(eras)
+                for h in range(24)
+                if ((eras == e) & (rows_e.hh // 2 == h)).any()
+            },
+            **r3_extras(rows=rows_e, p_neg=d_e.p_neg, cal=cal),
         },
     }  # fmt: skip
     log("real checks done")
     return out
 
 
-def record_values_for_rows(
-    *, segments: Sequence[sim.Segment], record: np.ndarray, cal: sim.Calendar
-) -> np.ndarray:
-    """Return the record's value for each valid half-hour of the K1 segments, in `Rows` order."""
+def record_values_for_rows(*, segments: Sequence[sim.Segment], record: np.ndarray) -> np.ndarray:
+    """Return a per-day record array's value for each valid half-hour of the K1 segments.
+
+    The values come in `Rows` order. A half-hour with no record row stays NaN.
+    """
     out = []
     for seg in segments:
         for d in np.flatnonzero(seg.cal_index >= 0):
             ok = seg.valid[d] & np.isfinite(seg.x[d])
-            out.append(np.nan_to_num(record[seg.cal_index[d]])[ok])
+            out.append(record[seg.cal_index[d]][ok])
     return np.concatenate(out)
+
+
+# --------------------------------------------------------------------------- figures 1, 2, and 6
+
+MONTH_LABELS: Final = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
+
+def era_month_shares(*, ctx: Context) -> dict[str, dict[str, float]]:
+    """Return, per era and calendar month of the year, the share of days under 1.0 MVA at the minimum.
+
+    Only the month of the year is kept, so that the figure shows no calendar date.
+    """
+    cal = ctx.table.calendar
+    month = np.array([int(str(d)[5:7]) for d in cal.dates])
+    out: dict[str, dict[str, float]] = {}
+    for era in np.unique(ctx.table.era):
+        on = ctx.table.era == era
+        out[str(era)] = {}
+        for m in range(1, 13):
+            sel = on & (month == m) & np.isfinite(cal.reading).any(axis=1)
+            if sel.sum() >= core.MIN_DAYS_IN_MONTH // 2:
+                share, _ = banks.near_zero_shares(r=cal.reading[sel])
+                out[str(era)][MONTH_LABELS[m - 1]] = share
+    return out
+
+
+def gallery_series(*, seg: sim.Segment) -> dict[str, np.ndarray]:
+    """Return one segment's first two base days as the series of figure 2 (96 half-hours)."""
+    days = np.flatnonzero(seg.cal_index >= 0)[:2]
+    pick = np.concatenate([np.arange(d * 48, d * 48 + 48) for d in days])
+
+    def flat(values: np.ndarray) -> np.ndarray:
+        return values.reshape(-1)[pick]
+
+    bsp = flat(seg.bsp)
+    return {
+        "base demand": flat(seg.base), "engine": flat(seg.engine), "solar": flat(seg.solar),
+        "signed truth": flat(seg.x), "folded reading": flat(seg.r),
+        "BSP step": np.r_[np.nan, np.diff(bsp)],
+    }  # fmt: skip
+
+
+def example_windows(*, rows: score.Rows, segments: Sequence[sim.Segment]) -> dict[str, np.ndarray]:
+    """Pick one scored day for each of the four examples of figure 6 and return its row indices.
+
+    The four are an import-only day, an engine-reversal day, a solar-reversal day, and a combined
+    day. A kind with no matching day is left out.
+    """
+    picked: dict[str, np.ndarray] = {}
+    for label, world in (
+        ("import only", "none"), ("engine reversal", "engine"), ("solar reversal", "solar"),
+        ("engine and solar", "both"),
+    ):  # fmt: skip
+        for k, seg in enumerate(segments):
+            if seg.world != world:
+                continue
+            for day_int in np.unique(rows.date[rows.seg == k]):
+                day = np.flatnonzero((rows.seg == k) & (rows.date == day_int))
+                complete = len(day) == 48
+                reverses = bool((rows.x[day] < -core.DEAD_BAND_POINTS).any())
+                if complete and (reverses or world == "none"):
+                    picked[label] = day
+                    break
+            if label in picked:
+                break
+    return picked
+
+
+def stage_figures(*, ctx: Context, arch: str, log: Log) -> list[Path]:
+    """Write figures 1, 2, and 6 from the real aggregates, the synthetic banks, and arm D's predictions.
+
+    Figure 1 keeps the month of the year only. Figures 2 and 6 show synthetic worlds built on real base
+    days, with hours of the day on the axis and no calendar date.
+
+    Args:
+        ctx: The context.
+        arch: The chosen architecture.
+        log: Receives progress lines.
+
+    Returns:
+        The written paths (run `svgo` on each before committing).
+    """
+    import e00729_figures as figures
+
+    out_dir = paths.data_root() / "figures"
+    test = banks.load_bank(path=bank_path(kind="test"))
+    written: list[Path] = []
+    shares = era_month_shares(ctx=ctx)
+    months = [m for m in MONTH_LABELS if any(m in v for v in shares.values())]
+    chart1 = figures.dot_chart(
+        scores=shares, rows=months, title="Days with a daily minimum below 1.0 MVA, by era and month",
+        x_title="Share of days",
+    )  # fmt: skip
+    figures.save_svg(chart=chart1, path=out_dir / "figure_1_eras.svg")
+    written.append(out_dir / "figure_1_eras.svg")
+    s2 = [s for s in test.segments if s.source == "S2" and s.world in ("solar", "both")][:6]
+    if s2:
+        gallery = figures.alt.vconcat(
+            *(
+                figures.series_chart(
+                    series=gallery_series(seg=s), title=f"Synthetic segment {i + 1}"
+                )
+                for i, s in enumerate(s2)
+            )
+        )
+        figures.save_svg(chart=gallery, path=out_dir / "figure_2_gallery.svg")
+        written.append(out_dir / "figure_2_gallery.svg")
+    rows = score.rows_from_segments(segments=test.segments, holidays=ctx.cal.holidays)
+    pred = load_predictions(arm="D", arch=arch, seed=0, name="test")
+    lobes = score.dist.Lobes(pred["p"], pred["mu_i"], pred["s_i"], pred["mu_r"], pred["s_r"])
+    q = score.dist.mixture_quantiles(lobes=lobes, levels=(0.05, 0.5, 0.95))
+    panels = []
+    for label, day in example_windows(rows=rows, segments=test.segments).items():
+        panels.append(
+            figures.band_chart(
+                truth=rows.x[day], lower=q[day, 0], median=q[day, 1], upper=q[day, 2],
+                p_neg=score.dist.prob_negative(lobes=lobes)[day], title=label,
+            )
+        )  # fmt: skip
+    if panels:
+        figures.save_svg(chart=figures.alt.vconcat(*panels), path=out_dir / "figure_6_windows.svg")
+        written.append(out_dir / "figure_6_windows.svg")
+    log(f"wrote {len(written)} figures")
+    return written

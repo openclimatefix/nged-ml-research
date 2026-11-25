@@ -70,7 +70,7 @@ def assert_not_in_lockdown(*, month_split: Mapping[str, str]) -> None:
 
 
 def assert_seed_spaces(*, train_seeds: Sequence[int], evaluation: Sequence[banks.Bank]) -> None:
-    """Check that no evaluation bank uses a training seed space."""
+    """Check that no evaluation bank uses a training seed space and no two share a root."""
     if not banks.seed_spaces_disjoint(train_seeds=train_seeds):
         _fail(message="a training seed space meets an evaluation seed space")
     train_roots = {banks.bank_root(kind="train", seed=s) for s in train_seeds}
@@ -78,6 +78,22 @@ def assert_seed_spaces(*, train_seeds: Sequence[int], evaluation: Sequence[banks
         _fail(message="an evaluation bank was built from a training root")
     if any(b.kind == "train" for b in evaluation):
         _fail(message="a training bank was listed as an evaluation bank")
+    if len({b.root for b in evaluation}) != len(evaluation):
+        _fail(message="two evaluation banks share a root")
+
+
+def assert_banks_independent(*, evaluation: Sequence[banks.Bank]) -> None:
+    """Check that no two evaluation banks hold a segment with the same drawn parameters.
+
+    Two segments of one bank may agree on a parameter by chance only with probability zero, so a
+    shared drawn value across banks means that two banks reused a random stream.
+    """
+    seen: dict[float, str] = {}
+    for bank in evaluation:
+        for seg in bank.segments:
+            beta = float(seg.params["beta"])
+            if seen.setdefault(beta, bank.kind) != bank.kind:
+                _fail(message="two evaluation banks share a drawn simulator parameter")
 
 
 def assert_hashes_match(*, digests_by_arm: Mapping[str, Mapping[str, str]]) -> None:
@@ -90,13 +106,23 @@ def assert_hashes_match(*, digests_by_arm: Mapping[str, Mapping[str, str]]) -> N
             _fail(message="two arms read evaluation banks with different hashes")
 
 
+MAX_IDENTICAL_SHARE: Final = 0.5
+"""A farm's CAMS series may equal D8's at no more than this share of daytime half-hours."""
+
+
 def assert_cams_differs(*, cal: sim.Calendar) -> None:
-    """Check that the CAMS irradiance at every farm differs from the series at D8."""
+    """Check that the CAMS irradiance at every farm differs from the series at D8.
+
+    Both series are on the same half-hourly interpolation, so an identical half-hour means that the
+    farm lies in D8's CAMS cell. A farm whose series equals D8's at more than half of the daytime
+    half-hours fails the check.
+    """
     for f in range(cal.farms.ghi.shape[0]):
         both = (cal.farms.ghi[f] > 0) & np.isfinite(cal.d8_ghi) & (cal.d8_ghi > 0)
         if both.sum() == 0:
             continue
-        if float(np.max(np.abs(cal.farms.ghi[f][both] - cal.d8_ghi[both]))) <= 0.0:
+        same = np.isclose(cal.farms.ghi[f][both], cal.d8_ghi[both], rtol=1e-6, atol=1e-6)
+        if float(same.mean()) > MAX_IDENTICAL_SHARE:
             _fail(message="a farm's CAMS series equals the CAMS series at D8")
 
 

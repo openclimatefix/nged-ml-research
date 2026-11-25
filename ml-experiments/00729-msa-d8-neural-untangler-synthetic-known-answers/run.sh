@@ -22,10 +22,10 @@
 #     (of this experiment or another, counted together) holds the GPU, and a lock file allows one worker
 #     of this experiment at a time. `banks`, `gate`, `choose`, `margin`, `score`, and `report` run on the CPU and skip both checks;
 #   - this folder on PYTHONPATH: `e00729_paths.py` adds the folders of experiments 721, 694, 700,
-#     697, 39, and 194 (the code this experiment imports) from this checkout.
+#     697, 39, 194, and 722 (the code this experiment imports) from this checkout.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # default to dummy values because the contracts package reads them at import. Each fit holds at most
-# 6 GB of the GPU (`e00729_fit.limit_gpu_memory`).
+# 6 GB of the GPU (`e00729_train.limit_gpu_memory`).
 set -euo pipefail
 if [ "${1:-}" != "--go" ] || [ -z "${2:-}" ]; then
     sed -n '2,30p' "$0" >&2

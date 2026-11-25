@@ -243,7 +243,8 @@ def load_day_table(*, closure_days: frozenset[date] = frozenset()) -> DayTable:
         dates=days, reading=reading, bsp=bsp,
         csi=csi_i.reshape(-1, 48)[day_idx], clear=clear.reshape(-1, 48)[day_idx],
         cosz=np.clip(np.cos(np.radians(zenith)), 0.0, None).reshape(-1, 48)[day_idx],
-        t2m=t2m.reshape(-1, 48)[day_idx], d8_ghi=ghi.reshape(-1, 48)[day_idx],
+        t2m=t2m.reshape(-1, 48)[day_idx],
+        d8_ghi=np.nan_to_num(csi_i * clear).reshape(-1, 48)[day_idx],
         holidays=bank_holiday_dates(),
         farms=farm_set(
             dates=days, frame=frame.filter(pl.col("kind") == "farm"), t0=t0, n_steps=n_steps
@@ -286,17 +287,92 @@ def month_table(*, cal: sim.Calendar) -> tuple[list[str], list[int], list[int]]:
 
 
 def metered_record() -> pl.DataFrame:
-    """Return the metered engine record (experiment 194's window table): `time`, `power` (MW)."""
+    """Return the metered engine record (experiment 194's window table).
+
+    Returns:
+        The table sorted by `time`, with `power` (MW) and `units` (the number of units running).
+    """
     path = next(ML_EXPERIMENTS_DATA_DIR.glob(RECORD_GLOB))
     return pl.read_parquet(path).sort("time")
 
 
-def record_by_day(*, record: pl.DataFrame, days: np.ndarray) -> np.ndarray:
-    """Return the record's output in points on the given days, `(n_days, 48)`, NaN elsewhere."""
+def record_by_day(*, record: pl.DataFrame, days: np.ndarray, column: str = "power") -> np.ndarray:
+    """Return a column of the record on the given days, `(n_days, 48)`, NaN where it has no row.
+
+    Args:
+        record: The metered engine record.
+        days: The days, as `datetime64[D]`.
+        column: `power` (returned in points of D8's capacity) or `units` (returned as it is).
+
+    Returns:
+        The array.
+    """
     frame = record.with_columns(start=pl.col("time") - pl.duration(minutes=30)).select(
-        "start", "power"
+        "start", column
     )
-    return _day_arrays(frame=frame, dates=days, scale=core.POINTS / core.CAPACITY_MVA)
+    scale = core.POINTS / core.CAPACITY_MVA if column == "power" else 1.0
+    return _day_arrays(frame=frame.rename({column: "power"}), dates=days, scale=scale)
+
+
+def closure_days_from_sheets(
+    *, sheets: dict[str, pl.DataFrame], substation_number: int
+) -> set[date]:
+    """Return the days within 24 hours of a logged closure of one substation.
+
+    A sheet is used when it has a column whose name holds "substation" (but not "name"), a column
+    whose name holds "start", "from", or "begin", and optionally one whose name holds "end", "to",
+    or "until". A closure runs from its start to its end (or the start alone when there is no end
+    column), and one day is added on each side.
+
+    Args:
+        sheets: The workbook's sheets by name.
+        substation_number: The substation's number.
+
+    Returns:
+        The days, as dates (empty when no sheet has the columns).
+    """
+    days: set[date] = set()
+    for frame in sheets.values():
+        names = {c.lower(): c for c in frame.columns}
+        sub = next((v for k, v in names.items() if "substation" in k and "name" not in k), None)
+        beg = next(
+            (v for k, v in names.items() if any(p in k for p in ("start", "from", "begin"))), None
+        )
+        end = next((v for k, v in names.items() if any(p in k for p in ("end", "until"))), None)
+        if sub is None or beg is None:
+            continue
+        mine = frame.filter(pl.col(sub).cast(pl.String, strict=False) == str(substation_number))
+        for row in mine.iter_rows(named=True):
+            first, last = row[beg], row[end] if end is not None else row[beg]
+            if not isinstance(first, datetime | date):
+                continue
+            last = last if isinstance(last, datetime | date) else first
+            a = first.date() if isinstance(first, datetime) else first
+            b = last.date() if isinstance(last, datetime) else last
+            days.update(a + timedelta(days=k) for k in range(-1, (b - a).days + 2))
+    return days
+
+
+def load_closure_days() -> tuple[frozenset[date], bool]:
+    """Load the switching logs and return D8's closure days, and whether the logs were readable.
+
+    Returns:
+        The days (empty when the workbook is missing or unreadable) and a flag that says whether
+        the workbook loaded with a usable sheet.
+    """
+    try:
+        import e00722_data as d722  # ty: ignore[unresolved-import]
+
+        sheets = pl.read_excel(d722.SWITCHING_LOG_PATH, sheet_id=0)
+        number = (
+            pl.read_parquet(d722.METADATA_PATH)
+            .filter(pl.col("time_series_id") == core.D8_SERIES_ID)["substation_number"]
+            .item()
+        )
+        days = closure_days_from_sheets(sheets=sheets, substation_number=int(number))
+    except Exception:  # noqa: BLE001
+        return frozenset(), False
+    return frozenset(days), True
 
 
 def atomic_write_text(*, path: Path, text: str) -> None:

@@ -110,29 +110,38 @@ def k1_engine_head(
 ) -> dict[str, float | bool | str]:
     """K1: the engine head against the metered record, with M2's F1 as the second bar.
 
+    Half-hours where the record has no row (NaN) are left out of every figure. The result holds the
+    error ratio and the F1 scores only: the raw mean of the record and the count of running
+    half-hours would let a reader estimate the engine's output, so neither is returned.
+
     Args:
         head_median: Arm G2's engine-head median (equal mixture of seeds 0 to 2) in points.
-        record: The record in points.
-        running: The record's own running label.
+        record: The record in points (NaN where the record has no row).
+        running: The record's own running label (`units >= 1`).
         m2_flag: M2's "running" flag on the same injected half-hours.
 
     Returns:
-        The two errors, the F1 scores, each bar, and `status` ("pass", "fail", or "void").
+        The error ratio, the F1 scores, each bar, and `status` ("pass", "fail", or "void").
     """
+    keep = np.isfinite(record)
+    head_median, record, running, m2_flag = (
+        a[keep] for a in (head_median, record, running, m2_flag)
+    )
     n_running = int(running.sum())
     mae_head = float(np.mean(np.abs(head_median - record)))
     mae_zero = float(np.mean(np.abs(record)))
+    ratio = mae_head / mae_zero if mae_zero > 0 else float("inf")
     flag = head_median > core.K1_RUNNING_POINTS
     f1_head = f1_score(truth=running, flag=flag)
     f1_m2 = f1_score(truth=running, flag=m2_flag)
-    bar_mae = mae_head <= core.K1_MAE_RATIO * mae_zero
+    bar_mae = ratio <= core.K1_MAE_RATIO
     bar_f1 = f1_head >= f1_m2
     status = (
         "void" if n_running < core.K1_MIN_RUNNING else ("pass" if bar_mae and bar_f1 else "fail")
     )
     return {
-        "n_running": float(n_running), "mae_head": mae_head, "mae_zero": mae_zero,
-        "f1_head": f1_head, "f1_m2": f1_m2, "bar_mae": bar_mae, "bar_f1": bar_f1, "status": status,
+        "mae_ratio": ratio, "f1_head": f1_head, "f1_m2": f1_m2, "bar_mae": bar_mae,
+        "bar_f1": bar_f1, "status": status,
     }  # fmt: skip
 
 
@@ -217,7 +226,18 @@ def era_groups(*, dates: np.ndarray, day_dates: np.ndarray, day_eras: Sequence[s
     return np.array([lookup[int(d)] for d in dates])
 
 
-def b_star_on_rows(*, rows: score.Rows, climatology: base.Climatology, pi: float) -> dist.Lobes:
-    """Return B1 on real rows with prior `pi` (the real days' injected share is 0, so pi is 0)."""
-    pb = climatology.prob_below(r=rows.features.r, f=rows.features)
+def b_star_on_rows(
+    *, rows: score.Rows, model: base.Climatology | base.Regression, pi: float
+) -> dist.Lobes:
+    """Return the sign-prior baseline B1 or B2 (whichever `model` is) on real rows.
+
+    Args:
+        rows: The real rows.
+        model: The fitted climatology (B1) or regression (B2), whichever the validation rule chose.
+        pi: The prior share of injected half-hours; the stand-in is the test mix's injected share.
+
+    Returns:
+        The two-lobe baseline.
+    """
+    pb = model.prob_below(r=rows.features.r, f=rows.features)
     return base.sign_prior_lobes(f=rows.features, prob_below=pb, pi=pi)

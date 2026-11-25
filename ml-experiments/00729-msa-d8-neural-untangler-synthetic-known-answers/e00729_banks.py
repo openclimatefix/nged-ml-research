@@ -24,11 +24,11 @@ SPLIT_OF_KIND: Final = {
     "train": "training", "validation": "validation", "test": "test", "shifted": "test",
 }  # fmt: skip
 SEED_BASE: Final = {
-    "train": core.TRAIN_SEED_BASE, "validation": core.EVAL_SEED_BASE,
+    "train": core.TRAIN_SEED_BASE, "validation": core.VALIDATION_SEED_BASE,
     "test": core.EVAL_SEED_BASE, "shifted": core.SHIFTED_SEED_BASE,
 }  # fmt: skip
-"""The first entry of each bank kind's `SeedSequence`. Test and validation share a base but differ
-in the month index, so their draws differ and never meet a training seed."""
+"""The first entry of each bank kind's `SeedSequence`. Every evaluation kind has its own root, so no
+two banks share a draw, and no root meets a training seed."""
 
 
 @dataclass
@@ -64,7 +64,8 @@ def seed_spaces_disjoint(*, train_seeds: Sequence[int]) -> bool:
     """Return whether no training root equals an evaluation root (the leakage check's core)."""
     train = {bank_root(kind="train", seed=s) for s in train_seeds}
     evals = {bank_root(kind=k, seed=None) for k in ("validation", "test", "shifted")}
-    return not (train & evals)
+    evaluation_roots = [bank_root(kind=k, seed=None) for k in ("validation", "test", "shifted")]
+    return not (train & evals) and len(evals) == len(evaluation_roots)
 
 
 def bank_digest(*, segments: Sequence[sim.Segment]) -> str:
@@ -98,18 +99,26 @@ def build_bank(
     n_draws = core.SEGMENT_DRAWS_TRAIN if kind == "train" else core.SEGMENT_DRAWS_EVAL
     segments: list[sim.Segment] = []
     none_share: dict[str, float] = {}
-    for index, month in enumerate(sorted(months)):
+    ordered = sorted(months)
+    planned = None
+    if kind != "train":
+        # evaluation worlds are assigned by quota across the whole bank, so the realised mix is the planned mix
+        planned = core.quota_world_types(
+            rng=np.random.default_rng(np.random.SeedSequence([root, 10_000_000])),
+            n=n_draws * len(ordered),
+            none_share=core.SHIFTED_NONE_SHARE if kind == "shifted" else core.TEST_MIX["none"],
+        )
+    for index, month in enumerate(ordered):
         ss = np.random.SeedSequence([root, index])
         children = ss.spawn(n_draws + 1)
-        rng_mix = np.random.default_rng(children[0])
-        if kind == "train":
+        if planned is None:
+            rng_mix = np.random.default_rng(children[0])
             share = core.draw_none_share(rng=rng_mix)
-        elif kind == "shifted":
-            share = core.SHIFTED_NONE_SHARE
+            worlds = core.draw_world_types(rng=rng_mix, n=n_draws, none_share=share)
         else:
-            share = core.TEST_MIX["none"]
+            worlds = planned[index * n_draws : (index + 1) * n_draws]
+            share = worlds.count("none") / n_draws
         none_share[month] = share
-        worlds = core.draw_world_types(rng=rng_mix, n=n_draws, none_share=share)
         segments.extend(
             sim.simulate_segment(
                 cal=cal,
@@ -124,6 +133,11 @@ def build_bank(
         kind=kind, seed=seed, root=root, none_share=none_share, segments=segments,
         digest=bank_digest(segments=segments),
     )  # fmt: skip
+
+
+def injected_share(*, bank: Bank) -> float:
+    """Return the share of a bank's segments that carry an injection (the prior pi of B1 and B2)."""
+    return float(np.mean([s.world != "none" for s in bank.segments]))
 
 
 def save_bank(*, bank: Bank, path: Path) -> None:
@@ -224,36 +238,90 @@ def step_fit(*, d_bsp: np.ndarray, d_eng: np.ndarray, weights: np.ndarray | None
     return StepFit(slope, float(np.sqrt(sigma2 / sxx)), float(np.sqrt(sigma2)))
 
 
+ZERO_STEP: Final = 1e-9
+"""An engine step with an absolute size below this counts as exactly zero (its own size bin)."""
+N_SIZE_BINS: Final = 1 + core.GATE_STEP_BINS
+"""Bin 0 holds the zero steps; bins 1 to 5 are the quintiles of the record's non-zero steps."""
+
+
 def size_bins(*, d_eng: np.ndarray, edges: np.ndarray) -> np.ndarray:
-    """Return the quintile bin (0 to 4) of each absolute engine step."""
-    inside = np.searchsorted(edges, np.abs(d_eng), side="right") - 1
-    return np.clip(inside, 0, core.GATE_STEP_BINS - 1)
+    """Return the size bin (0 to 5) of each absolute engine step: 0 for a zero step, else a quintile."""
+    size = np.abs(d_eng)
+    inside = np.searchsorted(edges, size, side="right") - 1
+    quintile = 1 + np.clip(inside, 0, core.GATE_STEP_BINS - 1)
+    return np.where(size < ZERO_STEP, 0, quintile)
 
 
 def real_bin_edges(*, d_eng: np.ndarray) -> np.ndarray:
-    """Return the 6 edges of the quintile bins of the real record's absolute step size."""
-    ok = np.abs(d_eng[np.isfinite(d_eng)])
-    return np.quantile(ok, np.linspace(0.0, 1.0, core.GATE_STEP_BINS + 1))
+    """Return the 6 edges of the quintile bins of the real record's non-zero absolute steps.
+
+    Most steps of an engine record are exactly zero, so quintiles of all steps would repeat an edge.
+    The zero steps are their own bin (see `size_bins`).
+    """
+    size = np.abs(d_eng[np.isfinite(d_eng)])
+    size = size[size >= ZERO_STEP]
+    return np.quantile(size, np.linspace(0.0, 1.0, core.GATE_STEP_BINS + 1))
 
 
-def size_matched_weights(*, d_eng: np.ndarray, edges: np.ndarray) -> np.ndarray:
-    """Return row weights so that each size bin holds the real record's share (one fifth) of rows.
+def real_bin_shares(*, d_eng: np.ndarray, edges: np.ndarray) -> np.ndarray:
+    """Return the share of the real record's finite steps in each of the 6 size bins."""
+    finite = np.isfinite(d_eng)
+    counts = np.bincount(size_bins(d_eng=d_eng[finite], edges=edges), minlength=N_SIZE_BINS)
+    return counts / max(int(counts.sum()), 1)
+
+
+def size_matched_weights(*, d_eng: np.ndarray, edges: np.ndarray, shares: np.ndarray) -> np.ndarray:
+    """Return row weights so that each non-empty size bin holds the real record's share of rows.
 
     Args:
         d_eng: A synthetic stretch's engine steps.
         edges: The real record's quintile edges from `real_bin_edges`.
+        shares: The real record's share of steps per bin, from `real_bin_shares`.
 
     Returns:
-        One weight per row (0 where the step is not finite); the weights sum to the finite count.
+        One weight per row (0 where the step is not finite). The shares of empty bins are shared out
+        among the other bins, and the weights sum to the finite count.
     """
-    bins = size_bins(d_eng=d_eng, edges=edges)
+    bins = size_bins(d_eng=np.nan_to_num(d_eng), edges=edges)
     finite = np.isfinite(d_eng)
     weights = np.zeros(len(d_eng))
-    for b in range(core.GATE_STEP_BINS):
+    present = [b for b in range(N_SIZE_BINS) if (finite & (bins == b)).any()]
+    total = float(sum(shares[b] for b in present))
+    if total <= 0:
+        return weights
+    for b in present:
         sel = finite & (bins == b)
-        if sel.any():
-            weights[sel] = (1.0 / core.GATE_STEP_BINS) / (sel.sum() / finite.sum())
+        weights[sel] = (shares[b] / total) / (sel.sum() / finite.sum())
     return weights
+
+
+def chunk_fits(
+    *, d_bsp: np.ndarray, d_eng: np.ndarray, length: int, edges: np.ndarray | None = None,
+    shares: np.ndarray | None = None, min_steps: int = 100,
+) -> list[StepFit]:  # fmt: skip
+    """Fit the step regression on consecutive chunks of `length` half-hours.
+
+    Args:
+        d_bsp: BSP steps (NaN across gaps).
+        d_eng: Engine steps.
+        length: The chunk length in half-hours.
+        edges: The real record's edges; when given with `shares`, each chunk is size-matched.
+        shares: The real record's share of steps per bin.
+        min_steps: A chunk with fewer finite engine steps is skipped.
+
+    Returns:
+        One fit per chunk.
+    """
+    fits = []
+    for a in range(0, len(d_eng) - length + 1, length):
+        e, b = d_eng[a : a + length], d_bsp[a : a + length]
+        if int(np.isfinite(e).sum()) < min_steps:
+            continue
+        w = None
+        if edges is not None and shares is not None:
+            w = size_matched_weights(d_eng=e, edges=edges, shares=shares)
+        fits.append(step_fit(d_bsp=b, d_eng=e, weights=w))
+    return fits
 
 
 def bsp_gate(
@@ -267,15 +335,19 @@ def bsp_gate(
         synthetic: One size-matched fit per synthetic stretch.
 
     Returns:
-        Each condition and whether the gate passes: the real slope's interval overlaps -1.0 to
+        Each condition, `void` (True when no synthetic stretch gave a fit, so that the gate could
+        not be read and does not pass), and whether the gate passes: the real slope's interval overlaps -1.0 to
         -0.6, and the real standard error and residual sd each lie in the 5th to 95th percentile of
         the synthetic stretches.
     """
     lo_b, hi_b = -core.RANGES["beta"][1], -core.RANGES["beta"][0]
-    overlap = real_ci[0] <= hi_b and real_ci[1] >= lo_b
+    overlap = bool(real_ci[0] <= hi_b and real_ci[1] >= lo_b)
     se = np.array([f.se for f in synthetic])
     sd = np.array([f.resid_sd for f in synthetic])
+    if not np.isfinite(se).any() or not np.isfinite(sd).any() or not np.isfinite(real.se):
+        return {"slope_overlap": overlap, "se_inside": False, "sd_inside": False, "void": True,
+                "pass": False}  # fmt: skip
     se_in = bool(np.nanpercentile(se, 5) <= real.se <= np.nanpercentile(se, 95))
     sd_in = bool(np.nanpercentile(sd, 5) <= real.resid_sd <= np.nanpercentile(sd, 95))
-    return {"slope_overlap": overlap, "se_inside": se_in, "sd_inside": sd_in,
+    return {"slope_overlap": overlap, "se_inside": se_in, "sd_inside": sd_in, "void": False,
             "pass": bool(overlap and se_in and sd_in)}  # fmt: skip

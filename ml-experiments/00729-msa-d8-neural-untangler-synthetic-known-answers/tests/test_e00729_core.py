@@ -229,3 +229,15 @@ def test_ranges_hold_every_simulator_parameter_of_the_page() -> None:
     assert core.RANGES["unit_points"] == (10.0, 50.0)
     assert core.RANGES["total_points_cap"][1] == 120.0
     assert core.RANGES["spell_days"] == (2, 19)
+
+
+def test_quota_assigns_the_planned_mix_exactly() -> None:
+    rng = np.random.default_rng(0)
+    worlds = core.quota_world_types(rng=rng, n=64, none_share=0.15)
+    assert {w: worlds.count(w) for w in core.WORLD_TYPES} == {
+        "none": 10, "engine": 19, "solar": 13, "both": 22,
+    }  # fmt: skip
+    shifted = core.quota_world_types(rng=rng, n=64, none_share=0.5)
+    assert shifted.count("none") == 32
+    assert len(shifted) == 64
+    assert core.quota_world_types(rng=np.random.default_rng(1), n=64, none_share=0.15) != worlds

@@ -33,7 +33,7 @@ EXPERIMENT_ID: Final = "00729"
 SLUG: Final = "msa-d8-neural-untangler-synthetic-known-answers"
 FOLDER: Final = f"{EXPERIMENT_ID}-{SLUG}"
 """The experiment's folder name under `ml-experiments/` and `data/ml-experiments/`."""
-SIBLING_PREFIXES: Final = ("00721-", "00694-", "00700-", "00697-", "00039-", "00194-")
+SIBLING_PREFIXES: Final = ("00721-", "00694-", "00700-", "00697-", "00039-", "00194-", "00722-")
 """The experiment folders whose modules this experiment imports by bare name."""
 
 

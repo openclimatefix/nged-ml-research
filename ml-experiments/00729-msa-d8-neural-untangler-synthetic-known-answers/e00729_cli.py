@@ -1,10 +1,10 @@
-# ruff: noqa: E402, E501, PLR0915
+# ruff: noqa: E402, E501, PLR0912, PLR0915
 """Experiment 729: the command line. Run it through `run.sh`, never directly.
 
     SLOT_CPU=<n> run.sh --go e00729_cli.py <stage> [options]
 
 Stages, in the order of the plan: `banks`, `gate`, `timing`, `screen`, `choose`, `ladder`,
-`margin`, `score`, `report`. `fit` runs one named fit. Every stage prints counts and scores only.
+`margin`, `score`, `report`, `figures`. `fit` runs one named fit. Every stage prints counts and scores only.
 """
 
 import argparse
@@ -32,7 +32,11 @@ def run_jobs(*, ctx: stages.Context, jobs: list[tuple[str, str, int]], device: s
     """Run fits one at a time (one GPU process)."""
     for arm, arch, seed in jobs:
         started = time.perf_counter()
-        rec = stages.run_fit(ctx=ctx, arm=arm, arch=arch, seed=seed, device=device, log=log)
+        rec = stages.run_fit_or_record_failure(
+            ctx=ctx, arm=arm, arch=arch, seed=seed, device=device, log=log
+        )
+        if rec is None:
+            continue
         log(
             f"fit {arm} {arch} seed {seed}: validation CRPS {rec['best_val_crps']:.4f}, {time.perf_counter() - started:.0f} s"
         )
@@ -62,6 +66,7 @@ def main(argv: list[str]) -> int:
             "margin",
             "score",
             "report",
+            "figures",
             "fit",
         ),
     )
@@ -132,6 +137,10 @@ def main(argv: list[str]) -> int:
 
         arch = stages.read_json(path=paths.data_root() / "selection.json")["chosen"]
         run_jobs(ctx=ctx, jobs=train.ladder_jobs(arch=arch), device=args.device)
+    elif args.stage == "figures":
+        arch = stages.read_json(path=paths.data_root() / "selection.json")["chosen"]
+        for p in stages.stage_figures(ctx=ctx, arch=arch, log=log):
+            log(f"wrote a figure: {report.figures.optimise_command(path=p)}")
     elif args.stage == "fit":
         run_jobs(ctx=ctx, jobs=[(args.arm, args.arch, args.seed)], device=args.device)
     elif args.stage == "score":

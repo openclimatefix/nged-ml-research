@@ -146,6 +146,8 @@ SEGMENT_DRAWS_TRAIN: Final = 32
 SEGMENT_DRAWS_EVAL: Final = 8
 TRAIN_SEED_BASE: Final = 7290
 EVAL_SEED_BASE: Final = 729_000
+VALIDATION_SEED_BASE: Final = 729_250
+"""The validation bank has its own seed space, so that no validation and test segment share a draw."""
 SHIFTED_SEED_BASE: Final = 729_500
 BSP_SAMPLER_SHARE: Final = 0.5
 """Half of each epoch's windows come from training months that carry real BSP steps."""
@@ -156,6 +158,30 @@ def world_probabilities(*, none_share: float) -> dict[str, float]:
     rest = 1.0 - none_share
     total = sum(OTHER_PROPORTIONS.values())
     return {"none": none_share} | {k: rest * v / total for k, v in OTHER_PROPORTIONS.items()}
+
+
+def quota_world_types(*, rng: np.random.Generator, n: int, none_share: float) -> list[str]:
+    """Assign the world types of `n` segments by quota, so that the realised mix is the planned mix.
+
+    Each world type gets `n` times its probability, rounded down, and the segments left over go to
+    the types with the largest remainders. The assignment is then shuffled.
+
+    Args:
+        rng: The generator that shuffles the assignment.
+        n: The number of segments.
+        none_share: The planned no-injection share.
+
+    Returns:
+        The world type of each segment.
+    """
+    probs = world_probabilities(none_share=none_share)
+    exact = {w: n * p for w, p in probs.items()}
+    counts = {w: int(np.floor(v + 1e-9)) for w, v in exact.items()}
+    left = n - sum(counts.values())
+    for w in sorted(exact, key=lambda k: (counts[k] - exact[k], k))[:left]:
+        counts[w] += 1
+    flat = [w for w, c in counts.items() for _ in range(c)]
+    return [flat[i] for i in rng.permutation(len(flat))]
 
 
 def draw_none_share(*, rng: np.random.Generator) -> float:
@@ -172,7 +198,7 @@ def draw_world_types(*, rng: np.random.Generator, n: int, none_share: float) -> 
 # --------------------------------------------------------------------------- simulator ranges
 
 RANGES: Final = {
-    "n_units": (1, 4), "unit_points": (10.0, 50.0), "total_points_cap": (0.0, 120.0),
+    "n_units": (1, 4), "unit_points": (10.0, 50.0), "min_unit_points": (0.0, 50.0), "total_points_cap": (0.0, 120.0),
     "no_run_share": (0.2, 0.7), "evening_prob": (0.3, 0.9), "evening_start_h": (15.0, 17.5),
     "evening_hours": (2.0, 6.0), "morning_prob": (0.1, 0.6), "morning_start_h": (5.5, 8.5),
     "morning_hours": (1.0, 8.0), "midday_prob": (0.0, 0.3), "midday_start_h": (10.0, 14.0),

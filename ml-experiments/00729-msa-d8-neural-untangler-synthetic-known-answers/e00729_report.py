@@ -99,6 +99,19 @@ def render_report(
     return "\n".join(out) + "\n"
 
 
+def era_hour_scores(*, r3: Mapping) -> dict[str, dict[str, float]]:
+    """Return figure 8's series: per era, the P(X<0) share and the below-1.0-MVA share by UTC hour."""
+    out: dict[str, dict[str, float]] = {}
+    for key, label in (
+        ("share_above_half_by_era_and_hour", "P(X<0) above 0.5"),
+        ("share_below_1mva_by_era_and_hour", "reading below 1.0 MVA"),
+    ):
+        for group, value in r3[key].items():
+            era, hour = group.rsplit("_", 1)
+            out.setdefault(f"{era}: {label}", {})[hour] = value
+    return out
+
+
 def write_figures(
     *, verdict: Mapping, tables: Mapping, gate: Mapping, selection: Mapping, out_dir: Path
 ) -> list[Path]:
@@ -129,6 +142,12 @@ def write_figures(
             frequency=verdict["calibration"]["frequency"],
         ),
         "figure_9_architectures.svg": figures.architecture_chart(scores=selection["scores"]),
+        "figure_8_eras.svg": figures.dot_chart(
+            scores=era_hour_scores(r3=verdict["real"]["r3"]),
+            rows=[str(h) for h in range(24)],
+            title="Real eras by UTC hour: share of half-hours with P(X<0) above 0.5, beside the share below 1.0 MVA",
+            x_title="Share of half-hours",
+        ),
         "figure_3_gate.svg": figures.share_pair_chart(
             groups=list(gate["shares"]),
             synthetic=[s["synthetic_day"] for s in gate["shares"].values()],

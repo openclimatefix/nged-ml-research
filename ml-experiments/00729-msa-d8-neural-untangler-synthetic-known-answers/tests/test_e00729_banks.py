@@ -37,7 +37,9 @@ def test_bank_sizes_and_world_mix_for_each_kind() -> None:
     assert all(
         core.NONE_SHARE_RANGE[0] <= v <= core.NONE_SHARE_RANGE[1] for v in train.none_share.values()
     )
-    assert all(v == core.TEST_MIX["none"] for v in test.none_share.values())
+    counts = {w: sum(g.world == w for g in test.segments) for w in core.WORLD_TYPES}
+    assert counts == {"none": 2, "engine": 5, "solar": 3, "both": 6}  # quota of 16 draws
+    assert banks.injected_share(bank=test) == pytest.approx(14 / 16)
     shifted = build(kind="shifted", seed=None)
     assert all(v == core.SHIFTED_NONE_SHARE for v in shifted.none_share.values())
 
@@ -113,15 +115,72 @@ def test_step_fit_recovers_a_known_slope_and_its_error() -> None:
     assert np.isnan(nan_fit.slope)
 
 
-def test_size_matched_weights_give_each_quintile_an_equal_share() -> None:
+def test_size_matched_weights_give_each_bin_the_real_share() -> None:
     rng = np.random.default_rng(1)
     real = rng.normal(0, 5, 10_000)
     edges = banks.real_bin_edges(d_eng=real)
+    shares = banks.real_bin_shares(d_eng=real, edges=edges)
     synthetic = np.concatenate([rng.normal(0, 1, 9000), rng.normal(0, 30, 1000)])
-    w = banks.size_matched_weights(d_eng=synthetic, edges=edges)
+    w = banks.size_matched_weights(d_eng=synthetic, edges=edges, shares=shares)
     bins = banks.size_bins(d_eng=synthetic, edges=edges)
-    shares = [w[bins == b].sum() / w.sum() for b in range(core.GATE_STEP_BINS)]
-    assert shares == pytest.approx([0.2] * 5)
+    got = [w[bins == b].sum() / w.sum() for b in range(banks.N_SIZE_BINS)]
+    assert got == pytest.approx(list(shares))
+    assert w.sum() == pytest.approx(len(synthetic))
+
+
+def test_a_record_of_mostly_flat_steps_gives_a_zero_bin_and_five_distinct_edges() -> None:
+    rng = np.random.default_rng(2)
+    real = np.where(rng.random(10_000) < 0.8, 0.0, rng.normal(0, 8, 10_000))
+    edges = banks.real_bin_edges(d_eng=real)
+    assert len(np.unique(edges)) == 6
+    shares = banks.real_bin_shares(d_eng=real, edges=edges)
+    assert shares[0] == pytest.approx(0.8, abs=0.02)
+    assert shares[1:] == pytest.approx([shares[1]] * 5, rel=0.1)
+    bins = banks.size_bins(d_eng=real, edges=edges)
+    assert set(np.unique(bins)) == set(range(6))
+    assert (bins[real == 0.0] == 0).all()
+    # a synthetic stretch with no zero steps gives the zero bin's share to the others
+    synthetic = rng.normal(0, 8, 2000)
+    w = banks.size_matched_weights(d_eng=synthetic, edges=edges, shares=shares)
+    assert w.sum() == pytest.approx(2000)
+    assert (w > 0).all()
+
+
+def test_chunk_fits_cut_the_series_into_whole_chunks_and_skip_sparse_ones() -> None:
+    rng = np.random.default_rng(3)
+    d_eng = rng.normal(0, 5, 1000)
+    d_bsp = -0.8 * d_eng + rng.normal(0, 1, 1000)
+    fits = banks.chunk_fits(d_bsp=d_bsp, d_eng=d_eng, length=300)
+    assert len(fits) == 3
+    assert all(f.slope == pytest.approx(-0.8, abs=0.05) for f in fits)
+    d_eng[:300] = np.nan
+    assert len(banks.chunk_fits(d_bsp=d_bsp, d_eng=d_eng, length=300)) == 2
+
+
+def test_a_gate_with_no_synthetic_fit_is_void_and_does_not_pass() -> None:
+    real = banks.StepFit(-0.76, 0.015, 4.0)
+    for synthetic in ([], [banks.StepFit(float("nan"), float("nan"), float("nan"))]):
+        gate = banks.bsp_gate(real=real, real_ci=(-0.9, -0.6), synthetic=synthetic)
+        assert gate["void"]
+        assert not gate["pass"]
+    ok = banks.bsp_gate(
+        real=real, real_ci=(-0.9, -0.6), synthetic=[banks.StepFit(-0.8, 0.015, 4.0)] * 3
+    )
+    assert not ok["void"]
+
+
+def test_every_evaluation_bank_has_its_own_root_and_draws() -> None:
+    roots = [banks.bank_root(kind=k, seed=None) for k in ("validation", "test", "shifted")]
+    assert len(set(roots)) == 3
+    val, test, shifted = (build(kind=k, seed=None) for k in ("validation", "test", "shifted"))
+    betas = [{s.params["beta"] for s in b.segments} for b in (val, test, shifted)]
+    assert not (betas[0] & betas[1]) and not (betas[0] & betas[2]) and not (betas[1] & betas[2])
+
+
+def test_the_shifted_bank_holds_half_the_segments_without_injection() -> None:
+    shifted = build(kind="shifted", seed=None)
+    assert sum(s.world == "none" for s in shifted.segments) == 8
+    assert banks.injected_share(bank=shifted) == pytest.approx(0.5)
 
 
 def test_bsp_gate_each_condition_can_fail() -> None:

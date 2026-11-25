@@ -196,6 +196,7 @@ def draw_engine(  # noqa: PLR0915
     if sizes.sum() > cap:
         sizes = sizes * cap / sizes.sum()
     record["unit_points"] = float(sizes.mean())
+    record["min_unit_points"] = float(sizes.min())
     record["total_points_cap"] = float(sizes.sum())
     no_run = uniform(rng=rng, name="no_run_share", record=record)
     p_eve = uniform(rng=rng, name="evening_prob", record=record)
