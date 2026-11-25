@@ -252,22 +252,25 @@ CPU with the rules of the corrections section, none changed after a count was se
   design expected 81), and 93 pass the visible depth. The counted set of 93 moves is above the floor
   of 60. The moves per fold month are 20 (2025-11), 24 (2026-01), 25 (2026-04), and 24 (2026-06), each
   above the floor of 8. Of the 93, 46 last 7 days or more. No counted move lacks a scorable row.
-- **GH5 stopped on its coverage rule.** The 400 training draws hold no permanent change at Primary
-  4, only 15 temporary moves there, and 5 permanent changes and 12 temporary moves at Primary 8, while
-  a typical Primary holds about 500 permanent changes and 1,500 temporary moves. Both are MVA-only
-  Primaries with a full history. Their cleaned power drops below 0.05 of capacity in isolated
-  single half-hours (514 half-hours at Primary 4 and 305 at Primary 8), and the floor test rejects an
-  onset whenever the power from the onset to the fold month dips below the depth of the step. The
-  stop is the consequence that the corrections section pre-registers. The per-fold tests and the
-  pooled kind-by-Primary test passed narrowly (the smallest p was 2.35e-4 against the level 2.27e-4).
-  The z-tests on the fall-share gap did not run, because the coverage stop comes first. The gate
-  does not change the floors after the fact, and no GH5 re-run is made before the maintainer rules.
+- **GH5 stopped on its coverage rule, tripped by Primary 4 alone.** The 400 training draws hold no
+  permanent change at Primary 4 and only 15 temporary moves there. Primary 8 holds 5 permanent
+  changes and 12 temporary moves, so it passes the clause that each Primary needs at least one event
+  of each kind, but it is starved all the same. A typical Primary holds about 500 permanent changes
+  and 1,500 temporary moves. Both starved Primaries are MVA-only Primaries with a full history.
+  Their cleaned power drops below 0.05 of capacity in isolated single half-hours (514 half-hours at
+  Primary 4 and 305 at Primary 8), and the floor test rejects an onset whenever the power from the
+  onset to the fold month dips below the depth of the step. The stop is the consequence that the
+  corrections section pre-registers. The per-fold tests and the pooled kind-by-Primary test passed
+  narrowly (the smallest p was 2.35e-4 against the level 2.27e-4). The z-tests on the fall-share gap
+  did not run, because the coverage stop comes first. The gate does not change the floors after the
+  fact, and no GH5 re-run is made before the maintainer rules.
 - **GH1 failed through a fault in the follow share, now fixed.** The divisor of the follow share
   averaged the injected change from midnight of the onset day. The generator places an onset at a
-  random half-hour of that day, 25 half-hours after midnight on average, so the half-hours before the
-  onset diluted the mean and the follow share of a flat permanent change read 1.056 against a limit of
-  1 within 0.05. The divisor now starts at the onset half-hour, and a unit test with a mid-day onset
-  checks it. The thresholds are unchanged. GH1 and GH2 have not been re-run since the fix.
+  random half-hour of that day (the mean onset measured on `g2` is 25 half-hours after midnight, and
+  the generator's expected value is 23.5), so the half-hours before the onset diluted the mean and
+  the follow share of a flat permanent change read 1.056 against a limit of 1 within 0.05. The
+  divisor now starts at the onset half-hour, and a unit test with a mid-day onset checks it. The
+  thresholds are unchanged. GH1 and GH2 have not been re-run since the fix.
 
 ## Names used on this page
 
