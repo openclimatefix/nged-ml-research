@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0912, PLR0915
+# ruff: noqa: E501, PT018, PLR0912, PLR0915
 """Experiment 725: the wiring checks KL1 to KL10 (design section 5).
 
 Usage:
@@ -53,14 +53,13 @@ FALLBACK_TRAIN_LIMIT: Final = 0.02
 ZERO_SCORED_LIMIT: Final = 0.01
 FORECAST_TOLERANCE: Final = 1e-6
 KL5_TOLERANCE: Final = 1e-4
+KL10_RAW_TOLERANCE: Final = 1e-4
 N_KL10_CELLS: Final = 50
 GRID_START: Final = datetime(2019, 9, 1, tzinfo=UTC)
 CLOCK_CHANGES: Final = (date(2025, 10, 26), date(2026, 3, 29))
 """The two UK clock changes that fall in the history of the folds."""
 KL5_COLUMNS: Final = (0, 1, 2, 3, 4, 8, 9, 10, 11)
 """Indices in the 12 trailing columns of the nine that are recomputed from the `ft` series (not t_min_day, t_max_day, t_cold_snap_days)."""
-WEATHER_SHORTWAVE: Final = 0
-WEATHER_TEMPERATURE: Final = 2
 
 
 def checks_dir(*, data_dir: Path) -> Path:
@@ -243,7 +242,9 @@ def kl1_forecast(*, lw, data_dir: Path, month: str, seed: int = 0) -> dict:  # n
 
     device = lw.live.device
     spec = arms713.resolve(arm=cm.M_STAR, data_dir=data_dir)
-    z_live = lw.live.with_rule(rule_name="Z")
+    z_live = (
+        lw.live.analysis_copy()
+    )  # exercises the rewrite path of `LiveSource.assemble` with the rule off
     lw.data.source, lw.world.source = z_live, z_live
     model = mdl.MsaNet(switches=spec.switches).to(device)
     state = arms713.model_file(data_dir=data_dir, arm=cm.M_STAR, month=month, seed=seed, stage=3)
@@ -272,6 +273,21 @@ def kl1_forecast(*, lw, data_dir: Path, month: str, seed: int = 0) -> dict:  # n
     )
     del fz
     return {"pass": True, "max_abs_difference": worst, "rows": joined.height}
+
+
+def t3_known_answer(*, live, picks) -> dict:  # noqa: ANN001
+    """Check M6: with the target-row summary moved back by one day (the parent's own day), the batch equals the unshifted batch bit for bit."""
+    import copy
+
+    import e00725_poison as pz
+
+    moved = copy.copy(live)
+    moved.target_summary_back_days = 1
+    for sample in picks:
+        a = pz.assemble_one(source=moved, sample=sample)
+        b = pz.assemble_one(source=live, sample=sample)
+        assert assemble_equal(a=a, b=b), f"T3: a shift of one day changes the batch at {sample}"
+    return {"pass": True, "n_samples": len(picks)}
 
 
 def kl4(*, live, picks) -> dict:  # noqa: ANN001
@@ -332,7 +348,10 @@ def kl7(*, cache, picks_primary: np.ndarray, picks_c: np.ndarray, rule_name: str
 
 
 def kl7_fold(*, lw, phase: str) -> dict:  # noqa: ANN001
-    """Run KL7 for arms `L` and `E` on the fold's training pairs or scored origins and apply the limits."""
+    """Run KL7 for arms `L` and `E` on the fold's training pairs or scored origins and apply the limits.
+
+    The shares (per arm, per Primary) are printed and stored before any limit is evaluated.
+    """
     import e00713_train as tr  # ty: ignore[unresolved-import]
     import e00725_poison as pz
 
@@ -342,35 +361,37 @@ def kl7_fold(*, lw, phase: str) -> dict:  # noqa: ANN001
         c_idx = np.concatenate([p.c_idx for p in pairs])
         limit = FALLBACK_TRAIN_LIMIT
     else:
-        origins = lw.data.test_origin_idx + 6
+        origins = lw.data.test_origin_idx + rule.NATIVE_OFFSET_STEPS
         primary, c_idx = (a.ravel() for a in np.meshgrid(np.arange(16), origins, indexing="ij"))
         limit = ZERO_SCORED_LIMIT
-    out = {}
+    out: dict = {"n_samples": len(c_idx), "limit": limit}
     for name in ("L", "E"):
         result = kl7(cache=lw.cache, picks_primary=primary, picks_c=c_idx, rule_name=name)
         result["limit"] = limit
         result["pass"] = bool(result["share"] < limit)
         out[name] = result
-        assert result["pass"], (
-            f"KL7: {result['share']:.4f} of the ENS cells of rule {name} have no row, limit {limit} "
-            f"({phase} phase); a breach goes to the manager as a coverage finding"
-        )
+    print("KL7 shares:", json.dumps(out, default=str), flush=True)
     if phase == "predict":
         # no scored cell reads an analysis fallback: a fallback cell of a scored batch reads exactly 0
-        sample = pz.OneSample(primary=int(primary[0]), c_idx=int(c_idx[0]))
-        batch = pz.assemble_one(source=lw.live, sample=sample)
-        plan = lw.live.plan(primary=batch.inputs.primary, hist_idx=batch.hist_idx)
-        values = batch.inputs.hist_weather[..., : rule.N_ENS_COLUMNS][plan.fallback]
-        assert bool((values == 0).all()), "KL7: a scored fallback cell reads a nonzero value"
+        n_fallback = 0
+        for p, c in zip(primary.tolist(), c_idx.tolist(), strict=True):
+            batch = pz.assemble_one(source=lw.live, sample=pz.OneSample(primary=p, c_idx=c))
+            plan = lw.live.plan(primary=batch.inputs.primary, hist_idx=batch.hist_idx)
+            values = batch.inputs.hist_weather[..., : rule.N_ENS_COLUMNS][plan.fallback]
+            n_fallback += int(values.numel())
+            assert bool((values == 0).all()), "KL7: a scored fallback cell reads a nonzero value"
+        out["scored_fallback_cells"] = n_fallback
         out["scored_fallback_reads_zero"] = True
-    out["pass"] = True
-    out["n_samples"] = len(c_idx)
+    out["pass"] = bool(all(out[n]["pass"] for n in ("L", "E")))
+    assert out["pass"], (
+        f"KL7: the share of ENS cells with no row is above {limit} ({phase} phase); "
+        "a breach goes to the manager as a coverage finding"
+    )
     return out
 
 
 def kl9(*, lw, month: str, seed: int, data_dir: Path, device: str) -> dict:  # noqa: ANN001
     """Check KL9: `assemble` runs once per batch in stage 2, in stage 3, and at prediction; stage 3 keeps the type; L and Z differ only in the changed cells."""
-    import e00713_layout as lay  # ty: ignore[unresolved-import]
     import e00713_train as tr  # ty: ignore[unresolved-import]
     import e00725_batch as lb
     import e00725_fit as fit_mod
@@ -430,30 +451,65 @@ def kl9(*, lw, month: str, seed: int, data_dir: Path, device: str) -> dict:  # n
             assert not bool((diff & ~changed).any()), (
                 "KL9: L and Z differ outside the changed cells"
             )
-            ens = rule.cell_sources(rule="L") == rule.SRC_ENS
+            sources = rule.cell_sources(rule="L")
+            ens = sources == rule.SRC_ENS
+            cams_cols = [0, *range(15, 19)]
             blocks = {
-                "age2_age3_young_tokens": ens[..., 15:19].any(
-                    axis=-1
-                ),  # columns 15 to 18 read ENS only in the young cells
-                "day_summary": (rule.cell_sources(rule="L") == rule.SRC_DAY_D3)[..., 19],
-                "columns_1_to_14": ens[..., 1:15].any(axis=-1),
+                "cams_columns_young_tokens": (diff[..., cams_cols] & ens[..., cams_cols]).any(),
+                "day_summary": (diff[..., 19:21] & (sources[..., 19:21] == rule.SRC_DAY_D3)).any(),
+                "columns_1_to_14_where_column_0_reads_cams": (
+                    diff[..., 1:15] & ens[..., 1:15] & (sources[..., :1] == rule.SRC_CAMS)
+                ).any(),
             }
-            for name, mask in blocks.items():
-                hit = (
-                    bool((diff[..., :].any(axis=-1) & mask).any())
-                    if name != "day_summary"
-                    else bool((diff[..., 19] & mask).any())
+            for name, hit in blocks.items():
+                assert bool(hit), (
+                    f"KL9: no value of the changed block {name} differs between L and Z"
                 )
-                assert hit, f"KL9: no value of the changed block {name} differs between L and Z"
-                out[f"block_{name}_differs"] = hit
-    pred = live.with_rule(rule_name="L")
-    pred.phase = "predict"
-    import e00725_poison as pz
-
-    sample = pz.OneSample(primary=0, c_idx=int(lw.world.cutoff_idx - lay.NATIVE_OFFSET_STEPS - 96))
-    del sample
+                out[f"block_{name}_differs"] = True
     out["pass"] = True
     return out
+
+
+def kl9_predict(*, lw, month: str, data_dir: Path, device: str) -> dict:  # noqa: ANN001
+    """Check KL9 at prediction: `assemble` runs once per batch of `forecast_frame`, and the data source is a `LiveSource`."""
+    import copy
+
+    import e00422_prep as prep422  # ty: ignore[unresolved-import]
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+    import e00713_arms as arms713  # ty: ignore[unresolved-import]
+    import e00713_predict as pred713  # ty: ignore[unresolved-import]
+    import e00713_train as tr  # ty: ignore[unresolved-import]
+    import e00725_batch as lb
+    import e00725_fit as fit_mod
+
+    assert type(lw.data.source) is lb.LiveSource, (
+        f"KL9: the data source is a {type(lw.data.source).__name__}"
+    )
+    spec = arms713.resolve(arm=cm.M_STAR, data_dir=data_dir)
+    model = fit_mod.new_model(seed=0, month=month, device=device, data_dir=data_dir)
+    data = copy.copy(lw.data)
+    data.test_origin_idx = lw.data.test_origin_idx[:1]
+    n_pairs = 16 * 14
+    n_batches = -(-n_pairs // pred713.PREDICT_BATCH)
+    batches = {"n": 0}
+    original = tr.batch_for
+
+    def counting(**kwargs):  # noqa: ANN003, ANN202
+        batches["n"] += 1
+        return original(**kwargs)
+
+    before = lw.live.counters["assemble_calls"]
+    sites = k578.sites().sort("primary")
+    with unittest.mock.patch.object(tr, "batch_for", counting):
+        pred713.forecast_frame(
+            model=model, data=data, spec=spec, world=lw.world, seed=0, mask_history=False,
+            grid_start_us=prep422.GRID_START_US, time_series_ids=sites["time_series_id"].to_numpy(),
+        )  # fmt: skip
+    calls = lw.live.counters["assemble_calls"] - before
+    assert batches["n"] == n_batches and calls == n_batches, (
+        f"KL9: {calls} assemble calls and {batches['n']} batches at prediction, {n_batches} expected"
+    )
+    return {"pass": True, "prediction_batches": n_batches, "assemble_calls": calls}
 
 
 def _with_source(world, source):  # noqa: ANN001, ANN202
@@ -511,48 +567,65 @@ def kl10(*, lw, picks, data_dir: Path, phase: str) -> dict:  # noqa: ANN001
     return {"pass": True, "n_samples": len(picks), "raw_cells_checked": cells}
 
 
-def _kl10_raw_cells(*, lw, picks, phase: str, n: int) -> int:  # noqa: ANN001
-    """Compare `n` random ENS weather cells with an independent Polars lookup of the raw summary rows."""
+def _kl10_raw_cells(*, lw, picks, phase: str, n: int) -> dict:  # noqa: ANN001
+    """Compare `n` random ENS weather cells, spread over the 7 weather columns, with an independent Polars lookup of the raw summary rows.
+
+    The raw folder is the one the phase's cache was built from (`meta.json` records it). Each cell is
+    compared twice: the raw value in `cache.raw` within 1e-4, and the standardised float16 value exactly.
+    """
     import e00397_prep as prep  # ty: ignore[unresolved-import]
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00428_data as data428  # ty: ignore[unresolved-import]
     import e00725_poison as pz
+    import e00725_sources as src
     import polars as pl
 
     rng = np.random.default_rng(0)
     live = lw.live
+    raw_dir = Path(src.read_meta(phase=phase, data_dir=ML_EXPERIMENTS_DATA_DIR)["raw_dir"])
     sites = {int(r["primary"]): r["site"] for r in prep.primaries().iter_rows(named=True)}
     keep37, _, _ = data428.non_lag_layout()
     mean, std = lw.stats["weather_mean"], lw.stats["weather_std"]
-    done = 0
+    done, n_zero, worst = 0, 0, 0.0
     while done < n:
+        col = done % src.N_WEATHER
         sample = picks[int(rng.integers(len(picks)))]
         out = pz.assemble_one(source=live, sample=sample)
         plan = live.plan(primary=out.inputs.primary, hist_idx=out.hist_idx)
-        cells = np.argwhere(plan.used[0, ..., :7].cpu().numpy())
+        cells = np.argwhere(plan.used[0, ..., col].cpu().numpy())
         if len(cells) == 0:
             continue
-        r, j, col = cells[int(rng.integers(len(cells)))]
+        r, j = cells[int(rng.integers(len(cells)))]
         g = int(out.hist_idx[0, r, j])
         valid_us = prep422.GRID_START_US + g * prep422.STEP_US
-        z = np.load(prep.RAW_DIR / "summary" / f"{sites[sample.primary]}.npz")
+        z = np.load(raw_dir / "summary" / f"{sites[sample.primary]}.npz")
         frame = pl.DataFrame(
             {"valid": z["valid"], "lead": z["lead"], "w": z["x"][:, keep37][:, col]}
         )
         row = frame.filter(pl.col("valid") == valid_us).sort("lead").head(1)
         assert row.height == 1, f"KL10: no raw summary row at valid time {valid_us}"
-        expected = np.float16(np.clip((float(row["w"][0]) - mean[col]) / std[col], -5.0, 5.0))
+        raw_value = float(row["w"][0])
+        n_zero += int(raw_value == 0.0)
+        cached = float(lw.cache.raw[sample.primary, g, col])
+        worst = max(worst, abs(cached - raw_value))
+        assert abs(cached - raw_value) <= KL10_RAW_TOLERANCE, (
+            f"KL10: the cached raw value of cell {(r, j, col)} is {cached}, the raw row gives {raw_value}"
+        )
+        expected = np.float16(np.clip((raw_value - mean[col]) / std[col], -5.0, 5.0))
         got = np.float16(float(out.inputs.hist_weather[0, r, j, col]))
         assert expected == got, (
             f"KL10: the ENS cell {(r, j, col)} reads {got}, the raw row gives {expected} ({phase})"
         )
         done += 1
-    return done
+    return {
+        "cells": done,
+        "exact_zero_cells": n_zero,
+        "worst_raw_difference": worst,
+        "raw_dir": str(raw_dir),
+    }
 
 
-def run_fold(
-    *, month: str, phase: str, device: str, data_dir: Path, only: set[str], kl3r_primaries: int
-) -> dict:
+def run_fold(*, month: str, phase: str, device: str, data_dir: Path, only: set[str]) -> dict:
     """Run the checks of one fold and one phase and write the result file."""
     os.environ["E00667_PHASE"] = phase
     import e00713_train as tr  # ty: ignore[unresolved-import]
@@ -561,6 +634,7 @@ def run_fold(
     import e00725_world as world_mod
 
     fz.assert_frozen_checkout()
+    fz.limit_gpu_memory(device=device)
     lw = world_mod.load_world(
         month=month, seed=0, rule_name="L", phase=phase, device=device, data_dir=data_dir
     )  # fmt: skip
@@ -586,44 +660,26 @@ def run_fold(
     results["origins"] = origins
     if run("KL1"):
         results["KL1"] = kl1_batch(live=lw.live, picks=picks[:TRAIN_SAMPLES])
-        if phase == "predict" and month == cm.ALL_FOLDS[0]:
-            results["KL1_forecast"] = kl1_forecast(lw=lw, data_dir=data_dir, month=month)
-            lw.live = (
-                lw.live
-            )  # the forecast check swapped the sources; rebuild them for the checks below
-            lw = world_mod.load_world(
-                month=month, seed=0, rule_name="L", phase=phase, device=device, data_dir=data_dir
-            )  # fmt: skip
     if run("KL2"):
         results["KL2"] = {
             "table": kl2_pure(contracts=[contract_datetime(c_idx=c) for c in origins]),
             **{name: kl2_batch(live=lw.live.with_rule(rule_name=name), samples=two_origin_picks, day0=day0) for name in rule.RULES},
         }  # fmt: skip
     if run("KL3"):
-        n = len(picks)
-        results["KL3"] = pz.kl3(
-            live=lw.live,
-            samples=picks[: max(n, 1) if phase == "train" else 480],
-            phase=phase,
-            with_controls=phase == "train" or True,
-        )
+        results["KL3"] = pz.kl3(live=lw.live, samples=picks, phase=phase, with_controls=True)
+        ref = pz.fallback_count_reference(
+            found=np.asarray(lw.cache.found), rule_name="L",
+            primary=np.array([s.primary for s in picks]), c_idx=np.array([s.c_idx for s in picks]),
+        )  # fmt: skip
+        results["KL3"]["fallback_reference"] = ref
         if phase == "train":
-            ref = pz.fallback_count_reference(
-                found=np.asarray(lw.cache.found), rule_name="L",
-                primary=np.array([s.primary for s in picks]), c_idx=np.array([s.c_idx for s in picks]),
-            )  # fmt: skip
-            results["KL3"]["fallback_reference"] = ref
             assert results["KL3"]["n_exempt_cells"] == ref, (
                 f"KL3: {results['KL3']['n_exempt_cells']} exempt cells, KL7 counts {ref}"
             )
         else:
-            assert results["KL3"]["n_exempt_cells"] >= 0
-    if run("KL3r") and phase == "train":
-        scratch = cm.work(data_dir=data_dir) / "scratch"
-        chosen_r = [
-            pz.OneSample(primary=p, c_idx=c) for c in origins for p in range(kl3r_primaries)
-        ]
-        results["KL3r"] = pz.kl3r(lw=lw, samples=chosen_r, phase=phase, scratch=scratch)
+            assert results["KL3"]["n_exempt_cells"] == 0, "KL3: a scored origin has exempt cells"
+    if run("T3"):
+        results["T3_known_answer"] = t3_known_answer(live=lw.live, picks=two_origin_picks)
     if run("KL4"):
         results["KL4"] = kl4(live=lw.live, picks=picks[:TRAIN_SAMPLES])
     if run("KL6") and phase == "train":
@@ -634,11 +690,50 @@ def run_fold(
         results["KL9"] = kl9(lw=lw, month=month, seed=0, data_dir=data_dir, device=device)
     if run("KL10"):
         results["KL10"] = kl10(lw=lw, picks=two_origin_picks, data_dir=data_dir, phase=phase)
+    if phase == "predict" and month == cm.ALL_FOLDS[0]:
+        # the two checks below swap the sources or run the network, so they come last
+        if run("KL9"):
+            results["KL9_predict"] = kl9_predict(
+                lw=lw, month=month, data_dir=data_dir, device=device
+            )
+        if run("KL1"):
+            results["KL1_forecast"] = kl1_forecast(lw=lw, data_dir=data_dir, month=month)
     results["pass"] = all(v.get("pass", True) for v in results.values() if isinstance(v, dict))
     path = checks_dir(data_dir=data_dir) / f"{month}_{phase}.json"
     cm.write_json_atomic(obj=results, path=path)
     print(json.dumps(results, indent=1, default=str)[:4000], flush=True)
     return results
+
+
+def kl3r_fold(*, month: str, data_dir: Path, n_primaries: int) -> dict:
+    """Run KL3r for one fold on the CPU, outside the GPU slot (it rebuilds the analysis arrays from poisoned inputs).
+
+    The rebuild takes about 1 minute per Primary and poisoned copy, so the job runs with `--device cpu`
+    semantics: the world is built on the CPU and no GPU memory is touched.
+    """
+    os.environ["E00667_PHASE"] = "train"
+    import e00713_train as tr  # ty: ignore[unresolved-import]
+    import e00725_frozen as fz
+    import e00725_poison as pz
+    import e00725_world as world_mod
+
+    fz.assert_frozen_checkout()
+    lw = world_mod.load_world(
+        month=month, seed=0, rule_name="L", phase="train", device="cpu", data_dir=data_dir
+    )
+    samples = tr.make_samples(world=lw.world, stage=2, placebo=False)
+    origins = pick_origins(available=np.unique(samples.c_idx[~samples.is_val]))
+    chosen = [pz.OneSample(primary=p, c_idx=c) for c in origins for p in range(n_primaries)]
+    scratch = cm.work(data_dir=data_dir) / "scratch"
+    result = {
+        "month": month,
+        "phase": "train",
+        "origins": origins,
+        **pz.kl3r(lw=lw, samples=chosen, phase="train", scratch=scratch),
+    }
+    cm.write_json_atomic(obj=result, path=checks_dir(data_dir=data_dir) / f"{month}_kl3r.json")
+    print(json.dumps(result, indent=1), flush=True)
+    return result
 
 
 def lay_native_offset() -> int:
@@ -663,6 +758,8 @@ def kl5(*, phase: str, data_dir: Path) -> dict:
     import e00725_sources as src
 
     cache = src.load_cache(phase=phase, data_dir=data_dir)
+    shortwave = prep418.WEATHER.index("shortwave")
+    temperature = prep418.WEATHER.index("temperature_2m")
     local_date = f437.local_date_codes()
     names = [d632.B1_GRID_NAMES[k] for k in KL5_COLUMNS]
     offsets = rule.token_grid_index(day=rule.REFERENCE_DAY) - (
@@ -676,15 +773,15 @@ def kl5(*, phase: str, data_dir: Path) -> dict:
         deltas = (8, 15, 22) if phase == "predict" else (-24, -15, -5)
         contracts += [contract_index(day=first + timedelta(days=d)) for d in deltas]
     compared = dict.fromkeys(names, 0)
+    in_scope = dict.fromkeys(names, 0)
+    one_sided_nan = dict.fromkeys(names, 0)
     worst = dict.fromkeys(names, 0.0)
     for row in prep.primaries().iter_rows(named=True):
         p = int(row["primary"])
         weather = np.asarray(cache.raw[p, :, : src.N_WEATHER], dtype=np.float32)
         with unittest.mock.patch.object(prep418, "dense_weather", lambda *, w=weather, **_: w):
             dense = f437.dense_arrays(row=row, local_date=local_date)
-        finite = np.isfinite(weather[:, WEATHER_SHORTWAVE]) & np.isfinite(
-            weather[:, WEATHER_TEMPERATURE]
-        )
+        finite = np.isfinite(weather[:, shortwave]) & np.isfinite(weather[:, temperature])
         csum = np.concatenate([[0], np.cumsum(finite)])
         for c in contracts:
             idx = c + offsets[ens]
@@ -695,11 +792,17 @@ def kl5(*, phase: str, data_dir: Path) -> dict:
             for k, name in zip(KL5_COLUMNS, names, strict=True):
                 stored = np.asarray(cache.raw[p, use, src.N_WEATHER + k], dtype=np.float64)
                 diff = np.abs(stored - dense[name][use])
+                ref = dense[name][use]
+                one_sided_nan[name] += int((np.isnan(stored) != np.isnan(ref)).sum())
+                in_scope[name] += len(idx)
                 compared[name] += len(use)
                 worst[name] = max(worst[name], float(np.nanmax(diff)) if len(diff) else 0.0)
     result = {
-        "pass": all(w <= KL5_TOLERANCE for w in worst.values()), "phase": phase,
-        "cells_compared": compared, "worst_abs_difference": worst,
+        "pass": all(w <= KL5_TOLERANCE for w in worst.values()) and not any(one_sided_nan.values()),
+        "phase": phase, "cells_compared": compared, "share_of_cells_compared": {
+            k: compared[k] / max(in_scope[k], 1) for k in names
+        },
+        "one_sided_nan_cells": one_sided_nan, "worst_abs_difference": worst,
     }  # fmt: skip
     cm.write_json_atomic(obj=result, path=checks_dir(data_dir=data_dir) / f"kl5_{phase}.json")
     print(json.dumps(result, indent=1), flush=True)
@@ -746,7 +849,8 @@ def collect(*, data_dir: Path, folds: Sequence[str]) -> dict:
     folder = checks_dir(data_dir=data_dir)
     needed = ["pure.json", "kl5_train.json", "kl5_predict.json", "kl8.json"]
     needed += [f"{m}_{ph}.json" for m in folds for ph in ("train", "predict")]
-    record: dict = {"code": fz.code_record(), "folds": list(folds)}
+    needed += [f"{m}_kl3r.json" for m in folds]
+    record: dict = {"code": fz.code_record(), "checks_hash": cm.checks_hash(), "folds": list(folds)}
     for name in needed:
         path = folder / name
         assert path.exists(), f"{path} is missing: run the check first"
@@ -771,13 +875,19 @@ def main() -> int:
     p_fold.add_argument("phase", choices=("train", "predict"))
     p_fold.add_argument("--device", default="cuda")
     p_fold.add_argument("--only", default="")
-    p_fold.add_argument("--kl3r-primaries", type=int, default=2)
+    p3r = sub.add_parser("kl3r")
+    p3r.add_argument("month")
+    p3r.add_argument("--primaries", type=int, default=2)
     p5 = sub.add_parser("kl5")
     p5.add_argument("phase", choices=("train", "predict"))
     sub.add_parser("kl8")
     p_collect = sub.add_parser("collect")
     p_collect.add_argument("--folds", default=",".join(cm.ALL_FOLDS))
     args = parser.parse_args()
+    if args.command in {"fold", "kl3r"}:
+        import torch  # ty: ignore[unresolved-import]
+
+        torch.set_num_threads(1)
     data_dir = ML_EXPERIMENTS_DATA_DIR
     if args.command == "pure":
         print(pure(data_dir=data_dir))
@@ -785,8 +895,10 @@ def main() -> int:
         only = {x for x in args.only.split(",") if x}
         result = run_fold(
             month=args.month, phase=args.phase, device=args.device, data_dir=data_dir, only=only,
-            kl3r_primaries=args.kl3r_primaries,
         )  # fmt: skip
+        return 0 if result["pass"] else 1
+    elif args.command == "kl3r":
+        result = kl3r_fold(month=args.month, data_dir=data_dir, n_primaries=args.primaries)
         return 0 if result["pass"] else 1
     elif args.command == "kl5":
         kl5(phase=args.phase, data_dir=data_dir)

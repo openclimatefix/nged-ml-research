@@ -31,7 +31,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import e00713_batch as bt  # ty: ignore[unresolved-import]
 import e00713_layout as lay  # ty: ignore[unresolved-import]
@@ -189,15 +189,26 @@ def kl3(
 
 
 def _poison_weather(
-    *, weather: np.ndarray, c_idx: int, value: float, shift_days: int
+    *,
+    weather: np.ndarray,
+    c_idx: int,
+    value: float,
+    shift_days: int,
+    kinds: Sequence[str] = ("era5", "cams"),
 ) -> np.ndarray:
-    """Return a copy of the raw (G, 7) weather of a Primary with the forbidden half-hours set to `value`."""
+    """Return a copy of the raw (G, 7) weather of a Primary with the forbidden half-hours set to `value`.
+
+    `kinds` selects the ERA5 columns (1 to 6, which feed the trailing temperature columns 7 to 14) and the
+    CAMS shortwave column (0, which feeds the trailing irradiance columns 15 to 18).
+    """
     out = np.array(weather, copy=True)
     native = c_idx - lay.NATIVE_OFFSET_STEPS
     day = c_idx // lay.STEPS_PER_DAY
     back = lay.STEPS_PER_DAY * shift_days
-    out[native - rule.ERA5_LAG_HOURS * 2 - back + 1 :, 1:] = value
-    out[lay.STEPS_PER_DAY * (day - 2) - back + 1 :, 0] = value
+    if "era5" in kinds:
+        out[native - rule.ERA5_LAG_HOURS * 2 - back + 1 :, 1:] = value
+    if "cams" in kinds:
+        out[lay.STEPS_PER_DAY * (day - 2) - back + 1 :, 0] = value
     return out
 
 
@@ -257,20 +268,21 @@ def rebuilt_primary_arrays(
         columns["lead_hours"] = np.zeros(grid.len(), dtype=np.float32)
         frame = pl.DataFrame(columns).with_columns(valid_time=grid, power_fcst_init_time=grid)
         x = prep.feature_matrix(frame=frame, scheme="summary")
-        raw7 = np.where(np.isfinite(weather), x[:, d632.WEATHER_IN_46], np.nan)
+        raw7 = np.where(np.isfinite(weather), x[:, d632.WEATHER_IN_46], np.nan).astype(np.float32)
         z7 = np.clip(
             (raw7 - stats["weather_mean"]) / stats["weather_std"], -d632.CLIP_SD, d632.CLIP_SD
         )
         dense = f437.dense_arrays(row=row, local_date=local_date)
-        grid12 = np.stack([dense[name] for name in d632.B1_GRID_NAMES], axis=1)
-        z12 = np.nan_to_num((grid12 - stats["b1_mean"][:12]) / stats["b1_std"][:12], nan=0.0)
+        grid12 = np.stack([dense[name] for name in d632.B1_GRID_NAMES], axis=1).astype(np.float32)
         cams = np.full((d632.N_DAYS, 2), np.nan, dtype=np.float32)
         for day, (mean, csi) in f437.cams_previous_day(site=row["site"]).items():
             if 0 <= day - d632.DAY0 < d632.N_DAYS:
                 cams[day - d632.DAY0] = (mean, csi)
-        zc = np.nan_to_num((cams - stats["b1_mean"][12:14]) / stats["b1_std"][12:14], nan=0.0)
+        z12, zc = d632.b1_scale(
+            grid=grid12, cams=cams, mean=stats["b1_mean"], std=stats["b1_std"], device="cpu"
+        )
     return (
-        np.nan_to_num(z7, nan=0.0).astype(np.float16), z12.astype(np.float16), zc.astype(np.float32),
+        np.nan_to_num(z7, nan=0.0).astype(np.float16), z12.numpy(), zc.numpy(),
     )  # fmt: skip
 
 
@@ -289,15 +301,38 @@ def source_with_rebuilt(
     return new
 
 
+class Control(NamedTuple):
+    """One negative control: the poisoned inputs, the history row to look at, and the columns that must change."""
+
+    kinds: tuple[str, ...]
+    slot: int
+    columns: slice
+
+
+CONTROLS: Final = {
+    "era5": Control(kinds=("era5",), slot=7 - rule.FIRST_AGE, columns=slice(7, 15)),
+    "cams": Control(kinds=("cams",), slot=3 - rule.FIRST_AGE, columns=slice(15, 19)),
+    "day_summary": Control(kinds=(), slot=-1, columns=slice(19, 21)),
+}
+"""The three negative controls of KL3r: the poison moved one day earlier in one input, and the columns that must change.
+
+The ERA5 control poisons raw weather columns 1 to 6 and must change trailing columns 7 to 14 at age 7; the CAMS
+control poisons raw column 0 and must change trailing columns 15 to 18 at age 3; the day-summary control poisons
+the hourly CAMS table alone and must change columns 19 and 20 at the tokens that read the summary of D - 3.
+"""
+
+
 def kl3r(
     *, lw: object, samples: Sequence[OneSample], phase: str, scratch: Path, with_controls: bool = True,
 ) -> dict:  # fmt: skip
-    """Run KL3r on `samples` (one Primary and origin each); the cost is about 1 minute per rebuild.
+    """Run KL3r on `samples` (one Primary and origin each).
 
     For each sample the analysis columns are rebuilt from clean weather and from poisoned weather (1e6 and
     NaN); the history assembled from the poisoned rebuild must equal the history assembled from the clean
     rebuild, outside the counted fallback cells. The clean rebuild must also equal the cached batch. With
-    `with_controls`, the poisons moved one day earlier must change the inputs of at least one sample.
+    `with_controls`, each of the three controls of `CONTROLS` (the poison moved one day earlier) must change
+    its own columns in at least one sample. The clean rebuild is cached for each Primary, because it does not
+    depend on the origin.
     """
     import e00397_prep as prep  # ty: ignore[unresolved-import]
     import e00418_prep as prep418  # ty: ignore[unresolved-import]
@@ -306,21 +341,25 @@ def kl3r(
     live: lb.LiveSource = lw.live  # ty: ignore[unresolved-attribute]
     rows = {int(r["primary"]): r for r in prep.primaries().iter_rows(named=True)}
     local_date = f437.local_date_codes()
-    changed = False
+    changed = dict.fromkeys(CONTROLS, False)
     n_cached_mismatch = 0
+    clean_cache: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    weather_cache: dict[int, np.ndarray] = {}
     for sample in samples:
         row = rows[sample.primary]
-        weather = prep418.dense_weather(series_id=int(row["time_series_id"]), site=row["site"])
-        clean_arrays = rebuilt_primary_arrays(
-            lw=lw, row=row, weather=weather, cams_path=prep418.CAMS_PATH, local_date=local_date
-        )  # fmt: skip
+        if sample.primary not in clean_cache:
+            weather_cache[sample.primary] = prep418.dense_weather(
+                series_id=int(row["time_series_id"]), site=row["site"]
+            )
+            clean_cache[sample.primary] = rebuilt_primary_arrays(
+                lw=lw, row=row, weather=weather_cache[sample.primary], cams_path=prep418.CAMS_PATH,
+                local_date=local_date,
+            )  # fmt: skip
+        weather = weather_cache[sample.primary]
+        clean_arrays = clean_cache[sample.primary]
         clean_src = source_with_rebuilt(
-            live=live,
-            primary=sample.primary,
-            z7=clean_arrays[0],
-            z12=clean_arrays[1],
-            zc=clean_arrays[2],
-        )
+            live=live, primary=sample.primary, z7=clean_arrays[0], z12=clean_arrays[1], zc=clean_arrays[2]
+        )  # fmt: skip
         reference = assemble_one(source=clean_src, sample=sample)
         cached = assemble_one(source=live, sample=sample)
         plan = live.plan(primary=reference.inputs.primary, hist_idx=reference.hist_idx)
@@ -342,38 +381,50 @@ def kl3r(
             assert equal_outside(
                 a=bad.inputs.hist_weather, b=reference.inputs.hist_weather, exempt=exempt
             ), f"KL3r: a poisoned rebuild ({value}) changed the history weather of sample {sample}"
-        if with_controls and not changed:
+        if not with_controls:
+            continue
+        reads_d3 = rule.cell_sources(rule=live.rule_name) == rule.SRC_DAY_D3  # ty: ignore[invalid-argument-type]
+        for name, control in CONTROLS.items():
+            if changed[name]:
+                continue
             arrays = _rebuild_poisoned(
                 lw=lw, row=row, weather=weather, sample=sample, value=1e6, shift_days=1,
-                scratch=scratch, local_date=local_date,
+                scratch=scratch, local_date=local_date, kinds=control.kinds, cams_table=name == "day_summary",
             )  # fmt: skip
             src = source_with_rebuilt(
                 live=live, primary=sample.primary, z7=arrays[0], z12=arrays[1], zc=arrays[2]
             )
             moved = assemble_one(source=src, sample=sample)
-            changed = not equal_outside(
-                a=moved.inputs.hist_weather, b=reference.inputs.hist_weather, exempt=exempt
-            )
+            diff = (moved.inputs.hist_weather != reference.inputs.hist_weather)[0].cpu().numpy()
+            columns = control.columns
+            if name == "day_summary":
+                changed[name] = bool((diff[..., columns] & reads_d3[..., columns]).any())
+            else:
+                changed[name] = bool(diff[control.slot, :, columns].any())
+    ok_controls = all(changed.values()) if with_controls else True
     return {
-        "pass": (changed if with_controls else True) and n_cached_mismatch == 0, "n_samples": len(samples),
-        "control_changed": changed, "clean_rebuild_differs_from_cache": n_cached_mismatch,
+        "pass": bool(ok_controls) and n_cached_mismatch == 0, "n_samples": len(samples),
+        "controls_changed": changed, "clean_rebuild_differs_from_cache": n_cached_mismatch,
     }  # fmt: skip
 
 
 def _rebuild_poisoned(
     *, lw: object, row: dict, weather: np.ndarray, sample: OneSample, value: float, shift_days: int,
-    scratch: Path, local_date: np.ndarray,
+    scratch: Path, local_date: np.ndarray, kinds: Sequence[str] = ("era5", "cams"), cams_table: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # fmt: skip
-    """Rebuild one Primary's analysis arrays from the poisoned raw weather and the poisoned hourly CAMS table."""
+    """Rebuild one Primary's analysis arrays from the poisoned raw weather (`kinds`) and, if `cams_table`, the poisoned hourly CAMS table."""
     import e00418_prep as prep418  # ty: ignore[unresolved-import]
 
     bad_weather = _poison_weather(
-        weather=weather, c_idx=sample.c_idx, value=value, shift_days=shift_days
+        weather=weather, c_idx=sample.c_idx, value=value, shift_days=shift_days, kinds=kinds
     )
-    bad_cams = _poison_cams_table(
-        path=prep418.CAMS_PATH, out=scratch / f"cams_poison_{sample.primary}_{sample.c_idx}.parquet",
-        c_idx=sample.c_idx, value=value, shift_days=shift_days,
-    )  # fmt: skip
+    if cams_table:
+        cams_path = _poison_cams_table(
+            path=prep418.CAMS_PATH, out=scratch / f"cams_poison_{sample.primary}_{sample.c_idx}.parquet",
+            c_idx=sample.c_idx, value=value, shift_days=shift_days,
+        )  # fmt: skip
+    else:
+        cams_path = prep418.CAMS_PATH
     return rebuilt_primary_arrays(
-        lw=lw, row=row, weather=bad_weather, cams_path=bad_cams, local_date=local_date
+        lw=lw, row=row, weather=bad_weather, cams_path=cams_path, local_date=local_date
     )

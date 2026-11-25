@@ -214,6 +214,28 @@ OWN_FIT_FILES: Final = (
 """The modules whose edits can change a fitted state or a prediction."""
 
 
+CHECK_FILES: Final = ("e00725_checks.py", "e00725_poison.py", "e00725_weather_lookahead.py")
+"""The modules of the wiring checks. They are in the gate's `checks_hash` and not in the fit hash."""
+
+
+def checks_hash() -> str:
+    """Return a hash of the wiring-check modules and the fit modules, which the wiring gate records."""
+    here = Path(__file__).parent
+    h = hashlib.sha256(own_files_hash().encode())
+    for name in CHECK_FILES:
+        h.update(name.encode())
+        h.update((here / name).read_bytes())
+    return h.hexdigest()[:16]
+
+
+def assert_gate_checks_hash(*, gate: dict) -> None:
+    """Refuse a wiring gate that was written by other check code than the code that is running."""
+    assert gate.get("checks_hash") == checks_hash(), (
+        f"the wiring gate carries checks hash {gate.get('checks_hash')}, the code has {checks_hash()}: "
+        "rerun the checks (`e00725_checks.py collect` after the per-fold checks)"
+    )
+
+
 def _git(*args: str) -> str:
     """Return the output of a git command run in this folder, or `unavailable`."""
     try:

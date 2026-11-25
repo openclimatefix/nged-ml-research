@@ -31,16 +31,20 @@ if [ "$load" -ge "${MAX_LOAD:-24}" ]; then
     echo "load average ${load} is at or above ${MAX_LOAD:-24}; wait" >&2
     exit 1
 fi
+gpu_job=no
 case "$script" in
-e00725_fit.py | e00725_predict.py | e00725_checks.py)
-    running=$(pgrep -fc "e00725_(fit|predict|checks)\.py" || true)
-    # this shell's own command line also matches, so count only processes besides it
+e00725_fit.py | e00725_predict.py) gpu_job=yes ;;
+e00725_checks.py) [ "${1:-}" = fold ] && gpu_job=yes ;;
+esac
+if [ "$gpu_job" = yes ]; then
+    # KL3r, the cache step, and the other checks run on the CPU outside the GPU slot
+    running=$(pgrep -fc "e00725_(fit|predict)\.py|e00725_checks\.py fold" || true)
+    # this shell's own command line also matches, so it is one of the processes counted
     if [ "${running:-0}" -gt "${MAX_GPU_PROCESSES:-2}" ]; then
         echo "${running} F8 GPU processes already run (limit ${MAX_GPU_PROCESSES:-2})" >&2
         exit 1
     fi
-    ;;
-esac
+fi
 # The frozen checkout's folder goes first, so that no other copy of experiment 713 is imported. The other
 # experiment folders that F8 imports (437, 560, 562, 667, and the rest) come after it, minus any 00713-*.
 export PYTHONPATH="$EXTRA_PYTHONPATH:$here"

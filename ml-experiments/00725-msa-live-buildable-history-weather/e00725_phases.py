@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PLR0911, PERF401
+# ruff: noqa: E501, PT018, PLR0911, PLR0912, PERF401
 """Experiment 725: the phase runner (design sections 7 and 9).
 
 Usage:
@@ -37,7 +37,7 @@ import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Final
 
@@ -151,9 +151,19 @@ def check_jobs() -> list[Job]:
             jobs.append(
                 Job("check", "e00725_checks.py", ("fold", month, phase), checks / f"{month}_{phase}.json", gpu=True)
             )  # fmt: skip
+    jobs += [
+        Job("check", "e00725_checks.py", ("kl3r", month), checks / f"{month}_kl3r.json", gpu=False)
+        for month in cm.ALL_FOLDS
+    ]
     jobs.append(
-        Job("check", "e00725_checks.py", ("collect",), cm.wiring_file(data_dir=ML_EXPERIMENTS_DATA_DIR), gpu=False)
-    )  # fmt: skip
+        Job(
+            "check",
+            "e00725_checks.py",
+            ("collect",),
+            cm.wiring_file(data_dir=ML_EXPERIMENTS_DATA_DIR),
+            gpu=False,
+        )
+    )
     return jobs
 
 
@@ -218,10 +228,29 @@ def hours_file() -> Path:
 
 
 def gate_for(*, phase: int) -> None:
-    """Refuse to run a phase whose conditional gate says no (probe flag, futility rule, projection cut)."""
+    """Refuse to run a phase whose gate says no (reproduction, projection, audit, probe, futility, cuts)."""
     decisions = cm.ROOT / "decisions"
+    cut_arms = read_json(path=projection_file()).get("cut_arms", [])
+    if phase == 1:
+        repro = read_json(path=decisions / "repro.json")
+        assert repro, "run `e00725_score.py repro` first (the reproduction check of the Z fit)"
+        assert repro["outcome"] == "pass" or (decisions / "repro_cleared.json").exists(), (
+            f"the reproduction check ended `{repro['outcome']}`: the experiment stops until the manager "
+            "writes decisions/repro_cleared.json"
+        )
+        assert projection_file().exists(), (
+            "run `e00725_phases.py project` first (arm E is cut before phase 1)"
+        )
     if phase == 2:
-        assert read_json(path=decisions / "quick_audit.json"), "run `e00725_score.py quick` first"
+        audit = read_json(path=decisions / "quick_audit.json")
+        assert audit, "run `e00725_score.py quick` first"
+        assert not audit["fires"] or (decisions / "audit_cleared.json").exists(), (
+            "the audit rule of the quick look fired: wait for the manager to write decisions/audit_cleared.json"
+        )
+    if phase == 3:
+        assert "Z" not in cut_arms, (
+            "the projection cut arm Z to the reproduction fit: phase 3 does not run"
+        )
     if phase == 5:
         flag = read_json(path=decisions / "probe_flag.json")
         assert flag, "run `e00725_score.py probe-flag` first"
@@ -230,10 +259,14 @@ def gate_for(*, phase: int) -> None:
         futility = read_json(path=decisions / "futility.json")
         assert futility, "run `e00725_score.py two` first"
         assert not futility["fired"], "the futility rule fired: seeds 2 to 4 do not run"
+        flag = read_json(path=decisions / "probe_flag.json")
+        assert flag, "run `e00725_score.py probe-flag` first: the probe reports before phase 6"
+        if flag["flag"]:
+            assert all(j.done() for j in phase_jobs(phase=5)), (
+                "the probe fired and has not finished: run phase 5"
+            )
     if phase == 7:
-        assert "E" not in read_json(path=projection_file()).get("cut_arms", []), (
-            "the projection cut arm E"
-        )
+        assert "E" not in cut_arms, "the projection cut arm E"
 
 
 def run_job(*, job: Job, device: str) -> int:
@@ -264,7 +297,8 @@ def run_chain(*, chain: list[Job], device: str, lock: threading.Lock, failures: 
             failures.append(f"{job.name}: exit status {status}")
             return
         if job.gpu:
-            add_seconds(job=job, seconds=time.monotonic() - started, lock=lock)
+            key_job = job if job.kind != "check" else replace(job, args=("CHECK", *job.args))
+            add_seconds(job=key_job, seconds=time.monotonic() - started, lock=lock)
 
 
 def chains_of(*, jobs: list[Job]) -> list[list[Job]]:
@@ -295,11 +329,29 @@ def run_phase(*, phase: int, parallel: int, device: str, dry_run: bool, notified
     before = fz.work_snapshot_713(data_dir=ML_EXPERIMENTS_DATA_DIR)
     failures: list[str] = []
     lock = threading.Lock()
-    serial = [j for j in todo if j.kind in {"cpu", "check"} or "--smoke" in j.args]
-    for job in serial:
+    is_collect = lambda j: j.script == "e00725_checks.py" and j.args[0] == "collect"  # noqa: E731
+    is_kl3r = lambda j: j.script == "e00725_checks.py" and j.args[0] == "kl3r"  # noqa: E731
+    before_collect = [
+        j for j in todo
+        if (j.kind in {"cpu", "check"} or "--smoke" in j.args) and not is_collect(j) and not is_kl3r(j)
+    ]  # fmt: skip
+    for job in before_collect:
         run_chain(chain=[job], device=device, lock=lock, failures=failures)
         if failures:
             break
+    kl3r_jobs = [j for j in todo if is_kl3r(j)]
+    if kl3r_jobs and not failures:
+        # KL3r is CPU only (about 40 minutes per fold), so it runs beside the GPU slot, one thread each
+        with ThreadPoolExecutor(max_workers=parallel) as pool:
+            for f in [
+                pool.submit(run_chain, chain=[j], device=device, lock=lock, failures=failures)
+                for j in kl3r_jobs
+            ]:
+                f.result()
+    for job in [j for j in todo if is_collect(j)]:
+        if not failures:
+            run_chain(chain=[job], device=device, lock=lock, failures=failures)
+    serial = [*before_collect, *kl3r_jobs, *[j for j in todo if is_collect(j)]]
     if not failures:
         with ThreadPoolExecutor(max_workers=parallel) as pool:
             futures = [
@@ -331,7 +383,7 @@ def seconds_of(*, log: Path) -> float | None:
 
 def hours_spent() -> float:
     """Return the GPU-process-hours of the finished GPU jobs."""
-    return sum(read_json(path=hours_file()).values()) / 3600.0
+    return sum(v for k, v in read_json(path=hours_file()).items() if " CHECK " not in k) / 3600.0
 
 
 def projection(*, per_fit_hours: float, cut_arms: list[str], cuts: list[str]) -> dict:
@@ -404,7 +456,7 @@ def cmd_project(*, from_phase1: bool) -> int:
     out["ceiling"] = cm.CEILING_GPU_PROCESS_HOURS
     cm.write_json_atomic(obj=out, path=projection_file())
     print(json.dumps(out, indent=1), flush=True)
-    if from_phase1 and float(out["total"]) > cm.CEILING_GPU_PROCESS_HOURS:
+    if float(out["total"]) > cm.CEILING_GPU_PROCESS_HOURS:
         print("THE PROJECTION CROSSES THE CEILING: stop and ask the manager.", flush=True)
         return 1
     return 0

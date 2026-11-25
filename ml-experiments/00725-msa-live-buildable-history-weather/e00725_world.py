@@ -51,12 +51,12 @@ def fold_statistics(*, data: inp.FoldData, pipe: inp.Pipeline) -> dict[str, np.n
     assert data.rows is not None, "build_fold_data must be called with keep_rows=True"
     standardiser = data.rows[0].base.standardiser
     stats = {
-        "weather_mean": np.asarray(standardiser.mean[: src.N_WEATHER], dtype=np.float64),
-        "weather_std": np.asarray(standardiser.std[: src.N_WEATHER], dtype=np.float64),
+        "weather_mean": np.asarray(standardiser.mean[: src.N_WEATHER]),
+        "weather_std": np.asarray(standardiser.std[: src.N_WEATHER]),
     }
     npz = np.load(pipe.e.stats_file(month=pipe.month))
-    stats["b1_mean"] = np.asarray(npz["mean"], dtype=np.float64)
-    stats["b1_std"] = np.asarray(npz["std"], dtype=np.float64)
+    stats["b1_mean"] = np.asarray(npz["mean"])
+    stats["b1_std"] = np.asarray(npz["std"])
     data.rows = None
     return stats
 
@@ -64,11 +64,13 @@ def fold_statistics(*, data: inp.FoldData, pipe: inp.Pipeline) -> dict[str, np.n
 def cams_day_array(
     *, pipe: inp.Pipeline, b1_mean: np.ndarray, b1_std: np.ndarray, device: str
 ) -> torch.Tensor:
-    """Return the standardised CAMS day summaries (16, N_DAYS, 2) as float32, as `b1_scale` standardises them."""
+    """Return the standardised CAMS day summaries (16, N_DAYS, 2) float32, standardised by experiment 632's own `b1_scale`."""
     _, cams = pipe.d632.dense_b1()
-    n_grid_cols = pipe.d632.N_B1_GRID
-    z = (np.asarray(cams) - b1_mean[n_grid_cols:]) / b1_std[n_grid_cols:]
-    return torch.from_numpy(np.nan_to_num(z, nan=0.0).astype(np.float32)).to(device)
+    _, z = pipe.d632.b1_scale(
+        grid=np.zeros((0, pipe.d632.N_B1_GRID), dtype=np.float32), cams=cams, mean=b1_mean, std=b1_std,
+        device=device,
+    )  # fmt: skip
+    return z
 
 
 def load_world(

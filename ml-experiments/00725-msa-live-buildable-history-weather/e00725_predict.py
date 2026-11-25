@@ -73,12 +73,14 @@ def predict(
     import e00578_common as k578  # ty: ignore[unresolved-import]
 
     fz.assert_frozen_checkout()
+    fz.limit_gpu_memory(device=device)
     out = cm.fit_file(data_dir=data_dir, arm=arm, month=month, seed=seed)
     if out.exists():
         print(f"{arm} {month} s{seed}: done, skipped", flush=True)
         return out
     gate = cm.wiring_file(data_dir=data_dir)
     assert gate.exists(), f"{gate} is missing: run e00725_checks.py first"
+    cm.assert_gate_checks_hash(gate=json.loads(gate.read_text()))
     predict_log: dict = {"arm": arm, "month": month, "seed": seed, **fz.code_record()}
     fz.check_code(
         earlier=json.loads(gate.read_text()).get("code", {}), accept=[], record=predict_log,
@@ -115,6 +117,7 @@ def predict(
         seconds=round(time.monotonic() - started, 1), counters=dict(lw.live.counters),
         peak_host_mb=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
         peak_gpu_mb=torch.cuda.max_memory_allocated() / 2**20 if device.startswith("cuda") else None,
+        nvidia_smi_process_mb=fz.nvidia_smi_process_mb() if device.startswith("cuda") else None,
     )  # fmt: skip
     cm.write_json_atomic(
         obj=predict_log,

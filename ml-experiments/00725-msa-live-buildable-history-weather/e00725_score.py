@@ -254,8 +254,17 @@ def cmd_zrule() -> int:
     return 0
 
 
+def read_cut_arms() -> list[str]:
+    """Return the arms that the phase 0 projection cut."""
+    path = cm.work(data_dir=ML_EXPERIMENTS_DATA_DIR) / "projection.json"
+    return json.loads(path.read_text()).get("cut_arms", []) if path.exists() else []
+
+
 def cmd_two() -> int:
     """The counted two-seed reading and the futility rule (design section 7)."""
+    assert (DECISIONS_DIR / "zrule.json").exists() or "Z" in read_cut_arms(), (
+        "run `e00725_score.py zrule` first: audit trigger 1 is read before the counted two-seed L2"
+    )
     res = counted(months=cm.ALL_FOLDS, seeds=cm.TWO_SEEDS)
     futility_fired = not res["L1_point_below_zero_in_a_group"]
     res["futility_rule_fired"] = bool(futility_fired)
@@ -425,7 +434,14 @@ def cmd_probe_read() -> int:
                 if own is None:
                     continue
                 hist = list(own["first"]["val_history"])
-                best_pass = int(np.argmin(hist)) + 1
+                best_pass = cm.stopping_record(
+                    entry={
+                        "stage": stage,
+                        "pairs": 1,
+                        "first": {**own["first"], "val_history": hist},
+                        "rerun": None,
+                    }
+                )["best_pass"]
                 p8 = _simulate_patience(history=hist, patience=8)
                 med_best, spread_best = _median_window(history=hist, end_pass=best_pass)
                 med_p8, spread_p8 = _median_window(history=hist, end_pass=p8)
@@ -442,12 +458,13 @@ def cmd_probe_read() -> int:
             if lp and zp:
                 diffs.append(lp["gain_nats"] - zp["gain_nats"])
         margins[f"stage{stage}"] = {
+            "n_folds_run": len(diffs),
             "gain_L_minus_gain_Z_per_fold": diffs,
-            "exceeds_threshold_on_all_folds": bool(len(diffs) == 2 and all(d > PROBE_THRESHOLD_NATS for d in diffs)),
+            "exceeds_threshold_on_all_folds_run": bool(diffs and all(d > PROBE_THRESHOLD_NATS for d in diffs)),
         }  # fmt: skip
     out["margins"] = margins
     out["page_statement_patience_8_may_undertrain_L"] = margins["stage3"][
-        "exceeds_threshold_on_all_folds"
+        "exceeds_threshold_on_all_folds_run"
     ]
     if all(available(arm=a, months=("2025-11", "2026-06"), seeds=(0,)) for a in ("L", "L-P")):
         res = contrasts(

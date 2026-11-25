@@ -166,10 +166,12 @@ def fit(
     """Fit stages 2 and 3 of one F8 arm and return the log."""
     spec = cm.resolve(arm=arm)
     fz.assert_frozen_checkout()
+    fz.limit_gpu_memory(device=device)
     log: dict = {"arm": arm, "month": month, "seed": seed, "smoke": smoke, "rule": spec.rule}
     gate = cm.wiring_file(data_dir=data_dir)
     if not smoke:
         assert gate.exists(), f"{gate} is missing: run e00725_checks.py first"
+        cm.assert_gate_checks_hash(gate=json.loads(gate.read_text()))
         fz.check_code(
             earlier=json.loads(gate.read_text()).get("code", {}), accept=[], record=log,
             what="the wiring-check gate file",

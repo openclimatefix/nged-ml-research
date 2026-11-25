@@ -142,10 +142,17 @@ def build_phase_cache(*, phase: str, data_dir: Path, dirs: CacheDirs | None = No
     import e00562_columns as c562  # ty: ignore[unresolved-import]
     import e00667_extend as ext  # ty: ignore[unresolved-import]
 
+    raw_dir_original = Path(prep.RAW_DIR)
     ext.redirect()
     dirs = dirs or phase_dirs(phase=phase, data_dir=data_dir)
+    for name in ("expected_ft_cols.npy", "expected_ft_origin.npy"):
+        assert (dirs.expected / name).exists(), (
+            f"{dirs.expected / name} is missing: `raw_table` would build and save it into the folder of "
+            "another experiment, so the cache step refuses to run"
+        )
     if phase == "predict":
         prep.RAW_DIR = ext.RAW_DIR
+    raw_dir = Path(prep.RAW_DIR) if phase == "predict" else raw_dir_original
     f437.TRAILING_DIR = dirs.trailing
     assert int(prep422.GRID_START_US) == int(GRID_START.timestamp() * 1e6)
     cols, origin = d560.raw_table(source="ft", cache=dirs.expected)
@@ -164,6 +171,7 @@ def build_phase_cache(*, phase: str, data_dir: Path, dirs: CacheDirs | None = No
     meta = {
         "phase": phase, "n_grid": N_GRID, "expected_dir": str(dirs.expected),
         "trailing_dir": str(dirs.trailing),
+        "raw_dir": str(raw_dir),
         "expected_mtimes_ns": {
             p.name: p.stat().st_mtime_ns for p in sorted(dirs.expected.glob("expected_ft_*.npy"))
         },

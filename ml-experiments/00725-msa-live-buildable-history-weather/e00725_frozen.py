@@ -192,3 +192,35 @@ def read_files_713(*, data_dir: Path, month: str, seed: int) -> list[Path]:
 def watched_mtimes(*, files: Sequence[Path]) -> dict[str, int]:
     """Return the modification times of `files`, which must exist."""
     return {str(f): f.stat().st_mtime_ns for f in files}
+
+
+GPU_BUDGET_BYTES: Final = 6 * 1024**3
+"""Each GPU process of F8 stays at or under 6 GB (design section 9)."""
+
+
+def limit_gpu_memory(*, device: str) -> None:
+    """Cap this process's CUDA allocator at 6 GB, so that an overrun raises an out-of-memory error at once."""
+    import torch  # ty: ignore[unresolved-import]
+
+    if device.startswith("cuda"):
+        total = torch.cuda.get_device_properties(device).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_BUDGET_BYTES / total), device)
+
+
+def nvidia_smi_process_mb() -> int | None:
+    """Return the GPU memory in MB that `nvidia-smi` reports for this process, or None."""
+    import os
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, check=True,
+        ).stdout  # fmt: skip
+    except subprocess.CalledProcessError, FileNotFoundError:
+        return None
+    for line in out.splitlines():
+        pid, _, mem = line.partition(",")
+        if pid.strip() == str(os.getpid()):
+            return int(mem.strip())
+    return None

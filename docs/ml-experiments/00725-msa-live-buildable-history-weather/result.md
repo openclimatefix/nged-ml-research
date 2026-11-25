@@ -196,11 +196,15 @@ columns 1 to 14 at 169 tokens (2,366 values). Check KL2 recomputes the count.
 - **CAMS day summary (columns 19 and 20).** The day read is the earlier of the day before the
   token's stamp day and D - 3. One formula covers every token.
 
-**The training phase and the prediction phase read different stored tables, as the Candidate
-does.** Training (stages 2 and 3) reads the `ft` table of experiment 560 and the B1 table of
-experiment 437 (821 runs, 2024-04-01 to 2026-06-30). Prediction reads experiment 667's extended copy
-of both (944 runs, to 2026-10-31). The training-phase `ft` table has gaps where the prediction-phase
-table has none, so checks KL1, KL5, and KL7 run once in each phase.
+**The training phase and the prediction phase of F8's history weather read different stored tables.**
+Training (stages 2 and 3) reads the `ft` table of experiment 560 and the B1 table of experiment 437
+(821 runs, 2024-04-01 to 2026-06-30). Prediction reads experiment 667's extended copy of both (944
+runs, to 2026-10-31). The Candidate's training rows and experiment 713's ensemble target row read
+experiment 667's extended copies in both phases, because `e00667_fold.install` redirects the inputs in
+both phases. The history ENS cells of F8 in training therefore come from a different table than the
+target row of the same sample. F8 reads every stored table without writing to it. The training-phase
+`ft` table has gaps where the prediction-phase table has none, so checks KL1, KL5, and KL7 run once in
+each phase.
 
 ### Missing cells and the target row
 

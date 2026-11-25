@@ -81,7 +81,10 @@ def lines_for(*, contract: datetime, rule_name: rule.RuleName) -> list[Line]:
                     )
                 elif code == rule.SRC_ERA5:
                     limit = native - timedelta(hours=rule.ERA5_LAG_HOURS)
-                    margin = (limit - last).total_seconds() / 3600
+                    latest = max(
+                        last, rule._local_day_end(stamp=last)
+                    )  # the daily extremes end at local midnight
+                    margin = (limit - latest).total_seconds() / 3600
                     basis = f"latest ERA5 value {margin:.1f} h older than the 120 h limit"
                 elif code == rule.SRC_CAMS:
                     cams_last = last if last.minute == 0 else last + timedelta(minutes=30)
