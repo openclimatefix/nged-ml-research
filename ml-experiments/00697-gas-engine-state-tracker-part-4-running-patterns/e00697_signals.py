@@ -128,7 +128,7 @@ def views(*, frames: dict[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
     """Return the three views the panels compare: D8's net and solar flags, and the host controls.
 
     The key `c1_null` holds the stacked null controls of the C2 hosts, which cover the period of
-    every signal (the C1 controls end before 2023-06-12).
+    every signal (the C1 controls end before the engine connected).
     """
     d8 = frames["d8"]
     return {

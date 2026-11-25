@@ -1,7 +1,8 @@
 # ruff: noqa: E501
 """Experiment 713: fit one MSA network (one arm, one fold, one seed) in the training phase.
 
-Usage: e00713_fit.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH ...] [--accept-gate-change OLD_HASH]
+Usage: e00713_fit.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH ...]
+       [--accept-gate-change OLD_HASH]
 
 Run it through `run.sh`. It sets `E00667_PHASE=train`, under which `e00667_fold.install` sets the
 cleaned power to NaN from the fold month's start, so no code path can read a held-out reading. It
@@ -9,12 +10,12 @@ refuses to run without `work/known_answers_passed.json`, which `e00713_known_ans
 that ends at the 60-pass cap is rerun from its starting state with a cap of 120 passes, and the log
 records both. Each stage's state is saved atomically, and a stage whose file exists is skipped.
 
-**Code policy.** Every stage log carries the code hash, the git commit, and a dirty flag. A resume, a
-finished-job skip, and the gate file are refused when their hash differs from the current code's, unless
-`--accept-code-change OLD_HASH` (stage states, repeatable) or `--accept-gate-change OLD_HASH` (the gate
-record) names the exact old hash; one flag never covers the other. The override, both hashes, and the diff stat of the
-fit modules go into the final log. The hash covers this experiment's fit modules and the imported
-recipe modules (`arms.RECIPE_MODULES`).
+**Code policy.** Every stage log carries the code hash, the git commit, and a dirty flag. A resume,
+a finished-job skip, and the gate file are refused when their hash differs from the current code's,
+unless `--accept-code-change OLD_HASH` (stage states, repeatable) or `--accept-gate-change OLD_HASH`
+(the gate record) names the exact old hash; one flag never covers the other. The override, both
+hashes, and the diff stat of the fit modules go into the final log. The hash covers this
+experiment's fit modules and the imported recipe modules (`arms.RECIPE_MODULES`).
 """
 
 import argparse

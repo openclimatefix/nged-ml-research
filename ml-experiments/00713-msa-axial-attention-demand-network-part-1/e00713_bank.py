@@ -127,6 +127,27 @@ def median_at(
     return np.concatenate(out)
 
 
+def filled_days(*, source: Any, primary: int, days: np.ndarray) -> np.ndarray:
+    """Return, for each origin day, whether the Primary's ensemble row is filled on lead days 1 to 5.
+
+    A day outside the ensemble table, or with an unfilled row at any of the five lead days, is False.
+    """
+    ens = source.ens
+    assert ens is not None
+    rel = days - ens.first_day
+    inside = (rel >= 0) & (rel < ens.filled.shape[1])
+    keep = np.zeros(len(days), bool)
+    if inside.any():
+        rows = torch.from_numpy(rel[inside]).to(ens.filled.device)
+        ok = torch.ones(len(rows), dtype=torch.bool, device=ens.filled.device)
+        for lead in range(1, 6):
+            ok &= ens.filled[
+                primary, rows[:, None], lay.STEPS_PER_DAY * lead + source.steps[None, :]
+            ].all(dim=1)
+        keep[inside] = ok.cpu().numpy()
+    return keep
+
+
 def cmd_shifts(*, arm: str, month: str, seed: int, device: str) -> None:
     """Write the follow share of each of experiment 581's 12 injected passes for one fitted network."""
     import e00581_bank as bank  # ty: ignore[unresolved-import]
@@ -143,6 +164,7 @@ def cmd_shifts(*, arm: str, month: str, seed: int, device: str) -> None:
     model = load_model(spec=spec, arm=arm, month=month, seed=seed, device=device, data_dir=data_dir)
     month_idx = data.cutoff_idx
     result: dict[str, float] = {}
+    dropped: dict[str, int] = {}
     for r in SHIFT_PASSES:
         shifted, rows = bank.contaminate(clean=data.clean, month_start_idx=month_idx, r=r)
         z = (shifted - data.target_mean[:, None]) / data.target_std[:, None]
@@ -153,6 +175,9 @@ def cmd_shifts(*, arm: str, month: str, seed: int, device: str) -> None:
             first_day = (row["onset_idx"] + 4 * lay.STEPS_PER_DAY) // 48
             last_day = row["end_idx"] // 48
             days = np.arange(first_day, last_day)
+            n_before = len(days)
+            days = days[filled_days(source=data.source, primary=p, days=days)]
+            dropped[f"r{r:02d}"] = dropped.get(f"r{r:02d}", 0) + n_before - len(days)
             if not len(days):
                 continue
             c = days * 48 + 24
@@ -169,9 +194,19 @@ def cmd_shifts(*, arm: str, month: str, seed: int, device: str) -> None:
             shares.append(float(np.mean(diffs)))
         result[f"r{r:02d}"] = float(np.mean(shares))
     path.parent.mkdir(parents=True, exist_ok=True)
+    dropped_path = path.with_name(path.stem + "_dropped.json")
+    dropped_path.write_text(json.dumps(dropped, indent=1))
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(result, indent=1))
     tmp.rename(path)
+    print(
+        arm,
+        month,
+        seed,
+        "origins dropped for want of an ensemble row, per pass:",
+        dropped,
+        flush=True,
+    )
     print(arm, month, seed, "follow share", float(np.mean(list(result.values()))), flush=True)
 
 

@@ -3,18 +3,19 @@
 
 Usage: e00713_protocol.py TAG ARM[,ARM...] [--seeds ...] [--months 2025-11 ...] [--no-cost]
 
-Adapted from `e00677_protocol.py`. Each arm is the seed mean of its quantiles (sorted within the row)
-in the layout of experiment 677: the contract origin (12:00 UTC), 672 half-hours, megawatts. The
-arm `C` is the stored Candidate (`e00713_score.load_arm`). The climatology and the manual-heuristic
-rows are the stored reference arms of experiment 87, relabelled from the 09:00 to the 12:00 origin.
-The climatology is the 51-member climatology of experiment 48's weekly walk-forward run, as experiment 87
-recomputed it at 11 levels (`e00087_assemble.py`); it is not refitted per fold, and its training window is
-that of experiment 48's run, which this experiment did not re-derive. The row is report-only.
-Every arm is scored on the half-hours that all of them share, with `studies.eval_protocol.metrics`:
-the mean absolute error of the median, CRPS, threshold-weighted CRPS, and the coverage and pinball
-loss at q01, q05, q95, and q99, by the slices of the protocol. The slices include the cold nights, the
-winter, the time of day, and the four load-shift scenarios (all rows; outside events and more than 7
-days after one; inside events; the 7 days after an event).
+Adapted from `e00677_protocol.py`. Each arm is the seed mean of its quantiles (sorted within the
+row) in the layout of experiment 677: the contract origin (12:00 UTC), 672 half-hours, megawatts.
+The arm `C` is the stored Candidate (`e00713_score.load_arm`). The climatology and the
+manual-heuristic rows are the stored reference arms of experiment 87, relabelled from the 09:00 to
+the 12:00 origin. The climatology is the 51-member climatology of experiment 48's weekly
+walk-forward run, as experiment 87 recomputed it at 11 levels (`e00087_assemble.py`); it is not
+refitted per fold, and its training window is that of experiment 48's run, which this experiment did
+not re-derive. The row is report-only. Every arm is scored on the half-hours that all of them share,
+with `studies.eval_protocol.metrics`: the mean absolute error of the median, CRPS,
+threshold-weighted CRPS, and the coverage and pinball loss at q01, q05, q95, and q99, by the slices
+of the protocol. The slices include the cold nights, the winter, the time of day, and the four
+load-shift scenarios (all rows; outside events and more than 7 days after one; inside events; the 7
+days after an event).
 
 The table of each slice and metric gives the mean per Primary group with a 95% interval from
 resampling whole origin months. Three further tables are written: the leave-one-Primary-out

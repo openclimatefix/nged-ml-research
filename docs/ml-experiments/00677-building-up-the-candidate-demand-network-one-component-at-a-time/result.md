@@ -285,7 +285,9 @@ that the stored arms and the ladder both cover.** The GAM (Primary demand resear
 XGBoost (arm `p_s6_bg2` of experiment 87) are stored with 09:00 UTC origins, and the rows the arms
 share run from origin 2025-11-01 to 2026-06-29 at lead times of 0 to 10 days (1,365,447 half-hours
 over the 16 Primaries). The six MW Primaries are scored separately from the seven MVA-only
-Primaries, because the MVA meters hide reverse flow.
+Primaries, because the MVA meters hide reverse flow. The seven are D2, D3, D4, D12, D19, D21, and
+D22. The eight MVA-only Primaries of the standard slices (`MVA_ONLY_LABELS` in
+`studies.eval_protocol.slices`) also include D8, which this comparison leaves out.
 
 | Group, slice | GAM | XGBoost | Manual heuristic | 667 | 3b | 5 | 8 | 9a | 9b |
 |---|---|---|---|---|---|---|---|---|---|

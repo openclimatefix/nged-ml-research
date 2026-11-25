@@ -11,15 +11,15 @@ status: finished
 kind: other
 protocol: demand-v2
 size: >-
-  complex. Stored: pretrained and fine-tuned lag-free networks and their raw quantile forecasts, under
-  this experiment's private data folder only; every earlier experiment is read and never written.
-  Serving path: not touched (this repository holds none). Degradation rule: not touched. Designs: more
-  than one defensible (how the day's shape is defined, what a missing price day does, how the
-  placebo day is drawn, which control isolates a battery effect from a national-state effect), so the
-  plan fixes each before any score is read. Callers: this folder's scripts import experiments 397,
-  422, 428, 448, 510, and the `studies` evaluation code. One Sonnet plan review, one Sonnet code review
-  before the first fit that produces quoted numbers, one Sonnet results review, and two Sonnet write-up
-  reviews.
+  complex. Stored: pretrained and fine-tuned lag-free networks and their raw quantile forecasts,
+  under this experiment's private data folder only; every earlier experiment is read and never
+  written. Serving path: not touched (this repository holds none). Degradation rule: not touched.
+  Designs: more than one defensible (how the day's shape is defined, what a missing price day does,
+  how the placebo day is drawn, which control isolates a battery effect from a national-state
+  effect), so the plan fixes each before any score is read. Callers: this folder's scripts import
+  experiments 397, 422, 428, 448, 510, and the `studies` evaluation code. One Sonnet plan review,
+  one Sonnet code review before the first fit that produces quoted numbers, one Sonnet results
+  review, and two Sonnet write-up reviews.
 hypothesis: >-
   The Market Index price of a whole local day, known exactly at training time, carries information
   about price-following embedded batteries and gas engines behind a Primary, so a lag-free demand
@@ -29,13 +29,13 @@ hypothesis: >-
 prediction: >-
   Written before any quoted score. P1: the oracle (PO) beats the no-shape control (P0) by 0.00 to
   0.06 points of CRPS at both groups, below or near the minimum detectable effect, because price
-  terms are 3 to 5% of the error at the one Primary where they were measured. P2 to P4 apply only
-  if the oracle passes the stop rule, because a ratio against a gain near zero cannot fail. P2: the
+  terms are 3 to 5% of the error at the one Primary where they were measured. P2 to P4 apply only if
+  the oracle passes the stop rule, because a ratio against a gain near zero cannot fail. P2: the
   shuffled-day placebo (PP) recovers at least 0.75 of the oracle's gain at a group; P2 fails if PP
   recovers less. P3: the national demand-and-wind control (PN) recovers at least 0.75 of the
   oracle's gain; P3 fails if PN recovers less. P4: at the Primaries with a known battery or gas
-  engine (D2, D5, D8, D9, D11, D14) the oracle's gain is larger than at the other Primaries; P4
-  fails if it is no larger.
+  engine (D2, D5, D8, D9, D11, and the register's Primary) the oracle's gain is larger than at the
+  other Primaries; P4 fails if it is no larger.
 decision_rule: >-
   See "Pre-registered rules". Continue to the training-time-only arms only if either group's
   Bonferroni interval for PO minus P0 excludes zero and the point estimate is at most minus the
@@ -128,7 +128,8 @@ numbers are interim and unaudited until the reviews are recorded in the pull req
   near min-to-max intervals, and the signs are mixed.
 - **Stop rule.** Neither group's point estimate reaches minus the minimum detectable effect, and
   the six's interval includes zero, so P-drop, P-aux, and P-teach did not run.
-- **Known-asset Primaries (D2, D5, D8, D9, D11, D14) against the others, oracle minus control.**
+- **Known-asset Primaries (D2, D5, D8, D9, D11, and the register's Primary) against the others,
+  oracle minus control.**
   Eight: +0.059 against -0.003. Six: -0.027 against -0.089.
 - **Horizon bands, oracle minus control.** Eight: +0.059 (day 1), +0.053 (days 2 to 3), -0.011
   (days 4 to 10). Six: +0.014, -0.020, -0.065.
@@ -263,12 +264,12 @@ generation, per half-hour, so they describe the day's residual demand shape.
 - **Intervals.** Month-block bootstrap with five blocks gives near min-to-max intervals; the page
   says so and gives the sign per fold beside every interval.
 - **Slices.** Per Primary and by half-hour of day, with the Primaries that have a known battery or
-  gas engine (D2, D5, D8, D9, D11, D14) against the other Primaries; evening-peak and overnight
-  half-hours against the rest; horizon bands day 1, days 2 to 3, and days 4 to 10 beside days 1 to
-  10; the half-hours of missing price days are excluded and counted. A pooled gain at Primaries
-  with no known asset is a
-  leak check, not a finding. The chart of the oracle gain by Primary and by half-hour of day uses
-  the OCF palette and no mark in the background colour.
+  gas engine (D2, D5, D8, D9, D11, and the register's Primary) against the other Primaries;
+  evening-peak and overnight half-hours against the rest; horizon bands day 1, days 2 to 3, and days
+  4 to 10 beside days 1 to 10; the half-hours of missing price days are excluded and counted. A
+  pooled gain at Primaries with no known asset is a leak check, not a finding. The chart of the
+  oracle gain by Primary and by half-hour of day uses the OCF palette and no mark in the background
+  colour.
 
 ## Pre-registered rules
 
@@ -300,3 +301,8 @@ generation, per half-hour, so they describe the day's residual demand shape.
 Cleaned data and the D15 and D18 start cut (through experiment 428's rows); rows with no labelled
 event; July 2026 unused; no XGBoost work; metered generators are not shown (this experiment scores
 substations); titles say "load-shift", never "switching"; every interim number is unaudited.
+
+**The slices script reads the name of the register's Primary from a private file.**
+`ml-experiments/engine_constants.py` loads it from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that this name stay out
+of the repository. The file is not committed, so a rerun of `e00513_slices.py` needs a copy of it.

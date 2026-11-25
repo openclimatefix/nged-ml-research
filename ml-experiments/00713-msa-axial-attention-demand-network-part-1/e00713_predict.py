@@ -1,17 +1,19 @@
 # ruff: noqa: E501, PT018
 """Experiment 713: forecast one fold with a fitted MSA network (prediction phase).
 
-Usage: e00713_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--accept-code-change OLD_HASH ...]
+Usage: e00713_predict.py ARM MONTH SEED [--device cuda] [--mask-history]
+       [--accept-code-change OLD_HASH ...]
 
 Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`, which
-opens the fold month's scored window. It loads the stage 3 state, asserts that the fold's standardiser
-equals the training phase's, forecasts every (Primary, scored origin, lead day), drops valid times on
-or after 2026-07-01, and writes `work/fits/<arm>/<month>_s<seed>.parquet` atomically. The columns are
-the Candidate's (`time_series_id`, `power_fcst_init_time`, `valid_time`, `q01` to `q99`, in shares of
-capacity) plus `seed`, `mean` (the mixture mean), `actual`, `lead_hours`, and `nwp_init_time`. It refuses a
-state whose stage 3 log carries another code hash unless `--accept-code-change` names the old hash, and
-it writes a `predict` log with the code record. `--mask-history` forecasts with
-every history power token masked (the free read-out of section 2.7) under the arm name `<arm>-nohist`.
+opens the fold month's scored window. It loads the stage 3 state, asserts that the fold's
+standardiser equals the training phase's, forecasts every (Primary, scored origin, lead day), drops
+valid times on or after 2026-07-01, and writes `work/fits/<arm>/<month>_s<seed>.parquet` atomically.
+The columns are the Candidate's (`time_series_id`, `power_fcst_init_time`, `valid_time`, `q01` to
+`q99`, in shares of capacity) plus `seed`, `mean` (the mixture mean), `actual`, `lead_hours`, and
+`nwp_init_time`. It refuses a state whose stage 3 log carries another code hash unless
+`--accept-code-change` names the old hash, and it writes a `predict` log with the code record.
+`--mask-history` forecasts with every history power token masked (the free read-out of section 2.7)
+under the arm name `<arm>-nohist`.
 """
 
 import argparse

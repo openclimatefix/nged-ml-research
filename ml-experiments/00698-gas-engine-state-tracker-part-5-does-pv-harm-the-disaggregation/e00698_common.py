@@ -17,6 +17,7 @@ farm series and of CAMS irradiance (the end of the hour). Panel-grid index `i` h
 """
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, TypedDict
@@ -45,6 +46,9 @@ from e00697_controls import (  # ty: ignore[unresolved-import]
     span_bounds,
 )
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 EXPERIMENT_ID: Final[int] = 698
 SLUG: Final[str] = "gas-engine-state-tracker-part-5-does-pv-harm-the-disaggregation"
@@ -111,7 +115,7 @@ NIGHT_LAST: Final[int] = 9
 SUMMER_MONTHS: Final[tuple[int, ...]] = (5, 6, 7, 8, 9)
 GHI_MIN: Final[float] = 50.0
 """A half-hour has a bright-or-dull third only above this CAMS irradiance (W/m2)."""
-UNIT_THRESHOLD_MW: Final[float] = 1.97 / 2
+UNIT_THRESHOLD_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw") / 2
 """An injected output of this size or more counts as 1 or more units running (`truth1`)."""
 FOLD_NEAR_ZERO_MW: Final[float] = 1.0
 """Fold states: signed real power above this is forward flow, below minus this is reverse flow."""
