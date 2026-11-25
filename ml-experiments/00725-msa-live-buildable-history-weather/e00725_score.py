@@ -1,23 +1,29 @@
-# ruff: noqa: E501, PT018, PERF401
-"""Experiment 725: the counted contrasts L1 and L2, the guards, the decision rules, and the report-only readings.
+# ruff: noqa: D205, E501, PT018, PERF401
+"""Experiment 725: the counted contrasts L1 and L2, the guards, the decision rules, and the
+report-only readings.
 
 Usage:
-    e00725_score.py quick          # quick look, folds 2025-11, 2026-01, 2026-03, 2026-06, seeds 0 and 1 (interim) + the audit rule
-    e00725_score.py zrule          # the rule on `Z` (design 6.1) on the quick-look folds, seeds 0 and 1
-    e00725_score.py two            # counted L1 and L2, 8 folds, seeds 0 and 1, and the futility rule
+    e00725_score.py quick
+        # quick look, folds 2025-11, 2026-01, 2026-03, 2026-06, seeds 0 and 1 (interim) + the audit rule
+    e00725_score.py zrule
+        # the rule on `Z` (design 6.1) on the quick-look folds, seeds 0 and 1
+    e00725_score.py two
+        # counted L1 and L2, 8 folds, seeds 0 and 1, and the futility rule
     e00725_score.py five           # counted L1 and L2, 8 folds, seeds 0 to 4, and the verdict
     e00725_score.py report-only    # the 95% readings of section 6.4 that the stored arms allow
-    e00725_score.py probe-flag     # the flag of section 8 that decides whether the budget probe runs
+    e00725_score.py probe-flag
+        # the flag of section 8 that decides whether the budget probe runs
     e00725_score.py probe-read     # the probe's gain on validation loss (report-only)
     e00725_score.py stopping       # the stopping-pass table: each F8 fit beside the stored `M*` fit
     e00725_score.py repro          # the reproduction check of `Z`, fold 2025-11, seed 0 (phase 0)
 
-**The scorer is experiment 713's.** The functions that load a forecast file, convert it to the contract
-origin, compute the losses, seed-average, pair, bootstrap, and apply the guards are imported from the
-frozen checkout (`e00713_score`), which must reproduce code hash `e85b84e2ea04b3cb`; no experiment 713 file
-is edited. F8 supplies the loader for its own arms, the two-seed and five-seed floors and deltas of design
-section 6.1, the group readings and verdict of section 6.3, the L2 sentences, the futility rule, the rule on
-`Z`, the audit rule of the quick look, and the probe flag.
+**The scorer is experiment 713's.** The functions that load a forecast file, convert it to the
+contract origin, compute the losses, seed-average, pair, bootstrap, and apply the guards are
+imported from the frozen checkout (`e00713_score`), which must reproduce code hash
+`e85b84e2ea04b3cb`; no experiment 713 file is edited. F8 supplies the loader for its own arms, the
+two-seed and five-seed floors and deltas of design section 6.1, the group readings and verdict of
+section 6.3, the L2 sentences, the futility rule, the rule on `Z`, the audit rule of the quick look,
+and the probe flag.
 
 Every result is written to `score/<command>.json` in F8's data folder. All losses are in points of capacity.
 """
@@ -60,7 +66,9 @@ GROUPS: Final = ("six", "eight")
 
 
 def arm_ready(*, arm: str, month: str, seed: int) -> bool:
-    """Return whether an F8 arm's forecast exists, and for `T3-C` whether the log of its passed checks exists too."""
+    """Return whether an F8 arm's forecast exists, and for `T3-C` whether the log of its passed
+    checks exists too.
+    """
     if arm == t3c.ARM:
         return (
             t3c.log_file(month=month, seed=seed).exists()
@@ -70,7 +78,9 @@ def arm_ready(*, arm: str, month: str, seed: int) -> bool:
 
 
 def arm_file(*, arm: str, month: str, seed: int) -> Path:
-    """Return the per-seed forecast file of an F8 arm; `T3-C` is the stored Candidate's prediction on moved inputs."""
+    """Return the per-seed forecast file of an F8 arm; `T3-C` is the stored Candidate's prediction
+    on moved inputs.
+    """
     if arm == t3c.ARM:
         assert t3c.log_file(month=month, seed=seed).exists(), (
             f"{arm} {month} seed {seed}: no log, so the checks of the prediction did not pass"
@@ -407,7 +417,9 @@ def cmd_stopping() -> int:
 
 
 def cmd_probe_flag() -> int:
-    """The flag of design section 8: L2 above the two-seed floor in either group, or more than 4 of 16 flagged `L` fits."""
+    """The flag of design section 8: L2 above the two-seed floor in either group, or more than 4 of
+    16 flagged `L` fits.
+    """
     res = contrasts(
         pairs=[("L", STAR)], months=cm.ALL_FOLDS, seeds=cm.TWO_SEEDS, level=REPORT_LEVEL
     )  # fmt: skip
@@ -446,7 +458,9 @@ def _median_window(*, history: list[float], end_pass: int) -> tuple[float, float
 
 
 def cmd_probe_read() -> int:
-    """The probe's gain on validation loss for `L-P` and `Z-P` (report-only), stage 3 first and stage 2 beside it."""
+    """The probe's gain on validation loss for `L-P` and `Z-P` (report-only), stage 3 first and
+    stage 2 beside it.
+    """
     out: dict = {"threshold_nats": PROBE_THRESHOLD_NATS, "folds": {}}
     for month in ("2025-11", "2026-06"):
         fold: dict = {}
@@ -540,7 +554,9 @@ def seed_spread(*, month: str = "2025-11") -> dict:
 
 
 def cmd_repro() -> int:
-    """Compare the `Z` fit of fold 2025-11, seed 0, with the stored `M*` fit (design section 5), and write the verdict."""
+    """Compare the `Z` fit of fold 2025-11, seed 0, with the stored `M*` fit (design section 5), and
+    write the verdict.
+    """
     month, seed = "2025-11", 0
     spread = seed_spread(month=month)
     rows, miss_nats, miss_points = [], [], []

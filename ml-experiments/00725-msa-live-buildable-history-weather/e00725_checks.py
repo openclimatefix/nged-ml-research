@@ -1,12 +1,15 @@
-# ruff: noqa: E501, PT018, PLR0912, PLR0915
+# ruff: noqa: D205, E501, PT018, PLR0912, PLR0915
 """Experiment 725: the wiring checks KL1 to KL10 (design section 5).
 
 Usage:
-    e00725_checks.py pure                      # KL2's table checks and the count of changed values (no data)
+    e00725_checks.py pure
+        # KL2's table checks and the count of changed values (no data)
     e00725_checks.py fold FOLD PHASE [--device cuda] [--only KL1,KL3,...] [--kl3r-primaries 2]
-    e00725_checks.py kl5 PHASE                 # KL5: stored B1 against the `ft` series (CPU, fold-free)
+    e00725_checks.py kl5 PHASE
+        # KL5: stored B1 against the `ft` series (CPU, fold-free)
     e00725_checks.py kl8                       # KL8: the look-ahead statements and the data check
-    e00725_checks.py collect [--folds 2025-11,...]   # merge the results into wiring_checks_passed.json
+    e00725_checks.py collect [--folds 2025-11,...]
+        # merge the results into wiring_checks_passed.json
 
 Every check is a wiring check that cannot fail on a correct build. `fold FOLD PHASE` builds one fold's
 world for one phase (one process per fold and phase, because experiment 667's fold module reads the fold
@@ -25,10 +28,11 @@ Results go into the JSON file of the fold and phase; the thresholds are the desi
 - KL4: no per-batch availability assertion raises, and the assertion fires on a tampered forecast origin.
 - KL5: stored trailing columns equal the columns recomputed from the `ft` series within 1e-4.
 - KL6: experiment 713's poisoned-power check (KA5) and next-day-run canary (KA6) pass through the source.
-- KL7: under 2% of training cells fall back; under 1% of scored cells read zero; no scored cell reads an analysis.
+- KL7: under 2% of training cells fall back; under 1% of scored cells read zero; no scored cell
+  reads an analysis.
 - KL8: the look-ahead statements have no negative margin, and the stored run frame passes.
-- KL9: `assemble` is called once per batch in stage 2, in stage 3, and at prediction; the stage 3 source is a
-  `LiveSource`; the history inputs of `L` and `Z` differ only in the changed cells.
+- KL9: `assemble` is called once per batch in stage 2, in stage 3, and at prediction; the stage 3
+  source is a `LiveSource`; the history inputs of `L` and `Z` differ only in the changed cells.
 - KL10: with the ENS arrays replaced by the analysis arrays, `L` equals `Z` except in the day summary;
   50 random ENS cells equal an independent lookup of the raw summary row.
 """
@@ -230,7 +234,9 @@ def kl1_batch(*, live, picks) -> dict:  # noqa: ANN001
 
 
 def kl1_forecast(*, lw, data_dir: Path, month: str, seed: int = 0) -> dict:  # noqa: ANN001
-    """Check KL1's forecast: the stored `M*` state, predicting through F8's source with the rule off, equals the stored file."""
+    """Check KL1's forecast: the stored `M*` state, predicting through F8's source with the rule
+    off, equals the stored file.
+    """
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
     import e00713_arms as arms713  # ty: ignore[unresolved-import]
@@ -276,7 +282,9 @@ def kl1_forecast(*, lw, data_dir: Path, month: str, seed: int = 0) -> dict:  # n
 
 
 def t3_known_answer(*, live, picks) -> dict:  # noqa: ANN001
-    """Check M6: with the target-row summary moved back by one day (the parent's own day), the batch equals the unshifted batch bit for bit."""
+    """Check M6: with the target-row summary moved back by one day (the parent's own day), the batch
+    equals the unshifted batch bit for bit.
+    """
     import copy
 
     import e00725_poison as pz
@@ -325,7 +333,9 @@ def kl6(*, live, picks) -> dict:  # noqa: ANN001
 
 
 def kl7(*, cache, picks_primary: np.ndarray, picks_c: np.ndarray, rule_name: str) -> dict:  # noqa: ANN001
-    """Count the fallback cells of the samples (KL7): the cells the rule reads from ENS whose half-hour has no row."""
+    """Count the fallback cells of the samples (KL7): the cells the rule reads from ENS whose
+    half-hour has no row.
+    """
     import e00725_poison as pz
 
     per_token = rule.ens_mask(rule=rule_name).sum()  # ty: ignore[invalid-argument-type]
@@ -391,7 +401,9 @@ def kl7_fold(*, lw, phase: str) -> dict:  # noqa: ANN001
 
 
 def kl9(*, lw, month: str, seed: int, data_dir: Path, device: str) -> dict:  # noqa: ANN001
-    """Check KL9: `assemble` runs once per batch in stage 2, in stage 3, and at prediction; stage 3 keeps the type; L and Z differ only in the changed cells."""
+    """Check KL9: `assemble` runs once per batch in stage 2, in stage 3, and at prediction; stage 3
+    keeps the type; L and Z differ only in the changed cells.
+    """
     import e00713_train as tr  # ty: ignore[unresolved-import]
     import e00725_batch as lb
     import e00725_fit as fit_mod
@@ -471,7 +483,9 @@ def kl9(*, lw, month: str, seed: int, data_dir: Path, device: str) -> dict:  # n
 
 
 def kl9_predict(*, lw, month: str, data_dir: Path, device: str) -> dict:  # noqa: ANN001
-    """Check KL9 at prediction: `assemble` runs once per batch of `forecast_frame`, and the data source is a `LiveSource`."""
+    """Check KL9 at prediction: `assemble` runs once per batch of `forecast_frame`, and the data
+    source is a `LiveSource`.
+    """
     import copy
 
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
@@ -520,7 +534,9 @@ def _with_source(world, source):  # noqa: ANN001, ANN202
 
 
 def kl10(*, lw, picks, data_dir: Path, phase: str) -> dict:  # noqa: ANN001
-    """Check KL10: ENS arrays replaced by the analysis arrays give the rule-off batch, and 50 ENS cells match the raw rows."""
+    """Check KL10: ENS arrays replaced by the analysis arrays give the rule-off batch, and 50 ENS
+    cells match the raw rows.
+    """
     import copy
 
     import e00725_poison as pz
@@ -568,7 +584,8 @@ def kl10(*, lw, picks, data_dir: Path, phase: str) -> dict:  # noqa: ANN001
 
 
 def _kl10_raw_cells(*, lw, picks, phase: str, n: int) -> dict:  # noqa: ANN001
-    """Compare `n` random ENS weather cells, spread over the 7 weather columns, with an independent Polars lookup of the raw summary rows.
+    """Compare `n` random ENS weather cells, spread over the 7 weather columns, with an independent
+    Polars lookup of the raw summary rows.
 
     The raw folder is the one the phase's cache was built from (`meta.json` records it). Each cell is
     compared twice: the raw value in `cache.raw` within 1e-4, and the standardised float16 value exactly.
@@ -714,7 +731,8 @@ def run_fold(*, month: str, phase: str, device: str, data_dir: Path, only: set[s
 
 
 def kl3r_fold(*, month: str, data_dir: Path, n_primaries: int) -> dict:
-    """Run KL3r for one fold on the CPU, outside the GPU slot (it rebuilds the analysis arrays from poisoned inputs).
+    """Run KL3r for one fold on the CPU, outside the GPU slot (it rebuilds the analysis arrays from
+    poisoned inputs).
 
     The rebuild takes about 1 minute per Primary and poisoned copy, so the job runs with `--device cpu`
     semantics: the world is built on the CPU and no GPU memory is touched.
@@ -834,16 +852,18 @@ def kl5(*, phase: str, data_dir: Path) -> dict:
 def kl8_arm_passes(*, name: str, lines: Sequence) -> tuple[bool, list[str]]:
     """Return whether the look-ahead statement of one arm passes, and its negative-margin lines.
 
-    `L` and `E` pass only with no negative margin. Arm `Z` (the lab-analysis arm, "as `M*`") reads the analysis
-    in every cell, so its negative margins are by definition (design sections 0 and 3); it passes only if it
-    still shows them, which proves that the statement can detect a look-ahead.
+    `L` and `E` pass only with no negative margin. Arm `Z` (the lab-analysis arm, "as `M*`") reads
+    the analysis in every cell, so its negative margins are by definition (design sections 0 and 3);
+    it passes only if it still shows them, which proves that the statement can detect a look-ahead.
     """
     negative = [x.text for x in lines if x.margin_hours < 0]
     return (bool(negative) if name == "Z" else not negative), negative
 
 
 def kl8(*, data_dir: Path) -> dict:
-    """Check KL8: print the look-ahead statements for `L`, `Z`, and `E` and require no negative margin and a PASS on the stored run frame."""
+    """Check KL8: print the look-ahead statements for `L`, `Z`, and `E` and require no negative
+    margin and a PASS on the stored run frame.
+    """
     import e00725_weather_lookahead as wl
 
     contract = datetime(2026, 3, 10, 12, tzinfo=UTC)
@@ -864,7 +884,9 @@ def kl8(*, data_dir: Path) -> dict:
 
 
 def pure(*, data_dir: Path) -> dict:
-    """Run the checks that need no data: KL2's table over the clock-change origins, and the count of changed values."""
+    """Run the checks that need no data: KL2's table over the clock-change origins, and the count of
+    changed values.
+    """
     contracts = [contract_datetime(c_idx=contract_index(day=d)) for d in (
         date(2025, 10, 28), date(2025, 11, 8), date(2026, 3, 31), date(2026, 6, 20),
     )]  # fmt: skip

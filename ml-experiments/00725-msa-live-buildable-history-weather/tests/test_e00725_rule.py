@@ -78,7 +78,8 @@ def test_day_summary_reads_d_minus_three_for_young_rows() -> None:
 
 
 def test_stopping_record_uses_the_first_best_pass_and_the_steps_formula() -> None:
-    """The best pass is the first pass within 1e-5 of the best loss, and steps are best pass times ceil(pairs / 256)."""
+    """The best pass is the first pass within 1e-5 of the best loss, and steps are best pass times
+    ceil(pairs / 256)."""
     first = {
         "passes": 6,
         "best_val": 0.9,

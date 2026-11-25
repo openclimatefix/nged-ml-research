@@ -92,7 +92,8 @@ def test_month_start_and_output_path() -> None:
 
 
 def test_phase_4_holds_a_table_job_and_a_fit_job_for_every_fold_and_seed() -> None:
-    """Phase 4 predicts `T3-C` on 8 folds and 2 seeds: a `table` job, then a `fit` job whose output is the log of the passed checks."""
+    """Phase 4 predicts `T3-C` on 8 folds and 2 seeds: a `table` job, then a `fit` job whose output
+    is the log of the passed checks."""
     jobs = [j for j in ph.phase_jobs(phase=4) if j.script == "e00725_t3_candidate.py"]
     assert len(jobs) == 2 * len(cm.ALL_FOLDS) * len(cm.TWO_SEEDS)
     assert all(j.gpu and j.args[0] == "T3-C" for j in jobs)

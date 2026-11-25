@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: D205, E501, PT018
 """Experiment 725: build the fold's world (experiment 713's arrays plus the live-rule arrays) for a phase.
 
 `load_world` runs experiment 713's pipeline for one fold and phase, takes the fold's standardiser
@@ -64,7 +64,9 @@ def fold_statistics(*, data: inp.FoldData, pipe: inp.Pipeline) -> dict[str, np.n
 def cams_day_array(
     *, pipe: inp.Pipeline, b1_mean: np.ndarray, b1_std: np.ndarray, device: str
 ) -> torch.Tensor:
-    """Return the standardised CAMS day summaries (16, N_DAYS, 2) float32, standardised by experiment 632's own `b1_scale`."""
+    """Return the standardised CAMS day summaries (16, N_DAYS, 2) float32, standardised by
+    experiment 632's own `b1_scale`.
+    """
     _, cams = pipe.d632.dense_b1()
     _, z = pipe.d632.b1_scale(
         grid=np.zeros((0, pipe.d632.N_B1_GRID), dtype=np.float32), cams=cams, mean=b1_mean, std=b1_std,

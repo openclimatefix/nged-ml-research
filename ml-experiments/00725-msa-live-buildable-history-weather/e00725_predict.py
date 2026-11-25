@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: D205, E501, PT018
 """Experiment 725: forecast one fold with a stored or fitted state on the live rule (prediction phase).
 
 Usage: e00725_predict.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH ...]
@@ -8,16 +8,16 @@ prediction-only readings of `e00725_common.PREDICT_SPECS`:
 
 - `S`: the stored stage 3 state of `M*` (experiment 713's `M1`, read only) predicts on the live rule,
   with no retraining.
-- `T3-M` and `T3-L`: `M*` on the analysis weather and `L` on the live rule, with the target row's CAMS day
-  summary moved from UTC day D - 1 to D - 3 (report-only read-out `T3`; no arm is trained on the moved
-  summary).
+- `T3-M` and `T3-L`: `M*` on the analysis weather and `L` on the live rule, with the target row's
+  CAMS day summary moved from UTC day D - 1 to D - 3 (report-only read-out `T3`; no arm is trained
+  on the moved summary).
 
-Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`, which opens the
-fold month's scored window. It asserts that the fold's standardiser equals the training phase's, forecasts
-every (Primary, scored origin, lead day) through experiment 713's `forecast_frame`, drops valid times on or
-after 2026-07-01, and writes `work/fits/<arm>/<month>_s<seed>.parquet` atomically with experiment 713's
-columns. It refuses a stage 3 state whose log carries another code hash unless `--accept-code-change` names
-the old hash.
+Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`, which
+opens the fold month's scored window. It asserts that the fold's standardiser equals the training
+phase's, forecasts every (Primary, scored origin, lead day) through experiment 713's
+`forecast_frame`, drops valid times on or after 2026-07-01, and writes
+`work/fits/<arm>/<month>_s<seed>.parquet` atomically with experiment 713's columns. It refuses a
+stage 3 state whose log carries another code hash unless `--accept-code-change` names the old hash.
 """
 
 import argparse
@@ -46,7 +46,9 @@ torch.set_num_threads(1)
 def resolve_state(
     *, arm: str, month: str, seed: int, data_dir: Path
 ) -> tuple[Path, Path, str, int | None, bool]:
-    """Return (state file, its stage log, the rule, the target-summary shift, is-713-state) of a prediction arm."""
+    """Return (state file, its stage log, the rule, the target-summary shift, is-713-state) of a
+    prediction arm.
+    """
     if arm in cm.PREDICT_SPECS:
         spec = cm.PREDICT_SPECS[arm]
         if spec.state == "m_star":

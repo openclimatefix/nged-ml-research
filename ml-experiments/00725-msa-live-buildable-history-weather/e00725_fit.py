@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PLR0915
+# ruff: noqa: D205, E501, PT018, PLR0915
 """Experiment 725: fit one F8 network (one arm, one fold, one seed) in the training phase.
 
 Usage: e00725_fit.py ARM MONTH SEED [--device cuda] [--smoke] [--accept-code-change OLD_HASH ...]
@@ -21,8 +21,9 @@ current code hash. `--smoke` writes under `smoke/` and is never scored.
 (passes, best pass, optimiser steps at the best pass, losses at pass 1 and at the best pass, cap hit,
 rerun).
 
-**Read only.** Nothing is written into experiment 713's data. The fit asserts that the files it reads
-from there (the stage 1 state and log, the standardiser hash, `selection.json`) are unchanged when it ends.
+**Read only.** Nothing is written into experiment 713's data. The fit asserts that the files it
+reads from there (the stage 1 state and log, the standardiser hash, `selection.json`) are unchanged
+when it ends.
 """
 
 import argparse
@@ -130,7 +131,9 @@ def run_stage(
     *, model: mdl.MsaNet, world: tr.World, stage: int, seed: int, encoders: str, spec: cm.ArmSpec,
     train_stage: Callable[..., tr.StageLog] = tr.train_stage,
 ) -> tuple[dict, tr.StageLog]:  # fmt: skip
-    """Train one stage with the arm's patience and cap, rerun at 120 passes if the cap is hit, and return the entry."""
+    """Train one stage with the arm's patience and cap, rerun at 120 passes if the cap is hit, and
+    return the entry.
+    """
     samples = tr.make_samples(world=world, stage=stage, placebo=False)
     start_state = copy.deepcopy(model.state_dict())
     record = train_stage(

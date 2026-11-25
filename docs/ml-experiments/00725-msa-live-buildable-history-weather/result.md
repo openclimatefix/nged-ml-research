@@ -248,24 +248,31 @@ are all unfilled. A second audit round confirmed the diff. The stored `L`, `Z`, 
 read with `--accept-code-change dad2fdbd70a1b0fb`, because the changed branch never runs in a fit.
 The wiring checks ran again under the new `checks_hash` and passed.
 
-## Docstring lint fix after the experiment was parked
+## Docstring lint fixes after the experiment was parked
 
-**A docstring-only edit of four modules changed the three hashes, and nothing stored was
-regenerated.** The lint step `pydoclint` reported 12 errors in `e00725_batch.py`,
-`e00725_poison.py`, `e00725_sources.py`, and `e00725_world.py`. The edit added the missing `Args:`
-and `Returns:` sections. The syntax trees of all 14 modules, compared with the docstrings stripped,
-are identical before and after the edit.
+**Two docstring-only edits of the code changed the three hashes, and nothing stored was
+regenerated.** The first edit added the `Args:` and `Returns:` sections that `pydoclint` reported
+as missing (12 errors in `e00725_batch.py`, `e00725_poison.py`, `e00725_sources.py`, and
+`e00725_world.py`). The second edit rewrapped 93 docstring lines over 100 columns that the
+docstring markdown check flagged, in 13 files (the counts are `e00725_t3_candidate.py` 29,
+`e00725_checks.py` 14, `e00725_phases.py` 10, `e00725_score.py` 10, `e00725_poison.py` 9,
+`e00725_predict.py` 5, `e00725_fit.py` 2, `e00725_weather_lookahead.py` 1, `e00725_world.py` 1, and
+12 in four test files). The rewrap moved the closing quotes of 24 wrapped docstrings onto their own
+lines, and added `D205` to the `# ruff: noqa` header of 8 modules, because a summary sentence over
+100 columns cannot stay on one line. The syntax trees of all 19 Python files, compared with the
+docstrings stripped, are identical before and after each edit, and so is the text of every
+docstring with its whitespace normalised.
 
-| Hash | Before the edit (head 188eac42e) | After the edit |
-|---|---|---|
-| `own_files_hash` (fit modules) | `2bd6286cad125ae6` | `a93840a6a1ed7358` |
-| `checks_hash` (check and fit modules) | `9b4b6cddf6122323` | `986904f8269b02c2` |
-| `code_hash` (stored states, gate) | `d8a361ef74c85258` | `82cb4025ac6912e2` |
+| Hash | Before both edits (head 188eac42e) | After the first edit (head b80c5b6aa) | After the rewrap |
+|---|---|---|---|
+| `own_files_hash` (fit modules) | `2bd6286cad125ae6` | `a93840a6a1ed7358` | `83a5f5e3315821e7` |
+| `checks_hash` (check and fit modules) | `9b4b6cddf6122323` | `986904f8269b02c2` | `133a0a6b691950b7` |
+| `code_hash` (stored states, gate) | `d8a361ef74c85258` | `82cb4025ac6912e2` | `fd415e0af50823a1` |
 
 **No stored fit, prediction, or check file was regenerated, and the stored files keep the hashes
-of the table before the edit.** The line is parked, so no later `predict` needs
-`--accept-code-change`. A later session that resumes the line would pass `--accept-code-change
-d8a361ef74c85258` and rerun the wiring checks under the new `checks_hash`.
+of the first column.** The line is parked, so no later `predict` needs `--accept-code-change`. A
+later session that resumes the line would pass `--accept-code-change d8a361ef74c85258` and rerun
+the wiring checks under the new `checks_hash`.
 
 ## Checks
 

@@ -1,31 +1,38 @@
-# ruff: noqa: E501, PT018, PLR0911, PLR0912, PERF401
+# ruff: noqa: D205, E501, PT018, PLR0911, PLR0912, PERF401
 """Experiment 725: the phase runner (design sections 7 and 9).
 
 Usage:
-    e00725_phases.py list PHASE                       # print the jobs of a phase and whether each is done
+    e00725_phases.py list PHASE
+        # print the jobs of a phase and whether each is done
     e00725_phases.py run PHASE [--parallel 1|2] [--dry-run] [--manager-notified] [--device cuda]
-    e00725_phases.py project [--from-phase1]          # the compute projection, and the cut that it implies
-    e00725_phases.py hours                            # GPU-process-hours spent so far, from the job logs
+    e00725_phases.py project [--from-phase1]
+        # the compute projection, and the cut that it implies
+    e00725_phases.py hours
+        # GPU-process-hours spent so far, from the job logs
 
 The runner holds no GPU or torch code. It launches each job as its own process through `run.sh`, so that
 every fit runs in a capped scope of its own, and it never runs more than two GPU jobs at a time.
 
 **Phases** (design section 9; PHASE is 0 to 7):
 
-- 0: the two ENS caches (CPU), the wiring checks KL1 to KL10, the smoke fit of `L` (never scored), the
-  reproduction fit of `Z` (fold 2025-11, seed 0) and its prediction, the reproduction check, and the projection.
+- 0: the two ENS caches (CPU), the wiring checks KL1 to KL10, the smoke fit of `L` (never scored),
+  the reproduction fit of `Z` (fold 2025-11, seed 0) and its prediction, the reproduction check, and
+  the projection.
 - 1: `L` on the quick-look folds, seeds 0 and 1, and the `S` predictions; then the quick look.
 - 2: `L` on the other 4 folds, seeds 0 and 1, and the `S` predictions.
-- 3: `Z` on the quick-look folds, seeds 0 and 1, less the phase 0 fit; then the rule on `Z` and the two-seed reading.
-- 4: the `T3` predictions of the stored `M*`, of `L`, and of the stored Candidate (target-row summary moved to D - 3).
-- 5: the budget probe, only if `decisions/probe_flag.json` says so (cut to fold 2025-11 if the projection says so).
+- 3: `Z` on the quick-look folds, seeds 0 and 1, less the phase 0 fit; then the rule on `Z` and the
+  two-seed reading.
+- 4: the `T3` predictions of the stored `M*`, of `L`, and of the stored Candidate (target-row
+  summary moved to D - 3).
+- 5: the budget probe, only if `decisions/probe_flag.json` says so (cut to fold 2025-11 if the
+  projection says so).
 - 6: `L` on 8 folds, seeds 2 to 4, unless `decisions/futility.json` says the futility rule fired.
 - 7: `E` on the quick-look folds, seeds 0 and 1, unless the projection cut it.
 
-**Guards the runner applies.** A job whose output exists is skipped. Phase 0 and phase 1 refuse to start a
-GPU job without `--manager-notified`, which records that "fits starting" went to the manager. Before and
-after a phase the runner hashes experiment 713's `work` folder and refuses to continue if the hash changed.
-After each job it adds the job's seconds to `work/gpu_hours.json`.
+**Guards the runner applies.** A job whose output exists is skipped. Phase 0 and phase 1 refuse to
+start a GPU job without `--manager-notified`, which records that "fits starting" went to the
+manager. Before and after a phase the runner hashes experiment 713's `work` folder and refuses to
+continue if the hash changed. After each job it adds the job's seconds to `work/gpu_hours.json`.
 """
 
 import argparse
@@ -129,7 +136,8 @@ def predict_jobs(*, arm: str, months: tuple[str, ...], seeds: tuple[int, ...]) -
 
 
 def t3_candidate_jobs(*, months: tuple[str, ...], seeds: tuple[int, ...]) -> list[Job]:
-    """Return, for every fold and seed, the `table` job and then the `fit` job that predict the stored Candidate with the target-row summary moved to D - 3.
+    """Return, for every fold and seed, the `table` job and then the `fit` job that predict the
+    stored Candidate with the target-row summary moved to D - 3.
 
     The `fit` job's output is the log that the job writes after its checks passed, not the forecast file.
     """
@@ -349,7 +357,9 @@ def run_chain(*, chain: list[Job], device: str, lock: threading.Lock, failures: 
 
 
 def chains_of(*, jobs: list[Job]) -> list[list[Job]]:
-    """Group GPU fit and predict jobs into chains: one chain per (arm, fold, seed), the fit first (one chain per fold for `T3-C`)."""
+    """Group GPU fit and predict jobs into chains: one chain per (arm, fold, seed), the fit first
+    (one chain per fold for `T3-C`).
+    """
     chains: dict[tuple[str, ...], list[Job]] = {}
     for job in jobs:
         # the two seeds of a `T3-C` fold share one folder, so they form one chain and never run at once

@@ -5,9 +5,9 @@ Usage: e00725_weather_lookahead.py [--origin 2026-03-10] [--rule L|Z|E] [--check
 
 For one contract origin (12:00 UTC on the given day), the script prints one line for each run of
 columns that read one source in a row of the 14 x 48 history matrix: the age, the columns, the
-weather group, the source, the span of valid times, and the margin in hours between the latest value of
-the span and the time at which a live service holds that value (a positive margin means the value was
-in hand at the native origin). The lines come from `e00725_rule.reference_table`, which uses
+weather group, the source, the span of valid times, and the margin in hours between the latest value
+of the span and the time at which a live service holds that value (a positive margin means the value
+was in hand at the native origin). The lines come from `e00725_rule.reference_table`, which uses
 `datetime` arithmetic alone. With `--check-data` the script also runs experiment 713's check of the
 stored run frame that the Candidate reads, and prints PASS or FAIL for it. The exit status is 1 on a
 negative margin or a FAIL.

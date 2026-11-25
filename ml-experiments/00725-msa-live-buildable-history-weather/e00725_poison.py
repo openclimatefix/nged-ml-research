@@ -1,11 +1,13 @@
-# ruff: noqa: E501, PT008
-"""Experiment 725: checks KL3, KL3n, and KL3r, the known-answer test that no history input uses weather unavailable at the origin.
+# ruff: noqa: D205, E501, PT008
+"""Experiment 725: checks KL3, KL3n, and KL3r, the known-answer test that no history input uses
+weather unavailable at the origin.
 
 **KL3.** For one sample (a Primary and a contract origin `c`), every stored source array is copied, and
 every value that the live rule forbids is set to 1e6 and then to NaN, before any lookup:
 
 - ERA5 values (columns 1 to 14 of the dense array) stamped after 09:00 UTC on D - 5;
-- half-hourly CAMS values (columns 0 and 15 to 18) whose CAMS source stamp is after 00:00 UTC on D - 2;
+- half-hourly CAMS values (columns 0 and 15 to 18) whose CAMS source stamp is after 00:00 UTC on
+  D - 2;
 - CAMS day summaries of UTC days after D - 3;
 - the `ft` values and stored B1 values whose run has a forecast origin at or after the native origin
   (this includes the run of day D, whose forecast origin is the native origin).
@@ -13,9 +15,9 @@ every value that the live rule forbids is set to 1e6 and then to NaN, before any
 The assembled history weather must be bit-identical to the unpoisoned batch, except in the counted
 fallback cells of a training sample (where an ENS cell reads the analysis, which may be poisoned).
 
-**KL3n.** The same poisons moved one step earlier (ERA5 after 09:00 UTC on D - 6, CAMS after 00:00 UTC on
-D - 3, day summaries after D - 4, runs with a forecast origin at or after 09:00 UTC on D - 1) must each
-change at least one input of at least one sample.
+**KL3n.** The same poisons moved one step earlier (ERA5 after 09:00 UTC on D - 6, CAMS after 00:00
+UTC on D - 3, day summaries after D - 4, runs with a forecast origin at or after 09:00 UTC on D - 1)
+must each change at least one input of at least one sample.
 
 **KL3r.** The 12 analysis window columns and the CAMS day summary come from `e00632_data.dense_b1()`,
 which loads arrays built once from the clean data, so a poison of the raw arrays never reaches them.
@@ -122,7 +124,9 @@ def exempt_mask(*, plan_fallback: torch.Tensor, phase: str) -> torch.Tensor:
 
 
 def equal_outside(*, a: torch.Tensor, b: torch.Tensor, exempt: torch.Tensor) -> bool:
-    """Return whether two history-weather tensors are bit-identical outside the exempt cells (NaN counts as different)."""
+    """Return whether two history-weather tensors are bit-identical outside the exempt cells (NaN
+    counts as different).
+    """
     zero = torch.zeros_like(a)
     return torch.equal(torch.where(exempt, zero, a), torch.where(exempt, zero, b))
 
@@ -132,7 +136,8 @@ def fallback_count_reference(
 ) -> int:  # fmt: skip
     """Return the number of fallback cells of the samples from the cache's `found` mask alone (the KL7 count).
 
-    A fallback cell is a (token, column) pair that the rule reads from the ENS value and whose half-hour has no row.
+    A fallback cell is a (token, column) pair that the rule reads from the ENS value and whose
+    half-hour has no row.
     """
     per_token = rule.ens_mask(rule=rule_name).sum(axis=-1)  # ty: ignore[invalid-argument-type]
     contract = rule.STEPS_PER_DAY * rule.REFERENCE_DAY + rule.STEPS_PER_DAY // 2
@@ -222,7 +227,9 @@ def _poison_weather(
 
 
 def _poison_cams_table(*, path: Path, out: Path, c_idx: int, value: float, shift_days: int) -> Path:
-    """Write a copy of the hourly CAMS table with the global irradiance after 00:00 UTC on D - 2 (less `shift_days`) set to `value`."""
+    """Write a copy of the hourly CAMS table with the global irradiance after 00:00 UTC on D - 2
+    (less `shift_days`) set to `value`.
+    """
     import polars as pl
 
     grid_start = datetime(2019, 9, 1, tzinfo=UTC)
@@ -240,7 +247,8 @@ def _poison_cams_table(*, path: Path, out: Path, c_idx: int, value: float, shift
 def rebuilt_primary_arrays(
     *, lw: object, row: dict, weather: np.ndarray, cams_path: Path, local_date: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # fmt: skip
-    """Rebuild one Primary's standardised weather (7 columns), window columns (12), and CAMS day summaries from raw inputs.
+    """Rebuild one Primary's standardised weather (7 columns), window columns (12), and CAMS day
+    summaries from raw inputs.
 
     The weather is built as `e00632_data.dense_raw` builds it (copied for one Primary), the window columns
     through `e00437_features.dense_arrays`, and the day summaries through `e00437_features.cams_previous_day`;
@@ -343,12 +351,12 @@ def kl3r(
 ) -> dict:  # fmt: skip
     """Run KL3r on `samples` (one Primary and origin each).
 
-    For each sample the analysis columns are rebuilt from clean weather and from poisoned weather (1e6 and
-    NaN); the history assembled from the poisoned rebuild must equal the history assembled from the clean
-    rebuild, outside the counted fallback cells. The clean rebuild must also equal the cached batch. With
-    `with_controls`, each of the three controls of `CONTROLS` (the poison moved one day earlier) must change
-    its own columns in at least one sample. The clean rebuild is cached for each Primary, because it does not
-    depend on the origin.
+    For each sample the analysis columns are rebuilt from clean weather and from poisoned weather
+    (1e6 and NaN); the history assembled from the poisoned rebuild must equal the history assembled
+    from the clean rebuild, outside the counted fallback cells. The clean rebuild must also equal
+    the cached batch. With `with_controls`, each of the three controls of `CONTROLS` (the poison
+    moved one day earlier) must change its own columns in at least one sample. The clean rebuild is
+    cached for each Primary, because it does not depend on the origin.
     """
     import e00397_prep as prep  # ty: ignore[unresolved-import]
     import e00418_prep as prep418  # ty: ignore[unresolved-import]
@@ -428,7 +436,9 @@ def _rebuild_poisoned(
     *, lw: object, row: dict, weather: np.ndarray, sample: OneSample, value: float, shift_days: int,
     scratch: Path, local_date: np.ndarray, kinds: Sequence[str] = ("era5", "cams"), cams_table: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # fmt: skip
-    """Rebuild one Primary's analysis arrays from the poisoned raw weather (`kinds`) and, if `cams_table`, the poisoned hourly CAMS table."""
+    """Rebuild one Primary's analysis arrays from the poisoned raw weather (`kinds`) and, if
+    `cams_table`, the poisoned hourly CAMS table.
+    """
     import e00418_prep as prep418  # ty: ignore[unresolved-import]
 
     bad_weather = _poison_weather(

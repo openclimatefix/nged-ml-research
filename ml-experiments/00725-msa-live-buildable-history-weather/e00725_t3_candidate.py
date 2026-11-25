@@ -1,36 +1,41 @@
-# ruff: noqa: E501, PT018
-"""Experiment 725: the stored Candidate predicts with the target row's CAMS day summary moved to D - 3 (read-out `T3`, arm `T3-C`).
+# ruff: noqa: D205, E501, PT018
+"""Experiment 725: the stored Candidate predicts with the target row's CAMS day summary moved to
+D - 3 (read-out `T3`, arm `T3-C`).
 
 Usage: e00725_t3_candidate.py T3-C MONTH SEED --step table|fit [--device cuda]
 
-**What moves.** The Candidate reads the CAMS mean and the CAMS clear-sky ratio of the UTC day before the
-forecast origin in two columns of its per-Primary table, `cams_prev_day_mean` and `cams_prev_day_csi`
-(experiment 437's `site_table` fills them with `cams.get(origin_day - 1)`). In `T3` those two columns hold
-the values of UTC day `origin_day - 3` for every row whose origin is on or after the first day of the fold
-month, which are the rows that the fold scores. Every other row and every other column keeps the stored
-value, so the standardiser, the training rows, and the lags of the Candidate are unchanged. No state is
-trained: the stored stage states and the stored step 2 state of experiment 667 predict.
+**What moves.** The Candidate reads the CAMS mean and the CAMS clear-sky ratio of the UTC day before
+the forecast origin in two columns of its per-Primary table, `cams_prev_day_mean` and
+`cams_prev_day_csi` (experiment 437's `site_table` fills them with `cams.get(origin_day - 1)`). In
+`T3` those two columns hold the values of UTC day `origin_day - 3` for every row whose origin is on
+or after the first day of the fold month, which are the rows that the fold scores. Every other row
+and every other column keeps the stored value, so the standardiser, the training rows, and the lags
+of the Candidate are unchanged. No state is trained: the stored stage states and the stored step 2
+state of experiment 667 predict.
 
-**How it runs.** The script follows `e00713_swap_c.py` (read only). It mirrors experiment 667's `inputs` as
-links under `t3_candidate/<month>` of this experiment's data folder, replaces the 16 table links of
-`inputs/trailing437` with the patched tables, links the stored states, the standardiser hash, and the chain,
-and runs experiment 667's own code with `E00667_PHASE=predict`: the `table` step builds the lag-free table
-`T` from the stored step 2 state on the patched inputs, and the `fit` step loads the stored stage state (the
-fine-tune is skipped, and the script asserts that) and writes the forecasts to
-`t3_candidate/<month>/P7_D50_<month>/work/fits/P5/<month>_d0_s<seed>.parquet`. The two steps are two jobs
-of one chain, because experiment 667's module reads its command at import. The phase runner puts both seeds
-of a fold in one chain, so the two seeds of a fold never run at once.
+**How it runs.** The script follows `e00713_swap_c.py` (read only). It mirrors experiment 667's
+`inputs` as links under `t3_candidate/<month>` of this experiment's data folder, replaces the 16
+table links of `inputs/trailing437` with the patched tables, links the stored states, the
+standardiser hash, and the chain, and runs experiment 667's own code with `E00667_PHASE=predict`:
+the `table` step builds the lag-free table `T` from the stored step 2 state on the patched inputs,
+and the `fit` step loads the stored stage state (the fine-tune is skipped, and the script asserts
+that) and writes the forecasts to
+`t3_candidate/<month>/P7_D50_<month>/work/fits/P5/<month>_d0_s<seed>.parquet`. The two steps are two
+jobs of one chain, because experiment 667's module reads its command at import. The phase runner
+puts both seeds of a fold in one chain, so the two seeds of a fold never run at once.
 
-**The CAMS file.** Experiment 667 built the stored tables from experiment 620's extended CAMS file, so the
-script points `e00418_prep.CAMS_PATH` at `e00667_tables.CAMS_EXTENDED` (the path only) before it reads CAMS.
+**The CAMS file.** Experiment 667 built the stored tables from experiment 620's extended CAMS file,
+so the script points `e00418_prep.CAMS_PATH` at `e00667_tables.CAMS_EXTENDED` (the path only) before
+it reads CAMS.
 
-**Checks the script makes.** Before it writes a table, it rebuilds the stored columns with `origin_day - 1`
-and asserts that they equal the stored columns on every row, which proves that the day arithmetic and the
-CAMS file are experiment 437's. After the `fit` step it asserts that the run reused the stored state, that the
-forecast keys equal the stored Candidate's keys, that the share of rows whose median changed is at least half
-the share of scored table rows whose CAMS value changed, and that nothing under experiment 667's folder
-changed. The log `t3_candidate/<month>/log_s<seed>.json` is the done marker of the arm, and it records the
-shares, the size of the differences, the code record, and the hash of this script.
+**Checks the script makes.** Before it writes a table, it rebuilds the stored columns with
+`origin_day - 1` and asserts that they equal the stored columns on every row, which proves that the
+day arithmetic and the CAMS file are experiment 437's. After the `fit` step it asserts that the run
+reused the stored state, that the forecast keys equal the stored Candidate's keys, that the share of
+rows whose median changed is at least half the share of scored table rows whose CAMS value changed,
+and that nothing under experiment 667's folder changed. The log
+`t3_candidate/<month>/log_s<seed>.json` is the done marker of the arm, and it records the shares,
+the size of the differences, the code record, and the hash of this script.
 """
 
 import argparse
@@ -77,7 +82,9 @@ def table_file(*, month: str, seed: int) -> Path:
 
 
 def log_file(*, month: str, seed: int) -> Path:
-    """Return the JSON log of one `T3-C` forecast, which the `fit` step writes after every check passed (the done marker of the arm)."""
+    """Return the JSON log of one `T3-C` forecast, which the `fit` step writes after every check
+    passed (the done marker of the arm).
+    """
     return root(month=month) / f"log_s{seed}.json"
 
 
@@ -90,7 +97,8 @@ def month_start_us(*, month: str) -> int:
 def day_columns(
     *, origin_us: np.ndarray, cams: dict[int, tuple[float, float]], back_days: int
 ) -> np.ndarray:
-    """Return (rows, 2): the CAMS mean and clear-sky ratio of UTC day `origin day - back_days`, NaN where CAMS has none.
+    """Return (rows, 2): the CAMS mean and clear-sky ratio of UTC day `origin day - back_days`, NaN
+    where CAMS has none.
 
     The origin day is the floor of the origin in days since the epoch, as in experiment 437's `site_table`.
     """
@@ -107,9 +115,9 @@ def patched_table(
 ) -> pl.DataFrame:
     """Return a Primary's table with the two CAMS columns of every row on or after `start_us` moved to D - 3.
 
-    The function first rebuilds both stored columns from `cams` with the stored day offset of 1 and asserts that
-    they equal the stored columns on every row. The patched table equals `source` in every other column and in
-    every row before `start_us`.
+    The function first rebuilds both stored columns from `cams` with the stored day offset of 1 and
+    asserts that they equal the stored columns on every row. The patched table equals `source` in
+    every other column and in every row before `start_us`.
     """
     origin = source["origin_us"].to_numpy()
     rebuilt = day_columns(origin_us=origin, cams=cams, back_days=1)
@@ -130,9 +138,11 @@ def patched_table(
 
 
 def use_stored_cams() -> Path:
-    """Point experiment 437's CAMS reader at the file that experiment 667 built the stored tables from; return the path.
+    """Point experiment 437's CAMS reader at the file that experiment 667 built the stored tables
+    from; return the path.
 
-    Only the path changes: `e00667_tables.setup()` would also write a combined file, and the script never calls it.
+    Only the path changes: `e00667_tables.setup()` would also write a combined file, and the script
+    never calls it.
     """
     import e00418_prep as prep418  # ty: ignore[unresolved-import]
     import e00667_tables as t667  # ty: ignore[unresolved-import]
@@ -143,7 +153,9 @@ def use_stored_cams() -> Path:
 
 
 def table_report(*, source: pl.DataFrame, table: pl.DataFrame, start_us: int) -> dict[str, int]:
-    """Return the counts of scored rows, finite values, and rows whose first CAMS column changed (NaN on both sides is no change)."""
+    """Return the counts of scored rows, finite values, and rows whose first CAMS column changed
+    (NaN on both sides is no change).
+    """
     scored = source["origin_us"].to_numpy() >= start_us
     before = source[CAMS_COLUMNS[0]].to_numpy()[scored]
     after = table[CAMS_COLUMNS[0]].to_numpy()[scored]
@@ -158,10 +170,12 @@ def table_report(*, source: pl.DataFrame, table: pl.DataFrame, start_us: int) ->
 
 
 def build_tables(*, month: str, swap: ModuleType) -> dict[str, dict[str, int]]:
-    """Replace the table links of `inputs/trailing437` under the fold's folder with the patched tables; return a report.
+    """Replace the table links of `inputs/trailing437` under the fold's folder with the patched
+    tables; return a report.
 
-    A patched table from an earlier run of the fold is kept, and the report is rebuilt from it, so that the second
-    seed of a fold reports the same counts as the first. The temporary file carries the process number.
+    A patched table from an earlier run of the fold is kept, and the report is rebuilt from it, so
+    that the second seed of a fold reports the same counts as the first. The temporary file carries
+    the process number.
     """
     import e00437_features as f437  # ty: ignore[unresolved-import]
 
@@ -189,7 +203,9 @@ def build_tables(*, month: str, swap: ModuleType) -> dict[str, dict[str, int]]:
 
 
 def link_stored(*, month: str, seed: int, swap: ModuleType) -> None:
-    """Link the stored stage state and the standardiser hash of experiment 667; the stored `T` table is not linked."""
+    """Link the stored stage state and the standardiser hash of experiment 667; the stored `T` table
+    is not linked.
+    """
     fold = swap.inp.ROOT_667 / f"{TRAIL_TAG}_{month}"
     stored = fold / "work" / "models" / "P5" / f"{month}_d0_s{seed}.pt"
     assert stored.exists(), stored
@@ -245,7 +261,9 @@ def run_step(*, month: str, seed: int, step: Step, device: str) -> int:
 def write_log(
     *, month: str, seed: int, seconds: float, tables: dict[str, dict[str, int]], swap: ModuleType
 ) -> None:
-    """Check the forecasts against the stored Candidate's and the stored state's reuse, then write the log (the arm's done marker)."""
+    """Check the forecasts against the stored Candidate's and the stored state's reuse, then write
+    the log (the arm's done marker).
+    """
     import e00713_score as sc713  # ty: ignore[unresolved-import]
     import e00725_frozen as fz
 

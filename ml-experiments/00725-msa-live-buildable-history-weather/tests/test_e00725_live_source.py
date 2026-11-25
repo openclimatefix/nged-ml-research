@@ -1,5 +1,6 @@
 # ruff: noqa: E501
-"""Tests of experiment 725's `LiveSource` on tiny synthetic arrays (CPU, torch, and the frozen checkout of experiment 713).
+"""Tests of experiment 725's `LiveSource` on tiny synthetic arrays (CPU, torch, and the frozen
+checkout of experiment 713).
 
 The tests skip when `e00713_batch` is not importable (put the frozen checkout's `00713-*` folder on `PYTHONPATH`).
 """
@@ -39,7 +40,8 @@ def make_base() -> bt.Source:
 
 
 def make_live(*, rule_name: str, phase: str = "train", found: bool = True) -> lb.LiveSource:
-    """Return a `LiveSource` whose ENS cells read 3.0, each with a forecast origin 12 half-hours before its stamp."""
+    """Return a `LiveSource` whose ENS cells read 3.0, each with a forecast origin 12 half-hours
+    before its stamp."""
     n = torch.arange(GRID)
     return lb.build_live_source(
         base=make_base(), rule_name=rule_name, phase=phase,
@@ -140,7 +142,8 @@ def test_placebo_batch_raises() -> None:
 
 
 def make_live_with_ens_table(*, back_days: int | None) -> lb.LiveSource:
-    """Return a `LiveSource` whose parent has an ensemble table, with half-hours 18 to 47 of origin day `C_DAY` unfilled for Primary 0."""
+    """Return a `LiveSource` whose parent has an ensemble table, with half-hours 18 to 47 of origin
+    day `C_DAY` unfilled for Primary 0."""
     n_rel = 48 * 14
     weather = torch.full((16, N_DAYS, n_rel, 21), 2.0, dtype=torch.float16)
     filled = torch.ones((16, N_DAYS, n_rel), dtype=torch.bool)
@@ -164,7 +167,8 @@ def make_live_with_ens_table(*, back_days: int | None) -> lb.LiveSource:
 
 
 def test_moved_summary_is_written_only_where_the_ensemble_row_exists() -> None:
-    """T3 keeps the parent's zero at an unfilled half-hour, and equals the parent's weather everywhere else but the two summary columns."""
+    """T3 keeps the parent's zero at an unfilled half-hour, and equals the parent's weather
+    everywhere else but the two summary columns."""
     kwargs = {
         "primary": torch.tensor([0, 3]), "c_idx": torch.tensor([C_IDX, C_IDX]),
         "lead_day": torch.tensor([0, 0]), "ensemble": True,

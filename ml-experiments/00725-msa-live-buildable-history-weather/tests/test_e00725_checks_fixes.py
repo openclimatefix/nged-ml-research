@@ -1,5 +1,6 @@
 # ruff: noqa: E501
-"""Tests of experiment 725's KL5 grid length, the KL8 statement for rule `Z`, and the GPU-process pattern of `run.sh`."""
+"""Tests of experiment 725's KL5 grid length, the KL8 statement for rule `Z`, and the GPU-process
+pattern of `run.sh`."""
 
 import dataclasses
 import re
@@ -25,7 +26,8 @@ RUN_SH = Path(__file__).resolve().parents[1] / "run.sh"
 def test_cache_grid_is_the_extended_grid_not_the_default_grid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The cache has 126,624 half-hours (to 2026-11-20 23:30), the grid that `redirect` sets; the default grid has 121,248."""
+    """The cache has 126,624 half-hours (to 2026-11-20 23:30), the grid that `redirect` sets; the
+    default grid has 121,248."""
     ext = pytest.importorskip("e00667_extend")
     common = pytest.importorskip("e00087_common")
     prep = pytest.importorskip("e00397_prep")
@@ -44,7 +46,8 @@ def test_cache_grid_is_the_extended_grid_not_the_default_grid(
 
 
 def test_lookahead_margins_l_and_e_are_never_negative_and_z_is_the_lab_arm() -> None:
-    """KL8 requires no negative margin for `L` and `E`. `Z` reads the analysis in every cell, so it has negative margins by construction."""
+    """KL8 requires no negative margin for `L` and `E`. `Z` reads the analysis in every cell, so it
+    has negative margins by construction."""
     contract = datetime(2026, 3, 10, 12, tzinfo=UTC)
     for name in ("L", "E"):
         assert all(x.margin_hours >= 0 for x in wl.lines_for(contract=contract, rule_name=name))  # ty: ignore[invalid-argument-type]
@@ -97,7 +100,8 @@ def test_kl8_l_and_e_fail_with_one_negative_margin() -> None:
 
 
 def test_kl8_z_needs_its_negative_lines() -> None:
-    """`Z` passes while it shows negative lines, and fails when they are filtered out (the check can detect a look-ahead)."""
+    """`Z` passes while it shows negative lines, and fails when they are filtered out (the check can
+    detect a look-ahead)."""
     lines = wl.lines_for(contract=CONTRACT, rule_name="Z")
     assert ck.kl8_arm_passes(name="Z", lines=lines)[0]
     kept = [x for x in lines if x.margin_hours >= 0]
@@ -105,7 +109,8 @@ def test_kl8_z_needs_its_negative_lines() -> None:
 
 
 def test_every_negative_z_line_overlaps_the_cells_that_the_live_rule_changes() -> None:
-    """Each negative line of `Z` holds at least one cell whose source `L` changes, so the look-ahead lies in the changed cells."""
+    """Each negative line of `Z` holds at least one cell whose source `L` changes, so the look-ahead
+    lies in the changed cells."""
     changed = rule.changed_cells(rule="L")
     negative = [x for x in wl.lines_for(contract=CONTRACT, rule_name="Z") if x.margin_hours < 0]
     assert negative
@@ -116,7 +121,8 @@ def test_every_negative_z_line_overlaps_the_cells_that_the_live_rule_changes() -
 
 
 def test_run_sh_exports_the_environment(tmp_path: Path) -> None:
-    """`run.sh` sets the frozen checkout first on PYTHONPATH, the dummy NGED variables, and one thread for every library."""
+    """`run.sh` sets the frozen checkout first on PYTHONPATH, the dummy NGED variables, and one
+    thread for every library."""
     text = RUN_SH.read_text()
     assert 'export PYTHONPATH="$EXTRA_PYTHONPATH:$here"' in text
     for name in (
