@@ -63,7 +63,9 @@ def main() -> int:
     seeds: dict[str, tuple[int, ...]] = {args.arm: SEEDS}
     old_per_seed, old_averaged, old_groups = old_loader(names=names, months=months, seeds=seeds)
     new_per_seed, new_averaged, new_groups = lean_loader(names=names, months=months, seeds=seeds)
-    ok = old_groups == new_groups
+    ok = old_groups.keys() == new_groups.keys() and all(
+        np.array_equal(old_groups[k], new_groups[k]) for k in old_groups
+    )
     print(f"Primary groups identical: {ok}")
     ok &= compare(
         title="per-seed frame",

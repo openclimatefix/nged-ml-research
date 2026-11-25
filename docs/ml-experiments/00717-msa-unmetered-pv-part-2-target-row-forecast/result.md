@@ -364,7 +364,7 @@ review, an audit if a trigger fires, a write-up review, and a prose review.
   seeds 0 and 1 of one arm, it prints the largest absolute difference between the two loaders in
   every column that the contrast reads, the row counts, and whether the row order is identical.
   The expected result is a difference of at most 1e-12 and identical order. SHA-256:
-  `f85c68ec8ec2e2047cec3465f0ad9c5230801be823131165f24a50c9cdffc9f1`. It has not been run yet.
+  `37e8cae474a3d63b3a49fdda3b4917a2337eef9b3deb86de0abd3a230c001f77`. It has not been run yet.
 - `.../e00717_report.py` and `.../e00717_figures.py`: print every number the final page quotes
   from the score files, and draw the contrast and by-fold charts from `score/part2.json`.
 - `.../e00717_futility_read.py`: reads the interim 2-seed contrasts and writes
