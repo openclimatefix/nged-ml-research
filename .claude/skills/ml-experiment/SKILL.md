@@ -256,7 +256,7 @@ practice itself.** State in the plan which of them the experiment follows.
   reuses stored models for prediction only, or fits a closed-form model with no iterations.
 - **Open every pull request as a draft**, run the local checks, and mark it ready only when the
   reviews are triaged.
-  - **Show that every input with a valid time carries only what was known at the forecast origin.**
+- **Show that every input with a valid time carries only what was known at the forecast origin.**
   Show it for weather, capacity factors, and every other such input, in the plan and by a test. A
   score whose weather input looks ahead is voided. State any other look-ahead on the page, with the
   series and folds it affects.
