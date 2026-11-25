@@ -299,7 +299,7 @@ def main() -> int:
     mde_path = args.scratch / "mde.json"
     summary = drv.score_all(
         data_dir=args.scratch, folds=("2025-12",), seeds=(0,), hidden_ids=hidden, mva_ids=site_index(*core.MVA_ONLY[:2]),
-        n_resamples=200, mde_path=mde_path, seed_difference_points=0.0,
+        n_resamples=200, mde_path=mde_path, seed_difference=0.0,
     )  # fmt: skip
     drv.write_summary(summary=summary, path=args.scratch / "summary.json")
     out["report"] = rep.format_report(

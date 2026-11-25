@@ -1058,6 +1058,17 @@ which audit triggers fired.
   alone (the rule of experiment 417, design A).
 - **Gap rows:** every signed Primary drops the half-hours at which any farm has a gap, in both
   worlds.
+- **Synthetic Primaries:** D9 and D11 export and D2 and D3 never export. The world uses the real
+  grid of the fold 2026-04 pipeline, the real calendar with England's bank holidays, the real 2 m
+  temperature, and the real shortwave likelihood `u`, in experiment 713's fixed demand table `w`.
+  The page does not say which Primaries or which fold, so these are choices.
+- **Synthetic sign labels:** the true sign of all four synthetic Primaries trains the sign head, and
+  all four train on the folded reading. The page does not state this, so it is a choice. In `W2` and
+  `W0` only the four visible signed Primaries carry a sign label, and the sign cross-entropy has
+  weight 1.0, a value that the page does not state either.
+- **Process split:** `e00721_cli.py` runs the fit, the predict, and the score phases as separate
+  processes. The score phase writes the MDE file from the seed difference of `SG-0` in `W2` on fold
+  2026-05, then runs the power check of G3 over experiment 713's stored `M1` seeds 0 to 4.
 
 ### Measurement
 

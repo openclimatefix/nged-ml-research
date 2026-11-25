@@ -149,10 +149,58 @@ def synthetic_gate(*, data_dir: Path, seeds: Sequence[int]) -> dict:
     }
 
 
+def seed_difference_points(*, data_dir: Path, hidden_ids: dict[str, int]) -> float:
+    """Return the difference between the two seeds of `SG-0` on fold 2026-05, in points.
+
+    The reading is the signed CRPS on the reverse-flow rows of the hidden pair, pooled over both
+    Primaries, on the rows that the two seeds share.
+    """
+    ids = list(hidden_ids.values())
+    frames_ = []
+    for seed in (0, 1):
+        df = load_frame(
+            data_dir=data_dir, job=fit.Job(arm="SG-0", world="W2", fold=core.MDE_FOLD, seed=seed)
+        )
+        if df is None:
+            msg = f"the MDE needs SG-0 in W2, fold {core.MDE_FOLD}, seeds 0 and 1: seed {seed} is missing"
+            raise FileNotFoundError(msg)
+        frames_.append(df.filter(pl.col("time_series_id").is_in(ids)))
+    keys = [k for k in score.KEYS if k != "seed"]
+    joined = (
+        frames_[0].select(*keys, "actual", "crps")
+        .join(frames_[1].select(*keys, "crps"), on=keys, suffix="_b")
+        .filter(pl.col("actual") < 0.0)
+    )  # fmt: skip
+    return float(joined.select((pl.col("crps") - pl.col("crps_b")).mean()).item())
+
+
+def power_check(*, m1_dir: Path, folds: Sequence[str], series_ids: dict[str, int]) -> dict:
+    """Return the power check of G3 from experiment 713's stored `M1` seeds at D5 and D10.
+
+    The five stored seeds of each fold are scored with this page's recipe (leads of 24 up to but not
+    including 240 hours, the signed CRPS), and `score.power_check_g3` counts the joint pass rate over
+    the 60 assignments of the seeds.
+    """
+    frames_: dict[tuple[str, int], pl.DataFrame] = {}
+    for fold in folds:
+        for seed in range(5):
+            path = m1_dir / f"{fold}_s{seed}.parquet"
+            if not path.exists():
+                msg = f"the power check needs {path}"
+                raise FileNotFoundError(msg)
+            df = pl.read_parquet(path).filter(
+                pl.col("time_series_id").is_in(list(series_ids.values())),
+                pl.col("lead_hours") >= core.LEAD_MIN_HOURS,
+                pl.col("lead_hours") < core.LEAD_MAX_HOURS_EXCLUSIVE,
+            )
+            frames_[(fold, seed)] = score.with_crps(frame=df.with_columns(fold=pl.lit(fold)))
+    return score.power_check_g3(frames=frames_, id_d5=series_ids["D5"], id_d10=series_ids["D10"])
+
+
 def score_all(
     *, data_dir: Path, folds: Sequence[str], seeds: Sequence[int], hidden_ids: dict[str, int], mva_ids: Sequence[int],
     n_resamples: int = core.N_RESAMPLES, stage0: dict | None = None, mde_path: Path | None = None,
-    seed_difference_points: float | None = None,
+    seed_difference: float | None = None, power: dict | None = None,
 ) -> dict:  # fmt: skip
     """Return the summary of the stored fits.
 
@@ -165,7 +213,8 @@ def score_all(
         n_resamples: Resamples of each reading.
         stage0: The Stage 0 table (the flag test and the stored curves), copied into the summary.
         mde_path: Where the MDE file is written, which refuses to be overwritten.
-        seed_difference_points: The seed difference of `SG-0` on fold 2026-05, for the MDE.
+        seed_difference: The seed difference of `SG-0` on fold 2026-05, for the MDE (computed when `None`).
+        power: The result of `power_check`, copied into the summary.
 
     Returns:
         The summary: `g1`, `g2`, `g3_checks`, `flags`, `synthetic`, `g4`, `read_outs`, `stage0`, and
@@ -173,9 +222,19 @@ def score_all(
     """
     ids = tuple(hidden_ids.values())
     reverse = pl.col("actual_a") < 0.0
-    if mde_path is not None and seed_difference_points is not None:
-        core.write_mde_file(path=mde_path, seed_difference_points=seed_difference_points)
-    summary: dict = {"stage0": stage0 or {}, "folds": list(folds), "seeds": list(seeds)}
+    if mde_path is not None and not mde_path.exists():
+        diff = (
+            seed_difference
+            if seed_difference is not None
+            else seed_difference_points(data_dir=data_dir, hidden_ids=hidden_ids)
+        )
+        core.write_mde_file(path=mde_path, seed_difference_points=diff)
+    summary: dict = {
+        "stage0": stage0 or {},
+        "folds": list(folds),
+        "seeds": list(seeds),
+        "power_check": power or {},
+    }
     synth = synthetic_gate(data_dir=data_dir, seeds=seeds)
     summary["synthetic"] = synth
     summary["synthetic_failed"] = not synth["pass"]
@@ -240,7 +299,9 @@ def score_all(
                 a=a, b=base, seeds=(0,), restrict=None, metric="fcrps", n_resamples=n_resamples
             )
     summary["g4"] = g4
-    summary["stops"] = asdict(core.Stops())
+    summary["stops"] = asdict(
+        core.Stops(power_check_failed=bool(power is not None and not power["pass"]))
+    )
     summary["correctness_failed"] = False
     summary["synthetic_cap_hit"] = False
     return summary

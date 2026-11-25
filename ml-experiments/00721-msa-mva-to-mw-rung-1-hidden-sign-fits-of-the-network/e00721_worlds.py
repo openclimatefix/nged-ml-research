@@ -185,6 +185,49 @@ def build_synthetic(
     )  # fmt: skip
 
 
+def synthetic_on_real_grid(
+    *, temperature_c: np.ndarray, u: np.ndarray, stamp_us: np.ndarray, day_type: np.ndarray,
+    half_hour: np.ndarray, table: np.ndarray, primaries: tuple[int, ...], exporters: tuple[int, ...],
+    seed: int, day_offset_points: float = 0.0,
+) -> tuple[SyntheticArrays, np.ndarray, np.ndarray]:  # fmt: skip
+    """Return the synthetic world of `primaries` on the real grid, and its `(n_primary, G)` embeddings.
+
+    The gross demand is `known_demand` of the real calendar and the real 2 m temperature, and the PV
+    term is `C u` with the real shortwave likelihood `u`. Both embeddings are NaN at every Primary
+    that is not in `primaries`.
+
+    Args:
+        temperature_c: `(n_primary, G)` real 2 m temperature in degrees Celsius, without NaN.
+        u: `(n_primary, G)` real yield curve in 0 to 1, without NaN.
+        stamp_us: `(G,)` the grid's stamps in microseconds.
+        day_type: `(G,)` day type 0 to 7.
+        half_hour: `(G,)` local half-hour of the day.
+        table: `(8, 48)` the fixed table `w` of experiment 713.
+        primaries: The `n_primary`-axis indices of the synthetic Primaries.
+        exporters: The subset of `primaries` that export on clear middays.
+        seed: Seed of the day offsets.
+        day_offset_points: Standard deviation of the per-day demand offset, in points.
+
+    Returns:
+        The synthetic arrays of the chosen Primaries (axis 0 is `primaries` in order), the signed
+        power `(n_primary, G)`, and the folded reading `(n_primary, G)`.
+    """
+    idx = list(primaries)
+    demand_mean = known_demand(
+        temperature_c=temperature_c[idx], day_type=day_type, half_hour=half_hour, table=table
+    )
+    _, month = hour_month(valid_us=stamp_us)
+    syn = build_synthetic(
+        demand_mean=demand_mean, u=u[idx], month=month, exporter=np.array([p in exporters for p in idx]),
+        seed=seed, day_offset_points=day_offset_points,
+    )  # fmt: skip
+    signed = np.full(temperature_c.shape, np.nan)
+    reading = np.full(temperature_c.shape, np.nan)
+    signed[idx] = syn.x
+    reading[idx] = syn.reading
+    return syn, signed, reading
+
+
 def shifted_sky(*, a: np.ndarray, days: int = core.SHIFT_DAYS) -> np.ndarray:
     """Return `a` from `days` days earlier on the last axis (the placebo sky), NaN at the start."""
     out = np.full(a.shape, np.nan, dtype=np.float64)

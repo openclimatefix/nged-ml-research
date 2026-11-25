@@ -83,6 +83,16 @@ class ProbeProvider:
         return {s: float(body[s]) for s in core.HIDDEN_PAIR}
 
 
+SYNTH_EXPORTERS: Final = ("D9", "D11")
+"""The synthetic world's two exporting Primaries (their real sky and temperature are used)."""
+SYNTH_NON_EXPORTERS: Final = ("D2", "D3")
+"""The synthetic world's two Primaries that never export."""
+SYNTH_PIPELINE_FOLD: Final = "2026-04"
+"""The real fold whose pipeline supplies the synthetic world's grid, weather, and cutoff (a sunny fold)."""
+SYNTH_WORLD_FILE: Final = "synthetic_world.json"
+"""File, under the output root, that holds `{"day_offset_points": 5.0}` once the reachability check has failed."""
+
+
 def sky_columns() -> dict[str, tuple[int, ...]]:
     """Return the sky column indices that `blank_sky` zeroes, from `e00721_arms` (tested)."""
     import e00721_arms as arms
@@ -149,6 +159,26 @@ def build_fold_world_arrays(
     return arrays
 
 
+def dense_tables(*, hist_p: np.ndarray, hist_ok: np.ndarray, device: str) -> pvb.PvTables:
+    """Return the stage-1 `PvTables`: the dense `p` read at the contract origin of every day."""
+    n_grid = hist_p.shape[1]
+    n_days = n_grid // lay.STEPS_PER_DAY
+    rel = np.arange(lay.STEPS_PER_DAY * lay.N_LEAD_DAYS)
+    idx = (np.arange(n_days) * lay.STEPS_PER_DAY + 24)[:, None] + rel[None, :]
+    valid = idx < n_grid
+    top = np.zeros((hist_p.shape[0], n_days, rel.size, 2), dtype=np.float32)
+    top[..., 0] = np.where(valid[None], hist_p[:, np.clip(idx, 0, n_grid - 1)], 0.0)
+    filled = (
+        np.broadcast_to(valid, (hist_p.shape[0], n_days, rel.size)).copy()
+        & hist_ok[:, np.clip(idx, 0, n_grid - 1)]
+    )
+    to = lambda a: torch.from_numpy(np.ascontiguousarray(a)).to(device)  # noqa: E731
+    return pvb.PvTables(
+        hist_p=to(hist_p), hist_ok=to(hist_ok), top_p0=to(top), top_filled=to(filled), first_day=0,
+        run_us=to(np.zeros((hist_p.shape[0], n_days), dtype=np.int64)),
+    )  # fmt: skip
+
+
 def pv_tables(
     *, pipe, data, share_scale: np.ndarray, caps_mw: np.ndarray, power_cap_mw: np.ndarray, increment_pct: np.ndarray, std: np.ndarray,  # noqa: ANN001
     stage: int, shifted: bool, scale: float, device: str,
@@ -178,20 +208,7 @@ def pv_tables(
     hist_p, hist_ok = pv.p_dense(estimate=est, target_std=std)
     to = lambda a: torch.from_numpy(np.ascontiguousarray(a)).to(device)  # noqa: E731
     if stage == 1:
-        n_days = n_grid // lay.STEPS_PER_DAY
-        rel = np.arange(lay.STEPS_PER_DAY * lay.N_LEAD_DAYS)
-        idx = (np.arange(n_days) * lay.STEPS_PER_DAY + 24)[:, None] + rel[None, :]
-        valid = idx < n_grid
-        top = np.zeros((16, n_days, rel.size, 2), dtype=np.float32)
-        top[..., 0] = np.where(valid[None], hist_p[:, np.clip(idx, 0, n_grid - 1)], 0.0)
-        filled = (
-            np.broadcast_to(valid, (16, n_days, rel.size)).copy()
-            & hist_ok[:, np.clip(idx, 0, n_grid - 1)]
-        )
-        return pvb.PvTables(
-            hist_p=to(hist_p), hist_ok=to(hist_ok), top_p0=to(top), top_filled=to(filled), first_day=0,
-            run_us=to(np.zeros((16, n_days), dtype=np.int64)),
-        )  # fmt: skip
+        return dense_tables(hist_p=hist_p, hist_ok=hist_ok, device=device)
     mr, test = data.rows
     standardiser = mr.base.standardiser
     first_day, n_days = data.source.ens.first_day, data.source.ens.filled.shape[1]
@@ -331,6 +348,101 @@ def build_real_arm_world(
     )  # fmt: skip
 
 
+def synthetic_day_offset_points(*, root: Path) -> float:
+    """Return the synthetic world's day offset in points: 0 unless `SYNTH_WORLD_FILE` says otherwise."""
+    path = root / SYNTH_WORLD_FILE
+    return float(json.loads(path.read_text())["day_offset_points"]) if path.exists() else 0.0
+
+
+def build_synthetic_arm_world(
+    *, job: fit.Job, data_dir: Path, device: str, phase: str
+) -> trn.ArmWorld:
+    """Return the `ArmWorld` of a synthetic-world job: four synthetic Primaries on the real grid.
+
+    The gross demand is `known_demand` of the real calendar (bank holidays included) and the real 2 m
+    temperature; the PV term is `C u` with the real shortwave likelihood `u`; the network reads the
+    real weather of experiment 713's pipeline. All four Primaries train on the folded reading, and
+    the true sign of all four trains the sign head (the page does not say; see the report).
+    Stage 1 only, so the world mode of `PvSource` reads the dense `p`.
+    """
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
+    import e00713_known_answer as ka  # ty: ignore[unresolved-import]
+    import e00720_real as real  # ty: ignore[unresolved-import]
+    from e00422_prep import GRID_START_US  # ty: ignore[unresolved-import]
+
+    spec = core.ARM_SPECS[job.arm]
+    pipe = inp.load_pipeline(
+        month=SYNTH_PIPELINE_FOLD, phase=phase, chain_root=inp.chain_root_of_seed(seed=job.seed)
+    )
+    data = inp.build_fold_data(pipe=pipe, device=device, keep_rows=True)
+    panel = real.load_panel(dense_raw_path=Path(pipe.d632.CACHE) / "dense_raw.npy")
+    n_grid = len(panel.stamp_us)
+    temperature = np.where(
+        np.isfinite(panel.temperature_c), panel.temperature_c, np.nanmedian(panel.temperature_c)
+    )
+    shifted = spec.shift_days > 0
+    u = np.nan_to_num(panel.u)
+    holidays = lay.england_bank_holidays(years=range(2019, 2029))
+    day_type = lay.day_types_for_grid(grid_start_us=GRID_START_US, n_grid=n_grid, holidays=holidays)
+    half_hour = lay.local_half_hours_for_grid(grid_start_us=GRID_START_US, n_grid=n_grid)  # fmt: skip
+    sites = list(panel.sites)
+    exporters = tuple(sites.index(s) for s in SYNTH_EXPORTERS)
+    non_exporters = tuple(sites.index(s) for s in SYNTH_NON_EXPORTERS)
+    four = (*exporters, *non_exporters)
+    syn, signed, reading = wd.synthetic_on_real_grid(
+        temperature_c=temperature, u=u, stamp_us=panel.stamp_us, day_type=day_type, half_hour=half_hour, table=ka.draw_table(),
+        primaries=four, exporters=exporters, seed=job.seed,
+        day_offset_points=synthetic_day_offset_points(root=fit.data_root(data_dir=data_dir)),
+    )  # fmt: skip
+    cap = np.zeros(16)
+    cap[list(four)] = syn.capacity_share
+    cutoff = data.cutoff_idx
+    if phase == "train":
+        signed[:, cutoff:] = np.nan
+        reading[:, cutoff:] = np.nan
+    pre = np.arange(n_grid) < cutoff
+    mean = np.zeros(16)
+    std = np.ones(16)
+    for i in four:
+        mean[i] = np.nanmean(reading[i, pre])
+        std[i] = np.nanstd(reading[i, pre])
+    supervised = np.zeros(16, dtype=bool)
+    supervised[list(four)] = True
+    u_used = np.nan_to_num(wd.shifted_sky(a=u, days=spec.shift_days)) if shifted else u
+
+    def z(arr: np.ndarray) -> torch.Tensor:
+        return torch.from_numpy(((arr - mean[:, None]) / std[:, None]).astype(np.float32)).to(
+            device
+        )
+
+    p_all = np.clip(cap[:, None] * u_used / std[:, None], 0.0, 10.0).astype(np.float32)
+    tables = dense_tables(hist_p=p_all, hist_ok=np.isfinite(reading) | ~pre[None, :], device=device)
+    sign = np.where(
+        np.isfinite(signed) & supervised[:, None], (signed < 0).astype(np.float32), np.nan
+    )
+    source = sgb.SgSource(
+        pv=pvb.PvSource(source=data.source, tables=tables, world=True), plain_z=z(reading), fold_z=z(reading),
+        u_grid=torch.from_numpy(u_used.astype(np.float32)).to(device), sign_grid=torch.from_numpy(sign.astype(np.float32)).to(device),
+        always_folded=supervised, supervised=supervised,
+    )  # fmt: skip
+    gate = np.zeros(16)
+    gate[list(exporters)] = 1.0
+    tworld = jobs.tr.World(
+        source=source, cutoff_idx=cutoff, clean=reading, target_mean=mean, target_std=std, month=job.fold, placebo_pool=None,
+    )  # fmt: skip
+    score_c = (
+        np.asarray(data.test_origin_idx, dtype=np.int64) + lay.NATIVE_OFFSET_STEPS
+        if data.test_origin_idx is not None
+        else None
+    )
+    return trn.ArmWorld(
+        spec=spec, world=tworld, sources={1: source}, clean_plain=reading, clean_fold=reading, folded_target=supervised,
+        shift=mean / std, q_v=np.full(16, core.REACTIVE_FLOOR_POINTS / 100.0) / std, gate=gate, val_primaries=four, seed=job.seed,
+        fold=job.fold, signed_truth=signed, reading=reading, predict_stage=1, score_c_idx=score_c, score_primaries=four,
+        train_primaries=four, stamp_us=panel.stamp_us, exporters=exporters, non_exporters=non_exporters,
+    )  # fmt: skip
+
+
 def make_world_builder(*, data_dir: Path, device: str, phase: str):  # noqa: ANN201
     """Return a builder of real `ArmWorld`s for `WorldInputs`.
 
@@ -340,6 +452,8 @@ def make_world_builder(*, data_dir: Path, device: str, phase: str):  # noqa: ANN
     assert os.environ.get("E00667_PHASE", phase) == phase
 
     def make(job: fit.Job) -> trn.ArmWorld:
+        if job.world == "synthetic":
+            return build_synthetic_arm_world(job=job, data_dir=data_dir, device=device, phase=phase)
         return build_real_arm_world(job=job, data_dir=data_dir, device=device, phase=phase)
 
     return make
