@@ -80,89 +80,130 @@ GPU-process-hours stands.
 
 ## Corrections to the plan made before any gate number was seen
 
-**Five rules of the gate and the training world were corrected before any count or test result on
-real data was printed.** The corrections are recorded here so that the commit order shows they came
-first.
+**Eight corrections to the gate and the training world were made before any count or test result on
+real data was printed.** They are recorded here so that the commit order shows they came first.
 
 - **The span of the reference error follows the design text.** The design defines the reference
   error over the fold's training span. The first code read the days `[md - 400, md)` of the stored
-  window, where `md` is the first day of the fold month. The corrected code reads
-  `[md - 758, md - 28)`, the 730 days on which experiment 714's reference is fitted. The reason is
-  that the design names the training span, and the stored window is a different and shorter span.
+  window, where `md` is the first day of the fold month. The corrected code reads `[md - 758, md -
+  28)`, the 730 days on which experiment 714's reference is fitted. The reason is that the design
+  names the training span, and the stored window is a different and shorter span.
 - **GH5 pools its tests and uses a Bonferroni level.** The first rule ran three chi-squared tests at
   the 1% level on each of 40 training draws, which is 120 tests with no correction. A correct
-  generator would fail at least one of the 120 tests with a chance of about 70%. The corrected rule
-  pools the 5 draws of each of the 8 fold months into one table, runs 5 tests per pooled fold (kind
+  generator would fail at least one of the 120 tests with a chance of about 70%. The rule in force
+  pools the draws of each of the 8 fold months into one table and runs 5 tests per pooled fold (kind
   by sign, kind by Primary, kind by sign within each group, and the balance of unmirrored rises and
-  falls), and reads the 40 tests at the level 0.01 divided by 40.
+  falls). Two z-tests and two pooled chi-squared tests, described below, bring the total to 44.
+  Every test is read at the level 0.01 divided by 44, which is 2.3e-4.
+- **GH5 uses 400 training draws, 50 for each fold month.** The first rule used 5 draws per fold
+  month. The smallest gap in fall share that a z-test finds with 80% power is then 0.10 to 0.14, too
+  large to exclude a weaker cue. With 400 draws the smallest gap is 0.04 to 0.06 on the synthetic
+  panels below. The coverage floors of GH4 (60 events pooled, 8 per fold month) were set for 40
+  draws, so GH5 scales them by 10: 600 events in each group and kind over all the draws, and 80 in
+  each fold month.
 - **The training world applies one placement rule to both kinds of event.** The design states the
   floor and the redraw for permanent changes only, and experiment 715 clips the steps at recipients
   only. The first code also clipped a temporary move at its MVA-only host, and tested a temporary
   move over its own length but a permanent change over the whole grid after its onset. Synthetic
   panels showed that these differences let the group and the sign of an event predict its kind. The
-  corrected rule tests every event at an MVA-only Primary over `[onset, end of grid)` of the
-  current history, so a rise and a fall of equal depth pass or fail the same way for both kinds. The
-  limits on stacking (a summed shift within 0.50, and a target at or above zero as if the step were
-  a fall) ignore the sign and apply to both kinds; only the count of two permanent changes per
-  Primary applies to permanent changes alone, because it depends on the host alone. A temporary
-  move is no longer clipped at its host, and a step that fails is redrawn at another Primary or
-  onset with its sign and depth kept.
-- **A permanent change is first placed in the first 28 days after its onset.** The onset of a
-  permanent change is drawn over the grid as if the change lasted 28 days (the cover that the
-  schedule counts), so that its onset distribution is uniform and does not crowd the end of the
-  schedule; the change itself never ends.
-- **GH5 adds a z-test on the fall share, which counts toward the verdict.** The chi-squared tests of
-  a single fold cannot see a gap of about 0.05 between the fall share of permanent changes and that
-  of temporary moves, and a gap of that size lets a network read the kind from the group and the
-  sign. The gate therefore pools all 40 draws and runs, in each group (MVA-only and signed-MW), a
-  z-test on the difference of the two fall shares with a pooled variance. It is read at the same
-  Bonferroni level as the other tests, 0.01 divided by 42 tests (5 per pooled fold times 8 folds,
-  plus these 2). A failure stops the line and no waiver applies. A group with no event of one kind
-  is reported with a notice, and the test then has nothing to compare.
-- **GH5 stops on a training world that lacks events.** In each group (MVA-only and signed-MW) and
-  for each kind, the 40 training draws must hold at least 60 events, and the 5 draws of each fold
-  month at least 8, the floors of GH4. A group with no event of a kind stops the line, with no
-  waiver and no fallback.
+  rule in force tests every event at an MVA-only Primary over `[onset, end of the training grid)` of
+  the current history, so a rise and a fall of equal depth pass or fail the same way for both kinds.
+  A temporary move is no longer clipped at its host. The limits on stacking (a summed shift within
+  0.50, and a target at or above zero as if the step were a fall) ignore the sign and apply to both
+  kinds. An event that fails a test is redrawn at its own Primary with a new onset, its sign and
+  depth kept, and is dropped when no onset passes. Only the cap of two permanent changes per Primary
+  applies to permanent changes alone.
+- **The redraw stays at the event's own Primary.** The first form of the rule redrew a failed event
+  at a Primary drawn at random. Permanent changes then flowed from the Primaries that already held
+  two permanent changes to the MVA-only Primaries, where the floor test turns away most falls. The
+  share of permanent changes among the events was then about 0.34 at the MVA-only Primaries and 0.22
+  at the other Primaries, a cue that the group predicts the kind. Redrawing at the event's own
+  Primary removes the flow.
+- **The first placement of a permanent change draws its onset as if the change lasted 28 days.** The
+  onset is uniform over the schedule except its last 28 days, and the change then runs to the end of
+  the training grid. A temporary move draws its onset over the schedule less its own length. The two
+  kinds therefore have different onset windows: no permanent change starts in the last 28 days of
+  the schedule, while 3.6% of temporary moves start there, and no temporary move of 120 days starts
+  in the last 120 days. The difference comes from the design's cover of 15%, and no cue from it was
+  found in the probes below.
+- **The training world is built on power truncated at the first half-hour of the fold month.** The
+  floor tests read the cleaned power from the onset to the end of the grid. With the whole grid of
+  experiment 709, which ends in 2026-06, the choice of the accepted steps for the fold 2025-11
+  depended on power from the test month and later months. That is a leakage of the test period into
+  the training set, and the fit script uses the same truncation. A permanent change now runs to the
+  truncation point.
+- **GH5 adds two z-tests, two pooled chi-squared tests, and a coverage stop, all counted.** A z-test
+  on the difference of the fall share of permanent changes and of temporary moves runs in each group
+  over all 400 draws, because the chi-squared tests of a single fold cannot see a gap of about 0.05.
+  A pooled chi-squared test of kind by group and one of kind by Primary run over all 400 draws. The
+  coverage stop requires, in each group and kind, 600 events over all the draws and 80 in each fold
+  month, and at least one event of each kind at every Primary. A failure of any of these stops the
+  line, with no waiver and no fallback, and the maintainer is told. The printed table lists the
+  events at each Primary by kind. The choice of the z-test in place of a bound of +-0.03 on the gap
+  was made after the synthetic numbers of the first probe were seen and before any real number, and
+  a bound on a point estimate whose standard error is about 0.03 would fail a correct generator
+  often. A group with no event of a kind fails the z-test.
 
-**The placement rule changes three things in the design, and they are design changes.**
+**The placement rule has four consequences, which are design changes.**
 
-- **Temporary moves now face the limit on the stack and the mirrored target floor.** Experiment 714
-  and experiment 715 apply neither to a temporary move. The corrected training world applies them
-  to both kinds, so a temporary move of a given depth is dropped at an MVA-only Primary whose power
-  could not carry a fall of that depth.
-- **The training draws are smaller.** On synthetic panel A a draw holds 96 events on average, down
-  from 105; on panel B it holds 86, down from 104.
-- **The z-test excludes only a strong cue.** With about 400 permanent changes and 650 to 2,800
-  temporary moves in a group, the smallest gap that the test finds with 80% power is 0.10 to 0.14.
-  A gap of 0.05 would pass. The gate prints the smallest gap from the real event counts.
+- **Temporary moves face the limit on the stack and the mirrored target floor.** Experiment 714 and
+  experiment 715 apply neither to a temporary move. A temporary move of a given depth is redrawn at
+  a new onset when the MVA-only Primary's power could not carry a fall of that depth, and is dropped
+  only when no onset passes.
+- **The training draws are smaller.** On synthetic panel A a draw holds 59 events on average, down
+  from 106; on panel B it holds 40, down from 105; on panel C it holds 60, down from 106.
+- **MVA-only Primaries carry shallow steps.** The target floor treats every step as a fall against
+  the cleaned power. On synthetic panel A, 1% of the steps at the MVA-only Primaries are 0.25 of
+  capacity or deeper, against 28% of the steps at the other Primaries, and 42% of the steps at the
+  MVA-only Primaries are of visible depth, against 70% at the other Primaries. The design's three
+  quarters of events at visible depth holds only before placement. A Primary whose cleaned power has
+  a low minimum receives few events or none, and the coverage stop then ends the line.
+- **The z-test excludes a gap only above its power.** With 400 draws the smallest gap that the
+  z-test finds with 80% power is 0.04 to 0.06 on the synthetic panels, and the gate prints the
+  smallest gap from the real event counts. A gap of 0.03 would pass, so the test excludes a cue only
+  above its power. The z-test treats events as independent, and events within one draw are mildly
+  dependent, so its p-values are a little too small.
 
-**Three rules were run on two synthetic panels of 40 draws each, at the gate level 2.4e-4.** The
+**The rules were run on three synthetic panels of 400 draws each, at the level 2.3e-4.** The
 MVA-only power of panel A runs from 0.25 to 0.65. The MVA-only power of panel B runs from about 0 to
-0.6, clipped at zero. The first rule is the generator before the correction (commit `cf4a29d91`).
-The second rule is the first form of the correction, in which the count, the stack, and the target
-floor were limits for permanent changes only and a change over a limit was dropped without a redraw.
-That form was proposed first and it was wrong, because the limits depend on the depth and the floor
-test passes falls of small depth only, so the limits changed the mix of signs of the permanent changes
-alone. The third rule is the placement rule in force. The gap is the fall share of permanent changes
-minus the fall share of temporary moves.
+0.6, clipped at zero. Panel C gives each MVA-only Primary a different minimum, from 0.04 to 0.32,
+and a seasonal swing. The "Before" rule is the generator at commit `cf4a29d91`. The "In force" rule
+is the placement rule above. Two earlier forms of the correction failed in probes and were replaced.
+The first form limited permanent changes alone by the count, the stack, and the target floor and
+dropped a change over a limit. It gave a gap of +0.221 on panel A among the MVA-only Primaries in a
+40-draw probe, and the instruction that proposed it was wrong as written. The second form applied
+the same limits to both kinds but redrew a failed event at a Primary drawn at random. It gave the
+group-by-kind imbalance described under the redraw above. The gap is the fall share of permanent
+changes minus the fall share of temporary moves. The column "Permanent share" is the share of
+permanent changes among the events of the group.
 
-| Rule | Panel | Group | Permanent: n, fall share | Temporary: n, fall share | Gap | z | Result |
-|---|---|---|---|---|---|---|---|
-| Before | A | MVA-only | 560, 0.364 | 1351, 0.413 | -0.049 | -1.98 | pass |
-| Before | A | signed-MW | 630, 0.608 | 1661, 0.587 | +0.021 | +0.91 | pass |
-| Before | B | MVA-only | 523, 0.216 | 1041, 0.251 | -0.035 | -1.52 | pass |
-| Before | B | signed-MW | 629, 0.665 | 1956, 0.653 | +0.012 | +0.54 | pass |
-| Permanent-only limits | A | MVA-only | 211, 0.483 | 1046, 0.263 | +0.221 | +6.38 | fail |
-| Permanent-only limits | A | signed-MW | 483, 0.617 | 2024, 0.636 | -0.019 | -0.77 | pass |
-| In force | A | MVA-only | 398, 0.492 | 657, 0.463 | +0.030 | +0.94 | pass |
-| In force | A | signed-MW | 569, 0.506 | 2223, 0.519 | -0.013 | -0.53 | pass |
-| In force | B | MVA-only | 0 | 0 | none | none | stop: no events |
-| In force | B | signed-MW | 601, 0.506 | 2855, 0.507 | -0.001 | -0.06 | pass |
+| Rule | Panel | Group | Permanent: n, fall share | Temporary: n, fall share | Gap | z | Permanent share | Result |
+|---|---|---|---|---|---|---|---|---|
+| Before | A | MVA-only | 5,676, 0.354 | 12,793, 0.414 | -0.060 | -7.67 | 0.307 | fail |
+| Before | A | signed_mw | 6,230, 0.613 | 17,614, 0.568 | +0.045 | +6.13 | 0.261 | fail |
+| Before | B | MVA-only | 5,333, 0.227 | 10,308, 0.276 | -0.048 | -6.53 | 0.341 | fail |
+| Before | B | signed_mw | 6,288, 0.670 | 20,042, 0.621 | +0.049 | +7.01 | 0.239 | fail |
+| Before | C | MVA-only | 5,686, 0.368 | 12,247, 0.388 | -0.021 | -2.65 | 0.317 | pass |
+| Before | C | signed_mw | 6,229, 0.598 | 18,170, 0.581 | +0.017 | +2.29 | 0.255 | pass |
+| In force | A | MVA-only | 2,272, 0.493 | 5,583, 0.498 | -0.005 | -0.37 | 0.289 | pass |
+| In force | A | signed_mw | 4,346, 0.490 | 11,565, 0.497 | -0.007 | -0.78 | 0.273 | pass |
+| In force | B | MVA-only | 0 | 0 | none | none | none | stop: no events |
+| In force | B | signed_mw | 4,362, 0.492 | 11,697, 0.495 | -0.003 | -0.30 | 0.272 | pass |
+| In force | C | MVA-only | 2,256, 0.484 | 5,723, 0.495 | -0.011 | -0.85 | 0.283 | pass |
+| In force | C | signed_mw | 4,348, 0.489 | 11,539, 0.497 | -0.008 | -0.92 | 0.274 | pass |
 
-**The z-test does not flag the generator before the correction, so the correction rests on the
-reasoning and not on that test.** The gaps before the correction (-0.049 and -0.035 among MVA-only
-Primaries) lie inside the smallest gap that the test finds. Panel B under the rule in force shows the
-coverage stop at work: the MVA-only Primaries hold no event of either kind, so the gate would stop.
+**The z-test flags the generator before the correction on panels A and B, and passes the rule in
+force on panels A and C.** The chi-squared test of kind by group over all 400 draws gives p of
+1.7e-25 (panel A), 4.2e-113 (panel B), and 3.0e-44 (panel C) before the correction, and 9.6e-3
+(panel A) and 0.14 (panel C) under the rule in force, both above the level 2.3e-4. On panel A the
+rule in force leaves a permanent share of 0.289 at the MVA-only Primaries against 0.273 elsewhere.
+Panel B shows the coverage stop at work, because its MVA-only Primaries hold no event of either
+kind. On panel C, the MVA-only Primary with the lowest minimum (0.04 of capacity) holds no event in
+400 draws, so the coverage stop at every Primary would end the line there as well.
+
+The `signed_mw` group of the tables, of the gate, and of the code holds the 8 Primaries that are not
+MVA-only. It includes the two Primaries whose unit is not signed megawatts, so it differs from the 6
+signed-MW Primaries named elsewhere on this page.
 
 **Unconfirmed assumptions, stated as the design states them.** The implementer confirms each one
 before the plan commit.
@@ -223,7 +264,10 @@ before the plan commit.
 - **The injected folds** are the four folds that `g2` covers: 2025-11, 2026-01, 2026-04, and
   2026-06. **The guard folds** are the other four folds of experiment 713: 2025-12, 2026-02,
   2026-03, and 2026-05.
-- **The two groups** are the six signed-MW Primaries and the eight MVA-only Primaries.
+- **The two groups** are the six signed-MW Primaries and the eight MVA-only Primaries. The
+  generator checks of GH5 name two groups, `mva_only` and `signed_mw`. The code's `signed_mw`
+  group holds the 8 Primaries that are not MVA-only, which include the two whose unit is not
+  signed megawatts.
 - **The counted slice** of a temporary move holds the target half-hours from the onset of the move
   to 7 days after the move ends.
 
@@ -271,8 +315,9 @@ permanent change never ends. A Primary takes at most two permanent changes per d
 permanent shift stays within +-0.50 of capacity, and an MVA-only Primary stays above experiment
 715's floor on power. A third of temporary moves have one metered recipient, a third have two or
 three, and a third have none. The sign at the donor is drawn independently of the kind and of the
-mirror class. Events cover 15% of each Primary's half-hours. Three quarters of events are of
-visible depth. A temporary move sits in the history and never in a target, and a permanent change
+mirror class. Events cover 15% of each Primary's half-hours. Three quarters of the drawn events are of
+visible depth before placement, and fewer at the MVA-only Primaries after it (see the
+corrections). A temporary move sits in the history and never in a target, and a permanent change
 sits in the history and in the target. `Rb` and `Rbn` read one shared draw per fold and seed, and
 training seeds and test seeds are disjoint by an assertion.
 

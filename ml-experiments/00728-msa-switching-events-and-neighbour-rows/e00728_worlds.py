@@ -32,9 +32,10 @@ metered mirror. `counted_moves` reads the truth tables of `g2` and applies the f
   recipient's step at 0.6 of the recipient's capacity, so for a capped row the recovered donor step
   is too small. No rule changes if a count differs from 81: the gate prints every count.
 - *The MVA-only floor.* Every event at an MVA-only host, temporary or permanent, must keep the
-  host's history at or above zero, and a permanent change must also keep the host's target at or
-  above zero. An event that breaks the test is redrawn at another Primary or onset with its sign and
-  depth kept, by one rule for both kinds, so that group and sign do not predict the kind. A
+  host's history at or above zero and the host's target at or above zero (as if the step were a
+  fall). An event that breaks a test is redrawn at its own Primary with a new onset, its sign and
+  depth kept, by one rule for both kinds, and is dropped when no onset passes. Only the cap of two
+  permanent changes per Primary applies to permanent changes alone. A
   recipient's mirror is clipped at zero, as experiment 715 clips it. A Primary with no reference
   error (NaN) has a visible depth of the floor of 0.10 alone.
 """
@@ -56,7 +57,7 @@ PER_DAY: Final = lay.STEPS_PER_DAY
 WORLD_KEY: Final = 728_001
 """First entry of the key of the training world's random stream."""
 REDRAW_KEY: Final = 728_002
-"""First entry of the key of the stream that redraws a permanent change that breaks a limit."""
+"""First entry of the key of the stream that redraws the onset of an event that fails a test."""
 TEST_SEED_BASE: Final = 728_900_000
 """Held-out draws use `TEST_SEED_BASE` plus the fold's index; `g2`'s seeds are experiment 714's."""
 TRAIN_SEED_BASE: Final = 728_100_000
@@ -276,11 +277,9 @@ def _floor_ok(*, history_row: np.ndarray, onset: int, shift: float, mva: bool) -
     """Return True if the step may be added to this Primary at this onset (design section 2.1).
 
     **The same floor test applies to a temporary move and to a permanent change.** At an MVA-only
-    Primary the history from the onset to the end of the grid, with the step added, stays at or
-    above zero, whatever the kind and the length of the event. The test therefore depends on the
-    host, the onset, the sign, and the depth alone. A step that fails is redrawn at another Primary
-    or onset with its sign and depth kept, so the redraw moves the same share of rejected steps of
-    each kind.
+    Primary the history from the onset to the end of the training grid, with the step added, stays
+    at or above zero, whatever the kind and the length of the event. The test therefore depends on
+    the host, the onset, the sign, and the depth alone.
     """
     if not mva:
         return True
@@ -331,13 +330,16 @@ def _recipient_shares(*, rng: np.random.Generator, mirror_class: int, n_near: in
 
 
 def training_world(  # noqa: PLR0915
-    *, clean: np.ndarray, first: int, last: int, world_seed: int, table: nb.NeighbourTable,
-    capacity_mw: np.ndarray, mva_only: np.ndarray, vis: np.ndarray,
+    *, clean: np.ndarray, end: int, first: int, last: int, world_seed: int,
+    table: nb.NeighbourTable, capacity_mw: np.ndarray, mva_only: np.ndarray, vis: np.ndarray,
 ) -> TrainingWorld:  # fmt: skip
     """Return one draw of the training world of a fold.
 
     Args:
-        clean: (16, G) cleaned power over capacity, NaN where flagged or missing.
+        clean: (16, G) cleaned power over capacity, NaN where flagged or missing. Only the
+            columns before `end` are read.
+        end: First grid index that the world must not read, the first half-hour of the fold month.
+            A permanent change runs to `end`.
         first: First grid index of the schedule (experiment 713's `c_idx.min() - 768`).
         last: End of the schedule (`c_idx.max() + 672`).
         world_seed: The seed of the draw (`train_seed` or `held_out_seed`).
@@ -347,12 +349,15 @@ def training_world(  # noqa: PLR0915
         vis: (16,) visible depth in shares of capacity (`visible_depth`).
 
     Returns:
-        The history and target arrays and the event table. `redrawn` counts events (either kind)
-        that failed the floor test of an MVA-only Primary or a limit on stacking and were moved to
-        another Primary or onset with their sign and depth kept.
+        The history and target arrays (G = `end` columns) and the event table. `redrawn` counts
+        events (either kind) that failed the floor test of an MVA-only Primary or a limit on
+        stacking and were moved to a new onset at their own Primary, with their sign and depth kept.
+        `dropped` counts events for which no onset passed.
     """
     assert vis.shape == (nb.N_PRIMARIES,), vis.shape
     assert (vis < DEPTH_MAX).all(), vis
+    assert 0 < last <= end <= clean.shape[1], (last, end, clean.shape)
+    clean = clean[:, :end]
     n_grid = clean.shape[1]
     history = clean.copy()
     target = clean.copy()
@@ -396,7 +401,6 @@ def training_world(  # noqa: PLR0915
             stat[1] += int(ok)
             tries = 0
             while not ok and tries < MAX_REDRAWS:
-                host = int(rng_redraw.integers(0, nb.N_PRIMARIES))
                 onset = place_onset(
                     fraction=float(rng_redraw.random()), first=first, last=last, length=placing
                 )  # fmt: skip
@@ -592,12 +596,13 @@ def fall_share_gap(
     """Return, per group, the fall shares of the two kinds and a z-test of their difference.
 
     **This is the effect-size reading of GH5, and it counts towards the verdict of the gate.** It
-    pools the given draws (all 40 of the gate). The chi-squared tests of a single fold have too few
+    pools the given draws (all 400 of the gate). The chi-squared tests of a single fold have too few
     events to see a gap of 0.05 between the fall share of permanent changes and that of temporary
     moves, and a gap of that size lets a network read the kind from the group and the sign. The test
     is a z-test on the difference of two proportions with a pooled variance, in each group, read at
     `level` (the Bonferroni level of the other GH5 tests). `power_gap` is the smallest gap that the
-    test finds with 80% power at the event counts of the draws.
+    test finds with 80% power at the event counts of the draws. A group with no event of a kind
+    fails the test (`passes` is 0, and the gap, z, and p are NaN).
     """
     from scipy.stats import norm
 
@@ -621,7 +626,12 @@ def fall_share_gap(
         reading["gap"] = reading["fall_share_permanent"] - reading["fall_share_temporary"]
         pooled = (falls["permanent"] + falls["temporary"]) / max(n_p + n_t, 1.0)
         se = float(np.sqrt(pooled * (1 - pooled) * (1 / max(n_p, 1.0) + 1 / max(n_t, 1.0))))
-        reading["z"] = reading["gap"] / se if se > 0 else 0.0
+        if n_p == 0 or n_t == 0 or se == 0:
+            reading.update(gap=float("nan"), z=float("nan"), p=float("nan"), power_gap=float("nan"))
+            reading["passes"] = 0.0
+            out[group] = reading
+            continue
+        reading["z"] = reading["gap"] / se
         reading["p"] = float(2 * norm.sf(abs(reading["z"])))
         reading["power_gap"] = (z_alpha + z_power) * se
         reading["passes"] = float(reading["p"] >= level)
@@ -629,24 +639,58 @@ def fall_share_gap(
     return out
 
 
+def _event_frame(*, worlds: list[TrainingWorld], mva_only: np.ndarray) -> pl.DataFrame:
+    """Return the events of the draws with their group (`mva_only`, or `signed_mw` for the rest)."""
+    return pl.DataFrame([e for w in worlds for e in w.events]).with_columns(
+        group=pl.col("host").map_elements(
+            lambda h: "mva_only" if mva_only[h] else "signed_mw", return_dtype=pl.String
+        )
+    )
+
+
+def kind_independence_pooled(
+    *, worlds: list[TrainingWorld], mva_only: np.ndarray, level: float
+) -> dict[str, object]:  # fmt: skip
+    """GH5: test kind by group (2 by 2) and kind by Primary over all the draws, at `level`.
+
+    **These two tests see a cue from the Primary to the kind that the per-fold tests cannot see.**
+    The `signed_mw` group holds the 8 Primaries that are not MVA-only, which include the two whose
+    unit is not signed megawatts. Both chi-squared tests count events. The kind-by-group table and
+    the events per Primary and kind are returned for printing.
+    """
+    frame = _event_frame(worlds=worlds, mva_only=mva_only)
+    table_group, p_group = _chi2_p(frame=frame, column="group")
+    table_host, p_host = _chi2_p(frame=frame, column="host")
+    return {
+        "table_group": table_group, "p_kind_by_group": p_group,
+        "table_host": table_host.sort("kind"), "p_kind_by_host_pooled": p_host,
+        "per_primary": frame.group_by("host", "kind").len().sort("host", "kind"),
+        "passes": bool(p_group >= level and p_host >= level),
+    }  # fmt: skip
+
+
 def coverage_problems(
     *, worlds_by_month: dict[str, list[TrainingWorld]], mva_only: np.ndarray, pooled: int,
     per_month: int,
 ) -> list[str]:  # fmt: skip
-    """Return one message for each group and kind whose events in the GH5 draws fall under a floor.
+    """Return one message for each group and kind, and each Primary, short of its coverage floor.
 
-    **The training world must hold events of both kinds in both groups.** The floors are those of
-    GH4: at least `pooled` events over all the draws, and at least `per_month` events among the
-    draws of each fold month. A group with no event of a kind fails both floors. An empty list means
-    the coverage holds. The gate stops on any message, with no waiver and no fallback.
+    **The training world must hold events of both kinds in both groups, and at every Primary.** The
+    floors of a group and kind are `pooled` events over all the draws and `per_month` events among
+    the draws of each fold month. A group with no event of a kind fails both. Each Primary must hold
+    at least one event of each kind over all the draws. An empty list means the coverage holds. The
+    gate stops on any message, with no waiver and no fallback, and the maintainer is told.
     """
     counts: dict[tuple[str, str, str], int] = {}
+    per_primary: dict[tuple[int, str], int] = {}
     for month, worlds in worlds_by_month.items():
         for world in worlds:
             for event in world.events:
                 group = "mva_only" if mva_only[event["host"]] else "signed_mw"
                 key = (group, event["kind"], month)
                 counts[key] = counts.get(key, 0) + 1
+                pk = (int(event["host"]), event["kind"])
+                per_primary[pk] = per_primary.get(pk, 0) + 1
     problems = []
     for group in ("mva_only", "signed_mw"):
         for kind in ("permanent", "temporary"):
@@ -656,6 +700,12 @@ def coverage_problems(
             short = {m: n for m, n in by_month.items() if n < per_month}
             if short:
                 problems.append(f"{group} {kind}: under {per_month} events in {short}")
+    problems.extend(
+        f"Primary {primary}: no {kind} event in the draws"
+        for primary in range(nb.N_PRIMARIES)
+        for kind in ("permanent", "temporary")
+        if per_primary.get((primary, kind), 0) < 1
+    )
     return problems
 
 

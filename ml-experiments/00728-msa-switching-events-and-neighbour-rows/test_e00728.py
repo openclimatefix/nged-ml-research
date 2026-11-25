@@ -50,7 +50,7 @@ def small_world(*, seed: int) -> tuple[wd.TrainingWorld, np.ndarray, np.ndarray]
     clean = 0.5 + 0.05 * rng.standard_normal((nb.N_PRIMARIES, N_GRID))
     mva = np.arange(nb.N_PRIMARIES) % 2 == 0
     world = wd.training_world(
-        clean=clean, first=FIRST, last=LAST, world_seed=seed, table=ring_table(),
+        clean=clean, end=N_GRID, first=FIRST, last=LAST, world_seed=seed, table=ring_table(),
         capacity_mw=np.full(nb.N_PRIMARIES, 30.0), mva_only=mva, vis=np.full(nb.N_PRIMARIES, 0.12),
     )  # fmt: skip
     return world, clean, mva
@@ -182,13 +182,15 @@ def test_floor_rule_does_not_tie_group_and_sign_to_kind() -> None:
     clean[mva] = 0.2 + 0.02 * rng.standard_normal((int(mva.sum()), N_GRID))
     worlds = [
         wd.training_world(
-            clean=clean, first=FIRST, last=LAST, world_seed=s, table=ring_table(),
+            clean=clean, end=N_GRID, first=FIRST, last=LAST, world_seed=s, table=ring_table(),
             capacity_mw=np.full(nb.N_PRIMARIES, 30.0), mva_only=mva, vis=np.full(nb.N_PRIMARIES, 0.12),
         )
         for s in range(20, 40)
     ]  # fmt: skip
     gaps = wd.fall_share_gap(worlds=worlds, mva_only=mva, level=1e-3)
     assert all(r["passes"] for r in gaps.values()), gaps
+    pooled = wd.kind_independence_pooled(worlds=worlds, mva_only=mva, level=1e-3)
+    assert pooled["passes"], (pooled["p_kind_by_group"], pooled["p_kind_by_host_pooled"])
     assert all(abs(r["gap"]) < r["power_gap"] for r in gaps.values()), gaps
 
 
@@ -222,9 +224,9 @@ def test_fall_share_gap_flags_a_planted_gap_and_not_equal_shares() -> None:
     assert planted["mva_only"]["power_gap"] < 0.15
 
 
-def test_coverage_stops_an_empty_group_and_a_thin_month() -> None:
-    """A group with no events of a kind, as on a panel with MVA-only power near zero, stops the gate."""
-    mva = np.array([True, False])
+def test_coverage_stops_an_empty_group_a_thin_month_and_an_empty_primary() -> None:
+    """A group or a Primary with no event of a kind, or a thin fold month, stops the gate."""
+    mva = np.arange(nb.N_PRIMARIES) % 2 == 0
     empty = np.zeros((1, 1))
 
     def world(hosts: list[int]) -> wd.TrainingWorld:
@@ -234,33 +236,54 @@ def test_coverage_stops_an_empty_group_and_a_thin_month() -> None:
             first_try={},
         )  # fmt: skip
 
-    months = {"2026-01": [world([0] * 10 + [1] * 10)], "2026-02": [world([0] * 10 + [1] * 10)]}
-    assert wd.coverage_problems(worlds_by_month=months, mva_only=mva, pooled=20, per_month=8) == []
-    only_signed = {m: [world([1] * 20)] for m in months}
+    every = list(range(nb.N_PRIMARIES))
+    months = {"2026-01": [world(every * 2)], "2026-02": [world(every * 2)]}
+    assert wd.coverage_problems(worlds_by_month=months, mva_only=mva, pooled=32, per_month=16) == []
+    only_signed = {m: [world([h for h in every if not mva[h]] * 4)] for m in months}
     problems = wd.coverage_problems(
         worlds_by_month=only_signed, mva_only=mva, pooled=20, per_month=8
     )
     assert any("mva_only permanent: 0 events" in p for p in problems), problems
-    thin = {"2026-01": [world([0] * 10 + [1] * 10)], "2026-02": [world([0] * 3 + [1] * 10)]}
-    problems = wd.coverage_problems(worlds_by_month=thin, mva_only=mva, pooled=10, per_month=8)
-    assert problems and all("2026-02" in p for p in problems), problems
+    assert any("Primary 0: no permanent event" in p for p in problems), problems
+    thin = {"2026-01": [world(every * 2)], "2026-02": [world(every[:15] * 2 + [15])]}
+    problems = wd.coverage_problems(worlds_by_month=thin, mva_only=mva, pooled=10, per_month=16)
+    assert any("2026-02" in p for p in problems), problems
 
 
-def test_stacking_limits_do_not_depend_on_the_sign() -> None:
-    """A rise and a fall of equal depth pass or fail the three limits together."""
+def test_fall_share_gap_fails_a_group_without_events() -> None:
+    """A group with no event of one kind returns a failure, not a pass."""
+    empty = np.zeros((1, 1))
+    events = [{"host": 0, "kind": "temporary", "sign": -1.0}] * 10
+    world = wd.TrainingWorld(
+        history=empty, target=empty, events=events, seed=0, redrawn=0, dropped=0, redraws={},
+        first_try={},
+    )  # fmt: skip
+    reading = wd.fall_share_gap(worlds=[world], mva_only=np.array([True]), level=1e-3)
+    assert reading["mva_only"]["passes"] == 0.0 and np.isnan(reading["mva_only"]["z"])
+    assert reading["signed_mw"]["passes"] == 0.0
+
+
+def test_stacking_limits_apply_the_same_verdict_to_either_sign() -> None:
+    """The limits read the depth alone: the count, the stack within 0.50, and the mirrored floor."""
     clean = np.full(1000, 0.3)
-    for count, perm, depth in ((0, 0.0, 0.2), (2, 0.0, 0.1), (1, 0.3, 0.3), (0, 0.0, 0.4)):
-        perm_sum = np.full(1000, perm)
-        verdict = wd._limits_ok(
-            clean_row=clean, perm_sum=perm_sum, count=count, onset=100, depth=depth, mva=True
+    flat = np.zeros(1000)
+
+    def verdict(*, count: int, perm: float, depth: float, mva: bool = True) -> bool:
+        return wd._limits_ok(
+            clean_row=clean,
+            perm_sum=np.full(1000, perm),
+            count=count,
+            onset=100,
+            depth=depth,
+            mva=mva,
         )
-        assert isinstance(verdict, bool)
-    assert not wd._limits_ok(
-        clean_row=clean, perm_sum=np.zeros(1000), count=0, onset=100, depth=0.4, mva=True
-    )  # a fall of 0.4 would take an MVA-only target of 0.3 below zero, so a rise of 0.4 is dropped too
-    assert wd._limits_ok(
-        clean_row=clean, perm_sum=np.zeros(1000), count=0, onset=100, depth=0.2, mva=True
-    )
+
+    assert verdict(count=0, perm=0.0, depth=0.2)
+    assert not verdict(count=2, perm=0.0, depth=0.1)  # the count of permanent changes
+    assert not verdict(count=1, perm=-0.3, depth=0.3, mva=False)  # a stack of 0.6 in either sign
+    assert not verdict(count=0, perm=0.0, depth=0.4)  # a fall would take the target below zero
+    assert verdict(count=0, perm=0.0, depth=0.4, mva=False)
+    assert wd._limits_ok(clean_row=clean, perm_sum=flat, count=0, onset=100, depth=0.3, mva=True)
 
 
 def test_donor_step_recovers_the_donor_from_a_receiving_row() -> None:

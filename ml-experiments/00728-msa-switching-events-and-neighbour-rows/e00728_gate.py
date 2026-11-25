@@ -23,15 +23,17 @@ the cleaned power (`ctx.panel.power`) and a training span of the 730 days that e
 fold month. The fits use experiment 713's cleaned power and its own span, so the draws of the fits
 differ in their NaN pattern and in their onsets. The checks test the generator, not the fits' arrays.
 
-**GH5's rule, as corrected before any number was seen.** The first rule ran 3 chi-squared tests at
-the 1% level on each of 40 training draws, 120 tests with no correction, which fails a correct
-generator with a chance of about 70%. The corrected rule pools the 5 draws of each of the 8 fold
-months into one table and reads the 40 tests of the gate (kind by sign, kind by Primary, kind by
-sign within each of the two groups, and the balance of unmirrored rises and falls, per pooled fold)
-at the level 0.01 / 40 (a Bonferroni correction). A second, counted rule reads the effect size: over
-all 40 draws, in each group, the fall share of permanent changes minus the fall share of temporary
-moves must lie within +-0.03. The chi-squared tests cannot see a gap of that size at the corrected
-level, because each pooled fold holds only an eighth of the events.
+**GH5's rule, written before any real number was seen.** The draws are 50 per fold month, 400 in
+all. The 50 draws of each of the 8 fold months are pooled into one table, and the gate runs 5 tests
+per pooled fold (kind by sign, kind by Primary, kind by sign within each of the two groups, and the
+balance of unmirrored rises and falls), two z-tests on the fall-share gap (one per group, over all
+400 draws), and two pooled chi-squared tests (kind by group, and kind by Primary, over all 400
+draws). That is 44 tests, read at the level 0.01 / 44 (a Bonferroni correction). A coverage stop
+reads the counts: in each group and kind, at least 600 events over all the draws and at least 80 in
+each fold month (the floors of GH4, scaled by the 10-fold increase of the draws), and at least one
+event of each kind at every Primary. Any shortfall stops the line, with no waiver and no fallback,
+and the maintainer is told. The training world is built on the cleaned power before the first
+half-hour of the fold month and reads nothing later.
 
 **The thresholds of GH1 and GH2, written before any number was seen.**
 
@@ -47,6 +49,7 @@ level, because each pooled fold holds only an eighth of the events.
 """
 
 import argparse
+import dataclasses
 import hashlib
 import json
 import sys
@@ -70,15 +73,20 @@ FLOOR_POOLED: Final = 60
 FLOOR_PER_MONTH: Final = 8
 EXPECTED_FLOOR_ONLY: Final = 81
 EXPECTED_LASTING: Final = 43
-TRAIN_SEEDS: Final = (0, 1, 2, 3, 4)
+N_DRAWS_PER_FOLD: Final = 50
+"""Training draws of each of the 8 fold months in GH5 and GH7: 400 draws in all."""
+TRAIN_SEEDS: Final = tuple(range(N_DRAWS_PER_FOLD))
+DRAW_SCALE: Final = N_DRAWS_PER_FOLD // 5
+"""The floors of GH4 were set for a world of 5 draws per fold month; GH5 scales them by this."""
 SPAN_DAYS: Final = 730
 SPAN_LAG_DAYS: Final = 28
 ORACLE_TOLERANCE: Final = 1e-9
 FLAT_FOLLOW_TOLERANCE: Final = 0.05
 PERSISTENCE_TOLERANCE: Final = 0.15
 CHECK_ORDER: Final = ("GH4", "GH6", "GH7", "GH5", "GH8", "GH9", "GH1", "GH2")
-N_TESTS: Final = wd.N_INDEPENDENCE_TESTS * len(wd.FOLD_MONTHS) + 2
-"""The tests of GH5: five on each of the 8 pooled folds, and one z-test on the fall-share gap in each group."""
+N_TESTS: Final = wd.N_INDEPENDENCE_TESTS * len(wd.FOLD_MONTHS) + 4
+"""The tests of GH5: five on each of the 8 pooled folds, two z-tests on the fall-share gap (one per
+group), and two pooled chi-squared tests (kind by group, and kind by Primary)."""
 FAMILY_LEVEL: Final = wd.INDEPENDENCE_LEVEL / N_TESTS
 SCRIPTS: Final = ("e00728_worlds.py", "e00728_score.py", "e00728_gate.py")
 
@@ -113,11 +121,19 @@ class Env:
         last = (common714.month_start_day(month=month) - SPAN_LAG_DAYS) * common714.DAY
         return last - SPAN_DAYS * common714.DAY, last
 
+    def end(self, *, month: str) -> int:
+        """Return the first grid half-hour of a fold month, where the training world must stop."""
+        return common714.month_start_day(month=month) * common714.DAY
+
+    def clean(self, *, month: str) -> np.ndarray:
+        """Return the cleaned power that a training draw of the fold month reads."""
+        return self.ctx.panel.power[:, : self.end(month=month)]
+
     def draw(self, *, month: str, seed: int) -> wd.TrainingWorld:
         """Return one training draw of a fold month and a training seed."""
         first, last = self.span(month=month)
         return wd.training_world(
-            clean=self.ctx.panel.power, first=first, last=last,
+            clean=self.ctx.panel.power, end=self.end(month=month), first=first, last=last,
             world_seed=wd.train_seed(month=month, seed=seed), table=self.table,
             capacity_mw=self.capacity_mw, mva_only=self.mva_only, vis=self.visible(month=month),
         )  # fmt: skip
@@ -279,10 +295,10 @@ def gh7(*, env: Env) -> dict:
         for seed in TRAIN_SEEDS:
             world = env.draw(month=month, seed=seed)
             stats = wd.check_targets_and_limits(
-                world=world, clean=env.ctx.panel.power, mva_only=env.mva_only
+                world=world, clean=env.clean(month=month), mva_only=env.mva_only
             )
             cover = wd.realised_cover(
-                world=world, clean=env.ctx.panel.power, first=first, last=last
+                world=world, clean=env.clean(month=month), first=first, last=last
             )
             rows.append({"month": month, "seed": seed, **stats, "cover": cover})
     table = pl.DataFrame(rows)
@@ -293,13 +309,19 @@ def gh7(*, env: Env) -> dict:
     return {"draws": rows}
 
 
+def slim(world: wd.TrainingWorld) -> wd.TrainingWorld:
+    """Return the draw without its two arrays, which GH5 does not read."""
+    empty = np.zeros((1, 1))
+    return dataclasses.replace(world, history=empty, target=empty)
+
+
 def gh5(*, env: Env) -> dict:
     """GH5: balance of sign and site across the two kinds, in `g2` and in every training draw.
 
-    The draws of one fold month are pooled into one table, and every test is read at the family level:
-    `INDEPENDENCE_LEVEL` divided by the number of tests of the gate (a Bonferroni correction). The
-    uncorrected rule was 3 tests at 1% on each of 40 draws, which fails a correct generator with a
-    chance of about 70%.
+    The 50 draws of one fold month are pooled into one table, and every test is read at the family
+    level: `INDEPENDENCE_LEVEL` divided by the number of tests of the gate (a Bonferroni
+    correction). Only the events of a draw are kept, because the arrays of 400 draws would not fit
+    in memory.
     """
     events = g2_event_table(env=env)
     signed = events.with_columns(sign=pl.col("size").sign())
@@ -328,7 +350,7 @@ def gh5(*, env: Env) -> dict:
     all_worlds: list[wd.TrainingWorld] = []
     worlds_by_month: dict[str, list[wd.TrainingWorld]] = {}
     for month in wd.FOLD_MONTHS:
-        worlds = [env.draw(month=month, seed=seed) for seed in TRAIN_SEEDS]
+        worlds = [slim(env.draw(month=month, seed=seed)) for seed in TRAIN_SEEDS]
         all_worlds.extend(worlds)
         worlds_by_month[month] = worlds
         tables = wd.independence_tables(worlds=worlds, mva_only=env.mva_only, level=level)
@@ -356,9 +378,24 @@ def gh5(*, env: Env) -> dict:
         title=f"GH5 training draws, pooled per fold: every p-value must be at least {level:.2e}",
         frame=pl.DataFrame(rows),
     )
+    pooled_tests = wd.kind_independence_pooled(
+        worlds=all_worlds, mva_only=env.mva_only, level=level
+    )
+    print_frame(
+        title="GH5 kind by group, over all the draws",
+        frame=pooled_tests["table_group"],  # ty: ignore[invalid-argument-type]
+    )
+    print_frame(
+        title="GH5 events per Primary and kind, over all the draws",
+        frame=pooled_tests["per_primary"].pivot(on="kind", index="host", values="len").sort("host"),  # ty: ignore[unresolved-attribute]
+    )
+    print(
+        f"GH5 pooled chi-squared p-values: kind by group {pooled_tests['p_kind_by_group']:.2e}, "
+        f"kind by Primary {pooled_tests['p_kind_by_host_pooled']:.2e}, level {level:.2e}"
+    )
     problems = wd.coverage_problems(
-        worlds_by_month=worlds_by_month, mva_only=env.mva_only, pooled=FLOOR_POOLED,
-        per_month=FLOOR_PER_MONTH,
+        worlds_by_month=worlds_by_month, mva_only=env.mva_only,
+        pooled=FLOOR_POOLED * DRAW_SCALE, per_month=FLOOR_PER_MONTH * DRAW_SCALE,
     )  # fmt: skip
     assert not problems, (
         f"GH5 FAILS the coverage floors of GH4 in the training draws: {problems}. Stop before "
@@ -379,13 +416,17 @@ def gh5(*, env: Env) -> dict:
             total[0] += n
             total[1] += ok
     print_frame(
-        title="GH5 first-try acceptance by kind, group and sign (floor test)",
+        title="GH5 first-try acceptance by kind, group and sign (floor test and limits on stacking)",
         frame=pl.DataFrame(
             [
                 {"kind|group|sign": k, "n": n, "accepted": ok, "share": ok / max(n, 1)}
                 for k, (n, ok) in sorted(first_try.items())
             ]
         ),
+    )
+    assert pooled_tests["passes"], (
+        f"GH5 FAILS: kind is not independent of the group or of the Primary over all the draws "
+        f"(p {pooled_tests['p_kind_by_group']:.2e} and {pooled_tests['p_kind_by_host_pooled']:.2e}, level {level:.2e})"
     )
     failed = {g: (r["gap"], r["p"]) for g, r in gaps.items() if not r["passes"]}
     assert not failed, f"GH5 FAILS the z-test on the fall-share gap (gap, p) per group: {failed}"
