@@ -6,6 +6,10 @@ import numpy as np
 import pytest
 
 torch = pytest.importorskip("torch")
+
+import e00721_paths  # noqa: E402
+
+e00721_paths.pin_threads()
 arms = pytest.importorskip("e00721_arms")
 mdl = pytest.importorskip("e00713_model")
 pvm = pytest.importorskip("e00716_model")

@@ -14,6 +14,10 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
+import e00721_paths  # noqa: E402
+
+e00721_paths.pin_threads()
+
 import e00721_arms as arms  # noqa: E402
 import e00721_driver as drv  # noqa: E402
 import e00721_e2e as e2e  # noqa: E402
@@ -113,4 +117,4 @@ def test_driver_counts_a_missing_curve_as_not_evaluated(tmp_path: Path) -> None:
 
 def test_driver_synthetic_gate_without_token_files_is_not_evaluable(tmp_path: Path) -> None:
     gate = drv.synthetic_gate(data_dir=tmp_path, seeds=(0, 1))
-    assert not gate["pass"] and not gate["evaluable"]
+    assert not gate["pass"] and gate["missing"] and not gate["failed"]

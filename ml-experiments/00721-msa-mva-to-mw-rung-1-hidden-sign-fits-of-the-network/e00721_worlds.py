@@ -558,7 +558,7 @@ def assert_no_two_worlds_on_shared_dates(
         finite &= np.isfinite(series[lab])
     if bool(finite.any()):
         msg = f"{labels} share {int(finite.sum())} dated half-hours: their difference is the injected farm's output"
-        raise ValueError(msg)
+        raise core.CorrectnessFailureError(msg)
 
 
 def holdout_guard(*, valid_us: np.ndarray) -> None:
@@ -566,7 +566,7 @@ def holdout_guard(*, valid_us: np.ndarray) -> None:
     stop = int(np.datetime64(core.HOLDOUT_START_ISO, "us").astype(np.int64))
     if bool((np.asarray(valid_us) >= stop).any()):
         msg = f"a valid time on or after {core.HOLDOUT_START_ISO} is in the data"
-        raise ValueError(msg)
+        raise core.CorrectnessFailureError(msg)
 
 
 def clip_to_holdout(

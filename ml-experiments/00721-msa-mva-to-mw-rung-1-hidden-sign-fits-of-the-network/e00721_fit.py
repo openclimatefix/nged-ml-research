@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Final, Protocol
+from typing import Any, Final, Protocol
 
 import e00721_core as core
 import numpy as np
@@ -45,11 +45,21 @@ class Job:
     world: str
     fold: str
     seed: int
+    capacity_scale: float = 1.0
+
+    @property
+    def base_key(self) -> str:
+        """Return the file stem of the job's fit (the fit does not depend on the capacity sensitivity)."""
+        return f"{self.arm}__{self.world}__{self.fold}__s{self.seed}"
 
     @property
     def key(self) -> str:
-        """Return the job's file stem."""
-        return f"{self.arm}__{self.world}__{self.fold}__s{self.seed}"
+        """Return the job's file stem; the prediction-only capacity sensitivity (0.7 or 1.3) adds a suffix."""
+        return (
+            self.base_key
+            if self.capacity_scale == 1.0
+            else f"{self.base_key}__cap{self.capacity_scale:g}"
+        )
 
 
 def data_root(*, data_dir: Path) -> Path:
@@ -59,13 +69,13 @@ def data_root(*, data_dir: Path) -> Path:
 
 def job_paths(*, data_dir: Path, job: Job) -> dict[str, Path]:
     """Return the per-job files: state, curve, predictions, and the done marker."""
-    root = data_root(data_dir=data_dir) / "fits" / job.key
+    root = data_root(data_dir=data_dir) / "fits" / job.base_key
     return {
         "state": root.with_suffix(".pt"),
         "curve": root.with_suffix(".curve.json"),
         "predictions": data_root(data_dir=data_dir) / "predictions" / f"{job.key}.parquet",
         "continuation_state": root.with_suffix(".continuation.pt"),
-        "done": root.with_suffix(".done.json"),
+        "done": data_root(data_dir=data_dir) / "fits" / f"{job.key}.done.json",
     }
 
 
@@ -168,7 +178,11 @@ def limit_gpu_memory(*, torch: object, device: int = 0) -> None:
 
 
 class ContinuationFloorReachedError(RuntimeError):
-    """The continuation time of the finished fits has reached the floor: the session asks the manager before the next `SG-A` fit in `W2`."""
+    """The continuation floor has been reached.
+
+    The continuation time of the finished fits has reached the floor: the session asks the manager
+    before the next `SG-A` fit in `W2`.
+    """
 
 
 @dataclass
@@ -437,8 +451,11 @@ def fit_job(
         continuation_wanted(job=job, stage=st) for st in inputs.stages(job=job)
     ):
         budget.check_before_continued_fit()
+    (data_root(data_dir=data_dir) / "PRIVATE").mkdir(
+        parents=True, exist_ok=True
+    )  # dated detail goes here
     started = time.monotonic()
-    stage_records = []
+    stage_records: list[dict[str, Any]] = []
     continuation_hours = 0.0
     for stage in inputs.stages(job=job):
         t0 = time.monotonic()

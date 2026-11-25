@@ -61,6 +61,8 @@ class ArmWorld:
         train_primaries: The Primaries that make the training pairs, or `None` for all 16.
         stamp_us: `(G,)` the microsecond stamp of every grid index.
         k_grid: `(16, G)` the clear-sky index, for the sunny-midday flag of the synthetic world's sign tokens.
+        series_ids: `(16,)` experiment 87's `time_series_id` of each Primary, written to the
+            predictions (the Primary index when `None`).
         exporters: The synthetic world's exporting Primaries (empty elsewhere).
         non_exporters: The synthetic world's non-exporting Primaries (empty elsewhere).
         log: Facts that the stages record for the job's log (the scale of the PV paths).
@@ -87,6 +89,7 @@ class ArmWorld:
     train_primaries: tuple[int, ...] | None = None
     stamp_us: np.ndarray | None = None
     k_grid: np.ndarray | None = None
+    series_ids: np.ndarray | None = None
     exporters: tuple[int, ...] = ()
     non_exporters: tuple[int, ...] = ()
     log: dict = field(default_factory=dict)
@@ -385,7 +388,9 @@ def predict_rows(
                     & (lead_h < core.LEAD_MAX_HOURS_EXCLUSIVE)
                 )
                 cols = {
-                    "time_series_id": pn[keep].astype(np.int64),
+                    "time_series_id": (pn if aw.series_ids is None else aw.series_ids[pn])[
+                        keep
+                    ].astype(np.int64),
                     "power_fcst_init_time": stamp_us[native][keep],
                     "valid_time": stamp_us[tidx][keep],
                     "fold": np.full(int(keep.sum()), aw.fold),
@@ -409,7 +414,10 @@ def predict_rows(
 def sign_tokens_of(
     *, model: torch.nn.Module, aw: ArmWorld, primaries: tuple[int, ...], c_idx: np.ndarray, cutoff_idx: int, batch: int = 128,
 ) -> dict[str, np.ndarray]:  # fmt: skip
-    """Return `rho`, the true sign, the signed power in points, `u`, a token id, and a sunny-midday flag of each token.
+    """Return the sign read-outs of each token.
+
+    The read-outs are `rho`, the true sign, the signed power in points, `u`, a token id, and a
+    sunny-midday flag.
 
     The tokens are the history tokens of `primaries` that the network never trained on: a token counts
     only when its own half-hour is at or after the fold's cutoff, where the fit phase held every value at
@@ -425,6 +433,9 @@ def sign_tokens_of(
         c_idx: The contract origins to read.
         cutoff_idx: The fold's cutoff grid index.
         batch: Samples per forward pass.
+
+    Returns:
+        Arrays `rho`, `x_points`, `u`, `token_id`, `primary`, and `sunny`, one entry per token.
     """
     import e00721_worlds as wd
 

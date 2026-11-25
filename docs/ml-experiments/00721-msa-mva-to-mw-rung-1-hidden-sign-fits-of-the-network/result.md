@@ -133,7 +133,8 @@ decision_rule: >-
   require); 0.95 and 0.85 (the assumed areas of the noise check) and 0 (its assumed correlation); 5
   points (the demand-noise day offset); 60 and 120 passes with patience 8 (the real-fold budget);
   0.7 and 1.3 (the capacity sensitivity); 0.5 (the probability that a supervised sample's history
-  rows are folded); -4 (the head's starting bias); 20,000 (the bootstrap's resamples) and 721 (its
+  rows are folded); 1.0 (`SIGN_CE_WEIGHT`, the weight of the sign head's cross-entropy in the stage 1
+  loss); -4 (the head's starting bias); 20,000 (the bootstrap's resamples) and 721 (its
   generator seed); and 0.6 GPU-process-hours (the continuation floor). The 6 sub-steps of the
   injection's interpolation come from experiment 720's code.
 benchmark: >-
@@ -651,7 +652,8 @@ to 0.19 and a margin for predictions, fold builds, and reruns at the pass cap. E
 stored real-fold fits took 0.178 GPU-process-hours on average, so the expected spend is lower: 64
 fits at 0.178, plus the code-works check and the continuation floor, is about 12.2. The first fit
 measures the real figure. The 13.6 is 64 fits at 0.2 (12.8), the code-works check (0.2), and the
-continuation floor of Branch A (0.6). Branch B replaces the continuation with two extra fits of 0.5
+continuation floor of Branch A (0.6). The 8 probe pretraining jobs add about 0.07, which the
+margin of the 14 absorbs. Branch B replaces the continuation with two extra fits of 0.5
 to 0.8 GPU-process-hours, for 13.5 to 13.8 in all.
 
 **The waves run in this order, so that the first results arrive early and each wave can stop the
@@ -724,9 +726,10 @@ times the oracle capacity) is prediction-only and refits nothing.
   and waits for the reply. The session sends "last fit ended" after each family. A fit that hits
   its pass cap is reported with its stopping pass.
 - **The capacity probe.** Experiment 662's probe, re-run per fold and per world for D5 and D10 (8
-  runs), is CPU work and uses no GPU-process-hours. Experiment 662 reports about 8 wall-clock hours
-  for its whole design, which bounds the probe's cost, and the first probe run is timed and the
-  manager told before the second.
+  runs), pretrains a network on the GPU for about 30 seconds per run (about 4 minutes in all, or about
+  0.07 GPU-process-hours) and runs its regression on the CPU. Experiment 662 reports about 8
+  wall-clock hours for its whole design, which bounds the probe's cost, and the first probe run is
+  timed and the manager told before the second.
 
 ## Stages, the quick look, and the seeds
 
@@ -803,10 +806,11 @@ capacity of D5 and D10 from [experiment
 readings, with data before the fold's start only, and takes the as-of table only for the other
 Primaries. The network that the probe reads is trained on rows in which D5 and D10 appear only as
 folded readings, so no signed reading of either Primary reaches the probe's weights. The code review
-checks this. The probe runs on the CPU, once per fold and world for D5 and D10 (8 runs), and its
-cost is in the GPU projection. The scale of `p` at every Primary is fixed per fold from these two
-sources, both outside the scored rows. The as-of capacity of the eight MVA-only Primaries carries
-F7's stated look-ahead in seven of eight folds, and it affects G4 only.
+checks this. The probe's pretraining runs on the GPU and its regression on the CPU, once per fold
+and world for D5 and D10 (8 runs), and its cost is in the GPU projection. The scale of `p` at every
+Primary is fixed per fold from these two sources, both outside the scored rows. The as-of capacity
+of the eight MVA-only Primaries carries F7's stated look-ahead in seven of eight folds, and it
+affects G4 only.
 
 **The holdout guard names the farm frame.** The row set ends before 2026-07-01, and the loader clips
 the farm frame, which runs to 2026-09-10, so that no valid time on or after 2026-07-01 is read.
@@ -1052,6 +1056,28 @@ which audit triggers fired.
 - **Block counting:** blocks of 10 consecutive valid dates are numbered from all of a fold's rows
   before the reverse-flow restriction, so a block with no reverse-flow row stays a resampling unit
   with a zero count.
+- **Sign head training:** the sign head trains in stage 1 only, with the trunk (Branch A). Its
+  cross-entropy enters the stage 1 loss with the weight `SIGN_CE_WEIGHT` of 1.0, and the head's
+  parameters sit in experiment 716's new-parameter group for stage 1 only. In stages 2 and 3 the head
+  is frozen: it takes no sign step, no cross-entropy, and no gradient, and none of its parameters is
+  in an optimiser group.
+- **Probe jobs:** the probe's pretraining job for each world and fold runs on the GPU (about 30
+  seconds each, about 4 minutes for the 8 jobs, in a 6 GB process) and the regression that reads
+  the capacity runs on the CPU. The probe runner sequences before the `W2` and `W0` fits.
+- **Synthetic world on the real grid:** the pipeline of fold 2026-04 supplies the real weather, the
+  Primaries D9 and D11 export, and D2 and D3 do not. All four train on the folded reading and the true
+  sign of all four trains the head. Each process serves one fold month, because experiment 713's
+  pipeline reads its fold month once.
+- **Folded loss at D15 and D18:** the page names D15 and D18 in neither list, so they train on
+  their stored readings with the plain likelihood, with no gate and no sign labels.
+- **Sky blinding:** besides the shortwave, the solar-gain columns, and the solar-geometry columns,
+  the longwave and precipitation columns and their ensemble spreads are blanked at a gate-open Primary,
+  because both carry cloud.
+- **Sign read-outs:** the sign accuracy uses every distinct token outside the dead band, with no
+  restriction on `u`, because the page states none. The area uses tokens with `u` of at least 0.3. The
+  false-call rate counts sunny midday half-hours (10:00 to 14:00 UTC with a clear-sky index of at
+  least 0.7) of the two non-exporting Primaries, with the gate forced open.
+- **Widening:** a reading widens its interval only when it has fewer than 20 resampling units.
 - **Sign head read-out base:** the history power that the read-out averages is the signed expectation
   `(1 - 2ρ) v`, and its variance includes the sign variance `4ρ(1 - ρ) v²`.
 - **Primary gate:** the per-Primary export gate is computed in NumPy from the training window's rows

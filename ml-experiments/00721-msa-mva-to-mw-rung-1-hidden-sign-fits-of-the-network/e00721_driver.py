@@ -8,6 +8,7 @@ and the reports of G4. The summary holds contrasts in points, areas, and boolean
 series, name, or dated value. The MDE file is written first and refuses to be overwritten.
 """
 
+import datetime
 import json
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -18,6 +19,9 @@ import e00721_fit as fit
 import e00721_score as score
 import numpy as np
 import polars as pl
+
+HOLDOUT_START = datetime.datetime.fromisoformat(core.HOLDOUT_START_ISO).replace(tzinfo=datetime.UTC)
+"""The first instant of the holdout: a stored forecast at or after it is never scored."""
 
 
 def load_frame(*, data_dir: Path, job: fit.Job) -> pl.DataFrame | None:
@@ -93,59 +97,81 @@ def flags_of(*, data_dir: Path, folds: Sequence[str], seeds: Sequence[int]) -> l
     return out
 
 
+def synthetic_cap_hit(*, data_dir: Path, seeds: Sequence[int]) -> bool:
+    """Return whether any stored `SG-A` synthetic fit ran to the 400-pass cap (row 2 then reads `inconclusive`)."""
+    for seed in seeds:
+        path = fit.job_paths(
+            data_dir=data_dir,
+            job=fit.Job(arm="SG-A", world="synthetic", fold="synthetic", seed=seed),
+        )["curve"]
+        if path.exists() and any(
+            len(st["val_history"]) >= core.SYNTH_MAX_PASSES
+            for st in json.loads(path.read_text())["stages"]
+        ):
+            return True
+    return False
+
+
+def _load_tokens(*, data_dir: Path, arm: str, seed: int) -> dict | None:
+    path = fit.job_paths(
+        data_dir=data_dir, job=fit.Job(arm=arm, world="synthetic", fold="synthetic", seed=seed)
+    )["predictions"].with_suffix(".tokens.npz")
+    return dict(np.load(path)) if path.exists() else None
+
+
 def synthetic_gate(*, data_dir: Path, seeds: Sequence[int]) -> dict:
     """Return the synthetic world's bars per seed.
 
-    The bars are the sign accuracy, the false-call rate, and the area margin over `SG-A-S`.
+    The bars are the page's: the sign accuracy outside the 2-point dead band at the two exporting
+    Primaries (no restriction on `u`, because the page states none), the false-call rate on the sunny
+    midday half-hours of the two non-exporting Primaries with the gate forced open, and the area margin
+    over `SG-A-S` on the distinct tokens of the exporters whose `u` is at least 0.3 and which lie outside
+    the dead band. Seed 1 is read only when seed 0 passed ("seed 0 first, then seed 1 only if seed 0
+    passed"). Every token was scored by a network that no training batch read it through.
+
+    Each seed's entry carries `status`: `missing` (a needed fit or token file is absent), `not_evaluable`
+    (an area on fewer than 30 tokens of either class), `pass`, or `fail`.
     """
     per_seed = []
     for seed in seeds:
-        toks = {}
-        for arm in ("SG-A", "SG-A-S"):
-            path = fit.job_paths(
-                data_dir=data_dir,
-                job=fit.Job(arm=arm, world="synthetic", fold="synthetic", seed=seed),
-            )["predictions"].with_suffix(".tokens.npz")
-            if not path.exists():
-                toks[arm] = None
-                continue
-            toks[arm] = dict(np.load(path))
-        if toks["SG-A"] is None or toks["SG-A-S"] is None:
-            per_seed.append({"seed": seed, "evaluable": False, "pass": False})
-            continue
-        sg = toks["SG-A"]
-        rho, reverse = score.sign_tokens(
-            rho=sg["exporters_rho"],
-            x_true_points=sg["exporters_x_points"],
-            u=sg["exporters_u"],
-            token_id=sg["exporters_token_id"],
+        sg, placebo = (
+            _load_tokens(data_dir=data_dir, arm=arm, seed=seed) for arm in ("SG-A", "SG-A-S")
         )
-        acc = score.sign_accuracy(rho=rho, reverse=reverse)
-        open_rho = sg["open_rho"]
-        sunny = sg["open_u"] >= core.U_MIN
-        false_call = score.false_call_rate(rho=open_rho[sunny]) if sunny.any() else float("nan")
-        pl_ = toks["SG-A-S"]
-        rho_s, reverse_s = score.sign_tokens(
-            rho=pl_["exporters_rho"],
-            x_true_points=pl_["exporters_x_points"],
-            u=pl_["exporters_u"],
-            token_id=pl_["exporters_token_id"],
-        )
-        area, area_s = (
-            score.auc(score=rho, positive=reverse),
-            score.auc(score=rho_s, positive=reverse_s),
-        )
-        evaluable = score.area_evaluable(reverse=reverse)
-        margin_ok = bool(evaluable and area - area_s >= core.AREA_MARGIN)
+        if sg is None or placebo is None:
+            per_seed.append({"seed": seed, "status": "missing", "evaluable": False, "pass": False})
+            break
+        acc_rho, acc_rev = score.sign_tokens(
+            rho=sg["exporters_rho"], x_true_points=sg["exporters_x_points"], u=sg["exporters_u"],
+            token_id=sg["exporters_token_id"], u_min=-np.inf,
+        )  # fmt: skip
+        accuracy = score.sign_accuracy(rho=acc_rho, reverse=acc_rev)
+        sunny = sg["open_sunny"].astype(bool) & np.isfinite(sg["open_rho"])
+        false_call = score.false_call_rate(rho=sg["open_rho"][sunny])
+        areas = []
+        for tok in (sg, placebo):
+            rho, rev = score.sign_tokens(
+                rho=tok["exporters_rho"], x_true_points=tok["exporters_x_points"], u=tok["exporters_u"], token_id=tok["exporters_token_id"],
+            )  # fmt: skip
+            areas.append((score.auc(score=rho, positive=rev), rev))
+        (area, rev), (area_s, _) = areas
+        evaluable = score.area_evaluable(reverse=rev)
+        ok = bool(
+            accuracy >= core.SIGN_ACCURACY_BAR and false_call <= core.FALSE_CALL_RATE_MAX
+            and evaluable and area - area_s >= core.AREA_MARGIN
+        )  # fmt: skip
+        status = "not_evaluable" if not evaluable else ("pass" if ok else "fail")
         per_seed.append({
-            "seed": seed, "evaluable": bool(evaluable), "sign_accuracy": acc, "false_call_rate": false_call,
-            "area": area, "area_placebo": area_s,
-            "pass": bool(acc >= core.SIGN_ACCURACY_BAR and false_call <= core.FALSE_CALL_RATE_MAX and margin_ok),
+            "seed": seed, "status": status, "evaluable": bool(evaluable), "sign_accuracy": accuracy, "false_call_rate": false_call,
+            "area": area, "area_placebo": area_s, "n_sunny_midday": int(sunny.sum()), "pass": status == "pass",
         })  # fmt: skip
+        if status != "pass":
+            break
     return {
         "per_seed": per_seed,
-        "pass": bool(per_seed and all(s["pass"] for s in per_seed)),
-        "evaluable": all(s["evaluable"] for s in per_seed),
+        "pass": bool(len(per_seed) == len(seeds) and all(s["pass"] for s in per_seed)),
+        "missing": any(s["status"] == "missing" for s in per_seed),
+        "not_evaluable": any(s["status"] == "not_evaluable" for s in per_seed),
+        "failed": any(s["status"] == "fail" for s in per_seed),
     }
 
 
@@ -192,9 +218,33 @@ def power_check(*, m1_dir: Path, folds: Sequence[str], series_ids: dict[str, int
                 pl.col("time_series_id").is_in(list(series_ids.values())),
                 pl.col("lead_hours") >= core.LEAD_MIN_HOURS,
                 pl.col("lead_hours") < core.LEAD_MAX_HOURS_EXCLUSIVE,
+                pl.col("valid_time").dt.replace_time_zone(None)
+                < HOLDOUT_START.replace(tzinfo=None),
             )
             frames_[(fold, seed)] = score.with_crps(frame=df.with_columns(fold=pl.lit(fold)))
     return score.power_check_g3(frames=frames_, id_d5=series_ids["D5"], id_d10=series_ids["D10"])
+
+
+def build_stops(
+    *, data_dir: Path, stage0: dict | None, power: dict | None, synth: dict
+) -> core.Stops:
+    """Return the stops of verdict row 0 from the stored files.
+
+    Stage 0's stops come from `stage0.json`, the manager's halt from the quick look's harm stop in
+    `quicklook.json`, and the stop of an area that is `not evaluable` from the synthetic gate.
+    """
+    stops = {
+        k: bool(v)
+        for k, v in ((stage0 or {}).get("stops", {})).items()
+        if k in core.Stops.__dataclass_fields__
+    }
+    quick = fit.data_root(data_dir=data_dir) / "quicklook.json"
+    stops["manager_halt"] = bool(
+        quick.exists() and json.loads(quick.read_text()).get("harm_stop", False)
+    )
+    stops["power_check_failed"] = bool(power is not None and not power["pass"])
+    stops["area_not_evaluable"] = bool(synth["not_evaluable"])
+    return core.Stops(**stops)
 
 
 def score_all(
@@ -237,7 +287,9 @@ def score_all(
     }
     synth = synthetic_gate(data_dir=data_dir, seeds=seeds)
     summary["synthetic"] = synth
-    summary["synthetic_failed"] = not synth["pass"]
+    summary["synthetic_failed"] = bool(synth["failed"])
+    summary["synthetic_missing"] = bool(synth["missing"])
+    summary["synthetic_not_evaluable"] = bool(synth["not_evaluable"])
     sg_a = frames(data_dir=data_dir, arm="SG-A", world="W2", folds=folds, seeds=seeds, ids=ids)
     sg_0 = frames(data_dir=data_dir, arm="SG-0", world="W2", folds=folds, seeds=seeds, ids=ids)
     sg_s = frames(data_dir=data_dir, arm="SG-A-S", world="W2", folds=folds, seeds=seeds, ids=ids)
@@ -245,7 +297,9 @@ def score_all(
     missing = [
         n for n, f in (("SG-A", sg_a), ("SG-0", sg_0), ("SG-A-S", sg_s), ("P0", p0_w2)) if f is None
     ]
-    summary["fit_failed"] = bool(missing)
+    # a fit that a stop of row 0 or row 2 leaves unrun never falls in row 3
+    stopped_earlier = bool(synth["failed"] or synth["not_evaluable"])
+    summary["fit_failed"] = bool((missing or synth["missing"]) and not stopped_earlier)
     summary["missing"] = missing
     nan = {"point": float("nan"), "lower": float("nan"), "upper": float("nan")}
     summary["g1"] = (
@@ -286,7 +340,7 @@ def score_all(
     summary["g3_checks"] = [{k: v for k, v in c.items() if k != "upper"} for c in checks]
     summary["g3_intervals"] = checks
     summary["g3_complete"] = len(checks) == 6
-    if len(checks) != 6:
+    if len(checks) != 6 and not stopped_earlier:
         summary["fit_failed"] = True
     summary["flags"] = flags_of(data_dir=data_dir, folds=folds, seeds=seeds)
     # G4: the folded CRPS of each arm at the eight MVA-only Primaries, seed 0, each minus P0.
@@ -300,11 +354,34 @@ def score_all(
             )
     summary["g4"] = g4
     summary["stops"] = asdict(
-        core.Stops(power_check_failed=bool(power is not None and not power["pass"]))
+        build_stops(data_dir=data_dir, stage0=stage0, power=power, synth=synth)
     )
-    summary["correctness_failed"] = False
-    summary["synthetic_cap_hit"] = False
+    summary["correctness_failed"] = bool(read_correctness(data_dir=data_dir))
+    summary["correctness_failures"] = read_correctness(data_dir=data_dir)
+    summary["synthetic_cap_hit"] = synthetic_cap_hit(data_dir=data_dir, seeds=seeds)
     return summary
+
+
+def correctness_path(*, data_dir: Path) -> Path:
+    """Return the file that records correctness failures.
+
+    The failures are the holdout guard, the fold point of the loss, and the other checks of
+    verdict row 1.
+    """
+    return fit.data_root(data_dir=data_dir) / "correctness.json"
+
+
+def record_correctness_failure(*, data_dir: Path, name: str, detail: str) -> None:
+    """Append a correctness failure to `correctness.json` (verdict row 1 reads it)."""
+    path = correctness_path(data_dir=data_dir)
+    old = read_correctness(data_dir=data_dir)
+    fit.atomic_write_json(path=path, body={"failures": [*old, {"check": name, "detail": detail}]})
+
+
+def read_correctness(*, data_dir: Path) -> list[dict]:
+    """Return the stored correctness failures (empty when there are none)."""
+    path = correctness_path(data_dir=data_dir)
+    return json.loads(path.read_text())["failures"] if path.exists() else []
 
 
 def write_summary(*, summary: dict, path: Path) -> None:

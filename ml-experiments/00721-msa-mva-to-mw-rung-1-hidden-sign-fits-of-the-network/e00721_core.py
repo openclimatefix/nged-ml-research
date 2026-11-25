@@ -361,6 +361,10 @@ def stopped_while_falling(*, val_history: Sequence[float], p8_cap: int | None = 
 # --------------------------------------------------------------------------- the verdict rows
 
 
+class CorrectnessFailureError(ValueError):
+    """Raised by a correctness check of verdict row 1 (the holdout guard, the no-two-worlds guard)."""
+
+
 @dataclass(frozen=True)
 class Stops:
     """The stops of row 0 (no verdict). Each field is true when that stop applies.

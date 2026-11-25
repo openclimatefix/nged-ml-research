@@ -24,7 +24,7 @@ import contextlib
 import datetime
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -143,7 +143,7 @@ def target_row_u_gate(
 
 
 @contextlib.contextmanager
-def grid_of_experiment_87() -> Iterator[None]:
+def grid_of_experiment_87() -> Generator[None]:
     """Put experiment 87's grid end back while the panel and the farm frame are read.
 
     Loading experiment 713's pipeline moves `e00087_common.GRID_END` to 2026-11-20 (experiment 667's
@@ -186,7 +186,10 @@ def clip_farm(*, farm: np.ndarray, stamp_us: np.ndarray) -> np.ndarray:
 
 
 def load_grid_inputs(*, fold: str, seed: int, phase: str, with_farms: bool = True) -> GridInputs:
-    """Load the pipeline, the panel, and the clipped farm series of a fold, in the order that keeps the grids equal."""
+    """Load the pipeline, the panel, and the clipped farm series of a fold.
+
+    The loading order keeps the grids equal.
+    """
     import e00422_prep as p422  # ty: ignore[unresolved-import]
     import e00506_data as d506  # ty: ignore[unresolved-import]
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
@@ -341,6 +344,18 @@ def pv_tables(
     )  # fmt: skip
 
 
+def series_id_array(*, sites: list[str]) -> np.ndarray:
+    """Return `(16,)` experiment 87's `time_series_id` of each Primary in panel order."""
+    import e00087_common as common  # ty: ignore[unresolved-import]
+
+    ids = {
+        r["site"]: int(r["time_series_id"])
+        for r in common.series_table().to_dicts()
+        if r["substation_type"] == "Primary"
+    }
+    return np.array([ids[s] for s in sites], dtype=np.int64)
+
+
 def on_grid_713(*, arr: np.ndarray, n_grid: int) -> np.ndarray:
     """Return `arr` (on experiment 87's grid) on experiment 713's grid, NaN beyond experiment 87's end."""
     return sgb.pad_to_grid(a=arr, n_grid=n_grid)
@@ -443,12 +458,15 @@ def build_real_arm_world(
         folded_target=folded_reading if spec.loss == "folded" else np.zeros(16, dtype=bool), shift=mean / std,
         q_v=np.full(16, core.REACTIVE_FLOOR_POINTS / 100.0) / std, gate=gate, val_primaries=hidden_ids, seed=job.seed, fold=job.fold,
         signed_truth=signed, reading=reading, predict_stage=2, score_c_idx=score_c, score_primaries=(*hidden_ids, *mva_ids),
-        train_primaries=None, stamp_us=gi.stamp_us, k_grid=k_grid,
+        train_primaries=None, stamp_us=gi.stamp_us, k_grid=k_grid, series_ids=series_id_array(sites=sites),
     )  # fmt: skip
 
 
 def synthetic_day_offset_points(*, root: Path) -> float:
-    """Return the synthetic world's day offset in points: 0 unless Stage 0 wrote `SYNTH_WORLD_FILE` with another value."""
+    """Return the synthetic world's day offset in points.
+
+    The offset is 0 unless Stage 0 wrote `SYNTH_WORLD_FILE` with another value.
+    """
     path = root / SYNTH_WORLD_FILE
     return float(json.loads(path.read_text())["day_offset_points"]) if path.exists() else 0.0
 
@@ -568,7 +586,7 @@ def build_synthetic_arm_world(
         spec=spec, world=tworld, sources={1: source}, clean_plain=reading, clean_fold=reading, folded_target=supervised,
         shift=mean / std, q_v=np.full(16, core.REACTIVE_FLOOR_POINTS / 100.0) / std, gate=gate, val_primaries=four, seed=job.seed,
         fold=job.fold, signed_truth=signed, reading=reading, predict_stage=1, score_c_idx=score_c, score_primaries=four,
-        train_primaries=four, stamp_us=gi.stamp_us, k_grid=k_grid, exporters=exporters, non_exporters=non_exporters,
+        train_primaries=four, stamp_us=gi.stamp_us, k_grid=k_grid, series_ids=series_id_array(sites=list(gi.panel.sites)), exporters=exporters, non_exporters=non_exporters,
     )  # fmt: skip
 
 
@@ -583,6 +601,8 @@ def make_world_builder(*, data_dir: Path, device: str, phase: str):  # noqa: ANN
     def make(job: fit.Job) -> trn.ArmWorld:
         if job.world == "synthetic":
             return build_synthetic_arm_world(job=job, data_dir=data_dir, device=device, phase=phase)
-        return build_real_arm_world(job=job, data_dir=data_dir, device=device, phase=phase)
+        return build_real_arm_world(
+            job=job, data_dir=data_dir, device=device, phase=phase, scale=job.capacity_scale
+        )
 
     return make

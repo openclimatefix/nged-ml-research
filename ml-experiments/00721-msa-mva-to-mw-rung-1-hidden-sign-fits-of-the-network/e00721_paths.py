@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 721: put the experiment folders that this experiment imports on `sys.path`.
 
 Importing this module is the whole interface. It appends, once, the experiment folders of the frozen
@@ -7,9 +8,25 @@ resolve.
 One `PYTHONPATH` entry per folder would exceed the limit on the size of an environment variable.
 """
 
+import contextlib
+import os
 import sys
 from pathlib import Path
 from typing import Final
+
+THREAD_NAMES: Final = (
+    "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS", "POLARS_MAX_THREADS", "RAYON_NUM_THREADS", "TOKIO_WORKER_THREADS",
+    "POLARS_ASYNC_THREAD_COUNT",
+)  # fmt: skip
+"""Variables that every process of this experiment sets to 1 before any library is imported."""
+THREAD_ENV: Final = {
+    **dict.fromkeys(THREAD_NAMES, "1"),
+    "_RJEM_MALLOC_CONF": "background_thread:false,narenas:1",
+}
+"""`THREAD_NAMES` at 1, and the setting that stops the allocator inside polars from starting 4 idle background threads."""
+for _name, _value in THREAD_ENV.items():
+    os.environ.setdefault(_name, _value)
 
 HERE: Final = Path(__file__).resolve().parent
 ROOT: Final = HERE.parent
@@ -34,3 +51,32 @@ def install() -> list[str]:
 
 
 install()
+
+
+def thread_count() -> int:
+    """Return the number of operating-system threads of this process (Linux `/proc`)."""
+    return int(Path("/proc/self/status").read_text().split("Threads:")[1].split()[0])
+
+
+def pin_threads() -> None:
+    """Pin every numerical library of this process to one thread, and assert it for torch.
+
+    Sets torch's intra-op and inter-op thread counts to 1. The second call raises `RuntimeError` once
+    parallel work has started, which is then fine because the count was already pinned. The function
+    also limits `threadpoolctl`'s pools (BLAS, OpenMP) to 1 when `threadpoolctl` is installed.
+    """
+    try:
+        import torch  # ty: ignore[unresolved-import]
+    except ImportError:
+        torch = None
+    if torch is not None:
+        torch.set_num_threads(1)
+        with contextlib.suppress(RuntimeError):
+            torch.set_num_interop_threads(1)
+        assert torch.get_num_threads() == 1, torch.get_num_threads()
+        assert torch.get_num_interop_threads() == 1, torch.get_num_interop_threads()
+    try:
+        import threadpoolctl  # ty: ignore[unresolved-import]
+    except ImportError:
+        return
+    threadpoolctl.threadpool_limits(limits=1)

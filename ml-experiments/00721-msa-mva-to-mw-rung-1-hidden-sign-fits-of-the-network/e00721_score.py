@@ -311,8 +311,14 @@ def read_contrast(
     alpha = (1.0 - level) / 2.0
     lo, hi = np.nanquantile(draws, [alpha, 1.0 - alpha])
     kish_b = core.kish_effective_number(counts=table.counts)
-    w_lo, w_hi = core.widened_interval(point=point, lower=float(lo), upper=float(hi), kish_b=kish_b)
     n_units = len(table.counts)
+    # the page: "a reading with fewer than 20 resampling units ... widens its interval"
+    if n_units < core.MIN_RESAMPLING_UNITS:
+        w_lo, w_hi = core.widened_interval(
+            point=point, lower=float(lo), upper=float(hi), kish_b=kish_b
+        )
+    else:
+        w_lo, w_hi = float(lo), float(hi)
     return ContrastReading(
         point=point, lower=w_lo, upper=w_hi, raw_lower=float(lo), raw_upper=float(hi), kish_b=kish_b,
         n_rows=int(total), n_blocks=int((table.counts > 0).sum()), n_units=n_units,

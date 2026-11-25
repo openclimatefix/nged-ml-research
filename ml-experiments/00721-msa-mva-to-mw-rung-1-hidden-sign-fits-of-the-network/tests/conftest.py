@@ -18,7 +18,9 @@ _TESTS = Path(__file__).parent
 _FOLDER = _TESTS.parent
 sys.path.insert(0, str(_FOLDER))
 
-import e00721_paths  # noqa: E402, F401  (puts the sibling experiments on sys.path)
+import e00721_paths  # noqa: E402  (puts the sibling experiments on sys.path)
+
+e00721_paths.pin_threads()
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.Item]) -> None:

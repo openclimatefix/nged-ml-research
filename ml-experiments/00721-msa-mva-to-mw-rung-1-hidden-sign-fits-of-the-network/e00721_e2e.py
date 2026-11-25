@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 from typing import Final
 
-import e00721_paths  # noqa: F401
+import e00721_paths
 
 # isort: split
 import e00713_batch as bt  # ty: ignore[unresolved-import]
@@ -180,7 +180,7 @@ def build_arm_world(*, job: fit.Job, mini: MiniWorld, device: str = "cpu") -> tr
         )
         sign = np.where(np.isfinite(mini.signed), (mini.signed < 0).astype(np.float32), np.nan)
         return sgb.SgSource(
-            pv=pv, plain_z=z(a["plain"]), fold_z=z(a["fold"]), u_grid=torch.from_numpy(u.astype(np.float32)).to(device),
+            pv=pv, plain_z=z(a["plain"]), fold_z=z(a["fold"]), u_grid=torch.from_numpy(mini.u.astype(np.float32)).to(device),
             sign_grid=torch.from_numpy(sign.astype(np.float32)).to(device), always_folded=always_folded, supervised=supervised,
         )  # fmt: skip
 
@@ -212,7 +212,7 @@ def build_arm_world(*, job: fit.Job, mini: MiniWorld, device: str = "cpu") -> tr
         seed=job.seed, fold=job.fold, signed_truth=mini.signed, reading=mini.fold_view, batch_size=64,
         predict_stage=1 if synthetic else 2, score_c_idx=score_c,
         score_primaries=(*exporters, *non_exporters) if synthetic else (*hidden_ids, *site_index(*core.MVA_ONLY[:2])),
-        train_primaries=primaries_train, stamp_us=mini.stamp_us, exporters=exporters, non_exporters=non_exporters,
+        train_primaries=primaries_train, stamp_us=mini.stamp_us, k_grid=mini.u, exporters=exporters, non_exporters=non_exporters,
     )  # fmt: skip
 
 
@@ -285,6 +285,7 @@ def run(*, scratch: Path, passes: int, seeds: tuple[int, ...] = (0,)) -> dict:
 
 def main() -> int:
     """Run the pass and write `e2e_run.json` under the scratch path."""
+    e00721_paths.pin_threads()
     parser = argparse.ArgumentParser()
     parser.add_argument("scratch", type=Path)
     parser.add_argument("--passes", type=int, default=2)

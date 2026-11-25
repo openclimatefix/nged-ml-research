@@ -21,7 +21,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-import e00721_paths  # noqa: F401
+import e00721_paths
 
 # isort: split
 import e00721_core as core
@@ -134,6 +134,83 @@ def check_real_modules_import() -> str:
     return "modules import: True, a missing probe file raises: False"
 
 
+def check_pipeline_panel_and_clipped_farms() -> str:
+    """Return flags for the loader's path: the pipeline, then the panel and the farm series on
+    experiment 87's grid.
+
+    The pipeline moves experiment 87's grid end, so the loader resets it around the panel and farm reads.
+    """
+    import e00721_real as real
+    import e00721_worlds as wd
+
+    gi = real.load_grid_inputs(fold="2026-05", seed=0, phase="train")
+    n87 = len(gi.panel.stamp_us)
+    holdout = gi.stamp_us[: len(gi.panel.stamp_us)] >= int(
+        np.datetime64(core.HOLDOUT_START_ISO, "us").astype(np.int64)
+    )
+    farms_clipped = all(
+        bool(np.isnan(f[holdout]).all()) and bool(np.isfinite(f[~holdout]).any())
+        for f in gi.farms.values()
+    )
+    arrays = real.build_fold_world_arrays(
+        panel=gi.panel, farm_for_site=gi.farms, world="W2", cutoff_idx=None
+    )
+    wd.holdout_guard(valid_us=gi.panel.stamp_us[np.isfinite(arrays.fold_view).any(axis=0)])
+    return (
+        f"panel on 121,248 steps: {n87 == real.N_GRID_87}, grid of 713 longer: {gi.n_grid > n87}, farm series: {len(gi.farms)}, "
+        f"every farm series NaN from 2026-07-01 and finite before: {farms_clipped}, holdout guard passes on the world: True"
+    )
+
+
+def check_synthetic_world_on_the_real_grid() -> str:
+    """Return flags for the synthetic world built on the real calendar, temperature, and sky."""
+    import e00721_real as real
+    import e00721_stage0 as stage0
+    import e00721_worlds as wd
+
+    gi = real.load_grid_inputs(fold="2026-05", seed=0, phase="train", with_farms=False)
+    parts = real.synthetic_inputs(gi=gi, seed=0, day_offset_points=0.0)
+    tok = stage0.exporter_tokens(parts=parts)
+    out = wd.reachability_check(pv_capacity=float(parts["syn"].capacity_share.max()), **tok)
+    return f"synthetic world built: True, reachability evaluable: {bool(out['evaluable'])}, exporters export: {bool((tok['x_true'] < 0).any())}"
+
+
+def check_m1_power_check_files() -> str:
+    """Return whether experiment 713's stored `M1` forecasts for the power check are present for 4
+    folds and 5 seeds."""
+    folder = DATA / "00713-msa-axial-attention-demand-network-part-1" / "work" / "fits" / "M1"
+    present = [(folder / f"{f}_s{s}.parquet").exists() for f in core.FOLDS for s in range(5)]
+    schema = pl.read_parquet_schema(folder / f"{core.FOLDS[0]}_s0.parquet")
+    return f"M1 files present: {sum(present)} of 20, columns: {all(c in schema for c in ('time_series_id', 'valid_time', 'lead_hours', 'actual', *QCOLS))}"
+
+
+def check_probe_inputs() -> str:
+    """Return flags for the inputs of the capacity probe (the pretraining rows of one fold, no
+    signed hidden reading used)."""
+    import e00428_data as data  # ty: ignore[unresolved-import]
+    import e00448_run as r448  # ty: ignore[unresolved-import]
+    import e00510_common as c  # ty: ignore[unresolved-import]
+    import e00621_common as k621  # ty: ignore[unresolved-import]
+    import e00662_fit as fit662  # ty: ignore[unresolved-import]
+
+    clean = c.clean_stack()
+    refit = c.month_start(month="2026-05")
+    rows = data.build_fold(refit=refit, clean=clean)
+    pre = r448.pretrain_rows(rows=rows, refit=refit, clean=clean)
+    return (
+        f"pretraining rows built: {len(pre.y) > 0}, x has 35 or more columns: {pre.x.shape[1] >= 35}, "
+        f"capacity vector has 16 entries: {len(k621.effective_capacity_mw()) == 16}, calibration table present: {fit662.E649.exists()}"
+    )
+
+
+def check_private_folder_is_creatable() -> str:
+    """Return whether the output root can hold the `PRIVATE` folder (created and removed if empty)."""
+    import e00721_figures as figs
+
+    folder = figs.private_dir(data_dir=Path(os.environ["DATA_PATH_INTERNAL"]))
+    return f"PRIVATE folder exists: {folder.is_dir()}"
+
+
 CHECKS: tuple[tuple[str, Callable[[], str]], ...] = (
     ("dense raw array", check_dense_raw),
     ("grid and sites", check_grid_and_sites),
@@ -144,11 +221,17 @@ CHECKS: tuple[tuple[str, Callable[[], str]], ...] = (
     ("capacity probe folder", check_capacity_probe_files),
     ("as-of capacity tables", check_as_of_capacity_tables),
     ("real modules", check_real_modules_import),
+    ("pipeline, panel, and clipped farms", check_pipeline_panel_and_clipped_farms),
+    ("synthetic world on the real grid", check_synthetic_world_on_the_real_grid),
+    ("M1 power-check files", check_m1_power_check_files),
+    ("probe inputs", check_probe_inputs),
+    ("PRIVATE folder", check_private_folder_is_creatable),
 )
 
 
 def main() -> int:
     """Run every check, print one line each, and return the number of failures."""
+    e00721_paths.pin_threads()
     failures = 0
     for name, check in CHECKS:
         try:
