@@ -65,8 +65,9 @@ decision_rule: >-
 benchmark: >-
   P0 (the reading read as signed import) and P0f (P0's point forecast given the same lobe-width
   floor as the neural networks, the reference for the harm checks); B1 (a demand climatology of D8's
-  base days that sets the probability of reverse flow to the probability that demand lies below the
-  reading); B2 (the same rule with a regression of base demand on calendar and temperature);
+  base days that sets the probability of reverse flow to the world's injected share times the
+  probability that demand lies below the reading); B2 (the same rule with a regression of base demand
+  on calendar and temperature);
   experiment 694's M2 tracker on the engine-only test segments; arm A (the reading alone) as the
   no-hint neural network.
 row_set_id: >-
@@ -307,9 +308,17 @@ It is BSP_real − β (E + S), with β drawn per segment from 0.6 to 1.0, so the
 eight Primaries and the outside generators is real and has the same structure in training and test.
 The neural network reads the half-hour change of this series.
 
-**The world mix is fixed for training and test alike:** no injection 0.15, engine only 0.30, solar
-only 0.20, and engine and solar 0.35. The share with no injection gives the neural network real
-pre-engine days whose answer is the reading itself.
+**The test world mix is fixed:** no injection 0.15, engine only 0.30, solar only 0.20, and engine
+and solar 0.35, so 85% of test segments carry an injection. The share with no injection gives the
+neural network real pre-engine days whose answer is the reading itself.
+
+**The training mix is randomised, so that C1 does not measure knowledge of the fixed 85%.** Each bank
+of 32 segment draws (one month, one seed) draws its own share of no-injection segments from a uniform
+range of 0.05 to 0.60, which makes the injected share of a bank range from 0.40 to 0.95. The other
+three world types share the remainder in the proportions 0.30 : 0.20 : 0.35. The test mix of 0.15
+and the shifted mix below (0.50) both lie inside the range. The baselines B1 and B2 receive the
+test world's injected share as a prior (see "Baselines"), so the neural network has no
+advantage in knowing the mix.
 
 **Training draws come from fixed banks, and test draws are shared by every arm.** Each training
 month gets 32 segment draws per seed, from generator seed 7290 plus the seed. Each
@@ -462,7 +471,10 @@ loss.
   for contrast C2, so that the floor adds the same CRPS to the neural network and to its reference.
   P0 itself is reported in every table.
 - **B1** uses the fact that the injected output is never negative: if demand D is below the reading,
-  X = +R is impossible, so P(X<0) = P(D < R). P(D < R) comes from the month-by-half-hour
+  X = +R is impossible, so P(X<0) = π × P(D < R), where π is the share of segments that carry an
+  injection in the world being scored (0.85 in the test banks). The prior π is the world-mix
+  knowledge that a fixed-mix neural network would absorb in training, and giving it to B1 and B2
+  keeps C1 from rewarding that knowledge. P(D < R) comes from the month-by-half-hour
   climatology of base demand (`baseline_forecasters.climatology.ClimatologyForecaster`, with local
   month, half-hour, and weekend flag) fitted on the training base days. The two lobes sit at ±R'.
 - **B2** is B1 with a linear regression of base demand on local half-hour, day of week, bank
@@ -472,6 +484,7 @@ loss.
   P(X<0). M2 has no solar term, so it is scored on the engine-only segments only, as a description.
 
 **B\* is the better of B1 and B2 on the validation months**, chosen before any test score is read.
+Both baselines use the prior π of the bank being scored.
 
 ## Scoring
 
@@ -536,6 +549,16 @@ so the standard deviation measured there understates the spread on test months, 
 matters more than the standard deviation. 0.25 points is about 26 kW, below which a difference in
 D8's reconstructed power is smaller than the reactive floor's effect on the reading. The value is
 written to `margin.json`, which refuses to be overwritten.
+
+**A shifted-mix read-out tests whether arm D has learned the training mix.** A second test bank is
+built once from a separate seed space with 50% of its segments carrying no injection (an injected
+share of 0.50, against 0.85 in the test banks), with the same months and draws. The read-out reports,
+for arm D and for B\* with the prior set to 0.50, the signed CRPS, the reliability term and diagram
+of P(X<0), and the share of half-hours with P(X<0) above 0.5. A neural network that had memorised the
+injected share would over-predict reverse flow in this bank, and its reliability term would rise
+well above its value on the test banks. The read-out enters no verdict row. The harm limit does not
+change: it is derived from the test mix (section "Verdict table"), and the shifted bank has a
+lower reverse-flow share, so it only makes harm easier to detect.
 
 **Two bars decide between `supported` and `partly supported`.**
 
@@ -633,13 +656,14 @@ On the real held-out base days every half-hour is import, so s = 0 and the limit
 One limit serves both checks, rounded down to 0.12 points.
 
 **The limit is fixed before any fit and before any score, and it does not depend on the simulation.**
-The one data input is D8's base readings, which the calculation script read to estimate s, and no
-score exists. The simulation is approximate: solar output is a clear-sky shape times a random
-cloud factor, and engine runs follow the parameter table without trips or ramps. A share s between
-0.03 and 0.08 would move the limit only between 0.129 and 0.136 points, so the rounded 0.12 holds
-across that range. The same simulation gives 4.7% of half-hours as reverse flow outside the dead band
-of 2 points, which is about 4,400 of the 92,000 half-hours of the test banks (8 months × 30 days × 8
-draws × 48 half-hours) and about 1,100 of the 23,000 in the two BSP test months.
+The training mix is randomised, and the limit is derived on the fixed test mix, which scores the
+harm checks. The one data input is D8's base readings, which the calculation script read to estimate
+s, and no score exists. The simulation is approximate: solar output is a clear-sky shape times a
+random cloud factor, and engine runs follow the parameter table without trips or ramps. A share s
+between 0.03 and 0.08 would move the limit only between 0.129 and 0.136 points, so the rounded 0.12
+holds across that range. The same simulation gives 4.7% of half-hours as reverse flow outside the
+dead band of 2 points, which is about 4,400 of the 92,000 half-hours of the test banks (8 months ×
+30 days × 8 draws × 48 half-hours) and about 1,100 of the 23,000 in the two BSP test months.
 
 **The second harm limit is on the normalised mean absolute error of the median.** Arm D's error on
 import half-hours may exceed P0's by at most 0.25 points, the margin's floor, because a median error
@@ -657,8 +681,8 @@ are never rerun. Every number is labelled interim until the counted reading it b
 - No base day sits in two splits, no training day lies within 2 days of a test or validation month,
   and no validation day lies within 2 days of a test month.
 - No test or validation month overlaps the fixed lockdown window.
-- The test and validation banks come from a seed space that no training bank uses, and their hashes
-  match across all arms.
+- The test, validation, and shifted-mix banks come from a seed space that no training bank uses, and
+  their hashes match across all arms.
 - Solar source S1 reads a farm on the scored base day only, S2 reads CAMS at a farm site, never at
   D8, and the CAMS series of that farm site differs from the CAMS series at D8.
 - The synthetic BSP is built the same way in every split, from the same base day's real meter.
