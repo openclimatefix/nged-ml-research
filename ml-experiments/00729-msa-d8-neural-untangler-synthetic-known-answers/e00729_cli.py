@@ -85,6 +85,7 @@ def main(argv: list[str]) -> int:
         help="the manager approved a projection above the budget",
     )
     args = parser.parse_args(argv)
+    stages.guard_run(stage=args.stage)
     if args.stage == "report":
         root = paths.data_root()
         verdict = stages.read_json(path=root / "verdict.json")

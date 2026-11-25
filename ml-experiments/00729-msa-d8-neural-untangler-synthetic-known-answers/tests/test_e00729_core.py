@@ -226,25 +226,20 @@ def test_reachability_and_gate_ratio() -> None:
 def test_ranges_hold_every_simulator_parameter_of_the_page() -> None:
     assert core.RANGES["beta"] == (0.6, 1.0)
     assert core.RANGES["q_mva"] == (0.0, 0.3)
-    assert core.RANGES["solar_capacity_points"] == (60.0, 400.0)
+    assert core.RANGES["solar_capacity_points"] == (5.0, 150.0)
     assert core.RANGES["unit_points"] == (10.0, 50.0)
     assert core.RANGES["total_points_cap"][1] == 120.0
-    assert core.RANGES["spell_days"] == (2, 6)
+    assert core.RANGES["spell_days"] == (2, 19)
 
 
-def test_the_one_retune_changed_exactly_five_ranges() -> None:
-    attempt_one = {
+def test_the_ranges_are_the_registered_first_attempt() -> None:
+    registered = {
         "no_run_share": (0.2, 0.7), "spells_per_30_days": (0.0, 2.0), "spell_days": (2, 19),
         "ramp_half_hours": (0.0, 2.0), "solar_capacity_points": (5.0, 150.0),
-    }  # fmt: skip
-    for name, old in attempt_one.items():
-        assert core.RANGES[name] != old
-        assert core.RANGES[name][0] <= old[1]
-    unchanged = {
         "n_units": (1, 4), "unit_points": (10.0, 50.0), "evening_hours": (2.0, 6.0),
         "unit_output_share": (0.6, 1.0), "beta": (0.6, 1.0), "q_mva": (0.0, 0.3),
     }  # fmt: skip
-    for name, value in unchanged.items():
+    for name, value in registered.items():
         assert core.RANGES[name] == value
 
 

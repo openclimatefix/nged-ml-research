@@ -217,6 +217,27 @@ def _day_arrays(*, frame: pl.DataFrame, dates: np.ndarray, scale: float) -> np.n
     return out
 
 
+def sky_present(*, ghi: np.ndarray, sun_up: np.ndarray) -> np.ndarray:
+    """Return, for each farm and day, whether the satellite sky covers the sun-up half-hours.
+
+    The irradiance is NaN at night, where the clear-sky irradiance is at or below
+    `MIN_CLEAR_W_M2`, so a count of finite half-hours over the whole day never reaches
+    `core.MIN_HH_FARM_DAY` (a UK day has at most about 30 sun-up half-hours). The sky is present
+    when at least `core.MIN_SKY_SHARE_SUN_UP` of the day's sun-up half-hours are finite, and the
+    day has at least one sun-up half-hour.
+
+    Args:
+        ghi: The irradiance, `(F, n, 48)`, NaN where missing.
+        sun_up: True where the clear-sky irradiance exceeds `MIN_CLEAR_W_M2`, `(F, n, 48)`.
+
+    Returns:
+        A boolean `(F, n)` array.
+    """
+    n_sun = sun_up.sum(axis=2)
+    n_finite = (np.isfinite(ghi) & sun_up).sum(axis=2)
+    return (n_sun > 0) & (n_finite >= core.MIN_SKY_SHARE_SUN_UP * n_sun)
+
+
 def farm_set(*, dates: np.ndarray, frame: pl.DataFrame, t0: datetime, n_steps: int) -> sim.FarmSet:
     """Build the farms' normalised output and skies on `dates` from experiment 39's farm rows."""
     import pvlib
@@ -226,7 +247,7 @@ def farm_set(*, dates: np.ndarray, frame: pl.DataFrame, t0: datetime, n_steps: i
     sites = pv_sites().sort("site")
     names = sites["site"].to_list()
     fields: dict[str, list[np.ndarray]] = {
-        k: [] for k in ("power", "ghi", "dni", "dhi", "zenith", "azimuth")
+        k: [] for k in ("power", "ghi", "dni", "dhi", "zenith", "azimuth", "sun_up")
     }
     day_idx = (dates - np.datetime64(t0.date(), "D")).astype(int)
     for row in sites.iter_rows(named=True):
@@ -251,12 +272,13 @@ def farm_set(*, dates: np.ndarray, frame: pl.DataFrame, t0: datetime, n_steps: i
         arrays = {
             "power": power, "ghi": ghi_i, "dni": np.asarray(split["dni"]),
             "dhi": np.asarray(split["dhi"]), "zenith": zen, "azimuth": azi,
+            "sun_up": clear > MIN_CLEAR_W_M2,
         }  # fmt: skip
         for k, v in arrays.items():
             fields[k].append(v.reshape(-1, 48)[day_idx])
     stacked = {k: np.stack(v) for k, v in fields.items()}
     power_ok = np.isfinite(stacked["power"]).sum(axis=2) >= core.MIN_HH_FARM_DAY
-    sky_ok = np.isfinite(stacked["ghi"]).sum(axis=2) >= core.MIN_HH_FARM_DAY
+    sky_ok = sky_present(ghi=stacked["ghi"], sun_up=stacked["sun_up"])
     stacked["ghi"] = np.nan_to_num(stacked["ghi"])
     stacked["dni"] = np.nan_to_num(stacked["dni"])
     stacked["dhi"] = np.nan_to_num(stacked["dhi"])

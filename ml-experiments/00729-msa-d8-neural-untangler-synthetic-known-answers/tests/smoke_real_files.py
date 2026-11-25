@@ -11,6 +11,7 @@ Exit status 0 means every input opened with the columns the code reads.
 """
 
 import sys
+import warnings
 from collections.abc import Callable
 
 import e00729_paths
@@ -145,6 +146,99 @@ def check_day_table() -> str:
     )
 
 
+CLEAR_DAY_CSI = 0.7
+"""A base day is clear when D8's mean CAMS clear-sky index over its sun-up half-hours is at least this."""
+MIN_S2_OUTPUT_SHARE = 0.9
+"""At least this share of S2 solar-world segments with a clear day must hold solar output.
+
+The expected share is 1.0: the sky is present on every real day of the frame, so a segment of
+source S2 has zero output only if the sky rule breaks. 0.9 leaves room for a few segments that hold
+no base day with sky and fails a rule that silences half of them."""
+N_S2_DRAWS = 8
+
+
+def clear_days(*, cal: object) -> np.ndarray:
+    """Return a mask of the base days whose mean CAMS clear-sky index over sun-up half-hours is high."""
+    sun = cal.cosz > 0  # ty: ignore[unresolved-attribute]
+    csi = np.where(sun & np.isfinite(cal.csi), cal.csi, np.nan)  # ty: ignore[unresolved-attribute]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        mean = np.nanmean(csi, axis=1)
+    return np.isfinite(mean) & (mean >= CLEAR_DAY_CSI)
+
+
+def check_s2_solar_on_clear_days() -> str:
+    """Draw source S2 solar on the real base days and fail if a clear day has zero output.
+
+    Returns:
+        A line of flags (booleans only).
+
+    Raises:
+        AssertionError: When a clear base day has no farm with a satellite sky, or an S2 draw leaves
+            a clear base day with zero output.
+    """
+    import e00729_sim as sim
+
+    days, _ = data.load_closure_days()
+    table = data.load_day_table(closure_days=days)
+    cal = data.select_days(cal=table.calendar, mask=table.is_base)
+    clear = clear_days(cal=cal)
+    sky_any = cal.farms.sky_ok.any(axis=0)
+    assert sky_any[clear].all(), "a clear base day has no farm with a satellite sky"
+    drawn = zero_clear = 0
+    for seed in range(200):
+        out, _, source, _ = sim.draw_solar(
+            rng=np.random.default_rng(seed),
+            farms=cal.farms,
+            cal_days=np.arange(len(cal.dates)),
+            record={},
+        )
+        if source != "S2":
+            continue
+        drawn += 1
+        zero_clear += int((out.max(axis=1)[clear] == 0).sum())
+        if drawn >= N_S2_DRAWS:
+            break
+    assert drawn == N_S2_DRAWS, "too few S2 draws"
+    assert zero_clear == 0, "an S2 draw left a clear base day with zero solar output"
+    return (
+        f"has clear base days: {bool(clear.any())}, every clear base day has a farm with a sky: {bool(sky_any[clear].all())}, "
+        f"no S2 draw has a clear base day with zero output: {zero_clear == 0}"
+    )
+
+
+def check_bank_s2_solar() -> str:
+    """Check the stored test bank: S2 solar-world segments with a clear day hold solar output.
+
+    Prints a flag that the bank is absent before the first bank build, and fails when a bank
+    exists and the share of such segments with output is under `MIN_S2_OUTPUT_SHARE`.
+
+    Returns:
+        A line of flags (booleans only).
+
+    Raises:
+        AssertionError: When the share is under `MIN_S2_OUTPUT_SHARE`.
+    """
+    import e00729_banks as banks
+    import e00729_stages as stages
+
+    path = stages.bank_path(kind="test")
+    if not path.exists():
+        return "test bank present: False"
+    bank = banks.load_bank(path=path)
+    chosen = []
+    for seg in bank.segments:
+        if seg.source != "S2" or seg.world not in ("solar", "both"):
+            continue
+        on = seg.cal_index >= 0
+        if bool(clear_days(cal=seg)[on].any()):
+            chosen.append(bool((seg.solar[on] > 0).any()))
+    share = float(np.mean(chosen)) if chosen else float("nan")
+    assert chosen, "no S2 solar-world segment with a clear day"
+    assert share >= MIN_S2_OUTPUT_SHARE, "S2 solar-world segments are silent"
+    return f"test bank present: True, share of S2 solar-world segments with output is at least {MIN_S2_OUTPUT_SHARE}: {share >= MIN_S2_OUTPUT_SHARE}"
+
+
 CHECKS: dict[str, Callable[[], str]] = {
     "frame_39": check_frame_39,
     "era5_weather": check_era5_weather,
@@ -155,6 +249,8 @@ CHECKS: dict[str, Callable[[], str]] = {
     "bank_holidays": check_bank_holidays,
     "private_constants": check_private_constants,
     "day_table": check_day_table,
+    "s2_solar_clear_days": check_s2_solar_on_clear_days,
+    "bank_s2_solar": check_bank_s2_solar,
 }
 
 

@@ -36,7 +36,8 @@ class FarmSet:
     Attributes:
         power: Output over effective capacity, shape `(F, n, 48)`, NaN where missing.
         power_ok: At least `MIN_HH_FARM_DAY` half-hours of data on the base day, `(F, n)`.
-        sky_ok: The satellite sky at the farm is present on the base day, `(F, n)`.
+        sky_ok: At least `MIN_SKY_SHARE_SUN_UP` of the base day's sun-up half-hours have CAMS
+            irradiance at the farm, `(F, n)`.
         ghi: CAMS global horizontal irradiance at the farm in W/m2, `(F, n, 48)`.
         dni: Direct normal irradiance, `(F, n, 48)`.
         dhi: Diffuse horizontal irradiance, `(F, n, 48)`.
@@ -110,7 +111,9 @@ class Segment:
         t2m: As in `Calendar`.
         wind10: As in `Calendar`.
         precip: As in `Calendar`.
-        s1_fallback: The day took source S2 because no farm had data, `(D + 2,)`.
+        s1_fallback: The day left its drawn source. On a segment of source S1 it means no farm had
+            power data, so the day took the S2 model; on either source it also means no farm had a
+            satellite sky, so the day has zero solar output. The name is kept for stored files.
         has_bsp: At least `MIN_DAYS_IN_MONTH` base days in the segment have BSP data.
         params: The drawn parameters, for the range assertion (never printed).
     """
@@ -300,8 +303,8 @@ def draw_solar(
         record: Receives every drawn parameter.
 
     Returns:
-        The output `(m, 48)`, the fallback flags `(m,)` (the day took source S2 because no farm had
-        data), the source name ("S1" or "S2"), and the farm index drawn for the segment.
+        The output `(m, 48)`, the fallback flags `(m,)` (the day left its drawn source: see
+        `Segment.s1_fallback`), the source name ("S1" or "S2"), and the farm index drawn for the segment.
     """
     capacity = float(np.exp(rng.uniform(*np.log(core.RANGES["solar_capacity_points"]))))
     record["solar_capacity_points"] = capacity

@@ -1,5 +1,6 @@
 """A tiny synthetic calendar for the tests: two months of base days with invented values."""
 
+import e00729_data as data
 import e00729_sim as sim
 import numpy as np
 
@@ -28,10 +29,12 @@ def make_calendar(
     ghi = 800.0 * sun[None, None, :] * rng.uniform(
         0.3, 1.0, (n_farms, n_days, 1)
     ) + 1e-3 * rng.random((n_farms, n_days, 48))
+    sun_up = np.broadcast_to(sun > 0, (n_farms, n_days, 48))
+    sky_ok = data.sky_present(ghi=np.where(sun_up, ghi, np.nan), sun_up=sun_up)
     farms = sim.FarmSet(
         power=farm_power,
         power_ok=np.ones((n_farms, n_days), dtype=bool),
-        sky_ok=np.ones((n_farms, n_days), dtype=bool),
+        sky_ok=sky_ok,
         ghi=ghi,
         dni=0.7 * ghi,
         dhi=0.3 * ghi,

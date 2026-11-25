@@ -199,12 +199,12 @@ def draw_world_types(*, rng: np.random.Generator, n: int, none_share: float) -> 
 
 RANGES: Final = {
     "n_units": (1, 4), "unit_points": (10.0, 50.0), "min_unit_points": (0.0, 50.0), "total_points_cap": (0.0, 120.0),
-    "no_run_share": (0.05, 0.5), "evening_prob": (0.3, 0.9), "evening_start_h": (15.0, 17.5),
+    "no_run_share": (0.2, 0.7), "evening_prob": (0.3, 0.9), "evening_start_h": (15.0, 17.5),
     "evening_hours": (2.0, 6.0), "morning_prob": (0.1, 0.6), "morning_start_h": (5.5, 8.5),
     "morning_hours": (1.0, 8.0), "midday_prob": (0.0, 0.3), "midday_start_h": (10.0, 14.0),
-    "midday_hours": (1.0, 4.0), "weekend_factor": (0.1, 0.8), "spells_per_30_days": (0.0, 0.5),
-    "spell_days": (2, 6), "unit_output_share": (0.6, 1.0), "ramp_half_hours": (0.0, 4.0),
-    "trip_prob": (0.0, 0.02), "trip_half_hours": (1, 4), "solar_capacity_points": (60.0, 400.0),
+    "midday_hours": (1.0, 4.0), "weekend_factor": (0.1, 0.8), "spells_per_30_days": (0.0, 2.0),
+    "spell_days": (2, 19), "unit_output_share": (0.6, 1.0), "ramp_half_hours": (0.0, 2.0),
+    "trip_prob": (0.0, 0.02), "trip_half_hours": (1, 4), "solar_capacity_points": (5.0, 150.0),
     "tilt_deg": (10.0, 40.0), "azimuth_deg": (120.0, 240.0), "dc_ac_ratio": (1.0, 1.4),
     "noise_sd": (0.05, 0.05), "q_mva": (0.0, 0.3), "q_factor": (0.8, 1.0), "beta": (0.6, 1.0),
 }  # fmt: skip
@@ -213,9 +213,17 @@ SPELL_LEVEL_RANGE: Final = (0.3, 1.0)
 """A multi-day spell runs at this share of the total engine size ("part or full output")."""
 NOISE_AUTOCORRELATION: Final = 0.9
 """Half-hour autocorrelation of the multiplicative noise on source S2."""
+RUN_ID: Final = "2"
+"""The run of the experiment: 1 was the first run, whose S2 solar worlds were silent (superseded)."""
 S1_SHARE: Final = 0.5
 """Half of the solar segments draw source S1 (the metered farms)."""
 MIN_HH_FARM_DAY: Final = 40
+"""A farm's power on a day counts when at least this many of the 48 half-hours are finite."""
+MIN_SKY_SHARE_SUN_UP: Final = MIN_HH_FARM_DAY / 48
+"""The satellite sky of a farm-day counts when this share of its sun-up half-hours is finite.
+
+It is the same share (40 of 48) that the power rule uses, applied to the half-hours where
+irradiance exists. On the real frame the share is at least 0.94 on every day of farm A."""
 SUBSTEPS_PER_HALF_HOUR: Final = 6
 """The engine simulator runs on a 5-minute grid, so a half-hour holding a switch has a partial mean."""
 SUN_UP_ZENITH_DEG: Final = 90.0
