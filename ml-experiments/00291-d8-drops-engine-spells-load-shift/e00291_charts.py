@@ -5,6 +5,7 @@ Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newl
 """
 
 import json
+import sys
 import textwrap
 from pathlib import Path
 from typing import Final
@@ -12,7 +13,10 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from e00291_common import DATA_DIR, UNIT_MW
+from e00291_common import DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -90,7 +94,7 @@ def figure_depth() -> alt.Chart:
             x=alt.X(
                 "depth_in_units:Q",
                 bin=alt.Bin(step=0.25, extent=[0, 3]),
-                title=f"Drop depth in units of {UNIT_MW} MW (the engine's recorded step)",
+                title="Drop depth in units of the engine's recorded step",
                 axis=alt.Axis(values=[0, 1, 2, 3]),
             ),
             y=alt.Y("count()", title="Drops", axis=alt.Axis(tickMinStep=1)),
@@ -98,7 +102,7 @@ def figure_depth() -> alt.Chart:
     )
     rules = (
         alt.Chart(pl.DataFrame({"unit": [1.0, 2.0, 3.0]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3])
+        .mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3], aria=False)
         .encode(x="unit:Q")
     )
     return (hist + rules).properties(
@@ -107,7 +111,7 @@ def figure_depth() -> alt.Chart:
         title=alt.TitleParams(
             "Drop depths spread between whole engine units",
             subtitle=wrapped(
-                "Bars: the 28 drops from 2023-08-15. Dashed lines: 1, 2, and 3 units. If the drops were "
+                "Bars: the 28 drops in scope. Dashed lines: 1, 2, and 3 units. If the drops were "
                 "whole numbers of units, the bars would stand at the lines."
             ),
             anchor="start",
@@ -116,51 +120,64 @@ def figure_depth() -> alt.Chart:
 
 
 def figure_fade() -> alt.VConcatChart:
-    """D8's monthly detector flag share and left-tail share, with the drops started."""
+    """D8's detector flag share and left-tail share, and drops started, pooled over two eras."""
+    eras = ["Before the shortfall fades", "After the shortfall fades"]
     m = pl.read_parquet(DATA_DIR / "monthly.parquet").with_columns(
-        pl.col("month").str.to_date("%Y-%m")
+        era=pl.when(pl.col("month") >= "2026-03").then(pl.lit(eras[1])).otherwise(pl.lit(eras[0]))
     )
-    long = m.unpivot(
+    pooled = m.group_by("era").agg(
+        v1_flag_share=pl.col("v1_flag_share").mean(),
+        left_tail_share=pl.col("left_tail_share").mean(),
+        drops_started=pl.col("drops_started").mean(),
+    )
+    long = pooled.unpivot(
         on=["v1_flag_share", "left_tail_share"],
-        index="month",
+        index="era",
         variable_name="series",
         value_name="share",
     ).with_columns(
         pl.col("series").replace(
             {
                 "v1_flag_share": "Half-hours flagged as engine running",
-                "left_tail_share": "Half-hours with power 2.5 MW or more below expected",
+                "left_tail_share": "Half-hours in the left tail",
             }
         )
     )
-    lines = (
+    names = ["Half-hours flagged as engine running", "Half-hours in the left tail"]
+    top = (
         alt.Chart(long)  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True, aria=False)
+        .mark_bar(aria=False)
         .encode(
-            x=alt.X("month:T", title="Month (2025-03 to 2026-06)", axis=alt.Axis(format="%Y-%m")),
-            y=alt.Y("share:Q", title="Share of D8's half-hours", scale=alt.Scale(domain=[0, 0.8])),
+            x=alt.X("era:N", title=None, sort=eras, axis=alt.Axis(labelAngle=0)),
+            xOffset=alt.XOffset("series:N", sort=names),
+            y=alt.Y(
+                "share:Q",
+                title="Mean monthly share of D8's half-hours",
+                scale=alt.Scale(domain=[0, 0.8]),
+            ),
             color=alt.Color(
                 "series:N",
-                scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
+                sort=names,
+                scale=alt.Scale(domain=names, range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
                 legend=alt.Legend(orient="top", title=None, direction="vertical", labelLimit=500),
             ),
         )
+        .properties(width=WIDTH - 60, height=170)
     )
     drops = (
-        alt.Chart(m)  # ty: ignore[unresolved-attribute]
-        .mark_bar(color=ocf.GREY_3, opacity=0.8, aria=False, size=12)
+        alt.Chart(pooled)  # ty: ignore[unresolved-attribute]
+        .mark_bar(color=ocf.GREY_3, opacity=0.8, aria=False, size=40)
         .encode(
-            x=alt.X("month:T", title="Month", axis=alt.Axis(format="%Y-%m")),
-            y=alt.Y("drops_started:Q", title="Drops started", axis=alt.Axis(tickMinStep=1)),
+            x=alt.X("era:N", title=None, sort=eras, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("drops_started:Q", title="Drops started per month"),
         )
         .properties(width=WIDTH - 60, height=70)
     )
-    top = lines.properties(width=WIDTH - 60, height=170)
     return alt.vconcat(top, drops).properties(
         title=alt.TitleParams(
-            "D8's shortfall and its drops stop after February 2026; the detector's flag does not",
+            "D8's shortfall and its drops stop; the detector's flag does not",
             subtitle=wrapped(
-                "Lines: D8 by month. Grey bars: drops starting that month (none after January 2026)."
+                "Means over the months of each era. Grey bars: drops started per month, no drop starts after the shortfall fades."
             ),
             anchor="start",
         )
@@ -175,7 +192,7 @@ def main() -> None:
         ("figure_2", figure_depth()),
         ("figure_3", figure_fade()),
     ):
-        chart.save(OUT_DIR / f"{name}.svg")
+        guard.save_chart(chart=chart, path=OUT_DIR / f"{name}.svg")
         print(name, flush=True)
 
 

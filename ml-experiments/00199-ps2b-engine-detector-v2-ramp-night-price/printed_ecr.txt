@@ -5,7 +5,7 @@ shape: (1, 7)
 │ ---          ┆ ---                  ┆ --- ┆ --- ┆ ---       ┆ ---            ┆ ---         │
 │ str          ┆ str                  ┆ str ┆ f64 ┆ str       ┆ date           ┆ f64         │
 ╞══════════════╪══════════════════════╪═════╪═════╪═══════════╪════════════════╪═════════════╡
-│ Fossil - Oil ┆ Engine (combustion / ┆ No  ┆ 1.0 ┆ Connected ┆ 2021-03-11     ┆ 3.250334    │
+│ Fossil - Oil ┆ Engine (combustion / ┆ No  ┆ [withheld] ┆ Connected ┆ [withheld] ┆ [withheld] │
 │              ┆ reciprocating)       ┆     ┆     ┆           ┆                ┆             │
 └──────────────┴──────────────────────┴─────┴─────┴───────────┴────────────────┴─────────────┘
 == D10: 0 gas, oil, CHP, biogas, or storage slots within 5.0 km

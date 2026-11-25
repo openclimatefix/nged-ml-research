@@ -174,9 +174,7 @@ residuals since the detected change, and `n` removes the level filter.
 - Weekly histogram (penalty 128): recall 0.00 for 10% steps and ramps, 0.10 for 25% steps.
 - D8 (break 2023-08-15): rolling GAM dates the change 2023-08-20 but alarms on 2023-12-06 (113 days
   late); histogram dates it 2023-08-17 and alarms 2023-10-19 (65 days late).
-- The Embedded Capacity Register holds 3 generators of at least 1 MW connected since 2020-06-01 at
-  these
-  Primaries, none at D8 near 2023-08, so the Register gave no independent check of the D8 date.
+- The register gave no independent check of the D8 date.
 - False changes count real load shifts, so the rates are upper bounds.
 
 ## Forecast

@@ -11,6 +11,7 @@ Weather columns of the panel are carried by grid index and never re-joined by ti
 """
 
 import pickle
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -30,6 +31,9 @@ from e00694_common import (  # ty: ignore[unresolved-import]
 from e00694_trackers import grid_track  # ty: ignore[unresolved-import]
 from e00695_common import grid_index  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 EXPERIMENT_ID: Final[int] = 697
 SLUG: Final[str] = "gas-engine-state-tracker-part-4-running-patterns"
@@ -65,7 +69,7 @@ START_SHIFT: Final[timedelta] = timedelta(minutes=30)
 """Subtracted from a power end stamp to give the start of its half-hour."""
 LOCAL_TZ: Final[str] = "Europe/London"
 DAY: Final[int] = 48
-UNIT_MW: Final[float] = 1.97
+UNIT_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw")
 """One engine unit, from the record's output levels (experiment 196)."""
 ERA_NAMES: Final[tuple[str, ...]] = ("net", "solar", "fade")
 VERDICT_ERAS: Final[tuple[str, ...]] = ("net", "solar")

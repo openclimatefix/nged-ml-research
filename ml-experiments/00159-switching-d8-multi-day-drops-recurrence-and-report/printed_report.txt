@@ -4,14 +4,12 @@ Sensitivity: threshold -2.0 MW gives 24 drops of 2 days or longer
 Sensitivity: threshold -2.5 MW gives 15 drops of 2 days or longer
 Drops (smoothed residual below -1.5 MW, >= 2 days): 29
 
-Depth (median expected minus metered, MW): median 2.71, range 1.19 to 5.36, mean 2.89, sd 1.09
+Depth (median expected minus metered, MW): [withheld]
 Duration (days): median 3.6, range 2.0 to 19.2
 Total days inside drops: 148.2 of 1642 (0.090)
 First drop: 2022-08-09; last: 2026-01-27
 Drops per start year: {2022: 1, 2023: 3, 2024: 7, 2025: 15, 2026: 3}
 Drops starting on or after 2023-07-01: 28 of 29
-Half-hours inside drops: below 1 MW 0.063, below 3 MW 0.435, median power 3.43 MW, median expected 6.20 MW
-Half-hours outside drops, after the first: below 1 MW 0.015, below 3 MW 0.158, median power 6.00 MW, median expected 6.38 MW
 start weekday counts Mon..Sun [3, 5, 7, 3, 1, 5, 5], chi-squared p = 0.479
 end weekday counts Mon..Sun [3, 3, 3, 4, 5, 8, 3], chi-squared p = 0.539
 start hour counts by 6-hour block (0-6, 6-12, 12-18, 18-24) [11, 3, 5, 10], chi-squared p = 0.104
@@ -26,7 +24,7 @@ Drop starts by season: {'winter (Dec-Feb)': 8, 'spring (Mar-May)': 3, 'summer (J
 Mean temperature during a drop minus the month's mean: -0.55 C (95% interval -1.61 to +0.49)
 
 Neighbour check: best step-up among D3, D14, and D5 in the 6 hours after the start
-Best neighbour step (MW): median +0.12, range -1.42 to +4.04; drop depth median 2.71
+Best neighbour step (MW): median +0.12, range -1.42 to +4.04; drop depth median [withheld]
 Share of drops with a neighbour step-up of at least 0.25 x depth: 11 of 29 (0.38; 0.23 to 0.56); placebo (random times from July 2023, away from any drop, same time of day) 0.344
 Share of drops with a neighbour step-up of at least 0.50 x depth: 8 of 29 (0.28; 0.15 to 0.46); placebo (random times from July 2023, away from any drop, same time of day) 0.214
 Share of drops with a neighbour step-up of at least 0.75 x depth: 5 of 29 (0.17; 0.08 to 0.35); placebo (random times from July 2023, away from any drop, same time of day) 0.124

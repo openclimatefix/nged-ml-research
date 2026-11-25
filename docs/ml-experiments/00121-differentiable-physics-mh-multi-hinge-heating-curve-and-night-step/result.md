@@ -104,9 +104,9 @@ detected, so every night label stays `not powered` and the verdict is `inconclus
 better.** It is measured in points, which are percent of a substation's effective capacity and not
 MW, after the recent-error filter (a Kalman filter that corrects each forecast with the latest
 metered error) unless stated. All forecasts use observed ERA5 temperature and CAMS irradiance
-instead of weather forecasts, so each number is a ceiling for a live forecast. One point is 0.054
-to 0.117 MW depending on the substation (effective capacity 5.72 MW at D5, 5.40 at D10, 10.78 at
-D11, 11.71 at D14, and 9.12 at D16).
+instead of weather forecasts, so each number is a ceiling for a live forecast. One point is 1% of
+the substation's effective capacity, so a point is a different number of megawatts at each
+substation. The capacities are withheld.
 
 | Code | Meaning |
 |---|---|
@@ -148,18 +148,18 @@ it.** The evolving night step (NS-UT) is worse than the fixed one.
 **B0-K gets 15 to 45% of the observed step; NS-U-K and NS-HW-K get most of it.** The table gives,
 over cold winter weekday nights (22:00 to 08:00, daily mean temperature below 8 C, 55 to 59 nights
 per substation in the scored winter, 64 to 65 in the replicate winter), the median observed step
-(half-hour starting 00:30 minus the half-hour starting 00:00) in points and MW, and each forecast's
+(half-hour starting 00:30 minus the half-hour starting 00:00) in points, and each forecast's
 median step minus it, with a 95% interval from resampling nights. This readout includes rows inside
 the switching masks, which every score on the page excludes; excluding them moves the gaps by at
 most 0.5 points.
 
-| Substation | Observed step, points (MW) | B0-K minus observed | NS-U-K minus observed | NS-HW-K minus observed |
+| Substation | Observed step, points | B0-K minus observed | NS-U-K minus observed | NS-HW-K minus observed |
 |---|---|---|---|---|
-| D5 | 7.0 (0.40) | −4.3 (−4.8 to −3.4) | −0.5 (−1.0 to +0.4) | +0.3 (−0.5 to +1.0) |
-| D10 | 11.3 (0.61) | −7.9 (−8.3 to −7.5) | −3.1 (−3.4 to −2.7) | −2.6 (−3.0 to −2.0) |
-| D11 | 3.6 (0.38) | −2.0 (−2.3 to −1.7) | −0.2 (−0.5 to +0.1) | +0.2 (−0.1 to +0.5) |
-| D14 | 1.8 (0.22) | −1.6 (−2.0 to −1.5) | −0.3 (−0.6 to −0.1) | −0.1 (−0.5 to +0.1) |
-| D16 | 7.9 (0.72) | −6.0 (−6.6 to −5.2) | −1.9 (−2.5 to −1.2) | −1.4 (−2.0 to −0.8) |
+| D5 | 7.0 | −4.3 (−4.8 to −3.4) | −0.5 (−1.0 to +0.4) | +0.3 (−0.5 to +1.0) |
+| D10 | 11.3 | −7.9 (−8.3 to −7.5) | −3.1 (−3.4 to −2.7) | −2.6 (−3.0 to −2.0) |
+| D11 | 3.6 | −2.0 (−2.3 to −1.7) | −0.2 (−0.5 to +0.1) | +0.2 (−0.1 to +0.5) |
+| D14 | 1.8 | −1.6 (−2.0 to −1.5) | −0.3 (−0.6 to −0.1) | −0.1 (−0.5 to +0.1) |
+| D16 | 7.9 | −6.0 (−6.6 to −5.2) | −1.9 (−2.5 to −1.2) | −1.4 (−2.0 to −0.8) |
 
 ![Cold winter nights, forecast against observed](figure_2_cold_nights.svg)
 
@@ -231,7 +231,7 @@ per-substation curve is shown.
   needed; NS-HW beat B0 on winter nights with a cold step in 72% against 90%). It was redefined
   after seeing that failure.
 - **Gate 4'' (redefined with a stated effect size and power target) failed.** At 5% false
-  positives (1 to 4% verified), a 4-point step (0.2 to 0.5 MW) is detected on the label's night
+  positives (1 to 4% verified), a 4-point step is detected on the label's night
   rows by NS-U in 14%, NS-HW in 14%, and NS-H in 8% of draws; a 7-point step in 59%, 57%, and 10%.
   On the step's own half-hour: 58%, 65%, and 16% for 4 points. NS-U does not detect a local-clock
   step (5%). Because gate 4'' failed, N2, N3, N4, and the indexing contrast are `not powered`, and
@@ -563,7 +563,7 @@ are agreed with the experiment manager.
   the labels it covers stay `not powered`, the verdict stays `inconclusive`, and the gate is not
   redefined again.
     - **Injected steps.** A step of 4 points and a step of 7 points of effective capacity (the sizes
-      seen at D5, D10, and D16; the units bullet below converts to MW) in the half-hour
+      seen at D5, D10, and D16) in the half-hour
       starting 00:30. The night-row noise has a standard deviation of 4.6 to 7.7 points at D5 and
       D10, so 4 points is about one noise standard deviation. Three kinds: a flat step on the UTC
       clock all year (`utc`), a flat step on the local clock all year (`local`), and a
@@ -571,13 +571,10 @@ are agreed with the experiment manager.
       the first smoothed temperature, scaled so the mean over the winter rows of that half-hour
       equals the stated size). A `placebo` has no step.
     - **Units.** The quantile score and every step are in points, that is, percent of the
-      substation's effective capacity, and not in MW. A step of `p` points is `p` times the
-      effective capacity divided by 100 in MW. The effective capacity is a single table value per
-      substation (5.72 MW at D5, 5.40 MW at D10, 10.78 MW at D11, 11.71 MW at D14, and 9.12 MW at
-      D16), so the MW conversion of a step carries the interval of the step in points and no
-      additional interval. A 4-point step is 0.23, 0.22, 0.43, 0.47, and 0.36 MW at D5, D10, D11,
-      D14, and D16, and a 7-point step is 0.40, 0.38, 0.75, 0.82, and 0.64 MW. The measured residual
-      steps of 4.4, 7.3, and 5.4 points at D5, D10, and D16 are 0.25, 0.39, and 0.49 MW.
+      substation's effective capacity, and not in MW. The effective capacity is a single table value
+      per substation, so a conversion of a step to MW carries the interval of the step in points and
+      no additional interval. The MW conversions of the injected and measured steps are withheld,
+      with the capacities.
     - **Statistic.** For an arm, the mean quantile score minus B0's on the label's own rows (BST
       nights for NS-U, winter nights for NS-H and NS-HW), unfiltered, on the same noise.
     - **Critical value.** The 5th percentile of the statistic over 100 placebo draws (20 per

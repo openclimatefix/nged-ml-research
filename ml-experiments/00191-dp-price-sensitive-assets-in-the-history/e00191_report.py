@@ -22,7 +22,9 @@ def contrast_table(*, variant: str, sites: tuple[str, ...], cut: str) -> None:
     for site in sites:
         row = report[site][cut]
         base = row["a0"]
-        print(f"{site}: a0 mae {base['ae']:.3f} qs {base['qs']:.3f} cov90 {base['cov90']:.2f}")
+        print(
+            f"{common.shown(site)}: a0 mae {base['ae']:.3f} qs {base['qs']:.3f} cov90 {base['cov90']:.2f}"
+        )
         for arm in ARMS[1:]:
             ae, qs = row[f"{arm}_minus_a0_ae"], row[f"{arm}_minus_a0_qs"]
             print(
@@ -40,7 +42,7 @@ def tails(*, variant: str, sites: tuple[str, ...]) -> None:
         for arm in ("a0", "h"):
             r = report[site]["all"][arm]
             print(
-                f"{site} {arm}: "
+                f"{common.shown(site)} {arm}: "
                 + "  ".join(
                     f"{q}: pin {r[f'pin_{q}']:.3f}, below {r[f'below_{q}']:.3f}"
                     for q in ("q01", "q05", "q95", "q99")
@@ -54,15 +56,20 @@ def median_minus_mean(*, variant: str, sites: tuple[str, ...]) -> None:
     for site in sites:
         frame = score.load(variant=variant, site=site)
         by_arm = frame.group_by("arm").agg((pl.col("q50") - pl.col("mean")).mean().alias("d"))
-        print(site, {r["arm"]: round(r["d"], 3) for r in by_arm.sort("arm").iter_rows(named=True)})
+        print(
+            common.shown(site),
+            {r["arm"]: round(r["d"], 3) for r in by_arm.sort("arm").iter_rows(named=True)},
+        )
 
 
 def against_experiment_155() -> None:
-    """Compare a0 at D14 with experiment 155's arm D and 136's A2 on the rows they share."""
-    mine = score.losses(frame=score.load(variant="gated", site="D14")).filter(pl.col("arm") == "a0")
+    """Compare a0 at the register's Primary with experiment 155's arm D and 136's A2 on the rows they share."""
+    mine = score.losses(frame=score.load(variant="gated", site=common.REGISTER_PRIMARY)).filter(
+        pl.col("arm") == "a0"
+    )
     for name, path in (
-        ("155 arm D", ML_EXPERIMENTS_DATA_DIR / "00155-dp-bg-stage2-assembly-night-offset-and-error-correction/work/dp_preds/d_scored_D14.parquet"),
-        ("136 arm A2", ML_EXPERIMENTS_DATA_DIR / "00136-dp-bg-stage1-assembly-on-the-ensemble-mean/work/dp_preds/a2_scored_D14.parquet"),
+        ("155 arm D", ML_EXPERIMENTS_DATA_DIR / f"00155-dp-bg-stage2-assembly-night-offset-and-error-correction/work/dp_preds/d_scored_{common.REGISTER_PRIMARY}.parquet"),
+        ("136 arm A2", ML_EXPERIMENTS_DATA_DIR / f"00136-dp-bg-stage1-assembly-on-the-ensemble-mean/work/dp_preds/a2_scored_{common.REGISTER_PRIMARY}.parquet"),
     ):  # fmt: skip
         other = pl.read_parquet(path).with_columns(
             month=pl.col("valid_time").dt.month() + 100 * pl.col("valid_time").dt.year(),
@@ -78,7 +85,7 @@ def against_experiment_155() -> None:
             other.select("run", "valid_time", o_qs="qs", o_ae="ae"), on=["run", "valid_time"]
         )
         print(
-            f"\nD14, rows shared with {name}: {joined.height:,}; a0 qs {joined['a_qs'].mean():.4f} "
+            f"\nthe register's Primary, rows shared with {name}: {joined.height:,}; a0 qs {joined['a_qs'].mean():.4f} "
             f"mae {joined['a_ae'].mean():.4f}; {name} qs {joined['o_qs'].mean():.4f} "
             f"mae {joined['o_ae'].mean():.4f}"
         )

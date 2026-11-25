@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """Draw the figures for experiment 194 from the tables the other scripts wrote."""
 
+import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Final
@@ -12,106 +13,119 @@ import polars as pl
 from plotting import ocf_theme as ocf
 from studies.charts import CONTENT_WIDTH_PX
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
+
 DOCS_DIR: Final[Path] = Path("docs/ml-experiments/00194-" + common.SLUG)
 WIDTH: Final[int] = CONTENT_WIDTH_PX - 80
 CHANGE: Final[date] = date(2023, 8, 14)
 FALL: Final[date] = date(2026, 3, 9)
 
-
-def rule(*, day: date, colour: str, dash: list[int] | None = None) -> alt.Chart:
-    """Return a vertical rule at a date."""
-    return (
-        alt.Chart(pl.DataFrame({"x": [day]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(color=colour, strokeDash=dash or [], strokeWidth=2)
-        .encode(x="x:T")
-    )
+SITE_NAMES: Final[dict[str, str]] = {
+    "D8": "D8",
+    "D3": "D3",
+    "D5": "D5",
+    common.REGISTER_PRIMARY: common.REGISTER_PRIMARY,
+}
+"""Chart label of each site."""
 
 
 def main() -> None:  # noqa: D103
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    # Figure 1: weekly left-tail share, D8 against controls.
-    frames = []
+    # Figure 1: shortfall share pooled over three eras; no dates, no megawatt values.
+    era_order = ["Before the shortfall starts", "While the shortfall lasts", "After it fades"]
+    rows = []
     for label in ("D8", *common.CONTROL_LABELS):
         w = pl.read_parquet(common.DATA_DIR / f"weekly_{label}.parquet").filter(pl.col("n") >= 168)
-        frames.append(w.select("time", "share").with_columns(site=pl.lit(label)))
-    weekly = pl.concat(frames)
-    # weekly files stop at 2026-07; they cover the whole window.
-    lines = (
-        alt.Chart(weekly)
-        .mark_line()
+        day = w["time"].dt.date()
+        era = (
+            pl.when(day < CHANGE)
+            .then(pl.lit(era_order[0]))
+            .when(day < FALL)
+            .then(pl.lit(era_order[1]))
+            .otherwise(pl.lit(era_order[2]))
+        )
+        pooled = (
+            w.with_columns(era=era)
+            .group_by("era")
+            .agg(k=pl.col("k").sum(), n=pl.col("n").sum())
+            .with_columns(
+                share=pl.col("k") / pl.col("n"), site=pl.lit(SITE_NAMES.get(label, label))
+            )
+        )
+        rows.append(pooled.select("era", "site", "share"))
+    fig1 = (
+        alt.Chart(pl.concat(rows))
+        .mark_bar(aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("time:T", title="Week"),
-            y=alt.Y("share:Q", title="Share of half-hours below -2.5 MW"),
+            x=alt.X(
+                "site:N", title=None, sort=list(SITE_NAMES.values()), axis=alt.Axis(labelAngle=0)
+            ),
+            y=alt.Y("share:Q", title="Share of half-hours in shortfall"),
             color=alt.Color(
                 "site:N",
-                title=None,
+                legend=None,
                 scale=alt.Scale(
-                    domain=["D8", "D3", "D5", "D14"],
+                    domain=list(SITE_NAMES.values()),
                     range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY, ocf.DATA_PURPLE],
                 ),
             ),
-            strokeWidth=alt.condition(alt.datum.site == "D8", alt.value(2.5), alt.value(1)),
+            column=alt.Column("era:N", title=None, sort=era_order),
+        )
+        .properties(
+            width=WIDTH // 4,
+            height=160,
+            title="D8's shortfall share is high only while the shortfall lasts (pooled eras)",
         )
     )
-    (
-        lines + rule(day=CHANGE, colour="black") + rule(day=FALL, colour="grey", dash=[4, 3])
-    ).properties(
-        width=WIDTH,
-        height=200,
-        title="D8's shortfall starts 2023-08-14 (black) and fades from March 2026 (grey dashed)",
-    ).save(DOCS_DIR / "figure_1.svg")
+    guard.save_chart(chart=fig1, path=DOCS_DIR / "figure_1.svg")
 
-    # Figure 2: daily zoom around the break.
-    both = (
-        pl.read_parquet(common.DATA_DIR / "d8_vs_g2.parquet")
-        .filter(
-            pl.col("time").is_between(
-                datetime(2023, 7, 15, tzinfo=UTC), datetime(2023, 9, 15, tzinfo=UTC), closed="left"
-            )
+    # Figure 2: pooled before and after the break; no dates, no megawatt values, no counts per day.
+    both = pl.read_parquet(common.DATA_DIR / "d8_vs_g2.parquet").filter(
+        pl.col("time").is_between(
+            datetime(2023, 7, 15, tzinfo=UTC), datetime(2023, 9, 15, tzinfo=UTC), closed="left"
         )
-        .with_columns(day=pl.col("time").dt.date())
     )
-    daily = (
-        both.group_by("day")
+    last_g2 = both.filter(pl.col("g2").is_not_null())["time"].dt.date().max()
+    pooled = (
+        both.with_columns(
+            period=pl.when(pl.col("time").dt.date() <= last_g2)
+            .then(pl.lit("Before the break"))
+            .otherwise(pl.lit("After the break")),
+        )
+        .group_by("period")
         .agg(
             tail=pl.col("tail").mean(),
-            g2_max=pl.col("g2").max(),
-            readings=pl.col("g2").is_not_null().sum(),
+            readings=pl.col("g2").is_not_null().mean(),
         )
-        .sort("day")
     )
+    order = ["Before the break", "After the break"]
     top = (
-        alt.Chart(daily)
-        .mark_bar(color=ocf.BRAND_ORANGE)
+        alt.Chart(pooled)
+        .mark_bar(color=ocf.BRAND_ORANGE, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("day:T", title=None),
+            x=alt.X("period:N", title=None, sort=order, axis=alt.Axis(labelAngle=0)),
             y=alt.Y("tail:Q", title="D8 shortfall share"),
         )
         .properties(
-            width=WIDTH,
+            width=WIDTH // 2,
             height=110,
-            title="Day by day around the break: D8's shortfall starts on 2023-08-15, the day G2's last output reading arrives",
+            title=[
+                "D8's shortfall share is higher after the break, once G2's output",
+                "readings stop arriving (the weeks either side, pooled)",
+            ],
         )
-    )
-    mid = (
-        alt.Chart(daily.filter(pl.col("g2_max").is_not_null()))
-        .mark_bar(color=ocf.DATA_BLUE)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("day:T", title=None),
-            y=alt.Y("g2_max:Q", title="G2 daily max (MW)"),
-        )
-        .properties(width=WIDTH, height=90)
     )
     bot = (
-        alt.Chart(daily)
-        .mark_bar(color=ocf.DATA_BLUE_LIGHT)
+        alt.Chart(pooled)
+        .mark_bar(color=ocf.DATA_BLUE_LIGHT, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("day:T", title="Day"),
-            y=alt.Y("readings:Q", title="G2 readings that day (of 48)"),
+            x=alt.X("period:N", title=None, sort=order, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("readings:Q", title="Share of half-hours with a G2 reading"),
         )
-        .properties(width=WIDTH, height=70)
+        .properties(width=WIDTH // 2, height=90)
     )
-    alt.vconcat(top, mid, bot).save(DOCS_DIR / "figure_2.svg")
+    guard.save_chart(chart=alt.vconcat(top, bot), path=DOCS_DIR / "figure_2.svg")
 
     # Figure 3: G2 running by price fifth.
     g2 = pl.read_parquet(common.DATA_DIR / "g2_window.parquet")
@@ -139,25 +153,26 @@ def main() -> None:  # noqa: D103
         )
     )
     err = alt.Chart(d).mark_rule(color="black").encode(x="fifth:O", y="low:Q", y2="high:Q")  # ty: ignore[unresolved-attribute]
-    (bars + err).properties(
+    fig3 = (bars + err).properties(
         width=WIDTH // 2,
         height=170,
         title="G2 ran in 9% of the cheapest and 26% of the dearest fifth (95% intervals)",
-    ).save(DOCS_DIR / "figure_3.svg")
+    )
+    guard.save_chart(chart=fig3, path=DOCS_DIR / "figure_3.svg")
 
-    # Figure 4: residual histograms.
+    # Figure 4: residual histograms per period; no dates, residual in multiples of the threshold.
     d8 = pl.read_parquet(common.DATA_DIR / "d8_resid.parquet")
     periods = {
-        "1 before the engine (2022-01 to 2023-06-12)": (
+        "1 before the engine": (
             datetime(2022, 1, 1, tzinfo=UTC),
-            datetime(2023, 6, 13, tzinfo=UTC),
+            common.ENGINE_CONNECTED,
         ),
-        "2 G2 output arrives (2023-07-03 to 08-15)": (common.G2_FIRST, common.G2_LAST),
-        "3 after (2023-09 to 2025-12)": (
+        "2 G2 output arrives": (common.G2_FIRST, common.G2_LAST),
+        "3 after": (
             datetime(2023, 9, 1, tzinfo=UTC),
             datetime(2026, 1, 1, tzinfo=UTC),
         ),
-        "4 spring 2026 (April to June)": (
+        "4 the shortfall has faded": (
             datetime(2026, 4, 1, tzinfo=UTC),
             datetime(2026, 7, 1, tzinfo=UTC),
         ),
@@ -168,36 +183,60 @@ def main() -> None:  # noqa: D103
         arr = d8.filter(pl.col("time").is_between(a, b, closed="left"))["resid"].to_numpy()
         h, _ = np.histogram(arr, bins=bins)
         hist_rows += [
-            {"period": name, "mw": float(bins[i] + 0.25), "share": float(h[i] / arr.size)}
+            {
+                "period": name,
+                "scaled": float((bins[i] + 0.25) / abs(common.LEFT_TAIL_MW)),
+                "share": float(h[i] / arr.size),
+            }
             for i in range(h.size)
         ]
-    alt.Chart(pl.DataFrame(hist_rows)).mark_bar(color=ocf.BRAND_ORANGE).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("mw:Q", title="D8 metered minus expected power (MW)"),
-        y=alt.Y("share:Q", title=None),
-        row=alt.Row("period:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left")),
-    ).properties(
-        width=WIDTH - 120,
-        height=70,
-        title="D8's residual gains a long negative tail after G2's output stops arriving (share of half-hours)",
-    ).save(DOCS_DIR / "figure_4.svg")
+    fig4 = (
+        alt.Chart(pl.DataFrame(hist_rows))
+        .mark_bar(color=ocf.BRAND_ORANGE, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "scaled:Q",
+                title="D8 metered minus expected power, in multiples of the shortfall threshold",
+            ),
+            y=alt.Y("share:Q", title=None),
+            row=alt.Row("period:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left")),
+        )
+        .properties(
+            width=WIDTH - 120,
+            height=70,
+            title="D8's residual gains a long negative tail after G2's output stops arriving (share of half-hours)",
+        )
+    )
+    guard.save_chart(chart=fig4, path=DOCS_DIR / "figure_4.svg")
 
-    # Figure 5: monthly share with the scored year of experiment 191.
+    # Figure 5: shortfall share in the scored year against the earlier history, pooled.
     monthly = pl.read_parquet(common.DATA_DIR / "d8_monthly.parquet")
-    band = (
-        alt.Chart(pl.DataFrame({"a": [date(2025, 7, 1)], "b": [date(2026, 7, 1)]}))  # ty: ignore[unresolved-attribute]
-        .mark_rect(color=ocf.DATA_BLUE_LIGHT, opacity=0.4)
-        .encode(x="a:T", x2="b:T")
+    scored_start = datetime(2025, 7, 1, tzinfo=UTC)
+    names = ["Earlier history", "Scored year"]
+    pooled5 = (
+        monthly.with_columns(
+            part=pl.when(pl.col("time") >= scored_start)
+            .then(pl.lit(names[1]))
+            .otherwise(pl.lit(names[0]))
+        )
+        .group_by("part")
+        .agg(k=pl.col("k").sum(), n=pl.col("n").sum())
+        .with_columns(share=pl.col("k") / pl.col("n"))
     )
-    line = (
-        alt.Chart(monthly)  # ty: ignore[unresolved-attribute]
-        .mark_line(color=ocf.BRAND_ORANGE, strokeWidth=2.5, point=True)
-        .encode(x=alt.X("time:T", title="Month"), y=alt.Y("share:Q", title="Share below -2.5 MW"))
+    fig5 = (
+        alt.Chart(pooled5)
+        .mark_bar(color=ocf.BRAND_ORANGE, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("part:N", title=None, sort=names, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("share:Q", title="Share of half-hours in shortfall"),
+        )
+        .properties(
+            width=WIDTH // 2,
+            height=160,
+            title="Experiment 191's scored year against the earlier history (pooled)",
+        )
     )
-    (band + line).properties(
-        width=WIDTH,
-        height=160,
-        title="Experiment 191's scored year (blue) holds seven months of the shortfall and five of its absence",
-    ).save(DOCS_DIR / "figure_5.svg")
+    guard.save_chart(chart=fig5, path=DOCS_DIR / "figure_5.svg")
 
 
 if __name__ == "__main__":

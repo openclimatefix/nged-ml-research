@@ -342,14 +342,20 @@ def cmd_score() -> None:
                         seed=seed,
                     ):
                         losses.append({"arm": arm, **r})
-                    ref = pl.read_parquet(D709 / "bank" / f"none_{month}_s{seed}" / path.name).join(
-                        forecast.select("time_series_id", "power_fcst_init_time", "valid_time"),
-                        on=["time_series_id", "power_fcst_init_time", "valid_time"], how="inner",
-                    )  # fmt: skip
-                    for r in event_rows(
-                        forecast=ref, events=events, ids=ids, name=path.stem, fold=month, seed=seed
-                    ):
-                        losses.append({"arm": "C", **r})
+                    if arm == star:  # one Candidate reference per pass, not one per arm
+                        ref = pl.read_parquet(D709 / "bank" / f"none_{month}_s{seed}" / path.name).join(
+                            forecast.select("time_series_id", "power_fcst_init_time", "valid_time"),
+                            on=["time_series_id", "power_fcst_init_time", "valid_time"], how="inner",
+                        )  # fmt: skip
+                        for r in event_rows(
+                            forecast=ref,
+                            events=events,
+                            ids=ids,
+                            name=path.stem,
+                            fold=month,
+                            seed=seed,
+                        ):
+                            losses.append({"arm": "C", **r})
     frame = pl.DataFrame(losses)
     per_event = frame.group_by("arm", "fold", "pass", "event", "slice").agg(pl.col("crps").mean())
     out = {}

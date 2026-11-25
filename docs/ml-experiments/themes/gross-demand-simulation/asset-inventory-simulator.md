@@ -108,11 +108,11 @@ per-asset capacity and a distribution of running times. Both quantities are aver
 events, so each event only has to be found often enough to estimate the average.
 
 **The D8 gas-engine line is the closest precedent for the relaxed formulation, and it shows both
-what works and what does not.** The best-supported account of D8 is that a 6 MW gas engine below it
+what works and what does not.** The best-supported account of D8 is that a gas engine below it
 stopped being added back into D8's reading on 2023-08-15. After that date D8's power falls well
 below what a fitted model expects whenever the engine runs ([experiment
 194](../../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)).
-NGED has not confirmed this account. A hidden Markov model of up to three units of about 1.75 MW
+NGED has not confirmed this account. A hidden Markov model of up to three engine units
 detects when the engine is running, when the engine's recorded output is added to D8's reading, but
 raises too many false alarms at three of six other Primaries ([experiment
 196](../../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)). The
@@ -125,8 +125,7 @@ forecast.** With the state of the last settled day, the engine term made the for
 ([experiment 294](../../00294-regime-aware-model-at-d8-engine-state-term/result.md)). Experiment 294
 did not try to forecast the state, so whether the state can be forecast is open. The relaxed
 formulation sidesteps the question by modelling how often and how long the engine runs. The unit
-size is not yet estimated well: experiment 294's fitted unit is 1.4 to 1.5 MW against a recorded
-1.97 MW.
+size is not yet estimated well: experiment 294's fitted unit differs from the recorded unit.
 
 ### What the net series can identify
 
@@ -204,7 +203,7 @@ voltage. Of the 98 slots, 97 carry a connection date.
 |---|---|---|---|
 | Solar | 77 | 33.2 | 15 (all) |
 | Bioenergy (biomass, biogas, landfill gas) | 8 | 11.1 | 6 |
-| Gas or oil engine | 2 | 7.0 | 2 (D14 6.0 MW, D5 1.0 MW) |
+| Gas or oil engine | 2 | not shown | 2 |
 | Type not given | 7 | 4.3 | 6 |
 | Wind | 1 | 1.2 | 1 (D9) |
 | Storage | 3 | 0.65 | 3 |
@@ -222,10 +221,10 @@ scenario could add before they appear in the net series.
   673](../../00673-pv-capacity-for-nged-per-primary-with-register-cross-check/result.md)). The
   registers together therefore miss part of the solar capacity. The Feed-in Tariff report, which
   does list small sites, ends in March 2025.
-- **The register name and the meter that records an asset can differ.** The 6 MW gas engine that
-  appears in D8's readings is registered under D14, and experiment 194 warns against reading the
-  register's Primary column as the substation whose meter records the asset. In that case, an asset
-  list read from the Primary column alone would put the engine at the wrong Primary.
+- **The register name and the meter that records an asset can differ.** A gas engine that appears in
+  D8's readings is registered under a different Primary, and experiment 194 warns against reading
+  the register's Primary column as the substation whose meter records the asset. In that case, an
+  asset list read from the Primary column alone would put the engine at the wrong Primary.
 - **Some rows cannot be placed.** Across the whole register, 655 connected rows carry no coordinate
   and 203 carry a coordinate inflated by a power of ten (experiment 673), and 7 slots at the study
   Primaries give no technology.
@@ -268,7 +267,7 @@ estimates. Each use carries a prediction that could fail and the measurement tha
 
 | Rank | Use | Value to NGED | Effort to build and test | Prediction that could fail | How it would be measured |
 |---|---|---|---|---|---|
-| 1 | An asset list per Primary, with parameters, beside the register | High: a stated main benefit; shows where the register name and the meter disagree, as for the D8 engine registered under D14 | Low: reuses the parts above | On injected known answers, capacity within 20% for every listed asset that steps 8 noise units or more, and under 0.5 MW for a listed asset that is absent | The smallest test below; the list is then shown as inferred |
+| 1 | An asset list per Primary, with parameters, beside the register | High: a stated main benefit; shows where the register name and the meter disagree, as for the D8 engine, which the register lists under a different Primary | Low: reuses the parts above | On injected known answers, capacity within 20% for every listed asset that steps 8 noise units or more, and under 0.5 MW for a listed asset that is absent | The smallest test below; the list is then shown as inferred |
 | 2 | Scenarios at long horizons (months ahead), for curtailment and planning | High: a stated aim of the forecast, and the horizon the maintainer says matters most | Medium to high: needs a running-time model per asset, forward models with real operating logic, and a demand scenario model | Issued a month ahead, between 0.5% and 2% of held-out half-hours fall above the scenarios' 0.99 quantile, and likewise below the 0.01 quantile, with a narrower 0.01-to-0.99 band than a block bootstrap of the Primary's own residual history | Coverage and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles on held-out months of 2026-01 to 2026-06 |
 | 3 | A what-if at days 1 to 10, such as a dormant generator that turns on | Medium to high: a question the maintainer named | Medium: needs a gas-engine plant model, which does not exist | Replaying a known start or stop, such as the D8 engine's change on 2023-08-15, the simulated change in the net series is within 30% of the observed change (a proposed threshold) | Error of the simulated step against the observed step on the known events |
 | 4 | A new connection added from the register before it appears in the data | Medium to high for planning; needs NGED to say which connections matter | Medium | For assets connected in 2024 to 2026, a scenario that adds the registered asset at its connection date moves the post-connection error of the solar or step term by at least half the asset's registered MW | Retrospective: hold out the data after each connection date and compare with and without the registered asset |
@@ -325,8 +324,8 @@ an option for the maintainer, not a planned experiment.
   which Primaries have export limits or flexible connections, and whether any metered generator's
   output is still added back into a Primary's reading. We have not asked.
 - **Validation of the asset list.** NGED cannot confirm which assets sit behind which meter beyond
-  the register, so only known-answer tests validate the list. The D8 engine registered under D14
-  shows that agreement with the register is not proof.
+  the register, so only known-answer tests validate the list. The D8 engine, which the register
+  lists under a different Primary, shows that agreement with the register is not proof.
 - **Bands may do the work.** At D8, widening the bands from past residuals cut the quantile score by
   9% to 19% and lifted the share of readings inside the 90% band from 42% to between 80% and 87%
   (experiment 264). A scenario use must beat that simpler widening before an engine term is worth

@@ -2,7 +2,6 @@
 """Draw the figures of experiment 191 from the score file and the stored fits."""
 
 import json
-import pickle
 from pathlib import Path
 from typing import Final
 
@@ -20,11 +19,15 @@ ARM_LABELS: Final[dict[str, str]] = {
     "p": "P: last settled day's price",
     "t": "T: price-driven half-hours removed from training",
 }
-CAPACITY_MW: Final[dict[str, float]] = {"D8": 10.379, "D14": 11.706}
+
+
+def chart_name(site: str) -> str:
+    """Return the site's label for a chart, naming the register's Primary generically."""
+    return "register's Primary" if site == common.REGISTER_PRIMARY else site
 
 
 def forest() -> None:
-    """Figure 1: each arm's mean absolute error minus the reference arm's, at D8 and D14."""
+    """Figure 1: each arm's mean absolute error minus the reference arm's, at D8 and the register's Primary."""
     report = json.loads((common.WORK_DIR / "score_gated.json").read_text())
     rows = []
     for site in common.ASSET_SITES:
@@ -34,7 +37,7 @@ def forest() -> None:
             c = row[f"{arm}_minus_a0_ae"]
             rows.append(
                 {
-                    "site": f"{site} (reference error {base:.1f} points)",
+                    "site": f"{chart_name(site)} (reference error {base:.1f} points)",
                     "label": label,
                     "diff": c["pct"],
                     "lo": c["low"] / base * 100,
@@ -69,7 +72,7 @@ def forest() -> None:
         )
         .properties(
             title=alt.TitleParams(
-                "At D8 and D14, no price-aware arm lowers the error clearly",
+                "At D8 and the register's Primary, no price-aware arm lowers the error clearly",
                 subtitle=[
                     "Dot: estimate. Line: 95% interval from resampling the 12 months of the scored year.",
                     "Orange dashed line: same error as the reference, which has no price input.",
@@ -84,57 +87,9 @@ def forest() -> None:
     chart.save(DOCS_DIR / "figure_1_error_against_reference.svg")
 
 
-def response() -> None:
-    """Figure 2: the fitted price response in MW at each monthly fit, D8 and D14."""
-    rows = []
-    for site in common.ASSET_SITES:
-        fits = pickle.loads((common.FITS_DIR / "gated" / f"{site}.pkl").read_bytes())
-        for cut_fits in fits:
-            theta = cut_fits.joint.theta_price
-            rows.append(
-                {
-                    "site": site,
-                    "cut": cut_fits.cut.replace(tzinfo=None),
-                    "mw": float(theta.sum()) * CAPACITY_MW[site] / 100.0,
-                }
-            )
-    frame = pl.DataFrame(rows)
-    chart = (
-        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True, strokeWidth=2)
-        .encode(
-            x=alt.X("cut:T", title="Month of the fit (each fit uses data up to the 1st)"),
-            y=alt.Y("mw:Q", title="Fitted price response (MW)"),
-            color=alt.Color(
-                "site:N",
-                title=None,
-                scale=alt.Scale(domain=["D8", "D14"], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]),
-                legend=alt.Legend(orient="top"),
-            ),
-        )
-        .properties(
-            width=WIDTH,
-            height=200,
-            title=alt.TitleParams(
-                "The model finds 1.2 to 1.9 MW of price response at D8 and almost none at D14",
-                subtitle=[
-                    "Output that the model takes off net load when all four price indicators are on,",
-                    "from each monthly fit of the price-aware model.",
-                ],
-                fontSize=12,
-                subtitleFontSize=10,
-                anchor="start",
-                offset=14,
-            ),
-        )
-    )
-    chart.save(DOCS_DIR / "figure_2_fitted_price_response.svg")
-
-
 def main() -> None:  # noqa: D103
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     forest()
-    response()
 
 
 if __name__ == "__main__":
