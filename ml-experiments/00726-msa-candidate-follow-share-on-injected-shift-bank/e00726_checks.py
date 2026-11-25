@@ -16,6 +16,7 @@ KM4; 1e-6 for KM2; and a follow share above 0.02 for the 0.50 shifts in KM3.
 
 import argparse
 import difflib
+import json
 import re
 import sys
 from collections.abc import Sequence
@@ -311,8 +312,13 @@ def check_km3() -> bool:
         if rows.height
         else float("nan")
     )
+    input_file = com.data_root() / "checks" / "blind_km3_input.json"
+    input_passed = input_file.exists() and bool(json.loads(input_file.read_text())["passed"])
+    com.blind_report(name="km3_input_seen", passed=input_passed, values={})
     return com.blind_report(
-        name="km3_follow", passed=bool(share > KM3_MIN_SHARE), values={"follow_share_050": share}
+        name="km3_follow",
+        passed=bool(share > KM3_MIN_SHARE) and input_passed,
+        values={"follow_share_050": share},
     )
 
 

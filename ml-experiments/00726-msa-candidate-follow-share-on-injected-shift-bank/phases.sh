@@ -12,14 +12,16 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 run="$here/run.sh"
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}"
 data="$(echo "$DATA_PATH_INTERNAL"/ml-experiments/00726-*)"
+[ -d "$data" ] || { echo "no data folder: $data" >&2; exit 2; }
 mkdir -p "$data/logs"
+max_refusals=720  # 12 hours of one-minute waits
 phase="${1:?usage: phases.sh phaseN [month ...]}"
 shift || true
 months=("$@")
 [ ${#months[@]} -eq 0 ] && months=(2025-11 2025-12 2026-01 2026-02 2026-03 2026-04 2026-05 2026-06)
 
 job() { # job <mode> <label> <script> <args...>
-  local mode="$1" label="$2"
+  local mode="$1" label="$2" refusals=0
   shift 2
   while true; do
     local t0 t1 status
@@ -28,6 +30,11 @@ job() { # job <mode> <label> <script> <args...>
     status=$?
     t1=$(date +%s)
     if [ "$status" -eq 3 ] || [ "$status" -eq 4 ]; then
+      refusals=$((refusals + 1))
+      if [ "$refusals" -ge "$max_refusals" ]; then
+        echo "STOP: job '$label' was refused $refusals times" >&2
+        exit "$status"
+      fi
       sleep 60
       continue
     fi
@@ -45,7 +52,10 @@ chk() { job cpu "check $*" e00726_checks.py "$@"; }
 
 phase0() {
   chk kp
-  for m in 2025-11 2026-06; do chk kc4 --month "$m"; chk kw --month "$m"; done
+  for m in 2025-11 2025-12 2026-01 2026-02 2026-03 2026-04 2026-05 2026-06; do
+    chk kc4 --month "$m"
+    chk kw --month "$m"
+  done
   # KC1: the zero world through the Candidate
   cand zero --root e667 --month 2025-11 --seeds 0 --passes 0
   cand zero --root e667 --month 2026-04 --seeds 0 --passes 0
@@ -109,4 +119,7 @@ phase4() {
   for m in 2025-11 2026-01 2026-04 2026-06; do cand g2 --root e667 --month "$m" --seeds 0 1; done
 }
 
-"$phase"
+case "$phase" in
+  phase0 | phase1 | phase2 | phase3 | phase4) "$phase" ;;
+  *) echo "unknown phase: $phase" >&2; exit 2 ;;
+esac

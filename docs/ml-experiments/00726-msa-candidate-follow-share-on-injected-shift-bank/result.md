@@ -488,6 +488,14 @@ the rule that no script runs before its review. The driver only calls the review
 reviewed scripts and adds a retry loop and a log of wall times. The phase 0 outputs are treated as
 unreviewed until the review passes, and no phase 1 job starts before then.
 
+**Order of events after the review of `phases.sh` failed.** The Opus review found that the check
+KM3 could not stop the line when its input half failed, and that KC4 and KW had been listed for two
+fold months only. The driver was stopped between jobs, before any MSA job started. With the
+manager's agreement, `compare km3` now also requires the stored result of the input half to say
+passed, `phases.sh` runs KC4 and KW on all 8 fold months, bounds its retry loop at 720 one-minute
+waits, checks that the data folder exists, and refuses unknown phase names. An Opus re-check
+runs before the driver resumes.
+
 ## Leakage and disclosures
 
 **No forecast reads power stamped later than 24 hours before the native origin, and no weight was
