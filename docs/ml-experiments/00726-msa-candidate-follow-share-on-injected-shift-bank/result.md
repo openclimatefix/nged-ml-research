@@ -459,6 +459,20 @@ files:** with experiment 667's paths, the copied `_done` would make KC2 pass by 
   no code for it exists. The write-up therefore has no attention maps from this experiment. The
   figures script is still to be written before the write-up.
 
+**The smoke test passed on fold 2026-06, the fold with the most training rows (7,929,723).** Preflight
+KP found all 461 expected input files. The Candidate job at root e667 with seeds 0 and 1 in one
+process wrote 16 files in 75 s, with a host peak of 6.3 GB and a GPU peak of 0.3 GB. The Candidate
+job at root seeds713 with seed 2 wrote 8 files in 70 s, with the same host peak. The MSA job for `M1`
+on the all-shifted world wrote 24 passes in 85 s, with a host peak of 7.7 GB (8.0 GB resident) and a
+GPU peak of 1.6 GB reserved. The peaks are `ru_maxrss` and torch's GPU figures. Check KC5 passed in
+both Candidate jobs, and the weather check KW passed.
+
+**At the +0.50 shifts that raise the power, the input clip binds for the six signed-MW Primaries.**
+In the smoke test's clip diagnostic for fold 2026-06, 50% of the shifted half-hours of those
+Primaries at depth 0.50 exceed capacity, although only 0.1% lie beyond 5 standard deviations. A
+follow share at those shifts is therefore a reading of a clipped input for that group. Every
+threshold stays as registered, and the clip diagnostic is printed with the readings.
+
 ## Leakage and disclosures
 
 **No forecast reads power stamped later than 24 hours before the native origin, and no weight was
@@ -536,13 +550,17 @@ manager before phase 0 and again before phase 1.
 
 **Machine rules, all through `run.sh`:**
 
-- Every command runs under `systemd-run --user --scope` with `MemoryMax=12G`, `MemorySwapMax=0`, and
-  `OOMPolicy=continue`.
+- Every command runs under `systemd-run --user --scope` with `MemorySwapMax=0` and
+  `OOMPolicy=continue`. `MemoryMax` is 12G for the MSA command and 9G for the Candidate command, a
+  default that `run.sh` sets per script and that the `MEMORY_MAX` environment variable overrides. The
+  MSA jobs run one at a time, because the smoke test measured a host peak of 8.0 GB for one MSA job.
 - One thread for every numerical library (`OMP_NUM_THREADS`, `MKL_NUM_THREADS`,
   `OPENBLAS_NUM_THREADS`, `POLARS_MAX_THREADS`, and `RAYON_NUM_THREADS` are 1, and
   `torch.set_num_threads(1)`).
 - The wrapper calls the virtual environment's Python directly after `uv sync --group gpu`, and never
-  `uv run` inside the scope.
+  `uv run` inside the scope. The preflight KP needs the `gpu` group as well, because the neighbour
+  lists come from a module that imports `torch`. Run every script through `run.sh` or
+  `uv run --no-sync`, never plain `uv run`, which would re-sync and remove the `gpu` group.
 - At most two GPU processes run at once, each under 6 GB of GPU memory, and the wrapper refuses to
   start when under 25 GB of host memory is available.
 - One process per job, atomic writes, and a finished job is skipped only when its own output file

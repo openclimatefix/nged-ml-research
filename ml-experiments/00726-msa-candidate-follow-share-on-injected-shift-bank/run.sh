@@ -8,7 +8,7 @@
 # pinned F4 checkout's folder second (the scripts assert both checkouts).
 #
 # Rules this wrapper enforces:
-#   - one cgroup scope with MemoryMax=${MEMORY_MAX:-9G}, no swap, and OOMPolicy=continue, so an out-of-memory kill
+#   - one cgroup scope with MemoryMax=${MEMORY_MAX:-12G for e00726_msa_panel.py, 9G otherwise}, no swap, and OOMPolicy=continue, so an out-of-memory kill
 #     takes this job alone and never the session;
 #   - one BLAS thread;
 #   - the virtual environment's interpreter, called directly, so `uv` never re-syncs it;
@@ -89,10 +89,17 @@ else
   export E00667_PHASE="${E00667_PHASE:-predict}"
 fi
 
+# the memory cap defaults per job type: 12G for the MSA command (peak 8.0 GB in the smoke test), 9G otherwise
+case "$script" in
+  e00726_msa_panel.py) default_cap=12G ;;
+  *) default_cap=9G ;;
+esac
+memory_max="${MEMORY_MAX:-$default_cap}"
+
 before="$(snapshot)"
 set +e
 systemd-run --user --scope --quiet \
-  -p MemoryMax="${MEMORY_MAX:-9G}" -p MemorySwapMax=0 -p OOMPolicy=continue \
+  -p MemoryMax="$memory_max" -p MemorySwapMax=0 -p OOMPolicy=continue \
   env \
     PYTHONPATH="$pythonpath" \
     OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 \
