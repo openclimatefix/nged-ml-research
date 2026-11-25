@@ -1,24 +1,25 @@
 # ruff: noqa: E501
-"""Experiment 721: the first GPU code-works check on one tiny real fold (not run until the manager says so).
+"""Experiment 721: the first GPU code-works check on one tiny real fold (not run until told to).
 
 The check fits `SG-A` in `W2` on the real fold 2026-05 for a handful of passes and asserts the ten
-properties that the second code review asked for. It makes no claim about any forecast. Every output goes
-under a scratch path under `$HOME`, and the process holds at most 6 GB of the GPU.
+properties that the second code review asked for. It makes no claim about any forecast. Every
+output goes under a scratch path under `$HOME`, and the process holds at most 6 GB of the GPU.
 
-A real fold is built in one phase per process, so the check has four subcommands, each run through
-`run.sh`:
+A real fold is built in one phase per process, so the check has four subcommands, each run
+through `run.sh`:
 
-1. `fit SCRATCH`: assertions 1 (no-continuation scored state), 2 (training target), 3 (sign labels),
-   4 (gate at the supervised Primaries), 5 (closed gate equals the base at the real shift), and the
-   fit's GPU peak (8).
+1. `fit SCRATCH`: assertions 1 (no-continuation scored state), 2 (training target), 3 (sign
+   labels), 4 (gate at the supervised Primaries), 5 (closed gate equals the base at the real
+   shift), and the fit's GPU peak (8).
 2. `predict SCRATCH`: assertions 6 (ensemble and PV runs at least 9 h before the native origin),
-   7 (the lead window), 9 (the predict phase reproduces the fitted PV scales), the predict peak (8), and
-   the share of PV target rows that are missing per Primary.
+   7 (the lead window), 9 (the predict phase reproduces the fitted PV scales), the predict peak
+   (8), and the share of PV target rows that are missing per Primary.
 3. `probe SCRATCH`: assertion 8 for the capacity probe (GPU peak at most 6 GB).
-4. `routing SCRATCH`: assertion 10 (`score_all` on the complete set of wave outputs reaches rows 4 to 9;
-   CPU only).
+4. `routing SCRATCH`: assertion 10 (`score_all` on the complete set of wave outputs reaches rows
+   4 to 9; CPU only).
 
-Usage: SLOT_CPU=<n> run.sh --go code_works_check.py <fit|predict|probe|routing> SCRATCH [--device cuda]
+Usage: `SLOT_CPU=3 run.sh --go code_works_check.py fit SCRATCH --device cuda`, with `fit`,
+`predict`, `probe`, or `routing` as the subcommand.
 """
 
 import argparse
