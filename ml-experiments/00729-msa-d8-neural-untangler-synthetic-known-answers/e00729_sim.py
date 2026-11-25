@@ -450,3 +450,44 @@ def simulate_segment(
         t2m=to_dense(calendar_values=cal.t2m, cal_index=cal_index),
         s1_fallback=s1_fallback, has_bsp=has_bsp, params=params,
     )  # fmt: skip
+
+
+def real_segment(
+    *, cal: Calendar, month: str, use: np.ndarray, reading: np.ndarray, truth: np.ndarray
+) -> Segment:
+    """Return a segment of real days with no injection, for the real-data checks.
+
+    Args:
+        cal: The calendar that holds the real fields (BSP, CAMS, temperature).
+        month: `YYYY-MM` of the segment.
+        use: Which days of `cal` the segment may use.
+        reading: The reading in points to feed the network, `(n, 48)` on the calendar axis.
+        truth: The answer in points, `(n, 48)` on the calendar axis (NaN where unknown).
+
+    Returns:
+        A segment whose `r` is `reading`, whose `x` is `truth`, and whose engine and solar are zero.
+    """
+    first_of = np.datetime64(f"{month}-01", "D")
+    nxt = (first_of.astype("datetime64[M]") + 1).astype("datetime64[D]")
+    n_cal = int((nxt - first_of).astype(int))
+    dates = first_of - np.timedelta64(1, "D") + np.arange(n_cal + 2)
+    pos = np.clip(np.searchsorted(cal.dates, dates), 0, len(cal.dates) - 1)
+    present = (cal.dates[pos] == dates) & use[pos]
+    present[0] = present[-1] = False
+    cal_index = np.where(present, pos, -1)
+    x = to_dense(calendar_values=truth, cal_index=cal_index)
+    r = to_dense(calendar_values=reading, cal_index=cal_index)
+    shape = (n_cal + 2, 48)
+    bsp = to_dense(calendar_values=cal.bsp, cal_index=cal_index)
+    return Segment(
+        month=month, world="none", source="none", dates=dates, cal_index=cal_index,
+        base=r, valid=np.isfinite(r) & np.isfinite(x), engine=np.zeros(shape, np.float32),
+        solar=np.zeros(shape, np.float32), x=x, r=r, bsp=bsp,
+        csi=to_dense(calendar_values=cal.csi, cal_index=cal_index),
+        clear=to_dense(calendar_values=cal.clear, cal_index=cal_index),
+        cosz=to_dense(calendar_values=cal.cosz, cal_index=cal_index),
+        t2m=to_dense(calendar_values=cal.t2m, cal_index=cal_index),
+        s1_fallback=np.zeros(n_cal + 2, dtype=bool),
+        has_bsp=int(np.isfinite(bsp).any(axis=1).sum()) >= core.MIN_DAYS_IN_MONTH,
+        params={},
+    )  # fmt: skip
