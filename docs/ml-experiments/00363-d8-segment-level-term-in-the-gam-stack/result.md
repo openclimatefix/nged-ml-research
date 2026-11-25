@@ -17,8 +17,8 @@ size: >-
   scripts import experiments 252, 354, and 361 and add one block of columns. Asset graph: not
   touched.
 hypothesis: >-
-  D8 (Marsh Lane) is a Primary substation whose demand carries on/off steps of about 4 MW and
-  multi-day drops of about 2.7 MW. Experiment 361 removed or masked the detected steps in the
+  D8 (Marsh Lane) is a Primary substation whose demand carries on/off steps and
+  multi-day drops. Experiment 361 removed or masked the detected steps in the
   training target and the score did not move. Giving the stack one penalised level term for each
   stretch between detected steps, fitted jointly with the weather and calendar terms, lets those
   terms be estimated within stretches, so D8's quantile score falls against experiment 354's best
@@ -196,3 +196,9 @@ the control).
 - **Code.** `ml-experiments/00363-d8-segment-level-term-in-the-gam-stack/`; imports experiments 252,
   264, 354, and 361. Schedule: monthly refits (the same cuts as the control), so the contrast does
 not depend on a cheaper schedule.
+
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.

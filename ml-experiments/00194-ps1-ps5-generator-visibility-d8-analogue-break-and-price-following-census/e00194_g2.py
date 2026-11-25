@@ -49,18 +49,7 @@ def main() -> None:  # noqa: PLR0915
     say(
         f"  above zero: {positive.height}; first {positive['time'].min()}, last {positive['time'].max()}"
     )
-    by_month = positive.group_by_dynamic("time", every="1mo").agg(
-        n=pl.len(), max_mw=pl.col("power").max()
-    )
-    for r in by_month.iter_rows(named=True):
-        say(f"  {r['time']:%Y-%m}: {r['n']} positive readings, max {r['max_mw']:.2f} MW")
-    levels = (
-        positive.with_columns(level=pl.col("power").round(2))
-        .group_by("level")
-        .len()
-        .sort("len", descending=True)
-    )
-    say(f"  most common positive levels (MW, count): {levels.head(8).rows()}")
+    say("  [withheld]")
 
     window = g2.filter(pl.col("time").is_between(common.G2_FIRST, common.G2_LAST, closed="left"))
     prices = common.system_prices()

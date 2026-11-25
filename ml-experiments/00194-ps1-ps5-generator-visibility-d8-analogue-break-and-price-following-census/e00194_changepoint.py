@@ -244,9 +244,13 @@ def main() -> None:  # noqa: PLR0915
         thr = -0.241 * cap
         frame = d8 if label == "D8" else common.residual_frame(panel=panel, label=label)
         wk = share_by(frame=tail_frame(frame=frame, threshold_mw=thr), every="1w")
-        say(
-            f"  {label}: capacity {cap:.2f} MW, threshold {thr:.2f} MW, overall share {float(wk['k'].sum()) / float(wk['n'].sum()):.3f}"
+        # The threshold is 0.241 times the capacity, so the control rows print neither.
+        size = (
+            f"capacity {cap:.2f} MW, threshold {thr:.2f} MW"
+            if label == "D8"
+            else "capacity and threshold [withheld]"
         )
+        say(f"  {label}: {size}, overall share {float(wk['k'].sum()) / float(wk['n'].sum()):.3f}")
         fit_one(label=f"{label} (scaled)", weekly=wk, rng=rng)
 
     say(

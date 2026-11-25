@@ -338,26 +338,25 @@ shape: (14, 7)
 
 ## Substation cards
 
-**Provisional: fitted to past weather, estimation only.** The MW column converts points with each
-substation's own 99th percentile of demand and is not a headline. D12 reports apparent power in
-MVA, so its "MW" is MVA.
+**Provisional: fitted to past weather, estimation only.** The step is in points of each
+substation's effective capacity, and is not a headline. The MW conversion is withheld.
 
-| Series | Step at 3 C, points (90% interval) | Step, MW (MVA at D12) | Slope, points per degree | Cold-dependent part, points | Flat part, points | Summer reference, points | Winters |
-|---|---|---|---|---|---|---|---|
-| D5 | 10.8 (10.4 to 11.2) | 0.62 | 0.25 (0.16 to 0.32) | 3.1 | 7.7 | -5.2 | 2021, 2022, 2023, 2024 |
-| D9 | 9.5 (8.6 to 10.4) | 0.68 | 0.38 (0.18 to 0.52) | 4.7 | 4.8 | -13.4 | 2023, 2024 |
-| D10 | 15.4 (14.9 to 15.8) | 0.83 | 0.37 (0.26 to 0.45) | 4.6 | 10.8 | -5.5 | 2021, 2022, 2023, 2024 |
-| D11 | 7.0 (6.7 to 7.4) | 0.76 | 0.13 (0.05 to 0.19) | 1.6 | 5.5 | -3.0 | 2021, 2022, 2023, 2024 |
-| D14 | 3.0 (2.5 to 3.4) | 0.35 | 0.09 (0.01 to 0.15) | 1.1 | 1.8 | -4.2 | 2021, 2022, 2023, 2024 |
-| D16 | 13.4 (12.9 to 13.8) | 1.22 | 0.26 (0.13 to 0.37) | 3.2 | 10.2 | -4.4 | 2021, 2022, 2023, 2024 |
-| D2 | 14.7 (14.1 to 15.1) | 2.67 | 0.53 (0.36 to 0.62) | 6.6 | 8.1 | -9.5 | 2021, 2022, 2023, 2024 |
-| D3 | 6.6 (6.4 to 6.8) | 0.85 | 0.16 (0.12 to 0.20) | 2.1 | 4.6 | -7.3 | 2021, 2022, 2023, 2024 |
-| D4 | 13.3 (12.2 to 14.3) | 1.62 | 0.41 (0.28 to 0.49) | 5.1 | 8.3 | -11.4 | 2021, 2022, 2023, 2024 |
-| D8 | 0.5 (-0.7 to 1.7) | 0.05 | 0.19 (0.09 to 0.29) | 2.4 | -2.0 | -0.7 | 2021, 2022, 2023, 2024 |
-| D12 | 14.9 (13.2 to 16.4) | 0.70 | 0.46 (0.16 to 0.67) | 5.7 | 9.2 | -2.3 | 2021, 2022, 2023, 2024 |
-| D19 | 33.5 (32.1 to 34.5) | 1.82 | 1.12 (0.84 to 1.29) | 14.0 | 19.4 | -10.5 | 2021, 2022, 2023, 2024 |
-| D21 | 9.6 (9.1 to 10.1) | 0.54 | 0.19 (0.10 to 0.25) | 2.4 | 7.2 | -5.9 | 2021, 2022, 2023, 2024 |
-| D22 | 12.7 (12.0 to 13.3) | 0.41 | 0.16 (0.04 to 0.26) | 2.0 | 10.7 | -6.0 | 2021, 2022, 2023, 2024 |
+| Series | Step at 3 C, points (90% interval) | Slope, points per degree | Cold-dependent part, points | Flat part, points | Summer reference, points | Winters |
+|---|---|---|---|---|---|---|
+| D5 | 10.8 (10.4 to 11.2) | 0.25 (0.16 to 0.32) | 3.1 | 7.7 | -5.2 | 2021, 2022, 2023, 2024 |
+| D9 | 9.5 (8.6 to 10.4) | 0.38 (0.18 to 0.52) | 4.7 | 4.8 | -13.4 | 2023, 2024 |
+| D10 | 15.4 (14.9 to 15.8) | 0.37 (0.26 to 0.45) | 4.6 | 10.8 | -5.5 | 2021, 2022, 2023, 2024 |
+| D11 | 7.0 (6.7 to 7.4) | 0.13 (0.05 to 0.19) | 1.6 | 5.5 | -3.0 | 2021, 2022, 2023, 2024 |
+| D14 | 3.0 (2.5 to 3.4) | 0.09 (0.01 to 0.15) | 1.1 | 1.8 | -4.2 | 2021, 2022, 2023, 2024 |
+| D16 | 13.4 (12.9 to 13.8) | 0.26 (0.13 to 0.37) | 3.2 | 10.2 | -4.4 | 2021, 2022, 2023, 2024 |
+| D2 | 14.7 (14.1 to 15.1) | 0.53 (0.36 to 0.62) | 6.6 | 8.1 | -9.5 | 2021, 2022, 2023, 2024 |
+| D3 | 6.6 (6.4 to 6.8) | 0.16 (0.12 to 0.20) | 2.1 | 4.6 | -7.3 | 2021, 2022, 2023, 2024 |
+| D4 | 13.3 (12.2 to 14.3) | 0.41 (0.28 to 0.49) | 5.1 | 8.3 | -11.4 | 2021, 2022, 2023, 2024 |
+| D8 | 0.5 (-0.7 to 1.7) | 0.19 (0.09 to 0.29) | 2.4 | -2.0 | -0.7 | 2021, 2022, 2023, 2024 |
+| D12 | 14.9 (13.2 to 16.4) | 0.46 (0.16 to 0.67) | 5.7 | 9.2 | -2.3 | 2021, 2022, 2023, 2024 |
+| D19 | 33.5 (32.1 to 34.5) | 1.12 (0.84 to 1.29) | 14.0 | 19.4 | -10.5 | 2021, 2022, 2023, 2024 |
+| D21 | 9.6 (9.1 to 10.1) | 0.19 (0.10 to 0.25) | 2.4 | 7.2 | -5.9 | 2021, 2022, 2023, 2024 |
+| D22 | 12.7 (12.0 to 13.3) | 0.16 (0.04 to 0.26) | 2.0 | 10.7 | -6.0 | 2021, 2022, 2023, 2024 |
 
 Start of the step, timing, and share left by the baseline model (R):
 
@@ -527,8 +526,7 @@ on winter weekdays for Cosy. Intervals resample 14-day blocks. Half-hours with n
   first and last year (2021 and 2025 for the Octopus edges; winters 2021-22 and 2024-25 for Cosy),
   the 90% interval of the change excluded 0 at 21% to 43% of placebo series (10% expected for either
   sign), because the load shape drifts between years by more than the sampling error. The empirical
-  detection limit is therefore the 90th percentile of the placebo changes, 1.19 points (about 0.06
-  to 0.22 MW across the 14 substations).
+  detection limit is therefore the 90th percentile of the placebo changes, 1.19 points.
 
 - **Against that limit, the Octopus Go and Intelligent Octopus Go edges show a change at D8 only.**
   At D8 the 23:30 edge changed by +2.5 points and the 05:30 edge by -2.3, in the expected signs. D8
@@ -598,29 +596,27 @@ selection winter.
 
 **Every size in this plan is in points of effective capacity, and the first draft mislabelled the
 unit as megawatts.** One point is 1% of the series' effective capacity, which is the series' own
-99th percentile of cleaned demand and not an electrical rating. Experiment 121's step figures (4.3,
-7.1, and 5.3 at D5, D10, and D16) are in points: its quantile scores are in points, and a 7.1 MW
-step at D10 would exceed the series' 5.4 MW effective capacity. The wrong label was found in test 1,
-which showed D10's night difference to be about 0.4 MW (about 8 points). Every number in the plan
-(the predictions, the injected shapes `S` of 4 and 7, the bias bound of 0.5, the trigger thresholds
-of 4, 8, and 15, and the 1.7 summer step) keeps its value and now reads in points. Each series'
-night difference `d` is converted to points before any fit, so the pooled steps average comparable
-quantities, and the page also prints each series' step in MW (one point at D10 is 0.054 MW). Test 1
-printed raw night differences for one series in the design winters and a per-series mean `d` over
-all nights of winters 2021-22 to 2025-26; no estimate, interval, or fit was computed before this
-clarification.
+99th percentile of cleaned demand and not an electrical rating. Experiment 121's step figures are in
+points: its quantile scores are in points, and a step read as megawatts would exceed the series'
+effective capacity at D10. The wrong label was found in test 1, which showed D10's night difference
+to be about 8 points. Every number in the plan (the predictions, the injected shapes `S` of 4 and 7,
+the bias bound of 0.5, the trigger thresholds of 4, 8, and 15, and the 1.7 summer step) keeps its
+value and now reads in points. Each series' night difference `d` is converted to points before any
+fit, so the pooled steps average comparable quantities, and the page prints each series' step in
+points only. Test 1 printed raw night differences for one series in the design winters and a
+per-series mean `d` over all nights of winters 2021-22 to 2025-26; no estimate, interval, or fit was
+computed before this clarification.
 
-**Units clarification: what "effective capacity" is, and the raw step in MW.** The table's
-effective capacity is a scale taken from the demand itself: it matches each series' 99th percentile
-of cleaned half-hourly demand (D10: 5.398 MW against a 99th percentile of 5.413 MW; D5: 5.723 against
-5.734; D16: 9.115 against 9.143). It is neither the electrical rating of the substation nor a PV
-capacity. A point is therefore 1% of that near-peak demand. Computed from the stored cleaned power
-on cold GMT nights (daily mean at most 3 C) of winters 2023-24 and 2024-25 (printed in `report.txt`
-under `raw_cold_step`), the half-hour ending at
-01:00 minus the mean of the 22:00 to 23:30 half-hours is 0.27 MW (4.8 points) at D5, 0.44 MW (8.2
-points) at D10, and 0.87 MW (9.5 points) at D16. The raw step is therefore a few tenths of a
-megawatt, and the figures of 1.9 to 10.7 "MW" in the earlier descriptive check of the night step
-are points: that check divided by a proxy capacity of about 100, which is the scale of points.
+**Units clarification: what "effective capacity" is.** The table's effective capacity is a scale
+taken from the demand itself: it matches each series' 99th percentile of cleaned half-hourly demand
+to within 0.5%. It is neither the electrical rating of the substation nor a PV capacity. A point is
+therefore 1% of that near-peak demand. Computed from the stored cleaned power on cold GMT nights
+(daily mean at most 3 C) of winters 2023-24 and 2024-25 (printed in `report.txt` under
+`raw_cold_step`), the half-hour ending at 01:00 minus the mean of the 22:00 to 23:30 half-hours is
+4.8 points at D5, 8.2 points at D10, and 9.5 points at D16. The raw step is therefore a few
+percent of the near-peak demand, and the figures of 1.9 to 10.7 "MW" in the earlier descriptive
+check of the night step are points: that check divided by a proxy capacity of about 100, which is
+the scale of points. The megawatt values of the capacities and the raw steps are withheld.
 
 ## Pre-fit clarification 3: actual demand against the baseline forecast on cold nights (written before the figure was computed)
 

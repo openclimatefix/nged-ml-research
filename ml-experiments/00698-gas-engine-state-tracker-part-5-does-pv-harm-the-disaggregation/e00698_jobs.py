@@ -225,7 +225,7 @@ def run_job(*, job: Job, write: bool = True) -> str:
     started = time.time()
     arrays = run_step4_job(job=job) if job.kind == "step4" else run_host_job(job=job)
     seconds = time.time() - started
-    line = f"{job.name}: {seconds:.0f} s, K={arrays['k_max']}, unit={float(arrays['unit']):.2f} MW"
+    line = f"{job.name}: {seconds:.0f} s, K={arrays['k_max']}, unit=[withheld]"
     if not write:
         return line + reproduces_experiment_697(job=job, flag=np.asarray(arrays["flag"]))
     JOBS_DIR.mkdir(parents=True, exist_ok=True)

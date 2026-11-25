@@ -221,6 +221,12 @@ give the same pattern for S1 to S4).
   separate audit re-derived the headline scores, contrasts, and correlations from the stored
   frame with its own code and found them correct. Its findings on wording are applied here.
 
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
+
 ## Caveats and what to try next
 
 - **Stage medians come from stored columns.** The plain-GAM median is `mean - level - anomaly` of

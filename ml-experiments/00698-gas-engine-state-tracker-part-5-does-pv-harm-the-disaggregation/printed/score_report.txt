@@ -51,18 +51,18 @@ d3solar, c89, weather_farm, no engine, smooth: false_flag +0.062 (+0.039 to +0.0
 d3solar, c89, total_farm, no engine, smooth: false_flag +0.062 (+0.039 to +0.086); bmd +0.059 (-0.002 to +0.126)
 
 ## Pooled midday scores by run (3 seeds), smoothed labels
-d8pre, none_free: P 0.987, R 0.626, F1 0.766, false-flag 0.000; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d8pre, c89_farm: P 0.210, R 0.380, F1 0.270, false-flag 0.180; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d8pre, c89_cams: P 0.391, R 0.342, F1 0.365, false-flag 0.058; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d8pre, c89_smooth: P 0.446, R 0.376, F1 0.408, false-flag 0.052; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d8pre, c89_smooth_farm: P 0.482, R 0.357, F1 0.410, false-flag 0.041; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d3solar, none_free: P 0.969, R 0.763, F1 0.854, false-flag 0.000; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d3solar, c70_farm: P 0.351, R 0.436, F1 0.389, false-flag 0.095; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d3solar, c70_smooth: P 0.609, R 0.513, F1 0.557, false-flag 0.034; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d3solar, c70_smooth_farm: P 0.680, R 0.503, F1 0.578, false-flag 0.025; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d3solar, c89_farm: P 0.297, R 0.387, F1 0.336, false-flag 0.111; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d3solar, c89_smooth: P 0.495, R 0.460, F1 0.477, false-flag 0.046; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
-d3solar, c89_smooth_farm: P 0.513, R 0.441, F1 0.474, false-flag 0.040; fits: K=3 unit=1.75, K=3 unit=1.75, K=3 unit=1.75
+d8pre, none_free: P 0.987, R 0.626, F1 0.766, false-flag 0.000; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d8pre, c89_farm: P 0.210, R 0.380, F1 0.270, false-flag 0.180; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d8pre, c89_cams: P 0.391, R 0.342, F1 0.365, false-flag 0.058; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d8pre, c89_smooth: P 0.446, R 0.376, F1 0.408, false-flag 0.052; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d8pre, c89_smooth_farm: P 0.482, R 0.357, F1 0.410, false-flag 0.041; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d3solar, none_free: P 0.969, R 0.763, F1 0.854, false-flag 0.000; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d3solar, c70_farm: P 0.351, R 0.436, F1 0.389, false-flag 0.095; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d3solar, c70_smooth: P 0.609, R 0.513, F1 0.557, false-flag 0.034; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d3solar, c70_smooth_farm: P 0.680, R 0.503, F1 0.578, false-flag 0.025; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d3solar, c89_farm: P 0.297, R 0.387, F1 0.336, false-flag 0.111; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d3solar, c89_smooth: P 0.495, R 0.460, F1 0.477, false-flag 0.046; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
+d3solar, c89_smooth_farm: P 0.513, R 0.441, F1 0.474, false-flag 0.040; fits: K=3 unit=[withheld], K=3 unit=[withheld], K=3 unit=[withheld]
 
 ## Fold census of scorable midday half-hours (shares of signed real power)
 d8pre, none_free, seed 0: forward 0.992, near_zero 0.006, reverse 0.001

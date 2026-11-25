@@ -750,7 +750,11 @@ def gallery_6(*, frames: dict[str, pl.DataFrame]) -> None:
 
 
 def gallery_8(*, frames: dict[str, pl.DataFrame]) -> None:
-    """G8: month by local half-hour heat maps of D8's weekday flags, and the mean block size."""
+    """G8: month by local half-hour heat maps of D8's weekday running share, by era.
+
+    Never add a panel of the tracker's fitted block size in MW here. A colour scale in megawatts
+    shows the engine's unit size, which is withheld, and the guard refuses the power unit.
+    """
     charts = []
     for era in ("net", "solar"):
         view = usable(frame=view_of(frame=frames["d8"], column="ts", era=era)).filter(
@@ -758,46 +762,28 @@ def gallery_8(*, frames: dict[str, pl.DataFrame]) -> None:
         )
         grid = (
             view.group_by("month", "local_half_hour")
-            .agg(
-                share=pl.col("state").mean(),
-                days=pl.col("local_date").n_unique(),
-                block=pl.col("fitted_mw").filter(pl.col("state") > 0.5).mean(),
-            )
+            .agg(share=pl.col("state").mean(), days=pl.col("local_date").n_unique())
             .filter(pl.col("days") >= HEATMAP_MIN_DAYS)
             .with_columns(
                 start=pl.col("local_half_hour") / 2, stop=(pl.col("local_half_hour") + 1) / 2
             )
         )
-        for column, colour, title in (
-            ("share", BLUE, "Running share"),
-            ("block", GREEN, "Block size (MW)"),
-        ):
-            charts.append(
-                alt.Chart(grid, title=f"{ERA_TITLES[era]}, weekdays")  # ty: ignore[unresolved-attribute]
-                .mark_rect(aria=False)
-                .encode(
-                    x=alt.X(
-                        "start:Q", axis=hour_axis(), scale=alt.Scale(domain=[0, 24], nice=False)
-                    ),
-                    x2="stop:Q",
-                    y=alt.Y("month:O", title="Calendar month (1 is January)"),
-                    color=alt.Color(
-                        f"{column}:Q",
-                        scale=alt.Scale(range=["#FFFFFF", colour]),
-                        legend=alt.Legend(
-                            title=title, format=".0%" if column == "share" else ".1f"
-                        ),
-                    ),
-                )
-                .properties(width=150, height=150)
+        charts.append(
+            alt.Chart(grid, title=f"{ERA_TITLES[era]}, weekdays")  # ty: ignore[unresolved-attribute]
+            .mark_rect(aria=False)
+            .encode(
+                x=alt.X("start:Q", axis=hour_axis(), scale=alt.Scale(domain=[0, 24], nice=False)),
+                x2="stop:Q",
+                y=alt.Y("month:O", title="Calendar month (1 to 12)"),
+                color=alt.Color(
+                    "share:Q",
+                    scale=alt.Scale(range=["#FFFFFF", BLUE]),
+                    legend=alt.Legend(title="Running share", format=".0%"),
+                ),
             )
-    save(
-        chart=alt.vconcat(
-            alt.hconcat(*charts[:2]).resolve_scale(color="independent"),
-            alt.hconcat(*charts[2:]).resolve_scale(color="independent"),
-        ).resolve_scale(color="independent"),
-        name="g8_season",
-    )
+            .properties(width=150, height=150)
+        )
+    save(chart=alt.hconcat(*charts).resolve_scale(color="shared"), name="g8_season")
 
 
 def host_null_frame() -> pl.DataFrame:

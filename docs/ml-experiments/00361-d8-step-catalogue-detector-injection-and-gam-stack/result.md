@@ -20,8 +20,8 @@ size: >-
   experiments 252 and 264 and copy experiment 354's fit code with one change, the training target.
   Asset graph: not touched.
 hypothesis: >-
-  D8 (Marsh Lane) is a Primary substation whose demand carries on/off steps of about 4 MW and
-  multi-day drops of about 2.7 MW that look like a dispatchable generator. A plain, as-of step
+  D8 (Marsh Lane) is a Primary substation whose demand carries on/off steps and
+  multi-day drops that look like a dispatchable generator. A plain, as-of step
   detector finds such components, and a GAM stack fitted on a training target with the detected
   steps removed scores better at D8 than the same stack fitted on the raw target, with the removed
   component returning through the own-residual band as the chance that the generator is running.
@@ -71,7 +71,7 @@ lessons:
     The rule finds 171 rises of at least 1.5 MW for 193 falls, so some of its falls are probably
     ordinary demand swings, though a generator also causes rises when it switches back on.
   - >-
-    The multi-day drops (6 found, median 2.7 MW and 2.5 days) match the earlier reading in
+    The multi-day drops (6 found, median 2.5 days) match the earlier reading in
     experiments 159 and 291 that the drops are generator spells, but
     they cover too few rows to move a monthly fit.
 production_status: not-for-production
@@ -154,7 +154,7 @@ from [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md), 
   only data before the cut is seen. The drop pass was added after the first catalogue run found only
   4 drops of 2 days or longer with the 6-hour rule, and before any forecast was scored.
 - **Catalogue at D8 since 2023-08-15.** 193 falls of at least 6 hours (median level -3.0 MW, median
-  dwell 0.38 days) and 171 rises of the same size; 6 multi-day drops (median level -2.7 MW, median
+  dwell 0.38 days) and 171 rises of the same size; 6 multi-day drops (median
   dwell 2.5 days). At 1.0 MW the counts are 273 falls and 11 drops; at 2.0 MW, 126 falls and 1 drop.
   Prediction P2 (25 to 40 falls and 20 to 30 drops) failed on both counts: experiment 159 found 29
   drops with a different baseline.
@@ -206,6 +206,12 @@ from [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md), 
   partly ordinary demand swings (171 rises for 193 falls). No Opus audit was run, because the brief
   excludes Opus, and no later experiment depends on this result's sign. Triggers 1, 3, 4, 5, 6, and
   7 did not fire.
+
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
 
 ## What to try next
 

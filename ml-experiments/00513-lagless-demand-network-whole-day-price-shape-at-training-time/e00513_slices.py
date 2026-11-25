@@ -12,6 +12,7 @@ All differences are arm minus P0 in points of effective capacity (negative favou
 ```
 """
 
+import sys
 from pathlib import Path
 from typing import Final
 
@@ -21,12 +22,22 @@ import e00513_score as score
 import polars as pl
 from plotting import ocf_theme as theme
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
+
 DOCS_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
     / "docs/ml-experiments/00513-lagless-demand-network-whole-day-price-shape-at-training-time"
 )
 SCORES: Final[Path] = score.WORK_DIR / "scores"
-ASSET_PRIMARIES: Final[tuple[str, ...]] = ("D2", "D5", "D8", "D9", "D11", "D14")
+ASSET_PRIMARIES: Final[tuple[str, ...]] = (
+    "D2",
+    "D5",
+    "D8",
+    "D9",
+    "D11",
+    engine.engine_string(key="d8_engine_register_primary"),
+)
 ARMS: Final[tuple[str, ...]] = ("PO", "PP", "PN")
 GROUPS: Final[dict[str, str]] = {"eight": "MVA-only eight", "six_clean": "Signed-MW six"}
 

@@ -391,7 +391,10 @@ def main() -> None:
         "given_running": float(flag_state[flag_target].mean()),
         "given_ordinary": float(flag_state[~flag_target].mean()),
     }
-    print("\nTerm out of sample (MW per unit of state): ", out_of_sample)
+    print(
+        "\nTerm out of sample (MW per unit of state): ",
+        {**out_of_sample, "slope_error_on_target_state_mw": "[withheld]"},
+    )
     coefficients = {site: cut_coefficients(site=site) for site in ("D8", *common.CONTROL_SITES)}
     report["checks"]["coefficients"] = coefficients
     scored_cuts = [
@@ -412,11 +415,11 @@ def main() -> None:
     }
     print(
         "\nEngine coefficient per monthly refit, scored year, MW (P(1+ unit) column):",
-        [round(x, 2) for x in mw],
+        "[withheld]",
     )
     print(
         "Engine coefficient per running unit (expected-units column), MW:",
-        [round(x, 2) for x in mw_units],
+        "[withheld]",
     )
     print("break coefficient D8 (points):", [round(r["regF"][0], 2) for r in scored_cuts])
     # --- controls

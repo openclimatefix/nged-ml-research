@@ -49,7 +49,7 @@ def _bst_shift(*, when: datetime) -> int:
 def build(
     *, y: np.ndarray, g2: np.ndarray, with_k1: bool = True, with_k2: bool = True, q: float = Q_FLOOR
 ) -> Injection:
-    """K1 (exact replay) and K2 (nine whole-week shifts into 2022-01 to 2023-05) in one copy."""
+    """K1 (exact replay) and K2 (nine whole-week shifts into engine-free history) in one copy."""
     n = len(y)
     out = np.full(n, np.nan)
     window = np.full(n, -1)

@@ -667,6 +667,17 @@ unresolved-import = "ignore"
 unsupported-operator = "ignore"
 redundant-condition = "ignore"
 
+[[tool.ty.overrides]]
+# Experiment 713's two `torch` check scripts import `torch` without a `# ty: ignore`, and CI does
+# not install the `gpu` dependency group. They are checked for the other rules only.
+include = [
+    "ml-experiments/00713-msa-axial-attention-demand-network-part-1/e00713_check_batch.py",
+    "ml-experiments/00713-msa-axial-attention-demand-network-part-1/e00713_check_model.py",
+]
+
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"
+
 [tool.ty.rules]
 # With the `gpu` dependency group installed, `torch` resolves, so `ty` reports every
 # `# ty: ignore[unresolved-import]` on a `torch` import as unused and every `nn.Module.forward`

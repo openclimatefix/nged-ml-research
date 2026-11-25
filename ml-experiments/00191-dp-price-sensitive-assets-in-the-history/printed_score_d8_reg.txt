@@ -85,7 +85,7 @@ t   n=  55210 qs=11.7846 mae=16.1976 cov90=0.422
    t-a0 qs: +0.6117 [+0.1973, +1.1274] = +5.47%
    t-a0 ae: +0.6407 [+0.1763, +1.1956] = +4.12%
 
-=== D14 (gated) rows per arm: 95,056, gate-on share 1.00, spread-positive share 0.50
+=== REG (gated) rows per arm: 95,056, gate-on share 1.00, spread-positive share 0.50
 -- cut all
 a0  n=  95056 qs=2.1630 mae=3.8400 cov90=0.887
 h   n=  95056 qs=2.1737 mae=3.8590 cov90=0.886

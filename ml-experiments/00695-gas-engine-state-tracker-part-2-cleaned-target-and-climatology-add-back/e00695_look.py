@@ -181,10 +181,7 @@ def look_step9a() -> None:
 
 
 def look_arithmetic() -> None:
-    """Print the capacity arithmetic and the engine record's running share."""
-    say(
-        f"Three units of 1.75 MW on {D8_CAPACITY_MVA} MVA: {3 * 1.75 / D8_CAPACITY_MVA * 100:.1f} points of capacity"
-    )
+    """Print the engine record's running share."""
     say(
         f"Gas A running share: {137 + 133 + 80} of {1704 + 137 + 133 + 80} half-hours = {(137 + 133 + 80) / 2054:.1%}"
     )

@@ -1,4 +1,4 @@
-"""The guard covers the Gas A levels-and-ramps figure of experiment 697 and keeps it value-free."""
+"""The guard covers experiment 697's Gas A ramps figure and season heat map, value-free."""
 
 from pathlib import Path
 from typing import Any, Final
@@ -60,4 +60,32 @@ def test_an_aggregate_without_units_or_labels_is_written(tmp_path: Path):
 def test_the_committed_figure_passes_the_text_check():
     docs = ROOT.parent / "docs" / "ml-experiments"
     (path,) = docs.glob(f"00697-*/{FIGURE}")
+    assert guard.svg_problems(svg=path.read_text()) == [], path
+
+
+SEASON_FIGURE: Final[str] = "g8_season.svg"
+
+
+def test_a_season_figure_with_a_megawatt_colour_scale_is_refused(tmp_path: Path):
+    target = tmp_path / "00697-x"
+    target.mkdir()
+    grid = pl.DataFrame({"hour": [0.0, 0.5], "month": [1, 2], "block": [0.37, 0.81]})
+    sized = (
+        _chart(grid)
+        .mark_rect(aria=False)
+        .encode(
+            x=alt.X("hour:Q", title="Hour"),
+            y=alt.Y("month:O", title="Month"),
+            color=alt.Color("block:Q", legend=alt.Legend(title="Block size (MW)")),
+        )
+    )
+    assert guard.is_guarded(path=target / SEASON_FIGURE)
+    with pytest.raises(guard.GuardError):
+        guard.save_chart(chart=sized, path=target / SEASON_FIGURE)
+    assert not (target / SEASON_FIGURE).exists()
+
+
+def test_the_committed_season_figure_passes_the_text_check():
+    docs = ROOT.parent / "docs" / "ml-experiments"
+    (path,) = docs.glob(f"00697-*/{SEASON_FIGURE}")
     assert guard.svg_problems(svg=path.read_text()) == [], path
