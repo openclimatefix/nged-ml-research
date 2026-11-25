@@ -59,11 +59,14 @@ decision_rule: >-
   production, with a point estimate of at least 0.02 required for an arm to replace R0 so that a
   0.01-point gain does not churn the recipe. Each contrast must also have the same sign for all
   three
-  seeds. Recency claim, per group: the weights help when C1's lower limit is above zero and C6's
-  lower limit is above zero there. The verdict is `supported` when both groups hold, `partly
-  supported` when one holds, `refuted` when C1's upper limit is below zero at either group, `not
-  supported` when C1's interval lies within -0.02 to +0.02 at both groups, and `inconclusive`
-  otherwise, including when C1 holds but the control C6 fails. The front-matter verdict covers
+  seeds. Recency claim, per group: C1 holds at a group when its lower limit is above zero and its sign is the same
+  in all three seeds, and the weights help at a group when C1 holds there and C6's lower limit is also
+  above zero with the same sign in all three seeds. The verdict is the first of these six rules that
+  applies, tried in this order: (1) `supported` when the weights help at both groups; (2)
+  `inconclusive` when C1 holds at a group where C6 does not hold; (3) `partly supported` when the
+  weights help at exactly one group; (4) `refuted` when C1's upper limit is below zero at either
+  group; (5) `not supported` when C1's interval lies within -0.02 to +0.02 at both groups; (6)
+  `inconclusive` otherwise. The front-matter verdict covers
   recency only; the half-life (C2, C3) and injection (C4, C5, C7, C8) results are stated in the
   headline. An arm replaces R0 only when its MAE interval is wholly below zero at both groups, its
   CRPS upper limit is below +0.02, and its copied share of injected shifts (experiment 677's

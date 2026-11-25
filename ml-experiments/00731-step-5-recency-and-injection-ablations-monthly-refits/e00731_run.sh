@@ -9,7 +9,7 @@
 # usage: e00731_run.sh ARM MONTH PHASE     ARM: R0 W0 W30 W270 WP IP B0; MONTH: 2025-11 .. 2026-10;
 #                                          PHASE: fit | pfit | bank | all (fit then pfit)
 # env:   DATA_PATH_INTERNAL (required), SEEDS ("0 1 2"), CORES (default 22-29), CAP (default 10G),
-#        R731 and R677 (data folders; R731 must contain 00731)
+#        BANKCAP (bank phase memory cap, default 14G), R731 and R677 (data folders; R731 must contain 00731)
 # Every fit and forecast is skipped when its output exists. Each Python command runs in a systemd scope with
 # a memory cap and no swap, one BLAS thread, pinned to CORES. Phase times go to $R731/logs/phase_times.csv.
 set -euo pipefail
@@ -37,7 +37,7 @@ ARMDIR=$R731/arms/k1_${ARM}_sp1/work
 TRAINLOG=$R731/logs/${M}_${ARM}_fit.log
 
 py() {  # one Python process: memory cap, no swap, one BLAS thread, pinned cores
-  systemd-run --user --scope -q -p MemoryMax=${CAP:-10G} -p MemorySwapMax=0 -p OOMPolicy=continue \
+  systemd-run --user --scope -q -p MemoryMax=${CAP_NOW:-${CAP:-10G}} -p MemorySwapMax=0 -p OOMPolicy=continue \
     env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH="$PYTHONPATH" \
     DATA_PATH_INTERNAL="$DATA_PATH_INTERNAL" NGED_S3_BUCKET_URL=x NGED_S3_BUCKET_ACCESS_KEY=x NGED_S3_BUCKET_SECRET=x \
     E00677_ROOT="$R731" E00677_SPAN=1 E00677_MONTH="$M" E00731_ARM="$ARM" CHAIN677="$CHAIN677" STATS677="$STATS677" \
@@ -52,11 +52,23 @@ phase_time() {  # phase_time PHASE DEVICE START END: one CSV row per run phase
     echo "$ARM,$M,$1,$2,$3,$4" >&9 ) 9>>"$f"
 }
 
+K1_HASH=$(sha256sum "$D/e00731_k1.py" | cut -d' ' -f1)
+check_code_hash() {  # a changed e00731_k1.py must not reuse earlier outputs (the smoke fits, for example)
+  local marker=$ARMDIR/code_hash_$M.txt
+  if [ -f "$marker" ] && [ "$(tr -d '[:space:]' < "$marker")" != "$K1_HASH" ]; then
+    echo "e00731_k1.py changed since $ARM $M was fitted: delete $ARMDIR outputs for $M first"; exit 1
+  fi
+  for h in "$ARMDIR"/history/${M}_d0_s?.json; do
+    [ -f "$h" ] && ! grep -q "$K1_HASH" "$h" && { echo "history $h has another code hash"; exit 1; }
+  done
+  return 0
+}
 have_models() { for s in $SEEDS; do [ -f "$ARMDIR/models/P5/${M}_d0_s$s.pt" ] || return 1; done; }
 have_fits() { for s in $SEEDS; do [ -f "$ARMDIR/fits/P5/${M}_d0_s$s.parquet" ] || return 1; done; }
 have_bank() { for s in $SEEDS; do [ -f "$R731/P0_D50_${M}_${ARM}_sp1/work/bank/${M}_d0_s$s.parquet" ] || return 1; done; }
 
 run_fit() {
+  check_code_hash
   if have_models && [ -f "$TRAINLOG" ] && grep -q "CHECKS PASSED" "$TRAINLOG"; then echo "$M $ARM fit exists"; return; fi
   local t0=$(date -u +%FT%TZ)
   E00677_PHASE=train py "$D/e00731_k1.py" "k1_$ARM" fit --step 5 --synthetic $SYN $A > "$TRAINLOG" 2>&1
@@ -65,6 +77,7 @@ run_fit() {
 }
 
 check_before_predict() {  # a failed fit must never be refitted with the scored month open
+  check_code_hash
   have_models || { echo "missing .pt files for $ARM $M: $SEEDS"; exit 1; }
   grep -q "CHECKS PASSED" "$TRAINLOG" || { echo "train log of $ARM $M lacks CHECKS PASSED"; exit 1; }
   for s in $SEEDS; do [ -f "$ARMDIR/history/${M}_d0_s$s.json" ] || echo "note: no loss history for seed $s (fit reused?)"; done
@@ -85,7 +98,7 @@ run_bank() {  # the held-out injected bank on the K1-type step-5 models, through
   if have_bank; then echo "$M $ARM bank exists"; return; fi
   local t0=$(date -u +%FT%TZ) CAND
   CAND=$(ls "$REPO"/ml-experiments/00677-*/e00677_cand.py)
-  E00677_PHASE=predict py "$CAND" P0+D50 bank --models-from "$ARMDIR/models/P5" --work-suffix "_${M}_${ARM}_sp1" \
+  CAP_NOW=${BANKCAP:-14G} E00677_PHASE=predict py "$CAND" P0+D50 bank --models-from "$ARMDIR/models/P5" --work-suffix "_${M}_${ARM}_sp1" \
     --synthetic $SYN $A > "$R731/logs/${M}_${ARM}_sp1_bank.log" 2>&1
   phase_time bank cuda "$t0" "$(date -u +%FT%TZ)"
   echo "$M $ARM bank done $(date -u +%T)"

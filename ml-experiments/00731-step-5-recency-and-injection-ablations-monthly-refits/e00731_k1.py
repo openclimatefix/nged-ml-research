@@ -103,14 +103,20 @@ ROOT = (
     else ML_EXPERIMENTS_DATA_DIR / NAME
 )
 # >>> E00731 PATCH BEGIN (A: root assertion)
-E00731_ROOT_OK = os.environ.get("E00677_ROOT", "")
-assert "00731" in E00731_ROOT_OK and "00731" in str(ROOT), (
+import hashlib as _hashlib
+from typing import Final as _Final
+
+E00731_ROOT_OK: _Final = os.environ.get("E00677_ROOT", "")
+E00731_CODE_HASH: _Final = _hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+"""The sha256 of this file: every fit, history, and world records it, and a changed file refuses old outputs."""
+assert "00731" in E00731_ROOT_OK, (
     "experiment 731 writes only under its own data folder: set E00677_ROOT to it",
     E00731_ROOT_OK,
     str(ROOT),
 )
+assert "00731" in str(ROOT), str(ROOT)
 assert "00677" not in str(ROOT), "experiment 677 is immutable: never write under its folder"
-E00731_ARM = os.environ.get("E00731_ARM", "")
+E00731_ARM: _Final = os.environ.get("E00731_ARM", "")
 assert E00731_ARM in {"R0", "W0", "W30", "W270", "WP", "IP", "B0"}, ("set E00731_ARM", E00731_ARM)
 assert MINE.command == "fit", "experiment 731 runs stage 3 only; stages 1 and 2 are 677's, frozen"
 assert MINE.step == "5" and not MINE.ens_only
@@ -225,7 +231,9 @@ if E00731_ARM == "WP":
         weight = (0.5 ** (age / kwargs["half_life_days"])).astype(np.float32)
         assert weight.shape == refit.weight.shape
         report = {**refit.report, "placebo_total_weight": float(weight.sum())}
-        return e.c.Refit(refit.index, refit.y, weight, refit.is_val, report)
+        return e.c.Refit(
+            index=refit.index, y=refit.y, weight=weight, is_val=refit.is_val, report=report
+        )
 
     e.c.select_rows = select_rows_wp
 # <<< E00731 PATCH END (B: the arm)
@@ -257,6 +265,24 @@ elif MINE.command == "step2":
 elif MINE.command == "fit":
     e.row_nll = arm.row_nll
 # >>> E00731 PATCH BEGIN (C: diagnostics and per-epoch loss history; no change to the fit)
+    _marker = OUT / "work" / f"code_hash_{MINE.months[0]}.txt"
+    _existing = [
+        *(OUT / "work" / "models" / "P5").glob(f"{MINE.months[0]}_d0_s*.pt"),
+        *(OUT / "work" / "fits" / "P5").glob(f"{MINE.months[0]}_d0_s*.parquet"),
+        *(OUT / "work" / "history").glob(f"{MINE.months[0]}_d0_s*.json"),
+        *(OUT / "work" / "worlds").glob(f"{MINE.months[0]}.npz"),
+    ]
+    if _marker.exists():
+        assert _marker.read_text().strip() == E00731_CODE_HASH, (
+            "e00731_k1.py changed since this arm and month were fitted: delete its outputs first",
+            str(_marker),
+        )
+    else:
+        assert not _existing, ("outputs without a code-hash marker: delete them", str(_marker))
+        _marker.parent.mkdir(parents=True, exist_ok=True)
+        _marker.write_text(E00731_CODE_HASH + "\n")
+    print("CODE HASH", E00731_CODE_HASH, flush=True)
+
     _outer_select_rows = e.c.select_rows
 
     def select_rows_report(**kwargs):
@@ -331,11 +357,18 @@ elif MINE.command == "fit":
         HIST.reset()
         model, log = _inner_fine_tune(**kwargs)
         rows, stored_epoch = HIST.finish()
+        assert len(rows) == log["epochs"], (len(rows), log["epochs"])
+        assert abs(rows[stored_epoch - 1]["val_nll"] - log["val_nll"]) < 1e-4, (
+            rows[stored_epoch - 1]["val_nll"],
+            log["val_nll"],
+        )
         day = e.f.day_of(month=kwargs["month"], cut=kwargs["cut"])
         path = OUT / "work" / "history" / f"{kwargs['month']}_d{day}_s{kwargs['seed']}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "arm": E00731_ARM,
+            "code_hash": E00731_CODE_HASH,
+            "max_epochs": e.SPEC.max_epochs,
             "epochs_run": len(rows),
             "epochs_in_log": log["epochs"],
             "stored_epoch": stored_epoch,
@@ -346,6 +379,7 @@ elif MINE.command == "fit":
         tmp.write_text(_json.dumps(payload, indent=1))
         tmp.rename(path)
         log["history_file"] = str(path)
+        log["code_hash"] = E00731_CODE_HASH
         log["stored_epoch"] = stored_epoch
         return model, log
 
@@ -363,7 +397,7 @@ elif MINE.command == "fit":
             tmp = path.with_suffix(".tmp.npz")
             np.savez_compressed(
                 tmp, shift=shift[:, first:last].astype(np.float32), first=first, last=last,
-                n_events=n_events, seed=seed,
+                n_events=n_events, seed=seed, code_hash=E00731_CODE_HASH,
             )  # fmt: skip
             tmp.rename(path)
         return fixed, n_events

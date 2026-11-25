@@ -38,7 +38,6 @@ from typing import Final
 import altair as alt
 import e00731_score as S  # noqa: N812  # ty: ignore[unresolved-import]
 import numpy as np
-import pandas as pd  # noqa: TID251  (Altair takes pandas frames)
 import polars as pl
 
 BLUE: Final = "#306BFF"
@@ -107,9 +106,19 @@ def loss_curves(*, out: Path, month: str = LOSS_MONTH, seed: int = 0) -> None:
                     "series": "Validation (what early stopping reads)",
                 }
             )
-        df = pd.DataFrame(rows)
+        df = pl.DataFrame(rows)
+        limit = h.get("max_epochs")
+        if limit is not None and h["epochs_run"] >= limit:
+            stop = f"ran to the {limit}-epoch limit"
+        else:
+            stop = f"early stopping ended the fit after epoch {h['epochs_run']}"
         stored.append(
-            {"arm": arm, "stored_epoch": h["stored_epoch"], "epochs_run": h["epochs_run"]}
+            {
+                "arm": arm,
+                "stored_epoch": h["stored_epoch"],
+                "epochs_run": h["epochs_run"],
+                "stop": stop,
+            }
         )
         lines = (
             alt.Chart(df)
@@ -131,32 +140,34 @@ def loss_curves(*, out: Path, month: str = LOSS_MONTH, seed: int = 0) -> None:
             )
         )
         rule = (
-            alt.Chart(pd.DataFrame({"epoch": [h["stored_epoch"]]}))
+            alt.Chart(pl.DataFrame({"epoch": [h["stored_epoch"]]}))
             .mark_rule(color=BLACK, strokeDash=[4, 3])
             .encode(x="epoch:Q")
         )
         label = (
             alt.Chart(
-                pd.DataFrame(
+                pl.DataFrame(
                     {"epoch": [h["stored_epoch"]], "text": [f"stored epoch {h['stored_epoch']}"]}
                 )
             )
             .mark_text(align="left", dx=4, dy=-4, color=BLACK, baseline="top")
             .encode(x="epoch:Q", y=alt.value(4), text="text:N")
         )
-        panels.append((lines + rule + label).properties(width=WIDTH - 90, height=110, title=text))
+        panels.append(
+            (lines + rule + label).properties(width=WIDTH - 90, height=110, title=f"{text}: {stop}")
+        )
     if not panels:
         return
     chart = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
             "Training and validation loss by epoch, one fold and one seed per arm",
             subtitle=wrap(
-                f"Refit month {month}, seed {seed}. Negative log-likelihood of the Gaussian mixture, lower is better. The dashed line marks the epoch whose weights are stored; training continues 8 epochs past it before early stopping ends the fit."
+                f"Refit month {month}, seed {seed}. Negative log-likelihood of the Gaussian mixture, lower is better. The dashed line marks the epoch whose weights are stored; each panel title says why the fit ended."
             ),
         )
     )
     chart.save(out / "loss_curves.svg")
-    pd.DataFrame(stored).to_csv(out / "loss_curves_stored_epochs.csv", index=False)
+    pl.DataFrame(stored).write_csv(out / "loss_curves_stored_epochs.csv")
     print("loss curves: stored epochs", stored)
 
 
@@ -187,21 +198,25 @@ def worlds(*, out: Path, months=WORLD_MONTHS, primary: str = EXAMPLE_PRIMARY) ->
             continue
         lo, hi = max(0, int(nz[0]) - 20 * 48), min(len(shift), int(nz[0]) + 70 * 48)
         t = np.arange(lo, hi) + first
-        lag_idx = t - 48  # the 24-hour lag input read for valid time t
-        base = share[lag_idx] * 100.0
-        df = pd.DataFrame(
+        # `build_month_syn` adds the shift at the grid time of the lagged observation itself
+        # (the label of a row is `shift[primary, lag index]`), so both series are plotted on the
+        # time of the lagged observation
+        base = share[t] * 100.0
+        df = pl.DataFrame(
             {
                 "day": (np.arange(lo, hi) - lo) / 48.0,
                 "Without the shifts (observed)": base,
                 "With the injected shifts": base + shift[lo:hi] * 100.0,
             }
-        ).melt("day", var_name="lag input", value_name="share")
+        ).unpivot(index="day", variable_name="lag input", value_name="share")
         start = lib.GRID_START + timedelta(minutes=30 * int(t[0]))
         panels.append(
             alt.Chart(df)
             .mark_line(clip=True)
             .encode(
-                x=alt.X("day:Q", title="Days into the window"),
+                x=alt.X(
+                    "day:Q", title="Days since the window start (time of the lagged observation)"
+                ),
                 y=alt.Y(
                     "share:Q",
                     title="24-hour lag input (% of capacity)",
@@ -277,7 +292,7 @@ def forecasts(*, out: Path) -> None:
     for title, hours in (("Day ahead (first 24 hours)", 24), ("14 days ahead", 24 * 14)):
         hi = EXAMPLE_ORIGIN + timedelta(hours=hours)
         obs = truth.filter((pl.col("valid_time") >= EXAMPLE_ORIGIN) & (pl.col("valid_time") < hi))
-        obs_df = pd.DataFrame(
+        obs_df = pl.DataFrame(
             {
                 "time": obs["valid_time"].to_list(),
                 "mw": obs["power"].to_list(),
@@ -298,7 +313,7 @@ def forecasts(*, out: Path) -> None:
             )
             if not f.height:
                 continue
-            df = pd.DataFrame(
+            df = pl.DataFrame(
                 {
                     "time": f["valid_time"].to_list(),
                     "q05": f["q05"].to_list(),
@@ -359,10 +374,10 @@ def events(*, out: Path, n_min: int = 6) -> None:
             & (pl.col("valid_time") >= lo)
             & (pl.col("valid_time") < hi)
         )
-        obs_df = pd.DataFrame({"time": obs["valid_time"].to_list(), "mw": obs["power"].to_list()})
+        obs_df = pl.DataFrame({"time": obs["valid_time"].to_list(), "mw": obs["power"].to_list()})
         layers = [
             alt.Chart(
-                pd.DataFrame({"a": [max(at(ev["start"]), lo)], "b": [min(at(ev["end"]), hi)]})
+                pl.DataFrame({"a": [max(at(ev["start"]), lo)], "b": [min(at(ev["end"]), hi)]})
             )
             .mark_rect(color="#DDDDDD", opacity=0.6)
             .encode(x="a:T", x2="b:T"),
@@ -375,7 +390,7 @@ def events(*, out: Path, n_min: int = 6) -> None:
         ]
         for name, colour in (("arm_R0_sp1", BLUE), ("stored_5wo_sp1", ORANGE)):
             f = seed_mean_window(name=name, tsid=tsid, lo=lo, hi=hi, lead=(24.0, 48.0))
-            df = pd.DataFrame({"time": f["valid_time"].to_list(), "mw": f["q50"].to_list()})
+            df = pl.DataFrame({"time": f["valid_time"].to_list(), "mw": f["q50"].to_list()})
             layers.append(
                 alt.Chart(df)
                 .mark_line(color=colour, opacity=0.9, clip=True)
@@ -399,11 +414,23 @@ def events(*, out: Path, n_min: int = 6) -> None:
 
 
 def tails(*, out: Path) -> None:
+    """Write the tails table on the rows of 677's joint pass, with the scorer's own observed power.
+
+    The rows are the 3,879,313 shared rows of pass A (`e00731_score.shared_keys`), and the observed
+    power is the cleaned grid that `e00677_score.main` scores against, not the raw ground truth.
+    """
     lib = S.sc.lib
-    truth = truth_frame().filter(pl.col("power").is_not_null() & pl.col("power").is_finite())
-    capacity = pl.read_parquet(lib.FOLDER / "series_capacity.parquet").select(
-        "time_series_id", "capacity"
+    keys = S.shared_keys(paths=[p for _, p in S.ladder_systems()])
+    assert len(keys) == S.EXPECTED_ROWS, len(keys)
+    ids = sorted(site_map()["time_series_id"].to_list())
+    cap_by_id = (
+        pl.read_parquet(lib.FOLDER / "series_capacity.parquet")
+        .filter(pl.col("time_series_id").is_in(ids))
+        .sort("time_series_id")["capacity"]
+        .to_numpy()
+        .astype(np.float64)
     )
+    grid = lib.cleaned_grid(ids=ids)
     levels = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
     rows = []
     for name, text in [
@@ -413,18 +440,18 @@ def tails(*, out: Path) -> None:
     ]:
         if not (S.ROOT_731 / "backtests" / f"{name}.parquet").exists():
             continue
-        f = (
-            S.sc.seed_mean(name=name, seeds=S.SEEDS)
-            .join(truth, on=["time_series_id", "valid_time"])
-            .join(
-                capacity.with_columns(pl.col("time_series_id").cast(pl.Int8)), on="time_series_id"
-            )
-        )
-        y = f["power"].to_numpy().astype(np.float64)
-        cap = f["capacity"].to_numpy().astype(np.float64)
-        rec = {"arm": text, "half_hours": f.height}
+        f = S.sc.seed_mean(name=name, seeds=S.SEEDS)
+        vidx = lib.grid_index(times=f["valid_time"])
+        oidx = lib.grid_index(times=f["power_fcst_init_time"])
+        key = S.key_of(tsid=f["time_series_id"].to_numpy(), origin=oidx, valid=vidx)
+        keep = np.isin(key, keys)
+        assert int(keep.sum()) == S.EXPECTED_ROWS, (name, int(keep.sum()))
+        row = np.searchsorted(ids, f["time_series_id"].to_numpy())[keep]
+        y = grid[row, vidx[keep]]
+        cap = cap_by_id[row]
+        rec = {"arm": text, "half_hours": int(keep.sum())}
         for col, tau in levels.items():
-            q = f[col].to_numpy().astype(np.float64)
+            q = f[col].to_numpy().astype(np.float64)[keep]
             rec[f"share_below_{col}"] = float((y <= q).mean())
             d = y - q
             rec[f"pinball_{col}"] = float(

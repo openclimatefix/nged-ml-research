@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501, PT018, PLR0915
 """Experiment 731: known-answer tests of the weights, the placebo, the injection, and the weather look-ahead.
 
 README. This script checks the code of steps 3 and 4 of experiment 731 (`e00731_k1.py`). Run it with
@@ -11,13 +11,18 @@ Usage: `python e00731_tests_known_answer.py [--skip-build]`. Tests, in this proc
 
 1. the unpatched part of `e00731_k1.py` equals `e00677_k1.py`;
 2. the root assertion refuses a folder without `00731` (a child process that must fail);
-3. the 710 placebo keeps the total weight within 5% (the total is printed) and its multiset of ages
-   except where the clipping of 710 acts;
-4. the synthetic generator at depth 0.3 shifts a constant series by 0.3 on events with a mid-day onset;
+3. the total weight of the 710 placebo stays within 5% of the true total (both totals are printed).
+   The placebo ages are not a permutation of the true ages, because calendar months differ in length
+   and 710 clips a row to its new month, so only the total is asserted;
+4. the synthetic generator at depth 0.3: the RNG draws are replayed, and the shift of a mid-day
+   onset event is exactly +-0.3 over its length and 0 on the half-hour before it;
 5. the weather look-ahead: for every origin 2026-07-01 to 2026-10-31 the ensemble summary file's run
-   time is at most the origin minus 9 hours, and one example row is printed.
+   time is at most the origin minus 9 hours, and one example row is printed. **This check depends on
+   experiment 607's `init=YYYY-MM-DD.parquet` file naming** (the date is the 00Z run); the check also
+   reads each file's own `power_fcst_init_time` and requires it to equal the file's date plus 9 hours,
+   which ties the file name to its rows.
 
-Child processes (`--child ARM`), which `exec` the setup of `e00731_k1.py` (everything before the first
+Child processes (`--child ARM`; `--child TRAIN` runs test 9), which `exec` the setup of `e00731_k1.py` (everything before the first
 command) so that the real patches are tested, on a fixed CPU core pair:
 
 6. R0: weights 1, 0.5, and 0.25 at ages 0, 90, and 180 days (the formula, and the original
@@ -26,7 +31,11 @@ command) so that the real patches are tested, on a fixed CPU core pair:
 8. IP, one real month, CPU only, build only: the lag block of the IP arm equals the plain unshifted
    `build_month` block on all rows and on the columns `x[:, 37:45]`, and a depth of 0.3 shifts the lag
    values by the label's sign where the label is nonzero. This builds one month of rows (about 4
-   million rows, a few GB, a few minutes on 2 cores): `--skip-build` leaves it out.
+   million rows, a few GB, about a minute on 2 cores): `--skip-build` leaves it out. At depth 0.3,
+   the lag value moves by a scale per Primary that equals the scale of `e.block_of` on a series with
+   0.3 added to that Primary alone;
+9. TRAIN: `e.train` on random rows gives identical state dicts and the same stored epoch with and
+   without the patch-C wrappers (`row_nll_recorded`, `select_rows_report`).
 """
 
 import argparse
@@ -49,7 +58,7 @@ NAME: Final = "00731-step-5-recency-and-injection-ablations-monthly-refits"
 MONTH: Final = "2026-01"
 BEGIN: Final = "# >>> E00731 PATCH BEGIN"
 END: Final = "# <<< E00731 PATCH END"
-CORES: Final = os.environ.get("CORES", "28-29")
+CORES: Final = os.environ.get("CORES", "20-21")
 
 
 def data_root() -> Path:
@@ -125,7 +134,11 @@ def run_child(
         *(extra or []),
     ]
     return subprocess.run(
-        cmd, env=child_env(arm=arm, root=root), capture_output=True, text=True, check=False
+        cmd,
+        env=child_env(arm="R0" if arm == "TRAIN" else arm, root=root),
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
 
@@ -163,8 +176,8 @@ def fake_rows(*, cutoff: datetime, n_days: int = 760) -> SimpleNamespace:
     )
 
 
-def test_placebo_multiset() -> None:
-    """Assert that the placebo ages are a near-permutation of the true ages and print the total weight."""
+def test_placebo_total_weight() -> None:
+    """Assert that the placebo's total weight stays within 5% of the true total, and print both."""
     import e00510_common as c  # ty: ignore[unresolved-import]
     import e00710_weights as w710  # ty: ignore[unresolved-import]
 
@@ -185,7 +198,7 @@ def test_placebo_multiset() -> None:
         ratio = w_perm.sum() / w_true.sum()
         print(
             f"[3] {yyyymm}: rows {len(valid):,}; total weight true {w_true.sum():,.1f}, placebo {w_perm.sum():,.1f} "
-            f"(ratio {ratio:.4f}); share of sorted ages equal {same_multiset:.3f}"
+            f"(ratio {ratio:.4f}); share of sorted ages equal {same_multiset:.3f} (not a permutation: months differ in length)"
         )
         assert abs(ratio - 1) < 0.05, ratio
         assert np.array_equal(
@@ -194,8 +207,6 @@ def test_placebo_multiset() -> None:
                 valid_us=valid, refit_us=refit_us, floor_us=floor_us, fold_yyyymm=yyyymm
             ),
         ), "not deterministic"
-        # the permutation is shared by the three seeds: it depends on the fold alone
-        assert w710.PLACEBO_SEED_BASE + yyyymm == 8_100_000 + yyyymm
 
 
 def test_synthetic_depth() -> None:
@@ -218,7 +229,35 @@ def test_synthetic_depth() -> None:
         onsets.extend(int(i) for i in nz[np.r_[True, np.diff(nz) > 1]])
     mid_day = [i for i in onsets if i % 48 != 0]
     assert mid_day, onsets
-    first = mid_day[0]
+    # replay the generator's draws and check one isolated mid-day event exactly
+    rng = np.random.default_rng(202601)
+    events = []
+    for p in range(clean.shape[0]):
+        covered = 0
+        while covered < bank.SYN_SHARE * clean.shape[1]:
+            length = int(rng.choice(bank.LENGTHS_DAYS)) * bank.PER_DAY
+            on = int(rng.integers(0, max(1, clean.shape[1] - length)))
+            depth = float(rng.choice((0.3, 0.3, 0.3))) * float(rng.choice([-1.0, 1.0]))
+            events.append((p, on, length, depth))
+            covered += length
+    assert len(events) == n_events, (len(events), n_events)
+    isolated = [
+        (p, on, ln, d)
+        for (p, on, ln, d) in events
+        if on % 48 != 0
+        and on > 0
+        and on + ln < clean.shape[1]
+        and all(
+            q != p or (o + n2 <= on or o >= on + ln)
+            for (q, o, n2, _) in events
+            if (q, o) != (p, on)
+        )
+    ]
+    assert isolated, "no isolated mid-day event to check"
+    p, on, ln, d = isolated[0]
+    assert np.allclose(shift[p, on : on + ln], d, atol=1e-9), (p, on, ln, d)
+    assert shift[p, on - 1] == 0 and shift[p, on + ln] == 0
+    first = on
     print(
         f"[4] depth 0.3: {n_events} events, shift magnitudes {values.tolist()}; "
         f"example onset at half-hour {first} = day {first // 48} {(first % 48) // 2:02d}:{30 * (first % 2):02d} UTC (mid-day)"
@@ -250,6 +289,7 @@ def test_weather_lookahead() -> None:
         assert origin.len() == 1, path
         origin_t = origin[0]
         run_t = day  # the file name is the 00Z run's date
+        assert origin_t == day + timedelta(hours=9), ("file name and rows disagree", path, origin_t)
         assert run_t <= origin_t - timedelta(hours=9), (path, run_t, origin_t)
         assert frame["valid_time"].min() > origin_t - timedelta(hours=9), path
         example = example or (run_t, origin_t, path.name)
@@ -367,8 +407,7 @@ def child_build(*, arm: str) -> dict:
     armmod._build_month_p5 = lambda **_: (
         mr
     )  # the same rows; `build_month_syn` overwrites the lag block in place
-    out = armmod.build_month_syn(month=MONTH, clean=clean)
-    assert out is mr
+    armmod.build_month_syn(month=MONTH, clean=clean)
     assert np.array_equal(mr.x[:, sl], plain_block, equal_nan=True), (
         "IP's lag block differs from the plain block"
     )
@@ -407,6 +446,33 @@ def child_build(*, arm: str) -> dict:
         print(
             f"[8] depth 0.3, lag column {col}: {int(moved.sum()):,} rows shifted, sign agrees on {agree.mean():.5f}; value change per unit label: median {np.median(ratio):.4f}, range {ratio.min():.4f} to {ratio.max():.4f}"
         )
+    # direct check of the shift size: add 0.3 to one Primary's whole series and read `e.block_of`
+    step_us, grid_us = e.c.prep422.STEP_US, e.c.prep422.GRID_START_US
+    origin_idx = (mr.origin_us - grid_us) // step_us
+    for prim in range(clean.shape[0]):
+        rows_p = np.flatnonzero(mr.primary == prim)[::40]
+        fixed_p = clean.copy()
+        fixed_p[prim] = np.where(np.isfinite(fixed_p[prim]), fixed_p[prim] + 0.3, fixed_p[prim])
+        direct = e.block_of(
+            clean=fixed_p,
+            primary=mr.primary[rows_p],
+            target_idx=mr.target_idx[rows_p],
+            origin_idx=origin_idx[rows_p],
+        )[:, 0]
+        direct = (direct - plain_block[rows_p, 0]) / 0.3
+        in_build = (
+            (mr.primary == prim)
+            & (np.abs(np.nan_to_num(lab[:, 0])) > 0.299)
+            & (np.abs(np.nan_to_num(lab[:, 0])) < 0.301)
+        )
+        built = (mr.x[in_build, 37] - plain_block[in_build, 0]) / lab[in_build, 0]
+        d_med, b_med = float(np.nanmedian(direct)), float(np.nanmedian(built))
+        assert abs(d_med - b_med) < 1e-3 * max(1.0, abs(d_med)), (prim, d_med, b_med)
+        near = float(np.mean(np.abs(built[np.isfinite(built)] - b_med) < 1e-3 * abs(b_med)))
+        assert near > 0.9, (prim, b_med, near)  # rows at a clipped value, mostly at the short-history Primaries
+        print(
+            f"[8] Primary {prim}: scale of a 0.3 shift in the lag value, direct {d_med:.4f}, through the injection {b_med:.4f} ({near:.4f} of rows within 0.1%)"
+        )
     # one example row for the weather look-ahead: run time, origin, oldest lag time
     grid_start = e.c.prep422.GRID_START_US
     step = e.c.prep422.STEP_US
@@ -423,6 +489,76 @@ def child_build(*, arm: str) -> dict:
     return {"arm": arm, "rows": len(mr.x)}
 
 
+def child_train() -> dict:
+    """Train a toy network on random rows with and without the patch-C wrappers; the fit must not change."""
+    import copy
+    import textwrap
+
+    import torch  # ty: ignore[unresolved-import]
+
+    ns = exec_setup(arm_name="R0")
+    e = ns["e"]
+
+    class Toy(torch.nn.Module):
+        """Stand-in with the attributes `e.train` reads (weather, datetime, mixer_ft)."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.weather = torch.nn.Linear(4, 4)
+            self.datetime = torch.nn.Linear(4, 4)
+            self.mixer_ft = torch.nn.Linear(4, 1)
+
+        def forward(self, x, p):  # noqa: ANN001, ANN202
+            return self.mixer_ft(torch.tanh(self.weather(x) + self.datetime(x))).squeeze(-1)
+
+    def toy_nll(*, out, z, p):  # noqa: ANN001, ANN202
+        return (out - z) ** 2
+
+    g = torch.Generator().manual_seed(1)
+    n = 4000
+    x = torch.randn(n, 4, generator=g)
+    z = x[:, 0] * 0.5 + 0.3 * torch.randn(n, generator=g)
+    w = torch.rand(n, generator=g) + 0.1
+    p = torch.zeros(n, dtype=torch.long)
+    is_val = torch.zeros(n, dtype=torch.bool)
+    is_val[-800:] = True
+    torch.manual_seed(0)
+    first = Toy()
+    second = copy.deepcopy(first)
+    e.row_nll = toy_nll
+    kw = {"x": x, "z": z, "w": w, "p": p, "is_val": is_val, "seed": 3, "lr": 5e-3,
+          "max_epochs": 25, "fresh_lr": None, "frozen": False, "anchor": None, "lam": 0.0,
+          "device": "cpu"}  # fmt: skip
+    cutoff = datetime(2026, 1, 1, tzinfo=UTC)
+    rows = fake_rows(cutoff=cutoff)
+    weights_before = e.c.select_rows(rows=rows, cutoff=cutoff, half_life_days=90.0).weight
+    epochs_a, best_a = e.train(model=first, **kw)
+    source = K1_731.read_text()
+    block = source.split("(C: diagnostics")[1].split(END)[0].split("\n", 1)[1]
+    block = block.split("    _outer_select_rows = e.c.select_rows\n", 1)[1]
+    block = (
+        "    _outer_select_rows = e.c.select_rows\n" + block
+    )  # drops the hash-marker section (it writes a file)
+    exec(compile(textwrap.dedent(block), "patch_c", "exec"), ns)  # noqa: S102
+    assert e.row_nll is not toy_nll, "the recording wrapper is not installed"
+    weights_after = e.c.select_rows(rows=rows, cutoff=cutoff, half_life_days=90.0).weight
+    assert np.array_equal(weights_before, weights_after), "select_rows_report changed the weights"
+    ns["HIST"].reset()
+    epochs_b, best_b = e.train(model=second, **kw)
+    assert (epochs_a, best_a) == (epochs_b, best_b), ((epochs_a, best_a), (epochs_b, best_b))
+    for (name, a), (_, b) in zip(
+        first.state_dict().items(), second.state_dict().items(), strict=True
+    ):
+        assert torch.equal(a, b), ("state differs", name)
+    history, stored = ns["HIST"].finish()
+    assert len(history) == epochs_b
+    assert abs(history[stored - 1]["val_nll"] - best_b) < 1e-5, (history[stored - 1], best_b)
+    print(
+        f"[9] patch C leaves the fit unchanged: identical state dicts, {epochs_b} epochs, stored epoch {stored}, validation NLL {best_b:.6f} (history {history[stored - 1]['val_nll']:.6f})"
+    )
+    return {"epochs": epochs_b, "stored": stored}
+
+
 def main() -> None:
     """Run the tests in this process, then the children."""
     parser = argparse.ArgumentParser()
@@ -433,17 +569,20 @@ def main() -> None:
     )
     args = parser.parse_args()
     if args.child:
+        if args.child == "TRAIN":
+            print("CHILD_RESULT " + json.dumps(child_train()))
+            return
         fn = child_build if args.child == "IP" else child_weights
         print("CHILD_RESULT " + json.dumps(fn(arm=args.child)))
         return
     if not args.only:
         test_unpatched_equals_original()
-        test_placebo_multiset()
+        test_placebo_total_weight()
         test_synthetic_depth()
         test_weather_lookahead()
         test_root_assertion()
     root = data_root() / NAME
-    arms = ("R0", "W0", "W30", "W270", "WP", "B0", *(() if args.skip_build else ("IP",)))
+    arms = ("R0", "W0", "W30", "W270", "WP", "B0", "TRAIN", *(() if args.skip_build else ("IP",)))
     for arm in args.only or arms:
         proc = run_child(arm=arm, root=root)
         sys.stdout.write(

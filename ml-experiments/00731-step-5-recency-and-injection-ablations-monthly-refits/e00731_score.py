@@ -66,6 +66,7 @@ import e00677_score as sc  # noqa: E402  # ty: ignore[unresolved-import]
 import e00677_slices as s677  # noqa: E402  # ty: ignore[unresolved-import]
 
 assert sc.ROOT == ROOT_731, (sc.ROOT, ROOT_731)
+S_LIB: Final = sc.lib
 ARMS: Final = ("R0", "W0", "W30", "W270", "WP", "IP", "B0")
 MONTHS: Final = (
     "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04",
@@ -174,9 +175,12 @@ def rows_path(*, system: str, setting: str) -> Path:
     tag = "s012" if setting == "joint" else setting
     if system in ARMS:
         return ROOT_731 / "scores" / f"arm_{system}_sp1_{tag}" / "rows.parquet"
-    if setting == "joint":
-        return ROOT_677 / "scores" / f"{STORED[system]}_s012" / "rows.parquet"
     return ROOT_731 / "scores" / f"stored_{system}_sp1_{tag}" / "rows.parquet"
+
+
+def rows_path_677(*, system: str) -> Path:
+    """Return 677's own stored per-row score file of arm 9a or `5wo` (read only; used by pass A and the check)."""
+    return ROOT_677 / "scores" / f"{STORED[system]}_s012" / "rows.parquet"
 
 
 def ladder_systems() -> list[tuple[str, Path]]:
@@ -368,7 +372,7 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
     assert len(keys_a) == EXPECTED_ROWS, (len(keys_a), EXPECTED_ROWS)
     frame = Frame(keys=keys_a, site=site)
     ref9a = values_on(
-        path=rows_path(system="9a", setting="joint"),
+        path=rows_path_677(system="9a"),
         keys=keys_a,
         columns={"mae": "Model_mae", "crps": "Model_crps"},
     )
@@ -405,6 +409,28 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
             )
             sums.add(frame=frame, setting=setting, mae=v["mae"], crps=v["crps"])
         systems[system] = sums
+        if system in STORED:  # the rescoring must reproduce 677's stored per-row scores
+            mine = values_on(
+                path=rows_path(system=system, setting="joint"),
+                keys=keys_a,
+                columns={"mae": "Model_mae", "crps": "Model_crps"},
+            )
+            theirs = values_on(
+                path=rows_path_677(system=system),
+                keys=keys_a,
+                columns={"mae": "Model_mae", "crps": "Model_crps"},
+            )
+            for metric in ("mae", "crps"):
+                worst = float(np.abs(mine[metric] - theirs[metric]).max())
+                assert worst < 1e-4, (
+                    "rescored stored arm differs from 677's rows",
+                    system,
+                    metric,
+                    worst,
+                )
+            print(
+                f"rescored {system} equals 677's stored per-row scores on the shared rows (checked MAE and CRPS)"
+            )
         print("summed", system, flush=True)
     assert (
         abs(float(systems["9a"].prim[("mae", "joint")].sum() / EXPECTED_ROWS) - EXPECTED_9A[0])
@@ -415,7 +441,10 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
         f"PASS B: step5w@1 MAE unchanged at {EXPECTED_9A[0]}, rows unchanged at {EXPECTED_ROWS:,}"
     )
     heur = values_on(
-        path=rows_path(system="9a", setting="joint"),
+        path=ROOT_677
+        / "scores"
+        / "step1_ens_only_sp3_s012"
+        / "rows.parquet",  # as in 677's joint pass
         keys=keys_a,
         columns={
             "heur_mae": "Manual heuristic_mae",
@@ -507,22 +536,33 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
 
 def month_table(*, keys: np.ndarray, frame: Frame, systems: tuple[str, str]) -> None:
     """Print the MAE of two systems by origin month (the gate's month-by-month comparison)."""
-    month = (frame.origin // DAY // 30.4375).astype(int)
+    start = np.datetime64(S_LIB.GRID_START.replace(tzinfo=None), "m")
+    month = (
+        (start + frame.origin * 30).astype("datetime64[M]").astype(str)
+    )  # calendar month of the origin
     rows = []
     for name in systems:
         v = values_on(
             path=rows_path(system=name, setting="joint"), keys=keys, columns={"mae": "Model_mae"}
         )["mae"]
         for m in np.unique(month):
-            rows.append({"system": name, "month_bin": int(m), "mae": float(v[month == m].mean())})
-    print(pl.DataFrame(rows).pivot(on="system", index="month_bin", values="mae"))
+            rows.append(
+                {"system": name, "origin_month": str(m), "mae": float(v[month == m].mean())}
+            )
+    print(pl.DataFrame(rows).pivot(on="system", index="origin_month", values="mae"))
+
+
+BANK_CHECK: Final = {"9a": 0.07101, "5wo": 0.12553}
+"""The copied share of 677's stored arms 9a and `5wo` on the held-out bank, 0 to 14 days, monthly refits."""
 
 
 def bank_follow(*, arms: list[str]) -> pl.DataFrame:
     """Return the share of an injected shift that the median copies, 0 to 14 days (677's `bank` measure).
 
-    Per (arm, seed, month): sum(change * shift) / sum(shift ** 2) over the scored rows whose 1-day lag
-    is shifted; months are pooled with row-count weights, then averaged over seeds.
+    Pooling is 677's (`e00677_bank_score.py`): per (arm, seed, month) the least-squares slope
+    sum(change * shift) / sum(shift ** 2) over the scored rows whose 1-day lag is shifted; the months
+    are pooled with the number of shifted rows as weights; the arm's value is the mean over seeds.
+    Every arm must have all 12 months and 3 seeds, and the stored arms must give 0.07101 and 0.12553.
     """
     folders = {
         **{a: (ROOT_731, f"P0_D50_{{m}}_{a}_sp1") for a in arms},
@@ -534,8 +574,7 @@ def bank_follow(*, arms: list[str]) -> pl.DataFrame:
         for month in MONTHS:
             for seed in SEEDS:
                 f = root / pattern.format(m=month) / "work" / "bank" / f"{month}_d0_s{seed}.parquet"
-                if not f.exists():
-                    continue
+                assert f.exists(), ("missing bank file", arm, month, seed, f)
                 d = (
                     pl.read_parquet(f, columns=["median_base", "median_bank", "lag_shift"])
                     .filter(pl.col("lag_shift") != 0)
@@ -548,13 +587,14 @@ def bank_follow(*, arms: list[str]) -> pl.DataFrame:
                     )
                 )
                 rows.append({"arm": arm, "month": month, "seed": seed, **d.row(0, named=True)})
-    if not rows:
-        return pl.DataFrame({"arm": [], "seed": [], "follow": [], "months": []})
-    per = pl.DataFrame(rows)
+    per = pl.DataFrame(rows).with_columns(follow=pl.col("num") / pl.col("den"))
+    assert per.height == len(folders) * len(MONTHS) * len(SEEDS), per.height
     seed_level = per.group_by("arm", "seed").agg(
-        follow=pl.col("num").sum() / pl.col("den").sum(), months=pl.len(), rows=pl.col("rows").sum()
+        follow=(pl.col("follow") * pl.col("rows")).sum() / pl.col("rows").sum(),
+        months=pl.len(),
+        rows=pl.col("rows").sum(),
     )
-    return (
+    out = (
         seed_level.group_by("arm")
         .agg(
             follow=pl.col("follow").mean(),
@@ -565,6 +605,18 @@ def bank_follow(*, arms: list[str]) -> pl.DataFrame:
         )
         .sort("arm")
     )
+    assert out["seeds"].to_list() == [len(SEEDS)] * out.height
+    assert out["months_per_seed"].to_list() == [float(len(MONTHS))] * out.height
+    for arm, want in BANK_CHECK.items():
+        got = float(out.filter(pl.col("arm") == arm)["follow"][0])
+        assert abs(got - want) < 2e-5, (
+            "bank follow of the stored arm differs from 677's",
+            arm,
+            got,
+            want,
+        )
+    print("bank follow: stored arms reproduce 677's", BANK_CHECK)
+    return out
 
 
 def median_minus_mean(*, arms: list[str]) -> pl.DataFrame:
@@ -719,15 +771,20 @@ def report(
             round(c6["diff"], 4),
             (round(c6["lo"], 4), round(c6["hi"], 4)),
         )
-    helped = [v["weights_help"] for v in verdict_parts.values()]
+    groups_ = list(verdict_parts.values())
+    helped = [v["weights_help"] for v in groups_]
+    c1_holds = [v["C1"]["lo"] > 0 and v["C1"]["same_sign"] for v in groups_]
+    # the pre-registered order: the first rule that applies decides
     if all(helped):
         verdict = "supported"
-    elif any(v["C1_below_zero"] for v in verdict_parts.values()):
-        verdict = "refuted"
-    elif all(v["C1_within_0.02"] for v in verdict_parts.values()):
-        verdict = "not supported"
-    elif any(helped):
+    elif any(c1 and not h for c1, h in zip(c1_holds, helped, strict=True)):
+        verdict = "inconclusive"  # C1 holds at a group where the control C6 fails
+    elif sum(helped) == 1:
         verdict = "partly supported"
+    elif any(v["C1_below_zero"] for v in groups_):
+        verdict = "refuted"
+    elif all(v["C1_within_0.02"] for v in groups_):
+        verdict = "not supported"
     else:
         verdict = "inconclusive"
     print("RECENCY VERDICT (mechanical, interim):", verdict)

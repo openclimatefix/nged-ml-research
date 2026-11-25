@@ -1,3 +1,4 @@
+# ruff: noqa: PLR0915, E501
 """Experiment 731: run a queue of (arm, month) jobs behind review markers, at most 3 at a time.
 
 README. This script runs the fit, bank, and score steps of experiment 731 by calling
@@ -58,8 +59,61 @@ def core_slots(*, cores: str, parallel: int) -> list[str]:
         ids.extend(range(int(lo), int(hi or lo) + 1))
     if len(ids) < parallel:
         return [cores] * parallel
-    size = len(ids) // parallel
-    return [",".join(map(str, ids[i * size : (i + 1) * size])) for i in range(parallel)]
+    base, extra = divmod(len(ids), parallel)  # 8 cores and 3 slots give 3, 3, and 2 cores
+    slots, start = [], 0
+    for i in range(parallel):
+        size = base + (1 if i < extra else 0)
+        slots.append(",".join(map(str, ids[start : start + size])))
+        start += size
+    return slots
+
+
+def smoke_check(*, root: Path) -> int:
+    """Compare R0, seed 0, month 2026-01 with 677's stored arm 9a on the same fold, per-row q50.
+
+    Prints the mean absolute difference of the two median forecasts, their correlation, and each
+    one's MAE against the observed power (points of capacity) on the shared rows. Returns 1 when the
+    two MAEs differ by more than 0.05 points or the correlation is below 0.99.
+    """
+    import numpy as np
+    import polars as pl
+
+    month, seed = SMOKE_MONTH, 0
+    r677 = next(root.parent.glob("00677-*"))
+    mine = root / "arms" / "k1_R0_sp1" / "work" / "fits" / "P5" / f"{month}_d0_s{seed}.parquet"
+    theirs = r677 / "arms" / "k1_5w_sp1" / "work" / "fits" / "P5" / f"{month}_d0_s{seed}.parquet"
+    keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
+    folder = next(root.parent.glob("backtest_year_2025-11_to_2026-10"))
+    truth = pl.read_parquet(folder / "ground_truth_primaries.parquet").select(
+        pl.col("time_series_id").cast(pl.Int64), "valid_time", "power"
+    )
+    capacity = pl.read_parquet(folder / "series_capacity.parquet").select(
+        pl.col("time_series_id").cast(pl.Int64), "capacity"
+    )
+
+    def q50(path: Path, name: str) -> pl.DataFrame:
+        frame = pl.read_parquet(path, columns=[*keys, "q50"])
+        return frame.with_columns(pl.col("time_series_id").cast(pl.Int64)).rename({"q50": name})
+
+    both = (
+        q50(mine, "mine")
+        .join(q50(theirs, "theirs"), on=keys, how="inner")
+        .join(truth, on=["time_series_id", "valid_time"])
+        .join(capacity, on="time_series_id")
+        .filter(pl.col("power").is_not_null() & pl.col("power").is_finite())
+    )
+    y = both["power"].to_numpy() / both["capacity"].to_numpy()  # the fits hold shares of capacity
+    a, b = both["mine"].to_numpy().astype(float), both["theirs"].to_numpy().astype(float)
+    mae_mine, mae_theirs = 100 * np.abs(y - a).mean(), 100 * np.abs(y - b).mean()
+    corr = float(np.corrcoef(a, b)[0, 1])
+    print(
+        f"smoke check R0 vs 677 arm 9a, {month}, seed {seed}: {both.height:,} shared rows; "
+        f"mean |q50 difference| {100 * np.abs(a - b).mean():.4f} points; correlation {corr:.5f}; "
+        f"MAE R0 {mae_mine:.4f}, arm 9a {mae_theirs:.4f}, difference {mae_mine - mae_theirs:+.4f}"
+    )
+    bad = abs(mae_mine - mae_theirs) > 0.05 or corr < 0.99
+    print("SMOKE CHECK", "FAILED" if bad else "passed")
+    return 1 if bad else 0
 
 
 def main() -> int:
@@ -85,7 +139,21 @@ def main() -> int:
     if args.phase == "score":
         cmd = [sys.executable, str(HERE / "e00731_score.py")]
         print("score:", " ".join(cmd))
-        return 0 if args.dry_run else subprocess.call(cmd, env=env)
+        if args.dry_run:
+            return 0
+        cores = os.environ.get("CORES", "22-29")
+        n_cores = len(core_slots(cores=cores, parallel=1)[0].split(","))
+        thread_env = dict.fromkeys(
+            ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"), "1"
+        )
+        scoped = [
+            "systemd-run", "--user", "--scope", "-q",
+            "-p", f"MemoryMax={os.environ.get('SCORECAP', '12G')}",
+            "-p", "MemorySwapMax=0", "-p", "OOMPolicy=continue",
+            "env", *(f"{k}={v}" for k, v in {**thread_env, "POLARS_MAX_THREADS": str(n_cores)}.items()),
+            "taskset", "-c", cores, *cmd,
+        ]  # fmt: skip
+        return subprocess.call(scoped, env=env)
     run_phase = {"smoke": "all", "fit": "all", "bank": "bank"}[args.phase]
     jobs = [(arm, month) for month in months for arm in args.arms]  # R0 first within each month
     slots = core_slots(cores=os.environ.get("CORES", "22-29"), parallel=args.parallel)
@@ -114,6 +182,8 @@ def main() -> int:
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         list(pool.map(work, jobs))
     print("failed jobs:", failed or "none")
+    if args.phase == "smoke" and not failed and not args.dry_run:
+        return smoke_check(root=root)
     return 1 if failed else 0
 
 
