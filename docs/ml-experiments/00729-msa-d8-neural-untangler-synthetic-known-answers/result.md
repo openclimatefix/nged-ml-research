@@ -1039,6 +1039,14 @@ Real-day panels carry no calendar dates.
 - **M2 reads each segment as one continuous series.** A missing half-hour is filled by linear
   interpolation before the tracker runs, and M2 is scored on every test segment, with the engine-only
   segments as the listed benchmark.
+- **A segment shorter than 28 days gives M2's causal spread its own median.** Experiment 694's
+  causal spread fails on a series shorter than 28 days, because a lag of 28 days reaches before
+  its first half-hour. A local copy skips those lags and equals 694's function on a series of 28
+  days or more (a test checks 28 and 60 days). Where fewer than 7 earlier days exist on a shorter
+  series, the spread is 1.4826 times the series' own median absolute lag-1 difference, at least 0.03
+  MVA, and is then quantised as before. The fill uses days after the half-hour it fills, so it mildly
+  favours M2, which is conservative against the neural networks. The K1 pseudo-segments are longer
+  than 28 days and pass through unchanged.
 - **A steps series is NaN across a gap of days.** The first half-hour of a day whose previous day is
   not in the record has no step.
 - **The engine size cap can push a unit below the 10-point draw range.** The code records each
@@ -1081,6 +1089,8 @@ Real-day panels carry no calendar dates.
   checks, and verdict table are in the sections above.
 - Every table reports signed CRPS, the 11-quantile pinball loss, and the normalised mean absolute
   error of the median, on all, import, and reverse-flow rows.
+- The M2 baseline fills the causal spread of a segment shorter than 28 days with the segment's own
+  median lag-1 spread (see "Choices fixed in the code"), which mildly favours M2.
 
 ## Files
 

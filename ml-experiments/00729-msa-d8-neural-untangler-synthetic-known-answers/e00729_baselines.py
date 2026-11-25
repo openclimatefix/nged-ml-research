@@ -7,6 +7,7 @@ of the world being scored. B1 estimates P(D < R) from a month-by-half-hour clima
 training base days, and B2 from a linear regression of base demand on calendar and temperature.
 """
 
+import warnings
 from dataclasses import dataclass
 from typing import Final
 
@@ -159,8 +160,72 @@ def injected_share(*, mix: dict[str, float]) -> float:
     return 1.0 - mix["none"]
 
 
+CAUSAL_LAGS: Final = 28
+"""The number of earlier days of the causal spread."""
+MIN_LAG_DAYS: Final = 7
+"""Fewer earlier days than this leave the causal spread undefined."""
+SPREAD_FLOOR: Final = 0.03
+"""The smallest spread, in MVA."""
+
+
+def causal_spread_safe(*, y: np.ndarray) -> np.ndarray:
+    """Return experiment 694's causal spread, skipping the lags that fall outside the series.
+
+    The spread is the median absolute lag-1 difference at the same half-hour of the day on each of
+    the previous 28 days, times 1.4826, and NaN where fewer than 7 earlier days exist. On a series
+    of at least 28 days the result equals `e00694_common.causal_spread`. A shorter series makes that
+    function raise, so a lag of `48 j` half-hours that is not shorter than the series is skipped
+    here.
+
+    Args:
+        y: A continuous half-hourly series in MVA.
+
+    Returns:
+        The spread in MVA, `(len(y),)`, with NaN where it is undefined.
+    """
+    n = len(y)
+    d = np.full(n, np.nan)
+    d[1:] = np.abs(np.diff(y))
+    stack = np.full((CAUSAL_LAGS, n), np.nan)
+    for j in range(1, CAUSAL_LAGS + 1):
+        if 48 * j < n:
+            stack[j - 1, 48 * j :] = d[: n - 48 * j]
+    count = np.isfinite(stack).sum(axis=0)
+    with np.errstate(all="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # an all-NaN column is the undefined spread
+        med = np.nanmedian(stack, axis=0)
+    spread = 1.4826 * med
+    spread[count < MIN_LAG_DAYS] = np.nan
+    return np.maximum(spread, SPREAD_FLOOR)
+
+
+def fill_short_series_spread(*, y: np.ndarray, spread: np.ndarray) -> np.ndarray:
+    """Fill the undefined spread of a series shorter than 28 days with the series' own spread.
+
+    A series of at least 28 days is returned unchanged, because experiment 694's quantiser then
+    fills the first days itself. The fill is 1.4826 times the median lag-1 absolute difference of
+    the whole series, which includes days after the half-hour it fills, and it is at least 0.03 MVA.
+
+    Args:
+        y: The series in MVA.
+        spread: The output of `causal_spread_safe`.
+
+    Returns:
+        The spread with NaN replaced where the series is short.
+    """
+    if len(y) >= CAUSAL_LAGS * 48 or not np.isnan(spread).any():
+        return spread
+    diffs = np.abs(np.diff(y))
+    diffs = diffs[np.isfinite(diffs)]
+    own = max(1.4826 * float(np.median(diffs)) if diffs.size else 0.0, SPREAD_FLOOR)
+    return np.where(np.isfinite(spread), spread, own)
+
+
 def m2_p_any(*, reading_points: np.ndarray) -> np.ndarray:
     """Return experiment 694's M2 smoothed probability that any engine unit runs, per half-hour.
+
+    A series shorter than 28 days takes its own median lag-1 spread where the causal spread is
+    undefined. That fill reads the series' later days, which mildly favours M2.
 
     Args:
         reading_points: A continuous half-hourly series of folded readings in points.
@@ -172,7 +237,8 @@ def m2_p_any(*, reading_points: np.ndarray) -> np.ndarray:
     import e00694_trackers as t694  # ty: ignore[unresolved-import]
 
     y = reading_points / core.POINTS * core.CAPACITY_MVA
-    lvl = c694.quantise_spread(spread=c694.causal_spread(y=y))
+    spread = fill_short_series_spread(y=y, spread=causal_spread_safe(y=y))
+    lvl = c694.quantise_spread(spread=spread)
     return np.asarray(t694.grid_track(y=y, lvl=lvl).p_any_smooth)
 
 
