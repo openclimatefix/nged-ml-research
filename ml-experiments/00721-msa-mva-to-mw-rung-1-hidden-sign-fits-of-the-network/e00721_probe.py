@@ -71,8 +71,13 @@ def probe_path(*, data_dir: Path, world: str, fold: str) -> Path:
     return real.ProbeProvider(root=fit.data_root(data_dir=data_dir)).path(world=world, fold=fold)
 
 
-def probe_one(*, world: str, fold: str, data_dir: Path, device: str) -> dict[str, float]:
-    """Pretrain the fold's network on the world's folded readings and return `{"D5": mw, "D10": mw}`."""
+def probe_capacity(*, fold: str, device: str) -> dict[str, float]:
+    """Pretrain the fold's network on the un-injected folded readings and return `{"D5": mw, "D10": mw}`.
+
+    The probe estimates the host's own PV, so it reads the `W0` reading (no injection) in both worlds.
+    The `W2` build then adds the oracle increment once, in `share_scale_with_injection`; probing the
+    injected reading would count the farm twice.
+    """
     import e00428_data as data  # ty: ignore[unresolved-import]
     import e00448_run as r448  # ty: ignore[unresolved-import]
     import e00510_common as c  # ty: ignore[unresolved-import]
@@ -86,7 +91,7 @@ def probe_one(*, world: str, fold: str, data_dir: Path, device: str) -> dict[str
 
     gi = real.load_grid_inputs(fold=fold, seed=0, phase="train", with_farms=True)
     w = real.build_fold_world_arrays(
-        panel=gi.panel, farm_for_site=gi.farms, world=world, cutoff_idx=None
+        panel=gi.panel, farm_for_site=gi.farms, world="W0", cutoff_idx=None
     )
     sites = list(gi.panel.sites)
     hidden = {s: sites.index(s) for s in core.HIDDEN_PAIR}
@@ -106,6 +111,11 @@ def probe_one(*, world: str, fold: str, data_dir: Path, device: str) -> dict[str
         keep[sel] = np.isfinite(folded)
         del site
     y = np.where(np.isfinite(y), y, 0.0)
+    # standardise each Primary with the mean and standard deviation of the series it is asked to estimate
+    t_mean, t_std = rows.target_mean.copy(), rows.target_std.copy()
+    for p in hidden.values():
+        own = (pre.primary == p) & keep
+        t_mean[p], t_std[p] = float(y[own].mean()), float(y[own].std())
     night_pts, rho = visible_night_and_rho(
         pre=pre, y=y, rows=rows, keep=keep, k=k, k621=k621, e649=fit662.E649
     )
@@ -122,10 +132,10 @@ def probe_one(*, world: str, fold: str, data_dir: Path, device: str) -> dict[str
     ix = np.nonzero(sel)[0][first]
     frame = {
         "x": pre.x[ix, :35], "y": y[ix].astype(np.float32), "primary": pre.primary[ix], "target_idx": pre.target_idx[ix],
-        "is_val": pre.is_val[ix], "target_mean": rows.target_mean, "target_std": rows.target_std,
+        "is_val": pre.is_val[ix], "target_mean": t_mean, "target_std": t_std,
         "std_mean": rows.standardiser.mean[:7], "std_std": rows.standardiser.std[:7], "night_pts": night_pts, "rho": rho,
     }  # fmt: skip
-    mean, std = rows.target_mean[pre.primary], rows.target_std[pre.primary]
+    mean, std = t_mean[pre.primary], t_std[pre.primary]
     z = torch.from_numpy(((y - mean) / std)[keep].astype(np.float32)).to(device)
     x_d = torch.from_numpy(pre.x[keep]).to(device)
     p_d = torch.from_numpy(pre.primary[keep]).to(device)
@@ -155,26 +165,43 @@ def probe_one(*, world: str, fold: str, data_dir: Path, device: str) -> dict[str
     return out
 
 
+TIMING_FILE = "first_probe_timing.json"
+"""File, in the probe folder, that records the first probe's wall time. The runner stops after it."""
+
+
 def run_probes(
     *, data_dir: Path, device: str, folds: tuple[str, ...] = core.FOLDS
 ) -> dict[str, float]:
-    """Run the probes of `folds` and return the seconds per run.
+    """Run the probes of `folds` and return the seconds per fold.
 
-    A process serves one fold month, so the CLI passes one fold (all 8 probes by default). A probe
-    whose file exists is skipped, and each run's wall time is printed.
+    A process serves one fold month, so the CLI passes one fold. The probe reads the un-injected
+    reading, so one pretraining per fold gives the file of both worlds. A fold whose two files exist is
+    skipped. The first probe run is timed, writes `TIMING_FILE`, and stops the runner ("the first probe
+    run is timed and the manager told before the second"); a later launch continues.
     """
     import e00721_paths
+    import torch  # ty: ignore[unresolved-import]
 
     e00721_paths.pin_threads()
-    seconds = {}
+    if device.startswith("cuda"):
+        fit.limit_gpu_memory(torch=torch)  # 6 GB per process, as in every fit
+    timing = probe_path(data_dir=data_dir, world="W2", fold=core.FOLDS[0]).parent / TIMING_FILE
+    seconds: dict[str, float] = {}
     for fold in folds:
-        for world in ("W2", "W0"):
-            path = probe_path(data_dir=data_dir, world=world, fold=fold)
-            if path.exists():
-                continue
-            started = time.monotonic()
-            capacity = probe_one(world=world, fold=fold, data_dir=data_dir, device=device)
+        paths = [probe_path(data_dir=data_dir, world=w, fold=fold) for w in ("W2", "W0")]
+        if all(p.exists() for p in paths):
+            continue
+        started = time.monotonic()
+        capacity = probe_capacity(fold=fold, device=device)
+        for path in paths:
             fit.atomic_write_json(path=path, body=capacity)
-            seconds[f"{world}_{fold}"] = time.monotonic() - started
-            print(f"probe {world} {fold}: {seconds[f'{world}_{fold}']:.0f} s", flush=True)
+        seconds[fold] = time.monotonic() - started
+        print(f"probe {fold}: {seconds[fold]:.0f} s (both worlds)", flush=True)
+        if not timing.exists():
+            fit.atomic_write_json(path=timing, body={"fold": fold, "seconds": seconds[fold]})
+            print(
+                "first probe timed: tell the manager before the next probe, then launch again",
+                flush=True,
+            )
+            break
     return seconds

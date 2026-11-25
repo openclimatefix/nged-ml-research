@@ -33,7 +33,8 @@ ArmSpec = core.ArmSpec
 
 POWER_CLIP: Final = 5.0
 """History is clipped to plus or minus 5 standard deviations before the sign step, and the signed
-expected history is clipped to plus or minus 5 in `v` units after it (the design's clip)."""
+expected history is clipped to plus or minus 5 in `z` units after it, as experiment 713's clip is,
+so a closed gate (`rho` of 0) returns the folded history unchanged at any shift."""
 WEATHER_NAMES: Final = (
     "shortwave", "longwave", "temperature_2m", "dew_point_temperature_2m", "pressure_surface",
     "precipitation", "wind_speed_10m",
@@ -166,8 +167,8 @@ def signed_expected_history(
         `z_exp = (1 - 2 rho) v - shift` and `4 rho (1 - rho) v²`.
     """
     v = z + shift[:, None, None]
-    v_exp = ((1.0 - 2.0 * rho) * v).clamp(-POWER_CLIP, POWER_CLIP)
-    return v_exp - shift[:, None, None], 4.0 * rho * (1.0 - rho) * v**2
+    z_exp = ((1.0 - 2.0 * rho) * v - shift[:, None, None]).clamp(-POWER_CLIP, POWER_CLIP)
+    return z_exp, 4.0 * rho * (1.0 - rho) * v**2
 
 
 class SgNet(pvm.PvNet):
@@ -185,6 +186,7 @@ class SgNet(pvm.PvNet):
         nn.init.constant_(self.pv_sign_lin.bias, core.HEAD_BIAS_START)
         self.register_buffer("export_gate", torch.ones(mdl.N_PRIMARIES))
         self.register_buffer("v_shift", torch.zeros(mdl.N_PRIMARIES))
+        self.detach_rho = False  # true in the stages where the head is frozen: rho is then a constant side input to the trunk
         self.last_rho: torch.Tensor | None = None
         self.rho_live: torch.Tensor | None = None
 
@@ -226,6 +228,8 @@ class SgNet(pvm.PvNet):
             return h0, torch.zeros_like(h0[..., 0]), torch.zeros_like(h0[..., 0]), no_history, alpha
         h = self.ln_readout(x)[:, 1:]
         rho = self.history_rho(h=h, inp=inp)
+        if self.detach_rho:
+            rho = rho.detach()
         self.last_rho = rho.detach()
         self.rho_live = rho
         z = inp.hist_power.clamp(-POWER_CLIP, POWER_CLIP)

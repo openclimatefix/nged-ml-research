@@ -232,6 +232,8 @@ class StageTrainable:
         head = getattr(model, "pv_sign_lin", None)
         if head is not None:
             head.requires_grad_(self.train_head)
+        if hasattr(model, "detach_rho"):
+            model.detach_rho = not self.train_head  # a frozen head sends no gradient into the trunk
         torch.manual_seed(aw.seed * 7 + stage)
         self.optimiser = torch.optim.AdamW(
             pvt.param_groups(model=model, stage=stage, encoders="random")

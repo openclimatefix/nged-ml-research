@@ -17,6 +17,7 @@ The module writes `synthetic_world.json` (the day offset the synthetic world use
 farm series, and prints no generator value.
 """
 
+import datetime
 from pathlib import Path
 
 import e00721_core as core
@@ -57,19 +58,44 @@ def flag_test(*, data_dir: Path) -> dict:
     }
 
 
-def exporter_tokens(*, parts: dict) -> dict[str, np.ndarray]:
-    """Return the pooled tokens of the synthetic exporters that the margin uses (flattened arrays)."""
+def scored_span(*, fold: str, n_grid: int) -> tuple[int, int]:
+    """Return the grid index range `[start, stop)` of the half-hours that the margin scores in a fold.
+
+    The margin scores history tokens at or after the fold's cutoff (the first half-hour of the fold's
+    month), where the fit phase held every value at NaN, up to the first half-hour of the next month.
+    """
+    from e00422_prep import GRID_START_US, STEP_US  # ty: ignore[unresolved-import]
+
+    year, month = (int(part) for part in fold.split("-"))
+    first = datetime.datetime(year, month, 1, tzinfo=datetime.UTC)
+    nxt = datetime.datetime(year + month // 12, month % 12 + 1, 1, tzinfo=datetime.UTC)
+
+    def index(when: datetime.datetime) -> int:
+        return int((int(when.timestamp()) * 1_000_000 - GRID_START_US) // STEP_US)
+
+    return index(first), min(index(nxt), n_grid)
+
+
+def exporter_tokens(*, parts: dict, span: tuple[int, int] | None = None) -> dict[str, np.ndarray]:
+    """Return the pooled tokens of the synthetic exporters that the margin uses (flattened arrays).
+
+    Args:
+        parts: The synthetic world's arrays (`real.synthetic_inputs`).
+        span: The grid index range `[start, stop)` of the tokens to keep, or `None` for the whole grid of
+            experiment 87. The checks of Stage 0 pass the span that the margin scores.
+    """
     syn, four, exporters = parts["syn"], list(parts["four"]), list(parts["exporters"])
     rows = [four.index(e) for e in exporters]
     n = syn.x.shape[1]
-    n87 = real.N_GRID_87
     keep = np.zeros(n, dtype=bool)
-    keep[:n87] = True
+    start, stop = (0, real.N_GRID_87) if span is None else span
+    keep[start : min(stop, real.N_GRID_87)] = True
     day = np.broadcast_to(np.arange(n) // wd.STEPS_PER_DAY, (len(rows), n))
     sel = lambda a: a[rows][:, keep].ravel()  # noqa: E731
     return {
         "demand_mean": sel(syn.demand_mean), "reading": sel(syn.reading), "x_true": sel(syn.x),
         "u": sel(parts["u"][exporters]), "day": sel(day),
+        "pv_capacity": sel(np.broadcast_to(syn.capacity_share[:, None], (len(four), n))),
     }  # fmt: skip
 
 
@@ -80,15 +106,14 @@ def run_stage0(*, data_dir: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     gi = real.load_grid_inputs(
         fold=core.SYNTH_PIPELINE_FOLD, seed=0, phase="train", with_farms=False
     )
+    span = scored_span(fold=core.SYNTH_PIPELINE_FOLD, n_grid=real.N_GRID_87)
     offset, reach_rows = 0.0, []
     for offset in (0.0, 5.0):
         rows = []
         for seed in seeds:
             parts = real.synthetic_inputs(gi=gi, seed=seed, day_offset_points=offset)
-            tok = exporter_tokens(parts=parts)
-            rows.append(
-                wd.reachability_check(pv_capacity=float(parts["syn"].capacity_share.max()), **tok)
-            )
+            tok = exporter_tokens(parts=parts, span=span)
+            rows.append(wd.reachability_check(**tok))
         reach_rows.append(
             {"day_offset_points": offset, "per_seed": rows, "pass": all(r["pass"] for r in rows)}
         )
@@ -98,7 +123,7 @@ def run_stage0(*, data_dir: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     day_counts = []
     for seed in seeds:
         parts = real.synthetic_inputs(gi=gi, seed=seed, day_offset_points=offset)
-        tok = exporter_tokens(parts=parts)
+        tok = exporter_tokens(parts=parts, span=span)
         ok = (tok["u"] >= core.U_MIN) & (np.abs(tok["x_true"]) * 100.0 >= core.DEAD_BAND_POINTS)
         rev = tok["x_true"] < 0.0
         day_counts.append(

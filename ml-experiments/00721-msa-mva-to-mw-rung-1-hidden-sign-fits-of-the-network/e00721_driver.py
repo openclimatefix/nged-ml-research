@@ -82,7 +82,14 @@ def frames(
 
 
 def flags_of(*, data_dir: Path, folds: Sequence[str], seeds: Sequence[int]) -> list[dict]:
-    """Return the flag of every counted stage of the `SG-A` fits in `W2` (a missing curve counts as not evaluated)."""
+    """Return the flag of every counted stage of the `SG-A` fits in `W2`.
+
+    Under Branch A only stage 1 of an `SG-A` fit is flagged: stages 2 and 3 are read by no verdict row
+    ("Stages 2 and 3 are not read by any verdict row"), so each fit contributes one entry. A fit run
+    without its continuation counts as flagged ("a fit run without its continuation ... counts as
+    flagged in rows 7 to 9, because its stage cannot be shown to have converged"). A missing curve adds
+    an unflagged entry, because the missing fit is routed to row 3 by `fit_failed`.
+    """
     out = []
     for fold in folds:
         for seed in seeds:
@@ -92,8 +99,13 @@ def flags_of(*, data_dir: Path, folds: Sequence[str], seeds: Sequence[int]) -> l
             if not path.exists():
                 out.append({"evaluated": False, "flagged": False, "reason": "missing curve"})
                 continue
-            no_flag = {"evaluated": False, "flagged": False, "reason": "no continuation requested"}
-            out.extend(stage["flag"] or no_flag for stage in json.loads(path.read_text())["stages"])
+            stage1 = json.loads(path.read_text())["stages"][0]
+            skipped = {
+                "evaluated": False,
+                "flagged": True,
+                "reason": "no continuation: stage cannot be shown to have converged",
+            }
+            out.append(stage1["flag"] or skipped)
     return out
 
 
@@ -145,6 +157,11 @@ def synthetic_gate(*, data_dir: Path, seeds: Sequence[int]) -> dict:
             token_id=sg["exporters_token_id"], u_min=-np.inf,
         )  # fmt: skip
         accuracy = score.sign_accuracy(rho=acc_rho, reverse=acc_rev)
+        day_rho, day_rev = score.sign_tokens(
+            rho=sg["exporters_rho"], x_true_points=sg["exporters_x_points"], u=sg["exporters_u"],
+            token_id=sg["exporters_token_id"], u_min=core.U_MIN,
+        )  # fmt: skip
+        accuracy_u03 = score.sign_accuracy(rho=day_rho, reverse=day_rev)
         sunny = sg["open_sunny"].astype(bool) & np.isfinite(sg["open_rho"])
         false_call = score.false_call_rate(rho=sg["open_rho"][sunny])
         areas = []
@@ -161,7 +178,7 @@ def synthetic_gate(*, data_dir: Path, seeds: Sequence[int]) -> dict:
         )  # fmt: skip
         status = "not_evaluable" if not evaluable else ("pass" if ok else "fail")
         per_seed.append({
-            "seed": seed, "status": status, "evaluable": bool(evaluable), "sign_accuracy": accuracy, "false_call_rate": false_call,
+            "seed": seed, "status": status, "evaluable": bool(evaluable), "sign_accuracy": accuracy, "sign_accuracy_u03": accuracy_u03, "false_call_rate": false_call,
             "area": area, "area_placebo": area_s, "n_sunny_midday": int(sunny.sum()), "pass": status == "pass",
         })  # fmt: skip
         if status != "pass":
@@ -293,10 +310,9 @@ def score_all(
     sg_a = frames(data_dir=data_dir, arm="SG-A", world="W2", folds=folds, seeds=seeds, ids=ids)
     sg_0 = frames(data_dir=data_dir, arm="SG-0", world="W2", folds=folds, seeds=seeds, ids=ids)
     sg_s = frames(data_dir=data_dir, arm="SG-A-S", world="W2", folds=folds, seeds=seeds, ids=ids)
-    p0_w2 = frames(data_dir=data_dir, arm="P0", world="W2", folds=folds, seeds=seeds, ids=ids)
-    missing = [
-        n for n, f in (("SG-A", sg_a), ("SG-0", sg_0), ("SG-A-S", sg_s), ("P0", p0_w2)) if f is None
-    ]
+    # `P0` in `W2` is fitted at seed 0 only (page, wave table): a read-out and G4 use it, and no counted reading does
+    p0_w2 = frames(data_dir=data_dir, arm="P0", world="W2", folds=folds, seeds=(0,), ids=ids)
+    missing = [n for n, f in (("SG-A", sg_a), ("SG-0", sg_0), ("SG-A-S", sg_s)) if f is None]
     # a fit that a stop of row 0 or row 2 leaves unrun never falls in row 3
     stopped_earlier = bool(synth["failed"] or synth["not_evaluable"])
     summary["fit_failed"] = bool((missing or synth["missing"]) and not stopped_earlier)
@@ -315,7 +331,11 @@ def score_all(
     summary["read_outs"] = {}
     if sg_a is not None and p0_w2 is not None:
         summary["read_outs"]["sg_a_minus_p0_reverse"] = contrast_dict(
-            a=sg_a, b=p0_w2, seeds=seeds, restrict=reverse, n_resamples=n_resamples
+            a=sg_a.filter(pl.col("seed") == 0),
+            b=p0_w2,
+            seeds=(0,),
+            restrict=reverse,
+            n_resamples=n_resamples,
         )
     # G3: SG-A minus P0 in W0 on the plain fits (both seeds) and on SG-A-open (seed 0).
     checks = []

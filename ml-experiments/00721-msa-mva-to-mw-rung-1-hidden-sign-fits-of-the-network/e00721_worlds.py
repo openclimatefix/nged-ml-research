@@ -244,7 +244,7 @@ def _auc_with_ties(*, score_: np.ndarray, positive: np.ndarray) -> float:
 
 
 def sky_blind_rule_scores(
-    *, demand_mean: np.ndarray, reading_v: np.ndarray, pv_capacity: float
+    *, demand_mean: np.ndarray, reading_v: np.ndarray, pv_capacity: float | np.ndarray
 ) -> np.ndarray:
     """Return the sign score of the sky-blind rule that knows the noise-free gross demand exactly.
 
@@ -265,7 +265,7 @@ def sky_blind_rule_scores(
 
 def reachability_check(
     *, demand_mean: np.ndarray, reading: np.ndarray, x_true: np.ndarray, u: np.ndarray, day: np.ndarray,
-    pv_capacity: float,
+    pv_capacity: float | np.ndarray,
 ) -> dict:  # fmt: skip
     """Return the reachability check of the sky-blind rule.
 
@@ -285,7 +285,7 @@ def reachability_check(
         u: The real shortwave likelihood of each token.
         day: A day label of each token.
         pv_capacity: The PV size `C` that the rule's feasibility test allows, in fractions of
-            capacity.
+            capacity: one number, or one number per token (each exporter's own size).
 
     Returns:
         The area, its standard error, the bound, the day counts, and whether the check passes.
@@ -294,7 +294,9 @@ def reachability_check(
     q = core.REACTIVE_FLOOR_POINTS / 100.0
     mag = np.sqrt(np.maximum(reading[ok] ** 2 - q**2, 0.0))
     scores = sky_blind_rule_scores(
-        demand_mean=demand_mean[ok], reading_v=mag, pv_capacity=pv_capacity
+        demand_mean=demand_mean[ok],
+        reading_v=mag,
+        pv_capacity=np.broadcast_to(pv_capacity, u.shape)[ok],
     )
     reverse = x_true[ok] < 0.0
     area = score.auc(score=scores, positive=reverse)

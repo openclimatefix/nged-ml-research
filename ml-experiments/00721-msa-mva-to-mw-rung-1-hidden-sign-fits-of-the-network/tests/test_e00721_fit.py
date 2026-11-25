@@ -152,7 +152,7 @@ def test_report_applies_the_verdict_table(tmp_path: Path) -> None:
     }  # fmt: skip
     text = report.format_report(summary=summary, mde=0.404)
     assert text.splitlines()[0] == "verdict row 5: supported"
-    summary["flags"] = [{"evaluated": False}]
+    summary["flags"] = [{"evaluated": False, "flagged": True}]
     summary["g2"] = {"point": -0.1, "upper": 0.1}
     assert (
         report.format_report(summary=summary, mde=0.404).splitlines()[0]

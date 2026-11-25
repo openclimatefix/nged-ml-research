@@ -27,9 +27,11 @@ def reading_of(*, body: Mapping, mde: float) -> core.Reading:
 def any_flagged(*, flags: list[Mapping]) -> bool:
     """Return whether any counted `SG-A` stage in `W2` is flagged.
 
-    A skipped continuation counting as flagged.
+    The driver writes one entry per fit (stage 1). A fit run without its continuation arrives as
+    `flagged` already, so only the `flagged` field is read here: an entry that was not evaluated and is
+    not flagged (a missing fit) is routed to row 3 by `fit_failed`, and counts for nothing here.
     """
-    return any(bool(f.get("flagged", False)) or not bool(f.get("evaluated", True)) for f in flags)
+    return any(bool(f.get("flagged", False)) for f in flags)
 
 
 def inputs_from_files(*, summary: Mapping, mde: float) -> core.VerdictInputs:

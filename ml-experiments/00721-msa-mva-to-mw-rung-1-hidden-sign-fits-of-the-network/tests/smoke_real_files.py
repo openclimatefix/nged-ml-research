@@ -168,10 +168,13 @@ def check_synthetic_world_on_the_real_grid() -> str:
     import e00721_stage0 as stage0
     import e00721_worlds as wd
 
-    gi = real.load_grid_inputs(fold="2026-05", seed=0, phase="train", with_farms=False)
+    gi = real.load_grid_inputs(
+        fold=core.SYNTH_PIPELINE_FOLD, seed=0, phase="train", with_farms=False
+    )
     parts = real.synthetic_inputs(gi=gi, seed=0, day_offset_points=0.0)
-    tok = stage0.exporter_tokens(parts=parts)
-    out = wd.reachability_check(pv_capacity=float(parts["syn"].capacity_share.max()), **tok)
+    span = stage0.scored_span(fold=core.SYNTH_PIPELINE_FOLD, n_grid=real.N_GRID_87)
+    tok = stage0.exporter_tokens(parts=parts, span=span)
+    out = wd.reachability_check(**tok)
     return f"synthetic world built: True, reachability evaluable: {bool(out['evaluable'])}, exporters export: {bool((tok['x_true'] < 0).any())}"
 
 

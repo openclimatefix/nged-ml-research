@@ -106,14 +106,24 @@ def group_by_pipeline_fold(*, jobs: Sequence[fit.Job]) -> dict[str, list[fit.Job
     return groups
 
 
-def run_in_processes(*, argv: Sequence[str], groups: dict[str, list[fit.Job]]) -> int:
-    """Run each fold month's jobs in its own process (`--only-fold`) and return the first non-zero exit status."""
+def run_in_processes(
+    *, argv: Sequence[str], groups: dict[str, list[fit.Job]], stop_after: Path | None = None
+) -> int:
+    """Run each fold month's jobs in its own process (`--only-fold`) and return the first non-zero exit status.
+
+    With `stop_after` (the probe's timing file), the loop stops after the process that creates that file,
+    so that the manager is told before the second probe.
+    """
     for month in groups:
+        existed = stop_after is not None and stop_after.exists()
         status = subprocess.run(
             [sys.executable, str(Path(__file__)), *argv, "--only-fold", month], check=False
         ).returncode
         if status != 0:
             return status
+        if stop_after is not None and not existed and stop_after.exists():
+            print("stopping after the first probe: tell the manager, then launch the command again")
+            return 0
     return 0
 
 
@@ -143,7 +153,9 @@ def hidden_series_ids() -> dict[str, int]:
     return {s: ids[s] for s in core.HIDDEN_PAIR}
 
 
-def run_phase(*, kind: str, jobs: list[fit.Job], data_dir: Path, device: str) -> None:
+def run_phase(
+    *, kind: str, jobs: list[fit.Job], data_dir: Path, device: str, continuation: bool = True
+) -> None:
     """Run the fit or the predict phase of `jobs` in this process.
 
     A correctness failure (the holdout guard, the no-two-worlds guard, an assertion) is recorded in
@@ -169,7 +181,11 @@ def run_phase(*, kind: str, jobs: list[fit.Job], data_dir: Path, device: str) ->
                 # the tallies of every process are read from the stored curve files before each fit
                 budget = fit.Budget.from_files(data_dir=data_dir)
                 fit.fit_job(
-                    job=job, inputs=inputs, data_dir=data_dir, budget=budget, continuation=True
+                    job=job,
+                    inputs=inputs,
+                    data_dir=data_dir,
+                    budget=budget,
+                    continuation=continuation,
                 )
             else:
                 fit.predict_job(job=job, inputs=inputs, data_dir=data_dir)
@@ -254,6 +270,11 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
             "--only-fold",
             help="internal: run only the jobs of this pipeline fold month in this process",
         )
+        if name == "fit":
+            p.add_argument(
+                "--no-continuation", action="store_true",
+                help="fit SG-A without its patience-30 continuation (the Branch A path the manager may allow at the floor stop); its stage then counts as flagged",
+            )  # fmt: skip
         if name == "predict":
             p.add_argument("--capacity-scale", type=float, choices=(1.0, *core.CAPACITY_SENSITIVITY), default=1.0,
                            help="prediction-only capacity sensitivity: 0.7 or 1.3 times the oracle capacity")  # fmt: skip
@@ -275,6 +296,7 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
             return run_in_processes(
                 argv=list(argv if argv is not None else sys.argv[1:]),
                 groups={key: [] for key in core.FOLDS},
+                stop_after=fit.data_root(data_dir=data_dir) / "probes" / "first_probe_timing.json",
             )
         run_probe(data_dir=data_dir, device=args.device, folds=(args.only_fold,))
         return 0
@@ -299,7 +321,10 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
         )
     if args.only_fold is not None:
         jobs = groups.get(args.only_fold, [])
-    run_phase(kind=args.command, jobs=jobs, data_dir=data_dir, device=args.device)
+    run_phase(
+        kind=args.command, jobs=jobs, data_dir=data_dir, device=args.device,
+        continuation=not getattr(args, "no_continuation", False),
+    )  # fmt: skip
     return 0
 
 
