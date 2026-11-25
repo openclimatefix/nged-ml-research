@@ -346,8 +346,41 @@ def segment_season(*, seg: sim729.Segment) -> str:
     return season_of(date=seg.dates[first])
 
 
-def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
+METERED_ZERO_MAX_SHARE: Final = 0.05
+"""The most S1 clear base days of a bank kind that may be excluded as metered at zero.
+
+In the real record 7 of 678 clear farm days (1.0%) have a farm that reports data but is metered
+at zero or missing whenever the sun is up (an outage or a zero-filled day), and the rate reaches
+4.6% in summer. The bound is 5 times the pooled real rate, so that a rule that silences more S1
+days than the real record does fails the check."""
+
+
+def metered_zero_days(*, cal: sim729.Calendar) -> np.ndarray:
+    """Return the calendar days on which some reporting farm is metered at zero while the sun is up.
+
+    Experiment 729's S1 draw copies the metered shape of the first farm with data and zeroes the
+    half-hours with the sun down, so on such a day the simulated solar output is zero although the
+    sky is clear. A day on which the meter shows only a small value at night counts too.
+
+    Args:
+        cal: The calendar of base days, with the farms' metered power.
+
+    Returns:
+        A mask over the calendar's days.
+    """
+    sun_up = cal.farms.zenith < core729.SUN_UP_ZENITH_DEG
+    daytime = np.where(sun_up & np.isfinite(cal.farms.power), cal.farms.power, -1.0)
+    return ((daytime.max(axis=2) <= 0.0) & cal.farms.power_ok).any(axis=0)
+
+
+def solar_output_shares(
+    *, bank: banks729.Bank, cal: sim729.Calendar
+) -> tuple[ShareCounter, dict[str, list[int]]]:
     """Count, per world type, source, and season, the clear base days with solar output.
+
+    An S1 day with no output on a calendar day that `metered_zero_days` marks is not counted in
+    the share. It is counted apart, and `component_checks` bounds its share of the S1 clear base
+    days by `METERED_ZERO_MAX_SHARE`.
 
     A day counts when it is a clear base day (see `clear_sun_up`) of a solar-world segment, is not
     flagged as a fallback day, and the day's solar output is above zero on at least one clear sun-up
@@ -356,6 +389,8 @@ def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
     solar output fails the check even if the engine key still passes.
     """
     counter = ShareCounter.new()
+    zero_day = metered_zero_days(cal=cal)
+    excluded: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     for seg in bank.segments:
         if seg.world not in ("solar", "both"):
             continue
@@ -363,6 +398,12 @@ def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
         days = np.flatnonzero((seg.cal_index >= 0) & clear_day & ~seg.s1_fallback)
         for d in days:
             hit = bool((seg.solar[d][clear[d]] > 0.0).any())
+            if seg.source == "S1":
+                is_zero = (not hit) and bool(zero_day[seg.cal_index[d]])
+                excluded[f"{bank.kind}/S1"][0] += int(is_zero)
+                excluded[f"{bank.kind}/S1"][1] += 1
+                if is_zero:
+                    continue
             season = season_of(date=seg.dates[d])
             counter.add(key=(seg.world, bank.kind, seg.source, season), hit=hit)
             ok = seg.valid[d] & (seg.solar[d] > MIN_STEP_POINTS)
@@ -371,7 +412,7 @@ def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
                 counter.add(
                     key=("solar_subtract", seg.world, bank.kind, seg.source, season), hit=subtracted
                 )
-    return counter
+    return counter, dict(excluded)
 
 
 def expected_solar_keys(*, bank: banks729.Bank) -> set[str]:
@@ -649,8 +690,17 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
     cases: dict[str, dict[str, int]] = {}
     short: list[str] = []
     for name, bank in banks_by_name.items():
+        solar_counter, excluded = solar_output_shares(bank=bank, cal=cal)
+        shares[f"{name}/solar_metered_zero"] = {
+            k: n_zero / n_all for k, (n_zero, n_all) in excluded.items() if n_all
+        }
+        short += [
+            f"{name}/solar/metered_zero_share/{k}"
+            for k, (n_zero, n_all) in excluded.items()
+            if n_all and n_zero / n_all > METERED_ZERO_MAX_SHARE
+        ]
         for label, counter, expected in (
-            ("solar", solar_output_shares(bank=bank), expected_solar_keys(bank=bank)),
+            ("solar", solar_counter, expected_solar_keys(bank=bank)),
             ("engine", engine_output_shares(bank=bank, cal=cal), expected_engine_keys(bank=bank)),
             ("bsp", bsp_shares(bank=bank, cal=cal), expected_bsp_keys(bank=bank)),
         ):

@@ -518,3 +518,60 @@ def test_the_minimum_cases_bar_applies_to_the_pool_of_a_kind_and_source() -> Non
     }  # fmt: skip
     pooled = banks.pooled_solar_cases(counts=counts)
     assert pooled == {"test/S2": 21, "test/S1": 2}
+
+
+def zero_metered_world(world: tuple) -> tuple:
+    """Return the test bank and a calendar where one reporting farm is metered at zero on a day.
+
+    Every S1 segment is also given zero solar output on that calendar day, as experiment 729's S1
+    draw would give it.
+    """
+    cal = copy.deepcopy(world[2])
+    bank = banks729.load_bank(path=banks.bank_path(root=world[0], kind="test"))
+    seg = next(s for s in bank.segments if s.world in ("solar", "both") and s.source == "S1")
+    _, clear_day = banks.clear_sun_up(csi=seg.csi, cosz=seg.cosz)
+    day = int(np.flatnonzero((seg.cal_index >= 0) & clear_day & ~seg.s1_fallback)[0])
+    cal_day = int(seg.cal_index[day])
+    cal.farms.power_ok[1, cal_day] = True
+    cal.farms.power[1, cal_day] = 0.0
+    for s in bank.segments:
+        if s.world in ("solar", "both") and s.source == "S1":
+            for d in np.flatnonzero(s.cal_index == cal_day):
+                s.solar[d] = 0.0
+    return bank, cal, cal_day
+
+
+def test_s1_days_metered_at_zero_in_the_real_record_are_excluded_and_bounded(
+    world: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(banks, "MIN_CASES", 1)
+    bank, cal, cal_day = zero_metered_world(world)
+    assert banks.metered_zero_days(cal=cal)[cal_day]
+    monkeypatch.setattr(banks, "METERED_ZERO_MAX_SHARE", 1.0)  # the fixture has few clear days
+    out = banks.component_checks(banks_by_name={"test": bank}, cal=cal)
+    assert not [k for k in out["short"] if "/solar/" in k], out["short"]
+    assert out["shares"]["test/solar_metered_zero"]["test/S1"] > 0.0
+    monkeypatch.setattr(banks, "METERED_ZERO_MAX_SHARE", 0.0)
+    bounded = banks.component_checks(banks_by_name={"test": bank}, cal=cal)
+    assert any("metered_zero_share" in k for k in bounded["short"])
+
+
+def test_a_silent_s1_generator_still_fails_although_some_real_days_are_metered_at_zero(
+    world: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(banks, "MIN_CASES", 1)
+    bank, cal, _ = zero_metered_world(world)
+    monkeypatch.setattr(banks, "METERED_ZERO_MAX_SHARE", 1.0)
+    for seg in bank.segments:
+        if seg.source == "S1":
+            seg.solar[:] = 0.0
+    out = banks.component_checks(banks_by_name={"test": bank}, cal=cal)
+    assert any("/solar/" in k and "S1" in k for k in out["short"])
+
+
+def test_the_stop_line_is_16_gpu_process_hours() -> None:
+    assert core.STOP_LINE_HOURS == 16.0
+    secs = dict.fromkeys(core.ARCHITECTURES, 1.0)
+    report = core.timing_gate_report(seconds_per_epoch=secs, peak_memory_gb=1.0)
+    assert report["stop_line_hours"] == 16.0
+    assert report["within_stop_line"]

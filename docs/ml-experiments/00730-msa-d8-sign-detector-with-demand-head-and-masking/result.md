@@ -318,6 +318,18 @@ leaving nothing to count. A solar key expects cases only in a season that holds 
 and a bank with solar-world segments and no clear base day fails. The bar of 20 cases applies to
 the solar cases pooled over worlds and seasons for each bank kind and source, because a split of a
 few months of the real record holds only a handful of clear base days in some seasons.
+
+**An S1 clear base day with no solar output is excluded from its share when the real record
+explains it, and a bound on the excluded days is fixed before the rebuilt banks pass.** On 7 of 678
+clear farm days in the real record (1.0%, and 4.6% in summer), a farm reports data but its
+metered output is zero or missing whenever the sun is up.
+Experiment 729's S1 draw copies the first reporting farm's metered
+shape, so a simulated S1 day on such a calendar day has zero output. The check excludes such a day
+from the share only where some reporting farm is metered at zero on that calendar day, and counts
+it apart. The excluded days must be at most 5% of the S1 clear base days of each bank kind, 5 times
+the pooled real rate of 1.0%. The first `banks` run stopped on this fault with S1 summer shares of
+0.78 to 0.98 in the training banks; the bound was set after that run and before any rebuilt bank
+passed.
 The banks stage counts, per world type, bank, source, and season:
 
 - the share of clear base days of solar-world segments with solar output above zero on at least
@@ -919,15 +931,17 @@ recurrent layer of the same width.
 | Total | | | about 5.0 |
 
 **An early stop near 130 epochs, where experiment 729's sign-only fits stopped, cuts the projection
-to about 2.5 GPU-process-hours.** The stop line is 8 GPU-process-hours, the manager's default, which
-the projection at the cap leaves 3 hours below. The timing gate runs before the first fit: 5 epochs
+to about 2.5 GPU-process-hours.** The stop line is 16 GPU-process-hours.
+The manager raised it from the default of 8 before any
+fit, and one GPU process of 6 GB stays. The projection at the cap is 11 hours below it.
+The timing gate runs before the first fit: 5 epochs
 of S on each of the four architectures, 5 epochs of SD-W and of SDe-PT on the bilstm, and 2 epochs
 of one pre-training run, and it records the peak resident memory of the pre-training row build,
 which loads the summary files of all 16 Primaries and must stay under the 14 GB cap. It projects
 every fit at its own architecture, with the later fits priced
-at the slowest architecture until the screen has chosen, and a projection above 8 hours at the cap
-stops the line and goes to the manager. The projection at the cap would pass 8 hours if the
-transformer took more than about 1.8 seconds an epoch and the screen chose a transformer variant.
+at the slowest architecture until the screen has chosen, and a projection above 16 hours at the cap
+stops the line and goes to the manager. The projection at the cap would pass 16 hours if the
+transformer took more than about 5.3 seconds an epoch and the screen chose it.
 
 **The CPU work is about 4 hours of wall time on the 6 cores, before the realism gate's re-tune.**
 

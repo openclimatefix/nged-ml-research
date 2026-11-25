@@ -146,8 +146,8 @@ GRU_TRANSFORMER_TOKEN: Final = 64
 
 # --------------------------------------------------------------------------- compute and stop line
 
-STOP_LINE_HOURS: Final = 8.0
-"""The manager's default stop line, in GPU-process-hours at the epoch cap."""
+STOP_LINE_HOURS: Final = 16.0
+"""The stop line in GPU-process-hours at the epoch cap, raised by the manager from 8 to 16."""
 MEMORY_CAP_GB: Final = 14.0
 """Slot A2's memory cap; the pre-training row build's peak resident memory must stay under it."""
 GPU_MEMORY_GB: Final = 6.0
