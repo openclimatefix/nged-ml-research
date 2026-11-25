@@ -1,9 +1,10 @@
 # ruff: noqa: E501, D103
 """Experiment 713: prove that the attention code changes no fit, forecast, or score. Reads only; no GPU.
 
-Prints the code hash of the fit modules now and the code hash recorded in every stored stage 3 log of the
-arms `M1`, `E`, and `P`, and the sha256 of the stored forecast files, and fails if any recorded hash differs from
-the current one. The bit-identical forward pass is asserted inside `e00713_attention.py extract` on every case.
+Prints the code hash of the fit modules now and the code hash recorded in every stored stage 3 log
+of the arms `M1`, `E`, and `P`, and the sha256 of the stored forecast files, and fails if any
+recorded hash differs from the current one. The bit-identical forward pass is asserted inside
+`e00713_attention.py extract` on every case.
 
 Usage: e00713_attention_proof.py
 """

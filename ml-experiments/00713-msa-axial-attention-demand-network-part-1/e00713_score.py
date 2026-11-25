@@ -558,7 +558,10 @@ def cmd_screen() -> int:
 
 
 def cmd_headline() -> int:
-    """H1 and H2 at 98.75% with 5 seeds, the three guards, the four `supported` guards, the readings, and the verdict."""
+    """Report H1 and H2 at 98.75% with 5 seeds, the guards, the readings, and the verdict.
+
+    The guards are the three guards and the four `supported` guards.
+    """
     star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     loaded = load_all(
         names=sorted({star, "C", "P"}), months=arms.ALL_FOLDS, seeds=arms.HEADLINE_SEEDS
@@ -591,7 +594,9 @@ def cmd_headline() -> int:
 
 
 def cmd_swaps() -> int:
-    """Report-only: the history-weather swaps (a), (b), and (c) of design 4.3 against the Candidate (seeds 0 and 1).
+    """Report-only: the history-weather swaps (a), (b), and (c) of design 4.3 against the Candidate.
+
+    The swaps use seeds 0 and 1.
 
     Swap (a) alone feeds the `supported` guard. Swap (b) minus swap (a) is the effect of the 14 B1
     columns, and swap (c) says how much the Candidate gains from ERA5 at its lag times.

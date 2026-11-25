@@ -543,7 +543,8 @@ training budget, and the test is correctly specified.
 
 **Six diagnostic fits and four replications followed the failed gate. They are diagnostics only,
 they gate nothing, and they support no claim that the gate is passed.** Each run is a single
-trajectory of arm `M` in synthetic world W1, with the code hash e85b84e2ea04b3cb, a cap of 400
+trajectory of arm `M` in synthetic world W1, with the code hash e85b84e2ea04b3cb (the hash
+before the docstring rewrap described below), a cap of 400
 passes, and no confidence interval. The variants changed the gradient-clip norm (1.0 or 10) and the
 learning rate of the lead-day parameters only (the lead-day map `w_lead`, the lead embedding, and
 the head's 14 lead-day input columns), by a factor of 1 or 10. The first six rows ran at training
@@ -595,6 +596,19 @@ the code hash equals e85b84e2ea04b3cb, and the sha256 of the last-run file and o
 `e00713_known_answer.py` equal the values pinned in the script. The fit scripts still check the code
 record of the gate file, so a waived gate written under one code hash is refused under another. The
 report script prints the waiver and fires audit trigger 1 (a control fails).
+
+**The code hash of the fit modules changed from e85b84e2ea04b3cb to 30951d79ab4d869a when the
+docstring lines of the experiment's scripts were rewrapped, and the fits were run at the old
+hash.** The hash is the first 16 characters of a SHA-256 over the bytes of the fit modules
+(`arms.FIT_CODE_FILES`) and the hashes of the imported recipe modules, so any edit to a docstring
+changes it. The gate file and the stage 3 logs of arms `M1`, `E`, and `P` (the logs the proof
+script `e00713_attention_proof.py` reads) record e85b84e2ea04b3cb. The
+rewrap changed docstring text only: the abstract syntax tree of each changed script, with its
+docstrings removed, is identical before and after (proof script and output in
+`briefs/msa_architecture/lint_rewrap_proof/` in the private data folder). The fit, predict, and
+attention-extract scripts would now refuse to resume or read the stored states without
+`--accept-code-change e85b84e2ea04b3cb`, and `e00713_waive_gate.py` would refuse to write the
+waiver again, because it pins the old hash.
 
 **Option 1 as written covers KA3 only, and the waiver covers KA12 as well.** KA12 also failed at the
 amended gate: arm `G` followed 0.0395 against the limit of arm `M` minus 0.05 = 0.0918, so the stem

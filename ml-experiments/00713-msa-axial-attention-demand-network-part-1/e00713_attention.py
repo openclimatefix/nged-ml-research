@@ -20,9 +20,11 @@ that the experiment scores. The extract checks that the forecast with `return_at
 the forecast without it bit for bit on every case, and it changes no fit, forecast, or score.
 
 **Stored per case.** `across` (the last block's weights from each target-row token to the 14 history
-rows, per head: 48 x 4 x 15, slot 0 the target row and slots 1 to 14 the history), `within_top` (the last block's within-day weights of the target row, 4 x 48 x 48),
-`alpha` (the read-out weights, 14 x 48), and the history grid indices. **Stored in the summary** (every Primary, every test origin, lead days 1 and 7): the mean
-across-day weight per history slot, split by whether the row has the target's weekday.
+rows, per head: 48 x 4 x 15, slot 0 the target row and slots 1 to 14 the history), `within_top` (the
+last block's within-day weights of the target row, 4 x 48 x 48), `alpha` (the read-out weights, 14 x
+48), and the history grid indices. **Stored in the summary** (every Primary, every test origin, lead
+days 1 and 7): the mean across-day weight per history slot, split by whether the row has the
+target's weekday.
 """
 
 import argparse
@@ -133,7 +135,10 @@ SCORED_ATOL: Final = 1e-4
 
 
 def limit_gpu_memory(*, device: str) -> None:
-    """Stop the caching allocator from taking more than `GPU_LIMIT_GB`, so an overrun raises instead of crowding other jobs."""
+    """Stop the caching allocator from taking more than `GPU_LIMIT_GB`.
+
+    An overrun then raises an error instead of crowding other jobs.
+    """
     if device.startswith("cuda"):
         index = torch.device(device).index or 0
         total = torch.cuda.get_device_properties(index).total_memory / 1e9
