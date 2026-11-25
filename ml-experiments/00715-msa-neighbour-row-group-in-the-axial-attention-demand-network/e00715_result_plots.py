@@ -5,7 +5,7 @@ Usage, through `run.sh`, never `uv run` (set `DATA_PATH_INTERNAL` first, and put
 experiment 713 folder on `EXTRA_PYTHONPATH`, as for the scorer):
 
     EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=12G run.sh e00715_result_plots.py plot8
-    EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=12G run.sh e00715_result_plots.py plot7 --hosts D5,D2
+    EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=12G run.sh e00715_result_plots.py plot7 --hosts D11,D19
     EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=12G run.sh e00715_result_plots.py lead-bands
 
 **Read-only.** The script reads the stored forecasts of M*, F4, and F4-R through the scorer's own
@@ -225,7 +225,7 @@ def generation_noted_hosts() -> set[str]:
 def plot7(*, hosts: list[str], fold: str) -> Path:
     """Draw plot 7: the first forecast origin of `fold` for one Primary of each group, F4 against M*."""
     assert fold in arms.ALL_FOLDS, fold
-    assert len(hosts) == 2, "give one D label of each group: --hosts D5,D2"
+    assert len(hosts) == 2, "give one D label of each group: --hosts D11,D19"
     assert hosts[0] in ALLOWED_HOSTS["six"], (
         f"{hosts[0]} is not vetted for the six: {ALLOWED_HOSTS}"
     )
@@ -295,7 +295,7 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
         )
     chart = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
-            "One 14-day forecast against the cleaned power, for one Primary of each group",
+            "One 14-day forecast against the cleaned demand, for one Primary of each group",
             subtitle=[
                 "Solid lines: median forecast of F4 (orange, with its 5% to 95% band) and of M* (blue); seed 0.",
                 "Dashed grey line: cleaned demand. Day 0 is the forecast origin (the first of the fold);",
