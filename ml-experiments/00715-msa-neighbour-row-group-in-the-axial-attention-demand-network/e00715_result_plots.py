@@ -272,16 +272,27 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
             .mark_area(opacity=0.2, color=ocf.BRAND_ORANGE, aria=False)
             .encode(y=alt.Y("low:Q", title="Demand (% of capacity)"), y2="high:Q")  # ty: ignore[unresolved-attribute]
         )
-        lines = base.mark_line(aria=False).encode(  # ty: ignore[unresolved-attribute]
-            y="median:Q",
-            color=alt.Color(
-                "forecast:N",
-                title=None,
-                scale=alt.Scale(
-                    domain=["F4", "M* (baseline)"], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]
-                ),
-                legend=alt.Legend(orient="top"),
+        colour = alt.Color(
+            "forecast:N",
+            title=None,
+            scale=alt.Scale(
+                domain=["F4", "M* (baseline)"], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]
             ),
+            legend=alt.Legend(orient="top"),
+        )
+
+        def median_line(
+            *, base: alt.Chart, colour: alt.Color, label: str, width: float
+        ) -> alt.Chart:
+            chart = base.transform_filter(alt.datum.forecast == label)
+            return chart.mark_line(strokeWidth=width, aria=False).encode(  # ty: ignore[unresolved-attribute]
+                y="median:Q", color=colour
+            )
+
+        # The two medians are close, so the wide M* line goes under the thin F4 line.
+        lines = alt.layer(
+            median_line(base=base, colour=colour, label="M* (baseline)", width=4),
+            median_line(base=base, colour=colour, label="F4", width=1.5),
         )
         actual = (
             base.transform_filter(alt.datum.forecast == "F4")
@@ -297,7 +308,7 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
         title=alt.TitleParams(
             "One 14-day forecast against the cleaned demand, for one Primary of each group",
             subtitle=[
-                "Solid lines: median forecast of F4 (orange, with its 5% to 95% band) and of M* (blue); seed 0.",
+                "Solid lines: median forecast of F4 (thin orange line, with its 5% to 95% band) and of M* (wide blue line); seed 0.",
                 "Dashed grey line: cleaned demand. Day 0 is the forecast origin (the first of the fold);",
                 "no calendar date is shown. The day-ahead forecast is days 0.5 to 1.5 (leads of 12 h to 36 h).",
                 *DEFINITIONS,

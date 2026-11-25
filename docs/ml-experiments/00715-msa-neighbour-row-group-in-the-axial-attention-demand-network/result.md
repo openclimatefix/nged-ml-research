@@ -175,15 +175,38 @@ dropped, so the refit-against-stored part of N1 is unmeasured. KN11(b) checks th
 path with a stored state of M\* reproduces experiment 713's bank forecasts, and it did not run
 because phase 4 did not run.
 
-**The page has no figures, because no plot was drawn.** The plan lists 10 plots, and none of them
-could be drawn from the fits that ran: the attention maps and the null-key share need a forward
-pass with attention returned, and the event charts need the injected-world forecasts of phase 4.
-Plots 7 and 8 (a forecast example and the contrasts by Primary and by fold) need no new fit. A
-script that draws them, and one extra report-only figure of the contrasts by lead band, is written.
-It has not run, and it waits for a code re-check.
+**The page shows 3 of the 10 planned plots, and the other 8 were not drawn.** The attention maps
+and the null-key share need a forward pass with attention returned, and the event charts need the
+injected-world forecasts of phase 4. Plots 7 and 8 and one extra report-only figure need no new fit.
+They are drawn from the stored forecasts by `e00715_result_plots.py`, which passed two code reviews.
+No axis carries a calendar date, and the folds are numbered 1 to 8.
+
+**In plot 8, the sign of each Primary's difference changes from fold to fold and from Primary to
+Primary.** The first 2 folds lean towards F4 forecasting worse. In fold 1 the mean difference F4
+minus M\* is +0.077 points of capacity at the six signed-MW Primaries and +0.082 at the eight
+MVA-only Primaries, and in fold 2 it is +0.058 and +0.043. The later 6 folds have no common sign.
+
+![F4 minus M\* and F4 minus F4-R by Primary and fold, with neighbour counts](plot_08_contrasts_by_primary_and_fold.svg)
+
+**In plot 7, F4 and M\* give nearly the same median forecast for both Primaries shown.** Both follow
+the daily shape of the cleaned demand and miss its day-to-day level in similar places. The
+example is one forecast origin for 2 Primaries, so it shows what a forecast looks like and does not
+measure which arm is better. The Primaries were chosen because no table records a metered generator
+below them, which is circumstantial evidence only.
+
+![One 14-day forecast of F4 and M\* against the cleaned demand, for D11 and D19](plot_07_forecast_example.svg)
+
+**The report-only lead-band figure shows no band with an interval that excludes zero for F4 minus
+M\*.** Over the headline band of 24 h up to but not including 240 h, F4 minus M\* is +0.013 points
+of capacity at the six signed-MW Primaries (98.75% interval -0.022 to +0.047) and +0.009 at the eight
+MVA-only Primaries (-0.025 to +0.045). F4 minus F4-R is +0.018 (-0.003 to +0.050) at the six and
+-0.003 (-0.026 to +0.018) at the eight. These four rows are the counted headline contrasts. The
+other 3 bands are report-only readings from the same forecasts.
+
+![Report-only: F4 minus M\* and F4 minus F4-R by lead band, 98.75% intervals](extra_contrasts_by_lead_band_report_only.svg)
 
 **Readings listed in the plan were not computed.** The report-only contrasts (N1 against the 5
-stored seeds of M\*, F4 minus the Candidate, the contrasts by lead band and by Primary), the
+stored seeds of M\*, F4 minus the Candidate), the
 normalised mean absolute error beside each CRPS contrast, cold winter nights, coverage, the
 avoidable-curtailment cost, the four load-shift scenarios, and the phase 5 read-outs with all
 neighbour slots masked were not scored. Without the phase 5 read-outs and the null-key share, the page
