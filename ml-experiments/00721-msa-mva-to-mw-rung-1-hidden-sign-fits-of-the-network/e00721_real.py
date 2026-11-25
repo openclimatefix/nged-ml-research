@@ -443,6 +443,11 @@ def build_real_arm_world(
         ]
     )  # fmt: skip
     gate[roles["unfolded"]] = 0.0
+    if spec.sign_head:
+        shut = [sites[i] for i in np.nonzero(supervised & (gate < 0.5))[0]]
+        assert not shut, (
+            f"the export gate is shut at the supervised Primaries {shut}: their sign labels would be discarded"
+        )
     tworld = jobs.tr.World(
         source=sources[1], cutoff_idx=cutoff, clean=a["target"], target_mean=mean, target_std=std, month=job.fold, placebo_pool=None,
     )  # fmt: skip

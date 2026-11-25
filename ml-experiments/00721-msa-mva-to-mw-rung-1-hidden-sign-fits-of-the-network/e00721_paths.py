@@ -63,8 +63,12 @@ def pin_threads() -> None:
 
     Sets torch's intra-op and inter-op thread counts to 1. The second call raises `RuntimeError` once
     parallel work has started, which is then fine because the count was already pinned. The function
-    also limits `threadpoolctl`'s pools (BLAS, OpenMP) to 1 when `threadpoolctl` is installed.
+    also limits `threadpoolctl`'s pools (BLAS, OpenMP) to 1 when `threadpoolctl` is installed. Under
+    `run.sh` (which sets `SLOT_CPU`), it asserts that the process may run on one core only.
     """
+    if os.environ.get("SLOT_CPU") is not None:
+        cores = os.sched_getaffinity(0)
+        assert len(cores) == 1, f"the process may run on {len(cores)} cores; run.sh pins one"
     try:
         import torch  # ty: ignore[unresolved-import]
     except ImportError:

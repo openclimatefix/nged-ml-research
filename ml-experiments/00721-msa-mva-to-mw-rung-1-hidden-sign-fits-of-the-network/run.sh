@@ -13,14 +13,14 @@
 #     `OOMPolicy=continue`, `AllowedCPUs=$SLOT_CPU`;
 #   - one thread for every numerical library (OMP, MKL, OpenBLAS, Polars, and Rayon);
 #   - `uptime` load at most 24 and at least 25 GB available at launch, or the wrapper refuses;
-#   - `taskset -c $SLOT_CPU` as well, and the job fails unless `os.sched_getaffinity` shows one core;
+#   - `taskset -c $SLOT_CPU` as well, and `e00721_paths.pin_threads` asserts that `os.sched_getaffinity` shows one core;
 #   - the venv's Python called directly (never `uv run` inside the scope); `PYTHON` names a venv built
 #     with `uv sync --group gpu` for the fits, and defaults to the `msa-f7-pv-part-1` worktree's venv,
 #     which has torch; the wrapper stops with an error when the interpreter cannot import torch;
 #   - for a command that uses the GPU (no `--device cpu`, and `CUDA_VISIBLE_DEVICES` not empty): the
-#     `nvidia-smi` totals leave room for 6 GB under the total of 36 GB, at most one other process of
-#     this experiment holds the GPU (at most two of ours), at most one process of another experiment (an
-#     F4 or F7 fit) shares it, and a lock file allows one worker at a time;
+#     `nvidia-smi` totals leave room for 6 GB under the total of 36 GB, at most one other GPU process
+#     (of this experiment or another, counted together) holds the GPU, and a lock file allows one worker
+#     of this experiment at a time. `stage0`, `quicklook`, and `score` run on the CPU and skip both checks;
 #   - this folder, and the folders of the experiments whose code this one imports, on PYTHONPATH:
 #     `e00721_paths.py` adds the experiment folders of the frozen 713 worktree, this branch's own
 #     experiment folders, and 716 and 720.
@@ -74,6 +74,8 @@ fi
 uses_gpu=1
 [ -z "${CUDA_VISIBLE_DEVICES+x}" ] || [ -n "${CUDA_VISIBLE_DEVICES}" ] || uses_gpu=0
 for arg in "$@"; do [ "$arg" = "cpu" ] && uses_gpu=0; done
+# stage 0, the quick look, and the scorer read files and compute on the CPU: no GPU check and no GPU lock
+case "${1:-}" in stage0 | quicklook | score) uses_gpu=0 ;; esac
 lock_prefix=""
 if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
     used_mb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '{s+=$1} END {print s+0}')
@@ -86,8 +88,8 @@ if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
     for pid in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader); do
         if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q 'e00721'; then ours=$((ours + 1)); else others=$((others + 1)); fi
     done
-    if [ "$ours" -ge 2 ] || [ "$others" -ge 2 ]; then
-        echo "GPU processes: ${ours} of experiment 721 and ${others} of others; the limits are 2 of ours and 1 other (an F4 or F7 fit) at a time" >&2
+    if [ $((ours + others)) -ge 2 ]; then
+        echo "GPU processes: ${ours} of experiment 721 and ${others} of others; at most 2 GPU processes run at once across all agents, and this one would be the third" >&2
         exit 1
     fi
     mkdir -p "$HOME/.cache"

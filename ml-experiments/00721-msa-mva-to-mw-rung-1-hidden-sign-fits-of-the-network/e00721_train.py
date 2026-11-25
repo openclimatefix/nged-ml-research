@@ -340,8 +340,8 @@ def predict_rows(
     """Return the scored rows of `model` at the contract origins `c_idx` for `primaries`.
 
     One row per (Primary, origin, target half-hour) with a finite signed truth or reading and a lead
-    of 24 to
-    239 hours. The columns are the keys of `e00721_score.KEYS`, `actual` (signed truth, or the reading where
+    of 24 up to but not including 240 hours after the 12:00 UTC contract origin (`power_fcst_init_time`
+    is that origin). The columns are the keys of `e00721_score.KEYS`, `actual` (signed truth, or the reading where
     the sign is unknown), `reading`, `q01` to `q99` (the signed mixture) and `fq01` to `fq99` (the folded
     reading's quantiles), all in capacity fractions.
     """
@@ -380,10 +380,9 @@ def predict_rows(
                 signed = aw.signed_truth[pn, tidx]
                 reading = aw.reading[pn, tidx]
                 actual = np.where(np.isfinite(signed), signed, reading)
-                native = (c.cpu().numpy() - lay.NATIVE_OFFSET_STEPS)[:, None].repeat(
-                    tidx.shape[1], axis=1
-                )
-                lead_h = (tidx - native) * 0.5
+                # the contract origin (12:00 UTC) is the lead's zero, as in experiment 713's `to_contract_shares`
+                contract = c.cpu().numpy()[:, None].repeat(tidx.shape[1], axis=1)
+                lead_h = (tidx - contract) * 0.5
                 keep = (
                     np.isfinite(actual)
                     & (lead_h >= core.LEAD_MIN_HOURS)
@@ -393,7 +392,7 @@ def predict_rows(
                     "time_series_id": (pn if aw.series_ids is None else aw.series_ids[pn])[
                         keep
                     ].astype(np.int64),
-                    "power_fcst_init_time": stamp_us[native][keep],
+                    "power_fcst_init_time": stamp_us[contract][keep],
                     "valid_time": stamp_us[tidx][keep],
                     "fold": np.full(int(keep.sum()), aw.fold),
                     "seed": np.full(int(keep.sum()), aw.seed, dtype=np.int64),

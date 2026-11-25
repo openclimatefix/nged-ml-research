@@ -288,3 +288,88 @@ def test_the_stage_0_span_is_the_fold_month_and_its_tokens_lie_inside_it() -> No
     start, stop = stage0.scored_span(fold="2026-04", n_grid=121_248)
     assert stop - start == 30 * 48
     assert start % 48 == 0
+
+
+# --------------------------------------------------------------------------- stage 0 token set and capacities (MUST-FIX 4, SHOULD-FIX 5)
+
+
+def _fake_parts(*, n: int = 121_248) -> dict:
+    from types import SimpleNamespace
+
+    rng = np.random.default_rng(0)
+    syn = SimpleNamespace(
+        x=rng.normal(size=(4, n)), demand_mean=rng.normal(size=(4, n)), reading=np.abs(rng.normal(size=(4, n))),
+        capacity_share=np.array([0.3, 0.5, 0.05, 0.05]),
+    )  # fmt: skip
+    return {"syn": syn, "four": (7, 8, 9, 10), "exporters": (7, 8), "u": rng.uniform(size=(16, n))}
+
+
+def test_the_stage_0_tokens_lie_in_the_scored_span_with_each_exporters_own_capacity() -> None:
+    import e00721_stage0 as stage0
+
+    parts = _fake_parts()
+    start, stop = stage0.scored_span(fold="2026-04", n_grid=121_248)
+    tok = stage0.exporter_tokens(parts=parts, span=(start, stop))
+    assert len(tok["day"]) == 2 * (stop - start)
+    assert tok["day"].min() == start // 48
+    assert tok["day"].max() == (stop - 1) // 48
+    assert set(np.unique(tok["pv_capacity"])) == {0.3, 0.5}
+    whole = stage0.exporter_tokens(parts=parts)
+    assert len(whole["day"]) == 2 * 121_248
+
+
+# --------------------------------------------------------------------------- SHOULD-FIX
+
+
+def test_the_lead_counts_from_the_12_utc_origin_in_the_scored_rows_and_the_power_check() -> None:
+    import e00721_train as trn
+
+    source = inspect.getsource(trn.predict_rows)
+    assert '"power_fcst_init_time": stamp_us[contract][keep]' in source
+    assert "(tidx - contract) * 0.5" in source
+    assert drv.NATIVE_TO_CONTRACT_HOURS == 3.0
+    assert "NATIVE_TO_CONTRACT_HOURS" in inspect.getsource(drv.power_check)
+
+
+def test_pin_threads_asserts_one_core_when_run_sh_names_a_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SLOT_CPU", "3")
+    monkeypatch.setattr("os.sched_getaffinity", lambda _pid: {1, 2})
+    with pytest.raises(AssertionError, match="2 cores"):
+        e00721_paths.pin_threads()
+    monkeypatch.setattr("os.sched_getaffinity", lambda _pid: {3})
+    e00721_paths.pin_threads()
+
+
+def test_the_gate_must_be_open_at_the_supervised_primaries() -> None:
+    import e00721_real as real
+
+    source = inspect.getsource(real.build_real_arm_world)
+    assert "supervised & (gate < 0.5)" in source
+
+
+def test_the_report_only_accuracy_at_u_0_3_ignores_the_night_tokens(tmp_path: Path) -> None:
+    jobs = _write_all_waves(root=tmp_path, flag_sg_a=False)
+    job = next(j for j in jobs if j.arm == "SG-A" and j.world == "synthetic" and j.seed == 0)
+    path = fit.job_paths(data_dir=tmp_path, job=job)["predictions"].with_suffix(".tokens.npz")
+    n = 400
+    x = np.where(np.arange(n) % 2 == 0, -5.0, 5.0)
+    night = np.arange(n) % 4 < 2
+    rho = np.where(x < 0, 0.95, 0.05)
+    rho = np.where(
+        night, 1.0 - rho, rho
+    )  # every night token is wrong, every daytime token is right
+    np.savez(
+        path, exporters_rho=rho, exporters_x_points=x, exporters_u=np.where(night, 0.0, 0.8), exporters_token_id=np.arange(n),
+        open_rho=np.full(n, 0.01), open_sunny=np.ones(n, dtype=bool),
+    )  # fmt: skip
+    entry = drv.synthetic_gate(data_dir=tmp_path, seeds=(0,))["per_seed"][0]
+    assert entry["sign_accuracy_u03"] == pytest.approx(1.0)
+    assert entry["sign_accuracy"] == pytest.approx(0.5)
+
+
+def test_run_sh_counts_every_gpu_process_and_skips_the_gpu_for_the_cpu_commands() -> None:
+    text = (Path(__file__).parent.parent / "run.sh").read_text()
+    assert "$((ours + others)) -ge 2" in text
+    assert "stage0 | quicklook | score" in text

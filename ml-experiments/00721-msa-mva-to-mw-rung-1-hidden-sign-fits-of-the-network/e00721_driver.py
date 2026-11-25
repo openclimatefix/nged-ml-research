@@ -13,6 +13,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
+from typing import Final
 
 import e00721_core as core
 import e00721_fit as fit
@@ -20,6 +21,8 @@ import e00721_score as score
 import numpy as np
 import polars as pl
 
+NATIVE_TO_CONTRACT_HOURS: Final = 3.0
+"""Hours from experiment 713's native origin (09:00 UTC) to the contract origin (12:00 UTC) of the page."""
 HOLDOUT_START = datetime.datetime.fromisoformat(core.HOLDOUT_START_ISO).replace(tzinfo=datetime.UTC)
 """The first instant of the holdout: a stored forecast at or after it is never scored."""
 
@@ -231,12 +234,21 @@ def power_check(*, m1_dir: Path, folds: Sequence[str], series_ids: dict[str, int
             if not path.exists():
                 msg = f"the power check needs {path}"
                 raise FileNotFoundError(msg)
-            df = pl.read_parquet(path).filter(
-                pl.col("time_series_id").is_in(list(series_ids.values())),
-                pl.col("lead_hours") >= core.LEAD_MIN_HOURS,
-                pl.col("lead_hours") < core.LEAD_MAX_HOURS_EXCLUSIVE,
-                pl.col("valid_time").dt.replace_time_zone(None)
-                < HOLDOUT_START.replace(tzinfo=None),
+            # the stored file's origin is the native 09:00 UTC; the page's lead counts from the 12:00 UTC origin
+            df = (
+                pl.read_parquet(path)
+                .with_columns(
+                    power_fcst_init_time=pl.col("power_fcst_init_time")
+                    + datetime.timedelta(hours=3),
+                    lead_hours=pl.col("lead_hours") - NATIVE_TO_CONTRACT_HOURS,
+                )
+                .filter(
+                    pl.col("time_series_id").is_in(list(series_ids.values())),
+                    pl.col("lead_hours") >= core.LEAD_MIN_HOURS,
+                    pl.col("lead_hours") < core.LEAD_MAX_HOURS_EXCLUSIVE,
+                    pl.col("valid_time").dt.replace_time_zone(None)
+                    < HOLDOUT_START.replace(tzinfo=None),
+                )
             )
             frames_[(fold, seed)] = score.with_crps(frame=df.with_columns(fold=pl.lit(fold)))
     return score.power_check_g3(frames=frames_, id_d5=series_ids["D5"], id_d10=series_ids["D10"])
