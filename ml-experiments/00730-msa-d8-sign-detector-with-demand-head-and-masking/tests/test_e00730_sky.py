@@ -195,3 +195,88 @@ def test_after_the_fix_the_gate_has_one_attempt_and_no_new_retune(tmp_path: Path
     assert banks.gate_attempts_allowed(root=tmp_path) == 1
     with pytest.raises(RuntimeError, match="exists already"):
         banks.write_retune_override(root=tmp_path)
+
+
+def test_a_gap_at_the_first_sun_up_half_hour_ignores_a_positive_dawn_neighbour() -> None:
+    cal = make_calendar()
+    farms = cal.farms
+    first = int(np.flatnonzero(farms.zenith[0, 3] < sky.SUN_UP_ZENITH_MAX_DEG)[0])
+    zenith, ghi = farms.zenith.copy(), farms.ghi.copy()
+    zenith[:, 3, first - 1] = 85.0  # dawn: the sun is up but outside the fill window
+    ghi[:, 3, first - 1] = 5.0  # a positive, biased-low dawn value
+    ghi[:, 3, first] = 0.0
+    cal = dataclasses.replace(cal, farms=dataclasses.replace(farms, zenith=zenith, ghi=ghi))
+    out = sky.fill_sky_gaps(cal=cal).farms
+    np.testing.assert_allclose(out.ghi[:, 3, first], farms.ghi[:, 3, first + 1])
+    assert out.ghi[0, 3, first - 1] == 5.0
+
+
+def test_nan_irradiance_at_sun_up_is_a_gap_too() -> None:
+    cal = make_calendar()
+    ghi = cal.farms.ghi.copy()
+    ghi[:, 3, MIDDAY] = np.nan
+    cal = dataclasses.replace(cal, farms=dataclasses.replace(cal.farms, ghi=ghi))
+    out = sky.fill_sky_gaps(cal=cal).farms
+    assert np.isfinite(out.ghi[:, 3, MIDDAY]).all()
+    assert (out.ghi[:, 3, MIDDAY] > 0).all()
+
+
+def test_the_wiring_in_bank_inputs_fills_the_calendar() -> None:
+    import e00730_stages as stages
+
+    cal = calendar_with_gaps(length=2)
+    ctx = SimpleNamespace(cal=cal, months=lambda *, split: [split], use={})
+    inputs = stages.bank_inputs(ctx=ctx)  # ty: ignore[invalid-argument-type]
+    assert sky.zeroed_sky_share(farms=cal.farms) > 0.0
+    assert sky.zeroed_sky_share(farms=inputs.cal.farms) == 0.0
+
+
+def test_the_rebuild_after_the_fix_cannot_be_repeated(tmp_path: Path) -> None:
+    old = {**banks.run_marker_payload(), "sky_gap_fill": "an earlier version"}
+    (tmp_path / banks.RUN_MARKER).write_text(json.dumps(old))
+    moved = tmp_path / banks.SKY_FIX_FOLDER
+    moved.mkdir()
+    (moved / "x").write_text("")
+    with pytest.raises(RuntimeError, match="verdict row 0"):
+        banks.guard_run(root=tmp_path, stage="banks")
+
+
+def _digest_root(root: Path) -> None:
+    (root / "banks").mkdir(parents=True, exist_ok=True)
+    (root / "banks" / "summary.json").write_text(json.dumps({"digests": {"test": "abc"}}))
+
+
+def test_a_gallery_record_of_other_banks_does_not_open_the_gate(tmp_path: Path) -> None:
+    import e00730_core as core
+
+    _digest_root(tmp_path)
+    folder = tmp_path / "PRIVATE" / "gallery"
+    folder.mkdir(parents=True)
+    panels = dict.fromkeys(core.PANEL_REQUIREMENTS, True)
+    record = {"panels": panels, "banks_digest": banks.banks_digest_id(root=tmp_path)}
+    (folder / "panel_check.json").write_text(json.dumps(record))
+    assert banks.gallery_passed(root=tmp_path)
+    (folder / "panel_check.json").write_text(json.dumps({"panels": panels}))
+    assert not banks.gallery_passed(root=tmp_path)
+    (folder / "panel_check.json").write_text(json.dumps({**record, "banks_digest": "other"}))
+    assert not banks.gallery_passed(root=tmp_path)
+
+
+def test_record_panel_check_refuses_an_auto_check_of_other_banks(tmp_path: Path) -> None:
+    import e00730_core as core
+    import e00730_stages as stages
+
+    _digest_root(tmp_path)
+    folder = tmp_path / "PRIVATE" / "gallery"
+    folder.mkdir(parents=True)
+    auto = {"panels": dict.fromkeys(core.PANEL_REQUIREMENTS, True)}
+    (folder / "auto_check.json").write_text(json.dumps(auto))
+    with pytest.raises(RuntimeError, match="other banks"):
+        stages.record_panel_check(root=tmp_path, design_lead_confirms={})
+    auto["banks_digest"] = banks.banks_digest_id(root=tmp_path)
+    (folder / "auto_check.json").write_text(json.dumps(auto))
+    done = stages.record_panel_check(
+        root=tmp_path, design_lead_confirms=dict.fromkeys(core.PANEL_REQUIREMENTS, True)
+    )
+    assert done["banks_digest"] == banks.banks_digest_id(root=tmp_path)
+    assert banks.gallery_passed(root=tmp_path)

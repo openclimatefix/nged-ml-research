@@ -86,3 +86,31 @@ def test_a_silent_engine_fails_per_segment_and_quiet_days_are_read_apart(
         seg.engine[:] = 0.0
     out = banks.component_checks(banks_by_name={"test": silent}, cal=cal)
     assert any("/engine/" in k and "weekday" in k for k in out["short"])
+
+
+def test_the_component_check_fails_a_bank_with_notches_a_silent_one_and_an_empty_one(
+    world: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bank, cal = world
+    monkeypatch.setattr(banks, "MIN_CASES", 1)
+    base = banks.component_checks(banks_by_name={"test": bank}, cal=cal)
+    assert not any("zeroed_sunup" in k for k in base["short"]), base["short"]
+    notched = copy.deepcopy(bank)
+    for seg in notched.segments:
+        if seg.source == "S2":
+            seg.solar[:, banks.MIDDAY_WINDOW.start : banks.MIDDAY_WINDOW.start + 2] = 0.0
+    out = banks.component_checks(banks_by_name={"test": notched}, cal=cal)
+    assert "test/solar/zeroed_sunup_share/S2" in out["short"]
+    silent = copy.deepcopy(bank)
+    for seg in silent.segments:
+        if seg.source == "S2":
+            seg.solar[:] = 0.0
+    assert banks.zeroed_sunup_share(bank=silent) == 1.0
+    assert (
+        "test/solar/zeroed_sunup_share/S2"
+        in banks.component_checks(banks_by_name={"test": silent}, cal=cal)["short"]
+    )
+    empty = copy.deepcopy(bank)
+    empty.segments = [s for s in empty.segments if s.source != "S2"]
+    out = banks.component_checks(banks_by_name={"test": empty}, cal=cal)
+    assert "test/solar/zeroed_sunup_share/S2/empty" in out["short"]

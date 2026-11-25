@@ -708,12 +708,12 @@ def stage_gallery(
         values = {
             n: float(v)
             for n, v in shares.items()
-            if isinstance(v, int | float) and not isinstance(v, bool) and np.isfinite(v)
+            if isinstance(v, int | float) and not isinstance(v, bool)
         }
         if k.endswith(("/solar_metered_zero", "/solar_zeroed_sunup")):
             bounded.update({f"{k}/{n}": v for n, v in values.items()})
         else:
-            components[k] = values
+            components[k] = {n: v for n, v in values.items() if np.isfinite(v)}
     near = {}
     for world in ("none", "engine", "solar", "both"):
         parts = [s.r[1:-1].reshape(-1) for s in segments if s.world == world]
@@ -732,7 +732,10 @@ def stage_gallery(
     figures.save_gallery(out=out, public_dir=root / "figures" / "gallery", private_dir=private)
     banks.write_json(
         path=private / "auto_check.json",
-        payload=gallery.build_panel_check(results=out.results, notes=out.notes),
+        payload={
+            **gallery.build_panel_check(results=out.results, notes=out.notes),
+            "banks_digest": banks.banks_digest_id(root=root),
+        },
     )
     log(f"gallery drawn: {sum(out.results.values())} of {len(out.results)} panels pass the check")
     return out.results
@@ -751,13 +754,16 @@ def record_panel_check(*, root: Path, design_lead_confirms: Mapping[str, bool]) 
     """
     import e00730_gallery as gallery
 
-    auto = banks.read_json(path=gallery.gallery_private_dir(root=root) / "auto_check.json")[
-        "panels"
-    ]
+    auto_record = banks.read_json(path=gallery.gallery_private_dir(root=root) / "auto_check.json")
+    if auto_record.get("banks_digest") != banks.banks_digest_id(root=root):
+        msg = "auto_check.json belongs to other banks: run `gallery` on the banks now in use"
+        raise RuntimeError(msg)
+    auto = auto_record["panels"]
     results = {
         k: bool(auto.get(k)) and bool(design_lead_confirms.get(k)) for k in core.PANEL_REQUIREMENTS
     }
     record = gallery.build_panel_check(results=results, notes={"confirmed_by": "the design lead"})
+    record["banks_digest"] = banks.banks_digest_id(root=root)
     gallery.write_panel_check(root=root, record=record)
     return record
 

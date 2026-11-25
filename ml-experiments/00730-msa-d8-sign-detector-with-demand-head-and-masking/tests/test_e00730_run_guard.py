@@ -31,7 +31,8 @@ def write_gallery(root: Path, *, passed: bool) -> None:
     folder = root / "PRIVATE" / "gallery"
     folder.mkdir(parents=True, exist_ok=True)
     panels = dict.fromkeys(core.PANEL_REQUIREMENTS, passed)
-    (folder / "panel_check.json").write_text(json.dumps({"panels": panels}))
+    record = {"panels": panels, "banks_digest": banks.banks_digest_id(root=root)}
+    (folder / "panel_check.json").write_text(json.dumps(record))
 
 
 def test_the_marker_names_this_experiment_and_the_required_run_id() -> None:

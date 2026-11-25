@@ -20,6 +20,7 @@ import e00730_paths
 # isort: split
 import e00730_core as core
 import e00730_pretrain as pretrain
+import e00730_sky as sky
 import e00730_stages as stages
 import numpy as np
 
@@ -153,9 +154,12 @@ def check_bank_s2() -> str:
         msg = "no clear base day in an S2 solar-world segment"
         raise ValueError(msg)
     share = with_output / total
+    zeroed = stages.banks.zeroed_sunup_share(bank=bank)
     return (
         "test bank present: True, share of clear S2 solar-world base days with output is at least "
-        f"{core.MIN_OUTPUT_SHARE}: {share >= core.MIN_OUTPUT_SHARE}"
+        f"{core.MIN_OUTPUT_SHARE}: {share >= core.MIN_OUTPUT_SHARE}, "
+        f"share of mid-day S2 half-hours with zero output is at most {sky.MAX_ZEROED_SHARE} "
+        f"(NaN fails): {zeroed <= sky.MAX_ZEROED_SHARE}"
     )
 
 
@@ -233,8 +237,6 @@ def check_sky_gaps() -> str:
     The bound is `sky.MAX_ZEROED_SHARE`, pre-registered on the plan page. The line prints shares
     and counts of farm-days only.
     """
-    import e00730_sky as sky
-
     ctx = stages.real_context()
     before = sky.zeroed_sky_share(farms=ctx.cal.farms)
     filled = sky.fill_sky_gaps(cal=ctx.cal)

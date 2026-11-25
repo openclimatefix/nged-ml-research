@@ -7,18 +7,19 @@ missing power reading. The result is a one- to four-half-hour "notch" of zero ou
 middle of a clear day. Experiment 729's code is not edited. `fill_sky_gaps` repairs the
 `Calendar` that this experiment builds its banks on:
 
-- **Sun-up rule.** Only half-hours with a solar zenith below `SUN_UP_ZENITH_MAX_DEG` are gaps.
-  Dawn, dusk, and night are never touched.
-- **Sky gaps (source S2).** A run of at most `MAX_SKY_GAP_HH` half-hours with zero irradiance at
-  sun-up is filled by linear interpolation of ghi over the cosine of the zenith, between the
-  nearest positive half-hours on both sides of the same day, or held at the clearness of the one
-  positive neighbour when the run touches the first or last sun-up half-hour. The direct and
-  diffuse parts are re-derived from the filled ghi with the Erbs model. A longer run, or a run
-  with no positive half-hour on either side, is not filled: the farm-day's sky becomes NaN and
-  the farm-day leaves `sky_ok`, like a farm-day with no sky. A gap is never zero-filled.
-- **Power gaps (source S1).** A run of at most `MAX_POWER_GAP_HH` missing half-hours at sun-up
-  is filled the same way, over the power. A longer run
-  removes the farm-day from `power_ok`. Genuine metered zeros are left as they are.
+- **Sun-up rule.** Only half-hours with a solar zenith below `SUN_UP_ZENITH_MAX_DEG` are gaps,
+  and only half-hours below that zenith serve as anchors. Dawn, dusk, and night are never
+  touched, so a missing value at a zenith of 80 to 90 degrees stays zero, as in experiment 729.
+- **Sky gaps (source S2).** A run of at most `MAX_SKY_GAP_HH` half-hours with zero or missing
+  irradiance at sun-up is filled by linear interpolation of ghi over the cosine of the zenith,
+  between the nearest positive sun-up half-hours on both sides of the same day. When the run
+  touches the first or last sun-up half-hour, the one anchor gives a constant ratio of ghi to the
+  cosine of the zenith. The direct and diffuse parts are re-derived from the filled ghi with the
+  Erbs model. A longer run, or a run with no anchor, is not filled: the farm-day's sky becomes NaN
+  and the farm-day leaves `sky_ok`, like a farm-day with no sky. A gap is never zero-filled.
+- **Power gaps (source S1).** A run of at most `MAX_POWER_GAP_HH` missing half-hours at sun-up is
+  filled the same way, over the power. A longer run removes the farm-day from `power_ok`. Genuine
+  metered zeros are left as they are.
 """
 
 import dataclasses
@@ -59,9 +60,9 @@ def day_of_year(*, dates: np.ndarray) -> np.ndarray:
 
 
 def sun_up_zero_mask(*, farms: sim729.FarmSet) -> np.ndarray:
-    """Return where irradiance is exactly zero although the sun is up, `(F, n, 48)`."""
+    """Return where irradiance is zero or missing although the sun is up, `(F, n, 48)`."""
     with np.errstate(invalid="ignore"):
-        return (farms.ghi == 0.0) & (farms.zenith < SUN_UP_ZENITH_MAX_DEG)
+        return ~(farms.ghi > 0.0) & (farms.zenith < SUN_UP_ZENITH_MAX_DEG)
 
 
 def zeroed_sky_share(*, farms: sim729.FarmSet) -> float:
@@ -77,7 +78,7 @@ def fill_run(
     """Return the fill of `values[start:stop]`, or None when the run has no usable neighbour.
 
     The fill interpolates `values / cos_z` linearly between the neighbours on both sides when both
-    are usable, and holds the value of the one usable neighbour otherwise (a gap that touches
+    are usable, and holds the ratio of the one usable neighbour otherwise (a gap that touches
     the first or last sun-up half-hour). It multiplies back by `cos_z`.
     """
     anchors = [i for i in (start - 1, stop) if 0 <= i < len(values) and usable[i]]
@@ -113,7 +114,7 @@ def fill_sky_gaps(*, cal: sim729.Calendar) -> sim729.Calendar:
     for f in range(n_farms):
         for d in np.flatnonzero(sky_ok[f] & zero[f].any(axis=1)):
             row, cos_z, at = ghi[f, d], _cos_zenith(zenith=farms.zenith[f, d]), zero[f, d]
-            usable = np.isfinite(row) & (row > 0.0)
+            usable = np.isfinite(row) & (row > 0.0) & (farms.zenith[f, d] < SUN_UP_ZENITH_MAX_DEG)
             filled = row.copy()
             ok = True
             for a, b in gap_runs(mask=at):
@@ -140,7 +141,7 @@ def fill_sky_gaps(*, cal: sim729.Calendar) -> sim729.Calendar:
             missing = ~np.isfinite(farms.power[f]) & (farms.zenith[f] < SUN_UP_ZENITH_MAX_DEG)
         for d in np.flatnonzero(power_ok[f] & missing.any(axis=1)):
             row, cos_z = power[f, d], _cos_zenith(zenith=farms.zenith[f, d])
-            usable = np.isfinite(row)
+            usable = np.isfinite(row) & (farms.zenith[f, d] < SUN_UP_ZENITH_MAX_DEG)
             for a, b in gap_runs(mask=missing[d]):
                 part = (
                     fill_run(values=row, cos_z=cos_z, start=a, stop=b, usable=usable)

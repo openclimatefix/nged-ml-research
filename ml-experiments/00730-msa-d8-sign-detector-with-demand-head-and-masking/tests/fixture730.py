@@ -44,7 +44,12 @@ def open_gallery(root: Path) -> None:
     folder = root / "PRIVATE" / "gallery"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "panel_check.json").write_text(
-        json.dumps({"panels": dict.fromkeys(core.PANEL_REQUIREMENTS, True)})
+        json.dumps(
+            {
+                "panels": dict.fromkeys(core.PANEL_REQUIREMENTS, True),
+                "banks_digest": banks.banks_digest_id(root=root),
+            }
+        )
     )
 
 

@@ -214,12 +214,27 @@ def gate_passed(*, root: Path, expected: Mapping[str, object]) -> bool:
     return bool(gate.get("pass")) and gate.get("marker") == expected
 
 
+def banks_digest_id(*, root: Path) -> str | None:
+    """Return a short hash of the bank digests in `banks/summary.json`, or None before `banks`."""
+    path = root / "banks" / "summary.json"
+    if not path.exists():
+        return None
+    digests = read_json(path=path)["digests"]
+    return hashlib.sha256(json.dumps(digests, sort_keys=True).encode()).hexdigest()[:16]
+
+
 def gallery_passed(*, root: Path) -> bool:
-    """Return whether `PRIVATE/gallery/panel_check.json` records every panel as passed."""
+    """Return whether `PRIVATE/gallery/panel_check.json` records every panel as passed.
+
+    The record must carry the digest id of the banks now in `root`, so that a record of earlier
+    banks never opens the gate.
+    """
     path = root / "PRIVATE" / "gallery" / "panel_check.json"
     if not path.exists():
         return False
     record = read_json(path=path)
+    if record.get("banks_digest") != banks_digest_id(root=root):
+        return False
     panels = record.get("panels", {})
     needed = set(core.PANEL_REQUIREMENTS)
     return bool(panels) and needed <= set(panels) and all(bool(v) for v in panels.values())
@@ -284,7 +299,7 @@ def _differs_only_in_sky_fill(
 ) -> bool:
     """Return whether the two markers differ, and only in the `sky_gap_fill` entry."""
     rest = {k: v for k, v in expected.items() if k != "sky_gap_fill"}
-    return expected != current and rest == {k: v for k, v in current.items() if k != "sky_gap_fill"}
+    return "sky_gap_fill" not in current and expected != current and rest == dict(current)
 
 
 def sky_fix_rebuild_blocked(*, root: Path) -> str | None:
@@ -797,7 +812,7 @@ def fallback_counts(*, bank: banks729.Bank) -> dict[str, float]:
 
 
 MIDDAY_WINDOW: Final = slice(20, 28)
-"""Half-hours 10:00 to 14:00 UTC, where the sun is above 10 degrees of elevation all year in GB."""
+"""Half-hours 10:00 to 14:00 UTC, where the sun is about 10 degrees or higher all year in GB."""
 
 
 def zeroed_sunup_share(*, bank: banks729.Bank) -> float:
@@ -818,7 +833,7 @@ def zeroed_sunup_share(*, bank: banks729.Bank) -> float:
         if s.world not in ("solar", "both") or s.source != "S2":
             continue
         for d in np.flatnonzero(s.cal_index >= 0):
-            if s.s1_fallback[d] or s.solar[d].max() <= 0.0:
+            if s.s1_fallback[d]:
                 continue
             window = s.solar[d, MIDDAY_WINDOW]
             zero += int((window <= 1e-9).sum())
@@ -881,7 +896,9 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
                 ]
         zeroed = zeroed_sunup_share(bank=bank)
         shares[f"{name}/solar_zeroed_sunup"] = {"S2": zeroed}
-        if np.isfinite(zeroed) and zeroed > sky.MAX_ZEROED_SHARE:
+        if not np.isfinite(zeroed):
+            short.append(f"{name}/solar/zeroed_sunup_share/S2/empty")
+        elif zeroed > sky.MAX_ZEROED_SHARE:
             short.append(f"{name}/solar/zeroed_sunup_share/S2")
         exact = none_and_fold_shares(bank=bank)
         shares[f"{name}/exact"] = exact

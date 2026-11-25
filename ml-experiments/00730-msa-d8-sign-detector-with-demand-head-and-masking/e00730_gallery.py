@@ -76,9 +76,29 @@ def run_plateaus(*, engine: np.ndarray, min_step: float = 2.0) -> int:
     return best
 
 
-def check_levels(*, one_unit: np.ndarray, several: np.ndarray) -> bool:
-    """Check that a one-unit day has one level per run, and a several-unit day more in a run."""
-    return run_plateaus(engine=one_unit) == 1 and run_plateaus(engine=several) >= 2
+ONE_UNIT_MAX_MULTI_LEVEL_SHARE: Final = 0.10
+"""At most this share of one-unit days may show two levels in a run (overlapping runs, spells)."""
+
+
+def check_units(*, one_unit_levels: Sequence[int], several_unit_levels: Sequence[int]) -> bool:
+    """Check that several-unit days show several levels in a run far more often than one-unit days.
+
+    A one-unit day can show two levels when two runs overlap or a spell meets a run, so the check
+    compares shares: the share of one-unit days with two or more levels is at most
+    `ONE_UNIT_MAX_MULTI_LEVEL_SHARE` and below the share of several-unit days.
+
+    Args:
+        one_unit_levels: `run_plateaus` of every one-unit day with output.
+        several_unit_levels: `run_plateaus` of every several-unit day with output.
+
+    Returns:
+        Whether the shares of days with two levels satisfy the check.
+    """
+    if not one_unit_levels or not several_unit_levels:
+        return False
+    one = float(np.mean(np.asarray(one_unit_levels) >= 2))
+    several = float(np.mean(np.asarray(several_unit_levels) >= 2))
+    return one <= ONE_UNIT_MAX_MULTI_LEVEL_SHARE and several > one
 
 
 def check_trip(*, engine: np.ndarray) -> bool:
@@ -122,13 +142,19 @@ def check_aggregate_bands(*, q10: np.ndarray, q50: np.ndarray, q90: np.ndarray) 
 def check_fold(*, reading: np.ndarray, truth: np.ndarray, floor: float, q_max: float) -> bool:
     """Check that the reading is the signed truth folded with a reactive floor.
 
-    The meter reads `sqrt(x**2 + q**2)`, so `reading**2 - truth**2` is `q**2` and lies between
-    the square of the floor and the square of the largest reactive term `q_max`. Far from zero the
-    reading then equals the truth up to `q**2 / (2 |x|)`, and near zero it sits at the floor.
+    The meter reads `sqrt(x**2 + q**2)`, so the reading is at least the floor and never negative,
+    and `reading**2 - truth**2` is `q**2`, which lies between the square of the floor and the square
+    of the largest reactive term `q_max`. Far from zero the reading then equals the truth up to
+    `q**2 / (2 |x|)`, and near zero it sits at the floor.
     """
-    q2 = reading.astype(float) ** 2 - truth.astype(float) ** 2
-    slack = 1e-3 * (1.0 + reading.astype(float) ** 2)
-    return bool(np.all(q2 >= floor**2 - slack) and np.all(q2 <= q_max**2 + slack))
+    r = reading.astype(float)
+    q2 = r**2 - truth.astype(float) ** 2
+    slack = 1e-5 * (1.0 + r**2)
+    return bool(
+        np.all(r >= floor - 1e-6)
+        and np.all(q2 >= floor**2 - slack)
+        and np.all(q2 <= q_max**2 + slack)
+    )
 
 
 def check_base_equals_truth(*, truth: np.ndarray, base: np.ndarray) -> bool:

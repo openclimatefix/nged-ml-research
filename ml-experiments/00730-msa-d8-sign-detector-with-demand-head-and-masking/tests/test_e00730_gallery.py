@@ -63,6 +63,8 @@ def test_weather_and_fold_checks() -> None:
     assert not gallery.check_fold(
         reading=np.array([12.0, 0.5, 0.5, 10.0]), truth=truth, floor=0.5, q_max=0.5
     )
+    unfolded = np.array([-10.0, 0.5, 0.5, 10.0])  # a negative reading: the fold was not applied
+    assert not gallery.check_fold(reading=unfolded, truth=truth, floor=0.5, q_max=0.5)
     assert gallery.check_base_equals_truth(truth=clear, base=clear)
     reading = np.ones(96)
     hidden = np.zeros(96, dtype=bool)
@@ -89,6 +91,8 @@ def test_levels_count_plateaus_inside_a_run_not_every_ramp_value() -> None:
     several[10:20] = [2.0, 4.0, 4.0, 4.0, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
     assert gallery.run_plateaus(engine=one) == 1
     assert gallery.run_plateaus(engine=several) == 2
-    assert gallery.check_levels(one_unit=one, several=several)
-    assert not gallery.check_levels(one_unit=several, several=one)
+    assert gallery.check_units(one_unit_levels=[1] * 19 + [2], several_unit_levels=[2, 2, 1, 2])
+    assert not gallery.check_units(one_unit_levels=[1, 2, 2], several_unit_levels=[2, 1])
+    assert not gallery.check_units(one_unit_levels=[1, 1], several_unit_levels=[1, 1])
+    assert not gallery.check_units(one_unit_levels=[], several_unit_levels=[2])
     assert gallery.run_plateaus(engine=np.zeros(48)) == 0

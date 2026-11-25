@@ -429,7 +429,9 @@ here, before the repaired banks exist:
 - For S2 a run of at most 4 half-hours (2 hours) is filled by linear interpolation of the global
   irradiance divided by the cosine of the zenith, between the nearest positive half-hours on both
   sides of the same day, and multiplied back by the cosine. A run that touches the first or last
-  sun-up half-hour is filled by holding the clearness of its one positive neighbour. The direct and
+  sun-up half-hour has one anchor, and the fill holds that anchor's ratio of global irradiance to
+  the cosine of the zenith. Only half-hours with a zenith below 80 degrees serve as anchors, and a
+  missing value at a zenith of 80 to 90 degrees stays zero, as in experiment 729. The direct and
   diffuse parts are derived again from the filled global irradiance with the Erbs model.
 - A run longer than 4 half-hours, or with no positive neighbour, is never filled with zero: the
   farm-day's sky becomes NaN and the farm-day leaves the set of days with a sky, which is the
@@ -440,61 +442,69 @@ here, before the repaired banks exist:
   and no farm-day with a sky.
 
 **A bound, fixed before the repaired banks exist, fails the banks and the smoke test if zeroed
-half-hours remain.** The share of mid-day half-hours (10:00 to 14:00 UTC, where the sun is above 10
-degrees of elevation all year) with zero output, on source-S2 solar days that kept their drawn
-source, must be at most 1% in every bank. On the banks before the repair this share was 1.1% in the
-test bank, 1.4% in the shifted bank, and 1.1% in the training banks of seeds 0 and 1. The smoke test
-reads the real farm table and fails if more than 1% of the sun-up half-hours of days with a sky have
-zero irradiance after the repair (it is 1.3% before and 0.0% after). S1 is not in this bound,
-because its genuine metered zeros are covered by the metered-zero bound.
+half-hours remain.** The share of mid-day half-hours (10:00 to 14:00 UTC, where the sun is about 10
+degrees or higher all year) with zero output, on source-S2 solar days that kept their drawn source,
+must be at most 1% in every bank. A bank with no such day, or a share that is not a number, fails
+the check, and the smoke test reads the same share in the test bank. On the banks before the repair
+this share was 1.1% in the test bank, 1.4% in the shifted bank, and 1.1% in the training banks of
+seeds 0 and 1. The smoke test reads the real farm table and fails if more than 1% of the sun-up
+half-hours of days with a sky have zero irradiance after the repair (it is 1.3% before and 0.0%
+after). S1 is not in this bound, because its genuine metered zeros are covered by the metered-zero
+bound.
 
 **The repair changes the synthetic worlds, so the run marker carries the repair's version and the
-guard allows one fresh gate attempt.** The marker's new entry, `sky_gap_fill`, names the zenith limit
-and the two gap limits. The `banks` stage then rebuilds only after the manager moves the earlier
-run's banks, `limits.json`, and `scores` to `superseded_run_2`, and refuses if anything else of the
-earlier run is left, if a fit or `margin.json` exists, or if the marker differs in another entry.
-The ranges override of the one permitted re-tune stays in place, and the re-tune stays spent: the
-gate has one attempt on the repaired banks, and if it fails the line stops at verdict row 0. The
-changed functions and their AST hashes (SHA-256 of `ast.dump` of the function without its
-docstring, first 12 hexadecimal digits) are:
+guard allows one fresh gate attempt.** The marker's new entry, `sky_gap_fill`, names the zenith
+limit and the two gap limits. The `banks` stage then rebuilds once, and only after the manager moves
+the earlier run's banks, `limits.json`, and `scores` to `superseded_run_2`, and refuses if anything
+else of the earlier run is left, if a fit or `margin.json` exists, or if the marker differs in
+another entry. A marker that already holds a `sky_gap_fill` entry never allows another rebuild. The
+gallery's automatic check and the design lead's record carry a digest of the banks, and a record of
+other banks does not open the gate. The ranges override of the one permitted re-tune stays in place,
+and the re-tune stays spent: the gate has one attempt on the repaired banks, and if it fails the
+line stops at verdict row 0. The changed functions and their AST hashes (SHA-256 of `ast.dump` of
+the function without its docstring, first 12 hexadecimal digits) are:
 
 | File | Function | Hash |
 |---|---|---|
 | `e00730_sky.py` | `gap_runs` | `e8ee39eee1cd` |
 | `e00730_sky.py` | `day_of_year` | `c5cbb512bdcb` |
-| `e00730_sky.py` | `sun_up_zero_mask` | `2de711c8d83a` |
+| `e00730_sky.py` | `sun_up_zero_mask` | `138f898fc916` |
 | `e00730_sky.py` | `zeroed_sky_share` | `3bbda0c39eb9` |
 | `e00730_sky.py` | `fill_run` | `8fd17d5f96bd` |
-| `e00730_sky.py` | `fill_sky_gaps` | `82024a2c4813` |
+| `e00730_sky.py` | `fill_sky_gaps` | `e4fd46d91de6` |
 | `e00730_banks.py` | `run_marker_payload` | `15a3bbc4939b` |
-| `e00730_banks.py` | `zeroed_sunup_share` | `090d05b7bae9` |
-| `e00730_banks.py` | `component_checks` | `aed6c7d8bd7e` |
+| `e00730_banks.py` | `banks_digest_id` | `ac81c3a384ff` |
+| `e00730_banks.py` | `gallery_passed` | `3d473c934a03` |
 | `e00730_banks.py` | `sky_fix_rebuild_blocked` | `f259f14016f3` |
 | `e00730_banks.py` | `gate_attempts_allowed` | `280f898261fc` |
 | `e00730_banks.py` | `_guard_banks` | `e7ae127396e8` |
+| `e00730_banks.py` | `zeroed_sunup_share` | `a3114756af4a` |
+| `e00730_banks.py` | `component_checks` | `078381f67958` |
 | `e00730_banks.py` | `stage_gate` | `04b8f89f2ae5` |
 | `e00730_stages.py` | `bank_inputs` | `06184af15845` |
-| `e00730_stages.py` | `stage_gallery` | `950397bd5f03` |
+| `e00730_stages.py` | `stage_gallery` | `f10505619bc6` |
+| `e00730_stages.py` | `record_panel_check` | `5f72b9e84f16` |
 | `e00730_gallery.py` | `run_plateaus` | `09d1c8a6b7c5` |
-| `e00730_gallery.py` | `check_levels` | `fec0d160c5fa` |
-| `e00730_gallery.py` | `check_fold` | `60e04eef5eff` |
+| `e00730_gallery.py` | `check_units` | `d289d568aec5` |
+| `e00730_gallery.py` | `check_fold` | `356a07b22b2f` |
+| `e00730_figures.py` | `engine_gallery` | `5864873838ff` |
 | `e00730_figures.py` | `extreme_index_day` | `e0220a7cd41f` |
 | `e00730_figures.py` | `solar_index_chart` | `e5226306a8b1` |
 | `e00730_figures.py` | `solar_gallery` | `86cd3ae032b1` |
-| `e00730_figures.py` | `aggregate_gallery` | `d1af8b1f5947` |
-| `e00730_figures.py` | `engine_gallery` | `9dd8ab8c98ff` |
 | `e00730_figures.py` | `bsp_fold_base_gallery` | `5a219638d110` |
+| `e00730_figures.py` | `aggregate_gallery` | `d1af8b1f5947` |
 
-**The same gallery reading changed four gallery checks and panels, with no change to a bar.** The
-G1 check on units counted every ramp value as a level, so it compared the number of steady
-plateaus inside a run instead (one unit has one plateau per run; several units have a run with two
-plateaus at least 2 points apart). The G5 check compared the folded reading with the truth by
-`allclose`, which fails for any reactive term, so it now checks that the reading squared minus the
-truth squared lies between the square of the floor and the square of the largest reactive term. The
-G2 panels now show the clearest and the cloudiest day of each season by the clear-sky index, compare
-the output as a share of the draw's solar capacity, and draw the clear-sky index on its own axis
-at the right. The G9 panel shows the lowest share of each check group (32 groups) against the bar,
-and the metered-zero and zeroed-sun-up shares in a second panel against their bounds, because the
+**The same gallery reading changed four gallery checks and panels, with no change to a bar.** The G1
+check on units counted every ramp value as a level, so it compares the share of days with two
+plateaus in a run (at least 2 points apart) for one-unit days, at most 10% because overlapping runs
+and spells give some one-unit days two levels, with that for several-unit days, which must be
+higher. The G5 check compared the folded reading with the truth by `allclose`, which fails whenever
+the reactive term is not negligible, so it now checks that the reading squared minus the truth
+squared lies between the square of the floor and the square of the largest reactive term. The G2
+panels now show the clearest and the cloudiest day of each season by the clear-sky index, compare
+the output as a share of the draw's solar capacity, and draw the clear-sky index on its own axis at
+the right. The G9 panel shows the lowest share of each check group (32 groups) against the bar, and
+the metered-zero and zeroed-sun-up shares in a second panel against their bounds, because the
 earlier panel drew 468 bars and drew the bounded shares against a bar of 0.99.
 
 ## The sign output and how it is scored

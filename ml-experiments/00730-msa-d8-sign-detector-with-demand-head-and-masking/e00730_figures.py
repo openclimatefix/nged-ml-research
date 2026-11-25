@@ -237,17 +237,31 @@ def engine_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) ->
         engine_panel(seg=hit[0], day=hit[1], title="G1: part load") if hit else None,
         "found" if hit else "no part-load day",
     )
-    one = find(
-        lambda s, d: (
-            s.params.get("n_units", 0) == 1 and gallery.run_plateaus(engine=day_of(s, d)) == 1
-        )
-    )
+    one = find(lambda s, d: s.params.get("n_units", 0) == 1 and day_of(s, d).max() > 0)
     many = find(
         lambda s, d: (
             s.params.get("n_units", 0) > 1 and gallery.run_plateaus(engine=day_of(s, d)) >= 2
         )
     )
-    ok = bool(one and many and gallery.check_levels(one_unit=day_of(*one), several=day_of(*many)))
+    one_levels = [
+        gallery.run_plateaus(engine=seg.engine[d])
+        for seg in engines
+        if seg.params.get("n_units", 0) == 1
+        for d in range(seg.engine.shape[0])
+        if seg.engine[d].max() > 0
+    ]
+    many_levels = [
+        gallery.run_plateaus(engine=seg.engine[d])
+        for seg in engines
+        if seg.params.get("n_units", 0) > 1
+        for d in range(seg.engine.shape[0])
+        if seg.engine[d].max() > 0
+    ]
+    ok = bool(
+        one
+        and many
+        and gallery.check_units(one_unit_levels=one_levels, several_unit_levels=many_levels)
+    )
     chart = None
     if one and many:
         chart = alt.vconcat(
