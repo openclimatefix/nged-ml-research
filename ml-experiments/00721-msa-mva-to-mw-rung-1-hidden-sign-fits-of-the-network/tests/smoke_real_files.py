@@ -215,7 +215,10 @@ def check_private_folder_is_creatable() -> str:
 
 
 def check_rescore_inputs() -> str:
-    """Return flags for the three stored quick-look prediction files (columns, shapes, and equal row sets; no value)."""
+    """Return flags for the three stored quick-look prediction files.
+
+    The flags are columns, shapes, and equal row counts; no value is read.
+    """
     root = DATA / "00721-msa-mva-to-mw-rung-1-hidden-sign-fits-of-the-network" / "predictions"
     frames = {}
     for arm in ("P0", "SG-0", "SG-A"):

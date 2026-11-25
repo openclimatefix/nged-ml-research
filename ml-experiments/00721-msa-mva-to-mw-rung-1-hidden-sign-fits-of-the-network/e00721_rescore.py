@@ -55,7 +55,10 @@ NOTE: Final = (
 
 
 def load_arms(*, data_dir: Path, ids: list[int]) -> dict[str, pl.DataFrame]:
-    """Return the stored scored rows of `P0`, `SG-0`, and `SG-A` (`W2`, fold 2026-05, seed 0) at the Primaries `ids`."""
+    """Return the stored scored rows of `P0`, `SG-0`, and `SG-A` at the Primaries `ids`.
+
+    The rows are those of `W2`, fold 2026-05, seed 0.
+    """
     out = {}
     for arm in ("P0", "SG-0", "SG-A"):
         df = drv.load_frame(data_dir=data_dir, job=fit.Job(arm=arm, world="W2", fold=FOLD, seed=0))
