@@ -415,6 +415,88 @@ def check_panels(
     return failures
 
 
+@dataclass(frozen=True)
+class Kc5Result:
+    """The verdict of `kc5_verdict`: the counts that KC5 prints and whether every test holds."""
+
+    passed: bool
+    n_rows: int
+    n_moved: int
+    n_expected_unmoved: int
+    n_wrong: int
+    clipped_by_primary: dict[int, int]
+    constants: dict[int, float]
+
+
+def kc5_verdict(
+    *,
+    primary: np.ndarray,
+    clean_lag: np.ndarray,
+    shifted_lag: np.ndarray,
+    moved_by: np.ndarray,
+    mean: float,
+    std: float,
+    clip_sd: float,
+    tolerance: float,
+    stray: int,
+) -> Kc5Result:
+    """Return KC5's verdict on the rows whose lag index lies inside a shifted window.
+
+    The Candidate's lag encoder standardises the lag with one mean and one standard deviation and
+    clips the result at plus or minus `clip_sd`. The expected move of a row is therefore
+    `clip((shifted - mean) / std) - clip((clean - mean) / std)`, and a row clipped at the same bound
+    before and after the shift is expected not to move. The check passes when `stray` is 0, at least
+    one row lies inside a window, every row moves by its expected amount to `tolerance` (relative
+    to the larger of 1 and the expected move), and the ratio of the move to the shift is one
+    constant per Primary on the rows where neither value is clipped.
+
+    Args:
+        primary: The Primary of each row inside a window.
+        clean_lag: The cleaned power at the row's lag index, in the units of the panel.
+        shifted_lag: The shifted power at the same index.
+        moved_by: The move of the Candidate's lag column, shifted minus unshifted, per row.
+        mean: The mean of the stored lag statistics.
+        std: The standard deviation of the stored lag statistics.
+        clip_sd: The encoder's clip, in standard deviations.
+        tolerance: The relative tolerance of the per-row and the per-Primary tests.
+        stray: The number of rows that moved although they lie outside every window.
+
+    Returns:
+        The counts and the verdict.
+    """
+    z_clean = (np.asarray(clean_lag, np.float64) - mean) / std
+    z_shift = (np.asarray(shifted_lag, np.float64) - mean) / std
+    expected = np.clip(z_shift, -clip_sd, clip_sd) - np.clip(z_clean, -clip_sd, clip_sd)
+    moved_by = np.asarray(moved_by, np.float64)
+    wrong = np.abs(moved_by - expected) > tolerance * np.maximum(1.0, np.abs(expected))
+    clipped = (np.abs(z_clean) >= clip_sd) | (np.abs(z_shift) >= clip_sd)
+    delta = np.asarray(shifted_lag, np.float64) - np.asarray(clean_lag, np.float64)
+    constants: dict[int, float] = {}
+    clipped_by_primary: dict[int, int] = {}
+    spread_ok = True
+    for pr in np.unique(primary):
+        mine = primary == pr
+        clipped_by_primary[int(pr)] = int((mine & clipped).sum())
+        free = mine & ~clipped
+        if not free.any():
+            continue
+        ratio = moved_by[free] / delta[free]
+        constants[int(pr)] = float(ratio.mean())
+        spread_ok &= bool(np.ptp(ratio) <= tolerance * max(1.0, abs(ratio.mean())))
+    n_wrong = int(wrong.sum())
+    n_moved = int((np.abs(moved_by) > 1e-9).sum())
+    passed = stray == 0 and len(expected) > 0 and n_wrong == 0 and spread_ok
+    return Kc5Result(
+        passed=passed,
+        n_rows=len(expected),
+        n_moved=n_moved,
+        n_expected_unmoved=int((expected == 0.0).sum()),
+        n_wrong=n_wrong,
+        clipped_by_primary=clipped_by_primary,
+        constants=constants,
+    )
+
+
 def clip_diagnostic(
     *,
     clean: np.ndarray,
@@ -423,11 +505,16 @@ def clip_diagnostic(
     month_start_idx: int,
     labels: Sequence[str],
     passes: Sequence[int] = tuple(range(N_PASSES)),
+    candidate_stats: tuple[float, float] | None = None,
 ) -> list[dict]:
     """Return, by depth, sign, and group, the share of shifted half-hours beyond the clip and range.
 
     `beyond_clip` is the share of the shifted half-hours of a window whose standardised value is
-    beyond plus or minus `CLIP_SD`. `out_of_range` is the share above capacity or below zero.
+    beyond plus or minus `CLIP_SD`, standardised per Primary with `target_mean` and `target_std`
+    as the MSA network does. `candidate_beyond_clip` is the same share where the value is
+    standardised with `candidate_stats`, the one mean and standard deviation of the Candidate's lag
+    encoder, and clipped at the same bound; it is `nan` when `candidate_stats` is `None`.
+    `out_of_range` is the share above capacity or below zero.
     """
     end = month_start_idx + bank.END_DAY * PER_DAY
     cells: dict[tuple[float, int, str], list[int]] = {}
@@ -439,10 +526,13 @@ def clip_diagnostic(
             window = window[np.isfinite(window)] + signed
             z = (window - target_mean[p]) / target_std[p]
             key = (abs(signed), sign, group_of.get(labels[p], "other"))
-            tally = cells.setdefault(key, [0, 0, 0])
+            tally = cells.setdefault(key, [0, 0, 0, 0])
             tally[0] += window.size
             tally[1] += int((np.abs(z) > CLIP_SD).sum())
             tally[2] += int(((window > 1.0) | (window < 0.0)).sum())
+            if candidate_stats is not None:
+                z_candidate = (window - candidate_stats[0]) / candidate_stats[1]
+                tally[3] += int((np.abs(z_candidate) > CLIP_SD).sum())
     return [
         {
             "depth": depth,
@@ -450,9 +540,12 @@ def clip_diagnostic(
             "group": group,
             "n_half_hours": n,
             "beyond_clip": beyond / n if n else float("nan"),
+            "candidate_beyond_clip": (
+                beyond_candidate / n if n and candidate_stats is not None else float("nan")
+            ),
             "out_of_range": out / n if n else float("nan"),
         }
-        for (depth, sign, group), (n, beyond, out) in sorted(cells.items())
+        for (depth, sign, group), (n, beyond, out, beyond_candidate) in sorted(cells.items())
     ]
 
 

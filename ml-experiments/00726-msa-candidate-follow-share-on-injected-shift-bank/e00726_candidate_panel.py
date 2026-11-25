@@ -429,30 +429,54 @@ def kc5(*, panels: Panels, test, clean: np.ndarray) -> None:
     sel = in_window & ok
     n_in = int(sel.sum())
     caught = int((moved & sel).sum())
-    # the shifted lag column moves by one constant per Primary times the shift of the lag index
-    # (the constant is 1, or the Primary's scale where `block_of` standardises the lag)
-    delta = (panels.power_lag[prim[sel], lag_idx[sel]] - clean[prim[sel], lag_idx[sel]]).astype(
-        np.float64
-    )
-    moved_by = panels.x[rows, LAG_FIRST][sel].astype(np.float64) - base[sel, 0].astype(np.float64)
-    ratio = moved_by / delta
-    constants: dict[int, float] = {}
-    spread_ok = True
-    for pr in np.unique(prim[sel]):
-        r_p = ratio[prim[sel] == pr]
-        constants[int(pr)] = float(r_p.mean())
-        spread_ok &= bool(np.ptp(r_p) <= KC5_RELATIVE_TOLERANCE * max(1.0, abs(r_p.mean())))
-    passed = stray == 0 and n_in > 0 and caught == n_in and spread_ok
+    # the encoder standardises the lag with one mean and standard deviation and clips it at
+    # `INPUT_CLIP_SD`, so the expected move of a row is the difference of the two clipped values
+    mean, std = (float(v) for v in e.CTX["stats"][0])
+    result = com.kc5_verdict(
+        primary=prim[sel],
+        clean_lag=clean[prim[sel], lag_idx[sel]],
+        shifted_lag=panels.power_lag[prim[sel], lag_idx[sel]],
+        moved_by=panels.x[rows, LAG_FIRST][sel].astype(np.float64) - base[sel, 0].astype(np.float64),
+        mean=mean,
+        std=std,
+        clip_sd=float(e.prep.INPUT_CLIP_SD),
+        tolerance=KC5_RELATIVE_TOLERANCE,
+        stray=stray,
+    )  # fmt: skip
+    passed = result.passed and n_in == result.n_rows
     print(
         f"KC5 {'PASS' if passed else 'FAIL'} (rows moved outside a window: {stray}; rows inside: "
-        f"{n_in}; moved: {caught}; constant per Primary: {constants}; float32 relative tolerance "
-        f"{KC5_RELATIVE_TOLERANCE})",
+        f"{n_in}; moved: {caught}; expected unmoved because clipped at the same bound before and "
+        f"after: {result.n_expected_unmoved}; rows off the clipped expectation: {result.n_wrong}; "
+        f"clipped rows per Primary: {result.clipped_by_primary}; constant per Primary on the "
+        f"unclipped rows: {result.constants}; float32 relative tolerance {KC5_RELATIVE_TOLERANCE})",
         flush=True,
     )
     assert passed, "KC5: the Candidate's lag column does not read the shifted panel"
 
 
 # ---------------------------------------------------------------- the jobs
+
+
+def write_clip_diagnostic(*, mr, clean: np.ndarray) -> None:
+    """Write the Candidate's clip share by depth, sign, and group to `clip_candidate_<month>.json`.
+
+    The share counts the shifted half-hours of every window whose lag, standardised with the
+    stored mean and standard deviation of the day lag, lies beyond the encoder's clip.
+    """
+    rows = com.clip_diagnostic(
+        clean=clean,
+        target_mean=mr.base.target_mean,
+        target_std=mr.base.target_std,
+        month_start_idx=c650.month_start_idx(month=MONTH),
+        labels=k578.sites().sort("primary")["label"].to_list(),
+        candidate_stats=(float(e.CTX["stats"][0][0]), float(e.CTX["stats"][0][1])),
+    )
+    for row in rows:
+        print(f"clip candidate {MONTH} {row}", flush=True)
+    com.write_json_atomic(
+        obj=rows, path=com.data_root() / "diagnostics" / f"clip_candidate_{MONTH}.json"
+    )
 
 
 def default_passes() -> list[int]:
@@ -530,6 +554,8 @@ def run_jobs(*, device: str) -> None:
         if not checked and WORLD in {"e581_all", "e581_host", "kc6_set", "kc6_one"}:
             kc5(panels=panels, test=test, clean=clean)
             checked = True
+            if WORLD == "e581_all":
+                write_clip_diagnostic(mr=mr, clean=clean)
         frame = forecast_window(
             model=models[seed], test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi,
             power_lag=panels.power_lag, power_sig=panels.power_sig, lag_x=panels.x, keep=panels.keep,

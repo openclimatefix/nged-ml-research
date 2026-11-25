@@ -322,6 +322,92 @@ def test_clip_diagnostic_counts_beyond_the_clip() -> None:
     assert any(row["beyond_clip"] == 1.0 for row in out)
 
 
+KC5_MEAN, KC5_STD, KC5_CLIP = 0.5, 0.2, 5.0
+
+
+def kc5_panel(*, n: int = 400) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return the Primary, the cleaned lag, and the shifted lag of a synthetic panel.
+
+    Primary 0 stays inside the clip, Primary 1 crosses it, and Primary 2 is clipped throughout.
+    """
+    rng = np.random.default_rng(1)
+    primary = np.repeat([0, 1, 2], n)
+    clean = np.concatenate(
+        [
+            0.5 + 0.05 * rng.standard_normal(n),
+            0.5 + 0.8 * rng.random(n),
+            np.full(n, 1.9) + 0.05 * rng.random(n),
+        ]
+    )
+    return primary, clean, clean + 0.5
+
+
+def kc5_expected(*, clean: np.ndarray, shifted: np.ndarray) -> np.ndarray:
+    def z(v: np.ndarray) -> np.ndarray:
+        return np.clip((v - KC5_MEAN) / KC5_STD, -KC5_CLIP, KC5_CLIP)
+
+    return z(shifted) - z(clean)
+
+
+def run_kc5(*, moved_by: np.ndarray | None = None, stray: int = 0) -> com.Kc5Result:
+    primary, clean, shifted = kc5_panel()
+    return com.kc5_verdict(
+        primary=primary,
+        clean_lag=clean,
+        shifted_lag=shifted,
+        moved_by=kc5_expected(clean=clean, shifted=shifted) if moved_by is None else moved_by,
+        mean=KC5_MEAN,
+        std=KC5_STD,
+        clip_sd=KC5_CLIP,
+        tolerance=1e-5,
+        stray=stray,
+    )
+
+
+def test_kc5_passes_where_a_primary_crosses_the_clip() -> None:
+    result = run_kc5()
+    assert result.passed
+    assert result.clipped_by_primary[0] == 0
+    assert result.clipped_by_primary[1] > 0
+    assert result.n_expected_unmoved > 0, "Primary 2 is clipped at the same bound before and after"
+    assert result.constants[0] == pytest.approx(1 / KC5_STD)
+
+
+def test_kc5_fails_on_a_row_moved_outside_a_window() -> None:
+    assert not run_kc5(stray=1).passed
+
+
+def test_kc5_fails_on_a_wrong_shift() -> None:
+    _primary, clean, shifted = kc5_panel()
+    expected = kc5_expected(clean=clean, shifted=shifted)
+    wrong = expected.copy()
+    wrong[5] *= 1.01  # an unclipped row of Primary 0 moves by 1% too much
+    assert not run_kc5(moved_by=wrong).passed
+    unclipped = expected.copy()
+    past_clip = 400 + int(np.argmax(shifted[400:800]))  # a Primary 1 row beyond the clip
+    unclipped[past_clip] = (shifted[past_clip] - clean[past_clip]) / KC5_STD  # the clip ignored
+    result = run_kc5(moved_by=unclipped)
+    assert not result.passed and result.n_wrong == 1
+
+
+def candidate_clip(*, stats: tuple[float, float] | None) -> list[dict]:
+    return com.clip_diagnostic(
+        clean=np.full((N_SITES, N_STEPS), 0.5),
+        target_mean=np.full(N_SITES, 0.5),
+        target_std=np.full(N_SITES, 0.05),
+        month_start_idx=MONTH_IDX,
+        labels=[f"D{p}" for p in range(N_SITES)],
+        passes=[0],
+        candidate_stats=stats,
+    )
+
+
+def test_clip_diagnostic_counts_the_candidates_clip() -> None:
+    assert all(np.isnan(row["candidate_beyond_clip"]) for row in candidate_clip(stats=None))
+    assert all(row["candidate_beyond_clip"] == 0.0 for row in candidate_clip(stats=(0.5, 0.5)))
+    assert all(row["candidate_beyond_clip"] == 1.0 for row in candidate_clip(stats=(0.5, 0.01)))
+
+
 def test_collect_and_contrast_on_stored_like_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -556,9 +642,9 @@ def test_interval_coverage() -> None:
 def clip_rows(*, month_scale: float) -> list[dict]:
     return [
         {"depth": 0.5, "sign": 1, "group": "six_signed_mw", "n_half_hours": int(100 * month_scale),
-         "beyond_clip": 0.0, "out_of_range": 0.5},
+         "beyond_clip": 0.0, "candidate_beyond_clip": 0.2, "out_of_range": 0.5},
         {"depth": 0.15, "sign": 1, "group": "six_signed_mw", "n_half_hours": 100,
-         "beyond_clip": 0.0, "out_of_range": 0.0},
+         "beyond_clip": 0.0, "candidate_beyond_clip": 0.0, "out_of_range": 0.0},
     ]  # fmt: skip
 
 
@@ -578,8 +664,30 @@ def test_clip_by_cell_weights_months_by_half_hours(
     cell = sc.clip_by_cell(diagnostics=diag).filter(pl.col("depth") == 0.5).row(0, named=True)
     assert cell["n_half_hours"] == 400
     assert cell["out_of_range"] == pytest.approx((0.5 * 100 + 0.1 * 300) / 400)
+    assert cell["candidate_beyond_clip"] == pytest.approx(0.2)
     with pytest.raises(RuntimeError):
         sc.read_clip_diagnostics(months=["2026-04"])
+
+
+def test_candidate_clip_file_is_joined_by_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    monkeypatch.setattr(com, "data_root", lambda: tmp_path)
+    (tmp_path / "diagnostics").mkdir()
+    msa_rows = [
+        {k: v for k, v in r.items() if k != "candidate_beyond_clip"}
+        for r in clip_rows(month_scale=1.0)
+    ]
+    (tmp_path / "diagnostics" / "clip_2025-11.json").write_text(json.dumps(msa_rows))
+    assert sc.read_clip_diagnostics(months=["2025-11"])["candidate_beyond_clip"].is_nan().all()
+    candidate_rows = [{**r, "candidate_beyond_clip": 0.3} for r in msa_rows]
+    (tmp_path / "diagnostics" / "clip_candidate_2025-11.json").write_text(
+        json.dumps(candidate_rows)
+    )
+    diag = sc.read_clip_diagnostics(months=["2025-11"])
+    assert diag["candidate_beyond_clip"].to_list() == [0.3, 0.3]
 
 
 def test_breakdown_rows_join_the_clip_diagnostics() -> None:
@@ -649,7 +757,7 @@ def test_pooled_clip_and_the_sign_and_sensitivity_rows() -> None:
     diag = pl.DataFrame(
         [
             {"depth": d, "sign": s, "group": "six_signed_mw", "n_half_hours": 100,
-             "beyond_clip": 0.0, "out_of_range": 0.5 if (d == 0.5 and s == 1) else 0.0, "month": MONTH}
+             "beyond_clip": 0.0, "candidate_beyond_clip": 0.0, "out_of_range": 0.5 if (d == 0.5 and s == 1) else 0.0, "month": MONTH}
             for d in (0.15, 0.30, 0.50) for s in (1, -1)
         ]
     )  # fmt: skip

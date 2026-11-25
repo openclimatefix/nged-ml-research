@@ -208,12 +208,15 @@ worlds, and check KM4 shows it.
 **Experiment 713 clips the standardised history power at 5 standard deviations, and a shift of 0.50
 of capacity reaches the clip.** In the coldest fold month the standard deviation of a Primary's
 cleaned power is 0.07 to 0.21 of capacity, so a shift of 0.50 is 2.4 to 7.0 standard deviations. The
-clip caps the follow share of `M1` mechanically, and the Candidate's lag columns are not clipped in
-that way, so the clip works against T1 and L1. A shift of 0.50 also leaves the physical range at some
-Primaries. Three measures answer both effects:
+clip caps the follow share of `M1` mechanically. The Candidate's lag encoder also clips its
+standardised lag at 5 standard deviations, but of one global standard deviation that is larger than
+the per-Primary ones of fold 2026-01, so the Candidate's clip binds later and less often. Both arms
+are clipped. A shift of 0.50 also leaves the physical range at some Primaries. Three measures answer
+these effects:
 
 - The MSA command prints, for every job, the share of shifted history half-hours beyond 5 standard
-  deviations, by depth and sign.
+  deviations, by depth and sign. The first Candidate job of each all-shifted month writes the
+  matching share for the Candidate's lag encoder, which the scorer carries beside it.
 - The scorer prints the share of shifted half-hours above capacity or below zero, by group and sign.
 - T1 and L1 on the shifts of depth 0.15 and 0.30 alone are a pre-registered sensitivity reading,
   which the 0.50 sign rule of the decision rule uses.
@@ -498,6 +501,38 @@ passed, `phases.sh` runs KC4 and KW on all 8 fold months, bounds its retry loop 
 waits, checks that the data folder exists, and refuses unknown phase names. An Opus re-check
 runs before the driver resumes.
 
+**Disclosure: the Candidate's lag encoder clips its input, and check KC5 first ignored the clip.**
+The design said that the Candidate's lag columns are not clipped. That sentence was wrong. The
+encoder standardises the day lag and the week lag with one mean and one standard deviation over the
+training rows of all 16 Primaries, then clips the result at 5 standard deviations. The clip is the
+deployed behaviour, so the Candidate's files hold its true response to the shifted panel, and no
+forecast file or stored hash changes. Check KC5 expected one constant move per Primary, which holds
+only where no row is clipped.
+
+**Order of events.** Phase 1 jobs 1 to 11 ran under the earlier KC5 and finished with exit 0. Job
+12, the all-shifted world of fold 2026-01 with seeds 0 and 1, stopped on a KC5 failure before it
+wrote any file. Nothing was waived. The fix tightens the gate: KC5 now expects, for each row, the
+move `clip((shifted - m) / s) - clip((clean - m) / s)` with the stored lag mean `m` and standard
+deviation `s`, asserts it per row to float32 precision, keeps the count of rows moved outside a
+window at 0, tests the constant per Primary only on rows where neither value is clipped, treats a
+row clipped at the same bound before and after as expected not to move, and prints the clipped-row
+count per Primary. No tolerance or threshold was loosened. The job records of jobs 1 to 11 name
+commit `129fca96a`, and the records of every job from job 12 onward name the commit of the fix, so
+the mixed commits are disclosed here. Job 11 is the only finished job in fold 2026-01. It is the
+host-only world, whose KC5 ran on a set that does not hold Primary 11, and its files are valid.
+
+**Caveat for reading 3 and the sensitivity rule: the Candidate's clip binds at some Primaries and
+passes, which is stated here before any score is read.** The audit approximated the 2026-01 lag
+statistics, and the 2025-11 and 2025-12 files were not computed pass by pass, so the figures are
+approximate. In fold 2026-01 the clip binds at Primary 11 (D16, a signed-MW Primary, whose capacity
+is listed in the code) in pass 0 at least, the pass that KC5 checks. It binds at Primaries 8, 12,
+and 15 in passes 3, 7, 8, 10, and 11. It binds heavily at Primary 10 (D15) in the negative passes 12
+to 23, where 455 of the 720 half-hours of the window are clipped at pass 13. A clipped half-hour
+caps how far the Candidate's lag column can follow a shift, so T1 and L1 at those cells read a
+clipped input, as `M1`'s follow share does at the signed-MW Primaries. The scorer now carries the
+Candidate's clip share beside the MSA network's in reading 3 and the sensitivity rule. Every
+threshold stays as registered.
+
 ## Leakage and disclosures
 
 **No forecast reads power stamped later than 24 hours before the native origin, and no weight was
@@ -517,8 +552,8 @@ a weather look-ahead.
   step.
 - At origin days 14 and 15 no input shows that the shift has ended, so T1 mixes following with letting
   go.
-- Experiment 713 clips the history power at 5 standard deviations, and a shift of 0.50 reaches the
-  clip and can leave the physical range.
+- Both arms clip their standardised power history at 5 standard deviations, and a shift of 0.50
+  reaches either clip and can leave the physical range.
 - Shifts are constant in megawatts across the day, which matches the working assumption for a load
   transfer and ignores the shape of the transferred load.
 - A percentile bootstrap with 8 clusters gives intervals slightly too narrow.

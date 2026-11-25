@@ -606,14 +606,28 @@ def read_clip_diagnostics(*, months: Sequence[str]) -> pl.DataFrame:
     """Return the clip diagnostics that the MSA command wrote for `months` (`diagnostics/clip_<month>.json`).
 
     Each row holds `depth`, `sign`, `group`, `n_half_hours`, `beyond_clip` (the share of shifted
-    half-hours beyond 5 standard deviations), and `out_of_range` (the share above capacity or below
-    zero), for one fold month.
+    half-hours beyond 5 standard deviations of the MSA network's per-Primary standardisation),
+    `candidate_beyond_clip` (the same share for the Candidate's lag encoder, from
+    `clip_candidate_<month>.json`, or `nan` where that file is missing), and `out_of_range` (the
+    share above capacity or below zero), for one fold month.
     """
     parts = []
     for month in months:
         path = com.data_root() / "diagnostics" / f"clip_{month}.json"
         com.require(path.exists(), f"the clip diagnostic of {month} is missing: {path}")
-        parts.append(pl.DataFrame(json.loads(path.read_text())).with_columns(month=pl.lit(month)))
+        frame = pl.DataFrame(json.loads(path.read_text()))
+        candidate_path = path.with_name(f"clip_candidate_{month}.json")
+        keys = ["depth", "sign", "group"]
+        if candidate_path.exists():
+            candidate = pl.DataFrame(json.loads(candidate_path.read_text())).select(
+                *keys, "candidate_beyond_clip"
+            )
+            frame = frame.drop("candidate_beyond_clip", strict=False).join(
+                candidate, on=keys, how="left"
+            )
+        elif "candidate_beyond_clip" not in frame.columns:
+            frame = frame.with_columns(candidate_beyond_clip=pl.lit(float("nan")))
+        parts.append(frame.with_columns(month=pl.lit(month)))
     return pl.concat(parts)
 
 
@@ -622,19 +636,30 @@ def clip_by_cell(*, diagnostics: pl.DataFrame) -> pl.DataFrame:
     return (
         diagnostics.with_columns(
             clipped=pl.col("beyond_clip") * pl.col("n_half_hours"),
+            clipped_candidate=pl.col("candidate_beyond_clip") * pl.col("n_half_hours"),
             outside=pl.col("out_of_range") * pl.col("n_half_hours"),
         )
         .group_by("group", "sign", "depth")
         .agg(
             pl.col("n_half_hours").sum(),
             pl.col("clipped").sum(),
+            pl.col("clipped_candidate").sum(),
             pl.col("outside").sum(),
         )
         .with_columns(
             beyond_clip=pl.col("clipped") / pl.col("n_half_hours"),
+            candidate_beyond_clip=pl.col("clipped_candidate") / pl.col("n_half_hours"),
             out_of_range=pl.col("outside") / pl.col("n_half_hours"),
         )
-        .select("group", "sign", "depth", "n_half_hours", "beyond_clip", "out_of_range")
+        .select(
+            "group",
+            "sign",
+            "depth",
+            "n_half_hours",
+            "beyond_clip",
+            "candidate_beyond_clip",
+            "out_of_range",
+        )
     )
 
 
@@ -650,8 +675,9 @@ def breakdown_rows(
     """Return reading 3: M1 minus C by slice, group, sign, depth, and length, read at 95%.
 
     Each row carries the clip diagnostics of its (group, sign, depth) cell: `beyond_clip` is the
-    share of the cell's shifted half-hours beyond 5 standard deviations (the input clip binds
-    there) and `out_of_range` is the share above capacity or below zero. The diagnostics are pooled
+    share of the cell's shifted half-hours beyond 5 standard deviations (the MSA network's input
+    clip binds there), `candidate_beyond_clip` is the same share for the Candidate's lag encoder,
+    and `out_of_range` is the share above capacity or below zero. The diagnostics are pooled
     over the four lengths, so rows of one cell and different lengths repeat the same shares. They
     count every shifted half-hour of each window, not only the history half-hours that `M1` sees at
     the counted origins. A cell with no diagnostic row carries `nan`.
@@ -675,6 +701,9 @@ def breakdown_rows(
                              "length_days": length,
                              **{k: stats[k] for k in ("D", "low", "high", "n_events")},
                              "beyond_clip": cell.get("beyond_clip", float("nan")),
+                             "candidate_beyond_clip": cell.get(
+                                 "candidate_beyond_clip", float("nan")
+                             ),
                              "out_of_range": cell.get("out_of_range", float("nan"))}
                         )  # fmt: skip
     return rows
@@ -691,10 +720,14 @@ def pooled_clip(
     )
     n = float(sel["n_half_hours"].sum()) if sel.height else 0.0
     if n == 0:
-        return {"beyond_clip": float("nan"), "out_of_range": float("nan")}
+        return {
+            "beyond_clip": float("nan"),
+            "candidate_beyond_clip": float("nan"),
+            "out_of_range": float("nan"),
+        }
     return {
         k: float(np.sum(sel[k].to_numpy() * sel["n_half_hours"].to_numpy()) / n)
-        for k in ("beyond_clip", "out_of_range")
+        for k in ("beyond_clip", "candidate_beyond_clip", "out_of_range")
     }
 
 
