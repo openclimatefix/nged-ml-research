@@ -135,8 +135,9 @@ SCORED_ATOL: Final = 1e-4
 def limit_gpu_memory(*, device: str) -> None:
     """Stop the caching allocator from taking more than `GPU_LIMIT_GB`, so an overrun raises instead of crowding other jobs."""
     if device.startswith("cuda"):
-        total = torch.cuda.get_device_properties(device).total_memory / 1e9
-        torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_LIMIT_GB / total), device)
+        index = torch.device(device).index or 0
+        total = torch.cuda.get_device_properties(index).total_memory / 1e9
+        torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_LIMIT_GB / total), index)
 
 
 def max_diff_to_stored(*, stored: pl.DataFrame, q: np.ndarray, valid: np.ndarray) -> float:
