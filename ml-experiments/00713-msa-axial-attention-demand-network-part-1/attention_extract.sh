@@ -3,14 +3,25 @@
 # at a time, each under run.sh (12 GB memory cap, one BLAS thread). Pass `--random-init` first for the smoke test.
 #
 # Usage: attention_extract.sh [--random-init] [MONTH] [SEED]     (defaults: 2026-01 and 0)
-# Check `nvidia-smi` and `uptime` first: start only while fewer than two other GPU processes run and the
-# one-minute load is under 24. Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment").
+# The script refuses to start while two or more other GPU processes run or the one-minute load is 24 or more.
+# `e00713_attention.py` limits the process to 6 GB of GPU memory. Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment").
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 extra=()
 if [ "${1:-}" = "--random-init" ]; then
     extra=(--random-init)
     shift
+fi
+# Enforce the manager's launch rules: fewer than two other GPU processes, and a one-minute load under 24.
+others=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -c . || true)
+if [ "$others" -ge 2 ]; then
+    echo "$others other GPU processes are running; wait until fewer than two" >&2
+    exit 1
+fi
+load=$(awk '{print int($1)}' /proc/loadavg)
+if [ "$load" -ge 24 ]; then
+    echo "the one-minute load is $load; wait until it is under 24" >&2
+    exit 1
 fi
 month="${1:-2026-01}"
 seed="${2:-0}"

@@ -46,6 +46,8 @@ import torch  # ty: ignore[unresolved-import]
 from plotting import ocf_theme as theme
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
+QCOLS: Final = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
+"""The Candidate's quantile columns, as in `e00713_predict.py`."""
 SUMMARY_LEADS: Final = (0, 6)
 """Lead days 1 and 7 as zero-based indices."""
 BATCH: Final = 256
@@ -124,6 +126,59 @@ def check_forward_identical(
     )
 
 
+GPU_LIMIT_GB: Final = 6.0
+"""The manager's limit of GPU memory for one process."""
+SCORED_ATOL: Final = 1e-4
+"""The largest difference, in shares of capacity, between an extracted quantile and the scored one (float32 and batch size)."""
+
+
+def limit_gpu_memory(*, device: str) -> None:
+    """Stop the caching allocator from taking more than `GPU_LIMIT_GB`, so an overrun raises instead of crowding other jobs."""
+    if device.startswith("cuda"):
+        total = torch.cuda.get_device_properties(device).total_memory / 1e9
+        torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_LIMIT_GB / total), device)
+
+
+def check_against_scored(
+    *, res: mdl.MsaOutput, batch: object, data: inp.FoldData, p: int, c: int, arm: str,
+    month: str, seed: int,
+) -> None:  # fmt: skip
+    """Assert that the case's quantiles equal the stored forecast of the same arm, origin, and valid times (read-only)."""
+    import e00422_prep as prep422  # ty: ignore[unresolved-import]
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    ids = k578.sites().sort("primary")["time_series_id"].to_numpy()
+    q = mdl.standardised_quantiles(out=res.out)
+    q = (
+        q * torch.from_numpy(data.target_std).to(q.device)[p]
+        + torch.from_numpy(data.target_mean).to(q.device)[p]
+    )
+    q = torch.sort(q, dim=-1).values[0].cpu().numpy()  # (48, 11)
+    tidx = batch.target_idx[0].cpu().numpy()  # ty: ignore[unresolved-attribute]
+    origin = prep422.GRID_START_US + (c - lay.NATIVE_OFFSET_STEPS) * lay.HALF_HOUR_US
+    valid = prep422.GRID_START_US + tidx * lay.HALF_HOUR_US
+    stored = (
+        pl.scan_parquet(
+            arms.fit_file(data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed)
+        )
+        .filter(
+            (pl.col("time_series_id") == int(ids[p]))
+            & (pl.col("power_fcst_init_time").dt.epoch("us") == origin)
+        )
+        .select("valid_time", *QCOLS)
+        .collect()
+    )
+    stored = stored.with_columns(v=pl.col("valid_time").dt.epoch("us")).sort("v")
+    assert stored.height > 0, "the case's origin is not in the stored forecast"
+    order = {int(v): i for i, v in enumerate(valid)}
+    rows = [order[int(v)] for v in stored["v"].to_list()]
+    worst = float(np.abs(stored.select(QCOLS).to_numpy() - q[rows]).max())
+    assert worst <= SCORED_ATOL, (
+        f"the extract's quantiles differ from the scored forecast by {worst}"
+    )
+    print(f"case matches the scored forecast: max abs difference {worst:.2e}", flush=True)
+
+
 def verify_fold(*, arm: str, month: str, seed: int, data: inp.FoldData, random_init: bool) -> None:
     """Refuse a fold whose standardiser, or (for a real state) whose code, differs from the fit's."""
     saved = (
@@ -143,6 +198,18 @@ def verify_fold(*, arm: str, month: str, seed: int, data: inp.FoldData, random_i
             accept=(),
             record={**arms.code_record()},
             what=f"{arm} {month} s{seed} attention extract",
+        )
+
+
+def check_case(
+    *, model: mdl.MsaNet, batch: object, res: mdl.MsaOutput, name: str, data: inp.FoldData, p: int,
+    c: int, arm: str, month: str, seed: int, scored: bool,
+) -> None:  # fmt: skip
+    """Run the bit-identity check and, for a real state, the check against the scored forecast."""
+    check_forward_identical(model=model, batch=batch, res=res, name=name)
+    if scored:
+        check_against_scored(
+            res=res, batch=batch, data=data, p=p, c=c, arm=arm, month=month, seed=seed
         )
 
 
@@ -187,7 +254,10 @@ def cmd_extract(*, arm: str, month: str, seed: int, device: str, random_init: bo
             pool=pool,
         )
         assert res.attention is not None and res.target_vector is not None
-        check_forward_identical(model=model, batch=b, res=res, name=name)
+        check_case(
+            model=model, batch=b, res=res, name=name, data=data, p=p, c=c, arm=arm, month=month,
+            seed=seed, scored=not random_init,
+        )  # fmt: skip
         last = max(int(k.split("_")[1]) for k in res.attention)
         out[f"{name}/across"] = res.attention[f"across_{last}"][0].cpu().numpy()
         if f"within_{last}" in res.attention:
@@ -239,8 +309,10 @@ def cmd_extract(*, arm: str, month: str, seed: int, device: str, random_init: bo
     print("stored", path, flush=True)
 
 
-def title_params(*, title: list[str]) -> alt.TitleParams:
+def title_params(*, title: list[str] | str) -> alt.TitleParams:
     """Return a title whose subtitle is wrapped to the figure width, which Vega does not do itself."""
+    if isinstance(title, str):
+        title = [title]
     lines = [line for part in title[1:] for line in textwrap.wrap(part, TITLE_CHARS)]
     return alt.TitleParams(
         title[0], subtitle=lines, anchor="start", fontSize=12, subtitleFontSize=11
@@ -385,6 +457,7 @@ def main() -> int:
     f.add_argument("seed", type=int)
     args = parser.parse_args()
     if args.command == "extract":
+        limit_gpu_memory(device=args.device)
         cmd_extract(
             arm=args.arm,
             month=args.month,
