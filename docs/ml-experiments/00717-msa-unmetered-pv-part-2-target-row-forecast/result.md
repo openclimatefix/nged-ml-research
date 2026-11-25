@@ -59,16 +59,17 @@ metric: >-
   of all 16 Primaries.
 ---
 
-**We ask whether the axial-attention network forecasts a Primary's demand better when its target
-row also carries an explicit forecast of the Primary's unmetered solar output, on top of the
-historical estimate that [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md)
-tests.** The forecast is an as-of capacity times a yield curve, driven by the ENS-mean and
-ENS-spread shortwave irradiance of the 00Z run of the origin day. This page is part 2 of
-follow-up F7. It is the plan: no arm has been fitted on the real folds, and every number below is a design
-value or a figure from an earlier experiment. The design is condensed from the private design note
-`f7_design.md`, and the details that this part shares with part 1 (the PV estimate, the as-of
-capacity, the network paths, the training recipe, the known-answer worlds, and the leakage rules)
-are on the page of experiment 716.
+**We ask whether the axial-attention network forecasts a Primary's demand better when its target row
+also carries an explicit forecast of the Primary's unmetered solar output, on top of the historical
+estimate that [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md) tests.**
+The forecast is an as-of capacity times a yield curve, driven by the ENS-mean and ENS-spread
+shortwave irradiance of the 00Z run of the origin day. This page is part 2 of follow-up F7. It is
+still the plan: the fits are stored, but the final 5-seed scores are not yet computed, so the page
+states no verdict and no headline, and every result number below comes from the interim 2-seed
+read-out or from a stored fit log. The design values and figures of earlier experiments keep their
+sources. The design is condensed from the private design note `f7_design.md`, and the details that
+this part shares with part 1 (the PV estimate, the as-of capacity, the network paths, the training
+recipe, the known-answer worlds, and the leakage rules) are on the page of experiment 716.
 
 **Known-answer check KF9 failed and the maintainer waived it, so the gate is a waived known-answer
 check and not a passed one.** The gate is the one of part 1. KF9 asks arm `H` to beat arm `H-S` on
@@ -138,31 +139,31 @@ makes no claim about era recognition or level shifts.
 | `HT-S` | As `HT`, with the target-row forecast from the ENS run 28 days earlier | 0 to 4 | Counted placebo |
 | `T` | The ENS PV forecast in the target row only | 0 and 1 | Report-only: scope (b) without scope (a) |
 
-**B1 is read against `H` and not against `M*`, so that part 2 is not credited with a gain that
-part 1 made.** `HT` with its target paths at zero is `H` exactly, and both start from the same
-state of `M*`. `HT` minus `M*` and `T` minus `M*` are report-only. `HT-S` reads the ENS run issued 28 days before the origin day
-at the same lead day, with the same clear-sky-index transfer on the mean and the spread. For
-origins in the first 28 days of the ENS record the donor run is 28 days later, which is issued after the sample's
-origin and says nothing about the sample's target day; the check counts those origins in training
-and in held-out days and the page lists them.
+**B1 is read against `H` and not against `M*`, so that part 2 is not credited with a gain that part
+1 made.** `HT` with its target paths at zero is `H` exactly, and both start from the same state of
+`M*`. `HT` minus `M*` and `T` minus `M*` are report-only. `HT-S` reads the ENS run issued 28 days
+before the origin day at the same lead day, with the same clear-sky-index transfer on the mean and
+the spread. For origins in the first 28 days of the ENS record the donor run is 28 days later, which
+is issued after the sample's origin and says nothing about the sample's target day; the check counts
+those origins in training and in held-out days and the page lists them.
 
 ## The target-row forecast
 
-**The target row gets two numbers per half-hour, `p0_mean` and `p0_sd`, from the yield curve's
-mean and standard deviation over three Gauss-Hermite nodes of the ENS shortwave.** The shortwave
-and its spread are columns 0 and 7 of the Candidate's non-lag layout, un-standardised with the
-fold's standardiser from float32 source rows, with the ENS-mean 2 m temperature. A second token
-path `γ_t ⊙ (W2_t GELU(W1_t [p0_mean·ok, p0_sd·ok, ok]) / r_t)` enters the target tokens, a table
-`c[primary]` multiplies `p0_mean` in the mixture means, and the head map reads `p0_mean` and
-`p0_sd`. All of them start at zero with a random partner. Arm `HT` has 4,800 new parameters
-(134,799 in all, 3.7% more than `M*`). With `a = 1` and `c = -1` the mean is the similar-day mean of
-gross demand minus the forecast PV, the decomposition of experiment 064; `p0_sd` lets the head
-widen the mixture when the ENS members disagree about the sky. The network, training recipe,
-optimiser groups (1e-2 for `a` and `c`, 3e-3 for `γ_h` and `γ_t`), and known-answer checks are those
-of experiment 716, with world WT and checks KF11 and KF12 for part 2. **KF11 requires `HT-S` minus
-`HT` in world WT to be at least 0.5 × the `gap` of WT** (`HT-S` reads the target sky of the run 28 days
-earlier), and the same two pre-checks as in part 1 apply to WT: the `gap` of at least 0.010 and the
-early-stopping check, which uses the rung that part 1's ladder chose.
+**The target row gets two numbers per half-hour, `p0_mean` and `p0_sd`, from the yield curve's mean
+and standard deviation over three Gauss-Hermite nodes of the ENS shortwave.** The shortwave and its
+spread are columns 0 and 7 of the Candidate's non-lag layout, un-standardised with the fold's
+standardiser from float32 source rows, with the ENS-mean 2 m temperature. A second token path `γ_t ⊙
+(W2_t GELU(W1_t [p0_mean·ok, p0_sd·ok, ok]) / r_t)` enters the target tokens, a table `c[primary]`
+multiplies `p0_mean` in the mixture means, and the head map reads `p0_mean` and `p0_sd`. All of them
+start at zero with a random partner. Arm `HT` has 4,800 new parameters (134,799 in all, 3.7% more
+than `M*`). With `a = 1` and `c = -1` the mean is the similar-day mean of gross demand minus the
+forecast PV, the decomposition of experiment 064; `p0_sd` lets the head widen the mixture when the
+ENS members disagree about the sky. The network, training recipe, optimiser groups (1e-2 for `a` and
+`c`, 3e-3 for `γ_h` and `γ_t`), and known-answer checks are those of experiment 716, with world WT
+and checks KF11 and KF12 for part 2. **KF11 requires `HT-S` minus `HT` in world WT to be at least
+0.5 × the `gap` of WT** (`HT-S` reads the target sky of the run 28 days earlier), and the same two
+pre-checks as in part 1 apply to WT: the `gap` of at least 0.010 and the early-stopping check, which
+uses the rung that part 1's ladder chose.
 
 ## Counted contrasts and the decision rule
 
@@ -171,26 +172,26 @@ early-stopping check, which uses the rung that part 1's ladder chose.
 | B1 | `HT` minus `H` | Does an explicit PV forecast in the target row add to the network that reads the historical estimate? |
 | B2 | `HT` minus `HT-S` | Does the gain come from the forecast sky of the target day? |
 
-Each part has four counted readings, so each interval is read at 98.75%. Because the two parts
-share arm `H`, each page also reports its contrasts at 99.375% (eight readings across both parts) as a
+Each part has four counted readings, so each interval is read at 98.75%. Because the two parts share
+arm `H`, each page also reports its contrasts at 99.375% (eight readings across both parts) as a
 labelled sensitivity reading that changes no verdict. **Report-only, at 95%:** `HT` minus `M*`, `T`
 minus `M*` (the reading that compares directly with experiments 501 and 644), `HT` minus `T`, every
 arm minus the Candidate, every contrast at all 16 Primaries, by lead band, by Primary, with one
 Primary left out, and with one month left out. The `supported` guards are those of experiment 716,
-except the mask guard, which belongs to part 1. Secondary readings S1, S2, and S4 (the solar block of the sunny
-folds, and no harm in the dark folds) apply to B1 and B2 and change no verdict.
+except the mask guard, which belongs to part 1. Secondary readings S1, S2, and S4 (the solar block
+of the sunny folds, and no harm in the dark folds) apply to B1 and B2 and change no verdict.
 
 **Seeds 2 to 4 run only if a counted treatment contrast gives a reason to continue.** After the
 8-fold, 2-seed reading of the counted contrasts, seeds 2 to 4 run only if, for at least one counted
 treatment contrast, the point estimate is below zero in at least one group (the six signed-MW
 Primaries, the eight MVA-only Primaries). If every counted treatment contrast has a point estimate
 at or above zero in both groups, the experiment is written up at 2 seeds with the pre-registered
-two-seed values, and the page states that the futility rule fired. A reading with a point
-estimate below zero is the only one that opens seeds 2 to 4, and the ablation contrasts (A2 and
-B2) never open them. Interim, 2 seeds: the counted points of B1 (-0.0014 and -0.0033) are below zero in both groups,
-so the rule opened seeds 2 to 4. This rule was added before any treatment score was read.
-No threshold or verdict rule changed. The fit logs of phase 3 already held validation-loss lines
-when this rule was added (five at the time of the edit), and they were not read before the edit.
+two-seed values, and the page states that the futility rule fired. A reading with a point estimate
+below zero is the only one that opens seeds 2 to 4, and the ablation contrasts (A2 and B2) never
+open them. Interim, 2 seeds: the counted points of B1 (-0.0014 and -0.0033) are below zero in both
+groups, so the rule opened seeds 2 to 4. This rule was added before any treatment score was read. No
+threshold or verdict rule changed. The fit logs of phase 3 already held validation-loss lines when
+this rule was added (five at the time of the edit), and they were not read before the edit.
 
 **Fits run in the order of phases 3, 4, and 5 before phase 6, and the fit logs are read for stopping
 passes only.** Every fit's log summary reports its stopping pass: the stage, the pass number, and
@@ -222,8 +223,8 @@ generator's time series.
 
 ## Method
 
-The experiment is planned and has no arm fitted on the real folds yet, so these bullets describe
-the design.
+All fits of the three arms are stored, and the final scores are not yet computed, so these bullets
+describe the design as it was run.
 
 - **The known-answer gate is waived at KF9:** `e00716_waive_gate.py` writes the gate file with
   `waived: true`, the failed check and its values, the code hash, and the sha256 of the last-run
@@ -241,13 +242,13 @@ the design.
 
 ## Amendments made after the first code review
 
-**The reference regressions, the gating fits, and the cold-night guard are as on the page of part 1.**
-The amendments that part 1's page lists (48 ridge regressions per Primary pooled over the 14 leads, the
-gating fits that mirror the real recipe, and the cold-night guard computed inside the scorer) apply to
-this page unchanged.
+**The reference regressions, the gating fits, and the cold-night guard are as on the page of part
+1.** The amendments that part 1's page lists (48 ridge regressions per Primary pooled over the 14
+leads, the gating fits that mirror the real recipe, and the cold-night guard computed inside the
+scorer) apply to this page unchanged.
 
-**KF7 runs on the GPU, as on the page of part 1.** The stored forecast of `M*` was written on the GPU,
-and the CPU path differs from it by 8.4e-6 of capacity at the 99th percentile.
+**KF7 runs on the GPU, as on the page of part 1.** The stored forecast of `M*` was written on the
+GPU, and the CPU path differs from it by 8.4e-6 of capacity at the 99th percentile.
 
 **The pre-check, the step up, and the reserve are as on the page of part 1.** After a failed
 early-stopping pre-check at rung N, the step up to the next rung needs a failed pre-check record of
@@ -277,18 +278,71 @@ deviation of the last 10 validation losses (`ddof=1`) lay between 0.0037 and 0.0
 world W1 sits at 0.0220 against the rung-4 limit of 0.0225.
 
 **The cold-night guard departs from the protocol's slice in two ways.** The guard restricts to UTC
-months 12, 1, and 2, which the protocol's slice does not, and reads the sun at the grid stamp, not at the
-half-hour midpoint.
+months 12, 1, and 2, which the protocol's slice does not, and reads the sun at the grid stamp, not
+at the half-hour midpoint.
 
-**Merge experiment 716 (part 1) first, then rebase this branch onto `main`.** Until part 1 is on `main`,
-`ty check` cannot resolve the `e00716_*` imports of this folder, so they carry `ty: ignore` comments.
-Every script here calls `e00717_guard.require_part1`, which refuses to run when `EXTRA_PYTHONPATH` does
-not name an existing part 1 folder or when an `e00716_*` module comes from any other folder, so a removed
-part 1 checkout cannot silently give way to a stale copy.
+**Merge experiment 716 (part 1) first, then rebase this branch onto `main`.** Until part 1 is on
+`main`, `ty check` cannot resolve the `e00716_*` imports of this folder, so they carry `ty: ignore`
+comments. Every script here calls `e00717_guard.require_part1`, which refuses to run when
+`EXTRA_PYTHONPATH` does not name an existing part 1 folder or when an `e00716_*` module comes from
+any other folder, so a removed part 1 checkout cannot silently give way to a stale copy.
 
 **The fits of `HT`, `HT-S`, and `T` run through this folder's `run.sh`,** which finds
-`e00716_fit.py` and `e00716_predict.py` in part 1's folder through `EXTRA_PYTHONPATH`. The fits write
-under this experiment's data folder.
+`e00716_fit.py` and `e00716_predict.py` in part 1's folder through `EXTRA_PYTHONPATH`. The fits
+write under this experiment's data folder.
+
+## What is stored, and what is not scored yet
+
+**All 96 fits of part 2 are stored, and every one ended by patience.** Arm `HT` has 40 fits (8
+folds, seeds 0 to 4), arm `HT-S` has 40, and arm `T` has 16 (8 folds, seeds 0 and 1). The fit logs
+in `work/logs/<arm>/<fold>_s<seed>_fit.json` give these stopping passes (stage 2 is the first of the
+two stages that each fit trains, and stage 3 is the second).
+
+| Arm | Fits | Stage 2 passes: mean (min to max) | Stage 3 passes: mean (min to max) | Fits at the pass cap |
+|---|---|---|---|---|
+| `HT` | 40 | 14.4 (10 to 25) | 17.0 (9 to 38) | 0 |
+| `HT-S` | 40 | 13.7 (10 to 25) | 16.0 (9 to 38) | 0 |
+| `T` | 16 | 13.7 (10 to 25) | 15.9 (10 to 23) | 0 |
+
+**Report-only read-outs of arm `HT` without a refit are stored for the look-ahead and mask checks.**
+The forecasts `HT-cams` and `HT-convention` (all 40 fold-seed cells), and `HT-nopv`, `HT-lookahead`,
+`HT-scale0.7`, and `HT-scale1.3` (8 folds, seed 0) are stored under `work/fits/`.
+
+**The final scores are not computed, so this page has no verdict.** The scorer
+`e00717_score.py part2 --n-seeds 5` and its secondary read-out wait for the maintainer to approve
+the command. The verdict, headline, lessons, take-home message, and advice follow from the
+pre-registered rule applied to those tables, and they are not written here. The only stored
+reading is the interim one of the futility rule (2 seeds, 98.75%, point estimates in points of
+capacity, from `score/futility_part2.json`). B1 is -0.0014 [-0.0319, +0.0327] at the six
+signed-MW Primaries and -0.0033 [-0.0646, +0.0508] at the eight MVA-only Primaries. B2 is
+-0.0077 and -0.0009 as points. Those readings opened seeds 2 to 4, which are the stored fits.
+
+**No training loss is stored, so the page has no training-and-validation loss plot.** The fit
+logs keep each stage's validation-loss history (`val_history`), its best value, and its stopping
+pass, and they keep no training loss per pass. A loss plot with both curves cannot be drawn from
+stored files.
+
+**GPU time: 23.7 GPU-process-hours are counted for F7 as a whole, and part 2's arms took 8.4.**
+The figure sums the start and end times of every GPU job in the F7 run logs (22.5 hours),
+the two known-answer fits of arm `M` in worlds WH and WT at seed 0 (1.1 hours, from file times),
+the KF7 check (0.02 hours), and the attention extraction (about 1 minute, which runs on the GPU).
+Part 2's share is arm `HT` 5.0, arm `HT-S` 2.4, and arm `T` 1.0 hours. The total stays under the
+manager's stop line of 26. If the rebuild of the known-answer world ladder (about 1.2 hours of
+wall time) ran on the GPU, the total is 26.1 hours. The code of that ladder
+(`e00716_world_rung.py` and `e00716_worlds.py`) names no device, so it is taken to run on the
+CPU, but the run log records no device, so the device of the ladder rebuild is unconfirmed. The
+run logs live in the workstation's `/tmp`, not in the data folder, and the figure is a sum over
+them.
+
+**The attention maps for fold 2026-05, seed 0, are those of experiment 716, not of arm `HT`.** Part
+2 has no stored attention for its own arms. The stored maps of arms `M*` and `H` are in
+`work/attention/` of [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md).
+**Caveat for reading them:** the as-of capacity factors of several Primaries in the fold 2026-05
+look ahead of the forecast origin, so the history estimate of arm `H` carries information that a
+live service would not have. Only Primaries D19 and D21 may host a forecast example, and no page
+shows D8, D12, or D22 as one.
+
+**Anonymisation.** The page names no metered generator and gives no capacity in megawatts.
 
 ## Reviews
 
@@ -299,9 +353,23 @@ review, an audit if a trigger fires, a write-up review, and a prose review.
 
 ## Files
 
-- `ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/`: the scoring, figure, and
-  report scripts of part 2. The network, batches, training, and predictions are in
-  `ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/`, which part 2 imports.
-- `data/ml-experiments/briefs/msa_architecture/f7_design.md` and its reviews (read, private).
-- Written by this experiment (to be created): fitted states under
-  `data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/work/`, never committed.
+- `ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/e00717_score.py`: scores arms
+`HT`, `HT-S`, and `H` with the scoring code of experiment 716 (contrasts B1 and B2, guards, verdict,
+secondary read-outs). It is reviewed and not yet run on the final forecasts. -
+`.../e00717_report.py` and `.../e00717_figures.py`: print every number the final page quotes from
+the score files, and draw the contrast and by-fold charts from `score/part2.json`. -
+`.../e00717_futility_read.py`: reads the interim 2-seed contrasts and writes
+`score/futility_part2.json`. `.../e00717_s1_read.py` writes the report-only `score/s1_interim.json`.
+- `.../e00717_guard.py` and `.../run.sh`: refuse a stale copy of part 1's code, and run a command
+with one thread per numerical library and a memory cap. -
+`ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/`: the network, batches, training,
+and predictions (`e00716_fit.py`, `e00716_predict.py`, `e00716_score.py`), imported and not edited,
+as described on [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md). -
+`data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/work/fits/<arm>/`: the stored
+forecasts, one parquet file per fold and seed (written by this experiment, read by the scorer).
+`work/logs/<arm>/` holds the fit, stage, and predict logs, and `work/models/` the network states.
+Never committed. - `data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/score/`:
+the interim files `futility_part2.json` and `s1_interim.json`, both written by this experiment. -
+`data/ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/work/fits/H/` and
+`work/attention/`: arm `H` forecasts and the attention maps, written by experiment 716 and read
+here. - `data/ml-experiments/briefs/msa_architecture/f7_design.md` and its reviews (read, private).
