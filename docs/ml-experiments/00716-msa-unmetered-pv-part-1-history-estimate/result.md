@@ -171,6 +171,14 @@ run scripts wrote to `/tmp/f7_*.log` (not committed), the `seconds` field of the
 output-file times of the first two gating fits, and the 65 s that the manager recorded for `KF7`.
 The 106 fits of part 1's arms took 4.94 hours of that total (the `seconds` field of the fit logs).
 
+**The no-refit read-out contrasts of arm `H` were not run.** The command
+`e00716_readouts.py contrasts H` fails, because line 190 of `e00716_readouts.py` calls
+`score.available_seeds`, which `e00716_score.py` no longer defines. The reading is a secondary
+read-out that changes no verdict. The seed sets also differ: `H-cams` and `H-convention` have 40
+forecast files each (8 folds, seeds 0 to 4), and `H-lookahead`, `H-nopv`, `H-scale0.7`, and
+`H-scale1.3` have 8 files each (8 folds, seed 0). The command needs a decision on the seed set
+before it can run, and no script was edited.
+
 ## Why this runs although the stop rule counts earlier verdicts
 
 **The maintainer asked for follow-up F7 by name and confirmed the scope on 2026-11-23 ("I
