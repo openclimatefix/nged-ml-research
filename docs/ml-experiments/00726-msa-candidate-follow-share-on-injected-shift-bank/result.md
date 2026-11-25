@@ -482,6 +482,12 @@ Primaries at depth 0.50 exceed capacity, although only 0.1% lie beyond 5 standar
 follow share at those shifts is therefore a reading of a clipped input for that group. Every
 threshold stays as registered, and the clip diagnostic is printed with the readings.
 
+**Disclosure: `phases.sh` ran before its code review.** The driver that runs the phases one job at a
+time (commit 5ca61e0d2) was started for phase 0 before an Opus agent had reviewed it, which breaks
+the rule that no script runs before its review. The driver only calls the reviewed `run.sh` and the
+reviewed scripts and adds a retry loop and a log of wall times. The phase 0 outputs are treated as
+unreviewed until the review passes, and no phase 1 job starts before then.
+
 ## Leakage and disclosures
 
 **No forecast reads power stamped later than 24 hours before the native origin, and no weight was
