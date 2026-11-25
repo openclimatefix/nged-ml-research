@@ -21,6 +21,7 @@ import e00729_core as core729
 import e00729_train as train729
 import e00730_arms as arms
 import e00730_core as core
+import e00730_masks as masks
 import e00730_nets as nets
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
@@ -299,21 +300,6 @@ def refit_729_arm(
 # --------------------------------------------------------------------------- the schedule
 
 
-def screen_jobs() -> list[tuple[str, str, int]]:
-    """Return the architecture screen: arms S-A and S on 4 architectures and 3 seeds (24 fits)."""
-    return [
-        (a, arch, s)
-        for a in core.SCREEN_ARMS
-        for arch in core.ARCHITECTURES
-        for s in core.ARCH_SEEDS
-    ]
-
-
-def style_jobs(*, arch: str) -> list[tuple[str, str, int]]:
-    """Return the masking-style fits SD-0, SD-K, SD-W, and SD-R (5 seeds each)."""
-    return [(f"SD-{s}", arch, seed) for s in core.STYLES for seed in core.MARGIN_SEEDS]
-
-
 def timing_gate(
     *, seconds_per_epoch: dict[str, float], peak_memory_gb: float, manager_approved: bool
 ) -> dict[str, float | bool]:
@@ -325,3 +311,63 @@ def timing_gate(
         **report,
         "pass": core.timing_gate_passes(report=report, manager_approved=manager_approved),
     }
+
+
+def masked_demand(
+    *,
+    net: torch.nn.Module,
+    prepared: Sequence[arms.PreparedSegment],
+    spec: arms.ArmSpec,
+    device: str,
+    style: str,
+) -> dict[str, np.ndarray]:
+    """Return the demand output on every valid half-hour with the fixed masks of `style`.
+
+    The masks depend on the style and the pick's index alone, so every arm sees the same masks.
+
+    Args:
+        net: The network.
+        prepared: The prepared segments of a bank.
+        spec: The arm.
+        device: "cuda" or "cpu".
+        style: The masking style of the evaluation.
+
+    Returns:
+        `demand_mu`, the true `base` demand, `hidden` (the half-hour was hidden), and `p`, each
+        flattened over the valid half-hours in `Rows` order.
+    """
+    picks = arms729.all_picks(prepared=prepared)
+    hidden = np.stack(
+        [
+            masks.fixed_hidden(style=style, index=i, utc_offset=float(prepared[s].offsets[d]))
+            for i, (s, d) in enumerate(picks)
+        ]
+    )
+    decoded, t, _ = predict(
+        net=net, prepared=prepared, spec=spec, device=device, hidden=hidden, picks=picks
+    )
+    ok = t[:, 1] > 0.5
+    scored = hidden[:, core729.MIDDLE_START : core729.MIDDLE_START + 48]
+    return {
+        "demand_mu": decoded["demand_mu"][ok],
+        "base": t[:, arms.BASE_ROW][ok],
+        "hidden": scored[ok],
+        "p": decoded["p"][ok],
+    }
+
+
+def causal_predictions(
+    *,
+    net: torch.nn.Module,
+    prepared: Sequence[arms.PreparedSegment],
+    spec: arms.ArmSpec,
+    device: str,
+    k: int,
+) -> np.ndarray:
+    """Return P(X < 0) on every valid half-hour when the first `k` half-hours are seen."""
+    picks = arms729.all_picks(prepared=prepared)
+    cut = np.full(len(picks), core729.MIDDLE_START + k - 1)
+    decoded, t, _ = predict(
+        net=net, prepared=prepared, spec=spec, device=device, cut_pos=cut, picks=picks
+    )
+    return valid_flat(values=decoded["p"], targets=t)

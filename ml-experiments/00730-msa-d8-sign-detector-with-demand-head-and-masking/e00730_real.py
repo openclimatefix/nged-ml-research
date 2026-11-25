@@ -48,3 +48,8 @@ def false_alarm_shares(*, p: np.ndarray) -> dict[str, float]:
         "above_half": float(np.mean(p > core.FALSE_ALARM_THRESHOLD)),
         "above_0.9": float(np.mean(p > 0.9)),
     }
+
+
+def share_by(*, values: np.ndarray, groups: np.ndarray) -> dict[str, float]:
+    """Return the share of True `values` in each group, as plain floats (aggregates only)."""
+    return {str(g): float(np.mean(values[groups == g])) for g in np.unique(groups)}

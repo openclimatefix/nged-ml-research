@@ -509,3 +509,28 @@ PANEL_REQUIREMENTS: Final = {
 }
 """The written list of what each gallery panel must show. The design lead checks each panel against
 it and records the result in `PRIVATE/gallery/panel_check.json`."""
+
+
+# --------------------------------------------------------------------------- the schedule
+
+
+def screen_jobs() -> list[tuple[str, str, int]]:
+    """Return the architecture screen: arms S-A and S on 4 architectures and 3 seeds (24 fits)."""
+    return [(a, arch, s) for a in SCREEN_ARMS for arch in ARCHITECTURES for s in ARCH_SEEDS]
+
+
+def style_jobs(*, arch: str) -> list[tuple[str, str, int]]:
+    """Return the masking-style fits SD-0, SD-K, SD-W, and SD-R (seeds 0 to 2: 12 fits)."""
+    return [(f"SD-{s}", arch, seed) for s in STYLES for seed in ARCH_SEEDS]
+
+
+def later_jobs(*, arch: str) -> list[tuple[str, str, int]]:
+    """Return the fits after the style choice: S seeds 3 and 4 and the four later arms."""
+    jobs = [("S", arch, s) for s in (3, 4)]
+    jobs += [(a, arch, s) for a in ("SDe-PT", "SDe-FR", "SD*-C", "SD*-lambda") for s in ARCH_SEEDS]
+    return jobs
+
+
+def refit_jobs() -> list[tuple[str, str, int]]:
+    """Return the 9 refits of experiment 729's arms A, D, and D-sign on the bilstm."""
+    return [(a, "bilstm", s) for a in REFIT_729_ARMS for s in ARCH_SEEDS]

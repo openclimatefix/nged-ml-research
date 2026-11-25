@@ -51,7 +51,16 @@ def check_encoder_table_alignment() -> str:
     return f"clear-sky peak hour within {low} to {high} UTC: {low <= hour <= high}"
 
 
+def check_grid_dates() -> str:
+    """Check that experiment 87's grid gives one UTC day per half-hour for the removal mask."""
+    import e00087_common as common  # ty: ignore[unresolved-import]
+
+    days = common.grid_times().dt.date().to_numpy().astype("datetime64[D]")
+    return f"grid has one day per half-hour: {days.shape[0] == common.grid_times().len()}"
+
+
 CHECKS: dict[str, Callable[[], str]] = {
+    "grid dates": check_grid_dates,
     "private splits": check_private_splits,
     "pre-training inputs": check_pretraining_inputs,
     "encoder table alignment": check_encoder_table_alignment,
