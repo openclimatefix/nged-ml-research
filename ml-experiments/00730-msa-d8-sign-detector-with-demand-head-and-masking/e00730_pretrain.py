@@ -512,10 +512,7 @@ def d8_raw_encoder_table(*, base_dates: np.ndarray) -> np.ndarray:
         The unstandardised table.
     """
     import e00087_common as common
-    import e00397_prep as prep
     import e00418_prep as prep418
-    import e00428_data as data428
-    import polars as pl
 
     series = d8_series()
     weather = prep418.dense_weather(series_id=series["time_series_id"], site="D8")
@@ -523,24 +520,48 @@ def d8_raw_encoder_table(*, base_dates: np.ndarray) -> np.ndarray:
     derived = common.derived_columns(
         valid_time=grid, latitude=series["latitude"], longitude=series["longitude"]
     )
+    day_start = np.array(
+        [common.grid_index(times=_midnight(day=d)) for d in base_dates], dtype=np.int64
+    )
+    return raw_table_on_days(weather=weather, derived=derived, day_start=day_start)
+
+
+def raw_table_on_days(*, weather: np.ndarray, derived: Any, day_start: np.ndarray) -> np.ndarray:
+    """Return the unstandardised encoder inputs of the days that start at `day_start`.
+
+    Only the grid rows that the days read are built: the dense weather can hold a missing value at
+    the grid's first and last stamps, which `feature_matrix` refuses, and no base day reads them.
+
+    Args:
+        weather: The dense weather on the whole grid, `(grid, 7)`.
+        derived: Experiment 87's derived columns on the whole grid.
+        day_start: The grid index of each day's midnight.
+
+    Returns:
+        The table `(days, 48, 28)`.
+    """
+    import e00087_common as common
+    import e00397_prep as prep
+    import e00418_prep as prep418
+    import e00428_data as data428
+    import polars as pl
+
+    stamps = day_start[:, None] + 1 + np.arange(STEPS_PER_DAY)[None, :]
+    used, inverse = np.unique(stamps, return_inverse=True)
     columns: dict[str, np.ndarray] = {}
     for j, name in enumerate(prep418.WEATHER):
-        columns[f"mean_{name}"] = weather[:, j]
-        columns[f"std_{name}"] = np.zeros(len(grid), dtype=np.float32)
+        columns[f"mean_{name}"] = weather[used, j]
+        columns[f"std_{name}"] = np.zeros(len(used), dtype=np.float32)
     for name in common.DERIVED:
-        columns[name] = derived[name].to_numpy()
+        columns[name] = derived[name].to_numpy()[used]
     for name in common.LAG_COLUMNS:
-        columns[name] = np.full(len(grid), np.nan, dtype=np.float32)
-    columns["lead_hours"] = np.zeros(len(grid), dtype=np.float32)
+        columns[name] = np.full(len(used), np.nan, dtype=np.float32)
+    columns["lead_hours"] = np.zeros(len(used), dtype=np.float32)
     raw = prep.feature_matrix(frame=pl.DataFrame(columns), scheme="summary")
     keep_cols, _, _ = data428.non_lag_layout()
     raw = raw[:, keep_cols]
     index = np.r_[np.arange(*WEATHER_SLICE.indices(37)), np.arange(*DATETIME_SLICE.indices(37))]
-    day_start = np.array(
-        [common.grid_index(times=_midnight(day=d)) for d in base_dates], dtype=np.int64
-    )
-    stamps = day_start[:, None] + 1 + np.arange(STEPS_PER_DAY)[None, :]
-    return raw[stamps][:, :, index]
+    return raw[inverse.reshape(stamps.shape)][:, :, index]
 
 
 def d8_series() -> dict:

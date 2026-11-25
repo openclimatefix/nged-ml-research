@@ -375,13 +375,52 @@ def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
 
 
 def expected_solar_keys(*, bank: banks729.Bank) -> set[str]:
-    """Return the solar keys a bank must hold: each (world, source, season) with a segment."""
-    keys = {
-        "/".join((s.world, bank.kind, s.source, segment_season(seg=s)))
-        for s in bank.segments
-        if s.world in ("solar", "both")
-    }
+    """Return the solar keys a bank must hold: each (world, source, season) with a clear base day.
+
+    A season in which no segment holds a clear base day (a month of the real record with no clear
+    sky) has no case to count, so it is not expected. A bank with solar-world segments and no clear
+    base day at all expects the key "no_clear_base_day", which is never counted, so that the check
+    fails instead of passing on nothing.
+
+    Args:
+        bank: A bank of segments.
+
+    Returns:
+        The expected keys.
+    """
+    keys = set()
+    solar_segments = 0
+    for seg in bank.segments:
+        if seg.world not in ("solar", "both"):
+            continue
+        solar_segments += 1
+        _, clear_day = clear_sun_up(csi=seg.csi, cosz=seg.cosz)
+        if ((seg.cal_index >= 0) & clear_day & ~seg.s1_fallback).any():
+            keys.add("/".join((seg.world, bank.kind, seg.source, segment_season(seg=seg))))
+    if solar_segments and not keys:
+        return {"no_clear_base_day"}
     return keys | {f"solar_subtract/{k}" for k in keys}
+
+
+def pooled_solar_cases(*, counts: Mapping[str, int]) -> dict[str, int]:
+    """Return the clear base days of each bank kind and source, pooled over worlds and seasons.
+
+    The bar `MIN_CASES` applies to this pool, because a split of a few months holds too few clear
+    base days for a bar on each season (the key `world/kind/source/season`).
+
+    Args:
+        counts: The cases of each solar key.
+
+    Returns:
+        The cases of each `kind/source`.
+    """
+    pooled: dict[str, int] = defaultdict(int)
+    for key, n in counts.items():
+        if key.startswith("solar_subtract/"):
+            continue
+        _, kind, source, _ = key.split("/")
+        pooled[f"{kind}/{source}"] += n
+    return dict(pooled)
 
 
 SIGMA_FLOOR: Final = 4.0
@@ -621,11 +660,17 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
             cases[f"{name}/{label}"] = counts
             short += [f"{name}/{label}/{k}" for k, v in result.items() if v < core.MIN_OUTPUT_SHARE]
             short += [f"{name}/{label}/{k}/missing" for k in sorted(expected - set(counts))]
-            short += [
-                f"{name}/{label}/{k}/too_few"
-                for k, n in counts.items()
-                if n < MIN_CASES and not k.startswith(("weekday", "quiet"))
-            ]
+            if label == "solar":
+                pooled = pooled_solar_cases(counts=counts)
+                short += [
+                    f"{name}/solar/pooled/{k}/too_few" for k, n in pooled.items() if n < MIN_CASES
+                ]
+            else:
+                short += [
+                    f"{name}/{label}/{k}/too_few"
+                    for k, n in counts.items()
+                    if n < MIN_CASES and not k.startswith(("weekday", "quiet"))
+                ]
         exact = none_and_fold_shares(bank=bank)
         shares[f"{name}/exact"] = exact
         short += [f"{name}/exact/{k}" for k, v in exact.items() if v < core.EXACT_SHARE]

@@ -313,8 +313,11 @@ no world mix, and no BSP coefficient range changes.
 **Every simulated component is checked for output where output must exist before the gate reads
 the banks.** The solar and BSP checks are stated per day, never per segment, because a segment of a
 month with one nonzero day would pass a per-segment check while the generator is still silent on
-the other days. A key that has no cases, or fewer than 20 cases, fails its check, so that a silent
-component cannot pass by leaving nothing to count.
+the other days. A key that has no cases fails its check, so that a silent component cannot pass by
+leaving nothing to count. A solar key expects cases only in a season that holds a clear base day,
+and a bank with solar-world segments and no clear base day fails. The bar of 20 cases applies to
+the solar cases pooled over worlds and seasons for each bank kind and source, because a split of a
+few months of the real record holds only a handful of clear base days in some seasons.
 The banks stage counts, per world type, bank, source, and season:
 
 - the share of clear base days of solar-world segments with solar output above zero on at least

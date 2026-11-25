@@ -178,6 +178,31 @@ def clear_day_counts(*, cal: object, used: dict[str, np.ndarray]) -> dict[str, i
     }
 
 
+def expected_cases(*, counts: dict[str, int]) -> dict[str, float]:
+    """Return the solar-world cases that a bank of each split would hold, pooled over seasons.
+
+    The bar `MIN_CASES` applies to the pool of a bank kind and source, because a split of a few
+    months holds too few clear days for a bar on each season. Each month of a bank draws
+    `SEGMENT_DRAWS_*` segments, of which the share `TEST_MIX["solar"] + TEST_MIX["both"]` carries
+    solar output, and each such segment counts every clear base day of its month.
+
+    Args:
+        counts: The clear base days by `split/season`.
+
+    Returns:
+        The expected cases of each split.
+    """
+    import e00729_core as core729
+
+    share = core729.TEST_MIX["solar"] + core729.TEST_MIX["both"]
+    out: dict[str, float] = {}
+    for key, n in counts.items():
+        split = key.split("/")[0]
+        draws = core729.SEGMENT_DRAWS_TRAIN if split == "training" else core729.SEGMENT_DRAWS_EVAL
+        out[split] = out.get(split, 0.0) + n * draws * share
+    return out
+
+
 def check_clear_day_counts() -> str:
     """Print the real clear base days by season and split, and whether each can reach `MIN_CASES`.
 
@@ -190,9 +215,16 @@ def check_clear_day_counts() -> str:
         for split in ("training", "validation", "test")
     }  # fmt: skip
     counts = clear_day_counts(cal=ctx.cal, used=used)
-    enough = all(n >= stages.banks.MIN_CASES for n in counts.values())
     text = ", ".join(f"{k} {n}" for k, n in counts.items())
-    return f"clear base days {text}; every count reaches MIN_CASES: {enough}"
+    expected = expected_cases(counts=counts)
+    enough = all(n >= stages.banks.MIN_CASES for n in expected.values())
+    seasons = all(n > 0 for n in counts.values())
+    return (
+        f"clear base days {text}; expected solar-world cases per split "
+        f"{', '.join(f'{k} {n:.0f}' for k, n in expected.items())}; "
+        f"every split reaches MIN_CASES pooled over seasons: {enough}; "
+        f"every season has a clear day (a season without one is not expected): {seasons or 'n/a'}"
+    )
 
 
 def check_grid_dates() -> str:

@@ -463,3 +463,58 @@ def test_n6_a_bank_whose_truth_does_not_subtract_the_solar_output_fails(
             seg.x = seg.base - seg.engine  # the solar output is no longer subtracted
     out = banks.component_checks(banks_by_name={"test": broken}, cal=cal)
     assert any("solar_subtract" in k for k in out["short"])
+
+
+# ---------------------------------------------------------------------- real-file smoke findings
+
+
+def test_the_d8_encoder_table_ignores_missing_weather_that_no_base_day_reads() -> None:
+    import e00087_common as common
+    import e00418_prep as prep418
+
+    grid = common.grid_times()
+    weather = np.random.default_rng(0).normal(size=(grid.len(), len(prep418.WEATHER)))
+    weather = weather.astype(np.float32)
+    weather[0] = np.nan  # the dense weather is missing at the grid's own edges
+    weather[-1] = np.nan
+    derived = common.derived_columns(valid_time=grid, latitude=54.0, longitude=-1.5)
+    day_start = np.array([48 * 400, 48 * 401, 48 * 402])
+    table = pretrain.raw_table_on_days(weather=weather, derived=derived, day_start=day_start)
+    assert table.shape == (3, 48, core.ENCODER_INPUT_COLUMNS)
+    assert np.isfinite(table).all()
+    weather[48 * 401 + 5] = np.nan  # a missing value inside a base day is still refused
+    with pytest.raises(ValueError, match="not finite"):
+        pretrain.raw_table_on_days(weather=weather, derived=derived, day_start=day_start)
+
+
+def test_a_season_without_a_clear_base_day_is_not_expected_but_a_silent_one_still_fails(
+    world: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cal = world[2]
+    bank = banks729.load_bank(path=banks.bank_path(root=world[0], kind="test"))
+    monkeypatch.setattr(banks, "MIN_CASES", 1)
+    keys = banks.expected_solar_keys(bank=bank)
+    assert keys
+    assert {k.split("/")[2] for k in keys if not k.startswith("solar_subtract")} == {"S1", "S2"}
+    cloudy = copy.deepcopy(bank)
+    for seg in cloudy.segments:
+        if seg.source == "S1":
+            seg.csi[:] = 0.1  # a month of the real record with no clear sky
+    assert not [k for k in banks.expected_solar_keys(bank=cloudy) if "/S1/" in k]
+    assert [k for k in banks.expected_solar_keys(bank=cloudy) if "/S2/" in k]
+    out = banks.component_checks(banks_by_name={"test": cloudy}, cal=cal)
+    assert not [k for k in out["short"] if "/solar/" in k], out["short"]
+    silent = copy.deepcopy(bank)
+    for seg in silent.segments:
+        seg.solar[:] = 0.0
+    short = banks.component_checks(banks_by_name={"test": silent}, cal=cal)["short"]
+    assert any("/solar/" in k for k in short)
+
+
+def test_the_minimum_cases_bar_applies_to_the_pool_of_a_kind_and_source() -> None:
+    counts = {
+        "solar/test/S2/winter": 12, "solar/test/S2/spring": 3, "both/test/S2/summer": 6,
+        "solar/test/S1/winter": 2, "solar_subtract/solar/test/S2/winter": 1,
+    }  # fmt: skip
+    pooled = banks.pooled_solar_cases(counts=counts)
+    assert pooled == {"test/S2": 21, "test/S1": 2}
