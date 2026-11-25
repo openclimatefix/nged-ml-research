@@ -7,6 +7,7 @@ series identifier, or a real value; log lines carry counts and scores. Files are
 The stages that need torch import `e00729_train` inside the function.
 """
 
+import hashlib
 import json
 import re
 import shutil
@@ -42,6 +43,139 @@ def write_json(*, path: Path, payload: dict) -> None:
 def read_json(*, path: Path) -> dict:
     """Read a JSON file."""
     return json.loads(path.read_text())
+
+
+RUN_MARKER: Final = "run_marker.json"
+"""Written by the `banks` stage; names the run, the sky rule, and the simulator ranges of the banks."""
+SUPERSEDED_NAMES: Final = (
+    "banks", "fits", "networks", "predictions", "scores", "margin.json", "verdict.json",
+    "selection.json", "figures", "PRIVATE/components", "PRIVATE/event_generator",
+)  # fmt: skip
+"""The outputs of an earlier run. A run that starts without a marker must find none of them.
+
+`PRIVATE/splits.md` is not among them: the run reads it.
+"""
+GATED_STAGES: Final = (
+    "timing", "screen", "choose", "ladder", "margin", "score", "figures", "series", "components",
+    "fit",
+)  # fmt: skip
+"""The stages that read fits or scores: each needs a passed gate on the banks now in use."""
+
+
+GATE_ATTEMPTS: Final = 2
+"""The realism gate runs once, and once more after the one permitted re-tune of the ranges."""
+
+
+def run_marker_payload() -> dict:
+    """Return what the run marker must hold for the code as it is now."""
+    ranges = hashlib.sha256(repr(sorted(core.RANGES.items())).encode()).hexdigest()[:16]
+    return {"run": core.RUN_ID, "sky_share": core.MIN_SKY_SHARE_SUN_UP, "ranges": ranges}
+
+
+def existing_outputs(*, root: Path) -> list[str]:
+    """Return the names, among `SUPERSEDED_NAMES`, that exist in the data folder and are not empty."""
+    found = []
+    for name in SUPERSEDED_NAMES:
+        path = root / name
+        if (path.is_dir() and any(path.iterdir())) or path.is_file():
+            found.append(name)
+    return found
+
+
+def gate_passed_on_current_banks(*, root: Path, expected: dict) -> bool:
+    """Return whether `scores/gate.json` records a pass on a marker equal to `expected`."""
+    path = root / "scores" / "gate.json"
+    if not path.exists():
+        return False
+    gate = read_json(path=path)
+    return bool(gate.get("pass")) and gate.get("marker") == expected
+
+
+def retune_allowed(*, root: Path, expected: dict, current: dict) -> str | None:
+    """Return why `banks` may not rebuild under changed ranges, or None when it may.
+
+    The one permitted re-tune needs exactly one gate attempt, which failed on the banks now on
+    disk, and a change of the ranges only (the run and the sky rule are equal).
+    """
+    attempts = sorted((root / "scores").glob("gate_attempt*.json"))
+    if len(attempts) != 1:
+        return f"{len(attempts)} gate attempts exist and the re-tune needs exactly 1"
+    attempt = read_json(path=attempts[0])
+    if attempt.get("pass") or attempt.get("marker") != current:
+        return "the gate attempt did not fail on the banks now on disk"
+    if current["run"] != expected["run"] or current["sky_share"] != expected["sky_share"]:
+        return "the run or the sky rule changed, and only the ranges may change"
+    return None
+
+
+def guard_run(*, stage: str) -> None:
+    """Refuse to run a stage on the outputs of another run.
+
+    The `banks` stage starts a run: it needs no output of an earlier run in the data folder, or a
+    run marker that matches (a resumed build), or a marker from changed ranges after exactly one
+    failed gate attempt and before any fit (the one permitted re-tune). Every other stage needs a
+    marker that matches the code, so it never reads banks, fits, or scores that an earlier run
+    wrote. The stages in `GATED_STAGES` also need a passed gate on the banks now in use.
+
+    Args:
+        stage: The stage name.
+
+    Raises:
+        RuntimeError: When the data folder holds outputs of another run, or no matching marker.
+    """
+    root = paths.data_root()
+    marker = root / RUN_MARKER
+    expected = run_marker_payload()
+    current = read_json(path=marker) if marker.exists() else None
+    if stage == "banks":
+        if current == expected:
+            return
+        if current is None:
+            stale = existing_outputs(root=root)
+            if stale == ["banks"] and not (root / "banks" / "summary.json").exists():
+                msg = (
+                    "banks/ holds an unfinished build (no summary.json, so a crash or a stop "
+                    f"during `banks`): move banks/ to {root.name}/unfinished_banks yourself, "
+                    "then run `banks` again"
+                )
+                raise RuntimeError(msg)
+            if stale:
+                msg = (
+                    f"the data folder holds outputs of an earlier run ({', '.join(stale)}) and no run "
+                    f"marker; move them to {root.name}/superseded_run_1 yourself, then run `banks`"
+                )
+                raise RuntimeError(msg)
+            return
+        fitted = [
+            n
+            for n in ("fits", "networks", "predictions")
+            if (root / n).exists() and any((root / n).iterdir())
+        ]
+        if fitted or (root / "margin.json").exists():
+            msg = (
+                f"the run marker differs from the code (run, sky rule, or ranges) and {', '.join(fitted) or 'margin.json'} "
+                "exist: move the outputs to superseded_run_N yourself"
+            )
+            raise RuntimeError(msg)
+        why = retune_allowed(root=root, expected=expected, current=current)
+        if why is not None:
+            msg = f"`banks` may not rebuild under a changed marker: {why} (verdict row 0 applies)"
+            raise RuntimeError(msg)
+        return
+    if stage in GATED_STAGES and current == expected:
+        if not gate_passed_on_current_banks(root=root, expected=expected):
+            msg = (
+                f"`{stage}` needs scores/gate.json with a pass on the banks now in use: run `gate`, "
+                "which has not passed (verdict row 0 applies after a second failure)"
+            )
+            raise RuntimeError(msg)
+        return
+    if current != expected:
+        msg = (
+            "no run marker matches the code (the banks were built by another run, other ranges, or "
+            f"not yet): run `banks` first, after moving earlier outputs out of {root}"
+        )
+        raise RuntimeError(msg)
 
 
 @dataclass
@@ -211,6 +345,7 @@ def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
         "leakage_pass": True,
     }
     write_json(path=summary_path, payload=summary)
+    write_json(path=paths.data_root() / RUN_MARKER, payload=run_marker_payload())
     return summary
 
 
@@ -230,10 +365,19 @@ def stage_gate(*, ctx: Context, log: Log) -> dict:
     Returns:
         The gate record (aggregates only).
     """
+    scores = paths.data_root() / "scores"
+    earlier = sorted(scores.glob("gate_attempt*.json"))
+    if earlier and read_json(path=earlier[-1])["pass"]:
+        msg = "the gate already passed; it is not run again"
+        raise RuntimeError(msg)
+    if len(earlier) >= GATE_ATTEMPTS:
+        msg = f"the gate has used its {GATE_ATTEMPTS} attempts (the first run and its one re-tune)"
+        raise RuntimeError(msg)
+    attempt = len(earlier) + 1
     train = banks.load_bank(path=bank_path(kind="train", seed=0))
     test = banks.load_bank(path=bank_path(kind="test"))
     cal_all = ctx.table.calendar
-    out: dict = {"shares": {}}
+    out: dict = {"shares": {}, "attempt": attempt, "marker": run_marker_payload()}
     passes = []
     for label, era, worlds in (
         ("net", data.ERA_NET, ("engine",)),
@@ -282,7 +426,8 @@ def stage_gate(*, ctx: Context, log: Log) -> dict:
     out["void"] = bool(gate["void"])
     out["pass"] = all(passes)
     log(f"gate BSP steps: pass {gate['pass']}, void {gate['void']}")
-    write_json(path=paths.data_root() / "scores" / "gate.json", payload=out)
+    write_json(path=scores / "gate.json", payload=out)
+    write_json(path=scores / f"gate_attempt{attempt}.json", payload=out)
     return out
 
 
@@ -1237,4 +1382,60 @@ def stage_series(*, ctx: Context, arch: str, log: Log) -> list[Path]:
         real_rows=real_rows, out_dir=paths.data_root() / "figures", log=log,
     )  # fmt: skip
     log(f"wrote {len(written)} time-series figures")
+    return written
+
+
+def stage_events(*, log: Log) -> list[Path]:
+    """Write the event-generator figures: simulated days, and the real engine record as aggregates.
+
+    The metered engine record is read only. Real series go only to `PRIVATE/event_generator`.
+
+    Args:
+        log: Receives one line per figure, with names only.
+
+    Returns:
+        The published figures (run `svgo` on each before committing).
+    """
+    import e00729_event_figures as events
+
+    test = banks.load_bank(path=bank_path(kind="test"))
+    written = events.write_event_figures(
+        segments=test.segments, record=data.metered_record(), out_dir=paths.data_root() / "figures",
+        private_dir=paths.private_dir() / "event_generator", log=log,
+    )  # fmt: skip
+    log(f"wrote {len(written)} published event-generator figures")
+    return written
+
+
+def stage_components(*, arch: str, log: Log) -> list[Path]:
+    """Write the component table and the head figures from stored predictions of arms G1 and G2.
+
+    The stage reads the stored test bank, the first training bank, and the stored test predictions
+    of seeds 0 to 2. It fits nothing, scores nothing new, and reads no real file.
+
+    Args:
+        arch: The chosen architecture.
+        log: Receives one line per file written.
+
+    Returns:
+        The published figures (run `svgo` on each before committing).
+    """
+    import e00729_component_scores as comp
+
+    test = banks.load_bank(path=bank_path(kind="test"))
+    train = banks.load_bank(path=bank_path(kind="train", seed=0))
+    predictions = {
+        head: {
+            seed: load_predictions(arm=arm, arch=arch, seed=seed, name="test")
+            for seed in core.ARCH_SEEDS
+        }
+        for head, arm in comp.HEADS.items()
+    }
+    root = paths.data_root()
+    written = comp.write_component_outputs(
+        test_segments=test.segments, train_segments=train.segments, predictions=predictions,
+        out_dir=root / "figures", private_dir=paths.private_dir() / "components",
+        scores_dir=root / "scores", log=log,
+    )  # fmt: skip
+    log(f"wrote {len(written)} published component figures")
     return written

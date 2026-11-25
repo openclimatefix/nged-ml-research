@@ -778,6 +778,30 @@ zero.
 the forecast moves when the neighbours' telemetry is missing), and all host history masked at
 prediction for F4 and M* (whether the neighbours' rows let F4 forecast a host without readings).
 
+## Known fault in the follow-share divisor
+
+**The follow-share function of this experiment averages the injected change from the wrong start,
+which inflates the absolute follow shares by about 3% to 9%.** The function is `visible_change` in
+`e00715_era.py`. Its divisor, the mean injected change over the host's visible history rows, starts
+at midnight of the onset day (`onset_day * 48`) instead of at the onset half-hour. The rows between
+midnight and the onset carry no injected change, so they pull the divisor down and push every follow
+share up.
+
+**A fault audit in experiment 728 measured the size of the bias.** Its G-H gate, a harness oracle
+test, feeds the scorer an oracle that follows a flat permanent step exactly. On experiment 728's g2
+events, the oracle reads about 1.056 instead of 1.000. By origin day 7, 10, 14, and 21, the readings
+are 1.093, 1.062, 1.042, and 1.026.
+
+**Two kinds of reading in this page are affected.** The absolute era follow shares are
+inflated by about 3% to 9%, with the
+larger bias at the earlier origins. The gap reading S4 is inflated by about the same proportion,
+because the gap is a difference of follow shares. The AUROC readings S1 to S3 compare how arms rank
+permanent against temporary events, so they move little.
+
+**The verdicts and the published numbers on this page are left as they were.** The fix landed in
+experiment 728's scorer, which now starts the window at the onset half-hour. The stored forecasts of
+experiment 715 were not re-scored.
+
 ## Known-answer checks
 
 **Every threshold is fixed now.** The known-answer script writes `work/known_answers_passed.json`,

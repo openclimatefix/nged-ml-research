@@ -52,22 +52,23 @@ you could not name without searching. This repository holds no production servin
 degradation rule, so an experiment never touches either.
 
 - **Every size follows this order, and the code review comes before the first run.** Sonnet writes
-  the plan and the code. A fresh Sonnet agent that did not write the code reviews it before the first
-  fit or scoring run that produces numbers you will quote (leakage, the fit stopping at the fold's
-  `train_end`, the scoring, and a match with any recipe the code copies), and you fix the problems.
-  If the first review flagged many problems, a second fresh Sonnet agent reviews the fixed code.
-  Then run the code, review the results, write up, and review the write-up. A free re-score of
+  the plan and the code. A fresh Sonnet agent that did not write the code reviews it before the
+  first fit or scoring run that produces numbers you will quote (leakage, the fit stopping at the
+  fold's `train_end`, the scoring, and a match with any recipe the code copies), and you fix the
+  problems. If the first review flagged many problems, a second fresh Sonnet agent reviews the fixed
+  code. Then run the code, review the results, write up, and review the write-up. A free re-score of
   stored forecasts follows the same order.
 - **Simple** is a permutation of settings the pipeline already has (input-feature sets, a
   hyperparameter, a loss), with no new data and no new method. It gets the order above with one
-  Sonnet code review, one Sonnet reviewer who checks the write-up against the printed report, and one
-  Sonnet reviewer who runs the prose review that "The write-up" describes.
+  Sonnet code review, one Sonnet reviewer who checks the write-up against the printed report, and
+  one Sonnet reviewer who runs the prose review that "The write-up" describes.
 - **Anything else** adds a Sonnet review of the plan, and the maintainer reviews the plan only if
   asked. It gets the same Sonnet code review before the first run, a Sonnet review of the write-up
   against the printed report, and a second Sonnet reviewer who runs the prose review.
-- **Every review defaults to Sonnet.** Use Opus for a review only when the experiment is very
-  complex or the result is very surprising, because two Opus reviews per experiment cost too many
-  credits.
+- **Reviews default to Sonnet, except where the manager's brief names Opus.** A manager assigns Opus
+  to the review of a plan, of risky code, or of a result that decides what happens next. With no
+  manager, use Opus only when the experiment is very complex or the result is very surprising,
+  because two Opus reviews per experiment use too much quota.
 
 Either size then runs the triggers in "Audit before merge", below, and gets an audit if one fires.
 
@@ -140,25 +141,24 @@ related experiments, and is a folder under `themes/` with `index.md`, `experimen
 `plan.md`, plus an entry in the `mkdocs.yml` navigation.
 
 **`take_home_message` is two or three plain sentences saying what the result means for the forecast,
-and it is required for every experiment with an id of 103 or more.** Write it for a reader who has not
-opened the page, with no jargon, and put the effect on the forecast first. It is shown in the
+and it is required for every experiment with an id of 103 or more.** Write it for a reader who has
+not opened the page, with no jargon, and put the effect on the forecast first. It is shown in the
 Experiments table of each theme. `uv run python scripts/mkdocs_hooks/experiment_tables.py --check`
 validates the whole front matter, and `... --theme <theme>` prints a theme's Experiments table.
 
 **`advice` is a YAML list of one-line imperatives for future experiments, and a result is not
-finished without it.** Each item says what to do and where it applies, and ends with a pointer to the
-evidence, such as a planned contrast (C1) or a section of the write-up. For example: "Put recent
+finished without it.** Each item says what to do and where it applies, and ends with a pointer to
+the evidence, such as a planned contrast (C1) or a section of the write-up. For example: "Put recent
 power in the stage 2 calibrator, not in stage 1b, for Primary substations (C1)." Write each item as
 a folded YAML scalar (`- >-`), wrapped at 100 characters, so that it makes sense without the page
 around it. Write the items from the write-up's lessons and headline contrasts, and drop any item
 that no number or statement in the write-up supports. The field is separate from the `lessons`
 summary and the page's lessons section, which explain the reasoning, and from `production_status`,
 which says whether the winner is ready for production. Before planning a new experiment, read the
-earlier advice with
-`awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f' docs/ml-experiments/*/result.md`,
-which prints a whole list however long it is, and say in the plan which items the plan follows and
-which it departs from. The overview's "What the experiments taught us so far" section is the
-curated roll-up of the `advice` lists.
+earlier advice with `awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f'
+docs/ml-experiments/*/result.md`, which prints a whole list however long it is, and say in the plan
+which items the plan follows and which it departs from. The overview's "What the experiments taught
+us so far" section is the curated roll-up of the `advice` lists.
 
 A plan also begins by reading `docs/ml-experiments/background/index.md`, and then
 `docs/ml-experiments/data-processing.md`, which lists the processing that the data needs before a
@@ -183,14 +183,14 @@ model trains or scores on it.
   tail holds enough draws. A contrast counts as a gain by the `study` skill's rule: the interval
   over repeated seeds excludes zero.
 - **A climatology row.** Include a month-by-half-hour climatology from
-  `baseline_forecasters.climatology.ClimatologyForecaster` (local month, half-hour, and weekend flag,
-  smoothed over neighbouring cells), trained on the fold's training window. The climatology has no
-  seed, so repeat its rows once per seed of the arms it is compared with.
+  `baseline_forecasters.climatology.ClimatologyForecaster` (local month, half-hour, and weekend
+  flag, smoothed over neighbouring cells), trained on the fold's training window. The climatology
+  has no seed, so repeat its rows once per seed of the arms it is compared with.
 - **No calendar memorisation.** A model must not be able to memorise the calendar position. The
   stage 1 pilot found a control whose error changed by 1.1 to 3.4 points when its hour and
-  day-of-year columns were removed. Use no calendar columns, or include a control without them. Group
-  any inner early-stopping or cross-validation split by valid time, because repeated ensemble runs
-  of one valid time would otherwise sit on both sides of the split.
+  day-of-year columns were removed. Use no calendar columns, or include a control without them.
+  Group any inner early-stopping or cross-validation split by valid time, because repeated ensemble
+  runs of one valid time would otherwise sit on both sides of the split.
 - **The leaderboard.** An experiment whose output has `PowerForecast`'s columns and covers the
   reference experiment's row keys may post to the leaderboard, as the `study` skill describes.
   The scoring script lives in the production repository, so a session here prepares the file and
@@ -208,8 +208,9 @@ model trains or scores on it.
 
 **A pre-registered gate stays pre-registered.** When a reading chosen after the scores were seen
 changes the verdict, report the pre-registered result first, label the later number as post hoc, and
-say plainly that the experiment does not pass the gate (experiment 692: 0.45 against a gate of 0.80,
-and 0.75 post hoc).
+say plainly that the experiment does not pass the gate. Write the verdict mapping (which result
+gives which verdict) before the run, and label every number that comes before the final scoring as
+interim.
 
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
@@ -225,8 +226,8 @@ practice itself.** State in the plan which of them the experiment follows.
   all drop the half-hours that the `substation_zero` rule flags. Report how many were dropped per
   fold.
 - **Cut the noisy start of a short-history Primary.** Drop every D15 and D18 row before 2025-03-01,
-  in training, lags, inference inputs, and scoring actuals. Experiment 399 found this cut lowers
-  CRPS at both Primaries by 1% to 2% and that no longer cut helps both.
+  in training, lags, inference inputs, and scoring actuals. The cut lowered CRPS at both Primaries
+  by 1% to 2%, and no longer cut helped at both Primaries.
 - **Save every fitted model** (an XGBoost booster as `.ubj`, a neural network as its state file) in
   the experiment's data folder, never in git, so a later experiment can run prediction-only checks.
 - **Reuse stored predictions** as controls and references before fitting anything, and say which
@@ -244,17 +245,52 @@ practice itself.** State in the plan which of them the experiment follows.
   event starts and ends and show how each forecast responds. State the unlogged-event caveat: NGED's
   logs may miss events, so the clean-lag rows may hold events no label covers, the harm table is
   optimistic, and the real-event slices undercount.
+- **Plot the training and validation losses, where appropriate.** An experiment that fits a neural
+  network, or any model that stops early on a validation set, includes a plot of the training loss
+  and the validation loss against the epoch (or boosting round) for each arm, with the epoch of the
+  stored model marked. Show one fold and one seed per arm where the full set would crowd the plot,
+  and say which fold and seed. The plot lets the reader see overfitting, a validation loss that
+  still falls when training stops, and an arm whose losses behave differently from the others.
+  Save each fit's loss history in the experiment's data folder beside the model, so that the plot
+  needs no refit. Leave the plot out, and say so in one line, when the experiment fits no model,
+  reuses stored models for prediction only, or fits a closed-form model with no iterations.
 - **Open every pull request as a draft**, run the local checks, and mark it ready only when the
   reviews are triaged.
+- **Show that every input with a valid time carries only what was known at the forecast origin.**
+  Show it for weather, capacity factors, and every other such input, in the plan and by a test. A
+  score whose weather input looks ahead is voided. State any other look-ahead on the page, with the
+  series and folds it affects.
+- **Stream scoring one fold or one seed at a time, and state the expected peak memory in the plan.**
+  A scorer that loads every seed at once scales with the seed count. Estimate the peak from column
+  widths and row counts, run it under a memory-capped scope, and record the measured peak.
+- **Write a per-phase time log** with each job's device (CPU or GPU), start time, and end time. Sum
+  it into GPU-process-hours after each phase, and stop at the GPU-hours line the plan sets and ask
+  the manager (or the maintainer, when no manager runs).
+- **Never let a script run a stage past its review gate.** A phases script checks that the review
+  marker for the next phase exists before it starts that phase. A run, an edit, or a calculation
+  that came before its review is a breach: disclose it in `result.md` and the PR body, and treat its
+  outputs as unreviewed until the review passes.
+- **Record the new hash of every edited reviewed script, and get a re-check limited to the diff
+  before the script runs again.** A change to a loader also gets a read-only equivalence check
+  before the edit.
+- **Test a harness at mid-day onsets, and check its output against an oracle.** A unit test that
+  places an event at midnight can hide a divisor that starts the day at midnight instead of at the
+  event's first half-hour, and a divisor that started the day at midnight inflated one earlier
+  experiment's follow share (the share of an injected load shift that the forecast copies) by 3% to
+  9%. For any measure of how a forecast follows an event, include a test with a mid-day onset and an
+  oracle check of the share.
+- **Check anonymisation before the PR leaves draft.** Published numbers for NGED's metered
+  generators are aggregates only, with no generator name, identifier, size, dates, or register
+  values.
 
 ## Use the compute the slot gives you
 
 **Run independent work in parallel, up to the slot's budget of cores and GPU memory.** Series,
 seeds, arms, folds, and refits that do not read each other's output can run side by side. A job that
 fits many small models, such as one per series or one tiny update per day, cannot keep a GPU or many
-cores busy one model at a time. Experiment 34 ran its daily warm-start fits for 16 series one after
-another, at about 2.7 of its 12 cores and almost no GPU, for 3.3 hours. Running 4 to 8 series at a
-time would have taken under an hour.
+cores busy one model at a time. Fitting 16 series one after another at about a quarter of the slot's
+cores and almost no GPU took 3.3 hours, where running 4 to 8 series at a time would have taken under
+an hour.
 
 - **Check utilisation in the first minutes of a long run.** Look at `uptime`, `nvidia-smi`, and the
   job's own CPU use. If the job uses well under its quota and will run for more than about 30
@@ -263,27 +299,29 @@ time would have taken under an hour.
   slot's cores, and the workers' GPU memory adds up to no more than the slot's share. Set each fit's
   memory cap from its measured peak, and run no more concurrent fits than the slot's cores and free
   memory allow. Ask the manager before exceeding any of the three.
-- **Keep the results independent of the schedule.** Fix the seed of each job, write each job's output
-  to its own file, and write it atomically, so that a run in parallel gives the numbers a run in
-  series would, and a crashed worker is rerun without touching the others.
+- **Keep the results independent of the schedule.** Fix the seed of each job, write each job's
+  output to its own file, and write it atomically, so that a run in parallel gives the numbers a run
+  in series would, and a crashed worker is rerun without touching the others.
 
 ## Keep the theme's Research plan page current
 
 **Update the owning theme's Research plan page (`docs/ml-experiments/themes/<theme>/plan.md`) in the
 first commit that adds the `planned` `result.md`, and again in the pull request that adds the
 finished write-up.** An experiment opens one pull request, when its result is ready, and the plan
-commit is the first commit in that pull request's history. No pull request is opened at plan time. A
-change to `src/studies/` that the experiment needs is the exception: open its pull request as
-soon as the module is ready for review, because the module needs its own review. The planning commit
-updates the experiment's row in the priority table at the top of the page with its id, the question
-in one line, the priority, what it waits for, and the state, and commits the `result.md` with
-`status: planned`, which the page's generated planned-experiments table then lists. The finished
-commit deletes that row and the experiment's proposal section from the page, sets the final
-`status`, `verdict`, and `production_status` in the front matter, and writes `take_home_message`.
-Nothing else is edited: the Experiments table of the theme, and the candidates table on the
-overview, are generated from the front matter. An idea the maintainer has agreed to run but that has
-no folder yet goes in the priority table marked "Proposed". An experiment that ends `invalid` or
-`failed` keeps its `result.md`, and its `take_home_message` says why.
+commit is the first commit in that pull request's history. No pull request is opened at plan time
+unless the manager's brief asks for a draft plan PR, which then becomes the experiment's one pull
+request with the plan commit first in its history. A change to `src/studies/` that the experiment
+needs is the exception: open its pull request as soon as the module is ready for review, because the
+module needs its own review. The planning commit updates the experiment's row in the priority table
+at the top of the page with its id, the question in one line, the priority, what it waits for, and
+the state, and commits the `result.md` with `status: planned`, which the page's generated
+planned-experiments table then lists. The finished commit deletes that row and the experiment's
+proposal section from the page, sets the final `status`, `verdict`, and `production_status` in the
+front matter, and writes `take_home_message`. Nothing else is edited: the Experiments table of the
+theme, and the candidates table on the overview, are generated from the front matter. An idea the
+maintainer has agreed to run but that has no folder yet goes in the priority table marked
+"Proposed". An experiment that ends `invalid` or `failed` keeps its `result.md`, and its
+`take_home_message` says why.
 
 **Name every experiment in a series with the same topic words in its slug, so a reader can find the
 series by eye.** Write the slug as a few words naming the topic and the part, such as
@@ -313,8 +351,8 @@ The loop has two steps, repeated:
     - **The results are positive.** Opus designs the next experiment, which builds on the finding,
       and the loop repeats.
     - **The results are inconclusive or negative, and the series has run only one experiment.** Do
-      not stop yet. Opus designs a second experiment that attacks the problem from a different angle,
-      such as a different signal, a different data source, or a different way of scoring.
+      not stop yet. Opus designs a second experiment that attacks the problem from a different
+      angle, such as a different signal, a different data source, or a different way of scoring.
     - **The results are still negative after at least two experiments.** Stop the series. The last
       write-up says what was tried, what the data showed, and what would have to change for another
       attempt to be worth running.
@@ -347,14 +385,15 @@ committed. A Sonnet agent writes it from the write-ups and one Sonnet agent revi
 evaluation protocol (`docs/ml-experiments/evaluation-protocol-<family>.md`) defines the headline
 metric, the folds, the tolerances, the minimum gain by tier, and the adoption conditions. Every
 `change` experiment records `protocol: <family>-v<N>` in its front matter, and
-`docs/ml-experiments/research-default-log.md` lists each family's versions. Read the rule page before
-planning any experiment that could improve a family's forecast. Do not write a metric, a tolerance,
-or a minimum gain into the plan for a `change` experiment, because the family's protocol owns them.
+`docs/ml-experiments/research-default-log.md` lists each family's versions. Read the rule page
+before planning any experiment that could improve a family's forecast. Do not write a metric, a
+tolerance, or a minimum gain into the plan for a `change` experiment, because the family's protocol
+owns them.
 
 **Naming checklist for a `change` experiment.**
 
-- Set `kind: change` in the front matter, and `kind: other` for a diagnostic, an audit, a data check,
-  or a detection or decision study.
+- Set `kind: change` in the front matter, and `kind: other` for a diagnostic, an audit, a data
+  check, or a detection or decision study.
 - Cite the version by its full name in the plan, in every `result.md`, and in the pull-request body,
   for example "default plus x versus Primary demand research default 1". Never write "default 3" or
   "v3" alone.
@@ -372,9 +411,9 @@ or a minimum gain into the plan for a `change` experiment, because the family's 
   version's name, and add a row to the log in the same pull request. If they do not, the verdict
   stays and the result is a candidate.
 
-**`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls
-under the stated threshold.** It is not `inconclusive`, because the direction is established. The
-write-up says how large the gain is and what the change costs, and the experiment is flagged
+**`small gain` is the verdict for an interval that excludes zero in the predicted direction but
+falls under the stated threshold.** It is not `inconclusive`, because the direction is established.
+The write-up says how large the gain is and what the change costs, and the experiment is flagged
 `candidate`. A change that wins on the gain condition but is not adopted is also a "candidate" in
 the research-default rule's sense, which is separate from `production_status: candidate` and from
 `production_status: adopted`, which mean production. The rule's rebase section says how a candidate
@@ -391,14 +430,15 @@ next release" table is the agenda for the maintainer's release review.
 
 **The pull request that cuts a model release records which experiments it adopted.** In that pull
 request, set `production_status` to `adopted` and `adopted_in` to the model release number in each
-incorporated experiment's `result.md`, and add a row to `docs/live_service/model-releases.md`
-listing the experiments the release incorporates. The pull requests that port the winners earlier do
-not set `adopted_in`, because the release number does not exist until the release is cut. A later
-experiment that overturns an adopted result sets `production_status` to `superseded` on the old
-experiment and names the new one in its `take_home_message`. The production repository owns the
-release routine (its `release-model` skill) and the release log (`docs/live_service/model-releases.md`,
-published at <https://openclimatefix.github.io/nged-substation-forecast/live_service/model-releases/>).
-A session here sets the two front-matter fields and leaves the release log to that repository.
+incorporated experiment's `result.md`, and add a row to the model-releases log in the production
+repository listing the experiments the release incorporates. The pull requests that port the winners
+earlier do not set `adopted_in`, because the release number does not exist until the release is cut.
+A later experiment that overturns an adopted result sets `production_status` to `superseded` on the
+old experiment and names the new one in its `take_home_message`. The production repository owns the
+release routine (its `release-model` skill) and the release log
+(`docs/live_service/model-releases.md`, published at
+<https://openclimatefix.github.io/nged-substation-forecast/live_service/model-releases/>). A session
+here sets the two front-matter fields and leaves the release log to that repository.
 
 ## The write-up
 
@@ -490,8 +530,8 @@ produced it. An experiment that plots feature importance follows the recipe in t
 
 ## Running a night's experiments
 
-When several experiment sessions run at once, the `ml-experiment-manager` skill covers the queue, the
-compute slots, and the merging.
+When several experiment sessions run at once, the `ml-experiment-manager` skill covers the queue,
+the compute slots, and the merging.
 
 The maintainer and Claude agree the next night's experiments by day, each as a committed `result.md`
 with status `planned`. The overnight session:
@@ -524,39 +564,38 @@ experiment, such as a control arm or a scoring rule, in this skill and not on th
 ## Audit before merge
 
 **A review that checks the printed numbers against the stored predictions cannot catch a method that
-is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.**
-Experiment 104 showed why. Its numbers review confirmed every printed number. An audit afterwards
-(`briefs/e104_audit.md`, in the private `data/ml-experiments/` folder) found that the residual
-spread shifted each forecast by the previous year's bias, which reversed two of the headline
-conclusions. Three failed controls had been explained away instead of investigated.
+is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.** In
+one experiment, the numbers review confirmed every printed number, yet an audit afterwards found
+that the residual spread shifted each forecast by the previous year's bias, which reversed two of
+the headline conclusions. Three failed controls had been explained away instead of investigated.
 
 **An audit is triggered when any of these holds:**
 
 1. **A control fails:** a positive control, a known-answer test, or a placebo.
 2. **A result contradicts its own prediction or an earlier experiment's finding,** and the
-   experiment's session has not tested an explanation and recorded it in the write-up. Experiment
-   87's solar offset lowered the score by 0.010 points against a predicted 0.10 to 0.15, although
-   experiment 64 had found a gain of 0.152.
+   experiment's session has not tested an explanation and recorded it in the write-up. A solar
+   offset that improved the score by only 0.010 points, against a predicted gain of 0.10 to 0.15
+   points and an earlier experiment's gain of 0.152 points, is an example.
 3. **The quantile-score contrast and the same contrast on the error of the mean or median forecast
    point in different directions.**
-4. **Leaving one site out flips the sign or the verdict of a planned contrast.** Experiment 104's C1
-   was −0.20 with D14 and +0.13 without it. A site scoring more than twice the median across sites
-   is a prompt to run the leave-one-out check, not a trigger, because with five sites that ratio is
-   noisy.
+4. **Leaving one site out flips the sign or the verdict of a planned contrast.** One planned
+   contrast was −0.20 with a site and +0.13 without it. A site scoring more than twice the median
+   across sites is a prompt to run the leave-one-out check, not a trigger, because with five sites
+   that ratio is noisy.
 5. **A nested arm beats the arm that contains it,** such as an arm with the same model given less
    input, **or a control that should change nothing moves the score by more than its own paired
    interval's half-width.**
 6. **A headline interval is more than twice as wide, or less than half as wide,** as the same
    contrast's interval in a sister experiment on the same rows.
-7. **A later experiment's design depends on this result's headline number or sign, and the result has
-   not been replicated.** The ordinary "what the next experiment should answer" handoff of an
+7. **A later experiment's design depends on this result's headline number or sign, and the result
+   has not been replicated.** The ordinary "what the next experiment should answer" handoff of an
    exploratory series does not count on its own.
 
 **Who runs it, and when.** The manager, or the experiment's own session when no manager is running,
 starts a fresh Sonnet agent with the audit brief, or an Opus agent when the experiment is very
-complex or the result very surprising. The agent that wrote the experiment never audits it.
-The audit runs after the code and write-up reviews and before the prose review. An audit is worth
-its cost even when credits are short, because a wrong method poisons every experiment built on it. The
+complex or the result very surprising. The agent that wrote the experiment never audits it. The
+audit runs after the code and write-up reviews and before the prose review. An audit is worth its
+cost even when credits are short, because a wrong method poisons every experiment built on it. The
 audit brief differs from a review brief: the agent re-derives the headline contrasts from the raw
 stored predictions, by its own code, and tries to break them. It checks each method's assumptions,
 such as how quantiles are built, how a base margin enters, and how a held value is extrapolated. It
@@ -600,15 +639,19 @@ experiment as finished, so the maintainer never has to sweep up after the sessio
 
 **Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
-`experiment_tables.py --check`. A failure found by CI costs a ten-minute rerun.
+`experiment_tables.py --check`. A failure found by CI costs a rerun of about 6 minutes. The
+recurring failures are line length in docstrings and markdown (MD013), `pydoclint` DOC201 (a missing
+`Returns:` section), and an SVG without a final newline.
 
-**Open the pull request as a draft, and mark it ready only when you are ready to merge.** CI does not
-run on a draft pull request, so pushes to a draft cost no CI minutes. Open the pull request with
+**Open the pull request as a draft, and mark it ready only when you are ready to merge.** CI does
+not run on a draft pull request, so pushes to a draft cost no CI minutes. Open the pull request with
 `gh pr create --draft`. When the local checks pass and the reviews are triaged, run `gh pr ready N`,
-which starts CI once. Wait for the `ci` check to pass before you merge. Every later push to a ready
-pull request runs CI again, so batch the fixes into one commit. If `ci` shows "skipping" after the
-ready-for-review click, the draft gate has raced the ready event and `ci` will never run. Push one
-more commit, and merge only after a real green run on the final head.
+which starts CI once. When a manager session is running, leave the PR as a draft and report its head
+sha instead, because the manager marks it ready and merges it. Wait for the `ci` check to pass
+before you merge. Every later push to a ready pull request runs CI again, so batch the fixes into
+one commit. If `ci` shows "skipping" after the ready-for-review click, the draft gate has raced the
+ready event and `ci` will never run. Push one more commit, and merge only after a real green run on
+the final head.
 
 **Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its
 `take_home_message`.** The agent receives the files and no account of the reasoning behind them,

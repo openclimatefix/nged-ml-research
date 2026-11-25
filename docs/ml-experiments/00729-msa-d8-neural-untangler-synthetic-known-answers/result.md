@@ -9,7 +9,7 @@ theme: solar-disaggregation
 also_relevant_to:
   - gross-demand-simulation
 status: finished
-verdict: not supported
+verdict: invalid
 kind: other
 size: >-
   Anything else. (1) It stores about 50 fitted neural networks, synthetic training and test banks,
@@ -97,54 +97,59 @@ metric: >-
   coverage; q05 and q95 coverage; the engine head's mean absolute error and running F1 on the
   metered engine record; false-alarm shares on real days.
 best_arm: >-
-  No arm. Arm D-quantile has the lowest import score of the neural networks (0.227 points against
-  P0f's 0.118), and arm D, the headline arm, scores +0.258 points above P0f on import rows against a
-  limit of 0.12. Against B* on all rows, arm D is 33.878 points better (interval -40.018 to
-  -27.593).
+  None. The run is invalid, because every simulated solar world of source S2 had no solar output, so
+  no arm is ranked.
 headline: >-
-  Arm D beats the demand-climatology rule B* by 33.878 points of D8's capacity in signed CRPS on
-  synthetic days (interval -40.018 to -27.593), but it scores 0.258 points above the point reading
-  P0f on synthetic import half-hours, against a pre-registered limit of 0.12 points, so the
-  verdict is not supported.
+  The run is invalid and its scores should not be used: the satellite-sky rule of the solar
+  simulator counted night half-hours, so every simulated solar world of source S2 had no solar
+  output, and 37.5% of the test rows sat in a world with a silent solar farm.
 lessons: >-
-  The neural network beats the demand-climatology rule B1 by 33.878 points, almost all of it on
-  import half-hours where B1 puts a probability near 0.40 on reverse flow, and the gain is measured
-  on a synthetic world only. The two-lobe head with its 0.5-point floor scores worse than the
-  reading on import half-hours, and so do the sign-only and 11-quantile heads, although both score
-  lower than arm D on the point means. The BSP steps did not lower the score (C4 is +0.149 points).
-  The sign calibration bar fails on four bins, and no real signed truth exists for D8. Every number
-  is interim.
+  Every simulated solar world of source S2 had zero solar output, because the sky rule needed 40
+  finite half-hours in a day and the irradiance is undefined at night, where a UK day has at most
+  about 30 sun-up half-hours. The scores, the verdict row, arm B, the solar head, and the gate's
+  solar-era shares of the first run are therefore unreliable. The engine simulator was not
+  affected. No fit was repeated after the fix, so the page keeps the first run's numbers only as a
+  record, each labelled as coming from the invalid first run.
 take_home_message: >-
-  A neural network trained on synthetic days finds the direction of D8's power flow much better
-  than rules built from D8's past demand, but the neural network adds error on the half-hours when
-  D8 imports power, and D8 imports on almost all half-hours. The harm check set in advance fails,
-  so the experiment does not support using this neural network, and no real signed record exists to
-  confirm the gain. The sign-only and quantile versions score lower than the headline neural
-  network on the point means and still fall short of simply reading the meter on import
-  half-hours.
+  The experiment is invalid: a bug silenced half of the simulated solar farms, so it does not show
+  whether a neural network can rebuild the sign of D8's power from its magnitude. Read the
+  write-up of experiment 730 and the later experiments in this line instead of the scores on this
+  page.
 advice:
   - >-
-    Check the harm on import half-hours against the reading with the same lobe floor before reading
-    any reverse-flow gain, and fail the arm if the excess passes the limit (H1).
+    Smoke-check, before any fit, that every simulated component is nonzero where it should be: for
+    each world type and each solar source, count the segments and half-hours with output, and fail
+    when a component that the world includes is zero throughout.
   - >-
-    Do not read a gain over a demand climatology as evidence for the neural network, because
-    B1 scores 34.664 points over all rows and any neural network beats it by more than 30 points
-    (C1, Table 3).
+    Call the real loader in a test, with a small fixture shaped like the real file, because a test
+    that builds the loader's output by hand cannot catch a rule that never passes on real data.
   - >-
-    Test an output head other than the two-lobe head with a 0.5-point floor on the same synthetic
-    banks before choosing a head, because the sign-only head and the 11-quantile head score lower
-    than arm D on the point means of all, import, and reverse-flow rows (C6, C13, Table 3).
+    Count a quality threshold over the half-hours where the quantity exists (the sun-up half-hours
+    for irradiance), and not over the whole day, because a threshold copied from a quantity that
+    exists at night never passes for a quantity that does not.
   - >-
-    Do not expect the bulk supply point steps to lower the score when they are added to the
-    sunshine inputs of a synthetic-day neural network, because C4 is +0.149 points (interval 0.068
-    to 0.455).
-  - >-
-    Report the calibration of P(X<0) by reading band, because arm D over-states reverse flow in the
-    bins from 0.1 to 0.8 and no arm is sure of the sign where the reading is under 1 MVA (the
-    ambiguity read-out, Table 5).
+    Read a gate that compares realism shares with a second question: does each component the gate
+    averages over actually contribute, because a silent component moves the shares and the
+    re-tune compensates for it.
 production_status: not-for-production
 adopted_in: none
 ---
+
+**This experiment is invalid, and none of its numbers should be used as a result.** The flaw was in
+the solar simulator: the sky rule counted all 48 half-hours of a day, including the night half-hours
+where the satellite irradiance is undefined, against a threshold of 40, and a UK day has at most
+about 30 sun-up half-hours. The rule therefore never passed, and every simulated solar world of
+source S2 (the PV model driven by CAMS) had no solar output. In the stored test bank, 24 of the 64
+segments, and 37.5% of the test rows, sat in a world that should hold solar output and held none.
+The training banks had 21% to 22% of their rows in such worlds, and the validation bank 25%.
+
+**The flaw affects all the synthetic-world scores, the verdict row, arm B and the solar head, and
+the solar-era shares of the realism gate.** The re-tune that raised the solar capacity range was
+chosen against those shares, so it is affected too. The engine simulator was not affected. The
+real-day checks read neural networks that were trained on the flawed banks, so they are affected
+as well. The maintainer decided that no fit is repeated. The page keeps the first run's numbers and
+figures as a record, and every one is labelled as coming from the invalid first run. Readers should
+look at the write-up of experiment 730 and the later experiments in this line.
 
 **We ask whether a neural network can turn a day of D8's unsigned reading into an estimate of D8's
 signed power, with honest uncertainty.** D8 is a primary substation (a "Primary"), which steps the
@@ -172,21 +177,58 @@ held-out synthetic days, the neural network scored far better than the best rule
 shape of the day, mostly because the rule gives ordinary import half-hours a high probability of
 reverse flow. On the half-hours where D8 imports power, which are almost all half-hours, the neural
 network scored worse than simply reading the meter, by more than the limit we set before the first
-fit. The rules of the plan therefore give the verdict `not supported`. Every number below is
-interim.
+fit. The rules of the plan gave the verdict `not supported` on those numbers. The run is invalid,
+so every number below is from the invalid first run.
 
 ## Result
 
-**The verdict is `not supported`, and verdict row 3 sets it: the harm check on import half-hours
-(H1) fails while the real-day check (H2) passes.** On the synthetic test half-hours where D8 imports
-power, arm D scores a signed continuous ranked probability score (CRPS) of 0.376 points and the
-reference P0f scores 0.118 points. The
-excess is +0.258 points against the pre-registered limit of 0.12 points. The normalised error of the
-median is also 0.379 points above P0f's, against its limit of 0.25 points. Both limits fail. The
-manager ruled that no simulator range is re-tuned and no neural network is refitted after this
-reading.
+*Every number in this section is from the invalid first run.*
+
+**The code changed after the first run, and the table gives each file's git blob before and after.**
+The commit before the changes is `c9d963946`, and no stage was run after them. The changes are
+these: the satellite sky of a farm-day now counts when 40 of 48 (83%) of its sun-up half-hours are
+finite, instead of 40 half-hours of the whole day; the five simulator ranges that the first run
+re-tuned are back at their registered values (solar capacity 5 to 150 points); every stage refuses
+to run unless the data folder carries a run marker that matches the code, and the gate refuses a
+third attempt. The tests and the real-file smoke test gained checks of the real `farm_set`, of an S2
+draw on clear days, and of the guard.
+
+| File | Blob before | Blob after |
+|---|---|---|
+| `e00729_cli.py` | edf396f8e0 | 7f4dd1e69c |
+| `e00729_core.py` | 18c72b6967 | a1b3ef7d71 |
+| `e00729_data.py` | 9b1006eca3 | 4f835d466e |
+| `e00729_sim.py` | 34aae11579 | 81e1263b3c |
+| `e00729_stages.py` | 9245f09b57 | b4db685dbf |
+| `smoke_real_files.py` | 828d71b22a | ab8cc661ab |
+| `synthetic_world.py` | 0ad4b2de69 | de09a505a5 |
+| `test_e00729_core.py` | 25e335e00a | 254ae0021d |
+| `test_e00729_farm_set.py` | new | 00bae6565b |
+| `test_e00729_run_guard.py` | new | 8eb655f929 |
+| `test_e00729_sim.py` | 1f2ed1895d | 54af40f44d |
+
+**A later commit, `dad5de5a8`, changed the code once more, and no stage was run after it either.**
+Experiment 730 imports this code, so the commit follows a second code review. Every stage from
+`timing` onwards now needs a passed gate on the banks in use, and `banks` may rebuild under changed
+ranges only after exactly one failed gate attempt and only for a change of the ranges. The
+superseded-output list also holds `figures/` and the private figure folders, and a crash during
+`banks` gets its own message. In the `components` stage, the coverage of the 90% interval is
+reported only on half-hours with true output, because every zero-truth half-hour lies inside an
+interval clipped at zero. The source-S1 error leaves out the days with no farm sky, and the table
+reports the share of source-S2 half-hours on such days. The smoke test of the stored test bank now
+counts clear days, and it asks for at least 0.99 instead of 0.9.
+
+**The verdict is `invalid`. The first run read verdict row 3 (`not supported`), where the harm check
+on import half-hours (H1) failed while the real-day check (H2) passed.** On the synthetic test
+half-hours where D8 imports power, arm D scores a signed continuous ranked probability score (CRPS)
+of 0.376 points and the reference P0f scores 0.118 points. The excess is +0.258 points against the
+pre-registered limit of 0.12 points. The normalised error of the median is also 0.379 points above
+P0f's, against its limit of 0.25 points. Both limits fail. The manager ruled that no simulator range
+is re-tuned and no neural network is refitted after this reading.
 
 ### What this means
+
+*Every number in this section is from the invalid first run.*
 
 **Within the synthetic world the neural network scores far better than the demand-climatology rule
 B1, and the neural network adds error where D8 only imports.** C1, arm D minus B\*, is −33.878
@@ -220,11 +262,13 @@ use.
 
 ### The bars and harm checks
 
+*Every number in this section is from the invalid first run.*
+
 **Table 1 gives each bar's reading: H1 and the sign calibration bar fail, and the other checks
 pass.** Source: the "Bars and harm checks" section of the
 printed report, and `verdict.json`.
 
-*Table 1. Bars and harm checks.*
+*Table 1 (from the invalid first run). Bars and harm checks.*
 
 | Check | Reading | Limit | Result |
 |---|---|---|---|
@@ -252,12 +296,14 @@ mean forecast, so the neural network over-states the probability of reverse flow
 
 ### The 12 counted contrasts and the report-only contrast
 
+*Every number in this section is from the invalid first run.*
+
 **Only C1 sets a verdict word, and C1's interval lies far below −m (−0.250 points).**
 Table 2 lists every contrast. A negative difference is a gain of the first arm. C6 is read on the
 pinball loss and the others on the signed CRPS. The BSP contrasts C4 and C12 are read on the two BSP
 test months, and by world type. Source: the "Contrasts" table of the printed report.
 
-*Table 2. The contrasts, in points of D8's capacity.*
+*Table 2 (from the invalid first run). The contrasts, in points of D8's capacity.*
 
 | Contrast | Arms | Reading | Point | Lower | Upper |
 |---|---|---|---|---|---|
@@ -302,9 +348,12 @@ not shown. C5 is −0.059 points, inside the predicted range of under 0.2.
 
 ![The 12 counted contrasts and the report-only C13](figure_5_contrasts.svg)
 
-*Figure 1. Each contrast of Table 2 at the Bonferroni level, with the margin m marked.*
+*Figure 1 (from the invalid first run). Each contrast of Table 2 at the Bonferroni level, with the
+margin m marked.*
 
 ### Scores of every arm and baseline
+
+*Every number in this section is from the invalid first run.*
 
 **Every arm beats B\* by more than 30 points over all rows, and no neural network beats P0f on
 import rows.** Table 3 gives the signed CRPS and the normalised error of the median, in points of
@@ -314,7 +363,8 @@ a point forecast. P0f has the same 0.5-point lobe floor as the neural networks. 
 M2 has no solar term (a departure from the plan; the M2 figures are as scored). Source: the "Scores"
 table of the printed report.
 
-*Table 3. Signed CRPS and normalised error of the median, in points of D8's capacity.*
+*Table 3 (from the invalid first run). Signed CRPS and normalised error of the median, in points of
+D8's capacity.*
 
 | System | CRPS, all | CRPS, import | CRPS, reverse | Median error, all | Median error, import | Median error, reverse |
 |---|---|---|---|---|---|---|
@@ -344,9 +394,8 @@ M2, and 112.405 for P0f.
 
 ![Signed CRPS of the arms and baselines](figure_4_scores.svg)
 
-*Figure 2. Signed CRPS of P0f, B\*, and the arms A, B, C, D, and H on all, import, and reverse-flow
-rows
-(smaller is better).*
+*Figure 2 (from the invalid first run). Signed CRPS of P0f, B\*, and the arms A, B, C, D, and H on
+all, import, and reverse-flow rows (smaller is better).*
 
 **The q05 and q95 coverage of every neural network is at least 0.94, consistent with the plan's note
 that the lobe floor makes coverage easy.** Source: the "q05 and q95 coverage" line of the printed
@@ -354,6 +403,8 @@ report. Arm D has q05 coverage of 0.996 and q95 coverage of 0.995. D-quantile ha
 coverage of the arms, 0.943.
 
 ### The architecture screen, B\*, and the margin
+
+*Every number in this section is from the invalid first run.*
 
 **The bidirectional long short-term memory neural network (bilstm) was chosen on the validation
 months, and
@@ -365,10 +416,12 @@ with the denoising autoencoder (3 seeds each; source: `selection.json`). Figure 
 
 ![Validation signed CRPS of the three architectures](figure_9_architectures.svg)
 
-*Figure 3. Mean signed CRPS on the validation months for the bilstm, the denoising autoencoder, and
-the U-net; the smaller is better.*
+*Figure 3 (from the invalid first run). Mean signed CRPS on the validation months for the bilstm,
+the denoising autoencoder, and the U-net; the smaller is better.*
 
 ### The realism gate and the timing gate
+
+*Every number in this section is from the invalid first run.*
 
 **The realism gate passed at its second attempt, after the one permitted re-tune of the simulator
 ranges.** Source: "Realism gate" in the printed report. Table 4 gives the share checks. The BSP-step
@@ -380,7 +433,7 @@ share is 0.59 for net daily minima, 0.61 for solar daily minima, and 0.56 for so
 against a lower edge of 0.5. The gate checks these shares and the BSP step slope, and it checks no
 other feature of the synthetic days.
 
-*Table 4. Real and synthetic shares in the realism gate.*
+*Table 4 (from the invalid first run). Real and synthetic shares in the realism gate.*
 
 | Series | Real daily-minimum share | Synthetic | Real half-hour share | Synthetic |
 |---|---|---|---|---|
@@ -389,8 +442,8 @@ other feature of the synthetic days.
 
 ![The realism gate](figure_3_gate.svg)
 
-*Figure 4. Share of days with a daily minimum below 1.0 MVA, synthetic against real, for the net and
-solar series.*
+*Figure 4 (from the invalid first run). Share of days with a daily minimum below 1.0 MVA, synthetic
+against real, for the net and solar series.*
 
 **The timing gate projects 1.102 GPU-process-hours at the epoch cap and 0.386 at early stopping,
 against a budget of 10.0.** Source: "Timing gate" in the printed report. The gate measured 0.350
@@ -398,6 +451,8 @@ seconds per epoch for the denoising autoencoder, 0.409 for the U-net, and 0.437 
 50 fits spent 1.107 GPU-process-hours in all, the sum of the `seconds` of their fit records.
 
 ### Real-day checks
+
+*Every number in this section is from the invalid first run.*
 
 **H2, K1, and K2 pass; R2 and R3 are reports with no bar.** Source: `verdict.json`, key `real`. All
 numbers in this list are aggregates.
@@ -419,10 +474,12 @@ numbers in this list are aggregates.
 
 ![Real eras by UTC hour](figure_8_eras.svg)
 
-*Figure 5. Real eras by UTC hour: the share of half-hours with P(X<0) above 0.5, beside the share of
-half-hours with a reading below 1.0 MVA.*
+*Figure 5 (from the invalid first run). Real eras by UTC hour: the share of half-hours with P(X<0)
+above 0.5, beside the share of half-hours with a reading below 1.0 MVA.*
 
 ### The shifted-mix read-out and the ambiguity read-out
+
+*Every number in this section is from the invalid first run.*
 
 **The shifted-mix read-out shows no sign that arm D memorised the training mix.** On the shifted
 bank, which has an injected share of 0.50 against 0.85 in the test banks, arm D scores a signed CRPS
@@ -441,7 +498,7 @@ confident on 0.003. D-sign has a mean P of 0.482. By the truth's size, the obser
 flow is 0.437 where |X| is under 1 times the reactive floor Q̂ of 0.1 MVA, 0.474 for 1 to 3, 0.402
 for 3 to 10, and 0.017 above 10. The ambiguity read-out has no bar.
 
-*Table 5. The ambiguity read-out by reading band.*
+*Table 5 (from the invalid first run). The ambiguity read-out by reading band.*
 
 | System | Reading band | Rows | Mean P(X<0) | Observed share | Reliability | Confident share |
 |---|---|---|---|---|---|---|
@@ -460,8 +517,8 @@ for 3 to 10, and 0.017 above 10. The ambiguity read-out has no bar.
 
 ![Reliability of P(X<0) for arm D](figure_7_reliability.svg)
 
-*Figure 6. The reliability diagram of arm D's P(X<0): forecast probability against the observed
-share of reverse flow.*
+*Figure 6 (from the invalid first run). The reliability diagram of arm D's P(X<0): forecast
+probability against the observed share of reverse flow.*
 
 ### Reviews and pre-run gates
 
@@ -472,6 +529,8 @@ written by the run, and figures 3, 4, 5, 7, 8, and 9 are in this section. The Op
 (the run's first review of this section) found no leakage and confirmed verdict row 3.
 
 ## Time series of the estimates
+
+*Every number in this section is from the invalid first run.*
 
 **Twelve figures show single 48-hour windows from the stored predictions, and each day is picked by
 a fixed rule.** The script `e00729_series_figures.py` (stage `series`) reads the stored test-bank
@@ -514,9 +573,9 @@ Outside the engine run all three arms sit on the reading with P(X<0) near zero. 
 
 ![An evening engine run that reverses the flow](series_01_evening_engine.svg)
 
-*Figure S1. An evening engine run that reverses the flow. Rule for the day: an engine-only day with
-reverse flow whose engine output is centred between 17:00 and 23:00 UTC; the day with the median
-depth of reverse flow. Arms at seed 0; band 5% to 95%.*
+*Figure S1 (from the invalid first run). An evening engine run that reverses the flow. Rule for the
+day: an engine-only day with reverse flow whose engine output is centred between 17:00 and 23:00
+UTC; the day with the median depth of reverse flow. Arms at seed 0; band 5% to 95%.*
 
 **On the morning engine day, the arms follow the direction of the run but not its depth.** The truth
 falls to −16.0 points on 11 half-hours. The lowest medians are −1.7 for arm A, −8.4 for arm B, and
@@ -525,9 +584,9 @@ at 0.67 for arm D. Arm B's P(X<0) falls back below 0.5 before the run ends.
 
 ![A morning engine run that reverses the flow](series_02_morning_engine.svg)
 
-*Figure S2. A morning engine run that reverses the flow. Rule for the day: an engine-only day with
-reverse flow whose engine output is centred between 06:00 and 12:00 UTC; the day with the median
-depth of reverse flow. Arms at seed 0; band 5% to 95%.*
+*Figure S2 (from the invalid first run). A morning engine run that reverses the flow. Rule for the
+day: an engine-only day with reverse flow whose engine output is centred between 06:00 and 12:00
+UTC; the day with the median depth of reverse flow. Arms at seed 0; band 5% to 95%.*
 
 **On the solar-only day, no arm puts its median or P(X<0) on the reverse flow.** The truth reaches
 −74.0 points on 11 half-hours. The lowest medians are +3.3, +10.6, and +11.6 for arms A, B, and D,
@@ -537,9 +596,9 @@ median and P(X<0) do not show it.
 
 ![Solar output alone reverses the flow at midday](series_03_solar_midday.svg)
 
-*Figure S3. Solar output alone reverses the flow at midday. Rule for the day: a solar-only day with
-reverse flow whose solar output is centred between 10:00 and 14:00 UTC; the day with the median
-depth of reverse flow. Arms at seed 0; band 5% to 95%.*
+*Figure S3 (from the invalid first run). Solar output alone reverses the flow at midday. Rule for
+the day: a solar-only day with reverse flow whose solar output is centred between 10:00 and 14:00
+UTC; the day with the median depth of reverse flow. Arms at seed 0; band 5% to 95%.*
 
 **On the engine-and-solar day, the arms flag reverse flow on most of the right half-hours and also
 raise P(X<0) on import half-hours.** The truth reaches −53.3 points on 10 half-hours. The medians of
@@ -550,9 +609,9 @@ half-hours of the day is 0.22, 0.17, and 0.21.
 
 ![Engine and solar output together](series_04_engine_and_solar.svg)
 
-*Figure S4. Engine and solar output together. Rule for the day: an engine-and-solar day with reverse
-flow in which both outputs reach at least 2 points; the day with the median depth of reverse flow.
-Arms at seed 0; band 5% to 95%.*
+*Figure S4 (from the invalid first run). Engine and solar output together. Rule for the day: an
+engine-and-solar day with reverse flow in which both outputs reach at least 2 points; the day with
+the median depth of reverse flow. Arms at seed 0; band 5% to 95%.*
 
 **On the ambiguous day, arm B puts its median at −74.3 points for about two hours although the truth
 never goes below −1.9.** The day has 4 reverse-flow half-hours. The P(X<0) of arm B peaks at 0.70
@@ -563,9 +622,9 @@ geometry, whatever an arm has learned about the sign.
 
 ![A day on which the reading comes close to zero and the sign is hard to tell](series_05_ambiguous.svg)
 
-*Figure S5. A day on which the reading comes close to zero and the sign is hard to tell. Rule for
-the day: a day with at least 4 half-hours of reading under 0.3 MVA; the day with the median number
-of such half-hours. Arms at seed 0; band 5% to 95%.*
+*Figure S5 (from the invalid first run). A day on which the reading comes close to zero and the sign
+is hard to tell. Rule for the day: a day with at least 4 half-hours of reading under 0.3 MVA; the
+day with the median number of such half-hours. Arms at seed 0; band 5% to 95%.*
 
 **On the typical no-injection import day, no arm invents reverse flow.** The truth and the reading
 stay above 57.0 points. The P(X<0) of arm D peaks at 0.00 and its mean is 0.001, and the P(X<0) of
@@ -575,9 +634,9 @@ typical case and not the worst.
 
 ![A plain import day with no injection](series_06_plain_import.svg)
 
-*Figure S6. A plain import day with no injection. Rule for the day: an all-import day of the no-
-injection worlds; the day with the median of arm D's largest P(X<0) of the day. Arms at seed 0; band
-5% to 95%.*
+*Figure S6 (from the invalid first run). A plain import day with no injection. Rule for the day: an
+all-import day of the no- injection worlds; the day with the median of arm D's largest P(X<0) of the
+day. Arms at seed 0; band 5% to 95%.*
 
 **On the import day with the largest harm, arms B and D put their medians at about −70 points where
 the median of arm A stays near +72.** The truth never goes below +2.7 points. The medians
@@ -588,9 +647,9 @@ P0f. The medians of arms B and D are roughly the mirror image of the median of a
 
 ![The import day on which arm D does worst against P0f](series_07_largest_harm.svg)
 
-*Figure S7. The import day on which arm D does worst against P0f. Rule for the day: a day of the
-test bank on which every half-hour is import; the day with the largest mean of arm D's signed CRPS
-minus P0f's. Arms at seed 0; band 5% to 95%.*
+*Figure S7 (from the invalid first run). The import day on which arm D does worst against P0f. Rule
+for the day: a day of the test bank on which every half-hour is import; the day with the largest
+mean of arm D's signed CRPS minus P0f's. Arms at seed 0; band 5% to 95%.*
 
 **On the BSP-month day, arm C keeps its median near zero where arm B swings to −93.6 points.** The
 truth reaches −16.9 points on 6 half-hours. The lowest median of arm C is −5.3. P(X<0) is above 0.5
@@ -600,9 +659,9 @@ arm C and 0.42 for arm B. The mean P(X<0) on the import half-hours of the day is
 
 ![A month with real BSP steps: arm C beside arm B](series_08_bsp_steps.svg)
 
-*Figure S8. A month with real BSP steps: arm C beside arm B. Rule for the day: an engine or engine-
-and-solar day in a BSP month with reverse flow; the day with the median depth of reverse flow. Arms
-at seed 0; band 5% to 95%.*
+*Figure S8 (from the invalid first run). A month with real BSP steps: arm C beside arm B. Rule for
+the day: an engine or engine- and-solar day in a BSP month with reverse flow; the day with the
+median depth of reverse flow. Arms at seed 0; band 5% to 95%.*
 
 **On the evening engine window, the 11-quantile head and the two-lobe head give nearly the same
 picture.** The median of D-quantile reaches −1.5 points against −0.3 for arm D, and P(X<0) peaks at
@@ -612,8 +671,8 @@ P(X<0) on import half-hours is 0.002 for D-quantile and 0.009 for arm D. This is
 
 ![The 11-quantile head beside the two-lobe head](series_09_quantile_head.svg)
 
-*Figure S9. The 11-quantile head beside the two-lobe head. Rule for the day: the day of Figure S1.
-Arms at seed 0; band 5% to 95%.*
+*Figure S9 (from the invalid first run). The 11-quantile head beside the two-lobe head. Rule for the
+day: the day of Figure S1. Arms at seed 0; band 5% to 95%.*
 
 **On the ambiguous window, D-sign gives a much narrower band than arm D and nearly the same
 P(X<0).** The P(X<0) of D-sign peaks at 0.57 against 0.60 for arm D. The mean band is 9.7 points
@@ -624,8 +683,8 @@ reading is under about 0.15 MVA.
 
 ![The sign-only head beside the two-lobe head](series_10_sign_head.svg)
 
-*Figure S10. The sign-only head beside the two-lobe head. Rule for the day: the day of Figure S5.
-Arms at seed 0; band 5% to 95%.*
+*Figure S10 (from the invalid first run). The sign-only head beside the two-lobe head. Rule for the
+day: the day of Figure S5. Arms at seed 0; band 5% to 95%.*
 
 **On the typical real day, no arm raises P(X<0) visibly above zero.** The plotted reading stays
 between about 60 and 92 points, and the three arms follow it. The P(X<0) lines lie on the zero line
@@ -633,9 +692,9 @@ on the whole day.
 
 ![A real day before the engine was connected, typical false alarm](series_11_real_median.svg)
 
-*Figure S11. A real day before the engine was connected, typical false alarm. Rule for the day: a
-real day before the engine was connected; the day with the median of arm D's largest P(X<0) of the
-day. Arms at seed 0; band 5% to 95%.*
+*Figure S11 (from the invalid first run). A real day before the engine was connected, typical false
+alarm. Rule for the day: a real day before the engine was connected; the day with the median of arm
+D's largest P(X<0) of the day. Arms at seed 0; band 5% to 95%.*
 
 **On the real day with the largest false alarm of arm D, P(X<0) stays under about 0.1 and the
 context holds a stretch of zero reading.** The reading in the 12 hours before the scored day is a
@@ -646,11 +705,114 @@ therefore comes where the window starts after a run of zero reading, and it neve
 
 ![A real day before the engine was connected, largest false alarm](series_12_real_largest.svg)
 
-*Figure S12. A real day before the engine was connected, largest false alarm. Rule for the day: a
-real day before the engine was connected; the day with the largest of arm D's largest P(X<0) of the
-day. Arms at seed 0; band 5% to 95%.*
+*Figure S12 (from the invalid first run). A real day before the engine was connected, largest false
+alarm. Rule for the day: a real day before the engine was connected; the day with the largest of arm
+D's largest P(X<0) of the day. Arms at seed 0; band 5% to 95%.*
+
+## The event generator against real data
+
+*The figures in this section come from the code and simulator ranges of the invalid first run.*
+
+**Three figures are published: the simulated engine days, the hour-of-day run probability against
+the real record, and the ramp sizes against the real record.** The script `e00729_event_figures.py`
+(stage `events`) draws 400 engines from the simulator with fixed seeds and no network output. Each
+draw has 30 invented days that start on a Monday, with the 400 starts spread over the 52 weeks of a
+year. Each draw takes the UK clock offset of each day and has Saturday and Sunday as its quiet days,
+so the simulated hour-of-day curves shift by an hour in summer as the real engine's clock may. The
+stage reads the real engine record and changes no file that it reads.
+
+**The real engine series stay private.** The metered engine and the metered solar farms are NGED
+generators, so no published figure shows a real series, a real size, a real date, or a real count.
+The five aggregates are shares. Each divides the output by the series' own reference output, so no
+absolute size can be recovered. Each share is rounded to the nearest 5%, for the real record and the
+simulated draws alike, so the bar heights do not reveal the record's length or the count in a bin.
+The rounded shares of one chart sum to about 1, and can differ from 1 by the rounding. The four bar
+charts use coarse bins, and a bin with fewer than 5 real events is merged with its neighbour, so no
+bin shows a single real run. The hour-of-day chart cannot merge hours, so it leaves a gap in the real
+line at each real hour with 1 to 4 running half-hours. The same normalisation and rounding apply to
+the simulated draws, and the simulated bins follow the real merges. A chart is published only when at
+least 100 real events lie behind it (running half-hours for the hour-of-day chart, and runs, steps,
+blocks of 7 days, or days for the others); otherwise the stage leaves the chart out and the page
+omits it.
+
+**Definitions of the five aggregates.** The reference output is the 99th percentile of running
+output, and running output is positive output of at least 10% of the 99.9th percentile of positive
+output, so small positive readings while idle cannot set the reference. A half-hour is running when
+the output is at least 15% of the reference output. A run is a stretch of running half-hours, and
+its length counts only where the run starts and ends inside a stretch of complete days. A ramp is a
+change of at least 5% of the reference output between two neighbouring half-hours, and the top ramp
+bin is 30% and above. A start is the first half-hour of a run, and the starts are counted in blocks
+of 7 complete consecutive days. The daily energy is the day's output summed, as a share of the
+reference output for 24 hours; the lowest bin holds every day under 0.5%, including days of net
+import. An engine that never runs counts its days with no run, no start, and zero energy. Weekdays
+and weekends come from the calendar, and the simulated draws treat bank holidays as weekdays.
+
+**Figure E1 shows twelve kinds of simulated engine day.** Each panel is three consecutive days from
+the randomised simulator, picked by a fixed rule: the first draw that fits the kind of day, preferring
+a draw that no earlier kind used. The label describes the first day of the panel. The caption names
+the ranges from which the simulator draws, and the panels hold simulated output only.
+
+![Twelve kinds of simulated engine day](events_01_engine_days.svg)
+
+*Figure E1 (from the invalid first run). Twelve kinds of simulated engine day, in points of D8's
+capacity, three days per panel, with the hour of day in UTC. Ranges drawn from: 1 to 4 units of 10
+to 50 points each (at most 120 points in all); evening, morning, and midday run starts and lengths;
+ramps of 0 to 4 half-hours (the registered range is 0 to 2, and the 0 to 4 is the re-tuned range
+that the invalid first run used); weekend factor 0.1 to 0.8. The full ranges are in the figure
+subtitle.*
+
+**Figure E2, the simulated solar days, is not published.** In the first run's stored test bank, the
+stage found no simulated day of source S2 (the PV model driven by CAMS) with solar output, so the
+figure had nothing to show. Source S1 is the metered farms'
+output, and its days stay private.
+
+**Three of the four bar charts are left out because too few real events lie behind them.** The
+run-length chart, the starts-per-week chart, and the daily-energy chart each fell under the floor of
+100 real events. The page gives no count. The hour-of-day chart and the ramp chart passed the floor
+and follow.
+
+![Share of half-hours running, by hour of day, real record and simulated draws](events_03_hour_of_day.svg)
+
+*Figure E3 (from the invalid first run). Share of half-hours with the engine running, by UTC hour,
+for weekdays (top) and weekends (bottom). Orange is the real record and blue is the pooled simulated
+draws, both rounded to 5%. A gap in the orange line is an hour with 1 to 4 running half-hours in the
+real record.*
+
+**On weekdays, the real engine runs in a larger share of half-hours between 04:00 and 15:00 UTC than
+the pooled simulated draws do, and both lines peak between 15:00 and 20:00 UTC.** The orange line
+stands at 0.15 to 0.35 from 04:00 to 15:00 UTC, with a peak of 0.35 near 07:00, while the blue line
+stands at 0.05 to 0.2 over the same hours. Both lines reach about 0.35 to 0.4 between 15:00 and 19:00
+UTC. The blue line is the mean of 400 draws, so the figure does not show whether individual draws
+cover the real morning share.
+
+**On weekends, the real record shows almost no running, and the pooled simulated draws show more.**
+The orange line is at 0 where it is drawn, with gaps where the real hour is blank, and the blue line
+stands at 0.05 to 0.2 with its peak between 16:00 and 19:00 UTC. The figure shows the pooled mean,
+so it does not show whether the lowest weekend factor of the simulator (0.1 of the weekday
+probability) covers the real weekends.
+
+![Share of half-hour steps in three size bins, real record and simulated draws](events_05_ramp.svg)
+
+*Figure E4 (from the invalid first run). Share of half-hour steps of at least 5% of the reference
+output in three size bins. Orange is the real record and blue is the pooled simulated draws, both
+rounded to 5%.*
+
+**The real record has more steps of 30% or more of the reference output than the simulated draws
+have, and fewer steps of 15% to 30%.** The real shares are 0.30, 0.25, and 0.45 for the bins 0.05 to
+0.15, 0.15 to 0.3, and 0.3 and above, and the simulated shares are 0.30, 0.35, and 0.35. The two
+distributions agree in the smallest bin, and the difference of 0.10 in each of the other two bins
+is larger than the 5% rounding of the figure.
+
+## The solar and engine heads against the true series
+
+**The component scores of the solar head and the engine head were written and reviewed, and the stage
+was not run.** The script `e00729_component_scores.py` (stage `components`) stays in the code. The
+silent solar worlds make its solar scores meaningless, and the maintainer decided that no stage of
+this experiment is rerun.
 
 ## Checks
+
+*Every number in this section is from the invalid first run.*
 
 **Two audit triggers fired, and no audit has run.** Trigger 2 fired because C1, C4, C6, and C13
 depart from the prediction, and the weak yardstick B1 explains the size of C1 only. Trigger 5 fired
@@ -802,23 +964,25 @@ from a fitted real value.** The descriptions are those of experiments
 [159](../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md): the engine runs more
 on weekday evenings, often starts on weekday mornings, runs for spells of a few half-hours, reaches
 most of its level in the first running half-hour, and runs on for days at a time in multi-day
-spells. Each segment draws one parameter set:
+spells. Each segment draws one parameter set. The table gives the registered range and the range
+that the invalid first run used, which differ in three rows (and in the solar capacity range
+below):
 
-| Parameter | Range |
-|---|---|
-| Number of units | 1 to 4 |
-| Size of one unit | 10 to 50 points; total capped at 120 points |
-| Share of days with no run | 0.05 to 0.5 |
-| Weekday evening run (start 15:00 to 17:30 local, 2 to 6 hours) | probability 0.3 to 0.9 a day |
-| Weekday morning run (start 05:30 to 08:30 local, 1 to 8 hours) | probability 0.1 to 0.6 a day |
-| Midday run (start 10:00 to 14:00 local, 1 to 4 hours) | probability 0 to 0.3 a day |
-| Weekend and bank-holiday factor on each run probability | 0.1 to 0.8 |
-| Multi-day spell (2 to 6 days, at part or full output) | 0 to 0.5 per 30 days |
-| Units running in a run | 1 to all, drawn per run |
-| Output of a running unit | 0.6 to 1.0 of its size |
-| Ramp to full output | 0 to 4 half-hours |
-| Trip of one unit, per running half-hour | probability 0 to 0.02, lasting 1 to 4 half-hours |
-| Start and stop times | continuous, so a half-hour that holds a switch carries a partial mean |
+| Parameter | Registered range | Range used in the invalid first run |
+|---|---|---|
+| Number of units | 1 to 4 | 1 to 4 |
+| Size of one unit | 10 to 50 points; total capped at 120 points | same |
+| Share of days with no run | 0.2 to 0.7 | 0.05 to 0.5 |
+| Weekday evening run (start 15:00 to 17:30 local, 2 to 6 hours) | probability 0.3 to 0.9 a day | same |
+| Weekday morning run (start 05:30 to 08:30 local, 1 to 8 hours) | probability 0.1 to 0.6 a day | same |
+| Midday run (start 10:00 to 14:00 local, 1 to 4 hours) | probability 0 to 0.3 a day | same |
+| Weekend and bank-holiday factor on each run probability | 0.1 to 0.8 | same |
+| Multi-day spell (at part or full output): length, and number per 30 days | 2 to 19 days, 0 to 2 | 2 to 6 days, 0 to 0.5 |
+| Units running in a run | 1 to all, drawn per run | same |
+| Output of a running unit | 0.6 to 1.0 of its size | same |
+| Ramp to full output | 0 to 2 half-hours | 0 to 4 half-hours |
+| Trip of one unit, per running half-hour | probability 0 to 0.02, lasting 1 to 4 half-hours | same |
+| Start and stop times | continuous, so a half-hour that holds a switch carries a partial mean | same |
 
 The simulator has no price input, so the engine's link with the system price (experiment 697's Q2)
 is not reproduced. Runs carry no season, because experiment 697 found no winter-summer difference.
@@ -837,7 +1001,8 @@ injected solar.** Each segment draws one source:
   alternating-current rating (1.0 to 1.4, with clipping), times a drawn capacity and a multiplicative
   noise with a half-hour autocorrelation of 0.9 and a standard deviation of 0.05.
 
-A segment with solar draws a capacity log-uniform from 60 to 400 points. Solar output is never
+A segment with solar draws a capacity log-uniform from 5 to 150 points as registered; the invalid
+first run used 60 to 400 points. Solar output is never
 negative and is zero when the sun is below the horizon. The stored CAMS index changes once an hour
 ([experiment 722](../00722-msa-mva-bsp-closure-and-fast-hint/result.md)), so S2 and every CAMS input
 interpolate the hourly index linearly to half-hours.
@@ -939,6 +1104,8 @@ half-hours outside a dead band of 2 points, and at least 200 in the two BSP test
 stops at row 0. The plan's simulation expects about 4,400 and about 1,100, so the counts have a
 margin of about 2 and 5 (section "Verdict table").
 
+*The gate records below are from the invalid first run.*
+
 **Gate attempt 1 failed its share checks and passed its BSP-step checks.** The first run of the gate
 on the training bank of seed 0 gave these shares. In engine-only worlds against the real net era,
 the share of days with a daily minimum below 1.0 MVA was 0.144 against 0.172 (ratio 0.84, inside
@@ -958,7 +1125,7 @@ existed. It tried 8 candidates, then 73 (spells, solar capacity, and ramps), the
 frequency and size, and solar capacity), and the set that kept every ratio furthest inside 0.5 to
 2.0 was taken. The ranges changed from attempt 1 are these:
 
-| Range | Attempt 1 | Re-tune |
+| Range | Attempt 1 (registered) | Re-tune (used in the invalid first run) |
 |---|---|---|
 | Share of days with no run | 0.2 to 0.7 | 0.05 to 0.5 |
 | Multi-day spells per 30 days | 0 to 2 | 0 to 0.5 |
@@ -1377,6 +1544,8 @@ are never rerun. Every number is labelled interim until the counted reading it b
 
 ## Compute and gates
 
+*The measured times in this section are from the invalid first run.*
+
 **The fits are small, and a timing gate measures their cost before the first fit.** One GPU process
 of at most 6 GB runs at a time, with one data worker, on the core set that the manager assigns,
 inside `systemd-run --user --scope` with MemoryMax 12G, MemorySwapMax 0, and one BLAS thread. The
@@ -1687,6 +1856,12 @@ edited.
 - `e00729_leakage.py`: the leakage assertions of verdict row 1.
 - `e00729_gate_calibration.py`: the offline calibration behind the one permitted re-tune of the
   simulator ranges; it prints share ratios only and reads no network output and no score.
+- `e00729_component_scores.py`: the component table and the head figures (stage `components`),
+  written and reviewed and not run. It reads stored predictions of arms G1 and G2 and the stored
+  banks, and writes solar days of source S1 only to `PRIVATE/components`.
+- `e00729_event_figures.py`: the event-generator figures (stage `events`). It draws simulated engine
+  and solar days, and compares aggregates of the simulated draws with aggregates of the real engine
+  record. It writes real series only to `PRIVATE/event_generator`.
 - `e00729_stages.py`, `e00729_cli.py`, `e00729_report.py`, `e00729_figures.py`, and `run.sh`: the
   stage orchestration (including the `figures` stage, which writes figures 1, 2, and 6), the command
   line, the printed report (which writes the other figures, among them figure 8), the figure code,
