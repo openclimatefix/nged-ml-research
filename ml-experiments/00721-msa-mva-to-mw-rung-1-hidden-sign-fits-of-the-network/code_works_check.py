@@ -54,6 +54,16 @@ LOOSE_STATE_GAP: Final = 1e-2
 REPORT_FILE: Final = "code_works_report.json"
 
 
+PV_SCALE_KEYS: Final = ("pv_hist_r", "pv_top_r")
+"""The names of 716's stored PV scale divisors `r_h` and `r_t`: buffers of the network, set once by
+`calibrate_scale` (the starting value is 1.0) and saved in the state dict."""
+
+
+def pv_scale_keys(*, state: dict) -> list[str]:
+    """Return the keys of a state dict that hold the network's PV scale divisors."""
+    return [k for k in state if k.rsplit(".", 1)[-1] in PV_SCALE_KEYS]
+
+
 def say(*, name: str, ok: bool, detail: str = "") -> None:
     """Print one assertion's result and raise when it fails."""
     print(f"{'ok  ' if ok else 'FAIL'} {name}: {detail}", flush=True)
@@ -294,11 +304,13 @@ def check_predict(*, scratch: Path, data_dir: Path, device: str) -> dict:
     )
     # 9. predicting leaves the network (the PV scales included) exactly as stored: nothing is recalibrated
     after = inputs.network_state(job=JOB)
-    scale_keys = [k for k in state if "scale" in k or k.rsplit(".", 1)[-1] in {"r_h", "r_t"}]
+    scale_keys = pv_scale_keys(state=state)
     say(
         name="9 the network after predicting equals the stored state, PV scales included",
-        ok=all(torch.equal(after[k], state[k].cpu()) for k in state) and bool(scale_keys),
-        detail=f"{len(scale_keys)} scale tensors",
+        ok=all(torch.equal(after[k], state[k].cpu()) for k in state)
+        and len(scale_keys) >= 1
+        and all(float(state[k]) != 1.0 for k in scale_keys),
+        detail=f"{len(scale_keys)} scale tensors: {scale_keys}",
     )
     gb = peak_gb(torch=torch, device=device)
     say(

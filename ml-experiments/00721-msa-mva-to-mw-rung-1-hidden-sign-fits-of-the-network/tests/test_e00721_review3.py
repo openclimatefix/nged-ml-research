@@ -232,3 +232,22 @@ def test_run_sh_skips_the_gpu_gate_for_stage0_quicklook_and_score(tmp_path: Path
     for n, command in enumerate(("stage0", "quicklook", "score")):
         out = _run_sh(tmp_path=tmp_path / str(n), pids="1\\n2\\n", args=[command])
         assert "GPU processes" not in out.stderr
+
+
+# --------------------------------------------------------------------------- where the PV scales live
+
+
+def test_the_pv_scales_are_state_dict_buffers_under_the_names_the_check_reads() -> None:
+    import code_works_check as cwc
+    import e00721_e2e as e2e
+    import e00721_jobs as jobs
+
+    job = fit.Job(arm="SG-A", world="W2", fold="2025-12", seed=0)
+    inputs = jobs.WorldInputs(make_world=e2e.make_world_builder())
+    state = inputs.network_state(job=job)
+    keys = cwc.pv_scale_keys(state=state)
+    assert sorted(k.rsplit(".", 1)[-1] for k in keys) == sorted(cwc.PV_SCALE_KEYS)
+    assert all(
+        float(state[k]) == 1.0 for k in keys
+    )  # the uncalibrated start; `calibrate_scale` sets them
+    assert cwc.pv_scale_keys(state={"trunk.weight": 0, "scale_like": 0}) == []
