@@ -1,0 +1,255 @@
+# ruff: noqa: PLR0915, E501, ANN001, ANN003, ANN201, D102, D107
+"""Experiment 715: check the fit driver's resume, skip, and code-policy logic with a stub that trains nothing.
+
+Usage: e00715_check_fit.py   (CPU only; run it through `run.sh`)
+
+The stub replaces `load_world` and `train_stage` (`e00715_fit.Deps`) and `make_samples`, and the
+check runs
+`e00715_fit.fit` against a temporary data folder that holds a fake experiment 713 stage 1 state. It checks
+that (a) a fresh job runs stages 2 and 3 once each and saves both states, (b) a job that crashed in
+stage 3
+resumes without retraining stage 2, (c) a finished job is skipped, (d) a stage log with another code
+hash
+is refused, and accepted only when the exact old hash is named, (e) a stage that hits the 60-pass
+cap is
+rerun from its starting state with a cap of 120 passes, (f) the log prints the peak host memory, and
+(g) a missing gate file refuses the job. Each refusal check has a matching accepting call, so a
+driver that
+refuses everything fails.
+"""
+
+import io
+import json
+import sys
+import tempfile
+from contextlib import redirect_stdout
+from pathlib import Path
+
+import e00713_arms as a713  # ty: ignore[unresolved-import]
+import e00713_model as mdl  # ty: ignore[unresolved-import]
+import e00715_arms as arms
+import e00715_fit as fit
+import e00715_train as tr
+import torch  # ty: ignore[unresolved-import]
+
+MONTH, SEED = "2025-11", 0
+
+
+def build_folder(*, root: Path) -> None:
+    """Write the fake stage 1 state and log of `M1`, the selection, and the gate file."""
+    sel = a713.selection_file(data_dir=root)
+    sel.parent.mkdir(parents=True, exist_ok=True)
+    sel.write_text(json.dumps({"m_star": "M1"}))
+    state = arms.stage1_state_file(data_dir=root, start_arm="M1", month=MONTH, seed=SEED)
+    state.parent.mkdir(parents=True, exist_ok=True)
+    torch.manual_seed(1)
+    torch.save(mdl.MsaNet(switches=mdl.ARM_SWITCHES["M"]).state_dict(), state)
+    log = arms.stage1_log_file(data_dir=root, start_arm="M1", month=MONTH, seed=SEED)
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text(json.dumps({"code_hash": a713.code_hash()}))
+    gate = arms.gate_file(data_dir=root)
+    gate.parent.mkdir(parents=True, exist_ok=True)
+    gate.write_text(json.dumps({"code": arms.code_record()}))
+    write_gate713(root=root, record=valid_gate713())
+
+
+def valid_gate713() -> dict:
+    """Return a record shaped like experiment 713's waived gate file (KA3 and KA12 failed, waived)."""
+    return {
+        "KA2": {"pass": True}, "KA3": {"pass": False}, "KA4": {"pass": True}, "KA10": {"pass": True},
+        "KA12": {"pass": False}, "KA5": "text", "KA6": "text", "waived": True,
+        "waiver": {
+            "date": "2026-11-23", "decision_quoted": "Go ahead with option 1",
+            "failed_checks": ["KA12", "KA3"], "thresholds_changed": False,
+        },
+        "code": {"code_hash": a713.code_hash()},
+        "known_answer_sha256": arms.GATE713_WAIVED_KA_SHA,
+    }  # fmt: skip
+
+
+def write_gate713(*, root: Path, record: dict) -> Path:
+    """Write `record` as experiment 713's gate file under `root`; return the path."""
+    path = a713.root(data_dir=root) / "work" / "known_answers_passed.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record))
+    return path
+
+
+def gate713_refusals(*, root: Path) -> dict[str, bool]:
+    """Check that `arms.gate713_summary` accepts the waived record and refuses each wrong one, by message."""
+    results = {}
+    write_gate713(root=root, record=valid_gate713())
+    results["j: the waived record of 713 is accepted"] = arms.gate713_summary(data_dir=root)["failed_checks"] == [
+        "KA12", "KA3",
+    ]  # fmt: skip
+
+    def mutate(fn) -> dict:
+        record = valid_gate713()
+        fn(record)
+        return record
+
+    cases = {
+        "a changed 713 code hash": (lambda r: r["code"].update(code_hash="0000000000000000"), "now has hash"),
+        "an extra failed check (KA2)": (lambda r: r["KA2"].update({"pass": False}), "not ['KA12', 'KA3']"),
+        "KA12 passing while waived": (lambda r: r["KA12"].update({"pass": True}), "not ['KA12', 'KA3']"),
+        "KA3 without a `pass` key": (lambda r: r["KA3"].pop("pass"), "has no boolean `pass`"),
+        "a string `waived`": (lambda r: r.update(waived="false"), "not a boolean"),
+        "no code block": (lambda r: r.pop("code"), "has no code block"),
+        "no waiver block": (lambda r: r.pop("waiver"), "does not name the failed checks"),
+        "a waiver that changed a threshold": (lambda r: r["waiver"].update(thresholds_changed=True), "no threshold changed"),
+        "another quoted decision": (lambda r: r["waiver"].update(decision_quoted="ok"), "quote the maintainer's decision"),
+        "a failed check without a waiver": (lambda r: r.update(waived=False), "no waiver"),
+        "an empty record": (lambda r: r.clear(), "has no code block"),
+        "a changed known-answer sha256": (lambda r: r.update(known_answer_sha256="0" * 64), "differs from the sha256"),
+        "KA5 missing": (lambda r: r.pop("KA5"), "KA5 or KA6 is not recorded"),
+    }  # fmt: skip
+    for name, (fn, expected) in cases.items():
+        write_gate713(root=root, record=mutate(fn))
+        try:
+            arms.gate713_summary(data_dir=root)
+        except AssertionError as err:
+            results[f"j: {name} is refused with the right message"] = expected in str(err)
+        else:
+            results[f"j: {name} is refused with the right message"] = False
+    passing = valid_gate713()
+    passing["KA3"]["pass"] = passing["KA12"]["pass"] = True
+    passing.pop("waived")
+    passing.pop("waiver")
+    write_gate713(root=root, record=passing)
+    results["j: a passed gate with no waiver is accepted"] = not arms.gate713_summary(
+        data_dir=root
+    )["waived"]
+    write_gate713(root=root, record=valid_gate713())
+    return results
+
+
+class Stub:
+    """Counts the stage calls and optionally crashes in, or caps, one stage."""
+
+    def __init__(self, *, crash_stage: int | None = None, cap_stage: int | None = None) -> None:
+        self.calls: list[tuple[int, int]] = []
+        self.crash_stage, self.cap_stage = crash_stage, cap_stage
+
+    def train_stage(self, *, model, stage, max_passes, **_):
+        self.calls.append((stage, max_passes))
+        if stage == self.crash_stage:
+            raise RuntimeError("simulated crash")
+        with torch.no_grad():
+            next(model.parameters()).add_(0.5)
+        cap = stage == self.cap_stage and max_passes == fit.CAP_FIRST
+        return fit.tr713.StageLog(stage=stage, passes=max_passes, best_val=0.5, cap_hit=cap)
+
+    def deps(self) -> fit.Deps:
+        return fit.Deps(load_world=lambda **_: (None, {"stub": 0}), train_stage=self.train_stage)  # ty: ignore[invalid-argument-type]
+
+
+def run(*, root: Path, stub: Stub, accept=()) -> tuple[dict, str]:
+    """Run `fit.fit` with the stub and return the log and the printed text."""
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        log = fit.fit(
+            arm="F4",
+            month=MONTH,
+            seed=SEED,
+            device="cpu",
+            data_dir=root,
+            accept=accept,
+            deps=stub.deps(),
+        )
+    return log, buf.getvalue()
+
+
+def refused(*, root: Path, accept=()) -> bool:
+    """Return whether `fit.fit` refuses with an AssertionError."""
+    try:
+        run(root=root, stub=Stub(), accept=accept)
+    except AssertionError:
+        return True
+    return False
+
+
+def main() -> int:
+    """Run the checks."""
+    tr.make_samples = lambda *, world, stage: [0, 1, 2]  # ty: ignore[invalid-assignment]
+    results: dict[str, bool] = {}
+    with tempfile.TemporaryDirectory(dir=Path.home() / ".cache") as tmp:
+        root = Path(tmp)
+        build_folder(root=root)
+        gate = arms.gate_file(data_dir=root)
+        gate_text = gate.read_text()
+        gate.unlink()
+        results["g: no gate file is refused"] = refused(root=root)
+        gate.write_text(gate_text)
+        gate713 = a713.root(data_dir=root) / "work" / "known_answers_passed.json"
+        text713 = gate713.read_text()
+        gate713.unlink()
+        results["g: no gate file of experiment 713 is refused"] = refused(root=root)
+        gate713.write_text(json.dumps({**json.loads(text713), "waived": False}))
+        results["g: a failed gate of experiment 713 without a waiver is refused"] = refused(
+            root=root
+        )
+        gate713.write_text(text713)
+        crash = Stub(crash_stage=3)
+        try:
+            run(root=root, stub=crash)
+            results["b: the stub crashed"] = False
+        except RuntimeError:
+            results["b: the stub crashed"] = [c[0] for c in crash.calls] == [2, 3]
+        stage2 = arms.model_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, stage=2)
+        results["b: stage 2 state saved before the crash"] = stage2.exists()
+        resume = Stub()
+        log, text = run(root=root, stub=resume)
+        results["b: the resume trains stage 3 only"] = [c[0] for c in resume.calls] == [3]
+        results["b: the resume log holds both stages"] = [s["stage"] for s in log["stages"]] == [
+            2,
+            3,
+        ]
+        results["f: the peak host memory is printed and logged"] = (
+            "peak host" in text and log["peak_host_mb"] > 0
+        )
+        again = Stub()
+        _, text = run(root=root, stub=again)
+        results["c: a finished job runs nothing"] = again.calls == [] and "done" in text
+        stage_log = arms.stage_log_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, stage=3)
+        original = stage_log.read_text()
+        record = json.loads(original)
+        record["code_hash"] = "deadbeefdeadbeef"
+        stage_log.write_text(json.dumps(record))
+        results["d: another code hash is refused"] = refused(root=root)
+        accepted = run(root=root, stub=Stub(), accept=["deadbeefdeadbeef"])[0]
+        results["d: the exact old hash is accepted and logged"] = "deadbeefdeadbeef" in json.dumps(
+            accepted.get("code_overrides", accepted)
+        )
+        record["e00713_code_hash"] = "0123456789abcdef"
+        stage_log.write_text(json.dumps(record))
+        results["d: a changed experiment 713 hash refuses even the exact old hash"] = refused(
+            root=root, accept=["deadbeefdeadbeef"]
+        )
+        stage_log.write_text(original)
+        final_log = arms.log_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, kind="fit")
+        logged = json.loads(final_log.read_text()).get("e00713_gate", {})
+        results["i: the final log records 713's waived gate and its failed checks"] = logged.get(
+            "waived"
+        ) is True and logged.get("failed_checks") == ["KA12", "KA3"]
+        results["h: the final log records the checkpoint flag"] = (
+            json.loads(final_log.read_text()).get("checkpoint_neighbours") is False
+        )
+        for stage in (2, 3):
+            arms.model_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, stage=stage).unlink()
+        arms.log_file(data_dir=root, arm="F4", month=MONTH, seed=SEED, kind="fit").unlink()
+        cap = Stub(cap_stage=2)
+        log, _ = run(root=root, stub=cap)
+        results["e: a capped stage reruns once at 120 passes"] = cap.calls == [
+            (2, 60),
+            (2, 120),
+            (3, 60),
+        ]
+        results["e: the log records both runs"] = log["stages"][0]["rerun"] is not None
+        results.update(gate713_refusals(root=root))
+    for name, ok in results.items():
+        print(("PASS" if ok else "FAIL"), name)
+    return 0 if all(results.values()) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
