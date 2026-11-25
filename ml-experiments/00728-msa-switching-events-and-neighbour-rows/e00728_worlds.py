@@ -1,0 +1,600 @@
+"""Experiment 728: the training world, the visible depth, the seed lists, and the counted event set.
+
+**The training world** extends experiment 715's `mirror_world` (design section 2.1). Each event is a
+constant step in shares of the host's capacity with an abrupt onset. The world differs from
+experiment 715's `mirror_world` in seven ways: the lengths of temporary moves are log-uniform from 1
+hour to 120 days, a permanent change never ends, a Primary takes at most two permanent changes with
+a summed shift within +-0.50 of capacity, a move has no, one, or two to three metered recipients
+(a third of the moves each), the sign is drawn independently of the kind and of the mirror class,
+the events cover 15% of each Primary's half-hours, and the depth is drawn so that three quarters of
+the events are of visible depth.
+
+A temporary move sits in the history of the host and of every recipient, and never in a target. A
+permanent change sits in the history and in the target of the host. A chance mirror of a permanent
+change (1 event in 10) sits in the history of one neighbour only.
+
+**The visible depth** (design section 2.4) of a step at a Primary is the larger of 0.10 of capacity
+and 2 times the Primary's daily-mean reference error. `reference_error` rebuilds experiment 714's
+weather-only reference with `e00714_common.build_reference`.
+
+**The counted event set** (design section 2.2) is `g2`'s temporary moves of visible depth with a
+metered mirror. `counted_moves` reads the truth tables of `g2` and applies the filter.
+"""
+
+from dataclasses import dataclass
+from typing import Final
+
+import e00713_layout as lay  # ty: ignore[unresolved-import]
+import e00714_common as common714  # ty: ignore[unresolved-import]
+import e00714_generator2 as g2gen  # ty: ignore[unresolved-import]
+import e00715_neighbours as nb  # ty: ignore[unresolved-import]
+import e00715_worlds as w715  # ty: ignore[unresolved-import]
+import numpy as np
+import polars as pl
+from scipy.stats import chi2_contingency
+
+PER_DAY: Final = lay.STEPS_PER_DAY
+WORLD_KEY: Final = 728_001
+"""First entry of the key of the training world's random stream."""
+REDRAW_KEY: Final = 728_002
+"""First entry of the key of the stream that redraws a permanent change that breaks a limit."""
+TEST_SEED_BASE: Final = 728_900_000
+"""Held-out draws use `TEST_SEED_BASE` plus the fold's index; `g2`'s seeds are experiment 714's."""
+TRAIN_SEED_BASE: Final = 728_100_000
+"""Training draws use this base plus 1000 per fold month plus the training seed."""
+FOLD_MONTHS: Final = (
+    "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+)  # fmt: skip
+"""Experiment 713's 8 folds, in order."""
+INJECTED_MONTHS: Final = common714.MONTHS
+"""The four folds that `g2` covers."""
+
+TEMPORARY_SHARE: Final = 0.70
+MIRROR_CLASS_SHARE: Final = 1.0 / 3.0
+"""A third of moves have one metered recipient, a third two or three, a third none."""
+MIN_LENGTH_HH: Final = 2
+"""One hour."""
+MAX_LENGTH_DAYS: Final = 120
+PERMANENT_COVER_DAYS: Final = 28
+"""A permanent change counts for this many days of the event cover."""
+EVENT_COVER: Final = 0.15
+MAX_PERMANENT_PER_PRIMARY: Final = 2
+MAX_PERMANENT_SUM: Final = 0.50
+"""The summed permanent shift at a Primary stays within this share of capacity."""
+MAX_REDRAWS: Final = 400
+SINGLE_SHARE: Final = (0.2, 1.0)
+"""Share of the megawatts moved that one metered recipient takes (experiment 715's range)."""
+MULTI_TOTAL_SHARE: Final = (0.6, 1.0)
+"""Summed share of the megawatts moved that two or three metered recipients take."""
+CHANCE_MIRROR: Final = w715.CHANCE_MIRROR
+VISIBLE_SHARE: Final = 0.75
+"""Share of events whose depth is at least the visible depth."""
+DEPTH_MAX: Final = 0.50
+DEPTH_MIN: Final = 0.05
+VISIBLE_FLOOR: Final = 0.10
+"""A step of visible depth is at least this share of capacity."""
+VISIBLE_FACTOR: Final = 2.0
+"""A step of visible depth is at least this many times the daily-mean reference error."""
+INDEPENDENCE_LEVEL: Final = 0.01
+"""A chi-squared test of independence that rejects at this level fails GH5."""
+FLOOR_TOLERANCE: Final = 1e-9
+
+
+@dataclass(frozen=True)
+class DrawnEvent:
+    """The random draws of one event, before any limit is applied.
+
+    Attributes:
+        temporary: True for a temporary move.
+        length: Length in half-hours (a permanent change is lengthened to the end of the grid).
+        onset_fraction: Uniform draw that places the onset.
+        depth: Unsigned depth in shares of the host's capacity.
+        sign: -1.0 for a fall, +1.0 for a rise.
+        mirror_class: 0 for no metered recipient, 1 for one, 2 for two or three (a temporary move
+            only).
+    """
+
+    temporary: bool
+    length: int
+    onset_fraction: float
+    depth: float
+    sign: float
+    mirror_class: int
+
+
+@dataclass
+class TrainingWorld:
+    """The two arrays of a training draw and its event table.
+
+    Attributes:
+        history: (16, G) power over capacity that the history rows read, all events in.
+        target: (16, G) power over capacity that the targets read: the cleaned power plus the
+            permanent changes only.
+        events: One dict per event.
+        seed: The world seed of the draw.
+        redrawn: Number of permanent changes that broke a limit and were redrawn.
+        dropped: Number of permanent changes that found no valid place and were dropped.
+    """
+
+    history: np.ndarray
+    target: np.ndarray
+    events: list[dict]
+    seed: int
+    redrawn: int
+    dropped: int
+
+
+# ---------------------------------------------------------------------- seeds
+
+
+def train_seed(*, month: str, seed: int) -> int:
+    """Return the world seed of the training draw of a fold month and a training seed."""
+    return TRAIN_SEED_BASE + FOLD_MONTHS.index(month) * 1000 + seed
+
+
+def held_out_seed(*, month: str) -> int:
+    """Return the world seed of the held-out draw of an injected fold month."""
+    assert month in INJECTED_MONTHS, month
+    return TEST_SEED_BASE + INJECTED_MONTHS.index(month)
+
+
+def g2_seeds(*, passes_per_month: dict[str, list[int]]) -> list[int]:
+    """Return the world seeds of the stored `g2` passes, `passes_per_month` by fold month."""
+    return [
+        g2gen.pass_seed(world="g2", month=month, index=index)
+        for month, indices in passes_per_month.items()
+        for index in indices
+    ]
+
+
+def assert_disjoint(*, train: list[int], g2: list[int], held_out: list[int]) -> None:
+    """GH6: assert that the training, `g2`, and held-out world seeds are pairwise disjoint."""
+    sets = {"train": set(train), "g2": set(g2), "held_out": set(held_out)}
+    for a, set_a in sets.items():
+        for b, set_b in sets.items():
+            if a < b:
+                both = set_a & set_b
+                assert not both, f"the {a} and {b} world seeds overlap: {sorted(both)[:5]}"
+
+
+def assert_train_seed_allowed(*, world_seed: int, test_seeds: list[int]) -> None:
+    """Refuse a fit whose training-world seed is in a test list (design section 2.1)."""
+    assert world_seed not in set(test_seeds), (
+        f"training-world seed {world_seed} is a test seed: refusing to fit"
+    )
+
+
+# ---------------------------------------------------------------------- visible depth
+
+
+def reference_error(*, ctx: common714.Context, month: str) -> np.ndarray:
+    """Return the daily-mean reference error of each of the 16 Primaries for a fold month.
+
+    The error is the mean absolute difference between the daily mean of the Primary's real power
+    and the daily mean of experiment 714's weather-only reference, in shares of capacity, over the
+    days of the stored window that lie before the fold month (experiment 714's `window_bounds`).
+    A Primary with no reference or no finite day is NaN. The array follows `nb.LABELS`.
+    """
+    month_day = common714.month_start_day(month=month)
+    reference = common714.reference_for(ctx=ctx, month_day=month_day)
+    lo = reference.start_hh
+    day = common714.DAY
+    n_before = (month_day * day - lo) // day
+    assert n_before > 0, (month, lo)
+    out = np.full(nb.N_PRIMARIES, np.nan)
+    for label_index, label in enumerate(nb.LABELS):
+        site = ctx.panel.sites.index(label)
+        real = ctx.panel.power[site, lo : lo + n_before * day].reshape(n_before, day)
+        ref = reference.power[site, : n_before * day].reshape(n_before, day)
+        with np.errstate(invalid="ignore"):
+            real_mean = np.nanmean(np.where(np.isfinite(ref), real, np.nan), axis=1)
+            ref_mean = np.nanmean(np.where(np.isfinite(real), ref, np.nan), axis=1)
+        diff = np.abs(real_mean - ref_mean)
+        if np.isfinite(diff).any():
+            out[label_index] = float(np.nanmean(diff))
+    return out
+
+
+def visible_depth(*, reference_error_share: np.ndarray) -> np.ndarray:
+    """Return the visible depth of each Primary: the larger of 0.10 and 2 times the reference error.
+
+    A Primary with no reference error (NaN) takes the floor of 0.10 alone.
+    """
+    scaled = np.where(
+        np.isfinite(reference_error_share), VISIBLE_FACTOR * reference_error_share, 0.0
+    )
+    return np.maximum(VISIBLE_FLOOR, scaled)
+
+
+# ---------------------------------------------------------------------- the training world
+
+
+def draw_event(*, rng: np.random.Generator, vis: float, n_grid: int) -> DrawnEvent:
+    """Draw one event's kind, length, onset, depth, sign, and mirror class.
+
+    Every draw is made for every event, so the stream does not depend on the kind. The kind, the
+    sign, and the depth are drawn independently of each other. The depth is log-uniform between the
+    Primary's visible depth and 0.50 for `VISIBLE_SHARE` of the events, and log-uniform between 0.05
+    and the visible depth for the rest.
+    """
+    u_kind, u_len, u_onset, u_band, u_depth, u_sign, u_class = rng.random(7)
+    temporary = bool(u_kind < TEMPORARY_SHARE)
+    lo_len, hi_len = np.log(MIN_LENGTH_HH), np.log(MAX_LENGTH_DAYS * PER_DAY)
+    length = round(float(np.exp(lo_len + u_len * (hi_len - lo_len))))
+    length = min(max(length, MIN_LENGTH_HH), n_grid - 1)
+    lo, hi = (vis, DEPTH_MAX) if u_band < VISIBLE_SHARE else (DEPTH_MIN, vis)
+    depth = float(np.exp(np.log(lo) + u_depth * (np.log(hi) - np.log(lo))))
+    sign = 1.0 if u_sign < 0.5 else -1.0
+    mirror_class = min(int(u_class / MIRROR_CLASS_SHARE), 2) if temporary else 0
+    return DrawnEvent(
+        temporary=temporary, length=length, onset_fraction=float(u_onset), depth=depth, sign=sign,
+        mirror_class=mirror_class,
+    )  # fmt: skip
+
+
+def place_onset(*, fraction: float, first: int, last: int, length: int) -> int:
+    """Return the onset: uniform over the grid indices where the event fits (as experiment 581)."""
+    hi = max(first + 1, last - length)
+    return first + min(int(fraction * (hi - first)), hi - first - 1)
+
+
+def _permanent_ok(
+    *, perm_sum: np.ndarray, count: int, clean_row: np.ndarray, onset: int, shift: float,
+    mva: bool,
+) -> bool:  # fmt: skip
+    """Return True if adding a permanent change keeps the three limits of design section 2.1."""
+    if count >= MAX_PERMANENT_PER_PRIMARY:
+        return False
+    new = perm_sum.copy()
+    new[onset:] += shift
+    if np.abs(new).max() > MAX_PERMANENT_SUM + FLOOR_TOLERANCE:
+        return False
+    if mva:
+        shifted = clean_row + new
+        finite = np.isfinite(shifted)
+        if finite.any() and shifted[finite].min() < -FLOOR_TOLERANCE:
+            return False
+    return True
+
+
+def _recipient_shares(*, rng: np.random.Generator, mirror_class: int, n_near: int) -> list[float]:
+    """Return the shares of the megawatts moved that each metered recipient takes."""
+    if mirror_class == 1 or n_near == 1:
+        return [float(rng.uniform(*SINGLE_SHARE))]
+    n_recipients = int(rng.integers(2, min(3, n_near) + 1))
+    total = float(rng.uniform(*MULTI_TOTAL_SHARE))
+    weights = rng.dirichlet(np.ones(n_recipients))
+    return [float(total * w) for w in weights]
+
+
+def training_world(  # noqa: PLR0915
+    *, clean: np.ndarray, first: int, last: int, world_seed: int, table: nb.NeighbourTable,
+    capacity_mw: np.ndarray, mva_only: np.ndarray, vis: np.ndarray,
+) -> TrainingWorld:  # fmt: skip
+    """Return one draw of the training world of a fold.
+
+    Args:
+        clean: (16, G) cleaned power over capacity, NaN where flagged or missing.
+        first: First grid index of the schedule (experiment 713's `c_idx.min() - 768`).
+        last: End of the schedule (`c_idx.max() + 672`).
+        world_seed: The seed of the draw (`train_seed` or `held_out_seed`).
+        table: The neighbour table (a recipient is a listed neighbour of the donor).
+        capacity_mw: (16,) effective capacity in megawatts.
+        mva_only: (16,) bool, True for MVA-only Primaries (steps are floored at zero).
+        vis: (16,) visible depth in shares of capacity (`visible_depth`).
+
+    Returns:
+        The history and target arrays and the event table. `redrawn` counts permanent changes that
+        broke a limit and were moved to another Primary or onset with their sign and depth kept.
+    """
+    assert vis.shape == (nb.N_PRIMARIES,), vis.shape
+    assert (vis < DEPTH_MAX).all(), vis
+    n_grid = clean.shape[1]
+    history = clean.copy()
+    target = clean.copy()
+    rng = np.random.default_rng([WORLD_KEY, world_seed])
+    rng_redraw = np.random.default_rng([REDRAW_KEY, world_seed])
+    perm_sum = np.zeros(clean.shape)
+    perm_count = np.zeros(nb.N_PRIMARIES, dtype=int)
+    events: list[dict] = []
+    redrawn = dropped = 0
+    span = last - first
+    for p in range(nb.N_PRIMARIES):
+        covered = 0
+        while covered < EVENT_COVER * span:
+            ev = draw_event(rng=rng, vis=float(vis[p]), n_grid=n_grid)
+            host, onset = (
+                p,
+                place_onset(fraction=ev.onset_fraction, first=first, last=last, length=ev.length),
+            )
+            shift = ev.sign * ev.depth
+            if ev.temporary:
+                length = ev.length
+                covered += length
+            else:
+                covered += PERMANENT_COVER_DAYS * PER_DAY
+                length = n_grid - onset
+                ok = _permanent_ok(
+                    perm_sum=perm_sum[host], count=int(perm_count[host]), clean_row=clean[host],
+                    onset=onset, shift=shift, mva=bool(mva_only[host]),
+                )  # fmt: skip
+                tries = 0
+                while not ok and tries < MAX_REDRAWS:
+                    host = int(rng_redraw.integers(0, nb.N_PRIMARIES))
+                    onset = place_onset(
+                        fraction=float(rng_redraw.random()), first=first, last=last,
+                        length=PERMANENT_COVER_DAYS * PER_DAY,
+                    )  # fmt: skip
+                    ok = _permanent_ok(
+                        perm_sum=perm_sum[host], count=int(perm_count[host]),
+                        clean_row=clean[host], onset=onset, shift=shift, mva=bool(mva_only[host]),
+                    )  # fmt: skip
+                    tries += 1
+                if tries:
+                    redrawn += 1
+                if not ok:
+                    dropped += 1
+                    continue
+                length = n_grid - onset
+                perm_sum[host, onset:] += shift
+                perm_count[host] += 1
+            floor_host = bool(mva_only[host])
+            w715.add_shift(
+                array=history, primary=host, onset=onset, length=length, shift=shift,
+                floor=floor_host and ev.temporary,
+            )  # fmt: skip
+            if not ev.temporary:
+                w715.add_shift(
+                    array=target, primary=host, onset=onset, length=length, shift=shift
+                )  # fmt: skip
+            near = table.neighbours[host]
+            recipients: list[int] = []
+            shares: list[float] = []
+            megawatts: list[float] = []
+            if ev.temporary:
+                want = ev.mirror_class
+            else:
+                want = 1 if (near and rng.random() < CHANCE_MIRROR) else 0
+            if want and near:
+                shares = _recipient_shares(rng=rng, mirror_class=want, n_near=len(near))
+                order = rng.permutation(len(near))[: len(shares)]
+                recipients = [int(near[i]) for i in order]
+                for r, s in zip(recipients, shares, strict=True):
+                    mw = -shift * capacity_mw[host] * s
+                    megawatts.append(float(mw))
+                    w715.add_shift(
+                        array=history, primary=r, onset=onset, length=length,
+                        shift=mw / capacity_mw[r], floor=bool(mva_only[r]),
+                    )  # fmt: skip
+            events.append(
+                {
+                    "host": host, "onset": onset, "length": length,
+                    "kind": "temporary" if ev.temporary else "permanent", "shift": shift,
+                    "depth": ev.depth, "sign": ev.sign, "visible": ev.depth >= float(vis[host]),
+                    "mirror_class": len(recipients), "recipients": recipients, "shares": shares,
+                    "megawatts": megawatts, "chance": bool(recipients and not ev.temporary),
+                }
+            )  # fmt: skip
+    return TrainingWorld(
+        history=history, target=target, events=events, seed=world_seed, redrawn=redrawn,
+        dropped=dropped,
+    )  # fmt: skip
+
+
+# ---------------------------------------------------------------------- checks of a draw (GH5, GH7)
+
+
+def check_targets_and_limits(
+    *, world: TrainingWorld, clean: np.ndarray, mva_only: np.ndarray
+) -> dict[str, float]:  # fmt: skip
+    """GH7: assert clean targets and the three limits on stacked permanent changes; return counts.
+
+    The target equals the cleaned power plus the permanent changes alone, so no target half-hour
+    of a donor or of a recipient carries a temporary move, and every half-hour after the onset of a
+    permanent change carries the change. A Primary has at most two permanent changes, the summed
+    permanent shift stays within +-0.50, and the shifted power of an MVA-only Primary stays at or
+    above zero. The realised permanent share of events is returned.
+    """
+    expected = clean.copy()
+    count = np.zeros(nb.N_PRIMARIES, dtype=int)
+    perm_sum = np.zeros(clean.shape)
+    for e in world.events:
+        if e["kind"] == "permanent":
+            w715.add_shift(
+                array=expected, primary=e["host"], onset=e["onset"], length=e["length"],
+                shift=e["shift"],
+            )  # fmt: skip
+            count[e["host"]] += 1
+            perm_sum[e["host"], e["onset"] : e["onset"] + e["length"]] += e["shift"]
+            assert e["onset"] + e["length"] == clean.shape[1], "a permanent change must never end"
+    same = np.array_equal(world.target, expected, equal_nan=True)
+    assert same, "a target differs from the cleaned power plus the permanent changes"
+    assert int(count.max()) <= MAX_PERMANENT_PER_PRIMARY, count
+    assert float(np.abs(perm_sum).max()) <= MAX_PERMANENT_SUM + FLOOR_TOLERANCE, "stack above 0.50"
+    for p in np.nonzero(mva_only)[0]:
+        row = world.target[p]
+        finite = np.isfinite(row)
+        floor_ok = (not finite.any()) or row[finite].min() >= -FLOOR_TOLERANCE
+        assert floor_ok, f"MVA-only Primary {p} goes below zero in the target"
+    n = len(world.events)
+    return {
+        "n_events": n,
+        "permanent_share": sum(e["kind"] == "permanent" for e in world.events) / max(n, 1),
+        "redrawn": world.redrawn,
+        "dropped": world.dropped,
+    }
+
+
+def realised_cover(*, world: TrainingWorld, clean: np.ndarray, first: int, last: int) -> float:
+    """Return the share of half-hours in `[first, last)` that carry an event at their Primary."""
+    inside = np.zeros(clean.shape, dtype=bool)
+    for e in world.events:
+        span = PERMANENT_COVER_DAYS * PER_DAY if e["kind"] == "permanent" else e["length"]
+        inside[e["host"], e["onset"] : e["onset"] + span] = True
+    return float(inside[:, first:last].mean())
+
+
+def independence_tables(*, world: TrainingWorld) -> dict[str, object]:
+    """GH5: return the tables of kind by sign and kind by Primary, and the chi-squared p-values.
+
+    Also returns the shares of unmirrored temporary rises and falls, which the design asserts are
+    equal (a two-sided binomial z-score at the 1% level fails the check).
+    """
+    frame = pl.DataFrame(world.events)
+    out: dict[str, object] = {}
+    for column in ("sign", "host"):
+        table = frame.group_by("kind", column).len().pivot(on=column, index="kind", values="len")
+        counts = table.drop("kind").fill_null(0).to_numpy().astype(float)
+        counts = counts[:, counts.sum(axis=0) > 0]
+        p_value = float(chi2_contingency(counts).pvalue) if counts.shape[1] > 1 else 1.0
+        out[f"kind_by_{column}"] = table
+        out[f"p_kind_by_{column}"] = p_value
+        assert p_value >= INDEPENDENCE_LEVEL, (
+            f"kind is not independent of {column} (chi-squared p={p_value:.4f}, seed {world.seed})"
+        )
+    bare = frame.filter((pl.col("kind") == "temporary") & (pl.col("mirror_class") == 0))
+    n = bare.height
+    rises = int((bare["sign"] > 0).sum())
+    z = (rises - n / 2) / max(np.sqrt(n / 4), 1e-9)
+    out["unmirrored_temporary"] = {"n": n, "rises": rises, "z": float(z)}
+    assert abs(z) < 2.576, f"unmirrored temporary rises and falls are unbalanced (z={z:.2f})"
+    return out
+
+
+def check_shared_draw(*, host_a: np.ndarray, host_b: np.ndarray) -> None:
+    """GH9: assert that the host arrays of `Rb` and `Rbn` for one fold and seed are identical."""
+    assert np.array_equal(host_a, host_b, equal_nan=True), "Rb and Rbn read different host arrays"
+
+
+# ---------------------------------------------------------------------- the counted event set
+
+
+def donor_step(*, truth: pl.DataFrame, capacity_mw: np.ndarray) -> np.ndarray:
+    """Return the unsigned step at the donor of each temporary move of a `g2` truth table.
+
+    A row scored at the donor holds the donor's step in `size`. A row scored at the receiving
+    Primary holds the recipient's step `moved` in shares of the recipient's capacity, which equals
+    `share * donor_step * capacity_donor / capacity_recipient`, so the donor's step is recovered
+    from `size`, `share`, and the two capacities (`moved` is capped at 0.6 in the generator, which
+    understates the donor's step for a capped row). A row with no donor in the panel (no
+    `recipient`) has a donor step of NaN.
+    """
+    out = np.full(truth.height, np.nan)
+    for i, row in enumerate(truth.iter_rows(named=True)):
+        if row["truth"] != "switch":
+            continue
+        if not row["receiving_host"]:
+            out[i] = abs(row["size"])
+        elif row["recipient"] is not None and row["recipient"] >= 0 and row["share"]:
+            donor = row["recipient"]
+            out[i] = (
+                abs(row["size"]) * capacity_mw[row["host"]] / (row["share"] * capacity_mw[donor])
+            )
+    return out
+
+
+def g2_events(*, capacity_mw: np.ndarray, vis_by_month: dict[str, np.ndarray]) -> pl.DataFrame:
+    """Return one row per `g2` event, with the donor step and the visible-depth flags.
+
+    The columns added to experiment 714's truth table are `donor_step` (unsigned, in shares of the
+    donor's capacity; NaN for a permanent change), `donor` (the donor's Primary index, or -1),
+    `depth_host` (the unsigned step at the scored host), `visible` (the step passes the visible
+    depth at its own Primary, with the visible depth of the fold month), and `metered` (the mirror
+    state is `full` or `partial`).
+    """
+    frames = []
+    for month in INJECTED_MONTHS:
+        for index in g2gen.stored_indices(world="g2", month=month):
+            truth = g2gen.read_pass(world="g2", month=month, index=index).truth
+            donors = np.where(
+                truth["receiving_host"].to_numpy(),
+                truth["recipient"].to_numpy(),
+                truth["host"].to_numpy(),
+            )
+            donors = np.where(truth["truth"].to_numpy() == "switch", donors, -1)
+            step = donor_step(truth=truth, capacity_mw=capacity_mw)
+            vis = vis_by_month[month]
+            host_vis = vis[truth["host"].to_numpy()]
+            depth_host = np.abs(truth["size"].to_numpy())
+            donor_vis = np.where(donors >= 0, vis[np.clip(donors, 0, None)], np.nan)
+            frames.append(
+                truth.with_columns(
+                    pl.Series("donor_step", step),
+                    pl.Series("donor", donors, dtype=pl.Int64),
+                    pl.Series("depth_host", depth_host),
+                    pl.Series(
+                        "visible",
+                        np.where(
+                            truth["truth"].to_numpy() == "switch",
+                            step >= donor_vis,
+                            depth_host >= host_vis,
+                        ),
+                    ),
+                    pl.col("mirror_state").is_in(["full", "partial"]).alias("metered"),
+                )
+            )
+    return pl.concat(frames)
+
+
+def counted_moves(*, events: pl.DataFrame, floor_only: bool = False) -> pl.DataFrame:
+    """Return `g2`'s temporary moves of visible depth with a metered mirror (design section 2.2).
+
+    The filter is the metered mirror and a donor step that passes the visible depth. With
+    `floor_only` the filter keeps the donor step of at least 0.10 of capacity alone, which is the
+    count of 81 before the reference-error term.
+    """
+    moves = events.filter((pl.col("truth") == "switch") & pl.col("metered"))
+    if floor_only:
+        return moves.filter(pl.col("donor_step") >= VISIBLE_FLOOR)
+    return moves.filter(pl.col("visible"))
+
+
+@dataclass(frozen=True)
+class CountReport:
+    """The counts of GH4.
+
+    Attributes:
+        all_temporary: Temporary moves of `g2`.
+        metered: Of those, the moves with a metered mirror.
+        floor_only: Of those, the moves with a donor step of at least 0.10 of capacity.
+        visible_depth: Of those, the moves that pass the full visible-depth definition.
+        lasting: Of the counted moves, those that last 7 days or more.
+        per_month: The counted moves per fold month.
+        per_mirror_state: The counted moves per mirror state.
+        per_band: The counted moves per duration band.
+    """
+
+    all_temporary: int
+    metered: int
+    floor_only: int
+    visible_depth: int
+    lasting: int
+    per_month: pl.DataFrame
+    per_mirror_state: pl.DataFrame
+    per_band: pl.DataFrame
+
+
+def count_report(*, events: pl.DataFrame) -> CountReport:
+    """GH4: return the counts of the counted events (the gate applies the floors)."""
+    switches = events.filter(pl.col("truth") == "switch")
+    counted = counted_moves(events=events)
+    return CountReport(
+        all_temporary=switches.height,
+        metered=switches.filter(pl.col("metered")).height,
+        floor_only=counted_moves(events=events, floor_only=True).height,
+        visible_depth=counted.height,
+        lasting=counted.filter(pl.col("duration_days") >= 7).height,
+        per_month=counted.group_by("month").len().sort("month"),
+        per_mirror_state=counted.group_by("mirror_state").len().sort("mirror_state"),
+        per_band=counted.group_by("band").len().sort("band"),
+    )
+
+
+def pooled_floor_ok(*, report: CountReport, pooled: int, per_month: int) -> bool:
+    """Return True if the pooled count and the count per fold month meet the floors of GH4."""
+    per = dict(
+        zip(report.per_month["month"].to_list(), report.per_month["len"].to_list(), strict=True)
+    )
+    return report.visible_depth >= pooled and all(
+        per.get(m, 0) >= per_month for m in INJECTED_MONTHS
+    )
