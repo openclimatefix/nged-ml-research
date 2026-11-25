@@ -58,22 +58,29 @@ def flag_test(*, data_dir: Path) -> dict:
     }
 
 
-def scored_span(*, fold: str, n_grid: int) -> tuple[int, int]:
-    """Return the grid index range `[start, stop)` of the half-hours that the margin scores in a fold.
+def scored_span(*, fold: str, n_grid: int, last_month: str | None = None) -> tuple[int, int]:
+    """Return the grid index range `[start, stop)` of the half-hours that the margin scores.
 
-    The margin scores history tokens at or after the fold's cutoff (the first half-hour of the fold's
-    month), where the fit phase held every value at NaN, up to the first half-hour of the next month.
+    The range runs from the first half-hour of `fold`'s month, the cutoff where the fit phase held every
+    value at NaN, to the first half-hour after `last_month` (the fold's own month by default), and it
+    never passes the grid length.
     """
     from e00422_prep import GRID_START_US, STEP_US  # ty: ignore[unresolved-import]
 
-    year, month = (int(part) for part in fold.split("-"))
-    first = datetime.datetime(year, month, 1, tzinfo=datetime.UTC)
-    nxt = datetime.datetime(year + month // 12, month % 12 + 1, 1, tzinfo=datetime.UTC)
-
-    def index(when: datetime.datetime) -> int:
+    def index(month: str, *, after: bool) -> int:
+        year, mon = (int(part) for part in month.split("-"))
+        year, mon = (year + mon // 12, mon % 12 + 1) if after else (year, mon)
+        when = datetime.datetime(year, mon, 1, tzinfo=datetime.UTC)
         return int((int(when.timestamp()) * 1_000_000 - GRID_START_US) // STEP_US)
 
-    return index(first), min(index(nxt), n_grid)
+    return index(fold, after=False), min(index(last_month or fold, after=True), n_grid)
+
+
+def synthetic_scored_span(*, n_grid: int) -> tuple[int, int]:
+    """Return the scored range of the synthetic fit: March to June 2026, before the 2026-07-01 holdout."""
+    return scored_span(
+        fold=core.SYNTH_SCORED_MONTHS[0], n_grid=n_grid, last_month=core.SYNTH_SCORED_MONTHS[-1]
+    )
 
 
 def exporter_tokens(*, parts: dict, span: tuple[int, int] | None = None) -> dict[str, np.ndarray]:
@@ -109,7 +116,7 @@ def run_stage0(*, data_dir: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     gi = real.load_grid_inputs(
         fold=core.SYNTH_PIPELINE_FOLD, seed=0, phase="train", with_farms=False
     )
-    span = scored_span(fold=core.SYNTH_PIPELINE_FOLD, n_grid=real.N_GRID_87)
+    span = synthetic_scored_span(n_grid=real.N_GRID_87)
     offset, reach_rows = 0.0, []
     for offset in (0.0, 5.0):
         rows = []

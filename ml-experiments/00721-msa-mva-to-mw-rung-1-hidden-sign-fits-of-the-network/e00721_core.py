@@ -131,7 +131,9 @@ A). The design lead accepted 1.0 as a named constant, listed on the page."""
 SIGN_HEAD_STAGE: Final = 1
 """The one stage in which the sign head trains (Branch A). In stages 2 and 3 the head is frozen: no
 cross-entropy, no gradient, and no parameter in any optimiser group."""
-SYNTH_PIPELINE_FOLD: Final = "2026-04"
+SYNTH_PIPELINE_FOLD: Final = "2026-03"
+SYNTH_SCORED_MONTHS: Final = ("2026-03", "2026-04", "2026-05", "2026-06")
+"""The synthetic fit trains before 2026-03-01 (after the purge) and scores the never-trained March to June 2026."""
 """The real fold whose pipeline supplies the synthetic world's grid, weather, and cutoff."""
 SYNTH_EXPORTERS: Final = ("D9", "D11")
 """The synthetic world's two exporting Primaries (their real sky and temperature are used)."""

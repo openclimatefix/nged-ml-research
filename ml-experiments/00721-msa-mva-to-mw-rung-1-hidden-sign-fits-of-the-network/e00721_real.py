@@ -507,6 +507,24 @@ def synthetic_inputs(*, gi: GridInputs, seed: int, day_offset_points: float) -> 
     }  # fmt: skip
 
 
+def synthetic_score_origins(*, n_grid: int) -> np.ndarray:
+    """Return the contract origins (12:00 UTC, every day) of the synthetic fit's scored months.
+
+    The days run from 2026-03-01 until the last origin whose 10 days of targets end before the
+    2026-07-01 holdout. The synthetic arrays have no real label, so any origin in the range is scored.
+    """
+    import e00721_stage0 as stage0
+
+    start, stop = stage0.synthetic_scored_span(n_grid=n_grid)
+    holdout = int(
+        (np.datetime64(core.HOLDOUT_START_ISO, "us").astype(np.int64) - lay.GRID_START_US)
+        // lay.STEP_US
+    )
+    last = min(stop, holdout) - lay.STEPS_PER_DAY * lay.N_LEAD_DAYS
+    days = np.arange(start // lay.STEPS_PER_DAY, last // lay.STEPS_PER_DAY)
+    return (days * lay.STEPS_PER_DAY + 24).astype(np.int64)
+
+
 def build_synthetic_arm_world(
     *, job: fit.Job, data_dir: Path, device: str, phase: str
 ) -> trn.ArmWorld:
@@ -582,11 +600,7 @@ def build_synthetic_arm_world(
     tworld = jobs.tr.World(
         source=source, cutoff_idx=cutoff, clean=reading, target_mean=mean, target_std=std, month=job.fold, placebo_pool=None,
     )  # fmt: skip
-    score_c = (
-        np.asarray(data.test_origin_idx, dtype=np.int64) + lay.NATIVE_OFFSET_STEPS
-        if data.test_origin_idx is not None
-        else None
-    )
+    score_c = synthetic_score_origins(n_grid=n_grid) if phase == "predict" else None
     return trn.ArmWorld(
         spec=spec, world=tworld, sources={1: source}, clean_plain=reading, clean_fold=reading, folded_target=supervised,
         shift=mean / std, q_v=np.full(16, core.REACTIVE_FLOOR_POINTS / 100.0) / std, gate=gate, val_primaries=four, seed=job.seed,

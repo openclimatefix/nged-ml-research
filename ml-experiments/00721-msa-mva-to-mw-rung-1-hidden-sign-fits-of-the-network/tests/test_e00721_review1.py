@@ -562,7 +562,7 @@ def test_jobs_are_grouped_so_that_each_process_serves_one_fold_month() -> None:
 
     jobs = [j for w in (1, 2, 3, 4) for j in fit.wave_jobs(wave=w)]
     groups = cli.group_by_pipeline_fold(jobs=jobs)
-    assert set(groups) <= {*core.FOLDS}
+    assert set(groups) <= {*core.FOLDS, core.SYNTH_PIPELINE_FOLD}
     assert all(cli.pipeline_fold(job=j) == m for m, js in groups.items() for j in js)
     first = cli.group_by_pipeline_fold(jobs=fit.wave_jobs(wave=4))
     assert next(iter(first)) == core.MDE_FOLD

@@ -15,7 +15,10 @@ through `run.sh`:
    7 (the lead window), 9 (the predict phase reproduces the fitted PV scales), the predict peak
    (8), and the share of PV target rows that are missing per Primary.
 3. `probe SCRATCH`: assertion 8 for the capacity probe (GPU peak at most 6 GB).
-4. `routing SCRATCH`: assertion 10 (`score_all` on the complete set of wave outputs reaches rows
+4. `synth-fit SCRATCH` and `synth-predict SCRATCH`: the synthetic fit on the pipeline fold
+   2026-03 (cutoff at 2026-03-01, target NaN from there on, scored origins in March to June 2026,
+   tokens written), with its seconds and GPU peak printed so the extra cost can be re-measured.
+5. `routing SCRATCH`: assertion 10 (`score_all` on the complete set of wave outputs reaches rows
    4 to 9; CPU only).
 
 Usage: `SLOT_CPU=3 run.sh --go code_works_check.py fit SCRATCH --device cuda`, with `fit`,
@@ -300,6 +303,60 @@ def check_probe(*, scratch: Path, device: str) -> dict:
     return {"probe_peak_gb": gb}
 
 
+SYNTH_JOB: Final = fit.Job(arm="SG-A", world="synthetic", fold="synthetic", seed=0)
+
+
+def check_synth(*, scratch: Path, device: str, phase: str) -> dict:
+    """Fit (phase `train`) or predict (phase `predict`) the synthetic `SG-A` and assert its span."""
+    import time
+
+    import e00721_real as real
+    import torch  # ty: ignore[unresolved-import]
+
+    if device.startswith("cuda"):
+        fit.limit_gpu_memory(torch=torch)
+        torch.cuda.reset_peak_memory_stats()
+    vars(core).update(SYNTH_MAX_PASSES=PASSES)
+    inputs = inputs_of(scratch=scratch, device=device, phase=phase)
+    started = time.monotonic()
+    if phase == "train":
+        fit.fit_job(
+            job=SYNTH_JOB, inputs=inputs, data_dir=scratch, budget=fit.Budget(), continuation=False
+        )
+        aw = inputs.world_of(job=SYNTH_JOB)
+        say(
+            name="11a the synthetic pipeline fold is 2026-03",
+            ok=core.SYNTH_PIPELINE_FOLD == "2026-03",
+        )
+        say(
+            name="11b the synthetic target is NaN at and after the cutoff",
+            ok=bool(np.isnan(aw.world.clean[:, aw.world.cutoff_idx :]).all()),
+        )
+    else:
+        fit.predict_job(job=SYNTH_JOB, inputs=inputs, data_dir=scratch)
+        aw = inputs.world_of(job=SYNTH_JOB)
+        c = aw.score_c_idx
+        say(
+            name="11c scored origins lie in March to June 2026",
+            ok=bool(
+                c is not None and (c == real.synthetic_score_origins(n_grid=len(aw.stamp_us))).all()
+            ),
+            detail=f"{len(c)} origins",
+        )
+        tokens = fit.job_paths(data_dir=scratch, job=SYNTH_JOB)["predictions"].with_suffix(
+            ".tokens.npz"
+        )
+        say(name="11d the sign tokens are written", ok=tokens.exists())
+    seconds = time.monotonic() - started
+    gb = peak_gb(torch=torch, device=device)
+    say(
+        name="11e the GPU peak is at most 6 GB",
+        ok=gb <= GPU_CAP_GB,
+        detail=f"{gb:.2f} GB, {seconds:.0f} s",
+    )
+    return {"phase": phase, "seconds": seconds, "peak_gb": gb}
+
+
 def check_routing(*, scratch: Path) -> dict:
     """Assert that `score_all` on the complete set of wave outputs reaches rows 4 to 9."""
     sys.path.insert(0, str(Path(__file__).parent / "tests"))
@@ -328,7 +385,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=("fit", "predict", "probe", "routing"))
+    parser.add_argument(
+        "command", choices=("fit", "predict", "probe", "routing", "synth-fit", "synth-predict")
+    )
     parser.add_argument("scratch", type=Path)
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
@@ -339,6 +398,12 @@ def main() -> int:
         report = check_fit(scratch=args.scratch, data_dir=data_dir, device=args.device)
     elif args.command == "predict":
         report = check_predict(scratch=args.scratch, data_dir=data_dir, device=args.device)
+    elif args.command in {"synth-fit", "synth-predict"}:
+        report = check_synth(
+            scratch=args.scratch / "synth",
+            device=args.device,
+            phase="train" if args.command == "synth-fit" else "predict",
+        )
     elif args.command == "probe":
         report = check_probe(scratch=args.scratch, device=args.device)
     else:

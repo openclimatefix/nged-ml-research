@@ -31,7 +31,7 @@ MVA = [2, 3]
 
 def _prediction_rows(*, fold: str, seed: int, offset: float) -> pl.DataFrame:
     rng = np.random.default_rng([seed, 17])
-    month = fold if fold != "synthetic" else "2026-04"
+    month = fold if fold != "synthetic" else "2026-03"
     start = np.datetime64(f"{month}-01T12:00", "us")
     vt = start + np.arange(0, 30 * 48) * np.timedelta64(30, "m")
     out = []
@@ -389,3 +389,16 @@ def test_the_real_no_continuation_path_writes_a_flagged_entry_that_the_driver_co
     assert result.flag["flagged"] is True
     assert result.continued is False
     assert result.best_state_p30 is None
+
+
+def test_the_synthetic_fit_scores_march_to_june_before_the_holdout() -> None:
+    import e00721_real as real
+    import e00721_stage0 as stage0
+
+    assert core.SYNTH_PIPELINE_FOLD == "2026-03"
+    start, stop = stage0.synthetic_scored_span(n_grid=121_248)
+    assert stop - start == (31 + 30 + 31 + 30) * 48
+    origins = real.synthetic_score_origins(n_grid=121_248)
+    assert origins.min() == start + 24
+    assert origins.max() + 48 * 10 <= stop
+    assert (origins % 48 == 24).all()

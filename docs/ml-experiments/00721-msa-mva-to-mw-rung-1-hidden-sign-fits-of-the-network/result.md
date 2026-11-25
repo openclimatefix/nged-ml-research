@@ -668,7 +668,7 @@ fast results justifies.
 | Wave | What runs | Fits | GPU-process-hours | Running total |
 |---|---|---|---|---|
 | 1 | Code-works check: one tiny run that trains, scores, and writes to a scratch folder, plus one full-size real batch that measures the GPU and host memory peaks and checks the scored-state assertion. No number from it is quoted | 0 counted | 0.2 | 0.2 |
-| 1 | Synthetic world, seed 0: `SG-A`, `SG-A-S` | 2 | 0.4 | 0.6 |
+| 1 | Synthetic world, seed 0: `SG-A`, `SG-A-S`, on the pipeline of fold 2026-03, trained before 2026-03-01 and scored on March to June 2026 (about 0.02 GPU-process-hours more scoring per fit than a one-month span, re-measured at the code-works check; the projection stays) | 2 | 0.4 | 0.6 |
 | 1 | Quick look: `W2`, fold 2026-05, seed 0: `P0`, `SG-0`, `SG-A`, with the continuation (Branch A: 0.6 to 0.7) or the budget check (Branch B: 1.1 to 1.4, from 0.6 plus the two extra fits of 0.5 to 0.8). Nothing reads G3 or the flag yet | 3, plus 2 in Branch B | 0.6 to 0.7 (A); 1.1 to 1.4 (B) | 1.2 to 1.3 (A); 1.7 to 2.0 (B) |
 | 2 | Synthetic world, seed 1, then the rest of `W2`, seed 0: `P0` 3, `S` 4, `SG-0` 3, `SG-A` 3, `SG-A-S` 4 | 19 | 3.8 | 5.0 to 5.1 (A); 5.5 to 5.8 (B) |
 | 3 | `W0`, seed 0: `P0`, `S`, `SG-0`, `SG-A`, and `SG-A-open`, 4 folds each | 20 | 4.0 | 9.0 to 9.1 (A); 9.5 to 9.8 (B) |
@@ -1070,7 +1070,7 @@ which audit triggers fired.
 - **Probe jobs:** the probe's pretraining job for each world and fold runs on the GPU (about 30
   seconds each, about 4 minutes for the 8 jobs, in a 6 GB process) and the regression that reads
   the capacity runs on the CPU. The probe runner sequences before the `W2` and `W0` fits.
-- **Synthetic world on the real grid:** the pipeline of fold 2026-04 supplies the real weather, the
+- **Synthetic world on the real grid:** the pipeline of fold 2026-03 supplies the real weather, the
   Primaries D9 and D11 export, and D2 and D3 do not. All four train on the folded reading and the true
   sign of all four trains the head. Each process serves one fold month, because experiment 713's
   pipeline reads its fold month once.
@@ -1092,8 +1092,21 @@ which audit triggers fired.
   alone (the rule of experiment 417, design A).
 - **Gap rows:** every signed Primary drops the half-hours at which any farm has a gap, in both
   worlds.
+- **Synthetic fold and scored span:** the synthetic fit trains on data before 2026-03-01 (after the
+  purge) and scores the never-trained tokens of March to June 2026, all before the 2026-07-01
+  holdout, whose guard is kept. A one-month span cannot pass the noise check, because the check
+  needs about 92 distinct days per class and a month holds at most 30. The distinct days per class
+  with `u` of at least 0.3 outside the dead band, as export days and import days, are 21 and 24 in
+  March, 28 and 29 in April, 29 and 30 in May, and 29 and 29 in June, so 107 and 112 over the four
+  months, which gives 3 standard errors of 0.092 or less against the margin of 0.10. Stage 0 runs
+  the reachability check and the noise check on exactly that scored set, with each exporter's own
+  capacity, and the margin and the noise-check rule are unchanged. The synthetic fit replaces the
+  power with synthetic power, so the real folds 2026-04 to 2026-06 and their training windows are
+  untouched. The extra cost is about 3 more months of scoring (prediction) in each of the 4
+  synthetic fits and about 1% less training data, an estimate of about 0.1 GPU-process-hours in
+  all that the code-works check re-measures; the projection stays at about 13.6 until then.
 - **Synthetic Primaries:** D9 and D11 export and D2 and D3 never export. The world uses the real
-  grid of the fold 2026-04 pipeline, the real calendar with England's bank holidays, the real 2 m
+  grid of the fold 2026-03 pipeline, the real calendar with England's bank holidays, the real 2 m
   temperature, and the real shortwave likelihood `u`, in experiment 713's fixed demand table `w`.
   The page does not say which Primaries or which fold, so these are choices.
 - **Synthetic sign labels:** the true sign of all four synthetic Primaries trains the sign head, and
