@@ -46,6 +46,8 @@ def make_calendar(
         clear=1000.0 * sun[None, :] * np.ones((n_days, 1)),
         cosz=sun[None, :] * np.ones((n_days, 1)),
         t2m=10.0 + rng.normal(0, 3.0, (n_days, 48)),
+        wind10=np.abs(5.0 + rng.normal(0, 2.0, (n_days, 48))),
+        precip=np.clip(rng.normal(0.0, 0.3, (n_days, 48)), 0.0, None),
         d8_ghi=ghi[0] * 1.07 + 1.0,
         holidays=np.array(["2022-04-15", "2022-04-18"], dtype="datetime64[D]"),
         farms=farms,

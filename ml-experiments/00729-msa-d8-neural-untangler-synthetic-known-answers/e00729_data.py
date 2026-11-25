@@ -1,14 +1,16 @@
 """Experiment 729: loaders for the real inputs.
 
-The loaders cover D8's reading, the BSP meter, the CAMS and temperature fields, the metered farms,
+The loaders cover D8's reading, the BSP meter, the CAMS and ERA5 weather fields, the metered farms,
 the bank holidays, the metered engine record, and the private cut.
 
 Every loader reads one file and returns arrays; none prints a value. D8's reading and the BSP A
 meter come from the cleaned power store through `studies.power.scan_power` (half-hours the
 `substation_zero` rule flags are already dropped). The CAMS index, clear-sky irradiance, zenith,
-and 2 m temperature come from experiment 39's frame. The metered engine record is experiment 194's
-window table. The private cut (the engine's connection date) is read through
-`engine_constants.engine_datetime` and is never printed or stored in any file of the repository.
+and 2 m temperature come from experiment 39's frame; the 10 m wind speed and the precipitation come
+from the stored ERA5 features of D8's grid cell, the cell of that temperature. The metered engine
+record is experiment 194's window table. The private cut (the engine's connection date) is read
+through `engine_constants.engine_datetime` and is never printed or stored in any file of the
+repository.
 """
 
 from dataclasses import dataclass
@@ -20,7 +22,7 @@ import e00729_core as core
 import e00729_sim as sim
 import numpy as np
 import polars as pl
-from studies.sources import ML_EXPERIMENTS_DATA_DIR
+from studies.sources import ML_EXPERIMENTS_DATA_DIR, study_dir_for
 
 FRAME_39: Final = (
     ML_EXPERIMENTS_DATA_DIR / "00039-pv-disaggregation-cams-injection/work/frame.parquet"
@@ -29,6 +31,10 @@ ERA_FRAME: Final = (
     ML_EXPERIMENTS_DATA_DIR
     / "00697-gas-engine-state-tracker-part-4-running-patterns/frames/frame_d8.parquet"
 )
+ERA5_FEATURES: Final = study_dir_for(study="stage1_pilot") / "demand/inputs/era5_features.parquet"
+"""ERA5 weather at each series' grid cell; its temperature is the one in experiment 39's frame."""
+MM_PER_HOUR_PER_KG_M2_S: Final = 3600.0
+"""The file gives precipitation in kg per square metre per second; each unit is 3,600 mm an hour."""
 RECORD_GLOB: Final = "00194-*/g2_window.parquet"
 D8_SITE: Final = "D8"
 MIN_CLEAR_W_M2: Final = 5.0
@@ -80,6 +86,48 @@ def hourly_to_half_hour(*, values: np.ndarray) -> np.ndarray:
     first = np.where(np.isfinite(prev), 0.75 * v + 0.25 * prev, v)
     second = np.where(np.isfinite(nxt), 0.75 * v + 0.25 * nxt, v)
     return np.stack([first, second], axis=1).reshape(-1)
+
+
+def era5_wind_and_precipitation(*, t0: datetime, n_steps: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return ERA5 10 m wind speed and precipitation at D8's grid cell on the half-hour grid.
+
+    The file holds the hourly ERA5 values at the whole hours and, between them, interpolated values
+    that are ignored here. Wind speed is an instantaneous value, so it is treated like the 2 m
+    temperature: the two half-hours of an hour share the whole hour's value, and
+    `hourly_to_half_hour` interpolates it. Precipitation is an accumulation over the hour that ends
+    at its stamp, so each half-hour takes the accumulation of the hour that contains it.
+
+    Args:
+        t0: The first instant of the grid (midnight UTC).
+        n_steps: The number of half-hours of the grid (even).
+
+    Returns:
+        Wind speed in metres per second and precipitation in millimetres per hour, each `(n_steps,)`
+        with NaN where ERA5 has no value.
+    """
+    frame = (
+        pl.read_parquet(
+            ERA5_FEATURES,
+            columns=["time_series_id", "valid_time", "wind_speed_10m", "precipitation"],
+        )
+        .filter(
+            (pl.col("time_series_id") == core.D8_SERIES_ID)
+            & (pl.col("valid_time").dt.minute() == 0)
+        )
+        .select("valid_time", "wind_speed_10m", "precipitation")
+    )
+    n_hours = n_steps // 2
+    hour = ((frame["valid_time"] - t0).dt.total_seconds() // 3600).to_numpy().astype(np.int64)
+    ok = (hour >= 0) & (hour <= n_hours)
+    wind_h = np.full(n_hours + 1, np.nan)
+    rain_h = np.full(n_hours + 1, np.nan)
+    wind_h[hour[ok]] = frame["wind_speed_10m"].cast(pl.Float64).to_numpy()[ok]
+    rain_h[hour[ok]] = (
+        frame["precipitation"].cast(pl.Float64).to_numpy()[ok] * MM_PER_HOUR_PER_KG_M2_S
+    )
+    wind = hourly_to_half_hour(values=np.repeat(wind_h[:n_hours], 2))
+    rain = np.repeat(rain_h[1 : n_hours + 1], 2)
+    return wind, rain
 
 
 def _grid(*, frame: pl.DataFrame, t0: datetime, n_steps: int, column: str) -> np.ndarray:
@@ -237,6 +285,7 @@ def load_day_table(*, closure_days: frozenset[date] = frozenset()) -> DayTable:
     t2m = hourly_to_half_hour(
         values=_grid(frame=d8f, t0=t0, n_steps=n_steps, column="temperature_2m")
     )
+    wind, rain = era5_wind_and_precipitation(t0=t0, n_steps=n_steps)
     csi_i = hourly_to_half_hour(values=csi)
     cut = private_cut()
     cal = sim.Calendar(
@@ -244,6 +293,7 @@ def load_day_table(*, closure_days: frozenset[date] = frozenset()) -> DayTable:
         csi=csi_i.reshape(-1, 48)[day_idx], clear=clear.reshape(-1, 48)[day_idx],
         cosz=np.clip(np.cos(np.radians(zenith)), 0.0, None).reshape(-1, 48)[day_idx],
         t2m=t2m.reshape(-1, 48)[day_idx],
+        wind10=wind.reshape(-1, 48)[day_idx], precip=rain.reshape(-1, 48)[day_idx],
         d8_ghi=np.nan_to_num(csi_i * clear).reshape(-1, 48)[day_idx],
         holidays=bank_holiday_dates(),
         farms=farm_set(
@@ -269,7 +319,8 @@ def select_days(*, cal: sim.Calendar, mask: np.ndarray) -> sim.Calendar:
     )  # fmt: skip
     return sim.Calendar(
         dates=cal.dates[mask], reading=cal.reading[mask], bsp=cal.bsp[mask], csi=cal.csi[mask],
-        clear=cal.clear[mask], cosz=cal.cosz[mask], t2m=cal.t2m[mask], d8_ghi=cal.d8_ghi[mask],
+        clear=cal.clear[mask], cosz=cal.cosz[mask], t2m=cal.t2m[mask],
+        wind10=cal.wind10[mask], precip=cal.precip[mask], d8_ghi=cal.d8_ghi[mask],
         holidays=cal.holidays, farms=farms,
     )  # fmt: skip
 

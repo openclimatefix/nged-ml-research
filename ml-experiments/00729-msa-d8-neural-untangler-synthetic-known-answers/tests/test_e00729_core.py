@@ -94,8 +94,9 @@ def test_level_and_constants_match_the_page() -> None:
     assert core.GENERATOR_SEED == 729
     assert core.QUANTILE_LEVELS == (0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
     assert core.QHAT_POINTS == pytest.approx(0.1 / 10.379 * 100)
-    assert core.N_FITS == 47
-    assert len(core.CONTRASTS) == 12
+    assert core.N_FITS == 50
+    assert len(core.CONTRASTS) == 13
+    assert core.N_CONTRASTS == 12
 
 
 def test_harm_limit_is_half_the_floor_over_the_import_share() -> None:

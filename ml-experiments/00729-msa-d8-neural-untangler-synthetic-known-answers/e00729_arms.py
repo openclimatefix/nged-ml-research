@@ -5,7 +5,8 @@ This module needs no torch. An arm is a row of `ARM_SPECS`: which input groups i
 length, its output head, and its auxiliary head. A segment is turned once into a channel stack of
 shape `(channels, (D + 2) * 48)`, and a window is a slice of the stack, so building a batch is cheap.
 No arm reads the month or the day of the year: the calendar inputs of arm D are the local
-half-hour, the day of the week, and the bank-holiday flag.
+half-hour, the day of the week, and the bank-holiday flag, and its coincident ERA5 weather inputs are
+the 2 m temperature, the 10 m wind speed, and the precipitation.
 """
 
 from collections.abc import Sequence
@@ -23,9 +24,11 @@ BSP_SCALE: Final = 20.0
 """BSP half-hour steps, in points, are divided by this."""
 CLEAR_SCALE: Final = 1000.0
 """Clear-sky irradiance in W/m2 is divided by this."""
-TARGET_NAMES: Final = ("x", "valid", "engine", "solar")
+TARGET_NAMES: Final = ("x", "valid", "engine", "solar", "r")
 """The rows of a window's target array."""
-HeadType = Literal["lobe", "quantile"]
+PRECIP_SCALE: Final = 0.5
+"""The precipitation channel is `log1p(millimetres per hour) / PRECIP_SCALE`."""
+HeadType = Literal["lobe", "quantile", "sign"]
 AuxType = Literal["none", "solar", "engine"]
 
 
@@ -38,11 +41,13 @@ class ArmSpec:
         cams: Reads the CAMS fields at D8 (clear-sky index, clear-sky irradiance, cosine of the
             zenith, and a presence mask).
         bsp: Reads the synthetic BSP steps and their mask.
-        calendar: Reads the local half-hour, the day of the week, the bank-holiday flag, and ERA5
-            temperature.
+        calendar: Reads the local half-hour, the day of the week, the bank-holiday flag, and the
+            coincident ERA5 2 m temperature, 10 m wind speed, and precipitation at D8's grid cell.
         lags: Reads the folded reading 7 and 14 days earlier, each with a mask.
         steps: The window length in half-hours (96, or 48 for the 24-hour window).
-        head: "lobe" (two-lobe mixture) or "quantile" (11 quantiles).
+        head: "lobe" (two-lobe mixture), "quantile" (11 quantiles), or "sign" (one probability of
+            reverse flow, with lobes fixed at plus and minus the reading with the reactive floor
+            removed).
         aux: The auxiliary output head: "none", "solar", or "engine".
         mask_training: Half of the training windows have a random span of the reading hidden.
     """
@@ -70,6 +75,7 @@ ARM_SPECS: Final = {
     "F": ArmSpec("F", cams=True, bsp=True, calendar=True, lags=True),
     "G1": ArmSpec("G1", cams=True, bsp=True, calendar=True, aux="solar"),
     "G2": ArmSpec("G2", cams=True, bsp=True, calendar=True, aux="engine"),
+    "Dsign": ArmSpec("Dsign", cams=True, bsp=True, calendar=True, head="sign"),
 }
 """Every arm of the plan's ladder and variants."""
 
@@ -82,7 +88,16 @@ def stack_names(*, spec: ArmSpec) -> list[str]:
     if spec.bsp:
         names += ["d_bsp", "bsp_mask"]
     if spec.calendar:
-        names += ["local_sin", "local_cos", "dow_sin", "dow_cos", "holiday", "t2m"]
+        names += [
+            "local_sin",
+            "local_cos",
+            "dow_sin",
+            "dow_cos",
+            "holiday",
+            "t2m",
+            "wind10",
+            "precip",
+        ]
     return names
 
 
@@ -98,17 +113,25 @@ class InputStats:
     Attributes:
         t_mean: Mean of ERA5 2 m temperature in degrees Celsius.
         t_sd: Standard deviation of the same.
+        w_mean: Mean of ERA5 10 m wind speed in metres per second.
+        w_sd: Standard deviation of the same.
     """
 
     t_mean: float
     t_sd: float
+    w_mean: float
+    w_sd: float
 
 
 def input_stats(*, cal: sim.Calendar, train_days: np.ndarray) -> InputStats:
-    """Return the temperature mean and standard deviation over the training days."""
+    """Return the temperature and wind-speed means and standard deviations over the training days."""
     t = cal.t2m[train_days]
     t = t[np.isfinite(t)]
-    return InputStats(float(t.mean()), float(max(t.std(), 1e-3)))
+    w = cal.wind10[train_days]
+    w = w[np.isfinite(w)]
+    return InputStats(
+        float(t.mean()), float(max(t.std(), 1e-3)), float(w.mean()), float(max(w.std(), 1e-3))
+    )
 
 
 def diff_along_time(*, x: np.ndarray) -> np.ndarray:
@@ -121,7 +144,11 @@ def diff_along_time(*, x: np.ndarray) -> np.ndarray:
 def calendar_rows(
     *, seg: sim.Segment, holidays: np.ndarray, stats: InputStats, hh: np.ndarray
 ) -> list[np.ndarray]:
-    """Return the six calendar rows (local half-hour, day of week, holiday, temperature).
+    """Return the eight calendar and weather rows.
+
+    The rows are the local half-hour (sine and cosine), the day of the week (sine and cosine), the
+    bank-holiday flag, the standardised 2 m temperature, the standardised 10 m wind speed, and the
+    scaled logarithm of the precipitation.
 
     Args:
         seg: The segment.
@@ -130,7 +157,7 @@ def calendar_rows(
         hh: The half-hour index `0..47` repeated for every dense day, flat.
 
     Returns:
-        Six flat arrays of length `(D + 2) * 48`.
+        Eight flat arrays of length `(D + 2) * 48`; weather that ERA5 lacks is zero.
     """
     n_days = len(seg.dates)
     offsets = np.array(
@@ -142,10 +169,12 @@ def calendar_rows(
     dow_angle = np.repeat(2.0 * np.pi * weekday / 7.0, 48)
     holiday = np.repeat(np.isin(seg.dates, holidays).astype(float), 48)
     t = (seg.t2m.reshape(-1) - stats.t_mean) / stats.t_sd
+    wind = (seg.wind10.reshape(-1) - stats.w_mean) / stats.w_sd
+    rain = np.log1p(np.clip(seg.precip.reshape(-1), 0.0, None)) / PRECIP_SCALE
     assert len(holiday) == n_days * 48
     return [
         np.sin(angle), np.cos(angle), np.sin(dow_angle), np.cos(dow_angle), holiday,
-        np.nan_to_num(t, nan=0.0),
+        np.nan_to_num(t, nan=0.0), np.nan_to_num(wind, nan=0.0), np.nan_to_num(rain, nan=0.0),
     ]  # fmt: skip
 
 
@@ -186,13 +215,18 @@ def segment_stack(
 
 
 def target_stack(*, seg: sim.Segment) -> np.ndarray:
-    """Return the `(4, (D + 2) * 48)` targets: truth, valid, engine, solar (zero where missing)."""
+    """Return the `(5, (D + 2) * 48)` targets: truth, valid, engine, solar, and the folded reading.
+
+    Missing values are zero. The reading row is in points and is never an input; the sign head's
+    decoder reads it to place its two lobes.
+    """
     return np.stack(
         [
             np.nan_to_num(seg.x.reshape(-1), nan=0.0),
             (seg.valid & np.isfinite(seg.x)).reshape(-1).astype(float),
             np.nan_to_num(seg.engine.reshape(-1), nan=0.0),
             np.nan_to_num(seg.solar.reshape(-1), nan=0.0),
+            np.nan_to_num(seg.r.reshape(-1), nan=0.0),
         ]
     ).astype(np.float32)
 
@@ -252,7 +286,7 @@ def build_window(
     *, stack: np.ndarray, targets: np.ndarray, dense_day: int, spec: ArmSpec,
     rng: np.random.Generator | None = None, mask: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:  # fmt: skip
-    """Return one window `(C, steps)` and its targets `(4, 48)`.
+    """Return one window `(C, steps)` and its targets `(5, 48)`.
 
     Args:
         stack: The segment's channel stack.
@@ -361,7 +395,7 @@ def make_batch(
     *, prepared: Sequence[PreparedSegment], picks: Sequence[tuple[int, int]], spec: ArmSpec,
     rng: np.random.Generator, training: bool,
 ) -> tuple[np.ndarray, np.ndarray]:  # fmt: skip
-    """Return the inputs `(B, C, steps)` and targets `(B, 4, 48)` of a batch of picks.
+    """Return the inputs `(B, C, steps)` and targets `(B, 5, 48)` of a batch of picks.
 
     Args:
         prepared: The prepared segments.

@@ -229,6 +229,11 @@ QHAT_POINTS: Final = QHAT_MVA / CAPACITY_MVA * POINTS
 DEAD_BAND_POINTS: Final = 2.0
 DAYLIGHT_HOURS_UTC: Final = (9, 13)
 """Half-hours that start from 09:00 up to, but not including, 13:00 UTC count as daylight."""
+READING_BAND_EDGES_MVA: Final = (0.3, 1.0, 3.0)
+"""Edges of the reading-level bands of the ambiguity read-out, in MVA: 0.3 MVA is the top of the
+simulated reactive power, and 1.0 MVA is the realism gate's near-zero level."""
+DISTANCE_EDGES_QHAT: Final = (1.0, 3.0, 10.0)
+"""Edges of the truth-magnitude bands of the ambiguity read-out, in multiples of `QHAT_MVA`."""
 QUANTILE_LEVELS: Final = (0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
 AUX_WEIGHT: Final = 0.5
 """Weight of an auxiliary head's negative log likelihood beside the main loss."""
@@ -238,7 +243,7 @@ AUX_WEIGHT: Final = 0.5
 BLOCK_DAYS: Final = 7
 N_CONTRASTS: Final = 12
 LEVEL: Final = 1.0 - 0.05 / N_CONTRASTS
-"""Bonferroni level across the 12 contrasts (99.583%)."""
+"""Bonferroni level across the 12 counted contrasts (99.583%). C13 is report-only and read at it."""
 N_RESAMPLES: Final = 20_000
 GENERATOR_SEED: Final = 729
 MIN_KISH_FACTOR: Final = 20
@@ -293,22 +298,25 @@ MAX_EPOCHS: Final = 200
 TIMING_EPOCHS: Final = 5
 GPU_BUDGET_HOURS: Final = 10.0
 GPU_MEMORY_GB: Final = 6.0
-N_FITS: Final = 47
+N_FITS: Final = 50
 MASK_PROBABILITY: Final = 0.5
 MASK_HOURS: Final = (1, 24)
 LAG_DAYS: Final = (7, 14)
 
 # --------------------------------------------------------------------------- arms and contrasts
 
-ARMS: Final = ("A", "B", "C", "D", "H", "Dq", "D24", "E", "F", "G1", "G2")
-LADDER_ARMS: Final = ("B", "C", "H", "Dq", "D24", "E", "F", "G1", "G2")
-"""The 9 arms other than A and D, which are fitted on the chosen architecture."""
+ARMS: Final = ("A", "B", "C", "D", "H", "Dq", "D24", "E", "F", "G1", "G2", "Dsign")
+LADDER_ARMS: Final = ("B", "C", "H", "Dq", "D24", "E", "F", "G1", "G2", "Dsign")
+"""The 10 arms other than A and D, which are fitted on the chosen architecture."""
 CONTRASTS: Final = {
     "C1": ("D", "Bstar"), "C2": ("A", "P0f"), "C3": ("B", "A"), "C4": ("C", "B"),
     "C5": ("D", "C"), "C6": ("Dq", "D"), "C7": ("E", "D"), "C8": ("F", "D"),
     "C9": ("G1", "D"), "C10": ("G2", "D"), "C11": ("D24", "D"), "C12": ("H", "A"),
+    "C13": ("Dsign", "D"),
 }  # fmt: skip
 """Each contrast as (arm minus arm); a negative difference is a gain."""
+REPORT_ONLY_CONTRASTS: Final = ("C13",)
+"""Contrasts that enter no verdict row and are not among the `N_CONTRASTS` counted ones."""
 BSP_CONTRASTS: Final = ("C4", "C12")
 PINBALL_CONTRASTS: Final = ("C6",)
 """Contrasts read on the 11-quantile pinball loss, not on signed CRPS."""

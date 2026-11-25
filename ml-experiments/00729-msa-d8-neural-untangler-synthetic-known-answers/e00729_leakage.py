@@ -21,7 +21,7 @@ FORBIDDEN_IN_SIMULATOR: Final = ("engine_constants", "g2_window", "metered_recor
 ALLOWED_INPUT_ROWS: Final = frozenset(
     {
         "r", "r_mask", "csi", "clear", "cosz", "cams_mask", "d_bsp", "bsp_mask", "local_sin",
-        "local_cos", "dow_sin", "dow_cos", "holiday", "t2m",
+        "local_cos", "dow_sin", "dow_cos", "holiday", "t2m", "wind10", "precip",
     }
 )  # fmt: skip
 """Every input row any arm may read; none is a month or a day of the year."""

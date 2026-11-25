@@ -426,6 +426,77 @@ def lobe_coverage_bar(*, covers: np.ndarray) -> dict[str, float | bool]:
     return {"coverage": share, "pass": share >= core.LOBE_COVERAGE_BAR}
 
 
+def ambiguity_strata(*, rows: Rows) -> dict[str, dict[str, np.ndarray]]:
+    """Return the row masks of the ambiguity read-out, by reading level and by truth magnitude.
+
+    The reading bands are the reading under, between, and over the edges `READING_BAND_EDGES_MVA`.
+    The truth bands are the truth's magnitude `|X|` under, between, and over the edges
+    `DISTANCE_EDGES_QHAT`, in multiples of the reactive floor `QHAT_MVA`. The truth under the
+    reactive floor is the case in which the reading cannot tell the sign.
+
+    Args:
+        rows: The scored rows.
+
+    Returns:
+        Two groups, "reading" and "truth_magnitude", each a mapping of a band's label to a mask.
+    """
+    scale = core.POINTS / core.CAPACITY_MVA
+    out: dict[str, dict[str, np.ndarray]] = {}
+    for group, values, edges, unit in (
+        ("reading", rows.r, tuple(e * scale for e in core.READING_BAND_EDGES_MVA), "MVA"),
+        (
+            "truth_magnitude", np.abs(rows.x),
+            tuple(e * core.QHAT_POINTS for e in core.DISTANCE_EDGES_QHAT), "QHAT",
+        ),
+    ):  # fmt: skip
+        raw = core.READING_BAND_EDGES_MVA if group == "reading" else core.DISTANCE_EDGES_QHAT
+        bounds = (-np.inf, *edges, np.inf)
+        labels = [
+            f"{unit}_{lo:g}_to_{hi:g}" for lo, hi in zip((0.0, *raw), (*raw, np.inf), strict=True)
+        ]
+        out[group] = {
+            label: (values >= bounds[k]) & (values < bounds[k + 1])
+            for k, label in enumerate(labels)
+        }
+    return out
+
+
+def ambiguity_readout(*, rows: Rows, p_neg: np.ndarray) -> dict[str, dict[str, dict[str, float]]]:
+    """Return the reliability and sharpness of P(X < 0) in each stratum of the ambiguity read-out.
+
+    The read-out reports; it sets no bar. Where the reading cannot tell the sign, P(X < 0) should
+    sit near 0.5 and be calibrated, and elsewhere it should sit near 0 or 1.
+
+    Args:
+        rows: The scored rows of a bank.
+        p_neg: One arm's seed-mean P(X < 0) on those rows.
+
+    Returns:
+        For each group and band: the row count, the mean forecast, the observed frequency of X < 0,
+        the reliability term over `RELIABILITY_BINS` bins, the mean of `2 |P - 0.5|` (sharpness, 0
+        at 0.5 and 1 at certainty), and the share of rows with P under 0.1 or over 0.9.
+    """
+    observed = rows.x < 0
+    out: dict[str, dict[str, dict[str, float]]] = {}
+    for group, bands in ambiguity_strata(rows=rows).items():
+        out[group] = {}
+        for label, mask in bands.items():
+            n = int(mask.sum())
+            if n == 0:
+                out[group][label] = {"n": 0.0}
+                continue
+            p = p_neg[mask]
+            rel = dist.reliability_term(prob=p, observed=observed[mask])
+            out[group][label] = {
+                "n": float(n), "mean_forecast": float(p.mean()),
+                "frequency": float(observed[mask].mean()),
+                "reliability": float(rel["reliability"]),  # ty: ignore[invalid-argument-type]
+                "sharpness": float(np.mean(2.0 * np.abs(p - 0.5))),
+                "confident_share": float(np.mean((p < 0.1) | (p > 0.9))),
+            }  # fmt: skip
+    return out
+
+
 def false_sign_share(*, p_neg: np.ndarray) -> float:
     """Return the share of half-hours with P(X < 0) above 0.5."""
     return float(np.mean(p_neg > 0.5))

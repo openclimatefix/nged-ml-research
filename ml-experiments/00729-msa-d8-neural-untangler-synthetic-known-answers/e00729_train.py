@@ -26,8 +26,8 @@ import torch  # ty: ignore[unresolved-import]
 INFER_BATCH: Final = 512
 FITS_PER_ARCH_IN_SCREEN: Final = 6
 """Arms A and D, 3 seeds each."""
-LADDER_FITS: Final = 29
-"""The 9 ladder arms times 3 seeds, plus seeds 3 and 4 of arm D."""
+LADDER_FITS: Final = 32
+"""The 10 ladder arms times 3 seeds, plus seeds 3 and 4 of arm D."""
 EARLY_STOP_EPOCHS: Final = 70
 
 
@@ -53,7 +53,7 @@ def predict_raw(
     *, net: torch.nn.Module, prepared: Sequence[arms.PreparedSegment], spec: arms.ArmSpec,
     device: str,
 ) -> tuple[np.ndarray, np.ndarray, list[tuple[int, int]]]:  # fmt: skip
-    """Return raw outputs `(P, outputs, 48)` and targets `(P, 4, 48)` of every (segment, day) pick.
+    """Return raw outputs `(P, outputs, 48)` and targets `(P, 5, 48)` of every (segment, day) pick.
 
     Args:
         net: The network (put in evaluation mode here).
@@ -76,19 +76,20 @@ def predict_raw(
         outs.append(y.float().cpu().numpy())
         tgts.append(t)
     if not picks:
-        return np.zeros((0, 1, 48)), np.zeros((0, 4, 48)), picks
+        return np.zeros((0, 1, 48)), np.zeros((0, 5, 48)), picks
     return np.concatenate(outs), np.concatenate(tgts), picks
 
 
-def decode(*, raw: np.ndarray, spec: arms.ArmSpec) -> dict[str, np.ndarray]:
+def decode(*, raw: np.ndarray, spec: arms.ArmSpec, reading: np.ndarray) -> dict[str, np.ndarray]:
     """Decode raw outputs `(N, outputs, 48)` into the arrays that predictions store.
 
     Args:
         raw: Cropped raw outputs.
         spec: The arm.
+        reading: The folded reading in points, `(N, 48)` (the sign head places its lobes with it).
 
     Returns:
-        For a two-lobe head `p`, `mu_i`, `s_i`, `mu_r`, `s_r` and, with an auxiliary head, `aux_mu`
+        For a two-lobe head or a sign head `p`, `mu_i`, `s_i`, `mu_r`, `s_r` and, with an auxiliary head, `aux_mu`
         and `aux_s`; for a quantile head `q` with the levels on the last axis. All `(N, 48)` or
         `(N, 48, 11)`.
     """
@@ -96,6 +97,9 @@ def decode(*, raw: np.ndarray, spec: arms.ArmSpec) -> dict[str, np.ndarray]:
     if spec.head == "quantile":
         q = nets.quantile_values(raw=t)
         return {"q": q.permute(0, 2, 1).numpy()}
+    if spec.head == "sign":
+        lobes = nets.sign_lobes(raw=t, reading=torch.from_numpy(reading.astype(np.float32)))
+        return {k: v.numpy() for k, v in lobes.items()}
     out = {k: v.numpy() for k, v in nets.lobe_parameters(raw=t).items()}
     if spec.aux != "none":
         aux = t[:, nets.LOBE_OUTPUTS :]
@@ -113,7 +117,7 @@ def flatten_valid(
 
     Args:
         decoded: The output of `decode`.
-        targets: The `(P, 4, 48)` targets.
+        targets: The `(P, 5, 48)` targets.
 
     Returns:
         The decoded arrays restricted to valid half-hours, `(M,)` or `(M, 11)`, and the truth `(M,)`.
@@ -225,7 +229,9 @@ def fit(
             torch.nn.utils.clip_grad_norm_(net.parameters(), core.CLIP_NORM)
             opt.step()
         raw_v, t_v, _ = predict_raw(net=net, prepared=val, spec=spec, device=device)
-        score = validation_crps(decoded=decode(raw=raw_v, spec=spec), targets=t_v)
+        score = validation_crps(
+            decoded=decode(raw=raw_v, spec=spec, reading=t_v[:, 4]), targets=t_v
+        )
         history.append(score)
         sched.step(score)
         if score < best:
@@ -250,7 +256,7 @@ def predictions(
 ) -> dict[str, np.ndarray]:  # fmt: skip
     """Return the decoded predictions on every valid half-hour of a bank, in `Rows` order."""
     raw, tgt, _ = predict_raw(net=net, prepared=prepared, spec=spec, device=device)
-    flat, _ = flatten_valid(decoded=decode(raw=raw, spec=spec), targets=tgt)
+    flat, _ = flatten_valid(decoded=decode(raw=raw, spec=spec, reading=tgt[:, 4]), targets=tgt)
     return flat
 
 
@@ -266,10 +272,10 @@ def save_predictions(*, arrays: dict[str, np.ndarray], path: Path) -> None:
 
 
 def projected_hours(*, seconds_per_epoch: dict[str, float], epochs: int) -> float:
-    """Return the GPU-process-hours of all 47 fits at `epochs` epochs each.
+    """Return the GPU-process-hours of all 50 fits at `epochs` epochs each.
 
     The 6 screen fits of each architecture use that architecture's measured time per epoch, and the
-    29 ladder fits use the slowest architecture's time (the chosen architecture is not yet known).
+    32 ladder fits use the slowest architecture's time (the chosen architecture is not yet known).
 
     Args:
         seconds_per_epoch: The measured seconds per epoch of each architecture on arm D.
@@ -322,11 +328,11 @@ def screen_jobs() -> list[tuple[str, str, int]]:
 
 
 def ladder_jobs(*, arch: str) -> list[tuple[str, str, int]]:
-    """Return the 29 ladder fits on the chosen architecture: 9 arms x 3 seeds, and D seeds 3, 4."""
+    """Return the 32 ladder fits on the chosen architecture: 10 arms x 3 seeds, and D seeds 3, 4."""
     jobs = [(arm, arch, s) for arm in core.LADDER_ARMS for s in core.ARCH_SEEDS]
     return jobs + [("D", arch, s) for s in core.MARGIN_SEEDS if s not in core.ARCH_SEEDS]
 
 
 def all_jobs_count(*, arch: str) -> int:
-    """Return the number of fits of the whole plan (47)."""
+    """Return the number of fits of the whole plan (50)."""
     return len(screen_jobs()) + len(ladder_jobs(arch=arch))

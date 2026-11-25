@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from synthetic_world import make_calendar
 
-STATS = arms.InputStats(10.0, 3.0)
+STATS = arms.InputStats(10.0, 3.0, 5.0, 2.0)
 
 
 def seg(
@@ -29,7 +29,7 @@ def test_channel_counts_follow_the_ladder() -> None:
     assert n["A"] == 2
     assert n["B"] == n["A"] + 4
     assert n["C"] == n["B"] + 2
-    assert n["D"] == n["C"] + 6
+    assert n["D"] == n["C"] + 8
     assert n["H"] == n["A"] + 2
     assert n["F"] == n["D"] + 4
     assert n["E"] == n["G1"] == n["G2"] == n["Dq"] == n["D24"] == n["D"]
@@ -42,7 +42,7 @@ def test_channel_counts_follow_the_ladder() -> None:
 
 def test_every_arm_differs_from_its_parent_in_one_way() -> None:
     d = arms.ARM_SPECS["D"]
-    for name in ("Dq", "D24", "E", "F", "G1", "G2"):
+    for name in ("Dq", "D24", "E", "F", "G1", "G2", "Dsign"):
         spec = arms.ARM_SPECS[name]
         diffs = [
             f
@@ -60,7 +60,7 @@ def test_window_has_96_steps_and_the_target_is_the_scored_day() -> None:
     day = 10
     w, t = arms.build_window(stack=stack, targets=targets, dense_day=day, spec=spec)
     assert w.shape == (arms.n_channels(spec=spec), 96)
-    assert t.shape == (4, 48)
+    assert t.shape == (5, 48)
     assert np.allclose(t[0], np.nan_to_num(s.x[day]), atol=1e-6)
     # the middle 24 hours of the window hold the scored day's reading
     assert np.allclose(w[0, 24:72], np.nan_to_num(s.r[day]) / arms.R_SCALE, atol=1e-5)

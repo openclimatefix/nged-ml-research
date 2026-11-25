@@ -74,7 +74,7 @@ def test_quantiles_are_sorted_and_pinball_is_minimised_at_the_truth() -> None:
 
 def test_batch_loss_ignores_invalid_half_hours_and_uses_the_right_aux_target() -> None:
     raw = torch.randn(2, 7, 48)
-    t = torch.zeros(2, 4, 48)
+    t = torch.zeros(2, 5, 48)
     t[:, 0] = 5.0
     t[:, 1] = 1.0
     base = nets.batch_loss(raw=raw, targets=t, head="lobe", aux="none")
@@ -120,7 +120,7 @@ def tiny_banks() -> list[arms.PreparedSegment]:
         )
         for i, w in enumerate(["both", "none", "engine"])
     ]
-    stats = arms.InputStats(10.0, 3.0)
+    stats = arms.InputStats(10.0, 3.0, 5.0, 2.0)
     return arms.prepare_segments(
         segments=segs, spec=arms.ARM_SPECS["A"], holidays=cal.holidays, stats=stats
     )
@@ -161,7 +161,7 @@ def test_a_tiny_cpu_fit_lowers_the_loss_and_saves_the_best_weights(monkeypatch, 
 def test_timing_projection_uses_the_slowest_architecture_for_the_ladder() -> None:
     per = {"dae": 10.0, "unet": 20.0, "bilstm": 30.0}
     hours = train.projected_hours(seconds_per_epoch=per, epochs=100)
-    assert hours == pytest.approx((6 * 60 + 29 * 30) * 100 / 3600)
+    assert hours == pytest.approx((6 * 60 + 32 * 30) * 100 / 3600)
     rep = train.timing_gate_report(seconds_per_epoch=per)
     assert rep["within_budget"] == (rep["hours_at_cap"] <= core.GPU_BUDGET_HOURS)
     slow = train.timing_gate_report(
@@ -172,11 +172,95 @@ def test_timing_projection_uses_the_slowest_architecture_for_the_ladder() -> Non
     assert quick["within_budget"]
 
 
-def test_the_job_lists_total_47_fits() -> None:
+def test_the_job_lists_total_50_fits() -> None:
     assert len(train.screen_jobs()) == 18
     ladder = train.ladder_jobs(arch="unet")
-    assert len(ladder) == 29
-    assert train.all_jobs_count(arch="unet") == core.N_FITS == 47
-    assert len({*train.screen_jobs(), *ladder}) == len(train.screen_jobs()) + 29 - len(
+    assert len(ladder) == 32
+    assert train.all_jobs_count(arch="unet") == core.N_FITS == 50
+    assert len({*train.screen_jobs(), *ladder}) == len(train.screen_jobs()) + 32 - len(
         set(train.screen_jobs()) & set(ladder)
     )
+
+
+def test_the_sign_head_has_one_output_and_is_trained_on_the_event_x_below_zero() -> None:
+    spec = arms.ARM_SPECS["Dsign"]
+    assert spec.head == "sign"
+    assert nets.n_outputs(head=spec.head, aux=spec.aux) == nets.SIGN_OUTPUTS == 1
+    x = torch.tensor([[-5.0, 5.0, 0.0]])
+    # a large positive logit means "X < 0": it is right for the first half-hour only
+    right = torch.tensor([[[8.0, -8.0, -8.0]]])
+    assert float(nets.sign_bce(raw=right, x=x).max()) < 1e-3  # X = 0 is not below zero
+    wrong = nets.sign_bce(raw=-right, x=x)
+    assert float(wrong.min()) > 7.0
+
+
+def test_the_sign_head_loss_ignores_invalid_half_hours() -> None:
+    raw = torch.randn(2, 1, 48)
+    t = torch.zeros(2, 5, 48)
+    t[:, 0] = -3.0
+    t[:, 1] = 1.0
+    t_bad = t.clone()
+    t_bad[:, 0, 5:9] = 1e6
+    t_bad[:, 1, 5:9] = 0.0
+    t_ref = t.clone()
+    t_ref[:, 1, 5:9] = 0.0
+    assert float(nets.batch_loss(raw=raw, targets=t_bad, head="sign", aux="none")) == pytest.approx(
+        float(nets.batch_loss(raw=raw, targets=t_ref, head="sign", aux="none"))
+    )
+
+
+def test_the_sign_lobes_sit_at_plus_and_minus_the_reading_without_the_reactive_floor() -> None:
+    reading = torch.tensor([[0.2, core.QHAT_POINTS, 5.0, 40.0]])
+    raw = torch.tensor([[[0.0, 1.0, -1.0, 2.0]]])
+    q = nets.sign_lobes(raw=raw, reading=reading)
+    magnitude = np.sqrt(np.maximum(reading.numpy()[0] ** 2 - core.QHAT_POINTS**2, 0.0))
+    assert np.allclose(q["mu_i"].numpy()[0], magnitude, atol=1e-6)
+    assert np.allclose(q["mu_r"].numpy()[0], -magnitude, atol=1e-6)
+    assert q["mu_i"][0, 0] == 0.0
+    assert q["mu_i"][0, 2] == pytest.approx(float(np.sqrt(25.0 - core.QHAT_POINTS**2)))
+    assert (q["s_i"] == core.FLOOR_POINTS).all()
+    assert (q["s_r"] == core.FLOOR_POINTS).all()
+    assert np.allclose(q["p"].numpy()[0], 1 / (1 + np.exp(-raw.numpy()[0, 0])), atol=1e-6)
+    # the weight of the negative lobe is P: a high logit moves the CRPS of a negative truth down
+    lobes = dist.Lobes(*(q[k].numpy().reshape(-1) for k in ("p", "mu_i", "s_i", "mu_r", "s_r")))
+    y = np.full(4, -5.0)
+    low = dist.Lobes(
+        *(
+            np.full(4, v) if k == "p" else getattr(lobes, k)
+            for k, v in (("p", 0.01), ("mu_i", 0), ("s_i", 0), ("mu_r", 0), ("s_r", 0))
+        )
+    )
+    high = dist.Lobes(
+        *(
+            np.full(4, v) if k == "p" else getattr(lobes, k)
+            for k, v in (("p", 0.99), ("mu_i", 0), ("s_i", 0), ("mu_r", 0), ("s_r", 0))
+        )
+    )
+    assert dist.mixture_crps(lobes=high, y=y)[2] < dist.mixture_crps(lobes=low, y=y)[2]
+
+
+def test_the_sign_arm_decodes_to_the_two_lobe_format_and_fits_on_cpu(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    monkeypatch.setattr(core, "EPOCH_WINDOWS", 64)
+    monkeypatch.setattr(core, "BATCH_SIZE", 32)
+    spec = arms.ARM_SPECS["Dsign"]
+    cal = make_calendar()
+    use = np.array([str(d)[:7] == "2022-03" for d in cal.dates])
+    segs = [
+        sim.simulate_segment(
+            cal=cal, month="2022-03", use=use, world=w, rng=np.random.default_rng(i)
+        )
+        for i, w in enumerate(["both", "none", "engine"])
+    ]
+    prepared = arms.prepare_segments(
+        segments=segs, spec=spec, holidays=cal.holidays, stats=arms.InputStats(10.0, 3.0, 5.0, 2.0)
+    )
+    net, result = train.fit(
+        spec=spec, arch="dae", seed=0, train=prepared, val=prepared, device="cpu", max_epochs=2,
+    )  # fmt: skip
+    assert result.n_weights > 0
+    flat = train.predictions(net=net, prepared=prepared, spec=spec, device="cpu")
+    assert set(flat) == {"p", "mu_i", "s_i", "mu_r", "s_r"}
+    assert (flat["mu_r"] <= 0).all()
+    assert (flat["mu_i"] >= 0).all()
+    assert np.allclose(flat["mu_i"], -flat["mu_r"])
+    assert ((flat["p"] > 0) & (flat["p"] < 1)).all()

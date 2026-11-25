@@ -66,6 +66,8 @@ class Calendar:
         clear: The clear-sky irradiance at D8 over 1000 W/m2, `(n, 48)`.
         cosz: The cosine of the solar zenith angle at D8 (never negative), `(n, 48)`.
         t2m: ERA5 2 m temperature at D8's cell in degrees Celsius, `(n, 48)`.
+        wind10: ERA5 10 m wind speed at D8's cell in metres per second, `(n, 48)`.
+        precip: ERA5 total precipitation at D8's cell in millimetres per hour, `(n, 48)`.
         d8_ghi: CAMS global horizontal irradiance at D8 in W/m2, `(n, 48)`, for the farm check.
         holidays: Bank-holiday dates, `datetime64[D]`.
         farms: The metered farms.
@@ -78,6 +80,8 @@ class Calendar:
     clear: np.ndarray
     cosz: np.ndarray
     t2m: np.ndarray
+    wind10: np.ndarray
+    precip: np.ndarray
     d8_ghi: np.ndarray
     holidays: np.ndarray
     farms: FarmSet
@@ -104,6 +108,8 @@ class Segment:
         clear: As in `Calendar`.
         cosz: As in `Calendar`.
         t2m: As in `Calendar`.
+        wind10: As in `Calendar`.
+        precip: As in `Calendar`.
         s1_fallback: The day took source S2 because no farm had data, `(D + 2,)`.
         has_bsp: At least `MIN_DAYS_IN_MONTH` base days in the segment have BSP data.
         params: The drawn parameters, for the range assertion (never printed).
@@ -125,6 +131,8 @@ class Segment:
     clear: np.ndarray
     cosz: np.ndarray
     t2m: np.ndarray
+    wind10: np.ndarray
+    precip: np.ndarray
     s1_fallback: np.ndarray
     has_bsp: bool
     params: dict[str, float] = field(default_factory=dict)
@@ -451,6 +459,8 @@ def simulate_segment(
         clear=to_dense(calendar_values=cal.clear, cal_index=cal_index),
         cosz=to_dense(calendar_values=cal.cosz, cal_index=cal_index),
         t2m=to_dense(calendar_values=cal.t2m, cal_index=cal_index),
+        wind10=to_dense(calendar_values=cal.wind10, cal_index=cal_index),
+        precip=to_dense(calendar_values=cal.precip, cal_index=cal_index),
         s1_fallback=s1_fallback, has_bsp=has_bsp, params=params,
     )  # fmt: skip
 
@@ -490,6 +500,8 @@ def real_segment(
         clear=to_dense(calendar_values=cal.clear, cal_index=cal_index),
         cosz=to_dense(calendar_values=cal.cosz, cal_index=cal_index),
         t2m=to_dense(calendar_values=cal.t2m, cal_index=cal_index),
+        wind10=to_dense(calendar_values=cal.wind10, cal_index=cal_index),
+        precip=to_dense(calendar_values=cal.precip, cal_index=cal_index),
         s1_fallback=np.zeros(n_cal + 2, dtype=bool),
         has_bsp=int(np.isfinite(bsp).any(axis=1).sum()) >= core.MIN_DAYS_IN_MONTH,
         params={},

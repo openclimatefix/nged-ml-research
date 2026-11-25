@@ -120,7 +120,11 @@ def test_the_stages_run_end_to_end_on_invented_arrays(monkeypatch, tmp_path) -> 
     assert core.TEST_MIX_INJECTED not in pis
     assert record["row"] in range(9)
     assert (tmp_path / "verdict.json").exists()
-    assert {"C1", "C12"} <= set(record["contrasts"])
+    assert {"C1", "C12", "C13"} <= set(record["contrasts"])
+    ambiguity = stages.read_json(path=tmp_path / "scores" / "tables.json")["ambiguity"]
+    assert set(ambiguity) == {*(a for a in core.ARMS if a != "Dq"), "Bstar"}
+    assert set(ambiguity["Dsign"]) == {"reading", "truth_magnitude"}
+    assert len(ambiguity["Dsign"]["reading"]) == 4
     assert "M2" in stages.read_json(path=tmp_path / "scores" / "tables.json")["tables"]
     assert not {"mae_head", "mae_zero", "n_running"} & set(record["real"]["k1"])
     realised = stages.read_json(path=tmp_path / "scores" / "tables.json")["realised_injected_share"]

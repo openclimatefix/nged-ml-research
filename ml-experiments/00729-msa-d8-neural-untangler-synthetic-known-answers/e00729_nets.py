@@ -3,7 +3,8 @@
 Every network maps `(batch, channels, steps)` to `(batch, outputs, steps)`; the loss and the
 predictor crop the scored day's 48 half-hours with `e00729_arms.middle_slice`. The two-lobe head has
 five outputs per half-hour (a sign logit, and a mean and a spread for each lobe), the solar and
-engine heads add two outputs each (a mean and a spread), and the quantile head has 11 outputs.
+engine heads add two outputs each (a mean and a spread), the quantile head has 11 outputs, and the
+sign head has one output per half-hour (the logit of the probability of reverse flow).
 """
 
 from typing import Final
@@ -20,6 +21,7 @@ SPREAD_SCALE: Final = 5.0
 """A lobe's spread is `FLOOR_POINTS + SPREAD_SCALE * softplus(raw)` points."""
 QUANTILE_SCALE: Final = 10.0
 LOBE_OUTPUTS: Final = 5
+SIGN_OUTPUTS: Final = 1
 AUX_OUTPUTS: Final = 2
 LOG_SQRT_2PI: Final = 0.9189385332046727
 
@@ -28,6 +30,8 @@ def n_outputs(*, head: HeadType, aux: AuxType) -> int:
     """Return the number of output channels of a head and its auxiliary head."""
     if head == "quantile":
         return len(core.QUANTILE_LEVELS)
+    if head == "sign":
+        return SIGN_OUTPUTS
     return LOBE_OUTPUTS + (AUX_OUTPUTS if aux != "none" else 0)
 
 
@@ -196,6 +200,41 @@ def pinball(*, q: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     return torch.maximum(taus * err, (taus - 1.0) * err).mean(dim=1)
 
 
+def sign_bce(*, raw: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """Return the binary cross-entropy of the sign logit against the event X < 0, per half-hour.
+
+    Args:
+        raw: Network output, `(B, 1, steps)`; the first channel is the logit of P(X < 0).
+        x: The signed truth in points, `(B, steps)`.
+
+    Returns:
+        The loss of each half-hour; the target is 1 where `x` is negative and 0 elsewhere.
+    """
+    return F.binary_cross_entropy_with_logits(raw[:, 0], (x < 0.0).to(raw.dtype), reduction="none")
+
+
+def sign_lobes(*, raw: torch.Tensor, reading: torch.Tensor) -> dict[str, torch.Tensor]:
+    """Return the two-lobe distribution of the sign head.
+
+    The lobes sit at plus and minus the reading with the reactive floor removed,
+    `sqrt(max(R^2 - QHAT^2, 0))`, with the fixed spread `FLOOR_POINTS`. The weights are
+    `(1 - P, P)` with `P = sigmoid(logit)`.
+
+    Args:
+        raw: Network output, `(B, 1, steps)`.
+        reading: The folded reading in points, `(B, steps)`.
+
+    Returns:
+        The same five keys as `lobe_parameters`.
+    """
+    magnitude = torch.sqrt(torch.clamp(reading**2 - core.QHAT_POINTS**2, min=0.0))
+    spread = torch.full_like(magnitude, core.FLOOR_POINTS)
+    return {
+        "p": torch.sigmoid(raw[:, 0]), "mu_i": magnitude, "s_i": spread, "mu_r": -magnitude,
+        "s_r": spread,
+    }  # fmt: skip
+
+
 def batch_loss(
     *, raw: torch.Tensor, targets: torch.Tensor, head: HeadType, aux: AuxType
 ) -> torch.Tensor:
@@ -203,7 +242,7 @@ def batch_loss(
 
     Args:
         raw: The network's output cropped to the scored day, `(B, outputs, 48)`.
-        targets: `(B, 4, 48)`: truth, valid, engine, solar.
+        targets: `(B, 5, 48)`: truth, valid, engine, solar, reading.
         head: The main head.
         aux: The auxiliary head.
 
@@ -211,11 +250,12 @@ def batch_loss(
         A scalar tensor.
     """
     x, valid = targets[:, 0], targets[:, 1]
-    per = (
-        pinball(q=quantile_values(raw=raw), x=x)
-        if head == "quantile"
-        else mixture_nll(raw=raw, x=x)
-    )
+    if head == "quantile":
+        per = pinball(q=quantile_values(raw=raw), x=x)
+    elif head == "sign":
+        per = sign_bce(raw=raw, x=x)
+    else:
+        per = mixture_nll(raw=raw, x=x)
     if aux != "none":
         target = targets[:, 3] if aux == "solar" else targets[:, 2]
         per = per + core.AUX_WEIGHT * aux_nll(raw=raw[:, LOBE_OUTPUTS:], target=target)

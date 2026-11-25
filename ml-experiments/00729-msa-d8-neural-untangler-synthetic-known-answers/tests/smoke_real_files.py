@@ -32,6 +32,31 @@ def check_frame_39() -> str:
     return f"columns present: {wanted <= set(schema.names())}, has rows: {rows > 0}"
 
 
+def check_era5_weather() -> str:
+    """Check D8's ERA5 wind speed and precipitation: columns, plausible ranges, and base-year coverage."""
+    import datetime as dt
+
+    frame = (
+        pl.scan_parquet(data.ERA5_FEATURES)
+        .filter(
+            (pl.col("time_series_id") == core.D8_SERIES_ID)
+            & (pl.col("valid_time").dt.minute() == 0)
+        )
+        .select("valid_time", "wind_speed_10m", "precipitation")
+        .collect()
+    )
+    first = dt.datetime(2019, 9, 1, tzinfo=dt.UTC)
+    last = dt.datetime.fromisoformat(core.REAL_UP_TO + "T23:00:00+00:00")
+    wanted = int((last - first).total_seconds() // 3600) + 1
+    span = frame.filter((pl.col("valid_time") >= first) & (pl.col("valid_time") <= last))
+    return (
+        f"has rows: {frame.height > 0}, every whole hour of the base years present: {span.height == wanted}, "
+        f"no null: {frame.null_count().sum_horizontal().item() == 0}, "
+        f"wind speed within 0 to 40 m/s: {bool(frame['wind_speed_10m'].is_between(0.0, 40.0).all())}, "
+        f"precipitation never negative: {bool((frame['precipitation'] >= 0.0).all())}"
+    )
+
+
 def check_era_frame() -> str:
     """Check that experiment 697's era frame holds `start` and `era` and the era labels."""
     frame = pl.scan_parquet(data.ERA_FRAME).select("start", "era").collect()
@@ -120,6 +145,7 @@ def check_day_table() -> str:
 
 CHECKS: dict[str, Callable[[], str]] = {
     "frame_39": check_frame_39,
+    "era5_weather": check_era5_weather,
     "era_frame": check_era_frame,
     "power": check_power,
     "record": check_record,

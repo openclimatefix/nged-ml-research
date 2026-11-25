@@ -606,6 +606,10 @@ def fit_baselines(*, ctx: Context) -> tuple[base.Climatology, base.Regression]:
     return base.Climatology.fit(demand=f.r, f=f), base.Regression.fit(demand=f.r, f=f)
 
 
+AMBIGUITY_ARMS: Final = (*(a for a in core.ARMS if a != "Dq"), "Bstar")
+"""The arms with a probability output, and B*: the ambiguity read-out covers them (not the quantile head)."""
+
+
 def contrast_plan() -> dict[str, list[tuple[str, str, str]]]:
     """Return, for each contrast, the readings to take as (label, row subset, month set)."""
     plan: dict[str, list[tuple[str, str, str]]] = {
@@ -849,6 +853,11 @@ def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:
         d=d, p0f_metrics=metrics["P0f"], p0_metrics=metrics["P0"], keep=masks["import"], real=False
     )
     tables = {name: score.subset_means(metrics=m, masks=masks) for name, m in metrics.items()}
+    ambiguity = {
+        name: score.ambiguity_readout(rows=rows, p_neg=m.p_neg)
+        for name, m in metrics.items()
+        if name in AMBIGUITY_ARMS
+    }
     coverage = {
         name: {"q05": float(m.q05_cover.mean()), "q95": float(m.q95_cover.mean())}
         for name, m in metrics.items()
@@ -856,7 +865,7 @@ def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:
     write_json(
         path=root / "scores" / "tables.json",
         payload={
-            "tables": tables, "coverage": coverage, "lobe_width_mean": float(d.width.mean()),
+            "tables": tables, "coverage": coverage, "ambiguity": ambiguity, "lobe_width_mean": float(d.width.mean()),
             "realised_injected_share": pi_test,
         },
     )  # fmt: skip
