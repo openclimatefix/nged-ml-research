@@ -373,6 +373,27 @@ def metered_zero_days(*, cal: sim729.Calendar) -> np.ndarray:
     return ((daytime.max(axis=2) <= 0.0) & cal.farms.power_ok).any(axis=0)
 
 
+def pooled_engine_cases(*, counts: Mapping[str, int]) -> dict[str, int]:
+    """Return the base days with engine output of each world and bank kind, pooled over seasons.
+
+    The bar `MIN_CASES` applies to the key "subtract" pooled over seasons, because a split of a few
+    months holds few days with engine output in some seasons. The keys "weekday" and "quiet" are
+    pools already and carry no case bar.
+
+    Args:
+        counts: The cases of each engine key.
+
+    Returns:
+        The cases of each `world/kind`.
+    """
+    pooled: dict[str, int] = defaultdict(int)
+    for key, n in counts.items():
+        name, world, kind, _ = key.split("/")
+        if name == "subtract":
+            pooled[f"{world}/{kind}"] += n
+    return dict(pooled)
+
+
 def solar_output_shares(
     *, bank: banks729.Bank, cal: sim729.Calendar
 ) -> tuple[ShareCounter, dict[str, list[int]]]:
@@ -714,6 +735,11 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
                 pooled = pooled_solar_cases(counts=counts)
                 short += [
                     f"{name}/solar/pooled/{k}/too_few" for k, n in pooled.items() if n < MIN_CASES
+                ]
+            elif label == "engine":
+                pooled = pooled_engine_cases(counts=counts)
+                short += [
+                    f"{name}/engine/pooled/{k}/too_few" for k, n in pooled.items() if n < MIN_CASES
                 ]
             else:
                 short += [

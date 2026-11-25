@@ -575,3 +575,35 @@ def test_the_stop_line_is_16_gpu_process_hours() -> None:
     report = core.timing_gate_report(seconds_per_epoch=secs, peak_memory_gb=1.0)
     assert report["stop_line_hours"] == 16.0
     assert report["within_stop_line"]
+
+
+def test_the_engine_case_bar_applies_to_the_subtract_cases_pooled_over_seasons() -> None:
+    counts = {
+        "subtract/engine/test/summer": 9, "subtract/engine/test/winter": 60,
+        "subtract/both/test/summer": 4, "weekday/engine/test/summer": 1,
+        "quiet/engine/test/summer": 1,
+    }  # fmt: skip
+    assert banks.pooled_engine_cases(counts=counts) == {"engine/test": 69, "both/test": 4}
+
+
+def test_a_small_engine_season_passes_a_pooled_short_bank_fails_and_a_silent_one_fails(
+    world: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bank, cal = world[2], world[2]
+    del bank
+    test = banks729.load_bank(path=banks.bank_path(root=world[0], kind="test"))
+    counter = banks.engine_output_shares(bank=test, cal=cal)
+    pooled = banks.pooled_engine_cases(counts=counter.cases())
+    assert pooled
+    monkeypatch.setattr(banks, "MIN_CASES", min(pooled.values()))
+    ok = banks.component_checks(banks_by_name={"test": test}, cal=cal)
+    assert not [k for k in ok["short"] if "/engine/" in k], ok["short"]
+    monkeypatch.setattr(banks, "MIN_CASES", max(pooled.values()) + 1)
+    few = banks.component_checks(banks_by_name={"test": test}, cal=cal)
+    assert any("/engine/pooled/" in k and k.endswith("/too_few") for k in few["short"])
+    monkeypatch.setattr(banks, "MIN_CASES", 1)
+    silent = copy.deepcopy(test)
+    for seg in silent.segments:
+        seg.engine[:] = 0.0
+    out = banks.component_checks(banks_by_name={"test": silent}, cal=cal)
+    assert any("/engine/" in k for k in out["short"])
