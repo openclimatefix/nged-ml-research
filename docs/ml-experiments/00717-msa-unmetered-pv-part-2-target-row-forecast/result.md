@@ -115,20 +115,23 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**We asked whether a neural network that forecasts a Primary substation's electricity demand
-becomes more accurate when it is also given a forecast of the solar power generated behind the
-substation, for the day being forecast.** The network is the axial-attention network of
-[experiment 713](../00713-msa-axial-attention-demand-network-part-1/result.md), and
-[experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md) already gives it an
-estimate of the solar output of each of the 14 past days. We added a forecast for the target day:
-the substation's installed solar capacity times a yield curve driven by the ensemble-mean and
+**We asked whether a neural network that forecasts a Primary substation's electricity demand becomes
+more accurate when it is also given a forecast of the solar power generated behind the substation,
+for the day being forecast.** The network is the axial-attention network of [experiment
+713](../00713-msa-axial-attention-demand-network-part-1/result.md), and [experiment
+716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md) already gives it an estimate of
+the solar output of each of the 14 past days. We added a forecast for the target day: the
+substation's installed solar capacity times a yield curve driven by the ensemble-mean and
 ensemble-spread shortwave irradiance of the 00:00 UTC European Centre for Medium-Range Weather
-Forecasts (ECMWF) ensemble run of the origin day. We compared the network with and without that
-forecast on 16 Primaries over 8 monthly test periods and 5 random seeds. A second network read
+Forecasts (ECMWF) ensemble (ENS) run of the origin day. We compared the network with and without
+that forecast on 16 Primaries over 8 monthly test periods and 5 random seeds. A second network read
 the forecast issued 28 days earlier, which has no information about the target day, so that a gain
-from the target day's own sky could be told from a gain from the extra parameters. The forecast
-error did not change: both differences are within 0.007 percentage points of capacity of zero, and
-every interval includes zero. This page is part 2 of follow-up F7. The design is condensed from the
+from the target day's own sky could be told from a gain from the extra parameters.
+
+**The forecast error did not change, and every interval includes zero.** Both differences are
+within 0.007 percentage points of capacity of zero.
+
+**This page is part 2 of follow-up F7.** The design is condensed from the
 private design note `f7_design.md`, and the details that this part shares with part 1 (the
 estimate of past solar output, the as-of capacity, the network paths, the training recipe, the
 known-answer worlds, and the leakage rules) are on the page of experiment 716.
@@ -136,18 +139,19 @@ known-answer worlds, and the leakage rules) are on the page of experiment 716.
 ## Result
 
 **The verdict is `not supported`, taken from the pre-registered mapping and applied as written.**
-Each of the two counted contrasts is read in two groups of Primaries: the six whose power is
-metered in signed megawatts, and the eight metered only in megavolt-amperes (MVA). B1 is arm `HT`
-minus arm `H`, and B2 is arm `HT` minus arm `HT-S`. Each of the four counted readings is "no
-detectable difference", because its 98.75% interval lies inside plus or minus 0.06 points of
+Each of the two counted contrasts is read in two groups of Primaries: the six whose power is metered
+in signed megawatts, and the eight metered only in megavolt-amperes (MVA). Arm `H` is the network
+without the target-row forecast, arm `HT` is the network with it, and arm `HT-S` is the placebo
+network that reads the forecast issued earlier, as the section "What is compared" describes. B1 is
+arm `HT` minus arm `H`, and B2 is arm `HT` minus arm `HT-S`. Each of the four counted readings is
+"no detectable difference", because its 98.75% interval lies inside plus or minus 0.06 points of
 capacity (six signed-MW Primaries) or 0.16 (eight MVA-only Primaries). The verdict function of
-experiment 716 maps four such readings to `not supported`, and `closes_line` is true, so the
-verdict adds one to the stop-rule count and closes the line. The prediction written before any fit
-held: B1 lies inside its ranges, and the interval of B2 includes zero in both groups. The
-warm-start states of experiment 713 come from a waived known-answer gate, and the verdict
-concerns a forecast added to a network that already reads the historical estimate. Every number in
-this section comes from `score/part2.json` or `score/secondary_part2.json` in the data folder of
-this experiment.
+experiment 716 maps four such readings to `not supported`, and `closes_line` is true, so the verdict
+adds one to the stop-rule count and closes the line. The prediction written before any fit held: B1
+lies inside its ranges, and the interval of B2 includes zero in both groups. The warm-start states
+of experiment 713 come from a waived known-answer gate, and the verdict concerns a forecast added to
+a network that already reads the historical estimate. Every number in this section comes from
+`score/part2.json` or `score/secondary_part2.json` in the data folder of this experiment.
 
 | Contrast | Group | Point | Interval (98.75%) | Seeds with the sign of the point |
 |---|---|---|---|---|
@@ -158,18 +162,21 @@ this experiment.
 | Control: `HT-S` minus `H` | six signed-MW | -0.0036 | -0.0300 to +0.0221 | 2 of 5 |
 | Control: `HT-S` minus `H` | eight MVA-only | -0.0005 | -0.0144 to +0.0159 | 2 of 5 |
 
-**The contrasts are differences of CRPS in percentage points of capacity, over leads of 24 h up to
-240 h, and a negative number favours the first arm.** The 99.375% sensitivity reading (eight
-readings across both parts) changes no verdict. Its B1 intervals are -0.0292 to +0.0293 and -0.0460
-to +0.0417. The seed guard fails in both groups, so a pre-registered `gain` reading was
-unreachable as well, and the three guards of the reading are false in every row.
+**The contrasts are differences of the continuous ranked probability score (CRPS) in percentage
+points of capacity, over leads of 24 h up to 240 h, and a negative number favours the first arm.**
+The 99.375% sensitivity reading (eight readings across both parts) changes no verdict. The B1
+intervals of the sensitivity reading are -0.0292 to +0.0293 and -0.0460 to +0.0417. The seed guard
+fails in both groups, so a pre-registered `gain` reading was unreachable as well. The three guards
+of the reading are false in every row.
 
 ![Counted contrasts B1 and B2 of part 2, with 98.75% intervals](contrasts.svg)
 
 ![B1 by fold: the difference in CRPS for each of the 8 monthly test periods](b1_by_fold.svg)
 
 **The 95% report-only readings are consistent with a tie, with two exceptions that change no
-verdict.** Report-only readings are not corrected for the number of readings.
+verdict.** Report-only readings are not corrected for the number of readings. Arm `T` is described
+in the section "What is compared", and `M*` and the Candidate are the benchmarks that the
+`benchmark` field of the front matter lists.
 
 | Reading (95%) | Six signed-MW | Eight MVA-only |
 |---|---|---|
@@ -189,9 +196,9 @@ intervals, on 2 seeds only.
 
 **The first contrast by lead band is flat.** At the six signed-MW Primaries, `HT` minus `H` is
 -0.0133 [-0.0318, +0.0108] at leads of 24 h to 72 h, -0.0106 [-0.0286, +0.0149] at 72 h to 120 h,
-and -0.0027 [-0.0247, +0.0235] at 120 h to 240 h. At the eight MVA-only Primaries it is +0.0005,
--0.0012, and -0.0010, with intervals of about plus or minus 0.03 to 0.035. All intervals include
-zero. The pooled reading over all 16 Primaries is +0.0140 [-0.0037, +0.0311].
+and -0.0027 [-0.0247, +0.0235] at 120 h to 240 h. At the eight MVA-only Primaries the contrast is
++0.0005, -0.0012, and -0.0010, with intervals of about plus or minus 0.03 to 0.035. All intervals
+include zero. The pooled reading over all 16 Primaries is +0.0140 [-0.0037, +0.0311].
 
 **Secondary readings S1 to S5 (95%, one of 14, so one false positive is likely) mostly read as a
 tie, and four of them have intervals that exclude zero.**
@@ -204,14 +211,14 @@ to 2026-06. S4 is B1 on the whole band of the four dark folds, 2025-11 to 2026-0
 | S2: `HT` minus `HT-S`, solar block, sunny folds | -0.0420 [-0.0482, -0.0278] | -0.0036 [-0.0430, +0.0555] | No, No |
 | S4: `HT` minus `H`, dark folds | -0.0043 [-0.0356, +0.0435] | -0.0072 [-0.0553, +0.0392] | Yes, Yes |
 
-**The four intervals that exclude zero change no verdict. S1 at the six signed-MW Primaries excludes
-zero but is 0.007 points, far below the 0.05 that
-the reading needs, and S2 at the same Primaries excludes zero with a point of -0.042, still above
-the -0.05 that it needs, so neither holds.** S2's interval is narrow because the seeds agree. S3
+**The four intervals that exclude zero change no verdict.** S1 at the six signed-MW Primaries
+excludes zero but is 0.007 points, far below the 0.05 that the reading needs. S2 at the same
+Primaries excludes zero with a point of -0.042, still above the -0.05 that the reading needs, so
+neither reading holds. S2's interval is narrow because the seeds agree. S3
 (the gap between the dull and the sunny third of days) is -0.0393 [-0.0617, -0.0154] at the
 six signed-MW Primaries and -0.0769 [-0.1146, -0.0403] at the eight MVA-only Primaries, with 90
 origin days, and holds in neither group. S5, the Spearman correlation between the per-Primary first
-contrast and the photovoltaic share, is -0.160 [-0.730, +0.509] over 14 Primaries.
+contrast and the photovoltaic (PV) share, is -0.160 [-0.730, +0.509] over 14 Primaries.
 
 **Leaving one Primary or one month out does not change a verdict, and flips the sign of B1 at the
 eight MVA-only Primaries in several cases because the point is almost zero.** At the six
@@ -257,24 +264,24 @@ look-ahead caveat for D19 and D21 applies. No attention extraction was run for a
 - **The median forecast minus the mean forecast, per site, is not stored.** `part2.json` has no
   table of it, so the page does not report it. This is a gap against the plan.
 - **The error of the median beside the CRPS contrast.** At the six signed-MW Primaries, the
-  normalised MAE contrast is -0.0114 [-0.0423, +0.0237], the same direction as B1. At the eight
-  MVA-only Primaries it is +0.0048 [-0.0564, +0.0635] against a CRPS contrast of -0.0007, so the
-  two point in different directions, and both intervals include zero. That is audit trigger 3 on
-  its wording, with no verdict at stake.
+  normalised mean absolute error (MAE) contrast is -0.0114 [-0.0423, +0.0237], the same direction as
+  B1. At the eight MVA-only Primaries the MAE contrast is +0.0048 [-0.0564, +0.0635] against a CRPS
+  contrast of -0.0007, so the two point in different directions, and both intervals include zero.
+  The disagreement fires audit trigger 3 on its wording, with no verdict at stake.
 - **Audit triggers: the skill requires an audit before merge when any trigger holds, so a read-only
-  audit of triggers 3, 4, and 5 was run, and it found no flip.** Trigger 1 fires, triggers 3 and 4
-  fire on their wording, and trigger 5 fires on its wording in a report-only reading. A Sonnet-sized
-  agent that did not write the code recomputed each reading with the scorer's own functions, 100,000
-  resamples, 5 seeds, and no GPU, following the manager's ruling (b) to audit these triggers instead
-  of waiving them.
+  audit of triggers 3, 4, and 5 was run, and the audit found no flip.** Trigger 1 fires, triggers 3
+  and 4 fire on their wording, and trigger 5 fires on its wording in a report-only reading. A
+  Sonnet-sized agent that did not write the code recomputed each reading with the scorer's own
+  functions, 100,000 resamples, 5 seeds, and no GPU, following the manager's ruling (b) to audit
+  these triggers instead of waiving them.
 - **Trigger 1 fires.** The known-answer check KF9 failed and the maintainer waived it, the same kind
   of waived check that experiment 713 counted as trigger 1.
-- **Trigger 3 fires nominally at the eight MVA-only Primaries, and it cannot change the verdict.**
-  B1 on CRPS is -0.00074 [-0.0422, +0.0385] at 98.75%. B1 on the normalised MAE of the median is
-  +0.00480, with [-0.0564, +0.0635] at 95% and [-0.0726, +0.0780] at 98.75%. Both match `part2.json`
-  exactly. The verdict rule counts CRPS only, and even if the MAE counted, its interval includes
-  zero and lies inside the limit of 0.16. The per-seed CRPS differences are +0.024, -0.037, +0.028,
-  -0.012, and +0.027, so the sign is noise.
+- **Trigger 3 fires nominally at the eight MVA-only Primaries, and the trigger cannot change the
+  verdict.** B1 on CRPS is -0.00074 [-0.0422, +0.0385] at 98.75%. B1 on the normalised MAE of the
+  median is +0.00480, with [-0.0564, +0.0635] at 95% and [-0.0726, +0.0780] at 98.75%. Both match
+  `part2.json` exactly. The verdict rule counts CRPS only, and even if the MAE counted, its interval
+  includes zero and lies inside the limit of 0.16. The per-seed CRPS differences are +0.024, -0.037,
+  +0.028, -0.012, and +0.027, so the sign is noise.
 - **Trigger 4 fires on its wording at the eight MVA-only Primaries, and no leave-one-out reading
   flips the verdict.** B1 at those Primaries, leaving out each Primary in turn (98.75%): D3 -0.00203
   [-0.0487, +0.0429], D19 -0.00236 [-0.0486, +0.0403], D4 +0.00054 [-0.0452, +0.0437], D12 +0.00275
@@ -290,14 +297,14 @@ look-ahead caveat for D19 and D21 applies. No attention extraction was run for a
   many cuts, and its month-block t interval of -0.025 to +0.290 includes zero, with 3 of 5 seeds
   sharing the sign. The second clause of the trigger (a control that should change nothing) did not
   fire.
-- **Trigger 6 is not computed.** It compares a headline interval with the same contrast in a sister
-  experiment, and experiment 716's `part1.json` does not exist yet. Trigger 2 does not apply,
-  because the result matches its prediction, and trigger 7 was not assessed.
+- **Trigger 6 is not computed.** The trigger compares a headline interval with the same contrast in
+  a sister experiment, and experiment 716's `part1.json` does not exist yet. Trigger 2 does not
+  apply, because the result matches its prediction, and trigger 7 was not assessed.
 - **Cold nights.** The cold-night difference is +0.0011 at the six signed-MW Primaries and -0.0406
   at the eight MVA-only Primaries (`cold_night_difference` in `part2.json`). The guard of
   `supported` for the six signed-MW Primaries holds, and for the eight MVA-only Primaries the
   guards of leaving one Primary and one month out and of the MAE fail. The verdict does not depend
-  on them.
+  on those guards.
 - **Tails.** The upper limits of the 95% intervals of the q01 and q99 pinball-loss contrasts are
   0.0092 and
   0.0308 at the six signed-MW Primaries and 0.0005 and 0.0146 at the eight MVA-only Primaries,
@@ -315,12 +322,14 @@ q95, and q99 coverage table, no avoidable-curtailment cost, and no four load-shi
 plan's reading of cold winter nights is the single difference above, with no per-arm score. The
 report script `e00717_report.py` stops with a `TypeError` while printing the report-only
 contrasts, after the cold-night line, because it indexes a list as a dictionary. This page takes
-those contrasts from `part2.json` directly. The script is a reviewed script and was not edited.
+those contrasts from `part2.json` directly. The script was reviewed and was not edited.
+
+## The waived known-answer gate
 
 **Known-answer check KF9 failed and the maintainer waived it, so the gate is a waived known-answer
-check and not a passed one.** The gate is the one of part 1. KF9 asks arm `H` to beat arm `H-S` on
-the solar block of world WH by half the `gap`. Its value is 0.00070 against the need of 0.00729, and
-its secondary readings (days 1 to 60, days 61 to 236, and pass 60) fail as well. KF10, KF11, and
+check and not a passed one.** The gate is the one of part 1. KF9 requires arm `H` to beat arm `H-S`
+on the solar block of world WH by half the `gap`. Its value is 0.00070 against the need of 0.00729,
+and its secondary readings (days 1 to 60, days 61 to 236, and pass 60) fail as well. KF10, KF11, and
 KF12 pass. No threshold and no verdict rule changed. An audit of the failure found no implementation
 fault and two method findings. First, the patience-8 rule scored arm `H` at passes 4, 23, and 5 of
 seeds 0, 1, and 2, against global bests at passes 43, 55, and 32, because the history path learns
@@ -332,19 +341,13 @@ known-answer test.
 
 **The early-stopping pre-check of the known-answer worlds read one seed of three, and the other
 seeds of arm `M` in world WH are noisier than its limit.** The pre-registered pre-check reads arm
-`M` of seed 0 only. At rung 4 it passed in both worlds, with a last-10 validation-loss noise of
-0.0109 in world WH against the limit of 0.0225, and 0.0121 in world WT against the limit of 0.134.
-Seeds 1 and 2 of arm `M` in WH have a last-10 noise of 0.029 and 0.031, above the WH limit, so the
-rung-4 pass in WH depended on seed 0. In WT, seeds 1 and 2 have 0.038 and 0.016, below the WT limit.
-A fresh numbers review checked this reading against the stored tables of part 1 and found no
+`M` of seed 0 only. At rung 4 the pre-check passed in both worlds, with a last-10 validation-loss
+noise of 0.0109 in world WH against the limit of 0.0225, and 0.0121 in world WT against the limit of
+0.134. Seeds 1 and 2 of arm `M` in WH have a last-10 noise of 0.029 and 0.031, above the WH limit,
+so the rung-4 pass in WH depended on seed 0. In WT, seeds 1 and 2 have 0.038 and 0.016, below the WT
+limit. A fresh numbers review checked this reading against the stored tables of part 1 and found no
 mismatch in the page's quotations of them. These values are copied from the page of experiment 716
 and are not re-derived here.
-
-**The expectation, written before any fit, was a tie, and the result was a tie.** Six earlier
-experiments found that an explicit PV term built
-on forecast weather did not help net demand (the table below), and the target tokens already carry
-ENS shortwave. With 5 seeds the design detects, with 80% power, a CRPS difference of 0.06 points
-of capacity at the six signed-MW Primaries and 0.16 at the eight MVA-only Primaries.
 
 ## Why this runs although the stop rule counts earlier verdicts
 
@@ -370,20 +373,26 @@ scoring at every Primary. The last `supported` or `small gain` verdict on this i
 | 031, 349, 405, 416 | PV features in XGBoost and the GAM stack; explicit term with learned capacity or 5 seeds | `inconclusive` | No |
 | 352, 639, 643 | Explicit terms scored with recorded weather | `partly supported` | No: neither counts nor resets |
 
+**The expectation, written before any fit, was a tie, and the result was a tie.** Six earlier
+experiments found that an explicit PV term built on forecast weather did not help net demand (the
+table above), and the target tokens already carry ENS shortwave. With 5 seeds the design detects,
+with 80% power, a CRPS difference of 0.06 points of capacity at the six signed-MW Primaries and 0.16
+at the eight MVA-only Primaries.
+
 **This part departs from the advice of experiments 644 and 655 (no explicit solar term in the ENS
 demand network) on the maintainer's instruction.** It follows experiment 661's advice to keep
 production's window-mean resampler for ENS shortwave and experiment 501's advice to judge a
 capacity by a placebo test. The new element over the counted experiments is the paired history
-estimate of experiment 716. Experiment 713's screen stop rule binds this part: if it fires, or
-if part 1 stops at its screen, part 2 stops and asks the manager. Experiment 713's known-answer
-gate failed KA3 and KA12 and was waived by the maintainer on 2026-11-23, so every verdict here
-makes no claim about era recognition or level shifts.
+estimate of experiment 716. Experiment 713's screen stop rule binds this part: if the rule fires, or
+if part 1 stops at its screen, part 2 stops and asks the manager. Experiment 713's known-answer gate
+failed KA3 and KA12 and was waived by the maintainer on 2026-11-23, so every verdict here makes no
+claim about era recognition or level shifts.
 
 ## What is compared
 
 | Arm | PV input | Seeds | Role |
 |---|---|---|---|
-| `H` | CAMS `PV̂` in the 14 history rows | 0 to 4 | Reference of B1 (experiment 716's fit) |
+| `H` | Copernicus Atmosphere Monitoring Service (CAMS) `PV̂` in the 14 history rows | 0 to 4 | Reference of B1 (experiment 716's fit) |
 | `HT` | As `H`, plus the ENS PV forecast in the target row | 0 to 4 | Treatment |
 | `HT-S` | As `HT`, with the target-row forecast from the ENS run 28 days earlier | 0 to 4 | Counted placebo |
 | `T` | The ENS PV forecast in the target row only | 0 and 1 | Report-only: scope (b) without scope (a) |
@@ -392,9 +401,9 @@ makes no claim about era recognition or level shifts.
 1 made.** `HT` with its target paths at zero is `H` exactly, and both start from the same state of
 `M*`. `HT` minus `M*` and `T` minus `M*` are report-only. `HT-S` reads the ENS run issued 28 days
 before the origin day at the same lead day, with the same clear-sky-index transfer on the mean and
-the spread. For origins in the first 28 days of the ENS record the donor run is 28 days later, which
-is issued after the sample's origin and says nothing about the sample's target day; the check counts
-those origins in training and in held-out days and the page lists them.
+the spread. For origins in the first 28 days of the ENS record the donor run is 28 days later. That
+run is issued after the sample's origin and says nothing about the sample's target day; the check
+counts those origins in training and in held-out days and the page lists them.
 
 ## The target-row forecast
 
@@ -406,10 +415,12 @@ standardiser from float32 source rows, with the ENS-mean 2 m temperature. A seco
 multiplies `p0_mean` in the mixture means, and the head map reads `p0_mean` and `p0_sd`. All of them
 start at zero with a random partner. Arm `HT` has 4,800 new parameters (134,799 in all, 3.7% more
 than `M*`). With `a = 1` and `c = -1` the mean is the similar-day mean of gross demand minus the
-forecast PV, the decomposition of experiment 064; `p0_sd` lets the head widen the mixture when the
-ENS members disagree about the sky. The network, training recipe, optimiser groups (1e-2 for `a` and
-`c`, 3e-3 for `γ_h` and `γ_t`), and known-answer checks are those of experiment 716, with world WT
-and checks KF11 and KF12 for part 2. **KF11 requires `HT-S` minus `HT` in world WT to be at least
+forecast PV, the decomposition of experiment 064. The input `p0_sd` lets the head widen the mixture
+when the ENS members disagree about the sky. The network, training recipe, optimiser groups (1e-2
+for `a` and `c`, 3e-3 for `γ_h` and `γ_t`), and known-answer checks are those of experiment 716,
+with world WT and checks KF11 and KF12 for part 2.
+
+**KF11 requires `HT-S` minus `HT` in world WT to be at least
 0.5 × the `gap` of WT** (`HT-S` reads the target sky of the run 28 days earlier), and the same two
 pre-checks as in part 1 apply to WT: the `gap` of at least 0.010 and the early-stopping check, which
 uses the rung that part 1's ladder chose.
@@ -436,9 +447,11 @@ treatment contrast, the point estimate is below zero in at least one group (the 
 Primaries, the eight MVA-only Primaries). If every counted treatment contrast has a point estimate
 at or above zero in both groups, the experiment is written up at 2 seeds with the pre-registered
 two-seed values, and the page states that the futility rule fired. A reading with a point estimate
-below zero is the only one that opens seeds 2 to 4, and the ablation contrasts (A2 and B2) never
-open them. Interim, 2 seeds: the counted points of B1 (-0.0014 and -0.0033) are below zero in both
-groups, so the rule opened seeds 2 to 4. This rule was added before any treatment score was read. No
+below zero is the only reading that opens seeds 2 to 4, and the ablation contrasts (A2 and B2) never
+open them.
+
+**At 2 seeds, the counted points of B1 (-0.0014 and -0.0033) were below zero in both groups, so the
+rule opened seeds 2 to 4.** The rule was added before any treatment score was read. No
 threshold or verdict rule changed. The fit logs of phase 3 already held validation-loss lines when
 this rule was added (five at the time of the edit), and they were not read before the edit.
 
@@ -466,10 +479,10 @@ generator's time series.
 
 - **The ENS cloud error defeated the explicit term in experiments 644, 655, and 661.** `HT` reads
   the
-  same forecast. `p0_sd` and the zero-initialised gain let the network discount it.
+  same forecast. `p0_sd` and the zero-initialised gain let the network discount the forecast.
 - **A nested arm beating its container** (`H` beating `HT`) is audit trigger 5 of experiment 713.
-- **The design cannot resolve a gain under 0.06 at the six signed-MW Primaries**, although the
-  smallest gain worth porting is 0.02.
+- **The design cannot resolve a gain under 0.06 points of capacity at the six signed-MW Primaries**,
+  although the smallest gain worth porting is 0.02 points of capacity.
 
 ## Method
 
@@ -585,30 +598,31 @@ forecast examples show Primaries and count days from the origin.
 
 Two Opus design reviews preceded this page, and the second review's finding S7 changed one verdict
 rule before any fit, as the decision rule states. Code reviews of the scripts and a read of the
-lean-loader diff took place before the final scoring. A fresh numbers review then checked every
-contrast, interval, seed count, secondary reading, fit count, and SHA-256 value on this page against
-the stored tables, and found them correct. A read-only audit of triggers 3, 4, and 5 followed and
-found no flip. Still to come: a write-up
-review and a prose review.
+lean-loader diff took place before the final scoring. A fresh Sonnet numbers review then checked
+every contrast, interval, seed count, secondary reading, fit count, and SHA-256 value on this page
+against the stored tables, and found them correct. The numbers review covers the write-up review
+against the printed report, because the numbers review compared the page with the stored tables and
+the report script's output, and no separate write-up review was run. A Sonnet audit of triggers 3,
+4, and 5 followed and found no flip. A prose review then swept the page against the prose rules, one
+rule at a time, and its verified findings are applied. No review remains to come.
 
 ## Files
 
 - `ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/e00717_score.py`: scores arms
   `HT`, `HT-S`, and `H` with the scoring code of experiment 716 (contrasts B1 and B2, guards,
-  verdict, secondary read-outs). It also holds `load_all_lean`, which replaces part 1's loader
-  with one that loads one fold at a time and keeps 7 columns per per-seed row, because the
-  5-seed run of the unpatched loader needs an estimated 14 to 17 GB (estimated from row counts
-  and column widths, not measured). SHA-256 of the file as committed with
-  the patch: `adfc8a4f0af7f2d1168e81ae786c94e323aadbbfb6acf40ec3f4ecae6a7c6648`. It ran the final
-  5-seed
-  scoring of part 2 (`score/part2.json` and `score/secondary_part2.json`).
-- `.../e00717_check_lean_loader.py`: a read-only check that writes no file. For one fold and
-  seeds 0 and 1 of one arm, it prints the largest absolute difference between the two loaders in
-  every column that the contrast reads, the row counts, and whether the row order is identical.
-  The expected result is a difference of at most 1e-12 and identical order. SHA-256:
-  `37e8cae474a3d63b3a49fdda3b4917a2337eef9b3deb86de0abd3a230c001f77`. It ran once, with a result of
-  PASS: a largest difference of 0 in every column and
-  identical row order, for one fold and 2 seeds of arm `HT`.
+  verdict, secondary read-outs). The script also holds `load_all_lean`, which replaces part 1's
+  loader with a loader that loads one fold at a time and keeps 7 columns per per-seed row, because
+  the 5-seed run of the unpatched loader needs an estimated 14 to 17 GB (estimated from row counts
+  and column widths, not measured). SHA-256 of the file as committed with the patch:
+  `adfc8a4f0af7f2d1168e81ae786c94e323aadbbfb6acf40ec3f4ecae6a7c6648`. The script ran the final
+  5-seed scoring of part 2 (`score/part2.json` and `score/secondary_part2.json`).
+- `.../e00717_check_lean_loader.py`: a read-only check that writes no file. For one fold and seeds 0
+  and 1 of one arm, the script prints the largest absolute difference between the two loaders in
+  every column that the contrast reads, the row counts, and whether the row order is identical. The
+  expected result is a difference of at most 1e-12 and identical order. SHA-256:
+  `37e8cae474a3d63b3a49fdda3b4917a2337eef9b3deb86de0abd3a230c001f77`. The script ran once, with a
+  result of PASS: a largest difference of 0 in every column and identical row order, for one fold
+  and 2 seeds of arm `HT`.
 - `.../e00717_report.py`: prints the numbers of the final page from the score files. It stops
   at the report-only extra contrasts, see "Planned tables that do not exist".
 - `.../e00717_figures.py`: draws a contrast chart and a by-fold chart from `score/part2.json`. The
@@ -616,7 +630,7 @@ review and a prose review.
   charts of `e00717_figures.py` were wider than the text column.
 - `.../e00717_plots.py`: draws `contrasts.svg` and `b1_by_fold.svg` from `score/part2.json`, the
   forecast examples at D11, D19, and D21 from the stored forecasts of arms `HT` and `H`, and the
-  validation-loss curves from the fit logs. It scores nothing.
+  validation-loss curves from the fit logs. The script scores nothing.
 - `.../e00717_futility_read.py`: reads the interim 2-seed contrasts and writes
   `score/futility_part2.json`. `.../e00717_s1_read.py` writes the report-only
   `score/s1_interim.json`.
