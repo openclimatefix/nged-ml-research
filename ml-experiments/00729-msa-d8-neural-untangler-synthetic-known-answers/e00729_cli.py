@@ -4,7 +4,7 @@
     SLOT_CPU=<n> run.sh --go e00729_cli.py <stage> [options]
 
 Stages, in the order of the plan: `banks`, `gate`, `timing`, `screen`, `choose`, `ladder`,
-`margin`, `score`, `report`, `figures`. `fit` runs one named fit. Every stage prints counts and scores only.
+`margin`, `score`, `report`, `figures`, `series`. `fit` runs one named fit. Every stage prints counts and scores only.
 """
 
 import argparse
@@ -67,6 +67,7 @@ def main(argv: list[str]) -> int:
             "score",
             "report",
             "figures",
+            "series",
             "fit",
         ),
     )
@@ -140,6 +141,10 @@ def main(argv: list[str]) -> int:
     elif args.stage == "figures":
         arch = stages.read_json(path=paths.data_root() / "selection.json")["chosen"]
         for p in stages.stage_figures(ctx=ctx, arch=arch, log=log):
+            log(f"wrote a figure: {report.figures.optimise_command(path=p)}")
+    elif args.stage == "series":
+        arch = stages.read_json(path=paths.data_root() / "selection.json")["chosen"]
+        for p in stages.stage_series(ctx=ctx, arch=arch, log=log):
             log(f"wrote a figure: {report.figures.optimise_command(path=p)}")
     elif args.stage == "fit":
         run_jobs(ctx=ctx, jobs=[(args.arm, args.arch, args.seed)], device=args.device)

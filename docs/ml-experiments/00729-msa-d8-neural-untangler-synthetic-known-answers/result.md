@@ -471,6 +471,56 @@ breach is unchanged in "The plan as registered". Figures 1, 2, and 6 of the plan
 written by the run, and figures 3, 4, 5, 7, 8, and 9 are in this section. The Opus result review
 (the run's first review of this section) found no leakage and confirmed verdict row 3.
 
+## Time series of the estimates
+
+**Twelve figures show single 48-hour windows from the stored predictions, and the days are picked by
+fixed rules.** The script `e00729_series_figures.py` (stage `series`) reads the stored test-bank
+predictions of each arm at seed 0 and draws one window per figure. It fits nothing and re-scores
+nothing. The middle 24 hours of each window are the scored day, and the 12 hours either side (grey
+blocks) are the context that the neural networks read. The top row holds the true signed power
+(black, synthetic days only), the folded reading (grey), and each arm's median with its 5% to 95%
+band. The row below holds each arm's P(X<0) with a dashed line at 0.5. The x axis is the hour of the
+day in UTC, and no figure carries a calendar date. A rule keeps the complete days that meet a
+condition and takes the day with the median of a key, or the largest for the two worst-case figures.
+A tie goes to the lowest segment and date, and no rule draws random numbers. The figures are not on
+this page yet: they are added to this folder after the stage has run on the stored files and the
+script has had its review.
+
+**Figures 1 to 4 show how the arms follow reverse flow caused by an engine, by solar output, and by
+both.** Figure 1 is an engine-only day with reverse flow whose engine output is centred between
+17:00 and 23:00 UTC. Figure 2 is the same rule for output centred between 06:00 and 12:00 UTC.
+Figure 3 is a solar-only day with reverse flow centred between 10:00 and 14:00 UTC. Figure 4 is an
+engine-and-solar day in which both outputs reach at least 2 points. Each takes the day with the
+median depth of reverse flow among the days that meet its condition. Look for whether the median of
+each arm drops below zero where the black line does, and whether P(X<0) crosses 0.5 there.
+
+**Figure 5 shows a day on which the reading comes close to zero.** The rule keeps days with at least
+4 half-hours of reading under 0.3 MVA and takes the day with the median number of such half-hours.
+The folded reading cannot show the sign there, so look for P(X<0) staying near 0.5 and for the band
+spanning both signs.
+
+**Figures 6 and 7 show the harm on import days.** Figure 6 is the no-injection day with the median
+of arm D's largest P(X<0) of the day, and figure 7 is the all-import day with the largest mean of
+arm D's signed CRPS minus P0f's. P0f appears as a grey line with P(X<0) near zero. Look for the size
+of the probability of reverse flow that arm D invents on days when the truth never goes below zero.
+
+**Figure 8 shows a month with real BSP steps.** The rule keeps engine and engine-and-solar days in a
+BSP month with reverse flow and takes the day with the median depth. The bottom row holds the
+half-hour change of the BSP meter. Arm C reads the steps and arm B does not, so look for whether the
+two arms differ where the steps occur.
+
+**Figures 9 and 10 put the other output heads beside arm D on a window already shown.** Figure 9
+uses the window of figure 1 for the 11-quantile arm D-quantile, and P(X<0) of that arm is read off
+by linear interpolation of its 11 quantiles. Figure 10 uses the window of figure 5 for the sign-only
+arm D-sign. Look for the width of the bands and for how far P(X<0) sits from 0.5 where the reading
+is small.
+
+**Figures 11 and 12 show real days before the engine was connected, with no truth line.** On these
+days D8 imports, so the reading is the answer. Figure 11 takes the day with the median of arm D's
+largest P(X<0) of the day, and figure 12 the day with the largest. The figures plot the reading and
+each arm's output only, with no metered or inferred engine series and no date. Look for whether
+P(X<0) rises above 0.5 on a day when the reading is far above zero.
+
 ## Checks
 
 **Two audit triggers fired, and no audit has run.** Trigger 2 fired because C1, C4, C6, and C13

@@ -1209,3 +1209,29 @@ def stage_figures(*, ctx: Context, arch: str, log: Log) -> list[Path]:
         written.append(out_dir / "figure_6_windows.svg")
     log(f"wrote {len(written)} figures")
     return written
+
+
+def stage_series(*, ctx: Context, arch: str, log: Log) -> list[Path]:
+    """Write the 12 time-series figures from stored predictions only (no fit, no re-score).
+
+    Args:
+        ctx: The context (the real days of set R1 need its calendar).
+        arch: The chosen architecture.
+        log: Receives one line per figure.
+
+    Returns:
+        The written paths (run `svgo` on each before committing).
+    """
+    import e00729_series_figures as series
+
+    test = banks.load_bank(path=bank_path(kind="test"))
+    holidays = ctx.cal.holidays
+    rows = score.rows_from_segments(segments=test.segments, holidays=holidays)
+    sets = real_sets(ctx=ctx)
+    real_rows = score.rows_from_segments(segments=sets["r1"], holidays=holidays)
+    written = series.write_series_figures(
+        arch=arch, test_segments=test.segments, rows=rows, real_segments=sets["r1"],
+        real_rows=real_rows, out_dir=paths.data_root() / "figures", log=log,
+    )  # fmt: skip
+    log(f"wrote {len(written)} time-series figures")
+    return written
