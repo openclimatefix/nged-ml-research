@@ -118,12 +118,14 @@ median forecast moves. **The axial-attention network moved its forecast by a lar
 shift than the Candidate in three of the four counted comparisons, and the fourth is
 inconclusive.** The verdict is `partly supported`.
 
-**The experiment fitted nothing.** It ran stored weights on shifted inputs and compared each forecast
-with the same weights' forecast on unshifted inputs. The final cost was 3.62 GPU-process-hours, under
-the reporting ceiling of 5. Everything in the sections from "Why this runs" to "Compute, order, and
-machine rules" is the design as it was registered before any forecast existed, written in the
-future tense and left unchanged except where a section says otherwise. The sections "Results",
-"Readings that were not run", "Disclosures from the run", and "Method" describe what happened.
+**The experiment fitted nothing.** It ran stored weights on shifted inputs and compared each
+forecast with the same weights' forecast on unshifted inputs. The final cost was 3.62
+GPU-process-hours, under the reporting ceiling of 5. The figure counts the `cand` and `msa` jobs and
+excludes 0.207 h of CPU-only check jobs, so `phase_times.tsv` sums to 3.824 h in all. Everything in
+the sections from "Why this runs" to "Compute, order, and machine rules" is the design as it was
+registered before any forecast existed, written in the future tense and left unchanged except where
+a section says otherwise. The sections "Results", "Readings that were not run", "Disclosures from
+the run", and "Method" describe what happened.
 
 ## Results
 
@@ -209,16 +211,20 @@ quotes readings 2, 3, 4, 5, 6, and 9, and S6 (reading 11). Reading 4 shows that 
 after origin day 16: for the 3-day shifts at origin day 16, `M1` follows 0.067 and the Candidate
 0.022.
 
-**The clip shares are quoted with one caveat: each counts every shifted half-hour of the window,
-not only the half-hours that a network reads at the counted origins.** In reading 3 the share of
-shifted half-hours beyond 5 standard deviations of the MSA network's per-Primary standardisation is
-5.2% for the raising passes and 0.9% for the lowering passes at the six signed-MW Primaries, and
-3.8% and 1.5% at the eight MVA-only Primaries. The share above capacity or below zero at the raising
-passes is 44% (the six signed-MW Primaries) and 31% (the eight MVA-only Primaries). The
-Candidate's clip share is 0.0001 or less in both counted groups. It is nonzero only for D15 with
-D18, on the falling passes, and it rises with depth. The result review checked the two stored
-Candidate files for 2025-11 and 2025-12 against the MSA command's files, and the two agree on every
-one of the 36 rows in `n_half_hours`, `beyond_clip`, and `out_of_range`.
+**The clip shares are quoted with one caveat: each counts every shifted half-hour of the window, not
+only the half-hours that a network reads at the counted origins.** In reading 3 the share of shifted
+half-hours beyond 5 standard deviations of the MSA network's per-Primary standardisation is 5.2% for
+the raising passes and 0.9% for the lowering passes at the six signed-MW Primaries, and 3.8% and
+1.5% at the eight MVA-only Primaries. The share above capacity or below zero at the raising passes
+is 44% (the six signed-MW Primaries) and 31% (the eight MVA-only Primaries). The Candidate's clip
+share, pooled over depth and over the 8 fold months, is 0.0001 or less in both counted groups. By
+cell it is not zero: at depth 0.50 on the raising passes, fold 2026-01 has 0.0035 at the six
+signed-MW Primaries and 0.0004 at the eight MVA-only Primaries, and no other fold month has a
+nonzero share in either counted group. The Candidate's clip share is otherwise nonzero for D15 with
+D18, on the falling passes and in part on the raising passes, and it rises with depth. The result
+review checked the two stored Candidate files for 2025-11 and 2025-12 against the MSA command's
+files, and the two agree on every one of the 36 rows in `n_half_hours`, `beyond_clip`, and
+`out_of_range`.
 
 ## Reading S6: F4 minus the Candidate on experiment 714's second generator
 
@@ -330,15 +336,16 @@ The edit is five lines. The first case is the driver `phases.sh`, described abov
 review checked this edit (below).
 
 **Caveat for reading 3 and the sensitivity rule, stated before any score was read: the Candidate's
-clip binds at some Primaries and passes in fold 2026-01.** The KC5 audit approximated the 2026-01
-lag statistics, and the 2025-11 and 2025-12 files were not computed pass by pass, so these figures
-are approximate. In fold 2026-01 the clip binds at Primary 11 (D16, a signed-MW Primary, whose
-capacity is listed in the code) in pass 0 at least. It binds at Primaries 8, 12, and 15 in passes 3,
-7, 8, 10, and 11. It binds heavily at Primary 10 (D15) in the negative passes 12 to 23, where 455 of
-the 720 half-hours of the window are clipped at pass 13. A clipped half-hour caps how far the
-Candidate's lag column can follow a shift. The stored shares counted over all 8 fold months are
-0.0001 or less in both counted groups (section "Results"), so the clip does not bind in the counted
-cells.
+clip binds at some Primaries and passes in fold 2026-01.** These Primary and pass figures are the
+KC5 audit's approximations of the 2026-01 lag statistics, and no stored file holds them. The 2025-11
+and 2025-12 files were not computed pass by pass. In fold 2026-01 the clip binds at Primary 11 (D16,
+a signed-MW Primary, whose capacity is listed in the code) in pass 0 at least. It binds at Primaries
+8, 12, and 15 in passes 3, 7, 8, 10, and 11. It binds heavily at Primary 10 (D15) in the negative
+passes 12 to 23, where 455 of the 720 half-hours of the window are clipped at pass 13. A clipped
+half-hour caps how far the Candidate's lag column can follow a shift. The stored shares, which are
+measured, are nonzero in the counted groups only in fold 2026-01 at depth 0.50 on the raising passes
+(0.0035 and 0.0004), and pooled over depth and fold months they are 0.0001 or less (section
+"Results"). The clip therefore binds in a small part of the counted cells.
 
 **The two Candidate clip files for 2025-11 and 2025-12 came from a script that was edited after its
 review, and the result review has since checked the edit.** The script
@@ -759,7 +766,7 @@ files:** with experiment 667's paths, the copied `_done` would make KC2 pass by 
   no code for it exists. The write-up therefore has no attention maps from this experiment, and no
   figures script was written.
 
-**The smoke test passed on fold 2026-06, the fold with the most training rows (7,929,723).** Preflight
+**The smoke test passed on fold 2026-06.** Preflight
 KP found all 461 expected input files. The Candidate job at root e667 with seeds 0 and 1 in one
 process wrote 16 files in 75 s, with a host peak of 6.3 GB and a GPU peak of 0.3 GB. The Candidate
 job at root seeds713 with seed 2 wrote 8 files in 70 s, with the same host peak. The MSA job for `M1`
