@@ -752,6 +752,13 @@ def lay_native_offset() -> int:
 # ----------------------------------------------------------------------------------------- KL5, KL8
 
 
+def common_grid() -> np.ndarray:
+    """Return the half-hourly grid that experiment 437's `dense_arrays` builds on (after any `redirect`)."""
+    import e00087_common as common  # ty: ignore[unresolved-import]
+
+    return common.grid_times().to_numpy()
+
+
 def kl5(*, phase: str, data_dir: Path) -> dict:
     """Check KL5: the nine trailing columns recomputed from the `ft` series equal experiment 437's stored values.
 
@@ -763,9 +770,15 @@ def kl5(*, phase: str, data_dir: Path) -> dict:
     import e00418_prep as prep418  # ty: ignore[unresolved-import]
     import e00437_features as f437  # ty: ignore[unresolved-import]
     import e00632_data as d632  # ty: ignore[unresolved-import]
+    import e00667_extend as ext  # ty: ignore[unresolved-import]
     import e00725_sources as src
 
+    # The cache, and experiment 713's world in both phases, sit on experiment 667's extended grid
+    # (126,624 half-hours to 2026-11-20). `dense_arrays` builds its clear-sky array on the grid of
+    # `e00087_common.GRID_END`, which is 2026-07-31 (121,248 half-hours) until `redirect` extends it.
+    ext.redirect()
     cache = src.load_cache(phase=phase, data_dir=data_dir)
+    assert len(common_grid()) == cache.raw.shape[1], (len(common_grid()), cache.raw.shape)
     shortwave = prep418.WEATHER.index("shortwave")
     temperature = prep418.WEATHER.index("temperature_2m")
     local_date = f437.local_date_codes()
