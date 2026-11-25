@@ -180,7 +180,7 @@ could be drawn from the fits that ran: the attention maps and the null-key share
 pass with attention returned, and the event charts need the injected-world forecasts of phase 4.
 Plots 7 and 8 (a forecast example and the contrasts by Primary and by fold) need no new fit. A
 script that draws them, and one extra report-only figure of the contrasts by lead band, is written.
-It has not run, and it waits for a second code review.
+It has not run, and it waits for a code re-check.
 
 **Readings listed in the plan were not computed.** The report-only contrasts (N1 against the 5
 stored seeds of M\*, F4 minus the Candidate, the contrasts by lead band and by Primary), the

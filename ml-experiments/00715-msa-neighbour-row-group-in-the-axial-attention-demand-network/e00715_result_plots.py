@@ -4,7 +4,7 @@
 Usage, through `run.sh`, never `uv run` (set `DATA_PATH_INTERNAL` first, and put the frozen
 experiment 713 folder on `EXTRA_PYTHONPATH`, as for the scorer):
 
-    EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=2G run.sh e00715_result_plots.py plot8
+    EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=12G run.sh e00715_result_plots.py plot8
     EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=12G run.sh e00715_result_plots.py plot7 --hosts D5,D2
     EXTRA_PYTHONPATH=<frozen 713 folder> SLOT_MEM=12G run.sh e00715_result_plots.py lead-bands
 
@@ -58,12 +58,22 @@ N1_LABEL: Final = "N1: F4 minus M*"
 N2_LABEL: Final = "N2: F4 minus F4-R"
 CONTRASTS: Final = {"N1": N1_LABEL, "N2": N2_LABEL}
 COLOURS: Final = {N1_LABEL: ocf.DATA_BLUE, N2_LABEL: ocf.BRAND_ORANGE}
-DEFINITIONS: Final = (
-    "F4: network with neighbour rows. M*: the baseline of experiment 713, without neighbour rows. "
-    "F4-R: F4 with its neighbours rewired to other Primaries (a placebo)."
-)
-UNIT: Final = "CRPS difference in points of capacity; below zero means F4 forecasts better"
-SCOPE: Final = "Each point or cell is the CRPS of the forecast averaged over 2 seeds, over 8 monthly folds, on leads of 24 h up to but not including 240 h."
+DEFINITIONS: Final = [
+    "F4: neural network with neighbour rows.",
+    "M*: the baseline of experiment 713, without neighbour rows.",
+    "F4-R: F4 with its neighbours rewired to other Primaries (a placebo).",
+]
+UNIT: Final = "CRPS difference in points of capacity; below zero means F4 forecasts better."
+SCOPE_CELL: Final = [
+    "Each cell: one Primary's mean CRPS difference in one fold (one month; the 8 folds are",
+    "November 2025 to June 2026), for the forecast averaged over 2 seeds, on leads of 24 h",
+    "up to but not including 240 h.",
+]
+# Hosts vetted for plot 7. No table records which Primary a metered generator connects to, so the
+# evidence is circumstantial: experiment 722 found no metered generator inside these Primaries'
+# service-area polygons and no `unresolved` generator fit, and NGED's monitor-direction file marks no
+# reverse power flow. D8, D12, D22, D14, and D4 are never allowed.
+ALLOWED_HOSTS: Final = {"six": ("D11",), "eight": ("D19", "D21")}
 TOL: Final = 1e-9
 WIDTH_PX: Final = CONTENT_WIDTH_PX
 BAND_HEADLINE: Final = "24-240 h (headline)"
@@ -115,7 +125,10 @@ def plot8() -> Path:
     group_of = {i: g for g in GROUP_NAMES for i in groups[g].tolist()}
     rows = []
     for key, contrast_label in CONTRASTS.items():
-        _, averaged = score.pair(treatment="F4", reference=reference_of(key), months=arms.ALL_FOLDS)
+        per_seed, averaged = score.pair(
+            treatment="F4", reference=reference_of(key), months=arms.ALL_FOLDS
+        )
+        del per_seed
         band = sc.HEADLINE_BAND_HOURS
         kept = {
             name: frame.filter((pl.col("lead_hours") >= band[0]) & (pl.col("lead_hours") < band[1]))
@@ -189,9 +202,11 @@ def plot8() -> Path:
             "F4 minus M* and F4 minus F4-R, by Primary and fold",
             subtitle=[
                 "Orange: F4 forecasts worse. Blue: F4 forecasts better. White: no difference.",
-                f"Rows 1 to 6: the six signed-MW Primaries ({', '.join(sc.SIX)}); rows 7 to 14: the eight MVA-only Primaries.",
-                SCOPE,
-                DEFINITIONS,
+                f"Rows 1 to 6: the six signed-MW Primaries ({', '.join(sc.SIX)});",
+                "rows 7 to 14: the eight MVA-only Primaries.",
+                UNIT,
+                *SCOPE_CELL,
+                *DEFINITIONS,
             ],
         )
     )
@@ -211,8 +226,12 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
     """Draw plot 7: the first forecast origin of `fold` for one Primary of each group, F4 against M*."""
     assert fold in arms.ALL_FOLDS, fold
     assert len(hosts) == 2, "give one D label of each group: --hosts D5,D2"
-    assert hosts[0] in sc.SIX, hosts
-    assert hosts[1] in sc.EIGHT, hosts
+    assert hosts[0] in ALLOWED_HOSTS["six"], (
+        f"{hosts[0]} is not vetted for the six: {ALLOWED_HOSTS}"
+    )
+    assert hosts[1] in ALLOWED_HOSTS["eight"], (
+        f"{hosts[1]} is not vetted for the eight: {ALLOWED_HOSTS}"
+    )
     refused = set(hosts) & generation_noted_hosts()
     assert not refused, f"{refused} has a metadata note about generation; choose another Primary"
     id_of = {v: k for k, v in labels_by_id().items()}
@@ -230,7 +249,7 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
                 (pl.col("time_series_id") == id_of[host])
                 & (pl.col("power_fcst_init_time") == origin)
             )
-            assert sub.height > 0, (host, name)
+            assert sub.height == 14 * 48, (host, name, sub.height)  # no gap in the cleaned demand
             parts.append(
                 sub.select(
                     days=pl.col("lead_hours") / 24.0,
@@ -251,7 +270,7 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
         band = (
             base.transform_filter(alt.datum.forecast == "F4")
             .mark_area(opacity=0.2, color=ocf.BRAND_ORANGE, aria=False)
-            .encode(y=alt.Y("low:Q", title="Power (% of capacity)"), y2="high:Q")  # ty: ignore[unresolved-attribute]
+            .encode(y=alt.Y("low:Q", title="Demand (% of capacity)"), y2="high:Q")  # ty: ignore[unresolved-attribute]
         )
         lines = base.mark_line(aria=False).encode(  # ty: ignore[unresolved-attribute]
             y="median:Q",
@@ -279,8 +298,9 @@ def plot7(*, hosts: list[str], fold: str) -> Path:
             "One 14-day forecast against the cleaned power, for one Primary of each group",
             subtitle=[
                 "Solid lines: median forecast of F4 (orange, with its 5% to 95% band) and of M* (blue); seed 0.",
-                "Dashed grey line: cleaned power. Day 0 is the forecast origin (the first of the fold); no calendar date is shown.",
-                "The first day is the day-ahead forecast. " + DEFINITIONS,
+                "Dashed grey line: cleaned demand. Day 0 is the forecast origin (the first of the fold);",
+                "no calendar date is shown. The day-ahead forecast is days 0.5 to 1.5 (leads of 12 h to 36 h).",
+                *DEFINITIONS,
             ],
         )
     )
@@ -359,9 +379,11 @@ def lead_bands() -> Path:
         title=alt.TitleParams(
             "Report-only: F4 minus M* and F4 minus F4-R by lead band",
             subtitle=[
-                f"{UNIT}. Dot: difference. Line: 98.75% interval from resampling whole months. Dashed line: no difference.",
-                "Report-only reading, not a counted contrast: only the 24-240 h row is the headline. Over 8 folds and 2 seeds.",
-                DEFINITIONS,
+                UNIT,
+                "Dot: difference. Line: 98.75% interval (the headline's level) from resampling whole months.",
+                "Dashed line: no difference. Over 8 folds and 2 seeds.",
+                "Report-only, not a counted contrast: only the 24-240 h row is the headline.",
+                *DEFINITIONS,
             ],
         )
     )
