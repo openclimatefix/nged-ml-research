@@ -55,7 +55,8 @@ class Context:
         use: For each split, for each month, the mask over `cal` of days a segment may use.
         stats: Temperature standardisation from the training days.
         cut_day: The private cut as a day (never printed).
-        closure_loaded: Whether the switching logs loaded and their closure days were dropped.
+        closure_status: `loaded`, `missing`, or `unreadable` (the switching logs).
+        closure_on_base: Whether any closure day fell on a base day, so that the log changed the base.
     """
 
     table: data.DayTable
@@ -65,7 +66,8 @@ class Context:
     use: dict[str, dict[str, np.ndarray]]
     stats: arms.InputStats
     cut_day: np.datetime64
-    closure_loaded: bool = False
+    closure_status: str = "missing"
+    closure_on_base: bool = False
 
     def months(self, *, split: str) -> list[str]:
         """Return the months of a split."""
@@ -94,14 +96,20 @@ def build_context() -> Context:
     Raises:
         CorrectnessFailureError: When the derived split differs from `PRIVATE/splits.md`.
     """
-    closure_days, closure_loaded = data.load_closure_days()
+    closure_days, closure_status = data.load_closure_days()
     table = data.load_day_table(closure_days=closure_days)
     cal = data.select_days(cal=table.calendar, mask=table.is_base)
     months, n_days, bsp_days = data.month_table(cal=cal)
     month_split = core.month_splits(months=months, n_days=n_days, bsp_days=bsp_days)
     private = paths.data_root() / "PRIVATE" / "splits.md"
-    if private.exists() and parse_private_splits(path=private) != month_split:
-        msg = "the split derived from the rule differs from PRIVATE/splits.md"
+    if not private.exists():
+        msg = "PRIVATE/splits.md is missing, so the derived split cannot be checked (verdict row 1)"
+        raise leak.CorrectnessFailureError(msg)
+    if parse_private_splits(path=private) != month_split:
+        msg = (
+            "the split derived from the rule, with the closure days dropped, differs from "
+            "PRIVATE/splits.md (verdict row 1): the design lead rules which calendar is registered"
+        )
         raise leak.CorrectnessFailureError(msg)
     days = [d.astype("datetime64[D]").astype(date) for d in cal.dates]
     day_split = np.array(core.assign_day_splits(days=days, splits=month_split))
@@ -120,7 +128,9 @@ def build_context() -> Context:
     leak.assert_cut_applied(base_dates=cal.dates, cut_day=cut_day)
     leak.assert_before_holdout(dates=table.calendar.dates)
     leak.assert_cams_differs(cal=cal)
-    return Context(table, cal, month_split, day_split, use, stats, cut_day, closure_loaded)  # ty: ignore[invalid-argument-type]
+    closed = np.array(sorted(closure_days), dtype="datetime64[D]")
+    on_base = bool(np.isin(table.calendar.dates[table.is_base], closed).any())
+    return Context(table, cal, month_split, day_split, use, stats, cut_day, closure_status, on_base)  # ty: ignore[invalid-argument-type]
 
 
 def bank_path(*, kind: str, seed: int | None = None) -> Path:
@@ -186,7 +196,8 @@ def stage_banks(*, ctx: Context, train_seeds: Sequence[int], log: Log) -> dict:
             for s in ("training", "validation", "test")
         },
         "dropped_days_by_guard": int((ctx.day_split == "dropped").sum()),
-        "closure_log_loaded": ctx.closure_loaded,
+        "closure_log_status": ctx.closure_status,
+        "closure_day_on_base_day": ctx.closure_on_base,
         "leakage_pass": True,
     }
     write_json(path=paths.data_root() / "banks" / "summary.json", payload=summary)
@@ -248,11 +259,13 @@ def stage_gate(*, ctx: Context, log: Log) -> dict:
         fit.slope,
         float(np.nanmedian([f.se for f in real_fits])) if real_fits else float("nan"),
         float(np.nanmedian([f.resid_sd for f in real_fits])) if real_fits else float("nan"),
+        int(np.median([f.n for f in real_fits])) if real_fits else 1,
     )
     gate = banks.bsp_gate(real=real_ref, real_ci=ci, synthetic=synthetic)
     out["bsp"] = {
         **gate, "real_slope_z_vs_placebo": float((fit.slope - np.mean(placebo)) / np.std(placebo)),
-        "n_synthetic_stretches": len(synthetic), "n_real_stretches": len(real_fits),
+        "n_synthetic_stretches": gate["n_finite_fits"], "n_synthetic_stretches_all": len(synthetic),
+        "n_real_stretches": len(real_fits),
         "stretch_half_hours": length,
     }  # fmt: skip
     passes.append(bool(gate["pass"]))
@@ -448,6 +461,7 @@ def run_fit(
     }
     payload = {**result.as_dict(), "digests": digests}
     write_json(path=record_path, payload=payload)
+    (fit_dir() / f"{name}.failed.json").unlink(missing_ok=True)
     return payload
 
 
@@ -632,6 +646,34 @@ def segment_p_any(*, segments: Sequence[sim.Segment]) -> np.ndarray:
     return np.concatenate(out)
 
 
+def needed_job_names() -> set[str]:
+    """Return the fits whose predictions a counted reading reads: every arm at seeds 0 to 2.
+
+    The margin also reads arm D at the other seeds. The architecture's choice has been made by then,
+    so the architecture is read from `selection.json`; before it exists, no fit is needed.
+    """
+    path = paths.data_root() / "selection.json"
+    if not path.exists():
+        return set()
+    arch = read_json(path=path)["chosen"]
+    names = {job_name(arm=a, arch=arch, seed=s) for a in core.ARMS for s in core.ARCH_SEEDS}
+    return names | {job_name(arm="D", arch=arch, seed=s) for s in core.MARGIN_SEEDS}
+
+
+def needed_fits_failed() -> bool:
+    """Return whether a needed fit has a failure record and no fit record.
+
+    A failure record is stale once a sanctioned rerun of the fit has written its fit record, and a
+    failure of a fit that no counted reading needs (a screen fit of another architecture) is not row 2.
+    """
+    needed = needed_job_names()
+    for path in fit_dir().glob("*.failed.json"):
+        name = path.name.removesuffix(".failed.json")
+        if name in needed and not (fit_dir() / f"{name}.json").exists():
+            return True
+    return False
+
+
 def terminal_verdict(
     *, root: Path, stopped: bool = False, invalid: bool = False, failed: bool = False
 ) -> dict:
@@ -671,14 +713,54 @@ def stage_score(*, ctx: Context, n_resamples: int = core.N_RESAMPLES, log: Log) 
         The verdict record, also written to `verdict.json`.
     """
     root = paths.data_root()
-    if any(fit_dir().glob("*.failed.json")):
-        log("a fit failed: verdict row 2")
+    if needed_fits_failed():
+        log("a fit that a counted reading needs failed: verdict row 2")
         return terminal_verdict(root=root, failed=True)
     try:
         return score_everything(ctx=ctx, n_resamples=n_resamples, log=log)
     except leak.CorrectnessFailureError:
         log("a correctness check failed while scoring: verdict row 1")
         return terminal_verdict(root=root, invalid=True)
+
+
+def write_bstar_once(*, path: Path, bstar: str) -> None:
+    """Write the choice of B* once; a later run that would choose another baseline is an error."""
+    if path.exists():
+        if read_json(path=path)["bstar"] != bstar:
+            msg = "B* chosen on the validation months differs from the stored choice"
+            raise leak.CorrectnessFailureError(msg)
+        return
+    write_json(path=path, payload={"bstar": bstar, "chosen_on": "validation"})
+
+
+TEST_MARKER: Final = "first_test_score.marker"
+"""A file that the first scoring run creates and never rewrites; its time is the first test score."""
+
+
+def choice_events(*, root: Path) -> list[str]:
+    """Return the names of the choices and of the first test score in order of file time.
+
+    The architecture, B*, and margin files are compared with the marker of the first test score,
+    which is created now when no earlier run made it. A choice file rewritten after the first test
+    score therefore sorts after it, and `assert_choices_before_test` fails.
+
+    Args:
+        root: The experiment's data folder.
+
+    Returns:
+        The event names, earliest first.
+    """
+    marker = root / "scores" / TEST_MARKER
+    if not marker.exists():
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("")
+    stamps = {
+        "architecture": (root / "selection.json").stat().st_mtime_ns,
+        "bstar": (root / "scores" / "bstar.json").stat().st_mtime_ns,
+        "margin": (root / "margin.json").stat().st_mtime_ns,
+        "test_score": marker.stat().st_mtime_ns,
+    }
+    return sorted(stamps, key=lambda k: (stamps[k], k == "test_score"))
 
 
 def fit_digests(*, arch: str, seeds: Sequence[int]) -> dict[str, dict[str, str]]:
@@ -725,17 +807,8 @@ def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:
     bstar = core.choose_baseline(
         b1=float(val_b["B1"].crps.mean()), b2=float(val_b["B2"].crps.mean())
     )
-    write_json(
-        path=root / "scores" / "bstar.json", payload={"bstar": bstar, "chosen_on": "validation"}
-    )
-    leak.assert_choices_before_test(
-        events=[
-            *(["architecture"] if (root / "selection.json").exists() else []),
-            *(["bstar"] if (root / "scores" / "bstar.json").exists() else []),
-            *(["margin"] if (root / "margin.json").exists() else []),
-            "test_score",
-        ]
-    )
+    write_bstar_once(path=root / "scores" / "bstar.json", bstar=bstar)
+    leak.assert_choices_before_test(events=choice_events(root=root))
     test_bank = banks.load_bank(path=bank_path(kind="test"))
     rows = score.rows_from_segments(segments=test_bank.segments, holidays=ctx.cal.holidays)
     pi_test = banks.injected_share(bank=test_bank)
@@ -797,7 +870,7 @@ def score_everything(*, ctx: Context, n_resamples: int, log: Log) -> dict:
     verdict_in = core.VerdictInputs(
         stopped=not (gate["pass"] and reach["pass"]),
         invalid=not read_json(path=root / "banks" / "summary.json")["leakage_pass"],
-        failed=any(fit_dir().glob("*.failed.json")),
+        failed=needed_fits_failed(),
         h1_pass=bool(h1["pass"]), h2_pass=bool(real_out["h2"]["pass"]),
         c1=core.Reading(c1["point"], c1["lower"], c1["upper"]), margin=margin,
         calibration_pass=bool(calib["pass"]), lobe_pass=bool(lobe["pass"]),

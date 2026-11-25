@@ -270,6 +270,10 @@ GATE_RATIO: Final = (0.5, 2.0)
 GATE_MIN_VALUE_MVA: Final = 1.0
 GATE_STEP_BINS: Final = 5
 GATE_PLACEBO_SHIFTS: Final = (3, 20)
+GATE_MIN_SYNTHETIC_FITS: Final = 5
+"""The BSP gate reads `void` when fewer finite synthetic stretches than this exist. The 5th and
+95th percentiles of a handful of fits are not a spread, so the gate cannot judge the real value
+(this count is a code choice, not a registered bar)."""
 REAL_UP_TO: Final = "2026-06-30"
 """The last valid date that any real check reads."""
 

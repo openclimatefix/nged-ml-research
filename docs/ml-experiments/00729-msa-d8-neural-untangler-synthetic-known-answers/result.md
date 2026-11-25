@@ -872,24 +872,40 @@ Real-day panels carry no calendar dates.
   validation bank takes root 729,250, the test bank 729,000, and the shifted bank 729,500, so no two
   banks share a draw. Each bank's world types are assigned by quota across the whole bank, so the
   realised mix is the planned mix up to rounding (10, 19, 13, and 22 segments of 64 for the test
-  bank). B1, B2, and M2 take the bank's realised share of injected segments as the prior pi.
+  bank), and the code then deals the segments out month by month, so each test month, and with
+  it each BSP test month, gets its share of every world type. B1 and B2 take the bank's realised
+  share of injected segments as the prior pi; M2 has no such prior.
 - **The BSP half of the realism gate uses stretches of one month, not the record's length.** The
   record spans more days than one synthetic segment, which is one month. The code cuts the real
   record and every engine-only synthetic segment into stretches of the longest length that a
   segment can hold; the real standard error and residual standard deviation are the medians over the
   real stretches, and the real slope's interval comes from the whole record. No registered bar
   changes. The zero steps of the record form their own size bin, and the five quintile bins are
-  taken over its non-zero steps, because most steps are zero. A gate with no usable synthetic
-  stretch is recorded as `void` and does not pass.
+  taken over its non-zero steps, because most steps are zero. Real and synthetic standard errors
+  are compared as the standard error times the square root of the number of finite step pairs,
+  because a stretch with more pairs has a smaller standard error. The gate counts only finite
+  synthetic fits, records that count, and reads `void` (which does not pass) below 5 of them, a
+  code choice and not a registered bar: the 5th and 95th percentiles of fewer fits are not a spread
+  that can judge the real value.
 - **K1's running label is the record's own `units >= 1`.** Half-hours without a record row are left
   out of K1, and the result holds the error ratio and the F1 scores only, never the raw mean of the
   record or a count of running half-hours.
 - **The switching logs are read with the column heuristic of experiment 722.** A closure runs from
-  its start to its end, and the days within 24 hours of either are dropped from the base. The summary
-  records whether the workbook loaded.
+  its start to its end, and the days within 24 hours of either are dropped from the base. Only a
+  missing or unreadable workbook is tolerated, and the summary records the status (`loaded`,
+  `missing`, or `unreadable`) and whether any closure day fell on a base day. The banks stage
+  raises a row-1 error when the split derived with the closure days differs from the private file,
+  or when the file is missing, and the smoke test prints the flag with and without closure days.
 - **The code computes B1's climatology directly.** The sign prior needs the empirical distribution of
   base demand in each (month, half-hour, weekend) cell, so the code builds it from the training days
   without smoothing over neighbouring cells, and does not call `ClimatologyForecaster`.
+- **M2 starts at the first day of each month, without the plan's 28 days of injected history.** The
+  simulated segments hold no earlier days, so M2 is weaker as a benchmark than the plan states, and
+  K1's F1 bar is easier to meet.
+- **A failure record counts only for a fit that a counted reading needs and that has no fit
+  record.** A sanctioned rerun that succeeds removes the stale record.
+- **The first test score is marked by a file** that the scoring stage creates once; the choice
+  files of the architecture, B*, and the margin must be older than it, and B* is written once.
 - **M2 reads each segment as one continuous series.** A missing half-hour is filled by linear
   interpolation before the tracker runs, and M2 is scored on every test segment, with the engine-only
   segments as the listed benchmark.

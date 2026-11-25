@@ -79,6 +79,28 @@ def bank_digest(*, segments: Sequence[sim.Segment]) -> str:
     return h.hexdigest()
 
 
+def deal_across_months(*, worlds: Sequence[str], n_months: int) -> list[str]:
+    """Spread a bank's world types over its months, so that each month gets its share of each type.
+
+    The world types are sorted and dealt out in turn, one month at a time, so a type with `k`
+    segments gives each month `k // n_months` or one more. Each month still holds the same number of
+    segments. The result lists month 0's segments first, then month 1's, and so on.
+
+    Args:
+        worlds: The bank's world types (the quota assignment).
+        n_months: The number of months of the bank.
+
+    Returns:
+        The world types in month-major order.
+    """
+    ordered = sorted(worlds)
+    per_month = len(ordered) // n_months
+    out: list[str] = []
+    for month in range(n_months):
+        out.extend(ordered[month::n_months][:per_month])
+    return out
+
+
 def build_bank(
     *, cal: sim.Calendar, kind: BankKind, seed: int | None, months: Sequence[str],
     month_use: dict[str, np.ndarray],
@@ -103,10 +125,13 @@ def build_bank(
     planned = None
     if kind != "train":
         # evaluation worlds are assigned by quota across the whole bank, so the realised mix is the planned mix
-        planned = core.quota_world_types(
-            rng=np.random.default_rng(np.random.SeedSequence([root, 10_000_000])),
-            n=n_draws * len(ordered),
-            none_share=core.SHIFTED_NONE_SHARE if kind == "shifted" else core.TEST_MIX["none"],
+        planned = deal_across_months(
+            worlds=core.quota_world_types(
+                rng=np.random.default_rng(np.random.SeedSequence([root, 10_000_000])),
+                n=n_draws * len(ordered),
+                none_share=core.SHIFTED_NONE_SHARE if kind == "shifted" else core.TEST_MIX["none"],
+            ),
+            n_months=len(ordered),
         )
     for index, month in enumerate(ordered):
         ss = np.random.SeedSequence([root, index])
@@ -209,11 +234,13 @@ class StepFit:
         slope: The slope of the BSP step per point of engine step.
         se: The slope's standard error.
         resid_sd: The residual standard deviation in points.
+        n: The number of finite step pairs behind the fit.
     """
 
     slope: float
     se: float
     resid_sd: float
+    n: int = 1
 
 
 def step_fit(*, d_bsp: np.ndarray, d_eng: np.ndarray, weights: np.ndarray | None = None) -> StepFit:
@@ -232,10 +259,10 @@ def step_fit(*, d_bsp: np.ndarray, d_eng: np.ndarray, weights: np.ndarray | None
     x, y = d_eng[ok], d_bsp[ok]
     sxx = float((w * x * x).sum())
     if sxx <= 0 or len(x) < 3:
-        return StepFit(float("nan"), float("nan"), float("nan"))
+        return StepFit(float("nan"), float("nan"), float("nan"), len(x))
     slope = float((w * x * y).sum() / sxx)
     sigma2 = float((w * (y - slope * x) ** 2).sum() / max(w.sum() - 1.0, 1.0))
-    return StepFit(slope, float(np.sqrt(sigma2 / sxx)), float(np.sqrt(sigma2)))
+    return StepFit(slope, float(np.sqrt(sigma2 / sxx)), float(np.sqrt(sigma2)), len(x))
 
 
 ZERO_STEP: Final = 1e-9
@@ -335,19 +362,24 @@ def bsp_gate(
         synthetic: One size-matched fit per synthetic stretch.
 
     Returns:
-        Each condition, `void` (True when no synthetic stretch gave a fit, so that the gate could
-        not be read and does not pass), and whether the gate passes: the real slope's interval overlaps -1.0 to
+        Each condition, `void` (True when fewer than `GATE_MIN_SYNTHETIC_FITS` finite synthetic fits
+        exist, so that the gate could not be read and does not pass), the finite count, and whether
+        the gate passes: the real slope's interval overlaps -1.0 to
         -0.6, and the real standard error and residual sd each lie in the 5th to 95th percentile of
         the synthetic stretches.
     """
     lo_b, hi_b = -core.RANGES["beta"][1], -core.RANGES["beta"][0]
     overlap = bool(real_ci[0] <= hi_b and real_ci[1] >= lo_b)
-    se = np.array([f.se for f in synthetic])
-    sd = np.array([f.resid_sd for f in synthetic])
-    if not np.isfinite(se).any() or not np.isfinite(sd).any() or not np.isfinite(real.se):
+    finite = [f for f in synthetic if np.isfinite(f.se) and np.isfinite(f.resid_sd)]
+    n_finite = len(finite)
+    if n_finite < core.GATE_MIN_SYNTHETIC_FITS or not np.isfinite(real.se):
         return {"slope_overlap": overlap, "se_inside": False, "sd_inside": False, "void": True,
-                "pass": False}  # fmt: skip
-    se_in = bool(np.nanpercentile(se, 5) <= real.se <= np.nanpercentile(se, 95))
-    sd_in = bool(np.nanpercentile(sd, 5) <= real.resid_sd <= np.nanpercentile(sd, 95))
+                "n_finite_fits": n_finite, "pass": False}  # fmt: skip
+    # a standard error falls as one over the root of the number of step pairs, so compare se * sqrt(n)
+    se = np.array([f.se * np.sqrt(f.n) for f in finite])
+    sd = np.array([f.resid_sd for f in finite])
+    real_se = real.se * np.sqrt(real.n)
+    se_in = bool(np.percentile(se, 5) <= real_se <= np.percentile(se, 95))
+    sd_in = bool(np.percentile(sd, 5) <= real.resid_sd <= np.percentile(sd, 95))
     return {"slope_overlap": overlap, "se_inside": se_in, "sd_inside": sd_in, "void": False,
-            "pass": bool(overlap and se_in and sd_in)}  # fmt: skip
+            "n_finite_fits": n_finite, "pass": bool(overlap and se_in and sd_in)}  # fmt: skip

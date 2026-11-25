@@ -18,6 +18,7 @@ import e00729_paths
 # isort: split
 import e00729_core as core
 import e00729_data as data
+import numpy as np
 import polars as pl
 
 e00729_paths.pin_threads()
@@ -85,21 +86,35 @@ def check_private_constants() -> str:
     return f"cut computed: {cut is not None}"
 
 
-def check_day_table() -> str:
-    """Check the day table, the split against the private file, and that a farm joins with data."""
+def split_flags(*, closure_days: frozenset) -> tuple[bool, bool, bool]:
+    """Return whether the derived split equals the private file, whether a farm joins, and the base."""
     import e00729_stages as stages
 
-    table = data.load_day_table()
+    table = data.load_day_table(closure_days=closure_days)
     cal = data.select_days(cal=table.calendar, mask=table.is_base)
     months, n_days, bsp_days = data.month_table(cal=cal)
     derived = core.month_splits(months=months, n_days=n_days, bsp_days=bsp_days)
     private = e00729_paths.data_root() / "PRIVATE" / "splits.md"
     same = private.exists() and stages.parse_private_splits(path=private) == derived
-    farm_joined = bool(table.calendar.farms.power_ok.any())
+    return same, bool(table.calendar.farms.power_ok.any()), bool(table.is_base.any())
+
+
+def check_day_table() -> str:
+    """Check the day table and print the split flags without and with the closure days (booleans)."""
+    without, farm_joined, has_base = split_flags(closure_days=frozenset())
+    days, status = data.load_closure_days()
+    table = data.load_day_table(closure_days=days)
+    on_base = bool(
+        np.isin(
+            table.calendar.dates[table.is_base], np.array(sorted(days), dtype="datetime64[D]")
+        ).any()
+    )
+    with_closure, _, _ = split_flags(closure_days=days)
     return (
-        f"has base days: {bool(table.is_base.any())}, months found: {len(months) > 0}, "
-        f"bsp days exist: {sum(bsp_days) > 0}, day counts positive: {all(n > 0 for n in n_days)}, "
-        f"code split equals the private file: {same}, a farm joins with data: {farm_joined}"
+        f"has base days: {has_base}, a farm joins with data: {farm_joined}, "
+        f"code split equals the private file without closure days: {without}, "
+        f"closure log loaded: {status == 'loaded'}, a closure day falls on a base day: {on_base}, "
+        f"code split equals the private file with closure days: {with_closure}"
     )
 
 

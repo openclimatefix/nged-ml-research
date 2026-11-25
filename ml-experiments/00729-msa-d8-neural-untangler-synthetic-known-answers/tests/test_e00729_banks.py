@@ -164,7 +164,7 @@ def test_a_gate_with_no_synthetic_fit_is_void_and_does_not_pass() -> None:
         assert gate["void"]
         assert not gate["pass"]
     ok = banks.bsp_gate(
-        real=real, real_ci=(-0.9, -0.6), synthetic=[banks.StepFit(-0.8, 0.015, 4.0)] * 3
+        real=real, real_ci=(-0.9, -0.6), synthetic=[banks.StepFit(-0.8, 0.015, 4.0)] * 5
     )
     assert not ok["void"]
 

@@ -353,12 +353,16 @@ def closure_days_from_sheets(
     return days
 
 
-def load_closure_days() -> tuple[frozenset[date], bool]:
-    """Load the switching logs and return D8's closure days, and whether the logs were readable.
+def load_closure_days() -> tuple[frozenset[date], str]:
+    """Load the switching logs and return D8's closure days and a status word.
+
+    Only the expected failures are caught: a missing workbook or module (`missing`), and a workbook
+    or metadata file that cannot be read as the code expects (`unreadable`). Any other error
+    propagates.
 
     Returns:
-        The days (empty when the workbook is missing or unreadable) and a flag that says whether
-        the workbook loaded with a usable sheet.
+        The days (empty unless the status is `loaded`) and the status: `loaded`, `missing`, or
+        `unreadable`.
     """
     try:
         import e00722_data as d722  # ty: ignore[unresolved-import]
@@ -370,9 +374,11 @@ def load_closure_days() -> tuple[frozenset[date], bool]:
             .item()
         )
         days = closure_days_from_sheets(sheets=sheets, substation_number=int(number))
-    except Exception:  # noqa: BLE001
-        return frozenset(), False
-    return frozenset(days), True
+    except OSError, ImportError:
+        return frozenset(), "missing"
+    except KeyError, ValueError, pl.exceptions.PolarsError:
+        return frozenset(), "unreadable"
+    return frozenset(days), "loaded"
 
 
 def atomic_write_text(*, path: Path, text: str) -> None:

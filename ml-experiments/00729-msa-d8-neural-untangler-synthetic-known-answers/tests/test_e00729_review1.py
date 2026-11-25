@@ -213,3 +213,122 @@ def test_the_cams_check_passes_a_different_farm_and_fails_a_farm_in_the_same_cel
     leak.assert_cams_differs(
         cal=dataclasses.replace(cal, d8_ghi=partly, farms=dataclasses.replace(cal.farms, ghi=ghi))
     )
+
+
+def test_a_gate_with_one_finite_fit_reads_void_and_the_record_shows_the_finite_count() -> None:
+    real_fit = banks.StepFit(-0.76, 0.015, 4.0, 100)
+    nan = banks.StepFit(float("nan"), float("nan"), float("nan"), 0)
+    one = banks.bsp_gate(
+        real=real_fit,
+        real_ci=(-0.9, -0.6),
+        synthetic=[banks.StepFit(-0.8, 0.015, 4.0, 100), nan, nan],
+    )
+    assert one["void"]
+    assert one["n_finite_fits"] == 1
+    assert not one["pass"]
+    few = [banks.StepFit(-0.8, 0.015, 4.0, 100)] * (core.GATE_MIN_SYNTHETIC_FITS - 1)
+    assert banks.bsp_gate(real=real_fit, real_ci=(-0.9, -0.6), synthetic=few)["void"]
+    enough = [
+        banks.StepFit(-0.8, 0.01 + 0.001 * k, 3.0 + 0.2 * k, 100)
+        for k in range(core.GATE_MIN_SYNTHETIC_FITS)
+    ]
+    ok = banks.bsp_gate(real=real_fit, real_ci=(-0.9, -0.6), synthetic=enough)
+    assert not ok["void"]
+    assert ok["n_finite_fits"] == core.GATE_MIN_SYNTHETIC_FITS
+
+
+def test_the_gate_compares_the_standard_error_at_equal_pair_counts() -> None:
+    synthetic = [banks.StepFit(-0.8, 0.02 + 0.001 * k, 4.0, 100) for k in range(10)]
+    # the same se * sqrt(n) as the synthetic fits, from a real stretch with four times the pairs
+    matched = banks.StepFit(-0.8, 0.025 / 2.0, 4.0, 400)
+    assert banks.bsp_gate(real=matched, real_ci=(-0.9, -0.6), synthetic=synthetic)["se_inside"]
+    raw = banks.StepFit(-0.8, 0.025, 4.0, 1)
+    assert not banks.bsp_gate(real=raw, real_ci=(-0.9, -0.6), synthetic=synthetic)["se_inside"]
+    assert not banks.bsp_gate(
+        real=banks.StepFit(-0.8, 0.025, 4.0, 400), real_ci=(-0.9, -0.6), synthetic=synthetic
+    )["se_inside"]
+
+
+def test_the_engine_only_segments_are_spread_over_the_months() -> None:
+    worlds = core.quota_world_types(rng=np.random.default_rng(0), n=64, none_share=0.15)
+    dealt = banks.deal_across_months(worlds=worlds, n_months=8)
+    assert sorted(dealt) == sorted(worlds)
+    for month in range(8):
+        chunk = dealt[month * 8 : (month + 1) * 8]
+        assert len(chunk) == 8
+        assert chunk.count("engine") in {2, 3}
+        assert chunk.count("none") in {1, 2}
+
+
+def make_root(tmp_path, *, margin_late: bool = False):  # noqa: ANN001
+    import os
+
+    (tmp_path / "scores").mkdir(parents=True, exist_ok=True)
+    for rel, t in (("selection.json", 100), ("scores/bstar.json", 110), ("margin.json", 120)):
+        (tmp_path / rel).write_text("{}")
+        os.utime(tmp_path / rel, ns=(t * 10**9, t * 10**9))
+    marker = tmp_path / "scores" / stages.TEST_MARKER
+    marker.write_text("")
+    os.utime(marker, ns=(150 * 10**9, 150 * 10**9))
+    if margin_late:
+        os.utime(tmp_path / "margin.json", ns=(200 * 10**9, 200 * 10**9))
+    return tmp_path
+
+
+def test_a_choice_rewritten_after_the_first_test_score_is_detected(tmp_path) -> None:  # noqa: ANN001
+    root = make_root(tmp_path)
+    events = stages.choice_events(root=root)
+    assert events[-1] == "test_score"
+    leak.assert_choices_before_test(events=events)
+    late = stages.choice_events(root=make_root(tmp_path, margin_late=True))
+    assert late.index("margin") > late.index("test_score")
+    with pytest.raises(leak.CorrectnessFailureError, match="margin"):
+        leak.assert_choices_before_test(events=late)
+
+
+def test_the_first_test_score_marker_is_created_once(tmp_path) -> None:  # noqa: ANN001
+    (tmp_path / "scores").mkdir()
+    for rel in ("selection.json", "scores/bstar.json", "margin.json"):
+        (tmp_path / rel).write_text("{}")
+    stages.choice_events(root=tmp_path)
+    marker = tmp_path / "scores" / stages.TEST_MARKER
+    first = marker.stat().st_mtime_ns
+    stages.choice_events(root=tmp_path)
+    assert marker.stat().st_mtime_ns == first
+
+
+def test_a_second_run_cannot_change_bstar(tmp_path) -> None:  # noqa: ANN001
+    path = tmp_path / "bstar.json"
+    stages.write_bstar_once(path=path, bstar="B1")
+    stages.write_bstar_once(path=path, bstar="B1")
+    with pytest.raises(leak.CorrectnessFailureError):
+        stages.write_bstar_once(path=path, bstar="B2")
+
+
+def test_the_closure_log_catches_only_the_expected_failures(monkeypatch) -> None:  # noqa: ANN001
+    import sys
+    import types
+
+    def fake_module(read):  # noqa: ANN001, ANN202
+        module = types.SimpleNamespace(SWITCHING_LOG_PATH="x", METADATA_PATH="y")
+        monkeypatch.setitem(sys.modules, "e00722_data", module)
+        monkeypatch.setattr(pl, "read_excel", read)
+
+    def missing(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
+        raise FileNotFoundError
+
+    fake_module(missing)
+    assert data.load_closure_days() == (frozenset(), "missing")
+
+    def unreadable(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
+        raise ValueError
+
+    fake_module(unreadable)
+    assert data.load_closure_days() == (frozenset(), "unreadable")
+
+    def unexpected(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
+        raise ZeroDivisionError
+
+    fake_module(unexpected)
+    with pytest.raises(ZeroDivisionError):
+        data.load_closure_days()
