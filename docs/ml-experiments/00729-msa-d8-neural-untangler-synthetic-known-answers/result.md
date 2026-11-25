@@ -177,6 +177,45 @@ interim.
 
 ## Result
 
+**Superseded first run.** The first run measured every reading on this page with the S2 solar worlds
+silent: the satellite-sky rule of `farm_set` never passed, so no day of source S2 held any solar
+output, and 24 of the 64 test-bank segments (37.5% of the test rows) were solar or engine-and-solar
+worlds with no solar output. The headline readings of that run were verdict row 3 and an H1 excess
+of +0.258 points, and both are superseded. Every other number on this page was measured on the same
+silent worlds and is superseded too, and the manager ruled that the whole chain is rerun from the
+banks, starting at gate attempt 1 with the registered simulator ranges. The superseded outputs move
+to `superseded_run_1` in the experiment's private data folder before the rerun, and no stage of the
+rerun reads them.
+
+**The code changed after the first run, and the table gives each file's git blob before and after.**
+The commit before the changes is `c9d963946`. The changes are these: the satellite sky of a farm-day
+now counts when 40 of 48 (83%) of its sun-up half-hours are finite, instead of 40 half-hours of the
+whole day; the five simulator ranges that the first run re-tuned are back at their registered values
+(solar capacity 5 to 150 points); every stage refuses to run unless the data folder carries a run
+marker that matches the code, and the gate refuses a third attempt. The tests and the real-file
+smoke test gained checks of the real `farm_set`, of an S2 draw on clear days, and of the guard.
+
+| File | Blob before | Blob after |
+|---|---|---|
+| `e00729_cli.py` | edf396f8e0 | 7f4dd1e69c |
+| `e00729_core.py` | 18c72b6967 | a1b3ef7d71 |
+| `e00729_data.py` | 9b1006eca3 | 4f835d466e |
+| `e00729_sim.py` | 34aae11579 | 81e1263b3c |
+| `e00729_stages.py` | 9245f09b57 | b4db685dbf |
+| `smoke_real_files.py` | 828d71b22a | ab8cc661ab |
+| `synthetic_world.py` | 0ad4b2de69 | de09a505a5 |
+| `test_e00729_core.py` | 25e335e00a | 254ae0021d |
+| `test_e00729_farm_set.py` | new | 00bae6565b |
+| `test_e00729_run_guard.py` | new | 8eb655f929 |
+| `test_e00729_sim.py` | 1f2ed1895d | 54af40f44d |
+
+**These sections hold numbers from the superseded run and are rewritten after the rerun.** They are
+"Result" and its subsections, "Time series of the estimates" (figures S1 to S12), "The event generator
+against real data" (the ranges in the caption of figure E1, and the findings under figures E3 and E4),
+"The solar and engine heads against the true series", "Checks", the realism gate and timing records
+under "The realism gate before any fit" and "Compute and gates", the figures 1 to 9, and the front
+matter (verdict and status). The registered plan sections keep their text.
+
 **The verdict is `not supported`, and verdict row 3 sets it: the harm check on import half-hours
 (H1) fails while the real-day check (H2) passes.** On the synthetic test half-hours where D8 imports
 power, arm D scores a signed continuous ranked probability score (CRPS) of 0.376 points and the
@@ -698,9 +737,10 @@ with the hour of day in UTC. Ranges drawn from: 1 to 4 units of 10 to 50 points 
 points in all); evening, morning, and midday run starts and lengths; ramps of 0 to 4 half-hours;
 weekend factor 0.1 to 0.8. The full ranges are in the figure subtitle.*
 
-**Figure E2, the simulated solar days, is not published.** The stage found no simulated day of
-source S2 (the PV model driven by CAMS) with solar output in the stored test bank, so the figure
-has nothing to show. Source S1 is the metered farms' output, and its days stay private.
+**Figure E2, the simulated solar days, is not published.** In the first run's stored test bank, the
+stage found no simulated day of source S2 (the PV model driven by CAMS) with solar output, so the
+figure had nothing to show. The rerun is expected to fill it. Source S1 is the metered farms'
+output, and its days stay private.
 
 **Three of the four bar charts are left out because too few real events lie behind them.** The
 run-length chart, the starts-per-week chart, and the daily-energy chart each fell under the floor of
@@ -773,8 +813,9 @@ its 10th to 90th percentile in bins of true output, and keep only bins of at lea
 with solar output.** In the first training bank, 194 segments of the solar and both worlds use
 source S2, and none of them holds any solar output. The same holds for the 8 such segments of the
 validation bank and the 24 such segments of the test bank. Every base day of those segments carries
-the flag that the day took no data. The solar head is therefore scored on days of source S1 only, in
-effect, until the cause is found.
+the flag that the day took no data. The solar head was therefore scored on days of source S1 only,
+in effect. The cause was the satellite-sky rule of `farm_set`, which is fixed for the rerun (see
+"Superseded first run").
 
 ## Checks
 
