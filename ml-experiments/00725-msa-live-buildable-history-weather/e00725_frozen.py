@@ -203,8 +203,9 @@ def limit_gpu_memory(*, device: str) -> None:
     import torch  # ty: ignore[unresolved-import]
 
     if device.startswith("cuda"):
-        total = torch.cuda.get_device_properties(device).total_memory
-        torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_BUDGET_BYTES / total), device)
+        index = torch.device(device).index or 0
+        total = torch.cuda.get_device_properties(index).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, GPU_BUDGET_BYTES / total), index)
 
 
 def nvidia_smi_process_mb() -> int | None:

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import e00725_checks as ck
+import e00725_frozen as fz
 import e00725_rule as rule
 import e00725_sources as src
 import e00725_weather_lookahead as wl
@@ -135,3 +136,33 @@ def test_run_sh_exports_the_environment(tmp_path: Path) -> None:
     assert env["NGED_S3_BUCKET_URL"] == "https://example.com"
     assert env["OMP_NUM_THREADS"] == env["MKL_NUM_THREADS"] == env["OPENBLAS_NUM_THREADS"] == "1"
     assert env["POLARS_MAX_THREADS"] == env["RAYON_NUM_THREADS"] == "1"
+
+
+@pytest.mark.parametrize("device", ["cuda", "cuda:1"])
+def test_limit_gpu_memory_passes_an_indexed_device(
+    monkeypatch: pytest.MonkeyPatch, device: str
+) -> None:
+    """`set_per_process_memory_fraction` rejects the bare string `cuda`, so the cap must pass a device index."""
+    torch = pytest.importorskip("torch")
+    calls: list[tuple[str, object]] = []
+
+    class Props:
+        total_memory = 24 * 1024**3
+
+    def properties(index: object) -> Props:
+        calls.append(("properties", index))
+        return Props()
+
+    def fraction(value: float, index: object) -> None:
+        calls.append(("fraction", index))
+        assert isinstance(index, int)
+        assert value == pytest.approx(0.25)
+
+    monkeypatch.setattr(torch.cuda, "get_device_properties", properties)
+    monkeypatch.setattr(torch.cuda, "set_per_process_memory_fraction", fraction)
+    fz.limit_gpu_memory(device=device)
+    expected = 1 if device == "cuda:1" else 0
+    assert calls == [("properties", expected), ("fraction", expected)]
+    calls.clear()
+    fz.limit_gpu_memory(device="cpu")
+    assert calls == []
