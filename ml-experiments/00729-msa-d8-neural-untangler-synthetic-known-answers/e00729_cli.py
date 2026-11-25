@@ -4,7 +4,8 @@
     SLOT_CPU=<n> run.sh --go e00729_cli.py <stage> [options]
 
 Stages, in the order of the plan: `banks`, `gate`, `timing`, `screen`, `choose`, `ladder`,
-`margin`, `score`, `report`, `figures`, `series`, `events`. `fit` runs one named fit. Every stage prints counts and scores only.
+`margin`, `score`, `report`, `figures`, `series`, `events`. `fit` runs one named fit.
+Every stage prints counts and scores only.
 """
 
 import argparse

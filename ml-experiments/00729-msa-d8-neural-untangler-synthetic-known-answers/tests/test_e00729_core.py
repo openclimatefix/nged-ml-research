@@ -1,5 +1,5 @@
 # ruff: noqa: E501, SIM300
-"""Known-answer tests of the constants, the split rule, the world mix, the margin file, and the verdict table."""
+"""Known-answer tests of the constants, split rule, world mix, margin file, and verdict table."""
 
 import json
 from datetime import date

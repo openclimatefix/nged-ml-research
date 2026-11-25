@@ -89,9 +89,9 @@ def decode(*, raw: np.ndarray, spec: arms.ArmSpec, reading: np.ndarray) -> dict[
         reading: The folded reading in points, `(N, 48)` (the sign head places its lobes with it).
 
     Returns:
-        For a two-lobe head or a sign head `p`, `mu_i`, `s_i`, `mu_r`, `s_r` and, with an auxiliary head, `aux_mu`
-        and `aux_s`; for a quantile head `q` with the levels on the last axis. All `(N, 48)` or
-        `(N, 48, 11)`.
+        For a two-lobe head or a sign head `p`, `mu_i`, `s_i`, `mu_r`, `s_r` and, with an
+        auxiliary head, `aux_mu` and `aux_s`; for a quantile head `q` with the levels on the last
+        axis. All `(N, 48)` or `(N, 48, 11)`.
     """
     t = torch.from_numpy(raw.astype(np.float32))
     if spec.head == "quantile":

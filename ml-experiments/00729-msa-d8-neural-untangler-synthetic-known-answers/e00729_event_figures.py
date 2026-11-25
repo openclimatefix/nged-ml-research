@@ -15,7 +15,8 @@ days beside simulated days with dates and megawatt-scale axes, for the maintaine
 
 The script reads the stored test bank (for the solar days) and the engine record (read-only). It
 fits nothing. The simulated engine series are fresh draws of `sim.draw_engine` with fixed seeds on
-an invented calendar of 30 days starting on a Monday, with weekend days as the quiet days.
+30 invented days that start on a Monday spread over the year, with the UK clock offset of each day
+and Saturday and Sunday as the quiet days.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -36,15 +37,22 @@ N_DRAWS: Final = 400
 N_DAYS_PER_DRAW: Final = 30
 INVENTED_MONDAY: Final = np.datetime64("2030-01-07", "D")
 RUN_SHARE: Final = 0.15
-"""A half-hour is running when the output is at least this share of the engine's own 99th percentile of running output."""
+"""A half-hour is running when the output is at least this share of the engine's own reference output."""
+FLOOR_SHARE: Final = 0.10
+"""Running output is positive output of at least this share of the 99.9th percentile of positive output.
+
+The reference output is the 99th percentile of running output, so idle noise cannot set it."""
+SHARE_STEP: Final = 0.05
+"""Every published real and simulated share is rounded to a multiple of this step, so that the
+record's length and the count in each bin cannot be solved from the bars."""
 STEP_SHARE: Final = 0.05
 """A half-hour step counts as a ramp when it changes the output by at least this share of the same reference."""
 MIN_REAL_EVENTS: Final = 5
 """A bin with fewer real events than this is merged into a neighbouring bin."""
 RUN_LENGTH_LOWER_H: Final = (0.0, 1.0, 2.0, 4.0, 8.0, 24.0)
-RAMP_LOWER: Final = (0.05, 0.15, 0.3, 0.6)
+RAMP_LOWER: Final = (0.05, 0.15, 0.3)
 STARTS_LOWER: Final = (0, 1, 2, 3, 5, 8)
-ENERGY_LOWER: Final = (0.0, 0.005, 0.05, 0.15, 0.3, 0.5)
+ENERGY_LOWER: Final = (-np.inf, 0.005, 0.05, 0.15, 0.3, 0.5)
 """Lower edges of the bins of run length (hours), ramp size (share), starts per week, and daily energy (share of the reference output for 24 hours)."""
 PANEL_WIDTH_PX: Final = 285
 PANEL_HEIGHT_PX: Final = 80
@@ -88,6 +96,28 @@ class EventStats:
         n = self.n_days[kind]
         return self.run_half_hours[kind] / (2.0 * n) if n else np.full(24, np.nan)
 
+    def published_probability(self, *, kind: str, blank_sparse: bool) -> np.ndarray:
+        """Return the run probability rounded to `SHARE_STEP`.
+
+        Args:
+            kind: "weekday" or "weekend".
+            blank_sparse: Set to NaN each hour whose running half-hours number between 1 and
+                `MIN_REAL_EVENTS - 1` (true for the real record only).
+
+        Returns:
+            The 24 rounded probabilities.
+        """
+        prob = quantise(values=self.run_probability(kind=kind))
+        if blank_sparse:
+            count = self.run_half_hours[kind]
+            prob = np.where((count > 0) & (count < MIN_REAL_EVENTS), np.nan, prob)
+        return prob
+
+
+def quantise(*, values: np.ndarray, step: float = SHARE_STEP) -> np.ndarray:
+    """Round shares to the nearest multiple of `step` (NaN stays NaN)."""
+    return np.round(values / step) * step
+
 
 def weekday_of(*, days: np.ndarray) -> np.ndarray:
     """Return the weekday (0 Monday to 6 Sunday) of days given as `datetime64[D]`."""
@@ -95,9 +125,16 @@ def weekday_of(*, days: np.ndarray) -> np.ndarray:
 
 
 def reference_level(*, series: np.ndarray) -> float | None:
-    """Return the 99th percentile of the positive output, or None when the series has none."""
+    """Return the 99th percentile of running output, or None when the series never runs.
+
+    Running output is positive output of at least `FLOOR_SHARE` of the 99.9th percentile of positive
+    output, so small positive readings while idle cannot set the reference.
+    """
     positive = series[np.isfinite(series) & (series > 0)]
-    return float(np.percentile(positive, 99)) if positive.size else None
+    if not positive.size:
+        return None
+    running = positive[positive >= FLOOR_SHARE * np.percentile(positive, 99.9)]
+    return float(np.percentile(running, 99))
 
 
 def complete_stretches(*, days: np.ndarray) -> list[tuple[int, int]]:
@@ -124,7 +161,7 @@ def run_edges(*, running: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 def event_stats(
     *, days: np.ndarray, dates: np.ndarray, reference: float | None = None
-) -> EventStats | None:
+) -> EventStats:
     """Return the statistics of one engine's `(n_days, 48)` output.
 
     Args:
@@ -133,12 +170,11 @@ def event_stats(
         reference: The reference output; the 99th percentile of positive output when None.
 
     Returns:
-        The statistics, or None when the engine never runs.
+        The statistics. An engine that never runs counts its days with no run, no start, no step,
+        and zero energy.
     """
     ref = reference if reference is not None else reference_level(series=days.ravel())
-    if ref is None or ref <= 0:
-        return None
-    share = days / ref
+    share = days / ref if ref is not None and ref > 0 else np.where(np.isfinite(days), 0.0, np.nan)
     kinds = {"weekday": weekday_of(days=dates) < 5, "weekend": weekday_of(days=dates) >= 5}
     run_hh = {k: np.zeros(24) for k in kinds}
     n_days = dict.fromkeys(kinds, 0)
@@ -185,7 +221,11 @@ def pool_stats(*, stats: Sequence[EventStats]) -> EventStats:
 
 
 def bin_counts(*, values: np.ndarray, lower: Sequence[float]) -> np.ndarray:
-    """Count the values in the bins that start at `lower` (the last bin is open); lower values are dropped."""
+    """Count the values in the bins that start at `lower`.
+
+    The last bin is open above. The first bin is open below when its edge is minus infinity, and
+    otherwise a value under the first edge is dropped.
+    """
     idx = np.searchsorted(np.asarray(lower, dtype=float), values, side="right") - 1
     idx = idx[idx >= 0]
     return np.bincount(idx, minlength=len(lower)).astype(float)
@@ -232,14 +272,16 @@ def grouped_shares(
         lower: The lower edges of the bins.
 
     Returns:
-        The groups, the real shares, and the simulated shares (each set sums to 1; NaN when empty).
+        The groups, the real shares, and the simulated shares, each rounded to `SHARE_STEP`.
     """
     rc = bin_counts(values=real, lower=lower)
     sc = bin_counts(values=sim_values, lower=lower)
     groups = merge_sparse_bins(real_counts=rc)
     rs = np.array([rc[a:b].sum() for a, b in groups])
     ss = np.array([sc[a:b].sum() for a, b in groups])
-    return groups, rs / rs.sum() if rs.sum() else rs, ss / ss.sum() if ss.sum() else ss
+    rs = quantise(values=rs / rs.sum()) if rs.sum() else rs
+    ss = quantise(values=ss / ss.sum()) if ss.sum() else ss
+    return groups, rs, ss
 
 
 def group_labels(
@@ -252,27 +294,58 @@ def group_labels(
 
     out = []
     for a, b in groups:
-        lo = fmt(lower[a])
         if b >= len(lower):
-            out.append(f"{lo}+{unit}" if a else f"all{unit}")
+            out.append(f"{fmt(lower[a])}+{unit}" if a else f"all{unit}")
+        elif np.isneginf(lower[a]):
+            out.append(f"under {fmt(lower[b])}{unit}")
         else:
-            out.append(f"{lo} to {fmt(lower[b])}{unit}")
+            out.append(f"{fmt(lower[a])} to {fmt(lower[b])}{unit}")
     return out
 
 
 # --------------------------------------------------------------------------- simulated engines
 
 
+def draw_dates(*, i: int) -> np.ndarray:
+    """Return the 30 invented days of draw `i`, starting on a Monday and spread over the year."""
+    return (
+        INVENTED_MONDAY
+        + np.timedelta64(7, "D") * (i % 52)
+        + np.arange(N_DAYS_PER_DRAW) * np.timedelta64(1, "D")
+    )
+
+
+def uk_utc_offset(*, dates: np.ndarray) -> np.ndarray:
+    """Return local minus UTC in hours: 1 from the last Sunday of March to the last Sunday of October."""
+    out = np.zeros(len(dates))
+    for k, d in enumerate(dates):
+        year = int(str(d)[:4])
+        last = {}
+        for month in (3, 10):
+            day = np.datetime64(f"{year}-{month:02d}-31", "D")
+            last[month] = day - np.timedelta64(
+                int(weekday_of(days=np.array([day]))[0] + 1) % 7, "D"
+            )
+        out[k] = 1.0 if last[3] <= d < last[10] else 0.0
+    return out
+
+
 def draw_engines(*, n: int = N_DRAWS) -> list[tuple[np.ndarray, dict[str, float]]]:
-    """Draw `n` simulated engines (30 days each) with fixed seeds; return each output and its parameters."""
-    dates = INVENTED_MONDAY + np.arange(N_DAYS_PER_DRAW)
-    quiet = weekday_of(days=dates) >= 5
+    """Draw `n` simulated engines (30 days each) with fixed seeds; return each output and its parameters.
+
+    Draw `i` starts `i % 52` weeks after `INVENTED_MONDAY`, uses the UK clock offset of each day, and
+    takes Saturday and Sunday as the quiet days.
+    """
     out = []
     for i in range(n):
+        dates = draw_dates(i=i)
         rng = np.random.default_rng(np.random.SeedSequence([EVENTS_SEED, i]))
         params: dict[str, float] = {}
         engine = sim.draw_engine(
-            rng=rng, utc_offset=np.zeros(N_DAYS_PER_DRAW), quiet_day=quiet, record=params
+            rng=rng,
+            utc_offset=uk_utc_offset(dates=dates),
+            quiet_day=weekday_of(days=dates) >= 5,
+            record=params,
         )
         out.append((engine, params))
     return out
@@ -280,9 +353,9 @@ def draw_engines(*, n: int = N_DRAWS) -> list[tuple[np.ndarray, dict[str, float]
 
 def simulated_stats(*, draws: Sequence[tuple[np.ndarray, dict[str, float]]]) -> EventStats:
     """Return the pooled statistics of the simulated engines, each normalised by its own reference."""
-    dates = INVENTED_MONDAY + np.arange(N_DAYS_PER_DRAW)
-    parts = [s for e, _ in draws if (s := event_stats(days=e, dates=dates)) is not None]
-    return pool_stats(stats=parts)
+    return pool_stats(
+        stats=[event_stats(days=e, dates=draw_dates(i=i)) for i, (e, _) in enumerate(draws)]
+    )
 
 
 def real_days(*, record: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
@@ -368,8 +441,7 @@ def pick_cases(*, draws: Sequence[tuple[np.ndarray, dict[str, float]]]) -> list[
 
     A kind with no window is left out. The rule draws no random number.
     """
-    dates = INVENTED_MONDAY + np.arange(N_DAYS_PER_DRAW)
-    quiet = weekday_of(days=dates) >= 5
+    quiet_of = [weekday_of(days=draw_dates(i=i)) >= 5 for i in range(len(draws))]
     out: list[GalleryCase] = []
     used: set[int] = set()
     for label, predicate in CASES:
@@ -379,7 +451,7 @@ def pick_cases(*, draws: Sequence[tuple[np.ndarray, dict[str, float]]]) -> list[
                 if i in used and not allow_used:
                     continue
                 for d in range(N_DAYS_PER_DRAW - 2):
-                    if predicate(engine[d : d + 3], params, bool(quiet[d])):
+                    if predicate(engine[d : d + 3], params, bool(quiet_of[i][d])):
                         found = GalleryCase(label, i, d, params)
                         break
                 if found:
@@ -574,6 +646,12 @@ def wrap_text(text: str, *, width: int) -> list[str]:
     return textwrap.wrap(text, width=width)
 
 
+def hour_values(*, probability: np.ndarray) -> list[float | None]:
+    """Return the 24 hourly values plus a closing value at hour 24, with None for a blank hour."""
+    values = [None if np.isnan(v) else float(v) for v in probability]
+    return [*values, values[-1]]
+
+
 def hour_chart(*, real: EventStats, sim_stats: EventStats) -> alt.VConcatChart:
     """Return the run probability by UTC hour, weekday above weekend, real record against simulated draws."""
     panels = []
@@ -582,9 +660,13 @@ def hour_chart(*, real: EventStats, sim_stats: EventStats) -> alt.VConcatChart:
             [
                 pl.DataFrame(
                     {
-                        "hour": np.arange(24) + 0.5,
+                        "hour": np.arange(25, dtype=float),
                         "source": name,
-                        "share": s.run_probability(kind=kind),
+                        "share": hour_values(
+                            probability=s.published_probability(
+                                kind=kind, blank_sparse=name == "Real record"
+                            )
+                        ),
                     }
                 )
                 for name, s in (("Real record", real), ("Simulated draws", sim_stats))
@@ -592,7 +674,7 @@ def hour_chart(*, real: EventStats, sim_stats: EventStats) -> alt.VConcatChart:
         )
         panels.append(
             alt.Chart(frame)
-            .mark_line(aria=False, strokeWidth=2, interpolate="step-after")
+            .mark_line(aria=False, strokeWidth=2, interpolate="step-after", invalid=None)
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "hour:Q",
@@ -619,7 +701,7 @@ def hour_chart(*, real: EventStats, sim_stats: EventStats) -> alt.VConcatChart:
         title=alt.TitleParams(
             "How often the engine is running, by hour of day",
             subtitle=wrap_text(
-                f"Running means output of at least {RUN_SHARE:.0%} of the engine's own 99th percentile of running output. Saturday and Sunday are the weekend; the simulated draws take bank holidays as weekdays.",
+                f"Running means output of at least {RUN_SHARE:.0%} of the engine's own reference output, the 99th percentile of its running output. Shares are rounded to {SHARE_STEP:.0%}, and a real hour with fewer than {MIN_REAL_EVENTS} running half-hours is left blank. Saturday and Sunday are the weekend; the simulated draws take bank holidays as weekdays and use the UK clock offset.",
                 width=95,
             ),
             anchor="start",
@@ -661,7 +743,11 @@ def share_chart(
         .properties(
             width=figures.WIDTH_PX - 100,
             height=150,
-            title=alt.TitleParams(title, subtitle=wrap_text(subtitle, width=95), anchor="start"),
+            title=alt.TitleParams(
+                title,
+                subtitle=wrap_text(f"{subtitle} Shares are rounded to {SHARE_STEP:.0%}.", width=95),
+                anchor="start",
+            ),
         )
     )
 
@@ -724,7 +810,7 @@ def distributions(*, real: EventStats, sim_stats: EventStats) -> list[Distributi
             "",
             real.daily_energy,
             sim_stats.daily_energy,
-            "Complete days. A day of no run holds under half a percent.",
+            "Complete days. The lowest bin holds the days with no run, including days of net import.",
         ),
     ]
 
@@ -749,7 +835,10 @@ def aggregate_charts(*, real: EventStats, sim_stats: EventStats) -> dict[str, al
 
 
 def real_windows(*, days: np.ndarray, dates: np.ndarray, n: int) -> list[tuple[str, np.ndarray]]:
-    """Return `n` three-day windows of the real record, evenly spaced over the windows of complete days (private only)."""
+    """Return `n` three-day windows of the real record, evenly spaced over the complete ones.
+
+    The windows are private: they go only to `PRIVATE/event_generator`.
+    """
     full = np.isfinite(days).all(axis=1)
     starts = [i for i in range(len(days) - 2) if full[i : i + 3].all()]
     if not starts:
@@ -788,8 +877,7 @@ def write_event_figures(
         )
     real_grid, real_dates = real_days(record=record)
     real = event_stats(days=real_grid, dates=real_dates)
-    if real is not None:
-        published.update(aggregate_charts(real=real, sim_stats=simulated_stats(draws=draws)))
+    published.update(aggregate_charts(real=real, sim_stats=simulated_stats(draws=draws)))
     written = []
     for name, chart in published.items():
         figures.save_svg(chart=chart, path=out_dir / name)

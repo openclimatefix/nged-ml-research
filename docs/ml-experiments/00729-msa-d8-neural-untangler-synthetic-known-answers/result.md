@@ -657,24 +657,34 @@ engine record.** The script `e00729_event_figures.py` (stage `events`) draws 400
 simulator, each of 30 invented days that start on a Monday with Saturday and Sunday as the quiet
 days, with fixed seeds and no network output. The figures cover the simulated engine, simulated
 solar output, and five aggregates of the simulated draws laid over the same aggregates of the real
-engine record. The stage reads the real engine record and changes no file that it reads.
+engine record. The stage reads the real engine record and changes no file that it reads. Each draw
+starts on a Monday, with the 400 starts spread over the 52 weeks of a year, takes the UK clock offset
+of each day, and has Saturday and Sunday as its quiet days, so the simulated hour-of-day curves are
+shifted by an hour in summer as the real engine's clock may be.
 
 **The real engine series stay private.** The metered engine and the metered solar farms are NGED
 generators, so no published figure shows a real series, a real size, a real date, or a real count.
-The five aggregates are shares. Each divides the output by the series' own 99th percentile of
-positive output, so no absolute size can be recovered. Each uses coarse bins, and a bin with fewer
-than 5 real events is merged with its neighbour, so no bin shows a single real run. The same
-normalisation, bins, and merges apply to the simulated draws. The solar figure shows only source S2,
+The five aggregates are shares. Each divides the output by the series' own reference output, so no
+absolute size can be recovered. Each share is rounded to the nearest 5%, for the real record and the
+simulated draws alike, so the bar heights do not reveal the record's length or the count in a bin.
+The four bar charts use coarse bins, and a bin with fewer than 5 real events is merged with its
+neighbour, so no bin shows a single real run. The hour-of-day chart cannot merge hours, so it leaves
+blank each real hour with 1 to 4 running half-hours. The same normalisation and rounding apply to the
+simulated draws, and the simulated bins follow the real merges. The solar figure shows only source S2,
 the PV model driven by CAMS, because source S1 is the metered farms' output. Real engine days beside
 simulated days, and the S1 days, are written to a private folder and are not published.
 
-**Definitions of the five aggregates.** A half-hour is running when the output is at least 15% of the
-reference output. A run is a stretch of running half-hours, and its length counts only where the run
-starts and ends inside a stretch of complete days. A ramp is a change of at least 5% of the
-reference output between two neighbouring half-hours. A start is the first half-hour of a run, and
-the starts are counted in blocks of 7 complete consecutive days. The daily energy is the day's
-output summed, as a share of the reference output for 24 hours. Weekdays and weekends come from the
-calendar, and the simulated draws treat bank holidays as weekdays.
+**Definitions of the five aggregates.** The reference output is the 99th percentile of running
+output, and running output is positive output of at least 10% of the 99.9th percentile of positive
+output, so small positive readings while idle cannot set the reference. A half-hour is running when
+the output is at least 15% of the reference output. A run is a stretch of running half-hours, and
+its length counts only where the run starts and ends inside a stretch of complete days. A ramp is a
+change of at least 5% of the reference output between two neighbouring half-hours, and the top ramp
+bin is 30% and above. A start is the first half-hour of a run, and the starts are counted in blocks
+of 7 complete consecutive days. The daily energy is the day's output summed, as a share of the
+reference output for 24 hours; the lowest bin holds every day under 0.5%, including days of net
+import. An engine that never runs counts its days with no run, no start, and zero energy. Weekdays
+and weekends come from the calendar, and the simulated draws treat bank holidays as weekdays.
 
 **Figures E1 and E2 show simulated days only.** Figure E1 shows twelve kinds of simulated engine day
 from the randomised simulator, each picked by a fixed rule from the first draw that fits and
