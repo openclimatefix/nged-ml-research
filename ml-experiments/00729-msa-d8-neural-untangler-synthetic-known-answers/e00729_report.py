@@ -9,10 +9,14 @@ read.
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Final
 
 import e00729_core as core
 import e00729_figures as figures
 import e00729_paths as paths
+
+HEADLINE_READINGS: Final = ("all", "bsp_all")
+"""The reading of a contrast that figure 5 plots, first match: every row, or the BSP test months."""
 
 
 def fmt(*, value: float, digits: int = 3) -> str:
@@ -127,6 +131,35 @@ def render_report(
     return "\n".join(out) + "\n"
 
 
+def contrast_points(
+    *, contrasts: Mapping[str, Mapping[str, Mapping[str, float]]]
+) -> dict[str, tuple[float, float, float]]:
+    """Return each contrast's headline reading as (point, lower, upper) for figure 5.
+
+    A contrast reads its "all" reading, or its "bsp_all" reading when it is a BSP contrast (named
+    "(BSP months)"). A report-only contrast is named so, and a void reading is left out.
+
+    Args:
+        contrasts: The `contrasts` record of `verdict.json`.
+
+    Returns:
+        The label of each contrast with a numeric reading, and its reading.
+    """
+    out: dict[str, tuple[float, float, float]] = {}
+    for name, readings in contrasts.items():
+        key = next((k for k in HEADLINE_READINGS if k in readings), None)
+        if key is None or readings[key].get("void"):
+            continue
+        label = name
+        if key == "bsp_all":
+            label += " (BSP months)"
+        if name in core.REPORT_ONLY_CONTRASTS:
+            label += " (report only)"
+        r = readings[key]
+        out[label] = (r["point"], r["lower"], r["upper"])
+    return out
+
+
 def era_hour_scores(*, r3: Mapping) -> dict[str, dict[str, float]]:
     """Return figure 8's series: per era, the P(X<0) share and the below-1.0-MVA share by UTC hour."""
     out: dict[str, dict[str, float]] = {}
@@ -159,16 +192,7 @@ def write_figures(
             x_title="Signed CRPS (points of D8's capacity)",
         ),
         "figure_5_contrasts.svg": figures.contrast_chart(
-            readings={
-                f"{n} (report only)" if n in core.REPORT_ONLY_CONTRASTS else n: (
-                    r["all"]["point"],
-                    r["all"]["lower"],
-                    r["all"]["upper"],
-                )
-                for n, r in verdict["contrasts"].items()
-                if not r["all"].get("void")
-            },
-            margin=verdict["margin"],
+            readings=contrast_points(contrasts=verdict["contrasts"]), margin=verdict["margin"]
         ),
         "figure_7_reliability.svg": figures.reliability_chart(
             mean_forecast=verdict["calibration"]["mean_forecast"],
