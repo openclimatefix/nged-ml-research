@@ -134,8 +134,8 @@ experiment's own branch, and do not open a pull request for it. Its front matter
 number, or `none`). `kind` is `change` (the experiment asks whether a research default plus x
 beats the research default) or `other`, and it is required from id 320 up. `promoted_to` is always
 optional, needs `kind: change`, and names the version of the research default that the
-experiment created, such as "Primary demand research default 2". Every result has the same front matter, so a later session
-finds results with `grep` over `docs/ml-experiments/*/result.md`.
+experiment created, such as "Primary demand research default 2". Every result has the same front
+matter, so a later session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 **`theme` names exactly one theme folder under `docs/ml-experiments/themes/`, and `also_relevant_to`
 lists the other themes the result bears on (an empty list if none).** The experiment appears in the
@@ -659,8 +659,9 @@ reports its head sha. The manager marks the pull request ready and merges it. If
 classifier denies `gh pr ready`, treat the denial as a permission denial: report it to the
 maintainer and do not work around it. Without a manager, wait for the `ci` check to pass
 before you merge. Every later push to a ready pull request runs CI again, so batch the fixes into
-one commit. If `ci` shows "skipping" after the ready-for-review click, the draft-time run has cancelled the ready-time run through the concurrency group, and a skipped
-check does not block the merge. Push one more commit, and merge only after a real green run on
+one commit. If `ci` shows "skipping" after the ready-for-review click, the draft-time run has
+cancelled the ready-time run through the concurrency group, and a skipped check does not block the
+merge. Push one more commit, and merge only after a real green run on
 the final head.
 
 **Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its

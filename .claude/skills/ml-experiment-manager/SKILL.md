@@ -42,8 +42,8 @@ slot.
 
 **Split the machine into named slots, each a share of cores and GPU memory, and keep a ledger.**
 Size the slots from the machine's own core count and GPU memory, and keep 2 cores for the system.
-Check `uptime` before starting a large fit, because slots rarely run flat out together. A ledger row holds the
-slot, the holder's session id, the GPU share, the cores, and the start date.
+Check `uptime` before starting a large fit, because slots rarely run flat out together. A ledger row
+holds the slot, the holder's session id, the GPU share, the cores, and the start date.
 
 - **Tell every session to run independent work in parallel inside its slot.** The `ml-experiment`
   skill's "Use the compute the slot gives you" section says how. A session that fits many small
