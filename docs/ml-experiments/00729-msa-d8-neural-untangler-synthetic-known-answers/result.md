@@ -655,7 +655,7 @@ solar-only worlds, 0.091 in engine-and-solar worlds). The limit is then 0.125 / 
 On the real held-out base days every half-hour is import, so s = 0 and the limit is 0.125 points.
 One limit serves both checks, rounded down to 0.12 points.
 
-**The limit is fixed before any fit and before any score, and it does not depend on the simulation.**
+**The limit is fixed before any fit and before any score, and it does not depend on the simulation. The figures in this derivation (s = 0.051, the limit of 0.132, and the rounded 0.12) are unreviewed until the Opus code review of the experiment's code passes (see "Reviews and pre-run gates").**
 The training mix is randomised, and the limit is derived on the fixed test mix, which scores the
 harm checks. The one data input is D8's base readings, which the calculation script read to estimate
 s, and no score exists. The simulation is approximate: solar output is a clear-sky shape times a
@@ -729,6 +729,10 @@ synthetic-array tests do not exercise (D8's reading, the BSP meter, the frame of
 ERA5 temperature, the bank holidays, and the metered engine record), then a "fits starting" line to
 the manager with the projection and the cores before each family of fits. Every fitted neural network
 is saved in the experiment's data folder.
+
+## Reviews and pre-run gates
+
+**Disclosed breach of the first-run rule: the planner ran `e00729_plan_calcs.py` before any Opus code review, and every number it produced is unreviewed.** The script applies the split rule to D8's private base calendar and writes the month lists to the private `PRIVATE/splits.md`. It then simulates 3,000 synthetic segments on D8's pre-engine readings. From the simulation it prints the reverse-flow share (all half-hours, outside the 2-point dead band, and by world type), the dead-band share, P0's median error on import half-hours, P0f's CRPS on import half-hours, and the lobe coverage of the floor alone. The script also counts the share of base days on which at least 1 and at least 3 metered farms have data, and prints the identical share and the median gap between the CAMS series at each farm and at D8. Last, it prints the arithmetic of the bootstrap widening, the seed floor, the GPU projection, and the harm limit. It reads the private engine-connection date to apply the cut but prints no engine size, date, series identifier, or per-day real value, and it prints split counts and shares only. The harm limit of 0.12 points, the simulated import share, the cell-gap range of 4.5% to 11%, and every other number it produced stay unreviewed until the Opus code review of the experiment's code passes. No further script runs before its review.
 
 ## Standing practices and earlier advice
 
