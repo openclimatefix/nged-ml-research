@@ -34,6 +34,10 @@ ARM_COLOURS: Final = {
 """Colours of the arms that carry the main story; every other arm takes grey."""
 
 
+LEGEND_LABEL_LIMIT_PX: Final = 260
+"""Legend labels are cut at this width in pixels; the longest era label is about 160 px."""
+
+
 def save_svg(*, chart: alt.TopLevelMixin, path: Path) -> None:
     """Write a chart as SVG (run `svgo` on the file before committing it)."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,7 +91,7 @@ def dot_chart(
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(domain=arms, range=colours),
-                legend=alt.Legend(orient="top"),
+                legend=alt.Legend(orient="top", labelLimit=LEGEND_LABEL_LIMIT_PX, columns=3),
             ),
         )
     )

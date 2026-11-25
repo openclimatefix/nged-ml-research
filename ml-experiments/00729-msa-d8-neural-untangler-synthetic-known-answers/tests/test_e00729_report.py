@@ -130,3 +130,15 @@ def test_render_report_runs_on_the_same_fixture(void_c13: bool) -> None:
     assert "C4 |" in text
     assert ("| C13 (report only) | all | void |" in text) is void_c13
     assert "| D | reading | MVA_0_to_0.3 | 10 |" in text
+
+
+def test_dot_chart_legend_labels_are_not_clipped() -> None:
+    """The era figure's legend once showed "reading below 1.0 M…", so the label limit must fit."""
+    import e00729_figures as figures
+
+    arms = ["fade: P(X<0) above 0.5", "fade: reading below 1.0 MVA", "solar: reading below 1.0 MVA"]
+    chart = figures.dot_chart(
+        scores={a: {"0": 0.1} for a in arms}, rows=["0"], title="t", x_title="x"
+    )
+    legend = chart.to_dict()["layer"][1]["encoding"]["color"]["legend"]
+    assert legend["labelLimit"] >= 7 * max(len(a) for a in arms)
