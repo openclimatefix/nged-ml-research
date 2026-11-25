@@ -1,7 +1,9 @@
 # ruff: noqa: E501, PERF401
 """Experiment 716: the validation-loss, attention-map, and forecast-example figures of the result page.
 
-Usage: run.sh e00716_writeup_figures.py losses OUT_DIR
+Usage: run.sh e00716_writeup_figures.py contrasts OUT_DIR   # A1 and A2 with intervals, and by fold and by Primary
+       run.sh e00716_writeup_figures.py tables               # prints the stopping-pass table of the fit logs
+       run.sh e00716_writeup_figures.py losses OUT_DIR
        run.sh e00716_writeup_figures.py attention OUT_DIR
        run.sh e00716_writeup_figures.py forecasts OUT_DIR
 
@@ -12,7 +14,7 @@ reads `work/attention/Mstar_2026-05_s0.npz` and `H_2026-05_s0.npz`, which
 `e00716_attention_extract.py` wrote. `forecasts` reads the same two files for the day-ahead cases and
 the stored forecast files of `M*` and `H` for the 14-day forecasts.
 
-**Anonymisation.** Every chart is of a Primary substation. The forecast examples use hosts D19 and D21
+**Anonymisation.** Every chart is of a Primary substation. The forecast examples use hosts D11, D19, and D21
 only. The attention maps use D11, D19, and D21. D19 and D21 read a capacity factor that looks ahead
 of fold 2026-05, and the page says so. No chart names a metered generator.
 """
@@ -35,7 +37,7 @@ WIDTH: Final = 640
 MONTH: Final = "2026-05"
 SEED: Final = 0
 HOSTS_ATTENTION: Final = ("D11", "D19", "D21")
-HOSTS_FORECAST: Final = ("D19", "D21")
+HOSTS_FORECAST: Final = ("D11", "D19", "D21")
 CASES: Final = {
     "clear_day": "clear target day",
     "dull_after_sunny": "dull target day after a sunny window",
@@ -541,15 +543,135 @@ def cmd_forecasts(*, out_dir: Path) -> None:
     figs.save(chart, path=out_dir / "forecast_full_horizon.svg")
 
 
+PART1: Final = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "score" / "part1.json"
+GROUP_NAME: Final = {"six": "Six signed-MW Primaries", "eight": "Eight MVA-only Primaries"}
+CONTRAST_COLOUR: Final = {
+    "A1: H minus M*": theme.DATA_BLUE,
+    "A2: H minus H-S": theme.DATA_PURPLE,
+    "Control: H-S minus M*": theme.DATA_SKY,
+}
+
+
+def cmd_contrasts(*, out_dir: Path) -> None:
+    """Draw A1 and A2 with their 98.75% intervals, A1 and A2 by fold, and the first contrast by Primary."""
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    res = json.loads(PART1.read_text())
+    rows = []
+    for key, label in (("first", "A1: H minus M*"), ("placebo", "A2: H minus H-S"), ("control", "Control: H-S minus M*")):
+        for g in ("six", "eight"):
+            c = res[f"counted:{key}:{g}"]
+            rows.append({"contrast": label, "group": GROUP_NAME[g], "point": c["point"], "lower": c["lower"], "upper": c["upper"], "delta": c["delta"]})
+            print(label, g, round(c["point"], 4), round(c["lower"], 4), round(c["upper"], 4), "limit", c["delta"])
+    table = pl.DataFrame(rows)
+    order = list(CONTRAST_COLOUR)
+    colour = alt.Color("contrast:N", legend=None, scale=alt.Scale(domain=order, range=list(CONTRAST_COLOUR.values())))
+    base = alt.Chart(table).encode(y=alt.Y("contrast:N", title=None, sort=order))
+    bars = base.mark_rule(strokeWidth=4).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X("lower:Q", title="CRPS difference, points of capacity (negative: the first arm is better)"), x2="upper:Q", color=colour
+    )
+    dots = base.mark_point(filled=True, size=80).encode(x="point:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    zero = base.mark_rule(color="#292B2B").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
+    chart = (
+        alt.layer(bars, dots, zero, data=table)
+        .properties(width=230, height=110)
+        .facet(column=alt.Column("group:N", title=None, sort=list(GROUP_NAME.values())))
+        .resolve_scale(x="independent")
+        .properties(
+            title=title_of(
+                title="Counted contrasts A1 and A2 and the placebo control, 98.75% intervals",
+                subtitle="Dot: mean difference in CRPS over 8 folds and 5 seeds. Line: 98.75% interval from resampling whole months. Vertical line: no difference. The no-detectable-difference limits of the decision rule are plus or minus 0.06 points (six signed-MW Primaries) and 0.16 (eight MVA-only Primaries).",
+            )
+        )
+    )
+    figs.save(chart, path=out_dir / "contrasts.svg")
+    # by fold
+    rows = []
+    for key, label in (("first", "A1: H minus M*"), ("placebo", "A2: H minus H-S")):
+        for g in ("six", "eight"):
+            for i, v in enumerate(res[f"counted:{key}:{g}"]["monthly"]):
+                rows.append({"contrast": label, "group": GROUP_NAME[g], "fold": i + 1, "difference": v})
+    fold_table = pl.DataFrame(rows)
+    print(fold_table.pivot(on="contrast", index=["group", "fold"], values="difference").sort("group", "fold"))
+    lines = (
+        alt.Chart()
+        .mark_line(point=True)  # ty: ignore[unresolved-attribute]
+        .encode(
+            x=alt.X("fold:O", title="Fold (1 = 2025-11 to 8 = 2026-06)", axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("difference:Q", title="CRPS difference, points of capacity"),
+            color=alt.Color("contrast:N", title=None, scale=alt.Scale(domain=order[:2], range=[CONTRAST_COLOUR[o] for o in order[:2]]), legend=alt.Legend(orient="top")),
+        )
+    )
+    zero = alt.Chart().mark_rule(color="#292B2B").encode(y=alt.datum(0))  # ty: ignore[unresolved-attribute]
+    chart = (
+        alt.layer(lines, zero, data=fold_table)
+        .properties(width=WIDTH - 90, height=130)
+        .facet(row=alt.Row("group:N", title=None, sort=list(GROUP_NAME.values())))
+        .properties(
+            title=title_of(
+                title="A1 and A2 by fold: the difference in CRPS in each monthly test period",
+                subtitle="Each point is the mean difference over the origins of one fold, averaged over 5 seeds. Negative favours the first arm.",
+            )
+        )
+    )
+    figs.save(chart, path=out_dir / "contrasts_by_fold.svg")
+    # by Primary
+    sites = k578.sites()
+    label_of = dict(zip(sites["time_series_id"].to_list(), sites["label"].to_list(), strict=True))
+    group_of = dict(zip(sites["time_series_id"].to_list(), sites["group"].to_list(), strict=True))
+    rows = []
+    for pid, v in res["per_primary"].items():
+        f = v["first"]
+        rows.append({"primary": label_of[int(pid)], "group": group_of[int(pid)], "point": f["point"], "lower": f["lower"], "upper": f["upper"]})
+    prim = pl.DataFrame(rows).sort("point")
+    print(prim)
+    order_p = prim["primary"].to_list()
+    # the D12 and D15 intervals are far wider than the rest: clip the axis and say so
+    base = alt.Chart(prim).encode(y=alt.Y("primary:N", title=None, sort=order_p))
+    gcol = alt.Color("group:N", title=None, scale=alt.Scale(domain=["signed-MW six", "MVA-only eight", "D15 and D18"], range=[theme.DATA_BLUE, theme.DATA_PURPLE, theme.BRAND_ORANGE]), legend=alt.Legend(orient="top"))
+    bars = base.mark_rule(strokeWidth=2, clip=True).encode(x=alt.X("lower:Q", title="CRPS difference H minus M*, points of capacity (negative: H is better)", scale=alt.Scale(domain=[-0.25, 0.15])), x2="upper:Q", color=gcol)  # ty: ignore[unresolved-attribute]
+    dots = base.mark_point(filled=True, size=60, clip=True).encode(x="point:Q", color=gcol)  # ty: ignore[unresolved-attribute]
+    zero = base.mark_rule(color="#292B2B").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
+    chart = (
+        alt.layer(bars, dots, zero)
+        .properties(width=WIDTH - 90, height=300)
+        .properties(
+            title=title_of(
+                title="A1 by Primary: H minus M*, 95% intervals",
+                subtitle="Report-only. Dot: mean difference in CRPS over 8 folds and 5 seeds. Line: 95% interval from resampling whole months, clipped to the axis. D15 (-0.345) and D18 read no solar estimate.",
+            )
+        )
+    )
+    figs.save(chart, path=out_dir / "contrasts_by_primary.svg")
+
+
+def cmd_tables() -> None:
+    """Print the stopping passes of every fit log: mean and range by arm and stage, and the fits at the pass cap."""
+    rows = []
+    for arm in ("H", "H-S", "H-X", "Z"):
+        for path in sorted((ATTENTION_DIR.parent / "logs" / arm).glob("*_fit.json")):
+            log = json.loads(path.read_text())
+            rows.extend({"arm": arm, "stage": int(e["stage"]), "passes": int(e["passes"]), "cap_hit": bool(e["cap_hit"]), "rerun": bool(e.get("rerun"))} for e in log["stages"])
+    table = pl.DataFrame(rows)
+    out = table.group_by("arm", "stage").agg(
+        pl.len().alias("fits"), pl.col("passes").mean().round(1).alias("mean"), pl.col("passes").min().alias("min"), pl.col("passes").max().alias("max"), pl.col("cap_hit").sum().alias("cap_hits"), pl.col("rerun").sum().alias("reruns")
+    ).sort("arm", "stage")
+    with pl.Config(tbl_rows=50):
+        print(out)
+
+
 def main() -> int:
     """Dispatch."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("losses", "attention", "forecasts"))
-    parser.add_argument("out_dir", type=Path)
+    parser.add_argument("command", choices=("losses", "attention", "forecasts", "contrasts", "tables"))
+    parser.add_argument("out_dir", type=Path, nargs="?")
     args = parser.parse_args()
-    {"losses": cmd_losses, "attention": cmd_attention, "forecasts": cmd_forecasts}[args.command](
-        out_dir=args.out_dir
-    )
+    if args.command == "tables":
+        cmd_tables()
+        return 0
+    assert args.out_dir is not None, "pass OUT_DIR"
+    commands = {"losses": cmd_losses, "attention": cmd_attention, "forecasts": cmd_forecasts, "contrasts": cmd_contrasts}
+    commands[args.command](out_dir=args.out_dir)
     return 0
 
 
