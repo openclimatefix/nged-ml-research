@@ -204,9 +204,10 @@ M\*.** Over the headline band of 24 h up to but not including 240 h, F4 minus M\
 of capacity at the six signed-MW Primaries (98.75% interval -0.022 to +0.047) and +0.008 at the eight
 MVA-only Primaries (-0.024 to +0.045). F4 minus F4-R is +0.018 (-0.003 to +0.050) at the six and
 -0.003 (-0.026 to +0.018) at the eight. These four rows are the counted headline contrasts. The
-other 3 bands are report-only readings from the same forecasts. The figure shows the interval of F4 minus F4-R at
-the eight over 24 h to 72 h ending near zero. The script did not store the per-band values, so this
-is read from the figure and not from a table, and the figure cannot resolve the sign of that end.
+other 3 bands are report-only readings from the same forecasts. The figure shows the interval of F4
+minus F4-R at the eight over 24 h to 72 h ending near zero. The script did not store the per-band
+values, so this is read from the figure and not from a table, and the figure cannot resolve the sign
+of that end.
 
 ![Report-only: F4 minus M\* and F4 minus F4-R by lead band, 98.75% intervals](extra_contrasts_by_lead_band_report_only.svg)
 
