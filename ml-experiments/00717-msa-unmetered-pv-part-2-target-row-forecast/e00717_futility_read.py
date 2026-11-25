@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 717: read the counted contrasts of F7 over all 8 folds at 2 seeds, for the futility rule (CPU only).
+"""Experiment 717: read the counted contrasts of F7 at 2 seeds, for the futility rule (CPU only).
 
 Usage: run.sh e00717_futility_read.py part1    # A1 (`H` minus `M*`) and A2 (`H` minus `H-S`)
        run.sh e00717_futility_read.py part2    # B1 (`HT` minus `H`) and B2 (`HT` minus `HT-S`)
@@ -15,10 +15,10 @@ interval, and per-fold points, and writes `score/futility_part<N>.json` of the p
 Every number is interim. A contrast is treatment minus reference in CRPS points of capacity, so a
 negative point estimate favours the treatment.
 
-Memory: the command loads three arms x 8 folds x 2 seeds = 48 forecast files at one time, about 6 to 9
-GB (an estimate from the screen run, which held 16 files under a 12 GB cap). Run it under `run.sh` with
-`SLOT_MEM=14G`, which is the cap `run.sh` passes to `systemd-run` with no swap. It uses one thread and no
-GPU.
+Memory: the command loads three arms x 8 folds x 2 seeds = 48 forecast files at one time, about 6
+to 9 GB (an estimate from the screen run, which held 16 files under a 12 GB cap). Run it under
+`run.sh` with `SLOT_MEM=14G`, which is the cap `run.sh` passes to `systemd-run` with no swap. It
+uses one thread and no GPU.
 """
 
 import argparse
@@ -37,7 +37,7 @@ LABELS = {1: {"first": "A1", "placebo": "A2"}, 2: {"first": "B1", "placebo": "B2
 
 
 def read_part(*, part: int) -> dict:
-    """Return the points, intervals, and per-fold points of a part's two counted contrasts at 2 seeds on 8 folds."""
+    """Return the points, intervals, and per-fold points of a part's two counted contrasts."""
     star = m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     pairs = score.pairs_of_part(part=part, star=star)
     contrasts = {k: pairs[k] for k in ("first", "placebo")}
@@ -72,7 +72,7 @@ def read_part(*, part: int) -> dict:
 
 
 def futility_opens_seeds(*, out: dict, part: int) -> bool:
-    """Return whether the part's counted treatment contrast (A1 or B1) has a point estimate below zero in at least one group.
+    """Return whether the counted treatment contrast (A1 or B1) is below zero in at least one group.
 
     A2 and B2 are the placebo contrasts and do not count. The staging rule on the plan pages opens
     seeds 2 to 4 only when this holds for some counted treatment contrast of either part.

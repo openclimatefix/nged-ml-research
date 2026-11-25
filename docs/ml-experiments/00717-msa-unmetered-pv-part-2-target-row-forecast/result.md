@@ -118,15 +118,15 @@ adopted_in: none
 **We asked whether a neural network that forecasts a Primary substation's electricity demand becomes
 more accurate when it is also given a forecast of the solar power generated behind the substation,
 for the day being forecast.** The network is the axial-attention network of [experiment
-713](../00713-msa-axial-attention-demand-network-part-1/result.md), and [experiment
-716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md) already gives it an estimate of
-the solar output of each of the 14 past days. We added a forecast for the target day: the
-substation's installed solar capacity times a yield curve driven by the ensemble-mean and
-ensemble-spread shortwave irradiance of the 00:00 UTC European Centre for Medium-Range Weather
-Forecasts (ECMWF) ensemble (ENS) run of the origin day. We compared the network with and without
-that forecast on 16 Primaries over 8 monthly test periods and 5 random seeds. A second network read
-the forecast issued 28 days earlier, which has no information about the target day, so that a gain
-from the target day's own sky could be told from a gain from the extra parameters.
+713](../00713-msa-axial-attention-demand-network-part-1/result.md), and experiment 716 (unmetered
+PV, part 1: the history estimate) already gives it an estimate of the solar output of each of the 14
+past days. We added a forecast for the target day: the substation's installed solar capacity times a
+yield curve driven by the ensemble-mean and ensemble-spread shortwave irradiance of the 00:00 UTC
+European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble (ENS) run of the origin day. We
+compared the network with and without that forecast on 16 Primaries over 8 monthly test periods and
+5 random seeds. A second network read the forecast issued 28 days earlier, which has no information
+about the target day, so that a gain from the target day's own sky could be told from a gain from
+the extra parameters.
 
 **The forecast error did not change, and every interval includes zero.** Both differences are
 within 0.007 percentage points of capacity of zero.
@@ -257,7 +257,7 @@ headless Chromium and read for labels, overlaps, and units.
 
 **Part 2 stores no attention maps of its own, so the maps of fold 2026-05, seed 0, are those of
 experiment 716.** Arms `M*` and `H` are stored in `work/attention/` of
-[experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md), and the same
+experiment 716 (unmetered PV, part 1: the history estimate), and the same
 look-ahead caveat for D19 and D21 applies. No attention extraction was run for arm `HT`.
 
 ## Checks
@@ -637,10 +637,18 @@ rule at a time, and its verified findings are applied. No review remains to come
   `score/s1_interim.json`.
 - `.../e00717_guard.py` and `.../run.sh`: refuse a stale copy of part 1's code, and run a command
   with one thread per numerical library and a memory cap.
+- `.../e00717_futility_read.py`, `.../e00717_plots.py`, and `.../e00717_s1_read.py`: the docstrings
+  of these three scripts were rewrapped to the 100-column limit after the scripts ran, and the code
+  is identical (the abstract syntax tree with docstrings blanked matches before and after). SHA-256
+  of the files as committed: `e00717_futility_read.py`
+  `1d45091c4638e3f039255561a1ab350ade0d2a27a23be7122bc978ae114dccb3`, `e00717_plots.py`
+  `a3d20d9441a84cb9a850468dd7970e6c9f2f0af94c1778a2270b62189b089281`, and `e00717_s1_read.py`
+  `f96bf3823b448e38335f254b11b82c2a15c1b4f25d1a5aab0832a5fe3d783b17`. The hashes of
+  `e00717_score.py` and `e00717_check_lean_loader.py` above are unchanged.
 - `ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/`: the network, batches,
   training, and predictions (`e00716_fit.py`, `e00716_predict.py`, `e00716_score.py`), imported
   and not edited, as described on
-  [experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md).
+  experiment 716 (unmetered PV, part 1: the history estimate).
 - `data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/work/fits/<arm>/`: the
   stored forecasts, one parquet file per fold and seed (written by this experiment, read by the
   scorer). `work/logs/<arm>/` holds the fit, stage, and predict logs, and `work/models/` the

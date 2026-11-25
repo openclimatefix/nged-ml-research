@@ -1,9 +1,12 @@
 # ruff: noqa: E501
 """Draw part 2's forecast examples and validation-loss curves from stored files only.
 
-Usage: run.sh e00717_plots.py contrasts OUT_DIR   # B1 and B2 with their intervals, and B1 by fold, from score/part2.json
+Usage: run.sh e00717_plots.py contrasts OUT_DIR   # B1 and B2 with intervals, and B1 by fold
        run.sh e00717_plots.py forecasts OUT_DIR   # 14-day and day-ahead forecasts of D11, D19, D21
-       run.sh e00717_plots.py loss OUT_DIR        # validation loss per pass of the three fits of fold 2026-05, seed 0
+       run.sh e00717_plots.py loss OUT_DIR        # validation loss per pass, fold 2026-05, seed 0
+
+The `contrasts` command reads `score/part2.json`, and the `loss` command reads the fit logs of the
+three fits.
 Reads the stored forecasts of arms `HT` and `H` (fold 2026-05, seed 0) and the fit logs of `HT`,
 `HT-S`, and `T`. It scores nothing and writes only the SVG files. The forecast hosts are D11, D19,
 and D21 only. The day counted from the origin replaces the date on every axis.
@@ -56,7 +59,7 @@ def forecast_frame() -> tuple[pl.DataFrame, datetime]:
 
 
 def tidy(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Return the host rows with the days from the origin, the host label, and the quantiles in % of capacity."""
+    """Return the host rows with the days from the origin, the host label, and the quantiles."""
     names = {v: k for k, v in HOSTS.items()}
     return frame.with_columns(
         day=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 1440.0,

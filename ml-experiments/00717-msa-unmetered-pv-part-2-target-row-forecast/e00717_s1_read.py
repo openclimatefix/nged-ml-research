@@ -1,18 +1,19 @@
 # ruff: noqa: E501
-"""Experiment 717: the S1 secondary reading, `A1` on the solar block of the sunny folds, INTERIM (CPU only).
+"""Experiment 717: the S1 secondary reading, `A1` on the sunny folds' solar block, INTERIM (CPU only).
 
-Usage: run.sh e00717_s1_read.py --smoke FOLD   # load one fold at seed 0 and print row counts; no contrast
+Usage: run.sh e00717_s1_read.py --smoke FOLD   # load one fold at seed 0, print row counts
        run.sh e00717_s1_read.py read           # the reading at the seeds that exist (2 seeds)
        run.sh e00717_s1_read.py --selftest
 
 S1 is one of 14 secondary readings. It is report-only, read at 95%, and changes no verdict. It reads
 `A1` (`H` minus `M*`, treatment minus reference in CRPS points of capacity, negative favours `H`)
-on the solar block of the folds 2026-04 to 2026-06, for the six signed-MW Primaries and for the eight
-MVA-only Primaries separately. The reviewed `secondary_s1_s2` of `e00716_score`
+on the solar block of the folds 2026-04 to 2026-06, for the six signed-MW Primaries and for the
+eight MVA-only Primaries separately. The reviewed `secondary_s1_s2` of `e00716_score`
 decides whether S1 holds (the point is at most -0.05 and the interval lies below zero), on every
-stored lead, as the final S1 does. The command also uses `load_all` and `pinned_seeds` without change, and writes `score/s1_interim.json` of part 2. It
-uses one thread and no GPU. Memory: 12 forecast files (2 arms, 3 folds, 2 seeds), an estimated 2 to 3 GB;
-the 12 GB default of `run.sh` is ample.
+stored lead, as the final S1 does. The command also uses `load_all` and `pinned_seeds` without
+change, and writes `score/s1_interim.json` of part 2. It uses one thread and no GPU. Memory: 12
+forecast files (2 arms, 3 folds, 2 seeds), an estimated 2 to 3 GB; the 12 GB default of `run.sh` is
+ample.
 """
 
 import argparse
@@ -33,7 +34,7 @@ NOTE = "S1 is one of 14 secondaries and changes no verdict"
 
 
 def read(*, n_seeds: int = 2) -> dict:
-    """Return A1 on the solar block of the sunny folds per counted group at 95%, from the reviewed `secondary_s1_s2`."""
+    """Return A1 on the solar block of the sunny folds per counted group at 95%."""
     star = m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     names = [star, "H"]
     seeds = score.pinned_seeds(n_seeds=n_seeds, names=names, months=score.SUNNY_FOLDS)
@@ -77,7 +78,7 @@ def smoke(*, fold: str) -> int:
 
 
 def check_holds_rule() -> None:
-    """Call the reviewed `secondary_s1_s2` on tiny synthetic frames with a stubbed `contrast`, so a reversed "holds" rule fails here."""
+    """Call `secondary_s1_s2` on tiny synthetic frames with a stubbed `contrast`, to catch a reversed rule."""
     stamp = datetime(2026, 5, 3, 9, 0, tzinfo=UTC)
     frame = pl.DataFrame({"power_fcst_init_time": [stamp], "valid_time": [stamp]})
     frames = {"H": frame, "M*": frame}
