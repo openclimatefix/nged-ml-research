@@ -33,7 +33,7 @@ are explained on the [NGED power telemetry page](nged-power-telemetry.md).
 | D14 | 120,052 | 0 | 0% | none | none | none | none |
 | D15 | 26,700 | 20,386 | 76.35% | 30.4 / 90.2 | all day | 55% | 12% |
 | D16 | 99,471 | 0 | 0% | none | none | none | none |
-| D18 | 28,360 | 48 | 0.17% | 10.6 / 33.0 | 11:00 | 85% | 35% |
+| D18 | 28,360 | 48 | 0.17% | 10.6 / 33.0 | all hours | 85% | 35% |
 
 The last two columns are shares of the Primary's reverse-flow half-hours. Expressed as shares of all
 half-hours, the ambiguous cases are 0.02% and 0.01% at D5, 0.26% and 0.18% at D10, 42% and 9% at
@@ -63,8 +63,8 @@ D15, and 0.14% and 0.06% at D18.
 
 - **D10's reverse flow is 0.26% of half-hours and sits between 10:00 and 15:00, peaking at 13:00,
   from March to August.** The pattern is consistent with solar PV.
-- **The yearly count rises from 0 half-hours in 2022 to 27, 55, 108, and 127 in 2023 to 2026.** The
-  share of half-hours rises from 0.15% to 0.81% over the same years, and 2026 is a partial year.
+- **The yearly count of reverse-flow half-hours has risen every year in the recent past.** The share
+  of half-hours is below 1% in every year, and the latest year is partial.
 - **Reverse flow at D10 is shallow, with one outlier.** The median depth is 3.2 points and the 99th
   percentile is 14.3 points. One isolated reading reaches 94 points, probably a switching event.
 - **Folding hides nearly all of it.** Of D10's 317 reverse-flow half-hours, 315 read below 1 MVA.
@@ -72,8 +72,8 @@ D15, and 0.14% and 0.06% at D18.
 ## D5 and D18: a handful of half-hours
 
 - **D5 has 19 reverse-flow half-hours in about seven years, all between 10:00 and 15:00.** They fall
-  in April, August, and September of 2021 and 2023, with a depth of at most 8.6 points, so they
-  are consistent with solar PV on days of low demand.
+  in spring and late summer, with a depth of at most 8.6 points, so they are consistent with solar
+  PV on days of low demand.
 - **D18 has 48 reverse-flow half-hours, all in a short episode in 2025, and none in 2026.** The
   episode spans every hour of the day, so the readings do not match a solar profile. The cause is not
   identified.
