@@ -78,6 +78,23 @@ GPU-process-hours stands.
   changes per Primary within +-0.50 of capacity. No measurement stands behind any of the three.
   **Closed: the three values stand as written.**
 
+## Corrections to the plan made before any gate number was seen
+
+**Two rules of the gate were corrected before any count or test result was printed.** Both
+corrections are recorded here so that the commit order shows they came first.
+
+- **The span of the reference error follows the design text.** The design defines the reference
+  error over the fold's training span. The first code read the days `[md - 400, md)` of the stored
+  window, where `md` is the first day of the fold month. The corrected code reads
+  `[md - 758, md - 28)`, the 730 days on which experiment 714's reference is fitted. The reason is
+  that the design names the training span, and the stored window is a different and shorter span.
+- **GH5 pools its tests and uses a Bonferroni level.** The first rule ran three chi-squared tests at
+  the 1% level on each of 40 training draws, which is 120 tests with no correction. A correct
+  generator would fail at least one of the 120 tests with a chance of about 70%. The corrected rule
+  pools the 5 draws of each of the 8 fold months into one table, runs 5 tests per pooled fold (kind
+  by sign, kind by Primary, kind by sign within each group, and the balance of unmirrored rises and
+  falls), and reads the 40 tests at the level 0.01 divided by 40.
+
 **Unconfirmed assumptions, stated as the design states them.** The implementer confirms each one
 before the plan commit.
 

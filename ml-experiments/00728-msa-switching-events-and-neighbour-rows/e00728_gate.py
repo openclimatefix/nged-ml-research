@@ -23,6 +23,13 @@ the cleaned power (`ctx.panel.power`) and a training span of the 730 days that e
 fold month. The fits use experiment 713's cleaned power and its own span, so the draws of the fits
 differ in their NaN pattern and in their onsets. The checks test the generator, not the fits' arrays.
 
+**GH5's rule, as corrected before any number was seen.** The first rule ran 3 chi-squared tests at
+the 1% level on each of 40 training draws, 120 tests with no correction, which fails a correct
+generator with a chance of about 70%. The corrected rule pools the 5 draws of each of the 8 fold
+months into one table and reads the 40 tests of the gate (kind by sign, kind by Primary, kind by
+sign within each of the two groups, and the balance of unmirrored rises and falls, per pooled fold)
+at the level 0.01 / 40 (a Bonferroni correction).
+
 **The thresholds of GH1 and GH2, written before any number was seen.**
 
 - GH1: the truth oracle's largest absolute row score is at most 1e-9 points of capacity; its mean
@@ -40,6 +47,7 @@ import argparse
 import hashlib
 import json
 import sys
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 from typing import Final
@@ -66,6 +74,9 @@ ORACLE_TOLERANCE: Final = 1e-9
 FLAT_FOLLOW_TOLERANCE: Final = 0.05
 PERSISTENCE_TOLERANCE: Final = 0.15
 CHECK_ORDER: Final = ("GH4", "GH6", "GH7", "GH5", "GH8", "GH9", "GH1", "GH2")
+N_TESTS: Final = wd.N_INDEPENDENCE_TESTS * len(wd.FOLD_MONTHS)
+"""The tests of GH5: four chi-squared tests and one z-test on each of the 8 pooled folds."""
+FAMILY_LEVEL: Final = wd.INDEPENDENCE_LEVEL / N_TESTS
 SCRIPTS: Final = ("e00728_worlds.py", "e00728_score.py", "e00728_gate.py")
 
 
@@ -105,8 +116,9 @@ class Env:
         )  # fmt: skip
 
 
-def print_frame(*, title: str, frame: pl.DataFrame) -> None:
+def print_frame(*, title: str, frame: object) -> None:
     """Print a titled table."""
+    assert isinstance(frame, pl.DataFrame), type(frame)
     print(f"\n{title}")
     with pl.Config(tbl_rows=200, tbl_cols=40):
         print(frame)
@@ -116,6 +128,18 @@ def g2_event_table(*, env: Env) -> pl.DataFrame:
     """Return `g2`'s events with the visible-depth columns, for the four injected fold months."""
     vis_by_month = {m: env.visible(month=m) for m in wd.INJECTED_MONTHS}
     return wd.g2_events(capacity_mw=env.capacity_mw, vis_by_month=vis_by_month)
+
+
+def scored_sites(*, row: dict) -> list[int]:
+    """Return the Primaries at which a counted move is scored: the host, and a metered recipient."""
+    sites = [int(row["host"])]
+    if (
+        row["mirror_state"] in {"full", "partial"}
+        and row["recipient"] is not None
+        and row["recipient"] >= 0
+    ):
+        sites.append(int(row["recipient"]))
+    return sites
 
 
 def gh4(*, env: Env) -> dict:
@@ -134,37 +158,79 @@ def gh4(*, env: Env) -> dict:
     print_frame(title="Visible depth, points of capacity", frame=visible)
     events = g2_event_table(env=env)
     report = wd.count_report(events=events)
+    permanent = events.filter(pl.col("truth") == "era")
+    visible_permanent = permanent.filter(pl.col("visible"))
     steps = {
         "events of g2": events.height,
-        "permanent changes": events.filter(pl.col("truth") == "era").height,
+        "permanent changes": permanent.height,
+        "permanent changes of visible depth (the guard P set)": visible_permanent.height,
         "all temporary moves": report.all_temporary,
         "with a metered mirror": report.metered,
         "donor step at least 0.10 of capacity (design: 81)": report.floor_only,
+        "  of those, lasting 7 days or more (design: 43 of the 81)": report.lasting_floor_only,
         "passing the visible depth (the counted set)": report.visible_depth,
-        "counted, lasting 7 days or more (design: 43 of the 81)": report.lasting,
+        "  of those, lasting 7 days or more": report.lasting,
     }
     for name, value in steps.items():
         print(f"GH4 count: {name}: {value}")
     print_frame(title="Counted moves per fold month", frame=report.per_month)
     print_frame(title="Counted moves per mirror state", frame=report.per_mirror_state)
     print_frame(title="Counted moves per duration band", frame=report.per_band)
-    counted = wd.counted_moves(events=events)
-    per_move = counted.select("month", "pass_index", "host", "donor", "mirror_state", "onset_day", "end_day", "duration_days", "donor_step").with_columns(
-        rows_valid=pl.Series(
-            [sc.rows_in_slice(onset_day=o, end_day=e) for o, e in zip(counted["onset_day"], counted["end_day"], strict=True)]
-        ),
-        rows_origin=pl.Series(
-            [sc.rows_in_slice(onset_day=o, end_day=e, by="origin") for o, e in zip(counted["onset_day"], counted["end_day"], strict=True)]
-        ),
-    )  # fmt: skip
     print_frame(
-        title="Counted moves: rows per scored Primary in the counted slice, both cuts",
+        title="Permanent changes of visible depth, per shape and sign",
+        frame=visible_permanent.with_columns(sign=pl.col("size").sign())
+        .group_by("kind", "sign")
+        .len()
+        .sort("kind", "sign"),
+    )
+    counted = wd.counted_moves(events=events)
+    counted = counted.with_columns(
+        group=pl.col("host").map_elements(
+            lambda h: "mva_only" if env.mva_only[h] else "signed_mw", return_dtype=pl.String
+        )
+    )
+    print_frame(
+        title="Counted moves per group of the scored host",
+        frame=counted.group_by("group").len().sort("group"),
+    )
+    rows = []
+    for row in counted.iter_rows(named=True):
+        per_site = [
+            sc.slice_rows(
+                clean=env.ctx.panel.power[site], onset_day=row["onset_day"], end_day=row["end_day"]
+            )
+            for site in scored_sites(row=row)
+        ]
+        rows.append(
+            {
+                "month": row["month"], "pass_index": row["pass_index"], "host": row["host"],
+                "mirror_state": row["mirror_state"], "onset_day": row["onset_day"],
+                "duration_days": row["duration_days"], "n_sites": len(per_site),
+                "nominal": per_site[0].nominal, "by_origin": per_site[0].by_origin,
+                "past_grid": sum(r.past_grid for r in per_site),
+                "no_truth": sum(r.no_truth for r in per_site),
+                "scorable": sum(r.scorable for r in per_site), "slice_1": sum(r.slice_1 for r in per_site),
+                "slice_2": sum(r.slice_2 for r in per_site),
+                "min_scorable_per_site": min(r.scorable for r in per_site),
+            }
+        )  # fmt: skip
+    per_move = pl.DataFrame(rows)
+    print_frame(
+        title="Counted moves: rows in the counted slice, summed over the scored Primaries (nominal is per Primary)",
         frame=per_move,
     )
-    zero_valid = per_move.filter(pl.col("rows_valid") == 0).height
-    zero_origin = per_move.filter(pl.col("rows_origin") == 0).height
+    totals = {
+        "scorable rows, slice 1 (move in force)": int(per_move["slice_1"].sum()),
+        "scorable rows, slice 2 (7 days after the end)": int(per_move["slice_2"].sum()),
+        "rows past the end of the grid": int(per_move["past_grid"].sum()),
+        "rows inside the grid with a NaN truth": int(per_move["no_truth"].sum()),
+    }
+    for name, value in totals.items():
+        print(f"GH4 rows: {name}: {value}")
+    no_rows = per_move.filter(pl.col("scorable") == 0)
+    one_site_empty = per_move.filter(pl.col("min_scorable_per_site") == 0)
     print(
-        f"GH4: counted moves with no row in the slice: by target half-hour {zero_valid}, by origin {zero_origin}"
+        f"GH4: counted moves with no scorable row at any scored Primary: {no_rows.height}; with no scorable row at one scored Primary: {one_site_empty.height}"
     )
     ok = wd.pooled_floor_ok(report=report, pooled=FLOOR_POOLED, per_month=FLOOR_PER_MONTH)
     assert ok, (
@@ -172,11 +238,12 @@ def gh4(*, env: Env) -> dict:
         f"{report.per_month.to_dicts()} per fold month (floor {FLOOR_PER_MONTH} each); the floor-only "
         f"count is {report.floor_only}. Stop before any GPU job and tell the manager. The gate does not fall back."
     )
-    assert zero_valid == 0, f"GH4 FAILS: {zero_valid} counted moves have no row in the slice"
+    assert no_rows.height == 0, (
+        f"GH4 FAILS: {no_rows.height} counted moves have no scorable row in the slice"
+    )
     return {
-        **dict(steps),
-        "per_month": report.per_month.to_dicts(),
-        "zero_rows_by_valid": zero_valid, "zero_rows_by_origin": zero_origin,
+        **dict(steps), **totals, "per_month": report.per_month.to_dicts(),
+        "no_scorable_rows": no_rows.height, "one_scored_primary_empty": one_site_empty.height,
     }  # fmt: skip
 
 
@@ -220,7 +287,13 @@ def gh7(*, env: Env) -> dict:
 
 
 def gh5(*, env: Env) -> dict:
-    """GH5: balance of sign and site across the two kinds, in `g2` and in every training draw."""
+    """GH5: balance of sign and site across the two kinds, in `g2` and in every training draw.
+
+    The draws of one fold month are pooled into one table, and every test is read at the family level:
+    `INDEPENDENCE_LEVEL` divided by the number of tests of the gate (a Bonferroni correction). The
+    uncorrected rule was 3 tests at 1% on each of 40 draws, which fails a correct generator with a
+    chance of about 70%.
+    """
     events = g2_event_table(env=env)
     signed = events.with_columns(sign=pl.col("size").sign())
     print_frame(
@@ -242,25 +315,35 @@ def gh5(*, env: Env) -> dict:
         title="GH5 g2: permanent changes by sign and size",
         frame=events.filter(pl.col("truth") == "era").group_by("size").len().sort("size"),
     )
+    level = FAMILY_LEVEL
+    print(f"GH5: {N_TESTS} tests, family level {wd.INDEPENDENCE_LEVEL}, per-test level {level:.2e}")
     rows = []
     for month in wd.FOLD_MONTHS:
-        for seed in TRAIN_SEEDS:
-            tables = wd.independence_tables(world=env.draw(month=month, seed=seed))
-            unmirrored = tables["unmirrored_temporary"]
-            assert isinstance(unmirrored, dict)
-            rows.append(
-                {
-                    "month": month, "seed": seed, "p_kind_by_sign": tables["p_kind_by_sign"],
-                    "p_kind_by_host": tables["p_kind_by_host"], "unmirrored_n": unmirrored["n"],
-                    "unmirrored_rise_share": unmirrored["rises"] / max(unmirrored["n"], 1),
-                    "unmirrored_z": unmirrored["z"],
-                }
-            )  # fmt: skip
+        worlds = [env.draw(month=month, seed=seed) for seed in TRAIN_SEEDS]
+        tables = wd.independence_tables(worlds=worlds, mva_only=env.mva_only, level=level)
+        unmirrored = tables["unmirrored_temporary"]
+        assert isinstance(unmirrored, dict)
+        print_frame(
+            title=f"GH5 {month}: kind by sign within the MVA-only Primaries",
+            frame=tables["kind_by_sign_mva_only"],
+        )
+        print_frame(
+            title=f"GH5 {month}: kind by sign within the signed-MW Primaries",
+            frame=tables["kind_by_sign_signed_mw"],
+        )
+        rows.append(
+            {
+                "month": month, "n_events": tables["n_events"], "p_kind_by_sign": tables["p_kind_by_sign"],
+                "p_kind_by_host": tables["p_kind_by_host"], "p_sign_mva_only": tables["p_kind_by_sign_mva_only"],
+                "p_sign_signed_mw": tables["p_kind_by_sign_signed_mw"], "unmirrored_n": unmirrored["n"],
+                "unmirrored_rise_share": unmirrored["rises"] / max(unmirrored["n"], 1), "unmirrored_z": unmirrored["z"],
+            }
+        )  # fmt: skip
     print_frame(
-        title=f"GH5 training draws: chi-squared p-values must be at least {wd.INDEPENDENCE_LEVEL}",
+        title=f"GH5 training draws, pooled per fold: every p-value must be at least {level:.2e}",
         frame=pl.DataFrame(rows),
     )
-    return {"draws": rows}
+    return {"per_test_level": level, "folds": rows}
 
 
 def gh8(*, env: Env) -> dict:
@@ -291,14 +374,25 @@ def gh8(*, env: Env) -> dict:
 
 
 def gh9(*, env: Env) -> dict:
-    """GH9: the host arrays that `Rb` and `Rbn` read for one fold and seed are identical."""
+    """GH9: the host arrays that `Rb` and `Rbn` read for one fold and seed are identical.
+
+    Each arm's draw is made independently from the seed, and the hashes of its history and target
+    arrays are compared. A fit records the same hash (`wd.world_hash`) in its log, and the counted
+    reading compares the two arms' hashes.
+    """
     month, seed = wd.FOLD_MONTHS[0], 0
-    a, b = env.draw(month=month, seed=seed), env.draw(month=month, seed=seed)
-    wd.check_shared_draw(host_a=a.history, host_b=b.history)
-    wd.check_shared_draw(host_a=a.target, host_b=b.target)
-    assert a.events == b.events, "two draws of one seed give different event tables"
-    print(f"GH9: two draws of {month} seed {seed} are identical ({len(a.events)} events)")
-    return {"month": month, "seed": seed, "n_events": len(a.events)}
+    draws = {"Rb": env.draw(month=month, seed=seed), "Rbn": env.draw(month=month, seed=seed)}
+    hashes = {arm: wd.world_hash(world=w) for arm, w in draws.items()}
+    wd.check_shared_draw(host_a=draws["Rb"].history, host_b=draws["Rbn"].history)
+    wd.check_shared_draw(host_a=draws["Rb"].target, host_b=draws["Rbn"].target)
+    assert hashes["Rb"] == hashes["Rbn"], f"Rb and Rbn hash differently: {hashes}"
+    assert draws["Rb"].events == draws["Rbn"].events, (
+        "two draws of one seed give different event tables"
+    )
+    print(
+        f"GH9: {month} seed {seed}: Rb and Rbn arrays hash to {hashes['Rb']} ({len(draws['Rb'].events)} events)"
+    )
+    return {"month": month, "seed": seed, "hashes": hashes}
 
 
 def oracle_readings(
@@ -340,8 +434,10 @@ def pool(*, readings: dict[str, sc.OracleReading]) -> dict[str, float]:
     """
 
     def mean_of(field: str) -> float:
-        values = [getattr(r, field) for r in readings.values() if np.isfinite(getattr(r, field))]
-        return float(np.mean(values)) if values else float("nan")
+        values = {m: getattr(r, field) for m, r in readings.items()}
+        bad = [m for m, v in values.items() if not np.isfinite(v)]
+        assert not bad, f"the reading `{field}` is not finite in fold month(s) {bad}: {values}"
+        return float(np.mean(list(values.values())))
 
     return {
         "max_abs_score": max(r.max_abs_score for r in readings.values()),
@@ -390,26 +486,45 @@ def file_hashes() -> dict[str, str]:
 
 
 def run(*, only: list[str]) -> int:
-    """Run the checks in `CHECK_ORDER`, record each result, and return 0 if all pass."""
-    env = Env()
-    results: dict[str, dict] = {"scripts": file_hashes()}  # ty: ignore[invalid-assignment]
-    failed = []
-    for name in CHECK_ORDER:
-        if only and name not in only:
-            continue
-        print(f"\n===== {name} =====", flush=True)
-        try:
-            results[name] = {"pass": True, **CHECKS[name](env=env)}
-        except AssertionError as exc:
-            results[name] = {"pass": False, "message": str(exc)}
-            failed.append(name)
-            print(f"{name} FAILED: {exc}", flush=True)
-            if name == "GH4":
-                break
-    GATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = GATE_FILE.with_name(GATE_FILE.name + ".tmp")
-    tmp.write_text(json.dumps(results, indent=1, default=str))
-    tmp.rename(GATE_FILE)
+    """Run the checks in `CHECK_ORDER`, record each result, and return 0 if all pass.
+
+    The record `gate_h.json` is always written, also when a check raises, and holds the failure.
+    """
+    results: dict[str, object] = {"scripts": file_hashes()}
+    failed: list[str] = []
+    try:
+        env = Env()
+        for name in CHECK_ORDER:
+            if only and name not in only:
+                continue
+            print(f"\n===== {name} =====", flush=True)
+            try:
+                results[name] = {"pass": True, **CHECKS[name](env=env)}
+            except Exception as exc:  # noqa: BLE001  (a check may fail in any way; the record keeps it)
+                results[name] = {
+                    "pass": False,
+                    "error": type(exc).__name__,
+                    "message": str(exc),
+                    "traceback": traceback.format_exc(),
+                }
+                failed.append(name)
+                print(f"{name} FAILED: {type(exc).__name__}: {exc}", flush=True)
+                if name == "GH4":
+                    break
+    except Exception as exc:  # noqa: BLE001  (the environment itself failed to load)
+        results["environment"] = {
+            "pass": False,
+            "error": type(exc).__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        failed.append("environment")
+        print(f"the environment failed to load: {type(exc).__name__}: {exc}", flush=True)
+    finally:
+        GATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = GATE_FILE.with_name(GATE_FILE.name + ".tmp")
+        tmp.write_text(json.dumps(results, indent=1, default=str))
+        tmp.rename(GATE_FILE)
     print(
         f"\nG-H: {'PASSED' if not failed else 'FAILED: ' + ', '.join(failed)}; record {GATE_FILE}"
     )

@@ -22,22 +22,24 @@ metered mirror. `counted_moves` reads the truth tables of `g2` and applies the f
 
 **Three flagged points for the reviewer.**
 
-- *The reference error is partly in-sample.* `reference_error` scores the reference over the days of
-  the stored window that lie before the fold month, and experiment 714 fitted the reference on days
-  that overlap them (`fit_reference` reads `[month_day - 758, month_day - 28)`). The in-sample error
-  is smaller than the out-of-sample error, so the visible depth is lower than a held-out reference
-  error would give, and more `g2` moves pass the filter. The design says "over the fold's training
-  span", and the function follows the design.
+- *The reference error is in-sample.* `reference_error` scores the reference over the fold's
+  training span `[month_day - 758, month_day - 28)`, the days that experiment 714's `fit_reference`
+  fits it on, as the design says. The in-sample error is smaller than an out-of-sample error, so the
+  visible depth is lower than a held-out reference error would give, and more `g2` moves pass the
+  filter. The filter is the same for every arm.
 - *The donor step ignores experiment 714's cap of 0.6.* `donor_step` recovers the donor's step of a
   move that `g2` scored at the receiving Primary from the recipient's step. The generator caps the
   recipient's step at 0.6 of the recipient's capacity, so for a capped row the recovered donor step
   is too small. No rule changes if a count differs from 81: the gate prints every count.
-- *The MVA-only floor.* The training world floors the history of an MVA-only host at zero for a
-  temporary move (as experiment 715 floors a recipient), and keeps the shifted target of an MVA-only
-  Primary at or above zero for permanent changes by the redraw limit. D15 and D18 have no reference
-  error, so their visible depth is the floor of 0.10 alone.
+- *The MVA-only floor.* Every event at an MVA-only host, temporary or permanent, must keep the
+  host's history at or above zero, and a permanent change must also keep the host's target at or
+  above zero. An event that breaks the test is redrawn at another Primary or onset with its sign and
+  depth kept, by one rule for both kinds, so that group and sign do not predict the kind. A
+  recipient's mirror is clipped at zero, as experiment 715 clips it. A Primary with no reference
+  error (NaN) has a visible depth of the floor of 0.10 alone.
 """
 
+import hashlib
 from dataclasses import dataclass
 from typing import Final
 
@@ -95,6 +97,8 @@ VISIBLE_FACTOR: Final = 2.0
 INDEPENDENCE_LEVEL: Final = 0.01
 """A chi-squared test of independence that rejects at this level fails GH5."""
 FLOOR_TOLERANCE: Final = 1e-9
+RECIPIENT_CAP: Final = 0.6
+"""Experiment 714 caps a recipient's step at this share of the recipient's capacity."""
 
 
 @dataclass(frozen=True)
@@ -129,8 +133,10 @@ class TrainingWorld:
             permanent changes only.
         events: One dict per event.
         seed: The world seed of the draw.
-        redrawn: Number of permanent changes that broke a limit and were redrawn.
-        dropped: Number of permanent changes that found no valid place and were dropped.
+        redrawn: Number of events that broke a limit and were redrawn.
+        dropped: Number of events that found no valid place and were dropped.
+        redraws: The same two counts by kind (`redrawn_temporary`, `redrawn_permanent`,
+            `dropped_temporary`, `dropped_permanent`).
     """
 
     history: np.ndarray
@@ -139,6 +145,7 @@ class TrainingWorld:
     seed: int
     redrawn: int
     dropped: int
+    redraws: dict[str, int]
 
 
 # ---------------------------------------------------------------------- seeds
@@ -188,27 +195,34 @@ def reference_error(*, ctx: common714.Context, month: str) -> np.ndarray:
     """Return the daily-mean reference error of each of the 16 Primaries for a fold month.
 
     The error is the mean absolute difference between the daily mean of the Primary's real power
-    and the daily mean of experiment 714's weather-only reference, in shares of capacity, over the
-    days of the stored window that lie before the fold month (experiment 714's `window_bounds`).
-    A Primary with no reference or no finite day is NaN. The array follows `nb.LABELS`.
+    and the daily mean of experiment 714's weather-only reference, in shares of capacity, **over the
+    fold's training span** `[month_day - 758, month_day - 28)` that the reference is fitted on
+    (experiment 714's `fit_reference`, `TRAIN_DAYS` and `TRAIN_LAG_DAYS`). A day's two means use
+    the half-hours at which both the real power and the reference are finite. A Primary with no
+    reference or no such day is NaN. The array follows `nb.LABELS`.
     """
     month_day = common714.month_start_day(month=month)
-    reference = common714.reference_for(ctx=ctx, month_day=month_day)
-    lo = reference.start_hh
     day = common714.DAY
-    n_before = (month_day * day - lo) // day
-    assert n_before > 0, (month, lo)
+    hi = month_day - common714.TRAIN_LAG_DAYS
+    lo = max(hi - common714.TRAIN_DAYS, 0)
     out = np.full(nb.N_PRIMARIES, np.nan)
     for label_index, label in enumerate(nb.LABELS):
         site = ctx.panel.sites.index(label)
-        real = ctx.panel.power[site, lo : lo + n_before * day].reshape(n_before, day)
-        ref = reference.power[site, : n_before * day].reshape(n_before, day)
-        with np.errstate(invalid="ignore"):
-            real_mean = np.nanmean(np.where(np.isfinite(ref), real, np.nan), axis=1)
-            ref_mean = np.nanmean(np.where(np.isfinite(real), ref, np.nan), axis=1)
-        diff = np.abs(real_mean - ref_mean)
-        if np.isfinite(diff).any():
-            out[label_index] = float(np.nanmean(diff))
+        beta = common714.fit_reference(
+            panel=ctx.panel, weather=ctx.weather, site=site, month_day=month_day
+        )
+        if beta is None:
+            continue
+        x = common714.design(weather=ctx.weather, site=site, day_lo=lo, day_hi=hi)
+        pred = (x @ beta).reshape(hi - lo, day)
+        real = ctx.panel.power[site, lo * day : hi * day].reshape(hi - lo, day)
+        ok = np.isfinite(real) & np.isfinite(pred)
+        count = ok.sum(axis=1)
+        have = count > 0
+        real_mean = np.where(ok, real, 0.0).sum(axis=1)[have] / count[have]
+        pred_mean = np.where(ok, pred, 0.0).sum(axis=1)[have] / count[have]
+        if have.any():
+            out[label_index] = float(np.abs(real_mean - pred_mean).mean())
     return out
 
 
@@ -255,11 +269,26 @@ def place_onset(*, fraction: float, first: int, last: int, length: int) -> int:
     return first + min(int(fraction * (hi - first)), hi - first - 1)
 
 
-def _permanent_ok(
-    *, perm_sum: np.ndarray, count: int, clean_row: np.ndarray, onset: int, shift: float,
-    mva: bool,
+def _placement_ok(
+    *, history_row: np.ndarray, clean_row: np.ndarray, perm_sum: np.ndarray, count: int,
+    onset: int, length: int, shift: float, mva: bool, temporary: bool,
 ) -> bool:  # fmt: skip
-    """Return True if adding a permanent change keeps the three limits of design section 2.1."""
+    """Return True if an event may sit at this Primary and onset (design section 2.1).
+
+    **The same floor test applies to a temporary move and to a permanent change.** At an MVA-only
+    Primary the history over the event, with the step added, stays at or above zero. If the test
+    were applied to one kind alone, the redraw would move the rejected steps of that kind to other
+    Primaries, and group and sign would predict the kind. A permanent change also keeps the limits
+    on stacking: at most `MAX_PERMANENT_PER_PRIMARY` per Primary, a summed shift within
+    `MAX_PERMANENT_SUM`, and a shifted target of an MVA-only Primary at or above zero.
+    """
+    if mva:
+        seg = history_row[onset : onset + length] + shift
+        finite = np.isfinite(seg)
+        if finite.any() and seg[finite].min() < -FLOOR_TOLERANCE:
+            return False
+    if temporary:
+        return True
     if count >= MAX_PERMANENT_PER_PRIMARY:
         return False
     new = perm_sum.copy()
@@ -302,7 +331,8 @@ def training_world(  # noqa: PLR0915
 
     Returns:
         The history and target arrays and the event table. `redrawn` counts permanent changes that
-        broke a limit and were moved to another Primary or onset with their sign and depth kept.
+        broke a limit (the floor of an MVA-only Primary, or a limit on stacking) and were moved to
+        another Primary or onset with their sign and depth kept.
     """
     assert vis.shape == (nb.N_PRIMARIES,), vis.shape
     assert (vis < DEPTH_MAX).all(), vis
@@ -314,51 +344,52 @@ def training_world(  # noqa: PLR0915
     perm_sum = np.zeros(clean.shape)
     perm_count = np.zeros(nb.N_PRIMARIES, dtype=int)
     events: list[dict] = []
-    redrawn = dropped = 0
+    redraws = {
+        "redrawn_temporary": 0,
+        "redrawn_permanent": 0,
+        "dropped_temporary": 0,
+        "dropped_permanent": 0,
+    }
     span = last - first
     for p in range(nb.N_PRIMARIES):
         covered = 0
         while covered < EVENT_COVER * span:
             ev = draw_event(rng=rng, vis=float(vis[p]), n_grid=n_grid)
-            host, onset = (
-                p,
-                place_onset(fraction=ev.onset_fraction, first=first, last=last, length=ev.length),
-            )
+            kind = "temporary" if ev.temporary else "permanent"
+            placing = ev.length if ev.temporary else PERMANENT_COVER_DAYS * PER_DAY
+            covered += placing
+            host = p
+            onset = place_onset(fraction=ev.onset_fraction, first=first, last=last, length=placing)
             shift = ev.sign * ev.depth
-            if ev.temporary:
-                length = ev.length
-                covered += length
-            else:
-                covered += PERMANENT_COVER_DAYS * PER_DAY
-                length = n_grid - onset
-                ok = _permanent_ok(
-                    perm_sum=perm_sum[host], count=int(perm_count[host]), clean_row=clean[host],
-                    onset=onset, shift=shift, mva=bool(mva_only[host]),
+
+            def fits(*, host: int, onset: int, ev: DrawnEvent = ev, shift: float = shift) -> bool:
+                length = ev.length if ev.temporary else n_grid - onset
+                return _placement_ok(
+                    history_row=history[host], clean_row=clean[host], perm_sum=perm_sum[host],
+                    count=int(perm_count[host]), onset=onset, length=length, shift=shift,
+                    mva=bool(mva_only[host]), temporary=ev.temporary,
                 )  # fmt: skip
-                tries = 0
-                while not ok and tries < MAX_REDRAWS:
-                    host = int(rng_redraw.integers(0, nb.N_PRIMARIES))
-                    onset = place_onset(
-                        fraction=float(rng_redraw.random()), first=first, last=last,
-                        length=PERMANENT_COVER_DAYS * PER_DAY,
-                    )  # fmt: skip
-                    ok = _permanent_ok(
-                        perm_sum=perm_sum[host], count=int(perm_count[host]),
-                        clean_row=clean[host], onset=onset, shift=shift, mva=bool(mva_only[host]),
-                    )  # fmt: skip
-                    tries += 1
-                if tries:
-                    redrawn += 1
-                if not ok:
-                    dropped += 1
-                    continue
-                length = n_grid - onset
+
+            ok = fits(host=host, onset=onset)
+            tries = 0
+            while not ok and tries < MAX_REDRAWS:
+                host = int(rng_redraw.integers(0, nb.N_PRIMARIES))
+                onset = place_onset(
+                    fraction=float(rng_redraw.random()), first=first, last=last, length=placing
+                )  # fmt: skip
+                ok = fits(host=host, onset=onset)
+                tries += 1
+            if tries:
+                redraws[f"redrawn_{kind}"] += 1
+            if not ok:
+                redraws[f"dropped_{kind}"] += 1
+                continue
+            length = ev.length if ev.temporary else n_grid - onset
+            if not ev.temporary:
                 perm_sum[host, onset:] += shift
                 perm_count[host] += 1
-            floor_host = bool(mva_only[host])
             w715.add_shift(
-                array=history, primary=host, onset=onset, length=length, shift=shift,
-                floor=floor_host and ev.temporary,
+                array=history, primary=host, onset=onset, length=length, shift=shift
             )  # fmt: skip
             if not ev.temporary:
                 w715.add_shift(
@@ -393,8 +424,9 @@ def training_world(  # noqa: PLR0915
                 }
             )  # fmt: skip
     return TrainingWorld(
-        history=history, target=target, events=events, seed=world_seed, redrawn=redrawn,
-        dropped=dropped,
+        history=history, target=target, events=events, seed=world_seed,
+        redrawn=redraws["redrawn_temporary"] + redraws["redrawn_permanent"],
+        dropped=redraws["dropped_temporary"] + redraws["dropped_permanent"], redraws=redraws,
     )  # fmt: skip
 
 
@@ -433,12 +465,16 @@ def check_targets_and_limits(
         finite = np.isfinite(row)
         floor_ok = (not finite.any()) or row[finite].min() >= -FLOOR_TOLERANCE
         assert floor_ok, f"MVA-only Primary {p} goes below zero in the target"
+    for p in np.nonzero(mva_only)[0]:
+        row = world.history[p]
+        finite = np.isfinite(row)
+        floor_ok = (not finite.any()) or row[finite].min() >= -FLOOR_TOLERANCE
+        assert floor_ok, f"MVA-only Primary {p} goes below zero in the history"
     n = len(world.events)
     return {
         "n_events": n,
         "permanent_share": sum(e["kind"] == "permanent" for e in world.events) / max(n, 1),
-        "redrawn": world.redrawn,
-        "dropped": world.dropped,
+        **world.redraws,
     }
 
 
@@ -451,31 +487,72 @@ def realised_cover(*, world: TrainingWorld, clean: np.ndarray, first: int, last:
     return float(inside[:, first:last].mean())
 
 
-def independence_tables(*, world: TrainingWorld) -> dict[str, object]:
-    """GH5: return the tables of kind by sign and kind by Primary, and the chi-squared p-values.
+def _chi2_p(*, frame: pl.DataFrame, column: str) -> tuple[pl.DataFrame, float]:
+    """Return the table of kind by `column`, and the p-value of a chi-squared independence test."""
+    table = frame.group_by("kind", column).len().pivot(on=column, index="kind", values="len")
+    counts = table.drop("kind").fill_null(0).to_numpy().astype(float)
+    counts = counts[:, counts.sum(axis=0) > 0]
+    if counts.shape[0] < 2 or counts.shape[1] < 2:
+        return table, 1.0
+    return table, float(chi2_contingency(counts).pvalue)
 
-    Also returns the shares of unmirrored temporary rises and falls, which the design asserts are
-    equal (a two-sided binomial z-score at the 1% level fails the check).
+
+def independence_tables(
+    *, worlds: list[TrainingWorld], mva_only: np.ndarray, level: float
+) -> dict[str, object]:  # fmt: skip
+    """GH5: pool the draws of one fold, return the tables of kind by sign, and test independence.
+
+    The tables are kind by sign, kind by Primary, and kind by sign within each group (the MVA-only
+    Primaries and the signed-MW Primaries), each with a chi-squared p-value.
+    The unmirrored temporary moves must show as many rises as falls (a two-sided z-score). Every
+    test is read at `level`,
+    which the gate sets to the family level `INDEPENDENCE_LEVEL` over the number of tests of the
+    gate (a Bonferroni correction). Pooling the draws of a fold gives the Primary table enough
+    events for a chi-squared test.
     """
-    frame = pl.DataFrame(world.events)
-    out: dict[str, object] = {}
-    for column in ("sign", "host"):
-        table = frame.group_by("kind", column).len().pivot(on=column, index="kind", values="len")
-        counts = table.drop("kind").fill_null(0).to_numpy().astype(float)
-        counts = counts[:, counts.sum(axis=0) > 0]
-        p_value = float(chi2_contingency(counts).pvalue) if counts.shape[1] > 1 else 1.0
-        out[f"kind_by_{column}"] = table
-        out[f"p_kind_by_{column}"] = p_value
-        assert p_value >= INDEPENDENCE_LEVEL, (
-            f"kind is not independent of {column} (chi-squared p={p_value:.4f}, seed {world.seed})"
+    from scipy.stats import norm
+
+    frame = pl.DataFrame([e for w in worlds for e in w.events]).with_columns(
+        group=pl.col("host").map_elements(
+            lambda h: "mva_only" if mva_only[h] else "signed_mw", return_dtype=pl.String
+        )
+    )
+    out: dict[str, object] = {"n_events": frame.height}
+    tests = {
+        "kind_by_sign": ("sign", frame),
+        "kind_by_host": ("host", frame),
+        "kind_by_sign_mva_only": ("sign", frame.filter(pl.col("group") == "mva_only")),
+        "kind_by_sign_signed_mw": ("sign", frame.filter(pl.col("group") == "signed_mw")),
+    }
+    for name, (column, sub) in tests.items():
+        table, p_value = _chi2_p(frame=sub, column=column)
+        out[name] = table
+        out[f"p_{name}"] = p_value
+        assert p_value >= level, (
+            f"kind is not independent: {name} (chi-squared p={p_value:.2e}, level {level:.2e})"
         )
     bare = frame.filter((pl.col("kind") == "temporary") & (pl.col("mirror_class") == 0))
     n = bare.height
     rises = int((bare["sign"] > 0).sum())
     z = (rises - n / 2) / max(np.sqrt(n / 4), 1e-9)
     out["unmirrored_temporary"] = {"n": n, "rises": rises, "z": float(z)}
-    assert abs(z) < 2.576, f"unmirrored temporary rises and falls are unbalanced (z={z:.2f})"
+    limit = float(norm.isf(level / 2))
+    assert abs(z) < limit, (
+        f"unmirrored temporary rises and falls are unbalanced (z={z:.2f}, limit {limit:.2f})"
+    )
     return out
+
+
+N_INDEPENDENCE_TESTS: Final = 5
+"""Tests per fold in `independence_tables`: four chi-squared tests and one z-test."""
+
+
+def world_hash(*, world: TrainingWorld) -> str:
+    """Return the sha256 of the history and target arrays of a draw (GH9; a fit records it too)."""
+    h = hashlib.sha256()
+    for array in (world.history, world.target):
+        h.update(np.ascontiguousarray(array).tobytes())
+    return h.hexdigest()
 
 
 def check_shared_draw(*, host_a: np.ndarray, host_b: np.ndarray) -> None:
@@ -504,6 +581,7 @@ def donor_step(*, truth: pl.DataFrame, capacity_mw: np.ndarray) -> np.ndarray:
             out[i] = abs(row["size"])
         elif row["recipient"] is not None and row["recipient"] >= 0 and row["share"]:
             donor = row["recipient"]
+            assert abs(row["size"]) < RECIPIENT_CAP, f"a receiving-host row is capped: {row}"
             out[i] = (
                 abs(row["size"]) * capacity_mw[row["host"]] / (row["share"] * capacity_mw[donor])
             )
@@ -575,7 +653,9 @@ class CountReport:
         metered: Of those, the moves with a metered mirror.
         floor_only: Of those, the moves with a donor step of at least 0.10 of capacity.
         visible_depth: Of those, the moves that pass the full visible-depth definition.
-        lasting: Of the counted moves, those that last 7 days or more.
+        lasting: Of the counted moves (visible depth), those that last 7 days or more.
+        lasting_floor_only: Of the floor-only moves, those that last 7 days or more (the design's
+            43 of 81).
         per_month: The counted moves per fold month.
         per_mirror_state: The counted moves per mirror state.
         per_band: The counted moves per duration band.
@@ -586,6 +666,7 @@ class CountReport:
     floor_only: int
     visible_depth: int
     lasting: int
+    lasting_floor_only: int
     per_month: pl.DataFrame
     per_mirror_state: pl.DataFrame
     per_band: pl.DataFrame
@@ -601,6 +682,9 @@ def count_report(*, events: pl.DataFrame) -> CountReport:
         floor_only=counted_moves(events=events, floor_only=True).height,
         visible_depth=counted.height,
         lasting=counted.filter(pl.col("duration_days") >= 7).height,
+        lasting_floor_only=counted_moves(events=events, floor_only=True)
+        .filter(pl.col("duration_days") >= 7)
+        .height,
         per_month=counted.group_by("month").len().sort("month"),
         per_mirror_state=counted.group_by("mirror_state").len().sort("mirror_state"),
         per_band=counted.group_by("band").len().sort("band"),

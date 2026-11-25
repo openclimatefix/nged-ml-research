@@ -26,9 +26,12 @@ follow share is the mean median difference over the target rows, over the mean i
 
 - The slice is cut on the target half-hour. If the design meant the origin day, the counts of GH4
   change, and the gate prints the counts of both cuts.
-- Storage: a stored `g2` pass holds injected power up to 45 days after the first day of the fold
-  month, so every target half-hour at the scored origins (at most 21 + 14 = 35 days after the
-  onset) is inside the stored window.
+- **The grid end.** Experiment 709's grid ends on 2026-06-30, so for fold 2026-06 a target half-hour
+  of a late origin can lie past the grid (and a stored `g2` pass holds injected power only to 45 days
+  after the first day of the fold month). `take` returns NaN for an index past the array. A row
+  whose truth is NaN is not scorable: `row_scores` gives it a NaN score, the counted reading and
+  guard P drop it, and `follow_shares` drops it. The gate counts the nominal rows, the rows past the
+  grid, the rows with a NaN truth, and the scorable rows of every counted move, and prints them.
 """
 
 from dataclasses import dataclass
@@ -86,23 +89,70 @@ def counted_slice(*, onset_day: int, end_day: int) -> tuple[int, int]:
     return onset_day * PER_DAY, (end + SLICE_AFTER_END_DAYS) * PER_DAY
 
 
-def rows_in_slice(*, onset_day: int, end_day: int, by: str = "valid") -> int:
-    """Return the number of (origin, lead day, half-hour) rows of one scored Primary in the slice.
+@dataclass(frozen=True)
+class SliceRows:
+    """The rows of one scored Primary of a temporary move at the scored origins.
 
-    `by` is `valid` (the target half-hour is in the slice, the design's cut) or `origin` (the origin
-    day is in the slice, experiment 715's cut). The gate prints both.
+    Attributes:
+        nominal: Rows whose target half-hour is in the counted slice.
+        by_origin: Rows whose origin day is in the slice (experiment 715's cut), for comparison.
+        past_grid: Nominal rows whose target half-hour lies past the end of the grid.
+        no_truth: Nominal rows inside the grid whose unswitched truth is NaN.
+        scorable: Nominal rows with a finite unswitched truth.
+        slice_1: Scorable rows while the move is in force.
+        slice_2: Scorable rows in the 7 days after the move ends.
+    """
+
+    nominal: int
+    by_origin: int
+    past_grid: int
+    no_truth: int
+    scorable: int
+    slice_1: int
+    slice_2: int
+
+
+def slice_rows(*, clean: np.ndarray, onset_day: int, end_day: int) -> SliceRows:
+    """Count the rows of one scored Primary of a temporary move in the counted slice.
+
+    Args:
+        clean: (G,) the Primary's unswitched power over capacity on the grid.
+        onset_day: Grid day of the onset.
+        end_day: Grid day of the end of the move.
+
+    Returns:
+        The counts of `SliceRows`. The slice is cut on the target half-hour, as the design says.
     """
     lo, hi = counted_slice(onset_day=onset_day, end_day=end_day)
-    total = 0
+    mid = (end_day if end_day >= 0 else NEVER_ENDS) * PER_DAY
+    nominal = by_origin = past = no_truth = slice_1 = slice_2 = 0
     for k in ORIGIN_DAYS:
         origin = onset_day + k
         for lead in LEAD_DAYS:
-            if by == "origin":
-                total += PER_DAY if lo <= origin * PER_DAY < hi else 0
-            else:
-                idx = target_index(origin_day=origin, lead_day=lead)
-                total += int(((idx >= lo) & (idx < hi)).sum())
-    return total
+            idx = target_index(origin_day=origin, lead_day=lead)
+            inside = (idx >= lo) & (idx < hi)
+            by_origin += PER_DAY if lo <= origin * PER_DAY < hi else 0
+            truth = take(array=clean, index=idx)
+            past_row = inside & (idx >= len(clean))
+            missing = inside & ~past_row & ~np.isfinite(truth)
+            good = inside & np.isfinite(truth)
+            nominal += int(inside.sum())
+            past += int(past_row.sum())
+            no_truth += int(missing.sum())
+            slice_1 += int((good & (idx < mid)).sum())
+            slice_2 += int((good & (idx >= mid)).sum())
+    return SliceRows(
+        nominal=nominal, by_origin=by_origin, past_grid=past, no_truth=no_truth,
+        scorable=slice_1 + slice_2, slice_1=slice_1, slice_2=slice_2,
+    )  # fmt: skip
+
+
+def take(*, array: np.ndarray, index: np.ndarray) -> np.ndarray:
+    """Return `array[index]`, with NaN where the index lies past the end of the array."""
+    out = np.full(index.shape, np.nan)
+    inside = index < len(array)
+    out[inside] = array[index[inside]]
+    return out
 
 
 def visible_change(
@@ -169,8 +219,8 @@ def rows_for_event(
                         "days_after_onset": np.full(PER_DAY, k),
                         "lead_day": np.full(PER_DAY, lead),
                         "valid_hh": valid,
-                        "truth_share": injected[valid],
-                        "clean_share": clean[valid],
+                        "truth_share": take(array=injected, index=valid),
+                        "clean_share": take(array=clean, index=valid),
                         "change": np.full(PER_DAY, change),
                         "in_force": np.full(PER_DAY, in_force),
                         "persist_injected": injected[back],
@@ -290,7 +340,8 @@ def follow_shares(*, injected: pl.DataFrame, real: pl.DataFrame) -> pl.DataFrame
 
     Returns:
         A frame with `event_id`, `primary`, `kind`, `shape`, `days_after_onset`, `in_force`, `change`, and
-        `follow`. A row with no finite change has a null `follow`.
+        `follow`. A row with no finite change has a null `follow`. Rows with a NaN median are dropped before
+        the mean, so a NaN truth never gives a NaN follow share.
     """
     keys = ["event_id", "primary", "days_after_onset", "lead_day", "valid_hh"]
     lo, hi = FOLLOW_LEAD_DAYS
@@ -300,8 +351,9 @@ def follow_shares(*, injected: pl.DataFrame, real: pl.DataFrame) -> pl.DataFrame
     )
     joined = a.join(b, on=keys, how="inner")
     assert joined.height == a.height, "the injected and the real forecasts cover different rows"
+    finite = joined.filter(pl.col("q50").is_finite() & pl.col("q50_real").is_finite())
     return (
-        joined.group_by("event_id", "primary", "kind", "shape", "days_after_onset")
+        finite.group_by("event_id", "primary", "kind", "shape", "days_after_onset")
         .agg(
             (pl.col("q50") - pl.col("q50_real")).mean().alias("shift"),
             pl.col("change").first(),

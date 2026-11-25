@@ -11,7 +11,7 @@
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # are set to dummy values here because the contracts package reads them at import.
 #
-# Checks before every job: at least MIN_AVAILABLE_GB (default 20) of free memory, a one-minute load
+# Checks before every job: at least MIN_AVAILABLE_GB (default 25) of free memory, a one-minute load
 # average below MAX_LOAD (default: 75% of the cores), and, with GPU=1, an exclusive lock so that this
 # experiment runs at most one GPU process at a time. Python caps the GPU memory at GPU_CAP_GB (6)
 # through `E00728_GPU_CAP_GB`; the fit script reads it.
@@ -27,9 +27,13 @@ if [ ! -d "$frozen_713" ]; then
     echo "the frozen checkout of experiment 713 is missing: $frozen_713 (set FROZEN_713)" >&2
     exit 1
 fi
+if [ -n "$(git -C "$frozen_713" status --porcelain)" ] || [ "$(git -C "$frozen_713" rev-parse --short=9 HEAD)" != "7c29114a8" ]; then
+    echo "the frozen checkout of experiment 713 is dirty or not at 7c29114a8: $frozen_713" >&2
+    exit 1
+fi
 available_gb=$(free -g | awk '/^Mem:/ {print $7}')
-if [ "${available_gb:-0}" -lt "${MIN_AVAILABLE_GB:-20}" ]; then
-    echo "only ${available_gb} GB available; wait until ${MIN_AVAILABLE_GB:-20} GB is free (set MIN_AVAILABLE_GB to override)" >&2
+if [ "${available_gb:-0}" -lt "${MIN_AVAILABLE_GB:-25}" ]; then
+    echo "only ${available_gb} GB available; wait until ${MIN_AVAILABLE_GB:-25} GB is free (set MIN_AVAILABLE_GB to override)" >&2
     exit 1
 fi
 cores=$(nproc)
