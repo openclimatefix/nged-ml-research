@@ -326,6 +326,38 @@ temporary move, with the onset marked.**
 
 ![Temporary move](injected_switch.svg)
 
+**The across-day attention of `M1` and `E` does not favour rows that share the target's weekday,
+and `P` shows the same lack of preference.** These charts come from one fold (the 2026-01 test month)
+and seed 0, read from the saved weights of `M1`, `E`, and `P` with the forecast unchanged. For
+the three displayed cases, the extract's forecast matched the stored scored forecast to within
+1.6e-06 in every quantile, and the forecast with the attention returned was bit-identical to the
+forecast without it. The weight on the target row itself is 0.048 for `M1`, 0.084 for `E`, and 0.039
+for `P` at lead day 1. Averaged over the 16 Primaries, every test origin, every half-hour, and the 4
+heads, each of the 14 history slots takes between 0.05 and 0.09 of the weight (a uniform spread
+would give 0.067 per slot of the 15). The rows with the target's weekday take 13.7% of the history
+weight in `M1` at lead day 1 (and 14.5% at lead day 7), 12.8% in `E` (14.4%), and 14.3% in `P`
+(14.3%). Two of 14 rows is 14.3%, so none of the three networks puts extra weight on the rows with
+the target's weekday.
+
+![Mean across-day attention by history slot, lead day 1](attention_by_age_lead1.svg)
+
+![Mean across-day attention by history slot, lead day 7](attention_by_age_lead7.svg)
+
+**Single cases show more structure than the average does, and the structure differs between the
+cases.** Each case is one origin and one Primary, chosen for display only, on outcomes the network
+never reads: the origin whose next-day actual has the largest half-hour step (`d8 steps`), and the
+origins with the highest and the lowest mean reanalysis shortwave over the target day (`clear day`
+and `dull day`). On the clear day, `M1` and `E` put their largest weights on slots 2 and 6 for the
+first half-hours of the target day, and `P` puts its largest weights on other slots. The three
+cases show different rows, so no single row dominates across cases. The cases are three origins, and
+each is a single forecast.
+
+![Across-day attention, case d8 steps](attention_across_d8_steps.svg)
+
+![Across-day attention, case clear day](attention_across_clear_day.svg)
+
+![Across-day attention, case dull day](attention_across_dull_day.svg)
+
 ## Checks
 
 - **Median minus mean forecast, per site.** For `M1` at seed 0, averaged over all leads of 0 to 14
@@ -396,8 +428,9 @@ temporary move, with the onset marked.**
   appears beside CRPS for the report-only contrasts in `report_only.json` and for the two contrasts
   named under Checks.
 - **The design's read-out of the across-day attention weights before and after an injected permanent
-  change (design section 6.5) was not built, and no attention maps are drawn.** The attention
-  extract waits for a GPU slot and a code review, and the page does not draw attention maps.
+  change (design section 6.5) was not built.** The attention maps above cover one fold (2026-01),
+  seed 0, and the arms `M1`, `E`, and `P`. They do not show attention on injected worlds, and the
+  mean weights cannot tell whether the attention of a single origin follows a step.
 - **The input sets differ.** The Candidate reads neighbour summaries and a table of expected inputs
   that the MSA neural network lacks, and the neural network reads 14 days of power and reanalysis
   history weather. The difference between the groups may come from inputs rather than architecture.
