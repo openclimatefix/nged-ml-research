@@ -30,14 +30,33 @@ def gallery_private_dir(*, root: Path) -> Path:
     return root / "PRIVATE" / PRIVATE_SUBFOLDER
 
 
+RAMP_SHARE: Final = 0.97
+"""A half-hour at or above this share of the running level has finished its ramp."""
+TRIP_FLANK_TOLERANCE: Final = 0.02
+"""A zero run is a trip when the levels before and after it differ by at most this share."""
+TRIP_MAX_HALF_HOURS: Final = 4
+"""The longest trip, in half-hours (`core729.RANGES["trip_half_hours"]`)."""
+PART_LOAD_SHARE: Final = 0.9
+"""Part load means the output stays below this share of the sum of the unit sizes."""
+
+
 def check_ramp(*, engine: np.ndarray) -> bool:
-    """Check that the output rises to its running level over 2 half-hours (no one-step jump)."""
-    up = np.flatnonzero((engine[:-1] <= 0.0) & (engine[1:] > 0.0))
-    if up.size == 0:
-        return False
-    first = int(up[0]) + 1
-    run = engine[first : first + 6]
-    return bool(run.size >= 3 and engine[first] < 0.99 * run.max())
+    """Check that a run rises to its level over at least 2 half-hours, as the plotted arrays show.
+
+    A run starts where the output turns positive. Its first half-hour must be under 0.75 of the
+    run's level (the highest of the next 8 half-hours) and its second half-hour must still be under
+    `RAMP_SHARE` of the level, so that the plotted line shows a staircase and not a step.
+    """
+    up = np.flatnonzero((engine[:-1] <= 0.0) & (engine[1:] > 0.0)) + 1
+    for first in up:
+        level = float(engine[first : first + 8].max())
+        if (
+            first + 2 < len(engine)
+            and engine[first] < 0.75 * level
+            and engine[first + 1] < RAMP_SHARE * level
+        ):
+            return True
+    return False
 
 
 def check_blocks(*, engine: np.ndarray, before: slice, block: slice) -> bool:
@@ -45,9 +64,75 @@ def check_blocks(*, engine: np.ndarray, before: slice, block: slice) -> bool:
     return bool((engine[block] > 0.0).any() and (engine[before] <= 0.0).all())
 
 
+def check_evening(*, engine: np.ndarray) -> bool:
+    """Check that some day of the plotted window has an evening block and no output before it."""
+    return any(
+        check_blocks(engine=day, before=slice(0, 20), block=slice(34, 46))
+        for day in engine.reshape(-1, 48)
+    )
+
+
+def check_morning(*, engine: np.ndarray) -> bool:
+    """Check that some day of the plotted window has a morning block and no output before it."""
+    return any(
+        check_blocks(engine=day, before=slice(0, 8), block=slice(10, 18))
+        for day in engine.reshape(-1, 48)
+    )
+
+
+def check_weekend(*, engine: np.ndarray, first_day_is_weekend: bool) -> bool:
+    """Check that the window's first day is a weekend day and has engine output."""
+    return bool(first_day_is_weekend and engine[:48].max() > 0.0)
+
+
 def check_part_load(*, engine: np.ndarray, unit_sizes: Sequence[float]) -> bool:
-    """Check that the output stays below the sum of the unit sizes and above zero somewhere."""
-    return bool((engine > 0.0).any() and engine.max() < float(sum(unit_sizes)))
+    """Check that the output is above zero and stays under 0.9 of the sum of the unit sizes."""
+    return bool((engine > 0.0).any() and engine.max() < PART_LOAD_SHARE * float(sum(unit_sizes)))
+
+
+def check_trip(*, engine: np.ndarray) -> bool:
+    """Check that the output drops to zero for 1 to 4 half-hours inside a block at one level.
+
+    Two blocks of one day with a gap between them do not count, because their levels differ. A
+    trip leaves the level before it and the level after it equal, within
+    `TRIP_FLANK_TOLERANCE`.
+    """
+    pos = engine > 0.0
+    zero = np.flatnonzero(~pos)
+    if zero.size == 0:
+        return False
+    starts = zero[np.concatenate([[True], np.diff(zero) > 1])]
+    stops = zero[np.concatenate([np.diff(zero) > 1, [True]])] + 1
+    for a, b in zip(starts, stops, strict=True):
+        if b - a > TRIP_MAX_HALF_HOURS or a < 3 or b + 3 > len(engine):
+            continue
+        before, after = float(engine[a - 3 : a].max()), float(engine[b : b + 3].max())
+        if (
+            before > 0.0
+            and after > 0.0
+            and abs(before - after) <= TRIP_FLANK_TOLERANCE * max(before, after)
+        ):
+            return True
+    return False
+
+
+def check_spell(*, engine: np.ndarray) -> bool:
+    """Check that the window shows a spell: whole days above zero, with a day before and after.
+
+    The output must stay above zero through at least 2 consecutive whole days, and the window must
+    hold a day that is not whole before the first and after the last, so that the plotted spell
+    starts and ends inside the window.
+    """
+    full = (engine.reshape(-1, 48) > 0.0).all(axis=1)
+    n = len(full)
+    for i in range(1, n - 2):
+        if full[i] and full[i + 1] and not full[i - 1]:
+            j = i + 1
+            while j + 1 < n and full[j + 1]:
+                j += 1
+            if j + 1 < n and not full[j + 1]:
+                return True
+    return False
 
 
 def run_plateaus(*, engine: np.ndarray, min_step: float = 2.0) -> int:
@@ -99,25 +184,6 @@ def check_units(*, one_unit_levels: Sequence[int], several_unit_levels: Sequence
     one = float(np.mean(np.asarray(one_unit_levels) >= 2))
     several = float(np.mean(np.asarray(several_unit_levels) >= 2))
     return one <= ONE_UNIT_MAX_MULTI_LEVEL_SHARE and several > one
-
-
-def check_trip(*, engine: np.ndarray) -> bool:
-    """Check that the output drops to zero inside a running block (between two positive runs)."""
-    pos = engine > 0.0
-    idx = np.flatnonzero(pos)
-    if idx.size < 2:
-        return False
-    return bool((~pos[idx[0] : idx[-1] + 1]).any())
-
-
-def check_spell(*, daily_max: np.ndarray, days: int = 2) -> bool:
-    """Check that the output stays above zero on at least `days` consecutive days."""
-    run = 0
-    for v in daily_max > 0.0:
-        run = run + 1 if v else 0
-        if run >= days:
-            return True
-    return False
 
 
 def check_clear(*, solar: np.ndarray, mid: slice) -> bool:

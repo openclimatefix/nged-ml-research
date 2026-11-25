@@ -9,7 +9,7 @@ private set and never in the published set, and the published S1 panels are seas
 requirement holds on the arrays behind it, which `e00730_gallery` records.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
@@ -44,6 +44,8 @@ SEASON_MONTHS: Final = {
     "autumn": (9, 10, 11),
 }
 HOUR_AXIS: Final = alt.Axis(values=[0, 12, 24, 36, 48, 60, 72, 84, 96])
+N_DRAWS: Final = 3
+"""Each G1 feature panel shows this many draws, from different segments."""
 save_svg = figures729.save_svg
 optimise_command = figures729.optimise_command
 
@@ -58,6 +60,7 @@ def window_chart(
     hidden: np.ndarray | None = None,
     y_title: str = "Points of capacity",
     height: int = 130,
+    n_days: int = 2,
 ) -> alt.Chart:
     """Return lines over a 96-half-hour window (days 1 and 2) with the hidden span shaded.
 
@@ -67,6 +70,7 @@ def window_chart(
         hidden: Positions whose reading is hidden, shaded grey, or None.
         y_title: The y-axis title with its unit.
         height: Plot height in pixels.
+        n_days: The window length in days, which sets the hour axis.
 
     Returns:
         The chart, with no calendar date anywhere.
@@ -84,7 +88,11 @@ def window_chart(
         alt.Chart(data)
         .mark_line(aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("hour:Q", title="Hours from the start of day 1 (UTC)", axis=HOUR_AXIS),
+            x=alt.X(
+                "hour:Q",
+                title="Hours from the start of day 1 (UTC)",
+                axis=alt.Axis(values=list(range(0, 24 * n_days + 1, 12 if n_days <= 2 else 24))),
+            ),
             y=alt.Y("value:Q", title=y_title),
             color=alt.Color(
                 "series:N",
@@ -158,138 +166,188 @@ def season_of_segment(*, seg: sim729.Segment, day: int) -> str:
     return next(s for s, months in SEASON_MONTHS.items() if month in months)
 
 
-def engine_panel(*, seg: sim729.Segment, day: int, title: str) -> alt.Chart:
-    """Return the engine output beside the base demand for one two-day window."""
-    return window_chart(
-        series={
-            "engine output": day_window(seg=seg, day=day, name="engine"),
-            "base demand": day_window(seg=seg, day=day, name="base"),
-        },
-        title=title,
-    )
+def engine_panel(
+    *,
+    seg: sim729.Segment,
+    day: int,
+    title: str,
+    n_days: int = 2,
+    unit_total: float | None = None,
+) -> alt.Chart:
+    """Return the engine output beside the base demand over `n_days` days from `day`.
+
+    Args:
+        seg: The segment.
+        day: The dense day the window starts on.
+        title: The panel title.
+        n_days: The window length in days.
+        unit_total: When given, a line at the sum of the unit sizes.
+
+    Returns:
+        The chart.
+    """
+    series = {
+        "engine output": window_array(seg=seg, day=day, n_days=n_days, name="engine"),
+        "base demand": window_array(seg=seg, day=day, n_days=n_days, name="base"),
+    }
+    if unit_total is not None:
+        series["sum of unit sizes"] = np.full(24 * n_days * 2, unit_total)
+    return window_chart(series=series, title=title, n_days=n_days)
+
+
+def window_array(*, seg: sim729.Segment, day: int, n_days: int, name: str) -> np.ndarray:
+    """Return `n_days` days of a dense array of a segment from `day`, flattened to half-hours."""
+    return np.asarray(getattr(seg, name)[day : day + n_days]).reshape(-1)
+
+
+def pick_windows(
+    *,
+    segments: Sequence[sim729.Segment],
+    n_days: int,
+    check: Callable[[sim729.Segment, int, np.ndarray], bool],
+    used: set[tuple[int, int]],
+    n: int = N_DRAWS,
+) -> list[tuple[sim729.Segment, int]]:
+    """Return up to `n` windows from different segments whose engine array passes `check`.
+
+    `check(seg, day, engine_window)` runs on the exact array that the panel plots. The first
+    passing window of each segment is a candidate. Candidates from months not yet drawn come
+    first, and windows that another panel already shows come last.
+
+    Args:
+        segments: The segments to search, in a fixed order.
+        n_days: The window length in days.
+        check: The feature check.
+        used: The `(id(segment), day)` windows that other panels show.
+        n: The number of draws wanted.
+
+    Returns:
+        The chosen `(segment, day)` pairs.
+    """
+    fresh: list[tuple[sim729.Segment, int]] = []
+    shown: list[tuple[sim729.Segment, int]] = []
+    for seg in segments:
+        for day in range(1, seg.engine.shape[0] - n_days):
+            if check(seg, day, window_array(seg=seg, day=day, n_days=n_days, name="engine")):
+                (shown if (id(seg), day) in used else fresh).append((seg, day))
+                break
+    chosen: list[tuple[sim729.Segment, int]] = []
+    months: set[str] = set()
+    for seg, day in [*fresh, *shown]:
+        if str(seg.month) not in months:
+            chosen.append((seg, day))
+            months.add(str(seg.month))
+    for pair in [*fresh, *shown]:
+        if len(chosen) >= n:
+            break
+        if not any(pair[0] is c[0] and pair[1] == c[1] for c in chosen):
+            chosen.append(pair)
+    chosen = chosen[:n]
+    used.update((id(seg), day) for seg, day in chosen)
+    return chosen
+
+
+def is_weekend(*, seg: sim729.Segment, day: int) -> bool:
+    """Return whether a segment's dense day is a Saturday or a Sunday."""
+    return np.datetime64(seg.dates[day], "D").astype(int) % 7 in (2, 3)
 
 
 def engine_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> None:
-    """Draw G1: the engine panels and their requirements."""
+    """Draw G1: a small multiple of draws for each engine feature, and the requirements.
+
+    Each feature panel shows `N_DRAWS` windows from different segments. The window of a draw is
+    picked by the feature itself, the check runs on the exact arrays that the panel plots, and a
+    panel passes only when every one of its draws passes. A window that another panel shows is
+    used again only when no other segment has the feature.
+    """
     engines = [s for s in segments if s.world in ("engine", "both")]
-
-    def record(key: str, ok: bool, chart: alt.TopLevelMixin | None, note: str) -> None:
-        out.results[key] = bool(ok)
-        out.notes[key] = note
-        if chart is not None:
-            out.public[key] = chart
-
-    def find(keep) -> tuple[sim729.Segment, int] | None:  # noqa: ANN001
-        return first_day(segments=engines, keep=keep)
-
-    def day_of(seg: sim729.Segment, d: int) -> np.ndarray:
-        return seg.engine[d]
-
-    hit = find(lambda s, d: gallery.check_ramp(engine=day_of(s, d)))
-    record(
-        "G1_ramp",
-        hit is not None,
-        engine_panel(seg=hit[0], day=hit[1], title="G1: a ramp") if hit else None,
-        "found" if hit else "no ramp day",
-    )
-    hit = find(
-        lambda s, d: gallery.check_blocks(
-            engine=day_of(s, d), before=slice(0, 20), block=slice(34, 46)
-        )
-    )
-    record(
-        "G1_evening",
-        hit is not None,
-        engine_panel(seg=hit[0], day=hit[1], title="G1: an evening run") if hit else None,
-        "found" if hit else "no evening day",
-    )
-    hit = find(
-        lambda s, d: gallery.check_blocks(
-            engine=day_of(s, d), before=slice(0, 8), block=slice(10, 18)
-        )
-    )
-    record(
-        "G1_morning",
-        hit is not None,
-        engine_panel(seg=hit[0], day=hit[1], title="G1: a morning run") if hit else None,
-        "found" if hit else "no morning day",
-    )
-    hit = find(
-        lambda s, d: (
-            bool(day_of(s, d).max() > 0)
-            and np.datetime64(s.dates[d], "D").astype(int) % 7 in (2, 3)
-        )
-    )
-    record(
-        "G1_weekend",
-        hit is not None,
-        engine_panel(seg=hit[0], day=hit[1], title="G1: a weekend day") if hit else None,
-        "found" if hit else "no weekend day",
-    )
-    hit = find(
-        lambda s, d: gallery.check_part_load(
-            engine=day_of(s, d), unit_sizes=[s.params.get("total_points_cap", 0.0)]
-        )
-    )
-    record(
-        "G1_part_load",
-        hit is not None,
-        engine_panel(seg=hit[0], day=hit[1], title="G1: part load") if hit else None,
-        "found" if hit else "no part-load day",
-    )
-    one = find(lambda s, d: s.params.get("n_units", 0) == 1 and day_of(s, d).max() > 0)
-    many = find(
-        lambda s, d: (
-            s.params.get("n_units", 0) > 1 and gallery.run_plateaus(engine=day_of(s, d)) >= 2
-        )
-    )
-    one_levels = [
-        gallery.run_plateaus(engine=seg.engine[d])
-        for seg in engines
-        if seg.params.get("n_units", 0) == 1
-        for d in range(seg.engine.shape[0])
-        if seg.engine[d].max() > 0
-    ]
-    many_levels = [
-        gallery.run_plateaus(engine=seg.engine[d])
-        for seg in engines
-        if seg.params.get("n_units", 0) > 1
-        for d in range(seg.engine.shape[0])
-        if seg.engine[d].max() > 0
-    ]
+    used: set[tuple[int, int]] = set()
+    features = (
+        ("G1_ramp", "a run with a ramp", 2, lambda s, d, e: gallery.check_ramp(engine=e), False),
+        (
+            "G1_evening", "an evening run", 2,
+            lambda s, d, e: gallery.check_evening(engine=e), False,
+        ),
+        (
+            "G1_morning", "a morning run", 2,
+            lambda s, d, e: gallery.check_morning(engine=e), False,
+        ),
+        (
+            "G1_weekend", "a weekend day", 2,
+            lambda s, d, e: gallery.check_weekend(engine=e, first_day_is_weekend=is_weekend(seg=s, day=d)),
+            False,
+        ),
+        (
+            "G1_part_load", "part load", 2,
+            lambda s, d, e: gallery.check_part_load(
+                engine=e, unit_sizes=[s.params.get("total_points_cap", 0.0)]
+            ),
+            True,
+        ),
+        ("G1_trip", "a trip inside a run", 2, lambda s, d, e: gallery.check_trip(engine=e), False),
+        (
+            "G1_spell", "a multi-day spell (5 days)", 5,
+            lambda s, d, e: gallery.check_spell(engine=e), False,
+        ),
+    )  # fmt: skip
+    for key, title, n_days, check, show_total in features:
+        picked = pick_windows(segments=engines, n_days=n_days, check=check, used=used)
+        passes = [
+            check(seg, day, window_array(seg=seg, day=day, n_days=n_days, name="engine"))
+            for seg, day in picked
+        ]
+        ok = len(picked) == N_DRAWS and all(passes)
+        panels = [
+            engine_panel(
+                seg=seg, day=day, n_days=n_days,
+                title=f"G1: {title} (draw {i + 1} of {N_DRAWS})",
+                unit_total=float(seg.params["total_points_cap"]) if show_total else None,
+            )
+            for i, (seg, day) in enumerate(picked)
+        ]  # fmt: skip
+        out.results[key] = ok
+        out.notes[key] = f"{sum(passes)} of {N_DRAWS} draws pass"
+        if panels:
+            out.public[key] = alt.vconcat(*panels)
+    # units: three one-unit and three several-unit draws, and the bank-wide share of two-level days
+    one = pick_windows(
+        segments=[s for s in engines if s.params.get("n_units", 0) == 1], n_days=2, used=used,
+        check=lambda s, d, e: bool(e.max() > 0 and gallery.run_plateaus(engine=e[:48]) <= 1
+                                   and gallery.run_plateaus(engine=e[48:]) <= 1),
+    )  # fmt: skip
+    many = pick_windows(
+        segments=[s for s in engines if s.params.get("n_units", 0) > 1], n_days=2, used=used,
+        check=lambda s, d, e: gallery.run_plateaus(engine=e[:48]) >= 2
+        or gallery.run_plateaus(engine=e[48:]) >= 2,
+    )  # fmt: skip
+    levels = {
+        label: [
+            gallery.run_plateaus(engine=seg.engine[d])
+            for seg in engines
+            if (seg.params.get("n_units", 0) == 1) == (label == "one")
+            for d in range(seg.engine.shape[0])
+            if seg.engine[d].max() > 0
+        ]
+        for label in ("one", "several")
+    }
     ok = bool(
-        one
-        and many
-        and gallery.check_units(one_unit_levels=one_levels, several_unit_levels=many_levels)
-    )
-    chart = None
-    if one and many:
-        chart = alt.vconcat(
-            engine_panel(seg=one[0], day=one[1], title="G1: one unit"),
-            engine_panel(seg=many[0], day=many[1], title="G1: several units"),
+        len(one) == N_DRAWS
+        and len(many) == N_DRAWS
+        and gallery.check_units(
+            one_unit_levels=levels["one"], several_unit_levels=levels["several"]
         )
-    record("G1_units", ok, chart, "found" if ok else "levels do not differ")
-    hit = find(lambda s, d: gallery.check_trip(engine=day_of(s, d)))
-    record(
-        "G1_trip",
-        hit is not None,
-        engine_panel(seg=hit[0], day=hit[1], title="G1: a trip") if hit else None,
-        "found" if hit else "no trip day",
     )
-    spell = None
-    for seg in engines:
-        if gallery.check_spell(daily_max=seg.engine.max(axis=1)):
-            run = np.flatnonzero(seg.engine.max(axis=1) > 0)
-            spell = (seg, int(run[0]))
-            break
-    spell_chart = (
-        engine_panel(
-            seg=spell[0], day=min(spell[1], spell[0].engine.shape[0] - 2), title="G1: a spell"
-        )
-        if spell
-        else None
-    )
-    record("G1_spell", spell is not None, spell_chart, "found" if spell else "no spell")
+    panels = [
+        engine_panel(seg=seg, day=day, title=f"G1: one unit (draw {i + 1} of {N_DRAWS})")
+        for i, (seg, day) in enumerate(one)
+    ] + [
+        engine_panel(seg=seg, day=day, title=f"G1: several units (draw {i + 1} of {N_DRAWS})")
+        for i, (seg, day) in enumerate(many)
+    ]
+    out.results["G1_units"] = ok
+    out.notes["G1_units"] = f"{len(one)} one-unit and {len(many)} several-unit draws"
+    if panels:
+        out.public["G1_units"] = alt.vconcat(*panels)
 
 
 def day_mean_index(*, seg: sim729.Segment, day: int) -> float:
@@ -424,14 +482,18 @@ def solar_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> 
                     title="Hours from the start of the day (UTC)",
                     axis=alt.Axis(values=[0, 6, 12, 18, 24]),
                 ),
-                y=alt.Y("value:Q", title="Solar output (points of capacity)"),
+                y=alt.Y("value:Q", title=None),
                 color=alt.Color("band:N", legend=alt.Legend(orient="top", title=None)),
                 row=alt.Row("season:N", title=None),
             )
             .properties(
                 width=WIDTH_PX - 100,
                 height=70,
-                title="G3: source S1, 10%, 50%, and 90% bands of the daily shape by season",
+                title=alt.TitleParams(
+                    "G3: source S1, 10%, 50%, and 90% bands of the daily shape by season",
+                    subtitle="Vertical axis of every season: solar output, points of capacity",
+                    anchor="start",
+                ),
             )
         )
         zero = float(np.mean([d.max() <= 0 for d in daily]))

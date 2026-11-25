@@ -32,19 +32,46 @@ def test_the_panel_file_goes_to_the_private_folder(tmp_path: Path) -> None:
 
 def test_engine_checks() -> None:
     engine = np.zeros(48)
-    engine[20:23] = [2.0, 4.9, 5.0]
+    engine[20:23] = [1.0, 3.0, 5.0]
     engine[23:30] = 5.0
     assert gallery.check_ramp(engine=engine)
     assert not gallery.check_ramp(engine=np.where(engine > 0, 5.0, 0.0))
+    one_step = engine.copy()
+    one_step[20:23] = [1.0, 5.0, 5.0]  # a partial first half-hour, then the level: not a ramp
+    assert not gallery.check_ramp(engine=one_step)
     assert gallery.check_blocks(engine=engine, before=slice(0, 20), block=slice(20, 30))
     assert gallery.check_part_load(engine=engine, unit_sizes=[3.0, 3.0])
     assert not gallery.check_part_load(engine=engine, unit_sizes=[3.0])
+    assert not gallery.check_part_load(engine=engine, unit_sizes=[5.2])  # within 0.9 of the total
     tripped = engine.copy()
     tripped[25] = 0.0
     assert gallery.check_trip(engine=tripped)
     assert not gallery.check_trip(engine=engine)
-    assert gallery.check_spell(daily_max=np.array([0.0, 1.0, 2.0, 0.0]))
-    assert not gallery.check_spell(daily_max=np.array([1.0, 0.0, 1.0]))
+    two_blocks = np.zeros(48)
+    two_blocks[10:14] = 3.0
+    two_blocks[16:20] = 5.0  # a short gap between two blocks at different levels is not a trip
+    assert not gallery.check_trip(engine=two_blocks)
+    long_gap = engine.copy()
+    long_gap[24:30] = 0.0  # a zero run longer than 4 half-hours is not a trip
+    assert not gallery.check_trip(engine=long_gap)
+    window = np.zeros(4 * 48)
+    window[48:144] = 3.0
+    assert gallery.check_spell(engine=window)
+    window[100] = 0.0
+    assert not gallery.check_spell(engine=window)
+    at_start = np.zeros(4 * 48)
+    at_start[:96] = 3.0  # the spell starts before the window: it is cut at the left edge
+    assert not gallery.check_spell(engine=at_start)
+    evening = np.zeros(96)
+    evening[36:44] = 4.0
+    assert gallery.check_evening(engine=evening)
+    assert not gallery.check_morning(engine=evening)
+    morning = np.zeros(96)
+    morning[12:16] = 4.0
+    assert gallery.check_morning(engine=morning)
+    assert gallery.check_weekend(engine=morning, first_day_is_weekend=True)
+    assert not gallery.check_weekend(engine=morning, first_day_is_weekend=False)
+    assert not gallery.check_weekend(engine=np.zeros(96), first_day_is_weekend=True)
 
 
 def test_weather_and_fold_checks() -> None:

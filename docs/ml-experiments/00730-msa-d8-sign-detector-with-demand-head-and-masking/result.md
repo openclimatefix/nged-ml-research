@@ -484,13 +484,23 @@ the function without its docstring, first 12 hexadecimal digits) are:
 | `e00730_stages.py` | `bank_inputs` | `06184af15845` |
 | `e00730_stages.py` | `stage_gallery` | `f10505619bc6` |
 | `e00730_stages.py` | `record_panel_check` | `5f72b9e84f16` |
+| `e00730_gallery.py` | `check_ramp` | `c895a8cbeef4` |
+| `e00730_gallery.py` | `check_evening` | `1970efd21016` |
+| `e00730_gallery.py` | `check_morning` | `1586969e11b5` |
+| `e00730_gallery.py` | `check_weekend` | `2626b12e3fb5` |
+| `e00730_gallery.py` | `check_part_load` | `69e78c54bd3c` |
+| `e00730_gallery.py` | `check_trip` | `66cf1d2ee06d` |
+| `e00730_gallery.py` | `check_spell` | `ff27b08a5a2d` |
 | `e00730_gallery.py` | `run_plateaus` | `09d1c8a6b7c5` |
 | `e00730_gallery.py` | `check_units` | `d289d568aec5` |
 | `e00730_gallery.py` | `check_fold` | `356a07b22b2f` |
-| `e00730_figures.py` | `engine_gallery` | `5864873838ff` |
+| `e00730_figures.py` | `window_array` | `966025012186` |
+| `e00730_figures.py` | `pick_windows` | `be874cc10c1f` |
+| `e00730_figures.py` | `is_weekend` | `b58f04c593f2` |
+| `e00730_figures.py` | `engine_gallery` | `657ae213fb07` |
 | `e00730_figures.py` | `extreme_index_day` | `e0220a7cd41f` |
 | `e00730_figures.py` | `solar_index_chart` | `e5226306a8b1` |
-| `e00730_figures.py` | `solar_gallery` | `86cd3ae032b1` |
+| `e00730_figures.py` | `solar_gallery` | `0d9c143a05d2` |
 | `e00730_figures.py` | `bsp_fold_base_gallery` | `5a219638d110` |
 | `e00730_figures.py` | `aggregate_gallery` | `d1af8b1f5947` |
 
@@ -498,14 +508,21 @@ the function without its docstring, first 12 hexadecimal digits) are:
 check on units counted every ramp value as a level, so it compares the share of days with two
 plateaus in a run (at least 2 points apart) for one-unit days, at most 10% because overlapping runs
 and spells give some one-unit days two levels, with that for several-unit days, which must be
-higher. The G5 check compared the folded reading with the truth by `allclose`, which fails whenever
-the reactive term is not negligible, so it now checks that the reading squared minus the truth
-squared lies between the square of the floor and the square of the largest reactive term. The G2
-panels now show the clearest and the cloudiest day of each season by the clear-sky index, compare
-the output as a share of the draw's solar capacity, and draw the clear-sky index on its own axis at
-the right. The G9 panel shows the lowest share of each check group (32 groups) against the bar, and
-the metered-zero and zeroed-sun-up shares in a second panel against their bounds, because the
-earlier panel drew 468 bars and drew the bounded shares against a bar of 0.99.
+higher. The G1 panels each showed the first matching window of the bank, so one window served five
+features and two checks ran on a day that the panel did not plot. Each G1 feature panel is now a
+small multiple of 3 draws from different segments. The feature picks each window, the check runs on
+the exact arrays that the panel plots, and the panel passes only if all 3 draws pass. The spell
+check needs at least 2 whole days of output with a non-whole day before and after inside a 5-day
+window (the registered spell length after the one re-tune is 2 to 3 days), and the trip check needs
+a zero run of 1 to 4 half-hours between two equal levels. The G3 panel carries one shared
+vertical-axis title. The G5 check compared the folded reading with the truth by `allclose`, which
+fails whenever the reactive term is not negligible, so it now checks that the reading squared minus
+the truth squared lies between the square of the floor and the square of the largest reactive term.
+The G2 panels now show the clearest and the cloudiest day of each season by the clear-sky index,
+compare the output as a share of the draw's solar capacity, and draw the clear-sky index on its own
+axis at the right. The G9 panel shows the lowest share of each check group (32 groups) against the
+bar, and the metered-zero and zeroed-sun-up shares in a second panel against their bounds, because
+the earlier panel drew 468 bars and drew the bounded shares against a bar of 0.99.
 
 ## The sign output and how it is scored
 
@@ -1208,9 +1225,11 @@ a generator bug shows by eye.** The figures stage draws it from the rebuilt bank
 any fit, and picks each panel's segment and day by a fixed rule from the test bank or the training
 bank of seed 0. Every panel carries days 1 and 2 of its window on the axis, never a date.
 
-- G1, engine days: a weekday with an evening run, a weekday with a morning run, a weekend day, a day
-  at part load, a run with a ramp of 2 half-hours, a day with one unit and a day with several units,
-  a day with a trip, and a multi-day spell, each showing the engine output beside the base demand.
+- G1, engine days: for each feature, a small multiple of 3 draws from different segments, each
+  showing the engine output beside the base demand: an evening run, a morning run, a weekend day, a
+  day at part load (with the sum of the unit sizes drawn), a run with a ramp over at least 2
+  half-hours, a day with one unit and a day with several units (3 draws each), a trip inside a run,
+  and a multi-day spell shown in a 5-day window.
 - G2, S2 solar days: the clearest day and the cloudiest day of each of the four seasons by the
   clear-sky index, each showing the solar output (as a share of the draw's capacity) beside the
   CAMS clear-sky index at D8 on a second axis.
