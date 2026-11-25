@@ -210,8 +210,8 @@ of capacity reaches the clip.** In the coldest fold month the standard deviation
 cleaned power is 0.07 to 0.21 of capacity, so a shift of 0.50 is 2.4 to 7.0 standard deviations. The
 clip caps the follow share of `M1` mechanically. The Candidate's lag encoder also clips its
 standardised lag at 5 standard deviations of one global standard deviation. Both arms are clipped,
-and the clip diagnostics below give each arm's share. A shift of 0.50 also leaves the physical range at some Primaries. Three measures answer
-these effects:
+and the clip diagnostics below give each arm's share. A shift of 0.50 also leaves the physical range
+at some Primaries. Three measures answer these effects:
 
 - The MSA command prints, for every job, the share of shifted history half-hours beyond 5 standard
   deviations, by depth and sign. The first Candidate job of each all-shifted month writes the
