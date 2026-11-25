@@ -22,6 +22,9 @@ the planner did not open.
 10. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
 11. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
 
+Where reverse flow occurs at the Primaries metered in signed MW is on [Reverse flow at the signed-MW
+Primaries](reverse-flow-at-signed-mw-primaries.md).
+
 The reference page [What is on disk](what-is-on-disk.md) says where each data set sits under
 `data/` and how to read it.
 
