@@ -404,6 +404,20 @@ days; larger solar capacities make more solar-era days cross the floor. The offl
 chosen set were 0.70 and 1.2 times the real net-era shares (days, half-hours) and 0.64 and 0.63 times
 the real solar-era shares. A second failure of the gate ends the line at verdict row 0.
 
+**The gate passed on attempt 2, and the gate has now used both of its runs.** The 129 candidate
+range sets were tried offline against the real era shares, so the re-tune used the calibration of
+the real shares and no network output and no score. In the net era, the share of days with a floor
+reading was 0.101 in the synthetic worlds against 0.172 in the real data (0.59 times), and the
+share of half-hours was 0.0124 against 0.0119 (1.04 times). In the solar era, the day share was
+0.328 against 0.536 (0.61 times), and the half-hour share was 0.0255 against 0.0454 (0.56 times).
+The solar-era half-hour share sits near the 0.5 lower bound. The BSP-step regression passed and
+was not void, with 8 finite synthetic fits (the minimum is 5) from 8 synthetic stretches (19
+stretches before the size-matched selection) and 1 real stretch. The reachability counts were 2,019
+stretches, of which 303 are BSP stretches. The gate's pass is a reading-level realism check only.
+It shows that the synthetic readings match the real readings in these shares and in the BSP-step
+slope, and it says nothing about whether a network trained on the synthetic worlds will untangle
+real engines.
+
 ## Arms and architectures
 
 ### The input ladder
