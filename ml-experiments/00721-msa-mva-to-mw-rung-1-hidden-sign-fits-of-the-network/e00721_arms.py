@@ -140,6 +140,9 @@ def blind_where_open(*, inp: SgInputs, gate_open: torch.Tensor) -> SgInputs:
     Args:
         inp: The batch.
         gate_open: `(B,)` bool, whether each sample's Primary has its export gate open.
+
+    Returns:
+        The batch, with the sky zeroed where the gate is open.
     """
     blind = blank_sky(inp=inp)
 
@@ -297,6 +300,9 @@ def truncated_nll(
         out: Raw mixture outputs `(B, 48, 9)`.
         reading_z: The reading in standardised units, `(B, 48)`.
         shift: `(B,)` mean over standard deviation of each sample's Primary.
+
+    Returns:
+        The negative log-likelihood of each target token, shape `(B, 48)`.
     """
     log_w, mean, std = mdl.base_models.mixture_parts(out=out, components=mdl.m559.COMPONENTS)
     mean_v = mean + shift[:, None, None]

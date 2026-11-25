@@ -83,6 +83,9 @@ def exporter_tokens(*, parts: dict, span: tuple[int, int] | None = None) -> dict
         parts: The synthetic world's arrays (`real.synthetic_inputs`).
         span: The grid index range `[start, stop)` of the tokens to keep, or `None` for the whole grid of
             experiment 87. The checks of Stage 0 pass the span that the margin scores.
+
+    Returns:
+        The arrays `demand_mean`, `reading`, `x_true`, `u`, `day`, and `pv_capacity`, one entry per token.
     """
     syn, four, exporters = parts["syn"], list(parts["four"]), list(parts["exporters"])
     rows = [four.index(e) for e in exporters]
