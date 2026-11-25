@@ -17,6 +17,12 @@ if the forecast follows, so the safe side is "the unshifted power is at or above
 for a pass that lowers the power it is "at or below the shifted q95". The reading prints the share
 of rows on the safe side for the Candidate and for `M1`, in each counted slice.
 
+**Reading 7, coverage.** `cov90` is the share of rows whose unshifted power lies between the shifted
+forecast's q05 and q95 (nominal 0.90), `cov90_base` is the same share for the unshifted forecast of
+the same network at the same keys, and `cov90_fall` is `cov90_base - cov90`. Experiment 581 found a
+fall in coverage from 0.94 to 0.77 behind a follow ratio of 0.1 to 0.2. The reading prints the
+level of each network and the difference `M1 minus C` of each column.
+
 **Reading 8, CRPS.** The CRPS is the project's quantile score (twice the pinball loss averaged over
 the 11 levels), in points of capacity, as in F4's `event_crps`. It is computed against the
 unshifted power for both counted slices, and against the shifted power for target half-hours before
@@ -35,6 +41,8 @@ import numpy as np
 import polars as pl
 from studies.eval_protocol.metrics import quantile_score
 
+METRICS: Final = ("safe", "cov90", "cov90_base", "cov90_fall", "crps_clean", "crps_shifted")
+"""The per-row columns of readings 7 and 8 for each network."""
 SEEDS_10: Final = (0, 1)
 N_PASSES_10: Final = 16
 ONSET_DAYS: Final = (7, 28)
@@ -47,6 +55,13 @@ def crps_from_quantiles(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndar
     `event_crps` computes it.
     """
     return quantile_score(actual=actual * 100.0, quantiles=quantiles * 100.0)
+
+
+def interval_coverage(*, lower: np.ndarray, upper: np.ndarray, actual: np.ndarray) -> np.ndarray:
+    """Return 1.0 where `actual` lies in [`lower`, `upper`], 0.0 where it does not, `nan` where it is missing."""
+    inside = ((actual >= lower) & (actual <= upper)).astype(np.float64)
+    inside[~np.isfinite(actual)] = np.nan
+    return inside
 
 
 def bank_files(*, net: str, month: str, seed: int, r: int) -> tuple[Path, Path]:
@@ -172,6 +187,14 @@ def make_extra(
             safe = np.where(sign > 0, actual >= q05, actual <= q95).astype(np.float64)
             safe[~np.isfinite(actual)] = np.nan
             new[f"{net}|safe"] = safe
+            q_b = np.column_stack([rows[f"{net}:{q}:b"].to_numpy() for q in com.QCOLS]).astype(
+                np.float64
+            )
+            cov_shifted = interval_coverage(lower=q05, upper=q95, actual=actual)
+            cov_base = interval_coverage(lower=q_b[:, 1], upper=q_b[:, 9], actual=actual)
+            new[f"{net}|cov90"] = cov_shifted
+            new[f"{net}|cov90_base"] = cov_base
+            new[f"{net}|cov90_fall"] = cov_base - cov_shifted
             new[f"{net}|crps_clean"] = crps_from_quantiles(quantiles=q_s, actual=actual)
             vs_shifted = crps_from_quantiles(quantiles=q_s, actual=shifted_actual)
             vs_shifted[~before_end] = np.nan
@@ -187,7 +210,7 @@ def run_coverage() -> int:
     clean = e.c.clean_stack()
     grid, step = e.c.prep422.GRID_START_US, e.c.prep422.STEP_US
     nets = ("C_host", "M1")
-    cols = [f"{n}|{m}" for n in nets for m in ("safe", "crps_clean", "crps_shifted")]
+    cols = [f"{n}|{m}" for n in nets for m in METRICS]
     got = sc.collect(
         nets=(sc.C_HOST, sc.M1), seeds=com.SEEDS_ALL, months=com.FOLD_MONTHS, passes=range(com.N_PASSES),
         primary_of_id=primary_of_id, n_sets=len(com.read_sets()), levels=com.QCOLS,
@@ -198,7 +221,7 @@ def run_coverage() -> int:
     out = []
     for slice_name in (com.SLICE_AFTER, com.SLICE_LASTING):
         for group in ("six_signed_mw", "eight_mva"):
-            for metric in ("safe", "crps_clean", "crps_shifted"):
+            for metric in METRICS:
                 stats = sc.contrast(events=got.events, a="M1", b="C_host", slice_name=slice_name, primaries=groups[group],
                                     months=com.FOLD_MONTHS, level=metric, draws=sc.REPORT_DRAWS, ci_level=sc.REPORT_LEVEL)  # fmt: skip
                 levels = {n: sc.level_of(events=got.events, net=n, slice_name=slice_name, primaries=groups[group],

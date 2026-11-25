@@ -540,3 +540,76 @@ def test_g2_core_ignores_the_trailing_type_comment() -> None:
     assert core == chk.g2_core(G2_TEXT.replace("  # ty: ignore[unresolved-import]", ""))
     assert chk.g2_returns_touched(G2_TEXT)
     assert not chk.g2_returns_touched(G2_TEXT.replace("list(gen.touched)", "gen.truth"))
+
+
+def test_interval_coverage() -> None:
+    import e00726_readings as rd
+
+    got = rd.interval_coverage(
+        lower=np.array([0.1, 0.1, 0.1]),
+        upper=np.array([0.5, 0.5, 0.5]),
+        actual=np.array([0.3, 0.6, np.nan]),
+    )
+    assert got[0] == 1.0 and got[1] == 0.0 and np.isnan(got[2])
+
+
+def clip_rows(*, month_scale: float) -> list[dict]:
+    return [
+        {"depth": 0.5, "sign": 1, "group": "six_signed_mw", "n_half_hours": int(100 * month_scale),
+         "beyond_clip": 0.0, "out_of_range": 0.5},
+        {"depth": 0.15, "sign": 1, "group": "six_signed_mw", "n_half_hours": 100,
+         "beyond_clip": 0.0, "out_of_range": 0.0},
+    ]  # fmt: skip
+
+
+def test_clip_by_cell_weights_months_by_half_hours(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    monkeypatch.setattr(com, "data_root", lambda: tmp_path)
+    (tmp_path / "diagnostics").mkdir()
+    rows_a = clip_rows(month_scale=1.0)
+    rows_b = clip_rows(month_scale=3.0)
+    rows_b[0]["out_of_range"] = 0.1
+    (tmp_path / "diagnostics" / "clip_2025-11.json").write_text(json.dumps(rows_a))
+    (tmp_path / "diagnostics" / "clip_2026-01.json").write_text(json.dumps(rows_b))
+    diag = sc.read_clip_diagnostics(months=["2025-11", "2026-01"])
+    cell = sc.clip_by_cell(diagnostics=diag).filter(pl.col("depth") == 0.5).row(0, named=True)
+    assert cell["n_half_hours"] == 400
+    assert cell["out_of_range"] == pytest.approx((0.5 * 100 + 0.1 * 300) / 400)
+    with pytest.raises(RuntimeError):
+        sc.read_clip_diagnostics(months=["2026-04"])
+
+
+def test_breakdown_rows_join_the_clip_diagnostics() -> None:
+    events = []
+    for r in range(com.N_PASSES):
+        for p in range(N_SITES):
+            events.append(
+                {"primary": p, "depth": 0.5, "sign": 1, "length_days": 15, "slice": com.SLICE_AFTER,
+                 "month": MONTH, "pass_r": r, "M1|q50": 0.6, "C_host|q50": 0.2}
+            )  # fmt: skip
+    clip = sc.clip_by_cell(
+        diagnostics=pl.DataFrame(clip_rows(month_scale=1.0)).with_columns(month=pl.lit(MONTH))
+    )
+    rows = sc.breakdown_rows(
+        events=pl.DataFrame(events), groups={"six_signed_mw": [0, 1, 2], "eight_mva": [3, 4]},
+        months=[MONTH], clip=clip,
+    )  # fmt: skip
+    assert len(rows) == 2 * 2 * 2 * 3 * 4
+    hit = [
+        r for r in rows
+        if (r["slice"], r["group"], r["sign"], r["depth"], r["length_days"])
+        == (com.SLICE_AFTER, "six_signed_mw", 1, 0.5, 15)
+    ]  # fmt: skip
+    assert (
+        len(hit) == 1
+        and hit[0]["D"] == pytest.approx(0.4)
+        and hit[0]["out_of_range"] == pytest.approx(0.5)
+    )
+    assert hit[0]["n_events"] == 3 * com.N_PASSES
+    empty = next(r for r in rows if r["length_days"] == 3 and r["sign"] == 1 and r["depth"] == 0.5)
+    assert empty["n_events"] == 0 and np.isnan(empty["D"])
+    other = next(r for r in rows if r["group"] == "eight_mva" and r["sign"] == -1)
+    assert np.isnan(other["out_of_range"])

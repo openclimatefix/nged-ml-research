@@ -452,9 +452,10 @@ files:** with experiment 667's paths, the copied `_done` would make KC2 pass by 
 - Experiment 715's `g2` forecasts exist for fold 2025-11 and seed 0 only, so reading S6 covers one
   fold and one seed.
 - Reading 8 uses the project's quantile score (twice the pinball loss over the 11 levels, as in
-  F4's scorer), in points of capacity. Reading 7's safe-side half is implemented, and its coverage
-  half is not yet. Reading 3 has no breakdown by length, and the clip diagnostics are not yet
-  joined to it.
+  F4's scorer), in points of capacity. Reading 7 has two halves: the safe-side share and the
+  coverage of the central 90% interval, with the fall from the unshifted forecast. Reading 3 is
+  broken down by slice, group, sign, depth, and length, and carries the clip diagnostics of its
+  (group, sign, depth) cell.
 - Phase 5 (the attention extraction) is cut. It is the first cut in the order of cuts below, and
   no code for it exists. The write-up therefore has no attention maps from this experiment. The
   figures script is still to be written before the write-up.
