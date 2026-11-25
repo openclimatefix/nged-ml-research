@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Tests of the networks, the losses, and a tiny fit. They need `torch` and run on the CPU."""
 
 import pytest
@@ -82,9 +81,7 @@ def test_batch_loss_ignores_invalid_half_hours_and_uses_the_right_aux_target() -
     t_bad = t.clone()
     t_bad[:, 0, 10:20] = 1e6
     t_bad[:, 1, 10:20] = 0.0
-    assert float(
-        nets.batch_loss(raw=raw, targets=t_bad, head="lobe", aux="none")
-    ) == pytest.approx(
+    assert float(nets.batch_loss(raw=raw, targets=t_bad, head="lobe", aux="none")) == pytest.approx(
         float(nets.batch_loss(raw=raw[:, :, :], targets=t_bad, head="lobe", aux="none"))
     )
     assert np.isfinite(float(base))
@@ -99,9 +96,9 @@ def test_batch_loss_ignores_invalid_half_hours_and_uses_the_right_aux_target() -
     assert float(
         nets.batch_loss(raw=raw, targets=t_eng, head="lobe", aux="solar")
     ) != pytest.approx(on_eng)
-    assert float(
-        nets.batch_loss(raw=raw, targets=t, head="lobe", aux="engine")
-    ) != pytest.approx(on_eng)
+    assert float(nets.batch_loss(raw=raw, targets=t, head="lobe", aux="engine")) != pytest.approx(
+        on_eng
+    )
 
 
 def test_the_loss_matches_the_exact_crps_ordering_numerically() -> None:
