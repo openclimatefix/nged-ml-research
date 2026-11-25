@@ -143,6 +143,11 @@ class LiveSource(bt.Source):
     def check_cells(self, *, c_idx: torch.Tensor, hist_idx: torch.Tensor, plan: CellPlan) -> None:
         """Check KL4: every cell the batch reads was available at the native origin.
 
+        Args:
+            c_idx: The contract-origin grid index of each sample.
+            hist_idx: The grid index of every history token.
+            plan: The cell plan that holds the stored forecast origin of every ENS cell.
+
         Raises:
             AssertionError: If an ENS cell has no stored forecast origin, a forecast origin after the
                 token's stamp or after the native origin, an ERA5 cell newer than the native origin
@@ -181,6 +186,12 @@ class LiveSource(bt.Source):
 
     def assemble(self, **kwargs: Any) -> bt.Assembled:  # ty: ignore[invalid-method-override]
         """Assemble a batch with the parent, then apply the live rule to the history weather.
+
+        Args:
+            **kwargs: The arguments of the parent's `assemble`.
+
+        Returns:
+            The parent's batch, with the history weather replaced by the live rule's cells.
 
         Raises:
             ValueError: For a placebo batch (`ages` given), which the rule's table does not cover.

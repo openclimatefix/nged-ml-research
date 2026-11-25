@@ -248,6 +248,25 @@ are all unfilled. A second audit round confirmed the diff. The stored `L`, `Z`, 
 read with `--accept-code-change dad2fdbd70a1b0fb`, because the changed branch never runs in a fit.
 The wiring checks ran again under the new `checks_hash` and passed.
 
+## Docstring lint fix after the experiment was parked
+
+**A docstring-only edit of four modules changed the three hashes, and nothing stored was
+regenerated.** The lint step `pydoclint` reported 12 errors in `e00725_batch.py`,
+`e00725_poison.py`, `e00725_sources.py`, and `e00725_world.py`. The edit added the missing `Args:`
+and `Returns:` sections. The syntax trees of all 14 modules, compared with the docstrings stripped,
+are identical before and after the edit.
+
+| Hash | Before the edit (head 188eac42e) | After the edit |
+|---|---|---|
+| `own_files_hash` (fit modules) | `2bd6286cad125ae6` | `a93840a6a1ed7358` |
+| `checks_hash` (check and fit modules) | `9b4b6cddf6122323` | `986904f8269b02c2` |
+| `code_hash` (stored states, gate) | `d8a361ef74c85258` | `82cb4025ac6912e2` |
+
+**No stored fit, prediction, or check file was regenerated, and the stored files keep the hashes
+of the table before the edit.** The line is parked, so no later `predict` needs
+`--accept-code-change`. A later session that resumes the line would pass `--accept-code-change
+d8a361ef74c85258` and rerun the wiring checks under the new `checks_hash`.
+
 ## Checks
 
 - **Audit triggers:** trigger 1 (`Z` minus `M*` above the two-seed noise floor) did not fire. The

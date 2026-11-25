@@ -225,6 +225,9 @@ def standardise_cache(
         weather_std: (7,) the standard deviation.
         b1_mean: (>=12,) the fold's stored B1 mean (`stats/B1/<month>.npz`).
         b1_std: (>=12,) the stored B1 standard deviation.
+
+    Returns:
+        The standardised cache as a float16 array of shape (16, G, 19).
     """
     n_primaries, n_grid, _ = cache.raw.shape
     out = np.zeros((n_primaries, n_grid, N_ENS), dtype=np.float16)

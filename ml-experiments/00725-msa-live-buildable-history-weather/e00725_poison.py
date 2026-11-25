@@ -78,6 +78,9 @@ def poisoned_source(
         kinds: Which of `era5`, `cams`, `day`, and `ens` to poison.
         shift_days: 0 for the exact limits of the rule; 1 moves every limit one day earlier (the
             negative controls of KL3n).
+
+    Returns:
+        A copy of `live` with the forbidden values replaced.
     """
     assert shift_days in {0, 1}
     new = copy.copy(live)
@@ -145,6 +148,12 @@ def kl3(
     *, live: lb.LiveSource, samples: Sequence[OneSample], phase: str, with_controls: bool = True,
 ) -> dict:  # fmt: skip
     """Run KL3 (and the KL3n controls) on `samples` and return the result.
+
+    Args:
+        live: The source.
+        samples: The Primaries and contract origins to check.
+        phase: `train` or `predict`.
+        with_controls: Whether to run the KL3n negative controls as well.
 
     Returns:
         A dict with `pass`, the number of samples, the number of exempt cells, and, for each control kind,
@@ -236,6 +245,13 @@ def rebuilt_primary_arrays(
     The weather is built as `e00632_data.dense_raw` builds it (copied for one Primary), the window columns
     through `e00437_features.dense_arrays`, and the day summaries through `e00437_features.cams_previous_day`;
     `e00418_prep.dense_weather` and `e00418_prep.CAMS_PATH` are patched to return the given inputs.
+
+    Args:
+        lw: The loaded world, whose `stats` hold the fold's statistics.
+        row: The Primary's row of the metadata table.
+        weather: The raw dense weather of the Primary.
+        cams_path: The CAMS table that the patched `CAMS_PATH` points to.
+        local_date: The local date of every half-hour of the grid.
 
     Returns:
         (7-column weather (G, 7) float16, window columns (G, 12) float16, day summaries (N_DAYS, 2) float32),

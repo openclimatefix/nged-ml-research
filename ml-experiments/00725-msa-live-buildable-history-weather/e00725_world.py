@@ -88,6 +88,9 @@ def load_world(
         data_dir: The experiments' data folder.
         target_summary_back_days: Read-out `T3`, see `LiveSource`.
         check_standardiser: Assert that the fold's standardiser equals the one experiment 713 stored.
+
+    Returns:
+        The world for the fold, with a `LiveSource` as its source.
     """
     fz.assert_frozen_checkout()
     fz.install_own_cache(data_dir=data_dir)
