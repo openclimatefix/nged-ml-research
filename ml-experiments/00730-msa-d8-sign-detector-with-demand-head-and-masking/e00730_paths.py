@@ -109,7 +109,7 @@ def pin_threads() -> None:
         cores = os.sched_getaffinity(0)
         assert len(cores) <= MAX_SLOT_CORES, f"the process may run on {len(cores)} cores"
     try:
-        import torch  # ty: ignore[unresolved-import]
+        import torch
     except ImportError:
         torch = None
     if torch is not None:
@@ -118,7 +118,7 @@ def pin_threads() -> None:
             torch.set_num_interop_threads(1)
         assert torch.get_num_threads() == 1, torch.get_num_threads()
     try:
-        import threadpoolctl  # ty: ignore[unresolved-import]
+        import threadpoolctl
     except ImportError:
         return
     threadpoolctl.threadpool_limits(limits=1)

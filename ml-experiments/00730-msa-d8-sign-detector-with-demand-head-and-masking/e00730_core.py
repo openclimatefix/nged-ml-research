@@ -89,6 +89,8 @@ DEMAND_GAIN_POINTS: Final = 1.0
 
 LAMBDA: Final = 0.1
 LAMBDA_REPORT: Final = 0.5
+TRANSFORMER_VARIANTS: Final = ("transformer", "gru_transformer")
+"""The two transformer variants; C6 reads the one with the lower validation Brier score of arm S."""
 ARCHITECTURES: Final = ("bilstm", "unet", "transformer", "gru_transformer")
 SCREEN_ARMS: Final = ("S-A", "S")
 ARCH_SEEDS: Final = (0, 1, 2)
@@ -166,6 +168,8 @@ CONTRASTS: Final = {
 """Each counted contrast as (arm minus arm); a negative difference is a gain."""
 REPORT_ONLY_ARMS: Final = ("SD*-lambda", "A", "D", "D-sign")
 """A failed fit of these arms voids a report-only reading and does not change the verdict."""
+NEEDED_ARMS: Final = ("S-A", "S", "SD-0", "SD-K", "SD-W", "SD-R")
+"""A failed fit of one of these arms makes verdict row 2 (the screen, C1 to C4, and the margin)."""
 VOID_BY_ARM: Final = {"SD*-C": "C7", "SDe-PT": "C5", "SDe-FR": "C5"}
 """A failed fit of one of these arms makes the contrast void; the verdict rows read the other arms."""
 Verdict = Literal[
@@ -430,8 +434,21 @@ def verdict_word(*, v: VerdictInputs) -> Verdict:
 # --------------------------------------------------------------------------- stop line and timing
 
 
+PRETRAIN_CAP_EPOCHS: Final = 60
+"""Experiment 510's epoch cap, which the pre-training loop keeps."""
+INFERENCE_HOURS: Final = 0.2
+"""The plan's allowance for validation, test, the 48-pass causal protocol, and the masked read-out."""
+PRETRAIN_ESTIMATE_HOURS: Final = 0.45
+"""The plan's upper estimate of the 3 pre-training runs, used until a run has been timed."""
+
+
 def projected_hours(
-    *, seconds_per_epoch: Mapping[str, float], chosen: str | None, epochs: int = MAX_EPOCHS
+    *,
+    seconds_per_epoch: Mapping[str, float],
+    chosen: str | None,
+    epochs: int = MAX_EPOCHS,
+    pretrain_seconds_per_epoch: float | None = None,
+    demand_seconds_per_epoch: float | None = None,
 ) -> float:
     """Return the GPU-process-hours of the plan's 56 GPU fits at `epochs` epochs each.
 
@@ -444,19 +461,35 @@ def projected_hours(
         seconds_per_epoch: The measured seconds per epoch of each architecture.
         chosen: The chosen architecture, or None before the screen.
         epochs: The cap of every new fit.
+        pretrain_seconds_per_epoch: The measured seconds an epoch of pre-training, or None to use
+            the plan's estimate for the 3 runs.
+        demand_seconds_per_epoch: The measured seconds an epoch of SD-W on the bilstm. Its ratio to
+            arm S on the bilstm (at least 1) scales the later fits, which all carry the demand head.
 
     Returns:
-        The projection in hours.
+        The projection in hours, with the pre-training and the inference allowance.
     """
     screen = sum(6 * seconds_per_epoch[a] for a in ARCHITECTURES)
     later_rate = seconds_per_epoch[chosen] if chosen else max(seconds_per_epoch.values())
+    if demand_seconds_per_epoch is not None:
+        later_rate *= max(1.0, demand_seconds_per_epoch / seconds_per_epoch["bilstm"])
     later = (2 + 12 + 6 + 3 + 3) * later_rate
     refit = 9 * seconds_per_epoch[REFIT_729_ARCH] * core729.MAX_EPOCHS / epochs
-    return (screen + later + refit) * epochs / 3600.0
+    fits = (screen + later + refit) * epochs / 3600.0
+    if pretrain_seconds_per_epoch is None:
+        pretrain = PRETRAIN_ESTIMATE_HOURS
+    else:
+        pretrain = N_PRETRAIN_RUNS * pretrain_seconds_per_epoch * PRETRAIN_CAP_EPOCHS / 3600.0
+    return fits + pretrain + INFERENCE_HOURS
 
 
 def timing_gate_report(
-    *, seconds_per_epoch: Mapping[str, float], peak_memory_gb: float, chosen: str | None = None
+    *,
+    seconds_per_epoch: Mapping[str, float],
+    peak_memory_gb: float,
+    chosen: str | None = None,
+    pretrain_seconds_per_epoch: float | None = None,
+    demand_seconds_per_epoch: float | None = None,
 ) -> dict[str, float | bool]:
     """Return the projection at the cap, and whether it and the peak memory pass the gate.
 
@@ -464,11 +497,17 @@ def timing_gate_report(
         seconds_per_epoch: The measured seconds per epoch of each architecture.
         peak_memory_gb: The peak resident memory of the pre-training row build, in GB.
         chosen: The chosen architecture, once the screen has chosen.
+        pretrain_seconds_per_epoch: The measured seconds an epoch of pre-training, or None.
+        demand_seconds_per_epoch: The measured seconds an epoch of SD-W on the bilstm, or None.
 
     Returns:
         The projection, the peak memory, and `within_stop_line` and `memory_ok`.
     """
-    cap = projected_hours(seconds_per_epoch=seconds_per_epoch, chosen=chosen)
+    cap = projected_hours(
+        seconds_per_epoch=seconds_per_epoch, chosen=chosen,
+        pretrain_seconds_per_epoch=pretrain_seconds_per_epoch,
+        demand_seconds_per_epoch=demand_seconds_per_epoch,
+    )  # fmt: skip
     return {
         "hours_at_cap": cap, "stop_line_hours": STOP_LINE_HOURS,
         "within_stop_line": cap <= STOP_LINE_HOURS, "peak_memory_gb": peak_memory_gb,
@@ -524,11 +563,14 @@ def style_jobs(*, arch: str) -> list[tuple[str, str, int]]:
     return [(f"SD-{s}", arch, seed) for s in STYLES for seed in ARCH_SEEDS]
 
 
+def margin_fit_jobs(*, arch: str) -> list[tuple[str, str, int]]:
+    """Return the 2 further fits of arm S (seeds 3 and 4) that set the margin, after the screen."""
+    return [("S", arch, s) for s in (3, 4)]
+
+
 def later_jobs(*, arch: str) -> list[tuple[str, str, int]]:
-    """Return the fits after the style choice: S seeds 3 and 4 and the four later arms."""
-    jobs = [("S", arch, s) for s in (3, 4)]
-    jobs += [(a, arch, s) for a in ("SDe-PT", "SDe-FR", "SD*-C", "SD*-lambda") for s in ARCH_SEEDS]
-    return jobs
+    """Return the fits after the style choice: SDe-PT, SDe-FR, SD*-C, and SD*-lambda (12 fits)."""
+    return [(a, arch, s) for a in ("SDe-PT", "SDe-FR", "SD*-C", "SD*-lambda") for s in ARCH_SEEDS]
 
 
 def refit_jobs() -> list[tuple[str, str, int]]:

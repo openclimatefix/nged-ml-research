@@ -59,12 +59,13 @@ def test_a_perfectly_calibrated_forecast_passes_the_calibration_bar() -> None:
     assert not bad["pass"]
 
 
-def test_causal_rows_and_visible_position() -> None:
+def test_causal_cut_is_t_plus_k_and_read_at_t() -> None:
     hh = np.arange(48)
-    assert score.causal_keep(hh=hh, k=12).sum() == 36
-    assert score.causal_keep(hh=hh, k=48).all()
-    assert score.causal_last_visible(k=0, middle_start=24) == 23
-    assert score.causal_last_visible(k=6, middle_start=24) == 29
+    del hh
+    assert score.causal_cut(t=10, k=0) == 10
+    assert score.causal_cut(t=10, k=6) == 16
+    assert score.causal_cut(t=44, k=12) == 47
+    assert score.causal_cut(t=3, k=48) is None
 
 
 def test_demand_error_splits_hidden_and_visible() -> None:

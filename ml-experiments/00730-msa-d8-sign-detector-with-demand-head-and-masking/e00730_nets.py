@@ -19,8 +19,8 @@ import e00729_core as core729
 import e00729_nets as nets729
 import e00730_arms as arms
 import e00730_core as core
-import torch  # ty: ignore[unresolved-import]
-from torch import nn  # ty: ignore[unresolved-import]
+import torch
+from torch import nn
 
 EMBEDDING: Final = 8
 """The width of the Primary embedding of experiment 545's encoders."""
@@ -120,7 +120,7 @@ class EncoderFront(nn.Module):
     def __init__(self, *, d8_index: int, n_primaries: int) -> None:
         """Build the front with random weights; `load_pretrained` fills the pre-trained arms."""
         super().__init__()
-        import e00397_models as base  # ty: ignore[unresolved-import]
+        import e00397_models as base
 
         self.d8_index = d8_index
         self.embedding = nn.Embedding(n_primaries, EMBEDDING)

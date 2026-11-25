@@ -100,7 +100,7 @@ def calibration(*, rows: score729.Rows, p: np.ndarray, bar: float) -> dict:
     Returns:
         The reliability term, the largest gap of a populated bin, the bins, and `pass`.
     """
-    keep = np.abs(rows.x) >= core.DEAD_BAND_POINTS
+    keep = np.abs(rows.x) > core.DEAD_BAND_POINTS
     rel = dist.reliability_term(prob=p[keep], observed=rows.x[keep] < 0)
     ok = bool(rel["reliability"] <= bar and rel["max_gap"] <= core.BIN_GAP_BAR)  # ty: ignore[unsupported-operator]
     return {**rel, "bar": bar, "pass": ok}
@@ -112,6 +112,26 @@ def real_harm_check(*, p: np.ndarray, limit: float) -> dict[str, float | bool]:
 
 
 # --------------------------------------------------------------------------- contrasts
+
+
+def contrast_at_level(
+    *,
+    rows: score729.Rows,
+    a: np.ndarray,
+    b: np.ndarray,
+    keep: np.ndarray,
+    n_resamples: int,
+    level: float = core.LEVEL,
+) -> score729.ContrastReading:
+    """Return the reading of `a - b` at this experiment's level and generator seed (730).
+
+    Experiment 729's `contrast` reads at its own level and seed, so the table and the reading are
+    built here and passed to `read_contrast` with `core.GENERATOR_SEED` and `level`.
+    """
+    table = score729.cell_table(rows=rows, diff=a - b, keep=keep, months=None)
+    return score729.read_contrast(
+        table=table, n_resamples=n_resamples, seed=core.GENERATOR_SEED, level=level
+    )
 
 
 def counted_contrasts(
@@ -137,7 +157,7 @@ def counted_contrasts(
     out = {}
     for name, (a, b) in core.CONTRASTS.items():
         if a in per_row and b in per_row:
-            out[name] = score729.contrast(
+            out[name] = contrast_at_level(
                 rows=rows, a=per_row[a], b=per_row[b], keep=keep, n_resamples=n_resamples
             )
     return out
@@ -153,7 +173,7 @@ def report_only_contrast(
 ) -> score729.ContrastReading:
     """Return one report-only contrast (a minus b), read at the same level as the counted ones."""
     keep = np.ones(rows.n, dtype=bool) if keep is None else keep
-    return score729.contrast(rows=rows, a=a, b=b, keep=keep, n_resamples=n_resamples)
+    return contrast_at_level(rows=rows, a=a, b=b, keep=keep, n_resamples=n_resamples)
 
 
 def contrast_dict(*, reading: score729.ContrastReading) -> dict[str, float]:
@@ -197,17 +217,18 @@ def demand_mae(
 # --------------------------------------------------------------------------- causal protocol
 
 
-def causal_last_visible(*, k: int, middle_start: int) -> int:
-    """Return the last visible window position when the first `k` half-hours of the day are seen."""
-    return middle_start + k - 1
+def read_at_cuts(*, values: np.ndarray, cuts: np.ndarray) -> np.ndarray:
+    """Return `values[i, cuts[i]]` for each window `i`: the output at the cut's own half-hour."""
+    return values[np.arange(len(cuts)), cuts]
 
 
-def causal_keep(*, hh: np.ndarray, k: int) -> np.ndarray:
-    """Return the rows the causal protocol of cut `k` scores: half-hour `k` of the day onward.
+def causal_cut(*, t: int, k: int) -> int | None:
+    """Return the scored-day position where the window is cut to read the output at half-hour `t`.
 
-    At k = 48 nothing lies after the cut, and the protocol scores every half-hour of the day.
+    The protocol shows `k` half-hours after `t`, so the cut is at `t + k`, held at the last scored
+    half-hour (47). At `k = 48` nothing is cut: the two-sided protocol, returned as None.
     """
-    return np.ones_like(hh, dtype=bool) if k >= 48 else hh >= k
+    return None if k >= 48 else min(t + k, 47)
 
 
 def causal_output_unchanged(

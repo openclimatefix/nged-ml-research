@@ -166,3 +166,28 @@ def harm_detection_by_group(*, rows: score729.Rows, p: np.ndarray) -> dict[str, 
         harm[name] = float(p[imp].mean()) if imp.any() else float("nan")
         detection[name] = float(p[rev].mean()) if rev.any() else float("nan")
     return {"harm": harm, "detection": detection}
+
+
+def metric_tables(
+    *, rows: score729.Rows, p_by_arm: Mapping[str, np.ndarray]
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Return the Brier score and log loss of each arm on every subset of `subset_masks`.
+
+    The subsets are all, import, and reverse rows, the dead band, each world type, each solar
+    source, and daylight against the other hours.
+    """
+    masks = score729.subset_masks(rows=rows)
+    out: dict[str, dict[str, dict[str, float]]] = {}
+    for arm, p in p_by_arm.items():
+        losses = {
+            "brier": score.row_brier(p=p, x=rows.x),
+            "log_loss": score.row_log_loss(p=p, x=rows.x),
+        }
+        out[arm] = {
+            name: {
+                "n": float(m.sum()),
+                **{k: float(v[m].mean()) if m.any() else float("nan") for k, v in losses.items()},
+            }
+            for name, m in masks.items()
+        }
+    return out

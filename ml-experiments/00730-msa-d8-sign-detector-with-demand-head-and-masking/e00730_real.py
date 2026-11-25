@@ -58,12 +58,20 @@ def share_by(*, values: np.ndarray, groups: np.ndarray) -> dict[str, float]:
 
 
 def k1_against_baselines(
-    *, rows: object, p: np.ndarray, mu: np.ndarray, climatology: base.Climatology, pi: float
+    *,
+    rows: object,
+    reading: np.ndarray,
+    p: np.ndarray,
+    mu: np.ndarray,
+    climatology: base.Climatology,
+    pi: float,
 ) -> dict[str, float]:
     """Return K1's scores beside B1's and the demand output's error beside the climatology's.
 
     Args:
         rows: The K1 rows (`x`, `r`, and `features`).
+        reading: D8's real reading on the same half-hours (the rows of set `k2`, unfolded of the
+            record), which the demand output is compared with.
         p: SD*'s P(X<0) on them.
         mu: SD*'s demand output on them, in points.
         climatology: Experiment 729's fitted demand climatology.
@@ -74,7 +82,7 @@ def k1_against_baselines(
         reading, and the demand climatology's.
     """
     f = rows.features  # ty: ignore[unresolved-attribute]
-    x, r = rows.x, rows.r  # ty: ignore[unresolved-attribute]
+    x, r = rows.x, reading  # ty: ignore[unresolved-attribute]
     b1 = np.clip(pi * climatology.prob_below(r=f.r, f=f), 0.0, 1.0)
     clim = signed.demand_climatology(climatology=climatology, features=f)
     return {

@@ -24,6 +24,7 @@ import e00730_paths  # noqa: F401
 import e00729_banks as banks729
 import e00729_core as core729
 import e00729_data as data729
+import e00729_leakage as leak729
 import e00729_score as score729
 import e00729_sim as sim729
 import e00729_stages as stages729
@@ -37,7 +38,8 @@ RUN_MARKER: Final = "run_marker.json"
 GATE_ATTEMPTS: Final = stages729.GATE_ATTEMPTS
 SUPERSEDED_NAMES: Final = (
     "banks", "fits", "networks", "predictions", "scores", "margin.json", "limits.json",
-    "verdict.json", "selection.json", "figures", "gallery", "pretrained",
+    "verdict.json", "selection.json", "style.json", "figures", "gallery", "pretrained",
+    "timing_scratch",
 )  # fmt: skip
 """The outputs of another run. A run that starts without a marker must find none of them."""
 GATED_STAGES: Final = (
@@ -71,6 +73,35 @@ def assert_fixed_code() -> None:
     if not callable(getattr(data729, "sky_present", None)):
         msg = "experiment 729's sky rule `sky_present` does not exist (verdict row 0)"
         raise StoppedError(msg)
+
+
+RANGES_OVERRIDE_FILE: Final = "ranges_override.json"
+"""The one permitted re-tune: new simulator ranges, read from this experiment's data folder."""
+_ORIGINAL_RANGES: Final = dict(core729.RANGES)
+
+
+def apply_ranges_override(*, root: Path) -> None:
+    """Set experiment 729's `RANGES` to its own values plus the override file of `root`, if any.
+
+    Experiment 729's file is not edited. The run marker hashes `RANGES` as it is after this call,
+    so an override changes the marker, and every stage that calls `guard_run` applies it first.
+
+    Args:
+        root: The experiment's data folder, which may hold the override file.
+
+    Raises:
+        ValueError: When the file names a range that experiment 729 does not have.
+    """
+    core729.RANGES.clear()
+    core729.RANGES.update(_ORIGINAL_RANGES)
+    path = root / RANGES_OVERRIDE_FILE
+    if not path.exists():
+        return
+    for name, value in json.loads(path.read_text()).items():
+        if name not in _ORIGINAL_RANGES:
+            msg = f"the range override names an unknown range ({name})"
+            raise ValueError(msg)
+        core729.RANGES[name] = tuple(value)
 
 
 def run_marker_payload() -> dict:
@@ -134,6 +165,7 @@ def guard_run(*, root: Path, stage: str) -> None:
     Raises:
         RuntimeError: When a gate is open or the data folder holds outputs of another run.
     """
+    apply_ranges_override(root=root)
     marker = root / RUN_MARKER
     expected = run_marker_payload()
     current = read_json(path=marker) if marker.exists() else None
@@ -165,8 +197,7 @@ def _guard_banks(*, root: Path, expected: dict, current: dict | None) -> None:
     if current == expected:
         return
     if current is None:
-        stale = stages729.existing_outputs(root=root)
-        stale = [n for n in stale if n in SUPERSEDED_NAMES]
+        stale = [n for n in SUPERSEDED_NAMES if (root / n).exists()]
         if stale == ["banks"] and not (root / "banks" / "summary.json").exists():
             msg = (
                 "banks/ holds an unfinished build (no summary.json, so a crash or a stop during "
@@ -185,9 +216,9 @@ def _guard_banks(*, root: Path, expected: dict, current: dict | None) -> None:
         for n in ("fits", "networks", "predictions")
         if (root / n).exists() and any((root / n).iterdir())
     ]
-    if fitted or (root / "margin.json").exists() or (root / "limits.json").exists():
+    if fitted or (root / "margin.json").exists():
         msg = (
-            "the run marker differs from the code and fits, margin.json, or limits.json exist: "
+            "the run marker differs from the code and fits or margin.json exist: "
             "move the outputs to superseded_run_N yourself"
         )
         raise RuntimeError(msg)
@@ -195,6 +226,9 @@ def _guard_banks(*, root: Path, expected: dict, current: dict | None) -> None:
     if why is not None:
         msg = f"`banks` may not rebuild under a changed marker: {why} (verdict row 0 applies)"
         raise RuntimeError(msg)
+    limits = root / "limits.json"
+    if limits.exists():
+        limits.replace(root / "limits_before_retune.json")
 
 
 def verify_banks_digest(*, root: Path) -> None:
@@ -251,17 +285,40 @@ class ShareCounter:
         """Return each key's share, with the key written as a `/`-joined string."""
         return {"/".join(k): self.hits[k] / self.total[k] for k in sorted(self.total)}
 
+    def cases(self) -> dict[str, int]:
+        """Return the number of cases behind each key's share."""
+        return {"/".join(k): self.total[k] for k in sorted(self.total)}
+
+
+SUN_UP_COSZ: Final = 0.1
+"""A half-hour is sun-up when its clear-sky index exists and the zenith cosine exceeds this."""
+MIN_SUN_UP_HALF_HOURS: Final = 8
+"""A clear base day has at least this many sun-up half-hours."""
+CLEAR_DAY_SHARE: Final = 0.9
+"""A clear base day has a clear half-hour on at least this share of its sun-up half-hours."""
+MIN_CASES: Final = 20
+"""A component key with fewer cases than this (days or half-hours) fails its check."""
+
 
 def clear_sun_up(*, csi: np.ndarray, cosz: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Return the clear sun-up half-hours and the clear base days of a `(days, 48)` pair of arrays.
+    """Return the clear sun-up half-hours and the clear base days of `(days, 48)` arrays.
 
-    A clear sun-up half-hour has a clear-sky index of at least `CLEAR_SUN_UP_CSI`. A clear base day
-    has at least one sun-up half-hour, and every one of them is clear.
+    The clear-sky index is NaN wherever the clear-sky irradiance is at most 5 W/m2, so a sun-up
+    half-hour is one on which the index exists and `cosz` exceeds `SUN_UP_COSZ`. A clear half-hour
+    has an index of at least `CLEAR_SUN_UP_CSI`. A clear base day has at least
+    `MIN_SUN_UP_HALF_HOURS` sun-up half-hours and a clear one on at least `CLEAR_DAY_SHARE` of them.
     """
-    sun_up = np.isfinite(cosz) & (cosz > 0.0)
-    clear = sun_up & np.isfinite(csi) & (csi >= core.CLEAR_SUN_UP_CSI)
-    clear_day = sun_up.any(axis=1) & (clear.sum(axis=1) == sun_up.sum(axis=1))
+    sun_up = np.isfinite(csi) & np.isfinite(cosz) & (cosz > SUN_UP_COSZ)
+    clear = sun_up & (np.nan_to_num(csi, nan=0.0) >= core.CLEAR_SUN_UP_CSI)
+    n_up = sun_up.sum(axis=1)
+    clear_day = (n_up >= MIN_SUN_UP_HALF_HOURS) & (clear.sum(axis=1) >= CLEAR_DAY_SHARE * n_up)
     return clear, clear_day
+
+
+def segment_season(*, seg: sim729.Segment) -> str:
+    """Return the season of a segment's first base day."""
+    first = int(np.flatnonzero(seg.cal_index >= 0)[0])
+    return season_of(date=seg.dates[first])
 
 
 def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
@@ -284,32 +341,75 @@ def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
     return counter
 
 
+def expected_solar_keys(*, bank: banks729.Bank) -> set[str]:
+    """Return the solar keys a bank must hold: each (world, source, season) with a segment."""
+    return {
+        "/".join((s.world, bank.kind, s.source, segment_season(seg=s)))
+        for s in bank.segments
+        if s.world in ("solar", "both")
+    }
+
+
+def segment_runs_enough(*, seg: sim729.Segment, weekday: bool) -> bool:
+    """Return whether a segment's days with engine output are not far below the drawn run share.
+
+    The drawn `no_run_share` is the share of days without a run, so the expected share of days with
+    output is at most `1 - no_run_share`. A segment fails when its count of days with output is
+    below half the expectation less three binomial standard deviations. Quiet days (weekends and
+    bank holidays) are read apart from weekdays; on quiet days the expectation is scaled by the
+    drawn `weekend_factor`.
+    """
+    days = np.flatnonzero(seg.cal_index >= 0)
+    dow = (seg.dates[days].astype("datetime64[D]").astype(int) + 3) % 7
+    keep = days[(dow < 5) if weekday else (dow >= 5)]
+    if keep.size == 0:
+        return True
+    expected = 1.0 - seg.params["no_run_share"]
+    if not weekday:
+        expected *= min(1.0, seg.params.get("weekend_factor", 1.0))
+    hits = int(sum((seg.engine[d] > 0.0).any() for d in keep))
+    floor = 0.5 * expected * keep.size - 3.0 * np.sqrt(keep.size * expected * (1.0 - expected))
+    return hits >= max(floor, 0.0) and (hits > 0 or expected * keep.size < 1.0)
+
+
 def engine_output_shares(*, bank: banks729.Bank) -> ShareCounter:
-    """Count the segments and base days of engine worlds with output, by world, bank, and season.
+    """Count engine-world segments by whether their days with output follow the drawn run share.
 
     The engine simulator of experiment 729 returns the summed output only and marks no running
-    half-hour, so output cannot be compared with a marker. Two proxies stand in. The key
-    "segment" counts each engine-world segment once, with a hit when its engine output is above zero
-    on at least one half-hour. The key "day" counts each base day of an engine-world segment on
-    which
-    the engine output is above zero on at least one half-hour, against the share of such days
-    that the truth then subtracts: the truth must fall below the base by the engine output.
+    half-hour, so output cannot be compared with a schedule. The key "weekday" and the key "quiet"
+    count, per engine-world segment, a hit when `segment_runs_enough` holds on that kind of day;
+    the share of segments that pass is read against `MIN_OUTPUT_SHARE`. The key "subtract" counts
+    each base day with engine output, and is a hit when the truth then lies below the base demand.
     """
     counter = ShareCounter.new()
     for seg in bank.segments:
         if seg.world not in ("engine", "both"):
             continue
-        counter.add(key=("segment", seg.world, bank.kind), hit=bool((seg.engine > 0.0).any()))
+        season = segment_season(seg=seg)
+        for name, weekday in (("weekday", True), ("quiet", False)):
+            counter.add(
+                key=(name, seg.world, bank.kind, season),
+                hit=segment_runs_enough(seg=seg, weekday=weekday),
+            )
         for d in np.flatnonzero(seg.cal_index >= 0):
-            if not (seg.engine[d] > 0.0).any():
-                continue
             running = seg.engine[d] > 0.0
             ok = seg.valid[d] & running
+            if not ok.any():
+                continue
             subtracted = bool((seg.x[d][ok] < seg.base[d][ok] - 0.5 * seg.engine[d][ok]).all())
-            counter.add(
-                key=("day", seg.world, bank.kind, season_of(date=seg.dates[d])), hit=subtracted
-            )
+            counter.add(key=("subtract", seg.world, bank.kind, season), hit=subtracted)
     return counter
+
+
+def expected_engine_keys(*, bank: banks729.Bank) -> set[str]:
+    """Return the engine keys that a bank must hold, by world and season of its segments."""
+    keys = set()
+    for s in bank.segments:
+        if s.world in ("engine", "both"):
+            season = segment_season(seg=s)
+            for name in ("weekday", "quiet", "subtract"):
+                keys.add(f"{name}/{s.world}/{bank.kind}/{season}")
+    return keys
 
 
 def bsp_shares(*, bank: banks729.Bank, cal: sim729.Calendar) -> ShareCounter:
@@ -333,6 +433,11 @@ def bsp_shares(*, bank: banks729.Bank, cal: sim729.Calendar) -> ShareCounter:
             differs = np.abs(seg.bsp[d][where].astype(np.float64) - real[where]) > 0.0
             counter.add(key=("bsp", seg.world, bank.kind), hit=bool(differs.all()))
     return counter
+
+
+def expected_bsp_keys(*, bank: banks729.Bank) -> set[str]:
+    """Return the BSP keys that a bank must hold: each injection world with BSP-month segments."""
+    return {f"bsp/{s.world}/{bank.kind}" for s in bank.segments if s.has_bsp and s.world != "none"}
 
 
 MIN_STEP_POINTS: Final = 1e-3
@@ -412,16 +517,25 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
         The shares of every check, the keys that fell short, and `pass`.
     """
     shares: dict[str, dict[str, float]] = {}
+    cases: dict[str, dict[str, int]] = {}
     short: list[str] = []
     for name, bank in banks_by_name.items():
-        for label, counter in (
-            ("solar", solar_output_shares(bank=bank)),
-            ("engine", engine_output_shares(bank=bank)),
-            ("bsp", bsp_shares(bank=bank, cal=cal)),
+        for label, counter, expected in (
+            ("solar", solar_output_shares(bank=bank), expected_solar_keys(bank=bank)),
+            ("engine", engine_output_shares(bank=bank), expected_engine_keys(bank=bank)),
+            ("bsp", bsp_shares(bank=bank, cal=cal), expected_bsp_keys(bank=bank)),
         ):
             result = counter.shares()
+            counts = counter.cases()
             shares[f"{name}/{label}"] = result
+            cases[f"{name}/{label}"] = counts
             short += [f"{name}/{label}/{k}" for k, v in result.items() if v < core.MIN_OUTPUT_SHARE]
+            short += [f"{name}/{label}/{k}/missing" for k in sorted(expected - set(counts))]
+            short += [
+                f"{name}/{label}/{k}/too_few"
+                for k, n in counts.items()
+                if n < MIN_CASES and not k.startswith(("weekday", "quiet"))
+            ]
         exact = none_and_fold_shares(bank=bank)
         shares[f"{name}/exact"] = exact
         short += [f"{name}/exact/{k}" for k, v in exact.items() if v < core.EXACT_SHARE]
@@ -429,7 +543,7 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
         shares[f"{name}/fallback"] = fall
         if not fall["no_sky_within_bar"]:
             short.append(f"{name}/fallback/no_sky_zero_output_share")
-    return {"shares": shares, "short": short, "pass": not short}
+    return {"shares": shares, "cases": cases, "short": short, "pass": not short}
 
 
 # --------------------------------------------------------------------------- the bank build
@@ -448,6 +562,31 @@ class BankInputs:
     cal: sim729.Calendar
     months: Mapping[str, Sequence[str]]
     use: Mapping[str, Mapping[str, np.ndarray]]
+
+
+def bank_leakage_checks(
+    *, built: Mapping[str, banks729.Bank], cal: sim729.Calendar, train_seeds: Sequence[int]
+) -> None:
+    """Run experiment 729's bank checks on the built banks.
+
+    Args:
+        built: The built banks by kind.
+        cal: The simulator calendar.
+        train_seeds: The training bank seeds, whose spaces the evaluation banks must not use.
+
+    Raises:
+        CorrectnessFailureError: When a check fails (verdict row 1).
+    """
+    evaluation = [built[k] for k in ("validation", "test", "shifted")]
+    leak729.assert_seed_spaces(train_seeds=train_seeds, evaluation=evaluation)
+    leak729.assert_banks_independent(evaluation=evaluation)
+    leak729.assert_parameter_ranges(segments=[s for b in built.values() for s in b.segments])
+    folder = Path(stages729.__file__).parent
+    leak729.assert_simulator_source_clean(paths=[folder / n for n in stages729.SIMULATOR_SOURCES])
+    for bank in evaluation:
+        for seg in bank.segments:
+            leak729.assert_bsp_construction(seg=seg, cal=cal)
+            leak729.assert_s1_same_day(seg=seg, cal=cal)
 
 
 def build_and_save_banks(
@@ -514,6 +653,11 @@ def stage_banks(*, root: Path, inputs: BankInputs, train_seeds: Sequence[int], l
     built = build_and_save_banks(root=root, inputs=inputs, train_seeds=train_seeds, log=log)
     banks729_list = [built[k] for k in ("validation", "test", "shifted")]
     check = component_checks(banks_by_name=built, cal=inputs.cal)
+    leakage_pass = True
+    try:
+        bank_leakage_checks(built=built, cal=inputs.cal, train_seeds=train_seeds)
+    except leak729.CorrectnessFailureError:
+        leakage_pass = False
     rows = score729.rows_from_segments(
         segments=built["test"].segments, holidays=inputs.cal.holidays
     )
@@ -527,9 +671,13 @@ def stage_banks(*, root: Path, inputs: BankInputs, train_seeds: Sequence[int], l
         "limits": limits.__dict__,
         "limit_in_range": core.limit_in_range(limit=limits.harm_limit),
         "components": check,
+        "leakage_pass": leakage_pass,
         "seed_spaces_disjoint": banks729.seed_spaces_disjoint(train_seeds=train_seeds),
     }
     write_json(path=root / "banks" / "summary.json", payload=summary)
+    if not leakage_pass:
+        msg = "a bank leakage check failed (verdict row 1)"
+        raise leak729.CorrectnessFailureError(msg)
     if not check["pass"]:
         msg = f"a component check fell short on {len(check['short'])} shares (verdict row 0)"
         raise StoppedError(msg)

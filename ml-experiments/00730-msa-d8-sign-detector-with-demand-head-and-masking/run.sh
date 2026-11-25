@@ -35,14 +35,14 @@ fi
 shift
 : "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}"
 : "${SLOT_CPUS:?set SLOT_CPUS to the cpu list the manager assigned (at most 6 cores)}"
-if ! [[ "$SLOT_CPUSS" =~ ^[0-9]+([-,][0-9]+)*$ ]]; then
-    echo "SLOT_CPUS must be a cpu list such as 16-21 (got '$SLOT_CPUSS')" >&2
+if ! [[ "$SLOT_CPUS" =~ ^[0-9]+([-,][0-9]+)*$ ]]; then
+    echo "SLOT_CPUS must be a cpu list such as 16-21 (got '$SLOT_CPUS')" >&2
     exit 64
 fi
 n_cpus=$(python3 -c "import sys; n=0
 for p in sys.argv[1].split(','):
     a,_,b=p.partition('-'); n+=int(b or a)-int(a)+1
-print(n)" "$SLOT_CPUSS")
+print(n)" "$SLOT_CPUS")
 if [ "$n_cpus" -gt 6 ]; then
     echo "SLOT_CPUS names ${n_cpus} cores; the slot holds at most 6" >&2
     exit 64

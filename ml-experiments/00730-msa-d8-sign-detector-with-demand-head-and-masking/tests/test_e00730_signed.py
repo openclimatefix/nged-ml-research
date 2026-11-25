@@ -73,7 +73,9 @@ def test_k1_scores_beside_b1_and_the_climatology() -> None:
     rows = invented_rows()
     clim = base.Climatology.fit(demand=rows.features.r, f=rows.features)
     p = np.where(rows.x < 0, 0.9, 0.05)
-    out = real.k1_against_baselines(rows=rows, p=p, mu=rows.r, climatology=clim, pi=0.5)
+    out = real.k1_against_baselines(
+        rows=rows, reading=rows.r, p=p, mu=rows.r, climatology=clim, pi=0.5
+    )
     assert out["demand_mae"] == 0.0
     assert out["demand_mae_climatology"] > 0.0
     assert out["brier_b1"] > 0.0

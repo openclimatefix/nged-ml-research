@@ -60,6 +60,22 @@ def assert_standardiser_surviving(
         _fail(message="the standardiser was fitted on a row that the removal drops")
 
 
+CHECK_BATCH: Final = 32
+"""Windows of one training batch that `run_fit` checks before training."""
+
+
+def assert_batch_loss_masks(*, windows: np.ndarray, targets: np.ndarray, keeps: np.ndarray) -> None:
+    """Check a training batch's loss masks against its own hidden half-hours.
+
+    A half-hour is hidden when the reading's presence row of the window is zero on a valid
+    half-hour of the scored day.
+    """
+    start = core.core729.MIDDLE_START
+    present = windows[:, 1, start : start + 48] > 0.5
+    valid = targets[:, 1] > 0.5
+    assert_keeps_follow_hidden(hidden=valid & ~present, keeps=keeps, valid=valid)
+
+
 def assert_no_foreign_weights(*, used: Sequence[Path], pretrained_root: Path) -> None:
     """Check that every encoder weight file used lies under this experiment's `pretrained/`."""
     root = pretrained_root.resolve()

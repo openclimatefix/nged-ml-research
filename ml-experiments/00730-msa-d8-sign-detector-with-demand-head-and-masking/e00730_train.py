@@ -23,8 +23,9 @@ import e00730_arms as arms
 import e00730_core as core
 import e00730_masks as masks
 import e00730_nets as nets
+import e00730_score as score
 import numpy as np
-import torch  # ty: ignore[unresolved-import]
+import torch
 
 INFER_BATCH: Final = 256
 MIN_FREE_FRACTION: Final = 0.0
@@ -79,14 +80,12 @@ def brier(*, p: np.ndarray, x: np.ndarray) -> float:
 
 
 def validation_cuts(*, n_picks: int) -> np.ndarray:
-    """Return the `CAUSAL_VALIDATION_CUTS` fixed cuts of a causal arm, `(n_picks, cuts)`.
+    """Return the fixed validation cuts of a causal arm, `(n_picks, CAUSAL_VALIDATION_CUTS)`.
 
-    The cuts are evenly spaced over the scored day's 48 half-hours and never drawn at random, so
-    every epoch validates on the same cuts.
+    The cuts are scored half-hours `0..47` drawn from seed 730 (`masks.fixed_cuts`), 4 per window,
+    and never drawn again, so every epoch validates on the same cuts.
     """
-    step = core729.WINDOW_STEPS_24 // core.CAUSAL_VALIDATION_CUTS
-    cuts = core729.MIDDLE_START + step * np.arange(core.CAUSAL_VALIDATION_CUTS)
-    return np.tile(cuts, (n_picks, 1))
+    return masks.fixed_cuts(n_windows=n_picks)
 
 
 def predict(
@@ -147,7 +146,7 @@ def validation_brier(
     spec: arms.ArmSpec,
     device: str,
 ) -> float:
-    """Return the validation Brier score (the mean over the fixed cuts for a causal arm)."""
+    """Return the validation Brier score (a causal arm reads each window at its 4 fixed cuts)."""
     if not spec.causal:
         decoded, t, _ = predict(net=net, prepared=prepared, spec=spec, device=device)
         return brier(
@@ -156,16 +155,15 @@ def validation_brier(
     picks = arms729.all_picks(prepared=prepared)
     cuts = validation_cuts(n_picks=len(picks))
     scores = []
-    for k in range(cuts.shape[1]):
+    for j in range(cuts.shape[1]):
         decoded, t, _ = predict(
-            net=net, prepared=prepared, spec=spec, device=device, cut_pos=cuts[:, k], picks=picks
-        )
-        scores.append(
-            brier(
-                p=valid_flat(values=decoded["p"], targets=t),
-                x=valid_flat(values=t[:, 0], targets=t),
-            )
-        )
+            net=net, prepared=prepared, spec=spec, device=device,
+            cut_pos=core729.MIDDLE_START + cuts[:, j], picks=picks,
+        )  # fmt: skip
+        ok = score.read_at_cuts(values=t[:, 1], cuts=cuts[:, j]) > 0.5
+        p = score.read_at_cuts(values=decoded["p"], cuts=cuts[:, j])[ok]
+        x = score.read_at_cuts(values=t[:, 0], cuts=cuts[:, j])[ok]
+        scores.append(brier(p=p, x=x))
     return float(np.mean(scores))
 
 
@@ -184,8 +182,9 @@ def fit(
     device: str,
     max_epochs: int = core.MAX_EPOCHS,
     out_path: Path | None = None,
-    frozen_encoders: bool = False,
     pretrained: Path | None = None,
+    d8_index: int = 0,
+    n_primaries: int = 16,
     log: Callable[[str], None] = lambda _: None,
 ) -> tuple[torch.nn.Module, FitRecord]:
     """Fit one network of experiment 730.
@@ -199,8 +198,9 @@ def fit(
         device: "cuda" or "cpu".
         max_epochs: The cap on epochs (300; the timing gate passes 5).
         out_path: Where to save the best weights, or None.
-        frozen_encoders: Freeze the encoders (arm SDe-FR).
-        pretrained: The pre-trained weight file the encoders start from (arms SDe-PT and SDe-FR).
+        pretrained: The pre-trained weight file the encoders start from (arm SDe-PT only).
+        d8_index: D8's row of the embedding (its index in experiment 397's table of Primaries).
+        n_primaries: The rows of the embedding (16).
         log: Receives one progress line per epoch (never a month or a date).
 
     Returns:
@@ -209,15 +209,20 @@ def fit(
     seed_all = fit_seed(arm=spec.name, arch=arch, seed=seed)
     torch.manual_seed(seed_all)
     rng = np.random.default_rng(seed_all)
-    net = nets.build_net(arch=arch, spec=spec).to(device)
+    if spec.name == "SDe-FR" and pretrained is not None:
+        msg = "SDe-FR starts from fresh weights and takes no pre-trained file"
+        raise ValueError(msg)
+    if spec.name == "SDe-PT" and pretrained is None:
+        msg = "SDe-PT starts from the pre-trained weights and needs the file"
+        raise ValueError(msg)
+    net = nets.build_net(arch=arch, spec=spec, d8_index=d8_index, n_primaries=n_primaries)
+    net = net.to(device)
     digest = ""
     if spec.inputs == "enc" and pretrained is not None:
         import e00730_pretrain as pretrain
 
         digest = pretrain.weight_digest(path=pretrained)
         net.front.load_pretrained(state=torch.load(pretrained, map_location=device))
-        for p in net.front.parameters():
-            p.requires_grad = not frozen_encoders
     params = [p for p in net.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=core.LEARNING_RATE, weight_decay=core.WEIGHT_DECAY)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -339,7 +344,10 @@ def masked_demand(
     """
     picks = arms729.all_picks(prepared=prepared)
     hidden = masks.fixed_hidden_for_picks(
-        style=style, picks=picks, offsets=[p.offsets for p in prepared]
+        style=style,
+        picks=picks,
+        offsets=[p.offsets for p in prepared],
+        segment_ids=[p.source_index for p in prepared],
     )
     decoded, t, _ = predict(
         net=net, prepared=prepared, spec=spec, device=device, hidden=hidden, picks=picks
@@ -362,10 +370,19 @@ def causal_predictions(
     device: str,
     k: int,
 ) -> np.ndarray:
-    """Return P(X < 0) on every valid half-hour when the first `k` half-hours are seen."""
+    """Return P(X < 0) on every valid half-hour when `k` half-hours after each one are visible.
+
+    For each scored half-hour `t` the window is cut at `t + k` and the output is read at `t`, so
+    every window takes 48 passes. At `k = 48` nothing is cut (the two-sided protocol).
+    """
     picks = arms729.all_picks(prepared=prepared)
-    cut = np.full(len(picks), core729.MIDDLE_START + k - 1)
-    decoded, t, _ = predict(
-        net=net, prepared=prepared, spec=spec, device=device, cut_pos=cut, picks=picks
-    )
-    return valid_flat(values=decoded["p"], targets=t)
+    columns: list[np.ndarray] = []
+    targets = np.zeros((0, 6, 48), dtype=np.float32)
+    for t in range(core729.WINDOW_STEPS_24):
+        pos = score.causal_cut(t=t, k=k)
+        cut = None if pos is None else np.full(len(picks), core729.MIDDLE_START + pos)
+        decoded, targets, _ = predict(
+            net=net, prepared=prepared, spec=spec, device=device, cut_pos=cut, picks=picks
+        )
+        columns.append(decoded["p"][:, t])
+    return valid_flat(values=np.stack(columns, axis=1), targets=targets)

@@ -369,6 +369,7 @@ def solar_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> 
 
 def bsp_fold_base_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> None:
     """Draw G4 (BSP), G5 (fold), and G6 (base days)."""
+    segments = [s for s in segments if s.source != "S1"]
     both = [s for s in segments if s.world != "none" and s.has_bsp]
     hit = first_day(
         segments=both, keep=lambda s, d: bool(np.isfinite(s.bsp[d]).all() and s.engine[d].max() > 0)
@@ -401,7 +402,10 @@ def bsp_fold_base_gallery(*, segments: Sequence[sim729.Segment], out: GalleryRes
             title="G5: the folded reading and the signed truth",
             height=110,
         )
-        ok = gallery.check_fold(reading=r, truth=x, floor=0.0, far=3.0 * core729.QHAT_POINTS)
+        floor = seg.params["q_mva"] / core729.CAPACITY_MVA * core729.POINTS * seg.params["q_factor"]
+        ok = gallery.check_fold(
+            reading=r, truth=x, floor=float(floor), far=3.0 * core729.QHAT_POINTS
+        )
     else:
         ok = False
     out.results["G5_fold"] = ok
@@ -426,6 +430,7 @@ def bsp_fold_base_gallery(*, segments: Sequence[sim729.Segment], out: GalleryRes
 
 def mask_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> None:
     """Draw G7: the masked reading beside the clean-demand target for K, W, R, and the causal cut."""
+    segments = [s for s in segments if s.source != "S1"]
     hit = first_day(
         segments=segments,
         keep=lambda s, d: bool(np.isfinite(s.r[d : d + 2]).all() and has_two_days(seg=s, day=d)),
@@ -499,7 +504,9 @@ def aggregate_gallery(
     out.public["G9_components"] = (bars + bar).properties(
         width=WIDTH_PX - 200, height=14 * max(len(data), 1)
     )
-    out.results["G9_components"] = gallery.check_shares(shares=component_shares)
+    out.results["G9_components"] = gallery.check_shares(
+        shares=component_shares, bar=core.MIN_OUTPUT_SHARE
+    )
     out.notes["G9_components"] = f"{len(component_shares)} shares"
 
 

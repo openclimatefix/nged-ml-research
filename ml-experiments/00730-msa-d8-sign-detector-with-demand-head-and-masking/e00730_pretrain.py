@@ -17,6 +17,7 @@ function, and need the real files.
 
 import json
 import os
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,8 @@ DATETIME_SLICE: Final = slice(14, 14 + core.ENCODER_DATETIME_COLUMNS)
 """Columns 14 to 34: the 21 solar-geometry, calendar, and holiday columns."""
 STANDARDISER_FILE: Final = "standardiser.npz"
 D8_TABLE_FILE: Final = "d8_encoder_inputs.parquet"
+N_PRIMARIES: Final = 16
+"""Experiment 397's table of Primaries holds this many series."""
 WEIGHT_FILE: Final = "2026-07_s{seed}.pt"
 STEPS_PER_DAY: Final = 48
 
@@ -219,7 +222,7 @@ def weight_digest(*, path: Path) -> str:
 
 def build_removed_mask(*, held_out_months: Sequence[str], record_days: np.ndarray) -> np.ndarray:
     """Return the removed half-hours of experiment 087's dense grid (real run; needs the grid)."""
-    import e00087_common as common  # ty: ignore[unresolved-import]
+    import e00087_common as common
 
     grid = common.grid_times().dt.date().to_numpy().astype("datetime64[D]")
     return removed_half_hour_mask(
@@ -235,10 +238,10 @@ def surviving_raw_x(*, refit, clean: np.ndarray) -> tuple[np.ndarray, np.ndarray
     the leakage test can refit the standardiser from the surviving rows and compare it with the one
     that `build_fold` stored.
     """
-    import e00087_regimes as regimes  # ty: ignore[unresolved-import]
-    import e00397_prep as prep  # ty: ignore[unresolved-import]
-    import e00422_prep as prep422  # ty: ignore[unresolved-import]
-    import e00428_data as data428  # ty: ignore[unresolved-import]
+    import e00087_regimes as regimes
+    import e00397_prep as prep
+    import e00422_prep as prep422
+    import e00428_data as data428
 
     keep_cols, _, mask = data428.non_lag_layout()
     xs, origins = [], []
@@ -279,9 +282,9 @@ def pretraining_rows(*, removed_mask: np.ndarray):  # noqa: ANN201
     """
     from datetime import UTC, datetime
 
-    import e00428_data as data428  # ty: ignore[unresolved-import]
-    import e00448_run as r448  # ty: ignore[unresolved-import]
-    import e00510_common as c  # ty: ignore[unresolved-import]
+    import e00428_data as data428
+    import e00448_run as r448
+    import e00510_common as c
 
     refit = datetime.fromisoformat(core.PRETRAIN_REFIT_ISO).replace(tzinfo=UTC)
     clean = clean_with_removal(clean=c.clean_stack(), removed_mask=removed_mask)
@@ -322,13 +325,16 @@ def train_pretraining(
     Returns:
         The network with its best weights, the epochs run, and the best held-out negative log likelihood.
     """
-    import e00397_models as base  # ty: ignore[unresolved-import]
-    import e00510_common as c  # ty: ignore[unresolved-import]
-    import e00545_model as m  # ty: ignore[unresolved-import]
-    import torch  # ty: ignore[unresolved-import]
+    import e00397_models as base
+    import e00510_common as c
+    import e00545_model as m
+    import torch
 
     torch.manual_seed(seed)
     n_primaries = int(p.max().item()) + 1
+    if n_primaries != N_PRIMARIES:
+        msg = f"the pre-training rows cover {n_primaries} Primaries, not {N_PRIMARIES}"
+        raise ValueError(msg)
     model = m.ModularMdn(n_primaries=n_primaries, aux=False, stage="pre").to(device)
     train_idx = torch.nonzero(~is_val).squeeze(1)
     val_idx = torch.nonzero(is_val).squeeze(1)
@@ -398,29 +404,26 @@ def run_pretraining(
     """
     import resource
 
-    import e00510_common as c  # ty: ignore[unresolved-import]
-    import torch  # ty: ignore[unresolved-import]
+    import e00510_common as c
+    import torch
 
     folder = root / "pretrained"
     removed = build_removed_mask(held_out_months=held_out_months, record_days=record_days)
     rows, pre, clean = pretraining_rows(removed_mask=removed)
     peak_gb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
-    assert keep_rows(
-        target_idx=pre.target_idx, origin_idx=pre.origin_idx, removed_mask=removed
-    ).all(), "a pre-training row lies in a removed period"
-    assert pre.is_val.any(), "no early-stopping week remains"
+    stored = StoredStandardiser(
+        mean=rows.standardiser.mean, std=rows.standardiser.std, mask=rows.standardiser.mask
+    )
     raw, _mask = surviving_raw_x(
         refit=__import__("datetime").datetime.fromisoformat(
             core.PRETRAIN_REFIT_ISO + "T00:00:00+00:00"
         ),
         clean=clean,
     )
-    stored = StoredStandardiser(
-        mean=rows.standardiser.mean, std=rows.standardiser.std, mask=rows.standardiser.mask
-    )
-    assert standardiser_matches(stored=stored, surviving_x=raw), (
-        "the standardiser saw a removed row"
-    )
+    check_pretraining_leakage(pre=pre, removed=removed, stored=stored, raw=raw)
+    if not pre.is_val.any():
+        msg = "no early-stopping week remains"
+        raise ValueError(msg)
     write_standardiser(standardiser=stored, folder=folder)
     if max_epochs is not None:
         c.MAX_EPOCHS = max_epochs
@@ -430,11 +433,15 @@ def run_pretraining(
         "w": torch.ones(len(pre.y), device=device), "p": torch.from_numpy(pre.primary).to(device),
         "v": torch.from_numpy(pre.is_val).to(device),
     }  # fmt: skip
-    record: dict = {"rows": len(pre.y), "peak_memory_gb": peak_gb, "seeds": {}}
+    record: dict = {
+        "rows": len(pre.y), "peak_memory_gb": peak_gb, "seeds": {},
+        "d8_index": d8_primary_index(), "n_primaries": N_PRIMARIES,
+    }  # fmt: skip
     for seed in seeds:
         target = weight_path(folder=folder, seed=seed)
         if target.exists():
             continue
+        started = time.perf_counter()
         model, epochs, best = train_pretraining(
             x=tensors["x"], z=tensors["z"], w=tensors["w"], p=tensors["p"], is_val=tensors["v"],
             seed=seed, device=device,
@@ -443,37 +450,66 @@ def run_pretraining(
         tmp = target.with_suffix(".tmp")
         torch.save(model.state_dict(), tmp)
         tmp.replace(target)
-        record["seeds"][str(seed)] = {"epochs": epochs, "held_out_nll": best}
+        record["seeds"][str(seed)] = {
+            "epochs": epochs, "held_out_nll": best,
+            "seconds_per_epoch": (time.perf_counter() - started) / max(epochs, 1),
+        }  # fmt: skip
     return record
 
 
-def build_d8_encoder_table(
-    *, root: Path, base_dates: np.ndarray, standardiser: StoredStandardiser
-) -> np.ndarray:
-    """Build D8's encoder input table on the base calendar and write it as `d8_encoder_inputs.parquet`.
+HOLIDAY_RAW_COLUMN: Final = DATETIME_SLICE.start + core.ENCODER_DATETIME_COLUMNS - 1
+"""Column of the raw 37 non-lag features that holds the signed distance to the nearest holiday."""
+
+
+def check_pretraining_leakage(
+    *, pre: Any, removed: np.ndarray, stored: StoredStandardiser, raw: np.ndarray
+) -> None:
+    """Run the plan's pre-training leakage assertions (each raises, and none is a bare `assert`).
+
+    Args:
+        pre: The pre-training rows (`target_idx`, `origin_idx`).
+        removed: The removed half-hours of the grid.
+        stored: The standardiser that the rows were built with.
+        raw: The surviving raw feature rows `(n, 37)`.
+    """
+    from datetime import UTC, datetime
+
+    import e00087_common as common
+    import e00730_leakage as leak
+
+    holdout = common.grid_index(
+        times=datetime.fromisoformat(core.core729.HOLDOUT_START_ISO).replace(tzinfo=UTC)
+    )
+    leak.assert_pretrain_removal(
+        target_idx=pre.target_idx, origin_idx=pre.origin_idx, removed_mask=removed,
+        valid_end_idx=int(holdout),
+    )  # fmt: skip
+    leak.assert_standardiser_surviving(stored=stored, surviving_x=raw)
+    leak.assert_holiday_clip(nearest_days=raw[:, HOLIDAY_RAW_COLUMN])
+
+
+def d8_raw_encoder_table(*, base_dates: np.ndarray) -> np.ndarray:
+    """Return D8's encoder inputs on `base_dates` before z-scoring, `(days, 48, 28)`.
 
     The weather columns come from experiment 418's `dense_weather` (CAMS shortwave at D8's point and
     ERA5 longwave, 2 m temperature, 2 m dew point, surface pressure, precipitation, and 10 m wind
     speed) and the datetime columns from experiment 87's `derived_columns` through experiment 397's
     `feature_matrix`, exactly as the pre-training rows were built. A half-hour that starts at `p`
-    half-hours after midnight ends at stamp `p + 1`, so it reads the grid index of that stamp. The
-    columns are z-scored with the stored standardiser.
+    half-hours after midnight ends at stamp `p + 1`, so it reads the grid index of that stamp.
 
     Args:
-        root: This experiment's data folder.
-        base_dates: D8's base days, `datetime64[D]`.
-        standardiser: The stored standardiser of the 37 non-lag columns.
+        base_dates: The days to build, `datetime64[D]`.
 
     Returns:
-        The table `(days, 48, 28)`.
+        The unstandardised table.
     """
-    import e00087_common as common  # ty: ignore[unresolved-import]
-    import e00397_prep as prep  # ty: ignore[unresolved-import]
-    import e00418_prep as prep418  # ty: ignore[unresolved-import]
-    import e00428_data as data428  # ty: ignore[unresolved-import]
+    import e00087_common as common
+    import e00397_prep as prep
+    import e00418_prep as prep418
+    import e00428_data as data428
     import polars as pl
 
-    series = prep.primaries().filter(pl.col("site") == "D8").row(0, named=True)
+    series = d8_series()
     weather = prep418.dense_weather(series_id=series["time_series_id"], site="D8")
     grid = common.grid_times()
     derived = common.derived_columns(
@@ -496,8 +532,45 @@ def build_d8_encoder_table(
         [common.grid_index(times=_midnight(day=d)) for d in base_dates], dtype=np.int64
     )
     stamps = day_start[:, None] + 1 + np.arange(STEPS_PER_DAY)[None, :]
+    return raw[stamps][:, :, index]
+
+
+def d8_series() -> dict:
+    """Return D8's row of experiment 397's table of Primaries, and check that the table holds 16."""
+    import e00397_prep as prep
+    import polars as pl
+
+    table = prep.primaries()
+    if table.height != N_PRIMARIES:
+        msg = f"expected {N_PRIMARIES} Primaries, found {table.height}"
+        raise ValueError(msg)
+    return table.filter(pl.col("site") == "D8").row(0, named=True)
+
+
+def d8_primary_index() -> int:
+    """Return the index of D8 in experiment 397's table of Primaries (its embedding row)."""
+    import e00397_prep as prep
+
+    table = prep.primaries()
+    return int(table["site"].to_list().index("D8"))
+
+
+def build_d8_encoder_table(
+    *, root: Path, base_dates: np.ndarray, standardiser: StoredStandardiser
+) -> np.ndarray:
+    """Build D8's encoder input table and write it as `d8_encoder_inputs.parquet`.
+
+    Args:
+        root: This experiment's data folder.
+        base_dates: The days to build (every calendar day of the real table), `datetime64[D]`.
+        standardiser: The stored standardiser of the 37 non-lag columns.
+
+    Returns:
+        The table `(days, 48, 28)`, z-scored with the stored standardiser.
+    """
     table = zscore_encoder_inputs(
-        raw=raw[stamps][:, :, index], standardiser=encoder_columns(standardiser=standardiser)
+        raw=d8_raw_encoder_table(base_dates=base_dates),
+        standardiser=encoder_columns(standardiser=standardiser),
     )
     write_table(table=table, base_dates=base_dates, path=root / "pretrained" / D8_TABLE_FILE)
     return table

@@ -86,7 +86,7 @@ def choose_architecture(*, root: Path) -> dict:
     """
     banks.guard_run(root=root, stage="choose")
     limits = core.read_limits_file(path=root / "limits.json")
-    scores, weights = {}, {}
+    scores, weights, s_scores = {}, {}, {}
     for arch in core.ARCHITECTURES:
         recs = [
             banks.read_json(path=fit_dir(root=root) / f"{job_name(arm=a, arch=arch, seed=s)}.json")
@@ -95,8 +95,13 @@ def choose_architecture(*, root: Path) -> dict:
         ]
         scores[arch] = float(np.mean([r["best_val_brier"] for r in recs]))
         weights[arch] = int(recs[0]["n_weights"])
+        s_scores[arch] = float(np.mean([r["best_val_brier"] for r in recs if r["arm"] == "S"]))
     chosen = core.choose_architecture(scores=scores, weights=weights, floor=limits.floor)
-    record = {"chosen": chosen, "scores": scores, "weights": weights, "chosen_on": "validation"}
+    variant = min(core.TRANSFORMER_VARIANTS, key=lambda a: s_scores[a])
+    record = {
+        "chosen": chosen, "scores": scores, "weights": weights, "chosen_on": "validation",
+        "s_scores": s_scores, "transformer_variant": variant,
+    }  # fmt: skip
     path = root / "selection.json"
     if not path.exists():
         core.write_once_json(path=path, payload=record)
@@ -238,11 +243,20 @@ def verdict(
     }
 
 
+def write_invalid_verdict(*, root: Path) -> None:
+    """Write the verdict record of row 1 (a correctness check failed), with no score in it."""
+    banks.write_json(
+        path=root / "scores" / "verdict.json",
+        payload={"row": 1, "verdict": core.VERDICT_WORDS[1], "contrasts": {}},
+    )
+
+
 def stage_names() -> Sequence[str]:
     """Return the stage names of the command line, in the order of the plan."""
     return (
-        "banks", "gallery", "gate", "pretrain", "timing", "screen", "choose", "margin", "styles",
-        "later", "refit729", "fit", "score", "real", "report", "figures", "series", "components",
+        "banks", "gallery", "gate", "timing", "pretrain", "screen", "choose", "margin-fits",
+        "margin", "styles", "choose-style",
+        "later", "refit729", "fit", "real", "score", "report", "figures", "series", "components",
     )  # fmt: skip
 
 
@@ -264,6 +278,7 @@ def run_fit(
     max_epochs: int = core.MAX_EPOCHS,
     encoder: arms.EncoderTable | None = None,
     pretrained: Path | None = None,
+    d8_index: int = 0,
 ) -> dict:
     """Fit one network, save it, and store its probabilities on the validation and test banks.
 
@@ -281,7 +296,8 @@ def run_fit(
         log: Receives progress lines.
         max_epochs: The cap on epochs.
         encoder: D8's encoder input table (arms SDe-PT and SDe-FR).
-        pretrained: The pre-trained weight file of an encoder arm.
+        pretrained: The pre-trained weight file of arm SDe-PT (None for SDe-FR, which starts fresh).
+        d8_index: D8's row of the encoders' embedding.
 
     Returns:
         The fit record.
@@ -303,6 +319,12 @@ def run_fit(
     kwargs = {"holidays": ctx.cal.holidays, "stats": ctx.stats, "encoder": encoder}
     prep_train = arms.prepare_segments(segments=train_bank.segments, spec=spec, **kwargs)
     prep_val = arms.prepare_segments(segments=val_bank.segments, spec=spec, **kwargs)
+    assert_fit_inputs(spec=spec, prepared=prep_train, seed=seed)
+    if encoder is not None:
+        for bank_segments in (train_bank.segments, val_bank.segments):
+            if encoder.coverage(segments=bank_segments) < core.MIN_OUTPUT_SHARE:
+                msg = "D8's encoder table lacks a row for too many base days of a bank"
+                raise ValueError(msg)
     net, record = train.fit(
         spec=spec,
         arch=arch,
@@ -312,8 +334,8 @@ def run_fit(
         device=device,
         max_epochs=max_epochs,
         out_path=root / "networks" / f"{name}.pt",
-        frozen_encoders=arm == "SDe-FR",
         pretrained=pretrained,
+        d8_index=d8_index,
         log=log,
     )
     store_predictions(
@@ -322,6 +344,36 @@ def run_fit(
     )  # fmt: skip
     banks.write_json(path=record_path, payload=record.as_dict())
     return record.as_dict()
+
+
+def assert_fit_inputs(
+    *, spec: arms.ArmSpec, prepared: Sequence[arms.PreparedSegment], seed: int
+) -> None:
+    """Run the plan's input leakage assertions on an arm and one training batch.
+
+    Args:
+        spec: The arm.
+        prepared: The prepared training segments.
+        seed: The fit seed, which draws the checked batch.
+
+    Raises:
+        CorrectnessFailureError: When the arm reads a month or an ordinal, a window row equals a
+            target row, or the sign loss applies on a hidden half-hour.
+    """
+    leak.assert_no_month_or_ordinal(specs={spec.name: spec})
+    picks = arms729_picks(prepared=prepared)[: leak.CHECK_BATCH]
+    rng = np.random.default_rng(seed)
+    x, t, k = arms.make_batch(prepared=prepared, picks=picks, spec=spec, rng=rng, training=True)
+    leak.assert_inputs_not_targets(windows=x, targets=t, spec=spec)
+    if not spec.causal:
+        leak.assert_batch_loss_masks(windows=x, targets=t, keeps=k)
+
+
+def arms729_picks(*, prepared: Sequence[arms.PreparedSegment]) -> list[tuple[int, int]]:
+    """Return every (segment, base day) pick of prepared segments."""
+    import e00729_arms as arms729
+
+    return arms729.all_picks(prepared=prepared)
 
 
 def store_predictions(
@@ -418,6 +470,7 @@ def run_jobs(
             continue
         try:
             run_one(arm, arch, seed)
+            (fit_dir(root=root) / f"{name}.failed.json").unlink(missing_ok=True)
             counts["run"] += 1
         except Exception as exc:  # noqa: BLE001
             counts["failed"] += 1
@@ -442,6 +495,8 @@ def stage_timing(
     peak_memory_gb: float,
     manager_approved: bool,
     log: Log,
+    pretrain_seconds_per_epoch: float | None = None,
+    demand_seconds_per_epoch: float | None = None,
 ) -> dict:
     """Write `scores/timing.json` from the measured seconds an epoch of each architecture.
 
@@ -451,6 +506,8 @@ def stage_timing(
         peak_memory_gb: The peak resident memory of the pre-training row build.
         manager_approved: The manager approved a projection above the stop line.
         log: Receives progress lines.
+        pretrain_seconds_per_epoch: The measured seconds an epoch of pre-training (2 epochs).
+        demand_seconds_per_epoch: The measured seconds an epoch of SD-W on the bilstm.
 
     Returns:
         The report with `pass`.
@@ -459,9 +516,12 @@ def stage_timing(
         StoppedError: When the projection or the peak memory is over its line.
     """
     banks.guard_run(root=root, stage="timing")
+    banks.verify_banks_digest(root=root)
     report = core.timing_gate_report(
-        seconds_per_epoch=seconds_per_epoch, peak_memory_gb=peak_memory_gb
-    )
+        seconds_per_epoch=seconds_per_epoch, peak_memory_gb=peak_memory_gb,
+        pretrain_seconds_per_epoch=pretrain_seconds_per_epoch,
+        demand_seconds_per_epoch=demand_seconds_per_epoch,
+    )  # fmt: skip
     passes = core.timing_gate_passes(report=report, manager_approved=manager_approved)
     out = {**report, "pass": passes}
     banks.write_json(path=root / "scores" / "timing.json", payload=out)
@@ -482,6 +542,7 @@ def _fit_stage(
 ) -> dict[str, int]:
     """Guard a fit stage, check the timing gate, and run its jobs."""
     banks.guard_run(root=root, stage=stage)
+    banks.verify_banks_digest(root=root)
     if not timing_passed(root=root):
         msg = f"`{stage}` needs scores/timing.json with a pass: run `timing` first"
         raise RuntimeError(msg)
@@ -504,8 +565,17 @@ def stage_styles(*, root: Path, run_one: Callable[[str, str, int], dict], log: L
     return _fit_stage(root=root, stage="styles", jobs=jobs, run_one=run_one, log=log)
 
 
+def stage_margin_fits(*, root: Path, run_one: Callable[[str, str, int], dict], log: Log) -> dict:
+    """Fit arm S for seeds 3 and 4 on the chosen architecture (2 fits), before any SD fit."""
+    jobs = core.margin_fit_jobs(arch=chosen_architecture(root=root))
+    return _fit_stage(root=root, stage="margin", jobs=jobs, run_one=run_one, log=log)
+
+
 def stage_later(*, root: Path, run_one: Callable[[str, str, int], dict], log: Log) -> dict:
-    """Fit S seeds 3 and 4, SDe-PT, SDe-FR, SD*-C, and SD*-lambda (14 fits)."""
+    """Fit SDe-PT, SDe-FR, SD*-C, and SD*-lambda (12 fits)."""
+    if not (root / "style.json").exists():
+        msg = "`later` reads the chosen masking style: run `choose-style` first"
+        raise RuntimeError(msg)
     jobs = core.later_jobs(arch=chosen_architecture(root=root))
     return _fit_stage(root=root, stage="later", jobs=jobs, run_one=run_one, log=log)
 
@@ -558,6 +628,7 @@ def stage_gallery(*, root: Path, shares_real: Mapping[str, float] | None, log: L
     components = {
         f"{k}/{n}": float(v)
         for k, shares in summary["components"]["shares"].items()
+        if not k.endswith("/fallback")
         for n, v in shares.items()
         if isinstance(v, int | float) and not isinstance(v, bool)
     }
@@ -609,12 +680,13 @@ def record_panel_check(*, root: Path, design_lead_confirms: Mapping[str, bool]) 
 # --------------------------------------------------------------------------- scoring
 
 
-def p_neg_of(*, pred: Mapping[str, np.ndarray], x: np.ndarray) -> np.ndarray:
-    """Return P(X < 0) of a stored prediction: the sign head's `p`, or the lobes' negative mass."""
-    if "mu_i" in pred:
-        s = score729
-        lobes = s.dist.Lobes(pred["p"], pred["mu_i"], pred["s_i"], pred["mu_r"], pred["s_r"])
-        return s.lobe_metrics(lobes=lobes, x=x).p_neg
+def p_neg_of(*, pred: Mapping[str, np.ndarray]) -> np.ndarray:
+    """Return P(X < 0) of a stored prediction: the head's own `p`, for every arm.
+
+    The refitted arms D and D-sign store two lobes, whose mass below zero is pulled towards 0.5
+    where the reading is small. Their scored probability is the head's own `p` (the weight of the
+    reverse-flow lobe), as for the sign-only arms.
+    """
     return pred["p"]
 
 
@@ -626,7 +698,7 @@ def load_p(
     for seed in seeds:
         folder = root / "predictions" / job_name(arm=arm, arch=arch, seed=seed)
         z = np.load(folder / f"{name}.npz")
-        ps.append(p_neg_of(pred={k: z[k] for k in z.files}, x=x))
+        ps.append(p_neg_of(pred={k: z[k] for k in z.files}))
     return score.seed_mean(p_by_seed=ps)
 
 
@@ -647,7 +719,7 @@ def real_h2_passed(*, root: Path) -> bool | None:
     return None if not path.exists() else bool(banks.read_json(path=path)["h2"]["pass"])
 
 
-def stage_score(
+def stage_score(  # noqa: PLR0915
     *,
     root: Path,
     holidays: np.ndarray,
@@ -675,7 +747,21 @@ def stage_score(
     arch = chosen_architecture(root=root)
     style = banks.read_json(path=root / "style.json")["chosen"]
     h2 = real_h2_passed(root=root)
-    failed = any(fit_dir(root=root).glob("*.failed.json"))
+    if h2 is None:
+        msg = "`score` needs scores/real.json (H2 is part of the verdict): run `real` first"
+        raise RuntimeError(msg)
+    failed_arms = failed_arm_names(root=root)
+    failed = bool(failed_arms & set(core.NEEDED_ARMS))
+    summary = banks.read_json(path=root / "banks" / "summary.json")
+    invalid = not summary.get("leakage_pass", False)
+    try:
+        leak.assert_files_older(
+            older=root / "limits.json",
+            newer=sorted(fit_dir(root=root).glob("*.json")),
+            what="the limits must be written before every fit",
+        )
+    except leak.CorrectnessFailureError:
+        invalid = True
     test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
     p: dict[str, np.ndarray] = {}
@@ -691,19 +777,40 @@ def stage_score(
             continue
     p["SD*"] = p[f"SD-{style}"]
     per_row = {arm: score.row_brier(p=v, x=rows.x) for arm, v in p.items()}
-    for a in ("transformer", "bilstm"):
+    variant = banks.read_json(path=root / "selection.json").get(
+        "transformer_variant", "transformer"
+    )
+    for key, a in (("transformer", variant), ("bilstm", "bilstm")):
         pa = load_p(root=root, arm="S", arch=a, seeds=core.ARCH_SEEDS, name="test", x=rows.x)
-        per_row[a] = score.row_brier(p=pa, x=rows.x)
+        per_row[key] = score.row_brier(p=pa, x=rows.x)
+    # C7 reads SD*-C in the causal protocol at k = 0; R10 reads its two-sided output.
+    counted = dict(per_row)
+    p_causal0 = causal_p(root=root, arch=arch, k=0)
+    if p_causal0 is None:
+        counted.pop("SD*-C", None)
+    else:
+        counted["SD*-C"] = score.row_brier(p=p_causal0, x=rows.x)
+    void = sorted({c for a_, c in core.VOID_BY_ARM.items() if a_ in failed_arms})
+    for c in void:
+        for arm in core.CONTRASTS[c]:
+            if arm in failed_arms or arm in core.VOID_BY_ARM:
+                counted.pop(arm, None)
     result = verdict(
         root=root,
         rows=rows,
         p=p,
-        per_row=per_row,
+        per_row=counted,
         n_resamples=n_resamples,
         failed=failed,
+        invalid=invalid,
         h2_pass=bool(h2),
     )
-    result["h2_pending"] = h2 is None
+    result["void_contrasts"] = void
+    result["failed_arms"] = sorted(failed_arms)
+    result["log_loss_contrasts"] = log_loss_contrasts(
+        rows=rows, p=p, p_causal0=p_causal0, root=root, arch=arch, variant=variant,
+        n_resamples=n_resamples, brier=result["contrasts"],
+    )  # fmt: skip
     limits = core.read_limits_file(path=root / "limits.json")
     result["checks_by_arm"] = {
         arm: {
@@ -719,6 +826,20 @@ def stage_score(
         root=root, rows=rows, p=p, test=test, arch=arch, style=style, baselines=baselines,
         n_resamples=n_resamples,
     )  # fmt: skip
+    result["tables"] = signed.metric_tables(rows=rows, p_by_arm=p)
+    result["ambiguity"] = {
+        arm: score729.ambiguity_readout(rows=rows, p_neg=v) for arm, v in p.items()
+    }
+    result["reliability_curves"] = {
+        arm: score.calibration(rows=rows, p=p[arm], bar=float("inf"))
+        for arm in ("S", "SD*", "D-sign")
+        if arm in p
+    }
+    result["reliability_curves"] = {
+        arm: {k: v[k] for k in ("mean_forecast", "frequency")}
+        for arm, v in result["reliability_curves"].items()
+    }
+    result["demand_readout"] = demand_readout(root=root, arch=arch)
     result["figure2"] = signed.brier_by_subset(rows=rows, p_by_arm={"P0": np.zeros(rows.n), **p})
     result["figure5"] = {
         arm: signed.harm_detection_by_group(rows=rows, p=p[arm]) for arm in ("S", "SD*") if arm in p
@@ -779,6 +900,99 @@ def signed_stage(
     return out
 
 
+def demand_readout(*, root: Path, arch: str) -> dict[str, dict[str, float]]:
+    """Return the demand error on hidden half-hours by trained style and evaluated style.
+
+    Reads `validation_masked_<style>.npz` of the arms SD-0, SD-K, SD-W, and SD-R (seeds 0 to 2),
+    which hold the demand output, the true base demand, and the hidden flag of the fixed masks.
+    """
+    out: dict[str, dict[str, float]] = {}
+    for trained in core.STYLES:
+        out[trained] = {}
+        for evaluated in core.STYLES:
+            vals = []
+            for seed in core.ARCH_SEEDS:
+                path = (
+                    root / "predictions" / job_name(arm=f"SD-{trained}", arch=arch, seed=seed)
+                    / f"validation_masked_{evaluated}.npz"
+                )  # fmt: skip
+                if not path.exists():
+                    continue
+                z = np.load(path)
+                hit = score.demand_mae(
+                    mu=z["demand_mu"], base=z["base"], valid=np.ones_like(z["hidden"], dtype=bool),
+                    hidden=z["hidden"].astype(bool),
+                )  # fmt: skip
+                vals.append(hit["hidden"])
+            out[trained][evaluated] = float(np.nanmean(vals)) if vals else float("nan")
+    return out
+
+
+def failed_arm_names(*, root: Path) -> set[str]:
+    """Return the arms (in file-name form) that have a `.failed.json` record."""
+    return {
+        f.name.split("_")[0].replace("star", "*") for f in fit_dir(root=root).glob("*.failed.json")
+    }
+
+
+def causal_p(*, root: Path, arch: str, k: int) -> np.ndarray | None:
+    """Return SD*-C's seed-mean P(X<0) in the causal protocol at `k`, or None without the files."""
+    files = [
+        root / "predictions" / job_name(arm="SD*-C", arch=arch, seed=s) / f"test_causal_k{k}.npz"
+        for s in core.ARCH_SEEDS
+    ]
+    if not all(f.exists() for f in files):
+        return None
+    return score.seed_mean(p_by_seed=[np.load(f)["p"] for f in files])
+
+
+def log_loss_contrasts(
+    *,
+    rows: score729.Rows,
+    p: Mapping[str, np.ndarray],
+    p_causal0: np.ndarray | None,
+    root: Path,
+    arch: str,
+    variant: str,
+    n_resamples: int,
+    brier: Mapping[str, Mapping[str, float]],
+) -> dict[str, dict]:
+    """Return each counted contrast on the log loss, with audit trigger 3 (opposite sign to Brier).
+
+    Args:
+        rows: The test rows.
+        p: Each arm's seed-mean P(X<0).
+        p_causal0: SD*-C's causal probabilities at k = 0, or None.
+        root: The data folder.
+        arch: The chosen architecture.
+        variant: The transformer variant that C6 reads.
+        n_resamples: The resamples of each reading.
+        brier: The counted contrasts' Brier readings.
+
+    Returns:
+        For each contrast read on the Brier score: the log-loss reading and `audit_trigger_3`.
+    """
+    loss = {arm: score.row_log_loss(p=v, x=rows.x) for arm, v in p.items()}
+    for key, a in (("transformer", variant), ("bilstm", "bilstm")):
+        pa = load_p(root=root, arm="S", arch=a, seeds=core.ARCH_SEEDS, name="test", x=rows.x)
+        loss[key] = score.row_log_loss(p=pa, x=rows.x)
+    if p_causal0 is not None:
+        loss["SD*-C"] = score.row_log_loss(p=p_causal0, x=rows.x)
+    out = {}
+    for name, (a, b) in core.CONTRASTS.items():
+        if name not in brier or a not in loss or b not in loss:
+            continue
+        reading = score.report_only_contrast(
+            rows=rows, a=loss[a], b=loss[b], n_resamples=n_resamples
+        )
+        point = float(reading.reading.point)
+        out[name] = {
+            **score.contrast_dict(reading=reading),
+            "audit_trigger_3": bool(point * brier[name]["point"] < 0.0),
+        }
+    return out
+
+
 def report_only(
     *, rows: score729.Rows, per_row: Mapping[str, np.ndarray], n_resamples: int
 ) -> dict:
@@ -818,8 +1032,8 @@ def causal_readout(
         if not all(f.exists() for f in files):
             continue
         b = score.row_brier(p=score.seed_mean(p_by_seed=[np.load(f)["p"] for f in files]), x=rows.x)
-        keep = score.causal_keep(hh=rows.hh, k=k)
-        out["brier_by_k"][k] = float(b[keep].mean())
+        keep = np.ones(rows.n, dtype=bool)
+        out["brier_by_k"][k] = float(b.mean())
         for label, ref in (("vs_p0", zeros), ("vs_s", per_s)):
             r = score.report_only_contrast(
                 rows=rows, a=b, b=ref, keep=keep, n_resamples=n_resamples
@@ -898,8 +1112,11 @@ def stage_real(
             axis=0,
         )
         test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
+        if not (np.array_equal(k1.date, k2.date) and np.array_equal(k1.hh, k2.hh)):
+            msg = "the K1 and K2 rows do not align half-hour by half-hour"
+            raise leak.CorrectnessFailureError(msg)
         k1_rec |= real.k1_against_baselines(
-            rows=k1, p=p_k1, mu=mu_k1, climatology=baselines[0],
+            rows=k1, reading=k2.r, p=p_k1, mu=mu_k1, climatology=baselines[0],
             pi=banks729.injected_share(bank=test),
         )  # fmt: skip
     if n_reverse < core.K1_MIN_REVERSE_DECIDABLE:
@@ -910,8 +1127,16 @@ def stage_real(
             bars.append(k1_rec["demand_mae"] < k1_rec["demand_mae_climatology"])
         k1_status = "pass" if all(bars) else "fail"
     k2_rec = score.harm_from_p(p=p_k2, limit=limits.harm_limit)
-    z = np.load(root / "predictions" / job_name(arm=arm, arch=arch, seed=0) / "real_eras.npz")
-    above = z["demand_mu"] > eras.r if "demand_mu" in z.files else np.zeros(eras.n, dtype=bool)
+    mu_eras = np.mean(
+        [
+            z["demand_mu"]
+            for z in load_preds(
+                root=root, arm=arm, arch=arch, seeds=core.ARCH_SEEDS, name="real_eras"
+            )
+        ],
+        axis=0,
+    )
+    above = mu_eras > eras.r
     era_hour = np.char.add(np.char.add(era_of_row.astype(str), "/"), (eras.hh // 2).astype(str))
     out = {
         "h2": real.h2(p=p_r1, limit=limits.harm_limit),
@@ -965,6 +1190,22 @@ def stage_figures(*, root: Path, log: Log) -> list[Path]:
         path=folder / "contrasts.svg",
     )
     written.append(folder / "contrasts.svg")
+    selection_path = root / "selection.json"
+    if selection_path.exists() and (screen := screen_scores(root=root)):
+        figures.save_svg(chart=figures.screen_chart(scores=screen), path=folder / "screen.svg")
+        written.append(folder / "screen.svg")
+    if v.get("reliability_curves"):
+        chart = figures.reliability_panels(
+            curves={
+                k: (c["mean_forecast"], c["frequency"]) for k, c in v["reliability_curves"].items()
+            }
+        )
+        figures.save_svg(chart=chart, path=folder / "reliability.svg")
+        written.append(folder / "reliability.svg")
+    if v.get("demand_readout"):
+        chart = figures.demand_readout_chart(errors=v["demand_readout"], climatology=float("nan"))
+        figures.save_svg(chart=chart, path=folder / "demand_readout.svg")
+        written.append(folder / "demand_readout.svg")
     by_k = v["causal"]["brier_by_k"]
     if by_k:
         chart = figures.causal_readout_chart(
@@ -998,6 +1239,23 @@ def stage_figures(*, root: Path, log: Log) -> list[Path]:
         written.append(folder / "real_eras.svg")
     log(f"{len(written)} figures written")
     return written
+
+
+def screen_scores(*, root: Path) -> dict[str, dict[str, float]]:
+    """Return the validation Brier score of arms S-A and S on each architecture (seed mean)."""
+    out: dict[str, dict[str, float]] = {}
+    for arm in core.SCREEN_ARMS:
+        for arch in core.ARCHITECTURES:
+            vals = [
+                banks.read_json(
+                    path=fit_dir(root=root) / f"{job_name(arm=arm, arch=arch, seed=s)}.json"
+                )["best_val_brier"]
+                for s in core.ARCH_SEEDS
+                if (fit_dir(root=root) / f"{job_name(arm=arm, arch=arch, seed=s)}.json").exists()
+            ]
+            if vals:
+                out.setdefault(arm, {})[arch] = float(np.mean(vals))
+    return out
 
 
 def stage_series(
@@ -1039,6 +1297,10 @@ def stage_series(
 # --------------------------------------------------------------------------- real-data drivers
 
 
+ARM_729_KEY: Final = {"D-sign": "Dsign"}
+"""Experiment 729's key for each refitted arm whose name differs here."""
+
+
 def run_refit_729(
     *, root: Path, ctx: stages729.Context, arm: str, arch: str, seed: int, device: str
 ) -> dict:
@@ -1053,7 +1315,7 @@ def run_refit_729(
     if record_path.exists():
         return banks.read_json(path=record_path)
     train729.limit_gpu_memory()
-    spec = arms729.ARM_SPECS[arm]
+    spec = arms729.ARM_SPECS[ARM_729_KEY.get(arm, arm)]
     kwargs = {"spec": spec, "holidays": ctx.cal.holidays, "stats": ctx.stats}
     train_bank = banks729.load_bank(path=banks.bank_path(root=root, kind="train", seed=seed))
     val_bank = banks729.load_bank(path=banks.bank_path(root=root, kind="validation"))
@@ -1076,12 +1338,18 @@ def run_refit_729(
 
 
 def measure_seconds_per_epoch(
-    *, root: Path, ctx: stages729.Context, arch: str, device: str, epochs: int = core.TIMING_EPOCHS
+    *,
+    root: Path,
+    ctx: stages729.Context,
+    arch: str,
+    device: str,
+    epochs: int = core.TIMING_EPOCHS,
+    arm: str = "S",
 ) -> float:
-    """Return the measured seconds an epoch of arm S on one architecture (nothing is saved)."""
+    """Return the measured seconds an epoch of one arm on one architecture (nothing is saved)."""
     import e00730_train as train
 
-    spec = spec_for(arm="S", style="K")
+    spec = spec_for(arm=arm, style="K")
     kwargs = {"holidays": ctx.cal.holidays, "stats": ctx.stats}
     tr = banks729.load_bank(path=banks.bank_path(root=root, kind="train", seed=0))
     va = banks729.load_bank(path=banks.bank_path(root=root, kind="validation"))
@@ -1102,25 +1370,72 @@ def encoder_inputs(*, root: Path) -> tuple[arms.EncoderTable, Path]:
     return arms.EncoderTable(dates=dates, values=values), folder
 
 
+STYLE_ARMS: Final = ("SD*-C", "SD*-lambda", "SDe-PT", "SDe-FR")
+"""The arms that read the chosen style, so they need `style.json`."""
+
+
 def fit_one(
     *, root: Path, ctx: stages729.Context, arm: str, arch: str, seed: int, device: str, log: Log
 ) -> dict:
-    """Fit one new arm; the style of SD* and the encoders come from files under `root`."""
+    """Fit one new arm; the style of SD* and the encoders come from files under `root`.
+
+    Args:
+        root: The experiment's data folder.
+        ctx: The experiment 729 context.
+        arm: The arm name.
+        arch: The architecture, `bilstm` or a transformer variant.
+        seed: The fit seed.
+        device: The torch device.
+        log: Progress logger.
+
+    Returns:
+        The fit record written for the job.
+
+    Raises:
+        RuntimeError: When an arm that reads the chosen style finds no `style.json`, or the timing
+            gate has not passed.
+    """
     import e00730_pretrain as pretrain
 
+    if not timing_passed(root=root):
+        msg = "a fit needs scores/timing.json with a pass: run `timing` first"
+        raise RuntimeError(msg)
     style_file = root / "style.json"
+    if arm in STYLE_ARMS and not style_file.exists():
+        msg = f"arm {arm} reads the chosen masking style: run `choose-style` first"
+        raise RuntimeError(msg)
     style = banks.read_json(path=style_file)["chosen"] if style_file.exists() else "K"
     encoder = pretrained = None
+    d8_index = 0
     if arm.startswith("SDe"):
         encoder, folder = encoder_inputs(root=root)
-        pretrained = pretrain.weight_path(folder=folder, seed=seed)
+        d8_index = pretrain.d8_primary_index()
+        if arm == "SDe-PT":
+            pretrained = pretrain.weight_path(folder=folder, seed=seed)
     return run_fit(
         root=root, ctx=ctx, arm=arm, arch=arch, seed=seed, style=style, device=device, log=log,
-        encoder=encoder, pretrained=pretrained,
+        encoder=encoder, pretrained=pretrained, d8_index=d8_index,
     )  # fmt: skip
 
 
 # --------------------------------------------------------------------------- real rows and windows
+
+
+def real_gallery_shares(*, ctx: stages729.Context) -> dict[str, float]:
+    """Return the real share of half-hours with a reading under 1 MVA, by the era of each world.
+
+    Days before the engine stand for the no-injection world, the net era for the engine worlds, and
+    the solar era for the engine-and-solar worlds. No real era matches the solar-only world.
+    """
+    data = stages729.data
+    cal_all = ctx.table.calendar
+    era = np.asarray(ctx.table.era)
+    out = {}
+    for world, name in (("none", data.ERA_PRE), ("engine", data.ERA_NET), ("both", data.ERA_SOLAR)):
+        r = cal_all.reading[era == name]
+        if r.size:
+            out[world] = float(np.nanmean(r < core.DECIDABLE_READING_POINTS))
+    return out
 
 
 def real_baselines(*, ctx: stages729.Context) -> tuple[object, object]:
@@ -1196,9 +1511,7 @@ def series_inputs(
     truth, reading, engine, solar = sc(rows.x), sc(rows.r), sc(rows.engine), sc(rows.solar)
     a_s, a_sd, a_c, a_mu = sc(p_s), sc(p_sd), sc(p_c), sc(mu)
     decidable = sc((rows.r >= core.DECIDABLE_READING_POINTS).astype(float)) > 0
-    source = np.array(["none", "S1", "S2"])[
-        np.bincount(key, weights=rows.source, minlength=n).astype(int) // 48 % 3
-    ]
+    source = np.array([test.segments[int(k // 1_000_000)].source for k in uniq])
     worlds = np.array([test.segments[int(k // 1_000_000)].world for k in uniq])
     table = sf.WindowTable(
         world=worlds,

@@ -111,9 +111,11 @@ def check_mask_panel(*, reading: np.ndarray, hidden: np.ndarray) -> bool:
     return bool(hidden.any() and (reading[hidden] == 0.0).all())
 
 
-def check_shares(*, shares: Mapping[str, float]) -> bool:
-    """Check that every component share is drawn against the bar `MIN_OUTPUT_SHARE`."""
-    return bool(shares) and all(np.isfinite(v) for v in shares.values())
+def check_shares(*, shares: Mapping[str, float], bar: float | None = None) -> bool:
+    """Check that every share is finite and, when a bar is given, at least the bar."""
+    return bool(shares) and all(
+        np.isfinite(v) and (bar is None or v >= bar) for v in shares.values()
+    )
 
 
 def build_panel_check(*, results: Mapping[str, bool], notes: Mapping[str, str]) -> dict:

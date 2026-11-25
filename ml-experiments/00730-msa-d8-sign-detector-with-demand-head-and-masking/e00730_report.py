@@ -18,6 +18,8 @@ def format_contrast(*, name: str, reading: Mapping[str, float]) -> str:
 
 def format_verdict(*, record: Mapping[str, object]) -> str:
     """Return the text of the verdict record: each counted contrast, H1, the bars, and the row."""
+    if "h1" not in record:
+        return f"verdict row {record['row']}: {record['verdict']} (no score was read)"
     lines = [f"verdict row {record['row']}: {record['verdict']} (margin {record['margin']:.5f})"]
     contrasts = record["contrasts"]
     assert isinstance(contrasts, Mapping)

@@ -134,10 +134,24 @@ class EncoderTable:
     dates: np.ndarray
     values: np.ndarray
 
+    def found(self, *, seg_dates: np.ndarray) -> np.ndarray:
+        """Return whether each of a segment's dense days has a row in the table."""
+        pos = np.clip(np.searchsorted(self.dates, seg_dates), 0, len(self.dates) - 1)
+        return self.dates[pos] == seg_dates
+
+    def coverage(self, *, segments: Sequence[sim729.Segment]) -> float:
+        """Return the share of the segments' base days that have an encoder row."""
+        total = hits = 0
+        for seg in segments:
+            base = seg.cal_index >= 0
+            total += int(base.sum())
+            hits += int(self.found(seg_dates=seg.dates)[base].sum())
+        return hits / total if total else 1.0
+
     def dense_rows(self, *, seg_dates: np.ndarray) -> np.ndarray:
         """Return the encoder rows of a segment's dense days `(28, (D + 2) * 48)`, else zero."""
         pos = np.clip(np.searchsorted(self.dates, seg_dates), 0, len(self.dates) - 1)
-        found = self.dates[pos] == seg_dates
+        found = self.found(seg_dates=seg_dates)
         out = np.zeros((len(seg_dates), 48, core.ENCODER_INPUT_COLUMNS), dtype=np.float32)
         out[found] = np.nan_to_num(self.values[pos[found]], nan=0.0)
         return out.reshape(-1, core.ENCODER_INPUT_COLUMNS).T
@@ -368,19 +382,19 @@ def make_batch(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return the inputs `(B, C, 96)`, targets `(B, 6, 48)`, and keeps `(B, 2, 48)` of a batch.
 
-    In training, half of the windows are masked in the arm's style (style "0" masks none), and an
-    arm
-    trained with the future hidden cuts the future on half of its windows, with a cut drawn
-    uniformly from the scored day's 48 half-hours. Evaluation windows are never masked or cut here.
+    In training, an arm trained with the future hidden cuts the future on half of its windows, with
+    a cut drawn uniformly from the scored day's 48 half-hours. The other windows are masked in the
+    arm's style with probability `MASK_PROBABILITY` (style "0" masks none), so no window carries
+    both. Evaluation windows are never masked or cut here.
     """
     xs, ts, ks = [], [], []
     for seg_index, day in picks:
         p = prepared[seg_index]
         hidden = cut = None
-        if training and spec.style != "0" and rng.uniform() < core.MASK_PROBABILITY:
-            hidden = masks.hidden_positions(style=spec.style, rng=rng, utc_offset=p.offsets[day])
         if training and spec.causal and rng.uniform() < core.MASK_PROBABILITY:
             cut = core729.MIDDLE_START + int(rng.integers(0, core729.WINDOW_STEPS_24))
+        elif training and spec.style != "0" and rng.uniform() < core.MASK_PROBABILITY:
+            hidden = masks.hidden_positions(style=spec.style, rng=rng, utc_offset=p.offsets[day])
         w, t, k = build_one(prepared=p, dense_day=day, spec=spec, hidden=hidden, cut_pos=cut)
         xs.append(w)
         ts.append(t)

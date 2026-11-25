@@ -156,7 +156,11 @@ def window_id(*, segment: int, day: int) -> int:
 
 
 def fixed_hidden_for_picks(
-    *, style: str, picks: Sequence[tuple[int, int]], offsets: Sequence[Sequence[float] | np.ndarray]
+    *,
+    style: str,
+    picks: Sequence[tuple[int, int]],
+    offsets: Sequence[Sequence[float] | np.ndarray],
+    segment_ids: Sequence[int] | None = None,
 ) -> np.ndarray:
     """Return the fixed masks `(len(picks), 96)` of the picks (segment, day), by window id.
 
@@ -164,6 +168,9 @@ def fixed_hidden_for_picks(
         style: The masking style.
         picks: The (segment, base day) of each window.
         offsets: For each segment, the UTC offset in hours of each of its base days.
+        segment_ids: The id of each segment in the window id (its position in the bank's list),
+            or None to use the segment's position in `offsets`. A prepared list that drops a
+            segment keeps the ids of the others.
 
     Returns:
         One row per pick, in the order of `picks`.
@@ -172,7 +179,7 @@ def fixed_hidden_for_picks(
         [
             fixed_hidden(
                 style=style,
-                index=window_id(segment=s, day=d),
+                index=window_id(segment=s if segment_ids is None else segment_ids[s], day=d),
                 utc_offset=float(offsets[s][d]),
             )
             for s, d in picks

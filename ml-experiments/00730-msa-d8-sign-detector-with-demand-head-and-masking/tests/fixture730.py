@@ -53,7 +53,9 @@ def write_choices(root: Path, *, style: str = "K", arch: str = "bilstm") -> None
     r = np.random.default_rng(1).uniform(0.5, 30.0, x.size)
     core.write_limits_file(path=root / "limits.json", limits=core.compute_limits(x=x, r=r))
     core.write_margin_file(path=root / "margin.json", floor=0.001, val_brier_s_by_seed=[0.02] * 5)
-    banks.write_json(path=root / "selection.json", payload={"chosen": arch})
+    banks.write_json(
+        path=root / "selection.json", payload={"chosen": arch, "transformer_variant": "transformer"}
+    )
     banks.write_json(path=root / "style.json", payload={"chosen": style})
 
 
@@ -90,3 +92,8 @@ def write_predictions(root: Path, rows, *, arch: str = "bilstm", style: str = "K
                         demand_mu=rng.normal(size=n) + 50.0,
                     )
     del style
+
+
+def write_real(root: Path, *, passed: bool = True) -> None:
+    """Write a minimal `scores/real.json`: H2 read, so that the score stage may run."""
+    banks.write_json(path=root / "scores" / "real.json", payload={"h2": {"pass": passed}})

@@ -311,14 +311,18 @@ check, the line stops at verdict row 0 and the manager is told.** No other freed
 no world mix, and no BSP coefficient range changes.
 
 **Every simulated component is checked for output where output must exist before the gate reads
-the banks.** Each check is stated per day, never per segment, because a segment of a month with one
-nonzero day would pass a per-segment check while the generator is still silent on the other days.
+the banks.** The solar and BSP checks are stated per day, never per segment, because a segment of a
+month with one nonzero day would pass a per-segment check while the generator is still silent on
+the other days. A key that has no cases, or fewer than 20 cases, fails its check, so that a silent
+component cannot pass by leaving nothing to count.
 The banks stage counts, per world type, bank, source, and season:
 
 - the share of clear base days of solar-world segments with solar output above zero on at least
   one clear sun-up half-hour, for S1 and S2 separately;
-- the share of running half-hours of engine-world segments with engine output above zero, per
-  half-hour that the engine simulator marks as running;
+- the share of engine-world segments whose days with engine output are not far below the run share
+  that the segment drew (`1 - no_run_share`), read separately on weekdays and on weekends and bank
+  holidays, because experiment 729's engine simulator marks no running half-hour and the plan does
+  not edit it;
 - the share of base days of BSP-month segments whose synthetic BSP differs from the real meter at
   every half-hour where the engine or solar output is above zero;
 - the share of no-injection half-hours whose truth equals the base demand; and
@@ -328,8 +332,10 @@ The banks stage counts, per world type, bank, source, and season:
 plan, and `tests/smoke_real_files.py` quote that same value.** Each share must be at least
 `MIN_OUTPUT_SHARE`, or 1.0 where the simulator leaves no room for an exception (the no-injection
 truth and the fold), or the line stops at verdict row 0 before any fit. A clear sun-up half-hour
-has a CAMS clear-sky index of at least 0.8 at D8, and a clear base day is a base day on which
-every sun-up half-hour is clear.
+has a CAMS clear-sky index of at least 0.8 at D8. A sun-up half-hour is one on which the index
+exists (it is missing where the clear-sky irradiance is at most 5 W/m2) and the cosine of the
+zenith exceeds 0.1. A clear base day has at least 8 sun-up half-hours and a clear one on at least
+0.9 of them.
 
 **A gallery of the synthetic world is a gate before any fit.** The figures stage draws the gallery
 from the rebuilt banks on the CPU (see "Figures planned"). The session, which is the design lead,
@@ -343,6 +349,8 @@ before the "fits starting" line.
 and its probability P(X<0) is the sigmoid of the logit.** The head is experiment 729's sign head.
 The scored probability is the head's own P(X<0), not the mass of a two-lobe mixture below zero,
 which experiment 729 showed is pulled towards 0.5 wherever the reading is small.
+The refitted arms D and D-sign, whose output is two lobes, are scored on the weight
+of the reverse-flow lobe, which is their head's own P(X<0).
 
 **The magnitude is reconstructed only for the signed read-outs.** The signed distribution is a
 mixture with weights (1 − P, P) of an import lobe at +M and a reverse-flow lobe at −M, where M =
@@ -827,7 +835,10 @@ not wholly independent of the simulator.
 ## Leakage checks
 
 **Each of these checks is an assertion in the code, and a failure is verdict row 1.** The checks of
-experiment 729's `e00729_leakage.py` run unchanged on the banks, and these are added:
+experiment 729's `e00729_leakage.py` run unchanged on the banks, and these are added.
+The predictions of the test bank are written when each fit ends, before the choices
+of the architecture, the style, and the margin; the choice-before-test check orders the first
+test *score*, which is read from those files, so no choice reads a test prediction:
 
 - No pre-training row of any Primary has a valid time in a test or validation month, within 2 days
   of one, on a day of the metered engine record or within 2 days of one, or on or after 2026-07-01.
@@ -1074,8 +1085,8 @@ these figures:
    band, as staggered dots on striped rows (`dot_chart` of experiment 700).
 3. The 7 counted contrasts with their intervals and the margin m.
 4. Reliability diagrams of P(X<0) for S, SD\*, SD\*-C in the causal protocol, and D-sign.
-5. The harm and detection numbers by world type and reading band, against the limit L and the bar of
-   0.5.
+5. The harm and detection numbers by world type and reading band, against the limit L and the
+   detection bar of 0.75.
 6. The demand read-out: the demand output's error on hidden half-hours, training style against
    evaluation style, with the demand climatology.
 7. The causal read-out: the Brier score against the number k of half-hours visible after the scored
@@ -1228,9 +1239,9 @@ and the pre-training mixer), `e00397_models.mlp`, experiment 428's `build_fold`,
 - `e00730_nets.py`: the transformer and the GRU-transformer with their attention flag, the sign
   and demand heads, the encoder front, and the loss.
 - `e00730_pretrain.py`: the pre-training without the held-out months, the stored standardiser,
-  and D8's encoder input table.
-- `e00730_encoders.py`: loading the pre-trained weights and D8's encoder input table, with the
-  digest checks.
+  D8's encoder input table, and the weight-file digest checks.
+- `e00730_signed.py`: the signed read-outs R2 to R6, table T1, and the by-group harm and detection
+  numbers.
 - `e00730_train.py`: the fit loop with the Brier early stop and the causal validation, the timing
   gate, and the fit schedule.
 - `e00730_score.py`: the Brier score, the log loss, H1, H2, the detection and calibration bars, the

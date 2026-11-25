@@ -41,11 +41,17 @@ def make_calendar(
         zenith=np.where(sun > 0, 60.0, 100.0)[None, None, :] * np.ones((n_farms, n_days, 1)),
         azimuth=np.full((n_farms, n_days, 48), 180.0),
     )
+    # Like the real table: the clear-sky index is NaN wherever the clear-sky irradiance is tiny,
+    # which includes the first and last half-hour with the sun up.
+    csi = np.clip(rng.uniform(0.5, 1.0, (n_days, 1)) * np.ones((1, 48)), 0, 1.2)
+    up = sun > 0
+    edge = up & ~np.roll(up, 1) | up & ~np.roll(up, -1)
+    csi = np.where(up & ~edge, csi, np.nan)
     return sim.Calendar(
         dates=dates,
         reading=reading,
         bsp=rng.normal(0, 4.0, (n_days, 48)) if bsp else np.full((n_days, 48), np.nan),
-        csi=np.clip(rng.uniform(0.2, 1.0, (n_days, 1)) * np.ones((1, 48)), 0, 1.2),
+        csi=csi,
         clear=1000.0 * sun[None, :] * np.ones((n_days, 1)),
         cosz=sun[None, :] * np.ones((n_days, 1)),
         t2m=10.0 + rng.normal(0, 3.0, (n_days, 48)),

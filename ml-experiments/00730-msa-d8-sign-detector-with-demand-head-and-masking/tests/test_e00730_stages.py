@@ -11,7 +11,7 @@ import e00730_core as core
 import e00730_stages as stages
 import numpy as np
 import pytest
-from fixture730 import make_root, open_gallery, write_choices, write_predictions
+from fixture730 import make_root, open_gallery, write_choices, write_predictions, write_real
 
 ALL_STAGES = (
     "gallery", "pretrain", "timing", "screen", "styles", "later", "refit729", "score", "real",
@@ -146,9 +146,10 @@ def test_a_failed_fit_is_recorded_and_the_run_goes_on(world: tuple) -> None:
 def test_job_lists_follow_the_plan() -> None:
     assert len(core.screen_jobs()) == 24
     assert len(core.style_jobs(arch="bilstm")) == 12
-    assert len(core.later_jobs(arch="bilstm")) == 14
+    assert len(core.later_jobs(arch="bilstm")) == 12
+    assert len(core.margin_fit_jobs(arch="bilstm")) == 2
     assert len(core.refit_jobs()) == 9
-    assert core.N_FITS - 0 == 24 + 12 + 14 + 9 or core.N_FITS - 0 == 24 + 12 + 14 + 9 + 3 or True
+    assert core.N_FITS == 24 + 2 + 12 + 12 + 9
     assert stages.arm_alias(arm="SD*", style="W") == "SD-W"
     assert stages.arm_alias(arm="S", style="W") == "S"
 
@@ -210,7 +211,6 @@ def test_score_real_report_figures_and_series_on_invented_predictions(world: tup
     assert set(verdict["figure5"]) == {"S", "SD*"}
     assert 0 <= verdict["row"] <= 8
     assert set(verdict["contrasts"]) <= set(core.CONTRASTS)
-    assert not verdict["h2_pending"]
     assert "R1" in verdict["report_only"]
     assert set(verdict["causal"]["brier_by_k"]) == {str(k) for k in core.CAUSAL_K} or set(
         verdict["causal"]["brier_by_k"]
@@ -234,15 +234,15 @@ def test_score_real_report_figures_and_series_on_invented_predictions(world: tup
     assert all(p.stem in {f"S{i}" for i in range(1, 17)} for p in paths)
 
 
-def test_a_missing_real_stage_leaves_h2_pending_and_fails_the_verdict(world: tuple) -> None:
+def test_score_refuses_before_h2_is_read(world: tuple) -> None:
     root, holidays, _ = world
     write_choices(root)
     test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
     write_predictions(root, rows)
-    verdict = stages.stage_score(root=root, holidays=holidays, n_resamples=100, log=lambda _: None)
-    assert verdict["h2_pending"]
-    assert verdict["row"] == 3
+    with pytest.raises(RuntimeError, match="real"):
+        stages.stage_score(root=root, holidays=holidays, n_resamples=100, log=lambda _: None)
+    assert stages.stage_names().index("real") < stages.stage_names().index("score")
 
 
 def test_a_failed_fit_makes_the_verdict_row_two(world: tuple) -> None:
@@ -251,6 +251,7 @@ def test_a_failed_fit_makes_the_verdict_row_two(world: tuple) -> None:
     test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
     write_predictions(root, rows)
+    write_real(root)
     banks.write_json(
         path=stages.fit_dir(root=root) / "S_bilstm_s0.failed.json", payload={"error": "X"}
     )

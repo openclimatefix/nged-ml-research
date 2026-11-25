@@ -4,8 +4,8 @@
     SLOT_CPUS=<list> run.sh --go e00730_cli.py <stage> [options]
 
 Stages, in the order of the plan: `banks`, `gate`, `gallery` (then `panels` once the design lead has
-read the gallery), `pretrain`, `timing`, `screen`, `choose`, `margin`, `styles`, `later`,
-`refit729`, `fit`, `real`, `score`, `report`, `figures`, `series`, and `components`. Every stage
+read the gallery), `timing`, `pretrain`, `screen`, `choose`, `margin`, `styles`, `choose-style`,
+`later`, `refit729`, `fit`, `real`, `score`, `report`, `figures`, `series`, and `components`. Every stage
 prints counts and scores only, and every stage but `banks` runs its guard first.
 """
 
@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import e00730_paths as paths
+import numpy as np
 
 paths.pin_threads()
 
@@ -43,7 +44,10 @@ def run_pretrain(*, root: Path, device: str, max_epochs: int | None, tmp: bool) 
 
     ctx = stages.real_context()
     held = [*ctx.months(split="test"), *ctx.months(split="validation")]
-    record_days = stages.stages729.data.record_days()  # ty: ignore[unresolved-attribute]
+    data = stages.stages729.data
+    cal_all = ctx.table.calendar
+    rec = data.record_by_day(record=data.metered_record(), days=cal_all.dates)
+    record_days = cal_all.dates[np.isfinite(rec).any(axis=1)]
     target = root / "timing_scratch" if tmp else root
     record = pretrain.run_pretraining(
         root=target, held_out_months=held, record_days=record_days,
@@ -52,7 +56,7 @@ def run_pretrain(*, root: Path, device: str, max_epochs: int | None, tmp: bool) 
     pretrain.write_record(record=record, path=target / "pretrained" / "record.json")
     if not tmp:
         standardiser = pretrain.read_standardiser(folder=root / "pretrained")
-        base = ctx.cal.dates
+        base = ctx.table.calendar.dates
         pretrain.build_d8_encoder_table(root=root, base_dates=base, standardiser=standardiser)
     return record
 
@@ -76,6 +80,10 @@ def main(argv: list[str]) -> int:
     except banks.StoppedError as exc:
         log(f"STOPPED (verdict row 0): {exc}")
         return 3
+    except stages.leak.CorrectnessFailureError as exc:
+        stages.write_invalid_verdict(root=root)
+        log(f"A CORRECTNESS CHECK FAILED (verdict row 1): {exc}")
+        return 4
 
 
 def dispatch(*, args: argparse.Namespace, root: Path) -> int:
@@ -91,13 +99,17 @@ def dispatch(*, args: argparse.Namespace, root: Path) -> int:
         ctx = stages.real_context()
         banks.stage_gate(root=root, gate_inputs=stages.real_gate_inputs(ctx=ctx), log=log)
     elif stage == "gallery":
-        stages.stage_gallery(root=root, shares_real=None, log=log)
+        ctx = stages.real_context()
+        stages.stage_gallery(root=root, shares_real=stages.real_gallery_shares(ctx=ctx), log=log)
     elif stage == "panels":
         confirms = json.loads(Path(args.confirm_panels).read_text())
         record = stages.record_panel_check(root=root, design_lead_confirms=confirms)
         log(f"panel check recorded: all passed {record['all_passed']}")
     elif stage == "pretrain":
         banks.guard_run(root=root, stage="pretrain")
+        if not stages.timing_passed(root=root):
+            msg = "`pretrain` needs scores/timing.json with a pass: run `timing` first"
+            raise RuntimeError(msg)
         log(
             f"pre-training: {run_pretrain(root=root, device=args.device, max_epochs=None, tmp=False)}"
         )
@@ -111,13 +123,20 @@ def dispatch(*, args: argparse.Namespace, root: Path) -> int:
         scratch = run_pretrain(
             root=root, device=args.device, max_epochs=core.TIMING_PRETRAIN_EPOCHS, tmp=True
         )
+        demand = stages.measure_seconds_per_epoch(
+            root=root, ctx=ctx, arch="bilstm", device=args.device, arm="SD-W"
+        )
         stages.stage_timing(
             root=root, seconds_per_epoch=secs, peak_memory_gb=scratch["peak_memory_gb"],
             manager_approved=args.manager_approved, log=log,
+            pretrain_seconds_per_epoch=scratch["seeds"]["0"]["seconds_per_epoch"],
+            demand_seconds_per_epoch=demand,
         )  # fmt: skip
-    elif stage in ("screen", "styles", "later"):
+    elif stage in ("screen", "styles", "later", "margin-fits"):
         run_one = device_runner(root=root, device=args.device)
-        counts = getattr(stages, f"stage_{stage}")(root=root, run_one=run_one, log=log)
+        counts = getattr(stages, f"stage_{stage.replace('-', '_')}")(
+            root=root, run_one=run_one, log=log
+        )
         log(f"{stage}: {counts}")
     elif stage == "refit729":
         ctx = stages.real_context()
@@ -131,6 +150,10 @@ def dispatch(*, args: argparse.Namespace, root: Path) -> int:
         log(f"refit729: {counts}")
     elif stage == "choose":
         log(str(stages.choose_architecture(root=root)))
+    elif stage == "choose-style":
+        arch = stages.chosen_architecture(root=root)
+        mae = stages.whole_day_demand_mae(root=root, arch=arch)
+        log(str(stages.choose_style(root=root, whole_day_demand_mae=mae)))
     elif stage == "margin":
         log(str(stages.write_margin(root=root)))
     elif stage == "fit":
