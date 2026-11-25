@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 729: the arms, the input channels of each, masking, lags, and window batches.
 
 This module needs no torch. An arm is a row of `ARM_SPECS`: which input groups it reads, its window

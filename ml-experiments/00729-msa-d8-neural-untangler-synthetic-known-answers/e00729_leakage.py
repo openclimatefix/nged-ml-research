@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 729: the leakage assertions. A failure raises `CorrectnessFailureError` (verdict row 1).
 
 Each function takes the objects it checks and returns `None`; none prints a month, a date, or a

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 729: build, hash, and store the synthetic banks, and the realism gate's functions.
 
 A bank is a list of segments of one kind. Training banks hold 32 draws per training month per seed
@@ -109,16 +110,16 @@ def build_bank(
             share = core.TEST_MIX["none"]
         none_share[month] = share
         worlds = core.draw_world_types(rng=rng_mix, n=n_draws, none_share=share)
-        for draw in range(n_draws):
-            segments.append(
-                sim.simulate_segment(
-                    cal=cal,
-                    month=month,
-                    use=month_use[month],
-                    world=worlds[draw],
-                    rng=np.random.default_rng(children[draw + 1]),
-                )  # fmt: skip
+        segments.extend(
+            sim.simulate_segment(
+                cal=cal,
+                month=month,
+                use=month_use[month],
+                world=worlds[draw],
+                rng=np.random.default_rng(children[draw + 1]),
             )
+            for draw in range(n_draws)
+        )
     return Bank(
         kind=kind, seed=seed, root=root, none_share=none_share, segments=segments,
         digest=bank_digest(segments=segments),
@@ -135,7 +136,7 @@ def save_bank(*, bank: Bank, path: Path) -> None:
 
 def load_bank(*, path: Path) -> Bank:
     """Read a bank and check that its stored digest matches its arrays."""
-    bank = pickle.loads(path.read_bytes())  # noqa: S301
+    bank = pickle.loads(path.read_bytes())
     assert bank_digest(segments=bank.segments) == bank.digest, "a stored bank changed on disk"
     return bank
 

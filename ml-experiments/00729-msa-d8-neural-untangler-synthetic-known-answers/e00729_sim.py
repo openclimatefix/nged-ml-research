@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 729: the engine and solar simulators, the fold, and the synthetic BSP meter.
 
 A segment is one calendar month of base days that carries one continuous injection draw. Every
@@ -168,7 +169,7 @@ def assert_in_ranges(*, params: dict[str, float]) -> None:
 # --------------------------------------------------------------------------- the engine
 
 
-def draw_engine(
+def draw_engine(  # noqa: PLR0915
     *, rng: np.random.Generator, utc_offset: np.ndarray, quiet_day: np.ndarray,
     record: dict[str, float],
 ) -> np.ndarray:  # fmt: skip
@@ -223,12 +224,12 @@ def draw_engine(
             share = rng.uniform(*core.RANGES["unit_output_share"], size=k)
             ramp_hh = float(rng.uniform(*core.RANGES["ramp_half_hours"]))
             start_utc = start_local - utc_offset[day]
-            a = int(round((day * 24 + start_utc) * 2 * sub))
-            b = a + int(round(length_h * 2 * sub))
+            a = round((day * 24 + start_utc) * 2 * sub)
+            b = a + round(length_h * 2 * sub)
             lo, hi = max(a, 0), min(b, n_days * per_day)
             if hi <= lo:
                 continue
-            ramp = int(round(ramp_hh * sub))
+            ramp = round(ramp_hh * sub)
             profile = np.ones(hi - lo)
             if ramp > 0:
                 steps = min(ramp, hi - lo)

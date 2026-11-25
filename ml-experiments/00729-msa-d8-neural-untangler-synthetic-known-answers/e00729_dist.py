@@ -61,7 +61,7 @@ class Lobes:
         s = np.stack([self.s_i, self.s_r], axis=1)
         return w, mu, s
 
-    def subset(self, *, rows: np.ndarray) -> "Lobes":
+    def subset(self, *, rows: np.ndarray) -> Lobes:
         """Return the distributions of the selected rows."""
         return Lobes(self.p[rows], self.mu_i[rows], self.s_i[rows], self.mu_r[rows], self.s_r[rows])
 
@@ -108,7 +108,7 @@ def mixture_quantiles(
     Returns:
         The quantiles in points.
     """
-    w, mu, s = lobes.components()
+    _, mu, s = lobes.components()
     lo0 = (mu - 10.0 * s).min(axis=1)
     hi0 = (mu + 10.0 * s).max(axis=1)
     out = np.empty((len(lobes.p), len(levels)))

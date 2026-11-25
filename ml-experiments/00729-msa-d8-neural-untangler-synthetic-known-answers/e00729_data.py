@@ -1,5 +1,7 @@
-"""Experiment 729: loaders for D8's reading, the BSP meter, the CAMS and temperature fields, the
-metered farms, the bank holidays, the metered engine record, and the private cut.
+"""Experiment 729: loaders for the real inputs.
+
+The loaders cover D8's reading, the BSP meter, the CAMS and temperature fields, the metered farms,
+the bank holidays, the metered engine record, and the private cut.
 
 Every loader reads one file and returns arrays; none prints a value. D8's reading and the BSP A
 meter come from the cleaned power store through `studies.power.scan_power` (half-hours the

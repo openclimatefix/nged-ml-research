@@ -75,10 +75,26 @@ def rows_from_segments(*, segments: Sequence[sim.Segment], holidays: np.ndarray)
     months = {m: i for i, m in enumerate(sorted({s.month for s in segments}))}
     parts: dict[str, list[np.ndarray]] = {
         k: []
-        for k in (
-            "seg month date hh x r engine solar world source fallback has_bsp "
-            "local_hh local_month weekend weekday holiday t2m"
-        ).split()
+        for k in [
+            "seg",
+            "month",
+            "date",
+            "hh",
+            "x",
+            "r",
+            "engine",
+            "solar",
+            "world",
+            "source",
+            "fallback",
+            "has_bsp",
+            "local_hh",
+            "local_month",
+            "weekend",
+            "weekday",
+            "holiday",
+            "t2m",
+        ]
     }
     for k, s in enumerate(segments):
         days = np.flatnonzero(s.cal_index >= 0)
@@ -91,7 +107,7 @@ def rows_from_segments(*, segments: Sequence[sim.Segment], holidays: np.ndarray)
             date = s.dates[d].astype("datetime64[D]")
             offset = sim.utc_offset_hours(day=date.astype(object))
             weekday = int((date - EPOCH).astype(int) + 3) % 7
-            local = (hh + int(round(2 * offset))) % 48
+            local = (hh + round(2 * offset)) % 48
             parts["seg"].append(np.full(n, k))
             parts["month"].append(np.full(n, months[s.month]))
             parts["date"].append(np.full(n, int((date - EPOCH).astype(int))))
@@ -157,6 +173,7 @@ class RowMetrics:
         crps: The signed CRPS in points.
         pinball: Twice the mean pinball loss over the 11 levels, in points.
         mae: The absolute error of the median, in points of capacity.
+        median: The median of the forecast distribution, in points.
         p_neg: P(X < 0).
         covers: Whether the lobe on the true side covers the truth (two-lobe heads only).
         width: The width of that lobe's 5% to 95% range.
@@ -167,6 +184,7 @@ class RowMetrics:
     crps: np.ndarray
     pinball: np.ndarray
     mae: np.ndarray
+    median: np.ndarray
     p_neg: np.ndarray
     covers: np.ndarray
     width: np.ndarray
@@ -181,6 +199,7 @@ def lobe_metrics(*, lobes: dist.Lobes, x: np.ndarray) -> RowMetrics:
         crps=dist.mixture_crps(lobes=lobes, y=x),
         pinball=dist.pinball_points(q=q, y=x),
         mae=np.abs(x - q[:, 5]),
+        median=q[:, 5],
         p_neg=dist.prob_negative(lobes=lobes),
         covers=dist.lobe_covers(lobes=lobes, y=x).astype(float),
         width=dist.lobe_width(lobes=lobes, y=x),
@@ -199,6 +218,7 @@ def quantile_metrics(*, q: np.ndarray, x: np.ndarray) -> RowMetrics:
         crps=dist.quantile_crps(q=qs, y=x),
         pinball=dist.pinball_points(q=qs, y=x),
         mae=np.abs(x - qs[:, 5]),
+        median=qs[:, 5],
         p_neg=p_neg,
         covers=nan,
         width=nan,

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 729: the training driver, the predictor, the timing gate, and the fit schedule.
 
 A fit trains one network of one architecture on one arm and seed: AdamW (learning rate 1e-3, weight

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 729: every named constant and bar of the plan, the split rule, and the verdict rule.
 
 Every number that the page's decision rule pre-registers is a `Final` here, so the page and the code
@@ -134,6 +135,8 @@ def assign_day_splits(*, days: Sequence[date], splits: Mapping[str, SplitName]) 
 WORLD_TYPES: Final = ("none", "engine", "solar", "both")
 TEST_MIX: Final = {"none": 0.15, "engine": 0.30, "solar": 0.20, "both": 0.35}
 """The fixed world mix of every test and validation bank."""
+TEST_MIX_INJECTED: Final = 1.0 - TEST_MIX["none"]
+"""The injected share of the test banks (0.85): the prior given to B1 and B2."""
 SHIFTED_NONE_SHARE: Final = 0.50
 """The no-injection share of the shifted-mix bank."""
 NONE_SHARE_RANGE: Final = (0.05, 0.60)
@@ -449,7 +452,7 @@ VERDICT_WORDS: Final = {
 }  # fmt: skip
 
 
-def verdict_row(*, v: VerdictInputs) -> int:
+def verdict_row(*, v: VerdictInputs) -> int:  # noqa: PLR0911
     """Return the first row of the verdict table that matches (0 to 8).
 
     Args:

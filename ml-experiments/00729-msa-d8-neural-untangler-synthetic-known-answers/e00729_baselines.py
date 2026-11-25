@@ -83,7 +83,7 @@ class Climatology:
         return (month.astype(int) * N_LOCAL_HH + hh.astype(int)) * 2 + weekend.astype(int)
 
     @classmethod
-    def fit(cls, *, demand: np.ndarray, f: Features) -> "Climatology":
+    def fit(cls, *, demand: np.ndarray, f: Features) -> Climatology:
         """Fit the climatology on training base demand (points) with its features."""
         ids = cls.cell_id(month=f.local_month, hh=f.local_hh, weekend=f.weekend)
         ok = np.isfinite(demand)
@@ -130,7 +130,7 @@ class Regression:
     t_mean: float
 
     @classmethod
-    def fit(cls, *, demand: np.ndarray, f: Features) -> "Regression":
+    def fit(cls, *, demand: np.ndarray, f: Features) -> Regression:
         """Fit by least squares on the rows where the demand is finite."""
         ok = np.isfinite(demand)
         t_mean = float(np.nanmean(f.t2m)) if np.isfinite(f.t2m).any() else 0.0

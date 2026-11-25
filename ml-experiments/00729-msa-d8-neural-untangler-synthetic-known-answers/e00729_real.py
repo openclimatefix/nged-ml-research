@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 729: the real-data checks R1, K1, K2, R2, and R3, and the harm check H2.
 
 Every function takes arrays and returns aggregates. None returns or prints a date, an engine size, a
@@ -20,10 +21,10 @@ SIGN_CHANGE_NEIGHBOUR: Final = 1
 NEAR_ZERO_POINTS: Final = core.GATE_MIN_VALUE_MVA / core.CAPACITY_MVA * core.POINTS
 
 
-def real_rows(
+def real_segments(
     *, cal: sim.Calendar, use: np.ndarray, reading: np.ndarray, truth: np.ndarray
-) -> score.Rows:
-    """Build scored rows from real days, one pseudo-segment per calendar month.
+) -> list[sim.Segment]:
+    """Build one pseudo-segment per calendar month from real days.
 
     Args:
         cal: The calendar.
@@ -32,15 +33,21 @@ def real_rows(
         truth: The answer in points (NaN where there is none), on the calendar axis.
 
     Returns:
-        The rows, in segment (month) then day then half-hour order.
+        The segments, in month order.
     """
     months = sorted({str(d)[:7] for d in cal.dates[use]})
-    segments = []
+    out = []
     for m in months:
         in_month = np.array([str(d)[:7] == m for d in cal.dates]) & use
-        segments.append(
-            sim.real_segment(cal=cal, month=m, use=in_month, reading=reading, truth=truth)
-        )
+        out.append(sim.real_segment(cal=cal, month=m, use=in_month, reading=reading, truth=truth))
+    return out
+
+
+def real_rows(
+    *, cal: sim.Calendar, use: np.ndarray, reading: np.ndarray, truth: np.ndarray
+) -> score.Rows:
+    """Build scored rows from real days (see `real_segments`)."""
+    segments = real_segments(cal=cal, use=use, reading=reading, truth=truth)
     return score.rows_from_segments(segments=segments, holidays=cal.holidays)
 
 
