@@ -26,14 +26,19 @@ def test_cache_grid_is_the_extended_grid_not_the_default_grid(
     """The cache has 126,624 half-hours (to 2026-11-20 23:30), the grid that `redirect` sets; the default grid has 121,248."""
     ext = pytest.importorskip("e00667_extend")
     common = pytest.importorskip("e00087_common")
-    old = common.GRID_END
-    try:
-        assert len(common.grid_times()) == 121_248
-        assert datetime(2026, 7, 31, 23, 30, tzinfo=UTC) == common.GRID_END
-        ext.redirect()
-        assert len(common.grid_times()) == src.N_GRID == 126_624
-    finally:
-        common.GRID_END = old
+    prep = pytest.importorskip("e00397_prep")
+    # `redirect` changes all four of these. monkeypatch restores each one after the test.
+    for module, name in (
+        (common, "GRID_END"),
+        (common, "ERA5_PATH"),
+        (common, "OBSERVED_PATH"),
+        (prep, "SUMMARY_DIR"),
+    ):
+        monkeypatch.setattr(module, name, getattr(module, name))
+    assert len(common.grid_times()) == 121_248
+    assert datetime(2026, 7, 31, 23, 30, tzinfo=UTC) == common.GRID_END
+    ext.redirect()
+    assert len(common.grid_times()) == src.N_GRID == 126_624
 
 
 def test_lookahead_margins_l_and_e_are_never_negative_and_z_is_the_lab_arm() -> None:

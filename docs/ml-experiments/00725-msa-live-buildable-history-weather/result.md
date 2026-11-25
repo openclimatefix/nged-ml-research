@@ -551,6 +551,9 @@ The experiment is planned and has no fitted result yet, so these bullets describ
   the stored stage 1 state, with frozen encoders and no new parameter.
 - **Measurement:** CRPS in points of capacity on experiment 713's row set, month-block bootstrap
   intervals, no valid time on or after 2026-07-01 scored.
+- **Look-ahead statement for `Z`:** the statement of `Z` shows negative margins of up to 111 h by
+  design, because `Z` reads the analysis in every cell. KL8 requires that `Z` shows them, which proves
+  that the statement detects a look-ahead. KL8 requires no negative margin for `L` or `E`.
 - **Standing practices followed:** monthly refit; cleaned data; fitted states saved outside git;
   stored forecasts reused as controls; a screen on four folds first; forecast example plots.
 - **Plots, many, as every MSA write-up carries:** the table of cells drawn as a 14-by-48 grid per
