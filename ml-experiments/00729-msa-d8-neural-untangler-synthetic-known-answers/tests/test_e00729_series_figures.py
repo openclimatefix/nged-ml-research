@@ -270,3 +270,21 @@ def test_the_figures_are_written_without_a_calendar_date_and_under_500_kb(
         assert p.stat().st_size < 500_000
         assert not re.search(r"20\d\d-\d\d", text)
         assert "aria-label" not in text or "2030" not in text
+
+
+def test_the_truth_and_the_reading_are_wider_than_the_arm_lines_so_they_show_as_a_halo(
+    world: World,
+) -> None:
+    segments, rows = world
+    day = series.complete_days(rows=rows)[0]
+    window = series.window_data(seg=segments[day.seg], date=day.date, with_truth=True)
+    fc = {"D": series.forecast_on(pred=lobe_arrays(rows, p=0.1), index=day.index)}
+    spec = series.window_chart(
+        title="t", subtitle="s", window=window, forecasts=fc, bands=("D",), show_bsp=False
+    ).to_dict()
+    layers = spec["vconcat"][0]["layer"]
+    encoding = next(layer["encoding"] for layer in layers if layer["mark"]["type"] == "line")
+    scale = encoding["strokeWidth"]["scale"]
+    widths = dict(zip(scale["domain"], scale["range"], strict=True))
+    assert widths[series.TRUTH_NAME] > widths[series.ARM_LABELS["D"]]
+    assert widths[series.READING_NAME] > widths[series.ARM_LABELS["D"]]

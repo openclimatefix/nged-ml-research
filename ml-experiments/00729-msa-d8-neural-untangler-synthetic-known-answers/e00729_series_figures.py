@@ -71,6 +71,10 @@ SERIES_COLOURS: Final = {
     ARM_LABELS["C"]: figures.GREEN, ARM_LABELS["D"]: figures.ORANGE,
     ARM_LABELS["Dq"]: figures.PURPLE, ARM_LABELS["Dsign"]: figures.PURPLE,
 }  # fmt: skip
+HALO_WIDTH_PX: Final = 4.5
+LINE_WIDTH_PX: Final = 1.6
+"""The truth and the reading are drawn this wide beneath the narrower arm lines, so that an arm that
+follows the truth does not hide it."""
 CONTEXT_SHADE: Final = "#F2F2F2"
 
 
@@ -430,6 +434,20 @@ def dash_encoding(*, names: Sequence[str]) -> alt.StrokeDash:
     )
 
 
+def width_encoding(*, names: Sequence[str]) -> alt.StrokeWidth:
+    """Return the line width: the truth and the reading are wide, so they show as a halo under the arms."""
+    return alt.StrokeWidth(
+        "series:N",
+        scale=alt.Scale(
+            domain=list(names),
+            range=[
+                HALO_WIDTH_PX if n in (TRUTH_NAME, READING_NAME) else LINE_WIDTH_PX for n in names
+            ],
+        ),
+        legend=None,
+    )
+
+
 def window_chart(
     *, title: str, subtitle: str, window: WindowData, forecasts: Mapping[str, Forecast],
     bands: Sequence[str], show_bsp: bool,
@@ -494,6 +512,7 @@ def window_chart(
             y=alt.Y("value:Q", title="Signed power (points of capacity)"),
             color=shared,
             strokeDash=dash_encoding(names=names),
+            strokeWidth=width_encoding(names=names),
         )
     ).properties(width=PLOT_WIDTH_PX, height=TOP_HEIGHT_PX)
     half = (

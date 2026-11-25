@@ -473,63 +473,182 @@ written by the run, and figures 3, 4, 5, 7, 8, and 9 are in this section. The Op
 
 ## Time series of the estimates
 
-**Twelve figures show single 48-hour windows from the stored predictions, and the days are picked by
-fixed rules.** The script `e00729_series_figures.py` (stage `series`) reads the stored test-bank
-predictions of each arm at seed 0 and draws one window per figure. It fits nothing and re-scores
-nothing. The middle 24 hours of each window are the scored day, and the 12 hours either side (grey
-blocks) are the context that the neural networks read. The top row holds the true signed power
-(black, synthetic days only), the folded reading (grey), and each arm's median with its 5% to 95%
-band. The row below holds each arm's P(X<0) with a dashed line at 0.5. The x axis is the hour of the
-day in UTC, and no figure carries a calendar date. A rule keeps the complete days that meet a
-condition and takes the day with the median of a key, or the largest for the two worst-case figures.
-A tie goes to the lowest segment and date, and no rule draws random numbers. The figures are not on
-this page yet: they are added to this folder after the stage has run on the stored files and the
-script has had its review.
+**Twelve figures show single 48-hour windows from the stored predictions, and each day is picked by
+a fixed rule.** The script `e00729_series_figures.py` (stage `series`) reads the stored test-bank
+predictions of each arm at seed 0, and the real held-out days for the last two figures. It fits
+nothing and re-scores nothing. The middle 24 hours of each window are the scored day, and the 12
+hours either side (grey blocks) are context that the neural networks read. The top row holds the
+true signed power (black, synthetic days only), the folded reading (grey), and each arm's median
+with a 5% to 95% band. The truth and the reading are drawn wide beneath the arm lines. The row below
+holds each arm's P(X<0), with a dashed line at 0.5. The x axis is the hour of the day in UTC, and no
+figure carries a calendar date. Each figure shows one day at seed 0, so none is a sample of days or
+a seed mean, and every number is interim.
 
-**Figures 1 to 4 show how the arms follow reverse flow caused by an engine, by solar output, and by
-both.** Figure 1 is an engine-only day with reverse flow whose engine output is centred between
-17:00 and 23:00 UTC. Figure 2 is the same rule for output centred between 06:00 and 12:00 UTC.
-Figure 3 is a solar-only day with reverse flow centred between 10:00 and 14:00 UTC. Figure 4 is an
-engine-and-solar day in which both outputs reach at least 2 points. Each takes the day with the
-median depth of reverse flow among the days that meet its condition. Look for whether the median of
-each arm drops below zero where the black line does, and whether P(X<0) crosses 0.5 there.
+**The numbers in the paragraphs below come from a read-only snippet over the stored test-bank
+predictions.** The snippet reuses the picking functions of the script and prints, for each synthetic
+figure's day, the lowest truth, the lowest median of each arm, the highest P(X<0), the number of
+half-hours with P(X<0) above 0.5, and the mean width of the 5% to 95% band. The real-day paragraphs
+describe what the plots show. Medians are in points of D8's capacity.
 
-**Figure 5 shows a day on which the reading comes close to zero.** The rule keeps days with at least
-4 half-hours of reading under 0.3 MVA and takes the day with the median number of such half-hours.
-The folded reading cannot show the sign there. P(X<0) is the mass of the arm's two-lobe distribution
-below zero, and the two lobes sit at plus and minus nearly the same size when the reading is small,
-so the mass goes to 0.5 by construction whatever the arm has learned about the sign. A P(X<0) near
-0.5 on this day therefore does not show that an arm is uncertain by its own judgement. Look at
-whether the band spans both signs and whether the median follows the truth.
+**The figure index lists the figures in the order of this section.**
 
-**Figures 6 and 7 show the harm on import days.** Figure 6 is the all-import day of the no-injection
-worlds with the median of arm D's largest P(X<0) of the day, and figure 7 is the all-import day with
-the largest mean of arm D's signed CRPS minus P0f's. P0f is a dashed grey line and puts no weight
-on reverse flow (its lobe probability is zero), and its P(X<0) is the mass of the lower lobe below
-zero, which is near zero while the reading is far above zero and rises towards 0.5 as the reading
-nears zero. Compare the size of the probability that arm D places on reverse flow with that of P0f
-on the same half-hours.
+- Figure S1: An evening engine run that reverses the flow.
+- Figure S2: A morning engine run that reverses the flow.
+- Figure S3: Solar output alone reverses the flow at midday.
+- Figure S4: Engine and solar output together.
+- Figure S5: A day on which the reading comes close to zero and the sign is hard to tell.
+- Figure S6: A plain import day with no injection.
+- Figure S7: The import day on which arm D does worst against P0f.
+- Figure S8: A month with real BSP steps: arm C beside arm B.
+- Figure S9: The 11-quantile head beside the two-lobe head.
+- Figure S10: The sign-only head beside the two-lobe head.
+- Figure S11: A real day before the engine was connected, typical false alarm.
+- Figure S12: A real day before the engine was connected, largest false alarm.
 
-**Figure 8 shows a month with real BSP steps.** The rule keeps engine and engine-and-solar days in a
-BSP month with reverse flow and takes the day with the median depth. The bottom row holds the
-half-hour change of the BSP meter. Arm C reads the steps and arm B does not, so look for whether the
-two arms differ where the steps occur.
+**On the evening engine day, the medians of arms A, B, and D stay close to zero while the truth
+drops to −7.8 points.** The truth is below zero on 5 half-hours. The median of arm A goes below zero
+on 3 of them (lowest −1.0), arm B on 2 (lowest −3.3), and arm D on 1 (lowest −0.3). P(X<0) peaks at
+0.56 for arm A, 0.58 for arm B, and 0.51 for arm D, and is above 0.5 on 3, 2, and 1 half-hours.
+Outside the engine run all three arms sit on the reading with P(X<0) near zero. The band of arm D is
+3.8 points wide on average.
 
-**Figures 9 and 10 put the other output heads beside arm D on a window already shown.** Figure 9
-uses the window of figure 1 for the 11-quantile arm D-quantile, and P(X<0) of that arm is read off
-by linear interpolation of its 11 quantiles, made non-decreasing as in the scoring. Figure 10 uses
-the window of figure 5 for the sign-only arm D-sign. The stored output of D-sign is a probability of
-reverse flow with the two lobes at plus and minus the reading with the reactive floor removed, and
-the figure plots the mixture's mass below zero. That mass goes to 0.5 by construction where the
-reading is under about 0.15 MVA, whatever the sign logit, so a value near 0.5 there is not evidence
-about the sign head. Look at the width of the bands, and at how far P(X<0) sits from 0.5 where the
-reading is larger.
+![An evening engine run that reverses the flow](series_01_evening_engine.svg)
 
-**Figures 11 and 12 show real days before the engine was connected, with no truth line.** On these
-days D8 imports, so the reading is the answer. Figure 11 takes the day with the median of arm D's
-largest P(X<0) of the day, and figure 12 the day with the largest. The figures plot the reading and
-each arm's output only, with no metered or inferred engine series and no date. Look for whether
-P(X<0) rises above 0.5 on a day when the reading is far above zero.
+*Figure S1. An evening engine run that reverses the flow. Rule for the day: an engine-only day with
+reverse flow whose engine output is centred between 17:00 and 23:00 UTC; the day with the median
+depth of reverse flow. Arms at seed 0; band 5% to 95%.*
+
+**On the morning engine day, the arms follow the direction of the run but not its depth.** The truth
+falls to −16.0 points on 11 half-hours. The lowest medians are −1.7 for arm A, −8.4 for arm B, and
+−4.8 for arm D. P(X<0) is above 0.5 on 9 half-hours for arms A and D and on 6 for arm B, and peaks
+at 0.67 for arm D. Arm B's P(X<0) falls back below 0.5 before the run ends.
+
+![A morning engine run that reverses the flow](series_02_morning_engine.svg)
+
+*Figure S2. A morning engine run that reverses the flow. Rule for the day: an engine-only day with
+reverse flow whose engine output is centred between 06:00 and 12:00 UTC; the day with the median
+depth of reverse flow. Arms at seed 0; band 5% to 95%.*
+
+**On the solar-only day, no arm puts its median or P(X<0) on the reverse flow.** The truth reaches
+−74.0 points on 11 half-hours. The lowest medians are +3.3, +10.6, and +11.6 for arms A, B, and D,
+so no median goes below zero, and P(X<0) peaks at 0.43, 0.30, and 0.43. The band of arm D is 26.4
+points wide on average and reaches below −100 near noon, so the band covers the truth while the
+median and P(X<0) do not show it.
+
+![Solar output alone reverses the flow at midday](series_03_solar_midday.svg)
+
+*Figure S3. Solar output alone reverses the flow at midday. Rule for the day: a solar-only day with
+reverse flow whose solar output is centred between 10:00 and 14:00 UTC; the day with the median
+depth of reverse flow. Arms at seed 0; band 5% to 95%.*
+
+**On the engine-and-solar day, the arms flag reverse flow on most of the right half-hours and also
+raise P(X<0) on import half-hours.** The truth reaches −53.3 points on 10 half-hours. The medians of
+arms B and D reach −67.3 and −59.9, and the median of arm A reaches −2.4. P(X<0) is above 0.5 on 9,
+9, and 10 half-hours for arms A, B, and D. Near 14:00 the medians of arms B and D dip to about −60
+where the truth is about −15, deeper than the truth at that half-hour. The mean P(X<0) on the import
+half-hours of the day is 0.22, 0.17, and 0.21.
+
+![Engine and solar output together](series_04_engine_and_solar.svg)
+
+*Figure S4. Engine and solar output together. Rule for the day: an engine-and-solar day with reverse
+flow in which both outputs reach at least 2 points; the day with the median depth of reverse flow.
+Arms at seed 0; band 5% to 95%.*
+
+**On the ambiguous day, arm B puts its median at −74.3 points for about two hours although the truth
+never goes below −1.9.** The day has 4 reverse-flow half-hours. The P(X<0) of arm B peaks at 0.70
+and is above 0.5 on 7 half-hours, against 4 and 3 half-hours for arms A and D. The band of arm D is
+37.7 points wide on average and reaches below −90 around 13:00. Near a reading of zero, P(X<0) is
+the mass of two lobes at plus and minus the reading, so a value near 0.5 there follows from the
+geometry, whatever an arm has learned about the sign.
+
+![A day on which the reading comes close to zero and the sign is hard to tell](series_05_ambiguous.svg)
+
+*Figure S5. A day on which the reading comes close to zero and the sign is hard to tell. Rule for
+the day: a day with at least 4 half-hours of reading under 0.3 MVA; the day with the median number
+of such half-hours. Arms at seed 0; band 5% to 95%.*
+
+**On the typical no-injection import day, no arm invents reverse flow.** The truth and the reading
+stay above 57.0 points. The P(X<0) of arm D peaks at 0.00 and its mean is 0.001, and the P(X<0) of
+arm A peaks at 0.01. The band of arm D is 1.7 points wide on average, close to the 1.6 points of
+P0f, which is the dashed line under the others. This day is the median of its rule, so it shows the
+typical case and not the worst.
+
+![A plain import day with no injection](series_06_plain_import.svg)
+
+*Figure S6. A plain import day with no injection. Rule for the day: an all-import day of the no-
+injection worlds; the day with the median of arm D's largest P(X<0) of the day. Arms at seed 0; band
+5% to 95%.*
+
+**On the import day with the largest harm, arms B and D put their medians at about −70 points where
+the median of arm A stays near +72.** The truth never goes below +2.7 points. The medians
+of arms B and D reach −72.8 and −70.1 on 10 half-hours, with P(X<0) up to 0.94 and 0.83. The median
+of arm A reaches only −1.0, with P(X<0) above 0.5 on 2 half-hours. P0f keeps its median on the
+reading with P(X<0) at 0.0, and the band of arm D is 36.9 points wide on average against 1.6 for
+P0f. The medians of arms B and D are roughly the mirror image of the median of arm A.
+
+![The import day on which arm D does worst against P0f](series_07_largest_harm.svg)
+
+*Figure S7. The import day on which arm D does worst against P0f. Rule for the day: a day of the
+test bank on which every half-hour is import; the day with the largest mean of arm D's signed CRPS
+minus P0f's. Arms at seed 0; band 5% to 95%.*
+
+**On the BSP-month day, arm C keeps its median near zero where arm B swings to −93.6 points.** The
+truth reaches −16.9 points on 6 half-hours. The lowest median of arm C is −5.3. P(X<0) is above 0.5
+on 9 half-hours for arm C and 10 for arm B, with a mean on the reverse-flow half-hours of 0.60 for
+arm C and 0.42 for arm B. The mean P(X<0) on the import half-hours of the day is 0.14 for arm C and
+0.19 for arm B. The bottom row shows steps of the BSP meter that reach about ±100 points.
+
+![A month with real BSP steps: arm C beside arm B](series_08_bsp_steps.svg)
+
+*Figure S8. A month with real BSP steps: arm C beside arm B. Rule for the day: an engine or engine-
+and-solar day in a BSP month with reverse flow; the day with the median depth of reverse flow. Arms
+at seed 0; band 5% to 95%.*
+
+**On the evening engine window, the 11-quantile head and the two-lobe head give nearly the same
+picture.** The median of D-quantile reaches −1.5 points against −0.3 for arm D, and P(X<0) peaks at
+0.65 against 0.51. The mean band is 3.3 points wide for D-quantile and 3.8 for arm D. The mean
+P(X<0) on import half-hours is 0.002 for D-quantile and 0.009 for arm D. This is one window at seed
+0, so it does not rank the heads.
+
+![The 11-quantile head beside the two-lobe head](series_09_quantile_head.svg)
+
+*Figure S9. The 11-quantile head beside the two-lobe head. Rule for the day: the day of Figure S1.
+Arms at seed 0; band 5% to 95%.*
+
+**On the ambiguous window, D-sign gives a much narrower band than arm D and nearly the same
+P(X<0).** The P(X<0) of D-sign peaks at 0.57 against 0.60 for arm D. The mean band is 9.7 points
+wide for D-sign and 37.7 for arm D. The median of D-sign goes below zero on 2 half-hours and that of
+arm D on 3. D-sign places its lobes at plus and minus the reading with the reactive floor removed,
+and its P(X<0) is the mass of the mixture below zero, which goes to 0.5 by construction where the
+reading is under about 0.15 MVA.
+
+![The sign-only head beside the two-lobe head](series_10_sign_head.svg)
+
+*Figure S10. The sign-only head beside the two-lobe head. Rule for the day: the day of Figure S5.
+Arms at seed 0; band 5% to 95%.*
+
+**On the typical real day, no arm raises P(X<0) visibly above zero.** The plotted reading stays
+between about 60 and 92 points, and the three arms follow it. The P(X<0) lines lie on the zero line
+on the whole day.
+
+![A real day before the engine was connected, typical false alarm](series_11_real_median.svg)
+
+*Figure S11. A real day before the engine was connected, typical false alarm. Rule for the day: a
+real day before the engine was connected; the day with the median of arm D's largest P(X<0) of the
+day. Arms at seed 0; band 5% to 95%.*
+
+**On the real day with the largest false alarm of arm D, P(X<0) stays under about 0.1 and the
+context holds a stretch of zero reading.** The reading in the 12 hours before the scored day is a
+flat zero until about the scored day's first half-hour, and then jumps to about 80 points. The
+P(X<0) of arms A and D is highest in the first half-hours of the scored day, at about 0.1 for arm A
+and about 0.05 for arm D, and falls to near zero after. The largest false alarm of arm D on this day
+therefore comes where the window starts after a run of zero reading, and it never reaches 0.5.
+
+![A real day before the engine was connected, largest false alarm](series_12_real_largest.svg)
+
+*Figure S12. A real day before the engine was connected, largest false alarm. Rule for the day: a
+real day before the engine was connected; the day with the largest of arm D's largest P(X<0) of the
+day. Arms at seed 0; band 5% to 95%.*
 
 ## Checks
 
