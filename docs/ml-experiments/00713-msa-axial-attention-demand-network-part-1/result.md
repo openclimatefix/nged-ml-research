@@ -338,13 +338,13 @@ in `E` (14.4%), and 14.3% in `P` (14.3%). Two of 14 rows is 14.3%, so none of th
 puts extra weight on the rows with the target's weekday.
 
 **`M1` and `E` give the most recent rows the most weight, and the weekday rows differ from their
-neighbours by at most 0.007.** At lead day 1, `M1` falls from 0.083 at slot 1 to 0.056 at slot 12,
-and `E` from 0.085 to 0.054, whereas `P`, whose slots are placebo rows with no age order, runs from
-0.067 to 0.077. Because of that gradient, the comparison with neighbouring slots is firmer than the
-comparison with a uniform spread. In `M1`, slot 6 (the first weekday row) takes 0.0725 against 0.0732
-and 0.0684 at slots 5 and 7, and slot 13 (the second) takes 0.0582 against 0.0562 and 0.0651 at
-slots 12 and 14. In `E`, slot 6 takes 0.0642 against 0.0667 and 0.0647, and slot 13 takes 0.0535
-against 0.0535 and 0.0605.
+neighbours by at most 0.007 at lead day 1.** At lead day 1, `M1` falls from 0.083 at slot 1 to
+0.056 at slot 12, and `E` from 0.085 to 0.054, whereas `P`, whose slots are placebo rows with no
+age order, runs from 0.058 to 0.077. Because of that gradient, the comparison with neighbouring
+slots is firmer than the comparison with a uniform spread. In `M1`, slot 6 (the first weekday row)
+takes 0.0725 against 0.0732 and 0.0684 at slots 5 and 7, and slot 13 (the second) takes 0.0582
+against 0.0562 and 0.0651 at slots 12 and 14. In `E`, slot 6 takes 0.0642 against 0.0667 and
+0.0647, and slot 13 takes 0.0535 against 0.0535 and 0.0605.
 
 ![Mean across-day attention by history slot, lead day 1](attention_by_age_lead1.svg)
 
@@ -354,12 +354,13 @@ against 0.0535 and 0.0605.
 Each case is one origin and one Primary, chosen for display only on outcomes the network never
 reads: an origin whose next-day actual has a large half-hour change (case A), and the origins with
 the highest (case B) and the lowest (case C) mean reanalysis shortwave over the target day at D5.
-On the clear day (case B), `M1` and `E` put their largest weights on slots 2 and 6 over the first 12
-half-hours of the target day (0.20 on slot 2 in both, and 0.24 and 0.21 on slot 6). Slot 6 is the
-row with the target's weekday, so this one forecast does favour it, while the average over origins
-does not. `P` puts its largest weights on slots 11, 3, and 8 in case B. In case A the largest `M1`
-weights fall on slots 3, 8, and 5, and in the dull day (case C) on slots 14, 11, and 12, so no single
-row dominates across cases. The cases are three origins, and each is a single forecast.
+On the clear day (case B), `M1` and `E` put their largest weights on slots 2 and 6 over the first
+12 half-hours of the target day (0.20 on slot 2 in both, and 0.24 and 0.21 on slot 6). Slot 6 is
+the row with the target's weekday, so this one forecast does favour it, while the average over
+origins does not. `P` puts its largest weights on slots 3, 14, and 7 over the first 12 half-hours
+of case B, and over the whole day on slots 11, 3, and 8. In case A the largest `M1` weights fall
+on slots 3, 8, and 5, and in the dull day (case C) on slots 14, 11, and 12, so no single row
+dominates across cases. The cases are three origins, and each is a single forecast.
 
 ![Across-day attention, case A](attention_across_case_a.svg)
 
@@ -371,11 +372,13 @@ row dominates across cases. The cases are three origins, and each is a single fo
 
 - **The attention extract reproduces the scored forecast.** For each of the 3 cases of `M1`, `E`, and
   `P`, the extract's quantiles (the 11 quantile columns) differ from the stored forecast of the same
-  arm, Primary, origin, and valid times by at most 1.6e-06 (the largest of 9 differences; limit 1e-4),
-  and the forecast with the attention returned is bit-identical to the forecast without it. The
-  runner logs are `attention_extract_{M1,E,P}_2026-01_s0.log` under `work/logs/` in the private data
-  folder. A smoke test with an untrained network ran before the one-line device-index fix of the GPU
-  memory cap was committed, so it ran on uncommitted code; the three real extracts ran after it.
+  arm, Primary, origin, and valid times by at most 1.6e-06 (the largest of 9 differences; limit
+  1e-4), and the forecast with the attention returned is bit-identical to the forecast without it.
+  The runner logs are `attention_extract_{M1,E,P}_2026-01_s0.log` under `work/logs/` in the private
+  data folder. A smoke test with an untrained network ran before the one-line device-index fix of
+  the GPU memory cap was committed, so it ran on uncommitted code. The real extract of `M1` also ran
+  just before that commit, and the real extracts of `E` and `P` ran after it. The fix changes only
+  the function that sets the GPU memory cap, and the 1.6e-06 match includes the `M1` extract.
 - **Median minus mean forecast, per site.** For `M1` at seed 0, averaged over all leads of 0 to 14
   days, the median sits between 0.96 points of capacity below and 0.20 above the mean forecast at
   the 14 scored Primaries, and 1.99 below at D15. The report script prints 10 of the 16 Primaries;
