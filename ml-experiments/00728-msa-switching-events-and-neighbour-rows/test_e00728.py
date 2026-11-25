@@ -60,7 +60,7 @@ def test_training_world_limits_and_clean_targets() -> None:
     """GH7 holds on a draw: clean targets, at most two permanent changes, a stack within 0.50."""
     world, clean, mva = small_world(seed=1)
     stats = wd.check_targets_and_limits(world=world, clean=clean, mva_only=mva)
-    assert stats["n_events"] > 100 and 0.0 < stats["permanent_share"] < 0.6
+    assert stats["n_events"] > 60 and 0.0 < stats["permanent_share"] < 0.6
     cover = wd.realised_cover(world=world, clean=clean, first=FIRST, last=LAST)
     assert 0.08 < cover < 0.45, cover
 
@@ -77,11 +77,11 @@ def test_training_world_is_deterministic_and_seeded() -> None:
 def test_mirror_classes_and_sign_balance() -> None:
     """A third of temporary moves have each mirror class, and the sign does not depend on the kind."""
     world, _, _ = small_world(seed=5)
-    temporary = [e for e in world.events if e["kind"] == "temporary"]
+    others = [small_world(seed=seed)[0] for seed in (6, 7)]
+    temporary = [e for w in (world, *others) for e in w.events if e["kind"] == "temporary"]
     classes = np.array([min(e["mirror_class"], 2) for e in temporary])
     shares = np.bincount(classes, minlength=3) / len(classes)
     assert np.all(np.abs(shares - 1 / 3) < 0.12), shares
-    others = [small_world(seed=seed)[0] for seed in (6, 7)]
     mva = np.arange(nb.N_PRIMARIES) % 2 == 0
     tables = wd.independence_tables(worlds=[world, *others], mva_only=mva, level=1e-4)
     assert "kind_by_sign_mva_only" in tables and "kind_by_sign_signed_mw" in tables
@@ -185,18 +185,82 @@ def test_floor_rule_does_not_tie_group_and_sign_to_kind() -> None:
             clean=clean, first=FIRST, last=LAST, world_seed=s, table=ring_table(),
             capacity_mw=np.full(nb.N_PRIMARIES, 30.0), mva_only=mva, vis=np.full(nb.N_PRIMARIES, 0.12),
         )
-        for s in range(20, 26)
+        for s in range(20, 40)
     ]  # fmt: skip
-    events = pl.DataFrame([e for w in worlds for e in w.events]).with_columns(
-        mva=pl.col("host").map_elements(lambda h: bool(mva[h]), return_dtype=pl.Boolean)
+    gaps = wd.fall_share_gap(worlds=worlds, mva_only=mva, level=1e-3)
+    assert all(r["passes"] for r in gaps.values()), gaps
+    assert all(abs(r["gap"]) < r["power_gap"] for r in gaps.values()), gaps
+
+
+def test_fall_share_gap_flags_a_planted_gap_and_not_equal_shares() -> None:
+    """The z-test sees 0.15 between 400 and 800 events at level 2.5e-4, and not equal shares."""
+
+    def world(*, falls_permanent: int, falls_temporary: int) -> wd.TrainingWorld:
+        events = [
+            {"host": 0, "kind": "permanent", "sign": -1.0 if i < falls_permanent else 1.0}
+            for i in range(400)
+        ] + [
+            {"host": 0, "kind": "temporary", "sign": -1.0 if i < falls_temporary else 1.0}
+            for i in range(800)
+        ]  # fmt: skip
+        empty = np.zeros((1, 1))
+        return wd.TrainingWorld(
+            history=empty, target=empty, events=events, seed=0, redrawn=0, dropped=0, redraws={},
+            first_try={},
+        )  # fmt: skip
+
+    mva = np.array([True])
+    equal = wd.fall_share_gap(
+        worlds=[world(falls_permanent=100, falls_temporary=200)], mva_only=mva, level=2.5e-4
     )
-    share = (
-        events.filter(pl.col("mva"))
-        .group_by("kind")
-        .agg((pl.col("sign") < 0).mean().alias("falls"))
+    assert equal["mva_only"]["passes"] and equal["mva_only"]["gap"] == 0.0
+    planted = wd.fall_share_gap(
+        worlds=[world(falls_permanent=160, falls_temporary=200)], mva_only=mva, level=2.5e-4
     )
-    falls = dict(zip(share["kind"].to_list(), share["falls"].to_list(), strict=True))
-    assert abs(falls["temporary"] - falls["permanent"]) < 0.12, falls
+    assert not planted["mva_only"]["passes"]
+    assert planted["mva_only"]["gap"] == pytest.approx(0.15)
+    assert planted["mva_only"]["power_gap"] < 0.15
+
+
+def test_coverage_stops_an_empty_group_and_a_thin_month() -> None:
+    """A group with no events of a kind, as on a panel with MVA-only power near zero, stops the gate."""
+    mva = np.array([True, False])
+    empty = np.zeros((1, 1))
+
+    def world(hosts: list[int]) -> wd.TrainingWorld:
+        events = [{"host": h, "kind": k} for h in hosts for k in ("permanent", "temporary")]
+        return wd.TrainingWorld(
+            history=empty, target=empty, events=events, seed=0, redrawn=0, dropped=0, redraws={},
+            first_try={},
+        )  # fmt: skip
+
+    months = {"2026-01": [world([0] * 10 + [1] * 10)], "2026-02": [world([0] * 10 + [1] * 10)]}
+    assert wd.coverage_problems(worlds_by_month=months, mva_only=mva, pooled=20, per_month=8) == []
+    only_signed = {m: [world([1] * 20)] for m in months}
+    problems = wd.coverage_problems(
+        worlds_by_month=only_signed, mva_only=mva, pooled=20, per_month=8
+    )
+    assert any("mva_only permanent: 0 events" in p for p in problems), problems
+    thin = {"2026-01": [world([0] * 10 + [1] * 10)], "2026-02": [world([0] * 3 + [1] * 10)]}
+    problems = wd.coverage_problems(worlds_by_month=thin, mva_only=mva, pooled=10, per_month=8)
+    assert problems and all("2026-02" in p for p in problems), problems
+
+
+def test_stacking_limits_do_not_depend_on_the_sign() -> None:
+    """A rise and a fall of equal depth pass or fail the three limits together."""
+    clean = np.full(1000, 0.3)
+    for count, perm, depth in ((0, 0.0, 0.2), (2, 0.0, 0.1), (1, 0.3, 0.3), (0, 0.0, 0.4)):
+        perm_sum = np.full(1000, perm)
+        verdict = wd._limits_ok(
+            clean_row=clean, perm_sum=perm_sum, count=count, onset=100, depth=depth, mva=True
+        )
+        assert isinstance(verdict, bool)
+    assert not wd._limits_ok(
+        clean_row=clean, perm_sum=np.zeros(1000), count=0, onset=100, depth=0.4, mva=True
+    )  # a fall of 0.4 would take an MVA-only target of 0.3 below zero, so a rise of 0.4 is dropped too
+    assert wd._limits_ok(
+        clean_row=clean, perm_sum=np.zeros(1000), count=0, onset=100, depth=0.2, mva=True
+    )
 
 
 def test_donor_step_recovers_the_donor_from_a_receiving_row() -> None:

@@ -80,8 +80,9 @@ GPU-process-hours stands.
 
 ## Corrections to the plan made before any gate number was seen
 
-**Two rules of the gate were corrected before any count or test result was printed.** Both
-corrections are recorded here so that the commit order shows they came first.
+**Five rules of the gate and the training world were corrected before any count or test result on
+real data was printed.** The corrections are recorded here so that the commit order shows they came
+first.
 
 - **The span of the reference error follows the design text.** The design defines the reference
   error over the fold's training span. The first code read the days `[md - 400, md)` of the stored
@@ -94,6 +95,74 @@ corrections are recorded here so that the commit order shows they came first.
   pools the 5 draws of each of the 8 fold months into one table, runs 5 tests per pooled fold (kind
   by sign, kind by Primary, kind by sign within each group, and the balance of unmirrored rises and
   falls), and reads the 40 tests at the level 0.01 divided by 40.
+- **The training world applies one placement rule to both kinds of event.** The design states the
+  floor and the redraw for permanent changes only, and experiment 715 clips the steps at recipients
+  only. The first code also clipped a temporary move at its MVA-only host, and tested a temporary
+  move over its own length but a permanent change over the whole grid after its onset. Synthetic
+  panels showed that these differences let the group and the sign of an event predict its kind. The
+  corrected rule tests every event at an MVA-only Primary over `[onset, end of grid)` of the
+  current history, so a rise and a fall of equal depth pass or fail the same way for both kinds. The
+  limits on stacking (a summed shift within 0.50, and a target at or above zero as if the step were
+  a fall) ignore the sign and apply to both kinds; only the count of two permanent changes per
+  Primary applies to permanent changes alone, because it depends on the host alone. A temporary
+  move is no longer clipped at its host, and a step that fails is redrawn at another Primary or
+  onset with its sign and depth kept.
+- **A permanent change is first placed in the first 28 days after its onset.** The onset of a
+  permanent change is drawn over the grid as if the change lasted 28 days (the cover that the
+  schedule counts), so that its onset distribution is uniform and does not crowd the end of the
+  schedule; the change itself never ends.
+- **GH5 adds a z-test on the fall share, which counts toward the verdict.** The chi-squared tests of
+  a single fold cannot see a gap of about 0.05 between the fall share of permanent changes and that
+  of temporary moves, and a gap of that size lets a network read the kind from the group and the
+  sign. The gate therefore pools all 40 draws and runs, in each group (MVA-only and signed-MW), a
+  z-test on the difference of the two fall shares with a pooled variance. It is read at the same
+  Bonferroni level as the other tests, 0.01 divided by 42 tests (5 per pooled fold times 8 folds,
+  plus these 2). A failure stops the line and no waiver applies. A group with no event of one kind
+  is reported with a notice, and the test then has nothing to compare.
+- **GH5 stops on a training world that lacks events.** In each group (MVA-only and signed-MW) and
+  for each kind, the 40 training draws must hold at least 60 events, and the 5 draws of each fold
+  month at least 8, the floors of GH4. A group with no event of a kind stops the line, with no
+  waiver and no fallback.
+
+**The placement rule changes three things in the design, and they are design changes.**
+
+- **Temporary moves now face the limit on the stack and the mirrored target floor.** Experiment 714
+  and experiment 715 apply neither to a temporary move. The corrected training world applies them
+  to both kinds, so a temporary move of a given depth is dropped at an MVA-only Primary whose power
+  could not carry a fall of that depth.
+- **The training draws are smaller.** On synthetic panel A a draw holds 96 events on average, down
+  from 105; on panel B it holds 86, down from 104.
+- **The z-test excludes only a strong cue.** With about 400 permanent changes and 650 to 2,800
+  temporary moves in a group, the smallest gap that the test finds with 80% power is 0.10 to 0.14.
+  A gap of 0.05 would pass. The gate prints the smallest gap from the real event counts.
+
+**Three rules were run on two synthetic panels of 40 draws each, at the gate level 2.4e-4.** The
+MVA-only power of panel A runs from 0.25 to 0.65. The MVA-only power of panel B runs from about 0 to
+0.6, clipped at zero. The first rule is the generator before the correction (commit `cf4a29d91`).
+The second rule is the first form of the correction, in which the count, the stack, and the target
+floor were limits for permanent changes only and a change over a limit was dropped without a redraw.
+That form was proposed first and it was wrong, because the limits depend on the depth and the floor
+test passes falls of small depth only, so the limits changed the mix of signs of the permanent changes
+alone. The third rule is the placement rule in force. The gap is the fall share of permanent changes
+minus the fall share of temporary moves.
+
+| Rule | Panel | Group | Permanent: n, fall share | Temporary: n, fall share | Gap | z | Result |
+|---|---|---|---|---|---|---|---|
+| Before | A | MVA-only | 560, 0.364 | 1351, 0.413 | -0.049 | -1.98 | pass |
+| Before | A | signed-MW | 630, 0.608 | 1661, 0.587 | +0.021 | +0.91 | pass |
+| Before | B | MVA-only | 523, 0.216 | 1041, 0.251 | -0.035 | -1.52 | pass |
+| Before | B | signed-MW | 629, 0.665 | 1956, 0.653 | +0.012 | +0.54 | pass |
+| Permanent-only limits | A | MVA-only | 211, 0.483 | 1046, 0.263 | +0.221 | +6.38 | fail |
+| Permanent-only limits | A | signed-MW | 483, 0.617 | 2024, 0.636 | -0.019 | -0.77 | pass |
+| In force | A | MVA-only | 398, 0.492 | 657, 0.463 | +0.030 | +0.94 | pass |
+| In force | A | signed-MW | 569, 0.506 | 2223, 0.519 | -0.013 | -0.53 | pass |
+| In force | B | MVA-only | 0 | 0 | none | none | stop: no events |
+| In force | B | signed-MW | 601, 0.506 | 2855, 0.507 | -0.001 | -0.06 | pass |
+
+**The z-test does not flag the generator before the correction, so the correction rests on the
+reasoning and not on that test.** The gaps before the correction (-0.049 and -0.035 among MVA-only
+Primaries) lie inside the smallest gap that the test finds. Panel B under the rule in force shows the
+coverage stop at work: the MVA-only Primaries hold no event of either kind, so the gate would stop.
 
 **Unconfirmed assumptions, stated as the design states them.** The implementer confirms each one
 before the plan commit.

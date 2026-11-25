@@ -223,8 +223,8 @@ def rows_for_event(
                         "clean_share": take(array=clean, index=valid),
                         "change": np.full(PER_DAY, change),
                         "in_force": np.full(PER_DAY, in_force),
-                        "persist_injected": injected[back],
-                        "persist_real": clean[back],
+                        "persist_injected": take(array=injected, index=back),
+                        "persist_real": take(array=clean, index=back),
                     }
                 )
             )

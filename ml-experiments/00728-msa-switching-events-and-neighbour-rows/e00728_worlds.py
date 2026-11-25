@@ -133,10 +133,12 @@ class TrainingWorld:
             permanent changes only.
         events: One dict per event.
         seed: The world seed of the draw.
-        redrawn: Number of events that broke a limit and were redrawn.
-        dropped: Number of events that found no valid place and were dropped.
+        redrawn: Number of events that failed the placement tests and were redrawn.
+        dropped: Number of events that found no place that passed the placement tests.
         redraws: The same two counts by kind (`redrawn_temporary`, `redrawn_permanent`,
             `dropped_temporary`, `dropped_permanent`).
+        first_try: For each `kind|group|sign` key, the number of events drawn and the number that
+            passed the placement tests at their first placement.
     """
 
     history: np.ndarray
@@ -146,6 +148,7 @@ class TrainingWorld:
     redrawn: int
     dropped: int
     redraws: dict[str, int]
+    first_try: dict[str, list[int]]
 
 
 # ---------------------------------------------------------------------- seeds
@@ -269,34 +272,48 @@ def place_onset(*, fraction: float, first: int, last: int, length: int) -> int:
     return first + min(int(fraction * (hi - first)), hi - first - 1)
 
 
-def _placement_ok(
-    *, history_row: np.ndarray, clean_row: np.ndarray, perm_sum: np.ndarray, count: int,
-    onset: int, length: int, shift: float, mva: bool, temporary: bool,
-) -> bool:  # fmt: skip
-    """Return True if an event may sit at this Primary and onset (design section 2.1).
+def _floor_ok(*, history_row: np.ndarray, onset: int, shift: float, mva: bool) -> bool:
+    """Return True if the step may be added to this Primary at this onset (design section 2.1).
 
     **The same floor test applies to a temporary move and to a permanent change.** At an MVA-only
-    Primary the history over the event, with the step added, stays at or above zero. If the test
-    were applied to one kind alone, the redraw would move the rejected steps of that kind to other
-    Primaries, and group and sign would predict the kind. A permanent change also keeps the limits
-    on stacking: at most `MAX_PERMANENT_PER_PRIMARY` per Primary, a summed shift within
-    `MAX_PERMANENT_SUM`, and a shifted target of an MVA-only Primary at or above zero.
+    Primary the history from the onset to the end of the grid, with the step added, stays at or
+    above zero, whatever the kind and the length of the event. The test therefore depends on the
+    host, the onset, the sign, and the depth alone. A step that fails is redrawn at another Primary
+    or onset with its sign and depth kept, so the redraw moves the same share of rejected steps of
+    each kind.
     """
-    if mva:
-        seg = history_row[onset : onset + length] + shift
-        finite = np.isfinite(seg)
-        if finite.any() and seg[finite].min() < -FLOOR_TOLERANCE:
-            return False
-    if temporary:
+    if not mva:
         return True
+    seg = history_row[onset:] + shift
+    finite = np.isfinite(seg)
+    return not (finite.any() and seg[finite].min() < -FLOOR_TOLERANCE)
+
+
+def _limits_ok(
+    *, clean_row: np.ndarray, perm_sum: np.ndarray, count: int, onset: int, depth: float, mva: bool
+) -> bool:  # fmt: skip
+    """Return True if a step of this depth may join the permanent changes already at the Primary.
+
+    **Both kinds of event face the same limits, and the limits ignore the sign.** The floor test
+    depends on the sign, and it passes shallow falls more often than deep ones. A limit that depends
+    on the depth and applied to one kind only would therefore pass a different mix of signs for that
+    kind, and group and sign would predict the kind. So a rise and a fall of equal depth pass or
+    fail these limits together, for a temporary move and for a permanent change alike. The limits
+    are a summed permanent shift within `MAX_PERMANENT_SUM` even if the new step has the sign that
+    adds to the sum, and, at an MVA-only Primary, a target at or above zero even if the new step is
+    a fall. The count of permanent changes at the Primary, at most `MAX_PERMANENT_PER_PRIMARY`,
+    depends on the host alone and is passed as zero for a temporary move.
+    """
     if count >= MAX_PERMANENT_PER_PRIMARY:
         return False
-    new = perm_sum.copy()
-    new[onset:] += shift
-    if np.abs(new).max() > MAX_PERMANENT_SUM + FLOOR_TOLERANCE:
+    if (
+        float(np.abs(perm_sum[onset:]).max(initial=0.0)) + depth
+        > MAX_PERMANENT_SUM + FLOOR_TOLERANCE
+    ):
         return False
     if mva:
-        shifted = clean_row + new
+        shifted = clean_row + perm_sum
+        shifted[onset:] -= depth
         finite = np.isfinite(shifted)
         if finite.any() and shifted[finite].min() < -FLOOR_TOLERANCE:
             return False
@@ -330,8 +347,8 @@ def training_world(  # noqa: PLR0915
         vis: (16,) visible depth in shares of capacity (`visible_depth`).
 
     Returns:
-        The history and target arrays and the event table. `redrawn` counts permanent changes that
-        broke a limit (the floor of an MVA-only Primary, or a limit on stacking) and were moved to
+        The history and target arrays and the event table. `redrawn` counts events (either kind)
+        that failed the floor test of an MVA-only Primary or a limit on stacking and were moved to
         another Primary or onset with their sign and depth kept.
     """
     assert vis.shape == (nb.N_PRIMARIES,), vis.shape
@@ -350,6 +367,7 @@ def training_world(  # noqa: PLR0915
         "dropped_temporary": 0,
         "dropped_permanent": 0,
     }
+    first_try: dict[str, list[int]] = {}
     span = last - first
     for p in range(nb.N_PRIMARIES):
         covered = 0
@@ -362,15 +380,20 @@ def training_world(  # noqa: PLR0915
             onset = place_onset(fraction=ev.onset_fraction, first=first, last=last, length=placing)
             shift = ev.sign * ev.depth
 
-            def fits(*, host: int, onset: int, ev: DrawnEvent = ev, shift: float = shift) -> bool:
-                length = ev.length if ev.temporary else n_grid - onset
-                return _placement_ok(
-                    history_row=history[host], clean_row=clean[host], perm_sum=perm_sum[host],
-                    count=int(perm_count[host]), onset=onset, length=length, shift=shift,
-                    mva=bool(mva_only[host]), temporary=ev.temporary,
+            def fits(*, host: int, onset: int, shift: float = shift, ev: DrawnEvent = ev) -> bool:
+                return _floor_ok(
+                    history_row=history[host], onset=onset, shift=shift, mva=bool(mva_only[host])
+                ) and _limits_ok(
+                    clean_row=clean[host], perm_sum=perm_sum[host],
+                    count=0 if ev.temporary else int(perm_count[host]), onset=onset,
+                    depth=ev.depth, mva=bool(mva_only[host]),
                 )  # fmt: skip
 
             ok = fits(host=host, onset=onset)
+            group = "mva_only" if mva_only[host] else "signed_mw"
+            stat = first_try.setdefault(f"{kind}|{group}|{'fall' if shift < 0 else 'rise'}", [0, 0])
+            stat[0] += 1
+            stat[1] += int(ok)
             tries = 0
             while not ok and tries < MAX_REDRAWS:
                 host = int(rng_redraw.integers(0, nb.N_PRIMARIES))
@@ -427,6 +450,7 @@ def training_world(  # noqa: PLR0915
         history=history, target=target, events=events, seed=world_seed,
         redrawn=redraws["redrawn_temporary"] + redraws["redrawn_permanent"],
         dropped=redraws["dropped_temporary"] + redraws["dropped_permanent"], redraws=redraws,
+        first_try=first_try,
     )  # fmt: skip
 
 
@@ -518,6 +542,8 @@ def independence_tables(
         )
     )
     out: dict[str, object] = {"n_events": frame.height}
+    notices: list[str] = []
+    out["notices"] = notices
     tests = {
         "kind_by_sign": ("sign", frame),
         "kind_by_host": ("host", frame),
@@ -526,6 +552,11 @@ def independence_tables(
     }
     for name, (column, sub) in tests.items():
         table, p_value = _chi2_p(frame=sub, column=column)
+        kinds = set(sub["kind"].to_list())
+        if kinds != {"temporary", "permanent"}:
+            notices.append(
+                f"NOTICE: {name} has events of kinds {sorted(kinds)} only, so p = 1 is a default"
+            )
         out[name] = table
         out[f"p_{name}"] = p_value
         assert p_value >= level, (
@@ -553,6 +584,79 @@ def world_hash(*, world: TrainingWorld) -> str:
     for array in (world.history, world.target):
         h.update(np.ascontiguousarray(array).tobytes())
     return h.hexdigest()
+
+
+def fall_share_gap(
+    *, worlds: list[TrainingWorld], mva_only: np.ndarray, level: float
+) -> dict[str, dict[str, float]]:  # fmt: skip
+    """Return, per group, the fall shares of the two kinds and a z-test of their difference.
+
+    **This is the effect-size reading of GH5, and it counts towards the verdict of the gate.** It
+    pools the given draws (all 40 of the gate). The chi-squared tests of a single fold have too few
+    events to see a gap of 0.05 between the fall share of permanent changes and that of temporary
+    moves, and a gap of that size lets a network read the kind from the group and the sign. The test
+    is a z-test on the difference of two proportions with a pooled variance, in each group, read at
+    `level` (the Bonferroni level of the other GH5 tests). `power_gap` is the smallest gap that the
+    test finds with 80% power at the event counts of the draws.
+    """
+    from scipy.stats import norm
+
+    frame = pl.DataFrame([e for w in worlds for e in w.events]).with_columns(
+        group=pl.col("host").map_elements(
+            lambda h: "mva_only" if mva_only[h] else "signed_mw", return_dtype=pl.String
+        )
+    )
+    z_alpha = float(norm.isf(level / 2))
+    z_power = float(norm.ppf(0.8))
+    out: dict[str, dict[str, float]] = {}
+    for group in ("mva_only", "signed_mw"):
+        reading: dict[str, float] = {}
+        falls: dict[str, int] = {}
+        for kind in ("permanent", "temporary"):
+            sub = frame.filter((pl.col("group") == group) & (pl.col("kind") == kind))
+            falls[kind] = int(np.sum(sub["sign"].to_numpy() < 0))
+            reading[f"n_{kind}"] = float(sub.height)
+            reading[f"fall_share_{kind}"] = falls[kind] / sub.height if sub.height else float("nan")
+        n_p, n_t = reading["n_permanent"], reading["n_temporary"]
+        reading["gap"] = reading["fall_share_permanent"] - reading["fall_share_temporary"]
+        pooled = (falls["permanent"] + falls["temporary"]) / max(n_p + n_t, 1.0)
+        se = float(np.sqrt(pooled * (1 - pooled) * (1 / max(n_p, 1.0) + 1 / max(n_t, 1.0))))
+        reading["z"] = reading["gap"] / se if se > 0 else 0.0
+        reading["p"] = float(2 * norm.sf(abs(reading["z"])))
+        reading["power_gap"] = (z_alpha + z_power) * se
+        reading["passes"] = float(reading["p"] >= level)
+        out[group] = reading
+    return out
+
+
+def coverage_problems(
+    *, worlds_by_month: dict[str, list[TrainingWorld]], mva_only: np.ndarray, pooled: int,
+    per_month: int,
+) -> list[str]:  # fmt: skip
+    """Return one message for each group and kind whose events in the GH5 draws fall under a floor.
+
+    **The training world must hold events of both kinds in both groups.** The floors are those of
+    GH4: at least `pooled` events over all the draws, and at least `per_month` events among the
+    draws of each fold month. A group with no event of a kind fails both floors. An empty list means
+    the coverage holds. The gate stops on any message, with no waiver and no fallback.
+    """
+    counts: dict[tuple[str, str, str], int] = {}
+    for month, worlds in worlds_by_month.items():
+        for world in worlds:
+            for event in world.events:
+                group = "mva_only" if mva_only[event["host"]] else "signed_mw"
+                key = (group, event["kind"], month)
+                counts[key] = counts.get(key, 0) + 1
+    problems = []
+    for group in ("mva_only", "signed_mw"):
+        for kind in ("permanent", "temporary"):
+            by_month = {m: counts.get((group, kind, m), 0) for m in worlds_by_month}
+            if sum(by_month.values()) < pooled:
+                problems.append(f"{group} {kind}: {sum(by_month.values())} events, floor {pooled}")
+            short = {m: n for m, n in by_month.items() if n < per_month}
+            if short:
+                problems.append(f"{group} {kind}: under {per_month} events in {short}")
+    return problems
 
 
 def check_shared_draw(*, host_a: np.ndarray, host_b: np.ndarray) -> None:

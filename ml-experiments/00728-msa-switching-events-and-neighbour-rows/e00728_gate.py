@@ -28,7 +28,10 @@ the 1% level on each of 40 training draws, 120 tests with no correction, which f
 generator with a chance of about 70%. The corrected rule pools the 5 draws of each of the 8 fold
 months into one table and reads the 40 tests of the gate (kind by sign, kind by Primary, kind by
 sign within each of the two groups, and the balance of unmirrored rises and falls, per pooled fold)
-at the level 0.01 / 40 (a Bonferroni correction).
+at the level 0.01 / 40 (a Bonferroni correction). A second, counted rule reads the effect size: over
+all 40 draws, in each group, the fall share of permanent changes minus the fall share of temporary
+moves must lie within +-0.03. The chi-squared tests cannot see a gap of that size at the corrected
+level, because each pooled fold holds only an eighth of the events.
 
 **The thresholds of GH1 and GH2, written before any number was seen.**
 
@@ -74,8 +77,8 @@ ORACLE_TOLERANCE: Final = 1e-9
 FLAT_FOLLOW_TOLERANCE: Final = 0.05
 PERSISTENCE_TOLERANCE: Final = 0.15
 CHECK_ORDER: Final = ("GH4", "GH6", "GH7", "GH5", "GH8", "GH9", "GH1", "GH2")
-N_TESTS: Final = wd.N_INDEPENDENCE_TESTS * len(wd.FOLD_MONTHS)
-"""The tests of GH5: four chi-squared tests and one z-test on each of the 8 pooled folds."""
+N_TESTS: Final = wd.N_INDEPENDENCE_TESTS * len(wd.FOLD_MONTHS) + 2
+"""The tests of GH5: five on each of the 8 pooled folds, and one z-test on the fall-share gap in each group."""
 FAMILY_LEVEL: Final = wd.INDEPENDENCE_LEVEL / N_TESTS
 SCRIPTS: Final = ("e00728_worlds.py", "e00728_score.py", "e00728_gate.py")
 
@@ -90,6 +93,10 @@ class Env:
         assert tuple(panel.sites) == tuple(nb.LABELS), (panel.sites, nb.LABELS)
         self.capacity_mw = np.asarray(panel.capacity_mw, dtype=np.float64)
         self.mva_only = np.asarray(panel.is_mva, dtype=bool)
+        floor = float(np.nanmin(panel.power[self.mva_only]))
+        assert floor >= -wd.FLOOR_TOLERANCE, (
+            f"the cleaned power of an MVA-only Primary goes below zero ({floor:.3f}): the floor rule of the training world would reject every event there"
+        )
         self.table = nb.load_table()
         self.vis: dict[str, np.ndarray] = {}
         self.errors: dict[str, np.ndarray] = {}
@@ -318,9 +325,15 @@ def gh5(*, env: Env) -> dict:
     level = FAMILY_LEVEL
     print(f"GH5: {N_TESTS} tests, family level {wd.INDEPENDENCE_LEVEL}, per-test level {level:.2e}")
     rows = []
+    all_worlds: list[wd.TrainingWorld] = []
+    worlds_by_month: dict[str, list[wd.TrainingWorld]] = {}
     for month in wd.FOLD_MONTHS:
         worlds = [env.draw(month=month, seed=seed) for seed in TRAIN_SEEDS]
+        all_worlds.extend(worlds)
+        worlds_by_month[month] = worlds
         tables = wd.independence_tables(worlds=worlds, mva_only=env.mva_only, level=level)
+        for notice in tables["notices"]:  # ty: ignore[not-iterable]
+            print(f"{month}: {notice}")
         unmirrored = tables["unmirrored_temporary"]
         assert isinstance(unmirrored, dict)
         print_frame(
@@ -343,7 +356,40 @@ def gh5(*, env: Env) -> dict:
         title=f"GH5 training draws, pooled per fold: every p-value must be at least {level:.2e}",
         frame=pl.DataFrame(rows),
     )
-    return {"per_test_level": level, "folds": rows}
+    problems = wd.coverage_problems(
+        worlds_by_month=worlds_by_month, mva_only=env.mva_only, pooled=FLOOR_POOLED,
+        per_month=FLOOR_PER_MONTH,
+    )  # fmt: skip
+    assert not problems, (
+        f"GH5 FAILS the coverage floors of GH4 in the training draws: {problems}. Stop before "
+        "any GPU job and tell the manager. The gate does not fall back."
+    )
+    gaps = wd.fall_share_gap(worlds=all_worlds, mva_only=env.mva_only, level=level)
+    print_frame(
+        title=(
+            f"GH5 over all {len(all_worlds)} draws: fall share of permanent changes minus that of "
+            f"temporary moves, z-test at level {level:.2e}"
+        ),
+        frame=pl.DataFrame([{"group": g, **r} for g, r in gaps.items()]),
+    )
+    first_try: dict[str, list[int]] = {}
+    for world in all_worlds:
+        for key, (n, ok) in world.first_try.items():
+            total = first_try.setdefault(key, [0, 0])
+            total[0] += n
+            total[1] += ok
+    print_frame(
+        title="GH5 first-try acceptance by kind, group and sign (floor test)",
+        frame=pl.DataFrame(
+            [
+                {"kind|group|sign": k, "n": n, "accepted": ok, "share": ok / max(n, 1)}
+                for k, (n, ok) in sorted(first_try.items())
+            ]
+        ),
+    )
+    failed = {g: (r["gap"], r["p"]) for g, r in gaps.items() if not r["passes"]}
+    assert not failed, f"GH5 FAILS the z-test on the fall-share gap (gap, p) per group: {failed}"
+    return {"per_test_level": level, "folds": rows, "fall_gap": gaps}
 
 
 def gh8(*, env: Env) -> dict:
