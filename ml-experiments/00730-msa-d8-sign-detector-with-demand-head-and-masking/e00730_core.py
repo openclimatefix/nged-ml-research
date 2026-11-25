@@ -95,6 +95,8 @@ ARCHITECTURES: Final = ("bilstm", "unet", "transformer", "gru_transformer")
 SCREEN_ARMS: Final = ("S-A", "S")
 ARCH_SEEDS: Final = (0, 1, 2)
 MARGIN_SEEDS: Final = (0, 1, 2, 3, 4)
+ARM_729_KEY: Final = {"D-sign": "Dsign"}
+"""Experiment 729's key (in `ARM_SPECS`) of each refitted arm whose name differs here."""
 REFIT_729_ARMS: Final = ("A", "D", "D-sign")
 """Experiment 729's arms refitted on the rebuilt banks, with 729's protocol (cap 200)."""
 REFIT_729_ARCH: Final = "bilstm"
@@ -437,7 +439,33 @@ def verdict_word(*, v: VerdictInputs) -> Verdict:
 PRETRAIN_CAP_EPOCHS: Final = 60
 """Experiment 510's epoch cap, which the pre-training loop keeps."""
 INFERENCE_HOURS: Final = 0.2
-"""The plan's allowance for validation, test, the 48-pass causal protocol, and the masked read-out."""
+"""The plan's allowance for validation, test, the 48-pass causal protocol, and the masked read-out.
+
+When the timing stage has measured one causal read-out, the allowance is this value less the
+estimated share of the causal read-out, which the measurement replaces (see `inference_hours`)."""
+CAUSAL_READOUTS: Final = 18
+"""One causal read-out per value of k (6) and per seed (3) of SD*-C."""
+CAUSAL_ESTIMATE_HOURS: Final = 0.1
+"""The part of `INFERENCE_HOURS` that the plan allows for the 18 causal read-outs."""
+
+
+def inference_hours(*, causal_seconds_per_call: float | None) -> float:
+    """Return the inference allowance, with the causal read-out measured when a timing is given.
+
+    Args:
+        causal_seconds_per_call: The measured seconds of one `causal_predictions` call at k = 0 on
+            the test bank, or None to use the plan's allowance.
+
+    Returns:
+        The hours of inference.
+    """
+    if causal_seconds_per_call is None:
+        return INFERENCE_HOURS
+    return (
+        INFERENCE_HOURS - CAUSAL_ESTIMATE_HOURS + CAUSAL_READOUTS * causal_seconds_per_call / 3600.0
+    )
+
+
 PRETRAIN_ESTIMATE_HOURS: Final = 0.45
 """The plan's upper estimate of the 3 pre-training runs, used until a run has been timed."""
 
@@ -449,6 +477,7 @@ def projected_hours(
     epochs: int = MAX_EPOCHS,
     pretrain_seconds_per_epoch: float | None = None,
     demand_seconds_per_epoch: float | None = None,
+    causal_seconds_per_call: float | None = None,
 ) -> float:
     """Return the GPU-process-hours of the plan's 56 GPU fits at `epochs` epochs each.
 
@@ -465,6 +494,8 @@ def projected_hours(
             the plan's estimate for the 3 runs.
         demand_seconds_per_epoch: The measured seconds an epoch of SD-W on the bilstm. Its ratio to
             arm S on the bilstm (at least 1) scales the later fits, which all carry the demand head.
+        causal_seconds_per_call: The measured seconds of one causal read-out at k = 0 on the test
+            bank. It is scaled by the 18 read-outs (6 values of k, 3 seeds).
 
     Returns:
         The projection in hours, with the pre-training and the inference allowance.
@@ -480,7 +511,7 @@ def projected_hours(
         pretrain = PRETRAIN_ESTIMATE_HOURS
     else:
         pretrain = N_PRETRAIN_RUNS * pretrain_seconds_per_epoch * PRETRAIN_CAP_EPOCHS / 3600.0
-    return fits + pretrain + INFERENCE_HOURS
+    return fits + pretrain + inference_hours(causal_seconds_per_call=causal_seconds_per_call)
 
 
 def timing_gate_report(
@@ -490,6 +521,7 @@ def timing_gate_report(
     chosen: str | None = None,
     pretrain_seconds_per_epoch: float | None = None,
     demand_seconds_per_epoch: float | None = None,
+    causal_seconds_per_call: float | None = None,
 ) -> dict[str, float | bool]:
     """Return the projection at the cap, and whether it and the peak memory pass the gate.
 
@@ -499,6 +531,7 @@ def timing_gate_report(
         chosen: The chosen architecture, once the screen has chosen.
         pretrain_seconds_per_epoch: The measured seconds an epoch of pre-training, or None.
         demand_seconds_per_epoch: The measured seconds an epoch of SD-W on the bilstm, or None.
+        causal_seconds_per_call: The measured seconds of one causal read-out, or None.
 
     Returns:
         The projection, the peak memory, and `within_stop_line` and `memory_ok`.
@@ -507,6 +540,7 @@ def timing_gate_report(
         seconds_per_epoch=seconds_per_epoch, chosen=chosen,
         pretrain_seconds_per_epoch=pretrain_seconds_per_epoch,
         demand_seconds_per_epoch=demand_seconds_per_epoch,
+        causal_seconds_per_call=causal_seconds_per_call,
     )  # fmt: skip
     return {
         "hours_at_cap": cap, "stop_line_hours": STOP_LINE_HOURS,

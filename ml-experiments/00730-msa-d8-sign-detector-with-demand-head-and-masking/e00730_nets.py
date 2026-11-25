@@ -10,7 +10,7 @@ the sign logit does not depend on the demand weights.
 """
 
 import math
-from typing import Final
+from typing import Final, cast
 
 import e00730_paths  # noqa: F401
 
@@ -84,6 +84,7 @@ class Transformer(nn.Module):
             )  # fmt: skip
         else:
             self.embed = nn.Conv1d(c_in, width, 5, padding=2)
+        self.position: torch.Tensor
         self.register_buffer("position", sinusoid_table(steps=steps, width=width))
         self.blocks = nn.ModuleList(
             Block(width, core.TRANSFORMER_HEADS, core.TRANSFORMER_FF, core.TRANSFORMER_DROPOUT)
@@ -177,9 +178,9 @@ class Net(nn.Module):
         self.backbone = backbone
 
     @property
-    def head(self) -> nn.Module:
+    def head(self) -> nn.Linear | nn.Conv1d:
         """The backbone's final layer, whose row 0 is the sign logit and rows 1 and 2 the demand."""
-        return self.backbone.head
+        return cast("nn.Linear | nn.Conv1d", self.backbone.head)
 
     def forward(self, x: torch.Tensor, **kwargs: bool) -> torch.Tensor | tuple:
         """Map `(B, C, L)` to `(B, n_out, L)`."""

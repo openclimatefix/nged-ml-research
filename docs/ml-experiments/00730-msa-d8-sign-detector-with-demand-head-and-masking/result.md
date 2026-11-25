@@ -319,10 +319,16 @@ The banks stage counts, per world type, bank, source, and season:
 
 - the share of clear base days of solar-world segments with solar output above zero on at least
   one clear sun-up half-hour, for S1 and S2 separately;
-- the share of engine-world segments whose days with engine output are not far below the run share
-  that the segment drew (`1 - no_run_share`), read separately on weekdays and on weekends and bank
-  holidays, because experiment 729's engine simulator marks no running half-hour and the plan does
-  not edit it;
+- the days with engine output of engine-world segments, pooled over each world, bank, and season,
+  and read separately on weekdays and on quiet days (weekends and bank holidays). Each day has a
+  lower-bound chance of output from the segment's drawn run chance, block probabilities, and
+  weekend factor. A pool fails when its count of days with output falls more than 4 standard
+  deviations below the sum of those chances, or when it has no day although it expects at least 3.
+  Experiment 729's engine simulator marks no running half-hour, and the plan does not edit it, so
+  the check reads "any output on the day": a silenced evening block alone still passes it, and the
+  next item is the second line of defence;
+- the share of base days with solar or engine output on which the truth lies below the base
+  demand, so that a change that stops the simulator subtracting a component fails the check;
 - the share of base days of BSP-month segments whose synthetic BSP differs from the real meter at
   every half-hour where the engine or solar output is above zero;
 - the share of no-injection half-hours whose truth equals the base demand; and
@@ -444,7 +450,8 @@ half-hour t, the test window is cut at t, and the output at t is read, so each t
 forward passes. A read-out with k half-hours after t visible, for k of 0, 2, 6, 12, 24, and 48,
 shows how P(X<0) changes as later data arrive. The read-out with k of 0 carries contrast C7. The
 later experiment reads history rows that end at a forecast origin, so a row t half-hours before the
-origin corresponds to k = t.
+origin corresponds to k = t. The cut sits at half-hour min(t + k, 47) of the day, so at k of 12 and
+24 the last half-hours of the day see fewer than k half-hours after them.
 
 **SD\*-C stops early on a causal validation score.** Each validation window carries 4 cuts, fixed
 by generator seed 730, and the validation Brier score reads the output at each cut with nothing
@@ -824,9 +831,9 @@ with the sign and the demand output read in place of the two-lobe output.
   the demand output's mean lies above the reading, by era and by UTC hour, beside the share of
   half-hours with P(X<0) above 0.5. A demand above the reading is what an engine or a solar farm
   below D8 would cause.
-- **R3, descriptions with no bar.** The share of half-hours with P(X<0) above 0.5 by era and month
-  and by era and UTC hour, beside the share of days whose daily minimum is below 1.0 MVA, for SD\*
-  and for SD\*-C in the causal protocol.
+- **R3, descriptions with no bar.** The share of half-hours with P(X<0) above 0.5 by era and by era
+  and UTC hour, for SD\* and for SD\*-C in the causal protocol at k = 0. No reading is split by
+  month, because the months of each era would show when the engine ran.
 
 **K1 and K2 are counted readings that change no verdict word.** Each is reported as passes, fails,
 or void. The simulator's ranges were set from published descriptions of the same record, so K1 is
@@ -905,7 +912,7 @@ recurrent layer of the same width.
 | Every later new fit, priced at the slowest architecture | 26 | 1.2 | 2.60 |
 | Experiment 729's arms A, D, and D-sign, at 200 epochs | 9 | 0.44 | 0.22 |
 | Pre-training | 3 runs | estimate | 0.45 (0.15 each, an upper estimate) |
-| Inference: validation, test, the 48-pass causal protocol, and the masked demand read-out | | | 0.2 |
+| Inference: validation, test, the 48-pass causal protocol, and the masked demand read-out | | | 0.2 (the timing gate replaces its 0.1 hours for the causal read-out by 18 times one measured causal read-out) |
 | Total | | | about 5.0 |
 
 **An early stop near 130 epochs, where experiment 729's sign-only fits stopped, cuts the projection
@@ -1059,10 +1066,12 @@ bank of seed 0. Every panel carries days 1 and 2 of its window on the axis, neve
   each of the three injected world types.
 - G7, the demand output's target: for each masking style K, W, and R, and for the causal cut, a
   window's masked inputs beside the clean-demand target, with the hidden span shaded.
-- G8, real against simulated aggregates: the share of days whose daily minimum is below 1.0 MVA by
-  month, for the real eras and the matching synthetic worlds; the share of half-hours below 1.0 MVA
-  by UTC hour, real and synthetic; and the realism gate's share ratios and BSP slope. No real
-  metered generator's series appears.
+- G8, real against simulated aggregates: the share of half-hours below 1.0 MVA for each world and
+  its matching real era, and the same share by UTC hour, real and synthetic. No panel shows a
+  month, because the months of each real era would reveal when the engine ran. The automatic check
+  of G8 confirms only that the panel was drawn and the synthetic shares are finite; the design
+  lead compares the real and the synthetic shares by eye. No real metered generator's series
+  appears.
 - G9, the component checks: the share of segments with output where output must exist, per
   component, world type, source, and split, against its bar.
 

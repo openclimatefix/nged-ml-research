@@ -52,6 +52,25 @@ GALLERY_GATED_STAGES: Final = (
 )  # fmt: skip
 """The stages that start a fit or a pre-training run: each also needs a passed gallery check."""
 NO_RUN_MARKER_STAGES: Final = ("banks",)
+INVALID_FILE: Final = "scores/invalid.json"
+"""Write-once record that a correctness check failed (verdict row 1); it holds the rule only."""
+
+
+def record_invalid(*, root: Path, rule: str) -> None:
+    """Write `scores/invalid.json` once; a later call leaves the first record in place.
+
+    Args:
+        root: The data folder of this experiment.
+        rule: The rule that failed (the text of the check, no score).
+    """
+    path = root / INVALID_FILE
+    if not path.exists():
+        write_json(path=path, payload={"rule": rule})
+
+
+def invalid_recorded(*, root: Path) -> bool:
+    """Return whether a correctness check has failed in this run."""
+    return (root / INVALID_FILE).exists()
 
 
 class StoppedError(RuntimeError):
@@ -176,6 +195,12 @@ def guard_run(*, root: Path, stage: str) -> None:
         msg = (
             "no run marker matches the code (the banks were built by another run, other ranges, "
             f"or not yet): run `banks` first, after moving earlier outputs out of {root.name}"
+        )
+        raise RuntimeError(msg)
+    if stage in GALLERY_GATED_STAGES and invalid_recorded(root=root):
+        msg = (
+            f"`{stage}` starts a fit, but {INVALID_FILE} records a failed correctness check "
+            "(verdict row 1): the run is over"
         )
         raise RuntimeError(msg)
     if stage in GATED_STAGES and not gate_passed(root=root, expected=expected):
@@ -326,7 +351,9 @@ def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
 
     A day counts when it is a clear base day (see `clear_sun_up`) of a solar-world segment, is not
     flagged as a fallback day, and the day's solar output is above zero on at least one clear sun-up
-    half-hour.
+    half-hour. The keys "solar_subtract" count each base day with solar output and are a hit when
+    the truth then lies below the base demand, so a change that stops the simulator subtracting the
+    solar output fails the check even if the engine key still passes.
     """
     counter = ShareCounter.new()
     for seg in bank.segments:
@@ -336,68 +363,131 @@ def solar_output_shares(*, bank: banks729.Bank) -> ShareCounter:
         days = np.flatnonzero((seg.cal_index >= 0) & clear_day & ~seg.s1_fallback)
         for d in days:
             hit = bool((seg.solar[d][clear[d]] > 0.0).any())
-            key = (seg.world, bank.kind, seg.source, season_of(date=seg.dates[d]))
-            counter.add(key=key, hit=hit)
+            season = season_of(date=seg.dates[d])
+            counter.add(key=(seg.world, bank.kind, seg.source, season), hit=hit)
+            ok = seg.valid[d] & (seg.solar[d] > MIN_STEP_POINTS)
+            if ok.any():
+                subtracted = bool((seg.x[d][ok] < seg.base[d][ok] - 0.5 * seg.solar[d][ok]).all())
+                counter.add(
+                    key=("solar_subtract", seg.world, bank.kind, seg.source, season), hit=subtracted
+                )
     return counter
 
 
 def expected_solar_keys(*, bank: banks729.Bank) -> set[str]:
     """Return the solar keys a bank must hold: each (world, source, season) with a segment."""
-    return {
+    keys = {
         "/".join((s.world, bank.kind, s.source, segment_season(seg=s)))
         for s in bank.segments
         if s.world in ("solar", "both")
     }
+    return keys | {f"solar_subtract/{k}" for k in keys}
 
 
-def segment_runs_enough(*, seg: sim729.Segment, weekday: bool) -> bool:
-    """Return whether a segment's days with engine output are not far below the drawn run share.
+SIGMA_FLOOR: Final = 4.0
+"""A pooled engine key fails when its output days fall this many standard deviations short."""
+MIN_EXPECTED_HITS: Final = 3.0
+"""A pooled engine key with at least this many expected output days fails when it has none."""
 
-    The drawn `no_run_share` is the share of days without a run, so the expected share of days with
-    output is at most `1 - no_run_share`. A segment fails when its count of days with output is
-    below half the expectation less three binomial standard deviations. Quiet days (weekends and
-    bank holidays) are read apart from weekdays; on quiet days the expectation is scaled by the
-    drawn `weekend_factor`.
+
+def engine_day_chance(*, params: Mapping[str, float], quiet: np.ndarray) -> np.ndarray:
+    """Return a lower bound of each day's chance of engine output, from the drawn parameters.
+
+    Experiment 729's simulator skips a day with chance `no_run_share`, and otherwise starts the
+    evening, morning, and midday blocks independently with chance `prob * factor`, where `factor`
+    is the drawn `weekend_factor` on a quiet day and 1 otherwise. A day has output when at least
+    one block starts. Multi-day spells and a block that starts on the day before add output, so the
+    chance is a lower bound.
+
+    Args:
+        params: The segment's drawn parameters.
+        quiet: True on a weekend or bank holiday, `(days,)`.
+
+    Returns:
+        The chance of at least one half-hour of output on each day, `(days,)`.
     """
-    days = np.flatnonzero(seg.cal_index >= 0)
-    dow = (seg.dates[days].astype("datetime64[D]").astype(int) + 3) % 7
-    keep = days[(dow < 5) if weekday else (dow >= 5)]
-    if keep.size == 0:
-        return True
-    expected = 1.0 - seg.params["no_run_share"]
-    if not weekday:
-        expected *= min(1.0, seg.params.get("weekend_factor", 1.0))
-    hits = int(sum((seg.engine[d] > 0.0).any() for d in keep))
-    floor = 0.5 * expected * keep.size - 3.0 * np.sqrt(keep.size * expected * (1.0 - expected))
-    return hits >= max(floor, 0.0) and (hits > 0 or expected * keep.size < 1.0)
+    factor = np.where(quiet, params["weekend_factor"], 1.0)
+    none_start = np.ones(quiet.shape)
+    for name in ("evening_prob", "morning_prob", "midday_prob"):
+        none_start = none_start * (1.0 - params[name] * factor)
+    return (1.0 - params["no_run_share"]) * (1.0 - none_start)
 
 
-def engine_output_shares(*, bank: banks729.Bank) -> ShareCounter:
-    """Count engine-world segments by whether their days with output follow the drawn run share.
+@dataclass
+class PooledDays:
+    """Engine output days pooled over segments, by key.
 
-    The engine simulator of experiment 729 returns the summed output only and marks no running
-    half-hour, so output cannot be compared with a schedule. The key "weekday" and the key "quiet"
-    count, per engine-world segment, a hit when `segment_runs_enough` holds on that kind of day;
-    the share of segments that pass is read against `MIN_OUTPUT_SHARE`. The key "subtract" counts
-    each base day with engine output, and is a hit when the truth then lies below the base demand.
+    Attributes:
+        hits: The days with output.
+        expected: The sum of each day's lower-bound chance of output.
+        variance: The sum of each day's binomial variance.
+    """
+
+    hits: dict[tuple, int]
+    expected: dict[tuple, float]
+    variance: dict[tuple, float]
+
+    @classmethod
+    def new(cls) -> PooledDays:
+        """Return an empty pool."""
+        return cls(defaultdict(int), defaultdict(float), defaultdict(float))
+
+    def add(self, *, key: tuple, hit: np.ndarray, chance: np.ndarray) -> None:
+        """Pool the days of one segment."""
+        self.hits[key] += int(hit.sum())
+        self.expected[key] += float(chance.sum())
+        self.variance[key] += float((chance * (1.0 - chance)).sum())
+
+    def fails(self, *, key: tuple) -> bool:
+        """Return whether the key's output days fall short of the lower bound."""
+        expected = self.expected[key]
+        low = expected - SIGMA_FLOOR * float(np.sqrt(self.variance[key]))
+        return self.hits[key] < low or (self.hits[key] == 0 and expected >= MIN_EXPECTED_HITS)
+
+
+def engine_output_shares(*, bank: banks729.Bank, cal: sim729.Calendar) -> ShareCounter:
+    """Count engine-world days with output against the drawn run chances, and the subtraction.
+
+    Experiment 729's engine simulator returns the summed output only and marks no running
+    half-hour, so output cannot be compared with a schedule. The keys "weekday" and "quiet" pool
+    the base days of every engine-world segment of a world, bank, and season, with quiet days the
+    weekends and `cal.holidays`. The pooled count of days with output must reach the sum of each
+    day's lower-bound chance (`engine_day_chance`) less four standard deviations, and a pool
+    that expects at least 3 days must not be empty. Each such key counts one case, a hit when it
+    passes. The check reads "any output on the day", so a silenced block (the evening only) still
+    passes it; the key "subtract" is the second line of defence: it counts each base day with
+    engine output, and is a hit when the truth then lies below the base demand.
+
+    Args:
+        bank: A bank of segments.
+        cal: The calendar, whose `holidays` are quiet days.
+
+    Returns:
+        The counter of keys "weekday", "quiet", and "subtract".
     """
     counter = ShareCounter.new()
+    pool = PooledDays.new()
     for seg in bank.segments:
         if seg.world not in ("engine", "both"):
             continue
         season = segment_season(seg=seg)
-        for name, weekday in (("weekday", True), ("quiet", False)):
-            counter.add(
-                key=(name, seg.world, bank.kind, season),
-                hit=segment_runs_enough(seg=seg, weekday=weekday),
-            )
-        for d in np.flatnonzero(seg.cal_index >= 0):
+        days = np.flatnonzero(seg.cal_index >= 0)
+        dates = seg.dates[days].astype("datetime64[D]")
+        weekday = (dates.astype(int) + 3) % 7
+        quiet = (weekday >= 5) | np.isin(dates, cal.holidays.astype("datetime64[D]"))
+        chance = engine_day_chance(params=seg.params, quiet=quiet)
+        hit = np.array([(seg.engine[d] > 0.0).any() for d in days], dtype=bool)
+        for name, on in (("weekday", ~quiet), ("quiet", quiet)):
+            pool.add(key=(name, seg.world, bank.kind, season), hit=hit[on], chance=chance[on])
+        for d in days:
             running = seg.engine[d] > 0.0
             ok = seg.valid[d] & running
             if not ok.any():
                 continue
             subtracted = bool((seg.x[d][ok] < seg.base[d][ok] - 0.5 * seg.engine[d][ok]).all())
             counter.add(key=("subtract", seg.world, bank.kind, season), hit=subtracted)
+    for key in sorted(pool.hits):
+        counter.add(key=key, hit=not pool.fails(key=key))
     return counter
 
 
@@ -522,7 +612,7 @@ def component_checks(*, banks_by_name: Mapping[str, banks729.Bank], cal: sim729.
     for name, bank in banks_by_name.items():
         for label, counter, expected in (
             ("solar", solar_output_shares(bank=bank), expected_solar_keys(bank=bank)),
-            ("engine", engine_output_shares(bank=bank), expected_engine_keys(bank=bank)),
+            ("engine", engine_output_shares(bank=bank, cal=cal), expected_engine_keys(bank=bank)),
             ("bsp", bsp_shares(bank=bank, cal=cal), expected_bsp_keys(bank=bank)),
         ):
             result = counter.shares()

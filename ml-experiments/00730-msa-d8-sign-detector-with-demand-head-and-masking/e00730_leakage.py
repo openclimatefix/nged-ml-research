@@ -25,8 +25,11 @@ CorrectnessFailureError = leak729.CorrectnessFailureError
 ALLOWED_INPUT_ROWS: Final = leak729.ALLOWED_INPUT_ROWS | {arms.FUTURE_ROW}
 ALLOWED_PREFIXES: Final = ("enc_",)
 """The encoder arms read 28 inputs named `enc_0` to `enc_27`, none a month or an ordinal."""
-HOLIDAY_COLUMN: Final = 27
+HOLIDAY_COLUMN: Final = 26
 """Index among the 28 encoder inputs of the signed distance to the nearest bank holiday."""
+HOLIDAY_COLUMN_NAME: Final = "nearest_days"
+"""Name of the nearest-holiday distance in experiment 428's non-lag feature layout."""
+FLOAT_SLACK: Final = 1e-6
 
 
 def _fail(*, message: str) -> None:
@@ -109,9 +112,23 @@ def assert_no_month_or_ordinal(*, specs: Mapping[str, arms.ArmSpec]) -> None:
 
 
 def assert_holiday_clip(*, nearest_days: np.ndarray) -> None:
-    """Check that the signed distance to the nearest holiday is clipped at plus and minus 7 days."""
-    if np.nanmax(np.abs(nearest_days)) > core.NEAREST_HOLIDAY_CLIP_DAYS:
+    """Check the stored nearest-holiday distance: clipped at 7 days and divided by 7.
+
+    Experiment 397's `feature_matrix` stores the signed distance divided by the clip, so every
+    finite value lies in [-1, 1]. The check also requires that the value 1 is reached, because a
+    column that never reaches the clip is not the distance (it could be a flag or another column).
+
+    Args:
+        nearest_days: The stored column over many rows.
+    """
+    values = np.asarray(nearest_days, dtype=float)
+    if not np.isfinite(values).all():
+        _fail(message="the nearest-holiday distance has a non-finite value")
+    peak = float(np.max(np.abs(values)))
+    if peak > 1.0 + FLOAT_SLACK:
         _fail(message="the nearest-holiday distance is not clipped at 7 days")
+    if peak < 1.0 - FLOAT_SLACK:
+        _fail(message="the nearest-holiday distance never reaches the 7-day clip (wrong column?)")
 
 
 def assert_keeps_follow_hidden(*, hidden: np.ndarray, keeps: np.ndarray, valid: np.ndarray) -> None:

@@ -11,6 +11,7 @@ prints counts and scores only, and every stage but `banks` runs its guard first.
 
 import argparse
 import json
+import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,6 +39,17 @@ def device_runner(*, root: Path, device: str):  # noqa: ANN201
     )
 
 
+def fresh_scratch(*, root: Path) -> Path:
+    """Return an empty `timing_scratch/` under `root`, removing the folder of an earlier run.
+
+    A rerun of the timing stage must not skip a seed whose weight file exists, because the
+    timing then has no record of that seed.
+    """
+    target = root / "timing_scratch"
+    shutil.rmtree(target, ignore_errors=True)
+    return target
+
+
 def run_pretrain(*, root: Path, device: str, max_epochs: int | None, tmp: bool) -> dict:
     """Run the three pre-training runs (or, for the timing gate, 2 epochs of one into a scratch folder)."""
     import e00730_pretrain as pretrain
@@ -48,7 +60,7 @@ def run_pretrain(*, root: Path, device: str, max_epochs: int | None, tmp: bool) 
     cal_all = ctx.table.calendar
     rec = data.record_by_day(record=data.metered_record(), days=cal_all.dates)
     record_days = cal_all.dates[np.isfinite(rec).any(axis=1)]
-    target = root / "timing_scratch" if tmp else root
+    target = fresh_scratch(root=root) if tmp else root
     record = pretrain.run_pretraining(
         root=target, held_out_months=held, record_days=record_days,
         seeds=[0] if tmp else core.PRETRAIN_SEEDS, device=device, max_epochs=max_epochs,
@@ -81,7 +93,7 @@ def main(argv: list[str]) -> int:
         log(f"STOPPED (verdict row 0): {exc}")
         return 3
     except stages.leak.CorrectnessFailureError as exc:
-        stages.write_invalid_verdict(root=root)
+        stages.write_invalid_verdict(root=root, rule=str(exc))
         log(f"A CORRECTNESS CHECK FAILED (verdict row 1): {exc}")
         return 4
 
@@ -100,7 +112,12 @@ def dispatch(*, args: argparse.Namespace, root: Path) -> int:
         banks.stage_gate(root=root, gate_inputs=stages.real_gate_inputs(ctx=ctx), log=log)
     elif stage == "gallery":
         ctx = stages.real_context()
-        stages.stage_gallery(root=root, shares_real=stages.real_gallery_shares(ctx=ctx), log=log)
+        stages.stage_gallery(
+            root=root,
+            shares_real=stages.real_gallery_shares(ctx=ctx),
+            hourly_real=stages.real_gallery_hourly(ctx=ctx),
+            log=log,
+        )
     elif stage == "panels":
         confirms = json.loads(Path(args.confirm_panels).read_text())
         record = stages.record_panel_check(root=root, design_lead_confirms=confirms)
@@ -131,6 +148,9 @@ def dispatch(*, args: argparse.Namespace, root: Path) -> int:
             manager_approved=args.manager_approved, log=log,
             pretrain_seconds_per_epoch=scratch["seeds"]["0"]["seconds_per_epoch"],
             demand_seconds_per_epoch=demand,
+            causal_seconds_per_call=stages.measure_causal_seconds(
+                root=root, ctx=ctx, arch="bilstm", device=args.device
+            ),
         )  # fmt: skip
     elif stage in ("screen", "styles", "later", "margin-fits"):
         run_one = device_runner(root=root, device=args.device)

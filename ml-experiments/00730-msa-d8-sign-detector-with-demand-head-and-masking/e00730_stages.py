@@ -9,7 +9,7 @@ only.
 
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Any, Final
 
 import e00730_paths  # noqa: F401
 
@@ -24,6 +24,9 @@ import e00730_leakage as leak
 import e00730_score as score
 import e00730_signed as signed
 import numpy as np
+
+if TYPE_CHECKING:
+    import torch
 
 TEST_MARKER: Final = "test_started"
 Log = banks.Log
@@ -243,8 +246,17 @@ def verdict(
     }
 
 
-def write_invalid_verdict(*, root: Path) -> None:
-    """Write the verdict record of row 1 (a correctness check failed), with no score in it."""
+def write_invalid_verdict(*, root: Path, rule: str = "a correctness check failed") -> None:
+    """Record row 1 (a correctness check failed) in `scores/invalid.json` and the verdict file.
+
+    `scores/invalid.json` is written once and read by `stage_score` and `guard_run`, so a later
+    `score` cannot overwrite the row-1 verdict.
+
+    Args:
+        root: The data folder.
+        rule: The rule that failed.
+    """
+    banks.record_invalid(root=root, rule=rule)
     banks.write_json(
         path=root / "scores" / "verdict.json",
         payload={"row": 1, "verdict": core.VERDICT_WORDS[1], "contrasts": {}},
@@ -340,7 +352,7 @@ def run_fit(
     )
     store_predictions(
         root=root, name=name, net=net, spec=spec, device=device, ctx=ctx, kwargs=kwargs,
-        val_bank=val_bank,
+        val_bank=val_bank, arch=arch, seed=seed,
     )  # fmt: skip
     banks.write_json(path=record_path, payload=record.as_dict())
     return record.as_dict()
@@ -380,18 +392,21 @@ def store_predictions(
     *,
     root: Path,
     name: str,
-    net: object,
+    net: torch.nn.Module,
     spec: arms.ArmSpec,
     device: str,
     ctx: stages729.Context,
     kwargs: dict,
     val_bank: banks729.Bank,
+    arch: str,
+    seed: int,
 ) -> None:
     """Store a fit's probabilities and demand outputs on every bank, the real sets, and read-outs.
 
     Every array is flattened over the valid half-hours in `Rows` order. Arms with the demand output
     also store the demand read-out under the fixed masks of each style, and the causal arm stores
-    its probabilities at each of the 6 values of k on the test bank.
+    its probabilities at each of the 6 values of k on the test bank. A transformer fit of seed 0
+    with the demand output stores figure 8's attention maps.
     """
     import e00729_train as train729
     import e00730_train as train
@@ -413,6 +428,12 @@ def store_predictions(
         decoded, targets, _ = train.predict(net=net, prepared=prep, spec=spec, device=device)
         flat = {k: train.valid_flat(values=v, targets=targets) for k, v in decoded.items()}
         train729.save_predictions(arrays=flat, path=folder / f"real_{set_name}.npz")
+        if spec.causal and set_name == "eras":
+            p = train.causal_predictions(net=net, prepared=prep, spec=spec, device=device, k=0)
+            train729.save_predictions(arrays={"p": p}, path=folder / REAL_CAUSAL_FILE)
+    if arch in core.TRANSFORMER_VARIANTS and spec.demand and not spec.causal and seed == 0:
+        maps = train.attention_maps(net=net, prepared=prepared["test"], spec=spec, device=device)
+        train729.save_predictions(arrays=maps, path=folder / ATTENTION_FILE)
     if spec.demand:
         for kind in ("validation", "test"):
             for style in core.STYLES:
@@ -426,6 +447,12 @@ def store_predictions(
                 net=net, prepared=prepared["test"], spec=spec, device=device, k=k
             )
             train729.save_predictions(arrays={"p": p}, path=folder / f"test_causal_k{k}.npz")
+
+
+ATTENTION_FILE: Final = "attention.npz"
+"""Figure 8's attention maps of a transformer fit of seed 0 (arms with the demand head)."""
+REAL_CAUSAL_FILE: Final = "real_eras_causal_k0.npz"
+"""SD*-C's causal P(X<0) at k = 0 on the real eras set (report-only R3)."""
 
 
 def real_sets(*, ctx: stages729.Context) -> dict:
@@ -461,6 +488,10 @@ def run_jobs(
 
     Returns:
         The numbers of fits run, skipped, and failed.
+
+    Raises:
+        CorrectnessFailureError: When a fit's correctness check fails (verdict row 1), which no
+            later fit may hide as a failed fit.
     """
     counts = {"run": 0, "skipped": 0, "failed": 0}
     for arm, arch, seed in jobs:
@@ -472,6 +503,8 @@ def run_jobs(
             run_one(arm, arch, seed)
             (fit_dir(root=root) / f"{name}.failed.json").unlink(missing_ok=True)
             counts["run"] += 1
+        except leak.CorrectnessFailureError:
+            raise
         except Exception as exc:  # noqa: BLE001
             counts["failed"] += 1
             banks.write_json(
@@ -480,6 +513,16 @@ def run_jobs(
             )
             log(f"fit {name} failed: {type(exc).__name__}")
     return counts
+
+
+def invalid_run(*, root: Path) -> bool:
+    """Return whether a correctness check failed: `scores/invalid.json` or a failed-fit record."""
+    if banks.invalid_recorded(root=root):
+        return True
+    return any(
+        banks.read_json(path=p).get("error") == "CorrectnessFailureError"
+        for p in fit_dir(root=root).glob("*.failed.json")
+    )
 
 
 def timing_passed(*, root: Path) -> bool:
@@ -497,6 +540,7 @@ def stage_timing(
     log: Log,
     pretrain_seconds_per_epoch: float | None = None,
     demand_seconds_per_epoch: float | None = None,
+    causal_seconds_per_call: float | None = None,
 ) -> dict:
     """Write `scores/timing.json` from the measured seconds an epoch of each architecture.
 
@@ -508,6 +552,7 @@ def stage_timing(
         log: Receives progress lines.
         pretrain_seconds_per_epoch: The measured seconds an epoch of pre-training (2 epochs).
         demand_seconds_per_epoch: The measured seconds an epoch of SD-W on the bilstm.
+        causal_seconds_per_call: The measured seconds of one causal read-out at k = 0.
 
     Returns:
         The report with `pass`.
@@ -521,6 +566,7 @@ def stage_timing(
         seconds_per_epoch=seconds_per_epoch, peak_memory_gb=peak_memory_gb,
         pretrain_seconds_per_epoch=pretrain_seconds_per_epoch,
         demand_seconds_per_epoch=demand_seconds_per_epoch,
+        causal_seconds_per_call=causal_seconds_per_call,
     )  # fmt: skip
     passes = core.timing_gate_passes(report=report, manager_approved=manager_approved)
     out = {**report, "pass": passes}
@@ -601,7 +647,34 @@ def whole_day_demand_mae(*, root: Path, arch: str) -> dict[str, float]:
 # --------------------------------------------------------------------------- gallery stage
 
 
-def stage_gallery(*, root: Path, shares_real: Mapping[str, float] | None, log: Log) -> dict:
+def share_near_zero(*, reading: np.ndarray) -> float:
+    """Return the share of finite readings below the decidable level; NaN when none is finite.
+
+    A NaN reading is dropped first, so it cannot count as "not near zero", and a world with no
+    finite reading gives NaN, which fails the finiteness check of panel G8.
+    """
+    finite = np.asarray(reading, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return float("nan")
+    return float(np.mean(finite < core.DECIDABLE_READING_POINTS))
+
+
+def near_zero_by_hour(*, reading_days: np.ndarray) -> np.ndarray:
+    """Return, for each UTC hour, the share of finite readings below 1 MVA, from `(days, 48)`."""
+    days = np.asarray(reading_days, dtype=float).reshape(-1, 48)
+    return np.array(
+        [share_near_zero(reading=days[:, 2 * h : 2 * h + 2]) for h in range(24)], dtype=float
+    )
+
+
+def stage_gallery(
+    *,
+    root: Path,
+    shares_real: Mapping[str, float] | None,
+    log: Log,
+    hourly_real: np.ndarray | None = None,
+) -> dict:
     """Draw the synthetic world gallery from the rebuilt banks and write the automatic check.
 
     The published panels go to `figures/gallery/` and every single metered-farm day to
@@ -613,6 +686,7 @@ def stage_gallery(*, root: Path, shares_real: Mapping[str, float] | None, log: L
         root: The data folder.
         shares_real: The real aggregates for panel G8, or None.
         log: Receives progress lines.
+        hourly_real: The real share of half-hours below 1 MVA for each UTC hour, `(24,)`, or None.
 
     Returns:
         The automatic result of each panel.
@@ -635,13 +709,15 @@ def stage_gallery(*, root: Path, shares_real: Mapping[str, float] | None, log: L
     near = {}
     for world in ("none", "engine", "solar", "both"):
         parts = [s.r[1:-1].reshape(-1) for s in segments if s.world == world]
-        r = np.concatenate(parts) if parts else np.array([np.nan])
-        near[world] = float(np.nanmean(r < core.DECIDABLE_READING_POINTS))
+        near[world] = share_near_zero(reading=np.concatenate(parts) if parts else np.array([]))
+    by_hour = [s.r[1:-1] for s in segments]
     out = figures.build_gallery(
         segments=segments,
         shares_synthetic=near,
         shares_real=shares_real,
         component_shares=components,
+        hourly_synthetic=near_zero_by_hour(reading_days=np.concatenate(by_hour)),
+        hourly_real=hourly_real,
     )
     private = gallery.gallery_private_dir(root=root)
     figures.save_gallery(out=out, public_dir=root / "figures" / "gallery", private_dir=private)
@@ -750,10 +826,13 @@ def stage_score(  # noqa: PLR0915
     if h2 is None:
         msg = "`score` needs scores/real.json (H2 is part of the verdict): run `real` first"
         raise RuntimeError(msg)
-    failed_arms = failed_arm_names(root=root)
+    variant = banks.read_json(path=root / "selection.json").get(
+        "transformer_variant", "transformer"
+    )
+    failed_arms = failed_arm_names(root=root, arch=arch, variant=variant)
     failed = bool(failed_arms & set(core.NEEDED_ARMS))
     summary = banks.read_json(path=root / "banks" / "summary.json")
-    invalid = not summary.get("leakage_pass", False)
+    invalid = not summary.get("leakage_pass", False) or invalid_run(root=root)
     try:
         leak.assert_files_older(
             older=root / "limits.json",
@@ -777,9 +856,6 @@ def stage_score(  # noqa: PLR0915
             continue
     p["SD*"] = p[f"SD-{style}"]
     per_row = {arm: score.row_brier(p=v, x=rows.x) for arm, v in p.items()}
-    variant = banks.read_json(path=root / "selection.json").get(
-        "transformer_variant", "transformer"
-    )
     for key, a in (("transformer", variant), ("bilstm", "bilstm")):
         pa = load_p(root=root, arm="S", arch=a, seeds=core.ARCH_SEEDS, name="test", x=rows.x)
         per_row[key] = score.row_brier(p=pa, x=rows.x)
@@ -840,6 +916,10 @@ def stage_score(  # noqa: PLR0915
         for arm, v in result["reliability_curves"].items()
     }
     result["demand_readout"] = demand_readout(root=root, arch=arch)
+    if baselines is not None:
+        result["demand_readout_climatology"] = demand_climatology_error(
+            root=root, arch=arch, holidays=holidays, climatology=baselines[0]
+        )
     result["figure2"] = signed.brier_by_subset(rows=rows, p_by_arm={"P0": np.zeros(rows.n), **p})
     result["figure5"] = {
         arm: signed.harm_detection_by_group(rows=rows, p=p[arm]) for arm in ("S", "SD*") if arm in p
@@ -928,17 +1008,102 @@ def demand_readout(*, root: Path, arch: str) -> dict[str, dict[str, float]]:
     return out
 
 
-def failed_arm_names(*, root: Path) -> set[str]:
-    """Return the arms (in file-name form) that have a `.failed.json` record."""
-    return {
-        f.name.split("_")[0].replace("star", "*") for f in fit_dir(root=root).glob("*.failed.json")
-    }
+def demand_climatology_error(
+    *, root: Path, arch: str, holidays: np.ndarray, climatology: object
+) -> float:
+    """Return the demand climatology's mean absolute error on the hidden half-hours of validation.
+
+    The validation bank's rows are in the order of the stored masked read-outs, so the climatology's
+    median demand at each row is compared with the true base demand on the half-hours that the fixed
+    masks hide (averaged over the four evaluation styles).
+
+    Args:
+        root: The data folder.
+        arch: The chosen architecture.
+        holidays: Bank-holiday dates.
+        climatology: Experiment 729's fitted demand climatology.
+
+    Returns:
+        The error in points, or NaN when no masked read-out is stored.
+    """
+    bank = banks729.load_bank(path=banks.bank_path(root=root, kind="validation"))
+    rows = score729.rows_from_segments(segments=bank.segments, holidays=holidays)
+    clim = signed.demand_climatology(climatology=climatology, features=rows.features)  # ty: ignore[invalid-argument-type]
+    errors = []
+    for style in core.STYLES:
+        path = (
+            root / "predictions" / job_name(arm=f"SD-{style}", arch=arch, seed=core.ARCH_SEEDS[0])
+            / f"validation_masked_{style}.npz"
+        )  # fmt: skip
+        if not path.exists():
+            continue
+        z = np.load(path)
+        hidden = z["hidden"].astype(bool)
+        if hidden.shape != clim.shape:
+            msg = "the validation rows do not match the stored masked read-out"
+            raise leak.CorrectnessFailureError(msg)
+        if hidden.any():
+            errors.append(float(np.abs(clim - z["base"])[hidden].mean()))
+    return float(np.mean(errors)) if errors else float("nan")
+
+
+def counted_architectures(*, arm: str, arch: str, variant: str) -> set[str]:
+    """Return the architectures on which a failed fit of `arm` counts against the verdict.
+
+    Arm S is fitted on every architecture in the screen, and only the bilstm, the chosen
+    architecture, and the chosen transformer variant enter a contrast. The other arms count on the
+    chosen architecture; the refits of experiment 729's arms count on the bilstm.
+
+    Args:
+        arm: The arm.
+        arch: The chosen architecture.
+        variant: The chosen transformer variant.
+
+    Returns:
+        The architectures on which a failed fit of the arm counts.
+    """
+    if arm == "S":
+        return {"bilstm", arch, variant}
+    return {arch, "bilstm"} if arm in core.REFIT_729_ARMS else {arch}
+
+
+def failed_arm_names(*, root: Path, arch: str, variant: str) -> set[str]:
+    """Return the arms with a `.failed.json` record on an architecture that counts for them.
+
+    Args:
+        root: The data folder.
+        arch: The chosen architecture.
+        variant: The chosen transformer variant.
+
+    Returns:
+        The arm names of the failed fits.
+    """
+    out = set()
+    for f in fit_dir(root=root).glob("*.failed.json"):
+        stem = f.name.removesuffix(".failed.json")
+        arm_part, _, rest = stem.partition("_")
+        fit_arch = rest.rpartition("_s")[0]
+        arm = arm_part.replace("star", "*")
+        if fit_arch in counted_architectures(arm=arm, arch=arch, variant=variant):
+            out.add(arm)
+    return out
 
 
 def causal_p(*, root: Path, arch: str, k: int) -> np.ndarray | None:
     """Return SD*-C's seed-mean P(X<0) in the causal protocol at `k`, or None without the files."""
     files = [
         root / "predictions" / job_name(arm="SD*-C", arch=arch, seed=s) / f"test_causal_k{k}.npz"
+        for s in core.ARCH_SEEDS
+    ]
+    if not all(f.exists() for f in files):
+        return None
+    return score.seed_mean(p_by_seed=[np.load(f)["p"] for f in files])
+
+
+def real_causal_p(*, root: Path, arch: str) -> np.ndarray | None:
+    """Return SD*-C's seed-mean causal P(X<0) at k = 0 on the real eras, or None without files."""
+    files = [
+        root / "predictions" / job_name(arm="SD*-C", arch=arch, seed=s) / REAL_CAUSAL_FILE
         for s in core.ARCH_SEEDS
     ]
     if not all(f.exists() for f in files):
@@ -1138,7 +1303,11 @@ def stage_real(
     )
     above = mu_eras > eras.r
     era_hour = np.char.add(np.char.add(era_of_row.astype(str), "/"), (eras.hh // 2).astype(str))
-    out = {
+    r3: dict[str, Any] = {
+        "share_p_above_half_by_era": real.share_by(values=p_eras > 0.5, groups=era_of_row),
+        "share_by_era_and_hour": real.share_by(values=p_eras > 0.5, groups=era_hour),
+    }
+    out: dict[str, Any] = {
         "h2": real.h2(p=p_r1, limit=limits.harm_limit),
         "k1": {
             **k1_rec,
@@ -1152,11 +1321,14 @@ def stage_real(
             "share_demand_above_by_era_and_hour": real.share_by(values=above, groups=era_hour),
             "share_p_above_half": real.share_by(values=p_eras > 0.5, groups=era_of_row),
         },
-        "r3": {
-            "share_p_above_half_by_era": real.share_by(values=p_eras > 0.5, groups=era_of_row),
-            "share_by_era_and_hour": real.share_by(values=p_eras > 0.5, groups=era_hour),
-        },
+        "r3": r3,
     }
+    p_causal = real_causal_p(root=root, arch=arch)
+    if p_causal is not None:
+        r3["causal"] = {
+            "share_p_above_half_by_era": real.share_by(values=p_causal > 0.5, groups=era_of_row),
+            "share_by_era_and_hour": real.share_by(values=p_causal > 0.5, groups=era_hour),
+        }
     banks.write_json(path=root / "scores" / "real.json", payload=out)
     log(f"real checks: H2 pass {out['h2']['pass']}, K1 {k1_status}, K2 {out['k2']['status']}")
     return out
@@ -1203,9 +1375,19 @@ def stage_figures(*, root: Path, log: Log) -> list[Path]:
         figures.save_svg(chart=chart, path=folder / "reliability.svg")
         written.append(folder / "reliability.svg")
     if v.get("demand_readout"):
-        chart = figures.demand_readout_chart(errors=v["demand_readout"], climatology=float("nan"))
+        chart = figures.demand_readout_chart(
+            errors=v["demand_readout"],
+            climatology=v.get("demand_readout_climatology", float("nan")),
+        )
         figures.save_svg(chart=chart, path=folder / "demand_readout.svg")
         written.append(folder / "demand_readout.svg")
+    attention = attention_maps_stored(root=root)
+    for name, grid in (attention or {}).items():
+        chart = figures.attention_chart(
+            attention=grid, title=f"Attention, {name.replace('_', ' ')}"
+        )
+        figures.save_svg(chart=chart, path=folder / f"attention_{name}.svg")
+        written.append(folder / f"attention_{name}.svg")
     by_k = v["causal"]["brier_by_k"]
     if by_k:
         chart = figures.causal_readout_chart(
@@ -1229,8 +1411,8 @@ def stage_figures(*, root: Path, log: Log) -> list[Path]:
         figures.save_svg(chart=chart, path=folder / "harm_detection.svg")
         written.append(folder / "harm_detection.svg")
     real_path = root / "scores" / "real.json"
-    if real_path.exists():
-        r = banks.read_json(path=real_path)
+    r = banks.read_json(path=real_path) if real_path.exists() else {}
+    if "r3" in r and "r2" in r:
         chart = figures.real_eras_chart(
             above_half=r["r3"]["share_by_era_and_hour"],
             demand_above=r["r2"]["share_demand_above_by_era_and_hour"],
@@ -1239,6 +1421,21 @@ def stage_figures(*, root: Path, log: Log) -> list[Path]:
         written.append(folder / "real_eras.svg")
     log(f"{len(written)} figures written")
     return written
+
+
+def attention_maps_stored(*, root: Path) -> dict[str, np.ndarray] | None:
+    """Return figure 8's maps from the chosen style's transformer fit of seed 0, or None."""
+    style_file = root / "style.json"
+    selection = root / "selection.json"
+    if not (style_file.exists() and selection.exists()):
+        return None
+    style = banks.read_json(path=style_file)["chosen"]
+    variant = banks.read_json(path=selection).get("transformer_variant", "transformer")
+    path = root / "predictions" / job_name(arm=f"SD-{style}", arch=variant, seed=0) / ATTENTION_FILE
+    if not path.exists():
+        return None
+    z = np.load(path)
+    return {k: z[k] for k in z.files}
 
 
 def screen_scores(*, root: Path) -> dict[str, dict[str, float]]:
@@ -1297,7 +1494,7 @@ def stage_series(
 # --------------------------------------------------------------------------- real-data drivers
 
 
-ARM_729_KEY: Final = {"D-sign": "Dsign"}
+ARM_729_KEY: Final = core.ARM_729_KEY
 """Experiment 729's key for each refitted arm whose name differs here."""
 
 
@@ -1359,6 +1556,31 @@ def measure_seconds_per_epoch(
         val=arms.prepare_segments(segments=va.segments, spec=spec, **kwargs),
     )  # fmt: skip
     return record.seconds_per_epoch
+
+
+def measure_causal_seconds(*, root: Path, ctx: stages729.Context, arch: str, device: str) -> float:
+    """Return the seconds of one `causal_predictions` call at k = 0 on the test bank .
+
+    The timing fit is a `TIMING_EPOCHS`-epoch fit of arm SD-W, whose network the read-out then uses.
+    """
+    import time
+
+    import e00730_train as train
+
+    spec = spec_for(arm="SD-W", style="K")
+    kwargs = {"holidays": ctx.cal.holidays, "stats": ctx.stats}
+    tr = banks729.load_bank(path=banks.bank_path(root=root, kind="train", seed=0))
+    va = banks729.load_bank(path=banks.bank_path(root=root, kind="validation"))
+    net, _ = train.fit(
+        spec=spec, arch=arch, seed=0, device=device, max_epochs=core.TIMING_EPOCHS,
+        train=arms.prepare_segments(segments=tr.segments, spec=spec, **kwargs),
+        val=arms.prepare_segments(segments=va.segments, spec=spec, **kwargs),
+    )  # fmt: skip
+    test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
+    prepared = arms.prepare_segments(segments=test.segments, spec=spec, **kwargs)
+    started = time.perf_counter()
+    train.causal_predictions(net=net, prepared=prepared, spec=spec, device=device, k=0)
+    return time.perf_counter() - started
 
 
 def encoder_inputs(*, root: Path) -> tuple[arms.EncoderTable, Path]:
@@ -1434,8 +1656,13 @@ def real_gallery_shares(*, ctx: stages729.Context) -> dict[str, float]:
     for world, name in (("none", data.ERA_PRE), ("engine", data.ERA_NET), ("both", data.ERA_SOLAR)):
         r = cal_all.reading[era == name]
         if r.size:
-            out[world] = float(np.nanmean(r < core.DECIDABLE_READING_POINTS))
+            out[world] = share_near_zero(reading=r)
     return out
+
+
+def real_gallery_hourly(*, ctx: stages729.Context) -> np.ndarray:
+    """Return the real share of half-hours below 1 MVA for each UTC hour, over every real day."""
+    return near_zero_by_hour(reading_days=ctx.table.calendar.reading)
 
 
 def real_baselines(*, ctx: stages729.Context) -> tuple[object, object]:

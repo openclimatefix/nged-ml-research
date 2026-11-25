@@ -457,8 +457,16 @@ def run_pretraining(
     return record
 
 
-HOLIDAY_RAW_COLUMN: Final = DATETIME_SLICE.start + core.ENCODER_DATETIME_COLUMNS - 1
-"""Column of the raw 37 non-lag features that holds the signed distance to the nearest holiday."""
+def holiday_raw_column() -> int:
+    """Return the column of the raw 37 non-lag features that holds the nearest-holiday distance.
+
+    Returns:
+        The position of `nearest_days` in experiment 428's non-lag layout, read by name.
+    """
+    import e00428_data as data428
+
+    _, names, _ = data428.non_lag_layout()
+    return names.index("nearest_days")
 
 
 def check_pretraining_leakage(
@@ -485,7 +493,7 @@ def check_pretraining_leakage(
         valid_end_idx=int(holdout),
     )  # fmt: skip
     leak.assert_standardiser_surviving(stored=stored, surviving_x=raw)
-    leak.assert_holiday_clip(nearest_days=raw[:, HOLIDAY_RAW_COLUMN])
+    leak.assert_holiday_clip(nearest_days=raw[:, holiday_raw_column()])
 
 
 def d8_raw_encoder_table(*, base_dates: np.ndarray) -> np.ndarray:

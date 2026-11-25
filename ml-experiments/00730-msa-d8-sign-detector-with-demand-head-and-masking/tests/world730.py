@@ -24,6 +24,9 @@ def make_calendar(
     hh = np.arange(48)
     demand = 40.0 + 20.0 * np.sin(np.pi * (hh - 10) / 48.0) ** 2
     reading = demand[None, :] + rng.normal(0, 1.0, (n_days, 48))
+    # Like the real meter: a day needs only 40 of its 48 half-hours, so a few readings are missing.
+    for day in range(n_days):
+        reading[day, rng.choice(48, size=2, replace=False)] = np.nan
     sun = np.clip(np.sin(np.pi * (hh - 12) / 24.0), 0.0, None)
     farm_power = np.clip(sun[None, None, :] * rng.uniform(0.3, 1.0, (n_farms, n_days, 1)), 0, None)
     ghi = 800.0 * sun[None, None, :] * rng.uniform(
@@ -31,9 +34,12 @@ def make_calendar(
     ) + 1e-3 * rng.random((n_farms, n_days, 48))
     sun_up = np.broadcast_to(sun > 0, (n_farms, n_days, 48))
     sky_ok = data.sky_present(ghi=np.where(sun_up, ghi, np.nan), sun_up=sun_up)
+    power_ok = np.ones((n_farms, n_days), dtype=bool)
+    power_ok[0, 5] = False  # one farm has no metered output on one day
+    farm_power = np.where(power_ok[:, :, None], farm_power, np.nan)
     farms = sim.FarmSet(
         power=farm_power,
-        power_ok=np.ones((n_farms, n_days), dtype=bool),
+        power_ok=power_ok,
         sky_ok=sky_ok,
         ghi=ghi,
         dni=0.7 * ghi,
@@ -43,7 +49,8 @@ def make_calendar(
     )
     # Like the real table: the clear-sky index is NaN wherever the clear-sky irradiance is tiny,
     # which includes the first and last half-hour with the sun up.
-    csi = np.clip(rng.uniform(0.5, 1.0, (n_days, 1)) * np.ones((1, 48)), 0, 1.2)
+    within_day = 1.0 + 0.05 * np.sin(hh / 3.0)[None, :]  # the index varies inside each day
+    csi = np.clip(rng.uniform(0.5, 1.0, (n_days, 1)) * within_day, 0, 1.2)
     up = sun > 0
     edge = up & ~np.roll(up, 1) | up & ~np.roll(up, -1)
     csi = np.where(up & ~edge, csi, np.nan)

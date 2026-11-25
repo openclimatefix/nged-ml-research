@@ -470,17 +470,54 @@ def mask_gallery(*, segments: Sequence[sim729.Segment], out: GalleryResult) -> N
     out.notes["G7_masks"] = "4 panels"
 
 
+def hourly_share_chart(*, synthetic: np.ndarray, real: np.ndarray) -> alt.Chart:
+    """Return the share of half-hours below 1 MVA by UTC hour, real and synthetic (24 points each)."""
+    hours = np.arange(24)
+    data = pl.DataFrame(
+        {
+            "hour": [*hours, *hours],
+            "source": ["synthetic"] * 24 + ["real"] * 24,
+            "share": [*np.asarray(synthetic, dtype=float), *np.asarray(real, dtype=float)],
+        }
+    )
+    return (
+        alt.Chart(data)
+        .mark_line(point=True)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("hour:Q", title="UTC hour of the day"),
+            y=alt.Y("share:Q", title="Share of half-hours below 1 MVA"),
+            color=alt.Color(
+                "source:N",
+                scale=alt.Scale(domain=["synthetic", "real"], range=[ORANGE, BLUE]),
+                legend=alt.Legend(orient="top"),
+            ),
+        )
+        .properties(width=WIDTH_PX - 120, height=140)
+    )
+
+
 def aggregate_gallery(
     *, shares_synthetic: Mapping[str, float], shares_real: Mapping[str, float] | None,
     component_shares: Mapping[str, float], out: GalleryResult,
+    hourly_synthetic: np.ndarray | None = None, hourly_real: np.ndarray | None = None,
 ) -> None:  # fmt: skip
-    """Draw G8 (real against simulated aggregates, when the real aggregates are supplied) and G9."""
+    """Draw G8 (real against simulated aggregates, when the real aggregates are supplied) and G9.
+
+    G8 holds the share of half-hours below 1 MVA by world, and by UTC hour when both hourly arrays
+    are given. Its automatic result checks only that the synthetic shares are finite and that the
+    panel was drawn; the design lead compares the real and synthetic shares by eye.
+    """
     names = list(shares_synthetic)
     if shares_real:
-        out.public["G8_realism"] = figures729.share_pair_chart(
+        pairs = figures729.share_pair_chart(
             groups=names, synthetic=[shares_synthetic[n] for n in names],
             real=[shares_real.get(n, float("nan")) for n in names], title="G8: real and synthetic aggregates",
         )  # fmt: skip
+        if hourly_synthetic is not None and hourly_real is not None:
+            hourly = hourly_share_chart(synthetic=hourly_synthetic, real=hourly_real)
+            out.public["G8_realism"] = alt.vconcat(pairs, hourly)
+        else:
+            out.public["G8_realism"] = pairs
     out.results["G8_realism"] = bool(shares_real) and gallery.check_shares(shares=shares_synthetic)
     out.notes["G8_realism"] = "drawn" if shares_real else "real aggregates not supplied"
     data = pl.DataFrame({"check": list(component_shares), "share": list(component_shares.values())})
@@ -513,6 +550,7 @@ def aggregate_gallery(
 def build_gallery(
     *, segments: Sequence[sim729.Segment], shares_synthetic: Mapping[str, float],
     shares_real: Mapping[str, float] | None, component_shares: Mapping[str, float],
+    hourly_synthetic: np.ndarray | None = None, hourly_real: np.ndarray | None = None,
 ) -> GalleryResult:  # fmt: skip
     """Draw the whole gallery from the segments of the test bank and the training bank of seed 0."""
     out = GalleryResult()
@@ -525,6 +563,8 @@ def build_gallery(
         shares_real=shares_real,
         component_shares=component_shares,
         out=out,
+        hourly_synthetic=hourly_synthetic,
+        hourly_real=hourly_real,
     )
     return out
 

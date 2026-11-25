@@ -85,6 +85,7 @@ def write_predictions(root: Path, rows, *, arch: str = "bilstm", style: str = "K
                     np.savez(folder / f"{name}.npz", **arrays)
                 for k in core.CAUSAL_K:
                     np.savez(folder / f"test_causal_k{k}.npz", p=rng.uniform(size=n))
+                np.savez(folder / "real_eras_causal_k0.npz", p=rng.uniform(size=n) * 0.1)
                 for real in ("r1", "k1", "k2", "eras"):
                     np.savez(
                         folder / f"real_{real}.npz",

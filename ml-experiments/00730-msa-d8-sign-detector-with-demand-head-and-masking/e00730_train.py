@@ -8,6 +8,7 @@ the validation signed CRPS). The causal arm validates on 4 fixed cuts per valida
 
 import copy
 import time
+import zlib
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -33,8 +34,9 @@ STATE_SUFFIX: Final = ".pt"
 
 
 def fit_seed(*, arm: str, arch: str, seed: int) -> int:
-    """Return the integer seed of one fit, the same for every run of the job."""
-    return train729.arch_seed(arch=arch, seed=seed) + sum(map(ord, arm)) * 7919
+    """Return the integer seed of one fit: the same for every run of a job, distinct per job."""
+    arm_code = zlib.crc32(arm.encode()) % 1_000_003
+    return 1000 * (core.ARCHITECTURES.index(arch) + 1) + seed + arm_code * 7919
 
 
 @dataclass
@@ -222,6 +224,9 @@ def fit(
         import e00730_pretrain as pretrain
 
         digest = pretrain.weight_digest(path=pretrained)
+        if net.front is None:
+            msg = "an encoder arm builds a network with the encoder front"
+            raise ValueError(msg)
         net.front.load_pretrained(state=torch.load(pretrained, map_location=device))
     params = [p for p in net.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=core.LEARNING_RATE, weight_decay=core.WEIGHT_DECAY)
@@ -296,26 +301,13 @@ def refit_729_arm(
 ) -> tuple[torch.nn.Module, dict]:
     """Refit one of experiment 729's arms (A, D, D-sign) with experiment 729's own `fit`."""
     net, record = train729.fit(
-        spec=arms729.ARM_SPECS[arm], arch=arch, seed=seed, train=train, val=val, device=device,
-        max_epochs=core729.MAX_EPOCHS, out_path=out_path,
+        spec=arms729.ARM_SPECS[core.ARM_729_KEY.get(arm, arm)], arch=arch, seed=seed,
+        train=train, val=val, device=device, max_epochs=core729.MAX_EPOCHS, out_path=out_path,
     )  # fmt: skip
     return net, record.as_dict()
 
 
 # --------------------------------------------------------------------------- the schedule
-
-
-def timing_gate(
-    *, seconds_per_epoch: dict[str, float], peak_memory_gb: float, manager_approved: bool
-) -> dict[str, float | bool]:
-    """Return the timing gate's report and whether it passes (see `core.timing_gate_report`)."""
-    report = core.timing_gate_report(
-        seconds_per_epoch=seconds_per_epoch, peak_memory_gb=peak_memory_gb
-    )
-    return {
-        **report,
-        "pass": core.timing_gate_passes(report=report, manager_approved=manager_approved),
-    }
 
 
 def masked_demand(
@@ -360,6 +352,68 @@ def masked_demand(
         "hidden": scored[ok],
         "p": decoded["p"][ok],
     }
+
+
+ATTENTION_GROUPS: Final = ("engine_reversal", "solar_reversal", "import_only", "single_engine_day")
+"""The attention maps of figure 8: three day types averaged, and the first engine-reversal day."""
+
+
+def attention_group(*, target: np.ndarray) -> str:
+    """Return the day type of one pick from its targets `(6, 48)`: truth, valid, engine, solar, ....
+
+    A day with a reverse-flow half-hour is an engine day when its largest engine output is at least
+    its largest solar output, and a solar day otherwise; any other day is import-only.
+    """
+    reverse = bool(((target[0] < 0.0) & (target[1] > 0.5)).any())
+    if not reverse:
+        return "import_only"
+    return "engine_reversal" if target[2].max() >= target[3].max() else "solar_reversal"
+
+
+def attention_maps(
+    *,
+    net: torch.nn.Module,
+    prepared: Sequence[arms.PreparedSegment],
+    spec: arms.ArmSpec,
+    device: str,
+) -> dict[str, np.ndarray]:
+    """Return figure 8's attention maps `(48, 96)`: scored half-hour by window position.
+
+    The transformer returns its head-averaged attention in each layer when asked. The map of a day
+    is the mean over the layers of the rows of the scored day, and a map of a day type is the mean
+    over the days of that type in the bank. A group with no day is left out.
+
+    Args:
+        net: A network whose backbone is a transformer.
+        prepared: The prepared segments of the scored bank.
+        spec: The arm.
+        device: "cuda" or "cpu".
+
+    Returns:
+        The maps by `ATTENTION_GROUPS`.
+    """
+    net.eval()
+    picks = arms729.all_picks(prepared=prepared)
+    sums: dict[str, np.ndarray] = {}
+    counts: dict[str, int] = {}
+    single: np.ndarray | None = None
+    with torch.no_grad():
+        for i in range(0, len(picks), INFER_BATCH):
+            x, t, _ = arms.make_eval_batch(
+                prepared=prepared, picks=picks[i : i + INFER_BATCH], spec=spec
+            )
+            _, layers = net(torch.from_numpy(x).to(device), return_attention=True)
+            weights = torch.stack(layers).mean(dim=0)[:, arms.middle(), :].float().cpu().numpy()
+            for w, target in zip(weights, t, strict=True):
+                group = attention_group(target=target)
+                sums[group] = sums.get(group, 0.0) + w
+                counts[group] = counts.get(group, 0) + 1
+                if single is None and group == "engine_reversal":
+                    single = w
+    out = {g: sums[g] / counts[g] for g in sums}
+    if single is not None:
+        out["single_engine_day"] = single
+    return out
 
 
 def causal_predictions(

@@ -101,9 +101,13 @@ def test_no_arm_reads_a_target_row() -> None:
 
 
 def test_holiday_distance_is_clipped_at_seven_days() -> None:
-    leak.assert_holiday_clip(nearest_days=np.array([-7.0, 0.0, 7.0]))
-    with pytest.raises(leak.CorrectnessFailureError, match="7 days"):
-        leak.assert_holiday_clip(nearest_days=np.array([8.0]))
+    leak.assert_holiday_clip(nearest_days=np.array([-1.0, 0.0, 0.5, 1.0]))
+    with pytest.raises(leak.CorrectnessFailureError, match="clipped at 7 days"):
+        leak.assert_holiday_clip(nearest_days=np.array([8.0, 1.0]))
+    with pytest.raises(leak.CorrectnessFailureError, match="non-finite"):
+        leak.assert_holiday_clip(nearest_days=np.array([np.nan, 1.0]))
+    with pytest.raises(leak.CorrectnessFailureError, match="never reaches"):
+        leak.assert_holiday_clip(nearest_days=np.array([0.0, 1.0, 0.0]) * 0.5)
 
 
 def test_sign_loss_never_applies_on_a_hidden_half_hour() -> None:

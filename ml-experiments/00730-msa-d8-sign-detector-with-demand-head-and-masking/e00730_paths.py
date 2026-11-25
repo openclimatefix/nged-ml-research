@@ -39,11 +39,12 @@ FOLDER_729: Final = "00729-msa-d8-neural-untangler-synthetic-known-answers"
 SIBLING_PREFIXES: Final = (
     "00729-", "00721-", "00694-", "00700-", "00697-", "00039-", "00194-", "00722-",
     "00397-", "00087-", "00418-", "00422-", "00428-", "00437-", "00448-", "00510-", "00511-",
-    "00545-",
+    "00545-", "00377-", "00381-", "00391-", "00400-", "00402-", "00410-",
 )  # fmt: skip
 """The experiment folders whose modules this experiment imports by bare name: experiment 729 and
 its imports (721, 694, 700, 697, 39, 194, and 722), and experiment 545's chain (397, 087, 418, 422,
-428, 437, 448, 510, 511, and 545)."""
+428, 437, 448, 510, 511, and 545), and the folders those modules import (377, 381, 391, 400,
+402, and 410)."""
 
 
 MAX_SLOT_CORES: Final = 6

@@ -43,28 +43,47 @@ def check_pretraining_inputs() -> str:
     )
 
 
+def weather_flags(*, table: np.ndarray, names: list[str]) -> tuple[int, list[bool]]:
+    """Return the shortwave column and, for each weather column, whether it varies.
+
+    Args:
+        table: The encoder table `(days, 48, columns)`, weather columns first.
+        names: The weather column names, in order.
+
+    Returns:
+        The index of the column named `shortwave`, and one flag per weather column.
+
+    Raises:
+        ValueError: When no weather column is named `shortwave`.
+    """
+    matches = [j for j, n in enumerate(names) if n == "shortwave"]
+    if not matches:
+        msg = "no weather column is named shortwave"
+        raise ValueError(msg)
+    flat = table.reshape(-1, table.shape[-1])
+    return matches[0], [bool(np.ptp(flat[:, j]) > 0.0) for j in range(len(names))]
+
+
 def check_encoder_table_alignment() -> str:
-    """Check D8's real encoder table (30 base days, built in memory) for constants and alignment."""
+    """Check D8's real encoder table (30 base days, built in memory) for constants and alignment.
+
+    Each of the 7 weather columns must vary over the table, and the shortwave column is found by
+    name (the check raises when no weather name matches). The datetime columns include `covid` and
+    the three `christmas_*` columns, which are constant outside December, so they are not read.
+    """
     import e00418_prep as prep418
 
     ctx = stages.real_context()
     dates = ctx.table.calendar.dates[:30].astype("datetime64[D]")
     table = pretrain.d8_raw_encoder_table(base_dates=dates)
-    names = [n for n, _ in enumerate(prep418.WEATHER)]
-    shortwave = next(
-        (
-            j
-            for j, n in enumerate(prep418.WEATHER)
-            if any(k in str(n) for k in ("ghi", "sw", "short"))
-        ),
-        0,
-    )
+    names = list(prep418.WEATHER)
+    shortwave, varying = weather_flags(table=table, names=names)
     hour = pretrain.clear_sky_peak_hour(table=table, cosz_column=shortwave)
     low, high = core.ENCODER_PEAK_HOURS_UTC
-    share = pretrain.share_non_constant(table=table)
     return (
-        f"table columns {table.shape[-1]} = 28: {table.shape[-1] == 28}, weather columns {len(names)}, "
-        f"share of non-constant columns is above 0.9: {share > 0.9}, "
+        f"table columns {table.shape[-1]} = 28: {table.shape[-1] == 28}, "
+        f"weather columns {len(names)} = 7: {len(names) == 7}, "
+        f"every weather column varies: {all(varying)}, "
         f"clear-sky peak hour within {low} to {high} UTC: {low <= hour <= high}"
     )
 
@@ -110,8 +129,70 @@ def check_s2_solar() -> str:
 
 
 def check_bank_s2() -> str:
-    """Run experiment 729's bank S2 check against `MIN_OUTPUT_SHARE`."""
-    return load_smoke_729().check_bank_s2_solar()  # ty: ignore[unresolved-attribute]
+    """Run experiment 729's bank S2 check on this experiment's test bank.
+
+    Experiment 729's own `check_bank_s2_solar` opens experiment 729's test bank, so this check loads
+    `banks/test.npz` of this experiment's data folder and applies experiment 729's `clear_days` and
+    this experiment's `MIN_OUTPUT_SHARE`. Before `banks` it prints "test bank present: False".
+    """
+    import e00729_banks as banks729
+
+    path = stages.banks.bank_path(root=e00730_paths.data_root(), kind="test")
+    if not path.exists():
+        return "test bank present: False"
+    smoke729 = load_smoke_729()
+    bank = banks729.load_bank(path=path)
+    with_output = total = 0
+    for seg in bank.segments:
+        if seg.source != "S2" or seg.world not in ("solar", "both"):
+            continue
+        days = (seg.cal_index >= 0) & smoke729.clear_days(cal=seg)  # ty: ignore[unresolved-attribute]
+        total += int(days.sum())
+        with_output += int((seg.solar[days].max(axis=1) > 0).sum())
+    if not total:
+        msg = "no clear base day in an S2 solar-world segment"
+        raise ValueError(msg)
+    share = with_output / total
+    return (
+        "test bank present: True, share of clear S2 solar-world base days with output is at least "
+        f"{core.MIN_OUTPUT_SHARE}: {share >= core.MIN_OUTPUT_SHARE}"
+    )
+
+
+def clear_day_counts(*, cal: object, used: dict[str, np.ndarray]) -> dict[str, int]:
+    """Count the clear base days of each split and season under `banks.clear_sun_up`.
+
+    Args:
+        cal: A calendar with `csi`, `cosz`, and `dates`.
+        used: For each split, the mask over the calendar's days that the split may use.
+
+    Returns:
+        The counts, keyed `split/season`.
+    """
+    _, clear_day = stages.banks.clear_sun_up(csi=cal.csi, cosz=cal.cosz)  # ty: ignore[unresolved-attribute]
+    seasons = np.array([stages.banks.season_of(date=d) for d in cal.dates])  # ty: ignore[unresolved-attribute]
+    return {
+        f"{split}/{season}": int((clear_day & mask & (seasons == season)).sum())
+        for split, mask in used.items()
+        for season in core.COMPONENT_SEASONS
+    }
+
+
+def check_clear_day_counts() -> str:
+    """Print the real clear base days by season and split, and whether each can reach `MIN_CASES`.
+
+    The count is of base days under `banks.clear_sun_up` (the rule the solar component check uses)
+    in the months of each split. It prints counts only, never a date.
+    """
+    ctx = stages.real_context()
+    used = {
+        split: np.any([np.asarray(ctx.use[split][m], dtype=bool) for m in ctx.months(split=split)], axis=0)
+        for split in ("training", "validation", "test")
+    }  # fmt: skip
+    counts = clear_day_counts(cal=ctx.cal, used=used)
+    enough = all(n >= stages.banks.MIN_CASES for n in counts.values())
+    text = ", ".join(f"{k} {n}" for k, n in counts.items())
+    return f"clear base days {text}; every count reaches MIN_CASES: {enough}"
 
 
 def check_grid_dates() -> str:
@@ -131,6 +212,7 @@ CHECKS: dict[str, Callable[[], str]] = {
     "primaries": check_primaries_and_summaries,
     "S2 solar on clear days": check_s2_solar,
     "bank S2 solar": check_bank_s2,
+    "clear base days by season": check_clear_day_counts,
 }
 
 

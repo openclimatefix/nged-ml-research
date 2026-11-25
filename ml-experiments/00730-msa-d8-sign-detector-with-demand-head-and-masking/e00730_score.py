@@ -15,10 +15,6 @@ import e00729_score as score729
 import e00730_core as core
 import numpy as np
 
-CAUSAL_PROTOCOL_ROWS_FROM_K: bool = True
-"""The causal protocol of cut k scores the half-hours of the scored day from half-hour k on."""
-
-
 # --------------------------------------------------------------------------- per-row scores
 
 
