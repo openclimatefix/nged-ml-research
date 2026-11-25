@@ -33,6 +33,24 @@ def clip_file_of(*, month: str) -> str:
     return f"clip_candidate_{month}.json"
 
 
+def attach_tables_on_cpu(*, standardiser: object) -> None:
+    """Build `e00574_fit.attach_tables`'s standardised expected-input table, but keep it on the CPU.
+
+    `e00574_fit.build_month` calls `attach_tables`, which uploads the table to the GPU. This script
+    never forecasts, and it runs with no GPU visible.
+
+    Args:
+        standardiser: The fold's standardiser, from the training rows.
+    """
+    import e00726_candidate_panel as cp  # ty: ignore[unresolved-import]
+
+    cols, origin = cp.e.d560.raw_table(source="ft", cache=cp.e.W560 / "expected")
+    cp.e.CTX["origin_ft"] = cp.np.asarray(origin)
+    cp.e.CTX["table_ft"] = cp.e.torch.from_numpy(
+        cp.e.d560.standardised_table(cols=cols, standardiser=standardiser)
+    )
+
+
 def main(*, argv: Sequence[str]) -> str:
     """Write the Candidate's clip file of the month in `argv`, or skip it.
 
@@ -59,9 +77,9 @@ def main(*, argv: Sequence[str]) -> str:
 
     clean = cp.e.c.clean_stack()
     assert clean.shape == cp.GRID_SHAPE, (clean.shape, cp.GRID_SHAPE)
-    cp.e.k.build_month = (
-        cp.build_month_syn
-    )  # as `run_jobs`: building the month sets the lag statistics
+    # as `run_jobs`, building the month sets the lag statistics; the table stays off the GPU
+    cp.e.attach_tables = attach_tables_on_cpu
+    cp.e.k.build_month = cp.build_month_syn
     mr = cp.e.k.build_month(month=month, clean=clean)
     cp.write_clip_diagnostic(mr=mr, clean=clean)
     assert target.exists(), target

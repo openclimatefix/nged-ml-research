@@ -209,9 +209,8 @@ worlds, and check KM4 shows it.
 of capacity reaches the clip.** In the coldest fold month the standard deviation of a Primary's
 cleaned power is 0.07 to 0.21 of capacity, so a shift of 0.50 is 2.4 to 7.0 standard deviations. The
 clip caps the follow share of `M1` mechanically. The Candidate's lag encoder also clips its
-standardised lag at 5 standard deviations, but of one global standard deviation that is larger than
-the per-Primary ones of fold 2026-01, so the Candidate's clip binds later and less often. Both arms
-are clipped. A shift of 0.50 also leaves the physical range at some Primaries. Three measures answer
+standardised lag at 5 standard deviations of one global standard deviation. Both arms are clipped,
+and the clip diagnostics below give each arm's share. A shift of 0.50 also leaves the physical range at some Primaries. Three measures answer
 these effects:
 
 - The MSA command prints, for every job, the share of shifted history half-hours beyond 5 standard
@@ -509,17 +508,24 @@ deployed behaviour, so the Candidate's files hold its true response to the shift
 forecast file or stored hash changes. Check KC5 expected one constant move per Primary, which holds
 only where no row is clipped.
 
-**Order of events.** Phase 1 jobs 1 to 11 ran under the earlier KC5 and finished with exit 0. Job
-12, the all-shifted world of fold 2026-01 with seeds 0 and 1, stopped on a KC5 failure before it
-wrote any file. Nothing was waived. The fix tightens the gate: KC5 now expects, for each row, the
-move `clip((shifted - m) / s) - clip((clean - m) / s)` with the stored lag mean `m` and standard
-deviation `s`, asserts it per row to float32 precision, keeps the count of rows moved outside a
-window at 0, tests the constant per Primary only on rows where neither value is clipped, treats a
-row clipped at the same bound before and after as expected not to move, and prints the clipped-row
-count per Primary. No tolerance or threshold was loosened. The job records of jobs 1 to 11 name
-commit `129fca96a`, and the records of every job from job 12 onward name the commit of the fix, so
-the mixed commits are disclosed here. Job 11 is the only finished job in fold 2026-01. It is the
-host-only world, whose KC5 ran on a set that does not hold Primary 11, and its files are valid.
+**Order of events.** Phase 1 jobs 1 to 11 ran under the earlier KC5, at commit `129fca96a`, and
+finished with exit 0. Job 12, the all-shifted world of fold 2026-01 with seeds 0 and 1, stopped on a
+KC5 failure before it wrote any file: the shift divided by the move of the lag column was 3.8638795
+at Primary 11 against 3.8755734 at the other rows. Nothing was waived. The fix tightens the gate:
+KC5 now expects, for each row, the move `clip((shifted - m) / s) - clip((clean - m) / s)` with the
+stored lag mean `m` and standard deviation `s`, asserts it per row to float32 precision, keeps the
+count of rows moved outside a window at 0, tests the constant per Primary only on rows where neither
+value is clipped, treats a row clipped at the same bound before and after as expected not to move,
+and prints the clipped-row count per Primary. No tolerance or threshold was loosened. The fix is
+commit `9fd66fd48`, where `e00726_candidate_panel.py`, `e00726_common.py`, and `e00726_score.py`
+have the SHA-256 hashes `d90e4e79937e3f6332c75926ec8b094ac9ace102cbfd3a1c3b0bc6e412fdee2f`,
+`ba3995c9a71ec917d674335658350a054e79d2d8695f95384e3d59d92acc8dbc`, and
+`36c7f6bbdde31aca425d4c9af6c54485e0befbb4802a13ce87f47da01a6ff73f`. Later commits only rewrap
+docstrings, with identical syntax trees, and add the clip script. The job records of jobs 1 to 11
+name `129fca96a`, and the records of every job from job 12 onward name the head that the driver runs
+from, a descendant of `9fd66fd48`, so the mixed commits are disclosed here. Job 11 is the only
+finished job in fold 2026-01. It is the host-only world, whose KC5 ran on a set that does not hold
+Primary 11, and its files are valid.
 
 **Caveat for reading 3 and the sensitivity rule: the Candidate's clip binds at some Primaries and
 passes, which is stated here before any score is read.** The audit approximated the 2026-01 lag
@@ -532,6 +538,19 @@ caps how far the Candidate's lag column can follow a shift, so T1 and L1 at thos
 clipped input, as `M1`'s follow share does at the signed-MW Primaries. The scorer now carries the
 Candidate's clip share beside the MSA network's in reading 3 and the sensitivity rule. Every
 threshold stays as registered.
+
+**The stored diagnostics show where each arm's clip binds in 2025-11 and 2025-12.** The Candidate
+clip shares come from the day-lag mean and standard deviation of each fold's training rows
+(`clip_candidate_<month>.json`), and the MSA shares from the per-Primary standardisation
+(`clip_<month>.json`). At the six signed-MW Primaries and the eight MVA-only Primaries, the shifts
+of 0.50 put 0.0% of the half-hours beyond the Candidate's clip in both months, against 8.9% to 27%
+beyond the MSA network's clip at the raising shifts and 0.4% to 5.0% at the lowering shifts, the
+largest at the signed-MW Primaries for the raising shifts. At D15 and D18, the Candidate's clip
+binds at the lowering shifts: 3.3% (2025-11) and 0.6% (2025-12) at depth 0.15, 4.6% and 5.2% at
+depth 0.30, and 15.9% and 28.9% at depth 0.50. In fold 2026-01 the audit's approximate statistics
+put the clip at Primary 11 and the other Primaries listed above, so the Candidate's clip is not
+absent there. The sensitivity rule reads the shifts of depth 0.15 and 0.30, where the Candidate's
+clip binds at D15 and D18 only.
 
 ## Leakage and disclosures
 
