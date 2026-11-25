@@ -244,6 +244,15 @@ practice itself.** State in the plan which of them the experiment follows.
   event starts and ends and show how each forecast responds. State the unlogged-event caveat: NGED's
   logs may miss events, so the clean-lag rows may hold events no label covers, the harm table is
   optimistic, and the real-event slices undercount.
+- **Plot the training and validation losses, where appropriate.** An experiment that fits a neural
+  network, or any model that stops early on a validation set, includes a plot of the training loss
+  and the validation loss against the epoch (or boosting round) for each arm, with the epoch of the
+  stored model marked. Show one fold and one seed per arm where the full set would crowd the plot,
+  and say which fold and seed. The plot lets the reader see overfitting, a validation loss that
+  still falls when training stops, and an arm whose losses behave differently from the others.
+  Save each fit's loss history in the experiment's data folder beside the model, so that the plot
+  needs no refit. Leave the plot out, and say so in one line, when the experiment fits no model,
+  reuses stored models for prediction only, or fits a closed-form model with no iterations.
 - **Open every pull request as a draft**, run the local checks, and mark it ready only when the
   reviews are triaged.
 
