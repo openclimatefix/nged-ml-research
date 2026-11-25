@@ -2,10 +2,12 @@
 """Experiment 713: forecast, injected-world, and contrast figures from the saved predictions.
 
 Usage:
-    e00713_figures.py series OUT_DIR           # day-ahead and 14-day forecasts against actuals
-    e00713_figures.py events TAG OUT_DIR       # the Candidate and M* on real logged events, three Primaries per group
-    e00713_figures.py injected OUT_DIR         # permanent change and temporary move, onset marked
-    e00713_figures.py contrasts OUT_DIR        # per-Primary and per-fold CRPS and CRPS minus C, six and eight apart, 24-240 h
+    e00713_figures.py series OUT_DIR       # day-ahead and 14-day forecasts against actuals
+    e00713_figures.py events TAG OUT_DIR   # the Candidate and M* on real logged events,
+                                           # three Primaries per group
+    e00713_figures.py injected OUT_DIR     # permanent change and temporary move, onset marked
+    e00713_figures.py contrasts OUT_DIR    # per-Primary and per-fold CRPS and CRPS minus C,
+                                           # six and eight apart, 24-240 h
 
 These scripts read the stored forecasts of the fits (`work/fits/<arm>/`), the bank forecasts
 (`bank713/`), and the protocol rows (`score/protocol_<TAG>/rows.parquet`). They run after the fits and
@@ -479,7 +481,9 @@ DRAWS: Final = 10_000
 
 
 def contrast_cells(*, star: str, months: tuple[str, ...], seeds: tuple[int, ...]) -> pl.DataFrame:
-    """Return per (arm, month, label, origin day) sums of CRPS and of the CRPS difference from `C`, headline band.
+    """Return per (arm, month, label, origin day) sums of CRPS and of its difference from `C`.
+
+    The rows cover the headline band.
 
     One fold and one arm are in memory at a time. The seed mean of each arm's quantiles is scored, as
     in `e00713_score.load_all`, and only the 24 to 240 h rows of the six and the eight are kept.
@@ -625,7 +629,10 @@ def contrast_chart(
 
 
 def cmd_contrasts(*, out_dir: Path) -> None:
-    """Draw per-Primary and per-fold CRPS (absolute and as a difference from `C`) in the 24 to 240 h band, six and eight apart."""
+    """Draw per-Primary and per-fold CRPS, absolute and minus `C`, in the 24 to 240 h band.
+
+    The six and the eight are drawn apart.
+    """
     star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     cells = contrast_cells(star=star, months=arms.ALL_FOLDS, seeds=arms.SCREEN_SEEDS)
     # The check against the stored headline: M* minus C pooled over each group's cells.
