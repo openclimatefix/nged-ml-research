@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Stage 0: the stopped-while-falling flag on the stored curves of experiments 713 and 716
 (read-only).
 
@@ -85,3 +86,39 @@ def test_false_flag_rate_on_flat_plateaus_of_713s_real_fold_curves() -> None:
     if len(curves) < 10:
         pytest.skip("the stored real-fold curves of experiment 713 are not on this machine")
     assert _plateau_flag_rate(curves=curves, n_draws=20, seed=0) <= core.PLATEAU_FALSE_FLAG_CEILING
+
+
+def _real_fold_curves(*, experiment: str) -> list[tuple[str, list[float]]]:
+    """Return (label, curve) of every stored real-fold stage curve of an experiment's logs."""
+    out = []
+    for f in sorted(DATA.glob(f"{experiment}-*/work/logs/*/*_fit_stage[123].json")):
+        body = json.loads(f.read_text())
+        for key in ("first", "rerun"):
+            h = (body.get(key) or {}).get("val_history")
+            if h and len(h) > core.REAL_FOLD_PATIENCE + 1:
+                out.append((f"{f.parent.name}/{f.stem}/{key}", [float(x) for x in h]))
+    return out
+
+
+@pytest.mark.parametrize("experiment", ["00713", "00715"])
+def test_every_stored_real_fold_curve_of_713_and_715_is_printed_with_its_flag(
+    experiment: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Print the flag of each stored real-fold curve of experiments 713 and 715 that runs past its stop.
+
+    The write-up lists them (the page's Stage 0 section). The test prints counts and flags only.
+    """
+    curves = _real_fold_curves(experiment=experiment)
+    if not curves:
+        pytest.skip(f"the stored curves of experiment {experiment} are not on this machine")
+    rows = []
+    for label, h in curves:
+        flag = core.stopped_while_falling(val_history=h)
+        rows.append((label, len(h), flag.flagged, round(flag.gap / max(flag.noise, 1e-12), 2)))
+    with capsys.disabled():
+        print(
+            f"\nstored real-fold curves of experiment {experiment}: label, passes, flag, gap in noise units:"
+        )
+        for row in rows:
+            print("  ", *row)
+    assert all(isinstance(r[2], bool) for r in rows)

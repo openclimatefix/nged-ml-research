@@ -557,7 +557,8 @@ reads seeds 0 and 1 together. In words:
   at D5"), and the design note copied the numbers and not the reading. The stored seed pairs show
   that the pooled limit and the reading both matter (decision 8). The maintainer has ruled for
   Option A, so the verdict rows read G3 under that reading; the first wave still waits for the rest
-  of Gate 3. The
+  of Gate 3. The six checks combine as follows: G3 fails when any check shows harm, is `unresolved`
+  when no check shows harm and any point estimate is above its limit, and passes otherwise. The
   write-up reports each gate decision per world and fold, because the gate is expected to stay shut
   at the un-injected pair, and a shut gate passes G3 by construction.
 - **G4, the eight MVA-only Primaries.** The folded CRPS of each arm at the eight, from the same
@@ -1041,6 +1042,22 @@ which audit triggers fired.
   1.3 under Branch A and about 1.7 to 2.0 under Branch B.
 - **Saved outputs:** every fitted network's state file under the experiment's data folder, never in
   git, and per-row forecasts through `experiment_store.write_predictions`.
+
+### Choices fixed in the code
+
+- **Day offset:** the synthetic world's 5-point day offset is the standard deviation of a per-day
+  offset of the gross demand.
+- **Censor rule:** a reading within 1e-4 of `Q` takes the probability mass inside `|X| <= Q`, and
+  every other reading takes the density of both signs with the Jacobian `r / |X|`.
+- **Block counting:** blocks of 10 consecutive valid dates are numbered from all of a fold's rows
+  before the reverse-flow restriction, so a block with no reverse-flow row stays a resampling unit
+  with a zero count.
+- **Sign head read-out base:** the history power that the read-out averages is the signed expectation
+  `(1 - 2ρ) v`, and its variance includes the sign variance `4ρ(1 - ρ) v²`.
+- **Primary gate:** the per-Primary export gate is computed in NumPy from the training window's rows
+  alone (the rule of experiment 417, design A).
+- **Gap rows:** every signed Primary drops the half-hours at which any farm has a gap, in both
+  worlds.
 
 ### Measurement
 

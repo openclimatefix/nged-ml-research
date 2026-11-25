@@ -66,8 +66,8 @@ def test_the_head_starts_near_zero_and_gets_a_gradient_when_the_gate_is_open() -
     assert float(sg.last_rho.max()) == pytest.approx(1 / (1 + np.exp(4.0)), rel=1e-4)
     loss = out.out.square().mean()
     loss.backward()
-    assert sg.sign_lin.bias.grad is not None
-    assert float(sg.sign_lin.bias.grad.abs()) > 0.0
+    assert sg.pv_sign_lin.bias.grad is not None
+    assert float(sg.pv_sign_lin.bias.grad.abs()) > 0.0
 
 
 def test_u_below_the_floor_closes_the_row_gate() -> None:

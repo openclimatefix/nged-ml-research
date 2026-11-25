@@ -18,6 +18,9 @@ censored branch for readings at the floor, which takes the mixture mass inside `
 from dataclasses import dataclass, replace
 from typing import Final
 
+import e00721_paths  # noqa: F401
+
+# isort: split
 import e00713_model as mdl  # ty: ignore[unresolved-import]
 import e00716_model as pvm  # ty: ignore[unresolved-import]
 import e00721_core as core
@@ -123,12 +126,13 @@ class SgNet(pvm.PvNet):
         """
         super().__init__(arm="HT", seed=seed)
         self.sign_head = sign_head
-        self.sign_lin = nn.Linear(mdl.WIDTH, 1)
-        nn.init.zeros_(self.sign_lin.weight)
-        nn.init.constant_(self.sign_lin.bias, core.HEAD_BIAS_START)
+        self.pv_sign_lin = nn.Linear(mdl.WIDTH, 1)
+        nn.init.zeros_(self.pv_sign_lin.weight)
+        nn.init.constant_(self.pv_sign_lin.bias, core.HEAD_BIAS_START)
         self.register_buffer("export_gate", torch.ones(mdl.N_PRIMARIES))
         self.register_buffer("v_shift", torch.zeros(mdl.N_PRIMARIES))
         self.last_rho: torch.Tensor | None = None
+        self.rho_live: torch.Tensor | None = None
 
     def set_gate(self, *, gate: np.ndarray, force_open: bool = False) -> None:
         """Set the per-Primary export gate `e_i` (all ones when forced open)."""
@@ -148,7 +152,7 @@ class SgNet(pvm.PvNet):
         """
         if not self.sign_head:
             return torch.zeros_like(inp.hist_u)
-        logit = self.sign_lin(h).squeeze(-1)
+        logit = self.pv_sign_lin(h).squeeze(-1)
         gate_u = (inp.hist_u >= core.U_MIN).to(logit.dtype)
         return self.export_gate[inp.primary][:, None, None] * gate_u * torch.sigmoid(logit)
 
@@ -162,6 +166,7 @@ class SgNet(pvm.PvNet):
         h = self.ln_readout(x)[:, 1:]
         rho = self.history_rho(h=h, inp=inp)
         self.last_rho = rho.detach()
+        self.rho_live = rho
         z = inp.hist_power.clamp(-POWER_CLIP, POWER_CLIP)
         z_exp, sign_var = signed_expected_history(z=z, rho=rho, shift=self.v_shift[inp.primary])
         base = (alpha * z_exp).sum(dim=1)

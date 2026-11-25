@@ -121,11 +121,6 @@ def test_resource_rules() -> None:
     assert fit.resource_problems(load=float("nan"), free_gb=60.0)
 
 
-def test_the_real_data_boundary_is_explicit() -> None:
-    with pytest.raises(NotImplementedError, match="smoke_real_files"):
-        fit.real_inputs_hole()
-
-
 def test_report_applies_the_verdict_table(tmp_path: Path) -> None:
     summary = {
         "g1": {"point": -0.6, "upper": -0.2}, "g2": {"point": -0.5, "upper": -0.1},

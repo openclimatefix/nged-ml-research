@@ -17,8 +17,8 @@
 #   - the venv's Python called directly (never `uv run` inside the scope); `PYTHON` names a venv built
 #     with `uv sync --group gpu` for the fits;
 #   - this folder, and the folders of the experiments whose code this one imports, on PYTHONPATH:
-#     713 (network, loop, scorer), 716 and 717 (F7's `HT` inputs), 720 (injection and folding), and 87 and 506 (the grid and the loaders of power, sky, and farms).
-#     `WORKTREES` names the folder that holds those worktrees.
+#     `e00721_paths.py` adds the experiment folders of the frozen 713 worktree, this branch's own
+#     experiment folders, and 716 and 720.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # default to dummy values because the contracts package reads them at import. Each fit holds at most
 # 6 GB of the GPU (`e00721_fit.limit_gpu_memory`).
@@ -49,19 +49,8 @@ if [ "$load" -gt 24 ]; then
     echo "one-minute load ${load} is above 24; wait" >&2
     exit 1
 fi
-worktrees="${WORKTREES:-$(dirname "$(dirname "$root")")}"
-paths="$here"
-for d in \
-    "$worktrees"/frozen-713-7c29114a8/ml-experiments/00713-msa-axial-attention-demand-network-part-1 \
-    "$worktrees"/frozen-713-7c29114a8/ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand \
-    "$worktrees"/frozen-713-7c29114a8/ml-experiments/00559-* \
-    "$worktrees"/msa-f7-pv-part-1/ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate \
-    "$worktrees"/msa-f7-pv-part-1/ml-experiments/00717-* \
-    "$worktrees"/msa-mva-to-mw-rung-0/ml-experiments/00720-msa-mva-to-mw-rung-0-signed-power-from-mva-meters \
-    "$root"/00087-* "$root"/00506-*; do
-    [ -d "$d" ] && paths="$paths:$d"
-done
-export PYTHONPATH="$paths${EXTRA_PYTHONPATH:+:$EXTRA_PYTHONPATH}"
+# `e00721_paths.py` puts the sibling experiment folders on sys.path; one PYTHONPATH entry per folder would exceed the size limit of an environment variable.
+export PYTHONPATH="$here"
 export NGED_S3_BUCKET_URL="${NGED_S3_BUCKET_URL:-https://example.com}"
 export NGED_S3_BUCKET_ACCESS_KEY="${NGED_S3_BUCKET_ACCESS_KEY:-dummy}"
 export NGED_S3_BUCKET_SECRET="${NGED_S3_BUCKET_SECRET:-dummy}"

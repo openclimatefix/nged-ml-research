@@ -18,23 +18,7 @@ _TESTS = Path(__file__).parent
 _FOLDER = _TESTS.parent
 sys.path.insert(0, str(_FOLDER))
 
-_WORKTREES = _FOLDER.parents[2]
-_SIBLINGS = (
-    "frozen-713-7c29114a8/ml-experiments/00713-msa-axial-attention-demand-network-part-1",
-    "frozen-713-7c29114a8/ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand",
-    "msa-f7-pv-part-1/ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate",
-    "msa-mva-to-mw-rung-0/ml-experiments/00720-msa-mva-to-mw-rung-0-signed-power-from-mva-meters",
-)
-for _sibling in _SIBLINGS:
-    _path = _WORKTREES / _sibling
-    if _path.is_dir():
-        sys.path.append(str(_path))
-sys.path.extend(
-    str(p) for p in sorted(_FOLDER.parent.glob("000[0-9][0-9]-*")) if p.name[:5] == "00087"
-)
-sys.path.extend(str(p) for p in sorted(_FOLDER.parent.glob("00506-*")))
-_559 = sorted((_WORKTREES / "frozen-713-7c29114a8" / "ml-experiments").glob("00559-*"))
-sys.path.extend(str(p) for p in _559)
+import e00721_paths  # noqa: E402, F401  (puts the sibling experiments on sys.path)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.Item]) -> None:

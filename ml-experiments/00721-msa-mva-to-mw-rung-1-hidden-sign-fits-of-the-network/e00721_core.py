@@ -121,6 +121,8 @@ HEAD_BIAS_START: Final = -4.0
 CONTINUATION_FLOOR_GPU_HOURS: Final = 0.6
 GPU_HOURS_PER_FIT: Final = 0.2
 GPU_HOURS_CAP: Final = 14.0
+SIGN_CE_WEIGHT: Final = 1.0
+"""Weight of the cross-entropy between `ρ` and the true sign (the page names the loss and not its weight)."""
 N_INJECTION_SUBSTEPS: Final = 6
 """Sub-steps of the within-half-hour interpolation. Experiment 720's code owns the number; this copy
 is asserted equal in a test."""

@@ -21,6 +21,7 @@ from typing import Final, Protocol
 
 import e00721_core as core
 import numpy as np
+import polars as pl
 
 GPU_MEMORY_BYTES: Final = 6 * 1024**3
 UPTIME_MAX: Final = 24.0
@@ -195,6 +196,7 @@ class FitResult:
         best_state_p8: The state at that pass.
         continued: Whether a continuation ran (Branch A).
         flag: The flag result's dictionary, if the flag was evaluated.
+        rerun_of_cap: Whether the stage was rerun at the higher cap.
     """
 
     val_history: list[float] = field(default_factory=list)
@@ -203,6 +205,7 @@ class FitResult:
     best_state_p8: dict | None = None
     continued: bool = False
     flag: dict | None = None
+    rerun_of_cap: bool = False
 
 
 class Trainable(Protocol):
@@ -287,26 +290,80 @@ def run_fit_with_flag(
 
 
 class JobInputs(Protocol):
-    """What a job needs from the data, built from real files and never in a unit test."""
+    """What a job needs from the data.
 
-    def build_trainable(self, *, job: Job) -> Trainable:
-        """Return the job's trainable (network, optimiser, batches, validation)."""
+    `e00721_real` builds it from real files, and `e00721_e2e` from a synthetic mini world.
+    """
 
-    def predict(self, *, job: Job, state: dict) -> object:
-        """Return the job's scored forecast table at the fold's rows."""
+    def stages(self, *, job: Job) -> tuple[int, ...]:
+        """Return the training stages of the job (1 for the synthetic world, 1 to 3 for a real fold)."""
+
+    def build_trainable(self, *, job: Job, stage: int) -> Trainable:
+        """Return the stage's trainable on the job's network (the network carries from stage to stage)."""
+
+    def predict(self, *, job: Job) -> pl.DataFrame:
+        """Return the job's scored forecast table at the fold's rows, from the network's current state."""
+
+    def network_state(self, *, job: Job) -> dict:
+        """Return a copy of the job's network state (for the `.pt` file)."""
+
+    def load_network_state(self, *, job: Job, state: dict) -> None:
+        """Build the job's network for the predict phase and load `state` into it."""
+
+    def sign_tokens(self, *, job: Job) -> dict[str, np.ndarray] | None:
+        """Return the sign tokens of a synthetic fit, or `None` for any other job."""
 
 
-def run_job(
+def run_stage(
+    *, job: Job, stage: int, inputs: JobInputs, continuation: bool, budget: Budget
+) -> tuple[FitResult, Trainable]:  # fmt: skip
+    """Fit one stage and return the result with the trainable.
+
+    On a real fold, a stage that ends at the cap is rerun from its start state at the rerun cap.
+    """
+    trainable = inputs.build_trainable(job=job, stage=stage)
+    start = trainable.get_state()
+    if job.world == "synthetic":
+        hist, best_pass, best_state = fit_patience(
+            fit=trainable, max_passes=core.SYNTH_MAX_PASSES, patience=core.SYNTH_PATIENCE
+        )
+        return FitResult(
+            val_history=hist, stop_pass_p8=len(hist) - 1, best_pass_p8=best_pass, best_state_p8=best_state,
+        ), trainable  # fmt: skip
+    flag_wanted = continuation and stage == 1 and job.arm == "SG-A" and job.world == "W2"
+    result = run_fit_with_flag(
+        fit=trainable, max_passes=core.REAL_FOLD_CAP_FIRST, continuation=flag_wanted, budget=budget
+    )
+    ran_to_cap = (
+        result.stop_pass_p8 + 1 >= core.REAL_FOLD_CAP_FIRST
+        and result.stop_pass_p8 - result.best_pass_p8 < core.REAL_FOLD_PATIENCE
+    )
+    if ran_to_cap:
+        trainable.set_state(start)
+        trainable = inputs.build_trainable(job=job, stage=stage)
+        again = run_fit_with_flag(
+            fit=trainable,
+            max_passes=core.REAL_FOLD_CAP_RERUN,
+            continuation=flag_wanted,
+            budget=budget,
+        )
+        again.rerun_of_cap = True
+        return again, trainable
+    return result, trainable
+
+
+def fit_job(
     *, job: Job, inputs: JobInputs, data_dir: Path, budget: Budget, continuation: bool, log: Callable[[str], None] = print
 ) -> dict:  # fmt: skip
-    """Run one job end to end and write its files atomically.
+    """Run the fit phase of one job and write its network state and curve atomically.
 
-    A job whose `done` file exists is skipped.
+    A job whose curve file exists is skipped. Each stage starts from the network that the earlier
+    stage left at its patience-8 best. The fit phase reads no data at or after the fold's cutoff.
     """
     paths = job_paths(data_dir=data_dir, job=job)
-    if paths["done"].exists():
-        log(f"skip {job.key}: done")
-        return json.loads(paths["done"].read_text())
+    if paths["curve"].exists() and paths["state"].exists():
+        log(f"skip {job.key}: fitted")
+        return json.loads(paths["curve"].read_text())
     problems = resource_problems(load=read_uptime_load(), free_gb=read_free_gb())
     if problems:
         msg = f"{job.key} does not start: {'; '.join(problems)}"
@@ -315,49 +372,79 @@ def run_job(
         msg = f"{job.key} does not start: the continuation floor of {budget.floor_hours} hours would be spent"
         raise RuntimeError(msg)
     started = time.monotonic()
-    trainable = inputs.build_trainable(job=job)
-    is_real = job.world != "synthetic"
-    max_passes = core.REAL_FOLD_CAP_FIRST if is_real else core.SYNTH_MAX_PASSES
-    if is_real:
-        result = run_fit_with_flag(
-            fit=trainable, max_passes=max_passes, continuation=continuation and job.arm == "SG-A" and job.world == "W2",
-            budget=budget,
+    stage_records = []
+    for stage in inputs.stages(job=job):
+        t0 = time.monotonic()
+        result, trainable = run_stage(
+            job=job, stage=stage, inputs=inputs, continuation=continuation, budget=budget
+        )
+        if result.best_state_p8 is not None:
+            trainable.set_state(result.best_state_p8)
+        stage_records.append(
+            {
+                "stage": stage, "val_history": result.val_history, "best_pass_p8": result.best_pass_p8,
+                "stop_pass_p8": result.stop_pass_p8, "continued": result.continued, "flag": result.flag,
+                "seconds": time.monotonic() - t0, "passes": len(result.val_history), "rerun": result.rerun_of_cap,
+            }
         )  # fmt: skip
-    else:
-        hist, best_pass, best_state = fit_patience(
-            fit=trainable, max_passes=max_passes, patience=core.SYNTH_PATIENCE
+        log(
+            f"{job.key} stage {stage}: {len(result.val_history)} passes, {time.monotonic() - t0:.1f} s"
         )
-        result = FitResult(
-            val_history=hist,
-            stop_pass_p8=len(hist) - 1,
-            best_pass_p8=best_pass,
-            best_state_p8=best_state,
-        )
-    state = result.best_state_p8 if result.best_state_p8 is not None else trainable.get_state()
-    inputs.predict(job=job, state=state)
+    import io
+
+    import torch  # ty: ignore[unresolved-import]
+
+    buffer = io.BytesIO()
+    torch.save(inputs.network_state(job=job), buffer)
+    atomic_write_bytes(path=paths["state"], payload=buffer.getvalue())
     hours = (time.monotonic() - started) / 3600.0
     budget.spent_hours += hours
     curve = {
-        "job": job.key, "val_history": result.val_history, "best_pass_p8": result.best_pass_p8,
-        "stop_pass_p8": result.stop_pass_p8, "continued": result.continued, "flag": result.flag, "hours": hours,
+        "job": job.key, "stages": stage_records, "hours": hours,
+        "flag": next((r["flag"] for r in stage_records if r["flag"] is not None), None),
+        "val_history": stage_records[0]["val_history"], "best_pass_p8": stage_records[0]["best_pass_p8"],
     }  # fmt: skip
     atomic_write_json(path=paths["curve"], body=curve)
-    atomic_write_json(path=paths["done"], body={"job": job.key, "hours": hours})
-    log(f"done {job.key}: {hours:.2f} h")
+    log(f"fitted {job.key}: {hours:.2f} h")
     return curve
 
 
-def real_inputs_hole() -> None:
-    """Raise: the builder of real batches is not in this module.
+def predict_job(
+    *, job: Job, inputs: JobInputs, data_dir: Path, log: Callable[[str], None] = print
+) -> None:
+    """Run the predict phase of one job: load its stored state, write the scored rows, and mark the job done."""
+    import torch  # ty: ignore[unresolved-import]
 
-    The batch builder needs the real grid, the weather, the capacity probe of each hidden Primary
-    per fold and
-    world, and the farm series, which only a run on the workstation can read. `smoke_real_files.py`
-    lists the
-    files it needs.
+    paths = job_paths(data_dir=data_dir, job=job)
+    if paths["done"].exists():
+        log(f"skip {job.key}: done")
+        return
+    assert paths["state"].exists(), f"{paths['state']} is missing: run the fit phase first"
+    inputs.load_network_state(job=job, state=torch.load(paths["state"], map_location="cpu"))
+    table = inputs.predict(job=job)
+    paths["predictions"].parent.mkdir(parents=True, exist_ok=True)
+    tmp = paths["predictions"].with_name(f".{paths['predictions'].name}.{os.getpid()}.tmp")
+    table.write_parquet(tmp)
+    tmp.replace(paths["predictions"])
+    tokens = inputs.sign_tokens(job=job)
+    if tokens is not None:
+        import io
 
-    Raises:
-        NotImplementedError: Always.
-    """
-    msg = "build a JobInputs from real files: see tests/smoke_real_files.py for the files it reads"
-    raise NotImplementedError(msg)
+        buffer = io.BytesIO()
+        np.savez(buffer, **tokens)  # ty: ignore[invalid-argument-type]
+        atomic_write_bytes(
+            path=paths["predictions"].with_suffix(".tokens.npz"), payload=buffer.getvalue()
+        )
+    atomic_write_json(path=paths["done"], body={"job": job.key, "rows": table.height})
+    log(f"predicted {job.key}: {table.height} rows")
+
+
+def run_job(
+    *, job: Job, inputs: JobInputs, data_dir: Path, budget: Budget, continuation: bool, log: Callable[[str], None] = print
+) -> dict:  # fmt: skip
+    """Run both phases of one job in this process (the end-to-end check; a real fold runs them in two processes)."""
+    curve = fit_job(
+        job=job, inputs=inputs, data_dir=data_dir, budget=budget, continuation=continuation, log=log
+    )
+    predict_job(job=job, inputs=inputs, data_dir=data_dir, log=log)
+    return curve
