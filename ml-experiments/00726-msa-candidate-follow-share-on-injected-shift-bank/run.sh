@@ -8,7 +8,7 @@
 # pinned F4 checkout's folder second (the scripts assert both checkouts).
 #
 # Rules this wrapper enforces:
-#   - one cgroup scope with MemoryMax=9G, no swap, and OOMPolicy=continue, so an out-of-memory kill
+#   - one cgroup scope with MemoryMax=${MEMORY_MAX:-9G}, no swap, and OOMPolicy=continue, so an out-of-memory kill
 #     takes this job alone and never the session;
 #   - one BLAS thread;
 #   - the virtual environment's interpreter, called directly, so `uv` never re-syncs it;
@@ -39,6 +39,10 @@ if [ "$load" -ge 24 ]; then
 fi
 
 # the frozen checkouts come first, so a copy of experiment 713 or 715 on this branch can never shadow them
+wt="$(dirname "$repo")"  # the folder that holds the frozen checkouts beside this worktree
+if [ -z "${EXTRA_PYTHONPATH:-}" ]; then
+  EXTRA_PYTHONPATH="$(echo "$wt"/frozen-713-7c29114a8/ml-experiments/00713-*):$(echo "$wt"/frozen-f4-ac3e768e4/ml-experiments/00715-*)"
+fi
 pythonpath="$here"
 if [ -n "${EXTRA_PYTHONPATH:-}" ]; then
   pythonpath="$here:$EXTRA_PYTHONPATH"
@@ -88,7 +92,7 @@ fi
 before="$(snapshot)"
 set +e
 systemd-run --user --scope --quiet \
-  -p MemoryMax=9G -p MemorySwapMax=0 -p OOMPolicy=continue \
+  -p MemoryMax="${MEMORY_MAX:-9G}" -p MemorySwapMax=0 -p OOMPolicy=continue \
   env \
     PYTHONPATH="$pythonpath" \
     OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 \

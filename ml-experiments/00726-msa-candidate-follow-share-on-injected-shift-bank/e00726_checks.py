@@ -16,6 +16,7 @@ KM4; 1e-6 for KM2; and a follow share above 0.02 for the 0.50 shifts in KM3.
 
 import argparse
 import difflib
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -407,28 +408,36 @@ def check_kp(*, strict: bool) -> bool:
     return ok
 
 
-def check_g2_copy() -> bool:
-    """Compare the lines from the import to the write of the generator's power with F4's, and the return line."""
-    f4_file = com.module_folder(name="e00715_era") / "e00715_era.py"
-    mine_file = Path(__file__).resolve().parent / "e00726_candidate_panel.py"
+def g2_core(text: str) -> list[str]:
+    """Return the lines of `g2_panel` from the import to the write of the generator's power.
+
+    A trailing comment is stripped from each line, so `# ty: ignore[...]` on the import does not
+    stop the match. Blank lines and comment lines are dropped.
+    """
     first = "import e00714_generator2 as g2"
     last = "out[:, lo : lo + n] = gen.power.power"
+    block = text[text.index("def g2_panel(") :].split("\n\n\n", maxsplit=1)[0]
+    lines = [re.sub(r"\s+#.*$", "", x).strip() for x in block.splitlines()]
+    lines = [x for x in lines if x and not x.startswith("#")]
+    return lines[lines.index(first) : lines.index(last) + 1]
 
-    def core(text: str) -> list[str]:
-        block = text[text.index("def g2_panel(") :].split("\n\n\n", maxsplit=1)[0]
-        lines = [
-            x.strip() for x in block.splitlines() if x.strip() and not x.strip().startswith("#")
-        ]
-        return lines[lines.index(first) : lines.index(last) + 1]
 
-    a, b = core(f4_file.read_text()), core(mine_file.read_text())
+def g2_returns_touched(text: str) -> bool:
+    """Return whether the `g2_panel` block of `text` holds the return line of the copy."""
+    block = text[text.index("def g2_panel(") :].split("\n\n\n", maxsplit=1)[0]
+    return "return out, list(gen.touched)" in [x.strip() for x in block.splitlines()]
+
+
+def check_g2_copy() -> bool:
+    """Compare the copy of `g2_panel` with F4's, body only, and check the return line of the copy."""
+    f4_file = com.module_folder(name="e00715_era") / "e00715_era.py"
+    mine_text = (Path(__file__).resolve().parent / "e00726_candidate_panel.py").read_text()
+    a, b = g2_core(f4_file.read_text()), g2_core(mine_text)
     diff = [
         d for d in difflib.unified_diff(a, b, lineterm="", n=0)
         if d[:1] in "+-" and d[:3] not in {"+++", "---"}
     ]  # fmt: skip
-    returns = "return out, list(gen.touched)" in [
-        x.strip() for x in mine_file.read_text().splitlines()
-    ]
+    returns = g2_returns_touched(mine_text)
     print(
         f"KP g2_panel copy: {len(a)} lines compared, {len(diff)} differ, return line ok: {returns}",
         flush=True,

@@ -512,9 +512,31 @@ def test_gates_raise_without_assert() -> None:
 def test_crps_from_quantiles_is_zero_for_a_perfect_point_forecast_and_grows_with_error() -> None:
     import e00726_readings as rd
 
-    q = np.tile(np.linspace(0.4, 0.6, 11), (3, 1))
+    q = np.tile(np.linspace(0.4, 0.6, 11), (3, 1))  # in capacity shares
     actual = np.array([0.5, 0.5, 0.9])
     crps = rd.crps_from_quantiles(quantiles=q, actual=actual)
     assert crps[0] == pytest.approx(crps[1]) and crps[2] > crps[0]
     sharp = rd.crps_from_quantiles(quantiles=np.full((1, 11), 0.5), actual=np.array([0.5]))
     assert sharp[0] == pytest.approx(0.0)
+
+
+G2_TEXT = """
+def g2_panel(*, clean, month, index):
+    \"\"\"Doc.\"\"\"
+    import e00714_generator2 as g2  # ty: ignore[unresolved-import]
+
+    gen = g2.read_pass(world="g2", month=month, index=index)
+    out = clean.astype(np.float64).copy()
+    lo, n = gen.power.start_hh, gen.power.power.shape[1]
+    out[:, lo : lo + n] = gen.power.power
+    return out, list(gen.touched)
+"""
+
+
+def test_g2_core_ignores_the_trailing_type_comment() -> None:
+    core = chk.g2_core(G2_TEXT)
+    assert core[0] == "import e00714_generator2 as g2"
+    assert core[-1] == "out[:, lo : lo + n] = gen.power.power" and len(core) == 5
+    assert core == chk.g2_core(G2_TEXT.replace("  # ty: ignore[unresolved-import]", ""))
+    assert chk.g2_returns_touched(G2_TEXT)
+    assert not chk.g2_returns_touched(G2_TEXT.replace("list(gen.touched)", "gen.truth"))

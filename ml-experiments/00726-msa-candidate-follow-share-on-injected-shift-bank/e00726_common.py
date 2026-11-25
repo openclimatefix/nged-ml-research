@@ -94,9 +94,17 @@ MSA_WORLDS: Final = ("all", "zero", "host")
 # ---------------------------------------------------------------- paths and the output rule
 
 
-def data_root() -> Path:
-    """Return this experiment's data folder."""
+def base_root() -> Path:
+    """Return this experiment's data folder, whatever the smoke setting."""
     return ML_EXPERIMENTS_DATA_DIR / NAME
+
+
+def data_root() -> Path:
+    """Return the folder that jobs write under: `smoke/` of this experiment's folder when `E00726_SMOKE` is set.
+
+    The smoke test writes there, so phase 1 never treats a smoke file as a finished job.
+    """
+    return base_root() / "smoke" if os.environ.get("E00726_SMOKE") else base_root()
 
 
 def folder_of(*, prefix: str) -> Path:
@@ -497,7 +505,7 @@ def neighbour_lists() -> tuple[dict[int, list[int]], list[str], np.ndarray]:
 
 def sets_file() -> Path:
     """Return the file that holds the host-only sets, written by the preflight."""
-    return data_root() / "candidate" / "sets.json"
+    return base_root() / "candidate" / "sets.json"
 
 
 def read_sets() -> list[list[int]]:

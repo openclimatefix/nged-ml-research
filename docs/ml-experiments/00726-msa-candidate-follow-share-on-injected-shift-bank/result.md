@@ -427,7 +427,7 @@ that the follow share needs.
 | KC2, experiment 650's events through the Candidate | World `e650`, every test row, two fold months, passes 0 and 7, seeds 0 and 1, written by this check's own run | Identical key sets and a largest difference of at most 1e-4 against experiment 667's stored files, which shows the copy is experiment 667's inject path |
 | KC3, experiment 709's bank through the Candidate | World `bank709`, two fold months, passes 0 and 5, seeds 0 and 1 | At most 1e-4 against experiment 709's stored forecasts on the shared keys |
 | KC4, the panel | The all-shifted and host-only panels of every pass and fold month | Equal to the cleaned power outside each shift's window and to the cleaned power plus the signed depth inside it; NaN where the cleaned power is NaN; in a host-only panel, every Primary outside the set equals the cleaned power |
-| KC5, the Candidate reads the shifted panel | The day-old lag column at an origin inside a window | Equals the shifted value to 1e-6, and the lag-time columns are identical |
+| KC5, the Candidate reads the shifted panel | The day-old lag column at an origin inside a window | Moves by one constant per Primary times the shift of the lag index, to a float32-relative tolerance of 1e-5 (absolute when the constant is below 1), in every in-window row and in at least one row; the lag-time columns are identical. The design asked for 1e-6; the lag column is stored in float32 at a magnitude of a few units, so the ratio of the movement to the shift carries a relative error of a few times 1e-7 per row |
 | KC6, no cross-talk in the Candidate | One Primary shifted, every test row; and one host-only set with the test rows cut to its members | Every Primary that does not read the shifted one as an in-neighbour is unchanged to 1e-4; the shifted Primary moves; the cut and uncut member forecasts agree |
 | KM1, zero shift through the MSA command | World `zero`, two fold months, seed 0, arms `M1`, `K`, `E`, and `N` | Identical key sets and a largest difference of at most 1e-4 |
 | KM3, the MSA command reads the shifted panel (runs before KM2) | `M1` on pass 0 of the first fold month | The history power inside a window equals the standardised shifted panel clipped at 5 standard deviations to 1e-6, and the follow share of the 0.50 shifts is above 0.02 |
@@ -441,6 +441,22 @@ that the follow share needs.
 **KM3 runs before KM2, because KM2 cannot fail if the MSA command never swaps the panel.** Arm `N` and
 the masked `M1` score 0 whether the shifted panel reaches the network or not. **KC2 must write its own
 files:** with experiment 667's paths, the copied `_done` would make KC2 pass by skipping.
+
+**Departures of the code from the design, stated before any check runs.**
+
+- KC5 uses the float32-relative tolerance in the table above, not 1e-6.
+- KM2 compares each arm's all-shifted forecast with its own unshifted forecast from the same
+  command: the `zero` world of arm `N`, and of `M1` with `--mask-history`, at seed 0 on the first fold
+  month and one more. A second row compares the masked `M1`'s zero world with experiment 713's
+  stored forecast at 1e-4.
+- Experiment 715's `g2` forecasts exist for fold 2025-11 and seed 0 only, so reading S6 covers one
+  fold and one seed.
+- Reading 8 uses the project's quantile score (twice the pinball loss over the 11 levels, as in
+  F4's scorer), in points of capacity. Reading 7's safe-side half is implemented, and its coverage
+  half is not yet. Reading 3 has no breakdown by length, and the clip diagnostics are not yet
+  joined to it.
+- No figures script and no code for phase 5 (the attention extraction) exist yet. Both need code
+  and a review before phase 1 or the phase is cut.
 
 ## Leakage and disclosures
 

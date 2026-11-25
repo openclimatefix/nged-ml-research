@@ -17,8 +17,8 @@ if the forecast follows, so the safe side is "the unshifted power is at or above
 for a pass that lowers the power it is "at or below the shifted q95". The reading prints the share
 of rows on the safe side for the Candidate and for `M1`, in each counted slice.
 
-**Reading 8, CRPS.** The CRPS of a forecast is approximated from its 11 quantiles as twice the
-pinball loss averaged over the levels with trapezoid weights. It is computed against the
+**Reading 8, CRPS.** The CRPS is the project's quantile score (twice the pinball loss averaged over
+the 11 levels), in points of capacity, as in F4's `event_crps`. It is computed against the
 unshifted power for both counted slices, and against the shifted power for target half-hours before
 the shift ends in the lasting-step slice.
 """
@@ -33,19 +33,20 @@ import e00726_common as com
 import e00726_score as sc
 import numpy as np
 import polars as pl
+from studies.eval_protocol.metrics import quantile_score
 
 SEEDS_10: Final = (0, 1)
 N_PASSES_10: Final = 16
 ONSET_DAYS: Final = (7, 28)
-TAUS: Final = np.array([0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99])
-CRPS_WEIGHTS: Final = np.gradient(TAUS) / np.gradient(TAUS).sum()
 
 
 def crps_from_quantiles(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndarray:
-    """Return the CRPS approximated by twice the weighted pinball loss over the 11 levels, per row."""
-    diff = actual[:, None] - quantiles
-    pinball = np.where(diff >= 0, TAUS * diff, (TAUS - 1.0) * diff)
-    return 2.0 * (pinball * CRPS_WEIGHTS).sum(axis=1)
+    """Return the project's CRPS per row, in points of capacity (the quantile score times 100).
+
+    This is `studies.eval_protocol.metrics.quantile_score` on values in percent of capacity, as F4's
+    `event_crps` computes it.
+    """
+    return quantile_score(actual=actual * 100.0, quantiles=quantiles * 100.0)
 
 
 def bank_files(*, net: str, month: str, seed: int, r: int) -> tuple[Path, Path]:
