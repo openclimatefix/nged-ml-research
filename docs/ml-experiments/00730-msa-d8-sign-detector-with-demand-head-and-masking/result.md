@@ -64,9 +64,10 @@ decision_rule: >-
   H2 fails; (4) `supported`, C1 at or below -m with an upper end below zero, and the sign
   calibration bar and the detection bar pass; (5) `partly supported`, C1 as in row 4 and one of
   those two bars fails; (6) `small gain`, C1's upper end below zero and its point above -m; (7)
-  `inconclusive`, C1's interval includes zero and its half-width is at least m; (8) `not
-  supported`, every other case. The section "Verdict table" gives every row in full. The experiment
-  ports nothing, so no smallest gain applies beyond m.
+  `inconclusive`, C1's interval includes zero and its half-width (half the width of the interval)
+  is at least m, or C1's point is at or below −m with an interval that includes zero and a
+  half-width under m; (8) `not supported`, every other case. The section "Verdict
+  table" gives every row in full. The experiment ports nothing, so no smallest gain applies beyond m.
 benchmark: >-
   P0 (the reading read as signed import, so P(X<0) is 0 on every half-hour), the reference for the
   harm checks; P0f (P0 with experiment 729's 0.5-point spread floor) for experiment 729's
@@ -108,14 +109,13 @@ whether encoders pre-trained on 16 Primaries help, whether a transformer does be
 recurrent neural network of the earlier experiment, and how much a version that sees only the past
 gives up. The page is the plan, written before any code exists, and holds no result.
 
-**Experiment 729's first run is invalid, and this experiment builds the corrected synthetic world
-and redoes experiment 729's key comparisons on it.** A rule in experiment 729's code that checked
-whether a solar farm's satellite sky was present counted the night-time half-hours as missing, so
-every solar-world segment of source S2 (the satellite-driven solar model, defined below) carried
-zero solar output. Those silent solar worlds were 37.5% of experiment 729's test rows. Experiment
-729 is not rerun. This experiment rebuilds the banks with the fixed code in its own data folder,
-runs the realism gate again under experiment 729's rules, and refits experiment 729's arms A, D, and
-D-sign on the rebuilt banks beside its own arms.
+**Experiment 729's banks lack solar output in every S2 solar world, so this experiment builds the
+corrected synthetic world and redoes experiment 729's key comparisons on it.** Every solar-world
+segment of source S2 (the satellite-driven solar model, defined below) in experiment 729's banks
+carries zero solar output, and those segments are 37.5% of experiment 729's test rows. This
+experiment rebuilds the banks with the corrected code in its own data folder, runs the realism gate
+again under experiment 729's rules, and refits experiment 729's arms A, D, and D-sign on the
+rebuilt banks beside its own arms.
 
 **The design follows the earlier experiment on the same kind of synthetic days.** [Experiment
 729](../00729-msa-d8-neural-untangler-synthetic-known-answers/result.md) trained neural networks
@@ -159,9 +159,9 @@ applied here to one series. The transformer is the encoder of [Vaswani et al.
 
 ## What experiment 729 found
 
-**Experiment 729's numbers come from banks in which every S2 solar world was silent, so they guided
-this design and are not evidence.** This experiment's refits of arms A, D, and D-sign test each
-finding below again on the rebuilt banks.
+**Experiment 729's numbers come from banks in which every S2 solar world has no output, so they
+guided this design and are not evidence.** This experiment's refits of arms A, D, and D-sign test
+each finding below again on the rebuilt banks.
 
 **Experiment 729's headline neural network beat the demand-climatology rule by a wide margin on
 synthetic days, and added error on import half-hours, so its verdict was `not supported`.** Its
@@ -199,14 +199,12 @@ data exist. This plan does not plan that work.
 
 **This experiment owns the corrected synthetic world: it rebuilds experiment 729's banks with the
 fixed simulator into its own data folder and never reads experiment 729's banks.** The world is
-experiment 729's as its plan registered it. Two corrections are on experiment 729's branch
-`exp-729-plan`, from commit `e33e88b67` on: the sky rule `sky_present` in `e00729_data.py`, which
-counts a farm's satellite sky as present when at least 40/48 of the day's sun-up half-hours have
-irradiance, and the simulator ranges restored to the values experiment 729's plan registered before
-its re-tune. The worktree of this experiment is built on experiment 729's pushed branch at
-`a2f30e9ed`, which does not hold those commits. **The fix commits are a prerequisite: the branch is
-merged forward to the head of `exp-729-plan` before any code of this experiment runs**, and the
-banks stage asserts that `e00729_core.RUN_ID` is "2" and that `e00729_data.sky_present` exists.
+experiment 729's as its plan registered it. Two corrections are in experiment 729's merged code: the
+sky rule `sky_present` in `e00729_data.py`, which counts a farm's satellite sky as present when at
+least 40/48 of the day's sun-up half-hours have irradiance, and the simulator ranges restored to the
+values experiment 729's plan registered before its re-tune. **The banks stage asserts that
+`e00729_core.RUN_ID` is "2" and that `e00729_data.sky_present` exists, and the line stops at verdict
+row 0 if the banks digest or `RUN_ID` is not the fixed one.**
 
 ### Base days and the split
 
@@ -313,20 +311,31 @@ check, the line stops at verdict row 0 and the manager is told.** No other freed
 no world mix, and no BSP coefficient range changes.
 
 **Every simulated component is checked for output where output must exist before the gate reads
-the banks.** The banks stage counts, per world type and bank, the share of engine-world segments
-with engine output on at least one running half-hour, the share of S1 and of S2 solar-world
-segments with solar output on clear sun-up half-hours, the share of BSP-month segments whose
-synthetic BSP differs from the real meter where the engine or solar output is above zero, the share
-of no-injection segments whose truth equals the base demand, and the share of half-hours whose
-reading is at least the reactive floor. Each share must be at least 0.9, or 1.0 where the
-simulator leaves no room for an exception (no-injection truth, the fold), or the line stops at
-verdict row 0 before any fit. A clear sun-up half-hour has a CAMS clear-sky index of at least 0.8
-at D8.
+the banks.** Each check is stated per day, never per segment, because a segment of a month with one
+nonzero day would pass a per-segment check while the generator is still silent on the other days.
+The banks stage counts, per world type, bank, source, and season:
+
+- the share of clear base days of solar-world segments with solar output above zero on at least
+  one clear sun-up half-hour, for S1 and S2 separately;
+- the share of running half-hours of engine-world segments with engine output above zero, per
+  half-hour that the engine simulator marks as running;
+- the share of base days of BSP-month segments whose synthetic BSP differs from the real meter at
+  every half-hour where the engine or solar output is above zero;
+- the share of no-injection half-hours whose truth equals the base demand; and
+- the share of half-hours whose reading is at least the reactive floor.
+
+**The bar is one constant, `MIN_OUTPUT_SHARE` = 0.99, in `e00730_core.py`, and the page, the
+plan, and `tests/smoke_real_files.py` quote that same value.** Each share must be at least
+`MIN_OUTPUT_SHARE`, or 1.0 where the simulator leaves no room for an exception (the no-injection
+truth and the fold), or the line stops at verdict row 0 before any fit. A clear sun-up half-hour
+has a CAMS clear-sky index of at least 0.8 at D8, and a clear base day is a base day on which
+every sun-up half-hour is clear.
 
 **A gallery of the synthetic world is a gate before any fit.** The figures stage draws the gallery
-from the rebuilt banks on the CPU (see "Figures planned"), and the maintainer's reading of the
-gallery is checked panel by panel against a written list of what each panel must show before the
-"fits starting" line, as "Compute, stop line, and gates" sets out.
+from the rebuilt banks on the CPU (see "Figures planned"). The session, which is the design lead,
+checks each panel against a written list of what the panel must show, and the maintainer reads the
+same gallery in the write-up. The check is in the gate list of "Compute, stop line, and gates",
+before the "fits starting" line.
 
 ## The sign output and how it is scored
 
@@ -413,6 +422,15 @@ the local half-hour, the day of the week, and the bank-holiday flag. One extra c
 the future is hidden. The sign loss is kept on the scored half-hours at or before the cut, and the
 demand loss on every scored half-hour. SD\*-C uses SD\*'s masking style on the other windows.
 
+**The cut is on the hourly grid of the weather sources, because the half-hour channels are built
+from hourly values.** The CAMS clear-sky index is hourly and is interpolated linearly to
+half-hours, and each hourly ERA5 and CAMS value is copied to both half-hours of its hour, with the
+period-end stamping that experiment 729's clear-sky-peak check exposes. A half-hour channel before
+the cut could therefore depend on the hour after the cut. Under a cut at half-hour t, every hourly
+source value stamped after the start of t's hour is hidden before the interpolation or the copy, and
+the channel for t is built from the remaining hourly values only. The same rule applies in training
+to SD\*-C's masked windows.
+
 **The causal protocol scores each half-hour t with nothing after t visible.** For each scored
 half-hour t, the test window is cut at t, and the output at t is read, so each test window takes 48
 forward passes. A read-out with k half-hours after t visible, for k of 0, 2, 6, 12, 24, and 48,
@@ -479,10 +497,19 @@ and stores the weights in this experiment's data folder.** The recipe is unchang
   2026-07-01, which keeps valid times at least 3.5 hours before the refit, so no valid time on or
   after 2026-07-01 is read. The rows are ERA5 and CAMS rows for all 16 Primaries from 2019-09-01,
   and the target is each Primary's cleaned power, z-scored per Primary.
-- **Removed rows:** every row of every Primary whose valid time falls in one of this experiment's 8
+- **Removed half-hours:** every half-hour of every Primary that falls in one of this experiment's 8
   test months or 4 validation months, or within 2 days of one, or on a day of the metered engine
   record or within 2 days of one. Neighbouring Primaries are removed as well as D8, because their
   demand in the held-out months shares D8's weather.
+- **How the removal reaches the fits:** experiment 428's `build_fold` fits the standardiser and the
+  target means and spreads on the rows before the refit, and experiment 448's `pretrain_rows` has no
+  exclusion argument. `e00730_pretrain.py` therefore sets `clean` to NaN on every removed half-hour
+  of every Primary before it calls `build_fold`, so that the standardiser, the target means and
+  spreads of experiment 428, and the lead-band medians of experiment 448's `spread_table` are all
+  rebuilt on the surviving half-hours. It then drops every `pretrain_rows` row whose valid time or
+  whose origin falls in a removed period. The rows are (origin, lead) pairs, and the ERA5 and CAMS
+  values of one valid time repeat across leads, so the removal tests the valid time and the origin
+  of each row.
 - **Network and loss:** `e00545_model.ModularMdn` with `stage="pre"` and no auxiliary heads; the
   mixer sees only the two encoders' outputs and the embedding, and outputs a 3-component Gaussian
   mixture trained by negative log likelihood.
@@ -602,18 +629,26 @@ threshold of zero, because nothing is ported.
 **Report-only readings enter no verdict row and no Bonferroni count, and each is read at the same
 level as the counted contrasts.**
 
-- S minus the refitted D-sign, on the Brier score, the log loss, and the signed CRPS.
-- Experiment 729's readings redone on the rebuilt banks: D minus B1 and A minus P0f in signed CRPS
-  over all rows (experiment 729's C1 and C2), D minus P0f in signed CRPS and in the normalised error
-  of the median on import rows (experiment 729's harm check H1, against its limits of 0.12 and 0.25
-  points), and D-sign minus D in signed CRPS (experiment 729's C13).
-- SD-0 minus S, the demand output without hidden input.
-- SDe-FR minus SD\*, the encoders against the raw calendar and weather rows.
-- SD\*-λ minus SD\*, the loss weight.
-- SD\*-C two-sided minus SD\*, whether training with the future hidden costs the two-sided score.
-- SD\*-C in the causal protocol against P0 and against S, at each k of the causal read-out.
-- The signed CRPS and the normalised mean absolute error of the median for S, SD\*, D-sign, A, and
-  D, for continuity.
+The page has 22 report-only contrasts (R1 to R22) and 2 report-only tables (T1 and T2), listed
+here so that the count is reproducible:
+
+| Reading | Content | Count |
+|---|---|---|
+| R1 | S minus the refitted D-sign, on the Brier score, the log loss, and the signed CRPS | 1 |
+| R2, R3 | Experiment 729's C1 and C2 redone on the rebuilt banks: D minus B1 and A minus P0f in signed CRPS over all rows | 2 |
+| R4, R5 | Experiment 729's harm check H1 redone: D minus P0f in signed CRPS (limit 0.12 points) and in the normalised error of the median (limit 0.25 points) on import rows | 2 |
+| R6 | Experiment 729's C13 redone: D-sign minus D in signed CRPS | 1 |
+| R7 | SD-0 minus S, the demand output without hidden input | 1 |
+| R8 | SDe-FR minus SD\*, the encoders against the raw calendar and weather rows | 1 |
+| R9 | SD\*-λ minus SD\*, the loss weight | 1 |
+| R10 | SD\*-C two-sided minus SD\*, whether training with the future hidden costs the two-sided score | 1 |
+| R11 to R16 | SD\*-C in the causal protocol minus P0, at each of the 6 values of k | 6 |
+| R17 to R22 | SD\*-C in the causal protocol minus S, at each of the 6 values of k | 6 |
+| T1 | The signed CRPS and the normalised mean absolute error of the median for S, SD\*, D-sign, A, and D, for continuity | table |
+| T2 | S and SD\* scored on the shifted-mix bank: the Brier score, the reliability term, and H1, with no bar | table |
+
+**The shifted-mix bank enters T2 alone.** Experiment 729's triage asked for a calibration check
+under a shifted world mix, and T2 reads it.
 
 **Every counted reading pairs arms on the same rows and averages seeds 0 to 2.** The point estimate
 is the mean over the seeds of each row's loss, and each resample uses the seed-averaged losses, as
@@ -629,14 +664,15 @@ factor falls below 20. The eight test months hold about 37 effective blocks and 
 segments in experiment 729's reading of C1, so no all-month interval is widened.
 
 **The margin m is set from the spread between seeds before any test contrast is read.** It is the
-larger of the floor f and twice the standard deviation over seeds 0 to 4 of arm S's validation
-Brier score, and seeds 3 and 4 are fitted for arm S alone. The floor is f = 0.02 s, 2% of P0's
-Brier score, rounded down to two significant figures. A Brier gain of f is the gain of turning 2%
-of the reverse-flow half-hours from a fully wrong call into a correct call; a smaller gain changes
-too few half-hours to matter for the later experiment that reads P(X<0). On experiment 729's
-silent-solar bank the floor would have been 0.00045. The banks stage writes f to `limits.json`
-before any fit, and m to `margin.json`; neither file can be overwritten. The tie windows of the
-architecture screen and of the choice of SD\* are f / 2.
+larger of the floor f and twice the standard deviation over seeds 0 to 4 of arm S's validation Brier
+score. Seeds 3 and 4 are fitted for arm S alone, on the architecture that the screen chooses, after
+the screen and before any SD fit, and m is written before any test score is read. The floor is f =
+0.02 s, 2% of P0's Brier score, rounded down to two significant figures. A Brier gain of f is the
+gain of turning 2% of the reverse-flow half-hours from a fully wrong call into a correct call; a
+smaller gain changes too few half-hours to matter for the later experiment that reads P(X<0). On
+experiment 729's silent-solar bank the floor would have been 0.00045. The banks stage writes f to
+`limits.json` before any fit, and m to `margin.json`; neither file can be overwritten. The tie
+windows of the architecture screen and of the choice of SD\* are f / 2.
 
 ## Harm checks and bars
 
@@ -697,13 +733,29 @@ days never read near zero, so the neural network meets no ambiguous reading ther
 
 **Two bars decide between `supported` and `partly supported`.**
 
-- **Sign calibration:** SD\*'s reliability term of P(X<0) outside the dead band is at most 0.01, and
-  no bin of at least 200 half-hours sits off the diagonal by more than 0.1, the bars of experiments
-  724 and 729.
+- **Sign calibration:** SD\*'s reliability term of P(X<0) outside the dead band is at most 0.1 s,
+  where s is the test bank's share of reverse-flow half-hours, written to `limits.json` with f and
+  L; and no bin of at least 200 half-hours sits off the diagonal by more than 0.1, the bin bar of
+  experiments 724 and 729. **The dead band is the set of rows with |X| at most 2 points of D8's
+  capacity** (`DEAD_BAND_POINTS` of experiment 729), and the reliability term is read on the other
+  rows. The reliability term is a count-weighted mean squared gap between a bin's mean probability
+  and its observed share, so a term of 0.1 s is a root-mean-square gap of about 0.3 times the square
+  root of s. The bar is scaled to s because P0's Brier score is s, and a fixed 0.01 would be a
+  fifth of P0's Brier score where s is about 0.05, too loose to separate a calibrated detector from
+  an uncalibrated one.
 - **Detection:** SD\*'s mean P(X<0) on the synthetic reverse-flow rows with a reading of at least 1
-  MVA is at least 0.5. The bar is the reverse-flow mirror of H1: P0 scores 0 there, and a detector
-  that puts less than half its probability on reverse flow where reverse flow happens and the
-  reading decides the sign is not yet useful.
+  MVA, which this page calls d, is at least 0.75. The bar is the reverse-flow mirror of H1: P0
+  scores 0 there, and a detector that puts less than three quarters of its probability on reverse
+  flow where reverse flow happens and the reading decides the sign is not yet useful. The bar is 0.75
+  because H1's mean limit is itself a recall bar, as the next paragraph shows.
+
+**H1's mean limit is a bar on d for a calibrated detector.** On the decidable rows, a calibrated
+detector's mean P(X<0) on import rows is s₁ (1 − d) / (1 − s₁), where d is its mean P(X<0) on
+reverse-flow rows. That mean is at most L = 0.25 s₁ / (1 − s₁) only if d is at least 0.75. H1's mean
+limit therefore binds first at d of 0.75, and the detection bar of 0.75 matches it. The formula
+holds only for the fixed test mix (no injection 0.15), so L is a property of this synthetic world
+and not of D8. The check cannot be met by outputting zeros, because the Brier gain and the detection
+bar both penalise zeros. The H1 and detection readings of S are reported beside those of SD\*.
 
 **Every number is labelled interim until the counted reading it belongs to is read.**
 
@@ -715,15 +767,20 @@ it scores elsewhere.
 
 | Row | Condition | Verdict |
 |---|---|---|
-| 0 | The line stops before C1 is read: the manager halts it; the fix commits of experiment 729 are not on the branch; a component check of the banks fails; the realism gate fails after its one re-tune, or attempt 1 fails a BSP check; the reachability counts are short; L falls outside 0.003 to 0.02; the gallery check finds a panel that does not show what the list requires; the timing projection exceeds the stop line and the manager declines; or a review gate has not passed when a fit would start | Stopped, no verdict (`inconclusive` in the front matter) |
+| 0 | The line stops before C1 is read: the manager halts it; the banks digest or `RUN_ID` is not the fixed one; a component check of the banks fails; the realism gate fails after its one re-tune, or attempt 1 fails a BSP check; the reachability counts are short; L falls outside 0.003 to 0.02; the gallery check finds a panel that does not show what the list requires; the timing projection exceeds the stop line and the manager declines; or a review gate has not passed when a fit would start | Stopped, no verdict (`inconclusive` in the front matter) |
 | 1 | A correctness check fails: a leakage assertion below, the holdout guard, the private cut, or a known-answer unit test of the Brier score, the log loss, the masks, the causal cut, or the bootstrap | `invalid` |
 | 2 | A fit that a counted reading needs raised and was not rerun under the rerun rule | `failed` |
 | 3 | H1 or H2 fails for SD\* | `not supported` |
 | 4 | C1 at or below −m with an upper end below zero, and the sign calibration and detection bars pass | `supported` |
 | 5 | C1 as in row 4, and the sign calibration bar or the detection bar fails | `partly supported` |
 | 6 | C1's upper end below zero and its point above −m | `small gain` |
-| 7 | C1's interval includes zero and its half-width is at least m | `inconclusive` |
+| 7 | C1's interval includes zero and its half-width is at least m, or C1's point is at or below −m with an interval that includes zero and a half-width under m | `inconclusive` |
 | 8 | Every other case | `not supported` |
+
+**The half-width of C1's interval is half the width of its 99.286% interval,** the upper end minus
+the lower end, divided by 2. **SD\* may be SD-0, the unmasked demand head,** if SD-0 wins the
+choice of masking style, and then "the chosen masking" in C1 means no masking; the verdict words
+still read C1 as the demand output's gain over S.
 
 **A failed report-only fit leaves the verdict untouched.** A missing seed of SD\*-λ makes its
 reading `void`. A failed fit of SD\*-C, SDe-PT, or SDe-FR makes C7 or C5 `void`, and the verdict
@@ -733,9 +790,9 @@ rows read the other arms, because C5 and C7 enter no verdict row.
 changes no constant, and the Opus reviewer confirms the fix.** `inconclusive` and `not supported`
 are never rerun.
 
-**The harm check H1 and the detection bar are also reported for S, A, D, D-sign, and SD\*-C in the
-causal protocol.** Those readings enter no verdict row. The causal reading decides whether the
-later experiment can feed P(X<0) into history rows.
+**The harm check H1 and the detection bar are also reported for S, A, D, and D-sign (two-sided), and
+for SD\*-C in the causal protocol.** Those readings enter no verdict row. The causal reading decides
+whether the later experiment can feed P(X<0) into history rows.
 
 ## Real-data checks
 
@@ -774,8 +831,9 @@ experiment 729's `e00729_leakage.py` run unchanged on the banks, and these are a
 
 - No pre-training row of any Primary has a valid time in a test or validation month, within 2 days
   of one, on a day of the metered engine record or within 2 days of one, or on or after 2026-07-01.
-- The pre-training standardiser is fitted on the rows that remain, and no early-stopping week of
-  the pre-training lies in a removed period.
+- The pre-training standardiser is fitted on the rows that remain: the leakage test refits the
+  standardiser from the surviving rows and asserts that it equals the stored one. No
+  early-stopping week of the pre-training lies in a removed period.
 - No stored weight file of experiments 545, 554, 560, 569, 667, or any other experiment is loaded;
   every pre-trained weight comes from this experiment's `pretrained/M0x/` folder, and the file's
   digest is recorded in each fit record.
@@ -784,7 +842,9 @@ experiment 729's `e00729_leakage.py` run unchanged on the banks, and these are a
 - The demand head's output feeds no input, no sign logit, and no later layer; a unit test changes
   the demand head's weights and checks that the sign logits do not change.
 - In the causal protocol, the output at half-hour t is unchanged when every observed channel after
-  t is replaced by random values; a unit test checks this on every architecture.
+  t is replaced by random values, and also when the raw hourly source values stamped after the
+  start of t's hour are replaced before the channels are built; a unit test checks both on every
+  architecture.
 - No input reads the month or the day of the year, and the nearest-holiday distance is clipped to
   plus or minus 7 days.
 - The architecture, the masking style of SD\*, and m are chosen on validation months only, before
@@ -833,15 +893,17 @@ recurrent layer of the same width.
 | Screen, transformer and GRU-transformer | 12 | 1.0 and 1.2 | 1.10 |
 | Every later new fit, priced at the slowest architecture | 26 | 1.2 | 2.60 |
 | Experiment 729's arms A, D, and D-sign, at 200 epochs | 9 | 0.44 | 0.22 |
-| Pre-training | 3 runs | measured | 0.45 (0.15 each, an upper estimate) |
+| Pre-training | 3 runs | estimate | 0.45 (0.15 each, an upper estimate) |
 | Inference: validation, test, the 48-pass causal protocol, and the masked demand read-out | | | 0.2 |
 | Total | | | about 5.0 |
 
 **An early stop near 130 epochs, where experiment 729's sign-only fits stopped, cuts the projection
-to about 2.7 GPU-process-hours.** The stop line is 8 GPU-process-hours, the manager's default, which
+to about 2.5 GPU-process-hours.** The stop line is 8 GPU-process-hours, the manager's default, which
 the projection at the cap leaves 3 hours below. The timing gate runs before the first fit: 5 epochs
 of S on each of the four architectures, 5 epochs of SD-W and of SDe-PT on the bilstm, and 2 epochs
-of one pre-training run. It projects every fit at its own architecture, with the later fits priced
+of one pre-training run, and it records the peak resident memory of the pre-training row build,
+which loads the summary files of all 16 Primaries and must stay under the 14 GB cap. It projects
+every fit at its own architecture, with the later fits priced
 at the slowest architecture until the screen has chosen, and a projection above 8 hours at the cap
 stops the line and goes to the manager. The projection at the cap would pass 8 hours if the
 transformer took more than about 1.8 seconds an epoch and the screen chose a transformer variant.
@@ -855,22 +917,23 @@ transformer took more than about 1.8 seconds an epoch and the screen chose a tra
 | One re-tune by experiment 729's offline calibration, if attempt 1 fails its shares | up to 2 hours (experiment 729's calibration tried 129 candidate range sets) |
 | The synthetic world gallery | under 30 minutes |
 | The pre-training rows of 16 Primaries and D8's encoder input table | under 1 hour |
-| The B1 baseline, the margin, the limits, scoring 59 fits, the demand and ambiguity read-outs, and the bootstrap of 20,000 resamples over 7 counted and 13 report-only readings | about 1.5 hours |
+| The B1 baseline, the margin, the limits, scoring 59 fits, the demand and ambiguity read-outs, and the bootstrap of 20,000 resamples over 7 counted and 22 report-only contrasts | about 1.5 hours |
 | The real-day checks and the figures | under 30 minutes |
 
 **The gates run in the maintainer's order, with the corrected world first.**
 
 1. This Opus plan, then a Sonnet plan review.
-2. The branch merged forward to the head of `exp-729-plan`, so that the fix commits from
-   `e33e88b67` on are in this experiment's history.
-3. Sonnet code, then a fresh Opus code review before any first run, and an Opus review of the fixes
+2. Sonnet code, then a fresh Opus code review before any first run, and an Opus review of the fixes
    and the fixed code path.
-4. A real-file smoke test of every file that the synthetic-array tests do not exercise, which also
-   runs experiment 729's `tests/smoke_real_files.py`: that script checks that at least 90% of S2
-   solar-world segments carry solar output on a clear day.
-5. The bank build, the component checks, and the realism gate, on the CPU.
-6. The synthetic world gallery, drawn from the rebuilt banks and checked panel by panel.
-7. The plan's pull request opened, and a "fits starting" line to the manager that carries the
+3. A real-file smoke test of every file that the synthetic-array tests do not exercise, which also
+   runs experiment 729's `tests/smoke_real_files.py`: that script checks that the share of clear
+   base days on which S2 solar-world segments carry solar output is at least `MIN_OUTPUT_SHARE`
+   (0.99), the same constant as the component checks.
+4. The bank build, the component checks, and the realism gate, on the CPU.
+5. The synthetic world gallery, drawn from the rebuilt banks. The session (the design lead) checks
+   each panel against the written list in `e00730_core.py` and records the result in
+   `PRIVATE/gallery/panel_check.json`; the maintainer reads the same gallery in the write-up.
+6. The plan's pull request opened, and a "fits starting" line to the manager that carries the
    projection, the cores, and the gallery's folder.
 
 **The first fit or pre-training run starts only after every gate above has passed.** The
@@ -880,33 +943,31 @@ the farms' metered output and satellite sky; the bank holidays; and the metered 
 pre-training runs count as fits. Every fitted neural network and every pre-trained weight file is
 saved in this experiment's data folder.
 
-## Risks the silent solar worlds point to
+## Checks that each simulated component produces output
 
 **A simulated component that silently outputs zero passes every score-based check, so each
 component needs its own check that it is nonzero where it must be.** Experiment 729's realism gate
-passed with every S2 solar world silent, because the gate's shares were met by the engine and S1
-worlds. The plan answers each risk below with a check that runs before any fit:
+passed with every S2 solar world producing no output, because the gate's shares were met by the
+engine and S1 worlds. The plan answers each risk below with a check that runs before any fit:
 
 - **A solar source that is silent on one source or one season.** The component checks count solar
-  output on clear sun-up half-hours by source, and the gallery shows S1 and S2 apart in each season.
-- **An engine that never runs, never ramps, or never trips.** The component checks count running
-  half-hours, and the gallery shows weekday and weekend days, part load, ramps, one and several
-  units, and a multi-day spell.
-- **A synthetic BSP meter that ignores the injection.** The component checks compare the synthetic
-  BSP with the real meter where the injection is above zero, and the gallery shows the BSP steps
-  with the injected steps marked.
-- **A fold that loses the reactive floor, or a truth that differs from the base on a no-injection
-  segment.** The component checks require both to hold on every half-hour.
-- **A masked input that is not hidden, or a demand target that is empty.** A unit test checks every
-  masking style on a window of known values, and the gallery shows the demand target beside the
-  masked inputs for each style.
-- **An encoder input table that is constant or misaligned in time.** The smoke test prints the
-  share of non-constant columns and the hour of the clear-sky peak in the table, which must lie
-  within 11:00 to 13:00 UTC.
-- **A rule that falls back silently.** Every fallback is counted per split and printed. An S1 day
-  that takes source S2 is expected on about a fifth of S1 days, because no farm has metered output
-  on 19% to 25% of base days. A day with no satellite sky at any farm carries zero solar output, so
-  a share of such days above 5% in any split stops the line at verdict row 0.
+  output per clear base day, split by source and by season, and the gallery shows S1 and S2 apart in
+  each season. - **An engine that never runs, never ramps, or never trips.** The component checks
+  count, for each running half-hour, whether the engine output is above zero, and the gallery shows
+  weekday and weekend days, part load, ramps, one and several units, and a multi-day spell. - **A
+  synthetic BSP meter that ignores the injection.** The component checks compare the synthetic BSP
+  with the real meter where the injection is above zero, and the gallery shows the BSP steps with
+  the injected steps marked. - **A fold that loses the reactive floor, or a truth that differs from
+  the base on a no-injection segment.** The component checks require both to hold on every
+  half-hour. - **A masked input that is not hidden, or a demand target that is empty.** A unit test
+  checks every masking style on a window of known values, and the gallery shows the demand target
+  beside the masked inputs for each style. - **An encoder input table that is constant or misaligned
+  in time.** The smoke test prints the share of non-constant columns and the hour of the clear-sky
+  peak in the table, which must lie within 11:00 to 13:00 UTC. - **A rule that falls back
+  silently.** Every fallback is counted per split and printed. An S1 day that takes source S2 is
+  expected on about a fifth of S1 days, because no farm has metered output on 19% to 25% of base
+  days. A day with no satellite sky at any farm carries zero solar output, so a share of such days
+  above 5% in any split stops the line at verdict row 0.
 
 ## Standing practices and earlier advice
 
@@ -956,9 +1017,11 @@ scores only, never a month, a date, an engine size, a series identifier, or a re
 **Every published figure is safe to publish: synthetic series in detail, except those built from
 the metered farms, and real series as aggregates or as D8's own reading with no calendar date.** No
 figure shows the metered engine record, a K1 or K2 day, or a date of the engine. Source S1 is a
-real farm's metered output scaled to a drawn capacity, so every panel that shows an S1 solar series
-is written to the private `PRIVATE/gallery/` folder and never published. Source S2 and the engine
-simulator are published in detail.
+real farm's metered output scaled to a drawn capacity, so the anonymisation rule decides how it is
+shown: the published gallery shows S1 only in aggregate panels (quantile bands of the daily shape
+by season, and the share of days with zero output, rounded, with no single farm's series), and every
+panel that shows a single S1 day is written to the private `PRIVATE/gallery/` folder and never
+published. Source S2 and the engine simulator are published in detail.
 
 ### The synthetic world gallery, a gate before any fit
 
@@ -972,8 +1035,10 @@ bank of seed 0. Every panel carries days 1 and 2 of its window on the axis, neve
   a day with a trip, and a multi-day spell, each showing the engine output beside the base demand.
 - G2, S2 solar days: a clear day and a cloudy day in each of the four seasons, each showing the
   solar output beside the CAMS clear-sky index at the farm site and at D8.
-- G3, S1 solar days, private only: the same eight panels for source S1, and a day that fell back
-  from S1 to S2.
+- G3, S1 solar days: the same eight single-day panels for source S1, and a day that fell back from
+  S1 to S2, in the private folder only; and the published aggregate panels, which show for each
+  season the 10%, 50%, and 90% bands of the daily shape of S1 output at a drawn capacity and the
+  share of days with zero output.
 - G4, the BSP meter: a BSP month's synthetic BSP steps beside the real meter's steps, with the
   injected steps (β times the change of the engine and solar output) marked.
 - G5, the fold: the folded reading beside the signed truth through a reverse-flow spell of the
@@ -993,11 +1058,16 @@ bank of seed 0. Every panel carries days 1 and 2 of its window on the axis, neve
 **The gallery passes when each panel shows what a written list requires of the panel.** The list,
 in `e00730_core.py`, says for example that the engine output of G1's ramp panel rises over 2
 half-hours, that every G2 clear-day panel has solar output above zero from mid-morning to
-mid-afternoon, and that G5's reading never falls below the reactive floor. The session checks each
-panel against the list and records the result beside the gallery; a panel that fails stops the line
-at verdict row 0.
+mid-afternoon, and that G5's reading never falls below the reactive floor. The session (the design
+lead) checks each panel against the list as a gate and records the result beside the gallery, in
+`PRIVATE/gallery/panel_check.json`; a panel that fails stops the line at verdict row 0. The
+maintainer reads the same gallery in the write-up, where every generator output and each solar
+source appear separately.
 
 ### Result figures
+
+The write-up carries the gallery's published panels G1 to G9 (G3 as its aggregate panels), and then
+these figures:
 
 1. The architecture screen: the validation Brier score of the four architectures on arms S-A and S.
 2. The Brier score of every arm and baseline on all, import, and reverse-flow rows and by reading
@@ -1068,7 +1138,8 @@ figure:
   experiment 729's key comparisons exist on the corrected world.
 - **The synthetic world gallery and the component checks are gates before any fit,** because a
   silent generator passed experiment 729's realism gate.
-- **S1 panels are private,** because source S1 is a real farm's metered output.
+- **S1 is published only in aggregate panels, and single S1 days stay private,** because source S1
+  is a real farm's metered output, and the anonymisation rule decides this.
 - **The test and validation months follow a rule and stay in experiment 729's private file,**
   because a list of months, with the era cut, could let a reader recompute withheld dates.
 
@@ -1120,7 +1191,7 @@ and 722) and of experiment 545's chain (397, 087, 418, 422, 428, 437, 448, 510, 
 reused function called unchanged needs no new review; every new module is reviewed.
 
 **Reused unchanged from `ml-experiments/00729-msa-d8-neural-untangler-synthetic-known-answers/`,
-at the head of `exp-729-plan` with the fix commits from `e33e88b67` on:**
+as merged:**
 
 - `e00729_core.py` (the split rule, the registered ranges, the reactive floor, the floor of 0.5
   points, and the bootstrap constants), `e00729_sim.py` (the engine and solar simulators, the fold,
