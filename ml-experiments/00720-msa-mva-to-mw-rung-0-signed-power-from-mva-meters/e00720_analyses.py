@@ -30,6 +30,9 @@ def classify_days(*, p_any: np.ndarray) -> np.ndarray:
 
     Args:
         p_any: `P(n >= 1)` per half-hour, `(days, 48)`.
+
+    Returns:
+        An integer array `(days,)` holding 1, 0, or -1 for each day.
     """
     running = (p_any > RUNNING_P).sum(axis=1) >= RUNNING_MIN_HALF_HOURS
     idle = ~(p_any > IDLE_MAX_P).any(axis=1)

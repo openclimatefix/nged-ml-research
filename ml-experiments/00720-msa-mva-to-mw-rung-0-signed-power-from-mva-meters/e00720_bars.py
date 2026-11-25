@@ -91,6 +91,10 @@ def v3_all_periods(*, periods: dict[str, dict[str, float]]) -> dict[str, Any]:
 
     Args:
         periods: Period label to `flagged_share`, `active_days_per_month`, and `forced_k3_flagged_share`.
+
+    Returns:
+        A dictionary with `periods` (each period's `v3_bar` result) and `passed` (true when there is
+        at least one period and every period passed).
     """
     per = {name: v3_bar(**vals) for name, vals in periods.items()}
     return {"periods": per, "passed": bool(per and all(p["passed"] for p in per.values()))}
@@ -125,6 +129,10 @@ def signed_crps_bar(
         seed_noise: The difference a second seed of the treatment moves the score (a measured number).
         rng: Random generator for the bootstrap over rows.
         n_boot: Number of resamples.
+
+    Returns:
+        A dictionary with `gain_over_hard`, `lower` (the 2.5th percentile of the bootstrap), `soft`,
+        `hard`, `minus_anchored` (only when `anchored` is given), and `passed`.
     """
     rng = rng or np.random.default_rng(720)
     d = hard - soft

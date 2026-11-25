@@ -173,6 +173,18 @@ def unanchored_posterior(
     neighbour weight 1 on the row's own day type and 0.2 otherwise, and `"sky"` multiplies that by a
     Gaussian in the difference of `u` at the same half-hour (peaked on rows of the same sky).
 
+    Args:
+        v: Reading with the floor removed, `(n_days, 48)`.
+        p: PV estimate, same shape.
+        u: Yield curve, same shape; it sets the gate and, with `weights = "sky"`, the neighbour
+            weights.
+        day_type: `(n_days,)` day type.
+        params: The constants of the read-out.
+        weights: `"day"` or `"sky"`, the neighbour weighting described above.
+        half_window: Number of days on each side of a day that make up its window.
+        n_passes: Number of passes.
+        u_min: The gate; a row with `u` below it gets `ρ = 0`.
+
     Returns:
         A list of `n_passes` arrays `(n_days, 48)`; days within `half_window` of either end are NaN.
     """

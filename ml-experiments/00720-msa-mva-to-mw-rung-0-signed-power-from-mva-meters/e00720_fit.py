@@ -54,6 +54,9 @@ def fit_demand_mean(
         day_type: `(n_days,)` day type.
         temperature: `(n_days,)` temperature.
         ridge: The ridge penalty on the temperature terms and the cell intercepts.
+
+    Returns:
+        The fitted demand `(n_days, 48)` for every day, including days with no anchor rows.
     """
     x = design_matrix(day_type=day_type, temperature=temperature)
     y = g.reshape(-1)

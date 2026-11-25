@@ -44,6 +44,8 @@ class HmmSpec:
         q: The reactive floor in points.
         sigma_e: Scale of the Student-t noise, in points.
         df: Degrees of freedom of the noise (0 or less gives a Gaussian, a check of rung 0e).
+        transition_cache: A slot for the full state transition matrix. Nothing in this experiment
+            sets it, so it stays `None`.
     """
 
     grid: np.ndarray

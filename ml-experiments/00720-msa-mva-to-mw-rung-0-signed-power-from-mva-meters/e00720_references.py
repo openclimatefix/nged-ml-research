@@ -111,6 +111,10 @@ def day_scores(
         truth: Boolean day truth.
         label: Experiment 674's class per day (`reverse`, `no_reverse`, `unknown`, `not_scorable`). With
             it, `call` is replaced by `label == "reverse"` and unknown or not-scorable days are excluded.
+
+    Returns:
+        A dictionary with `recall`, `false_reverse` (NaN when its denominator is zero), `n_days`
+        (the scored days), `n_unknown`, and `n_not_scorable`.
     """
     if label is not None:
         scorable = np.isin(label, ["reverse", "no_reverse"])

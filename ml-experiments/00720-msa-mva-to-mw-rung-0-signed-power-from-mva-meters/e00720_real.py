@@ -217,6 +217,13 @@ F7_COMMIT: Final[str] = "126577d1d6d34ed880a79b542d86ecde10e3689e"
 def check_f7_commit(*, module_file: Path) -> str:
     """Return the commit of the tree that holds `module_file`, after asserting it is `F7_COMMIT` and clean.
 
+    Args:
+        module_file: The path of a file in the folder of experiment 716's code; its git tree is
+            checked.
+
+    Returns:
+        The full hash of the checked-out commit.
+
     Raises:
         RuntimeError: When the tree is at another commit or has uncommitted changes.
     """

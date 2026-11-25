@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D417, E731, PT018, PERF401
+# ruff: noqa: E501, E731, PT018, PERF401
 """Experiment 720, rungs 0b and 0e (V1): the sign read-outs side by side on one injected world.
 
 A `ProbeWorld` is one Primary at one injection level and one fold: day matrices of the reading with
@@ -381,9 +381,11 @@ def build_probe_world(
     """Return a world: the host's signed power minus a farm's output, folded through the meter.
 
     Args:
+        name: The label of the world, which is also its key in the stored arrays.
         y_pct: The host's signed power in points of capacity on the grid (NaN where flagged).
         stamp_us: Valid times (ends of half-hours).
-        u: Scaled CAMS unit shape at the host; `k`: clear-sky index.
+        u: Scaled CAMS unit shape at the host.
+        k: Clear-sky index at the host.
         temperature_c: Temperature at the host.
         p_host_pct: F7's PV estimate of the host's own unmetered PV, in points (0 where absent).
         farm_at: Maps times in microseconds to the farm's normalised output (NaN in a gap); `None` for
@@ -394,6 +396,7 @@ def build_probe_world(
         estimate_scale: Multiplier of the injected capacity in `p` (1.0 oracle; 0.7 and 1.3 sensitivity).
         host_scale: Multiplier of the host's own PV estimate in `p` (1.0; 0.7 and 1.3 at level 0, where
             the D5 bar is read; 2.5 in the hard check world).
+        q: The reactive floor in points, used to fold the signed power through the meter.
         holidays_us: Start-of-day instants (microseconds) of bank holidays, read as Sundays.
 
     Returns:

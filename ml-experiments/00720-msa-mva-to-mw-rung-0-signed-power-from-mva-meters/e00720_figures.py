@@ -45,6 +45,9 @@ def write_chart(
         publish_dir: A publishable folder, or `None` (the default) to write privately.
         private_dir: Override of the private folder (used by the self-test).
 
+    Returns:
+        The path of the SVG file that was written.
+
     Raises:
         ValueError: When `publish_dir` is given and the table is not a public aggregate, or when the
             table holds a dated generator value (the guard raises in both cases).

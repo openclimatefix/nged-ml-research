@@ -83,6 +83,9 @@ def slow_trend(*, ymat: np.ndarray, f_mat: np.ndarray, calib_rows: np.ndarray) -
         ymat: `(days, 48)` magnitude of the reading.
         f_mat: `(days, 48)` the calendar mean fitted on the pre-roll.
         calib_rows: `(days,)` boolean, the days of the pre-roll.
+
+    Returns:
+        The offset per day, `(days,)`, with the pre-roll mean removed.
     """
     with np.errstate(all="ignore"):
         day = np.nanmean(ymat - f_mat, axis=1)
@@ -197,6 +200,10 @@ def hindsight_fit(
         n_bins: Residual grid size.
         gate: The cost gate; the first fit measures it and later fits are checked against it.
         projected_fits: How many fits the whole run will make (for the projection).
+
+    Returns:
+        A `HindsightFit` holding the flags, the filtered probabilities, the unit size, the log-
+        likelihood, and the timing of the fit.
     """
     t0 = time.perf_counter()
     mag = np.sqrt(np.maximum(y**2 - q**2, 0.0))
@@ -355,6 +362,13 @@ def cluster_bootstrap_paired(
         x_b: The same cells for the second method (experiment 694's `M2`).
         n_boot: Number of resamples.
         seed: Random seed.
+
+    Returns:
+        A dictionary with `point` (the pooled F1 difference), `lower` and `upper` (the 95%
+        interval), `f1_a`, `f1_b`, `n_clusters`, and `n_segments`.
+
+    Raises:
+        ValueError: When `x_a` and `x_b` differ in shape.
     """
     if x_a.shape != x_b.shape:
         msg = "the two methods must cover the same clusters and segments"
