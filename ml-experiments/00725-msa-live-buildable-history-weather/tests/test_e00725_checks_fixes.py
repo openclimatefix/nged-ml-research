@@ -7,17 +7,19 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
+# Experiment 713's frozen folder holds `e00713_arms`, which `e00725_frozen` imports. It is on the path
+# only when `run.sh` or `PYTHONPATH` names it, so CI skips this module.
+pytest.importorskip("e00713_arms")
+
 import e00725_checks as ck
 import e00725_frozen as fz
 import e00725_rule as rule
 import e00725_sources as src
 import e00725_weather_lookahead as wl
-import pytest
 
-RUN_SH = (
-    Path(__file__).resolve().parents[1]
-    / "ml-experiments/00725-msa-live-buildable-history-weather/run.sh"
-)
+RUN_SH = Path(__file__).resolve().parents[1] / "run.sh"
 
 
 def test_cache_grid_is_the_extended_grid_not_the_default_grid(
