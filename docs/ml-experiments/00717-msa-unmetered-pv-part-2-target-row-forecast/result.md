@@ -236,7 +236,8 @@ chosen before the plots were drawn.** The band is the 5% to 95% range of arm `HT
 the median forecasts of `HT` and `H` and the actual. The bands widen with the lead. **A caveat
 applies to D19 and D21: the as-of capacity factors of the fold 2026-05 look ahead of the forecast
 origin at both Primaries, so the solar estimate of arm `H` carries information that a live service
-would not have.** D8, D12, and D22 are not shown, for the same reason. The charts were rendered with headless Chromium and read for labels, overlaps, and units.
+would not have.** D8, D12, and D22 are not shown, for the same reason. The charts were rendered with
+headless Chromium and read for labels, overlaps, and units.
 
 ## Attention maps
 
