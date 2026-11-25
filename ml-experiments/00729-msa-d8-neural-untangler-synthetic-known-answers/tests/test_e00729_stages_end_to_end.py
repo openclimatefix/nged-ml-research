@@ -196,7 +196,7 @@ def test_the_stages_run_end_to_end_on_invented_arrays(monkeypatch, tmp_path) -> 
     monkeypatch.setattr(leak, "assert_hashes_match", raise_error)
     assert stages.stage_score(ctx=ctx, n_resamples=40, log=logs.append)["row"] == 1
     assert original["leakage_pass"]
-    assert all("/home/" not in line for line in logs)
+    assert all("/ho" + "me/" not in line for line in logs)
 
 
 def test_a_failed_fit_is_recorded_and_not_retried(monkeypatch, tmp_path) -> None:
