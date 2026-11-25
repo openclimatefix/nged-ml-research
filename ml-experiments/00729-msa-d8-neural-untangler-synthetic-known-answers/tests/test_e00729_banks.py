@@ -174,7 +174,9 @@ def test_every_evaluation_bank_has_its_own_root_and_draws() -> None:
     assert len(set(roots)) == 3
     val, test, shifted = (build(kind=k, seed=None) for k in ("validation", "test", "shifted"))
     betas = [{s.params["beta"] for s in b.segments} for b in (val, test, shifted)]
-    assert not (betas[0] & betas[1]) and not (betas[0] & betas[2]) and not (betas[1] & betas[2])
+    assert not (betas[0] & betas[1])
+    assert not (betas[0] & betas[2])
+    assert not (betas[1] & betas[2])
 
 
 def test_the_shifted_bank_holds_half_the_segments_without_injection() -> None:

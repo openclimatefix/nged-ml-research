@@ -53,10 +53,25 @@ def check_power() -> str:
 
 
 def check_record() -> str:
-    """Check that the metered engine record has `time` and `power` columns and rows."""
+    """Check the metered engine record: its columns, a `units` column, and more than a month of rows."""
     frame = data.metered_record()
-    has_columns = {"time", "power"} <= set(frame.columns)
-    return f"columns present: {has_columns}, has rows: {frame.height > 0}"
+    has_columns = {"time", "power", "units"} <= set(frame.columns)
+    return (
+        f"columns present: {has_columns}, more than a month of half-hours: {frame.height > 48 * 31}"
+    )
+
+
+def check_clear_sky_peak() -> str:
+    """Check that D8's clear-sky irradiance peaks within 11:00 to 13:00 UTC (the period-end shift)."""
+    frame = pl.scan_parquet(data.FRAME_39).filter(pl.col("site") == data.D8_SITE)
+    by_hour = (
+        frame.group_by(pl.col("time").dt.hour().alias("hour"))
+        .agg(pl.col("ghi_u_clear").mean())
+        .collect()
+        .sort("ghi_u_clear")
+    )
+    peak = int(by_hour["hour"][-1])
+    return f"clear-sky peak hour is within 11 to 13 UTC: {11 <= peak <= 13}"
 
 
 def check_bank_holidays() -> str:
@@ -71,12 +86,21 @@ def check_private_constants() -> str:
 
 
 def check_day_table() -> str:
-    """Check that the loader builds a day table with base days, printing flags only."""
+    """Check the day table, the split against the private file, and that a farm joins with data."""
+    import e00729_stages as stages
+
     table = data.load_day_table()
-    months, n_days, bsp_days = data.month_table(
-        cal=data.select_days(cal=table.calendar, mask=table.is_base)
+    cal = data.select_days(cal=table.calendar, mask=table.is_base)
+    months, n_days, bsp_days = data.month_table(cal=cal)
+    derived = core.month_splits(months=months, n_days=n_days, bsp_days=bsp_days)
+    private = e00729_paths.data_root() / "PRIVATE" / "splits.md"
+    same = private.exists() and stages.parse_private_splits(path=private) == derived
+    farm_joined = bool(table.calendar.farms.power_ok.any())
+    return (
+        f"has base days: {bool(table.is_base.any())}, months found: {len(months) > 0}, "
+        f"bsp days exist: {sum(bsp_days) > 0}, day counts positive: {all(n > 0 for n in n_days)}, "
+        f"code split equals the private file: {same}, a farm joins with data: {farm_joined}"
     )
-    return f"has base days: {bool(table.is_base.any())}, months found: {len(months) > 0}, bsp days exist: {sum(bsp_days) > 0}, day counts positive: {all(n > 0 for n in n_days)}"
 
 
 CHECKS: dict[str, Callable[[], str]] = {
@@ -84,6 +108,7 @@ CHECKS: dict[str, Callable[[], str]] = {
     "era_frame": check_era_frame,
     "power": check_power,
     "record": check_record,
+    "clear_sky_peak": check_clear_sky_peak,
     "bank_holidays": check_bank_holidays,
     "private_constants": check_private_constants,
     "day_table": check_day_table,
