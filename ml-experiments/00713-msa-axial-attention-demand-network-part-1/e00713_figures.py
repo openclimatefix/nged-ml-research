@@ -150,12 +150,16 @@ def forecast_chart(*, data: pl.DataFrame, horizon_hours: float, title: list[str]
         sub = base.transform_filter(alt.datum.arm == arm)
         layers.append(
             alt.layer(
-                sub.mark_area(color=LIGHT[arm], opacity=0.45).encode(  # ty: ignore[unresolved-attribute]
+                sub.mark_area(color=LIGHT[arm], opacity=0.45, aria=False).encode(  # ty: ignore[unresolved-attribute]
                     x=x, y=alt.Y("q05:Q", title="Power (% of capacity)"), y2="q95:Q"
                 ),
-                sub.mark_area(color=LIGHT[arm], opacity=0.9).encode(x=x, y="q25:Q", y2="q75:Q"),  # ty: ignore[unresolved-attribute]
-                sub.mark_line(color=COLOUR[arm], strokeWidth=1.6, clip=True).encode(x=x, y="q50:Q"),  # ty: ignore[unresolved-attribute]
-                sub.mark_line(color="#222222", strokeWidth=1.0, clip=True).encode(  # ty: ignore[unresolved-attribute]
+                sub.mark_area(color=LIGHT[arm], opacity=0.9, aria=False).encode(  # ty: ignore[unresolved-attribute]
+                    x=x, y="q25:Q", y2="q75:Q"
+                ),
+                sub.mark_line(color=COLOUR[arm], strokeWidth=1.6, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
+                    x=x, y="q50:Q"
+                ),
+                sub.mark_line(color="#222222", strokeWidth=1.0, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
                     x=x, y="actual:Q"
                 ),
             ).properties(
@@ -170,11 +174,11 @@ def forecast_chart(*, data: pl.DataFrame, horizon_hours: float, title: list[str]
 
 
 def cmd_series(*, out_dir: Path) -> None:
-    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
-    truth = score.truth_stack()
     for _, _, _, label in CASES:
         assert label not in REFUSED_SERIES_HOSTS, f"{label} is refused as a series host"
         assert label in ALLOWED_SERIES_HOSTS, f"{label} is not in {ALLOWED_SERIES_HOSTS}"
+    star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
+    truth = score.truth_stack()
     for season, month, day, label in CASES:
         data = pl.concat(
             [
