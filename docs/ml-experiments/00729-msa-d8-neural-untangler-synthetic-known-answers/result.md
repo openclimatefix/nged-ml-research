@@ -11,9 +11,9 @@ also_relevant_to:
 status: planned
 kind: other
 size: >-
-  Anything else. (1) It stores about 47 fitted neural networks, synthetic training and test banks,
+  Anything else. (1) It stores about 50 fitted neural networks, synthetic training and test banks,
   per-half-hour predictions, and score tables, all private; (2) more than one design defensibly tests
-  the hypothesis (three neural-network architectures, two output heads, and a ladder of inputs), so
+  the hypothesis (three neural-network architectures, three output heads, and a ladder of inputs), so
   all are arms with a pre-registered selection rule; (3) it imports experiment 694's tracker as a
   baseline and reads the stored frame of experiment 39 and the engine window of experiment 194,
   whose callers cannot be named without searching the repository; (4) it touches no serving path or
@@ -22,9 +22,10 @@ size: >-
   the results, write-up, and prose reviews.
 hypothesis: >-
   A neural network that reads 48 hours of D8's apparent-power reading together with satellite
-  sunshine, the half-hour steps of the bulk supply point meter above D8, and the calendar and
-  temperature inputs of a demand forecast, and that is trained only on synthetic days built from
-  D8's own readings before its gas engine was connected, returns for each half-hour of the middle
+  sunshine, the half-hour steps of the bulk supply point meter above D8, and the calendar inputs
+  and coincident observed temperature, wind speed, and precipitation of a demand forecast, and that
+  is trained only on synthetic days built from D8's own readings before its gas engine was
+  connected, returns for each half-hour of the middle
   24 hours a two-lobe distribution of D8's signed power. On held-out synthetic days the neural
   network's signed continuous ranked probability score (CRPS) beats the best rule that does not
   learn from the day's shape, and on real days before the engine was connected the neural network
@@ -36,9 +37,15 @@ prediction: >-
   ladder, adding sunshine (C3) and adding the bulk supply point steps (C4) each lower the signed
   CRPS by at least 0.3 points. The C3 gain rests on solar source S1, whose output shares no
   satellite product with the sunshine input. The C4 gain sits mostly in the worlds with an engine.
-  Adding the calendar and temperature inputs (C5) changes the signed CRPS by under 0.2 points. The
+  Adding the calendar, temperature, wind-speed, and precipitation inputs (C5) changes the signed
+  CRPS by under 0.2 points. The
   quantile head (C6) has an 11-quantile pinball loss at least 0.2 points higher than the two-lobe
-  head. The 48-hour window has a signed CRPS lower than the 24-hour window (C11). The harm checks
+  head. The 48-hour window has a signed CRPS lower than the 24-hour window (C11). The sign-only arm
+  D-sign, which outputs one probability of reverse flow per half-hour and fixes its two lobes at plus
+  and minus the reading with the reactive floor removed, is a simpler function that may receive less
+  supervisory signal. D-sign scores a signed CRPS higher than arm D (C13, a loss) by 0.01 to 0.10
+  points, always below the 0.25-point floor of the margin m, and its reliability term of P(X<0) is
+  within 0.005 of arm D's. This sentence was fixed before any fit exists. The harm checks
   pass: arm D's signed CRPS exceeds P0f's by 0.01 to 0.08 points on import half-hours, against a
   limit of 0.12 points. The likeliest miss is the sign calibration bar on solar-only worlds. The
   second likeliest is the lobe coverage bar on half-hours within 3 points of zero. The prediction
@@ -61,7 +68,8 @@ decision_rule: >-
   those two bars fails; (6) `small gain`, C1's upper end below zero and its point above -m; (7)
   `inconclusive`, C1's interval includes zero and its half-width is at least m; (8) `not
   supported`, every other case. The section "Verdict table" gives every row in full. The experiment
-  ports nothing, so no smallest gain applies beyond m.
+  ports nothing, so no smallest gain applies beyond m. C13 (D-sign minus arm D) is a thirteenth
+  reading that enters no verdict row and is not among the 12 that set the Bonferroni level.
 benchmark: >-
   P0 (the reading read as signed import) and P0f (P0's point forecast given the same lobe-width
   floor as the neural networks, the reference for the harm checks); B1 (a demand climatology of D8's
@@ -433,7 +441,7 @@ window's position in every arm.
 | A | The reading R and its missing-value mask | Two-lobe |
 | B | A plus the CAMS clear-sky index, clear-sky irradiance, and cosine of the solar zenith angle at D8 | Two-lobe |
 | C | B plus the synthetic BSP steps and a BSP mask | Two-lobe |
-| D | C plus local half-hour (sine and cosine), day of week, bank-holiday flag, and ERA5 2 m temperature at D8's grid cell | Two-lobe |
+| D | C plus local half-hour (sine and cosine), day of week, bank-holiday flag, and ERA5 2 m temperature, 10 m wind speed, and precipitation at D8's grid cell | Two-lobe |
 | H | A plus the synthetic BSP steps and a BSP mask, with no CAMS fields | Two-lobe |
 | D-quantile | D | 11 quantiles, pinball loss |
 | D-24 | D on a 24-hour window holding only the scored day | Two-lobe |
@@ -441,6 +449,7 @@ window's position in every arm.
 | F | D plus the folded reading of the same segment 7 and 14 days earlier, each with a mask | Two-lobe |
 | G1 | D | Two-lobe plus a solar-output head |
 | G2 | D | Two-lobe plus an engine-output head |
+| D-sign | D | One probability of reverse flow, with the two lobes fixed at plus and minus the reading with the reactive floor removed |
 
 **The ladder is cumulative, so the BSP gain depends on the order of the inputs.** In arm C the BSP
 steps join an input set that already holds sunshine, and the steps may carry less information once
@@ -449,11 +458,17 @@ BSP gain in the other order. A BSP gain that shows in C12 and not in C4 means th
 carries the information. Neither order is a result about which input matters most.
 
 **Arm D carries the coincident observed weather because this is a reconstruction of the past, not
-a forecast.** The temperature is the hour's own ERA5 value, and no forecast origin exists, so the
-origin-time weather rule of the forecasting experiments does not apply. Wind speed and
-precipitation are not stored for D8's grid cell over the base years, so arm D omits them (see the
-maintainer's decisions). No arm reads the month or the day of the year, so no arm can memorise the
-calendar.
+a forecast.** The temperature, the 10 m wind speed, and the precipitation are the hour's own ERA5
+values, and no forecast origin exists, so the origin-time weather rule of the forecasting
+experiments does not apply. The three values are ERA5's at D8's grid cell, the cell that gives the
+temperature. The wind speed is the stored speed of the 10 m wind (the square root of the sum of the
+squares of its eastward and northward components, checked against the two component files), and the
+precipitation is ERA5's total precipitation. The stored hourly values cover every hour from
+2019-09-01 to 2026-07-31, with no gap and no missing value, so every base day has all three. The
+wind speed is standardised with the mean and standard deviation over the training days, and the
+precipitation enters as the logarithm of one plus its millimetres an hour, divided by 0.5. No arm
+reads the month or the day of the year, so no arm can memorise the calendar. Every arm that
+extends arm D (D-quantile, D-24, E, F, G1, G2, and D-sign) carries the same three weather inputs.
 
 **Arm F's earlier days carry their own engine and solar output, never a copy of the scored day's.**
 The segment is simulated as one continuous month, so the day 7 days earlier holds that day's own
@@ -502,6 +517,16 @@ whose
 mean is exact scores a CRPS of 0.5 × (2 × 0.399 − 0.564) = 0.117 points. No arm can score below about
 0.12 points on a half-hour where its lobe is right, and the harm checks therefore use P0f (see
 "Baselines") and not P0.
+
+**The sign head outputs one logit per half-hour and is trained by binary cross-entropy on the event
+X < 0.** The probability P is the sigmoid of the logit. The signed distribution is the two-lobe
+mixture with weights (1 − P, P), an import lobe at +M and a reverse-flow lobe at −M, where M =
+sqrt(max(R² − Q̂², 0)) is the reading R with the reactive floor Q̂ of 0.1 MVA removed (the
+magnitude that P0 uses). Both lobes have the fixed spread of 0.5 points, the same floor as every
+other neural network and as P0f. Arm D-sign is therefore scored by the same signed CRPS, the same
+pinball loss, and the same reliability of P(X<0) as every other arm. The head leaves the magnitude
+to the reading and learns only the sign, so the contrast C13 shows what learning the magnitude
+adds to learning the sign.
 
 **The quantile head outputs the 11 quantiles 0.05, 0.1, 0.2 to 0.9 in steps of 0.1, and 0.95**,
 sorted, and is trained by the pinball loss ([Koenker and Bassett
@@ -569,9 +594,12 @@ hold about 33 blocks and 64 segments, so no interval on all test months is widen
 months hold about 8 blocks and 16 segments, so the BSP contrasts are widened by about 1.46 (the
 ratio of the t quantile with 7 degrees of freedom to the normal quantile, 2.865).
 
-**Twelve contrasts are planned, and each is read at 99.583% (Bonferroni across the 12).** A
+**Twelve contrasts are counted, and each is read at 99.583% (Bonferroni across the 12).** A
 negative difference is a gain. C1 carries the verdict. The other eleven each read "gain", "loss", or
-"no detectable difference" at a threshold of zero, because nothing here is ported. C6 is read on the
+"no detectable difference" at a threshold of zero, because nothing here is ported. A thirteenth
+contrast, C13, is report-only: it enters no verdict row and no bar, so it adds nothing to the
+Bonferroni count, which stays at 12. C13 is read at the same 99.583% level, which makes its interval
+wider than a 95% interval, and it is described and never counted. C6 is read on the
 11-quantile pinball loss, defined as twice the mean of the pinball losses over the 11 levels (in
 points, comparable with CRPS), for the two-lobe head's quantiles and for the quantile head. Every
 other contrast is read on signed CRPS.
@@ -590,6 +618,7 @@ other contrast is read on signed CRPS.
 | C10 | G2 minus D | All |
 | C11 | D-24 minus D | All |
 | C12 | H minus A | The two BSP test months, and by world type |
+| C13 (report only) | D-sign minus D, on signed CRPS, so a positive difference is a loss of the sign-only arm | All |
 
 **The margin m is set from the spread between seeds before any test contrast is read.** It is the
 larger of 0.25 points and twice the standard deviation over seeds 0 to 4 of arm D's signed CRPS on
@@ -612,6 +641,19 @@ injected share would over-predict reverse flow in this bank, and its reliability
 well above its value on the test banks. The read-out enters no verdict row. The harm limit does not
 change: it is derived from the test mix (section "Verdict table"), and the shifted bank has a
 lower reverse-flow share, so it only makes harm easier to detect.
+
+**An ambiguity read-out reports where P(X<0) is uncertain and whether it is calibrated there.** It
+covers every arm with a probability output (every arm except D-quantile) and B\*, on the synthetic
+test rows only, because the truth is known only there. Two groups of strata split the rows. The
+first group splits the rows by the reading's level, in four bands: under 0.3 MVA (the top of the
+simulated reactive power), 0.3 to 1.0 MVA, 1.0 to 3.0 MVA, and over 3.0 MVA. The second group splits
+the rows by the truth's magnitude |X| in multiples of the reactive floor Q̂ of 0.1 MVA, in four
+bands: under 1, 1 to 3, 3 to 10, and over 10. Each stratum reports its row count, its mean P(X<0),
+the observed share of reverse flow, the reliability term of the Brier score over 10 bins, the
+sharpness (the mean of 2 |P − 0.5|, which is 0 at P = 0.5 and 1 at certainty), and the share of rows
+with P under 0.1 or over 0.9. The read-out sets no bar and enters no verdict row. A probability
+that serves the user well sits near 0.5, with a mean forecast close to the observed share, where the
+reading cannot tell the sign (a truth under Q̂), and sits near 0 or 1 where the reading is clear.
 
 **Two bars decide between `supported` and `partly supported`.**
 
@@ -755,6 +797,9 @@ are never rerun. Every number is labelled interim until the counted reading it b
   metered engine record or the private constants file.
 - The private cut is applied, and no day of the metered engine record is a base day.
 - No valid time on or after 2026-07-01 is read, and no arm reads the month or the day of the year.
+- The ERA5 wind speed and precipitation are the coincident hourly values of the scored hours at
+  D8's grid cell, the same legitimate reconstruction input as the temperature, and each input row
+  of every arm is on a list of allowed rows that holds no calendar-position row.
 - The architecture, B\*, and m are chosen on validation months only, before any test score exists.
 
 ## Compute and gates
@@ -762,37 +807,41 @@ are never rerun. Every number is labelled interim until the counted reading it b
 **The fits are small, and a timing gate measures their cost before the first fit.** One GPU process
 of at most 6 GB runs at a time, with one data worker, on the core set that the manager assigns,
 inside `systemd-run --user --scope` with MemoryMax 12G, MemorySwapMax 0, and one BLAS thread. The
-plan has 11 arms (A, B, C, D, H, D-quantile, D-24, E, F, G1, G2) and 47 fits:
+plan has 12 arms (A, B, C, D, H, D-quantile, D-24, E, F, G1, G2, D-sign) and 50 fits:
 
 - 18 fits in the architecture screen (3 architectures, arms A and D, 3 seeds);
-- 27 fits in the ladder (the 9 arms other than A and D, 3 seeds each);
+- 30 fits in the ladder (the 10 arms other than A and D, 3 seeds each);
 - 2 further fits of arm D, for seeds 3 and 4, which set the margin m.
 
-The total of 47 holds only if the ladder reuses the fits of arms A and D from the screen, on the
+The total of 50 holds only if the ladder reuses the fits of arms A and D from the screen, on the
 architecture that the validation rule chooses.
 
-**The GPU projection is 2.7 to 7.8 GPU-process-hours, and 10.2 if the bidirectional LSTM is slow.**
-The timing gate runs 5 epochs of each architecture on arm D and projects the GPU-process-hours from
-the measured time per epoch. At an assumed 3 seconds an epoch, 47 fits at the cap of 200 epochs take
-about 7.8 GPU-process-hours, and 47 fits at an early stop near 70 epochs about 2.7. The bidirectional
-LSTM may exceed 3 seconds an epoch. If the 6 LSTM fits (arms A and D, 3 seeds) take 10 seconds an
-epoch at the cap, the total is about 10.2 GPU-process-hours. The default budget is 10
-GPU-process-hours. The manager owns the GPU slots and may set another budget, and a projection above
-the budget goes to the manager before any fit.
+**The GPU projection is about 1.17 GPU-process-hours at the epoch cap, from a timing gate that
+measured 0.35 to 0.44 seconds an epoch.** The timing gate runs 5 epochs of each architecture on arm
+D and projects the GPU-process-hours from the measured time per epoch. At those times, the 47 fits
+of the plan before arm D-sign take 1.10 GPU-process-hours at the cap of 200 epochs. Arm D-sign adds 3
+fits, which the projection prices at the slowest architecture's 0.44 seconds an epoch (D-sign's
+single output makes it no slower), so the 50 fits take about 1.17 GPU-process-hours at the cap
+(1.10 plus 3 × 200 × 0.44 / 3600 = 0.07). An early stop near 70 epochs takes about 0.41. The plan's
+first projection assumed 3 seconds an epoch and gave 2.7 to 7.8 GPU-process-hours, and 10.2 if the
+bidirectional LSTM were slow; the measured times are about seven times shorter. The default budget
+is 10 GPU-process-hours. The manager owns the GPU slots and may set another budget, and a
+projection above the budget goes to the manager before any fit.
 
 **The CPU work adds about 2 hours on one core.** These are estimates from the plan's simulation,
 which drew 3,000 segments in a few seconds, and the timing gate measures them:
 
 - Generating the training, validation, and test banks for 5 seeds takes under 15 minutes.
-- Scoring 47 fits on test banks of about 92,000 half-hours each, and the bootstrap of 20,000
-  resamples over the cell means of 12 contrasts, take about 30 minutes.
+- Scoring 50 fits on test banks of about 92,000 half-hours each, and the bootstrap of 20,000
+  resamples over the cell means of 13 contrasts, take about 30 minutes.
 - M2's baseline runs on one CPU core in under an hour.
 
 **The gates run in the maintainer's order:** this plan, a Sonnet plan review, Sonnet code, a fresh
 Opus code review before any first run, a real-file smoke test of every loader that reads a file the
 synthetic-array tests do not exercise (D8's reading, the BSP meter, the frame of experiment 39, the
-ERA5 temperature, the bank holidays, and the metered engine record), then a "fits starting" line to
-the manager with the projection and the cores before each family of fits. Every fitted neural network
+ERA5 temperature, wind speed, and precipitation, the bank holidays, and the metered engine record),
+then a "fits starting" line to the manager with the projection and the cores before each family of
+fits. Every fitted neural network
 is saved in the experiment's data folder.
 
 ## Reviews and pre-run gates
@@ -840,12 +889,8 @@ load-shift scenarios do not apply; days near a logged closure are dropped instea
 
 ## Decisions that need the maintainer
 
-**One decision belongs to the maintainer; the plan decides everything else and records the
-decision above.**
-
-| Decision | Default if no answer |
-|---|---|
-| Arm D could carry wind speed and precipitation, which need a new download of ERA5 at D8's grid cell for the base years (small, free) | Arm D omits wind speed and precipitation |
+**The plan holds no open decision.** Arm D carries ERA5 wind speed and precipitation from the files
+already stored, and the sign-only arm D-sign is a report-only contrast.
 
 ## Figures planned
 
@@ -860,7 +905,7 @@ Real-day panels carry no calendar dates.
 3. The realism gate: synthetic against real shares of near-zero days and half-hours.
 4. Signed CRPS of every arm and baseline on all, import, and reverse-flow rows, as staggered dots on
    striped rows (`dot_chart` of experiment 700).
-5. The 12 contrasts with their intervals and the margin m.
+5. The 12 counted contrasts and the report-only C13, with their intervals and the margin m.
 6. Example test windows: the two-lobe distribution as a band and P(X<0) as a strip against the
    truth, for an import-only, an engine-reversal, a solar-reversal, and a combined day.
 7. The reliability diagram of P(X<0).
@@ -875,10 +920,13 @@ Real-day panels carry no calendar dates.
 - **The engine head's real check subtracts the record from D8's reading (K1),** because D8's reading
   is gross demand on the record's days; the unchanged days become a placebo (K2).
 - **The BSP coefficient β is drawn from 0.6 to 1.0,** because the step test found a response below 1.
-- **Arm D omits wind speed and precipitation,** which are not stored for D8's grid cell.
+- **Arm D carries wind speed and precipitation,** from the stored ERA5 features of D8's grid cell,
+  because this is a reconstruction and coincident observed weather is legitimate.
+- **Arm D-sign is report-only,** because it enters no verdict row, and the Bonferroni level stays at
+  12 counted contrasts.
 - **The ladder is cumulative (A, then B, C, D)** and the variants E, F, G1, G2, the quantile head,
-  and the 24-hour window are each added to arm D, so that every contrast changes one input. Arm H
-  adds the BSP steps to arm A, so that the BSP gain is read in both orders.
+  the 24-hour window, and the sign head are each added to arm D, so that every contrast changes one
+  input. Arm H adds the BSP steps to arm A, so that the BSP gain is read in both orders.
 - **The demand-climatology baseline is B1,** which turns the climatology into a sign probability
   through the rule that injected output is never negative.
 - **The harm checks use P0f and not P0,** because the lobe-width floor adds 0.117 points to every
@@ -910,8 +958,25 @@ Real-day panels carry no calendar dates.
 - **The quantile arm Dq is scored by its piecewise-linear CRPS,** computed from its 11 quantiles.
 - **P0's lobes use a spread of 1e-6 points, P0f's use the 0.5-point floor,** and both take the
   reading after removing the 0.1 MVA reactive floor.
-- **The timing gate projects the 29 ladder fits at the slowest architecture's time per epoch,**
+- **The timing gate projects the 32 ladder fits at the slowest architecture's time per epoch,**
   because the chosen architecture is not known at that point.
+- **The ERA5 wind speed and precipitation are read from the stored hourly features of D8's grid
+  cell, the file that holds the temperature.** The wind speed is instantaneous, so both half-hours
+  of an hour share the whole hour's value and the same linear interpolation as the temperature
+  applies. The precipitation is an accumulation over the hour that ends at its stamp, so each
+  half-hour takes the accumulation of the hour that contains it, in millimetres an hour (the file's
+  kilograms per square metre per second times 3,600). A missing value would enter as zero without a
+  mask, as the temperature does, and the stored record has none over the base years.
+- **The banks are rebuilt with the two weather fields and keep their readings and digests.** A
+  segment now stores the wind speed and the precipitation, so a bank built before this change
+  cannot be loaded by the new code. The weather fields enter no random draw and no digest, so the
+  rebuilt banks hold the same readings, truths, engines, and solar outputs, and every bank digest
+  is unchanged. The realism gate reads only the readings, so the gate does not run again.
+- **The sign head's reading row is a target row, never an input.** The target stack holds the
+  folded reading as its fifth row so that the sign head's decoder can place its two lobes, and no
+  input window reads that row.
+- **The ambiguity read-out's bands are code constants:** the reading bands at 0.3, 1.0, and 3.0
+  MVA, and the truth-magnitude bands at 1, 3, and 10 times the 0.1 MVA reactive floor.
 - **The margin file refuses to be overwritten,** so that m is fixed once, before any test score.
 - **M2 runs on a continuous series of folded readings, with the causal spread,** and its running
   probability is multiplied by the climatology's sign probability.
@@ -977,7 +1042,7 @@ Real-day panels carry no calendar dates.
   head; the inputs, layers, and heads of each architecture are in "Three neural-network
   architectures" and "The output heads".
 - Inputs are in points of D8's capacity, the CAMS fields are normalised by clear-sky values, and
-  temperature is standardised on the training days.
+  temperature and wind speed are standardised on the training days.
 - Every arm reads a 48-hour window and is scored on its middle 24 hours, except D-24.
 
 **Training regime:**
@@ -1018,18 +1083,18 @@ edited.
 - `e00729_core.py`: every named constant and bar on this page, the split rule (which derives the
   months from the private base calendar), the world mixes, the margin file, and the verdict rule.
 - `e00729_data.py`: loaders for D8's cleaned reading, the BSP A meter, the CAMS and temperature
-  fields of experiment 39's frame, the metered farms' output, the bank holidays, the metered engine
-  record, and the private cut.
+  fields of experiment 39's frame, the ERA5 wind speed and precipitation at D8's grid cell, the
+  metered farms' output, the bank holidays, the metered engine record, and the private cut.
 - `e00729_sim.py`: the engine and solar simulators, the fold, and the synthetic BSP.
 - `e00729_banks.py`: builds, hashes, saves, and loads the training, validation, test, and shifted
   banks, and holds the functions of the realism gate.
-- `e00729_arms.py`: the 11 arms, their input channels, windows, lags, masking, and the sampler.
+- `e00729_arms.py`: the 12 arms, their input channels, windows, lags, masking, and the sampler.
 - `e00729_nets.py` and `e00729_train.py`: the three architectures, the heads and losses, the fits,
-  the timing gate, and the 47-fit schedule.
+  the timing gate, and the 50-fit schedule.
 - `e00729_dist.py`: the exact mixture CRPS, the quantiles, and the quantile CRPS.
 - `e00729_baselines.py`: P0, P0f, B1, B2, and a wrapper of experiment 694's M2.
 - `e00729_score.py`: the scored rows, the metrics, the two-way bootstrap, the Kish widening, the
-  bars, and the harm and reachability checks.
+  bars, the harm and reachability checks, and the ambiguity read-out.
 - `e00729_real.py`: R1, K1, K2, R2, and R3.
 - `e00729_leakage.py`: the leakage assertions of verdict row 1.
 - `e00729_gate_calibration.py`: the offline calibration behind the one permitted re-tune of the
@@ -1051,6 +1116,9 @@ edited.
 - `data/ml-experiments/00039-pv-disaggregation-cams-injection/work/frame.parquet`: read. The CAMS
   index, clear-sky irradiance, zenith, and 2 m temperature at D8 and at the farm sites, from
   [experiment 39](../00039-pv-disaggregation-cams-injection/result.md).
+- `data/studies/per_study/stage1_pilot/demand/inputs/era5_features.parquet`: read. The hourly ERA5
+  10 m wind speed and total precipitation at D8's grid cell, the file and the cell that give the
+  temperature of experiment 39's frame.
 - The metered engine record: read, from the window table of [experiment
   194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md).
   Never published with dates.
