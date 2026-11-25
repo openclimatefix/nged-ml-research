@@ -13,7 +13,9 @@ reads any data.
 import sys
 import tempfile
 from pathlib import Path
+from typing import Final
 
+import e00713_layout as lay  # ty: ignore[unresolved-import]
 import e00716_arms as arms
 import e00716_attention_extract as ex
 import e00716_batch as pvb
@@ -23,7 +25,9 @@ import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 
-HOSTS_TO_INDEX = {"D11": 3, "D19": 7, "D21": 12}
+WEEKDAY_SLOTS: Final = {1: [6, 13], 7: [7, 14]}
+"""The history slots whose row has the target's weekday: slot k is age k+1, and lead day L adds L-1 days."""
+HOSTS_TO_INDEX: Final = {"D11": 3, "D19": 7, "D21": 12}
 
 
 def randomised_h(*, seed: int) -> pvm.PvNet:
@@ -45,8 +49,8 @@ def check_attention() -> list[str]:
     shortwave = source.dense_weather[:, :, ex.SHORTWAVE_COLUMN].float().numpy()
     cases = ex.pick_cases(shortwave=shortwave, primaries=HOSTS_TO_INDEX, c_all=c_all)
     assert len(cases) == len(ex.CASE_HOSTS) * len(ex.CASE_KINDS)
-    assert {v[0] for v in cases.values()} == set(HOSTS_TO_INDEX.values())
-    assert all(int(v[1]) in set(c_all.tolist()) for v in cases.values())
+    assert {v.primary for v in cases.values()} == set(HOSTS_TO_INDEX.values())
+    assert all(v.contract_idx in set(c_all.tolist()) for v in cases.values())
     zeros, ones = np.zeros(16), np.ones(16)
     case = next(iter(cases.values()))
     arrays = ex.case_arrays(model=model, source=ps, case=case, target_mean=zeros, target_std=ones)
@@ -55,10 +59,14 @@ def check_attention() -> list[str]:
     assert arrays["alpha"].shape == (14, 48) and arrays["q"].shape == (48, 11)
     assert arrays["hist_pv"].shape == (14, 48) and arrays["hist_power"].shape == (14, 48)
     plain = ex.run_model(
-        model=model, source=ps, primary=np.array([case[0]]), c_idx=np.array([case[1]]), lead=0
+        model=model,
+        source=ps,
+        primary=np.array([case.primary]),
+        c_idx=np.array([case.contract_idx]),
+        lead=0,
     )[0]
     batch = ex.pvt.batch_for(
-        source=ps, samples=ex.tr.SampleSet(np.array([case[0]]), np.array([case[1]]), np.zeros(1, bool)),
+        source=ps, samples=ex.tr.SampleSet(primary=np.array([case.primary]), c_idx=np.array([case.contract_idx]), is_val=np.zeros(1, bool)),
         index=np.arange(1), lead=np.zeros(1, dtype=np.int64), cut=10**9,
     )  # fmt: skip
     with torch.no_grad():
@@ -70,9 +78,60 @@ def check_attention() -> list[str]:
         mean = summary[f"summary_lead{lead}/mean_weight"]
         same = summary[f"summary_lead{lead}/same_weekday_weight"]
         assert mean.shape == (16, ex.N_SLOTS) and np.allclose(mean.sum(axis=1), 1.0, atol=1e-4)
-        assert (same <= mean + 1e-9).all() and (same[:, 0] == 0).all()
+        weekday_slots = WEEKDAY_SLOTS[lead]
+        other = [k for k in range(ex.N_SLOTS) if k not in weekday_slots]
+        assert np.array_equal(same[:, weekday_slots], mean[:, weekday_slots]), lead
+        assert (same[:, other] == 0).all(), lead
         assert (summary[f"summary_lead{lead}/count"] == len(c_all)).all()
     return ["attention arrays: shapes, softmax sums, unchanged forecast, summary bounds"]
+
+
+def planted_shortwave(*, dull_spike: bool) -> tuple[np.ndarray, np.ndarray]:
+    """Return a (16, G) shortwave array with planted patterns, and the scored origins (`c_all`).
+
+    Every Primary holds the same pattern on a base of 1.0. Without `dull_spike`, the history rows of
+    origin X (index 20) hold 5.0 and its target day 0.05, and origin Y (index 2) has a target day of 9.0.
+    With `dull_spike`, a spike of 50.0 lies in the day before the origin of origin W (index 10), which
+    no history row reads, and W's target day is 0.01.
+    """
+    c_all = (cb.FIRST_DAY + np.arange(cb.N_DAYS - 1)) * 48 + 24
+    row = np.ones(cb.G)
+    if dull_spike:
+        w = int(c_all[10])
+        row[w - 48 : w] = 50.0
+        row[w : w + 48] = 0.01
+    else:
+        x, y = int(c_all[20]), int(c_all[2])
+        row[lay.history_grid_index(contract_idx=np.array([x])).ravel()] = 5.0
+        row[y : y + 48] = 9.0
+        row[x : x + 48] = 0.05
+    return np.tile(row, (16, 1)), c_all
+
+
+def check_picks() -> list[str]:
+    """Check the history window and the picks on planted shortwave patterns."""
+    ramp = np.arange(cb.G, dtype=np.float64)
+    c_all = (cb.FIRST_DAY + np.arange(cb.N_DAYS - 1)) * 48 + 24
+    assert np.allclose(ex.history_means(shortwave=ramp, c_all=c_all), c_all - 384.5)
+    shortwave, c_all = planted_shortwave(dull_spike=False)
+    cases = ex.pick_cases(shortwave=shortwave, primaries=HOSTS_TO_INDEX, c_all=c_all)
+    for host in ex.CASE_HOSTS:
+        dull = cases[ex.case_key(host=host, kind="dull_after_sunny")]
+        clear = cases[ex.case_key(host=host, kind="clear_day")]
+        assert dull.contract_idx == int(c_all[20]), dull
+        assert clear.contract_idx == int(c_all[2]), clear
+        assert abs(dull.history_mean - 5.0) < 1e-9 and abs(dull.target_mean - 0.05) < 1e-9
+    shortwave, c_all = planted_shortwave(dull_spike=True)
+    try:
+        ex.pick_cases(shortwave=shortwave, primaries=HOSTS_TO_INDEX, c_all=c_all)
+    except AssertionError:
+        pass
+    else:
+        msg = "a spike that no history row reads made a dull-after-sunny case"
+        raise AssertionError(msg)
+    return [
+        "picks: history window is the 14 history rows, planted picks found, a spike outside the rows picks nothing"
+    ]
 
 
 def check_max_difference() -> list[str]:
@@ -133,7 +192,7 @@ def check_refusal() -> list[str]:
 def main() -> int:
     """Run every check and print one line per check."""
     torch.set_num_threads(1)
-    lines = check_attention() + check_max_difference() + check_refusal()
+    lines = check_attention() + check_picks() + check_max_difference() + check_refusal()
     print("\n".join(lines))
     return 0
 
