@@ -1,10 +1,11 @@
 """Tests of the windows, the neighbour channels, the batches, and the checks on the tensors."""
 
 import dataclasses
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import e00729_arms as arms729
 import e00729_core as core729
+import e00729_sim as sim
 import e00730_arms as arms730
 import e00730_masks as masks
 import e00732_arms as arms
@@ -19,13 +20,13 @@ from world732 import make_bank, make_neighbours
 class World(NamedTuple):
     """The invented bank, its overlays and prepared segments, and the neighbours' medians."""
 
-    cal: object
-    segs: list
-    series: dict
-    overlays: list
+    cal: sim.Calendar
+    segs: list[sim.Segment]
+    series: dict[str, np.ndarray]
+    overlays: list[ov.TransferOverlay]
     prepared: list[arms.Prepared]
     index: ov.PairIndex
-    stats: object
+    stats: arms729.InputStats
     medians: dict[str, float]
 
 
@@ -45,6 +46,12 @@ def world() -> World:
     return World(
         cal, segs, series, overlays, prepared, ov.build_pair_index(segments=segs), stats, medians
     )
+
+
+def need(array: np.ndarray | None) -> np.ndarray:
+    """Return an optional batch member that the test built, failing when it is absent."""
+    assert array is not None
+    return array
 
 
 def edge_picks(*, prepared: list[arms.Prepared], limit: int = 60) -> list[tuple[int, int]]:
@@ -140,7 +147,7 @@ def test_hiding_zeroes_all_twelve_channels_and_never_leaks_the_hidden_steps_sign
         else ov.window_delta(index=world.index, sibling=sib, amount=20.0, day=day)
     )
     triple = arms.build_triple(p=p, day=day, spec=spec, hidden=hidden, delta=delta, eps=0.2)
-    for member in (triple.x, triple.xi, triple.xc):
+    for member in (triple.x, need(triple.xi), need(triple.xc)):
         assert (member[arms.N_BASE :, hidden] == 0).all()
         assert (member[arms.ROW["r"]][hidden] == 0).all()
         assert (member[arms.ROW["r_mask"]][hidden] == 0).all()
@@ -178,18 +185,22 @@ def test_injected_member_differs_only_in_the_reading_bsp_and_aligned_channels(
             changed = {
                 arms.ALL_NAMES[i]
                 for i in range(arms.N_CHANNELS)
-                if not np.array_equal(tr.x[i], tr.xi[i])
+                if not np.array_equal(tr.x[i], need(tr.xi)[i])
             }
             allowed = {"r", "d_bsp", *(f"{n}_aligned" for n in nb.NEIGHBOURS)}
             assert changed <= allowed, changed
-            np.testing.assert_allclose(tr.ti[arms.T["x"]], tr.t[arms.T["x"]] - tr.delta, atol=1e-5)
             np.testing.assert_allclose(
-                tr.ti[arms.T["solar"]], tr.t[arms.T["solar"]] + tr.delta, atol=1e-5
+                need(tr.ti)[arms.T["x"]], tr.t[arms.T["x"]] - tr.delta, atol=1e-5
             )
-            assert np.array_equal(tr.ti[arms.T["event"]], tr.t[arms.T["event"]])
+            np.testing.assert_allclose(
+                need(tr.ti)[arms.T["solar"]], tr.t[arms.T["solar"]] + tr.delta, atol=1e-5
+            )
+            assert np.array_equal(need(tr.ti)[arms.T["event"]], tr.t[arms.T["event"]])
             # the reading is the original wherever delta is zero, exactly
             zero = delta[1:] == 0.0
-            np.testing.assert_array_equal(tr.xi[arms.ROW["r"]][zero], tr.x[arms.ROW["r"]][zero])
+            np.testing.assert_array_equal(
+                need(tr.xi)[arms.ROW["r"]][zero], tr.x[arms.ROW["r"]][zero]
+            )
             checked += 1
             if checked >= 12:
                 return
@@ -205,9 +216,9 @@ def test_injected_reading_matches_the_refold_of_the_injected_truth(world: World)
                 continue
             delta = ov.window_delta(index=world.index, sibling=sib, amount=50.0, day=day)
             tr = arms.build_triple(p=p, day=day, spec=spec, hidden=None, delta=delta, eps=None)
-            ok = tr.ti[arms.T["valid"]] > 0.5
-            got = tr.xi[arms.ROW["r"], arms.MID : arms.MID + 48] * arms729.R_SCALE
-            np.testing.assert_allclose(got[ok], tr.ti[arms.T["r"]][ok], rtol=1e-4, atol=1e-3)
+            ok = need(tr.ti)[arms.T["valid"]] > 0.5
+            got = need(tr.xi)[arms.ROW["r"], arms.MID : arms.MID + 48] * arms729.R_SCALE
+            np.testing.assert_allclose(got[ok], need(tr.ti)[arms.T["r"]][ok], rtol=1e-4, atol=1e-3)
             assert tr.delta.max() > 0
             return
     pytest.fail("no window had a sibling")
@@ -223,7 +234,7 @@ def test_bsp_channel_of_the_injected_member_carries_beta_times_delta(world: Worl
             delta = ov.window_delta(index=world.index, sibling=sib, amount=50.0, day=day)
             tr = arms.build_triple(p=p, day=day, spec=spec, hidden=None, delta=delta, eps=None)
             want = -p.beta * np.diff(delta.astype(np.float64)) / arms729.BSP_SCALE
-            got = tr.xi[arms.ROW["d_bsp"]] - tr.x[arms.ROW["d_bsp"]]
+            got = need(tr.xi)[arms.ROW["d_bsp"]] - tr.x[arms.ROW["d_bsp"]]
             ok = tr.x[arms.ROW["bsp_mask"]] > 0.5
             assert ok.any()
             assert np.abs(want[ok]).max() > 0
@@ -236,7 +247,7 @@ def test_raised_member_differs_only_in_the_clear_sky_index(world: World) -> None
     spec = arms.eval_spec(raised=True)
     p = next(q for q in world.prepared if (q.base.stack[arms.ROW["csi"]] > 0).any())
     tr = arms.build_triple(p=p, day=int(p.days[5]), spec=spec, hidden=None, delta=None, eps=0.2)
-    w, wc = tr.x, tr.xc
+    w, wc = tr.x, need(tr.xc)
     changed = {arms.ALL_NAMES[i] for i in range(arms.N_CHANNELS) if not np.array_equal(w[i], wc[i])}
     assert changed == {"csi"}
     mask = ov.raisable(csi=w[arms.ROW["csi"]], cosz=w[arms.ROW["cosz"]])
@@ -259,7 +270,7 @@ def test_the_three_members_share_one_hidden_span_and_the_keeps_follow_it(world: 
         else ov.window_delta(index=world.index, sibling=sib, amount=20.0, day=day)
     )
     tr = arms.build_triple(p=p, day=day, spec=spec, hidden=hidden, delta=delta, eps=0.2)
-    for window in (tr.x, tr.xi, tr.xc):
+    for window in (tr.x, need(tr.xi), need(tr.xc)):
         assert (window[arms.ROW["r"]][hidden] == 0).all()
         assert (window[arms.ROW["r_mask"]][hidden] == 0).all()
     scored_hidden = hidden[arms.MID : arms.MID + 48]
@@ -298,9 +309,9 @@ def test_no_input_equals_a_target_and_a_planted_leak_is_caught(world: World) -> 
         index=world.index,
     )
     for i in range(32):
-        for window, target in ((batch.x[i], batch.t[i]), (batch.xi[i], batch.ti[i])):
-            # the solar row is left out: the invented sky is a pure clear-sky shape, so the clear-sky
-            # channels equal it. The real-file smoke test checks the solar row on real skies.
+        for window, target in ((batch.x[i], batch.t[i]), (need(batch.xi)[i], need(batch.ti)[i])):
+            # the solar row is left out: the invented sky is a pure clear-sky shape, so the
+            # clear-sky channels equal it. The real-file smoke test checks real skies.
             probe = target.copy()
             probe[arms.T["solar"]] = 0.0
             assert not arms.input_equals_target(window=window, targets=probe)
@@ -372,7 +383,7 @@ def test_a_window_without_a_sibling_takes_no_pair(world: World) -> None:
     batch = arms.make_batch(prepared=prep, picks=picks, spec=spec, rng=rng, index=idx)
     assert 0 < batch.pair.mean() < 1
     no_pair = batch.pair == 0
-    np.testing.assert_array_equal(batch.xi[no_pair], batch.x[no_pair])
+    np.testing.assert_array_equal(need(batch.xi)[no_pair], batch.x[no_pair])
     assert (batch.delta[no_pair] == 0).all()
     assert (batch.amount[no_pair] == 0).all()
     assert (batch.delta_win[no_pair] == 0).all()
@@ -413,7 +424,7 @@ def test_eval_batch_has_the_fixed_pair_and_skips_windows_without_a_sibling(world
 
 def test_hide_bsp_zeroes_only_the_bsp_channels_in_every_member(world: World) -> None:
     picks = arms.all_picks(prepared=world.prepared)[:6]
-    kw = {
+    kw: dict[str, Any] = {
         "prepared": world.prepared,
         "picks": picks,
         "spec": arms.eval_spec(inject=True, raised=True),
@@ -424,7 +435,11 @@ def test_hide_bsp_zeroes_only_the_bsp_channels_in_every_member(world: World) -> 
     shown = arms.make_eval_batch(**kw)
     hidden = arms.make_eval_batch(**kw, hide_bsp=True)
     bsp_rows = (arms.ROW["d_bsp"], arms.ROW["bsp_mask"])
-    for a, b in ((shown.x, hidden.x), (shown.xi, hidden.xi), (shown.xc, hidden.xc)):
+    for a, b in (
+        (shown.x, hidden.x),
+        (need(shown.xi), need(hidden.xi)),
+        (need(shown.xc), need(hidden.xc)),
+    ):
         assert (b[:, arms.ROW["d_bsp"]] == 0).all()
         assert (b[:, arms.ROW["bsp_mask"]] == 0).all()
         keep = [i for i in range(arms.N_CHANNELS) if i not in bsp_rows]
@@ -438,7 +453,7 @@ def test_hide_bsp_zeroes_only_the_bsp_channels_in_every_member(world: World) -> 
 
 def test_u_n_has_no_neighbour_channel_and_u_nobsp_has_no_bsp_channel(world: World) -> None:
     picks = edge_picks(prepared=world.prepared)[:20]
-    kw = {
+    kw: dict[str, Any] = {
         "prepared": world.prepared,
         "picks": picks,
         "index": world.index,
@@ -452,11 +467,19 @@ def test_u_n_has_no_neighbour_channel_and_u_nobsp_has_no_bsp_channel(world: Worl
     no_bsp = arms.make_eval_batch(
         spec=arms.eval_spec(inject=True, raised=True, bsp_zeroed=True), **kw
     )
-    for a, b in ((full.x, no_nb.x), (full.xi, no_nb.xi), (full.xc, no_nb.xc)):
+    for a, b in (
+        (full.x, no_nb.x),
+        (need(full.xi), need(no_nb.xi)),
+        (need(full.xc), need(no_nb.xc)),
+    ):
         assert b.shape[1] == arms.N_BASE == arms.n_channels(spec=arms.eval_spec(neighbours=False))
         np.testing.assert_array_equal(a[:, : arms.N_BASE], b)
     bsp_rows = (arms.ROW["d_bsp"], arms.ROW["bsp_mask"])
-    for a, b in ((full.x, no_bsp.x), (full.xi, no_bsp.xi), (full.xc, no_bsp.xc)):
+    for a, b in (
+        (full.x, no_bsp.x),
+        (need(full.xi), need(no_bsp.xi)),
+        (need(full.xc), need(no_bsp.xc)),
+    ):
         assert b.shape == a.shape
         assert not b[:, list(bsp_rows)].any()
         keep = [i for i in range(arms.N_CHANNELS) if i not in bsp_rows]
@@ -471,10 +494,10 @@ def test_a_training_batch_of_each_ablated_arm_has_the_right_channels(world: Worl
     picks = arms.sample_picks(prepared=world.prepared, n=16, rng=np.random.default_rng(3))
     for name, channels in (("U-N", arms.N_BASE), ("U-noBSP", arms.N_CHANNELS)):
         batch = train_batch(world=world, spec=core.ARMS[name], picks=picks)
-        for member in (batch.x, batch.xi, batch.xc):
+        for member in (batch.x, need(batch.xi), need(batch.xc)):
             assert member.shape[1] == channels
     zeroed = train_batch(world=world, spec=core.ARMS["U-noBSP"], picks=picks)
-    for member in (zeroed.x, zeroed.xi, zeroed.xc):
+    for member in (zeroed.x, need(zeroed.xi), need(zeroed.xc)):
         assert not member[:, [arms.ROW["d_bsp"], arms.ROW["bsp_mask"]]].any()
 
 
@@ -622,7 +645,7 @@ def test_an_injected_member_with_no_extra_output_fails_the_injection_check(world
 
 def test_an_injected_member_that_changes_elsewhere_fails_the_injection_check(world: World) -> None:
     batch = make_checked(world=world)
-    xi = batch.xi.copy()
+    xi = need(batch.xi).copy()
     b = int(np.flatnonzero(batch.pair > 0)[0])
     step = np.diff(batch.delta_win[b])
     zero = np.flatnonzero((batch.delta_win[b][1:] == 0.0) & (step == 0.0))[0]

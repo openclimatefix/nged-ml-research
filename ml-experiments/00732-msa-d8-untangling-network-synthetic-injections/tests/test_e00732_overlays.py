@@ -3,6 +3,7 @@
 import dataclasses
 import itertools
 from pathlib import Path
+from typing import Any
 
 import e00729_sim as sim
 import e00732_core as core
@@ -345,6 +346,7 @@ def test_a_demand_shaped_transfer_follows_the_donor_and_a_flat_donor_gives_a_con
     flat = ov.shape_profile(
         probe=probe, shape="demand", donor=np.full(n, 33.0), sun=zeros, kappa=0.5
     )
+    assert flat is not None
     np.testing.assert_allclose(flat, 1.0)
     nothing = ov.shape_profile(
         probe=probe, shape="demand", donor=np.full(n, np.nan), sun=zeros, kappa=0.5
@@ -395,7 +397,7 @@ def test_a_donor_with_nothing_to_give_drops_the_transfer_and_counts_it(bank: Ban
 
 def test_overlays_are_deterministic_and_seeds_differ(bank: Bank) -> None:
     _, segs, series = bank
-    kw = {"segments": segs[:6], "kind": "train", "neighbours": series}
+    kw: dict[str, Any] = {"segments": segs[:6], "kind": "train", "neighbours": series}
     a = ov.overlay_segments(seed=0, **kw)
     b = ov.overlay_segments(seed=0, **kw)
     c = ov.overlay_segments(seed=1, **kw)
@@ -492,14 +494,13 @@ def test_the_shape_floor_check_fails_on_a_load_that_changes_sign(
     _, segs, _ = bank
     bad = []
     for o in test_overlays:
-        flipped = [
-            dataclasses.replace(
-                t, profile=np.where(np.arange(len(t.profile)) == 1, -0.5, t.profile)
-            )
-            if t.shape == "solar" and len(t.profile) > 2
-            else t
-            for t in o.transfers
-        ]
+        flipped = []
+        for t in o.transfers:
+            if t.shape == "solar" and t.profile is not None and len(t.profile) > 2:
+                broken = np.asarray(t.profile).copy()
+                broken[1] = -0.5
+                t = dataclasses.replace(t, profile=broken)  # noqa: PLW2901
+            flipped.append(t)
         bad.append(dataclasses.replace(o, transfers=flipped))
     assert not ov.share_passes(
         share=ov.transfer_checks(overlays=bad, originals=segs)["shape_floor"], bar=1.0

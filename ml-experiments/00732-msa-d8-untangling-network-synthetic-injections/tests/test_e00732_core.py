@@ -3,6 +3,7 @@
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 import e00729_core as core729
 import e00732_core as core
@@ -14,8 +15,8 @@ def reading(point: float, lower: float, upper: float) -> core729.Reading:
     return core729.Reading(point, lower, upper)
 
 
-def inputs(**kw: object) -> core.VerdictInputs:
-    base = {
+def inputs(**kw: Any) -> core.VerdictInputs:
+    base: dict[str, Any] = {
         "stopped": False, "invalid": False, "silent_test_missed": False, "failed": False,
         "h1_pooled_pass": True, "h1_high_pass": True, "h2_pass": True, "band_fail": False,
         "c1": reading(0.0, -0.001, 0.001), "margin": core.MARGIN_730,

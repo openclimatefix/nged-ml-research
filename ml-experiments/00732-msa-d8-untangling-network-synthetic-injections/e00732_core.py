@@ -654,6 +654,9 @@ def write_limits_file(
         n_rows: The test bank's scored half-hours.
         noise_units: The four noise units in points (D8, D3, D5, D14), from the training base days
             alone; the file holds them before any fit.
+
+    Returns:
+        The record that the file holds.
     """
     if noise_units is not None and set(noise_units) != set(NOISE_UNIT_NAMES):
         msg = f"the noise units must name exactly {NOISE_UNIT_NAMES}"

@@ -159,8 +159,8 @@ class TransferOverlay:
         event: 1 on a half-hour that holds a transfer edge.
         size: The signed change of D8's demand at each edge half-hour (plus or minus T0).
         n_failed: Transfers that could not be placed after `MAX_REDRAWS` redraws.
-        n_dropped: Transfers dropped by the donor rule after `DONOR_REDRAWS` redraws of the size.
         rate: The drawn transfers per 30 days.
+        n_dropped: Transfers dropped by the donor rule after `DONOR_REDRAWS` redraws of the size.
         neighbours_real: The neighbours' stored series on the segment's dense axis in points
             (D5 and D14 signed, D3 a magnitude), NaN where absent.
         neighbours: The same after the mirrors of the transfers (before any fold).
@@ -378,6 +378,11 @@ def _place(
     *, arr: _SegmentArrays, accepted: Sequence[Transfer], rng: np.random.Generator
 ) -> tuple[Transfer, float] | None:
     """Draw one transfer's placement, direction, partner, shape, and mirror, or None when it does not fit.
+
+    Args:
+        arr: The segment's arrays (scored half-hours, base demand, sun, and neighbours).
+        accepted: The transfers already placed on the segment (a new one may not overlap them).
+        rng: The segment's generator.
 
     Returns:
         The transfer (with a unit size and its profile) and the largest T0 that the donor rule
