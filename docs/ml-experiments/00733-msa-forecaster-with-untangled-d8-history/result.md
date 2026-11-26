@@ -138,9 +138,11 @@ the forecast origin, and no untangled value of a target half-hour ever enters th
 **The untangling network enters frozen, through its stored outputs, and is never trained through
 the forecaster's loss.** Three reasons decide this choice:
 
-- The frozen network was fitted only on synthetic days built from D8's readings of a period that
-  ends before the first history day of any real fold, so no fit of the untangling network saw a
-  real day that the forecaster reads.
+- The frozen network was fitted only on synthetic days built from D8's pre-engine readings. Those
+  days lie inside the training window of experiment 713's stage 1, but stage 1 is not refitted
+  here and its stored states read no untangled channel. Every pre-engine day precedes the first
+  history day of stages 2 and 3, the only stages that read the untangled channels, so no fit of the
+  untangling network saw a real day whose untangled channel the forecaster reads.
 - An untangling network trained end to end would learn whatever helps the forecast loss, and its
   three outputs would no longer mean the probability of reverse flow, the solar output, and the
   transfer step that the synthetic world defines and scores.
@@ -214,7 +216,7 @@ synthetic forecast faces the same weather uncertainty as a real one.
 - **Experiment 730:** the sign-only U-net S gave the best probability of reverse flow on synthetic
   days (Brier score 0.00853), and a demand output with a shared encoder made the sign worse. On real
   days its checks H2 and K2 passed.
-- **Experiment 732** (running, not yet scored) trains one U-net, U\*, for the sign, the solar output,
+- **Experiment 732** trains one U-net, U\*, for the sign, the solar output,
   and the transfer steps, and stores U\*'s outputs for every real D8 day from the start of the
   forecaster's training window to the end of the last fold, apart from days with no reading.
 
@@ -254,7 +256,10 @@ scored as a report-only check that the new path harms nobody.
 untangled signals enter the forecaster.** The channel stage reads experiment 732's printed verdict
 row and reading words from its stored score files and writes the choice to `channels.json` before
 any fit of this experiment. Experiment 732's predictions on real days are read, and its synthetic
-test scores only through those words.
+test scores only through those words. The rule's reading of the real-day checks H2, K2, P1, and P3
+is one bit of selection per signal on real days, some of which fall in the fold months. Those checks
+read aggregates of the untangling network's outputs and no forecast score, and the write-up states
+the selection beside the verdict.
 
 | Signal | Source when usable | Usable when | Otherwise |
 |---|---|---|---|
@@ -293,7 +298,11 @@ token is visible. The re-run costs two windows per origin per seed, a few minute
 **The same rule builds the channels of the synthetic forecasting world and of the placebo.** The
 placebo FU-S reads, for each history half-hour, the untangled values of the same half-hour 28 days
 earlier, which lie before every history row of the sample. A history half-hour whose untangled value
-is missing (a day with no reading) has its flag off.
+is missing (a day with no reading) has its flag off. A change of regime inside the 28 days, such as
+a load transfer or more solar capacity, makes the placebo's values wrong in level as well as in day,
+so C2 tests the day-by-day values together with any recent change of level. The report prints the
+share of absent flags in FU and in FU-S per fold, so that a C2 gain is not read as a gain from
+coverage.
 
 **The table of untangled channels must cover at least 90% of D8's visible history half-hours in
 each fold's training window and in each fold month, or the line stops at verdict row 0.** The
@@ -308,7 +317,11 @@ reads, for every target token of every sample in every batch, the run's initiali
 availability time, and fails unless the initialisation time is 00:00 UTC on day D and the
 availability time is at or before the native origin. The same assertion checks that every other
 target-row column (the trailing-temperature and solar-gain columns, and the CAMS day summary of day
-D − 1) reads no valid time at or after the native origin. The assertion prints one example row in
+D − 1) reads no valid time at or after the native origin. Those columns are observations of past
+days that a live service may not hold at the native origin, so the code records them as a lab
+shortcut, and every score is a ceiling on that account, as experiment 725's unrun read-out T3 says.
+The date-time columns (solar geometry, calendar, and holiday flags) hold no weather. The assertion
+prints one example row in
 this form, with the real values of the first sample of fold 2026-01:
 
 ```text
@@ -332,9 +345,12 @@ service could build changed CRPS by no detectable amount.
 **Each guard below is an assertion in the code, and a failure is verdict row 1.**
 
 - Every base day of every bank that trained, stopped, or tested experiments 730 and 732 precedes
-  the first history half-hour of any real-fold sample. The code reads the base calendar from
-  experiment 730's banks and the first history half-hour from the fold layout, and prints only
-  pass or fail.
+  the first history half-hour of any stage 2 or stage 3 sample of any fold, the only samples that
+  read an untangled channel. The code reads the base calendar from experiment 730's banks and the
+  first history half-hour from the fold layout, and prints only pass or fail. A second assertion
+  counts the samples whose history overlaps a base day and the untangled channels present there,
+  and requires both counts to be zero, so that a change to the fold layout cannot let a pre-engine
+  day's in-sample channel into a fit.
 - No untangled value of a target half-hour enters any input. The untangled channels are built on
   the history grid alone, and a poisoned copy of the channel table with every target-row value set
   to NaN gives the same forecast to 1e-6.
@@ -427,7 +443,7 @@ expected here.
 **The fits run in an order that puts the verdict first.** The order is: the timing gate, F0r, FU on
 the four screening folds at seeds 0 and 1, the screen rule, the rest of FU, FU-S, Y0, YU, and then
 the report-only arms FS and YT. A stop at the stop line loses report-only arms before any counted
-one.
+arm.
 
 **The screen reads FU minus M\* on folds 2025-11, 2026-01, 2026-05, and 2026-06 at seeds 0 and 1,
 and every screen number is interim.** If the screen's point estimate is above +2% of M*'s CRPS at
@@ -478,6 +494,10 @@ interval comes from experiment 729's two-way bootstrap, called unchanged: within
 blocks of 7 consecutive origin dates and, independently, whole segments are resampled, with 20,000
 resamples, generator seed 733, the Kish effective number of each factor printed, and the same t
 widening when either factor falls below 20.
+
+**C1 reads 5 seeds and C2 reads 3, so the report prints the half-width of each interval beside
+the verdict.** A C2 that includes zero only because its interval is wider than C1's is then visible
+to the reader.
 
 **The normalised mean absolute error of the median is printed beside every CRPS contrast, and the log
 loss beside every Brier contrast.** A point of the opposite sign is audit trigger 3 of the
@@ -589,7 +609,9 @@ and 717 was 3.5 GB, under the cap of 6 GB.
 | Total | | | 10.56 |
 
 **The pre-registered cost is 10.56 GPU-process-hours, under the manager's limit of 12, and the stop
-line is 12.** The timing gate runs before the first fit: 1 fold of FU at seed 0 and 5 passes of YU,
+line is 12.** The smoke test, the timing gate, and the re-runs of the untangling network (0.5 hours)
+count towards the 12 hours, as the table does. The timing gate runs before the first fit: 1 fold
+of FU at seed 0 and 5 passes of YU,
 recording the seconds per fit and per pass, the peak GPU memory, and the peak resident memory. The
 gate projects every fit at its measured rate (FU-S, FS, and F0r at FU's rate; Y0 and YT at YU's).
 If the projection exceeds 12 hours, report-only arms are dropped from the end of the fit order until
@@ -638,7 +660,7 @@ date-time encoder holds calendar columns, as in experiments 713 and 716, with no
 them. The second is that D8 is metered in MVA only, so the load-shift plots cannot show both
 metering groups that the skill names.
 
-**The plan follows sixteen items of earlier advice.**
+**The plan follows 16 items of earlier advice.**
 
 - It reads the gain at one MVA-only Primary, D8, rather than pooled (713).
 - It reports the other 15 Primaries beside D8 in R3 (713).
@@ -707,7 +729,8 @@ solar sources, fold, synthetic BSP meter, base days, and masks:
 show.**
 
 - **G10, the layout of a synthetic sample:** for three test segments, the base days of the month on
-  an axis of days, with the 14 history rows and the 10 target rows of one origin marked and the
+  an axis of days, with the 14 history rows and the target rows of lead days 1 to 14 that lie inside
+  the segment marked, the scored lead days 2 to 10 shaded, and the
   segment's edges shaded. The panel must show every history and target row inside the segment.
 - **G11, synthetic target days:** for three S2 test segments, the folded reading, the signed truth,
   the injected engine, and the injected solar output over 10 target days, with reverse-flow
@@ -777,12 +800,17 @@ published page carries the coverage counts.
 - **A random start for the synthetic forecaster,** because experiment 713's stage 1 states trained on
   D8's real readings of the base months.
 - **Training banks of seeds 3 and 4 for the synthetic forecaster,** because no fit of experiment 732
-  read them, so the untangled channels of the training samples are out of sample for the untangling
-  network, as they are on the test bank.
+  read them. Only the injections are unseen: the base days of the training months are the same as
+  in experiment 732's training banks, so the untangled channels of the training samples are cleaner
+  than the test samples' channels, whose base months no fit saw, and C3 and C4 are read on the test
+  bank alone.
 - **Five seeds for C1 and three for the other real-fold arms,** to keep the cost under 12
   GPU-process-hours with the headline at full strength.
 - **The smallest gain g of 2% of M*'s CRPS at D8,** because the change adds a neural network and a
-  pipeline stage that production would have to run and monitor.
+  pipeline stage that production would have to run and monitor. The prediction expects C1 to
+  resolve only gains of about 3% or more, so row 4 (`small gain`) is reachable only if C1's interval
+  turns out narrower than expected; g is set by the cost of porting and not by the power of the
+  design, and the page says so when row 4 cannot occur.
 - **The month-block bootstrap with t widening on the real folds,** because one Primary leaves no
   second factor to resample, and 8 blocks need the t widening that experiment 713 found the plain
   percentile interval lacked.
@@ -857,7 +885,10 @@ the id as `e00733_`):
   imported module exists; a test that every `.numpy()` call follows `.cpu()`; a test that a failure
   record stores the message and the traceback; a test that a failed chain exits with code 5 and the
   launcher does not read that code as "slot busy"; tests that touch every device branch (CUDA and
-  CPU); and the known-answer tests of verdict row 1 (the bit-for-bit zero path, the starting rule of
+  CPU); a test that every sample of the other 15 Primaries carries every untangled channel at zero
+  with its flag off; a test that the masking of R4 sets every untangled channel and flag of D8 to
+  zero at prediction and changes nothing else; and the known-answer tests of verdict row 1 (the
+  bit-for-bit zero path, the starting rule of
   the sign head, the poisoned copies, the origin-time weather assertion on a row that breaks it, and
   the bootstrap).
 
