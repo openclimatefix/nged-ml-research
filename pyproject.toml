@@ -620,6 +620,8 @@ include = [
     "studies/unmetered_battery_capacity/capacity_state_space.py",
     "ml-experiments/00730-msa-d8-sign-detector-with-demand-head-and-masking/*.py",
     "ml-experiments/00730-msa-d8-sign-detector-with-demand-head-and-masking/tests/*.py",
+    "ml-experiments/00733-msa-forecaster-with-untangled-d8-history/*.py",
+    "ml-experiments/00733-msa-forecaster-with-untangled-d8-history/tests/*.py",
 ]
 
 [tool.ty.overrides.rules]
