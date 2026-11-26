@@ -1803,10 +1803,53 @@ def tensor_charts(*, t: Tensor) -> dict[str, alt.TopLevelMixin]:
     }
 
 
+def assert_siblings_are_published(
+    *, index: ov.PairIndex, segments: Sequence[sim729.Segment]
+) -> None:
+    """Check that every sibling that can lend G21 its extra injection is a published (S2) farm.
+
+    Args:
+        index: The pair index G21 draws its injected member from.
+        segments: The segments the index was built from.
+
+    Raises:
+        CorrectnessFailureError: When a sibling has a source outside `core.TEST_SIBLING_SOURCES`,
+            or the index and the segments do not match (a metered farm could reach a published file).
+    """
+    if len(index.months) != len(segments):
+        msg = "G21's pair index was not built from the segments it is checked against"
+        raise leak.CorrectnessFailureError(msg)
+    bad = sum(
+        1
+        for sibs in index.siblings.values()
+        for j in sibs
+        if segments[int(j)].source not in core.TEST_SIBLING_SOURCES
+    )
+    if bad:
+        msg = f"{bad} G21 siblings are not of a published source: a metered farm could reach a published file"
+        raise leak.CorrectnessFailureError(msg)
+
+
 def panel_g21(
-    *, prepared: Sequence[arms.Prepared], index: ov.PairIndex
+    *,
+    prepared: Sequence[arms.Prepared],
+    index: ov.PairIndex,
+    segments: Sequence[sim729.Segment],
 ) -> tuple[dict[str, alt.TopLevelMixin], bool, str]:
-    """Draw G21 from the training bank of seed 0."""
+    """Draw G21 from the training bank of seed 0.
+
+    G21 is published, so its injected member may take its extra output from a sibling of a published
+    source only.
+
+    Args:
+        prepared: The prepared training segments.
+        index: The pair index (built with `core.TEST_SIBLING_SOURCES`).
+        segments: The segments of the bank the index was built from.
+
+    Returns:
+        The charts, whether the check passes, and a counts-only note.
+    """
+    assert_siblings_are_published(index=index, segments=segments)
     t = build_tensor(prepared=prepared, index=index)
     return (
         (tensor_charts(t=t) if t is not None else {}),
@@ -1904,7 +1947,12 @@ def build_panels(
             noise_d8=noise_d8,
         ),
     )
-    add("G21_input_tensor", *panel_g21(prepared=train_prepared, index=train_index))
+    add(
+        "G21_input_tensor",
+        *panel_g21(
+            prepared=train_prepared, index=train_index, segments=[o.seg for o in train_overlays]
+        ),
+    )
     return out
 
 
@@ -1968,7 +2016,7 @@ def stage_gallery(
     limits = stages.read_json(path=root / "limits.json")
     panels = build_panels(
         test_overlays=test_overlays, test_segments=te.segments, train_overlays=train_overlays, train_prepared=prepared,
-        train_index=ov.build_pair_index(segments=tr.segments), test_index=ov.build_pair_index(segments=te.segments, sources=core.TEST_SIBLING_SOURCES),
+        train_index=ov.build_pair_index(segments=tr.segments, sources=core.TEST_SIBLING_SOURCES), test_index=ov.build_pair_index(segments=te.segments, sources=core.TEST_SIBLING_SOURCES),
         test_index_both=ov.build_pair_index(segments=te.segments), overlay_summary=summary, base_dates=base.dates, reading=base.reading,  # ty: ignore[unresolved-attribute]
         arrays=arrays, medians=env.medians, noise_d8=float(limits["noise_units"]["D8"]),  # ty: ignore[unresolved-attribute]
     )  # fmt: skip

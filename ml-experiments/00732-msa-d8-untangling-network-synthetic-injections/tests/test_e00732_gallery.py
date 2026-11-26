@@ -205,6 +205,25 @@ def test_g21_passes_and_fails_when_the_hidden_neighbours_leak(world: World) -> N
     assert set(charts) == {"g21_tensor", "g21_variants"}
 
 
+def test_g21_is_built_from_published_siblings_only(world: World) -> None:
+    import e00732_leakage as leak
+
+    segments = [o.seg for o in world.train]
+    index_s2 = ov.build_pair_index(segments=world.segs, sources=core.TEST_SIBLING_SOURCES)
+    g.assert_siblings_are_published(index=index_s2, segments=world.segs)
+    with_s1 = ov.build_pair_index(segments=world.segs)  # the default sources hold S1 and S2
+    assert any(world.segs[int(j)].source == "S1" for s in with_s1.siblings.values() for j in s)
+    with pytest.raises(leak.CorrectnessFailureError, match="published source"):
+        g.assert_siblings_are_published(index=with_s1, segments=world.segs)
+    with pytest.raises(leak.CorrectnessFailureError, match="published source"):
+        g.panel_g21(prepared=world.prepared, index=with_s1, segments=segments)
+    with pytest.raises(leak.CorrectnessFailureError, match="not built from"):
+        g.assert_siblings_are_published(index=index_s2, segments=world.segs[:-1])
+    charts, ok, _ = g.panel_g21(prepared=world.prepared, index=index_s2, segments=segments)
+    assert ok
+    assert set(charts) == {"g21_tensor", "g21_variants"}
+
+
 def test_auto_check_lists_every_required_panel_and_fails_on_a_missing_one() -> None:
     panels = g.Panels(results=dict.fromkeys(core.PANEL_REQUIREMENTS, True))
     assert g.auto_check_record(panels=panels, banks_digest="d")["all_passed"]
