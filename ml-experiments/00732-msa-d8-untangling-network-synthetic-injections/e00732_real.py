@@ -39,7 +39,9 @@ K3_MIN_EDGES: Final = 10
 K3_WINDOW_HALF_HOURS: Final = 4
 
 
-def p1_night(*, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray, in_sample: np.ndarray | None = None) -> dict:
+def p1_night(
+    *, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray, in_sample: np.ndarray | None = None
+) -> dict:
     """Return P1: the night bar on real half-hours, with the in-sample part (pre-engine training months) apart.
 
     Args:
@@ -64,7 +66,12 @@ def p2_no_farm(*, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray) -> dict:
     if not keep.any():
         return {"mean_rounded": float("nan"), "share_above": float("nan"), "n": 0, "pass": False}
     mean, share = float(pv[keep].mean()), float(np.mean(pv[keep] > P2_EXCEED_POINTS))
-    return {"mean_rounded": round(mean, 1), "share_above": share, "n": int(keep.sum()), "pass": bool(mean <= P2_MEAN_MAX and share <= P2_EXCEED_SHARE)}
+    return {
+        "mean_rounded": round(mean, 1),
+        "share_above": share,
+        "n": int(keep.sum()),
+        "pass": bool(mean <= P2_MEAN_MAX and share <= P2_EXCEED_SHARE),
+    }
 
 
 def ranks(*, a: np.ndarray) -> np.ndarray:
@@ -96,7 +103,12 @@ def p3_follows_sky(*, pv: np.ndarray, csi: np.ndarray, cosz: np.ndarray, valid: 
     up = valid & score.sun_up(cosz=cosz)
     days = up.sum(axis=1) >= 1
     if days.sum() < 3:
-        return {"spearman": float("nan"), "ratio": float("nan"), "n_days": int(days.sum()), "pass": False}
+        return {
+            "spearman": float("nan"),
+            "ratio": float("nan"),
+            "n_days": int(days.sum()),
+            "pass": False,
+        }
     daily_pv = np.where(up, pv, 0.0).sum(axis=1)[days]
     daily_csi = (np.where(up, csi, 0.0).sum(axis=1) / np.maximum(up.sum(axis=1), 1))[days]
     rho = spearman(a=daily_pv, b=daily_csi)
@@ -105,10 +117,19 @@ def p3_follows_sky(*, pv: np.ndarray, csi: np.ndarray, cosz: np.ndarray, valid: 
     mid_csi = csi[:, MIDDAY].mean(axis=1)
     clear = mid_valid & (mid_csi >= CLEAR_INDEX)
     cloudy = mid_valid & (mid_csi < CLOUDY_INDEX)
-    if clear.sum() < MIN_DAYS_PER_SKY or cloudy.sum() < MIN_DAYS_PER_SKY or mid_pv[cloudy].mean() <= 0:
+    if (
+        clear.sum() < MIN_DAYS_PER_SKY
+        or cloudy.sum() < MIN_DAYS_PER_SKY
+        or mid_pv[cloudy].mean() <= 0
+    ):
         return {"spearman": rho, "ratio": float("nan"), "n_days": int(days.sum()), "pass": False}
     ratio = float(mid_pv[clear].mean() / mid_pv[cloudy].mean())
-    return {"spearman": rho, "ratio": ratio, "n_days": int(days.sum()), "pass": bool(rho > P3_MIN_CORRELATION and ratio > P3_MIN_RATIO)}
+    return {
+        "spearman": rho,
+        "ratio": ratio,
+        "n_days": int(days.sum()),
+        "pass": bool(rho > P3_MIN_CORRELATION and ratio > P3_MIN_RATIO),
+    }
 
 
 def p4_absorb(*, pv: np.ndarray, running: np.ndarray, hh: np.ndarray, valid: np.ndarray) -> dict:
@@ -127,7 +148,11 @@ def p4_absorb(*, pv: np.ndarray, running: np.ndarray, hh: np.ndarray, valid: np.
             den += float(on.sum())
     if den == 0.0:
         return {"pass": False, "n_running": int((valid & running).sum()), "void": True}
-    return {"pass": bool(num / den <= P4_MAX_DIFFERENCE), "n_running": int((valid & running).sum()), "void": False}
+    return {
+        "pass": bool(num / den <= P4_MAX_DIFFERENCE),
+        "n_running": int((valid & running).sum()),
+        "void": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -143,7 +168,9 @@ class Edge:
     has_time: bool
 
 
-def closure_edges_from_sheets(*, sheets: dict[str, pl.DataFrame], substation_number: int) -> list[Edge]:
+def closure_edges_from_sheets(
+    *, sheets: dict[str, pl.DataFrame], substation_number: int
+) -> list[Edge]:
     """Return the start and the end of every logged closure of one substation, with their times.
 
     The sheets are read as experiment 729's `closure_days_from_sheets` reads them (the same column rules);
@@ -153,7 +180,9 @@ def closure_edges_from_sheets(*, sheets: dict[str, pl.DataFrame], substation_num
     for frame in sheets.values():
         names = {c.lower(): c for c in frame.columns}
         sub = next((v for k, v in names.items() if "substation" in k and "name" not in k), None)
-        beg = next((v for k, v in names.items() if any(p in k for p in ("start", "from", "begin"))), None)
+        beg = next(
+            (v for k, v in names.items() if any(p in k for p in ("start", "from", "begin"))), None
+        )
         end = next((v for k, v in names.items() if any(p in k for p in ("end", "until"))), None)
         if sub is None or beg is None:
             continue
@@ -164,11 +193,15 @@ def closure_edges_from_sheets(*, sheets: dict[str, pl.DataFrame], substation_num
                 if isinstance(value, datetime):
                     edges.append(Edge(when=value, has_time=True))
                 elif isinstance(value, date):
-                    edges.append(Edge(when=datetime(value.year, value.month, value.day), has_time=False))
+                    edges.append(
+                        Edge(when=datetime(value.year, value.month, value.day), has_time=False)
+                    )
     return edges
 
 
-def k3_hit_rate(*, edges: Sequence[Edge], step_p: np.ndarray, day_index: dict[date, int], valid: np.ndarray) -> dict:
+def k3_hit_rate(
+    *, edges: Sequence[Edge], step_p: np.ndarray, day_index: dict[date, int], valid: np.ndarray
+) -> dict:
     """Return K3's hit share: logged edges with a step probability above 0.5 within 2 hours (or on the logged day).
 
     Args:
@@ -222,10 +255,14 @@ def load_closure_edges() -> tuple[list[Edge], str]:
         import e00722_data as d722  # ty: ignore[unresolved-import]
 
         sheets = pl.read_excel(d722.SWITCHING_LOG_PATH, sheet_id=0)
-        number = pl.read_parquet(d722.METADATA_PATH).filter(pl.col("time_series_id") == core729.D8_SERIES_ID)["substation_number"].item()
+        number = (
+            pl.read_parquet(d722.METADATA_PATH)
+            .filter(pl.col("time_series_id") == core729.D8_SERIES_ID)["substation_number"]
+            .item()
+        )
         edges = closure_edges_from_sheets(sheets=sheets, substation_number=int(number))
-    except (OSError, ImportError):
+    except OSError, ImportError:
         return [], "missing"
-    except (KeyError, ValueError, pl.exceptions.PolarsError):
+    except KeyError, ValueError, pl.exceptions.PolarsError:
         return [], "unreadable"
     return edges, "loaded"

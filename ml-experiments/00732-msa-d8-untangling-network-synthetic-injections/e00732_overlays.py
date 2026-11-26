@@ -172,7 +172,8 @@ def draw_transfers(
             cand = Transfer(
                 start_tick=first,
                 ticks=ticks,
-                size=float(np.exp(rng.uniform(lo_s, hi_s))) * (1.0 if rng.uniform() < 0.5 else -1.0),
+                size=float(np.exp(rng.uniform(lo_s, hi_s)))
+                * (1.0 if rng.uniform() < 0.5 else -1.0),
                 inside_bsp_a=bool(rng.uniform() < core.TRANSFER_INSIDE_BSP_A),
             )
             ok_end = cand.end_tick <= n_ticks - 1 and on_scored[cand.end_half_hour]
@@ -240,7 +241,9 @@ def apply_transfers(
         seg,
         base=(seg.base + t).astype(np.float32),
         x=x,
-        r=np.where(np.isfinite(seg.r), refold(x=np.nan_to_num(x, nan=0.0), q=q), np.nan).astype(np.float32),
+        r=np.where(np.isfinite(seg.r), refold(x=np.nan_to_num(x, nan=0.0), q=q), np.nan).astype(
+            np.float32
+        ),
         bsp=(seg.bsp + beta * t_bsp).astype(np.float32),
     )
     return TransferOverlay(
@@ -259,7 +262,9 @@ def overlay_seed(*, kind: str, seed: int | None) -> int:
 
 def overlay_rng(*, kind: str, seed: int | None, index: int) -> np.random.Generator:
     """Return the generator of segment `index` of a bank's transfer overlay."""
-    return np.random.default_rng(np.random.SeedSequence([overlay_seed(kind=kind, seed=seed), 1, index]))
+    return np.random.default_rng(
+        np.random.SeedSequence([overlay_seed(kind=kind, seed=seed), 1, index])
+    )
 
 
 def overlay_segments(
@@ -280,7 +285,11 @@ def overlay_segments(
     out = []
     for index, seg in enumerate(segments, start=first_index):
         rng = overlay_rng(kind=kind, seed=seed, index=index)
-        rate = float(rng.uniform(*core.TRANSFER_RATE_TRAIN)) if kind == "train" else core.TRANSFER_RATE_FIXED
+        rate = (
+            float(rng.uniform(*core.TRANSFER_RATE_TRAIN))
+            if kind == "train"
+            else core.TRANSFER_RATE_FIXED
+        )
         transfers, failed = draw_transfers(seg=seg, rate=rate, rng=rng)
         out.append(apply_transfers(seg=seg, transfers=transfers, n_failed=failed, rate=rate))
     return out
@@ -327,7 +336,9 @@ class PairIndex:
 
     def share_unpaired(self) -> dict[str, float]:
         """Return the share of each month's windows with no sibling, in time order of the month label."""
-        return {m: self.unpaired[m] / self.windows[m] for m in sorted(self.windows) if self.windows[m]}
+        return {
+            m: self.unpaired[m] / self.windows[m] for m in sorted(self.windows) if self.windows[m]
+        }
 
 
 def build_pair_index(
@@ -368,7 +379,13 @@ def build_pair_index(
                 unpaired[seg.month] = unpaired.get(seg.month, 0) + 1
     for m in windows:
         unpaired.setdefault(m, 0)
-    return PairIndex(siblings=siblings, units=units, windows=windows, unpaired=unpaired, months=[s.month for s in segments])
+    return PairIndex(
+        siblings=siblings,
+        units=units,
+        windows=windows,
+        unpaired=unpaired,
+        months=[s.month for s in segments],
+    )
 
 
 def pick_sibling(
@@ -403,7 +420,11 @@ def inject(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return the injected truth, re-folded reading, and BSP meter: `x - delta`, `sqrt(.)`, `bsp - beta delta`."""
     x_new = (x - delta).astype(np.float32)
-    return x_new, refold(x=np.nan_to_num(x_new, nan=0.0), q=q), (bsp - beta * delta).astype(np.float32)
+    return (
+        x_new,
+        refold(x=np.nan_to_num(x_new, nan=0.0), q=q),
+        (bsp - beta * delta).astype(np.float32),
+    )
 
 
 # --------------------------------------------------------------------------- the raised sky
@@ -427,7 +448,9 @@ def raise_sky(*, csi: np.ndarray, cosz: np.ndarray, eps: float) -> np.ndarray:
 # --------------------------------------------------------------------------- component checks
 
 
-def transfer_checks(*, overlays: Sequence[TransferOverlay], originals: Sequence[sim729.Segment]) -> dict[str, Share]:
+def transfer_checks(
+    *, overlays: Sequence[TransferOverlay], originals: Sequence[sim729.Segment]
+) -> dict[str, Share]:
     """Return the component checks of the transfer overlay.
 
     Args:
@@ -457,7 +480,9 @@ def transfer_checks(*, overlays: Sequence[TransferOverlay], originals: Sequence[
             span &= scored
             if span.any():
                 exact[1] += 1
-                exact[0] += int(np.allclose(diff[span], tr.size, atol=TOLERANCE * max(1.0, abs(tr.size))))
+                exact[0] += int(
+                    np.allclose(diff[span], tr.size, atol=TOLERANCE * max(1.0, abs(tr.size)))
+                )
             for hh in (tr.start_half_hour, tr.end_half_hour):
                 edges[1] += 1
                 edges[0] += int(scored[hh] and ov.event[hh // 48, hh % 48] > 0.0)
@@ -469,8 +494,15 @@ def transfer_checks(*, overlays: Sequence[TransferOverlay], originals: Sequence[
                 else:
                     outside[1] += 1
                     want = ov.beta * tr.size
-                    outside[0] += int(np.allclose(bsp_diff[bsp_span], want, atol=TOLERANCE * max(1.0, abs(want))))
-    out = {"transfer_exact": exact, "transfer_edges_scored": edges, "bsp_inside_unchanged": inside, "bsp_outside_moves": outside}
+                    outside[0] += int(
+                        np.allclose(bsp_diff[bsp_span], want, atol=TOLERANCE * max(1.0, abs(want)))
+                    )
+    out = {
+        "transfer_exact": exact,
+        "transfer_edges_scored": edges,
+        "bsp_inside_unchanged": inside,
+        "bsp_outside_moves": outside,
+    }
     return {k: Share(v[0] / v[1] if v[1] else float("nan"), v[1]) for k, v in out.items()}
 
 
@@ -491,7 +523,11 @@ def pair_checks(*, segments: Sequence[sim729.Segment], index: PairIndex, amount:
     """
     keys = sorted(index.siblings)
     rng = np.random.default_rng(seed)
-    chosen = [keys[int(k)] for k in rng.choice(len(keys), size=min(n_pairs, len(keys)), replace=False)] if keys else []
+    chosen = (
+        [keys[int(k)] for k in rng.choice(len(keys), size=min(n_pairs, len(keys)), replace=False)]
+        if keys
+        else []
+    )
     active = [0, 0]
     equal = [0, 0]
     for i, d in chosen:
@@ -501,7 +537,13 @@ def pair_checks(*, segments: Sequence[sim729.Segment], index: PairIndex, amount:
             continue
         delta = delta_flat(index=index, sibling=j, amount=amount)
         q = reactive_floor(seg=seg)
-        _, r_new, _ = inject(x=seg.x, q=q, delta=delta.reshape(seg.x.shape), bsp=seg.bsp, beta=float(seg.params[BETA_KEY]))
+        _, r_new, _ = inject(
+            x=seg.x,
+            q=q,
+            delta=delta.reshape(seg.x.shape),
+            bsp=seg.bsp,
+            beta=float(seg.params[BETA_KEY]),
+        )
         day = slice(d * 48, d * 48 + 48)
         dd = delta[day]
         cosz = seg.cosz.reshape(-1)[day]
@@ -535,16 +577,31 @@ def raised_checks(*, segments: Sequence[sim729.Segment], eps: float = core.TEST_
 
 
 def reachability(
-    *, overlays: Sequence[TransferOverlay], index: PairIndex | None, n_windows_by_amount: Mapping[float, int] | None
+    *,
+    overlays: Sequence[TransferOverlay],
+    index: PairIndex | None,
+    n_windows_by_amount: Mapping[float, int] | None,
 ) -> dict[str, tuple[int, int, bool]]:
     """Return the reachability counts (count, bar, passes) of the test overlay."""
     steps = 0
     for ov in overlays:
         scored = scored_half_hours(seg=ov.seg).reshape(ov.event.shape)
-        steps += int(((ov.event > 0) & scored & (np.abs(ov.size) >= core.MIN_STEP_POINTS_REACHABLE)).sum())
-    out = {"transfer_steps_5_points": (steps, core.MIN_TRANSFER_STEPS_TEST, steps >= core.MIN_TRANSFER_STEPS_TEST)}
+        steps += int(
+            ((ov.event > 0) & scored & (np.abs(ov.size) >= core.MIN_STEP_POINTS_REACHABLE)).sum()
+        )
+    out = {
+        "transfer_steps_5_points": (
+            steps,
+            core.MIN_TRANSFER_STEPS_TEST,
+            steps >= core.MIN_TRANSFER_STEPS_TEST,
+        )
+    }
     for a, n in (n_windows_by_amount or {}).items():
-        out[f"windows_at_{a:g}"] = (n, core.MIN_WINDOWS_PER_AMOUNT, n >= core.MIN_WINDOWS_PER_AMOUNT)
+        out[f"windows_at_{a:g}"] = (
+            n,
+            core.MIN_WINDOWS_PER_AMOUNT,
+            n >= core.MIN_WINDOWS_PER_AMOUNT,
+        )
     return out
 
 
@@ -553,7 +610,9 @@ def sibling_windows(*, segments: Sequence[sim729.Segment], sources: Sequence[str
     return len(build_pair_index(segments=segments, sources=sources).siblings)
 
 
-def unpaired_problems(*, share_unpaired: Mapping[str, float], bar: float = core.MAX_UNPAIRED_SHARE) -> list[str]:
+def unpaired_problems(
+    *, share_unpaired: Mapping[str, float], bar: float = core.MAX_UNPAIRED_SHARE
+) -> list[str]:
     """Return the months (by position in time order) whose unpaired share exceeds the bar."""
     return [f"month {i}" for i, (_, v) in enumerate(sorted(share_unpaired.items())) if not v <= bar]
 

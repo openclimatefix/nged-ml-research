@@ -258,13 +258,22 @@ TIMING_ARMS: Final = ("U*", "U-NC", "S+", "U-SG", "U*-L")
 INFERENCE_HOURS: Final = 0.25
 TIMING_GATE_HOURS: Final = 0.05
 FITS_PER_ARM: Final = len(SEEDS)
-RATE_OF: Final = {"U*": "U*", "U-NC": "U-NC", "U-NCw": "U-NC", "S+": "S+", "U-SG": "U-SG", "U*-L": "U*-L"}
+RATE_OF: Final = {
+    "U*": "U*",
+    "U-NC": "U-NC",
+    "U-NCw": "U-NC",
+    "S+": "S+",
+    "U-SG": "U-SG",
+    "U*-L": "U*-L",
+}
 """The timed arm whose seconds an epoch prices each fitted arm."""
 MAX_SLOT_WORKERS: Final = 6
 
 # --------------------------------------------------------------------------- the verdict
 
-Verdict = Literal["stopped", "invalid", "failed", "not supported", "supported", "partly supported", "inconclusive"]
+Verdict = Literal[
+    "stopped", "invalid", "failed", "not supported", "supported", "partly supported", "inconclusive"
+]
 VERDICT_WORDS: Final = {
     0: "stopped", 1: "invalid", 2: "failed", 3: "not supported", 4: "supported",
     5: "partly supported", 6: "not supported", 7: "inconclusive", 8: "not supported",
@@ -363,7 +372,11 @@ def transfer_word(*, c5: core729.Reading | None, f1: float, reachable: bool) -> 
     Returns:
         "works", "works only in Brier score", "no better than the rule", "worse than the rule", or "void".
     """
-    if not reachable or c5 is None or not all(math.isfinite(z) for z in (c5.point, c5.lower, c5.upper)):
+    if (
+        not reachable
+        or c5 is None
+        or not all(math.isfinite(z) for z in (c5.point, c5.lower, c5.upper))
+    ):
         return "void"
     if c5.upper < 0.0:
         return "works" if f1 >= TRANSFER_F1_BAR else "works only in Brier score"
@@ -425,7 +438,9 @@ def band_limits(*, x: np.ndarray, r: np.ndarray) -> dict[str, BandLimit]:
     }
 
 
-def write_limits_file(*, path: Path, limits: Mapping[str, BandLimit], s: float, n_rows: int) -> dict:
+def write_limits_file(
+    *, path: Path, limits: Mapping[str, BandLimit], s: float, n_rows: int
+) -> dict:
     """Write `limits.json` once (a second write raises `FileExistsError`) and return the record."""
     record = {
         "s": s, "n_rows": n_rows,
@@ -441,7 +456,10 @@ def read_limits_file(*, path: Path) -> dict[str, BandLimit]:
         msg = f"{path} does not exist: the limits must be written before any fit"
         raise FileNotFoundError(msg)
     bands = json.loads(path.read_text())["bands"]
-    return {k: BandLimit(share=v["share"], limit=v["limit"], n_rows=v["n_rows"]) for k, v in bands.items()}
+    return {
+        k: BandLimit(share=v["share"], limit=v["limit"], n_rows=v["n_rows"])
+        for k, v in bands.items()
+    }
 
 
 def limit_problems(*, limits: Mapping[str, BandLimit]) -> list[str]:
@@ -496,7 +514,11 @@ def timing_gate_report(*, seconds_per_epoch: Mapping[str, float], peak_gpu_gb: f
 
 def timing_gate_passes(*, report: Mapping[str, object], manager_approved: bool) -> bool:
     """Return whether fits may start: memory and GPU within bounds, and the projection within the line or approved."""
-    return bool(report["memory_ok"] and report["gpu_ok"] and (report["within_stop_line"] or manager_approved))
+    return bool(
+        report["memory_ok"]
+        and report["gpu_ok"]
+        and (report["within_stop_line"] or manager_approved)
+    )
 
 
 # --------------------------------------------------------------------------- the gallery's list
@@ -513,7 +535,15 @@ PANEL_REQUIREMENTS: Final = {
 }
 """The written list of what each new gallery panel must show. The session that runs the experiment
 checks each panel against it and records the result in `PRIVATE/gallery/panel_check.json`."""
-GALLERY_PUBLISHED: Final = ("G10_transfers", "G11_pairs", "G12_raised_sky", "G13_targets", "G14_parameters", "G15_everything", "G16_pairing")
+GALLERY_PUBLISHED: Final = (
+    "G10_transfers",
+    "G11_pairs",
+    "G12_raised_sky",
+    "G13_targets",
+    "G14_parameters",
+    "G15_everything",
+    "G16_pairing",
+)
 GALLERY_PRIVATE_ONLY: Final = ("G17_s1_pairs",)
 
 # --------------------------------------------------------------------------- the schedule
@@ -521,7 +551,9 @@ GALLERY_PRIVATE_ONLY: Final = ("G17_s1_pairs",)
 
 def fit_jobs() -> list[tuple[str, str, int]]:
     """Return the 18 fits as (arm, architecture, seed), in the order of the families."""
-    return [(arm, ARMS[arm].arch, seed) for _, arms in FIT_FAMILIES for arm in arms for seed in SEEDS]
+    return [
+        (arm, ARMS[arm].arch, seed) for _, arms in FIT_FAMILIES for arm in arms for seed in SEEDS
+    ]
 
 
 def family_of(*, arm: str) -> str:
@@ -540,4 +572,19 @@ def job_name(*, arm: str, arch: str, seed: int) -> str:
 
 def stage_names() -> Sequence[str]:
     """Return the stage names of the command line, in the order of the plan."""
-    return ("banks", "limits", "overlays", "gallery", "panels", "timing", "fit", "real", "score", "report", "figures", "loss_curves", "series", "chain")
+    return (
+        "banks",
+        "limits",
+        "overlays",
+        "gallery",
+        "panels",
+        "timing",
+        "fit",
+        "real",
+        "score",
+        "report",
+        "figures",
+        "loss_curves",
+        "series",
+        "chain",
+    )

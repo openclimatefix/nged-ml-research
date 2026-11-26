@@ -49,7 +49,9 @@ def rmse_on(*, values_sq: np.ndarray, keep: np.ndarray) -> float:
 # --------------------------------------------------------------------------- the five solar bars
 
 
-def injection_keep(*, delta: np.ndarray, amount: float, cosz: np.ndarray, pair: np.ndarray) -> np.ndarray:
+def injection_keep(
+    *, delta: np.ndarray, amount: float, cosz: np.ndarray, pair: np.ndarray
+) -> np.ndarray:
     """Return the half-hours an injection reading uses: paired window, sun up, and delta at least 5% of the amount.
 
     Args:
@@ -61,7 +63,9 @@ def injection_keep(*, delta: np.ndarray, amount: float, cosz: np.ndarray, pair: 
     return (pair[:, None] > 0.5) & sun_up(cosz=cosz) & (delta >= core.DELTA_SHARE_OF_A * amount)
 
 
-def recovery_bar(*, pv_inj: np.ndarray, pv_plain: np.ndarray, delta: np.ndarray, amount: float, keep: np.ndarray) -> dict[str, float | bool]:
+def recovery_bar(
+    *, pv_inj: np.ndarray, pv_plain: np.ndarray, delta: np.ndarray, amount: float, keep: np.ndarray
+) -> dict[str, float | bool]:
     """Return the recovery bar at one amount: the ratio of summed response to summed delta, and the median relative error.
 
     The bar fails when there is no half-hour to read.
@@ -74,7 +78,9 @@ def recovery_bar(*, pv_inj: np.ndarray, pv_plain: np.ndarray, delta: np.ndarray,
     return {"rho": rho, "median_error_over_a": med, "n": int(keep.sum()), "pass": bool(ok)}
 
 
-def injection_error_rows(*, pv_inj: np.ndarray, pv_plain: np.ndarray, delta: np.ndarray) -> np.ndarray:
+def injection_error_rows(
+    *, pv_inj: np.ndarray, pv_plain: np.ndarray, delta: np.ndarray
+) -> np.ndarray:
     """Return the per-row absolute injection error |dPV - delta|."""
     return np.abs(pv_inj - pv_plain - delta)
 
@@ -85,7 +91,12 @@ def night_bar(*, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray) -> dict[st
     if not keep.any():
         return {"mean": float("nan"), "share_above": float("nan"), "n": 0, "pass": False}
     mean, share = float(pv[keep].mean()), float(np.mean(pv[keep] > core.NIGHT_EXCEED_POINTS))
-    return {"mean": mean, "share_above": share, "n": int(keep.sum()), "pass": bool(mean <= core.NIGHT_MEAN_POINTS and share <= core.NIGHT_EXCEED_SHARE)}
+    return {
+        "mean": mean,
+        "share_above": share,
+        "n": int(keep.sum()),
+        "pass": bool(mean <= core.NIGHT_MEAN_POINTS and share <= core.NIGHT_EXCEED_SHARE),
+    }
 
 
 def violations(*, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray) -> np.ndarray:
@@ -93,15 +104,23 @@ def violations(*, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray) -
     return ((pv - pv_raised) > core.MONOTONE_TOLERANCE_POINTS).astype(np.float64)
 
 
-def monotone_bar(*, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray) -> dict[str, float | bool]:
+def monotone_bar(
+    *, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray
+) -> dict[str, float | bool]:
     """Return the monotonicity bar: the share of raisable half-hours where the raised sky lowers the solar output."""
     if not raisable.any():
         return {"share": float("nan"), "n": 0, "pass": False}
     share = float(violations(pv=pv, pv_raised=pv_raised, raisable=raisable)[raisable].mean())
-    return {"share": share, "n": int(raisable.sum()), "pass": bool(share <= core.MONOTONE_MAX_SHARE)}
+    return {
+        "share": share,
+        "n": int(raisable.sum()),
+        "pass": bool(share <= core.MONOTONE_MAX_SHARE),
+    }
 
 
-def response_bar(*, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray, solar_target: np.ndarray) -> dict[str, float | bool]:
+def response_bar(
+    *, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray, solar_target: np.ndarray
+) -> dict[str, float | bool]:
     """Return the response bar: the share of raisable half-hours of solar windows (target at least 1 point) that respond."""
     keep = raisable & (solar_target >= core.RESPONSE_MIN_TARGET_POINTS)
     if not keep.any():
@@ -127,7 +146,15 @@ def _dilate(*, a: np.ndarray, width: int) -> np.ndarray:
     return out
 
 
-def step_f1(*, step_p: np.ndarray, event: np.ndarray, size: np.ndarray, valid: np.ndarray, threshold: float = core.STEP_THRESHOLD, min_points: float = core.BIG_STEP_POINTS) -> dict[str, float | bool]:
+def step_f1(
+    *,
+    step_p: np.ndarray,
+    event: np.ndarray,
+    size: np.ndarray,
+    valid: np.ndarray,
+    threshold: float = core.STEP_THRESHOLD,
+    min_points: float = core.BIG_STEP_POINTS,
+) -> dict[str, float | bool]:
     """Return precision, recall, and F1 of the step output at `threshold` on steps of at least `min_points`.
 
     A true step counts as found when a prediction above the threshold lies within one half-hour of it, and a
@@ -137,20 +164,40 @@ def step_f1(*, step_p: np.ndarray, event: np.ndarray, size: np.ndarray, valid: n
     true_big = (event > 0.5) & (np.abs(size) >= min_points) & valid
     called = (step_p > threshold) & valid
     if not true_big.any():
-        return {"precision": float("nan"), "recall": float("nan"), "f1": float("nan"), "n_true": 0, "n_called": int(called.sum())}
+        return {
+            "precision": float("nan"),
+            "recall": float("nan"),
+            "f1": float("nan"),
+            "n_true": 0,
+            "n_called": int(called.sum()),
+        }
     recall = float(_dilate(a=called, width=core.STEP_TOLERANCE_HALF_HOURS)[true_big].mean())
-    precision = float(_dilate(a=true_big, width=core.STEP_TOLERANCE_HALF_HOURS)[called].mean()) if called.any() else 0.0
+    precision = (
+        float(_dilate(a=true_big, width=core.STEP_TOLERANCE_HALF_HOURS)[called].mean())
+        if called.any()
+        else 0.0
+    )
     f1 = 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
-    return {"precision": precision, "recall": recall, "f1": f1, "n_true": int(true_big.sum()), "n_called": int(called.sum())}
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "n_true": int(true_big.sum()),
+        "n_called": int(called.sum()),
+    }
 
 
-def size_error(*, size_hat: np.ndarray, size: np.ndarray, event: np.ndarray, valid: np.ndarray) -> float:
+def size_error(
+    *, size_hat: np.ndarray, size: np.ndarray, event: np.ndarray, valid: np.ndarray
+) -> float:
     """Return the mean absolute error of the step size on the true edge half-hours (NaN when there are none)."""
     keep = (event > 0.5) & valid
     return mean_on(values=np.abs(size_hat - size), keep=keep)
 
 
-def transfer_scenarios(*, inside: np.ndarray, since_end_days: np.ndarray, valid: np.ndarray) -> dict[str, np.ndarray]:
+def transfer_scenarios(
+    *, inside: np.ndarray, since_end_days: np.ndarray, valid: np.ndarray
+) -> dict[str, np.ndarray]:
     """Return the four scenario masks of table T2 on the transfer overlay.
 
     Args:
@@ -179,7 +226,9 @@ def band_masks(*, rows: score729.Rows) -> dict[str, np.ndarray]:
     }
 
 
-def harm_by_band(*, rows: score729.Rows, p: np.ndarray, limits: Mapping[str, core.BandLimit]) -> dict[str, dict[str, float | bool]]:
+def harm_by_band(
+    *, rows: score729.Rows, p: np.ndarray, limits: Mapping[str, core.BandLimit]
+) -> dict[str, dict[str, float | bool]]:
     """Return H1 for each band: the mean P(X<0), the share above 0.5, and the pass flag against the band's limit."""
     return {
         name: score730.harm_from_p(p=p[keep], limit=limits[name].limit)
@@ -222,7 +271,9 @@ class InjectionRows:
 
     def keys(self) -> np.ndarray:
         """Return the (segment, date, half-hour, amount) key of each row as a structured array."""
-        return np.rec.fromarrays([self.seg, self.date, self.hh, self.amount], names="seg,date,hh,amount")
+        return np.rec.fromarrays(
+            [self.seg, self.date, self.hh, self.amount], names="seg,date,hh,amount"
+        )
 
 
 def stack_amounts(*, rows: score729.Rows, amounts: Sequence[float]) -> InjectionRows:
@@ -239,7 +290,14 @@ def keys_are_unique(*, rows: InjectionRows) -> bool:
     return len(np.unique(rows.keys())) == rows.n
 
 
-def injection_contrast(*, rows: InjectionRows, a: np.ndarray, b: np.ndarray, keep: np.ndarray, n_resamples: int = core.N_RESAMPLES) -> score729.ContrastReading:
+def injection_contrast(
+    *,
+    rows: InjectionRows,
+    a: np.ndarray,
+    b: np.ndarray,
+    keep: np.ndarray,
+    n_resamples: int = core.N_RESAMPLES,
+) -> score729.ContrastReading:
     """Return C3: the contrast of the injection errors of two arms on the stacked rows.
 
     Fails when the keys repeat, because the bootstrap would then double-count a row.
@@ -253,7 +311,14 @@ def injection_contrast(*, rows: InjectionRows, a: np.ndarray, b: np.ndarray, kee
 # --------------------------------------------------------------------------- contrasts and shares
 
 
-def contrast_of(*, rows: object, a: np.ndarray, b: np.ndarray, keep: np.ndarray | None = None, n_resamples: int = core.N_RESAMPLES) -> score729.ContrastReading:
+def contrast_of(
+    *,
+    rows: object,
+    a: np.ndarray,
+    b: np.ndarray,
+    keep: np.ndarray | None = None,
+    n_resamples: int = core.N_RESAMPLES,
+) -> score729.ContrastReading:
     """Return the reading of `a - b` per row on `keep` (all rows by default), at the counted level, seed 732."""
     n = int(a.shape[0])
     keep = np.ones(n, dtype=bool) if keep is None else keep
@@ -262,7 +327,11 @@ def contrast_of(*, rows: object, a: np.ndarray, b: np.ndarray, keep: np.ndarray 
 
 def reading_dict(*, reading: score729.ContrastReading) -> dict[str, float]:
     """Return a contrast reading as a plain dictionary (point, ends, rows, Kish numbers, widening)."""
-    return {**score730.contrast_dict(reading=reading), "kish_blocks": float(reading.kish_blocks), "kish_segments": float(reading.kish_segments)}
+    return {
+        **score730.contrast_dict(reading=reading),
+        "kish_blocks": float(reading.kish_blocks),
+        "kish_segments": float(reading.kish_segments),
+    }
 
 
 def log_loss_opposes(*, brier_point: float, log_loss_point: float) -> bool:

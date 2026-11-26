@@ -102,25 +102,43 @@ def test_limit_problems_catch_a_different_pooled_limit_and_empty_bands() -> None
 
 
 def test_transfer_word_covers_every_case() -> None:
-    gain, none, loss = reading(-0.01, -0.02, -0.005), reading(0.0, -0.01, 0.01), reading(0.01, 0.005, 0.02)
+    gain, none, loss = (
+        reading(-0.01, -0.02, -0.005),
+        reading(0.0, -0.01, 0.01),
+        reading(0.01, 0.005, 0.02),
+    )
     assert core.transfer_word(c5=gain, f1=0.7, reachable=True) == "works"
     assert core.transfer_word(c5=gain, f1=0.5, reachable=True) == "works only in Brier score"
     assert core.transfer_word(c5=none, f1=0.9, reachable=True) == "no better than the rule"
     assert core.transfer_word(c5=loss, f1=0.9, reachable=True) == "worse than the rule"
     assert core.transfer_word(c5=gain, f1=0.9, reachable=False) == "void"
-    assert core.transfer_word(c5=reading(float("nan"), float("nan"), float("nan")), f1=0.9, reachable=True) == "void"
+    assert (
+        core.transfer_word(
+            c5=reading(float("nan"), float("nan"), float("nan")), f1=0.9, reachable=True
+        )
+        == "void"
+    )
 
 
 def test_projection_prices_each_arm_at_its_own_rate_and_stops_over_the_line() -> None:
     secs = {"U*": 1.6, "U-NC": 1.1, "S+": 0.45, "U-SG": 1.6, "U*-L": 2.1}
     hours = core.projected_hours(seconds_per_epoch=secs)
     assert hours == pytest.approx((3 * 300 * (1.6 + 1.1 + 1.1 + 0.45 + 1.6 + 2.1)) / 3600 + 0.3)
-    report = core.timing_gate_report(seconds_per_epoch=secs, peak_gpu_gb=3.0, peak_rss_gb=5.0, pair_seconds_per_epoch=0.2)
+    report = core.timing_gate_report(
+        seconds_per_epoch=secs, peak_gpu_gb=3.0, peak_rss_gb=5.0, pair_seconds_per_epoch=0.2
+    )
     assert core.timing_gate_passes(report=report, manager_approved=False)
-    slow = core.timing_gate_report(seconds_per_epoch={k: 40.0 for k in secs}, peak_gpu_gb=3.0, peak_rss_gb=5.0, pair_seconds_per_epoch=0.2)
+    slow = core.timing_gate_report(
+        seconds_per_epoch={k: 40.0 for k in secs},
+        peak_gpu_gb=3.0,
+        peak_rss_gb=5.0,
+        pair_seconds_per_epoch=0.2,
+    )
     assert not core.timing_gate_passes(report=slow, manager_approved=False)
     assert core.timing_gate_passes(report=slow, manager_approved=True)
-    big = core.timing_gate_report(seconds_per_epoch=secs, peak_gpu_gb=7.0, peak_rss_gb=5.0, pair_seconds_per_epoch=0.2)
+    big = core.timing_gate_report(
+        seconds_per_epoch=secs, peak_gpu_gb=7.0, peak_rss_gb=5.0, pair_seconds_per_epoch=0.2
+    )
     assert not core.timing_gate_passes(report=big, manager_approved=True)
     with pytest.raises(KeyError):
         core.projected_hours(seconds_per_epoch={"U*": 1.0})
@@ -128,8 +146,18 @@ def test_projection_prices_each_arm_at_its_own_rate_and_stops_over_the_line() ->
 
 def test_arm_weights_follow_the_plan() -> None:
     a = core.ARMS
-    assert a["U*"].weights["injection"] == a["U*"].weights["night"] == a["U*"].weights["monotone"] == 0.02
-    assert a["U-NC"].weights["injection"] == a["U-NC"].weights["night"] == a["U-NC"].weights["monotone"] == 0.0
+    assert (
+        a["U*"].weights["injection"]
+        == a["U*"].weights["night"]
+        == a["U*"].weights["monotone"]
+        == 0.02
+    )
+    assert (
+        a["U-NC"].weights["injection"]
+        == a["U-NC"].weights["night"]
+        == a["U-NC"].weights["monotone"]
+        == 0.0
+    )
     assert a["U-NCw"].weights["solar"] == 0.08 and a["U-NC"].weights["solar"] == 0.02
     assert all(v == 0.0 for k, v in a["S+"].weights.items() if k != "sign") and not a["S+"].heads
     assert a["U-SG"].stop_gradient and not a["U*"].stop_gradient
@@ -149,5 +177,7 @@ def test_every_arm_has_a_family_and_the_families_cover_the_fits() -> None:
 
 
 def test_panels_g10_to_g17_are_listed() -> None:
-    assert sorted(core.PANEL_REQUIREMENTS) == sorted([*core.GALLERY_PUBLISHED, *core.GALLERY_PRIVATE_ONLY])
+    assert sorted(core.PANEL_REQUIREMENTS) == sorted(
+        [*core.GALLERY_PUBLISHED, *core.GALLERY_PRIVATE_ONLY]
+    )
     assert len(core.PANEL_REQUIREMENTS) == 8

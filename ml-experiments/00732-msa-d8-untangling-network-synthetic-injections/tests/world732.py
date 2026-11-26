@@ -24,7 +24,9 @@ MONTHS = ("2022-03", "2022-04")
 WORLDS = ("none", "engine", "solar", "both")
 
 
-def make_bank(*, draws_per_world: int = 3, seed: int = 0, n_days: int = 62) -> tuple[sim.Calendar, list[sim.Segment]]:
+def make_bank(
+    *, draws_per_world: int = 3, seed: int = 0, n_days: int = 62
+) -> tuple[sim.Calendar, list[sim.Segment]]:
     """Return a calendar and `draws_per_world` segments of each world type in each of two months."""
     cal = make_calendar(n_days=n_days, seed=seed)
     segments = []
@@ -33,7 +35,13 @@ def make_bank(*, draws_per_world: int = 3, seed: int = 0, n_days: int = 62) -> t
             for k in range(draws_per_world):
                 rng = np.random.default_rng([seed, m, w, k])
                 segments.append(
-                    sim.simulate_segment(cal=cal, month=month, use=np.ones(len(cal.dates), bool), world=world, rng=rng)
+                    sim.simulate_segment(
+                        cal=cal,
+                        month=month,
+                        use=np.ones(len(cal.dates), bool),
+                        world=world,
+                        rng=rng,
+                    )
                 )
     return cal, segments
 

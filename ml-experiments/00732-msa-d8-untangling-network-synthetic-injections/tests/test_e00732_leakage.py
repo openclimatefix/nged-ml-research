@@ -49,7 +49,9 @@ def test_writes_into_other_experiments_data_folders_fire(tmp_path) -> None:
     mine.mkdir()
     leak.assert_stage_wrote_nothing_in(written=[mine / "a.json"], forbidden_roots=[other])
     with pytest.raises(leak.CorrectnessFailureError):
-        leak.assert_stage_wrote_nothing_in(written=[mine / "a.json", other / "b.json"], forbidden_roots=[other])
+        leak.assert_stage_wrote_nothing_in(
+            written=[mine / "a.json", other / "b.json"], forbidden_roots=[other]
+        )
 
 
 def test_limits_must_be_older_than_every_fit_record(tmp_path) -> None:

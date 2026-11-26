@@ -28,10 +28,14 @@ def _fail(*, message: str) -> None:
     raise CorrectnessFailureError(message)
 
 
-def assert_inputs_not_targets(*, windows: np.ndarray, targets: np.ndarray, delta: np.ndarray | None = None) -> None:
+def assert_inputs_not_targets(
+    *, windows: np.ndarray, targets: np.ndarray, delta: np.ndarray | None = None
+) -> None:
     """Check that no input channel of any window equals the solar target, a step target, delta, or the base demand."""
     for i in range(len(windows)):
-        if arms.input_equals_target(window=windows[i], targets=targets[i], delta=None if delta is None else delta[i]):
+        if arms.input_equals_target(
+            window=windows[i], targets=targets[i], delta=None if delta is None else delta[i]
+        ):
             _fail(message="an input channel equals a target row of the scored day")
 
 
@@ -56,7 +60,9 @@ def assert_seed_spaces_disjoint() -> None:
         _fail(message="two training seeds share an overlay seed")
 
 
-def assert_overlay_depends_only_on_its_segment(*, segments: Sequence[object], kind: str, seed: int | None) -> None:
+def assert_overlay_depends_only_on_its_segment(
+    *, segments: Sequence[object], kind: str, seed: int | None
+) -> None:
     """Check that the overlay of a segment does not change when the other segments of the bank change.
 
     The overlay of segment `i` is built alone and compared with the overlay built inside the whole list.
@@ -74,7 +80,9 @@ def assert_pair_index_from_own_bank(*, index: ov.PairIndex, segments: Sequence[o
         _fail(message="the pair index was built from another bank's segments")
 
 
-def assert_stage_wrote_nothing_in(*, written: Sequence[Path], forbidden_roots: Sequence[Path]) -> None:
+def assert_stage_wrote_nothing_in(
+    *, written: Sequence[Path], forbidden_roots: Sequence[Path]
+) -> None:
     """Check that no written path lies in experiment 730's or experiment 729's data folder."""
     for root in forbidden_roots:
         assert_nothing_written_to(written=written, forbidden_root=root)

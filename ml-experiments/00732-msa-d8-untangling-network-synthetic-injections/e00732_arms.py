@@ -93,7 +93,9 @@ def prepare(
     Returns:
         The prepared segments; `source_index` is the segment's position in the bank.
     """
-    base = arms730.prepare_segments(segments=[o.seg for o in overlays], spec=STACK_SPEC, holidays=holidays, stats=stats)
+    base = arms730.prepare_segments(
+        segments=[o.seg for o in overlays], spec=STACK_SPEC, holidays=holidays, stats=stats
+    )
     return [
         Prepared(
             base=b, q=overlays[b.source_index].q.reshape(-1), bsp=overlays[b.source_index].seg.bsp.reshape(-1),
@@ -108,7 +110,10 @@ def prepare_plain(
     *, segments: Sequence, holidays: np.ndarray, stats: arms729.InputStats
 ) -> list[Prepared]:
     """Return the prepared segments of a bank or real set with no load transfer (all zeros)."""
-    overlays = [ov.apply_transfers(seg=s, transfers=[]) if "beta" in s.params else _no_transfer(seg=s) for s in segments]
+    overlays = [
+        ov.apply_transfers(seg=s, transfers=[]) if "beta" in s.params else _no_transfer(seg=s)
+        for s in segments
+    ]
     return prepare(overlays=overlays, holidays=holidays, stats=stats)
 
 
@@ -168,7 +173,9 @@ def injected_window(
     scored = delta_flat[day * 48 : day * 48 + 48]
     target[T["x"]] -= scored
     target[T["solar"]] += scored
-    target[T["r"]] = np.nan_to_num(ov.refold(x=target[T["x"]], q=p.q[day * 48 : day * 48 + 48]), nan=0.0)
+    target[T["r"]] = np.nan_to_num(
+        ov.refold(x=target[T["x"]], q=p.q[day * 48 : day * 48 + 48]), nan=0.0
+    )
     return out, target, scored.astype(np.float32)
 
 
@@ -179,7 +186,9 @@ def raised_window(*, plain: np.ndarray, eps: float) -> np.ndarray:
     return out
 
 
-def keeps_of(*, p: Prepared, day: int, window: np.ndarray, hidden: np.ndarray | None, target: np.ndarray) -> np.ndarray:
+def keeps_of(
+    *, p: Prepared, day: int, window: np.ndarray, hidden: np.ndarray | None, target: np.ndarray
+) -> np.ndarray:
     """Return the `(7, 48)` keeps of the scored day, in the order of `KEEP_ROWS`.
 
     The sign, step, size, and injection terms drop hidden half-hours; the solar term keeps them.
@@ -257,14 +266,18 @@ def build_triple(
         if delta_flat is None:
             inj, inj_target = plain.copy(), target.copy()
         else:
-            inj, inj_target, scored = injected_window(p=p, day=day, plain=plain, delta_flat=delta_flat)
+            inj, inj_target, scored = injected_window(
+                p=p, day=day, plain=plain, delta_flat=delta_flat
+            )
     raised = None
     if spec.raised:
         raised = raised_window(plain=plain, eps=core.TEST_EPS if eps is None else eps)
     return plain, inj, raised, target, inj_target, keeps, scored
 
 
-def collate(*, parts: Sequence[tuple], pair: Sequence[bool], amount: Sequence[float], spec: core.ArmSpec732) -> Batch:
+def collate(
+    *, parts: Sequence[tuple], pair: Sequence[bool], amount: Sequence[float], spec: core.ArmSpec732
+) -> Batch:
     """Stack the triples of a batch."""
     xs, xis, xcs, ts, tis, ks, ds = zip(*parts, strict=True)
     return Batch(
@@ -304,7 +317,9 @@ def make_batch(
             if sib is not None:
                 delta_flat = ov.delta_flat(index=index, sibling=sib, amount=a)
         eps = float(rng.uniform(*core.EPS_RANGE)) if spec.raised else None
-        parts.append(build_triple(p=p, day=day, spec=spec, hidden=hidden, delta_flat=delta_flat, eps=eps))
+        parts.append(
+            build_triple(p=p, day=day, spec=spec, hidden=hidden, delta_flat=delta_flat, eps=eps)
+        )
         pair.append(delta_flat is not None)
         amount.append(a if delta_flat is not None else 0.0)
     return collate(parts=parts, pair=pair, amount=amount, spec=spec)
@@ -340,7 +355,14 @@ def make_eval_batch(
             if sib is not None:
                 delta_flat = ov.delta_flat(index=index, sibling=sib, amount=amount)
         parts.append(
-            build_triple(p=p, day=day, spec=spec, hidden=None if hidden is None else hidden[i], delta_flat=delta_flat, eps=eps)
+            build_triple(
+                p=p,
+                day=day,
+                spec=spec,
+                hidden=None if hidden is None else hidden[i],
+                delta_flat=delta_flat,
+                eps=eps,
+            )
         )
         pair.append(delta_flat is not None)
         amt.append(amount if delta_flat is not None and amount is not None else 0.0)
@@ -358,7 +380,9 @@ def eval_spec(*, inject: bool = False, raised: bool = False) -> core.ArmSpec732:
     return core.ArmSpec732("eval", "unet", True, core.BASE_WEIGHTS, inject=inject, raised=raised)
 
 
-def input_equals_target(*, window: np.ndarray, targets: np.ndarray, delta: np.ndarray | None = None) -> bool:
+def input_equals_target(
+    *, window: np.ndarray, targets: np.ndarray, delta: np.ndarray | None = None
+) -> bool:
     """Return whether any input channel equals a target row of the scored day (the leakage check).
 
     The truth, engine, base-demand, and solar rows are compared as experiment 730 does; the step
@@ -379,7 +403,9 @@ def input_equals_target(*, window: np.ndarray, targets: np.ndarray, delta: np.nd
                 continue
             if np.allclose(channel, row, atol=1e-6):
                 return True
-            if row is not delta_row and np.allclose(channel, row / (np.abs(row).max() or 1.0), atol=1e-6):
+            if row is not delta_row and np.allclose(
+                channel, row / (np.abs(row).max() or 1.0), atol=1e-6
+            ):
                 return True
     return False
 
@@ -389,6 +415,8 @@ def all_picks(*, prepared: Sequence[Prepared]) -> list[tuple[int, int]]:
     return [(i, int(d)) for i, p in enumerate(prepared) for d in p.days]
 
 
-def sample_picks(*, prepared: Sequence[Prepared], n: int, rng: np.random.Generator) -> list[tuple[int, int]]:
+def sample_picks(
+    *, prepared: Sequence[Prepared], n: int, rng: np.random.Generator
+) -> list[tuple[int, int]]:
     """Draw `n` picks, half from segments with real BSP steps (experiment 729's sampler)."""
     return arms729.sample_picks(prepared=prepared, n=n, rng=rng)  # ty: ignore[invalid-argument-type]

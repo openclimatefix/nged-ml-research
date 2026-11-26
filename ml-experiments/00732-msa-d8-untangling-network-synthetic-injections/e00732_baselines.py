@@ -30,7 +30,9 @@ def signed_reading_estimate(*, p: np.ndarray, r: np.ndarray) -> np.ndarray:
     return np.where(p > 0.5, -m, m)
 
 
-def solar_from_demand(*, demand: np.ndarray, p: np.ndarray, r: np.ndarray, cosz: np.ndarray) -> np.ndarray:
+def solar_from_demand(
+    *, demand: np.ndarray, p: np.ndarray, r: np.ndarray, cosz: np.ndarray
+) -> np.ndarray:
     """Return max(0, demand - X-hat) on sun-up half-hours and 0 at night, for one seed (or a seed mean).
 
     Args:
@@ -46,23 +48,41 @@ def solar_from_demand(*, demand: np.ndarray, p: np.ndarray, r: np.ndarray, cosz:
     return np.where(cosz > core.SUN_UP_COSZ, est, 0.0)
 
 
-def b_pv2(*, demand_by_seed: Sequence[np.ndarray], p_by_seed: Sequence[np.ndarray], r: np.ndarray, cosz: np.ndarray) -> np.ndarray:
+def b_pv2(
+    *,
+    demand_by_seed: Sequence[np.ndarray],
+    p_by_seed: Sequence[np.ndarray],
+    r: np.ndarray,
+    cosz: np.ndarray,
+) -> np.ndarray:
     """Return B-PV2: the rule per seed of SD*, averaged over seeds 0 to 2 (it fails on a seed count that is not 3)."""
     if len(demand_by_seed) != len(core.SEEDS) or len(p_by_seed) != len(core.SEEDS):
         msg = "B-PV2 needs the three seeds of SD* (a missing seed makes the baseline void)"
         raise ValueError(msg)
-    return np.mean([solar_from_demand(demand=d, p=p, r=r, cosz=cosz) for d, p in zip(demand_by_seed, p_by_seed, strict=True)], axis=0)
+    return np.mean(
+        [
+            solar_from_demand(demand=d, p=p, r=r, cosz=cosz)
+            for d, p in zip(demand_by_seed, p_by_seed, strict=True)
+        ],
+        axis=0,
+    )
 
 
-def b_pv1(*, demand_median: np.ndarray, p_by_seed: Sequence[np.ndarray], r: np.ndarray, cosz: np.ndarray) -> np.ndarray:
+def b_pv1(
+    *, demand_median: np.ndarray, p_by_seed: Sequence[np.ndarray], r: np.ndarray, cosz: np.ndarray
+) -> np.ndarray:
     """Return B-PV1: the same rule with the climatology median in place of the demand output, on S's P(X<0)."""
     if len(p_by_seed) != len(core.SEEDS):
         msg = "B-PV1 needs the three seeds of S"
         raise ValueError(msg)
-    return np.mean([solar_from_demand(demand=demand_median, p=p, r=r, cosz=cosz) for p in p_by_seed], axis=0)
+    return np.mean(
+        [solar_from_demand(demand=demand_median, p=p, r=r, cosz=cosz) for p in p_by_seed], axis=0
+    )
 
 
-def bt_features(*, r: np.ndarray, bsp: np.ndarray, cosz: np.ndarray, valid: np.ndarray) -> np.ndarray:
+def bt_features(
+    *, r: np.ndarray, bsp: np.ndarray, cosz: np.ndarray, valid: np.ndarray
+) -> np.ndarray:
     """Return B-T's five inputs per half-hour, `(P, 48, 5)`, from the reading and the BSP step of each window.
 
     The inputs are the absolute half-hour change of the reading, that change over the window's median
@@ -83,13 +103,17 @@ def bt_features(*, r: np.ndarray, bsp: np.ndarray, cosz: np.ndarray, valid: np.n
     dr = np.zeros_like(r, dtype=np.float64)
     dr[:, 1:] = np.where(valid[:, 1:] & valid[:, :-1], r[:, 1:] - r[:, :-1], 0.0)
     a = np.abs(dr)
-    med = np.array([np.median(row[v]) if v.any() else 0.0 for row, v in zip(a, valid, strict=True)])[:, None]
+    med = np.array(
+        [np.median(row[v]) if v.any() else 0.0 for row, v in zip(a, valid, strict=True)]
+    )[:, None]
     scaled = a / np.maximum(med, 1e-3)
     db = np.abs(np.nan_to_num(bsp, nan=0.0))
     return np.stack([a, scaled, db, np.abs(a - db), cosz], axis=-1)
 
 
-def fit_logistic(*, features: np.ndarray, y: np.ndarray, ridge: float = 1e-3, steps: int = 50) -> np.ndarray:
+def fit_logistic(
+    *, features: np.ndarray, y: np.ndarray, ridge: float = 1e-3, steps: int = 50
+) -> np.ndarray:
     """Return the weights (bias first) of a ridge-penalised logistic regression fitted with Newton steps.
 
     Args:

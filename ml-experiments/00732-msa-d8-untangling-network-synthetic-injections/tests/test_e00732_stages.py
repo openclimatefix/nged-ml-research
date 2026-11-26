@@ -24,9 +24,13 @@ def folders(tmp_path, monkeypatch):
 
 def test_banks_stage_verifies_records_once_and_marks_the_run(folders) -> None:
     root, root730, world = folders
-    record = stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
+    record = stages.stage_banks(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print
+    )
     assert record["n_rows"] == world["n"] and (root / "run_marker.json").exists()
-    again = stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
+    again = stages.stage_banks(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print
+    )
     assert again == record
 
 
@@ -75,7 +79,10 @@ def test_limits_are_written_once_and_a_wrong_pooled_limit_stops(folders, monkeyp
     stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
     rec = stages.stage_limits(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
     assert set(rec["bands"]) == set(core.BANDS) and rec["n_rows"] == world["n"]
-    assert stages.stage_limits(root=root, root730=root730, holidays=world["cal"].holidays, log=print) == rec
+    assert (
+        stages.stage_limits(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
+        == rec
+    )
     (root / "limits.json").unlink()
     monkeypatch.setattr(core, "POOLED_LIMIT_730", 0.5)
     with pytest.raises(stages.StoppedError, match="pooled limit"):
@@ -100,7 +107,10 @@ def test_guard_orders_the_stages_and_a_recorded_failure_ends_the_run(folders) ->
         stages.guard_run(root=root, root730=root730, stage="fit")
     gallery = root / "PRIVATE" / "gallery"
     gallery.mkdir(parents=True)
-    ok = {"banks_digest": stages.banks730.banks_digest_id(root=root730), "panels": dict.fromkeys(core.PANEL_REQUIREMENTS, True)}
+    ok = {
+        "banks_digest": stages.banks730.banks_digest_id(root=root730),
+        "panels": dict.fromkeys(core.PANEL_REQUIREMENTS, True),
+    }
     (gallery / "panel_check.json").write_text(json.dumps(ok))
     stages.guard_run(root=root, root730=root730, stage="timing")
     with pytest.raises(RuntimeError, match="timing"):
@@ -124,14 +134,23 @@ def test_guard_orders_the_stages_and_a_recorded_failure_ends_the_run(folders) ->
 def test_overlays_stage_passes_on_the_invented_bank_and_writes_digests(folders) -> None:
     root, root730, world = folders
     stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
-    summary = stages.stage_overlays(root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1))
-    assert summary["pass"] and set(summary["banks"]) == {"train_s0", "train_s1", "validation", "test"}
+    summary = stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1)
+    )
+    assert summary["pass"] and set(summary["banks"]) == {
+        "train_s0",
+        "train_s1",
+        "validation",
+        "test",
+    }
     on_disk = json.loads((root / "overlays" / "summary.json").read_text())
     assert on_disk["digests"]["test"] == summary["banks"]["test"]["digest"]
     assert stages.overlays_passed(root=root)
     assert summary["banks"]["test"]["reachability"]["transfer_steps_5_points"]["pass"]
     assert all(v["n"] > 0 for v in summary["banks"]["test"]["transfer_checks"].values())
-    summary2 = stages.stage_overlays(root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1))
+    summary2 = stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1)
+    )
     assert summary2["banks"]["test"]["digest"] == summary["banks"]["test"]["digest"]
 
 
@@ -140,7 +159,9 @@ def test_overlays_stage_stops_on_a_short_reachability_count(folders, monkeypatch
     stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
     monkeypatch.setattr(core, "MIN_TRANSFER_STEPS_TEST", 10**9)
     with pytest.raises(stages.StoppedError, match="reachability"):
-        stages.stage_overlays(root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,))
+        stages.stage_overlays(
+            root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,)
+        )
     assert not stages.overlays_passed(root=root)
 
 
@@ -149,22 +170,35 @@ def test_overlays_stage_stops_when_a_training_month_lacks_sibling_pairs(folders)
     import e00729_banks as banks729
 
     no_solar = [s for s in world["segments"] if s.world in ("none", "engine")]
-    bank = banks729.Bank(kind="train", seed=0, root=0, none_share={}, segments=no_solar, digest=banks729.bank_digest(segments=no_solar))
+    bank = banks729.Bank(
+        kind="train",
+        seed=0,
+        root=0,
+        none_share={},
+        segments=no_solar,
+        digest=banks729.bank_digest(segments=no_solar),
+    )
     banks729.save_bank(bank=bank, path=root730 / "banks" / "train_s0.pkl")
     summary = json.loads((root730 / "banks" / "summary.json").read_text())
     summary["digests"]["train_s0"] = bank.digest
     (root730 / "banks" / "summary.json").write_text(json.dumps(summary))
     stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
     with pytest.raises(stages.StoppedError, match="sibling pairs"):
-        stages.stage_overlays(root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,))
+        stages.stage_overlays(
+            root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,)
+        )
 
 
-def test_overlays_stage_stops_when_the_training_reverse_share_moves_by_more_than_ten_percent(folders, monkeypatch) -> None:
+def test_overlays_stage_stops_when_the_training_reverse_share_moves_by_more_than_ten_percent(
+    folders, monkeypatch
+) -> None:
     root, root730, world = folders
     stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
     monkeypatch.setattr(core, "TRAIN_REVERSE_SHARE_TOLERANCE", -1.0)
     with pytest.raises(stages.StoppedError, match="reverse flow"):
-        stages.stage_overlays(root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,))
+        stages.stage_overlays(
+            root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,)
+        )
 
 
 def test_experiment_730s_folder_is_never_written(folders) -> None:
@@ -175,7 +209,9 @@ def test_experiment_730s_folder_is_never_written(folders) -> None:
     try:
         stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
         stages.stage_limits(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
-        stages.stage_overlays(root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,))
+        stages.stage_overlays(
+            root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,)
+        )
     finally:
         for p in root730.rglob("*"):
             p.chmod(p.stat().st_mode | stat.S_IWUSR)

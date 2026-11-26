@@ -58,13 +58,29 @@ class Truth:
         return self.t[:, arms.T[name]]
 
 
-def truth(*, prepared: Sequence[arms.Prepared], index: ov.PairIndex | None = None, amount: float | None = None, eps: float | None = None, picks: list[tuple[int, int]] | None = None) -> Truth:
+def truth(
+    *,
+    prepared: Sequence[arms.Prepared],
+    index: ov.PairIndex | None = None,
+    amount: float | None = None,
+    eps: float | None = None,
+    picks: list[tuple[int, int]] | None = None,
+) -> Truth:
     """Return the truth arrays of every scored day of `prepared`, with the injected member's targets when an amount is given."""
     picks = arms.all_picks(prepared=prepared) if picks is None else picks
     spec = arms.eval_spec(inject=amount is not None, raised=eps is not None)
-    parts: dict[str, list[np.ndarray]] = {k: [] for k in ("t", "ti", "pair", "delta", "cosz", "csi", "dbsp", "raisable")}
+    parts: dict[str, list[np.ndarray]] = {
+        k: [] for k in ("t", "ti", "pair", "delta", "cosz", "csi", "dbsp", "raisable")
+    }
     for i in range(0, len(picks), CHUNK):
-        b = arms.make_eval_batch(prepared=prepared, picks=picks[i : i + CHUNK], spec=spec, index=index, amount=amount, eps=eps)
+        b = arms.make_eval_batch(
+            prepared=prepared,
+            picks=picks[i : i + CHUNK],
+            spec=spec,
+            index=index,
+            amount=amount,
+            eps=eps,
+        )
         parts["t"].append(b.t)
         if b.ti is not None:
             parts["ti"].append(b.ti)
@@ -76,4 +92,14 @@ def truth(*, prepared: Sequence[arms.Prepared], index: ov.PairIndex | None = Non
         parts["dbsp"].append(b.x[:, arms.ROW["d_bsp"], scored])
         parts["raisable"].append(b.keeps[:, arms.K["raisable"]] > 0.5)
     cat = {k: np.concatenate(v) if v else None for k, v in parts.items()}
-    return Truth(t=cat["t"], ti=cat["ti"], pair=cat["pair"], delta=cat["delta"], cosz=cat["cosz"], csi=cat["csi"], dbsp=cat["dbsp"], keep_raisable=cat["raisable"], picks=picks)  # ty: ignore[invalid-argument-type]
+    return Truth(
+        t=cat["t"],
+        ti=cat["ti"],
+        pair=cat["pair"],
+        delta=cat["delta"],
+        cosz=cat["cosz"],
+        csi=cat["csi"],
+        dbsp=cat["dbsp"],
+        keep_raisable=cat["raisable"],
+        picks=picks,
+    )  # ty: ignore[invalid-argument-type]

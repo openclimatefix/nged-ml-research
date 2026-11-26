@@ -61,26 +61,44 @@ def terms(
     Returns:
         The terms by name (`sign` always; the others only for an arm with the extra heads).
     """
-    out = {"sign": masked_mean(per=nets729.sign_bce(raw=raw_w[:, :1], x=t[:, T["x"]]), keep=keeps[:, K["sign"]])}
+    out = {
+        "sign": masked_mean(
+            per=nets729.sign_bce(raw=raw_w[:, :1], x=t[:, T["x"]]), keep=keeps[:, K["sign"]]
+        )
+    }
     if raw_w.shape[1] == 1:
         return out
     pv_w = nets.solar_of(raw=raw_w[:, 1])
     event = t[:, T["event"]]
     pair_col = pair[:, None]
     solar = [(huber(error=pv_w - t[:, T["solar"]]), keeps[:, K["solar"]])]
-    step = [(F.binary_cross_entropy_with_logits(raw_w[:, 2], event, reduction="none"), keeps[:, K["step"]])]
+    step = [
+        (
+            F.binary_cross_entropy_with_logits(raw_w[:, 2], event, reduction="none"),
+            keeps[:, K["step"]],
+        )
+    ]
     pv_i = None
     if raw_i is not None and ti is not None:
         pv_i = nets.solar_of(raw=raw_i[:, 1])
         solar.append((huber(error=pv_i - ti[:, T["solar"]]), keeps[:, K["solar"]] * pair_col))
-        step.append((F.binary_cross_entropy_with_logits(raw_i[:, 2], event, reduction="none"), keeps[:, K["step"]] * pair_col))
+        step.append(
+            (
+                F.binary_cross_entropy_with_logits(raw_i[:, 2], event, reduction="none"),
+                keeps[:, K["step"]] * pair_col,
+            )
+        )
     out["solar"] = pooled_mean(parts=solar)
     out["step"] = pooled_mean(parts=step)
     size_pred = core.SIZE_SCALE * raw_w[:, 3]
-    out["size"] = masked_mean(per=huber(error=size_pred - t[:, T["size"]]), keep=keeps[:, K["size"]])
+    out["size"] = masked_mean(
+        per=huber(error=size_pred - t[:, T["size"]]), keep=keeps[:, K["size"]]
+    )
     night = [(pv_w, keeps[:, K["night"]])]
     if pv_i is not None:
-        out["injection"] = masked_mean(per=huber(error=(pv_i - pv_w) - delta), keep=keeps[:, K["injection"]] * pair_col)
+        out["injection"] = masked_mean(
+            per=huber(error=(pv_i - pv_w) - delta), keep=keeps[:, K["injection"]] * pair_col
+        )
         night.append((pv_i, keeps[:, K["night"]] * pair_col))
     out["night"] = pooled_mean(parts=night)
     if raw_c is not None:

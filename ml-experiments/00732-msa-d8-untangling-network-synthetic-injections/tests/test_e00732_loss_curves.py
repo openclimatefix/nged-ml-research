@@ -13,10 +13,23 @@ SHAPE_730 = {  # the keys of experiment 730's fit record, with this experiment's
 }  # fmt: skip
 
 
-def record(*, arm: str = "U*", epochs: int = 40, best: int = 30, terms: tuple[str, ...] = ("sign", "solar", "step", "total")) -> dict:
+def record(
+    *,
+    arm: str = "U*",
+    epochs: int = 40,
+    best: int = 30,
+    terms: tuple[str, ...] = ("sign", "solar", "step", "total"),
+) -> dict:
     rng = np.random.default_rng(0)
-    history = list(0.04 - 0.001 * np.minimum(np.arange(epochs), best - 1) + 0.0005 * np.maximum(np.arange(epochs) - (best - 1), 0))
-    hist = {k: [float(x) for x in np.exp(-np.arange(epochs) / 20) + 0.01 * rng.random(epochs)] for k in terms}
+    history = list(
+        0.04
+        - 0.001 * np.minimum(np.arange(epochs), best - 1)
+        + 0.0005 * np.maximum(np.arange(epochs) - (best - 1), 0)
+    )
+    hist = {
+        k: [float(x) for x in np.exp(-np.arange(epochs) / 20) + 0.01 * rng.random(epochs)]
+        for k in terms
+    }
     return {**SHAPE_730, "arm": arm, "arch": core.ARMS[arm].arch, "epochs": epochs, "best_epoch": best, "history": history,
             "train_terms": hist, "val_terms": {k: [v * 1.1 for v in vs] for k, vs in hist.items()}}  # fmt: skip
 
@@ -49,7 +62,9 @@ def test_an_empty_or_missing_history_fails_loudly() -> None:
         broken = {**r, key: {}}
         with pytest.raises(figures.HistoryError, match="no per-epoch loss history"):
             figures.curve_rows(record=broken)
-    legacy = {k: v for k, v in r.items() if k not in ("train_terms", "val_terms")}  # a record in experiment 730's shape
+    legacy = {
+        k: v for k, v in r.items() if k not in ("train_terms", "val_terms")
+    }  # a record in experiment 730's shape
     with pytest.raises(figures.HistoryError, match="no per-epoch loss history"):
         figures.loss_panel(record=legacy)
     with pytest.raises(figures.HistoryError, match="validation history"):
@@ -77,12 +92,23 @@ def test_the_stage_reads_stored_records_only_and_names_the_seed_in_the_title(tmp
     fits = tmp_path / "fits"
     fits.mkdir()
     for arm, spec in core.ARMS.items():
-        terms = ("sign", "total") if arm == "S+" else ("sign", "solar", "step", "size", "injection", "night", "monotone", "total")
-        (fits / f"{core.job_name(arm=arm, arch=spec.arch, seed=0)}.json").write_text(json.dumps(record(arm=arm, terms=terms)))
+        terms = (
+            ("sign", "total")
+            if arm == "S+"
+            else ("sign", "solar", "step", "size", "injection", "night", "monotone", "total")
+        )
+        (fits / f"{core.job_name(arm=arm, arch=spec.arch, seed=0)}.json").write_text(
+            json.dumps(record(arm=arm, terms=terms))
+        )
     logged = []
     written = figures.stage_loss_curves(root=tmp_path, log=logged.append)
     svg = written[0].read_text()
-    assert written[0].name == "loss_curves.svg" and "<svg" in svg and "seed 0" in svg and "stored model at epoch 30" in svg
+    assert (
+        written[0].name == "loss_curves.svg"
+        and "<svg" in svg
+        and "seed 0" in svg
+        and "stored model at epoch 30" in svg
+    )
     assert len(logged) == 1
     (fits / f"{core.job_name(arm='U-SG', arch='unet', seed=0)}.json").unlink()
     with pytest.raises(FileNotFoundError, match="U-SG|USG"):

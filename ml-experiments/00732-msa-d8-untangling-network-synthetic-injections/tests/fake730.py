@@ -14,9 +14,20 @@ def build(*, root: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     """Write banks, summary, margin, and stored predictions under `root` and return the pieces the tests need."""
     cal, segs = make_bank(draws_per_world=3)
     digests = {}
-    kinds = [("train", s) for s in seeds] + [("validation", None), ("test", None), ("shifted", None)]
+    kinds = [("train", s) for s in seeds] + [
+        ("validation", None),
+        ("test", None),
+        ("shifted", None),
+    ]
     for kind, seed in kinds:
-        bank = banks729.Bank(kind=kind, seed=seed, root=0, none_share={}, segments=segs, digest=banks729.bank_digest(segments=segs))
+        bank = banks729.Bank(
+            kind=kind,
+            seed=seed,
+            root=0,
+            none_share={},
+            segments=segs,
+            digest=banks729.bank_digest(segments=segs),
+        )
         path = root / "banks" / (f"{kind}_s{seed}.pkl" if seed is not None else f"{kind}.pkl")
         banks729.save_bank(bank=bank, path=path)
         digests[f"{kind}_s{seed}" if seed is not None else kind] = bank.digest
@@ -31,9 +42,14 @@ def build(*, root: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
             p = np.clip(0.8 * p_true + 0.05 + 0.02 * rng.random(rows.n), 0, 1)
             arrays = {"p": p.astype(np.float32)}
             if arm == "SD-R":
-                arrays |= {"demand_mu": np.abs(rows.r).astype(np.float32), "demand_s": np.ones(rows.n, np.float32)}
+                arrays |= {
+                    "demand_mu": np.abs(rows.r).astype(np.float32),
+                    "demand_s": np.ones(rows.n, np.float32),
+                }
             np.savez(folder / "test.npz", **arrays)
-    (root / "margin.json").write_text(json.dumps({"margin": 0.00122, "floor": 0.0007, "val_brier_s_by_seed": [0.1]}))
+    (root / "margin.json").write_text(
+        json.dumps({"margin": 0.00122, "floor": 0.0007, "val_brier_s_by_seed": [0.1]})
+    )
     return {"cal": cal, "segments": segs, "rows": rows, "n": rows.n}
 
 

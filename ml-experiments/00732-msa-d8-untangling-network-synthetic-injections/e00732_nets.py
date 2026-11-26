@@ -74,7 +74,11 @@ class Net(nn.Module):
         self.extra: nn.Module | None = None
         if heads:
             width = HIDDEN[arch]
-            self.extra = nn.Conv1d(width, EXTRA_OUTPUTS, 1) if arch == "unet" else nn.Linear(width, EXTRA_OUTPUTS)
+            self.extra = (
+                nn.Conv1d(width, EXTRA_OUTPUTS, 1)
+                if arch == "unet"
+                else nn.Linear(width, EXTRA_OUTPUTS)
+            )
 
     def features(self, x: torch.Tensor) -> torch.Tensor:
         """Return the backbone's last hidden layer."""

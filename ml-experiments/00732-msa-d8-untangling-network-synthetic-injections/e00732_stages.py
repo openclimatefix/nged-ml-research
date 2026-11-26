@@ -109,7 +109,11 @@ def invalid_recorded(*, root: Path) -> bool:
 
 def run_marker_payload(*, root730: Path) -> dict:
     """Return what the run marker holds: the experiment, the row set, and the id of experiment 730's banks."""
-    return {"experiment": "00732", "row_set_id": core.ROW_SET_ID, "banks_digest": banks730.banks_digest_id(root=root730)}
+    return {
+        "experiment": "00732",
+        "row_set_id": core.ROW_SET_ID,
+        "banks_digest": banks730.banks_digest_id(root=root730),
+    }
 
 
 def gallery_passed(*, root: Path, root730: Path) -> bool:
@@ -121,7 +125,11 @@ def gallery_passed(*, root: Path, root730: Path) -> bool:
     if record.get("banks_digest") != banks730.banks_digest_id(root=root730):
         return False
     panels = record.get("panels", {})
-    return bool(panels) and set(core.PANEL_REQUIREMENTS) <= set(panels) and all(bool(v) for v in panels.values())
+    return (
+        bool(panels)
+        and set(core.PANEL_REQUIREMENTS) <= set(panels)
+        and all(bool(v) for v in panels.values())
+    )
 
 
 def overlays_passed(*, root: Path) -> bool:
@@ -184,12 +192,25 @@ def job_name_730(*, arm: str, arch: str, seed: int) -> str:
     return f"{arm.replace('*', 'star')}_{arch}_s{seed}"
 
 
-def stored_predictions(*, root730: Path, arm: str, arch: str, seeds: Sequence[int] = STORED_SEEDS) -> list[Path]:
+def stored_predictions(
+    *, root730: Path, arm: str, arch: str, seeds: Sequence[int] = STORED_SEEDS
+) -> list[Path]:
     """Return the `test.npz` files of one stored arm of experiment 730, in seed order."""
-    return [root730 / "predictions" / job_name_730(arm=arm, arch=arch, seed=s) / "test.npz" for s in seeds]
+    return [
+        root730 / "predictions" / job_name_730(arm=arm, arch=arch, seed=s) / "test.npz"
+        for s in seeds
+    ]
 
 
-def load_stored(*, root730: Path, name: str, arm: str, arch: str, seeds: Sequence[int] = STORED_SEEDS, file: str = "test") -> list[dict[str, np.ndarray]]:
+def load_stored(
+    *,
+    root730: Path,
+    name: str,
+    arm: str,
+    arch: str,
+    seeds: Sequence[int] = STORED_SEEDS,
+    file: str = "test",
+) -> list[dict[str, np.ndarray]]:
     """Read one stored arm's arrays of every seed (read only)."""
     out = []
     for s in seeds:
@@ -245,11 +266,19 @@ def stage_banks(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) ->
             if any(a.shape[0] != rows.n for a in arrays.values()):
                 msg = f"a stored array of {name} seed {k} does not have {rows.n} rows"
                 raise leak.CorrectnessFailureError(msg)
-    canary = score730.mean_brier(p=seed_mean_p(arrays=load_stored(root730=root730, name="S", arm="S", arch="unet")), x=rows.x)
-    if round(canary, core.BRIER_CANARY_DECIMALS) != round(core.BRIER_CANARY, core.BRIER_CANARY_DECIMALS):
+    canary = score730.mean_brier(
+        p=seed_mean_p(arrays=load_stored(root730=root730, name="S", arm="S", arch="unet")), x=rows.x
+    )
+    if round(canary, core.BRIER_CANARY_DECIMALS) != round(
+        core.BRIER_CANARY, core.BRIER_CANARY_DECIMALS
+    ):
         msg = "the Brier canary of S does not reproduce experiment 730's printed value"
         raise leak.CorrectnessFailureError(msg)
-    files = {f"{name}_s{k}": file_digest(path=p) for name, (arm, arch) in CONTROL_FOLDERS.items() for k, p in enumerate(stored_predictions(root730=root730, arm=arm, arch=arch))}
+    files = {
+        f"{name}_s{k}": file_digest(path=p)
+        for name, (arm, arch) in CONTROL_FOLDERS.items()
+        for k, p in enumerate(stored_predictions(root730=root730, arm=arm, arch=arch))
+    }
     margin = read_json(path=root730 / "margin.json")
     if abs(float(margin["margin"]) - core.MARGIN_730) > 5e-6:
         msg = "experiment 730's margin.json does not hold the margin of the plan (verdict row 0)"
@@ -264,7 +293,10 @@ def stage_banks(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) ->
         if first["row_key_digest"] != record["row_key_digest"]:
             msg = "the row-key digest differs from the one recorded at the first run"
             raise leak.CorrectnessFailureError(msg)
-        if first["predictions"] != record["predictions"] or first["margin_json"] != record["margin_json"]:
+        if (
+            first["predictions"] != record["predictions"]
+            or first["margin_json"] != record["margin_json"]
+        ):
             msg = "experiment 730's stored predictions or margin.json differ from their recorded digests (verdict row 0)"
             raise StoppedError(msg)
     else:
@@ -292,7 +324,9 @@ def stage_limits(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) -
     path = root / "limits.json"
     if path.exists():
         return read_json(path=path)
-    record = core.write_limits_file(path=path, limits=limits, s=float(np.mean(rows.x < 0.0)), n_rows=rows.n)
+    record = core.write_limits_file(
+        path=path, limits=limits, s=float(np.mean(rows.x < 0.0)), n_rows=rows.n
+    )
     log("limits written: " + ", ".join(f"{k} {v.limit}" for k, v in limits.items()))
     return record
 
@@ -307,21 +341,40 @@ def share_json(*, shares: Mapping[str, ov.Share]) -> dict[str, dict[str, float]]
 
 def failed_shares(*, shares: Mapping[str, ov.Share], where: str) -> list[str]:
     """Return a line for each share that has no cases or is below `MIN_OUTPUT_SHARE`."""
-    return [f"{where}: {k} reads {v.value:.4f} on {v.n} cases" for k, v in shares.items() if not ov.share_passes(share=v)]
+    return [
+        f"{where}: {k} reads {v.value:.4f} on {v.n} cases"
+        for k, v in shares.items()
+        if not ov.share_passes(share=v)
+    ]
 
 
 def reverse_share(*, segments: Sequence[Any], holidays: np.ndarray) -> float:
     """Return the share of scored half-hours with a negative truth (the sign-supervised half-hours, hidden spans aside)."""
-    return float(np.mean(score729.rows_from_segments(segments=list(segments), holidays=holidays).x < 0.0))
+    return float(
+        np.mean(score729.rows_from_segments(segments=list(segments), holidays=holidays).x < 0.0)
+    )
 
 
-def overlay_stage_bank(*, name: str, segments: Sequence[Any], kind: str, seed: int | None, holidays: np.ndarray, test: bool) -> tuple[dict, list[str]]:
+def overlay_stage_bank(
+    *,
+    name: str,
+    segments: Sequence[Any],
+    kind: str,
+    seed: int | None,
+    holidays: np.ndarray,
+    test: bool,
+) -> tuple[dict, list[str]]:
     """Build one bank's overlays and return its record and the problems found (component shares, counts, digests)."""
     overlays = ov.overlay_segments(segments=segments, kind=kind, seed=seed)
-    problems = failed_shares(shares=ov.transfer_checks(overlays=overlays, originals=segments), where=name)
+    problems = failed_shares(
+        shares=ov.transfer_checks(overlays=overlays, originals=segments), where=name
+    )
     index = ov.build_pair_index(segments=segments)
     unpaired = index.share_unpaired()
-    problems += [f"{name}: {p} lacks sibling pairs for more than 5% of its windows" for p in ov.unpaired_problems(share_unpaired=unpaired)]
+    problems += [
+        f"{name}: {p} lacks sibling pairs for more than 5% of its windows"
+        for p in ov.unpaired_problems(share_unpaired=unpaired)
+    ]
     record: dict[str, Any] = {
         "digest": ov.overlay_digest(overlays=overlays), "n_transfers": int(sum(len(o.transfers) for o in overlays)),
         "share_unpaired_by_month_position": [float(unpaired[m]) for m in sorted(unpaired)],
@@ -334,18 +387,37 @@ def overlay_stage_bank(*, name: str, segments: Sequence[Any], kind: str, seed: i
             checks = ov.pair_checks(segments=segments, index=index, amount=a)
             problems += failed_shares(shares=checks, where=f"{name} pairs at {a:g}")
             record[f"pair_checks_{a:g}"] = share_json(shares=checks)
-            windows[a] = sum(1 for (i, d) in index.siblings if ov.fixed_sibling(index=index, segment=i, day=d) is not None)
+            windows[a] = sum(
+                1
+                for (i, d) in index.siblings
+                if ov.fixed_sibling(index=index, segment=i, day=d) is not None
+            )
         raised = ov.raised_checks(segments=segments)
         problems += failed_shares(shares={"raised": raised}, where=name)
         record["raised"] = share_json(shares={"raised": raised})["raised"]
         reach = ov.reachability(overlays=overlays, index=index, n_windows_by_amount=windows)
-        record["reachability"] = {k: {"count": v[0], "bar": v[1], "pass": v[2]} for k, v in reach.items()}
-        problems += [f"{name}: reachability {k} holds {v[0]} against {v[1]}" for k, v in reach.items() if not v[2]]
-    record["transfer_checks"] = share_json(shares=ov.transfer_checks(overlays=overlays, originals=segments))
+        record["reachability"] = {
+            k: {"count": v[0], "bar": v[1], "pass": v[2]} for k, v in reach.items()
+        }
+        problems += [
+            f"{name}: reachability {k} holds {v[0]} against {v[1]}"
+            for k, v in reach.items()
+            if not v[2]
+        ]
+    record["transfer_checks"] = share_json(
+        shares=ov.transfer_checks(overlays=overlays, originals=segments)
+    )
     return record, problems
 
 
-def stage_overlays(*, root: Path, root730: Path, holidays: np.ndarray, log: Log, train_seeds: Sequence[int] = range(5)) -> dict:
+def stage_overlays(
+    *,
+    root: Path,
+    root730: Path,
+    holidays: np.ndarray,
+    log: Log,
+    train_seeds: Sequence[int] = range(5),
+) -> dict:
     """Build every overlay on the CPU, run the component checks, and write `overlays/summary.json`.
 
     The stage stops at verdict row 0 when a component check fails or has no cases, a month lacks
@@ -360,18 +432,34 @@ def stage_overlays(*, root: Path, root730: Path, holidays: np.ndarray, log: Log,
     leak.assert_no_month_or_day_of_year()
     records: dict[str, Any] = {}
     problems: list[str] = []
-    jobs = [(f"train_s{s}", "train", s, False) for s in train_seeds] + [("validation", "validation", None, False), ("test", "test", None, True)]
+    jobs = [(f"train_s{s}", "train", s, False) for s in train_seeds] + [
+        ("validation", "validation", None, False),
+        ("test", "test", None, True),
+    ]
     for name, kind, seed, is_test in jobs:
         bank = banks729.load_bank(path=banks730.bank_path(root=root730, kind=kind, seed=seed))
-        leak.assert_overlay_depends_only_on_its_segment(segments=bank.segments[:6], kind=kind, seed=seed)
-        record, found = overlay_stage_bank(name=name, segments=bank.segments, kind=kind, seed=seed, holidays=holidays, test=is_test)
+        leak.assert_overlay_depends_only_on_its_segment(
+            segments=bank.segments[:6], kind=kind, seed=seed
+        )
+        record, found = overlay_stage_bank(
+            name=name, segments=bank.segments, kind=kind, seed=seed, holidays=holidays, test=is_test
+        )
         records[name], problems = record, problems + found
         log(f"overlay {name}: {record['n_transfers']} transfers, {len(found)} problems")
     stored = float(np.mean([records[f"train_s{s}"]["reverse_share_stored"] for s in train_seeds]))
-    withs = float(np.mean([records[f"train_s{s}"]["reverse_share_with_transfers"] for s in train_seeds]))
+    withs = float(
+        np.mean([records[f"train_s{s}"]["reverse_share_with_transfers"] for s in train_seeds])
+    )
     if not stored > 0.0 or abs(withs - stored) > core.TRAIN_REVERSE_SHARE_TOLERANCE * stored:
-        problems.append("the training share of reverse flow with the transfers differs from the stored share by more than 10%")
-    summary = {"banks": records, "reverse_share": {"stored": stored, "with_transfers": withs}, "problems": problems, "pass": not problems}
+        problems.append(
+            "the training share of reverse flow with the transfers differs from the stored share by more than 10%"
+        )
+    summary = {
+        "banks": records,
+        "reverse_share": {"stored": stored, "with_transfers": withs},
+        "problems": problems,
+        "pass": not problems,
+    }
     path = root / "overlays" / "summary.json"
     digests = {k: v["digest"] for k, v in records.items()}
     if path.exists() and read_json(path=path)["digests"] != digests:

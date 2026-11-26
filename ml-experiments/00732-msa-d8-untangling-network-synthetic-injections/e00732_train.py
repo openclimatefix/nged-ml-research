@@ -91,7 +91,9 @@ def tensor(*, array: np.ndarray | None, device: str) -> torch.Tensor | None:
     return torch.from_numpy(np.ascontiguousarray(array, dtype=np.float32)).to(device)
 
 
-def forward_members(*, net: torch.nn.Module, batch: arms.Batch, device: str) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
+def forward_members(
+    *, net: torch.nn.Module, batch: arms.Batch, device: str
+) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
     """Run the plain, injected, and raised windows through the network in one pass and crop the scored day.
 
     Both members of a pair pass through the same function in the same pass, because the networks
@@ -107,7 +109,9 @@ def forward_members(*, net: torch.nn.Module, batch: arms.Batch, device: str) -> 
     return parts[0], raw_i, raw_c
 
 
-def batch_loss(*, net: torch.nn.Module, spec: core.ArmSpec732, batch: arms.Batch, device: str) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+def batch_loss(
+    *, net: torch.nn.Module, spec: core.ArmSpec732, batch: arms.Batch, device: str
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Return the weighted loss of a batch of triples and its unweighted terms."""
     raw_w, raw_i, raw_c = forward_members(net=net, batch=batch, device=device)
     values = losses.terms(
@@ -172,8 +176,12 @@ def predict(
     """
     net.eval()
     picks = arms.all_picks(prepared=prepared) if picks is None else picks
-    spec = arms.eval_spec(inject=amount is not None and extra_heads, raised=eps is not None and extra_heads)
-    chunks: dict[str, list] = {k: [] for k in ("plain", "inj", "raised", "t", "ti", "pair", "delta", "cosz", "csi")}
+    spec = arms.eval_spec(
+        inject=amount is not None and extra_heads, raised=eps is not None and extra_heads
+    )
+    chunks: dict[str, list] = {
+        k: [] for k in ("plain", "inj", "raised", "t", "ti", "pair", "delta", "cosz", "csi")
+    }
     for i in range(0, len(picks), INFER_BATCH):
         j = slice(i, i + INFER_BATCH)
         batch = arms.make_eval_batch(
@@ -181,11 +189,17 @@ def predict(
             hidden=None if hidden is None else hidden[j], hide_bsp=hide_bsp,
         )  # fmt: skip
         raw_w, raw_i, raw_c = forward_members(net=net, batch=batch, device=device)
-        chunks["plain"].append({k: v.float().cpu().numpy() for k, v in nets.decode(raw=raw_w).items()})
+        chunks["plain"].append(
+            {k: v.float().cpu().numpy() for k, v in nets.decode(raw=raw_w).items()}
+        )
         if raw_i is not None:
-            chunks["inj"].append({k: v.float().cpu().numpy() for k, v in nets.decode(raw=raw_i).items()})
+            chunks["inj"].append(
+                {k: v.float().cpu().numpy() for k, v in nets.decode(raw=raw_i).items()}
+            )
         if raw_c is not None:
-            chunks["raised"].append({k: v.float().cpu().numpy() for k, v in nets.decode(raw=raw_c).items()})
+            chunks["raised"].append(
+                {k: v.float().cpu().numpy() for k, v in nets.decode(raw=raw_c).items()}
+            )
         chunks["t"].append(batch.t)
         if batch.ti is not None:
             chunks["ti"].append(batch.ti)
@@ -226,7 +240,10 @@ def validation_scores(
     out = {"brier": float(np.mean((p - (x < 0.0)) ** 2))}
     if spec.heads:
         up = valid_flat(values=pred.cosz, targets=pred.t) > core.SUN_UP_COSZ
-        err = np.abs(valid_flat(values=pred.plain["pv"], targets=pred.t) - valid_flat(values=pred.t[:, arms.T["solar"]], targets=pred.t))
+        err = np.abs(
+            valid_flat(values=pred.plain["pv"], targets=pred.t)
+            - valid_flat(values=pred.t[:, arms.T["solar"]], targets=pred.t)
+        )
         out["solar_mae"] = float(err[up].mean()) if up.any() else float("nan")
         tp = predict(net=net, prepared=val_transfer, device=device)
         ev = valid_flat(values=tp.t[:, arms.T["event"]], targets=tp.t)
@@ -256,7 +273,13 @@ def validation_terms(
     sums: dict[str, float] = {}
     count = 0
     for i in range(0, len(picks), core.BATCH_SIZE):
-        batch = arms.make_batch(prepared=prepared, picks=picks[i : i + core.BATCH_SIZE], spec=spec, rng=rng, index=index if spec.inject else None)
+        batch = arms.make_batch(
+            prepared=prepared,
+            picks=picks[i : i + core.BATCH_SIZE],
+            spec=spec,
+            rng=rng,
+            index=index if spec.inject else None,
+        )
         loss, values = batch_loss(net=net, spec=spec, batch=batch, device=device)
         for k, v in {**values, "total": loss}.items():
             sums[k] = sums.get(k, 0.0) + float(v) * len(batch.x)
@@ -299,7 +322,9 @@ def fit(
     net = nets.build_net(spec=spec, c_in=arms.N_CHANNELS).to(device)
     params = [p for p in net.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode="min", factor=0.5, patience=LR_PATIENCE)
+    sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        opt, mode="min", factor=0.5, patience=LR_PATIENCE
+    )
     if device == "cuda":
         torch.cuda.reset_peak_memory_stats()
     best, best_epoch, best_state = float("inf"), 0, copy.deepcopy(net.state_dict())
@@ -330,11 +355,15 @@ def fit(
             loss.backward()
             torch.nn.utils.clip_grad_norm_(params, CLIP_NORM)
             opt.step()
-        scores = validation_scores(net=net, spec=spec, val_plain=val_plain, val_transfer=val_transfer, device=device)
+        scores = validation_scores(
+            net=net, spec=spec, val_plain=val_plain, val_transfer=val_transfer, device=device
+        )
         history.append(scores["brier"])
         for k, v in epoch_sums.items():
             train_terms.setdefault(k, []).append(v / max(epoch_count, 1))
-        for k, v in validation_terms(net=net, spec=spec, prepared=val_transfer, index=val_index, device=device).items():
+        for k, v in validation_terms(
+            net=net, spec=spec, prepared=val_transfer, index=val_index, device=device
+        ).items():
             val_terms.setdefault(k, []).append(v)
         solar_history.append(scores.get("solar_mae", float("nan")))
         step_history.append(scores.get("step_brier", float("nan")))
@@ -363,14 +392,25 @@ def peak_rss_gb() -> float:
 
 
 def time_pair_building(
-    *, spec: core.ArmSpec732, train: Sequence[arms.Prepared], index: ov.PairIndex, n_windows: int = 512, seed: int = 0
+    *,
+    spec: core.ArmSpec732,
+    train: Sequence[arms.Prepared],
+    index: ov.PairIndex,
+    n_windows: int = 512,
+    seed: int = 0,
 ) -> float:
     """Return the seconds an epoch of 8,000 windows would take to build on one CPU thread (batch building alone)."""
     rng = np.random.default_rng(seed)
     picks = arms.sample_picks(prepared=train, n=n_windows, rng=rng)
     started = time.perf_counter()
     for i in range(0, len(picks), core.BATCH_SIZE):
-        arms.make_batch(prepared=train, picks=picks[i : i + core.BATCH_SIZE], spec=spec, rng=rng, index=index if spec.inject else None)
+        arms.make_batch(
+            prepared=train,
+            picks=picks[i : i + core.BATCH_SIZE],
+            spec=spec,
+            rng=rng,
+            index=index if spec.inject else None,
+        )
     return (time.perf_counter() - started) * core.EPOCH_WINDOWS / n_windows
 
 
@@ -380,5 +420,14 @@ def measure_seconds_per_epoch(
     epochs: int = core.TIMING_EPOCHS,
 ) -> float:  # fmt: skip
     """Return the mean seconds an epoch of the arm takes, with the overlay and pair building inside the time."""
-    _, record = fit(spec=spec, seed=0, train=train, index=index, val_plain=val_plain, val_transfer=val_transfer, device=device, max_epochs=epochs)
+    _, record = fit(
+        spec=spec,
+        seed=0,
+        train=train,
+        index=index,
+        val_plain=val_plain,
+        val_transfer=val_transfer,
+        device=device,
+        max_epochs=epochs,
+    )
     return record.seconds_per_epoch

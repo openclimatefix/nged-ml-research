@@ -66,7 +66,11 @@ def curve_rows(*, record: Mapping[str, object]) -> pl.DataFrame:
             if len(v) != n or not np.isfinite(v).all():
                 msg = f"the {split} history of term {term} is not {n} finite values"
                 raise HistoryError(msg)
-            parts.append(pl.DataFrame({"epoch": np.arange(1, n + 1), "split": split, "term": term, "value": v}))
+            parts.append(
+                pl.DataFrame(
+                    {"epoch": np.arange(1, n + 1), "split": split, "term": term, "value": v}
+                )
+            )
     return pl.concat(parts)
 
 
@@ -78,7 +82,9 @@ def best_epoch_of(*, record: Mapping[str, object]) -> int:
         raise HistoryError(msg)
     best = int(record["best_epoch"])  # ty: ignore[invalid-argument-type]
     if best != int(np.argmin(history)) + 1:
-        msg = "best_epoch differs from the epoch of the lowest validation Brier score in the history"
+        msg = (
+            "best_epoch differs from the epoch of the lowest validation Brier score in the history"
+        )
         raise HistoryError(msg)
     return best
 
@@ -93,14 +99,32 @@ def loss_panel(*, record: Mapping[str, object]) -> alt.LayerChart:
         .mark_line(aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("epoch:Q", title="Epoch"),
-            y=alt.Y("value:Q", title="Loss term (symmetric log scale)", scale=alt.Scale(type="symlog", constant=1e-3)),
-            color=alt.Color("term:N", scale=alt.Scale(domain=terms, range=[TERM_COLOURS[t] for t in terms]), legend=alt.Legend(orient="top", title=None)),
-            strokeDash=alt.StrokeDash("split:N", scale=alt.Scale(domain=["train", "validation"], range=[[1, 0], [5, 3]]), legend=alt.Legend(orient="top", title=None)),
+            y=alt.Y(
+                "value:Q",
+                title="Loss term (symmetric log scale)",
+                scale=alt.Scale(type="symlog", constant=1e-3),
+            ),
+            color=alt.Color(
+                "term:N",
+                scale=alt.Scale(domain=terms, range=[TERM_COLOURS[t] for t in terms]),
+                legend=alt.Legend(orient="top", title=None),
+            ),
+            strokeDash=alt.StrokeDash(
+                "split:N",
+                scale=alt.Scale(domain=["train", "validation"], range=[[1, 0], [5, 3]]),
+                legend=alt.Legend(orient="top", title=None),
+            ),
         )
     )
-    mark = alt.Chart(pl.DataFrame({"epoch": [best], "label": [f"stored model: epoch {best}"]})).mark_rule(color="#000000", strokeDash=[2, 2], aria=False).encode(x="epoch:Q")  # ty: ignore[unresolved-attribute]
+    mark = (
+        alt.Chart(pl.DataFrame({"epoch": [best], "label": [f"stored model: epoch {best}"]}))
+        .mark_rule(color="#000000", strokeDash=[2, 2], aria=False)
+        .encode(x="epoch:Q")
+    )  # ty: ignore[unresolved-attribute]
     title = f"{record['arm']}, seed {record['seed']}, {record['arch']}: stored model at epoch {best} of {record['epochs']}"
-    return (lines + mark).properties(width=WIDTH_PX, height=150, title=alt.TitleParams(title, anchor="start"))
+    return (lines + mark).properties(
+        width=WIDTH_PX, height=150, title=alt.TitleParams(title, anchor="start")
+    )
 
 
 def loss_curves_chart(*, records: Sequence[Mapping[str, object]]) -> alt.VConcatChart:
@@ -110,7 +134,10 @@ def loss_curves_chart(*, records: Sequence[Mapping[str, object]]) -> alt.VConcat
         raise HistoryError(msg)
     panels = [loss_panel(record=r) for r in records]
     title = alt.TitleParams(
-        ["Training and validation loss terms by epoch, one fit per arm", f"Seed {LOSS_CURVE_SEED} of each arm; solid: training batches, dashed: one fixed set of validation triples (the validation transfer overlay)"],
+        [
+            "Training and validation loss terms by epoch, one fit per arm",
+            f"Seed {LOSS_CURVE_SEED} of each arm; solid: training batches, dashed: one fixed set of validation triples (the validation transfer overlay)",
+        ],
         anchor="start",
     )
     return alt.vconcat(*panels, title=title).resolve_scale(color="independent")
@@ -122,7 +149,9 @@ def loss_curve_checks(*, records: Sequence[Mapping[str, object]]) -> dict[str, b
     for r in records:
         rows = curve_rows(record=r)
         out[f"{r['arm']}_markers_match"] = best_epoch_of(record=r) == int(r["best_epoch"])  # ty: ignore[invalid-argument-type]
-        out[f"{r['arm']}_has_sign_curves"] = {"train", "validation"} <= set(rows.filter(pl.col("term") == "sign")["split"].to_list())
+        out[f"{r['arm']}_has_sign_curves"] = {"train", "validation"} <= set(
+            rows.filter(pl.col("term") == "sign")["split"].to_list()
+        )
     return out
 
 
@@ -137,7 +166,9 @@ def stage_loss_curves(*, root: Path, log) -> list[Path]:  # noqa: ANN001
 
     records = []
     for arm, spec in core.ARMS.items():
-        path = root / "fits" / f"{core.job_name(arm=arm, arch=spec.arch, seed=LOSS_CURVE_SEED)}.json"
+        path = (
+            root / "fits" / f"{core.job_name(arm=arm, arch=spec.arch, seed=LOSS_CURVE_SEED)}.json"
+        )
         if not path.exists():
             msg = f"no fit record {path.name}: the loss curves need the stored history of seed {LOSS_CURVE_SEED} of every arm"
             raise FileNotFoundError(msg)
