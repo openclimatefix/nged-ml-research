@@ -260,7 +260,8 @@ headless Chromium and read for labels, overlaps, and units.
 experiment 716.** Arms `M*` and `H` are stored in `work/attention/` of
 [experiment
 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md) (unmetered PV, part 1: the history
-estimate), and the same look-ahead caveat for D19 and D21 applies. No attention extraction was run for arm `HT`.
+estimate), and the same look-ahead caveat for D19 and D21 applies. No attention extraction was run
+for arm `HT`.
 
 ## Checks
 
