@@ -437,6 +437,8 @@ class ChainSteps:
         screen_point: Returns the screen's relative CRPS point of FU minus M* (after the screen
             fits).
         log: Receives the progress lines.
+        select_jobs: Keeps a subset of a family's jobs (a debug run on a scratch root; the default
+            keeps every job).
         now: Returns the time stamp of a line.
     """
 
@@ -444,6 +446,9 @@ class ChainSteps:
     f0r_gate: Callable[[], None]
     screen_point: Callable[[], float]
     log: Log = print
+    select_jobs: Callable[
+        [str, list[tuple[str, str | None, int]]], list[tuple[str, str | None, int]]
+    ] = field(default=lambda _family, jobs: jobs)
     now: Callable[[], str] = field(
         default=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     )
@@ -457,7 +462,7 @@ def write_chain_status(*, root: Path, state: str, **extra: object) -> None:
     )
 
 
-def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:
+def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:  # noqa: PLR0912, PLR0915
     """Run the fit families in the plan's order and write the chain status.
 
     The order is F0r (then the F0r gate), FU on the screening folds, the screen rule, the rest of
@@ -497,7 +502,7 @@ def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:
             if family in ("FU", "FU-S") and screen_stopped:
                 steps.log(f"family {family} skipped by the screen rule")
                 continue
-            jobs = family_jobs(family=family)
+            jobs = steps.select_jobs(family, family_jobs(family=family))
             where = core.ARMS[arm].where
             hours = len(jobs) * per_fit[where] / 3600.0
             steps.log(
@@ -553,6 +558,24 @@ def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:
             root=root,
             state="failed",
             reason="correctness failure",
+            traceback=traceback.format_exc(),
+            failed=failed,
+        )
+        return read_json(path=root / CHAIN_STATUS)
+    except GuardError as exc:
+        write_chain_status(
+            root=root,
+            state="failed",
+            reason=f"guard: {exc}",
+            traceback=traceback.format_exc(),
+            failed=failed,
+        )
+        raise
+    except Exception as exc:  # noqa: BLE001
+        write_chain_status(
+            root=root,
+            state="failed",
+            reason=f"{type(exc).__name__}: {exc}",
             traceback=traceback.format_exc(),
             failed=failed,
         )

@@ -11,13 +11,10 @@ and 5 for any failed fit or chain; never 1, which the launcher reserves for "slo
 leaves
 `scores/failure_<stage>.json` with the message and the traceback.
 
-Stages implemented here: `guard`, `timing` (from measured numbers), `fit` (one job), `chain`,
-`report`,
-`loss_curves`. The stages that need the real-file adapters of the synthetic world (`banks`,
-`limits`, `gallery`,
-`smoke`, `score`, `figures`, `attention`, `series`) take their functions from `STAGE_FUNCTIONS`,
-which the
-real-environment run fills; a stage with no function exits 2 with a message, never silently.
+Stages built: `guard`, `banks`, `channels`, `limits`, `gallery`, `timing`, `fit`, `chain`, `report`,
+and `loss_curves`. `main` installs the stage functions of `e00733_runtime` into `STAGE_FUNCTIONS`,
+never at import. The stages not built yet (`smoke`, `score`, `figures`, `attention`, `series`,
+`predict`) have no function, and such a stage exits 2 with a message, never silently.
 """
 
 import argparse
@@ -97,8 +94,25 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
         return st.exit_code(exc=exc)
 
 
+def install_runtime() -> None:
+    """Put the stage functions of `e00733_runtime` into `STAGE_FUNCTIONS`."""
+    import e00733_runtime as rt
+
+    STAGE_FUNCTIONS.update(
+        {
+            "banks": rt.stage_banks, "channels": rt.stage_channels, "limits": rt.stage_limits,
+            "gallery": rt.stage_gallery, "fit": rt.stage_fit, "chain": rt.stage_chain,
+        }
+    )  # fmt: skip
+
+
 def _timing(args: argparse.Namespace, root: Path) -> dict:
-    measured = json.loads(Path(args.measured).read_text())
+    if args.measured is None:
+        import e00733_runtime as rt
+
+        measured = rt.measure_timing(args, root)
+    else:
+        measured = json.loads(Path(args.measured).read_text())
     choice_path = paths.channels_json(root=root)
     same = (
         bool(json.loads(choice_path.read_text()).get("fu_equals_fs"))
@@ -141,6 +155,20 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--interim", action="store_true", help="label every number interim (stage report)"
     )
+    p.add_argument(
+        "--limit-segments", type=int, default=None, help="scratch root only: segments per bank"
+    )
+    p.add_argument(
+        "--max-passes", type=int, default=None, help="scratch root only: cap every fit's passes"
+    )
+    p.add_argument(
+        "--skip-gates", action="store_true", help="scratch root only: no F0r gate, no screen"
+    )
+    p.add_argument(
+        "--first-job-per-family",
+        action="store_true",
+        help="scratch root only: the chain fits one job of each family",
+    )
     p.add_argument("--arm", default=None)
     p.add_argument("--fold", default=None)
     p.add_argument("--seed", type=int, default=0)
@@ -156,6 +184,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Parse the arguments, pin the threads, and run the stage."""
     args = parser().parse_args(argv)
     paths.pin_threads()
+    install_runtime()
     root = Path(args.data_root) if args.data_root else paths.data_root()
     return run_stage(args=args, root=root, digest=banks_digest(root730=paths.root_730()))
 
