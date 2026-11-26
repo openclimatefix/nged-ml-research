@@ -7,7 +7,7 @@ import e00729_banks as banks729
 import e00729_score as score729
 import e00732_stages as stages
 import numpy as np
-from world732 import make_bank
+from world732 import make_bank, make_base, make_neighbours
 
 
 def build(*, root: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
@@ -50,7 +50,10 @@ def build(*, root: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     (root / "margin.json").write_text(
         json.dumps({"margin": 0.00122, "floor": 0.0007, "val_brier_s_by_seed": [0.1]})
     )
-    return {"cal": cal, "segments": segs, "rows": rows, "n": rows.n}
+    return {
+        "cal": cal, "segments": segs, "rows": rows, "n": rows.n, "base": make_base(cal=cal),
+        "neighbours": make_neighbours(cal=cal),
+    }  # fmt: skip
 
 
 def patch_constants(monkeypatch, *, root: Path, world: dict) -> None:
@@ -58,7 +61,7 @@ def patch_constants(monkeypatch, *, root: Path, world: dict) -> None:
     import e00730_score as score730
     import e00732_core as core
 
-    arrays = stages.load_stored(root730=root, name="S", arm="S", arch="unet")
+    arrays = stages.load_stored(root730=root, arm="S", arch="unet")
     canary = score730.mean_brier(p=stages.seed_mean_p(arrays=arrays), x=world["rows"].x)
     pooled = core.band_limits(x=world["rows"].x, r=world["rows"].r)["pooled"].limit
     monkeypatch.setattr(core, "N_TEST_ROWS", world["n"])

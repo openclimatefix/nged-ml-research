@@ -95,7 +95,7 @@ def test_timing_gate_then_one_fit_stores_record_network_and_predictions(run, mon
 
 
 def fake730_rows(root730) -> int:
-    return len(stages.load_stored(root730=root730, name="S", arm="S", arch="unet")[0]["p"])
+    return len(stages.load_stored(root730=root730, arm="S", arch="unet")[0]["p"])
 
 
 def test_timing_gate_stops_over_the_line_unless_the_manager_approves(run, monkeypatch) -> None:

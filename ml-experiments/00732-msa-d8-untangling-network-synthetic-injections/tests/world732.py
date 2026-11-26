@@ -77,3 +77,35 @@ def make_neighbours(*, cal: sim.Calendar, seed: int = 0) -> dict[str, np.ndarray
         name: nb.place_on_calendar(grid=grid, dates=cal.dates, first_day=first)
         for name, grid in grids.items()
     }
+
+
+def make_base(*, cal: sim.Calendar) -> object:
+    """Return D8's base calendar as the stages read it: the first 60% of the days train, then validation, then test."""
+    import e00732_stages as stages
+
+    n = len(cal.dates)
+    split = np.array(["training"] * n, dtype=object)
+    split[int(0.6 * n) : int(0.8 * n)] = "validation"
+    split[int(0.8 * n) :] = "test"
+    return stages.BaseDays(
+        dates=cal.dates, reading=cal.reading, bsp=cal.bsp, holidays=cal.holidays, split=split
+    )
+
+
+def seed_neighbour_files(*, root: Path, base: object, arrays: dict[str, np.ndarray]) -> None:
+    """Write the neighbour table, the medians, and a passing check file, as a passed `neighbours` stage leaves them.
+
+    The invented neighbours do not mirror the invented reading, so the stage's own gates are tested apart.
+    """
+    import e00732_neighbours as nb
+    import e00732_stages as stages
+
+    nb.write_table(root=root, dates=base.dates, arrays=arrays)  # ty: ignore[unresolved-attribute]
+    medians = {
+        n: nb.training_median(
+            folded=nb.fold(signed=arrays[n], floor=0.0), train_rows=base.train_rows  # ty: ignore[unresolved-attribute]
+        )
+        for n in nb.NEIGHBOURS
+    }
+    stages.write_json(path=root / stages.MEDIANS_FILE, payload=medians)
+    stages.write_json(path=root / stages.NEIGHBOUR_CHECK, payload={"pass": True})
