@@ -574,3 +574,46 @@ def test_the_series_and_figures_stages_draw_windows_and_the_contrast_chart(
     assert not next(iter((root / "figures" / "series").glob("*.svg"))).read_text().count("2022-")
     report.stage_figures(root=root, root730=root730, env=env, base=world["base"], log=print)
     assert (root / "figures" / "contrasts.svg").exists()
+
+
+def test_the_train_tensor_check_has_a_bsp_present_injected_pair(gated: Any) -> None:
+    root, root730, env = gated
+    summary = stages.stage_tensor_checks(root=root, root730=root730, env=env, log=print)
+    assert summary["checks"]["U*/train"]["injected_bsp_on_delta"]["n"] > 0
+    assert summary["checks"]["U*/validation"]["injected_bsp_on_delta"]["n"] > 0
+
+
+def test_bsp_present_picks_hold_only_windows_with_a_meter_and_solar_output(gated: Any) -> None:
+    import e00732_arms as arms
+    import e00732_overlays as ov
+    from e00729_banks import load_bank
+    import e00730_banks as banks730
+
+    root, root730, env = gated
+    bank = load_bank(path=banks730.bank_path(root=root730, kind="train", seed=0))
+    over = ov.overlay_segments(
+        segments=bank.segments, kind="train", seed=0, neighbours=env.neighbours
+    )
+    prepared = arms.prepare(
+        overlays=over, holidays=env.holidays, stats=env.stats, medians=env.medians
+    )
+    picks = stages.bsp_present_solar_picks(prepared=prepared, limit=50)
+    assert picks
+    for seg_i, day in picks:
+        p = prepared[seg_i]
+        assert p.world in ov.SOLAR_WORLDS
+        assert np.isfinite(p.bsp[day * 48 : day * 48 + 48]).all()
+    for p in prepared:
+        p.bsp[:] = np.nan
+    assert stages.bsp_present_solar_picks(prepared=prepared, limit=50) == []
+
+
+def test_a_tensor_check_without_a_case_is_a_problem() -> None:
+    import e00732_arms as arms
+    import e00732_overlays as ov
+
+    empty = ov.Share(value=0.0, n=0) if hasattr(ov, "Share") else None
+    assert empty is not None
+    assert arms.tensor_problems(checks={"injected_bsp_on_delta": empty}) == [
+        "injected_bsp_on_delta"
+    ]

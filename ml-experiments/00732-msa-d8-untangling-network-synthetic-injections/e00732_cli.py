@@ -29,7 +29,7 @@ import e00732_stages as stages
 import numpy as np
 
 CPU_ONLY_STAGES = (
-    "banks", "neighbours", "limits", "overlays", "tensor", "gallery", "panels", "real", "score",
+    "banks", "neighbours", "limits", "overlays", "tensor", "solar_diag", "gallery", "panels", "real", "score",
     "report", "figures", "loss_curves", "series",
 )  # fmt: skip
 
@@ -156,6 +156,15 @@ def dispatch(*, args: argparse.Namespace, root: Path, root730: Path) -> int:
         )
     elif stage == "tensor":
         stages.stage_tensor_checks(
+            root=root,
+            root730=root730,
+            env=real_env(root=root, ctx=ctx, base=base, with_real=False),
+            log=log,
+        )
+    elif stage == "solar_diag":
+        import e00732_solar_diag as diag
+
+        diag.stage_solar_diag(
             root=root,
             root730=root730,
             env=real_env(root=root, ctx=ctx, base=base, with_real=False),

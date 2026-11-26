@@ -769,6 +769,35 @@ def solar_world_picks(*, prepared: Sequence[arms.Prepared], limit: int) -> list[
     return picks[:limit]
 
 
+def bsp_present_solar_picks(
+    *, prepared: Sequence[arms.Prepared], limit: int
+) -> list[tuple[int, int]]:
+    """Return windows of solar-world segments whose scored day has BSP data and solar output.
+
+    The check that the injected member's BSP channel moves needs such windows, and most segments
+    have no BSP meter.
+
+    Args:
+        prepared: The prepared segments.
+        limit: The most windows to return.
+
+    Returns:
+        `(segment index, dense day)` pairs.
+    """
+    picks: list[tuple[int, int]] = []
+    for i, p in enumerate(prepared):
+        if p.world not in ov.SOLAR_WORLDS:
+            continue
+        for d in p.days:
+            a = int(d) * 48
+            if np.isfinite(p.bsp[a : a + 48]).all() and (p.base.targets[3, a : a + 48] > 0).any():
+                picks.append((i, int(d)))
+                break
+        if len(picks) >= limit:
+            break
+    return picks
+
+
 def tensor_check_specs() -> dict[str, core.ArmSpec732]:
     """Return the arms whose batches the tensor checks run on: U*, U-N, and U-noBSP."""
     return {name: core.ARMS[name] for name in ("U*", "U-N", "U-noBSP")}
@@ -820,11 +849,15 @@ def stage_tensor_checks(
     )
     record: dict[str, Any] = {}
     problems: list[str] = []
-    picks_tr = mirror_edge_picks(prepared=train, limit=n_edges) + solar_world_picks(
-        prepared=train, limit=n_solar
+    picks_tr = (
+        mirror_edge_picks(prepared=train, limit=n_edges)
+        + solar_world_picks(prepared=train, limit=n_solar)
+        + bsp_present_solar_picks(prepared=train, limit=n_solar)
     )
-    picks_va = mirror_edge_picks(prepared=val, limit=n_edges) + solar_world_picks(
-        prepared=val, limit=n_solar
+    picks_va = (
+        mirror_edge_picks(prepared=val, limit=n_edges)
+        + solar_world_picks(prepared=val, limit=n_solar)
+        + bsp_present_solar_picks(prepared=val, limit=n_solar)
     )
     hidden = masks.fixed_hidden_for_picks(
         style=core.STYLE, picks=picks_va, offsets=[p.offsets for p in val],

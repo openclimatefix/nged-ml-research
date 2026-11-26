@@ -890,6 +890,7 @@ def stage_names() -> Sequence[str]:
         "gallery",
         "panels",
         "tensor",
+        "solar_diag",
         "timing",
         "fit",
         "real",
