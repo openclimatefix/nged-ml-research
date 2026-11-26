@@ -216,19 +216,18 @@ def check_lag_correlations_and_noise_units() -> str:
     )
 
 
-def check_experiment_729_smoke_test() -> str:
-    """Run experiment 729's own smoke test of its real files and report its exit status."""
+def check_experiment_730_s2_solar() -> str:
+    """Run experiment 730's own S2 solar checks (the stored S2 output and 730's test bank), as 730 does."""
     import importlib.util
     from pathlib import Path
 
-    path = next(Path(__file__).resolve().parents[2].glob("00729-*/tests/smoke_real_files.py"))
-    spec = importlib.util.spec_from_file_location("smoke_real_files_729", path)
+    path = next(Path(__file__).resolve().parents[2].glob("00730-*/tests/smoke_real_files.py"))
+    spec = importlib.util.spec_from_file_location("smoke_real_files_730", path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    status = module.main()
-    return f"experiment 729's smoke test passed: {status == 0} (exit status {status})"
+    return f"{module.check_s2_solar()}; {module.check_bank_s2()}"
 
 
 def check_private_splits() -> str:
@@ -255,7 +254,7 @@ CHECKS: dict[str, Callable[[], str]] = {
     "sibling selection": check_sibling_selection_by_month,
     "negative power of D5 and D14": check_negative_power_share_of_d5_and_d14,
     "lag correlations and noise units": check_lag_correlations_and_noise_units,
-    "experiment 729 smoke test": check_experiment_729_smoke_test,
+    "experiment 730 S2 solar checks": check_experiment_730_s2_solar,
     "timing inputs": check_timing_inputs,
 }
 
