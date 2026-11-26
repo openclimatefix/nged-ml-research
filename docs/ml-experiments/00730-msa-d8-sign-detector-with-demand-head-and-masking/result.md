@@ -477,6 +477,28 @@ rows.** D-sign scores 6.04 points on reverse-flow rows, D scores 14.3, A scores 
 drew them from the chosen style's transformer fit of seed 0, and that fit does not exist: the arms
 with a demand output are fitted on the U-net, the architecture the screen chose.
 
+![The validation score of each arm's seed-0 fit against the epoch](fig_loss_curves.svg)
+
+**Figure 11 shows that the validation score of every arm's seed-0 fit falls steeply in the first
+20 or so epochs, then flattens.** Each panel is one arm's fit with seed 0. Ten panels draw the
+validation Brier score of P(X<0), for the U-net fits of arms S-A, S, SD-0, SD-K, SD-W, SD-R, SDe-PT,
+SDe-FR, SD\*-C, and SD\*-λ. SD\* is the fit of SD-R, so it has no panel of its own. The other three
+panels draw the validation signed CRPS of the bidirectional LSTM refits of arms A, D, and D-sign.
+The panels hold the validation score only, because the fits stored no training loss.
+
+**In the ten Brier panels the stored epoch lies between epoch 58 (S-A) and epoch 168 (SDe-PT), on
+a flat stretch of the curve.** Each of these fits stopped 25 epochs after its stored epoch. The
+mean of the last 5 epochs lies 0.0001 to 0.0012 above the score at the stored epoch, so none of the
+ten curves is still falling at the stop. The curves are noisy, with single-epoch spikes, and the
+S and SD-W curves drift upward a little after the stored epoch.
+
+**The refits of arms A and D stored epochs 199 and 192 of the cap of 200 epochs.** The curve of arm
+A still slopes slightly downward at the cap, so the cap and not the early stop ended that fit. Arm
+D-sign stored epoch 67 and stopped at epoch 92.
+
+**The plot was added after the merge, from the stored histories of the fits.** The run itself
+produced no loss plot.
+
 ### Single test days drawn from the synthetic test bank
 
 **Each figure draws the scored UTC day, 24 hours, from one 48-hour window of a synthetic test day.**
@@ -2086,6 +2108,8 @@ and the pre-training mixer), `e00397_models.mlp`, experiment 428's `build_fold`,
 - `e00730_stages.py`, `e00730_cli.py`, `e00730_report.py`, `e00730_figures.py`,
   `e00730_series_figures.py`, and `run.sh`: the stage orchestration, the command line, the printed
   report, the figures, the time series figures, and the launch wrapper.
+- `e00730_loss_curves.py`: added after the merge; draws figure 11 from the stored `history` and
+  `best_epoch` of each seed-0 fit. It is not a stage of `e00730_cli.py`.
 - `tests/`: tests on synthetic arrays only, including the known-answer tests of the Brier score,
   the log loss, the masks, and the causal cut, and an end-to-end run of the stages with tiny fits
   on the CPU; the tests that need `torch` skip in CI.
