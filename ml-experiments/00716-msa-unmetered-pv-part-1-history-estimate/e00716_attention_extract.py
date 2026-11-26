@@ -1,7 +1,10 @@
 # ruff: noqa: E501, PT018
-"""Experiment 716 and 717: attention maps and read-out weights of `M*`, `H`, and `HT` on the same samples.
+"""Experiment 716 and 717: attention maps and read-out weights of `M*`, `H`, and `HT`.
 
-Usage: run.sh e00716_attention_extract.py MONTH SEED [--arms M* H HT] [--device cuda] [--accept-code-change OLD_HASH ...]
+The attention maps and read-out weights of the three arms are taken on the same samples.
+
+Usage: run.sh e00716_attention_extract.py MONTH SEED [--arms M* H HT] [--device cuda]
+       [--accept-code-change OLD_HASH ...]
        run.sh e00716_attention_extract.py 2026-05 0
 
 Run it through `run.sh` (one thread for every numerical library, a 12 GB cap with no swap through
@@ -25,30 +28,32 @@ arm in `--arms` exists. Delete the file by hand to extract it again.
 
 **Cases.** Three hosts, `CASE_HOSTS` (D11, D19, D21), each with two lead-day-1 cases chosen from the
 fold's scored origins and the CAMS shortwave (weather column 0 of the dense table) at the host. A
-`clear_day` is the origin with the highest mean shortwave over the target day. A `dull_after_sunny` is
-the origin with the lowest target-day mean among the origins whose history rows are in the sunniest
-third, and the script stops when that target-day mean is not below the fold's lower tercile. The history
-mean covers the 14 history rows of the network (ages 2 to 15, `lay.history_grid_index`), so every value
-of it ends at least 21 hours before the native origin. The target-day mean is the realised sky after the
-origin: it picks the case and is fed to no input. No other Primary appears in a case.
+`clear_day` is the origin with the highest mean shortwave over the target day. A `dull_after_sunny`
+is the origin with the lowest target-day mean among the origins whose history rows are in the
+sunniest third, and the script stops when that target-day mean is not below the fold's lower
+tercile. The history mean covers the 14 history rows of the network (ages 2 to 15,
+`lay.history_grid_index`), so every value of it ends at least 21 hours before the native origin. The
+target-day mean is the realised sky after the origin: it picks the case and is fed to no input. No
+other Primary appears in a case.
 
-**Stored per arm and case** (`<host>/<case>/...` in `work/attention/<arm>_<month>_s<seed>.npz` of the
-folder that owns the arm): `across` (the last block's weights from each target-row token to the target
-row and the 14 history rows, per head: 48 x 4 x 15; slot 0 is the target row, and slot k from 1 to 14 is the history
-row of age k+1, which starts k+1 days before the forecast origin), `within_top` (the last block's within-day weights of the target row,
-4 x 48 x 48), `alpha` (the read-out weights, 14 x 48), `hist_idx`, `target_idx`, `meta` (Primary index,
-contract-origin index, zero-based lead day), the forecast `q` (48 x 11 quantiles, in units of capacity),
-`mean`, and `actual`, and the history `hist_power` (14 x 48, capacity units, NaN where hidden) and, for an
-arm with a history path, `hist_pv` (14 x 48, the estimate as a share of capacity, so it can be drawn
+**Stored per arm and case** (`<host>/<case>/...` in `work/attention/<arm>_<month>_s<seed>.npz` of
+the folder that owns the arm): `across` (the last block's weights from each target-row token to the
+target row and the 14 history rows, per head: 48 x 4 x 15; slot 0 is the target row, and slot k from
+1 to 14 is the history row of age k+1, which starts k+1 days before the forecast origin),
+`within_top` (the last block's within-day weights of the target row, 4 x 48 x 48), `alpha` (the
+read-out weights, 14 x 48), `hist_idx`, `target_idx`, `meta` (Primary index, contract-origin index,
+zero-based lead day), the forecast `q` (48 x 11 quantiles, in units of capacity), `mean`, and
+`actual`, and the history `hist_power` (14 x 48, capacity units, NaN where hidden) and, for an arm
+with a history path, `hist_pv` (14 x 48, the estimate as a share of capacity, so it can be drawn
 beside `hist_power`), and `history_mean` and `target_mean` (the two shortwave means that picked the
-case). **Stored in the summary** (every Primary, every scored
-origin, lead days 1 and 7): `summary_lead<k>/mean_weight` and `summary_lead<k>/same_weekday_weight`, each
-16 x 15, and `summary_lead<k>/count`, 16. The file also holds `max_difference_to_stored`, the largest
-difference between the arm's forecast on the cases and the stored forecast file.
+case). **Stored in the summary** (every Primary, every scored origin, lead days 1 and 7):
+`summary_lead<k>/mean_weight` and `summary_lead<k>/same_weekday_weight`, each 16 x 15, and
+`summary_lead<k>/count`, 16. The file also holds `max_difference_to_stored`, the largest difference
+between the arm's forecast on the cases and the stored forecast file.
 
 Each file has a sidecar `.json` with the code record of the run. The script writes nothing else.
-Plots of the stored forecasts (the time series of the page) read the stored parquet files, and plots of
-`across` and `alpha` read the files of this script.
+Plots of the stored forecasts (the time series of the page) read the stored parquet files, and plots
+of `across` and `alpha` read the files of this script.
 
 All arms in one call must have the same PV input, because one set of PV tables serves them all: run
 `HT` in a call of its own (`--arms HT`), and run `M*` with `H` or with any one PV arm.
@@ -138,7 +143,10 @@ class Case(NamedTuple):
 
 
 def history_means(*, shortwave: np.ndarray, c_all: np.ndarray) -> np.ndarray:
-    """Return the mean shortwave of the 14 history rows of each origin in `c_all` (shortwave is one Primary's (G,) row)."""
+    """Return the mean shortwave of the 14 history rows of each origin in `c_all`.
+
+    Shortwave is one Primary's (G,) row.
+    """
     return shortwave[lay.history_grid_index(contract_idx=c_all)].mean(axis=(1, 2))
 
 
@@ -153,7 +161,8 @@ def pick_cases(
         c_all: The contract-origin indices of the scored origins.
 
     Raises:
-        AssertionError: When no origin in the sunniest third has a target day below the fold's lower tercile.
+        AssertionError: When no origin in the sunniest third has a target day below the fold's lower
+            tercile.
     """
     day = lay.STEPS_PER_DAY
     assert int(c_all.max()) + day <= shortwave.shape[1], "a target day ends after the grid"
@@ -247,7 +256,10 @@ def case_arrays(
 def summary_arrays(
     *, model: pvm.PvNet, source: pvb.PvSource, c_all: np.ndarray
 ) -> dict[str, np.ndarray]:
-    """Return, per Primary and per history slot, the mean across-day weight and the part on rows with the target's weekday.
+    """Return, per Primary and history slot, the mean across-day weight and its same-weekday part.
+
+    The weights are per Primary and per history slot: the mean across-day weight, and the part on rows
+    with the target's weekday.
 
     Slot 0 is the target row, which has no weekday split. A history row has the target's weekday when
     its age in whole days from the target row's first half-hour is a multiple of 7.
@@ -284,7 +296,9 @@ def max_difference(
     quantiles: np.ndarray,
     mean: np.ndarray,
 ) -> float:
-    """Return the largest absolute difference between one case's forecast and the stored forecast file's rows, over the 11 quantiles and the mean.
+    """Return the largest absolute difference between one case's forecast and the stored forecast file.
+
+    The difference is taken over the stored forecast file's rows, over the 11 quantiles and the mean.
 
     Every one of the 48 valid times must be in the stored file, and every value must be finite.
     """

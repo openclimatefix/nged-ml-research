@@ -1,13 +1,18 @@
 # ruff: noqa: E501, PT018, PERF401, PLR0915, E731
-"""Experiment 716: scoring, contrasts, guards, verdicts, and secondary readings (WP6a and WP6b; design section 7).
+"""Experiment 716: scoring, contrasts, guards, verdicts, and secondary readings.
 
-Usage: run.sh e00716_score.py baseline       # WP6a: experiment 713's scorer on M* and C, solar-block slices
-       run.sh e00716_score.py zrule          # the rule on arm Z
-       run.sh e00716_score.py part1 --n-seeds 5   # A1 and A2, guards, readings, verdict, S1, S2, S4, report-only cuts
-       run.sh e00716_score.py part2 --n-seeds 5   # B1 and B2 (the 16-Primary table is in the file)
-       run.sh e00716_score.py screen         # part 1's stop rule on the four screen folds (interim)
-       run.sh e00716_score.py secondary1 --n-seeds 5  # S3 and S5 (secondary2 for part 2)
-       run.sh e00716_score.py --selftest     # the decision logic on synthetic frames (no data)
+This module covers WP6a and WP6b (design section 7).
+
+Usage:
+
+- `run.sh e00716_score.py baseline`: WP6a, experiment 713's scorer on M* and C, solar-block slices.
+- `run.sh e00716_score.py zrule`: the rule on arm Z.
+- `run.sh e00716_score.py part1 --n-seeds 5`: A1 and A2, guards, readings, verdict, S1, S2, S4,
+  report-only cuts.
+- `run.sh e00716_score.py part2 --n-seeds 5`: B1 and B2 (the 16-Primary table is in the file).
+- `run.sh e00716_score.py screen`: part 1's stop rule on the four screen folds (interim).
+- `run.sh e00716_score.py secondary1 --n-seeds 5`: S3 and S5 (secondary2 for part 2).
+- `run.sh e00716_score.py --selftest`: the decision logic on synthetic frames (no data).
 
 Experiment 713's scorer does the loading of forecast files, the losses, the seed average, the
 month-block bootstrap, and the t and seed and noise-floor guards. This module adds F7's arms, the
@@ -58,7 +63,10 @@ GROUPS_COUNTED: Final = ("six", "eight")
 
 
 def thresholds(*, n_seeds: int) -> tuple[dict[str, float], dict[str, float]]:
-    """Return (delta, noise floor) per group: the 5-seed values, or F4's two-seed values when fewer than 5 seeds exist."""
+    """Return (delta, noise floor) per group.
+
+    These are the 5-seed values, or F4's two-seed values when fewer than 5 seeds exist.
+    """
     return (DELTA_5, FLOOR_5) if n_seeds >= 5 else (DELTA_2, FLOOR_2)
 
 
@@ -78,7 +86,11 @@ def fit_path(*, name: str, month: str, seed: int, data_dir: Path = ML_EXPERIMENT
 
 
 def load_arm(*, arm: str, seeds: tuple[int, ...], months: tuple[str, ...]) -> pl.DataFrame:
-    """Return an arm's per-seed rows (contract origin, capacity shares); F7 arms and read-outs from F7's files, others from experiment 713's loader."""
+    """Return an arm's per-seed rows (contract origin, capacity shares).
+
+    F7 arms and read-outs come from F7's files, and the other arms come from experiment 713's
+    loader.
+    """
     is_f7 = arm in arms.ARMS or any(arm.startswith(b + "-") for b in arms.ARMS)
     if not is_f7:
         return s713.load_arm(arm=arm, seeds=seeds, months=months)
@@ -202,7 +214,8 @@ class PlaceboReading:
     Attributes:
         upper: The upper limit of the placebo contrast (A2 or B2) per group.
         point: Its point estimate per group.
-        control_reading: The reading of the placebo arm minus its control (`H-S` minus `M*`, or `HT-S` minus `H`) per group.
+        control_reading: The reading of the placebo arm minus its control (`H-S` minus `M*`, or `HT-S`
+            minus `H`) per group.
     """
 
     upper: dict[str, float]
@@ -216,7 +229,10 @@ class PlaceboReading:
 
 
 def verdict(*, readings: dict[str, str], placebo: PlaceboReading, guards_hold: bool) -> str:
-    """Return the verdict by the first row of the verdict table of design 7.4 (with the guard on a harmful placebo in rows 3 to 5)."""
+    """Return the verdict by the first row of the verdict table of design 7.4.
+
+    The verdict includes the guard on a harmful placebo in rows 3 to 5.
+    """
     r = list(readings.values())
     if "clear loss" in r:
         return "refuted"
@@ -331,17 +347,22 @@ NIGHT_COS_ZENITH_MAX: Final = float(np.sin(np.radians(-5.0)))
 
 
 def cold_night_grid(*, raw: np.ndarray) -> np.ndarray:
-    """Return a (16, G) bool array of the half-hours that F7's cold-night guard reads: the sun more than 5 degrees below the horizon and the temperature at or below 3 C.
+    """Return a (16, G) bool array of the half-hours that F7's cold-night guard reads.
 
-    The slice has two departures from the protocol's `cold_nights` slice. The protocol's slice has no
-    month restriction; this guard adds one, to UTC months 12, 1 and 2 (see `cold_night_difference`), to match "cold winter nights".
-    The protocol reads the sun at the half-hour midpoint, while this guard reads the cosine of the zenith
-    at the grid stamp. Both are recorded as departures on the plan page. The temperature is dense column 2,
-    which has not been compared with the protocol's `temperature_c` series.
+    The guard reads the half-hours with the sun more than 5 degrees below the horizon and the
+    temperature at or below 3 C.
 
-    `raw` is the dense table of experiment 713 (column 2 is the temperature in degrees Celsius, column
-    7 the cosine of the zenith at the stamp). The guard reads this re-implementation of the protocol's
-    two thresholds, in points of capacity, because the protocol's own scorer loads only experiment 713's arms.
+    The slice has two departures from the protocol's `cold_nights` slice. The protocol's slice has
+    no month restriction; this guard adds one, to UTC months 12, 1 and 2 (see
+    `cold_night_difference`), to match "cold winter nights". The protocol reads the sun at the
+    half-hour midpoint, while this guard reads the cosine of the zenith at the grid stamp. Both are
+    recorded as departures on the plan page. The temperature is dense column 2, which has not been
+    compared with the protocol's `temperature_c` series.
+
+    `raw` is the dense table of experiment 713 (column 2 is the temperature in degrees Celsius,
+    column 7 the cosine of the zenith at the stamp). The guard reads this re-implementation of the
+    protocol's two thresholds, in points of capacity, because the protocol's own scorer loads only
+    experiment 713's arms.
     """
     return (np.asarray(raw[:, :, 7]) < NIGHT_COS_ZENITH_MAX) & (
         np.asarray(raw[:, :, 2]) <= COLD_NIGHT_MAX_TEMPERATURE_C
@@ -352,7 +373,11 @@ def cold_night_difference(
     *, averaged: dict, groups: dict, treatment: str, reference: str, cold: np.ndarray, prim_of: dict[int, int], grid_start_us: int,
     step_us: int = 1_800_000_000,
 ) -> dict[str, float]:  # fmt: skip
-    """Return, per counted group, the treatment's mean CRPS minus the reference's on the cold winter nights of the headline band (points of capacity; positive is worse)."""
+    """Return the treatment's mean CRPS minus the reference's on cold winter nights.
+
+    The result is per counted group, on the cold winter nights of the headline band (points of
+    capacity; positive is worse).
+    """
     out = {}
     for g in GROUPS_COUNTED:
         sel = {
@@ -374,7 +399,10 @@ def cold_night_difference(
 
 
 def load_cold_inputs() -> tuple[np.ndarray, dict[int, int], int]:
-    """Read the dense table of experiment 713 and the Primary map of the scorer, and return the cold-night grid, the map, and the grid start."""
+    """Return the cold-night grid, the Primary map, and the grid start.
+
+    The function reads the dense table of experiment 713 and the Primary map of the scorer.
+    """
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
 
@@ -394,7 +422,10 @@ def load_cold_inputs() -> tuple[np.ndarray, dict[int, int], int]:
 
 
 def z_rule(*, per_seed: dict, averaged: dict, groups: dict, star: str) -> dict:
-    """Return the rule on arm `Z`: `Z` minus `M*` on its 5 folds, in absolute value, against the two-seed floor (audit trigger 1)."""
+    """Return the rule on arm `Z` (audit trigger 1).
+
+    The rule reads `Z` minus `M*` on its 5 folds, in absolute value, against the two-seed floor.
+    """
     out: dict = {}
     for g in GROUPS_COUNTED:
         c = contrast(
@@ -449,7 +480,11 @@ def secondary_s1_s2(
 def secondary_s4(
     *, per_seed: dict, averaged: dict, groups: dict, pairs: dict[str, tuple[str, str]], n_seeds: int
 ) -> dict:
-    """Return S4 (no harm in the dark): the first contrast on the whole band of the dark folds; it holds when the interval lies inside plus or minus `delta`."""
+    """Return S4 (no harm in the dark).
+
+    S4 is the first contrast on the whole band of the dark folds. It holds when the interval lies
+    inside plus or minus `delta`.
+    """
     ps = apply_slice(per_seed, solar=False, folds=DARK_FOLDS)
     av = apply_slice(averaged, solar=False, folds=DARK_FOLDS)
     out = {}
@@ -471,9 +506,13 @@ def secondary_s4(
 
 
 def shift_control(*, star_frame: pl.DataFrame, treated_frame: pl.DataFrame) -> pl.DataFrame:
-    """Return `M*`'s forecasts with every quantile shifted, per Primary and fold, by the mean difference between the treated arm's median and `M*`'s median over the scored rows.
+    """Return `M*`'s forecasts with every quantile shifted, per Primary and fold.
 
-    Both frames are seed-averaged, hold the same keys, and carry no losses (call `s713.add_losses` on the result).
+    The shift is the mean difference between the treated arm's median and `M*`'s median over the
+    scored rows.
+
+    Both frames are seed-averaged, hold the same keys, and carry no losses (call `s713.add_losses`
+    on the result).
     """
     assert star_frame.height == treated_frame.height
     joined = star_frame.select(*KEYS, "q50").join(
@@ -495,7 +534,11 @@ def shift_control(*, star_frame: pl.DataFrame, treated_frame: pl.DataFrame) -> p
 def daily_clear_sky_index(
     *, ghi: np.ndarray, clear: np.ndarray, floor_w_m2: float = 50.0
 ) -> np.ndarray:
-    """Return the UTC-day clear-sky index of each Primary, (n_primary, n_days): summed irradiance over summed clear-sky irradiance, in half-hours with clear-sky irradiance above `floor_w_m2`."""
+    """Return the UTC-day clear-sky index of each Primary, shape (n_primary, n_days).
+
+    The index is summed irradiance over summed clear-sky irradiance, in half-hours with clear-sky
+    irradiance above `floor_w_m2`.
+    """
     n_days = ghi.shape[1] // 48
     g = ghi[:, : n_days * 48].reshape(ghi.shape[0], n_days, 48)
     c = clear[:, : n_days * 48].reshape(ghi.shape[0], n_days, 48)
@@ -508,7 +551,11 @@ def daily_clear_sky_index(
 def dullness_thirds(
     *, frame: pl.DataFrame, csi: np.ndarray, prim_of: dict[int, int], grid_start_us: int
 ) -> pl.DataFrame:
-    """Add `third` (0 duller, 1 middle, 2 sunnier) to each row: the valid day's clear-sky index minus the mean over the UTC days 2 to 15 before the origin's date, split into thirds within each Primary and fold."""
+    """Add `third` (0 duller, 1 middle, 2 sunnier) to each row.
+
+    The valid day's clear-sky index minus the mean over the UTC days 2 to 15 before the origin's
+    date is split into thirds within each Primary and fold.
+    """
     day_us = 86_400 * 1_000_000
     prim = np.array([prim_of[t] for t in frame["time_series_id"].to_list()])
     vday = ((frame["valid_time"].dt.epoch("us").to_numpy() - grid_start_us) // day_us).astype(
@@ -558,11 +605,14 @@ def secondary_s3(
     n_resamples: int = 10_000,
     seed: int = 3,
 ) -> dict:
-    """Return S3 for one group: A1 on the duller third minus A1 on the sunnier third, for the treated arm and for the shifted-`M*` control, and the gap between the two differences with a bootstrap interval over origin days.
+    """Return S3 for one group: A1 on the duller third minus A1 on the sunnier third.
+
+    The difference is taken for the treated arm and for the shifted-`M*` control. S3 also holds the
+    gap between the two differences, with a bootstrap interval over origin days.
 
     All three frames are seed-averaged, hold the same keys, carry losses, and have a `third` column
-    (the solar block of the sunny folds). The reading holds when the treated arm's difference of thirds
-    lies at least 0.10 below the control's and the interval of the gap is below zero.
+    (the solar block of the sunny folds). The reading holds when the treated arm's difference of
+    thirds lies at least 0.10 below the control's and the interval of the gap is below zero.
     """
     sel = {
         n: s713.restrict(frame=f, group=group, band=s713.HEADLINE_BAND_HOURS, groups=groups)
@@ -608,7 +658,11 @@ def secondary_s5(
     n_resamples: int = 10_000,
     seed: int = 5,
 ) -> dict:
-    """Return S5: the Spearman correlation between the per-Primary first contrast (solar block, sunny folds) and the PV share, with a bootstrap interval over the 14 Primaries of the six and the eight."""
+    """Return S5: the Spearman correlation between the per-Primary first contrast and the PV share.
+
+    The first contrast is on the solar block of the sunny folds. The bootstrap interval is over the
+    14 Primaries of the six and the eight.
+    """
     ids = sorted(set(first_by_primary) & set(pv_share))
     x = np.array([pv_share[i] for i in ids])
     y = np.array([first_by_primary[i] for i in ids])
@@ -629,7 +683,11 @@ def secondary_s5(
 def report_only_tables(
     *, per_seed: dict, averaged: dict, groups: dict, treatment: str, reference: str, n_seeds: int
 ) -> dict:
-    """Return one contrast's report-only cuts at 95%: all 16 Primaries pooled, D15 with D18, three lead bands, each Primary, and the normalised MAE of the median beside CRPS."""
+    """Return one contrast's report-only cuts at 95%.
+
+    The cuts are all 16 Primaries pooled, D15 with D18, three lead bands, each Primary, and the
+    normalised MAE of the median beside CRPS.
+    """
     out: dict = {}
     pooled = {**groups, "all16": np.concatenate([groups["six"], groups["eight"], groups["other"]])}
     for g in ("all16", "other"):
@@ -687,9 +745,12 @@ def report_only_tables(
 def audit_trigger_5(
     *, per_seed: dict, averaged: dict, groups: dict, part: int, n_seeds: int
 ) -> dict:
-    """Return audit trigger 5 (713's): a nested arm beating its container, `H-S` beating `H` in part 1 and `H` beating `HT` in part 2.
+    """Return audit trigger 5 (713's): a nested arm beating its container.
 
-    The trigger fires when the nested arm's contrast against its container reads "gain" or "small gain" in either group.
+    The nested arm is `H-S` beating `H` in part 1 and `H` beating `HT` in part 2.
+
+    The trigger fires when the nested arm's contrast against its container reads "gain" or "small
+    gain" in either group.
     """
     nested, container = ("H-S", "H") if part == 1 else ("H", "HT")
     readings = {
@@ -712,10 +773,15 @@ def audit_trigger_5(
 def per_primary_table(
     *, per_seed: dict, averaged: dict, groups: dict, pairs: dict[str, tuple[str, str]], n_seeds: int
 ) -> dict:
-    """Return, for every one of the 16 Primaries, keyed by `time_series_id`, each contrast's CRPS point and 95% month-block interval and the normalised MAE of the median (points of capacity).
+    """Return each contrast's CRPS point, 95% interval, and normalised MAE for every Primary.
+
+    The result has one entry for each of the 16 Primaries, keyed by `time_series_id`. Each entry
+    holds each contrast's CRPS point and 95% month-block interval and the normalised MAE of the
+    median (points of capacity).
 
     Design 7.1 and 11.2: part 2 is scored at every Primary. Each Primary is its own group, so the
-    thresholds that belong to the six and the eight do not apply and only the point and the interval are read.
+    thresholds that belong to the six and the eight do not apply and only the point and the interval
+    are read.
     """
     out: dict = {}
     ids = sorted(
@@ -748,7 +814,10 @@ def per_primary_table(
 
 
 def leave_one_out_tables(*, averaged: dict, groups: dict, treatment: str, reference: str) -> dict:
-    """Return the first contrast's CRPS point (headline band) with each Primary left out and with each month left out, per counted group."""
+    """Return the first contrast's CRPS point with each Primary and each month left out.
+
+    The point is on the headline band, per counted group.
+    """
     out: dict = {}
     for g in GROUPS_COUNTED:
         sel = {
@@ -793,7 +862,10 @@ def score_part(
     *, part: int, star: str, months: tuple[str, ...], seeds: tuple[int, ...], truth: np.ndarray | None = None,
     mask_points: dict | None = None, cold_night_difference: dict | None = None,
 ) -> dict:  # fmt: skip
-    """Return a part's counted contrasts at 98.75% and 99.375%, readings, guards, and verdict, and the report-only cuts."""
+    """Return a part's counted contrasts at 98.75% and 99.375%, with the report-only cuts.
+
+    The result also holds the readings, guards, and verdict.
+    """
     pairs = pairs_of_part(part=part, star=star)
     names = sorted({n for p in pairs.values() for n in p})
     per_seed, averaged, groups = load_all(
@@ -955,7 +1027,10 @@ def mask_points_of(
 
 
 def cmd_baseline() -> int:
-    """WP6a: experiment 713's scorer on `M*` and `C` on all 8 folds, with the solar-block table per group and fold."""
+    """WP6a: experiment 713's scorer on `M*` and `C` on all 8 folds.
+
+    The output has the solar-block table per group and fold.
+    """
     star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     seeds = arms713.HEADLINE_SEEDS
     per_seed, averaged, groups = load_all(
@@ -1071,7 +1146,10 @@ def cmd_part(*, part: int, n_seeds: int) -> int:
 
 
 def extra_pairs(*, part: int, star: str) -> dict[str, tuple[str, str]]:
-    """Return the report-only contrasts of design 7.5 that are not counted: nested and cross-arm readings, and every arm against `C`."""
+    """Return the report-only contrasts of design 7.5 that are not counted.
+
+    They are nested and cross-arm readings, and every arm against `C`.
+    """
     if part == 1:
         pairs = {
             "H-X": ("H", "H-X"),
@@ -1089,7 +1167,11 @@ def extra_pairs(*, part: int, star: str) -> dict[str, tuple[str, str]]:
 def cells_present(
     *, name: str, seeds: tuple[int, ...] = arms.HEADLINE_SEEDS
 ) -> set[tuple[str, int]] | None:
-    """Return the (fold, seed) cells that an F7 arm has a forecast file for, or `None` for an arm of experiment 713 (its loader reports a missing file itself)."""
+    """Return the (fold, seed) cells that an F7 arm has a forecast file for.
+
+    The function returns `None` for an arm of experiment 713, whose loader reports a missing file
+    itself.
+    """
     if not (name in arms.ARMS or any(name.startswith(b + "-") for b in arms.ARMS)):
         return None
     return {
@@ -1127,11 +1209,13 @@ def shared_cells(*, treatment: str, reference: str) -> tuple[tuple[str, ...], tu
 
 
 def report_only_extra(*, part: int, star: str, truth: np.ndarray | None) -> dict:
-    """Return each extra contrast at 95% in both groups, on the folds and seeds both arms hold, with what is missing printed and recorded.
+    """Return each extra contrast at 95% in both groups, on the folds and seeds both arms hold.
 
-    A contrast that cannot be read for want of a common fold or seed is recorded under `not_read` with
-    the reason and printed. A mismatch of keys between two arms that do have files is a real error and is
-    never caught.
+    What is missing is printed and recorded.
+
+    A contrast that cannot be read for want of a common fold or seed is recorded under `not_read`
+    with the reason and printed. A mismatch of keys between two arms that do have files is a real
+    error and is never caught.
     """
     out: dict = {}
     for label, (t, r) in extra_pairs(part=part, star=star).items():
@@ -1163,7 +1247,11 @@ def report_only_extra(*, part: int, star: str, truth: np.ndarray | None) -> dict
 
 
 def screen_stop_rule(*, first: dict[str, dict], monthly: dict[str, np.ndarray]) -> dict:
-    """Return 713's screen stop rule for part 1: `H` minus `M*` above +0.15 in both groups, or above +0.10 in both groups and positive in at least 3 of 4 folds in both groups."""
+    """Return 713's screen stop rule for part 1.
+
+    The rule is `H` minus `M*` above +0.15 in both groups, or above +0.10 in both groups and
+    positive in at least 3 of 4 folds in both groups.
+    """
     big = all(first[g]["point"] > 0.15 for g in GROUPS_COUNTED)
     moderate = all(
         first[g]["point"] > 0.10 and int((np.asarray(monthly[g]) > 0).sum()) >= 3
@@ -1177,7 +1265,10 @@ def screen_stop_rule(*, first: dict[str, dict], monthly: dict[str, np.ndarray]) 
 
 
 def cmd_screen() -> int:
-    """Part 1's stop rule on the four screen folds, seeds 0 and 1 (every number is interim); design section 10 has this one reading and no other."""
+    """Part 1's stop rule on the four screen folds, seeds 0 and 1.
+
+    Every number is interim. Design section 10 has this one reading and no other.
+    """
     star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     names = ["H", star]
     seeds = pinned_seeds(n_seeds=2, names=["H"], months=arms.SCREEN_FOLDS)
@@ -1210,7 +1301,10 @@ def cmd_screen() -> int:
 
 
 def capacity_share_of_fold(*, fold: str) -> dict[int, float]:
-    """Return each Primary's PV capacity over its power capacity at `fold` (the S5 share), from the as-of capacity table."""
+    """Return each Primary's PV capacity over its power capacity at `fold`.
+
+    This is the S5 share, from the as-of capacity table.
+    """
     import e00397_prep as prep397  # ty: ignore[unresolved-import]
     import e00716_pv as pv
 
@@ -1223,7 +1317,11 @@ def capacity_share_of_fold(*, fold: str) -> dict[int, float]:
 
 
 def cmd_secondary(*, part: int, n_seeds: int) -> int:
-    """S3 (the dull-day gap against the shifted-`M*` control) and S5 (the per-Primary contrast against the PV share), on the solar block of the sunny folds."""
+    """S3 and S5 on the solar block of the sunny folds.
+
+    S3 is the dull-day gap against the shifted-`M*` control. S5 is the per-Primary contrast against
+    the PV share.
+    """
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
     import e00716_pv as pv
@@ -1337,7 +1435,11 @@ def synthetic_arm(
 
 
 def selftest() -> int:
-    """Check the reading table, the verdict table, the placebo guard, the shifted-`M*` control, and a contrast on synthetic frames."""
+    """Check the decision logic on synthetic frames.
+
+    The checks cover the reading table, the verdict table, the placebo guard, the shifted-`M*`
+    control, and a contrast.
+    """
     s713.N_RESAMPLES = 2000
     c = lambda point, lo, hi, guards=True, delta=0.06, g4=True: {
         "point": point, "lower": lo, "upper": hi, "t_guard": guards, "seed_guard": guards, "floor_guard": guards, "seed_guard_4_of_5": g4, "delta": delta,

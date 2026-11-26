@@ -1,5 +1,7 @@
 # ruff: noqa: E501, PT018, PLR0915, E731
-"""Experiment 716: fit one PV arm (one arm, one fold, one seed) in the training phase (design section 6, WP4).
+"""Experiment 716: fit one PV arm (one arm, one fold, one seed) in the training phase.
+
+The fit follows design section 6 (WP4).
 
 Usage: e00716_fit.py ARM MONTH SEED [--device cuda] [--accept-code-change OLD_HASH ...]
        [--accept-gate-change OLD_HASH] [--accept-713-hash OLD_HASH ...]
@@ -111,7 +113,8 @@ def fit(
 ) -> dict:  # fmt: skip
     """Fit stages 2 and 3 and return the log.
 
-    `loader` builds the fold's inputs (`default_loader` reads the real data; the checks pass a synthetic one).
+    `loader` builds the fold's inputs (`default_loader` reads the real data; the checks pass a synthetic
+    one).
     """
     log: dict = {"arm": arm, "month": month, "seed": seed}
     if require_gate:
@@ -212,7 +215,10 @@ def fit(
 def train_with_rerun(
     *, model: pvm.PvNet, world: tr.World, stage: int, samples: tr.SampleSet, seed: int, encoders: str, start_state: dict,
 ) -> tuple[tr.StageLog, tr.StageLog | None]:  # fmt: skip
-    """Train a stage at a cap of 60 passes; a stage that ends at the cap is rerun from its starting state at 120."""
+    """Train a stage at a cap of 60 passes.
+
+    A stage that ends at the cap is rerun from its starting state at a cap of 120.
+    """
     import e00716_train as pvt
 
     first = pvt.train_stage(
@@ -441,7 +447,10 @@ def default_loader(arm: str, month: str, seed: int, device: str) -> FitInputs:
 def build_pv_source_for_check(
     *, month: str, arm: str = "HT", phase: str = "train"
 ) -> tuple[pvb.PvSource, tr.World, np.ndarray | None]:
-    """Return the real fold's `PvSource` of `arm` on the CPU, 713's `World` around it, and the scored origins, for KF2 on real arrays (`e00716_check_batch.py real MONTH`).
+    """Return the real fold's `PvSource` of `arm` on the CPU, 713's `World`, and the scored origins.
+
+    The `World` is built around the `PvSource`. The three values serve KF2 on real
+    arrays (`e00716_check_batch.py real MONTH`).
 
     The scored origins (`test_origin_idx`) exist only in the `predict` phase, whose process must have
     set `E00667_PHASE=predict` before importing this module; the `train` phase returns `None`.

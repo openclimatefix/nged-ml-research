@@ -2,11 +2,11 @@
 """Experiment 716: batches with the four PV tensors (design section 4.1, WP3).
 
 `PvSource` wraps experiment 713's `Source`: `assemble` calls `Source.assemble` unchanged and adds
-`hist_pv`, `hist_pv_ok`, `top_pv`, and `top_pv_ok` from its own arrays. The history estimate is read at
-each history token's own grid index; the target-row estimate is read from the table of the origin's own
-00Z run (or, for `HT-S`, of the donor run), keyed as `EnsTensors` is. The mask dropout draws from a
-generator of its own, keyed by (seed, stage, pass, batch), so the trunk's dropout masks and the global
-torch stream equal arm `Z`'s.
+`hist_pv`, `hist_pv_ok`, `top_pv`, and `top_pv_ok` from its own arrays. The history estimate is read
+at each history token's own grid index; the target-row estimate is read from the table of the
+origin's own 00Z run (or, for `HT-S`, of the donor run), keyed as `EnsTensors` is. The mask dropout
+draws from a generator of its own, keyed by (seed, stage, pass, batch), so the trunk's dropout masks
+and the global torch stream equal arm `Z`'s.
 """
 
 from dataclasses import dataclass
@@ -45,7 +45,8 @@ class PvTables:
         top_filled: (16, n_days, 672) bool.
         first_day: The day number of table day 0 (the same as `EnsTensors.first_day`).
         run_us: (16, n_days) int64 issue time of the run behind each row of `top_p0`, 0 where absent.
-        exception_days: Table days whose donor run is issued after the origin (the `HT-S` exception); the issue-time assertion skips them.
+        exception_days: Table days whose donor run is issued after the origin (the `HT-S` exception);
+            the issue-time assertion skips them.
     """
 
     hist_p: torch.Tensor
@@ -60,7 +61,9 @@ class PvTables:
 def pv_dropout_masks(
     *, seed: int, stage: int, epoch: int, batch: int, n: int
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the two mask draws of one training batch: (CAMS-rule mask, mask of 713's convention), each (n,) bool.
+    """Return the two mask draws of one training batch, each (n,) bool.
+
+    The draws are (CAMS-rule mask, mask of 713's convention).
 
     The draw uses its own generator keyed by (seed, stage, pass, batch), never the global torch
     stream, so every PV arm and placebo of one seed and the arm `Z` see the same trunk dropout. A
@@ -75,7 +78,9 @@ def pv_dropout_masks(
 def apply_ok_mask(
     *, ok: torch.Tensor, cams_rule: torch.Tensor | None, convention: torch.Tensor | None
 ) -> torch.Tensor:
-    """Return `hist_pv_ok` with the CAMS-rule mask (age-2 row, columns 25 to 47 of the age-3 row) and the mask of ages 2 to 5 applied.
+    """Return `hist_pv_ok` with the CAMS-rule mask and the mask of ages 2 to 5 applied.
+
+    The CAMS-rule mask covers the age-2 row and columns 25 to 47 of the age-3 row.
 
     `cams_rule` and `convention` are (B,) bool or None. Rows are the history rows 0 to 13 (ages 2 to 15).
     """

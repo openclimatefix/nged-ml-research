@@ -43,7 +43,10 @@ def reachable_range(*, rate: float, steps: int) -> float:
 
 
 def token_length_share(*, model: pvm.PvNet, inp: pvm.PvInputs) -> dict[str, float]:
-    """Return the mean length of each PV path's output as a share of the mean length of the token it is added to (experiment 713's token before the paths)."""
+    """Return the mean length of each PV path's output as a share of the mean token length.
+
+    The token is the one that the path is added to (experiment 713's token before the paths).
+    """
     model.eval()
     with torch.no_grad():
         base, _ = mdl.MsaNet._tokens(model, inp)  # ty: ignore[invalid-argument-type]
@@ -67,7 +70,10 @@ def token_length_share(*, model: pvm.PvNet, inp: pvm.PvInputs) -> dict[str, floa
 
 
 def learned_gains(*, model: pvm.PvNet, steps: int) -> dict:
-    """Return `a` and `c` per Primary, the norms of the token-path gains, and each as a share of its reachable range at `steps` steps."""
+    """Return `a` and `c` per Primary and the norms of the token-path gains.
+
+    Each of the values is also returned as a share of its reachable range at `steps` steps.
+    """
     out: dict = {}
     for name, rate in (
         ("pv_a", 1e-2),
@@ -88,7 +94,10 @@ def learned_gains(*, model: pvm.PvNet, steps: int) -> dict:
 
 
 def readout_contrasts(*, base: str, months: tuple[str, ...], seeds: tuple[int, ...]) -> dict:
-    """Return, at 95%, each read-out against its parent arm and against `M*`, per group (the look-ahead on the dark folds at the six)."""
+    """Return, at 95%, each read-out against its parent arm and against `M*`, per group.
+
+    The look-ahead on the dark folds is scored at the six.
+    """
     star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     names = [base, star, *[f"{base}-{r}" for r in READOUTS]]
     per_seed, averaged, groups = score.load_all(
@@ -126,7 +135,11 @@ def load_state(*, arm: str, month: str, seed: int) -> pvm.PvNet:
 
 
 def steps_of(*, arm: str, month: str, seed: int) -> int:
-    """Return the fit's own optimiser steps over stages 2 and 3 (design 7.5): each stage's passes times the batches of its training pairs; the fit log must hold `train_pairs`."""
+    """Return the fit's own optimiser steps over stages 2 and 3 (design 7.5).
+
+    Each stage's steps are its passes times the batches of its training pairs; the fit log must hold
+    `train_pairs`.
+    """
     path = arms.log_file(
         data_dir=ML_EXPERIMENTS_DATA_DIR, arm=arm, month=month, seed=seed, kind="fit"
     )

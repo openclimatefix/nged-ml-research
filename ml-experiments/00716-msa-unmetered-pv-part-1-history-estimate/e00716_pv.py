@@ -9,11 +9,12 @@ This module holds the as-of capacity table, the dense history estimate over the 
 target-row table, and the three placebo builders: `H-S` (the sky of 28 days earlier), `HT-S` (the ENS
 run of 28 days earlier), and `H-X` (the other Primary's estimate). It reads no neural network.
 
-Dense-table column order (read from `e00632_data.dense_raw`): weather columns 0 to 6 hold the CAMS
-shortwave at column 0 and the ERA5 2 m temperature at column 2, and columns 7 to 27 are the date-time
-columns of experiment 397's rows 14 to 34, so column 7 is the cosine of the zenith and columns 8 and 9
-are the sine and cosine of the azimuth (`e00634_common.unit_curve` reads the same columns 14, 15, and
-16 of a Candidate row). `check_dense_columns` checks the order against the Candidate's rows.
+Dense-table column order (read from `e00632_data.dense_raw`): weather columns 0 to 6 hold the
+CAMS shortwave at column 0 and the ERA5 2 m temperature at column 2, and columns 7 to 27 are the
+date-time columns of experiment 397's rows 14 to 34, so column 7 is the cosine of the zenith and
+columns 8 and 9 are the sine and cosine of the azimuth (`e00634_common.unit_curve` reads the
+same columns 14, 15, and 16 of a Candidate row). `check_dense_columns` checks the order against
+the Candidate's rows.
 """
 
 from dataclasses import dataclass
@@ -82,7 +83,8 @@ class AsOfCapacity:
         source: The experiment of the table, `649` or `662`, or `None` where absent.
         cutoff: The stored cutoff the value was read from.
         lookahead_probes: The probes' neural networks were trained to a cutoff after the fold's.
-        lookahead_factors: The calibration factor or the 0.7858 rescale comes from data after the fold's cutoff.
+        lookahead_factors: The calibration factor or the 0.7858 rescale comes from data after the fold's
+            cutoff.
     """
 
     site: str
@@ -164,7 +166,9 @@ def capacity_table(*, fold: str, sites: list[str]) -> list[AsOfCapacity]:
 def probe_table_at_cutoff(
     *, cutoff: str, table_649: pl.DataFrame, table_662: pl.DataFrame
 ) -> dict[str, float]:
-    """Return the `probe` column of `e00673_deliverable.probe_table` at `cutoff` (copied with a `cutoff` argument).
+    """Return the `probe` column of `e00673_deliverable.probe_table` at `cutoff`.
+
+    The function is a copy with a `cutoff` argument.
 
     Source: `e00673_deliverable.probe_table`, lines 255 to 308 (experiment 673), whose cutoff is the
     literal `2026-06`. The six read `cal_p50` and the eight read `cal_p50 × rescale`, with the rescale
@@ -210,7 +214,10 @@ def lookahead_statement(*, caps: list[AsOfCapacity]) -> list[str]:
 
 
 def day_of_year(*, grid_start_us: int, n_grid: int, step_us: int = 1_800_000_000) -> np.ndarray:
-    """Return the day of the year (1 to 366, float) of every grid stamp, as `e00634_common.unit_curve` does."""
+    """Return the day of the year (1 to 366, float) of every grid stamp.
+
+    The calculation is the same as in `e00634_common.unit_curve`.
+    """
     stamps = grid_start_us + np.arange(n_grid, dtype=np.int64) * step_us
     return pl.Series(stamps).cast(pl.Datetime("us")).dt.ordinal_day().to_numpy().astype(np.float64)
 
@@ -339,7 +346,9 @@ def transfer_sky(
     *, donor_mean: np.ndarray, donor_sd: np.ndarray | None, clear_donor: np.ndarray,
     clear_own: np.ndarray, cap: float = K_CAP, low_sun: float = LOW_SUN_W_M2,
 ) -> SkyTransfer:  # fmt: skip
-    """Move the sky of a donor half-hour onto the sun position of the token (one clear-sky function on both sides).
+    """Move the sky of a donor half-hour onto the sun position of the token.
+
+    One clear-sky function is used on both sides.
 
     `k` is the donor's irradiance over the Haurwitz irradiance at the donor's own zenith, capped at
     `cap`. Where the donor's clear-sky irradiance is under `low_sun` W/m2, `k` is the donor day's
@@ -593,7 +602,9 @@ def check_dense_weather(
     min_ghi_corr: float = 0.7,
     min_temp_corr: float = 0.9,
 ) -> str:
-    """Check that the dense table's shortwave and temperature columns are the Candidate rows' quantities (KF4, column identity).
+    """Check that the dense table's shortwave and temperature columns are the Candidate rows' quantities.
+
+    This is KF4, the column identity check.
 
     The dense table holds the observed weather (ERA5 and CAMS) and the rows hold the numerical weather
     prediction at the row's lead, so the two cannot be equal. They must still correlate strongly at the
@@ -620,10 +631,13 @@ N_ENS_STEPS: Final = 14 * GRID_STEPS_PER_DAY
 
 @dataclass
 class TargetRaw:
-    """The raw ENS target-row quantities of the Candidate's rows, in `EnsTensors`' (Primary, origin day, position) layout.
+    """The raw ENS target-row quantities of the Candidate's rows.
+
+    The tensors follow the (Primary, origin day, position) layout of `EnsTensors`.
 
     Attributes:
-        values: (16, n_days, 672, 4) float32: ENS-mean shortwave, ENS-spread shortwave (W/m2), 2 m temperature (C), and the cosine of the zenith, from the float32 rows.
+        values: (16, n_days, 672, 4) float32: ENS-mean shortwave, ENS-spread shortwave (W/m2), 2 m
+            temperature (C), and the cosine of the zenith, from the float32 rows.
         azimuth: (16, n_days, 672, 2) float32: the sine and cosine of the azimuth.
         filled: (16, n_days, 672) bool.
         first_day: The day number (grid index // 48) of day index 0.
@@ -680,7 +694,10 @@ def target_raw_from_rows(
 
 
 def merge_target_raw(*, base: TargetRaw, other: TargetRaw) -> TargetRaw:
-    """Return `base` with the filled entries of `other` written over it (the scored rows over the training rows)."""
+    """Return `base` with the filled entries of `other` written over it.
+
+    In use, the scored rows are written over the training rows.
+    """
     assert base.first_day == other.first_day
     take = other.filled
     values = np.where(take[..., None], other.values, base.values)
@@ -775,10 +792,13 @@ def target_doy(*, first_day: int, n_days: int) -> np.ndarray:
 def monthly_mean_temperature(
     *, raw: np.ndarray, cutoff_idx: int, window_days: int = 730
 ) -> np.ndarray:
-    """Return the temperature (16, G) with each token's value replaced by the Primary's mean 2 m temperature of the same calendar month.
+    """Return the temperature (16, G) with each token's value replaced by a monthly mean.
 
-    The mean is taken over the `window_days` before `cutoff_idx` (the fold's training days). This is
-    the temperature of the CAMS-rule read-out (design section 7.5), because the history estimate otherwise reads ERA5 temperature, which a live service would not have.
+    The replacement is the Primary's mean 2 m temperature of the same calendar month.
+
+    The mean is taken over the `window_days` before `cutoff_idx` (the fold's training days). This is the
+    temperature of the CAMS-rule read-out (design section 7.5), because the history estimate otherwise
+    reads ERA5 temperature, which a live service would not have.
     """
     n_primary, n_grid = raw.shape[:2]
     stamps = GRID_START_US + np.arange(n_grid, dtype=np.int64) * STEP_US

@@ -1,30 +1,39 @@
 # ruff: noqa: E501, PT018, PT017, PLR0915, E731, ANN003
-"""Experiment 716: known-answer checks KF6 and KF9 to KF12, KF15, and the early-stopping pre-check (WP5b; design section 8.2).
+"""Experiment 716: known-answer checks KF6, KF9 to KF12, KF15, and the early-stopping pre-check.
 
-Usage: run.sh e00716_known_answer.py --selftest
-       run.sh e00716_known_answer.py fit-m WORLD SEED [--device cuda]    # arm M, hiding the world's sky
-       run.sh e00716_known_answer.py precheck                            # the early-stopping pre-check, before any PV fit
-       run.sh e00716_known_answer.py fit-arms WORLD SEED [--device cuda] # the three gating arms (refuses before a passed pre-check)
-       run.sh e00716_known_answer.py finish                              # the checks, the gate file (reads work/wiring/*.json)
+These checks are work package WP5b (design section 8.2).
 
-Order (design 8.2): `fit-m WH 0` and `fit-m WT 0`, then `precheck`. A failed pre-check goes up one rung:
-`e00716_world_rung.py --after N`, then `fit-m WH 0`, `fit-m WT 0` and `precheck` again. Only after a pass
-are the other `fit-m` jobs (seeds 1 and 2, and world WN) and every `fit-arms` job allowed.
+Usage:
+
+- `run.sh e00716_known_answer.py --selftest`
+- `run.sh e00716_known_answer.py fit-m WORLD SEED [--device cuda]` fits arm M, hiding the world's
+  sky.
+- `run.sh e00716_known_answer.py precheck` runs the early-stopping pre-check, before any PV fit.
+- `run.sh e00716_known_answer.py fit-arms WORLD SEED [--device cuda]` fits the three gating arms
+  (it refuses before a passed pre-check).
+- `run.sh e00716_known_answer.py finish` runs the checks and writes the gate file (it reads
+  `work/wiring/*.json`).
+
+Order (design 8.2): `fit-m WH 0` and `fit-m WT 0`, then `precheck`. A failed pre-check goes up one
+rung: `e00716_world_rung.py --after N`, then `fit-m WH 0`, `fit-m WT 0` and `precheck` again. Only
+after a pass are the other `fit-m` jobs (seeds 1 and 2, and world WN) and every `fit-arms` job
+allowed.
 
 This file is implemented and has not been run on real data: the work package's brief forbids any GPU
 use and any fit. `--selftest` runs the decision logic on synthetic numbers and one smoke pass of a
 gating fit on a tiny synthetic world on the CPU.
 
 **The world.** `e00716_worlds.build_world` makes the power at the rung that `work/world_rung.json`
-names. The weather tokens keep the real ERA5-and-CAMS arrays except for one hidden sky: the shortwave
-column, every shortwave-derived column, and the longwave column are zero in the history rows of world
-WH and in the target row of world WT (`HIDDEN_COLUMNS`, asserted against the names of experiment 632's
-columns). Arm `M` is trained from scratch under experiment 713's amended known-answer budget (stage 1,
-at most 400 passes, patience 30) with experiment 713's own `train_stage`. Each gating arm starts from the
-state of `M` of the same seed and trains for 60 passes with no early stopping: it uses
-`e00716_train.train_stage` at the settings that the design lists (no ensemble target row, no `p0_sd`
-in WT, shifts of experiment 581's `synthetic_source` in training, validation on the unshifted source,
-token weights 1, trunk rate 2e-4, stage 2's cut), and records every metric after every pass.
+names. The weather tokens keep the real ERA5-and-CAMS arrays except for one hidden sky: the
+shortwave column, every shortwave-derived column, and the longwave column are zero in the history
+rows of world WH and in the target row of world WT (`HIDDEN_COLUMNS`, asserted against the names of
+experiment 632's columns). Arm `M` is trained from scratch under experiment 713's amended
+known-answer budget (stage 1, at most 400 passes, patience 30) with experiment 713's own
+`train_stage`. Each gating arm starts from the state of `M` of the same seed and trains for 60
+passes with no early stopping: it uses `e00716_train.train_stage` at the settings that the design
+lists (no ensemble target row, no `p0_sd` in WT, shifts of experiment 581's `synthetic_source` in
+training, validation on the unshifted source, token weights 1, trunk rate 2e-4, stage 2's cut), and
+records every metric after every pass.
 """
 
 from __future__ import annotations
@@ -74,7 +83,10 @@ PATIENCE_713: Final = tr.PATIENCE
 
 
 def check_hidden_columns() -> None:
-    """Assert that `HIDDEN_COLUMNS` name the shortwave-derived columns of experiment 632's layout and experiment 713's CAMS columns."""
+    """Assert that `HIDDEN_COLUMNS` names the shortwave-derived columns.
+
+    The columns come from experiment 632's layout and experiment 713's CAMS columns.
+    """
     b1 = d632.B1_GRID_NAMES
     assert HIDDEN_COLUMNS["sw_mean_3h"] == mdl.N_WEATHER + b1.index("sw_mean_3h")
     assert HIDDEN_COLUMNS["sw_mean_6h"] == mdl.N_WEATHER + b1.index("sw_mean_6h")
@@ -90,7 +102,11 @@ def check_hidden_columns() -> None:
 
 
 class WorldSource(pvb.PvSource):
-    """A world source that zeroes the hidden sky columns in the history rows (`hide="history"`) or the target row (`hide="target"`)."""
+    """A world source that zeroes the hidden sky columns.
+
+    The columns are zeroed in the history rows (`hide="history"`) or the target row
+    (`hide="target"`).
+    """
 
     def __init__(self, *, source: bt.Source, tables: pvb.PvTables, hide: str) -> None:
         """Hold the source and tables in world mode."""
@@ -116,7 +132,9 @@ class WorldSource(pvb.PvSource):
 
 
 class HidingSource(bt.Source):
-    """Experiment 713's source with the hidden sky columns zeroed in the history rows or the target row, for training arm `M` in a world.
+    """Experiment 713's source with the hidden sky columns zeroed, for training arm `M` in a world.
+
+    The hidden sky columns are zeroed in the history rows or the target row.
 
     Arm `M` is trained "in each world" (design 8.2), and each world hides one part of the sky, so `M`
     must never see the part its world hides.
@@ -157,7 +175,9 @@ def world_tables(
     `p` is `s u` over the world's own `target_std`, clipped to 0..10, for the four Primaries (other
     rows are absent). `H-S` and `HT-S` read the yield curve of the shifted sky (`shifted` is the pair
     (ghi, temperature) from `pv.shifted_sky`, 28 days earlier); `H-S` shifts the history estimate and
-    `HT-S` the target row only. `WN` reads `0.30 u`, and its world has no dip (`build_world(s_override=0)`). `H` fills `hist_p`; `HT` and `T` fill the target table too, with `p0_sd = 0`.
+    `HT-S` the target row only. `WN` reads `0.30 u`, and its world has no dip
+    (`build_world(s_override=0)`). `H` fills `hist_p`; `HT` and `T` fill the target table too, with
+    `p0_sd = 0`.
     """
     n_grid = world.y.shape[1]
     n_days = n_grid // lay.STEPS_PER_DAY
@@ -212,7 +232,11 @@ def world_standardisation(*, world: wd.PvWorld, cutoff_idx: int) -> tuple[np.nda
 def to_tr_world(
     *, world: wd.PvWorld, template: bt.Source, tables: pvb.PvTables, hide: str, cutoff_idx: int, device: str,
 ) -> tuple[tr.World, np.ndarray, np.ndarray]:  # fmt: skip
-    """Return experiment 713's `World` of the synthetic power, with a `WorldSource`, and the world's mean and standard deviation (16,) (zero and one for absent Primaries)."""
+    """Return experiment 713's `World` of the synthetic power, with a `WorldSource`.
+
+    The function also returns the world's mean and standard deviation (16,), which are zero and one
+    for absent Primaries.
+    """
     mean4, std4 = world_standardisation(world=world, cutoff_idx=cutoff_idx)
     n_grid = world.y.shape[1]
     clean = np.full((16, n_grid), np.nan, dtype=np.float32)
@@ -246,7 +270,11 @@ def predict_medians(
     mean: np.ndarray,
     std: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Return (median, actual, target index, origin day) per (origin, lead day, column) in capacity shares, on the unshifted source with every PV flag as the arm sets it."""
+    """Return (median, actual, target index, origin day) per (origin, lead day, column).
+
+    The values are in capacity shares, on the unshifted source, with every PV flag as the arm sets
+    it.
+    """
     model.eval()
     meds, acts, idxs, days = [], [], [], []
     samples = tr.SampleSet(primary=primary, c_idx=c_idx, is_val=np.zeros(len(primary), bool))
@@ -280,11 +308,12 @@ def maes(
     day: np.ndarray | None = None,
     first_day: int = 0,
 ) -> dict[str, float]:
-    """Return the MAE of the median on all finite target tokens and on the solar block (UTC half-hours 12 to 29).
+    """Return the MAE of the median on all finite target tokens and on the solar block.
 
-    With `day` (the origin day of each token) and `first_day` (the first validation day), the solar-block
-    MAE is also returned for the first `EARLY_DAYS` validation days (`solar_early`) and for the later days
-    (`solar_late`): secondary readings of KF9 and KF11 that never gate (design addendum 1, F5).
+    The solar block is UTC half-hours 12 to 29. With `day` (the origin day of each token) and
+    `first_day` (the first validation day), the solar-block MAE is also returned for the first
+    `EARLY_DAYS` validation days (`solar_early`) and for the later days (`solar_late`): secondary
+    readings of KF9 and KF11 that never gate (design addendum 1, F5).
     """
     ok = np.isfinite(act)
     err = np.abs(med - act)
@@ -314,7 +343,11 @@ def best_pass(*, val_history: list[float], patience: int = PATIENCE_713) -> int:
 
 
 def check_metric(*, per_pass: list[float], best: int, width: int = GATING_CHECK_PASSES) -> float:
-    """Return the median over the `width` evaluated passes ending at the best-validation pass (fewer if the best pass comes earlier)."""
+    """Return the median over the `width` evaluated passes ending at the best pass.
+
+    The best pass is the best-validation pass. The median covers fewer passes if the best pass comes
+    earlier than `width` passes in.
+    """
     lo = max(0, best - width)
     return float(np.median(per_pass[lo:best]))
 
@@ -348,7 +381,10 @@ def gating_metric(
 def kf_results(
     *, kind_metrics: dict[str, dict[str, dict[str, float]]], gaps: dict[str, float]
 ) -> dict:
-    """Return KF9 to KF12 from the per-world metrics (`kind_metrics[world][arm][metric]`) and the references' `gap` per world."""
+    """Return KF9 to KF12 from the per-world metrics and the references' `gap` per world.
+
+    The per-world metrics are `kind_metrics[world][arm][metric]`.
+    """
     th = THRESHOLDS
     wh, wt, wn = kind_metrics["WH"], kind_metrics["WT"], kind_metrics["WN"]
     kf9 = wh["H-S"]["solar"] - wh["H"]["solar"]
@@ -364,7 +400,10 @@ def kf_results(
 
 
 def kf15(*, c_by_primary: dict[int, float]) -> dict:
-    """Return KF15 (secondary, never gating): the learned `c` of each of the four Primaries of WT lies between -1.3 and -0.7."""
+    """Return KF15 (secondary, never gating).
+
+    The check holds when the learned `c` of each of the four Primaries of WT lies between -1.3 and -0.7.
+    """
     lo, hi = THRESHOLDS["kf15_range"]  # ty: ignore[not-iterable]
     return {
         "c": c_by_primary,
@@ -376,7 +415,10 @@ def kf15(*, c_by_primary: dict[int, float]) -> dict:
 def early_stopping_precheck(
     *, nll_naive: float, nll_oracle: float, m_val_history: list[float]
 ) -> dict:
-    """Return the early-stopping pre-check: the references' difference in negative log-likelihood against 10 times the validation noise of arm `M`.
+    """Return the early-stopping pre-check.
+
+    The pre-check compares the references' difference in negative log-likelihood against 10 times
+    the validation noise of arm `M`.
 
     The noise is the standard deviation of the last 10 values of arm `M`'s validation loss in the same world.
     """
@@ -412,7 +454,11 @@ def precheck_diagnostics(*, m_val_history: list[float]) -> dict:
 
 
 def gaussian_nll_standardised(*, errors: np.ndarray, std: np.ndarray) -> float:
-    """Return the mean Gaussian negative log-likelihood of `errors` (n_tokens,) after dividing each by its Primary's `std`, with the error's own standard deviation."""
+    """Return the mean Gaussian negative log-likelihood of `errors` (n_tokens,).
+
+    Each error is divided by its Primary's `std` first, and the likelihood uses the error's own
+    standard deviation.
+    """
     z = errors / std
     var = float(np.mean(z**2))
     return 0.5 * float(np.log(2 * np.pi * var)) + 0.5
@@ -435,7 +481,9 @@ def run_gating_arm(
     *, arm: str, start_state: dict, world713: tr.World, mean: np.ndarray, std: np.ndarray, seed: int, passes: int, samples: tr.SampleSet, held: tr.SampleSet,
     train_source: pvb.PvSource | None, device: str,
 ) -> dict:  # fmt: skip
-    """Train one gating arm from `start_state` for `passes` passes with no early stopping and record the metrics after every pass.
+    """Train one gating arm from `start_state` for `passes` passes with no early stopping.
+
+    The function records the metrics after every pass.
 
     The settings mirror the real fits (design 8.2): the encoders are frozen as `M*`'s are, the constant
     divisors `r_h` and `r_t` are calibrated on the arm's own training samples before the first step,
@@ -510,7 +558,10 @@ def work_dir() -> Path:
 
 
 def selftest() -> int:
-    """Check the decision logic on synthetic numbers, the hidden columns, and one smoke pass of a gating fit on a tiny CPU world."""
+    """Check the decision logic, the hidden columns, and one smoke pass of a gating fit.
+
+    The decision logic runs on synthetic numbers, and the smoke pass runs on a tiny CPU world.
+    """
     check_hidden_columns()
     print("hidden sky columns: ", HIDDEN_COLUMNS)
     assert (
@@ -571,7 +622,11 @@ def selftest() -> int:
 
 
 def check_order() -> None:
-    """B5: no PV gating fit and no later `M` fit may run before a passed pre-check, and the ladder steps up after a failure."""
+    """B5: check that no fit runs before a passed pre-check and the ladder steps up after a failure.
+
+    No PV gating fit and no later `M` fit may run before a passed pre-check, and the ladder steps up
+    after a failure.
+    """
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -614,7 +669,11 @@ def check_order() -> None:
 
 
 def check_records() -> None:
-    """S1 and S2: a wiring record or an artefact is refused when edited, written from a dirty tree, or written by other code or other check scripts."""
+    """S1 and S2: check that a wiring record or an artefact is refused when it is not clean.
+
+    A wiring record or an artefact is refused when edited, written from a dirty tree, or written by
+    other code or other check scripts.
+    """
     body = {
         "check": "KF2", "pass": True, "detail": {}, "fold": "2025-11",
         "check_file_sha256": arms.check_file_hashes(), **arms.code_record(), "git_dirty": False,
@@ -653,7 +712,11 @@ def check_records() -> None:
 
 
 def check_world_rung_file() -> None:
-    """F2: `chosen_rung` refuses a `world_rung.json` that is stale, from the 60-day single-draw rule, or lacks the eight-draw fields, and accepts a current one."""
+    """F2: check which `world_rung.json` files `chosen_rung` refuses and which it accepts.
+
+    `chosen_rung` refuses a `world_rung.json` that is stale, from the 60-day single-draw rule, or
+    lacks the eight-draw fields, and accepts a current one.
+    """
     import tempfile
 
     clean = {**arms.code_record(), "git_dirty": False}
@@ -697,7 +760,11 @@ def check_world_rung_file() -> None:
 
 
 def check_diagnostics() -> None:
-    """The pre-check's printed diagnostics do not change its verdict, and `maes` splits the solar MAE at 60 days."""
+    """Check that the pre-check's diagnostics leave its verdict unchanged.
+
+    The pre-check's printed diagnostics do not change its verdict, and `maes` splits the solar MAE
+    at 60 days.
+    """
     hist = [1.0 - 0.05 * i for i in range(20)] + [
         0.05 + 0.01 * i for i in range(30)
     ]  # best at pass 20, then drifting up
@@ -734,7 +801,10 @@ def check_diagnostics() -> None:
 
 
 def smoke() -> None:
-    """One gating pass of arm `HT` in a tiny synthetic world on the CPU: the tables, the hidden sky, the unshifted validation, and the metrics."""
+    """Run one gating pass of arm `HT` in a tiny synthetic world on the CPU.
+
+    The pass exercises the tables, the hidden sky, the unshifted validation, and the metrics.
+    """
     rng = np.random.default_rng(0)
     n_days = 170
     n_grid = 48 * n_days
@@ -895,7 +965,10 @@ def smoke() -> None:
 
 
 def pseudo_raw(*, dense: wd.Dense4) -> np.ndarray:
-    """Return a (4, G, 28) table with the shortwave, temperature, and solar-geometry columns that `pv.shifted_sky` reads."""
+    """Return a (4, G, 28) table of the columns that `pv.shifted_sky` reads.
+
+    The columns are the shortwave, temperature, and solar-geometry columns.
+    """
     raw = np.zeros((dense.ghi.shape[0], dense.ghi.shape[1], 28), dtype=np.float32)
     raw[:, :, pv.DRAW_COLUMNS["ghi"]] = dense.ghi
     raw[:, :, pv.DRAW_COLUMNS["temperature"]] = dense.temperature_c
@@ -942,7 +1015,11 @@ def precheck_file(*, rung: int) -> Path:
 
 
 def read_checked(*, path: Path, files: tuple[str, ...] | None = None) -> dict:
-    """Read a stored JSON artefact and refuse it when its code record is missing, from a dirty tree, or from other code (`files` limits the comparison to those modules)."""
+    """Read a stored JSON artefact and refuse it when its code record is not clean.
+
+    The artefact is refused when its code record is missing, from a dirty tree, or from other code
+    (`files` limits the comparison to those modules).
+    """
     record = json.loads(path.read_text())
     problems = arms.artefact_problems(what=path.name, record=record, files=files)
     assert not problems, "; ".join(problems)
@@ -954,7 +1031,10 @@ WORLD_FILES: Final = arms.WORLD_FILES
 
 
 def require_precheck(*, rung: int) -> None:
-    """Refuse to continue unless the early-stopping pre-check has passed at `rung` (the rung is decided before any PV fit)."""
+    """Refuse to continue unless the early-stopping pre-check has passed at `rung`.
+
+    The rung is decided before any PV fit.
+    """
     path = precheck_file(rung=rung)
     assert path.exists(), f"run the `precheck` command first: {path.name} is missing"
     record = read_checked(path=path)
@@ -1004,7 +1084,10 @@ HIDE_OF_WORLD: Final = {"WH": "history", "WT": "target", "WN": "none"}
 
 
 def m_world(*, ctx: WorldContext, device: str) -> tr.World:
-    """Return experiment 713's `World` for arm `M` in this world: the synthetic power, and the same hidden sky as the world's other arms."""
+    """Return experiment 713's `World` for arm `M` in this world.
+
+    The world holds the synthetic power and the same hidden sky as the world's other arms.
+    """
     tables_z = world_tables(
         world=ctx.world, dense=ctx.dense, arm="Z", kind="WT", target_std=ctx.std4, device=device
     )
@@ -1019,7 +1102,9 @@ def m_world(*, ctx: WorldContext, device: str) -> tr.World:
 
 
 def fit_m(*, kind: str, seed: int, device: str) -> Path:
-    """Train arm `M` of one world and seed from scratch (stage 1, experiment 713's amended budget) on a source that hides the world's sky, and store its state and log.
+    """Train arm `M` of one world and seed from scratch, and store its state and log.
+
+    The fit is stage 1 on experiment 713's amended budget, on a source that hides the world's sky.
 
     Seed 0 of worlds WH and WT is fitted first, to run the pre-check at the rung of `world_rung.json`.
     Every other (world, seed) waits for the pre-check to pass at that rung, so the rung is decided
@@ -1052,7 +1137,9 @@ def fit_m(*, kind: str, seed: int, device: str) -> Path:
 
 
 def precheck(*, device: str = "cpu") -> int:
-    """Run the early-stopping pre-check at the rung of `world_rung.json`, from arm `M` of seed 0 in WH and WT, and write `precheck_rung<N>.json`.
+    """Run the early-stopping pre-check at the rung of `world_rung.json`.
+
+    The check starts from arm `M` of seed 0 in WH and WT, and writes `precheck_rung<N>.json`.
 
     The check reads no PV fit. On a failure it prints the step to the next rung.
     """
@@ -1180,7 +1267,10 @@ def read_wiring_records() -> tuple[dict[str, dict], list[str]]:
 
 
 def finish() -> int:
-    """Aggregate the jobs, run the decision logic, and write `known_answers_passed.json` only if every gating check passes."""
+    """Aggregate the jobs and run the decision logic.
+
+    The function writes `known_answers_passed.json` only if every gating check passes.
+    """
     root = work_root()
     rung_record = read_checked(path=root / "world_rung.json", files=WORLD_FILES)
     assert not wrung.rung_record_problems(record=rung_record), wrung.rung_record_problems(

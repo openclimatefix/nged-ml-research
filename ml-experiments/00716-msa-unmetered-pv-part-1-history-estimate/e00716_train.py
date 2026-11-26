@@ -64,7 +64,10 @@ def batch_for(
 def validation_loss(
     *, model: pvm.PvNet, source: pvb.PvSource, samples: tr.SampleSet, cut: int
 ) -> float:
-    """Return the unweighted mixture negative log-likelihood on the held-out (sample, lead day) pairs, with no mask."""
+    """Return the unweighted mixture negative log-likelihood on the held-out pairs, with no mask.
+
+    The pairs are (sample, lead day) pairs.
+    """
     model.eval()
     idx = np.nonzero(samples.is_val)[0]
     total, count = 0.0, 0
@@ -90,8 +93,8 @@ def param_groups(
 ) -> list[dict]:
     """Return the optimiser groups: 713's three for the parameters of `M*`, then one per rate for the new parameters.
 
-    Every group carries `weight_decay` explicitly, a `base_lr`, and `warmup` (true for the trunk's groups, false for the new ones).
-    `new_lr_scale` multiplies the new rates (0 is the check KF13b).
+    Every group carries `weight_decay` explicitly, a `base_lr`, and `warmup` (true for the trunk's
+    groups, false for the new ones). `new_lr_scale` multiplies the new rates (0 is the check KF13b).
     """
     base_lr = tr.PRETRAIN_LR if stage == 1 else tr.FINE_TUNE_LR
     trunk = {n: p for n, p in model.named_parameters() if not n.startswith(pvm.NEW_PREFIX)}
@@ -131,7 +134,10 @@ def param_groups(
 
 
 def calibration_batches(*, world: tr.World, samples: tr.SampleSet, source: pvb.PvSource, cut: int):  # noqa: ANN201
-    """Yield the training samples of the arm in batches, with no mask and lead day `index mod 14`, to set `r_h` and `r_t`."""
+    """Yield the training samples of the arm in batches, with no mask and lead day `index mod 14`.
+
+    The samples are used to set `r_h` and `r_t`.
+    """
     train_idx = np.nonzero(~samples.is_val)[0]
     for start in range(0, len(train_idx), tr.BATCH * 2):
         sel = train_idx[start : start + tr.BATCH * 2]

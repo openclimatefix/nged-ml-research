@@ -450,7 +450,7 @@ def cmd_forecasts(*, out_dir: Path) -> None:
         stroke=1.6,
         scale=scale,
         title=title_of(
-            title="First-day forecast of M* and H, fold 2026-05, seed 0, at two Primaries",
+            title="First-day forecast of M* and H, fold 2026-05, seed 0, at D11, D19, and D21",
             subtitle="Lines: the median forecast and the cleaned demand. Shaded bands: the 5% to 95% range of each arm. The 48 half-hours of the first target day.",
         ),
     )
@@ -536,15 +536,20 @@ def cmd_forecasts(*, out_dir: Path) -> None:
         stroke=1.2,
         scale=scale,
         title=title_of(
-            title="Full-horizon forecast of M* and H, fold 2026-05, seed 0, at the same two Primaries",
-            subtitle="Lines: the median forecast and the cleaned demand. Shaded bands: the 5% to 95% range of each arm. The stored forecast file covers the leads it holds.",
+            title="Full-horizon forecast of M* and H, fold 2026-05, seed 0, at D11, D19, and D21",
+            subtitle="Lines: the median forecast and the cleaned demand. Shaded bands: the 5% to 95% range of each arm. Each panel uses the latest stored origin (09:00 UTC) that reaches the first half-hour of its case, at a lead of 3 h; the stored forecast runs from 3 h to 338.5 h.",
         ),
     )
     figs.save(chart, path=out_dir / "forecast_full_horizon.svg")
 
 
 PART1: Final = arms.root(data_dir=ML_EXPERIMENTS_DATA_DIR, arm="Z") / "score" / "part1.json"
-GROUP_NAME: Final = {"six": "Six signed-MW Primaries", "eight": "Eight MVA-only Primaries"}
+GROUP_NAME: Final = {"six": "The six signed-MW Primaries", "eight": "The eight MVA-only Primaries"}
+SITE_GROUP_NAME: Final = {
+    "signed-MW six": "The six signed-MW Primaries",
+    "MVA-only eight": "The eight MVA-only Primaries",
+    "D15 and D18": "D15 and D18 (no solar estimate)",
+}
 CONTRAST_COLOUR: Final = {
     "A1: H minus M*": theme.DATA_BLUE,
     "A2: H minus H-S": theme.DATA_PURPLE,
@@ -668,7 +673,7 @@ def cmd_contrasts(*, out_dir: Path) -> None:
         rows.append(
             {
                 "primary": label_of[int(pid)],
-                "group": group_of[int(pid)],
+                "group": SITE_GROUP_NAME[group_of[int(pid)]],
                 "point": f["point"],
                 "lower": f["lower"],
                 "upper": f["upper"],
@@ -683,10 +688,10 @@ def cmd_contrasts(*, out_dir: Path) -> None:
         "group:N",
         title=None,
         scale=alt.Scale(
-            domain=["signed-MW six", "MVA-only eight", "D15 and D18"],
+            domain=list(SITE_GROUP_NAME.values()),
             range=[theme.DATA_BLUE, theme.DATA_PURPLE, theme.BRAND_ORANGE],
         ),
-        legend=alt.Legend(orient="top"),
+        legend=alt.Legend(orient="top", labelLimit=400, columns=1),
     )
     bars = base.mark_rule(strokeWidth=2, clip=True).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(

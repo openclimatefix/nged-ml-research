@@ -1,14 +1,16 @@
 # ruff: noqa: E501, PT018, PT017
-"""Experiment 716: the checks of `e00716_batch.py` that need no fit (KF2, the mask dropout, the origin-time assertion; WP3).
+"""Experiment 716: the checks of `e00716_batch.py` that need no fit (WP3).
+
+The checks are KF2, the mask dropout, and the origin-time assertion.
 
 Usage: run.sh e00716_check_batch.py [synthetic|real MONTH [--record]|real-train MONTH|real-predict MONTH]
 
-`synthetic` builds a small `Source` of random arrays and runs every check on it. `real MONTH` builds the
-fold's real arrays on the CPU (`e00716_fit.build_tables`) and runs KF2 on them twice, each time in a
-process of its own because 713's pipeline module reads its phase once at import: on the training
-phase's stage 2 samples, and on the scored, held-out origins of the predict phase (where the target
-table holds the runs of the held-out month). The record of KF2 is written only when both pass. It needs
-the stored data and is a CPU self test, not a fit.
+`synthetic` builds a small `Source` of random arrays and runs every check on it. `real MONTH` builds
+the fold's real arrays on the CPU (`e00716_fit.build_tables`) and runs KF2 on them twice, each time
+in a process of its own because 713's pipeline module reads its phase once at import: on the
+training phase's stage 2 samples, and on the scored, held-out origins of the predict phase (where
+the target table holds the runs of the held-out month). The record of KF2 is written only when both
+pass. It needs the stored data and is a CPU self test, not a fit.
 """
 
 import os
@@ -85,7 +87,9 @@ def real_keys(*, ps: pvb.PvSource, world: object, tr: object, n: int = 64) -> Ke
 
 
 def held_out_keys(*, ps: pvb.PvSource, test_origin_idx: np.ndarray, n: int = 64) -> Keys:
-    """Return `n` (Primary, contract origin, lead day) triples drawn from the scored, held-out origins of the predict phase.
+    """Return `n` (Primary, contract origin, lead day) triples drawn from the scored origins.
+
+    The scored origins are the held-out origins of the predict phase.
 
     Every drawn origin must lie inside the target table, so the check is not vacuous.
     """
@@ -121,7 +125,10 @@ def kf2_poison(
     has_target: bool = True,
     net_arm: str = "HT",
 ) -> list[str]:
-    """KF2: poisoning every history `p` from 48 steps before the contract origin and every target-row value of a later run changes no input.
+    """KF2: poisoning the history `p` and the later target-row values changes no input.
+
+    The poisoning covers every history `p` from 48 steps before the contract origin and every target-row
+    value of a later run.
 
     The poisoned copy sets history `p` at every grid index from the contract origin minus 48 steps on
     (so the 24 hours before the origin are covered, and the newest history token sits one step before
@@ -206,7 +213,10 @@ def kf2_poison(
 
 
 def check_masks(*, ps: pvb.PvSource) -> list[str]:
-    """The CAMS-rule and 713-convention masks hit the rows of design sections 6 and 9.2, and the dropout draw is off the torch stream."""
+    """The CAMS-rule and 713-convention masks hit the rows of design sections 6 and 9.2.
+
+    The dropout draw is off the torch stream.
+    """
     primary, c_idx, lead = sample_keys(n=40, seed=2)
     full = ps.assemble(primary=primary, c_idx=c_idx, lead_day=lead)
     cams = torch.ones(40, dtype=torch.bool)
@@ -236,7 +246,10 @@ def check_masks(*, ps: pvb.PvSource) -> list[str]:
 
 
 def check_origin_time(*, ps: pvb.PvSource) -> list[str]:
-    """A target table keyed by a run issued after the native origin minus 9 hours is refused, and the listed exception days are not."""
+    """A target table keyed by a run issued after the native origin minus 9 hours is refused.
+
+    The listed exception days are not refused.
+    """
     primary, c_idx, lead = sample_keys(n=8, seed=3)
     bad = pvb.PvTables(**{**ps.tables.__dict__, "run_us": ps.tables.run_us + 24 * lay.HOUR_US})
     try:

@@ -1,12 +1,14 @@
 # ruff: noqa: E501, PT018, PLR0915, ANN003
-"""Experiment 716: KF13 and KF13b, the copied training loop against experiment 713's (WP4 check; CPU, synthetic world).
+"""Experiment 716: KF13 and KF13b, the copied training loop against experiment 713's.
+
+The WP4 check runs on the CPU, in a synthetic world.
 
 Usage: run.sh e00716_check_train.py
 
 KF13: experiment 713's `train_stage` and this experiment's copy, with every PV path absent (network
-`Z`), train stage 2 for one pass (about 40 steps at a batch of 32) from one stored state with one seed
-and one sample set, under `torch.use_deterministic_algorithms(True)`. The two state dictionaries must be
-bit-identical.
+`Z`), train stage 2 for one pass (about 40 steps at a batch of 32) from one stored state with one
+seed and one sample set, under `torch.use_deterministic_algorithms(True)`. The two state
+dictionaries must be bit-identical.
 
 KF13b: the same, with the full network of arm `HT` (all three paths, random non-zero PV tables) and
 the new group's rate scaled to zero. Every PV contribution is an exact zero at the start, so the trunk
@@ -77,7 +79,10 @@ def state_equal(*, a: dict, b: dict, keys: list[str]) -> list[str]:
 
 
 def check_groups() -> None:
-    """KF8's group half: the optimiser groups, rates, decays, warm-up flags, and clips equal design section 6."""
+    """KF8's group half: the optimiser groups equal design section 6.
+
+    The check covers the rates, decays, warm-up flags, and clips.
+    """
     for encoders in ("trained", "frozen"):
         for stage in (2, 3):
             m = pvm.PvNet(arm="HT", seed=0)

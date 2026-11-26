@@ -1,8 +1,9 @@
 # ruff: noqa: E501
 """Experiment 716: the figures of part 1's page, drawn from the stored score files (WP7).
 
-Usage: run.sh e00716_figures.py contrasts OUT_DIR    # A1 and A2 with their 98.75% intervals, per fold, per group
-       run.sh e00716_figures.py share OUT_DIR        # the first contrast per Primary against the PV share
+Usage: run.sh e00716_figures.py contrasts OUT_DIR
+       # A1 and A2 with their 98.75% intervals, per fold, per group
+       run.sh e00716_figures.py share OUT_DIR  # the first contrast per Primary against the PV share
        run.sh e00716_figures.py gains OUT_DIR        # the learned a and c per Primary
        run.sh e00716_figures.py --selftest
 
@@ -81,7 +82,10 @@ def interval_table(*, result: dict, prefix: str, labels: dict[str, str]) -> pl.D
 
 
 def contrast_chart(*, table: pl.DataFrame, title: str) -> alt.TopLevelMixin:
-    """Return the counted contrasts as points with intervals, one panel per group, with the zero line and the detectable difference `delta`."""
+    """Return the counted contrasts as points with intervals, one panel per group.
+
+    Each panel has the zero line and the detectable difference `delta`.
+    """
     base = alt.Chart(table).encode(y=alt.Y("contrast:N", title=None))
     bars = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
@@ -106,7 +110,10 @@ def contrast_chart(*, table: pl.DataFrame, title: str) -> alt.TopLevelMixin:
 def fold_chart(
     *, monthly: dict[str, list[float]], folds: tuple[str, ...], title: str
 ) -> alt.TopLevelMixin:
-    """Return the first contrast's monthly difference per fold for each group (`monthly[group]` lists one value per fold in order)."""
+    """Return the first contrast's monthly difference per fold for each group.
+
+    `monthly[group]` lists one value per fold in order.
+    """
     rows = [
         {"fold": f, "group": g, "difference": v}
         for g, vals in monthly.items()
@@ -178,7 +185,10 @@ def gains_chart(*, a: dict[int, float], c: dict[int, float], title: str) -> alt.
 def pv_and_power_chart(
     *, hours: np.ndarray, p: np.ndarray, power: np.ndarray, title: str
 ) -> alt.TopLevelMixin:
-    """Return `p` beside the net power for one Primary over several days (`p` and `power` are (days, 48); days count back from the origin)."""
+    """Return `p` beside the net power for one Primary over several days.
+
+    `p` and `power` are (days, 48), and the days count back from the origin.
+    """
     n_days = p.shape[0]
     rows = [
         {

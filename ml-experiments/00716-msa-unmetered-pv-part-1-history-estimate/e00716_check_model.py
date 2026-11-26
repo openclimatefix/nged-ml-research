@@ -1,5 +1,7 @@
 # ruff: noqa: E501, B023, ISC004, E731
-"""Experiment 716: the checks of `e00716_model.py` that need no data (KF1, KF8, the parameter counts; WP2).
+"""Experiment 716: the checks of `e00716_model.py` that need no data.
+
+These are KF1, KF8, and the parameter counts (WP2).
 
 Usage: run.sh e00716_check_model.py
 
@@ -95,7 +97,10 @@ def check_loading() -> list[str]:
 
 
 def check_zero_start() -> list[str]:
-    """KF1: an `M*` state gives the output of `M*` bit for bit for real, shifted, and other-Primary PV inputs and every `ok` pattern."""
+    """Check KF1: an `M*` state gives the output of `M*` bit for bit.
+
+    The check covers real, shifted, and other-Primary PV inputs and every `ok` pattern.
+    """
     star = randomised_m_star(seed=2)
     reference = {}
     inputs = random_inputs(seed=3)
@@ -172,7 +177,9 @@ def check_same_start() -> list[str]:
 
 
 def check_pv_gradients() -> list[str]:
-    """KF8: every zero layer has a non-zero gradient at step 0 and W1 and W2 of both token paths from step 1.
+    """Check KF8: every zero layer has a non-zero gradient at step 0.
+
+    W1 and W2 of both token paths have a non-zero gradient from step 1.
 
     The gain an arm leaves unused is exempt by name (`c` in `H`, `a` in `T`).
     """
@@ -226,7 +233,10 @@ def check_pv_gradients() -> list[str]:
 
 
 def check_cosine_table() -> list[str]:
-    """Print the median cosine similarity between the token vectors of the path at p = 0, 0.5, 1, 2, 3, 5 (KF8)."""
+    """Print the median cosine similarity between the token vectors of the path (KF8).
+
+    The similarity is printed at p = 0, 0.5, 1, 2, 3, 5.
+    """
     net = pvm.PvNet(arm="H", seed=0)
     ps = torch.tensor([0.0, 0.5, 1.0, 2.0, 3.0, 5.0])
     feats = torch.stack([ps, torch.ones_like(ps)], dim=-1)
@@ -241,7 +251,10 @@ def check_cosine_table() -> list[str]:
 
 
 def check_calibration_generator() -> list[str]:
-    """Regression for review blocker B1: `calibrate_scale` must accept a one-shot generator for `HT` (both buffers)."""
+    """Check the regression for review blocker B1.
+
+    `calibrate_scale` must accept a one-shot generator for `HT` (both buffers).
+    """
     inp = random_inputs(seed=1, b=4)
     out = []
     for arm in ("H", "T", "HT"):

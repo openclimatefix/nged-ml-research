@@ -1,20 +1,21 @@
 # ruff: noqa: E501, PT018
-"""Experiment 716: the three synthetic worlds and the NumPy ridge references (WP5a; design section 8.2).
+"""Experiment 716: the three synthetic worlds and the NumPy ridge references.
 
-Everything here is NumPy on the CPU and reads no neural network. A world is experiment 713's world W0
-(the real grid, the real ERA5-and-CAMS weather, and the real calendar of four Primaries, with power
-replaced by a known function plus noise of standard deviation 0.01) with four additions: a hidden
-daytime level `L_b d(t)`, a daily daytime anomaly `e_day d(t)`, a PV-like dip `-s u(t)`, and (for the
-networks only) one part of the sky hidden from the weather tokens. This module builds the power and
-the two reference estimators; the driver `e00716_world_rung.py` runs them rung by rung.
+This module is WP5a (design section 8.2). Everything here is NumPy on the CPU and reads no neural
+network. A world is experiment 713's world W0 (the real grid, the real ERA5-and-CAMS weather, and
+the real calendar of four Primaries, with power replaced by a known function plus noise of standard
+deviation 0.01) with four additions: a hidden daytime level `L_b d(t)`, a daily daytime anomaly
+`e_day d(t)`, a PV-like dip `-s u(t)`, and (for the networks only) one part of the sky hidden from
+the weather tokens. This module builds the power and the two reference estimators; the driver
+`e00716_world_rung.py` runs them rung by rung.
 
 **One ridge per Primary and target half-hour, pooled over lead days.** The design asks for a ridge
 regression fitted separately for each of the four Primaries. A single linear model cannot give a
 daytime level that scales with the target half-hour's `d`, so each Primary's ridge here is a family
 of 48 regressions, one per target half-hour of the row (grid column), which share one penalty chosen
 by cross-validation. Every regression pools the 14 lead days of an origin: the history features of an
-origin are shared by its 14 lead days, which lets the Gram matrix of the history features be built once
-per origin and the eigendecomposition be shared by all 48 regressions (`block_ridge`).
+origin are shared by its 14 lead days, which lets the Gram matrix of the history features be built
+once per origin and the eigendecomposition be shared by all 48 regressions (`block_ridge`).
 """
 
 from __future__ import annotations
@@ -132,12 +133,12 @@ def dense4_from_raw(
 def check_validation_weather_finite(
     *, raw: np.ndarray, b1_grid: np.ndarray, cams: np.ndarray, day_code: np.ndarray, cutoff_idx: int
 ) -> str:
-    """Assert that every input the networks read is finite over the whole validation window (design addendum 1, F11).
+    """Assert that every input the networks read is finite over the whole validation window.
 
-    `dense4_from_raw` and `b1_scale` turn a missing value into 0, which would read as night. The window
-    runs from the oldest history token of the first validation origin to the last target token of the
-    last one, and covers all 28 dense columns of the four Primaries, the 12 B1 grid columns, and the 2 CAMS
-    day columns.
+    This is design addendum 1, F11. `dense4_from_raw` and `b1_scale` turn a missing value into 0,
+    which would read as night. The window runs from the oldest history token of the first validation
+    origin to the last target token of the last one, and covers all 28 dense columns of the four
+    Primaries, the 12 B1 grid columns, and the 2 CAMS day columns.
     """
     first_origin = (cutoff_idx // 48) * 48 + 24
     last_origin = first_origin + 48 * (HELD_OUT_DAYS - 1)
@@ -163,12 +164,15 @@ def draw_table(*, n_day_types: int = 8) -> np.ndarray:
 
 @dataclass
 class PvWorld:
-    """One world's power and the quantities the references and the networks read, each (4, G) unless stated.
+    """One world's power and the quantities the references and the networks read.
+
+    Each quantity is (4, G) unless stated.
 
     Attributes:
         rung: The rung's settings.
         y: The power over capacity (known function, hidden level, anomaly, dip, and noise).
-        known: The known W0 function (`0.5 + 0.02 max(0, 15.5 - T) + w`), which the references subtract.
+        known: The known W0 function (`0.5 + 0.02 max(0, 15.5 - T) + w`), which the references
+            subtract.
         d: The shape `d(t)` of the hidden level.
         u: The yield curve `u(t)` of the real CAMS irradiance.
         s: (4,) the dip's size per Primary.
@@ -193,7 +197,11 @@ class PvWorld:
 
 
 def yield_and_shape(*, dense: Dense4) -> tuple[np.ndarray, np.ndarray]:
-    """Return `u` (the yield curve of the real CAMS irradiance) and `d` (the clear-sky yield curve over its daily maximum)."""
+    """Return the yield curve `u` and the shape `d` of the hidden level.
+
+    The curve `u` is the yield curve of the real CAMS irradiance, and `d` is the clear-sky yield curve
+    over its daily maximum.
+    """
     n_primary, n_grid = dense.ghi.shape
     u = np.zeros((n_primary, n_grid))
     d = np.zeros((n_primary, n_grid))
@@ -296,7 +304,10 @@ def origin_sets(
 
 @dataclass
 class Features:
-    """History features `h` (n, p), target-token features `z` (n, 14, 48, k), and targets `y` (n, 14, 48) of one Primary.
+    """The features and targets of one Primary.
+
+    The history features are `h` (n, p), the target-token features are `z` (n, 14, 48, k), and the
+    targets are `y` (n, 14, 48).
 
     Attributes:
         h: (n, p) float64, unstandardised.
@@ -314,7 +325,10 @@ class Features:
 
 
 def solar_columns() -> np.ndarray:
-    """Return which of the 48 target columns (starting at the 12:00 UTC contract origin) fall in the UTC solar block."""
+    """Return which of the 48 target columns fall in the UTC solar block.
+
+    The columns start at the 12:00 UTC contract origin.
+    """
     utc_half_hour = (24 + np.arange(48)) % 48
     return (utc_half_hour >= SOLAR_HALF_HOURS_UTC[0]) & (utc_half_hour <= SOLAR_HALF_HOURS_UTC[1])
 
@@ -322,12 +336,13 @@ def solar_columns() -> np.ndarray:
 def build_features(
     *, world: PvWorld, dense: Dense4, pos: int, c: np.ndarray, kind: str, reference: str
 ) -> Features:
-    """Return the features of one Primary's origins `c` for world `kind` (`WH` or `WT`) and `reference` (`naive` or `oracle`).
+    """Return the features of one Primary's origins `c`.
 
-    The history features are shared by the 14 lead days of an origin. The lists follow design section
-    8.2; two readings are made explicit: "d of each history token" and "the product of the range with
-    d" are taken at the history token (14 x 48 each), and the target row's `d` and visible weather are
-    taken at each target token.
+    The features are for world `kind` (`WH` or `WT`) and `reference` (`naive` or `oracle`). The
+    history features are shared by the 14 lead days of an origin. The lists follow design
+    section 8.2; two readings are made explicit: "d of each history token" and "the product of
+    the range with d" are taken at the history token (14 x 48 each), and the target row's `d`
+    and visible weather are taken at each target token.
     """
     assert kind in {"WH", "WT"} and reference in {"naive", "oracle"}
     steps = np.arange(48)
@@ -402,7 +417,11 @@ class Piece:
 
 
 def piece_of(*, hs: np.ndarray, z: np.ndarray, y: np.ndarray) -> Piece:
-    """Return the block-ridge sums of origins with standardised history features `hs` (n, p), `z` (n, 14, 48, k), and `y` (n, 14, 48)."""
+    """Return the block-ridge sums of origins.
+
+    The origins have standardised history features `hs` (n, p), `z` (n, 14, 48, k), and `y` (n, 14,
+    48).
+    """
     zsum = z.sum(axis=1)  # (n, 48, k)
     ysum = y.sum(axis=1)  # (n, 48)
     b = np.stack([hs.T @ zsum[:, h] for h in range(48)])  # (48, p, k)
@@ -415,7 +434,10 @@ def piece_of(*, hs: np.ndarray, z: np.ndarray, y: np.ndarray) -> Piece:
 
 @dataclass
 class Fit:
-    """The eigendecomposition of a piece's Gram matrix, from which any penalty's solution follows cheaply."""
+    """The eigendecomposition of a piece's Gram matrix.
+
+    Any penalty's solution follows cheaply from the eigendecomposition.
+    """
 
     piece: Piece
     evals: np.ndarray
@@ -434,9 +456,10 @@ def prepare(*, piece: Piece) -> Fit:
 
 
 def solve(*, fit: Fit, penalty: float, z_ridge: float = 1e-8) -> tuple[np.ndarray, np.ndarray]:
-    """Return the weights `w` (48, p) of the history features and `v` (48, k) of the target features at `penalty`.
+    """Return the weights `w` (48, p) and `v` (48, k) at `penalty`.
 
-    The system per half-hour is `[[A + lam I, B], [B', C + eps I]] [w; v] = [r; q]`, solved by
+    The weights `w` are those of the history features and `v` those of the target features. The
+    system per half-hour is `[[A + lam I, B], [B', C + eps I]] [w; v] = [r; q]`, solved by
     eliminating `w` with the eigendecomposition of `A`.
     """
     inv = 1.0 / (fit.evals + penalty)  # (p,)
@@ -461,7 +484,10 @@ def predict(*, hs: np.ndarray, z: np.ndarray, w: np.ndarray, v: np.ndarray) -> n
 
 
 def standardise(train: np.ndarray, *others: np.ndarray) -> tuple[np.ndarray, ...]:
-    """Standardise the columns of `train` and apply the same statistics to `others`; a constant column becomes zero."""
+    """Standardise the columns of `train` and apply the same statistics to `others`.
+
+    A constant column becomes zero.
+    """
     mean = train.mean(axis=0)
     std = train.std(axis=0)
     scale = np.where(std > 1e-12, 1.0 / np.where(std > 1e-12, std, 1.0), 0.0)
@@ -477,7 +503,8 @@ class ReferenceResult:
         cv_mae: The cross-validation MAE of each candidate penalty.
         err_solar: Absolute errors on the solar-block validation tokens (flattened).
         err_all: Absolute errors on all validation tokens.
-        nll_gaussian: (n_leads_val,) not used by the gap; the validation residual standard deviation on the solar block.
+        nll_gaussian: (n_leads_val,) not used by the gap; the validation residual standard deviation
+            on the solar block.
     """
 
     penalty: float
@@ -545,7 +572,11 @@ class GapResult:
 def gap_of_world(
     *, world: PvWorld, dense: Dense4, kind: str, cutoff_idx: int, log: bool = True
 ) -> GapResult:
-    """Return the `gap` of world `kind` at `world.rung`: the naive reference's MAE of the median minus the oracle's, on solar-block validation tokens pooled over the four Primaries."""
+    """Return the `gap` of world `kind` at `world.rung`.
+
+    The `gap` is the naive reference's MAE of the median minus the oracle's, on solar-block
+    validation tokens pooled over the four Primaries.
+    """
     sets = origin_sets(world=world, cutoff_idx=cutoff_idx)
     naive_err, oracle_err, per_primary, penalties = [], [], [], {}
     for pos in range(len(PRIMARIES)):
@@ -584,12 +615,14 @@ def gap_of_world(
 def heldout_nll(
     *, world: PvWorld, dense: Dense4, kind: str, cutoff_idx: int, target_std: np.ndarray
 ) -> dict[str, float]:
-    """Return the Gaussian negative log-likelihood of the naive and the oracle reference on the tokens that experiment 713's `validation_loss` averages.
+    """Return the Gaussian negative log-likelihood of the naive and the oracle reference.
 
-    The tokens are the held-out origins' target tokens at lead days 1, 2, 4, 7, 10, and 14, all 48
-    half-hours, unweighted, in the world's standardised units (errors divided by each Primary's
-    `target_std`), each reference as a Gaussian with its own error standard deviation. The references
-    are the ridge references of `gap_of_world`, scored on the held-out origins instead.
+    The tokens are those that experiment 713's `validation_loss` averages. The tokens are the
+    held-out origins' target tokens at lead days 1, 2, 4, 7, 10, and 14, all 48 half-hours,
+    unweighted, in the world's standardised units (errors divided by each Primary's
+    `target_std`), each reference as a Gaussian with its own error standard deviation. The
+    references are the ridge references of `gap_of_world`, scored on the held-out origins
+    instead.
     """
     sets = origin_sets(world=world, cutoff_idx=cutoff_idx)
     errors: dict[str, list[np.ndarray]] = {"naive": [], "oracle": []}

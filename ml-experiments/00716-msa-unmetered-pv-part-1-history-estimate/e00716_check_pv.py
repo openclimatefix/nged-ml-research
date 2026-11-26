@@ -3,7 +3,8 @@
 
 Usage: run.sh e00716_check_pv.py [synthetic|capacity|all|kf14|kf4real MONTH] [--record]
 
-`kf14` and `kf4real` read stored data (CPU, read only); `--record` writes the wiring record of the check that ran.
+`kf14` and `kf4real` read stored data (CPU, read only); `--record` writes the wiring record of the
+check that ran.
 
 `synthetic` runs on built arrays (no stored data except the constant `u99`); `capacity` reads the
 stored capacity tables of experiments 649, 662, and 673 and prints KF5.
@@ -182,7 +183,10 @@ def kf3_placebos() -> list[str]:
 
 
 def kf5_capacity() -> list[str]:
-    """KF5: the as-of rule, the printed capacities of every fold, and the reproduction of experiment 673's `probe` column."""
+    """KF5: the as-of rule and the printed capacities of every fold.
+
+    The check also reproduces experiment 673's `probe` column.
+    """
     import e00673_deliverable as dl  # ty: ignore[unresolved-import]
 
     assert pv.latest_cutoff(stored=pv.FOLD_CUTOFFS_649, fold="2025-11") == ("2025-10", False)
@@ -319,7 +323,10 @@ def kf3c_target_donor() -> list[str]:
 def kf14_check(
     *, ghi: np.ndarray, cos_zenith_at: dict[int, np.ndarray], n_steps: int, floor_w_m2: float = 5.0
 ) -> dict[str, int]:
-    """Count the stamps that contradict a period-end labelling, and the stamps that contradict a period-start labelling.
+    """Count the stamps that contradict each of the two labelling conventions.
+
+    The first count is of the stamps that contradict a period-end labelling, and the second is of the
+    stamps that contradict a period-start labelling.
 
     `cos_zenith_at[k]` is the cosine of the zenith `k` grid steps (half-hours) after each stamp, for `k`
     from `-n_steps` to `n_steps`; `n_steps` is the length of the CAMS period in grid steps. A positive
@@ -351,7 +358,9 @@ def best_shift(corr: dict[int, float]) -> int:
 def kf14_correlations(
     *, ghi: np.ndarray, cos_zenith_at: dict[int, np.ndarray], n_steps: int
 ) -> dict[int, float]:
-    """Return the correlation of `ghi` with the mean positive cosine of the zenith over the period ending `shift` grid steps after each stamp, for shifts -1, 0 and +1.
+    """Return the correlation of `ghi` with the mean positive cosine of the zenith at three shifts.
+
+    The mean is over the period ending `shift` grid steps after each stamp, for shifts -1, 0 and +1.
 
     The two-sided violation counts of `kf14_check` cannot tell a period-end label from a stamp 30
     minutes later, because both give no end violations. The period-end label is right when shift 0
@@ -426,7 +435,10 @@ def check_origin_hour() -> list[str]:
 
 
 def kf14_real() -> list[str]:
-    """KF14 on the CAMS source file of experiment 707 (read only), with the sun's geometry of the dense table at the same stamps."""
+    """KF14 on the CAMS source file of experiment 707 (read only).
+
+    The check uses the sun's geometry of the dense table at the same stamps.
+    """
     import e00397_prep as prep397  # ty: ignore[unresolved-import]
     import e00707_prep as prep707  # ty: ignore[unresolved-import]
     import e00716_world_rung as wr
@@ -477,7 +489,10 @@ def kf14_real() -> list[str]:
 
 
 def kf6_statements() -> list[str]:
-    """KF6: experiment 713's row-by-row statement, then the source and issue time of every PV value for each fit family."""
+    """KF6: experiment 713's row-by-row statement.
+
+    The statement is followed by the source and issue time of every PV value for each fit family.
+    """
     from datetime import UTC, datetime
 
     import e00713_layout as lay  # ty: ignore[unresolved-import]
@@ -523,7 +538,10 @@ def kf6_statements() -> list[str]:
 
 
 def kf4_real(*, month: str = "2025-11") -> list[str]:
-    """KF4's real-data half: the dense `u` against `e00634_common.unit_curve` at 1e-6, and the dense geometry columns against the Candidate's rows."""
+    """KF4's real-data half: the dense `u` against `e00634_common.unit_curve` at 1e-6.
+
+    The half also checks the dense geometry columns against the Candidate's rows.
+    """
     import e00634_common as c634  # ty: ignore[unresolved-import]
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
     import e00716_arms as arms

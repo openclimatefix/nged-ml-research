@@ -1,7 +1,8 @@
 # ruff: noqa: E501, PT018
 """Experiment 716: forecast one fold with a fitted PV arm (prediction phase; WP4).
 
-Usage: e00716_predict.py ARM MONTH SEED [--device cuda] [--readout NAME] [--accept-code-change OLD_HASH ...]
+Usage: e00716_predict.py ARM MONTH SEED [--device cuda] [--readout NAME]
+       [--accept-code-change OLD_HASH ...]
        e00716_predict.py --kf7
 
 Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`. It loads
@@ -221,10 +222,13 @@ def predict(
 
 
 def kf7(*, data_dir: Path, device: str = "cpu") -> str:
-    """KF7: predict fold 2025-11, seed 0 from the stored stage 3 state of `M*` as arm `Z` and compare with `M*`'s stored forecast.
+    """KF7: predict fold 2025-11, seed 0 from the stored stage 3 state of `M*` as arm `Z`.
 
-    The stored forecast was written on the GPU, and the CPU path differs from it by 8.4e-6 of capacity at
-    the 99th percentile (experiment 713's own CPU path gives the same difference), so KF7 runs with `--device cuda`.
+    The prediction is compared with `M*`'s stored forecast.
+
+    The stored forecast was written on the GPU, and the CPU path differs from it by 8.4e-6 of capacity
+    at the 99th percentile (experiment 713's own CPU path gives the same difference), so KF7 runs with
+    `--device cuda`.
     """
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]

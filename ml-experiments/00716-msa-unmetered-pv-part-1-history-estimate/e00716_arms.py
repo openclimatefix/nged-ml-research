@@ -1,9 +1,10 @@
 # ruff: noqa: E501
-"""Experiment 716 and 717: the arms, the folds, the file layout, the job list, and the code hash (WP4).
+"""Experiment 716 and 717: the arms, the folds, the file layout, the job list, and the code hash.
 
-Every arm of both parts is defined here, so part 2's folder imports this module. Part 1's arms
-(`Z`, `H`, `H-S`, `H-X`) write under `00716-*/work/`, and part 2's (`HT`, `HT-S`, `T`) under
-`00717-*/work/`. Every arm starts stages 2 and 3 from the stored stage 1 state of `M*` of experiment 713.
+This module is WP4. Every arm of both parts is defined here, so part 2's folder imports this module.
+Part 1's arms (`Z`, `H`, `H-S`, `H-X`) write under `00716-*/work/`, and part 2's (`HT`, `HT-S`, `T`)
+under `00717-*/work/`. Every arm starts stages 2 and 3 from the stored stage 1 state of `M*` of
+experiment 713.
 """
 
 import functools
@@ -40,8 +41,10 @@ class PvArmSpec:
     Attributes:
         name: The arm's name (`Z`, `H`, `H-S`, `H-X`, `HT`, `HT-S`, `T`).
         net: The network of `e00716_model.PV_SWITCHES` (`Z`, `H`, `HT`, or `T`).
-        history: The history estimate: `none`, `real` (CAMS), `shifted` (the sky 28 days earlier), or `partner` (another Primary's).
-        target: The target-row estimate: `none`, `real` (the origin's ENS run), or `shifted` (the run 28 days earlier).
+        history: The history estimate: `none`, `real` (CAMS), `shifted` (the sky 28 days earlier),
+            or `partner` (another Primary's).
+        target: The target-row estimate: `none`, `real` (the origin's ENS run), or `shifted` (the
+            run 28 days earlier).
         part: 1 or 2.
     """
 
@@ -72,7 +75,10 @@ FIT_CODE_FILES: Final = (
 
 @functools.cache
 def code_hash() -> str:
-    """Return a hash of this folder's fit modules and of experiment 713's own code hash (its fit modules and recipe)."""
+    """Return a hash of this folder's fit modules and of experiment 713's own code hash.
+
+    That code hash covers its fit modules and recipe.
+    """
     here = Path(__file__).parent
     h = hashlib.sha256()
     for name in FIT_CODE_FILES:
@@ -83,7 +89,10 @@ def code_hash() -> str:
 
 @functools.cache
 def file_hashes() -> dict[str, str]:
-    """Return the first 12 hex digits of the sha256 of each fit module (the known-answer files included)."""
+    """Return the first 12 hex digits of the sha256 of each fit module.
+
+    The known-answer files are included.
+    """
     here = Path(__file__).parent
     return {n: hashlib.sha256((here / n).read_bytes()).hexdigest()[:12] for n in FIT_CODE_FILES}
 
@@ -103,7 +112,10 @@ WORLD_FILES: Final = ("e00716_worlds.py", "e00716_world_rung.py")
 
 
 def code_record() -> dict:
-    """Return what a log records about the code: this folder's hash, 713's hash, the git commit, and a dirty flag."""
+    """Return what a log records about the code.
+
+    The record holds this folder's hash, 713's hash, the git commit, and a dirty flag.
+    """
     return {
         "code_hash": code_hash(),
         "e00713_code_hash": arms713.code_hash(),
@@ -146,7 +158,10 @@ def check_code(
 def check_713_warm_start(
     *, stage1_log: dict, accept_713: Sequence[str], record: dict, what: str
 ) -> None:
-    """Assert that the code hash logged with the stage 1 state of `M*` equals 713's `code_hash()` as this checkout computes it.
+    """Assert that the logged code hash of the stage 1 state of `M*` equals 713's `code_hash()`.
+
+    The logged hash is the one stored with that state, and `code_hash()` is as this
+    checkout computes it.
 
     An override names the exact old hash with `--accept-713-hash`, and is logged.
     """
@@ -213,9 +228,10 @@ def m_star_stage1_log(*, data_dir: Path, month: str, seed: int) -> Path:
 def jobs(*, phase: int) -> list[tuple[str, str, int]]:
     """Return the (arm, month, seed) jobs of a phase of design section 10.
 
-    Phase 2: `Z` on 5 folds, seeds 0 and 1. Phase 3: `H` and `H-S` on the 4 screen folds, seeds 0 and 1.
-    Phase 4: `H` and `H-S` on the other 4 folds. Phase 5: `HT` and `HT-S` on 8 folds, seeds 0 and 1.
-    Phase 6: `H`, `H-S`, `HT`, and `HT-S` on 8 folds, seeds 2 to 4. Phase 7: `T` and `H-X` on 8 folds, seeds 0 and 1.
+    Phase 2: `Z` on 5 folds, seeds 0 and 1. Phase 3: `H` and `H-S` on the 4 screen folds, seeds 0
+    and 1. Phase 4: `H` and `H-S` on the other 4 folds. Phase 5: `HT` and `HT-S` on 8 folds, seeds 0
+    and 1. Phase 6: `H`, `H-S`, `HT`, and `HT-S` on 8 folds, seeds 2 to 4. Phase 7: `T` and `H-X` on
+    8 folds, seeds 0 and 1.
     """
     if phase == 2:
         return [("Z", m, s) for m in Z_FOLDS for s in TWO_SEEDS]
@@ -236,10 +252,11 @@ def jobs(*, phase: int) -> list[tuple[str, str, int]]:
 
 
 def gate713_summary(*, data_dir: Path) -> dict:
-    """Return experiment 713's gate record as `{waived, failed_checks, ...}`, and refuse an unwaived failure.
+    """Return experiment 713's gate record, and refuse an unwaived failure.
 
-    The file is `00713-*/work/known_answers_passed.json`. A record with `waived` true must name the
-    failed checks (KA3 and KA12) and `thresholds_changed` false.
+    The record has the form `{waived, failed_checks, ...}`. The file is
+    `00713-*/work/known_answers_passed.json`. A record with `waived` true must name the failed
+    checks (KA3 and KA12) and `thresholds_changed` false.
     """
     path = arms713.root(data_dir=data_dir) / "work" / "known_answers_passed.json"
     assert path.exists(), f"{path} is missing: experiment 713's known-answer gate has not run"
@@ -295,7 +312,10 @@ def install_own_cache() -> Path:
 
 
 def watched_mtimes(*, data_dir: Path) -> dict[str, int]:
-    """Return the modification times of the files of experiment 713 that this experiment reads and must not change."""
+    """Return the modification times of the files of experiment 713 that this experiment reads.
+
+    This experiment must not change those files.
+    """
     base = arms713.root(data_dir=data_dir)
     files = [
         base / "work" / "selection.json",
@@ -308,7 +328,10 @@ def watched_mtimes(*, data_dir: Path) -> dict[str, int]:
 
 
 def wiring_file(*, data_dir: Path, name: str) -> Path:
-    """Return the record of one wiring check (`KF1` to `KF14`), which `e00716_known_answer.py finish` reads."""
+    """Return the record of one wiring check (`KF1` to `KF14`).
+
+    The command `e00716_known_answer.py finish` reads the record.
+    """
     return root(data_dir=data_dir, arm="Z") / "work" / "wiring" / f"{name}.json"
 
 
@@ -328,14 +351,22 @@ def check_file_hashes() -> dict[str, str]:
 
 
 def seal_of(*, body: dict) -> str:
-    """Return the sha256 of a record's contents and its commit: a hand edit of any field breaks it (it is not a secret, so it shows an edit rather than stops one)."""
+    """Return the sha256 of a record's contents and its commit.
+
+    A hand edit of any field breaks the seal. The seal is not a secret, so it shows an edit rather
+    than stops one.
+    """
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()
 
 
 def write_wiring_record(
     *, data_dir: Path, name: str, passed: bool, detail: dict | None = None, fold: str | None = None
 ) -> Path:
-    """Write the sealed record of a wiring check: the code hash, the check scripts' hashes, 713's hash, the git state, and the fold it ran on."""
+    """Write the sealed record of a wiring check.
+
+    The record holds the code hash, the check scripts' hashes, 713's hash, the git state, and the fold
+    the check ran on.
+    """
     assert name not in FOLD_CHECKS or fold, f"{name} runs on a real fold: pass `fold`"
     path = wiring_file(data_dir=data_dir, name=name)
     path.parent.mkdir(parents=True, exist_ok=True)

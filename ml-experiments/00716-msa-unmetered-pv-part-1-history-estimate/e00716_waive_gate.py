@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 716: write the known-answer gate file as a waived known-answer check (maintainer decision on KF9).
+"""Experiment 716: write the known-answer gate file as a waived known-answer check.
+
+The waiver follows the maintainer's decision on KF9.
 
 Usage: e00716_waive_gate.py [--selftest]
 
