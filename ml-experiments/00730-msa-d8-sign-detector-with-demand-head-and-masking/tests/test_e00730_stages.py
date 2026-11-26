@@ -1,5 +1,6 @@
 """Tests of the stage drivers on a tiny synthetic data folder (no real file, no torch)."""
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -189,7 +190,10 @@ def test_score_real_report_figures_and_series_on_invented_predictions(world: tup
     test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
     write_predictions(root, rows)
-    real_rows = dict.fromkeys(("r1", "k1", "k2", "eras"), rows)
+    # Real rows come from one segment per month, so no (date, hh) key repeats; the test bank has
+    # several draws of each day, so the invented real rows get unique keys.
+    unique = dataclasses.replace(rows, date=np.arange(rows.n) // 48, hh=np.arange(rows.n) % 48)
+    real_rows = dict.fromkeys(("r1", "k1", "k2", "eras"), unique)
     era = np.array(["net", "solar"])[np.arange(rows.n) % 2]
     baselines = fit_invented_baselines(rows)
     real = stages.stage_real(

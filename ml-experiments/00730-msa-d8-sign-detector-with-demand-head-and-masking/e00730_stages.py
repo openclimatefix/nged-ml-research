@@ -1241,6 +1241,38 @@ def shifted_table(*, root: Path, arch: str, style: str, limit: float, holidays: 
 # --------------------------------------------------------------------------- real, report, figures
 
 
+def align_k2_to_k1(*, k1: score729.Rows, k2: score729.Rows) -> np.ndarray:
+    """Return the index into the K2 rows of each K1 row, matched by (date, half-hour).
+
+    K1 drops the half-hours where the metered record has no row, and K2 keeps them, so K2 may hold
+    more half-hours than K1. Every K1 half-hour must be in K2 exactly once, and the K2 rows picked
+    must carry the K1 keys in the K1 order.
+
+    Args:
+        k1: The K1 rows.
+        k2: The K2 rows.
+
+    Returns:
+        The K2 row index of each K1 row.
+
+    Raises:
+        CorrectnessFailureError: When a key repeats in either set, a K1 key is missing from K2, or
+            the aligned K2 keys differ from the K1 keys (verdict row 1).
+    """
+    msg = "the K1 and K2 rows do not align half-hour by half-hour"
+    key1 = k1.date.astype(np.int64) * 100 + k1.hh
+    key2 = k2.date.astype(np.int64) * 100 + k2.hh
+    if len(np.unique(key1)) != len(key1) or len(np.unique(key2)) != len(key2):
+        raise leak.CorrectnessFailureError(msg)
+    order = np.argsort(key2, kind="stable")
+    pos = np.searchsorted(key2[order], key1)
+    pos = np.clip(pos, 0, max(len(key2) - 1, 0))
+    index = order[pos] if len(key2) else np.zeros(0, dtype=np.int64)
+    if len(key2) < len(key1) or not np.array_equal(key2[index], key1):
+        raise leak.CorrectnessFailureError(msg)
+    return index
+
+
 def stage_real(
     *,
     root: Path,
@@ -1292,11 +1324,9 @@ def stage_real(
             axis=0,
         )
         test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
-        if not (np.array_equal(k1.date, k2.date) and np.array_equal(k1.hh, k2.hh)):
-            msg = "the K1 and K2 rows do not align half-hour by half-hour"
-            raise leak.CorrectnessFailureError(msg)
+        k2_on_k1 = align_k2_to_k1(k1=k1, k2=k2)
         k1_rec |= real.k1_against_baselines(
-            rows=k1, reading=k2.r, p=p_k1, mu=mu_k1, climatology=baselines[0],
+            rows=k1, reading=k2.r[k2_on_k1], p=p_k1, mu=mu_k1, climatology=baselines[0],
             pi=banks729.injected_share(bank=test),
         )  # fmt: skip
     if n_reverse < core.K1_MIN_REVERSE_DECIDABLE:

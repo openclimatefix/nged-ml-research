@@ -1014,6 +1014,23 @@ with the sign and the demand output read in place of the two-lobe output.
 or void. The simulator's ranges were set from published descriptions of the same record, so K1 is
 not wholly independent of the simulator.
 
+### A first-run correctness failure in the `real` stage
+
+**The first run of the `real` stage stopped at verdict row 1 because K2 holds half-hours that K1
+lacks.** The metered engine record has half-hours with no row. K1's truth is D8's reading minus the
+record, so K1 drops those half-hours, and K2's truth is the reading itself, so K2 keeps them. Of the
+2,112 half-hours of K2, 58 are absent from K1 (2,054 remain). Both sets cover the same 44 days, with
+no repeated key, so the sets differ by the 58 missing record rows and by nothing else. The
+alignment check compared the two sets whole, so it raised the correctness failure, and the stage
+wrote no score: its first record is the `scores/invalid.json` of the failure, with the verdict row
+beside it. The first run produced no numbers, so there are no first-run numbers to label.
+
+**The fix aligns K2 to K1 by day and half-hour inside the K1 comparison only.** The stage looks up
+each K1 half-hour in K2 and still raises the correctness failure when a key repeats, when a K1 key
+is missing from K2, or when the aligned K2 keys differ from the K1 keys. The K2 harm check keeps all
+K2 half-hours, and no constant changes. The first record is kept as `invalid_run1.json` when the
+rerun is allowed.
+
 ## Leakage checks
 
 **Each of these checks is an assertion in the code, and a failure is verdict row 1.** The checks of
