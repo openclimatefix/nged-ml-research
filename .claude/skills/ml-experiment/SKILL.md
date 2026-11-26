@@ -70,8 +70,26 @@ degradation rule, so an experiment never touches either.
   manager, use Opus only when the experiment is very complex or the result is very surprising,
   because two Opus reviews per experiment use too much quota.
 
-**Smoke-test the reviewed code on a small input before the first fit whose numbers you will
-quote.** A small run catches a crash or a silent zero before the full run spends its compute.
+**After the code review and before the first fit whose numbers you will quote, run a
+real-environment smoke test.** A code review is not a substitute for the smoke test. The unit tests
+and the review read code that has never run on the real device or the real files. In experiment
+732, two bugs failed every fit within seconds. Both sat on the `cuda` branch that every CPU test
+skipped: a call to a function that does not exist, and a CUDA tensor passed to `.numpy()`. The
+smoke test has three parts, and the synthetic-data check on the data files in "Standing practices
+for every new experiment" is one more smoke check of the same kind.
+
+- **Run one epoch (or one boosting round) of every arm on the real device and the real input
+  files.** Read the input files from `DATA_PATH_INTERNAL`, and write every output to a scratch
+  folder such as `.claude/scratch/`, not to the experiment's data folder. Take each arm through its
+  checks on the fitted model, its prediction step, and a read of its stored predictions by the
+  scoring code.
+- **Run every later stage once on validation rows only** (score, report, figures). Validation rows
+  are the rows that the plan names for early stopping and selection, and the smoke test never reads
+  the fold's test months.
+- **Keep three cheap guards in the code.** Add a test that every attribute taken from an imported
+  module exists. Make the failure record store the exception message and the traceback. Make a
+  failed chain exit with a non-zero code that differs from the exit code of the launcher that
+  refuses to start a job while the GPU is busy.
 
 Either size then runs the triggers in "Audit before merge", below, and gets an audit if one fires.
 
