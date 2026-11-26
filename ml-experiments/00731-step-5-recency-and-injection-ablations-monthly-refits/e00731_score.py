@@ -391,13 +391,23 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
         )
     print("REPRODUCTION GATE (pass A): passed", flush=True)
     # ---------------- pass B: the new arms join the same intersection
-    for arm in arms:
-        k = ok_keys(path=rows_path(system=arm, setting="joint"))
-        assert np.isin(keys_a, k, assume_unique=True).all(), (
-            "arm lacks rows of the shared set",
-            arm,
-        )
-    assert frame.counts.sum() == EXPECTED_ROWS
+    # The scoring inputs (the cleaned grid) changed after experiment 677 ran: the rows below that 677
+    # scored and this script's scorer does not, or the reverse, are counted and printed. Pass B uses
+    # the rows that both scorings share, so every system in a contrast is scored by one scorer.
+    keys_b = keys_a
+    for system in (*arms, "9a", "5wo"):
+        keys_b = keys_b[
+            np.isin(keys_b, ok_keys(path=rows_path(system=system, setting="joint")), assume_unique=True)
+        ]
+    print(
+        f"PASS B: {len(keys_b):,} shared rows of {len(keys_a):,} in pass A "
+        f"({len(keys_a) - len(keys_b):,} rows are scored by experiment 677's scorer and not by this one)",
+        flush=True,
+    )
+    assert len(keys_b) > 0.99 * len(keys_a), "pass B lost more than 1% of pass A's rows"
+    keys_a = keys_b
+    frame = Frame(keys=keys_a, site=site)
+    N_B = len(keys_b)
     systems: dict[str, Sums] = {}
     for system in (*arms, "9a", "5wo"):
         sums = Sums()
@@ -432,14 +442,12 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
                 f"rescored {system} equals 677's stored per-row scores on the shared rows (checked MAE and CRPS)"
             )
         print("summed", system, flush=True)
-    assert (
-        abs(float(systems["9a"].prim[("mae", "joint")].sum() / EXPECTED_ROWS) - EXPECTED_9A[0])
-        < 5e-5
-    )
-    assert frame.counts.sum() == EXPECTED_ROWS
     print(
-        f"PASS B: step5w@1 MAE unchanged at {EXPECTED_9A[0]}, rows unchanged at {EXPECTED_ROWS:,}"
+        f"stored arm 9a rescored on pass B's {N_B:,} rows: MAE "
+        f"{float(systems['9a'].prim[('mae', 'joint')].sum() / N_B):.4f} "
+        f"(677's pass A value {EXPECTED_9A[0]})"
     )
+    assert frame.counts.sum() == N_B
     heur = values_on(
         path=ROOT_677
         / "scores"
@@ -461,8 +469,8 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
         systems[sysname] = sums
     # ---------------- reproduction gate of R0 against arm 9a
     if "R0" in systems:
-        r0 = systems["R0"].prim[("mae", "joint")].sum() / EXPECTED_ROWS
-        n9 = systems["9a"].prim[("mae", "joint")].sum() / EXPECTED_ROWS
+        r0 = systems["R0"].prim[("mae", "joint")].sum() / N_B
+        n9 = systems["9a"].prim[("mae", "joint")].sum() / N_B
         print(
             f"R0 seed-mean MAE {r0:.4f}, arm 9a {n9:.4f}, difference {r0 - n9:+.4f} (gate {GATE_TOLERANCE})"
         )
