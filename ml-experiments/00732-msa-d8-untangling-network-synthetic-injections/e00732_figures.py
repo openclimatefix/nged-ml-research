@@ -165,12 +165,15 @@ def loss_curve_checks(*, records: Sequence[Mapping[str, object]]) -> dict[str, b
     return out
 
 
-def stage_loss_curves(*, root: Path, log: Callable[[str], None]) -> list[Path]:
+def stage_loss_curves(
+    *, root: Path, log: Callable[[str], None], root730: Path | None = None
+) -> list[Path]:
     """Draw `figures/loss_curves.svg` from the stored fit records of seed 0 of every arm (no refit).
 
     Args:
         root: The data folder.
         log: Receives progress lines.
+        root730: Experiment 730's data folder; when given, the run guard runs first.
 
     Returns:
         The paths of the figures written.
@@ -181,6 +184,10 @@ def stage_loss_curves(*, root: Path, log: Callable[[str], None]) -> list[Path]:
     """
     import json
 
+    if root730 is not None:
+        import e00732_stages as stages
+
+        stages.guard_run(root=root, root730=root730, stage="loss_curves")
     records = []
     for arm, spec in core.ARMS.items():
         path = (

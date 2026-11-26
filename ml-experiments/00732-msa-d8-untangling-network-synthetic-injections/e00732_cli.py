@@ -127,7 +127,7 @@ def dispatch(*, args: argparse.Namespace, root: Path, root730: Path) -> int:
     if stage == "loss_curves":
         import e00732_figures as figures
 
-        figures.stage_loss_curves(root=root, log=log)
+        figures.stage_loss_curves(root=root, log=log, root730=root730)
         return 0
     ctx = real_context()
     base = real_base(ctx=ctx)

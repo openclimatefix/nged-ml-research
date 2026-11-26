@@ -526,7 +526,7 @@ def test_the_gallery_stage_writes_published_and_private_panels_and_the_check_fil
     )["all_passed"]
 
 
-def _write_stub_predictions(*, root: Any, truth_rows: int) -> None:
+def _write_stub_predictions(*, root: Any, truth_rows: int, chain_state: str = "complete") -> None:
     """Write seed folders for U* with invented outputs of the right row count (the plain, transfer,
     injection, and raised sets).
     """
@@ -542,6 +542,7 @@ def _write_stub_predictions(*, root: Any, truth_rows: int) -> None:
         holidays=np.array([], dtype="datetime64[D]"),
     )
     assert rows.n == truth_rows
+    stages.write_json(path=root / stages.CHAIN_STATUS, payload={"state": chain_state})
     keys = dict(zip(truth.ROW_KEY_NAMES, (rows.seg, rows.date, rows.hh), strict=True))
     rng = np.random.default_rng(0)
     spec = core.ARMS["U*"]
@@ -912,7 +913,7 @@ def test_the_first_test_score_writes_the_marker_and_later_fits_and_chain_scores_
     )  # fmt: skip
     _write_stub_predictions(root=root, truth_rows=world["n"])
     stages.write_json(path=root / stages.CHAIN_STATUS, payload={"state": "running"})
-    with pytest.raises(stages.GuardError, match="chain is running"):
+    with pytest.raises(stages.GuardError, match="complete, failed, or stopped"):
         report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
     assert not (root / "scores" / stages.TEST_MARKER).exists()
     stages.write_json(path=root / stages.CHAIN_STATUS, payload={"state": "complete"})
@@ -943,6 +944,7 @@ def test_a_choice_made_after_the_first_test_score_or_never_made_fails(
     leak.assert_no_test_choice(events=events)
     stages.write_json(path=root / stages.BT_RECORD, payload={"B-T": {}})
     marker = root / "scores" / stages.TEST_MARKER
+    stages.write_marker(root=root)
     os.utime(marker, ns=(1, 1))  # the marker is older than the B-T record: B-T was fixed after
     with pytest.raises(leak.CorrectnessFailureError, match="not fixed before"):
         leak.assert_no_test_choice(events=stages.choice_events(root=root))
@@ -1048,3 +1050,63 @@ def test_the_rebuilt_windows_must_hold_the_rows_of_the_test_bank(gated: Any, fol
     flipped = dataclasses.replace(rows, has_bsp=~np.asarray(rows.has_bsp, dtype=bool))
     with pytest.raises(leak.CorrectnessFailureError, match="BSP flag"):
         report.check_truth_matches_rows(truth_=t_plain, prepared=plain, rows=flipped)
+
+
+def test_a_score_before_the_chain_ends_leaves_no_marker_and_does_not_block_the_fits(
+    gated: Any, folders: Any
+) -> None:
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    with pytest.raises(stages.GuardError, match="stored predictions"):  # no fit stored yet
+        report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    _write_stub_predictions(root=root, truth_rows=world["n"], chain_state="running")
+    with pytest.raises(stages.GuardError):  # the chain has not ended
+        report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    _write_stub_predictions_state(root=root, state="stopped")
+    report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert (root / "scores" / stages.TEST_MARKER).exists()
+
+
+def _write_stub_predictions_state(*, root: Any, state: str) -> None:
+    stages.write_json(path=root / stages.CHAIN_STATUS, payload={"state": state})
+
+
+def test_a_failed_choice_check_leaves_no_marker(gated: Any, folders: Any) -> None:
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    (root / "limits.json").touch()
+    with pytest.raises(leak.CorrectnessFailureError):
+        report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert not (root / "scores" / stages.TEST_MARKER).exists()
+
+
+def test_a_five_point_step_shortfall_voids_the_transfer_word(
+    gated: Any, folders: Any, monkeypatch: Any
+) -> None:
+    import e00732_report as report
+    import e00732_score as score
+
+    root, root730, env = gated
+    world = folders[2]
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    all_steps = report.stage_score(
+        root=root, root730=root730, env=env, base=world["base"], log=print
+    )["n_transfer_steps"]
+    monkeypatch.setattr(core, "MIN_STEP_POINTS_REACHABLE", 1e9)  # no step reaches 5 points
+    (root / "scores" / stages.TEST_MARKER).unlink()
+    few = report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert all_steps > 0
+    assert few["n_transfer_steps"] == 0
+    reach = score.overlay_reachability(
+        n_transfer_steps=few["n_transfer_steps"], windows_by_amount=few["windows_by_amount"]
+    )
+    assert not reach["transfer_reachable"]

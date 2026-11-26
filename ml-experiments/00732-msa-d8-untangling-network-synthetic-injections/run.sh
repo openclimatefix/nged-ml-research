@@ -80,7 +80,7 @@ fi
 # Set PYTHON explicitly, for example `PYTHON=/path/to/venv/bin/python` (a venv built with `uv sync
 # --group gpu`). The default venv path holds the text `msa-f7`, so the scorer check below would match
 # a fit of this experiment that runs with the default interpreter. The check therefore ignores command
-# lines that name `e00732`, and it keeps refusing on any other match.
+# lines that name an `e00732_` script, and it keeps refusing on any other match.
 default_python="$(dirname "$root")/.claude/worktrees/msa-f7-pv-part-1/.venv/bin/python"
 [ -x "$default_python" ] || default_python="$HOME/dev/nged-ml-research/.claude/worktrees/msa-f7-pv-part-1/.venv/bin/python"
 python_bin="${PYTHON:-$default_python}"
@@ -113,7 +113,7 @@ if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
         echo "a process of experiment 732 already holds the GPU; the slot allows one GPU process of this experiment" >&2
         exit 1
     fi
-    if pgrep -af 'e0071[67]_score|msa-f7' | grep -qv 'e00732\b' ; then
+    if pgrep -af 'e0071[67]_score|msa-f7' | grep -qv 'e00732_' ; then
         echo "a scorer of experiment 716 or 717, or an F7 job, holds the GPU: wait" >&2
         exit 1
     fi

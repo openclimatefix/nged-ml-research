@@ -670,8 +670,7 @@ and the solar bars and solar contrasts, and the score stage records how many hal
 excluded. The overlays stage reports the unreliable share of the S1 sun-up half-hours of solar
 worlds for each bank and stops the line at verdict row 0 when any bank exceeds 7%. The bound was 5%
 when first registered. The maintainer raised it to 7%, before any fit, after the read-only
-diagnostic read 5.68% on the validation bank. No bank and no bar changed. The banks themselves are
-not changed.
+diagnostic read 5.68% on the validation bank. No bank and no bar changed.
 
 ## The four outputs of the network
 

@@ -12,6 +12,7 @@ value of a real solar era.
 """
 
 import hashlib
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -166,10 +167,32 @@ def marker_exists(*, root: Path) -> bool:
     return (root / "scores" / TEST_MARKER).exists()
 
 
+def chain_finished(*, root: Path) -> bool:
+    """Return whether stored predictions exist and the chain ended (complete, failed, or stopped)."""
+    path = root / CHAIN_STATUS
+    return (
+        bool(prediction_files(root=root))
+        and path.exists()
+        and read_json(path=path).get("state") in CHAIN_DONE_STATES
+    )
+
+
 def chain_running(*, root: Path) -> bool:
     """Return whether `chain_status.json` says that the chain is running."""
     path = root / CHAIN_STATUS
     return path.exists() and read_json(path=path).get("state") == "running"
+
+
+def write_marker(*, root: Path) -> None:
+    """Write the marker of the first test score (nothing changes when it exists)."""
+    marker = root / "scores" / TEST_MARKER
+    if not marker.exists():
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("")
+
+
+CHAIN_DONE_STATES: Final = ("complete", "failed", "stopped")
+"""The chain states after which the test outputs may be scored."""
 
 
 def choice_events(*, root: Path) -> list[str]:
@@ -177,8 +200,8 @@ def choice_events(*, root: Path) -> list[str]:
 
     The events are `limits` (`limits.json`), `fits` (the newest stored prediction file), `bt` (the
     record of the B-T fit, `scores/bt_fit.json`), and `test_score` (the marker `scores/test_started`,
-    made now when it does not exist yet). A choice that was rewritten after the first test score
-    sorts after `test_score`, and `leak.assert_no_test_choice` fails. A choice that does not exist is
+    taken now, without writing the file, when it does not exist yet; `write_marker` writes it). A
+    choice that was rewritten after the first test score sorts after `test_score`, and `leak.assert_no_test_choice` fails. A choice that does not exist is
     left out, and `assert_no_test_choice` fails on that too.
 
     Args:
@@ -188,10 +211,9 @@ def choice_events(*, root: Path) -> list[str]:
         The event names, earliest first.
     """
     marker = root / "scores" / TEST_MARKER
-    if not marker.exists():
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text("")
-    stamps: dict[str, int] = {"test_score": marker.stat().st_mtime_ns}
+    stamps: dict[str, int] = {
+        "test_score": marker.stat().st_mtime_ns if marker.exists() else time.time_ns()
+    }
     if (root / "limits.json").exists():
         stamps["limits"] = (root / "limits.json").stat().st_mtime_ns
     fits = prediction_files(root=root)
@@ -325,7 +347,7 @@ def _guard_banks(*, root: Path, expected: dict, current: dict | None) -> None:
         raise GuardError(msg)
 
 
-def guard_run(*, root: Path, root730: Path, stage: str) -> None:
+def guard_run(*, root: Path, root730: Path, stage: str) -> None:  # noqa: PLR0912
     """Refuse to run a stage on the outputs of another run, or without the gates before a fit.
 
     Args:
@@ -390,6 +412,9 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
         and not (root / "limits.json").exists()
     ):
         msg = f"`{stage}` needs limits.json"
+        raise GuardError(msg)
+    if stage == "score" and not chain_finished(root=root):
+        msg = "`score` needs stored predictions and a `chain_status.json` that says complete, failed, or stopped: the first test score ends every later fit"
         raise GuardError(msg)
     if stage in READING_STAGES and chain_running(root=root):
         msg = f"`{stage}` reads the test outputs, but the chain is running (`chain_status.json` says running): wait for the last fit"
@@ -659,7 +684,14 @@ def stage_limits(
         recomputed = {
             k: {"share": v.share, "limit": v.limit, "n_rows": v.n_rows} for k, v in limits.items()
         }
-        if stored["bands"] != recomputed or stored["n_rows"] != rows.n:
+        units = noise_units(base=base, arrays=arrays)
+        if (
+            stored["bands"] != recomputed
+            or stored["n_rows"] != rows.n
+            or not np.isclose(stored["s"], float(np.mean(rows.x < 0.0)))
+            or stored["noise_units"] is None
+            or any(not np.isclose(stored["noise_units"][k], v) for k, v in units.items())
+        ):
             msg = (
                 "limits.json differs from the limits recomputed from the test bank (verdict row 0)"
             )
@@ -742,7 +774,7 @@ def overlay_stage_bank(
         )
     if n_up and n_bad / n_up > core.MAX_UNRELIABLE_SHARE:
         problems.append(
-            f"{name}: {n_bad} of {n_up} S1 sun-up half-hours of solar worlds are unreliable solar targets (more than 7%)"
+            f"{name}: {n_bad} of {n_up} S1 sun-up half-hours of solar worlds are unreliable solar targets (more than {core.MAX_UNRELIABLE_SHARE:.0%})"
         )
     if test:
         windows = {}

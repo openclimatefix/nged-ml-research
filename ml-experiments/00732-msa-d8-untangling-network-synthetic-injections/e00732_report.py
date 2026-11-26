@@ -539,6 +539,7 @@ def stage_score(
         limits=root / "limits.json", fit_records=stages.prediction_files(root=root)
     )
     leak.assert_no_test_choice(events=stages.choice_events(root=root))
+    stages.write_marker(root=root)
     readings = score.compute_readings(truth=truth_, arms=arm_map)
     h1 = (
         score.harm_by_band(rows=truth_.rows, p=arm_map["U*"].p, limits=core.read_limits_file(path=root / "limits.json"))  # ty: ignore[invalid-argument-type]
@@ -556,7 +557,7 @@ def stage_score(
         f1_big = float(found["f1"])
     record = {
         "readings": reading_json(readings=readings), "h1": h1, "solar_bars": bars, "f1_big": f1_big,
-        "n_rows": n, "n_unreliable_excluded": int(truth_.exclude.sum()), "n_transfer_steps": int(truth_.event.sum()),
+        "n_rows": n, "n_unreliable_excluded": int(truth_.exclude.sum()), "n_transfer_steps": int(((truth_.event > 0) & (np.abs(truth_.size) >= core.MIN_STEP_POINTS_REACHABLE)).sum()),
         "windows_by_amount": {str(a): int(truth_.pair[a].sum()) for a in core.TEST_INJECTION_POINTS},
         "n_bsp_reverse": int(((truth_.rows.x < 0.0) & np.asarray(truth_.rows.has_bsp, dtype=bool)).sum()),
         "arms_present": sorted(k for k, v in arm_map.items() if v.p is not None or v.pv is not None or v.step is not None),
@@ -1105,6 +1106,7 @@ def stage_figures(
     """
     import e00732_figures as figures
 
+    stages.guard_run(root=root, root730=root730, stage="figures")
     rec = stages.read_json(path=root / READINGS_FILE)
     if "U*" not in rec["arms_present"]:
         msg = "the figures need the stored outputs of U* (no empty plot is drawn)"
