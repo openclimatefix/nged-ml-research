@@ -369,3 +369,25 @@ def test_the_tensor_stage_fails_a_silent_mirror_in_the_stage_itself(gated) -> No
     env2 = stages.Env(holidays=env.holidays, stats=env.stats, neighbours=silent, medians=env.medians)
     with pytest.raises(stages.StoppedError):
         stages.stage_tensor_checks(root=root, root730=root730, env=env2, log=print)
+
+
+def test_the_gallery_stage_writes_published_and_private_panels_and_the_check_file(gated, folders) -> None:
+    import e00732_gallery as gallery
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    results = gallery.stage_gallery(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert set(results) == set(core.PANEL_REQUIREMENTS)
+    private = gallery.gallery_private_dir(root=root)
+    assert list(private.glob("gallery_g17*.svg")) and not list((root / "figures" / "gallery").glob("*g17*"))
+    assert list((root / "figures" / "gallery").glob("gallery_g10*.svg"))
+    auto = json.loads((private / gallery.AUTO_FILE).read_text())
+    assert set(auto["panels"]) == set(core.PANEL_REQUIREMENTS)
+    confirms = dict.fromkeys(core.PANEL_REQUIREMENTS, True)
+    record = gallery.record_panel_check(root=root, root730=root730, confirms=confirms)
+    assert record["panels"] == auto["panels"]  # the reading cannot turn a failed check into a pass
+    assert not gallery.record_panel_check(root=root, root730=root730, confirms=dict.fromkeys(confirms, False))["all_passed"]

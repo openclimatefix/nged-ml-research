@@ -24,6 +24,7 @@ import e00732_paths  # noqa: F401
 
 # isort: split
 import altair as alt
+import e00729_core as core729
 import e00729_figures as figures729
 import e00729_sim as sim729
 import e00730_banks as banks730
@@ -301,6 +302,9 @@ def choose_windows(
             days = slice(day0, day0 + n_days)
             if (o.seg.cal_index[days] < 0).any() or not np.isfinite(o.seg.x[days]).all():
                 continue
+            lo, hi = day0 * 48, (day0 + n_days) * 48
+            if any(t is not tr and t.start_half_hour < hi and t.end_half_hour >= lo for t in o.transfers):
+                continue
             out.append(window_of(overlay=o, original=originals[i], index=i, day0=day0, n_days=n_days, transfer=tr))
             break
         if len(out) == n:
@@ -377,7 +381,7 @@ def panel_g10(
 
     def removes_in_solar_spell(o: ov.TransferOverlay, tr: ov.Transfer) -> bool:
         d0 = int(tr.start_half_hour // 48)
-        return tr.size < 0 and o.seg.world in ov.SOLAR_WORLDS and bool(np.nanmax(o.seg.solar[d0 : d0 + 2]) > 0)
+        return tr.size < 0 and tr.inside_bsp_a and o.seg.world in ov.SOLAR_WORLDS and bool(np.nanmax(o.seg.solar[d0 : d0 + 2]) > 0)
 
     cases = {
         "g10_adds_load": ("A transfer that adds load on an import day, inside BSP A", adds_on_import_day, False, 0, 2),
@@ -429,6 +433,12 @@ class PairWin:
     cosz: np.ndarray
 
 
+def window_cols(*, day: int) -> slice:
+    """Return the dense half-hours of the 96-half-hour window around a scored day."""
+    start = day * 48 - core729.MIDDLE_START
+    return slice(start, start + core729.WINDOW_STEPS)
+
+
 def pair_windows(
     *, segments: Sequence[sim729.Segment], overlays: Sequence[ov.TransferOverlay] | None,
     index: ov.PairIndex, amount: float, source: str, public: bool, n: int = N_DRAWS,
@@ -451,30 +461,32 @@ def pair_windows(
     used: set[int] = set()
     for (i, d), sibs in sorted(index.siblings.items()):
         seg = segments[i]
-        if i in used or d < 1 or d + 2 > seg.x.shape[0] - 1 or (public and not publishable(seg=seg)):
+        if i in used or d < 1 or (public and not publishable(seg=seg)):
             continue
-        if seg.world in ov.SOLAR_WORLDS and public and seg.source != "S2":
+        if public and seg.world in ov.SOLAR_WORLDS:
             continue
         pick = [int(j) for j in sibs if segments[int(j)].source == source]
         if not pick:
             continue
-        j = pick[0]
-        win_delta = ov.window_delta(index=index, sibling=j, amount=amount, day=d)
-        cols = slice(d * 48, d * 48 + 96)
-        q = ov.reactive_floor(seg=seg)
-        flat_delta = np.concatenate([win_delta[1:], np.zeros(0)])
+        cols = window_cols(day=d)
+        if cols.start < 0 or cols.stop > seg.x.size or seg.cal_index[d] < 0:
+            continue
+        delta97 = ov.window_delta(index=index, sibling=pick[0], amount=amount, day=d)
+        delta = delta97[1:].astype(np.float64)
+        if not (delta > 0).any():
+            continue
         x = seg.x.reshape(-1)[cols].astype(np.float64)
-        x_new, r_new, bsp_new = ov.inject(
-            x=x, q=q.reshape(-1)[cols], delta=flat_delta[:96], bsp=seg.bsp.reshape(-1)[cols], beta=float(seg.params[ov.BETA_KEY]),
-        )  # fmt: skip
+        q = ov.reactive_floor(seg=seg).reshape(-1)[cols]
+        bsp = seg.bsp.reshape(-1)[cols]
+        x_new, r_new, bsp_new = ov.inject(x=x, q=q, delta=delta, bsp=bsp, beta=float(seg.params[ov.BETA_KEY]))
         out.append(
             PairWin(
-                amount=amount, sibling_source=segments[j].source, delta=flat_delta[:96].astype(np.float64),
+                amount=amount, sibling_source=segments[pick[0]].source, delta=delta,
                 x0=x, x1=x_new.astype(np.float64), r0=seg.r.reshape(-1)[cols].astype(np.float64),
-                r1=r_new.astype(np.float64), bsp0=seg.bsp.reshape(-1)[cols].astype(np.float64),
+                r1=r_new.astype(np.float64), bsp0=bsp.astype(np.float64),
                 bsp1=bsp_new.astype(np.float64), cosz=seg.cosz.reshape(-1)[cols].astype(np.float64),
             )
-        )
+        )  # fmt: skip
         used.add(i)
         if len(out) == n:
             break
@@ -489,7 +501,8 @@ def check_pairs(*, pairs: Sequence[PairWin]) -> bool:
         active = p.delta > 0.0
         if not active.any() or (active & ~(p.cosz > core.NIGHT_COSZ)).any():
             return False
-        if not np.allclose(p.x0 - p.x1, p.delta, atol=TOL):
+        seen = np.isfinite(p.x0)
+        if not np.allclose((p.x0 - p.x1)[seen], p.delta[seen], atol=TOL):
             return False
         ok = np.isfinite(p.r0) & np.isfinite(p.r1)
         if (np.abs(p.r1 - p.r0)[ok & ~active] > TOL).any() or not (np.abs(p.r1 - p.r0)[ok & active] > 0).any():
@@ -559,9 +572,11 @@ def panel_g12(*, segments: Sequence[sim729.Segment]) -> tuple[dict[str, alt.TopL
             continue
         for d in range(1, seg.x.shape[0] - 2):
             up = seg.cosz[d] > core.SUN_UP_COSZ
-            if seg.cal_index[d] < 0 or up.sum() < 6 or not np.isfinite(seg.csi[d][up]).all():
+            if seg.cal_index[d] < 0 or up.sum() < 6 or not np.isfinite(seg.csi[d : d + 2]).any():
                 continue
-            level = float(np.mean(seg.csi[d][up]))
+            level = float(np.nanmean(seg.csi[d][up]))
+            if not np.isfinite(level):
+                continue
             if "clear" not in best or level > best["clear"][0]:
                 best["clear"] = (level, i, d)
             if "cloudy" not in best or level < best["cloudy"][0]:
@@ -619,7 +634,7 @@ def panel_g13(
     """Draw G13: the solar target, the step events, and the step sizes of one window of each world type, with the hidden span of style R shaded."""
     windows: list[dict[str, object]] = []
     charts: list[alt.TopLevelMixin] = []
-    for world in core.core729.WORLD_TYPES:
+    for world in core729.WORLD_TYPES:
         wins = choose_windows(
             overlays=[o for o in overlays if o.seg.world == world], originals=[originals[i] for i, o in enumerate(overlays) if o.seg.world == world],
             keep=lambda o, tr: True, n=1,
@@ -670,7 +685,7 @@ def settled_table(*, overlays_by_name: Mapping[str, Sequence[ov.TransferOverlay]
 
 def parameter_arrays(*, overlays: Sequence[ov.TransferOverlay]) -> dict[str, np.ndarray]:
     """Return the drawn parameters of a bank: the transfers per 30 days of each segment, the durations in hours, the sizes in points, and whether the partner sits under BSP A."""
-    rate = np.array([len(o.transfers) * 30.0 / o.seg.n_dense for o in overlays])
+    rate = np.array([len(o.transfers) * 30.0 / (o.seg.x.shape[0] - 2) for o in overlays])
     drawn = np.array([o.rate for o in overlays])
     trs = [tr for o in overlays for tr in o.transfers]
     return {
@@ -798,22 +813,30 @@ def panel_g15(
         for tr in o.transfers:
             d = int(min(max(tr.start_half_hour // 48, 1), seg.x.shape[0] - 3))
             sibs = [int(j) for j in index.siblings.get((i, d), []) if originals[int(j)].source == "S2"]
-            sl = slice(d, d + 2)
-            if not sibs or not (np.abs(seg.engine[sl]).max() > 0 and np.abs(seg.solar[sl]).max() > 0 and np.abs(o.t[sl]).max() > 0):
+            cols = window_cols(day=d)
+            if not sibs or cols.start < 0 or cols.stop > seg.x.size or seg.cal_index[d] < 0:
+                continue
+
+            def flat(a: np.ndarray, cols: slice = cols) -> np.ndarray:
+                return np.asarray(a).reshape(-1)[cols].astype(np.float64)
+
+            if not all(np.abs(flat(a)).max() > 0 for a in (seg.engine, seg.solar, o.t)):
                 continue
             delta = ov.window_delta(index=index, sibling=sibs[0], amount=20.0, day=d)[1:].astype(np.float64)
             if not (delta > 0).any():
                 continue
-            cols = slice(d * 48, d * 48 + 96)
-            flat = lambda a: np.asarray(a).reshape(-1)[cols].astype(np.float64)  # noqa: E731
-            q = flat(o.q)
-            x, base, eng, sol, r, bsp = flat(seg.x), flat(seg.base), flat(seg.engine), flat(seg.solar), flat(seg.r), flat(seg.bsp)
-            x_inj, r_inj, bsp_inj = ov.inject(x=x, q=q, delta=delta, bsp=bsp, beta=o.beta)
-            windows.append({"x": x, "base": base, "engine": eng, "solar": sol, "t": flat(o.t), "delta": delta, "r": r, "bsp": np.nan_to_num(bsp), "x_inj": x_inj.astype(np.float64), "r_inj": r_inj.astype(np.float64), "bsp_inj": np.nan_to_num(bsp_inj.astype(np.float64))})
-            w = windows[-1]
+            x, bsp = flat(seg.x), flat(seg.bsp)
+            x_inj, r_inj, bsp_inj = ov.inject(x=x, q=flat(o.q), delta=delta, bsp=bsp, beta=o.beta)
+            w = {
+                "x": x, "base": flat(seg.base), "engine": flat(seg.engine), "solar": flat(seg.solar),
+                "t": flat(o.t), "delta": delta, "r": flat(seg.r), "bsp": np.nan_to_num(bsp),
+                "x_inj": x_inj.astype(np.float64), "r_inj": r_inj.astype(np.float64),
+                "bsp_inj": np.nan_to_num(bsp_inj.astype(np.float64)),
+            }  # fmt: skip
+            windows.append(w)
             charts += [
-                lines_chart(series={"base demand": base, "engine output": eng, "solar output": sol, "transferred load": w["t"], "extra injection": delta}, title=f"Draw {len(windows)}: the components", height=100),
-                lines_chart(series={"truth w": x, "truth w+": w["x_inj"], "reading w": np.nan_to_num(r), "reading w+": w["r_inj"]}, widths={"truth w": 0.8, "reading w": 0.8, "truth w+": 2.2, "reading w+": 2.2}, title="The window w and its injected member w+", height=100),
+                lines_chart(series={"base demand": w["base"], "engine output": w["engine"], "solar output": w["solar"], "transferred load": w["t"], "extra injection": delta}, title=f"Draw {len(windows)}: the components", height=100),
+                lines_chart(series={"truth w": x, "truth w+": w["x_inj"], "reading w": np.nan_to_num(w["r"]), "reading w+": w["r_inj"]}, widths={"truth w": 0.8, "reading w": 0.8, "truth w+": 2.2, "reading w+": 2.2}, title="The window w and its injected member w+", height=100),
                 lines_chart(series={"BSP w": w["bsp"], "BSP w+": w["bsp_inj"]}, widths={"BSP w": 0.8, "BSP w+": 2.2}, title="The BSP meter", height=70),
             ]  # fmt: skip
             break
@@ -854,8 +877,10 @@ def panel_g16(*, summary: Mapping[str, object]) -> tuple[dict[str, alt.TopLevelM
 
 def mirror_change(*, w: Win, name: str) -> tuple[float, float]:
     """Return a neighbour's mean change over the transfer's half-hours and the mean transferred load there."""
-    inside = np.abs(w.t) > 0
-    return float(np.nanmean((w.nb_after[name] - w.nb_before[name])[inside])), float(np.mean(w.t[inside]))
+    inside = (np.abs(w.t) > 0) & np.isfinite(w.nb_before[name]) & np.isfinite(w.nb_after[name])
+    if not inside.any():
+        return float("nan"), float("nan")
+    return float(np.mean((w.nb_after[name] - w.nb_before[name])[inside])), float(np.mean(w.t[inside]))
 
 
 def check_g18(*, wins: Mapping[str, Sequence[Win]]) -> bool:
@@ -876,7 +901,7 @@ def check_g18(*, wins: Mapping[str, Sequence[Win]]) -> bool:
                 moved = np.nan_to_num(w.nb_after[name] - w.nb_before[name])
                 if name == case and tr.mirrored:
                     change, load = mirror_change(w=w, name=name)
-                    if abs(change + tr.jitter * load) > core.MIRROR_TOLERANCE_POINTS or abs(change) < TOL:
+                    if not abs(change + tr.jitter * load) <= core.MIRROR_TOLERANCE_POINTS or abs(change) < TOL:
                         return False
                 elif np.abs(moved).max() > TOL:
                     return False
@@ -918,7 +943,7 @@ def panel_g18(
     cases = {"D3": "D3", "D5": "D5", "D14": "D14", core.UNREAD_PARTNER: "A partner that the neural network does not read"}
     groups: dict[str, list[Win]] = {}
     for key in cases:
-        groups[key] = choose_windows(overlays=overlays, originals=originals, keep=lambda o, tr, key=key: tr.partner == key and np.isfinite(o.seg.x[max(tr.start_half_hour // 48, 1)]).all())
+        groups[key] = choose_windows(overlays=overlays, originals=originals, keep=lambda o, tr, key=key: tr.partner == key and np.isfinite(o.seg.x[max(tr.start_half_hour // 48, 1) : max(tr.start_half_hour // 48, 1) + 2]).all() and (key not in nb.NEIGHBOURS or np.isfinite(o.neighbours_real[key][max(tr.start_half_hour // 48, 1) : max(tr.start_half_hour // 48, 1) + 2]).all()))
     charts = {
         f"g18_{'partner_' + k if k in nb.NEIGHBOURS else 'unread'}": g18_charts(wins=v, medians=medians, title=f"G18: transfer with partner {cases[k]}")
         for k, v in groups.items()
@@ -1037,9 +1062,13 @@ def mirror_points(*, overlays: Sequence[ov.TransferOverlay]) -> list[dict[str, o
             if not tr.mirrored:
                 continue
             lo, hi = tr.start_half_hour, tr.end_half_hour + 1
-            change = np.nanmean((o.neighbours[tr.partner].reshape(-1) - o.neighbours_real[tr.partner].reshape(-1))[lo:hi])
-            load = np.mean(o.t.reshape(-1)[lo:hi])
-            rows.append({"partner": tr.partner, "jittered": tr.jitter != 1.0, "change": float(change), "minus_load": float(-load), "j": float(tr.jitter)})
+            diff = (o.neighbours[tr.partner].reshape(-1) - o.neighbours_real[tr.partner].reshape(-1))[lo:hi]
+            t = o.t.reshape(-1)[lo:hi]
+            seen = np.isfinite(diff) & (np.abs(t) > 0)
+            if not seen.any():
+                continue
+            change, load = float(np.mean(diff[seen])), float(np.mean(t[seen]))
+            rows.append({"partner": tr.partner, "jittered": tr.jitter != 1.0, "change": change, "minus_load": -load, "j": float(tr.jitter)})
     return rows
 
 
@@ -1124,35 +1153,38 @@ def build_tensor(*, prepared: Sequence[arms.Prepared], index: ov.PairIndex, rng_
     source S2 and an edge of a transfer that a read neighbour mirrors, outside the hidden span.
     """
     full = arms.eval_spec(inject=True, raised=True)
-    for i, p in enumerate(prepared):
+    for p in prepared:
         if p.world in ov.SOLAR_WORLDS:
             continue
+        days = {int(x) for x in p.days}
         for tr in p.transfers:
             if not tr.mirrored:
                 continue
             for hh in (tr.start_half_hour, tr.end_half_hour):
                 d = hh // 48
-                if d not in set(int(x) for x in p.days) or d < 1:
+                if d not in days or d < 1:
                     continue
-                sibs = [j for j in index.siblings.get((p.source_index, d), []) if index.months and True]
                 sib = ov.fixed_sibling(index=index, segment=p.source_index, day=d)
-                if sib is None or not sibs:
+                if sib is None:
                     continue
                 delta = ov.window_delta(index=index, sibling=sib, amount=20.0, day=d)
                 if not (delta[1 + arms.MID : 1 + arms.MID + 48] > 0).any():
                     continue
-                pos = [tr.start_half_hour - (d * 48 - arms.MID), tr.end_half_hour - (d * 48 - arms.MID)]
-                edges = [x for x in pos if 0 <= x < arms.STEPS]
+                start = d * 48 - arms.MID
+                edges = [e for e in (tr.start_half_hour - start, tr.end_half_hour - start) if 0 <= e < arms.STEPS]
+                hidden = None
                 for k in range(50):
-                    hidden = masks.hidden_positions(style=core.STYLE, rng=np.random.default_rng([rng_seed, k]), utc_offset=float(p.offsets[d]))
-                    if hidden.any() and not any(hidden[e] for e in edges):
+                    cand = masks.hidden_positions(style=core.STYLE, rng=np.random.default_rng([rng_seed, k]), utc_offset=float(p.offsets[d]))
+                    if cand.any() and not any(cand[e] for e in edges):
+                        hidden = cand
                         break
-                else:
+                if hidden is None or not edges:
                     continue
                 trip = arms.build_triple(p=p, day=d, spec=full, hidden=hidden, delta=delta, eps=core.TEST_EPS)
                 un = arms.build_triple(p=p, day=d, spec=arms.eval_spec(inject=True, raised=True, neighbours=False), hidden=hidden, delta=delta, eps=core.TEST_EPS)
                 nobsp = arms.build_triple(p=p, day=d, spec=arms.eval_spec(inject=True, raised=True, bsp_zeroed=True), hidden=hidden, delta=delta, eps=core.TEST_EPS)
-                assert trip.xi is not None and trip.xc is not None
+                if trip.xi is None or trip.xc is None:
+                    continue
                 return Tensor(trip.x, trip.xi, trip.xc, hidden, delta, edges, tr.partner, un.x, nobsp.x)
     return None
 
