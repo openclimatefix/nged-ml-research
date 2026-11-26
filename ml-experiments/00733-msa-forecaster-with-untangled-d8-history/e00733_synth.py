@@ -1,0 +1,506 @@
+# ruff: noqa: E501
+"""Experiment 733: the synthetic forecasting world, as pure index arithmetic on per-segment arrays.
+
+A forecasting sample is (segment, origin day D, lead day k). It has the layout of experiment 713: the
+contract origin is 12:00 UTC on dense day D (`c = 48 D + 24`, a stamp index), history row `a` holds the
+stamps `c - 48 a + j` for ages 2 to 15, and the target row of lead day `k` holds `c + 48 (k - 1) + j`,
+with the stamp `g` on slot `g - 1` of the segment's dense axis. A history half-hour is visible only
+when its stamp is at most `c - 54`, as in `e00733_channels.visible_history_mask`.
+
+This module holds no experiment-730 bank and no weather product. The real adapters build one
+`SegmentArrays` per segment (the folded reading, the true sign, the untangled channels, the history
+weather, and the ensemble rows of the base date) and this module cuts samples and batches from them.
+The ensemble coverage of the base dates is a result, never an error: a base date without a 00Z run of
+the ensemble has the status `coverage_gap`, and the stage shrinks the world by the plan's rule
+(segments with no covered origin are left out; more than half of the test segments left out stops
+the line at verdict row 0).
+
+No function prints a date. Every function that touches a real base date returns counts or arrays.
+"""
+
+import re
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Final
+
+import e00733_core as core
+import e00733_paths as paths  # noqa: F401
+import numpy as np
+from e00733_channels import StoppedError
+
+ENS_MODEL_ID: Final = "ECMWF_ENS_0_25_degree"
+"""The `nwp_model_id` partition of the `NWP` Delta table that holds the ensemble runs."""
+RUN_PARTITION: Final = re.compile(r"init_time=(\d{4}-\d{2}-\d{2})T00(?:%3A|:)00")
+"""A 00Z partition folder of the `NWP` table (the colon is written `%3A` on disk)."""
+STATUS_OK: Final = "ok"
+STATUS_GAP: Final = "coverage_gap"
+N_LEAD: Final = 14
+N_WEATHER_COLUMNS: Final = 21
+N_SPREAD_COLUMNS: Final = 7
+STEPS: Final = core.STEPS_PER_DAY
+TOP_ROWS: Final = 14
+SCORED_K0: Final = tuple(d - 1 for d in core.SYNTHETIC_LEAD_DAYS)
+"""The scored lead days 2 to 10 as zero-based lead indices."""
+
+
+class SynthError(RuntimeError):
+    """A check of the synthetic world failed (a correctness failure, verdict row 1)."""
+
+
+# --------------------------------------------------------------------------- ensemble coverage
+
+
+def nwp_run_days(*, nwp_root: Path, model_id: str = ENS_MODEL_ID) -> frozenset[np.datetime64]:
+    """Return the days that have a 00Z run in the `NWP` table, read from the partition folder names (read only).
+
+    Args:
+        nwp_root: The folder of the `NWP` Delta table.
+        model_id: The `nwp_model_id` partition.
+
+    Returns:
+        The days (`datetime64[D]`).
+
+    Raises:
+        SynthError: When the partition folder is missing or holds no 00Z partition.
+    """
+    folder = nwp_root / f"nwp_model_id={model_id}"
+    if not folder.is_dir():
+        msg = "the NWP table has no partition folder for the ensemble"
+        raise SynthError(msg)
+    days = set()
+    for entry in folder.iterdir():
+        match = RUN_PARTITION.match(entry.name)
+        if match is not None:
+            days.add(np.datetime64(match.group(1), "D"))
+    if not days:
+        msg = "the NWP table holds no 00Z run of the ensemble"
+        raise SynthError(msg)
+    return frozenset(days)
+
+
+@dataclass(frozen=True)
+class CoverageResult:
+    """The ensemble coverage of one split's base dates.
+
+    Attributes:
+        covered: Per segment, a bool array over its base dates: whether the 00Z run of the base date exists.
+        n_segments: The number of segments.
+        n_left_out: The segments with no covered base date (left out of the world).
+        n_fully_covered: The segments whose every base date is covered.
+        n_base_dates: The base dates of all segments.
+        n_covered: The base dates with a run.
+    """
+
+    covered: tuple[np.ndarray, ...]
+    n_segments: int
+    n_left_out: int
+    n_fully_covered: int
+    n_base_dates: int
+    n_covered: int
+
+    @property
+    def left_out_share(self) -> float:
+        """Return the share of segments left out."""
+        return self.n_left_out / self.n_segments if self.n_segments else float("nan")
+
+    @property
+    def covered_share(self) -> float:
+        """Return the share of base dates with a run."""
+        return self.n_covered / self.n_base_dates if self.n_base_dates else float("nan")
+
+    def statuses(self, *, segment: int) -> list[str]:
+        """Return the `coverage_gap` result of each base date of one segment: "ok" or "coverage_gap"."""
+        return [STATUS_OK if c else STATUS_GAP for c in self.covered[segment]]
+
+    def counts(self) -> dict[str, int | float]:
+        """Return the counts (no date) that the private log and `limits.json` hold."""
+        return {
+            "n_segments": self.n_segments, "n_left_out": self.n_left_out,
+            "n_fully_covered": self.n_fully_covered, "n_base_dates": self.n_base_dates,
+            "n_covered": self.n_covered, "n_gap_base_dates": self.n_base_dates - self.n_covered,
+        }  # fmt: skip
+
+
+def ens_coverage(
+    *, base_dates: Sequence[np.ndarray], run_days: Collection[np.datetime64]
+) -> CoverageResult:
+    """Return the coverage of each segment's base dates by the days that have a 00Z run.
+
+    Args:
+        base_dates: One `datetime64[D]` array per segment: the segment's base days.
+        run_days: The days with a 00Z run.
+
+    Returns:
+        The result. A base date without a run is a `coverage_gap` in `statuses`; nothing is raised and
+        nothing is downloaded.
+    """
+    runs = np.array(sorted(run_days), dtype="datetime64[D]")
+    covered = tuple(np.isin(np.asarray(d).astype("datetime64[D]"), runs) for d in base_dates)
+    return CoverageResult(
+        covered=covered,
+        n_segments=len(covered),
+        n_left_out=sum(1 for c in covered if not c.any()),
+        n_fully_covered=sum(1 for c in covered if len(c) and c.all()),
+        n_base_dates=sum(len(c) for c in covered),
+        n_covered=sum(int(c.sum()) for c in covered),
+    )
+
+
+def assert_enough_test_segments(*, result: CoverageResult) -> None:
+    """Stop the line (verdict row 0) when more than half of the test segments are left out.
+
+    Raises:
+        StoppedError: When the test split holds no segment or the left-out share is above the limit.
+    """
+    if result.n_segments == 0:
+        msg = "the synthetic test split holds no segment"
+        raise StoppedError(msg)
+    if result.left_out_share > core.MAX_MISSING_TEST_SEGMENT_SHARE:
+        msg = "more than half of the synthetic test segments lack ensemble runs (verdict row 0)"
+        raise StoppedError(msg)
+
+
+def kept_segments(*, result: CoverageResult) -> list[int]:
+    """Return the indices of the segments that keep at least one covered origin."""
+    return [i for i, c in enumerate(result.covered) if c.any()]
+
+
+# --------------------------------------------------------------------------- per-segment arrays
+
+
+@dataclass
+class SegmentArrays:
+    """One synthetic segment's arrays on its dense axis of `n_days` days.
+
+    Attributes:
+        present: `(n_days,)` whether the dense day is a real base day.
+        covered: `(n_days,)` whether the base day has a 00Z ensemble run (an origin may sit there).
+        reading_z: `(n_days * 48,)` the folded reading, standardised; NaN where the reading is invalid.
+        x_neg: `(n_days * 48,)` the indicator of X < 0 (1.0 or 0.0), NaN where invalid.
+        solar_points: `(n_days * 48,)` the injected solar output in points.
+        u_raw: `(n_days * 48, 3)` the untangled channels `[P(X<0), solar points, step probability]`.
+        u_ok: `(n_days * 48,)` whether the untangled channels exist at the half-hour.
+        hist_weather: `(n_days * 48, 21)` the history weather columns (ERA5 and CAMS).
+        hist_datetime: `(n_days * 48, 21)` the date-time columns.
+        day_type: `(n_days * 48,)` int the day type (0 to 7).
+        top_weather: `(n_days, 14, 48, 21)` the target-row weather of the ensemble run of the base day, per lead day.
+        top_spread: `(n_days, 14, 48, 7)` the ensemble spread columns.
+        top_datetime: `(n_days, 14, 48, 21)` the date-time columns of the target rows.
+        top_day_type: `(n_days, 14, 48)` int.
+    """
+
+    present: np.ndarray
+    covered: np.ndarray
+    reading_z: np.ndarray
+    x_neg: np.ndarray
+    solar_points: np.ndarray
+    u_raw: np.ndarray
+    u_ok: np.ndarray
+    hist_weather: np.ndarray
+    hist_datetime: np.ndarray
+    day_type: np.ndarray
+    top_weather: np.ndarray
+    top_spread: np.ndarray
+    top_datetime: np.ndarray
+    top_day_type: np.ndarray
+
+    @property
+    def n_days(self) -> int:
+        """Return the number of dense days."""
+        return len(self.present)
+
+    def check_shapes(self) -> None:
+        """Raise when an array does not have the shape that its name promises."""
+        n, s = self.n_days, self.n_days * STEPS
+        want = {
+            "covered": (n,), "reading_z": (s,), "x_neg": (s,), "solar_points": (s,),
+            "u_raw": (s, core.N_CHANNELS), "u_ok": (s,), "hist_weather": (s, N_WEATHER_COLUMNS),
+            "hist_datetime": (s, N_WEATHER_COLUMNS), "day_type": (s,),
+            "top_weather": (n, TOP_ROWS, STEPS, N_WEATHER_COLUMNS),
+            "top_spread": (n, TOP_ROWS, STEPS, N_SPREAD_COLUMNS),
+            "top_datetime": (n, TOP_ROWS, STEPS, N_WEATHER_COLUMNS),
+            "top_day_type": (n, TOP_ROWS, STEPS),
+        }  # fmt: skip
+        for name, shape in want.items():
+            if getattr(self, name).shape != shape:
+                msg = f"the segment array {name} has shape {getattr(self, name).shape}, not {shape}"
+                raise SynthError(msg)
+
+
+def history_slots(*, origin_day: np.ndarray) -> np.ndarray:
+    """Return the `(N, 14, 48)` dense slots of the history rows of origins on dense days `origin_day`.
+
+    The stamp is `c - 48 a + j` with `c = 48 D + 24`, and the slot is the stamp minus one.
+    """
+    c = np.asarray(origin_day, dtype=np.int64) * STEPS + 24
+    ages = np.arange(core.MIN_AGE, core.MAX_AGE + 1)
+    return c[:, None, None] - STEPS * ages[None, :, None] + np.arange(STEPS)[None, None, :] - 1
+
+
+def target_slots(*, origin_day: np.ndarray, lead_index: np.ndarray) -> np.ndarray:
+    """Return the `(N, 48)` dense slots of the target row of lead index `k - 1`."""
+    c = np.asarray(origin_day, dtype=np.int64) * STEPS + 24
+    k = np.asarray(lead_index, dtype=np.int64)
+    return c[:, None] + STEPS * k[:, None] + np.arange(STEPS)[None, :] - 1
+
+
+def visible_slots(*, origin_day: np.ndarray, slots: np.ndarray) -> np.ndarray:
+    """Return which slots obey the 27-hour rule: the stamp (slot + 1) is at most `c - 54`."""
+    c = np.asarray(origin_day, dtype=np.int64) * STEPS + 24
+    limit = (c - core.NEWEST_VISIBLE_BEFORE_CONTRACT).reshape((-1,) + (1,) * (slots.ndim - 1))
+    return (slots + 1) <= limit
+
+
+def _slot_present(*, seg: SegmentArrays, slots: np.ndarray) -> np.ndarray:
+    """Return whether each slot lies on a real base day of the segment."""
+    s = np.asarray(slots)
+    inside = (s >= 0) & (s < seg.n_days * STEPS)
+    day = np.clip(s // STEPS, 0, seg.n_days - 1)
+    return inside & seg.present[day]
+
+
+def history_row_exists(*, seg: SegmentArrays, origin_day: np.ndarray) -> np.ndarray:
+    """Return the `(N, 14)` mask of history rows whose 48 half-hours all lie on real base days."""
+    return _slot_present(seg=seg, slots=history_slots(origin_day=origin_day)).all(axis=2)
+
+
+@dataclass(frozen=True)
+class SampleIndex:
+    """The samples of one split: segment, origin day, and lead index (`k - 1`), each `(N,)` int64."""
+
+    seg: np.ndarray
+    origin_day: np.ndarray
+    lead_index: np.ndarray
+
+    def __len__(self) -> int:
+        """Return the number of samples."""
+        return len(self.seg)
+
+    def take(self, *, mask: np.ndarray) -> SampleIndex:
+        """Return the samples where `mask` holds."""
+        return SampleIndex(self.seg[mask], self.origin_day[mask], self.lead_index[mask])
+
+
+def enumerate_samples(*, segments: Sequence[SegmentArrays]) -> SampleIndex:
+    """Return every sample of the segments that the plan keeps.
+
+    An origin sits on a real base day with a covered ensemble run. A sample is kept when at least
+    `MIN_HISTORY_ROWS` of its 14 history rows exist and its target row lies on real base days (the
+    row has at least one finite reading or sign). A history row or a target row outside the segment
+    is absent, never filled.
+
+    Args:
+        segments: The segments' arrays.
+
+    Returns:
+        The index, sorted by segment, origin day, and lead index.
+    """
+    seg_i, day_i, k_i = [], [], []
+    for i, seg in enumerate(segments):
+        days = np.flatnonzero(seg.present & seg.covered)
+        if not len(days):
+            continue
+        rows = history_row_exists(seg=seg, origin_day=days).sum(axis=1)
+        days = days[rows >= core.MIN_HISTORY_ROWS]
+        for k in range(N_LEAD):
+            t = target_slots(origin_day=days, lead_index=np.full(len(days), k))
+            ok = _slot_present(seg=seg, slots=t).all(axis=1)
+            d = days[ok]
+            finite = np.isfinite(seg.x_neg[t[ok]]).any(axis=1)
+            d = d[finite]
+            seg_i.append(np.full(len(d), i, dtype=np.int64))
+            day_i.append(d.astype(np.int64))
+            k_i.append(np.full(len(d), k, dtype=np.int64))
+    if not seg_i:
+        return SampleIndex(*(np.zeros(0, dtype=np.int64) for _ in range(3)))
+    out = SampleIndex(np.concatenate(seg_i), np.concatenate(day_i), np.concatenate(k_i))
+    order = np.lexsort((out.lead_index, out.origin_day, out.seg))
+    return SampleIndex(out.seg[order], out.origin_day[order], out.lead_index[order])
+
+
+def scored(*, index: SampleIndex) -> np.ndarray:
+    """Return the mask of the samples whose lead day is one of the scored lead days 2 to 10."""
+    return np.isin(index.lead_index, np.asarray(SCORED_K0))
+
+
+# --------------------------------------------------------------------------- batches
+
+CHANNEL_MODES: Final = ("untangled", "absent", "true")
+"""`untangled`: the stored and re-run outputs (YU); `absent`: no channel (Y0); `true`: the true sign and solar output (YT)."""
+
+
+@dataclass
+class SynthBatch:
+    """One batch of synthetic samples as numpy arrays, in the fields of `e00733_model.UntInputs`.
+
+    Attributes:
+        arrays: The `UntInputs` fields by name.
+        target_z: `(B, 48)` the folded reading, standardised; NaN where invalid.
+        sign_truth: `(B, 48)` the indicator of X < 0, NaN where unknown.
+        history_x_neg: `(B, 14, 48)` the true sign of each history half-hour (the oracle's input; NaN where unknown).
+    """
+
+    arrays: dict[str, np.ndarray]
+    target_z: np.ndarray
+    sign_truth: np.ndarray
+    history_x_neg: np.ndarray
+
+
+def gather_batch(
+    *,
+    segments: Sequence[SegmentArrays],
+    index: SampleIndex,
+    rows: np.ndarray,
+    d8_index: int,
+    target_std: float,
+    mode: str = "untangled",
+    mask_history: tuple[np.ndarray, np.ndarray] | None = None,
+) -> SynthBatch:
+    """Cut the batch of samples `rows` out of the segments' arrays.
+
+    Args:
+        segments: The segments' arrays.
+        index: The split's samples.
+        rows: The positions in `index` of the batch.
+        d8_index: The Primary index of D8 (the forecaster's embedding of the synthetic series).
+        target_std: D8's target standard deviation, the divisor of the solar channel.
+        mode: One of `CHANNEL_MODES`.
+        mask_history: The age-2 mask and the mask of ages 2 to 5 (each `(B,)` bool) of a training
+            batch, applied to the channels only, never to the reading.
+
+    Returns:
+        The batch.
+
+    Raises:
+        SynthError: When `mode` is unknown, or a target row lies outside its segment (a gather that
+            would read a half-hour of another segment).
+    """
+    if mode not in CHANNEL_MODES:
+        msg = f"unknown channel mode {mode}"
+        raise SynthError(msg)
+    b = len(rows)
+    out: dict[str, np.ndarray] = {
+        k: np.zeros(s, dtype=dt)
+        for k, s, dt in (
+            ("top_weather", (b, STEPS, N_WEATHER_COLUMNS), np.float32),
+            ("top_spread", (b, STEPS, N_SPREAD_COLUMNS), np.float32),
+            ("top_datetime", (b, STEPS, N_WEATHER_COLUMNS), np.float32),
+            ("hist_weather", (b, core.N_HISTORY_ROWS, STEPS, N_WEATHER_COLUMNS), np.float32),
+            ("hist_datetime", (b, core.N_HISTORY_ROWS, STEPS, N_WEATHER_COLUMNS), np.float32),
+            ("hist_power", (b, core.N_HISTORY_ROWS, STEPS), np.float32),
+            ("hist_visible", (b, core.N_HISTORY_ROWS, STEPS), bool),
+            ("row_exists", (b, core.N_HISTORY_ROWS), bool),
+            ("day_type_top", (b, STEPS), np.int64),
+            ("day_type_hist", (b, core.N_HISTORY_ROWS, STEPS), np.int64),
+            ("hist_u", (b, core.N_HISTORY_ROWS, STEPS, core.N_CHANNELS), np.float32),
+            ("hist_u_ok", (b, core.N_HISTORY_ROWS, STEPS), bool),
+        )
+    }  # fmt: skip
+    target_z = np.full((b, STEPS), np.nan, dtype=np.float32)
+    sign_truth = np.full((b, STEPS), np.nan, dtype=np.float32)
+    hist_x = np.full((b, core.N_HISTORY_ROWS, STEPS), np.nan, dtype=np.float32)
+    for n, r in enumerate(rows):
+        seg = segments[int(index.seg[r])]
+        d, k = int(index.origin_day[r]), int(index.lead_index[r])
+        hs = history_slots(origin_day=np.array([d]))[0]
+        inside = (hs >= 0) & (hs < seg.n_days * STEPS)
+        hs_c = np.clip(hs, 0, seg.n_days * STEPS - 1)
+        exists = _slot_present(seg=seg, slots=hs).all(axis=1)
+        vis = visible_slots(origin_day=np.array([d]), slots=hs[None])[0] & inside & exists[:, None]
+        reading = seg.reading_z[hs_c]
+        finite = np.isfinite(reading) & vis
+        out["row_exists"][n] = exists
+        out["hist_visible"][n] = finite
+        out["hist_power"][n] = np.where(finite, reading, 0.0)
+        out["hist_weather"][n] = seg.hist_weather[hs_c] * inside[..., None]
+        out["hist_datetime"][n] = seg.hist_datetime[hs_c] * inside[..., None]
+        out["day_type_hist"][n] = seg.day_type[hs_c]
+        out["top_weather"][n] = seg.top_weather[d, k]
+        out["top_spread"][n] = seg.top_spread[d, k]
+        out["top_datetime"][n] = seg.top_datetime[d, k]
+        out["day_type_top"][n] = seg.top_day_type[d, k]
+        ts = target_slots(origin_day=np.array([d]), lead_index=np.array([k]))[0]
+        if ts.min() < 0 or ts.max() >= seg.n_days * STEPS:
+            msg = "a target row lies outside its segment"
+            raise SynthError(msg)
+        target_z[n] = seg.reading_z[ts]
+        sign_truth[n] = seg.x_neg[ts]
+        hist_x[n] = np.where(vis, seg.x_neg[hs_c], np.nan)
+        out["hist_u"][n], out["hist_u_ok"][n] = _channels(
+            seg=seg, slots=hs_c, ok=finite, mode=mode, target_std=target_std
+        )
+    if mask_history is not None:
+        _apply_masks(out=out, masks=mask_history)
+    out["primary"] = np.full(b, d8_index, dtype=np.int64)
+    out["lead_day"] = index.lead_index[rows].astype(np.int64)
+    return SynthBatch(arrays=out, target_z=target_z, sign_truth=sign_truth, history_x_neg=hist_x)
+
+
+def _channels(
+    *, seg: SegmentArrays, slots: np.ndarray, ok: np.ndarray, mode: str, target_std: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the `(14, 48, 3)` channels and flag of one sample's history, in the forecaster's input units."""
+    if mode == "absent":
+        return np.zeros((*ok.shape, core.N_CHANNELS), np.float32), np.zeros_like(ok)
+    if mode == "true":
+        have = ok & np.isfinite(seg.x_neg[slots])
+        u = np.stack(
+            [
+                np.nan_to_num(seg.x_neg[slots]),
+                solar_unit(points=seg.solar_points[slots], target_std=target_std),
+                np.zeros(slots.shape),
+            ],
+            axis=-1,
+        )
+    else:
+        have = ok & seg.u_ok[slots]
+        raw = seg.u_raw[slots]
+        u = np.stack(
+            [raw[..., 0], solar_unit(points=raw[..., 1], target_std=target_std), raw[..., 2]],
+            axis=-1,
+        )
+    return np.where(have[..., None], u, 0.0).astype(np.float32), have
+
+
+def solar_unit(*, points: np.ndarray, target_std: float) -> np.ndarray:
+    """Return the solar channel `v`: points over D8's capacity and the standard deviation, clipped to 0 to 10."""
+    return np.clip(np.asarray(points) / 100.0 / target_std, 0.0, core.SOLAR_CLIP_MAX)
+
+
+def _apply_masks(*, out: dict[str, np.ndarray], masks: tuple[np.ndarray, np.ndarray]) -> None:
+    """Apply experiment 716's CAMS-rule mask and the mask of ages 2 to 5 to the channels, in place."""
+    cams, convention = masks
+    ok = out["hist_u_ok"]
+    ok[:, 0] &= ~cams[:, None]
+    ok[:, 1, core.CAMS_RULE_FIRST_MASKED_COLUMN :] &= ~cams[:, None]
+    ok[:, :4] &= ~convention[:, None, None]
+    out["hist_u"] *= ok[..., None]
+
+
+def assert_no_world_leak(*, input_names: Sequence[str]) -> None:
+    """Fail when an input of the synthetic forecaster is one that the plan forbids.
+
+    The forecaster reads no world type, no engine parameter, no solar capacity, and no truth array
+    except through the oracle arm's declared true channels.
+    """
+    forbidden = ("world", "engine", "capacity", "params", "truth", "x_neg", "solar_points")
+    bad = [n for n in input_names if any(f in n for f in forbidden)]
+    if bad:
+        msg = f"the synthetic forecaster reads forbidden inputs: {bad}"
+        raise SynthError(msg)
+
+
+def share_reverse(*, index: SampleIndex, segments: Sequence[SegmentArrays]) -> tuple[float, int]:
+    """Return the share of reverse-flow half-hours among the scored target rows, and their count."""
+    sel = np.flatnonzero(scored(index=index))
+    n_rev = n_all = 0
+    for r in sel:
+        seg = segments[int(index.seg[r])]
+        t = target_slots(
+            origin_day=index.origin_day[r : r + 1], lead_index=index.lead_index[r : r + 1]
+        )[0]
+        v = seg.x_neg[t]
+        n_all += int(np.isfinite(v).sum())
+        n_rev += int(np.nansum(v))
+    return (n_rev / n_all if n_all else float("nan")), n_rev

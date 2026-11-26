@@ -1,0 +1,326 @@
+# ruff: noqa: E501, PT018, C408
+"""Tests of `e00733_train`: the batch wiring, the optimiser groups, both loops, and the host conversion."""
+
+from types import SimpleNamespace
+
+import e00733_core as core
+import e00733_inputs as inp
+import e00733_leakage as leak
+import e00733_model as model
+import e00733_synth as sy
+import numpy as np
+import pytest
+from synth_fixture import make_segment
+
+torch = pytest.importorskip("torch")
+import e00713_layout as lay  # noqa: E402  # ty: ignore[unresolved-import]
+import e00733_train as tn  # noqa: E402
+from torch_inputs import make_inputs  # noqa: E402
+
+
+class _FakeTensor:
+    """A stand-in for a CUDA tensor: `numpy()` before `cpu()` fails, as a real CUDA tensor does."""
+
+    def __init__(self) -> None:
+        self.on_host = False
+
+    def detach(self) -> _FakeTensor:
+        return self
+
+    def cpu(self) -> _FakeTensor:
+        self.on_host = True
+        return self
+
+    def numpy(self) -> np.ndarray:
+        if not self.on_host:
+            msg = "can't convert cuda:0 device type tensor to numpy"
+            raise TypeError(msg)
+        return np.zeros(2)
+
+
+def test_to_numpy_moves_to_the_host_first() -> None:
+    """The conversion calls `.detach().cpu()` before `.numpy()` (a CUDA tensor raises otherwise)."""
+    assert tn.to_numpy(tensor=_FakeTensor()).shape == (2,)  # ty: ignore[invalid-argument-type]
+    with pytest.raises(TypeError):
+        _FakeTensor().numpy()
+
+
+def test_param_groups_put_every_new_parameter_in_a_group_without_warmup() -> None:
+    """The trunk groups warm up; the new parameters form their own groups, the gain without weight decay."""
+    net = model.UntangledNet(seed=0, sign_head=False)
+    net.freeze_encoders()
+    groups = tn.param_groups(net=net, stage=2, encoders="frozen")
+    new_ids = {id(p) for n, p in net.named_parameters() if n.startswith(model.NEW_PREFIXES)}
+    in_new = {id(p) for g in groups if not g["trunk"] for p in g["params"]}
+    assert in_new == new_ids
+    assert all(g["warmup"] for g in groups if g["trunk"])
+    gain = next(g for g in groups if any(p is net.u_gamma for p in g["params"]))
+    assert gain["weight_decay"] == 0.0 and gain["lr"] == pytest.approx(3e-3)
+    other = next(g for g in groups if g["lr"] == pytest.approx(2e-3) and not g["trunk"])
+    assert other["weight_decay"] == pytest.approx(1e-3)
+    scaled = tn.param_groups(net=net, stage=2, encoders="frozen", new_lr_scale=0.0)
+    assert all(g["lr"] == 0.0 for g in scaled if not g["trunk"])
+    trunk, new = tn.split_params(optimiser=torch.optim.AdamW(groups), net=net)
+    assert len(new) == len(new_ids) and not {id(p) for p in trunk} & new_ids
+
+
+class _FakeSource:
+    """A 713-style source: random `MsaInputs` fields, a target with NaN past the cut, and run times."""
+
+    def __init__(self, *, run_offset_us: int = 0) -> None:
+        self.device = "cpu"
+        self.ens = SimpleNamespace(first_day=0, run_us=None)
+        self.run_offset_us = run_offset_us
+
+    def assemble(
+        self,
+        *,
+        primary: torch.Tensor,
+        c_idx: torch.Tensor,
+        lead_day: torch.Tensor,
+        ensemble: bool,
+        mask_all_power: object,
+        mask_newest_row: object,
+        target_end: object,
+    ) -> SimpleNamespace:
+        b = len(primary)
+        mi = make_inputs(b=b, seed=int(c_idx[0]), channels=False)
+        base = {k: v for k, v in mi.__dict__.items() if k not in {"hist_u", "hist_u_ok"}}
+        base["primary"], base["lead_day"] = primary, lead_day
+        from e00713_model import MsaInputs  # ty: ignore[unresolved-import]
+
+        hist_idx = (
+            c_idx[:, None, None]
+            - 48 * torch.arange(2, 16)[None, :, None]
+            + torch.arange(48)[None, None, :]
+        )
+        target_idx = c_idx[:, None] + 48 * lead_day[:, None] + torch.arange(48)[None, :]
+        target = torch.randn(b, 48)
+        self.ens.run_us = torch.zeros(16, 4000, dtype=torch.int64)
+        day = c_idx // 48
+        for i in range(b):
+            origin_day = int(day[i])
+            self.ens.run_us[int(primary[i]), origin_day] = (
+                lay.GRID_START_US + origin_day * lay.DAY_US + self.run_offset_us
+            )
+        return SimpleNamespace(
+            inputs=MsaInputs(**base), target=target, target_idx=target_idx, hist_idx=hist_idx
+        )
+
+
+def _tensors(*, n_grid: int, d8: int = 3) -> inp.ChannelTensors:
+    rng = np.random.default_rng(0)
+    values = np.stack(
+        [rng.random(n_grid), rng.random(n_grid) * 20, rng.random(n_grid)], axis=1
+    ).astype(np.float32)
+    return inp.build_tensors(
+        dense_values=values,
+        dense_ok=np.ones(n_grid, bool),
+        n_primaries=16,
+        d8_index=d8,
+        target_std=2.0,
+    )
+
+
+def test_unt_source_adds_channels_only_at_d8_and_checks_the_run() -> None:
+    """The batch carries channels at D8 only; a run issued at the wrong time fails the origin-time assertion."""
+    n_grid = 48 * 400
+    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=n_grid))
+    c_idx = torch.tensor([48 * 300 + 24, 48 * 301 + 24])
+    primary = torch.tensor([3, 5])
+    got = src.assemble(
+        primary=primary, c_idx=c_idx, lead_day=torch.tensor([0, 2]), cams_rule=None, convention=None
+    )
+    assert got.inputs.hist_u_ok[0].any() and not got.inputs.hist_u_ok[1].any()
+    assert (got.inputs.hist_u[1] == 0).all()
+    late = tn.UntSource(
+        source=_FakeSource(run_offset_us=3 * lay.HOUR_US), tensors=_tensors(n_grid=n_grid)
+    )
+    with pytest.raises(leak.CorrectnessFailureError):
+        late.assemble(primary=primary, c_idx=c_idx, lead_day=torch.tensor([0, 2]))
+
+
+def test_check_batch_rejects_history_after_the_target() -> None:
+    """A history token at or after the first target token fails the batch check."""
+    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=48 * 400))
+    b = src.assemble(
+        primary=torch.tensor([3]), c_idx=torch.tensor([48 * 300 + 24]), lead_day=torch.tensor([0])
+    )
+    b.hist_idx = b.target_idx[:, :1, None].expand(-1, 14, 48).clone()
+    with pytest.raises(leak.CorrectnessFailureError):
+        tn.check_batch(batch=b)
+
+
+def test_day_start_us_is_midnight_of_the_origin_day() -> None:
+    """The latest valid time of the other target-row columns is 00:00 UTC on the origin's day."""
+    c = np.array([48 * 300 + 24])
+    assert int(tn.day_start_us(c_idx=c)[0] % lay.DAY_US) == 0
+    assert int(tn.day_start_us(c_idx=c)[0]) == lay.GRID_START_US + 300 * lay.DAY_US
+
+
+# --------------------------------------------------------------------------- the synthetic loop
+
+
+def _world(*, n_days: int = 40, seed: int = 0) -> tuple[list[sy.SegmentArrays], sy.SampleIndex]:
+    segs = [make_segment(n_days=n_days, seed=seed)]
+    idx = sy.enumerate_samples(segments=segs)
+    sel = np.arange(len(idx))[:: max(1, len(idx) // 48)]
+    return segs, sy.SampleIndex(idx.seg[sel], idx.origin_day[sel], idx.lead_index[sel])
+
+
+def test_synthetic_loop_records_both_losses_and_marks_the_stored_pass() -> None:
+    """Every pass has a training loss, a validation loss and its two parts; the stored pass is the best one."""
+    segs, idx = _world()
+    net = model.UntangledNet(seed=0, sign_head=True, clim_logit=-1.5)
+    hist = tn.train_synthetic(
+        net=net, train_segments=segs, train_index=idx, val_segments=segs, val_index=idx,
+        seed=0, mode="untangled", d8_index=3, target_std=1.0, device="cpu", max_epochs=3, patience=2, batch_size=16,
+    )  # fmt: skip
+    n = len(hist.val)
+    assert 1 <= n <= 3 and len(hist.train) == len(hist.val_nll) == len(hist.val_bce) == n
+    assert hist.stored_pass == int(np.argmin(hist.val)) + 1
+    assert hist.val[hist.stored_pass - 1] == pytest.approx(
+        hist.val_nll[hist.stored_pass - 1] + hist.val_bce[hist.stored_pass - 1], rel=1e-3
+    )
+    assert all(np.isfinite(hist.train))
+    assert not net.training
+
+
+def test_synthetic_loop_moves_the_sign_head_and_is_reproducible() -> None:
+    """The sign head's output layer leaves zero, and two runs with one seed agree."""
+    segs, idx = _world()
+    kwargs = dict(
+        train_segments=segs,
+        train_index=idx,
+        val_segments=segs,
+        val_index=idx,
+        seed=1,
+        mode="untangled",
+        d8_index=3,
+        target_std=1.0,
+        device="cpu",
+        max_epochs=2,
+        patience=5,
+        batch_size=16,
+    )
+    torch.manual_seed(5)
+    a = model.UntangledNet(seed=0, sign_head=True)
+    torch.manual_seed(5)
+    b = model.UntangledNet(seed=0, sign_head=True)
+    ha = tn.train_synthetic(net=a, **kwargs)  # ty: ignore[invalid-argument-type]
+    hb = tn.train_synthetic(net=b, **kwargs)  # ty: ignore[invalid-argument-type]
+    assert float(a.sign_out.weight.detach().abs().sum()) > 0
+    assert ha.val == hb.val
+
+
+def test_synthetic_y0_reads_no_channel() -> None:
+    """The control arm sees absent channels in every batch, so its path never receives a flagged token."""
+    segs, idx = _world()
+    b = sy.gather_batch(
+        segments=segs, index=idx, rows=np.arange(8), d8_index=3, target_std=1.0, mode="absent"
+    )
+    x = tn.synthetic_arrays_to_inputs(batch=b, device="cpu")
+    assert not bool(x.hist_u_ok.any())
+    net = model.UntangledNet(seed=0, sign_head=True)
+    loss, nll, bce = tn.synthetic_loss(net=net, batch=b, device="cpu")
+    assert float(loss.detach()) == pytest.approx(
+        float(nll.detach()) + float(bce.detach()), rel=1e-5
+    )
+
+
+def test_cap_hit_and_still_falling_flags() -> None:
+    """A loop that ends at the cap says so and whether the validation loss was still falling."""
+    segs, idx = _world()
+    net = model.UntangledNet(seed=0, sign_head=True)
+    hist = tn.train_synthetic(
+        net=net, train_segments=segs, train_index=idx, val_segments=segs, val_index=idx,
+        seed=2, mode="absent", d8_index=3, target_std=1.0, device="cpu", max_epochs=2, patience=9, batch_size=16,
+    )  # fmt: skip
+    assert hist.cap_hit and len(hist.val) == 2
+    assert hist.still_falling == (hist.val[-1] < hist.val[-2])
+    assert set(hist.as_dict()) >= {"train", "val", "stored_pass", "cap_hit", "still_falling"}
+
+
+# --------------------------------------------------------------------------- the real-fold loop with stubs
+
+
+class _World:
+    def __init__(self, source: tn.UntSource) -> None:
+        self.source = source
+
+
+def _samples(*, n: int = 40) -> SimpleNamespace:
+    rng = np.random.default_rng(0)
+    return SimpleNamespace(
+        primary=np.full(n, 3), c_idx=(300 + rng.integers(0, 50, n)) * 48 + 24,
+        is_val=np.arange(n) % 5 == 0, ages=None,
+    )  # fmt: skip
+
+
+def test_real_fold_loop_trains_the_new_parameters_and_records_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With stubs for the world's helpers, the loop returns a history with the stored pass and moves the gain."""
+    monkeypatch.setattr(tn.tr, "token_weights", lambda **_: torch.ones(1, 1))
+    monkeypatch.setattr(tn.tr, "target_end", lambda **_: 10**9)
+    monkeypatch.setattr(tn.tr, "BATCH", 8)
+    monkeypatch.setattr(tn.tr, "VALIDATION_LEAD_DAYS", (0, 3))
+    monkeypatch.setattr(
+        tn,
+        "block_dropout_masks",
+        lambda **kw: (np.zeros(len(kw["origin_idx"]), bool), np.zeros(len(kw["origin_idx"]), bool)),
+    )
+    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=48 * 400))
+    net = model.UntangledNet(seed=0)
+    net.freeze_encoders()
+    before = {
+        n: p.detach().clone()
+        for n, p in net.named_parameters()
+        if not n.startswith(model.NEW_PREFIXES)
+    }
+    log, hist = tn.train_stage(
+        net=net,
+        world=_World(src),
+        stage=2,
+        samples=_samples(),
+        seed=0,
+        encoders="frozen",
+        max_passes=2,
+        patience=3,
+    )
+    assert hist.stage == 2 and len(hist.train) == len(hist.val) == 2 and hist.stored_pass >= 1
+    assert log.passes == 2 and log.cap_hit
+    assert float(net.u_gamma.detach().abs().sum()) > 0
+    frozen = [n for n in before if n.startswith(("weather.", "datetime.", "embedding."))]
+    assert all(torch.equal(before[n], dict(net.named_parameters())[n]) for n in frozen)
+
+
+def test_real_fold_loop_with_zero_new_rate_leaves_the_gain_at_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`new_lr_scale = 0` keeps every new parameter at its start (the trunk-only check)."""
+    monkeypatch.setattr(tn.tr, "token_weights", lambda **_: torch.ones(1, 1))
+    monkeypatch.setattr(tn.tr, "target_end", lambda **_: 10**9)
+    monkeypatch.setattr(tn.tr, "BATCH", 8)
+    monkeypatch.setattr(tn.tr, "VALIDATION_LEAD_DAYS", (0,))
+    monkeypatch.setattr(
+        tn,
+        "block_dropout_masks",
+        lambda **kw: (np.zeros(len(kw["origin_idx"]), bool), np.zeros(len(kw["origin_idx"]), bool)),
+    )
+    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=48 * 400))
+    net = model.UntangledNet(seed=0)
+    net.freeze_encoders()
+    tn.train_stage(
+        net=net,
+        world=_World(src),
+        stage=2,
+        samples=_samples(),
+        seed=0,
+        encoders="frozen",
+        max_passes=1,
+        new_lr_scale=0.0,
+        max_steps=2,
+    )
+    assert float(net.u_gamma.detach().abs().sum()) == 0.0
+    assert core.SYNTHETIC_PATIENCE == 20  # the registered patience of the synthetic loop
