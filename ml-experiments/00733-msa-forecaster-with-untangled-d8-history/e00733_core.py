@@ -40,6 +40,8 @@ F0R_SEEDS: Final = (0, 1)
 HEADLINE_SEEDS: Final = (0, 1, 2, 3, 4)
 PLACEBO_SEEDS: Final = (0, 1, 2)
 SYNTHETIC_SEEDS: Final = (0, 1, 2)
+WORLD_WEATHER_FOLD: Final = "2025-11"
+"""The fold whose standardiser the synthetic world's weather columns use."""
 N_HISTORY_ROWS: Final = 14
 MIN_AGE: Final = 2
 MAX_AGE: Final = MIN_AGE + N_HISTORY_ROWS - 1
