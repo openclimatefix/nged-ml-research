@@ -40,6 +40,12 @@ def present(*, by_name: Mapping[str, np.ndarray | None]) -> dict[str, np.ndarray
 def required(*, by_name: Mapping[str, np.ndarray | None]) -> dict[str, np.ndarray]:
     """Return `by_name` with every array present.
 
+    Args:
+        by_name: Each arm's array, or `None` where the arm did not produce one.
+
+    Returns:
+        The same arrays, now known not to be `None`.
+
     Raises:
         ValueError: If any arm's array is `None`.
     """
