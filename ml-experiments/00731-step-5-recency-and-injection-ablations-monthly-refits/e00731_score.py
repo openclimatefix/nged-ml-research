@@ -397,7 +397,9 @@ def stage_contrasts(*, arms: list[str], continue_after_gate_failure: bool) -> No
     keys_b = keys_a
     for system in (*arms, "9a", "5wo"):
         keys_b = keys_b[
-            np.isin(keys_b, ok_keys(path=rows_path(system=system, setting="joint")), assume_unique=True)
+            np.isin(
+                keys_b, ok_keys(path=rows_path(system=system, setting="joint")), assume_unique=True
+            )
         ]
     print(
         f"PASS B: {len(keys_b):,} shared rows of {len(keys_a):,} in pass A "
