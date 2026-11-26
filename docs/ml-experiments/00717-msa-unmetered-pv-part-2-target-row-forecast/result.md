@@ -118,8 +118,9 @@ adopted_in: none
 **We asked whether a neural network that forecasts a Primary substation's electricity demand becomes
 more accurate when it is also given a forecast of the solar power generated behind the substation,
 for the day being forecast.** The network is the axial-attention network of [experiment
-713](../00713-msa-axial-attention-demand-network-part-1/result.md), and experiment 716 (unmetered
-PV, part 1: the history estimate) already gives it an estimate of the solar output of each of the 14
+713](../00713-msa-axial-attention-demand-network-part-1/result.md), and [experiment
+716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md) (unmetered PV, part 1: the history
+estimate) already gives it an estimate of the solar output of each of the 14
 past days. We added a forecast for the target day: the substation's installed solar capacity times a
 yield curve driven by the ensemble-mean and ensemble-spread shortwave irradiance of the 00:00 UTC
 European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble (ENS) run of the origin day. We
@@ -134,7 +135,7 @@ within 0.007 percentage points of capacity of zero.
 **This page is part 2 of follow-up F7.** The design is condensed from the
 private design note `f7_design.md`, and the details that this part shares with part 1 (the
 estimate of past solar output, the as-of capacity, the network paths, the training recipe, the
-known-answer worlds, and the leakage rules) are on the page of experiment 716.
+known-answer worlds, and the leakage rules) are on the [page of experiment 716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md).
 
 ## Result
 
@@ -257,8 +258,9 @@ headless Chromium and read for labels, overlaps, and units.
 
 **Part 2 stores no attention maps of its own, so the maps of fold 2026-05, seed 0, are those of
 experiment 716.** Arms `M*` and `H` are stored in `work/attention/` of
-experiment 716 (unmetered PV, part 1: the history estimate), and the same
-look-ahead caveat for D19 and D21 applies. No attention extraction was run for arm `HT`.
+[experiment
+716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md) (unmetered PV, part 1: the history
+estimate), and the same look-ahead caveat for D19 and D21 applies. No attention extraction was run for arm `HT`.
 
 ## Checks
 
@@ -298,8 +300,11 @@ look-ahead caveat for D19 and D21 applies. No attention extraction was run for a
   many cuts, and its month-block t interval of -0.025 to +0.290 includes zero, with 3 of 5 seeds
   sharing the sign. The second clause of the trigger (a control that should change nothing) did not
   fire.
-- **Trigger 6 is not computed.** The trigger compares a headline interval with the same contrast in
-  a sister experiment, and experiment 716's `part1.json` does not exist yet. Trigger 2 does not
+- **Trigger 6 fires only on a liberal reading.** The trigger compares a headline interval with the
+  same contrast in a sister experiment. The 98.75% interval of B1 is 1.10 times as wide as that of A1
+  at the six signed-MW Primaries and 1.52 times as wide at the eight MVA-only Primaries, and the
+  interval of B2 is 1.78 times as wide as that of A2 at the eight MVA-only Primaries. Only B2 against
+  A2 at the six signed-MW Primaries exceeds the factor of 2, at 3.13 times as wide. Trigger 2 does not
   apply, because the result matches its prediction, and trigger 7 was not assessed.
 - **Cold nights.** The cold-night difference is +0.0011 at the six signed-MW Primaries and -0.0406
   at the eight MVA-only Primaries (`cold_night_difference` in `part2.json`). The guard of
@@ -648,7 +653,9 @@ rule at a time, and its verified findings are applied. No review remains to come
 - `ml-experiments/00716-msa-unmetered-pv-part-1-history-estimate/`: the network, batches,
   training, and predictions (`e00716_fit.py`, `e00716_predict.py`, `e00716_score.py`), imported
   and not edited, as described on
-  experiment 716 (unmetered PV, part 1: the history estimate).
+  [experiment
+  716](../00716-msa-unmetered-pv-part-1-history-estimate/result.md)
+  (unmetered PV, part 1: the history estimate).
 - `data/ml-experiments/00717-msa-unmetered-pv-part-2-target-row-forecast/work/fits/<arm>/`: the
   stored forecasts, one parquet file per fold and seed (written by this experiment, read by the
   scorer). `work/logs/<arm>/` holds the fit, stage, and predict logs, and `work/models/` the
