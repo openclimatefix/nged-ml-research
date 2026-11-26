@@ -51,7 +51,7 @@ class Reading732:
         row: Experiment 732's verdict row.
         solar_word: Its solar word ("reasonable", "partly", "not shown", or "void").
         transfer_word: Its transfer word.
-        checks: Whether each real-day check passed (`h2`, `k2`, `p1`, `p3`); None when unread.
+        checks: Whether each real-day check passed (`h2`, `p1`, `p3`); None when unread.
         chain_complete: Whether experiment 732's chain status is "complete".
     """
 
@@ -103,8 +103,9 @@ def _passed(record: object) -> bool | None:
 def read_reading_732(*, root: Path) -> Reading732 | None:
     """Return the rule's reading of experiment 732's stored files, or None when `verdict.json` is missing.
 
-    The checks come from `scores/real.json`: `h2`, `k2`, `p1` (its `all` part), and `p3`. A check
-    that the file does not hold is None, and the rule treats None as not passed.
+    The checks come from `scores/real.json`: `h2`, `p1` (its `all` part), and `p3`. A check
+    that the file does not hold is None, and the rule treats None as not passed. Experiment 732
+    never scored K2, so no check named K2 is read.
 
     Args:
         root: Experiment 732's data folder (read only).
@@ -129,7 +130,7 @@ def read_reading_732(*, root: Path) -> Reading732 | None:
         solar_word=str(words.get("solar", "void")),
         transfer_word=str(words.get("transfer", "void")),
         checks={
-            "h2": _passed(real.get("h2")), "k2": _passed(real.get("k2")),
+            "h2": _passed(real.get("h2")),
             "p1": _passed(p1.get("all") if isinstance(p1, dict) else None),
             "p3": _passed(real.get("p3")),
         },
@@ -140,7 +141,7 @@ def read_reading_732(*, root: Path) -> Reading732 | None:
 def decide(*, reading: Reading732 | None) -> ChannelChoice:
     """Return the rule's choice from experiment 732's reading.
 
-    P(X<0) comes from U* when experiment 732's verdict row is 4 or 5 and its checks H2 and K2 pass,
+    P(X<0) comes from U* when experiment 732's verdict row is 4 or 5 and its check H2 passes,
     and from experiment 730's S otherwise. The solar output enters when the P(X<0) source is U*, the
     solar word is "reasonable" or "partly", and P1 and P3 pass. The transfer-step probability enters
     when the P(X<0) source is U* and the transfer word is "works" or "works only in Brier score".
@@ -163,7 +164,7 @@ def decide(*, reading: Reading732 | None) -> ChannelChoice:
         checks.get(c) is True for c in core.P_NEG_REQUIRED_CHECKS
     )
     if p_neg_ok:
-        reasons["p_neg"] = "experiment 732's verdict row and real-day checks H2 and K2 allow U*"
+        reasons["p_neg"] = "experiment 732's verdict row and real-day check H2 allow U*"
     else:
         failing = [c for c in core.P_NEG_REQUIRED_CHECKS if checks.get(c) is not True]
         reasons["p_neg"] = (

@@ -2,6 +2,7 @@
 """Tests of `e00733_channels`: the rule, the stored-output reader, the table, the placebo, and the coverage."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,7 @@ def _reading(
     complete: bool = True,
     **checks: bool | None,
 ) -> ch.Reading732:
-    base = {"h2": True, "k2": True, "p1": True, "p3": True}
+    base = {"h2": True, "p1": True, "p3": True}
     base.update(checks)
     return ch.Reading732(
         row=row, solar_word=solar, transfer_word=transfer, checks=base, chain_complete=complete
@@ -34,16 +35,20 @@ def test_rule_uses_732_when_every_check_passes() -> None:
     assert not choice.fu_equals_fs
 
 
-def test_rule_falls_back_to_730_when_k2_missing() -> None:
-    """A check that the file does not hold counts as not passed.
-
-    So P(X<0) comes from 730's S and the other channels drop.
-    """
-    choice = ch.decide(reading=_reading(k2=None))
+def test_rule_falls_back_to_730_when_h2_missing() -> None:
+    """A check that the file does not hold counts as not passed, so P(X<0) comes from 730's S."""
+    choice = ch.decide(reading=_reading(h2=None))
     assert choice.p_neg_source == core.SOURCE_730
     assert choice.usable == ("p_neg",)
     assert choice.dropped == ("solar", "step_p")
     assert choice.fu_equals_fs
+
+
+def test_k2_is_not_part_of_the_rule() -> None:
+    """Experiment 732 never scored K2, so a reading that carries no K2 check still picks U*."""
+    reading = _reading()
+    assert "k2" not in reading.checks
+    assert ch.decide(reading=reading).p_neg_source == core.SOURCE_732
 
 
 def test_rule_drops_solar_alone_when_p3_fails() -> None:
@@ -90,7 +95,7 @@ def test_read_reading_732_reads_the_stored_formats(tmp_path: Path) -> None:
     got = ch.read_reading_732(root=tmp_path)
     assert got is not None
     assert (got.row, got.solar_word, got.chain_complete) == (5, "partly", True)
-    assert got.checks == {"h2": True, "k2": None, "p1": True, "p3": False}
+    assert got.checks == {"h2": True, "p1": True, "p3": False}
 
 
 def _write_source(
@@ -138,7 +143,7 @@ def test_730_rows_take_their_keys_from_the_era_keys(
     """Experiment 730's files hold no keys; a length mismatch with the era keys raises."""
     for s in core.SOURCE_SEEDS:
         _write_source(tmp_path, ch.JOB_730, s, 12, rng, keys=False)
-    choice = ch.decide(reading=_reading(k2=None))
+    choice = ch.decide(reading=_reading(h2=None))
     keys = (np.arange(12) // 4 + 19000, np.arange(12) % 4)
     out = ch.load_outputs(
         choice=choice, root_732=tmp_path / "none", root_730=tmp_path, eras_keys=keys
@@ -270,3 +275,28 @@ def test_absent_share() -> None:
     assert ch.absent_share(flag=flag, visible=vis) == pytest.approx(1 / 3)
     with pytest.raises(ch.CorrectnessFailureError):
         ch.absent_share(flag=flag, visible=np.zeros(4, dtype=bool))
+
+
+REAL_732 = Path(os.environ.get("DATA_PATH_INTERNAL", "/nonexistent")) / "ml-experiments" / "00732-msa-d8-untangling-network-synthetic-injections"
+
+
+@pytest.mark.skipif(
+    not (REAL_732 / "scores" / "verdict.json").exists(), reason="experiment 732's private files absent"
+)
+def test_the_rule_on_experiment_732s_real_score_files() -> None:
+    """Experiment 732's verdict row 4, H2 passing, solar 'not shown', transfer 'works only in Brier score'.
+
+    The rule gives P(X<0) from U*, the solar channel dropped, the transfer step from U*, and FU
+    distinct from FS.
+    """
+    reading = ch.read_reading_732(root=REAL_732)
+    assert reading is not None
+    assert reading.row == 4
+    assert reading.solar_word == "not shown"
+    assert reading.transfer_word == "works only in Brier score"
+    assert reading.checks["h2"] is True
+    choice = ch.decide(reading=reading)
+    assert choice.p_neg_source == core.SOURCE_732
+    assert choice.usable == ("p_neg", "step_p")
+    assert choice.dropped == ("solar",)
+    assert not choice.fu_equals_fs

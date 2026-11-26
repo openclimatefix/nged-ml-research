@@ -88,7 +88,8 @@ LEARNING_RATES: Final = {"gamma": 3e-3, "w1_w2_head_map": 2e-3, "readout_table":
 # Which untangled signal is usable: the rule of "Which untangled signals enter".
 P_NEG_USABLE_ROWS_732: Final = (4, 5)
 """Experiment 732's verdict rows 4 (`supported`) and 5 (`inconclusive`) leave U* usable for P(X<0)."""
-P_NEG_REQUIRED_CHECKS: Final = ("h2", "k2")
+P_NEG_REQUIRED_CHECKS: Final = ("h2",)
+"""Experiment 732 never scored K2, so the rule reads H2 alone (ruling of 2026-11-26)."""
 SOLAR_USABLE_WORDS: Final = ("reasonable", "partly")
 SOLAR_REQUIRED_CHECKS: Final = ("p1", "p3")
 TRANSFER_USABLE_WORDS: Final = ("works", "works only in Brier score")

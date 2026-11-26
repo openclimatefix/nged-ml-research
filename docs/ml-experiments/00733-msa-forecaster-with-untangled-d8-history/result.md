@@ -215,7 +215,7 @@ synthetic forecast faces the same weather uncertainty as a real one.
   generator whose output this experiment reads is drawn in a gallery before the first fit.
 - **Experiment 730:** the sign-only U-net S gave the best probability of reverse flow on synthetic
   days (Brier score 0.00853), and a demand output with a shared encoder made the sign worse. On real
-  days its checks H2 and K2 passed.
+  days its check H2 passed.
 - **Experiment 732** trains one U-net, U\*, for the sign, the solar output,
   and the transfer steps, and stores U\*'s outputs for every real D8 day from the start of the
   forecaster's training window to the end of the last fold, apart from days with no reading.
@@ -256,14 +256,14 @@ scored as a report-only check that the new path harms nobody.
 untangled signals enter the forecaster.** The channel stage reads experiment 732's printed verdict
 row and reading words from its stored score files and writes the choice to `channels.json` before
 any fit of this experiment. Experiment 732's predictions on real days are read, and its synthetic
-test scores only through those words. The rule's reading of the real-day checks H2, K2, P1, and P3
+test scores only through those words. The rule's reading of the real-day checks H2, P1, and P3
 is one bit of selection per signal on real days, some of which fall in the fold months. Those checks
 read aggregates of the untangling network's outputs and no forecast score, and the write-up states
 the selection beside the verdict.
 
 | Signal | Source when usable | Usable when | Otherwise |
 |---|---|---|---|
-| P(X<0) | Experiment 732's U\*, seeds 0 to 2 averaged | Experiment 732's verdict row is 4 (`supported`) or 5 (`inconclusive`), and its real-day checks H2 and K2 pass | Experiment 730's S, seeds 0 to 2 averaged, from its stored real-day predictions |
+| P(X<0) | Experiment 732's U\*, seeds 0 to 2 averaged | Experiment 732's verdict row is 4 (`supported`) or 5 (`inconclusive`), and its real-day check H2 passes | Experiment 730's S, seeds 0 to 2 averaged, from its stored real-day predictions |
 | Solar output | Experiment 732's U\* | The P(X<0) source is U\*, experiment 732's solar word is "reasonable" or "partly", and its real-day checks P1 (night) and P3 (follows the sky) pass | Dropped |
 | Transfer-step probability | Experiment 732's U\* | The P(X<0) source is U\*, and experiment 732's transfer word is "works" or "works only in Brier score" | Dropped |
 
@@ -792,6 +792,14 @@ published page carries the coverage counts.
   dropping the newest days' channels, because the newest history days are the most informative and
   the hidden-span input is what the untangling network trained on. R12 measures what the stored
   outputs would have changed.
+- **Experiment 732's check K2 is dropped from the rule (ruling of the design lead, 2026-11-26, set
+  before any experiment 733 score exists).** Experiment 732's real-day stage computes H2, P1 to P4,
+  and K3 only, and its page says K1 and K2 were not done, so the condition "H2 and K2 pass" reads
+  "H2 passes" for the P(X<0) source. With experiment 732's verdict row 4, H2 passing, the solar word
+  "not shown", and the transfer word "works only in Brier score", the rule gives P(X<0) from
+  experiment 732's U\*, the solar output dropped (zeroed, flag off), and the transfer-step
+  probability from U\*. FU carries P(X<0) and the transfer step, FS carries P(X<0) alone, and FU and
+  FS are distinct arms.
 - **All 16 Primaries with the channels at D8 alone,** so that M\* is an exact control and the recipe
   stays experiment 713's.
 - **No sign head on the real folds,** because no real day has a known sign, and a head trained on

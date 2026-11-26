@@ -55,9 +55,9 @@ def smoke_rule_and_outputs() -> ch.ChannelChoice | None:
         return None
     print(f"       checks read from real.json: {dict(reading.checks)}")
     check(
-        name="a missing check is not guessed",
-        ok=reading.checks["k2"] is None or isinstance(reading.checks["k2"], bool),
-        detail="K2 is absent from real.json" if reading.checks["k2"] is None else "K2 present",
+        name="experiment 732's H2 check is read",
+        ok=isinstance(reading.checks["h2"], bool),
+        detail=f"H2 {reading.checks['h2']}",
     )
     choice = ch.decide(reading=reading)
     print(
