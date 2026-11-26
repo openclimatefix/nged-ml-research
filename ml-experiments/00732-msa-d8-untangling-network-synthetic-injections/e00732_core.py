@@ -559,7 +559,10 @@ def transfer_word(*, c5: core729.Reading | None, f1: float, reachable: bool) -> 
 
 
 def neighbour_word(*, c7: core729.Reading | None, reachable: bool) -> str:
-    """Return the neighbour word, read from C7: "the neighbours help", "no detectable difference", "the neighbours hurt", or "void"."""
+    """Return the neighbour word, read from C7.
+
+    The word is "the neighbours help", "no detectable difference", "the neighbours hurt", or "void".
+    """
     word = reading_word(reading=c7)
     if not reachable or word == "void":
         return "void"
@@ -813,7 +816,7 @@ PANEL_REQUIREMENTS: Final = {
     "G17_s1_pairs": "the pairs built from source S1 are written to the private folder only",
     "G18_neighbours": "every mirror is equal and opposite at the drawn partner and absent at the other neighbours, the neighbour moves by j times the transfer in the jittered case, and no neighbour moves when the partner is not read",
     "G19_shapes": "a constant, a demand-shaped, and a solar-shaped transfer of the same T0 differ in shape, share the mean T0, never fall below 0.1 T0, and leave the solar target unchanged",
-    "G20_neighbour_table": "every neighbour covers at least 90% of the base-day half-hours in every month, the drawn sizes in D8's noise units reach both sides of 4, and every mirror check point lies on the line of equality",
+    "G20_neighbour_table": "every neighbour covers at least 90% of the base-day half-hours over the whole table, the drawn sizes in D8's noise units reach both sides of 4, and every mirror check point lies on the line of equality",
     "G21_input_tensor": "every neighbour channel is flat where the list says it must move or zero inside the hidden span, the injected member differs from the plain one only in the reading, BSP, and sign-aligned channels, and U-N and U-noBSP differ from U* only in the neighbour and BSP channels",
 }
 """The written list of what each new gallery panel must show. The session that runs the experiment

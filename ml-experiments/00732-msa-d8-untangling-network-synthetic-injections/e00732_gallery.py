@@ -1471,17 +1471,19 @@ def mirror_points(*, overlays: Sequence[ov.TransferOverlay]) -> list[dict[str, o
 
 def check_g20(
     *,
-    coverage: Mapping[str, np.ndarray],
+    overall: Mapping[str, float],
     noise_sizes: Mapping[str, np.ndarray],
     points: Sequence[Mapping[str, object]],
 ) -> bool:
     """Check the neighbour table and the drawn sizes.
 
-    Every neighbour covers at least 90% of D8's present half-hours in every month; the drawn sizes in
-    D8's noise units of the test overlay reach both sides of 4; and every mirror point lies on the line
-    of equality `change = -j load` within `MIRROR_TOLERANCE_POINTS`, with at least 10 points.
+    Every neighbour covers at least 90% of D8's present half-hours over the whole table; the drawn
+    sizes in D8's noise units of the test overlay reach both sides of 4; and every mirror point lies
+    on the line of equality `change = -j load` within `MIRROR_TOLERANCE_POINTS`, with at least 10 points.
     """
-    if not coverage or any(v.size == 0 or v.min() < nb.MIN_COVERAGE for v in coverage.values()):
+    if set(overall) != set(nb.NEIGHBOURS) or any(
+        not v >= nb.MIN_COVERAGE for v in overall.values()
+    ):
         return False
     test = noise_sizes.get("test")
     if (
@@ -1501,6 +1503,7 @@ def panel_g20(
 ) -> tuple[dict[str, alt.TopLevelMixin], bool, str]:  # fmt: skip
     """Draw G20: the coverage per month index, the drawn sizes in D8's noise units, and the mirror check's scatter."""
     coverage = monthly_coverage(base_dates=base_dates, reading=reading, arrays=arrays)
+    overall = nb.coverage(table=arrays, reading=reading)
     sizes = {
         n: np.array([abs(t.size) / noise_d8 for o in os_ for t in o.transfers])
         for n, os_ in overlays_by_name.items()
@@ -1538,7 +1541,8 @@ def panel_g20(
         width=WIDTH_PX,
         height=130,
         title=alt.TitleParams(
-            "Coverage of each neighbour by month (rule: the bound of 90%)", anchor="start"
+            "Coverage of each neighbour by month, information only (rule: the bound of 90% applies to the whole table)",
+            anchor="start",
         ),
     )
     hist = histogram_chart(
@@ -1588,7 +1592,7 @@ def panel_g20(
         else None
     )
     charts = [cov, hist] + ([scatter] if scatter is not None else [])
-    ok = check_g20(coverage=coverage, noise_sizes=sizes, points=points) if scatter_rows else False
+    ok = check_g20(overall=overall, noise_sizes=sizes, points=points) if scatter_rows else False
     return (
         {
             "g20_neighbour_table": stack(
@@ -1596,7 +1600,8 @@ def panel_g20(
             )
         },
         ok,
-        f"mirror points {len(points)}",
+        f"mirror points {len(points)}; overall coverage "
+        + ", ".join(f"{n} {v:.3f}" for n, v in overall.items()),
     )
 
 

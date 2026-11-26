@@ -420,6 +420,9 @@ download and no new data source.
 
 **The table must cover at least 90% of the base-day half-hours for every neighbour, or the line
 stops at verdict row 0.** The real-file smoke test prints the coverage per neighbour and per split.
+The bound applies to the whole table for each neighbour and not to a month or a split. D14 has
+almost no readings in the first two months of D8's calendar, and the presence mask masks those
+months, so the network sees D14 as absent there.
 A missing half-hour gets a presence mask of zero, as D8's missing readings do. If the coverage
 gate fails, a fresh export of the neighbours' series is a new data source, and the section
 "Decisions that need the maintainer" holds that case.
@@ -1464,11 +1467,12 @@ segment. The written list in `e00732_core.py` says what each panel must show:
 - **G19, the three transfer shapes.** For a constant, a demand-shaped, and a solar-shaped transfer
   of the same T₀: the transferred load T against time with the line of T₀, D8's truth, the
   partner's series, and the solar target, which is unchanged in all three.
-- **G20, the neighbour table and the noise units.** The coverage of each neighbour per month index,
-  against the bound of 90%; the histogram of the drawn sizes in D8's noise units for the training
-  overlay of seed 0 and the test overlay, with a line at 4 noise units; and, per partner, the
-  mirror check's mean change of the partner against minus the mean of T, with the line of
-  equality and the jittered mirrors in a second colour.
+- **G20, the neighbour table and the noise units.** The coverage of each neighbour per month
+  index, against the bound of 90%, which the gate applies to the whole table of each neighbour and
+  which the panel shows by month for information only; the histogram of the drawn sizes in D8's
+  noise units for the training overlay of seed 0 and the test overlay, with a line at 4 noise
+  units; and, per partner, the mirror check's mean change of the partner against minus the mean of
+  T, with the line of equality and the jittered mirrors in a second colour.
 - **G21, one built input tensor.** For one training window of U\* with a mirrored transfer, an
   injection, and a hidden span: every input channel of w, w⁺, and w^c as a row of small panels on
   one time axis (the reading and its mask, the four CAMS channels, the BSP change and its mask, the
