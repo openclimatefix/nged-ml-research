@@ -102,7 +102,7 @@ def test_timing_gate_then_one_fit_stores_record_network_and_predictions(
         f"test_inj_{a:g}{s}" for a in core.TEST_INJECTION_POINTS for s in ("", "_nobsp")
     } <= names
     with np.load(folder / "test.npz") as z:
-        assert set(z.files) == {"p", "pv", "step_p", "size"}
+        assert set(z.files) == {"p", "pv", "step_p", "size", "row_seg", "row_date", "row_hh"}
         assert len(z["p"]) == fake730_rows(root730)
     assert (
         fit.fit_one(root=root, root730=root730, env=env, arm="U*", seed=0, device="cpu", log=print)

@@ -67,7 +67,35 @@ def mean_over_seeds(
     return np.mean([a[key].astype(np.float64) for a in arrays if a is not None], axis=0)
 
 
-def arm_scores(*, root: Path, arm: str, n_rows: int) -> score.ArmScores:
+def check_stored_keys(
+    *, arrays: Sequence[Mapping[str, np.ndarray] | None], keys: np.ndarray, what: str
+) -> None:
+    """Check that every stored array carries the row keys of the test rows, and that they match.
+
+    Args:
+        arrays: The stored files of one set, one for each seed.
+        keys: The (segment, date, half-hour) keys of the test rows `(3, N)`.
+        what: The arm and set, for the message.
+
+    Raises:
+        CorrectnessFailureError: When a file lacks the keys or they differ from the rows' (a stored
+            output that is not on the rows it is scored against, verdict row 1).
+    """
+    for a in arrays:
+        if a is None:
+            continue
+        if any(k not in a for k in truth.ROW_KEY_NAMES):
+            msg = f"{what}: a stored file holds no row keys"
+            raise stages.leak.CorrectnessFailureError(msg)
+        stored = np.stack([a[k].astype(np.int64) for k in truth.ROW_KEY_NAMES])
+        if stored.shape != keys.shape or not np.array_equal(stored, keys):
+            msg = f"{what}: the stored row keys differ from the rows of the test bank"
+            raise stages.leak.CorrectnessFailureError(msg)
+
+
+def arm_scores(
+    *, root: Path, arm: str, n_rows: int, keys: np.ndarray | None = None
+) -> score.ArmScores:
     """Return one fitted arm's seed-averaged outputs on the test rows.
 
     An output that was not stored is returned as None.
@@ -76,12 +104,15 @@ def arm_scores(*, root: Path, arm: str, n_rows: int) -> score.ArmScores:
         root: The data folder of this experiment.
         arm: The arm's name.
         n_rows: The number of scored rows of the test bank.
+        keys: The (segment, date, half-hour) keys of the test rows `(3, N)`; every stored file must
+            hold the same keys (not checked when None).
 
     Returns:
         The arm's outputs (None where an output was not stored).
 
     Raises:
         ScoreError: When a stored array does not have `n_rows` rows.
+        CorrectnessFailureError: When a stored file's row keys are missing or differ.
     """
     spec = core.ARMS[arm]
     folders = [
@@ -93,6 +124,8 @@ def arm_scores(*, root: Path, arm: str, n_rows: int) -> score.ArmScores:
 
     def get(name: str, key: str) -> np.ndarray | None:
         a = seeds(name)
+        if keys is not None:
+            check_stored_keys(arrays=a, keys=keys, what=f"{arm} {name}")
         out = mean_over_seeds(arrays=a, key=key) if len(a) == len(core.SEEDS) else None
         if out is not None and out.shape[0] != n_rows:
             msg = f"a stored array of {arm} has {out.shape[0]} rows, not {n_rows}"
@@ -115,6 +148,50 @@ def stored_arm_scores(*, root730: Path, arm: str) -> score.ArmScores:
     folder, arch = stages.CONTROL_FOLDERS[arm]
     arrays = stages.load_stored(root730=root730, arm=folder, arch=arch)
     return score.ArmScores(p=stages.seed_mean_p(arrays=arrays))
+
+
+def row_keys_of(*, rows: score729.Rows) -> np.ndarray:
+    """Return the (segment, date, half-hour) keys of the rows `(3, N)`."""
+    return np.stack([np.asarray(a, dtype=np.int64) for a in (rows.seg, rows.date, rows.hh)])
+
+
+def check_truth_matches_rows(
+    *, truth_: truth.Truth, prepared: Sequence[arms.Prepared], rows: score729.Rows
+) -> None:
+    """Check that the rebuilt windows hold the same rows as experiment 729's `Rows` of the test bank.
+
+    The (segment, date, half-hour) keys, the signed truth, the reading, and the BSP flag of the flat
+    valid half-hours must equal `rows.seg`, `rows.date`, `rows.hh`, `rows.x`, `rows.r`, and
+    `rows.has_bsp`.
+
+    Args:
+        truth_: The truth of the plain windows.
+        prepared: The prepared plain segments the truth was built from.
+        rows: The test bank's rows from `rows_from_segments`.
+
+    Raises:
+        CorrectnessFailureError: When a key or a value differs (verdict row 1).
+    """
+    keys = truth_.flat_keys()
+    wanted = row_keys_of(rows=rows)
+    if keys.shape != wanted.shape or not np.array_equal(keys, wanted):
+        msg = "the rebuilt windows hold other (segment, date, half-hour) rows than the test bank's rows"
+        raise stages.leak.CorrectnessFailureError(msg)
+    if not np.allclose(truth_.flat(values=truth_.row(name="x")), rows.x, atol=1e-3):
+        msg = "the rebuilt windows hold another signed truth than the test bank's rows"
+        raise stages.leak.CorrectnessFailureError(msg)
+    r = truth_.flat(values=truth_.r_points)  # ty: ignore[invalid-argument-type]
+    shown = np.isfinite(r)
+    if not np.allclose(r[shown], np.asarray(rows.r)[shown], atol=1e-2):
+        msg = "the rebuilt windows hold another reading than the test bank's rows"
+        raise stages.leak.CorrectnessFailureError(msg)
+    has_bsp = np.asarray([p.has_bsp for p in prepared])
+    per_window = np.broadcast_to(
+        has_bsp[[i for i, _ in truth_.picks]][:, None], truth_.valid().shape
+    )
+    if not np.array_equal(truth_.flat(values=per_window), np.asarray(rows.has_bsp, dtype=bool)):
+        msg = "the rebuilt windows hold another BSP flag than the test bank's rows"
+        raise stages.leak.CorrectnessFailureError(msg)
 
 
 def build_truth(
@@ -154,6 +231,7 @@ def build_truth(
         delta[a] = ti.flat(values=ti.delta)
         pair[a] = ti.flat(values=np.broadcast_to(ti.pair[:, None], valid.shape))
     rows = score729.rows_from_segments(segments=te.segments, holidays=env.holidays)
+    check_truth_matches_rows(truth_=t_plain, prepared=plain, rows=rows)
     tr = score.transfer_rows(
         transfers=[p.transfers for p in overlay], picks=arms.all_picks(prepared=overlay),
         valid=valid, noise_d8=noise_d8,
@@ -383,7 +461,8 @@ def assemble_arms(
         _, test_overlay, test_valid = build_truth(root730=root730, env=env, noise_d8=1.0)
     n = truth_.rows.n
     arm_map: dict[str, score.ArmScores] = {
-        a: arm_scores(root=root, arm=a, n_rows=n) for a in FITTED_ARMS
+        a: arm_scores(root=root, arm=a, n_rows=n, keys=row_keys_of(rows=truth_.rows))
+        for a in FITTED_ARMS
     }
     arm_map["S"], arm_map["S-L"] = (stored_arm_scores(root730=root730, arm=a) for a in ("S", "S-L"))
     arm_map["B-PV2"] = pv2_scores(root730=root730, truth_=truth_)

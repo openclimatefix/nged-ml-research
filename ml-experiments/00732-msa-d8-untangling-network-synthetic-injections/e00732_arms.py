@@ -73,6 +73,7 @@ class Prepared:
         transfers: The segment's transfers (the tensor checks read their edges and partners).
         world: The simulated world type of the segment ("none" for a real segment).
         unreliable: The half-hours of S1 solar output that are zero-filled gaps, flat (None: none).
+        dates: The date of each dense day (`datetime64[D]`, None when the segment has none).
     """
 
     base: arms730.PreparedSegment
@@ -87,6 +88,7 @@ class Prepared:
     transfers: list[ov.Transfer] = field(default_factory=list)
     world: str = "none"
     unreliable: np.ndarray | None = None
+    dates: np.ndarray | None = None
 
     @property
     def days(self) -> np.ndarray:
@@ -159,6 +161,7 @@ def prepare(
                 nb_folded_real=_folded(series=o.neighbours_real, floors=o.floors, length=length),
                 medians=scale, transfers=list(o.transfers), world=str(getattr(o.seg, "world", "none")),
                 unreliable=ov.unreliable_solar(seg=o.seg).reshape(-1),
+                dates=np.asarray(o.seg.dates).astype("datetime64[D]") if hasattr(o.seg, "dates") else None,
             )
         )  # fmt: skip
     return out

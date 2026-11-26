@@ -529,6 +529,19 @@ def _write_stub_predictions(*, root: Any, truth_rows: int) -> None:
     """Write seed folders for U* with invented outputs of the right row count (the plain, transfer,
     injection, and raised sets).
     """
+    import e00729_banks as banks729
+    import e00729_score as score729
+    import e00730_banks as banks730
+    import e00732_truth as truth
+
+    rows = score729.rows_from_segments(
+        segments=banks729.load_bank(
+            path=banks730.bank_path(root=root.parent / "730", kind="test")
+        ).segments,
+        holidays=np.array([], dtype="datetime64[D]"),
+    )
+    assert rows.n == truth_rows
+    keys = dict(zip(truth.ROW_KEY_NAMES, (rows.seg, rows.date, rows.hh), strict=True))
     rng = np.random.default_rng(0)
     spec = core.ARMS["U*"]
     for s in core.SEEDS:
@@ -544,7 +557,10 @@ def _write_stub_predictions(*, root: Any, truth_rows: int) -> None:
             "test_raised",
             *(f"test_inj_{a:g}" for a in core.TEST_INJECTION_POINTS),
         ):
-            np.savez(folder / f"{name}.npz", **{k: v.astype(np.float32) for k, v in base.items()})  # ty: ignore[invalid-argument-type]
+            np.savez(
+                folder / f"{name}.npz",
+                **{k: v.astype(np.float32) for k, v in (base | keys).items()},
+            )  # ty: ignore[invalid-argument-type]
 
 
 def test_the_score_stage_reads_stored_arms_and_leaves_a_missing_arm_void(
@@ -964,3 +980,70 @@ def test_the_pair_index_of_another_bank_fails_the_own_bank_check(folders: Any) -
     leak.assert_pair_index_from_own_bank(index=index, segments=tr.segments)
     with pytest.raises(leak.CorrectnessFailureError, match="another bank"):
         leak.assert_pair_index_from_own_bank(index=index, segments=va.segments)
+
+
+def test_a_stored_file_without_or_with_wrong_row_keys_fails_the_score_stage(
+    gated: Any, folders: Any
+) -> None:
+    import e00732_report as report
+    import e00732_truth as truth
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    folder = root / "predictions" / "Ustar_unet_s1"
+    path = folder / "test.npz"
+    with np.load(path) as z:
+        full = {k: z[k] for k in z.files}
+    np.savez(path, **{k: v for k, v in full.items() if k not in truth.ROW_KEY_NAMES})
+    with pytest.raises(leak.CorrectnessFailureError, match="no row keys"):
+        report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    shifted = {**full, "row_hh": (full["row_hh"] + 1) % 48}
+    np.savez(path, **shifted)
+    with pytest.raises(leak.CorrectnessFailureError, match="stored row keys differ"):
+        report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    np.savez(path, **full)
+    report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+
+
+def test_the_rebuilt_windows_must_hold_the_rows_of_the_test_bank(gated: Any, folders: Any) -> None:
+    import dataclasses
+
+    import e00729_banks as banks729
+    import e00730_banks as banks730
+    import e00732_arms as arms
+    import e00732_report as report
+    import e00732_truth as truth
+
+    root, root730, env = gated
+    world = folders[2]
+    te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
+    plain = arms.prepare_plain(
+        segments=te.segments,
+        neighbours=env.neighbours,
+        holidays=env.holidays,
+        stats=env.stats,
+        medians=env.medians,
+    )
+    t_plain = truth.truth(prepared=plain)
+    from e00729_score import rows_from_segments
+
+    rows = rows_from_segments(segments=te.segments, holidays=env.holidays)
+    assert rows.n == world["n"]
+    report.check_truth_matches_rows(truth_=t_plain, prepared=plain, rows=rows)
+    moved = dataclasses.replace(rows, hh=(np.asarray(rows.hh) + 1) % 48)
+    with pytest.raises(leak.CorrectnessFailureError, match=r"other .* rows"):
+        report.check_truth_matches_rows(truth_=t_plain, prepared=plain, rows=moved)
+    other_x = dataclasses.replace(rows, x=np.asarray(rows.x) + 1.0)
+    with pytest.raises(leak.CorrectnessFailureError, match="signed truth"):
+        report.check_truth_matches_rows(truth_=t_plain, prepared=plain, rows=other_x)
+    other_r = dataclasses.replace(rows, r=np.asarray(rows.r) + 1.0)
+    with pytest.raises(leak.CorrectnessFailureError, match="reading"):
+        report.check_truth_matches_rows(truth_=t_plain, prepared=plain, rows=other_r)
+    flipped = dataclasses.replace(rows, has_bsp=~np.asarray(rows.has_bsp, dtype=bool))
+    with pytest.raises(leak.CorrectnessFailureError, match="BSP flag"):
+        report.check_truth_matches_rows(truth_=t_plain, prepared=plain, rows=flipped)

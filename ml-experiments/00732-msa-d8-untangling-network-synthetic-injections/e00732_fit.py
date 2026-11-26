@@ -133,6 +133,8 @@ def store_set(
     """Store one member of a prediction set, flat on the valid half-hours."""
     arrays = getattr(pred, member)
     flat = {k: tr.flat(values=v) for k, v in arrays.items()}
+    if tr.keys is not None:
+        flat |= dict(zip(truth.ROW_KEY_NAMES, tr.flat_keys(), strict=True))
     train729.save_predictions(arrays=flat, path=folder / f"{name}.npz")
 
 
