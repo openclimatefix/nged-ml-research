@@ -160,6 +160,9 @@ class PvSource:
             cap_steps: The power cap in steps; 0 is the negative control.
             hist_p_override: (16, G) a replacement history `p` (the poison copy of KF2).
             top_p0_override: (16, n_days, 672, 2) a replacement target table (the poison copy of KF2).
+
+        Returns:
+            The assembled batch of inputs and PV tensors.
         """
         assert ensemble, "F7 fits and predicts with the ensemble target row"
         out = self.source.assemble(

@@ -178,6 +178,7 @@ class PvWorld:
         s: (4,) the dip's size per Primary.
         level: The hidden daytime level `L_b` at every grid index (before `d`).
         anomaly: The daily anomaly `e_day` at every grid index (before `d`).
+        extra: Further arrays that a rung adds, keyed by name.
     """
 
     rung: Rung
@@ -503,8 +504,8 @@ class ReferenceResult:
         cv_mae: The cross-validation MAE of each candidate penalty.
         err_solar: Absolute errors on the solar-block validation tokens (flattened).
         err_all: Absolute errors on all validation tokens.
-        nll_gaussian: (n_leads_val,) not used by the gap; the validation residual standard deviation
-            on the solar block.
+        resid_sd: The validation residual standard deviation on the solar block.
+        err_full: Absolute errors on every validation lead of every token, or None if not kept.
     """
 
     penalty: float

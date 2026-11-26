@@ -408,6 +408,10 @@ def shifted_sky(
     the grid start keep their own sky and are listed by the returned mask. The day of a token is the
     block of 48 grid indices that contains it, so the donor day is the block of the donor stamp.
 
+    Args:
+        raw: The raw weather array of the dense grid, one row per Primary, one column per stamp.
+        shift_days: The number of days between a token and its donor sky.
+
     Returns:
         The shortwave (16, G), the temperature (16, G), the mask of tokens with no donor (16, G),
         and the mask where the cap or the low-sun rule bound (16, G).
@@ -517,6 +521,9 @@ def target_row_pv(
         share_scale: (N,) `capacity_mw / power_capacity_mw` of each row's Primary, 0 if absent.
         target_std: (N,) the row's Primary's `target_std`.
         u99: Scaling constant, default the stored one.
+
+    Returns:
+        The `(N, 2)` array of `p0_mean` and `p0_sd`.
     """
     mean, sd = yield_curve(
         ghi_mean=ghi, ghi_sd=ghi_sd, cos_zenith=geometry[:, 0], sin_azimuth=geometry[:, 1],
@@ -726,6 +733,9 @@ def target_estimate(
         donor_day: (n_days,) the donor origin day index of the `HT-S` placebo, or None for the real run.
             A row whose donor row is missing is not filled in the result.
         u99: Scaling constant, default the stored one.
+
+    Returns:
+        The estimate `p0_mean`, `p0_sd` and the mask of the rows that were filled.
     """
     n_primary, n_days = raw.filled.shape[:2]
     p0 = np.zeros((n_primary, n_days, N_ENS_STEPS, 2), dtype=np.float32)

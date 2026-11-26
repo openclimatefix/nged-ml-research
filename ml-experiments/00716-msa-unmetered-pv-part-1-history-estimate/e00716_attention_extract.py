@@ -160,6 +160,9 @@ def pick_cases(
         primaries: The Primary index of each host in `CASE_HOSTS`.
         c_all: The contract-origin indices of the scored origins.
 
+    Returns:
+        The cases, keyed by `<host>/<kind>`.
+
     Raises:
         AssertionError: When no origin in the sunniest third has a target day below the fold's lower
             tercile.

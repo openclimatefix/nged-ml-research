@@ -1029,9 +1029,9 @@ separate write-up review has run.
   SHA-256 of each edited script, besides the scorer above:
     - `e00716_arms.py`: `6f70d648ac2f04ba27a5914c4220f9fcd8e912192bfab8e1967aa8f2e3220793`
     - `e00716_attention_extract.py`:
-      `915ae0bd79e7a0eee65c4fe96baa3bd0f493a51e82babfa23556977db9ffaafc`
-    - `e00716_batch.py`: `953edec504f03c6b97efe62916186eee6de65189d65e5525b637575ff723a012`
-    - `e00716_check_batch.py`: `8ed517e589b29fa76755c876ef50ab5f2ccd9517e54a5ca10cc72eae45c93299`
+      `8ddf273bd9c61133a27a4993d3115820b251504473ecfef4d74cedd44531e736`
+    - `e00716_batch.py`: `3fdd605d8b17412a571fef7a36cce7c2ac148054e476db166077a6363f23073a`
+    - `e00716_check_batch.py`: `3fdd605d8b17412a571fef7a36cce7c2ac148054e476db166077a6363f23073a`
     - `e00716_check_model.py`: `ac56b973b4975b643cc7a4263704d10a40f100c39aa1eaac04f541309153bbd2`
     - `e00716_check_pv.py`: `46986f8902397404324e2d2bbd9035b745748de6625d27e27aed989f5f6dcb97`
     - `e00716_check_train.py`: `c3b150341c9a8b1786c34517f27ea988fbb4ebd800026b2d301e83c04c0349d0`
@@ -1039,12 +1039,12 @@ separate write-up review has run.
     - `e00716_fit.py`: `bff75bb8d3d892d63994b462cd1ce58fb14cc4c97c4cd5d79bf8952c8acfe4b8`
     - `e00716_known_answer.py`: `4d0d94c381c4c6bdee4221a0717319ee2c406bb13d7fe52a1537df10c3564775`
     - `e00716_predict.py`: `840b4abd0db7720db57a34246c0e97cf81095f24eebea702bfdf3b1185e50e13`
-    - `e00716_pv.py`: `510b9fd2fa76bf6f6090fa20a9382f3f71ec68221ef66f7b90e28830e8be0d30`
-    - `e00716_readouts.py`: `0046aec830149659ad77f4555ee7f658c099c18390de0a403c1036129dfa872e`
+    - `e00716_pv.py`: `d648c94885b429321e3bffce0ce98f9de326d9f93e11338ddcd6464a3f11f3bf`
+    - `e00716_readouts.py`: `d648c94885b429321e3bffce0ce98f9de326d9f93e11338ddcd6464a3f11f3bf`
     - `e00716_train.py`: `05ab662b28f7dc7d8124936fe80f8c29bab52b250c3f309b44dde03f535c058d`
     - `e00716_waive_gate.py`: `4b6c481f4477cc21f60711468d3407fe7886f62e96c78b2fe5402e0f601866ce`
     - `e00716_world_rung.py`: `fc5a9c86314a91ae2eccaef2fb2787f7c19c99378641c703901fb6d24cb65999`
-    - `e00716_worlds.py`: `e200b229770cf3d2fe42c7360f701f17d3fd7bbbb7cebf03e7ea90a976624a87`
+    - `e00716_worlds.py`: `213bc456208b87b974ad520126019c54c720db5bf4af008087839d5ab6c3d7d2`
 - **The waiver pins a hash that differs from the committed `e00716_known_answer.py`.**
   `e00716_waive_gate.py` pins the SHA-256 of `e00716_known_answer.py`, and the gate check reads that
   pin, so a re-run of the waiver, or of a fit that checks the gate, would refuse with the committed
