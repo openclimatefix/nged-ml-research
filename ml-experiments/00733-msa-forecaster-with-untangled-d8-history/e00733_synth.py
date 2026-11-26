@@ -1,16 +1,20 @@
 # ruff: noqa: E501
 """Experiment 733: the synthetic forecasting world, as pure index arithmetic on per-segment arrays.
 
-A forecasting sample is (segment, origin day D, lead day k). It has the layout of experiment 713: the
-contract origin is 12:00 UTC on dense day D (`c = 48 D + 24`, a stamp index), history row `a` holds the
-stamps `c - 48 a + j` for ages 2 to 15, and the target row of lead day `k` holds `c + 48 (k - 1) + j`,
+A forecasting sample is (segment, origin day D, lead day k). It has the layout of experiment 713:
+the
+contract origin is 12:00 UTC on dense day D (`c = 48 D + 24`, a stamp index), history row `a` holds
+the
+stamps `c - 48 a + j` for ages 2 to 15, and the target row of lead day `k` holds `c + 48 (k - 1) +
+j`,
 with the stamp `g` on slot `g - 1` of the segment's dense axis. A history half-hour is visible only
 when its stamp is at most `c - 54`, as in `e00733_channels.visible_history_mask`.
 
 This module holds no experiment-730 bank and no weather product. The real adapters build one
 `SegmentArrays` per segment (the folded reading, the true sign, the untangled channels, the history
 weather, and the ensemble rows of the base date) and this module cuts samples and batches from them.
-The ensemble coverage of the base dates is a result, never an error: a base date without a 00Z run of
+The ensemble coverage of the base dates is a result, never an error: a base date without a 00Z run
+of
 the ensemble has the status `coverage_gap`, and the stage shrinks the world by the plan's rule
 (segments with no covered origin are left out; more than half of the test segments left out stops
 the line at verdict row 0).
@@ -29,6 +33,8 @@ import e00733_paths as paths  # noqa: F401
 import numpy as np
 from e00733_channels import StoppedError
 
+SUMMARY_FILE: Final = re.compile(r"^init=(\d{4}-\d{2}-\d{2})\.parquet$")
+"""The name of a run summary file."""
 ENS_MODEL_ID: Final = "ECMWF_ENS_0_25_degree"
 """The `nwp_model_id` partition of the `NWP` Delta table that holds the ensemble runs."""
 RUN_PARTITION: Final = re.compile(r"init_time=(\d{4}-\d{2}-\d{2})T00(?:%3A|:)00")
@@ -52,7 +58,9 @@ class SynthError(RuntimeError):
 
 
 def nwp_run_days(*, nwp_root: Path, model_id: str = ENS_MODEL_ID) -> frozenset[np.datetime64]:
-    """Return the days that have a 00Z run in the `NWP` table, read from the partition folder names (read only).
+    """Return the days that have a 00Z run in the `NWP` table.
+
+    Read from the partition folder names (read only).
 
     Args:
         nwp_root: The folder of the `NWP` Delta table.
@@ -79,12 +87,45 @@ def nwp_run_days(*, nwp_root: Path, model_id: str = ENS_MODEL_ID) -> frozenset[n
     return frozenset(days)
 
 
+def summary_run_days(*, summary_dirs: Sequence[Path]) -> frozenset[np.datetime64]:
+    """Return the days that have a stored run summary.
+
+    (`init=<date>.parquet`) in any of the folders (read only).
+
+    The synthetic world's target rows read these summaries, which experiment 607 holds from
+    2024-04-01 and experiment 707 holds from 2020-10-15 to 2024-03-31 (built from the `NWP` table).
+    A base date without a summary is a `coverage_gap`; nothing is downloaded or built.
+
+    Args:
+        summary_dirs: The folders searched.
+
+    Returns:
+        The days (`datetime64[D]`).
+
+    Raises:
+        SynthError: When no folder holds a summary.
+    """
+    days = set()
+    for folder in summary_dirs:
+        if not folder.is_dir():
+            continue
+        for entry in folder.iterdir():
+            match = SUMMARY_FILE.match(entry.name)
+            if match is not None:
+                days.add(np.datetime64(match.group(1), "D"))
+    if not days:
+        msg = "no folder of run summaries holds a file"
+        raise SynthError(msg)
+    return frozenset(days)
+
+
 @dataclass(frozen=True)
 class CoverageResult:
     """The ensemble coverage of one split's base dates.
 
     Attributes:
-        covered: Per segment, a bool array over its base dates: whether the 00Z run of the base date exists.
+        covered: Per segment, a bool array over its base dates: whether the 00Z run of the base
+            date exists.
         n_segments: The number of segments.
         n_left_out: The segments with no covered base date (left out of the world).
         n_fully_covered: The segments whose every base date is covered.
@@ -110,7 +151,10 @@ class CoverageResult:
         return self.n_covered / self.n_base_dates if self.n_base_dates else float("nan")
 
     def statuses(self, *, segment: int) -> list[str]:
-        """Return the `coverage_gap` result of each base date of one segment: "ok" or "coverage_gap"."""
+        """Return the `coverage_gap` result of each base date of one segment.
+
+        "ok" or "coverage_gap".
+        """
         return [STATUS_OK if c else STATUS_GAP for c in self.covered[segment]]
 
     def counts(self) -> dict[str, int | float]:
@@ -132,7 +176,8 @@ def ens_coverage(
         run_days: The days with a 00Z run.
 
     Returns:
-        The result. A base date without a run is a `coverage_gap` in `statuses`; nothing is raised and
+        The result. A base date without a run is a `coverage_gap` in `statuses`; nothing is raised
+        and
         nothing is downloaded.
     """
     runs = np.array(sorted(run_days), dtype="datetime64[D]")
@@ -179,7 +224,8 @@ class SegmentArrays:
     Attributes:
         present: `(n_days,)` whether the dense day is a real base day.
         covered: `(n_days,)` whether the base day has a 00Z ensemble run (an origin may sit there).
-        reading_z: `(n_days * 48,)` the folded reading, standardised; NaN where the reading is invalid.
+        reading_z: `(n_days * 48,)` the folded reading, standardised; NaN where the reading is
+            invalid.
         x_neg: `(n_days * 48,)` the indicator of X < 0 (1.0 or 0.0), NaN where invalid.
         solar_points: `(n_days * 48,)` the injected solar output in points.
         u_raw: `(n_days * 48, 3)` the untangled channels `[P(X<0), solar points, step probability]`.
@@ -194,7 +240,8 @@ class SegmentArrays:
         top_spread: `(n_days, 14, 48, 7)` the ensemble spread columns.
         top_datetime: `(n_days, 14, 48, 21)` the date-time columns of the target rows.
         top_day_type: `(n_days, 14, 48)` int.
-        u_rerun: `(n_days, 2, 48, 3)` the re-run outputs of UTC days D - 2 and D - 1 for an origin on
+        u_rerun: `(n_days, 2, 48, 3)` the re-run outputs of UTC days D - 2 and D - 1 for an origin
+            on
             dense day D (None: the stored outputs are used for every history day).
         u_rerun_ok: `(n_days, 2, 48)` bool, the flag of `u_rerun`.
     """
@@ -242,7 +289,9 @@ class SegmentArrays:
 
 
 def history_slots(*, origin_day: np.ndarray) -> np.ndarray:
-    """Return the `(N, 14, 48)` dense slots of the history rows of origins on dense days `origin_day`.
+    """Return the `(N, 14.
+
+    48)` dense slots of the history rows of origins on dense days `origin_day`.
 
     The stamp is `c - 48 a + j` with `c = 48 D + 24`, and the slot is the stamp minus one.
     """
@@ -280,7 +329,10 @@ def history_row_exists(*, seg: SegmentArrays, origin_day: np.ndarray) -> np.ndar
 
 @dataclass(frozen=True)
 class SampleIndex:
-    """The samples of one split: segment, origin day, and lead index (`k - 1`), each `(N,)` int64."""
+    """The samples of one split: segment, origin day, and lead index (`k - 1`).
+
+    Each `(N,)` int64.
+    """
 
     seg: np.ndarray
     origin_day: np.ndarray
@@ -340,7 +392,8 @@ def scored(*, index: SampleIndex) -> np.ndarray:
 # --------------------------------------------------------------------------- batches
 
 CHANNEL_MODES: Final = ("untangled", "absent", "true")
-"""`untangled`: the stored and re-run outputs (YU); `absent`: no channel (Y0); `true`: the true sign and solar output (YT)."""
+"""`untangled`: the stored and re-run outputs (YU); `absent`: no channel (Y0); `true`: the true
+sign and solar output (YT)."""
 
 
 @dataclass
@@ -460,7 +513,10 @@ def _channels(
     target_std: float,
     origin_day: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the `(14, 48, 3)` channels and flag of one sample's history, in the forecaster's input units."""
+    """Return the `(14, 48, 3)` channels and flag of one sample's history.
+
+    In the forecaster's input units.
+    """
     if mode == "absent":
         return np.zeros((*ok.shape, core.N_CHANNELS), np.float32), np.zeros_like(ok)
     if mode == "true":
@@ -492,12 +548,18 @@ def _channels(
 
 
 def solar_unit(*, points: np.ndarray, target_std: float) -> np.ndarray:
-    """Return the solar channel `v`: points over D8's capacity and the standard deviation, clipped to 0 to 10."""
+    """Return the solar channel `v`: points over D8's capacity and the standard deviation.
+
+    Clipped to 0 to 10.
+    """
     return np.clip(np.asarray(points) / 100.0 / target_std, 0.0, core.SOLAR_CLIP_MAX)
 
 
 def _apply_masks(*, out: dict[str, np.ndarray], masks: tuple[np.ndarray, np.ndarray]) -> None:
-    """Apply experiment 716's CAMS-rule mask and the mask of ages 2 to 5 to the channels, in place."""
+    """Apply experiment 716's CAMS-rule mask and the mask of ages 2 to 5 to the channels.
+
+    In place.
+    """
     cams, convention = masks
     ok = out["hist_u_ok"]
     ok[:, 0] &= ~cams[:, None]

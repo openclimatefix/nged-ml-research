@@ -44,7 +44,8 @@ def nonempty(*, name: str, n: int) -> bool:
 
 
 def smoke_rule_and_outputs() -> ch.ChannelChoice | None:
-    """Apply the rule to experiment 732's real files and read the stored outputs of the chosen source."""
+    """Apply the rule to experiment 732's real files and read the stored outputs of the chosen
+    source."""
     root_732, root_730 = paths.root_732(), paths.root_730()
     reading = ch.read_reading_732(root=root_732)
     check(
@@ -121,7 +122,8 @@ def smoke_rule_and_outputs() -> ch.ChannelChoice | None:
 
 
 def smoke_banks() -> None:
-    """Recompute every stored bank's digest with experiment 729's code and compare it with 730's summary."""
+    """Recompute every stored bank's digest with experiment 729's code and compare it with 730's
+    summary."""
     n = lk.assert_bank_digests(root_730=paths.root_730())
     nonempty(name="banks checked against their digest", n=n)
 
@@ -130,10 +132,10 @@ def smoke_ensemble() -> None:
     """Read the ensemble summaries of two consecutive days and check the units."""
     day = (date(2025, 6, 15) - date(1970, 1, 1)).days
     prev = rr.read_ens_run(
-        summary_dir=paths.ens_summary_dir(), run_epoch_day=day - 1, series_id=D8_SERIES_ID
+        summary_dir=paths.ens_summary_dirs(), run_epoch_day=day - 1, series_id=D8_SERIES_ID
     )
     cur = rr.read_ens_run(
-        summary_dir=paths.ens_summary_dir(), run_epoch_day=day, series_id=D8_SERIES_ID
+        summary_dir=paths.ens_summary_dirs(), run_epoch_day=day, series_id=D8_SERIES_ID
     )
     nonempty(name="ensemble valid times of the D-1 run", n=len(prev.valid_us))
     nonempty(name="ensemble valid times of the D run", n=len(cur.valid_us))
@@ -225,7 +227,8 @@ def smoke_networks(choice: ch.ChannelChoice | None) -> None:
 
 
 def _real_inputs():  # noqa: ANN202
-    """Return experiment 729's context, the three neighbours' real series, and their medians (read only)."""
+    """Return experiment 729's context, the three neighbours' real series, and their medians (read
+    only)."""
     import e00722_guard as guard
     import e00729_stages as stages729
     import e00732_neighbours as nb732
@@ -268,7 +271,7 @@ def smoke_real_windows() -> None:
     def make(*, calendar, nb, first: int, last: int) -> rl.RealWindows:  # noqa: ANN001
         return rl.build_real_windows(
             cal=calendar, reading_rule_use=use, holidays=ctx.cal.holidays, stats=ctx.stats, medians=medians,
-            neighbours=nb, summary_dir=paths.ens_summary_dir(), first_epoch_day=first, last_epoch_day=last,
+            neighbours=nb, summary_dir=paths.ens_summary_dirs(), first_epoch_day=first, last_epoch_day=last,
         )  # fmt: skip
 
     # per-fold coverage: every day of a fold month is an origin; the base days of experiment 729 end in 2023
@@ -282,7 +285,7 @@ def smoke_real_windows() -> None:
     cover = rl.ens_coverage_by_split(
         origin_days=np.array(origin_days),
         splits=np.array(labels),
-        summary_dir=paths.ens_summary_dir(),
+        summary_dir=paths.ens_summary_dirs(),
     )
     for fold, counts in sorted(cover.items()):
         print(

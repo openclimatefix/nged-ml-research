@@ -176,6 +176,9 @@ class UntSource:
 def check_batch(*, batch: UntAssembled) -> None:
     """Run the per-batch assertions: the origin-time weather of every target token, the history order, and the channel ranges.
 
+    Args:
+        batch: The assembled batch.
+
     Raises:
         CorrectnessFailureError: When a target token reads a run that is not the origin's own 00Z run
             or was available only after the native origin, or the history lies after the target.

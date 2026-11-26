@@ -1,5 +1,6 @@
-# ruff: noqa: E501, PT018
-"""Tests of `e00733_synth`: the ensemble coverage result, the sample layout, visibility, and leakage."""
+# ruff: noqa: PT018
+"""Tests of `e00733_synth`: the ensemble coverage result, the sample layout, visibility, and
+leakage."""
 
 from pathlib import Path
 
@@ -16,7 +17,8 @@ def _days(*dates: str) -> np.ndarray:
 
 
 def test_nwp_run_days_reads_partition_names(tmp_path: Path) -> None:
-    """The run days come from the `init_time=...T00%3A00` folder names; other folders are ignored."""
+    """The run days come from the `init_time=...T00%3A00` folder names; other folders are
+    ignored."""
     folder = tmp_path / f"nwp_model_id={sy.ENS_MODEL_ID}"
     for name in (
         "init_time=2020-10-15T00%3A00%3A00.000000Z",
@@ -34,7 +36,8 @@ def test_nwp_run_days_reads_partition_names(tmp_path: Path) -> None:
 
 
 def test_coverage_reports_gaps_as_data_and_never_raises() -> None:
-    """A base date without a run is a `coverage_gap` status; segments with no covered date are left out."""
+    """A base date without a run is a `coverage_gap` status; segments with no covered date are left
+    out."""
     runs = {np.datetime64("2020-10-15"), np.datetime64("2020-10-16")}
     res = sy.ens_coverage(
         base_dates=[
@@ -72,7 +75,8 @@ def test_more_than_half_of_the_test_segments_left_out_stops_the_line() -> None:
 
 
 def test_history_and_target_slots_follow_the_layout() -> None:
-    """History row age 2 starts at stamp c - 96; the target row of lead index 0 starts at the contract origin."""
+    """History row age 2 starts at stamp c - 96; the target row of lead index 0 starts at the
+    contract origin."""
     d = np.array([20])
     h = sy.history_slots(origin_day=d)
     c = 20 * 48 + 24
@@ -206,3 +210,22 @@ def test_share_reverse_counts_scored_rows_only() -> None:
     idx = sy.enumerate_samples(segments=[seg])
     share, n = sy.share_reverse(index=idx, segments=[seg])
     assert 0.1 < share < 0.3 and n > 0
+
+
+def test_summary_run_days_unions_two_folders(tmp_path: Path) -> None:
+    """Run summaries in experiment 607's folder and 707's back-fill folder both count as covered;
+    nothing is built."""
+    a, b = tmp_path / "607", tmp_path / "707"
+    a.mkdir()
+    b.mkdir()
+    (a / "init=2024-04-01.parquet").write_text("")
+    (b / "init=2023-06-30.parquet").write_text("")
+    (b / "README").write_text("")
+    days = sy.summary_run_days(summary_dirs=[a, b, tmp_path / "missing"])
+    assert days == {np.datetime64("2024-04-01"), np.datetime64("2023-06-30")}
+    result = sy.ens_coverage(
+        base_dates=[np.array(["2023-06-30", "2023-07-01"], dtype="datetime64[D]")], run_days=days
+    )
+    assert result.statuses(segment=0) == [sy.STATUS_OK, sy.STATUS_GAP]
+    with pytest.raises(sy.SynthError):
+        sy.summary_run_days(summary_dirs=[tmp_path / "missing"])

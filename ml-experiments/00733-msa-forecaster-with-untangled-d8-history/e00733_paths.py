@@ -133,6 +133,26 @@ def ens_summary_dir() -> Path:
     return _internal_root() / FOLDER_607 / "work" / "ens_summary"
 
 
+def ens_backfill_summary_dir() -> Path:
+    """Return the folder of experiment 707's back-filled ensemble run summaries.
+
+    (2020-10-15 to 2024-03-31), read only.
+
+    Experiment 707 built these files from the `NWP` Delta table, in the format of experiment 607's
+    summaries, so the synthetic world's base days (before 2024-04-01) read ensemble runs without a
+    download.
+    """
+    return _internal_root() / FOLDER_707 / "work" / "backfill" / "ens_summary"
+
+
+def ens_summary_dirs() -> tuple[Path, Path]:
+    """Return the folders searched for a run summary: experiment 607's (from 2024-04-01).
+
+    Then experiment 707's back-fill.
+    """
+    return (ens_summary_dir(), ens_backfill_summary_dir())
+
+
 def root_716() -> Path:
     """Return experiment 716's data folder, read only."""
     return _internal_root() / FOLDER_716

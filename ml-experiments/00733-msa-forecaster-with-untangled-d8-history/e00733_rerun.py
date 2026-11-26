@@ -34,11 +34,14 @@ MID: Final = core.WINDOW_MIDDLE_START
 RERUN_OFFSETS: Final = (2, 1)
 """The re-run windows of an origin on day D are those of UTC days D - 2 and D - 1."""
 LAST_VISIBLE_SLOT_OF_D_MINUS_1: Final = 17
-"""The last slot of UTC day D - 1 whose reading is visible: slot 17 (08:30 to 09:00 UTC, stamped 09:00)."""
+"""The last slot of UTC day D - 1 whose reading is visible: slot 17 (08:30 to 09:00 UTC, stamped
+09:00)."""
 MM_PER_HOUR_PER_KG_M2_S: Final = 3600.0
-"""The ensemble's precipitation is in kg m-2 s-1; the network's ERA5 channel is in millimetres per hour."""
+"""The ensemble's precipitation is in kg m-2 s-1; the network's ERA5 channel is in millimetres per
+hour."""
 PRECIP_SCALE: Final = 0.5
-"""The precipitation channel is `log1p(millimetres per hour) / PRECIP_SCALE`, as experiment 729 builds it."""
+"""The precipitation channel is `log1p(millimetres per hour) / PRECIP_SCALE`, as experiment 729
+builds it."""
 US_PER_HOUR: Final = 3_600 * 1_000_000
 US_PER_DAY: Final = 24 * US_PER_HOUR
 US_PER_STEP: Final = US_PER_HOUR // 2
@@ -64,7 +67,8 @@ def last_visible_abs_slot(*, origin_day: int) -> int:
 
     As a slot counted from midnight of day 0.
 
-    The newest visible stamp is `c - 54` with `c = 48 D + 24`, and slot `a` carries stamp `a + 1`, so
+    The newest visible stamp is `c - 54` with `c = 48 D + 24`, and slot `a` carries stamp `a + 1`,
+    so
     slot `48 (D - 1) + 17` is the last visible one.
     """
     c = origin_day * core.STEPS_PER_DAY + 24
@@ -83,12 +87,18 @@ def window_abs_slots(*, day: int) -> np.ndarray:
 
 
 def window_hidden(*, origin_day: int, day: int) -> np.ndarray:
-    """Return which of the 96 columns of the window of UTC day `day` lie after the visibility limit of `origin_day`."""
+    """Return which of the 96 columns of the window of UTC day `day` lie after the limit.
+
+    The limit is the visibility limit of `origin_day`.
+    """
     return window_abs_slots(day=day) > last_visible_abs_slot(origin_day=origin_day)
 
 
 def visible_middle(*, origin_day: int, day: int) -> np.ndarray:
-    """Return which of the 48 scored half-hours of UTC day `day` are visible to an origin on `origin_day`."""
+    """Return which of the 48 scored half-hours of UTC day `day` are visible.
+
+    Visible means visible to an origin on `origin_day`.
+    """
     return ~window_hidden(origin_day=origin_day, day=day)[MID : MID + core.STEPS_PER_DAY]
 
 
@@ -124,7 +134,8 @@ def hide_window(
 
     The reading, the CAMS clear-sky index, the BSP step, and their masks are set to zero at the
     hidden columns. The ERA5 rows at the hidden columns are replaced by `era5` (zero where `era5`
-    holds NaN, which is also the value of weather that ERA5 lacks). The neighbour channels are not in
+    holds NaN, which is also the value of weather that ERA5 lacks). The neighbour channels are not
+    in
     this window; the caller builds them from the hidden window and the same `hidden`.
 
     Args:
@@ -189,11 +200,14 @@ class EnsRun:
     precip: np.ndarray
 
 
-def read_ens_run(*, summary_dir: Path, run_epoch_day: int, series_id: int) -> EnsRun:
+def read_ens_run(
+    *, summary_dir: Path | Sequence[Path], run_epoch_day: int, series_id: int
+) -> EnsRun:
     """Read one run's summary file for one series.
 
     Args:
-        summary_dir: The folder of `init=<date>.parquet` files.
+        summary_dir: The folder of `init=<date>.parquet` files, or several folders searched in
+            order.
         run_epoch_day: The epoch day of the run's 00:00 UTC initialisation.
         series_id: The `time_series_id` of D8.
 
@@ -206,7 +220,9 @@ def read_ens_run(*, summary_dir: Path, run_epoch_day: int, series_id: int) -> En
     import polars as pl
 
     day = date(1970, 1, 1) + timedelta(days=run_epoch_day)
-    path = summary_dir / f"init={day.isoformat()}.parquet"
+    folders = [summary_dir] if isinstance(summary_dir, Path) else list(summary_dir)
+    found = [f / f"init={day.isoformat()}.parquet" for f in folders]
+    path = next((c for c in found if c.exists()), found[0])
     if not path.exists():
         msg = "an ensemble run summary that the re-run needs is missing"
         raise RerunError(msg)
@@ -241,7 +257,8 @@ def ens_for_window(
         window_stamps_us: The period-end stamp of each of the 96 columns, in microseconds.
 
     Returns:
-        `temperature`, `wind`, and `precip`, each `(96,)` with NaN where the chosen run has no stamp.
+        `temperature`, `wind`, and `precip`, each `(96,)` with NaN where the chosen run has no
+        stamp.
 
     Raises:
         RerunError: When the runs are not those of days D - 1 and D.
@@ -268,7 +285,10 @@ def ens_for_window(
 
 
 def window_stamps_us(*, day_epoch: int) -> np.ndarray:
-    """Return the period-end stamp (microseconds) of each of the 96 columns of the window of the UTC day `day_epoch`."""
+    """Return the period-end stamp.
+
+    (microseconds) of each of the 96 columns of the window of the UTC day `day_epoch`.
+    """
     first_slot = (day_epoch - 1) * core.STEPS_PER_DAY + MID
     return (first_slot + 1 + np.arange(STEPS)) * US_PER_STEP
 
@@ -282,7 +302,8 @@ class RerunOutputs:
 
     Attributes:
         origin_days: The grid day number of each origin `(n,)`.
-        values: `(n, 2, 48, 3)` float32: P(X<0), the solar output in points, and the step probability
+        values: `(n, 2, 48, 3)` float32: P(X<0), the solar output in points, and the step
+            probability
             for UTC days D - 2 and D - 1.
         ok: `(n, 2, 48)`: whether the half-hour is visible and D8 holds a reading there.
     """
@@ -300,11 +321,14 @@ def rerun_origins(
     n_seeds: int,
     batch: int = 256,
 ) -> RerunOutputs:  # fmt: skip
-    """Re-run the network on days D - 2 and D - 1 of every origin and average the outputs over seeds.
+    """Re-run the network on days D - 2 and D - 1 of every origin.
+
+    The outputs are averaged over seeds.
 
     Args:
         origin_days: The grid day number D of each origin.
-        build_window: `(origin_day, day, hidden)` to the input window `(C, 96)` with the inputs after
+        build_window: `(origin_day, day, hidden)` to the input window `(C, 96)` with the inputs
+            after
             the limit hidden, and the middle's reading mask `(48,)` before hiding.
         predict: The windows `(n, C, 96)` to the decoded outputs `(seeds, n, 3, 48)`.
         n_seeds: The number of seeds `predict` returns.
@@ -314,7 +338,8 @@ def rerun_origins(
         The outputs.
 
     Raises:
-        RerunError: When `predict` returns a shape other than `(n_seeds, n, 3, 48)` or a non-finite value.
+        RerunError: When `predict` returns a shape other than `(n_seeds, n, 3, 48)` or a non-finite
+            value.
     """
     jobs = [(d, d - off) for d in origin_days for off in RERUN_OFFSETS]
     windows, readings = [], []
@@ -365,7 +390,9 @@ def read_rerun(*, path: Path) -> RerunOutputs:
 def assert_rerun_ignores_inputs_after_limit(
     *, run: Callable[[float | None], np.ndarray], poison_values: Sequence[float] = POISON_VALUES, tol: float = core.TOLERANCE_POISON,
 ) -> int:  # fmt: skip
-    """Check that poisoning every input after the limit leaves the re-run's outputs finite and unchanged.
+    """Check that poisoning every input after the limit changes no output.
+
+    The outputs stay finite and unchanged.
 
     Args:
         run: Returns the re-run's outputs with the inputs after the limit replaced by the given
@@ -403,7 +430,9 @@ def assert_rerun_ignores_inputs_after_limit(
 def span_segment(
     *, cal: Any, first_epoch_day: int, last_epoch_day: int, reading: np.ndarray, truth: np.ndarray, use: np.ndarray,
 ) -> Any:  # fmt: skip
-    """Return one pseudo-segment of real days that spans every calendar day from `first_epoch_day` to `last_epoch_day`.
+    """Return one pseudo-segment of real days from `first_epoch_day` to `last_epoch_day`.
+
+    The segment spans every calendar day in between.
 
     The segment is experiment 729's `real_segment` generalised from one month to a range of days, so
     a window near a month edge reads the real days on both sides. The first and last dense days are
@@ -450,7 +479,9 @@ def span_segment(
 
 
 def poisoned_calendar(*, cal: Any, origin_epoch_day: int, value: float) -> Any:
-    """Return a copy of the calendar with every input after the visibility limit of one origin set to `value`.
+    """Return a copy of the calendar with every input after the limit set to `value`.
+
+    The limit is the visibility limit of one origin.
 
     The inputs are D8's reading, the BSP meter, the CAMS clear-sky index, and the ERA5 temperature,
     wind speed, and precipitation, at every half-hour after the last visible slot of the origin.
@@ -481,7 +512,10 @@ def poisoned_calendar(*, cal: Any, origin_epoch_day: int, value: float) -> Any:
 def poisoned_neighbours(
     *, neighbours: Mapping[str, np.ndarray], dates: np.ndarray, origin_epoch_day: int, value: float
 ) -> dict[str, np.ndarray]:  # fmt: skip
-    """Return the neighbours' series (on the calendar axis) with every half-hour after the limit set to `value`."""
+    """Return the neighbours' series.
+
+    (on the calendar axis) with every half-hour after the limit set to `value`.
+    """
     epoch = np.asarray(dates).astype("datetime64[D]").astype(np.int64)
     limit = last_visible_abs_slot(origin_day=origin_epoch_day - GRID_START_EPOCH_DAY)
     slot = (epoch[:, None] - GRID_START_EPOCH_DAY) * core.STEPS_PER_DAY + np.arange(
@@ -509,7 +543,8 @@ def load_network(
         device: "cpu" (the plan's CPU steps never use the GPU).
 
     Returns:
-        The network in evaluation mode. `U*` reads the stack and the 12 neighbour channels; `S` reads
+        The network in evaluation mode. `U*` reads the stack and the 12 neighbour channels; `S`
+        reads
         the stack alone.
     """
     import e00730_arms as arms730

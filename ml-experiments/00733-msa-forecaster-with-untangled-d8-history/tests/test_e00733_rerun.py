@@ -4,6 +4,7 @@
 The visibility limit on the windows, the hiding, the ensemble units, and the orchestration.
 """
 
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import e00733_core as core
@@ -35,7 +36,8 @@ def test_visible_middle_counts() -> None:
 
 
 def test_hide_window_zeroes_inputs_and_replaces_weather() -> None:
-    """Hidden columns hold zeros (reading rows) or ensemble values (weather rows); visible ones keep theirs."""
+    """Hidden columns hold zeros (reading rows) or ensemble values (weather rows); visible ones
+    keep theirs."""
     names = ("r", "r_mask", "csi", "cams_mask", "d_bsp", "bsp_mask", "t2m", "wind10", "precip")
     rows = {n: i for i, n in enumerate(names)}
     window = np.ones((len(names), rr.STEPS))
@@ -175,3 +177,28 @@ def test_poison_check_passes_when_outputs_ignore_the_poison_and_fails_otherwise(
         rr.assert_rerun_ignores_inputs_after_limit(run=lambda _v: base, poison_values=())
     with pytest.raises(rr.RerunError):
         rr.assert_rerun_ignores_inputs_after_limit(run=lambda _v: np.zeros(0))
+
+
+def test_read_ens_run_searches_several_folders(tmp_path: Path) -> None:
+    """A run in the second folder (the 707 back-fill) is found when the first folder lacks it."""
+    import polars as pl
+
+    first, second = tmp_path / "a", tmp_path / "b"
+    first.mkdir()
+    second.mkdir()
+    day = 18000
+    frame = pl.DataFrame(
+        {
+            "time_series_id": [26, 26],
+            "valid_time": [datetime(2019, 4, 14, 0, 30), datetime(2019, 4, 14, 1, 0)],
+            rr.ENS_COLUMNS["temperature"]: [1.0, 2.0],
+            rr.ENS_COLUMNS["wind"]: [3.0, 4.0],
+            rr.ENS_COLUMNS["precip"]: [0.0, 0.0],
+        }
+    )
+    name = f"init={date(1970, 1, 1) + timedelta(days=day)}.parquet"
+    frame.write_parquet(second / name)
+    run = rr.read_ens_run(summary_dir=[first, second], run_epoch_day=day, series_id=26)
+    assert run.temperature.tolist() == [1.0, 2.0]
+    with pytest.raises(rr.RerunError):
+        rr.read_ens_run(summary_dir=first, run_epoch_day=day, series_id=26)

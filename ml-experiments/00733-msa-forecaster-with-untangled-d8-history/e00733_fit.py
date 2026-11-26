@@ -2,9 +2,11 @@
 """Experiment 733: one fit, its stored files, and the runner that records a failed fit (torch).
 
 A fit stores its record (`fits/<job>.json`, with the per-pass losses of every stage and the pass
-whose state was stored), its network (`networks/<job>.pt`, one file per stage on the real folds), and,
+whose state was stored), its network (`networks/<job>.pt`, one file per stage on the real folds),
+and,
 on the synthetic world, nothing else: prediction runs in its own process (`e00733_predict`). A fit
-whose record exists is skipped. A fit that raises leaves `fits/<job>.failed.json` with the message and
+whose record exists is skipped. A fit that raises leaves `fits/<job>.failed.json` with the message
+and
 the traceback, and the runner goes on; a correctness failure, a stop, and a guard always propagate.
 
 The GPU cap goes through experiment 729's `limit_gpu_memory`, in the one function `prepare_device`.
@@ -36,11 +38,15 @@ from e00730_leakage import CorrectnessFailureError  # ty: ignore[unresolved-impo
 
 CAP_FIRST: Final = 60
 CAP_RERUN: Final = 120
-"""A stage that ends at the cap of 60 passes is rerun from its starting state at a cap of 120, as experiment 716 does."""
+"""A stage that ends at the cap of 60 passes is rerun from its starting state at a cap of 120, as
+experiment 716 does."""
 
 
 class GuardError(RuntimeError):
-    """A gate is closed (a device or a review gate); the line stops and nothing is recorded as a failed fit."""
+    """A gate is closed (a device or a review gate).
+
+    The line stops and nothing is recorded as a failed fit.
+    """
 
 
 # --------------------------------------------------------------------------- the files
@@ -61,7 +67,10 @@ def record_path(*, root: Path, arm: str, fold: str | None, seed: int) -> Path:
 
 
 def network_path(*, root: Path, arm: str, fold: str | None, seed: int, stage: int = 0) -> Path:
-    """Return the path of a fit's network state (`stage` 2 or 3 on the real folds, 0 on the synthetic world)."""
+    """Return the path of a fit's network state (`stage` 2 or 3 on the real folds.
+
+    0 on the synthetic world).
+    """
     name = job_name(arm=arm, fold=fold, seed=seed)
     return root / "networks" / (f"{name}_stage{stage}.pt" if stage else f"{name}.pt")
 
@@ -144,29 +153,34 @@ RealLoader = Callable[[str, str, int, str], RealInputs]
 
 def train_with_rerun(
     *, net: model.UntangledNet, world: object, stage: int, samples: object, seed: int, encoders: str,
-    start_state: Mapping[str, torch.Tensor],
+    start_state: Mapping[str, torch.Tensor], max_passes: int | None = None,
 ) -> list[train.History]:  # fmt: skip
     """Train a stage at a cap of 60 passes.
 
-    A stage that ends at the cap is rerun from its starting state at 120.
+    A stage that ends at the cap is rerun from its starting state at 120. `max_passes` (the smoke
+    test's
+    one pass) replaces both caps.
     """
+    cap_first, cap_rerun = (
+        (CAP_FIRST, CAP_RERUN) if max_passes is None else (max_passes, max_passes)
+    )
     _, first = train.train_stage(
         net=net, world=world, stage=stage, samples=samples, seed=seed, encoders=encoders,
-        max_passes=CAP_FIRST,
+        max_passes=cap_first,
     )  # fmt: skip
     if not first.cap_hit:
         return [first]
     net.load_state_dict(start_state)
     _, again = train.train_stage(
         net=net, world=world, stage=stage, samples=samples, seed=seed, encoders=encoders,
-        max_passes=CAP_RERUN,
+        max_passes=cap_rerun,
     )  # fmt: skip
     return [first, again]
 
 
 def fit_real(
     *, root: Path, arm: str, fold: str, seed: int, device: str, loader: RealLoader,
-    make_samples: Callable[..., object] | None = None,
+    make_samples: Callable[..., object] | None = None, max_passes: int | None = None,
 ) -> dict[str, Any]:  # fmt: skip
     """Fit stages 2 and 3 of one real-fold arm from M*'s stored stage 1 state, and write the record.
 
@@ -178,6 +192,7 @@ def fit_real(
         device: "cuda" or "cpu".
         loader: Builds the fold's inputs.
         make_samples: Experiment 713's `make_samples` (default: `e00713_train.make_samples`).
+        max_passes: Replaces the caps of 60 and 120 passes (the smoke test runs one pass).
 
     Returns:
         The record. A fit whose record exists is skipped and its record returned.
@@ -216,7 +231,7 @@ def fit_real(
         start_state = {k: v.detach().clone() for k, v in net.state_dict().items()}
         histories = train_with_rerun(
             net=net, world=inputs.world, stage=stage, samples=samples, seed=seed,
-            encoders=inputs.encoders, start_state=start_state,
+            encoders=inputs.encoders, start_state=start_state, max_passes=max_passes,
         )  # fmt: skip
         final = histories[-1]
         save_state(
@@ -269,7 +284,10 @@ SyntheticLoader = Callable[[str, int, str], SyntheticInputs]
 
 
 def synthetic_mode(*, arm: str) -> str:
-    """Return the channel mode of a synthetic arm: `absent` (Y0), `untangled` (YU), or `true` (YT)."""
+    """Return the channel mode of a synthetic arm: `absent` (Y0), `untangled` (YU), or `true`.
+
+    (YT).
+    """
     spec = core.ARMS[arm]
     if spec.where != "synthetic":
         msg = f"{arm} is not a synthetic arm"
@@ -278,7 +296,13 @@ def synthetic_mode(*, arm: str) -> str:
 
 
 def fit_synthetic(
-    *, root: Path, arm: str, seed: int, device: str, loader: SyntheticLoader
+    *,
+    root: Path,
+    arm: str,
+    seed: int,
+    device: str,
+    loader: SyntheticLoader,
+    max_epochs: int | None = None,
 ) -> dict[str, Any]:
     """Fit one synthetic arm from a random start, and write its state and record.
 
@@ -291,6 +315,7 @@ def fit_synthetic(
         seed: The seed.
         device: "cuda" or "cpu".
         loader: Builds the fit's inputs.
+        max_epochs: Replaces the cap of 80 passes (the smoke test runs one pass).
 
     Returns:
         The record. A fit whose record exists is skipped and its record returned.
@@ -311,6 +336,7 @@ def fit_synthetic(
         net=net, train_segments=inputs.train_segments, train_index=inputs.train_index,
         val_segments=inputs.val_segments, val_index=inputs.val_index, seed=seed, mode=mode,
         d8_index=inputs.d8_index, target_std=inputs.target_std, device=device,
+        **({} if max_epochs is None else {"max_epochs": max_epochs}),
     )  # fmt: skip
     save_state(state=net.state_dict(), path=network_path(root=root, arm=arm, fold=None, seed=seed))
     record = {
@@ -329,7 +355,9 @@ def fit_synthetic(
 
 
 def loss_curve_data(*, record: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the per-pass losses of a fit record, with the stored pass marked, for the loss-curve figure.
+    """Return the per-pass losses of a fit record, with the stored pass marked.
+
+    For the loss-curve figure.
 
     A real-fold record gives one series per stage; a synthetic record gives one series with its two
     validation parts.
@@ -454,7 +482,10 @@ def last_fit_ended_line(*, family: str, counts: Mapping[str, int], now: str) -> 
 
 
 def assert_fits_after_limits(*, root: Path, fit_records: Sequence[Path]) -> None:
-    """Fail when a fit record is older than `limits.json` (a fit must start after the limits were written)."""
+    """Fail when a fit record is older than `limits.json`.
+
+    (a fit must start after the limits were written).
+    """
     limits = root / "limits.json"
     if not limits.exists():
         msg = "limits.json is missing, so no fit may start"
@@ -474,5 +505,8 @@ def d8_index_from(*, labels: Sequence[str]) -> int:
 
 
 def zero_check(*, values: np.ndarray) -> bool:
-    """Return whether an array is all zero (the check that a dropped channel stays zero in a fit input)."""
+    """Return whether an array is all zero.
+
+    (the check that a dropped channel stays zero in a fit input).
+    """
     return not bool(np.any(values))

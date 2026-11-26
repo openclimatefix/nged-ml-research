@@ -30,7 +30,10 @@ import numpy as np
 from e00733_channels import GRID_START_EPOCH_DAY, StoredOutputs
 
 TOLERANCE_REPRODUCTION: Final = 1e-2
-"""The largest allowed difference between a re-computed output with nothing hidden and the stored output of a day away from the month edges. A CPU run differs from the GPU run that stored the file by up to 3e-3 on 12 sampled days; the check is meant to catch a window built wrongly, which moves an output by 0.1 or more."""
+"""The largest allowed difference between a re-computed output with nothing hidden and the stored
+output of a day away from the month edges. A CPU run differs from the GPU run that stored the file
+by up to 3e-3 on 12 sampled days; the check is meant to catch a window built wrongly, which moves
+an output by 0.1 or more."""
 D8_SERIES_ID: Final = 26
 """The `time_series_id` of D8 in the ensemble summaries."""
 
@@ -49,9 +52,10 @@ class RealWindows:
         first_epoch_day: The epoch day of the segment's first real day.
         arms: Experiment 732's `e00732_arms` module.
         stats: Experiment 729's `InputStats` (the standardisation of the ensemble means).
-        summary_dir: The folder of the ensemble summaries.
+        summary_dir: The folder of the ensemble summaries, or several folders searched in order.
         series_id: D8's `time_series_id`.
-        extra_ok: A function from the epoch day to a `(48,)` mask of half-hours that experiment 713's
+        extra_ok: A function from the epoch day to a `(48,)` mask of half-hours that experiment
+            713's
             reading mask also accepts (None: no further condition).
         runs: A cache of ensemble runs by epoch day.
         missing_ens_columns: How many hidden columns had no ensemble value (set to zero, as
@@ -63,14 +67,17 @@ class RealWindows:
     first_epoch_day: int
     arms: Any
     stats: Any
-    summary_dir: Path
+    summary_dir: Path | Sequence[Path]
     series_id: int
     extra_ok: Callable[[int], np.ndarray] | None = None
     runs: dict[int, rr.EnsRun] = field(default_factory=dict)
     missing_ens_columns: int = 0
 
     def dense(self, *, epoch_day: int) -> int:
-        """Return the index of an epoch day on the segment's dense axis (the first column is a padding day)."""
+        """Return the index of an epoch day on the segment's dense axis.
+
+        (the first column is a padding day).
+        """
         return epoch_day - self.first_epoch_day + 1
 
     def run(self, *, epoch_day: int) -> rr.EnsRun:
@@ -139,7 +146,7 @@ def build_real_windows(
     stats: Any,
     medians: Mapping[str, float],
     neighbours: Mapping[str, np.ndarray] | None,
-    summary_dir: Path,
+    summary_dir: Path | Sequence[Path],
     first_epoch_day: int,
     last_epoch_day: int,
     series_id: int = D8_SERIES_ID,
@@ -154,7 +161,7 @@ def build_real_windows(
         stats: Experiment 729's `InputStats`.
         medians: The training median of each folded neighbour.
         neighbours: The neighbours' real series on the calendar axis (None: zero channels).
-        summary_dir: The folder of the ensemble summaries.
+        summary_dir: The folder of the ensemble summaries, or several folders searched in order.
         first_epoch_day: The first real day, in days since 1970-01-01.
         last_epoch_day: The last real day.
         series_id: D8's `time_series_id`.
@@ -198,7 +205,8 @@ def reproduce_stored(
         tolerance: The largest allowed difference of a probability.
 
     Returns:
-        The number of rows compared, the largest difference of P(X<0), of the step probability, and of
+        The number of rows compared, the largest difference of P(X<0), of the step probability, and
+        of
         the solar output relative to the stored range.
 
     Raises:
@@ -244,7 +252,9 @@ def reproduce_stored(
 def poisoned_origin_run(
     *, make_windows: Callable[[Any, Mapping[str, np.ndarray] | None], RealWindows], cal: Any, neighbours: Mapping[str, np.ndarray], origin_day: int, predict: Callable[[np.ndarray], np.ndarray], n_seeds: int,
 ) -> int:  # fmt: skip
-    """Check that poisoning every real input after the limit leaves the re-run of one origin unchanged.
+    """Check that poisoning every real input after the limit changes nothing.
+
+    The check re-runs one origin.
 
     Args:
         make_windows: Builds the `RealWindows` from a calendar and neighbour arrays.
@@ -280,7 +290,7 @@ def poisoned_origin_run(
 
 
 def ens_coverage_by_split(
-    *, origin_days: np.ndarray, splits: np.ndarray, summary_dir: Path, series_id: int = D8_SERIES_ID
+    *, origin_days: np.ndarray, splits: np.ndarray, summary_dir: Path | Sequence[Path], series_id: int = D8_SERIES_ID
 ) -> dict[str, dict[str, int]]:  # fmt: skip
     """Count, for each split.
 
@@ -291,7 +301,7 @@ def ens_coverage_by_split(
     Args:
         origin_days: The grid day number of each origin `(n,)`.
         splits: The split of each origin `(n,)`.
-        summary_dir: The folder of the ensemble summaries.
+        summary_dir: The folder of the ensemble summaries, or several folders searched in order.
         series_id: D8's `time_series_id`.
 
     Returns:
