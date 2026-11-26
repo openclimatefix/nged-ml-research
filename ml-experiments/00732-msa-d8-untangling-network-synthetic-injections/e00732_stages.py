@@ -201,8 +201,9 @@ def choice_events(*, root: Path) -> list[str]:
     The events are `limits` (`limits.json`), `fits` (the newest stored prediction file), `bt` (the
     record of the B-T fit, `scores/bt_fit.json`), and `test_score` (the marker `scores/test_started`,
     taken now, without writing the file, when it does not exist yet; `write_marker` writes it). A
-    choice that was rewritten after the first test score sorts after `test_score`, and `leak.assert_no_test_choice` fails. A choice that does not exist is
-    left out, and `assert_no_test_choice` fails on that too.
+    choice that was rewritten after the first test score sorts after `test_score`, and
+    `leak.assert_no_test_choice` fails. A choice that does not exist is left out, and
+    `assert_no_test_choice` fails on that too.
 
     Args:
         root: The data folder.
