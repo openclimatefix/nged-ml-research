@@ -277,11 +277,16 @@ def test_absent_share() -> None:
         ch.absent_share(flag=flag, visible=np.zeros(4, dtype=bool))
 
 
-REAL_732 = Path(os.environ.get("DATA_PATH_INTERNAL", "/nonexistent")) / "ml-experiments" / "00732-msa-d8-untangling-network-synthetic-injections"
+REAL_732 = (
+    Path(os.environ.get("DATA_PATH_INTERNAL", "/nonexistent"))
+    / "ml-experiments"
+    / "00732-msa-d8-untangling-network-synthetic-injections"
+)
 
 
 @pytest.mark.skipif(
-    not (REAL_732 / "scores" / "verdict.json").exists(), reason="experiment 732's private files absent"
+    not (REAL_732 / "scores" / "verdict.json").exists(),
+    reason="experiment 732's private files absent",
 )
 def test_the_rule_on_experiment_732s_real_score_files() -> None:
     """Experiment 732's verdict row 4, H2 passing, solar 'not shown', transfer 'works only in Brier score'.
