@@ -110,26 +110,31 @@ def plan_windows(*, t: WindowTable, published: bool = True) -> dict[str, int | N
         "W12": ext(mask=syn & (t.world == "engine"), key=t.pv_max, largest=True),
         "W13": ext(mask=syn & (t.source == "S2") & t.solar_out, key=t.solar_error, largest=True),
     }
-    for name, mask in (
-        ("W14", t.adds), ("W16", t.removes), ("W18", t.in_solar), ("W19", t.other_bsp),
-        ("W20", t.solar_shape & t.mirrored), ("W21", t.solar_shape & ~t.mirrored),
-    ):  # fmt: skip
-        plan[name] = ext(mask=syn & mask, key=np.arange(len(t.world), dtype=float), largest=False)
-    plan["W15"] = _second(mask=syn & t.adds)
-    plan["W17"] = _second(mask=syn & t.removes)
-    plan["W22"] = ext(mask=syn & t.mirrored, key=t.step_gain_vs_un, largest=True)
-    plan["W23"] = ext(
-        mask=syn & (t.missed_noise_units >= BIG_NOISE_UNITS), key=t.missed_noise_units, largest=True
-    )
+    used = {i for i in plan.values() if i is not None}
+    index_key = np.arange(len(t.world), dtype=float)
+    transfer_rules = (
+        ("W14", syn & t.adds, "first"), ("W15", syn & t.adds, "first"),
+        ("W16", syn & t.removes, "first"), ("W17", syn & t.removes, "first"),
+        ("W18", syn & t.in_solar, "first"), ("W19", syn & t.other_bsp, "first"),
+        ("W20", syn & t.solar_shape & t.mirrored, "first"),
+        ("W21", syn & t.solar_shape & ~t.mirrored, "first"),
+        ("W22", syn & t.mirrored, "gain"), ("W23", syn & (t.missed_noise_units >= BIG_NOISE_UNITS), "missed"),
+    )  # fmt: skip
+    for name, mask, how in transfer_rules:
+        free = mask.copy()
+        free[list(used)] = False  # a window already drawn is never drawn twice
+        if how == "first":
+            pick = ext(mask=free, key=index_key, largest=False)
+        elif how == "gain":
+            pick = ext(mask=free, key=t.step_gain_vs_un, largest=True)
+        else:
+            pick = ext(mask=free, key=t.missed_noise_units, largest=True)
+        plan[name] = pick
+        if pick is not None:
+            used.add(pick)
     for name in ("W9", "W10", "W11", "W24", "W25"):
         plan.setdefault(name, None)
     return {k: plan[k] for k in core.SERIES_WINDOWS}
-
-
-def _second(*, mask: np.ndarray) -> int | None:
-    """Return the second window of a mask (the first is the rule above it)."""
-    idx = np.flatnonzero(mask)
-    return int(idx[1]) if idx.size > 1 else None
 
 
 def window_figure(*, window: Mapping[str, np.ndarray], title: str) -> alt.VConcatChart:

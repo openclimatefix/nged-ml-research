@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0914, PLR0915
+# ruff: noqa: E402, E501, PLR0915
 """Experiment 732: the absolute scores of every arm, for the write-up (new, read only, CPU).
 
 Reads the stored predictions and rebuilds the test rows exactly as `e00732_report.stage_figures`
@@ -14,7 +14,6 @@ with `DATA_PATH_INTERNAL` set. Aggregates only.
 
 import json
 import sys
-from pathlib import Path
 
 import e00732_paths as paths
 
@@ -87,7 +86,9 @@ def main() -> None:
             "h1": score.harm_by_band(rows=rows, p=p, limits=limits),
             "detection": score730.detection(rows=rows, p=p),
             "calibration": {
-                k: v for k, v in score730.calibration(rows=rows, p=p, bar=0.1 * s_share).items() if k in ("reliability", "max_gap", "pass", "bar")
+                k: v
+                for k, v in score730.calibration(rows=rows, p=p, bar=0.1 * s_share).items()
+                if k in ("reliability", "max_gap", "pass", "bar")
             },
         }
     out["sign"] = sign
@@ -108,7 +109,9 @@ def main() -> None:
     out["solar_mean_target_sun_up"] = float(rows.solar[up].mean())
     out["solar_mean_target_solar_worlds"] = float(rows.solar[up & solar_rows].mean())
     out["zero_output_mae_note"] = "a head that outputs nothing has MAE equal to the mean target"
-    out["t1_solar_by_world_source"] = score.solar_error_table(rows=rows, cosz=truth_.cosz, pv_by_arm=pv)
+    out["t1_solar_by_world_source"] = score.solar_error_table(
+        rows=rows, cosz=truth_.cosz, pv_by_arm=pv
+    )
     out["t1_transfer"] = score.transfer_solar_table(
         rows=rows, cosz=truth_.cosz, tr=truth_.tr,
         pv_tr_by_arm={n: arm_map[n].pv_tr for n in ("U*", "U-N") if arm_map[n].pv_tr is not None},
@@ -129,28 +132,50 @@ def main() -> None:
                 str(amt): score.recovery_bar(pv_inj=a.pv_inj[amt], pv_plain=a.pv, delta=truth_.delta[amt], amount=amt, keep=keep[amt])
                 for amt in core.TEST_INJECTION_POINTS
             }  # fmt: skip
-            entry["recovery_reverse"] = score.recovery_reverse_bar(pv_inj=a.pv_inj, pv_plain=a.pv, delta=truth_.delta, keep=keep, reverse=x < 0)
+            entry["recovery_reverse"] = score.recovery_reverse_bar(
+                pv_inj=a.pv_inj, pv_plain=a.pv, delta=truth_.delta, keep=keep, reverse=x < 0
+            )
             entry["recovery_by_group"] = {
                 str(amt): score.recovery_by_group(truth=truth_, pv_plain=a.pv, pv_inj=a.pv_inj, groups=score.sign_change_groups(truth=truth_, amount=amt))
                 for amt in core.TEST_INJECTION_POINTS
             }  # fmt: skip
             entry["injection_median_abs_error_points"] = {
-                str(amt): float(np.median(np.abs(a.pv_inj[amt] - a.pv - truth_.delta[amt])[keep[amt]])) for amt in core.TEST_INJECTION_POINTS
+                str(amt): float(
+                    np.median(np.abs(a.pv_inj[amt] - a.pv - truth_.delta[amt])[keep[amt]])
+                )
+                for amt in core.TEST_INJECTION_POINTS
             }
             entry["injection_mean_abs_error_points"] = {
-                str(amt): float(np.mean(np.abs(a.pv_inj[amt] - a.pv - truth_.delta[amt])[keep[amt]])) for amt in core.TEST_INJECTION_POINTS
+                str(amt): float(
+                    np.mean(np.abs(a.pv_inj[amt] - a.pv - truth_.delta[amt])[keep[amt]])
+                )
+                for amt in core.TEST_INJECTION_POINTS
             }
-        entry["absolute"] = score.absolute_bar(pv=a.pv, solar=rows.solar, cosz=truth_.cosz, world_is_solar=solar_rows, exclude=truth_.exclude)
+        entry["absolute"] = score.absolute_bar(
+            pv=a.pv,
+            solar=rows.solar,
+            cosz=truth_.cosz,
+            world_is_solar=solar_rows,
+            exclude=truth_.exclude,
+        )
         entry["night"] = score.night_bar(pv=a.pv, cosz=truth_.cosz, valid=np.ones(rows.n, bool))
         if a.pv_raised is not None:
-            entry["monotone"] = score.monotone_bar(pv=a.pv, pv_raised=a.pv_raised, raisable=truth_.raisable)
-            entry["response"] = score.response_bar(pv=a.pv, pv_raised=a.pv_raised, raisable=truth_.raisable, solar_target=rows.solar)
+            entry["monotone"] = score.monotone_bar(
+                pv=a.pv, pv_raised=a.pv_raised, raisable=truth_.raisable
+            )
+            entry["response"] = score.response_bar(
+                pv=a.pv, pv_raised=a.pv_raised, raisable=truth_.raisable, solar_target=rows.solar
+            )
         bars[n] = entry
     out["solar_bars"] = bars
 
     tr = truth_.tr
     step = {}
-    one = {"e": truth_.event[None, :], "s": truth_.size[None, :], "v": np.ones((1, truth_.event.size), bool)}
+    one = {
+        "e": truth_.event[None, :],
+        "s": truth_.size[None, :],
+        "v": np.ones((1, truth_.event.size), bool),
+    }
     for n in ARMS_STEP:
         a = arm_map[n]
         if a.step is None:
@@ -159,15 +184,30 @@ def main() -> None:
         step[n] = {
             "f1_big": f,
             "brier_step": float(((a.step - truth_.event) ** 2).mean()),
-            "size_error_points": None if a.size_hat is None else float(score.size_error(size_hat=a.size_hat, size=truth_.size, event=truth_.event, valid=np.ones_like(truth_.event, bool))),
+            "size_error_points": None
+            if a.size_hat is None
+            else float(
+                score.size_error(
+                    size_hat=a.size_hat,
+                    size=truth_.size,
+                    event=truth_.event,
+                    valid=np.ones_like(truth_.event, bool),
+                )
+            ),
             "precision_all": score.precision_all(step_p=a.step, event=truth_.event),
-            "t6": score.step_table(step_p=a.step, size_hat=a.size_hat, event=truth_.event, size=truth_.size, tr=tr),
+            "t6": score.step_table(
+                step_p=a.step, size_hat=a.size_hat, event=truth_.event, size=truth_.size, tr=tr
+            ),
         }
         counts = {
             "below": int(((truth_.event > 0.5) & (tr.edge_noise < 4.0) & tr.edge).sum()),
             "above": int(((truth_.event > 0.5) & (tr.edge_noise >= 4.0) & tr.edge).sum()),
         }
-        step[n]["detectability"] = score.detectability(table=step[n]["t6"]["size_noise_units"], precision=step[n]["precision_all"], counts=counts)  # type: ignore[index]
+        step[n]["detectability"] = score.detectability(
+            table=step[n]["t6"]["size_noise_units"],
+            precision=step[n]["precision_all"],
+            counts=counts,
+        )  # type: ignore[index]
         step[n]["counts_by_4_noise_units"] = counts
     out["step"] = step
     out["r18"] = score.recall_gap_r18(
@@ -178,12 +218,23 @@ def main() -> None:
     out["n_edges_5_points_plus"] = int(((truth_.event > 0.5) & (np.abs(truth_.size) >= 5.0)).sum())
     out["n_transfer_rows"] = int(truth_.event.size)
 
-    out["t2_scenarios"] = score.scenario_table(truth=truth_, arms={n: arm_map[n] for n in ("U*", "S+", "S", "U-N") if arm_map[n].p_tr is not None or arm_map[n].step is not None})
-    out["t3_ambiguity"] = score.ambiguity_table(rows=rows, p_by_arm={n: arm_map[n].p for n in ("U*", "S+", "U-SG", "S")})
+    out["t2_scenarios"] = score.scenario_table(
+        truth=truth_,
+        arms={
+            n: arm_map[n]
+            for n in ("U*", "S+", "S", "U-N")
+            if arm_map[n].p_tr is not None or arm_map[n].step is not None
+        },
+    )
+    out["t3_ambiguity"] = score.ambiguity_table(
+        rows=rows, p_by_arm={n: arm_map[n].p for n in ("U*", "S+", "U-SG", "S")}
+    )
     # T5: U* with the BSP channel hidden
     a = arm_map["U*"]
     if a.pv is not None and a.p_nobsp is not None:
-        out["u_star_p_nobsp_brier_bsp_rows"] = float(score730.row_brier(p=a.p_nobsp, x=x)[bsp].mean())
+        out["u_star_p_nobsp_brier_bsp_rows"] = float(
+            score730.row_brier(p=a.p_nobsp, x=x)[bsp].mean()
+        )
         out["u_star_p_brier_bsp_rows"] = float(score730.row_brier(p=a.p, x=x)[bsp].mean())
     out["bsp_rows"] = int(bsp.sum())
     out["bsp_reverse_rows"] = int(((x < 0) & bsp).sum())

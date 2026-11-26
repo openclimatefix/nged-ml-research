@@ -118,40 +118,43 @@ headline: >-
   of reverse flow no worse than the sign-detector experiment 730's sign-only network (C1 -0.00066,
   interval -0.00223 to +0.00071, margin 0.00122), so the verdict is row 4, `supported`
   (non-inferior). The extra tasks did not improve the sign: U* minus the sign-only network S+
-  trained on the same windows (C6) is +0.00065 (+0.00004 to +0.00137). The solar output on synthetic
-  days beats every rule (mean absolute error 3.31 points of capacity against 6.93 for the best rule)
-  but misses two of eight bars, so its word is "not shown". The transfer head finds 7.7% of the
-  simulated steps of 5 points or more. The neighbours (C7) and the BSP steps (R19) made no
+  trained on the same windows (C6) is a small loss of +0.00065 (+0.00004 to +0.00137), an interval
+  that holds the fitted networks fixed and that includes zero over seeds. The solar output on
+  synthetic days beats every rule (mean absolute error 3.31 points of capacity against 6.93 for the
+  best rule) but misses two of eight bars, so its word is "not shown". The transfer head finds 7.7%
+  of the simulated steps of 5 points or more. The neighbours (C7) and the BSP steps (R19) made no
   detectable difference overall. All numbers are interim.
 lessons: >-
   The plan named row 5 as the likeliest verdict and row 4 as the next, and row 4 came out. A
   sign-only network on the same windows (S+) scored 0.00131 lower than the sign-detector experiment
   730's S, so the apparent gain over S comes from this experiment's training windows and inputs and
-  not from the extra heads. The extra heads worsen the probability of reverse flow by about 0.0007
-  (Brier score), whether or not their gradients reach the shared backbone (U-SG against U*). The
-  contrastive terms make the solar head obey the physical rules (monotonicity violations fall from
-  33% to 0.7%) and lower the injection error, and a heavier plain solar loss lowers the solar error
-  more. Transfer detection is weak: a recall of 7.7% on steps of 5 points or more, and 22% for the
-  largest steps. The neighbours help only where the mirror is exact, and the BSP input worsens
-  detection. On real days the solar output follows the sky but does not stay at zero before the
-  solar farm existed. All numbers are interim.
+  not from the extra heads. The extra heads did not improve the probability of reverse flow, and C6
+  is a small loss of about 0.0007 whose interval includes zero over seeds, so the data cannot say
+  that the extra heads hurt the sign. The contrastive terms make the solar head obey the physical
+  rules (monotonicity violations fall from 33% to 0.7%) and lower the injection error, and a heavier
+  plain solar loss lowers the solar error more. Transfer detection is weak: a recall of 7.7% on
+  steps of 5 points or more, and 22% for the largest steps. The neighbours help only where the
+  mirror is exact, and the BSP input worsens detection. On real days the solar output follows the
+  sky but does not stay at zero before the solar farm existed. All numbers are interim.
 take_home_message: >-
   A single neural network that also estimates solar output and spots load transfers gives a
   probability of reverse flow that is no worse than the sign-only network of the sign-detector
-  experiment 730 by more than a set margin (C1), but it is detectably worse than a sign-only network
-  trained on the same windows (C6), so the extra tasks should not be added to improve the sign. On
-  synthetic days it estimates the solar output much better than the rules, but it finds only about
-  8% of the simulated load transfers of 5 points or more, and on real days it still outputs solar
-  where there was no solar farm. All numbers are interim.
+  experiment 730 by more than a set margin (C1), but it is slightly worse than a sign-only network
+  trained on the same windows (C6; the interval holds the fitted networks fixed and the reading
+  depends on the bootstrap scheme), so the extra tasks did not improve the sign. On synthetic days
+  it estimates the solar output much better than the rules, but it finds only about 8% of the
+  simulated load transfers of 5 points or more, and on real days it still outputs solar where there
+  was no solar farm. All numbers are interim.
 advice:
   - >-
     Use the sign-only U-net trained on this experiment's windows and inputs (S+) as the reference
-    for the probability of reverse flow at D8, because it scored lower than every arm with extra
-    heads (C6, R4).
+    for the probability of reverse flow at D8, because it scored lower than U* (C6) and lower than
+    the sign-only network S of the sign-detector experiment 730 (R4), although S+ differs from S in
+    fit code and seed as well as in inputs, and R4 is strong over seeds (p = 0.001).
   - >-
     Do not add solar, step, or size heads to a sign neural network in order to improve the sign,
-    because the extra heads worsen the Brier score of the probability of reverse flow by about
-    0.0007 whether or not their gradients reach the shared backbone (C6, R1, R2).
+    because none of the arms with extra heads scored better than S+ (C6; U-noBSP minus S+ is
+    +0.00022, -0.0006 to +0.0011); the data does not show that the extra heads hurt the sign either.
   - >-
     Keep the injection, night, and monotone terms in any network that outputs solar power, because
     they cut monotonicity violations from 33% to 0.7% and lower the injection error (C3, R9).
@@ -239,9 +242,14 @@ so there is no detectable difference.
 **The sign-only neural network trained on the same windows is the fair comparison, and it scores
 better than U\*.** That arm is S+, trained on the same windows and inputs as U\*. S+ scored 0.00721,
 and U\* minus S+ (C6) is +0.00065 (+0.00004 to +0.00137), so the extra tasks made the probability
-slightly worse, by an amount whose interval just excludes zero. The apparent gain over S comes from
-this experiment's training windows and inputs, not from the extra tasks: S+ minus S (R4) is -0.00131
-(-0.00299 to +0.00002).
+slightly worse in the plan's bootstrap, by an amount whose interval just excludes zero. That
+interval holds the fitted neural networks fixed, and the reading depends on the bootstrap scheme: a
+two-way bootstrap of the independent audit gives C6 an interval of -0.00012 to +0.00156, a bootstrap
+over the 8 test months gives +0.00030 to +0.00106, and over the three seeds the nine seed-pair
+values run from -0.00019 to +0.00134 (t = 1.88, p = 0.14). The apparent gain over S is shared by S+,
+so it does not come from the extra tasks: S+ minus S (R4) is -0.00131 (-0.00299 to +0.00002), and R4
+is strong over seeds (p = 0.001). S+ differs from S in fit code and seed as well as in training
+windows and inputs, so the page cannot say which of these produced the gain.
 
 **(b) The neural network separates solar output from the reading on synthetic days to a useful
 degree, but it fails the pre-registered rule for the word "reasonable".** A point is 1% of D8's
@@ -252,14 +260,15 @@ and 16.80 for a rule that reads the sky alone. (C4 and the error of 4.89 points 
 sun-up half-hours of worlds that hold solar output, so they sit on a different set of rows from the
 3.31.)
 
-**Six of the eight pre-registered solar bars pass, and the two misses are small.** A bar is a pass
-threshold fixed before any fit; the section "The solar output rises with an added solar output on
-synthetic days" lists all eight. The two that fail are the recovery of a 5-point injection (0.83 of
-the injected amount, against a bar of 0.9 to 1.1) and the output at night (a mean of 0.065 points
-against 0.05, and 1.02% of night half-hours above 0.5 points against 0.5%). The solar word is
-therefore "not shown", because the rule withholds "partly" and "reasonable" when a recovery bar
-fails. On real days the sky check passes and the night check passes, but the two checks that ask for
-no solar output where no solar farm exists, and for no solar output that follows the engine, fail.
+**Six of the eight pre-registered solar bars pass, and two fail.** A bar is a pass threshold fixed
+before any fit; the section "The solar output rises with an added solar output on synthetic days"
+lists all eight. The two that fail are the recovery of a 5-point injection (0.83 of the injected
+amount, against a bar of 0.9 to 1.1) and the output at night (a mean of 0.065 points against 0.05,
+and 1.02% of night half-hours above 0.5 points against 0.5%). The night share is twice its bar, and
+the 5-point recovery is 0.066 below the lower end of its bar. The solar word is therefore "not
+shown", because the rule withholds "partly" and "reasonable" when a recovery bar fails. On real days
+the sky check passes and the night check passes, but the two checks that ask for no solar output
+where no solar farm exists, and for no solar output that follows the engine, fail.
 
 **(c) The neural network barely detects switching events, even on synthetic days with a known step
 at every transfer.** At a threshold of 0.5 the neural network flagged 70 half-hours, 66% of them
@@ -283,14 +292,14 @@ cases (R22).
 **Against the sign-detector experiment 730, the harm that experiment found is smaller here and does
 not reach the verdict.** In the sign-detector experiment 730 the arm with a demand output scored
 0.00105 worse than S (interval -0.00011 to +0.00222) and failed the false-alarm check H1. In this
-experiment the extra tasks score 0.00065 worse than the same-window sign-only neural network S+
-(C6), a smaller difference in the same direction, and U\* passes H1 pooled and at 3 MVA and above.
-In the band of 1 to 3 MVA, the mean probability of reverse flow on import half-hours is 0.0894 for
-U\*, 0.0828 for S, and 0.0717 for S+, against a limit of 0.083. The verdict table labels this band
-"at the calibrated boundary", because the lower end of the harm reading HB (U\* minus S in the mean
-probability of reverse flow on import half-hours of 1 to 3 MVA: +0.00657, interval -0.01052 to
-+0.02846) is not above zero. The verdict of the sign-detector experiment 730 was row 3 (`not
-supported`); the verdict here is row 4.
+experiment the extra tasks score 0.00065 worse than the same-window sign-only neural network S+ (C6,
+with the caveat above), a smaller difference in the same direction, and U\* passes H1 pooled and at
+3 MVA and above. In the band of 1 to 3 MVA, the mean probability of reverse flow on import
+half-hours is 0.0894 for U\*, 0.0828 for S, and 0.0717 for S+, against a limit of 0.083. The verdict
+table labels this band "at the calibrated boundary", because the lower end of the harm reading HB
+(U\* minus S in the mean probability of reverse flow on import half-hours of 1 to 3 MVA: +0.00657,
+interval -0.01052 to +0.02846) is not above zero. The verdict of the sign-detector experiment 730
+was row 3 (`not supported`); the verdict here is row 4.
 
 ### The verdict is `supported`: the extra tasks leave the probability of reverse flow no worse than before
 
@@ -390,18 +399,21 @@ neural network trained on synthetic days with a known answer) with 20,000 resamp
 contrasts C1 and C6 and the report-only readings R1, R2, R4, R5, R13, R19, and R21 share one axis,
 in Brier score.
 
-**The stop-gradient arm U-SG shows that sharing gradients between the heads is not what worsens the
-probability of reverse flow.** In U-SG the solar, step, and size heads read the backbone through a
-stop-gradient, so their losses train only their own linear layers. U-SG minus S+ (R1) is +0.00057
-(+0.000002 to +0.00129), and U\* minus U-SG (R2) is +0.00008 (-0.00068 to +0.00071). U-SG and U\*
-therefore worsen the probability by about the same amount, and the worsening is not shown to depend
-on the shared gradients. The solar head of U-SG learned almost nothing (a mean absolute error of
-13.46 points over all sun-up half-hours, 23.78 on sun-up half-hours of solar worlds, and a recovery
-of 0.20 to 0.27), so the worsening in U-SG is not due to a working solar head.
+**The stop-gradient arm U-SG does not show that the extra heads hurt the sign.** In U-SG the solar,
+step, and size heads read the backbone through a stop-gradient, so their losses train only their own
+linear layers. The global gradient-norm clip still couples the heads to the backbone, because the
+clip rescales the whole update. The backbone otherwise receives the objective of S+, so U-SG minus
+S+ (R1) is +0.00057 (+0.000002 to +0.00129) and measures the spread between two differently seeded
+fits with the same objective (the seed of a fit comes from a hash of the arm's name). U\* minus U-SG
+(R2) is +0.00008 (-0.00068 to +0.00071). The arm with all three extra heads and no BSP input,
+U-noBSP, is not distinguishable from S+: U-noBSP minus S+ is +0.00022 (-0.00060 to +0.00110) in the
+auditor's two-way bootstrap. The data therefore cannot say that the extra heads hurt the sign. The
+solar head of U-SG learned almost nothing (a mean absolute error of 13.46 points over all sun-up
+half-hours, 23.78 on sun-up half-hours of solar worlds, and a recovery of 0.20 to 0.27).
 
 **The contrastive terms improve the sign a little.** U\* minus U-NC (R5, the same neural network
-without the injection, night, and monotone terms) is -0.00060 (-0.00126 to -0.00006). Without those
-terms the extra heads worsen the sign more: U-NC scores 0.00847, against 0.00721 for S+.
+without the injection, night, and monotone terms) is -0.00060 (-0.00126 to -0.00006). U-NC scores
+0.00847, against 0.00721 for S+.
 
 **The bidirectional long short-term memory (LSTM) neural network gives the same picture as the
 U-net.** U\*-L minus S-L (R3, the bidirectional LSTM of the sign-detector experiment 730) is
@@ -803,25 +815,29 @@ near zero.*
 
 ![W18: inside a solar spell](series_W18.svg)
 
-*W18: a transfer inside a solar spell; the window looks the same by eye as W16 and W20, so the three
-rules pick one window.*
+*W18: a transfer inside a solar spell; the one true edge at about 12.5 hours gets a step probability
+near zero. The sign probability peaks at about 0.9 at 10 hours, and the solar output is about 40
+points above the target there.*
 
 ![W19: a partner under another BSP](series_W19.svg)
 
-*W19: a transfer to a Primary under another BSP; the four true edges between 17 and 23 hours get a
-step probability near zero.*
+*W19: a transfer to a Primary under another BSP; the true edge at about 21 hours gets a step
+probability near zero, and the largest step probability of the day, about 0.25, falls at about 23.5
+hours with no edge.*
 
 **W20 to W23: shape, mirror, and the transfers of most interest.**
 
 ![W20: a solar-shaped transfer with a mirror](series_W20.svg)
 
-*W20: a solar-shaped transfer with a mirror at a neighbour; the step probability reaches about 0.25
-near 21 hours and stays near zero at the true edge at about 7 hours.*
+*W20: a solar-shaped transfer with a mirror at a neighbour; the true edge at the end of the window
+gets a step probability of about 0.15. The signed truth falls to about -70 points at midday, the
+reading folds, and the sign probability is near 1 from 11 to 14 hours.*
 
 ![W21: a solar-shaped transfer without a mirror](series_W21.svg)
 
-*W21: a solar-shaped transfer without a mirror; the four true edges in the evening are missed, and
-the window looks the same by eye as W14.*
+*W21: a solar-shaped transfer without a mirror; the true edge at about 14.5 hours gets a step
+probability near zero. The window is all import, with a sign probability under 0.001, and the solar
+output is 5 to 10 points below the target.*
 
 ![W22: the mirrored transfer with the largest gain over U-N](series_W22.svg)
 
@@ -847,23 +863,25 @@ layer.
   capacity) is the metric of C2 to C4, printed beside its root mean squared error in the solar
   table. The sign has no median, so no normalised error of the median is reported for it, and the
   plan's request for a normalised error of the median is not met.
-- **Audit triggers 2 and 5 fired, and no audit has run.** Trigger 5 fired because S+, a nested arm
-  with fewer outputs, scores better than U\* by a margin whose interval excludes zero (C6). Trigger
-  2 fired because C6 and the solar word differ from the prediction. The stored evidence is the
-  stop-gradient arm (R1 and R2) and the arms without the contrastive terms (R5), which place the
-  worsening on the extra heads and not on the shared gradients. Trigger 3 did not fire: the Brier
-  and log-loss points agree for C1, C6, and R4. Trigger 4 does not apply (the test bank is
-  synthetic). Trigger 6 does not fire: C1's half-width is 0.00147, which is (0.00071 + 0.00223) / 2
-  and 1.26 times the half-width of 0.00117 of C1 in the sign-detector experiment 730, inside the
-  limits of one half to two times. An independent audit is left to the manager.
+- **Audit triggers 2 and 5 fired, and an independent audit has run.** Trigger 5 fired because S+, a
+  nested arm with fewer outputs, scores better than U\* by a margin whose interval excludes zero
+  (C6). Trigger 2 fired because C6 and the solar word differ from the prediction. The independent
+  audit of the stored predictions reproduces the contrasts and finds that C6 is not robust to the
+  bootstrap scheme, which is why the page does not claim that the extra heads hurt the sign. Trigger
+  3 did not fire: the Brier and log-loss points agree for C1, C6, and R4. Trigger 4 does not apply
+  (the test bank is synthetic). Trigger 6 does not fire: C1's half-width is 0.00147, which is
+  (0.00071 + 0.00223) / 2 and 1.26 times the half-width of 0.00117 of C1 in the sign-detector
+  experiment 730, inside the limits of one half to two times. The independent audit by a fresh Opus
+  agent found no leakage and no changed bar, and reproduced every point estimate.
 
 ### What the result means for later experiments
 
-**A sign-only neural network is enough for the probability of reverse flow, and the extra heads do
-not belong in it.** Of the arms fitted here, S+ has the lowest Brier score on all half-hours and on
-import half-hours, and the lowest H1 (the false-alarm check). U-noBSP has a lower Brier score on
-reverse-flow half-hours (0.1041 against 0.1102) and a higher detection (0.876 against 0.866). U\* is
-the best arm that also gives a solar output.
+**A sign-only neural network is enough for the probability of reverse flow, and the extra heads did
+not improve it.** C1 is non-inferior under every bootstrap scheme the audit tried, and the extra
+heads did not improve the sign under any of them. Of the arms fitted here, S+ has the lowest Brier
+score on all half-hours and on import half-hours, and the lowest H1 (the false-alarm check). U-noBSP
+has a lower Brier score on reverse-flow half-hours (0.1041 against 0.1102) and a higher detection
+(0.876 against 0.866). U\* is the best arm that also gives a solar output.
 
 **The solar output works on synthetic days, and the contrastive terms are what make it obey the
 physical rules, but the real-day checks do not yet support it.** The next experiment on the solar
@@ -879,8 +897,10 @@ many steps), and read the switching logs first, because the transfer generator h
 ## Disclosures
 
 **Each item below departed from the plan or limits what the page can claim.** No bank and no bar
-changed, and `CODE_VERSION` stayed 2. Terms such as the bars and the arms are defined in the
-sections after this one.
+changed, and `CODE_VERSION` stayed 2. One gate changed before any fit: the G20 coverage gate moved
+from every month to the plan's whole-table rule for each neighbour, because D14 has almost no
+readings in two months, and the change matched the registered rule. Terms such as the bars and the
+arms are defined in the sections after this one.
 
 - **A zero-fill rule excludes unreliable solar targets.** The known-answer experiment 729's solar
   simulator keeps a day of the metered farm's output when the farm has at least 40 of 48 readings,
@@ -920,9 +940,17 @@ sections after this one.
   bank, bar, or constant changed, and the 24 fits that scored come from the third start and the S+
   fits of the second.
 - **NaN cosines of the zenith angle count as sun down in the B-T and B-TN rules.** The real banks
-  hold NaN cosines, which turned the step rules into NaN; the fix was set before any score existed
-  (the test-score marker is dated after it).
+  hold NaN cosines, which turned the step rules into NaN. A smoke run of the score stage on the test
+  bank with 1-epoch fit outputs found the fault, before the official score and with no test number
+  read, and the fix precedes the test-score marker. In all, 8,784 of the 94,080 test half-hours
+  (9.3%) have a NaN cosine, in pairs near dawn and dusk, and count as neither sun-up nor night in
+  B-T and B-TN.
 - **Series windows W24 and W25 were never drawn,** because K3 is void.
+- **The first drawing of the series windows repeated windows, and the series were redrawn.** The
+  picker took the first window in table order without excluding windows already drawn, so the first
+  W14, W19, and W21 were one window, and so were W16, W18, and W20. The picker now excludes drawn
+  windows, and only the series stage was rerun, on the CPU, with no other stage and no stored score
+  changed. W18 to W21 are new windows; the other series windows are unchanged.
 - **Plan items not done.** The shifted-mix bank (table T4) and the recovery by tercile of the BSP
   coupling and with the BSP channel hidden in the injection overlay (the last part of table T5) were
   not computed; table T2 has no row for S, because S was never run on the transfer overlay; the
@@ -1163,9 +1191,9 @@ shows the same window as built for U-N (neighbour channels absent, drawn as zero
 - U\* also reads 12 neighbour channels: for each of D3, D5, and D14, the scaled folded reading, its
   half-hour change, that change times the sign of D8's change of reading, and a presence mask.
 - The backbone is the U-net of experiment 729 (a convolutional neural network after [Ronneberger et
-  al. (2015)](https://doi.org/10.1007/978-3-319-24574-4_28)) with four levels of 32, 64, 128, and
-  256 channels, kernels of width 5, group normalisation, GELU activations, and skip connections,
-  with 1.07 million weights. The bidirectional LSTM of U\*-L has 0.55 million weights.
+  al. (2015)](https://doi.org/10.1007/978-3-319-24574-4_28)) with 4 levels of 32, 64, 128, and 256
+  channels, kernels of width 5, group normalisation, GELU activations, and skip connections, with
+  1.07 million weights. The bidirectional LSTM of U\*-L has 0.55 million weights.
 - U\* outputs, at each of the middle 24 hours' half-hours, a sign logit, a non-negative solar output
   in points (a softplus), a transfer-step logit, and a step size in points, each a linear layer on
   the backbone's last hidden layer.
@@ -1215,7 +1243,7 @@ shows the same window as built for U-N (neighbour channels absent, drawn as zero
   mean, the reliability term, the mean absolute error of the solar output in points of capacity, the
   recovery ratio, the Brier score, precision, recall, and F1 of the step event, and the mean
   absolute error of the step size.
-- The scored rows drop 243 half-hours of unreliable solar targets (see "Disclosures").
+- The scored solar rows drop 243 half-hours of unreliable solar targets (see "Disclosures").
 - The standing practices that apply to a reconstruction are followed: cleaned data, saved neural
   networks, stored predictions as controls. Monthly refits, the cut of the noisy start of the
   short-history Primaries D15 and D18, the tail coverage, and the forecast plots do not apply,

@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 # ruff: noqa: E501
 """Experiment 732: the counted contrasts drawn in three groups of one unit each (new, read only, CPU).
 
@@ -28,7 +29,11 @@ def main() -> None:
     rec = json.loads((root / "scores" / "readings.json").read_text())["readings"]
     allr = {**rec["counted"], **rec["report"]}
     for name, keys, title in (
-        ("contrasts_sign", SIGN, "Sign: Brier score of P(X<0), first arm minus second (negative favours the first)"),
+        (
+            "contrasts_sign",
+            SIGN,
+            "Sign: Brier score of P(X<0), first arm minus second (negative favours the first)",
+        ),
         ("contrasts_step", STEP, "Transfer step: Brier score of the step event"),
         ("contrasts_solar", SOLAR, "Solar output: mean absolute error in points of capacity"),
     ):
