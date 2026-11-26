@@ -37,6 +37,12 @@ import numpy as np
 
 Log = Callable[[str], None]
 StoppedError = banks730.StoppedError
+
+
+class GuardError(RuntimeError):
+    """Raised by `guard_run` when a gate is open or the folder holds the outputs of another run."""
+
+
 RUN_MARKER: Final = "run_marker.json"
 CODE_VERSION: Final = 1
 """The version of this experiment's code that the run marker records. A change that alters a stored output raises it."""
@@ -260,10 +266,10 @@ def _guard_banks(*, root: Path, expected: dict, current: dict | None) -> None:
     }
     if fits_exist(root=root) or not only_version:
         msg = "the run marker differs from the code and the banks in use: move the outputs to superseded_run_N yourself"
-        raise RuntimeError(msg)
+        raise GuardError(msg)
     if len(gate_attempts(root=root)["versions"]) >= MAX_GATE_VERSIONS:
         msg = "the gates have used their one attempt after a change of the code version (verdict row 0)"
-        raise RuntimeError(msg)
+        raise GuardError(msg)
 
 
 def guard_run(*, root: Path, root730: Path, stage: str) -> None:
@@ -275,7 +281,7 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
         stage: The stage name.
 
     Raises:
-        RuntimeError: When a gate is open, a correctness check has failed, or the folder holds
+        GuardError: When a gate is open, a correctness check has failed, or the folder holds
             outputs of another run.
     """
     expected = run_marker_payload(root730=root730)
@@ -286,7 +292,7 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
         return
     if current != expected:
         msg = "no run marker matches the banks and the code in use: run `banks` first"
-        raise RuntimeError(msg)
+        raise GuardError(msg)
     needs = {
         "limits": (("neighbours", neighbours_passed(root=root)),),
         "overlays": (("limits.json", (root / "limits.json").exists()),),
@@ -299,11 +305,11 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
     for what, ok in needs.get(stage, ()):
         if not ok:
             msg = f"`{stage}` needs {what} first"
-            raise RuntimeError(msg)
+            raise GuardError(msg)
     if stage in GATED_STAGES:
         if invalid_recorded(root=root):
             msg = f"`{stage}` starts a fit, but {INVALID_FILE} records a failed correctness check (verdict row 1): the run is over"
-            raise RuntimeError(msg)
+            raise GuardError(msg)
         for what, ok in (
             (
                 "neighbours/check.json with a pass and the neighbour table",
@@ -319,16 +325,16 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
         ):
             if not ok:
                 msg = f"`{stage}` needs {what}"
-                raise RuntimeError(msg)
+                raise GuardError(msg)
     if stage in FIT_STAGES and not timing_passed(root=root):
         msg = f"`{stage}` needs scores/timing.json with a pass: run `timing` first"
-        raise RuntimeError(msg)
+        raise GuardError(msg)
     if (
         stage in ("score", "real", "report", "figures", "series")
         and not (root / "limits.json").exists()
     ):
         msg = f"`{stage}` needs limits.json"
-        raise RuntimeError(msg)
+        raise GuardError(msg)
 
 
 # --------------------------------------------------------------------------- the banks of experiment 730
@@ -673,11 +679,7 @@ def overlay_stage_bank(
         record["reachability"] = {
             k: {"count": v[0], "bar": v[1], "pass": v[2]} for k, v in reach.items()
         }
-        problems += [
-            f"{name}: reachability {k} holds {v[0]} against {v[1]}"
-            for k, v in reach.items()
-            if not v[2]
-        ]
+        record["reachability_short"] = sorted(k for k, v in reach.items() if not v[2])
     return record, problems
 
 
@@ -693,10 +695,10 @@ def stage_overlays(
     """Build every overlay on the CPU, run the component checks, and write `overlays/summary.json`.
 
     The stage stops at verdict row 0 when a component check fails or has no cases (the mirror check
-    included), a month lacks sibling pairs for more than 5% of its windows, a reachability count is
-    short, or the training share of reverse flow with the transfers differs from the stored share by
-    more than 10% of the stored share. A reachability shortfall that the plan says only voids a word
-    is listed in the summary and does not stop the line (the check of `ov.reachability` reports it).
+    included), a month lacks sibling pairs for more than 5% of its windows, or the training share of reverse flow with the transfers differs from the stored share by
+    more than 10% of the stored share. A reachability shortfall only voids a word of the verdict (the
+    plan says the line does not stop), so the summary lists it under `reachability_short` of the test
+    bank and `stage_score` reads the counts again.
 
     Args:
         root: The data folder of this experiment.

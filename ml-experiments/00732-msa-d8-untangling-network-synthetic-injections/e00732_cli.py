@@ -96,6 +96,9 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--seed", type=int)
     parser.add_argument("--confirm-panels", help="JSON file of the session's per-panel reading")
     parser.add_argument("--manager-approved", action="store_true")
+    parser.add_argument(
+        "--rerun", action="store_true", help="Run again a fit that has a .failed.json"
+    )
     parser.add_argument("--cores", default="?", help="The cores of the slot, for the printed lines")
     args = parser.parse_args(argv)
     root = paths.data_root()
@@ -203,7 +206,12 @@ def dispatch(*, args: argparse.Namespace, root: Path, root730: Path) -> int:
                 run_one(args.arm, core.ARMS[args.arm].arch, args.seed)
             else:
                 status = fit.stage_chain(
-                    root=root, root730=root730, run_one=run_one, log=log, cores=args.cores
+                    root=root,
+                    root730=root730,
+                    run_one=run_one,
+                    log=log,
+                    cores=args.cores,
+                    rerun=args.rerun,
                 )
                 log(f"chain: {status['state']}")
     else:

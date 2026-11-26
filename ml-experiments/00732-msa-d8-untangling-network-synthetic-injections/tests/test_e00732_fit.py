@@ -208,6 +208,57 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
     assert json.loads((root / "chain_status.json").read_text())["state"] == "failed"
 
 
+@pytest.mark.parametrize("error", [stages.StoppedError, stages.GuardError])
+def test_a_stop_or_a_closed_gate_is_never_hidden_as_a_failed_fit(
+    run: Any, error: type[Exception]
+) -> None:
+    root, root730, _env = run
+    (root / "scores").mkdir(exist_ok=True)
+    stages.write_json(
+        path=root / "scores" / "timing.json", payload={"pass": True, "hours_at_cap": 3.0}
+    )
+
+    def stop(arm: Any, arch: Any, seed: Any) -> Any:
+        raise error("a gate is open")
+
+    with pytest.raises(error):
+        fit.run_jobs(root=root, jobs=[("U*", "unet", 0)], run_one=stop, log=print)
+    assert not list(root.glob("fits/*.failed.json"))
+    with pytest.raises(error):
+        fit.stage_chain(root=root, root730=root730, run_one=stop, log=print)
+    status = json.loads((root / "chain_status.json").read_text())
+    assert status["state"] == "stopped"
+    assert not list(root.glob("fits/*.failed.json"))
+
+
+def test_a_failed_fit_is_skipped_unless_rerun_is_passed(run: Any) -> None:
+    root, _root730, _env = run
+    calls: list[str] = []
+
+    def flaky(arm: Any, arch: Any, seed: Any) -> Any:
+        calls.append(arm)
+        if len(calls) == 1:
+            raise ValueError("a fit raised")
+        stages.write_json(
+            path=stages.job_path(root=root, arm=arm, arch=arch, seed=seed), payload={"arm": arm}
+        )
+        return {}
+
+    jobs = [("U*", "unet", 0)]
+    assert fit.run_jobs(root=root, jobs=jobs, run_one=flaky, log=print)["failed"] == 1
+    again = fit.run_jobs(root=root, jobs=jobs, run_one=flaky, log=print)
+    assert again["skipped_failed"] == 1
+    assert len(calls) == 1
+    done = fit.run_jobs(root=root, jobs=jobs, run_one=flaky, log=print, rerun=True)
+    assert done["run"] == 1
+    assert len(calls) == 2
+    assert (
+        not stages.job_path(root=root, arm="U*", arch="unet", seed=0)
+        .with_suffix(".failed.json")
+        .exists()
+    )
+
+
 def test_net_checks_fire_on_a_head_that_leaks_into_the_sign_and_on_a_missing_stop_gradient() -> (
     None
 ):

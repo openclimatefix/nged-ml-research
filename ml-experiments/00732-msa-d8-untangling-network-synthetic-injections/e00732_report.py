@@ -10,12 +10,12 @@ files into `scores/verdict.json` through `score.build_verdict`. Nothing here pri
 or a name; the files hold aggregates only.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import e00732_paths  # noqa: F401
+import e00732_paths
 
 # isort: split
 import e00729_banks as banks729
@@ -535,6 +535,7 @@ def real_day_checks(
     edges: Sequence[real.Edge],
     closure_days: np.ndarray | None,
     dates: np.ndarray,
+    private_log: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Return P2, P3, P4, and K3 from the stored real-day outputs, as aggregates only.
 
@@ -551,6 +552,7 @@ def real_day_checks(
         edges: The logged closure edges of D8.
         closure_days: Whether each calendar row lies within a logged closure.
         dates: The date of each calendar row (`datetime64[D]`).
+        private_log: Receives P4's count of running half-hours (it never enters the result).
 
     Returns:
         "p2", "p3", "p4", and "k3" (each None when its inputs are missing).
@@ -573,7 +575,7 @@ def real_day_checks(
     if k1 is not None and pv_k is not None and running_k1 is not None:
         out["p4"] = real.p4_absorb(
             pv=pv_k, running=np.asarray(running_k1, dtype=bool), hh=k1.hh,
-            valid=np.ones(len(pv_k), dtype=bool),
+            valid=np.ones(len(pv_k), dtype=bool), private_log=private_log,
         )  # fmt: skip
     steps = {
         n: outputs["r1"].get(k)
@@ -632,6 +634,10 @@ def stage_real(
             for s in core.SEEDS
         ]
 
+    def private_log(line: str) -> None:
+        with (e00732_paths.private_dir(root=root) / "real_private.log").open("a") as f:
+            f.write(line + "\n")
+
     folders = folders_of("U*")
     limits = core.read_limits_file(path=root / "limits.json")
     out: dict[str, Any] = {"h2": None, "p1": None, "p2": None, "p3": None, "p4": None, "k3": None}
@@ -674,6 +680,7 @@ def stage_real(
                 r1=rows["r1"], eras=rows["eras"], k1=rows["k1"], outputs=outputs,
                 day_eras=np.asarray(ctx.table.era), running_k1=running, edges=edges,  # ty: ignore[unresolved-attribute]
                 closure_days=closure_days, dates=cal.dates.astype("datetime64[D]"),
+                private_log=private_log,
             )
         )  # fmt: skip
         out["k3_status"] = status

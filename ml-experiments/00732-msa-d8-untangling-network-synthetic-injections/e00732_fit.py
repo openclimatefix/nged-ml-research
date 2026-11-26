@@ -239,30 +239,43 @@ def run_jobs(
     jobs: Sequence[tuple[str, str, int]],
     run_one: Callable[[str, str, int], dict],
     log: Log,
+    rerun: bool = False,
 ) -> dict[str, int]:
-    """Run fits one at a time; a fit that raises is recorded as failed (verdict row 2 when needed).
+    """Run fits one at a time; a fit that raises is recorded as failed and the run goes on.
 
-    Not rerun, and the run goes on.
+    A failed fit leaves `<name>.failed.json` and is not run again unless `rerun` is true. A
+    `CorrectnessFailureError` (verdict row 1), a `StoppedError` (verdict row 0), and a `GuardError`
+    (a gate that is open) are never hidden as a failed fit: each propagates.
 
-    A `CorrectnessFailureError` is never hidden as a failed fit: it propagates (verdict row 1).
+    Args:
+        root: The data folder.
+        jobs: The (arm, architecture, seed) of each fit.
+        run_one: Runs one fit.
+        log: Receives progress lines.
+        rerun: Whether to run a fit again that has a `.failed.json`.
+
+    Returns:
+        The counts of fits run, skipped, skipped as already failed, and failed.
     """
-    counts = {"run": 0, "skipped": 0, "failed": 0}
+    counts = {"run": 0, "skipped": 0, "skipped_failed": 0, "failed": 0}
     for arm, arch, seed in jobs:
         record = stages.job_path(root=root, arm=arm, arch=arch, seed=seed)
+        failed_path = record.with_suffix(".failed.json")
         if record.exists():
             counts["skipped"] += 1
             continue
+        if failed_path.exists() and not rerun:
+            counts["skipped_failed"] += 1
+            continue
         try:
             run_one(arm, arch, seed)
-            record.with_suffix(".failed.json").unlink(missing_ok=True)
+            failed_path.unlink(missing_ok=True)
             counts["run"] += 1
-        except leak.CorrectnessFailureError:
+        except leak.CorrectnessFailureError, stages.StoppedError, stages.GuardError:
             raise
         except Exception as exc:  # noqa: BLE001
             counts["failed"] += 1
-            stages.write_json(
-                path=record.with_suffix(".failed.json"), payload={"error": type(exc).__name__}
-            )
+            stages.write_json(path=failed_path, payload={"error": type(exc).__name__})
             log(f"fit {record.stem} failed: {type(exc).__name__}")
     return counts
 
@@ -367,6 +380,7 @@ def stage_chain(
     run_one: Callable[[str, str, int], dict],
     log: Log,
     cores: str = "?",
+    rerun: bool = False,
 ) -> dict:
     """Run the fits family by family, stopping at the first stop or failure.
 
@@ -385,6 +399,7 @@ def stage_chain(
         run_one: Runs one fit given its arm, architecture, and seed.
         log: Receives progress lines.
         cores: The slot's cores, for the printed lines.
+        rerun: Whether to run a fit again that has a `.failed.json`.
 
     Returns:
         The status record.
@@ -401,13 +416,13 @@ def stage_chain(
         write_status(root=root, status={"state": "running", "family": family, "done": done})
         log(fits_starting_line(family=family, hours=float(timing["hours_at_cap"]), cores=cores))
         try:
-            counts = run_jobs(root=root, jobs=jobs, run_one=run_one, log=log)
+            counts = run_jobs(root=root, jobs=jobs, run_one=run_one, log=log, rerun=rerun)
         except leak.CorrectnessFailureError as exc:
             stages.record_invalid(root=root, rule=str(exc))
             status = {"state": "invalid", "family": family, "reason": str(exc), "done": done}
             write_status(root=root, status=status)
             raise
-        except stages.StoppedError as exc:
+        except (stages.StoppedError, stages.GuardError) as exc:
             write_status(
                 root=root,
                 status={"state": "stopped", "family": family, "reason": str(exc), "done": done},

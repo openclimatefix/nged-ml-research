@@ -1484,7 +1484,9 @@ class VerdictFacts:
 def unread_checks(*, facts: VerdictFacts) -> list[str]:
     """Return the checks that the row reads and that cannot be read.
 
-    The checks are C1, H1 by band, and H2. Each makes the run `failed`, never a silent row 6.
+    The checks are C1, H1 by band, H2, and HB (read only when the band of 1 to 3 MVA is above its
+    limit, because a band above its limit needs HB's lower bound). Each makes the run `failed`, never
+    a silent row 6.
     """
     unread = []
     if not finite_reading(reading=facts.c.get("C1")):
@@ -1496,6 +1498,10 @@ def unread_checks(*, facts: VerdictFacts) -> list[str]:
     )
     if facts.h2 is None or int(facts.h2.get("n", 0)) == 0:
         unread.append("H2")
+    band = facts.h1.get("1-3MVA")
+    hb_readable = facts.hb is not None and finite_reading(reading=facts.hb)
+    if band is not None and int(band.get("n", 0)) > 0 and not band["pass"] and not hb_readable:
+        unread.append("HB")
     return unread
 
 
@@ -1518,10 +1524,8 @@ def build_verdict(*, facts: VerdictFacts) -> dict[str, object]:
     )
     band_status = (
         "unread"
-        if "H1 1-3MVA" in unread
-        else band_boundary(
-            band=facts.h1["1-3MVA"], b13_lower=hb_lower if math.isfinite(hb_lower) else 0.0
-        )
+        if "H1 1-3MVA" in unread or "HB" in unread
+        else band_boundary(band=facts.h1["1-3MVA"], b13_lower=hb_lower)
     )
     c1_reading = (
         c1.reading

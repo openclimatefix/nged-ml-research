@@ -230,20 +230,20 @@ def test_overlays_stage_passes_on_the_invented_bank_and_writes_digests(folders: 
     assert summary2["banks"]["test"]["digest"] == summary["banks"]["test"]["digest"]
 
 
-def test_overlays_stage_stops_on_a_short_reachability_count(folders: Any, monkeypatch: Any) -> None:
+def test_a_short_reachability_count_is_recorded_and_does_not_stop_the_line(
+    folders: Any, monkeypatch: Any
+) -> None:
     root, root730, world = folders
     banks_and_limits(root=root, root730=root730, world=world)
     monkeypatch.setattr(core, "MIN_TRANSFER_STEPS_TEST", 10**9)
-    with pytest.raises(stages.StoppedError, match="reachability"):
-        stages.stage_overlays(
-            root=root,
-            root730=root730,
-            holidays=world["cal"].holidays,
-            log=print,
-            train_seeds=(0,),
-            neighbours=world["neighbours"],
-        )
-    assert not stages.overlays_passed(root=root)
+    summary = stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print,
+        train_seeds=(0,), neighbours=world["neighbours"],
+    )  # fmt: skip
+    assert summary["pass"]
+    assert summary["banks"]["test"]["reachability_short"] == ["transfer_steps_5_points"]
+    assert not summary["banks"]["test"]["reachability"]["transfer_steps_5_points"]["pass"]
+    assert stages.overlays_passed(root=root)
 
 
 def test_overlays_stage_stops_when_a_training_month_lacks_sibling_pairs(folders: Any) -> None:
@@ -788,14 +788,21 @@ def test_overlays_stage_records_the_unreliable_share_per_bank(folders: Any) -> N
     )["digests"])  # fmt: skip
 
 
-def test_overlays_stage_stops_when_more_than_five_percent_are_unreliable(
+def test_overlays_stage_stops_only_above_the_registered_unreliable_share(
     folders: Any, monkeypatch: Any
 ) -> None:
     import e00732_overlays as ov
 
-    monkeypatch.setattr(ov, "unreliable_counts", lambda *, segments: (10, 100))
+    assert core.MAX_UNRELIABLE_SHARE == 0.07
+    n_up = 10_000
+    just_above = int(core.MAX_UNRELIABLE_SHARE * n_up) + 1
+    just_below = int(core.MAX_UNRELIABLE_SHARE * n_up) - 1
+    monkeypatch.setattr(ov, "unreliable_counts", lambda *, segments: (just_above, n_up))
     with pytest.raises(stages.StoppedError, match="unreliable solar targets"):
         _run_overlays(folders=folders)
+    monkeypatch.setattr(ov, "unreliable_counts", lambda *, segments: (just_below, n_up))
+    summary = _run_overlays(folders=folders)
+    assert summary["pass"]
 
 
 def test_overlays_stage_stops_on_a_silent_mask(folders: Any, monkeypatch: Any) -> None:

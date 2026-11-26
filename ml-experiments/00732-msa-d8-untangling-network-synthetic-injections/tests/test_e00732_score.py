@@ -637,6 +637,18 @@ def test_a_band_above_its_limit_fails_only_with_hb_lower_above_zero() -> None:
     assert failing["band_1_3_mva"] == "fail"
 
 
+def test_a_band_above_its_limit_with_an_unreadable_hb_is_unread_row_2() -> None:
+    nan = reading(point=float("nan"), lower=float("nan"), upper=float("nan"))
+    band = {"pooled": PASS, "3MVA+": PASS, "1-3MVA": {"pass": False, "n": 10}}
+    for hb in (nan, None):
+        out = sc.build_verdict(facts=facts(h1=band, hb=hb))
+        assert out["row"] == 2
+        assert out["band_1_3_mva"] == "unread"
+        assert "HB" in out["reason"]  # ty: ignore[unsupported-operator]
+    # a band that passes does not need HB
+    assert sc.build_verdict(facts=facts(hb=nan))["row"] != 2
+
+
 def test_unread_c1_or_harm_checks_are_row_2_never_a_silent_row_6() -> None:
     nan = reading(point=float("nan"), lower=float("nan"), upper=float("nan"))
     out = sc.build_verdict(facts=facts(c={**facts().c, "C1": nan}))

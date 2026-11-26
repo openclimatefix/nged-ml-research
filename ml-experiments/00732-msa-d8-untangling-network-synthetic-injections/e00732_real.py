@@ -7,7 +7,7 @@ function returns the level, the daily shape, or the peak of the solar output on 
 and P2 alone returns a mean (of the pre-engine era, which holds no solar farm) rounded to 0.1 points.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Final
@@ -129,15 +129,35 @@ def p3_follows_sky(*, pv: np.ndarray, csi: np.ndarray, cosz: np.ndarray, valid: 
     }
 
 
-def p4_absorb(*, pv: np.ndarray, running: np.ndarray, hh: np.ndarray, valid: np.ndarray) -> dict:
+def p4_absorb(
+    *,
+    pv: np.ndarray,
+    running: np.ndarray,
+    hh: np.ndarray,
+    valid: np.ndarray,
+    private_log: Callable[[str], None] | None = None,
+) -> dict:
     """Return P4's pass word on K1's half-hours: the solar output does not rise when the metered engine runs.
 
     At each UTC half-hour the mean output of the running half-hours is compared with that of the
     half-hours when the engine is off, and the differences are averaged with the running counts as
-    weights. The function returns a pass flag and counts, never a mean or a difference.
+    weights. The function returns a pass flag and a void flag, never a mean, a difference, or the
+    number of running half-hours, which `private_log` receives when it is given.
+
+    Args:
+        pv: The solar output of each half-hour.
+        running: Whether the metered engine runs in each half-hour.
+        hh: The half-hour of the day of each half-hour.
+        valid: Whether each half-hour is read.
+        private_log: Receives the number of running half-hours (for the private log only).
+
+    Returns:
+        `{"pass": bool, "void": bool}`.
     """
+    if private_log is not None:
+        private_log(f"P4: {int((valid & running).sum())} running half-hours read")
     if not score.finite_on(pv, keep=valid & running):
-        return {"pass": False, "n_running": int((valid & running).sum()), "void": False}
+        return {"pass": False, "void": False}
     num, den = 0.0, 0.0
     for h in range(48):
         on = valid & running & (hh == h)
@@ -146,12 +166,8 @@ def p4_absorb(*, pv: np.ndarray, running: np.ndarray, hh: np.ndarray, valid: np.
             num += float(on.sum()) * (float(pv[on].mean()) - float(pv[off].mean()))
             den += float(on.sum())
     if den == 0.0:
-        return {"pass": False, "n_running": int((valid & running).sum()), "void": True}
-    return {
-        "pass": bool(num / den <= core.P4_MAX_DIFFERENCE_POINTS),
-        "n_running": int((valid & running).sum()),
-        "void": False,
-    }
+        return {"pass": False, "void": True}
+    return {"pass": bool(num / den <= core.P4_MAX_DIFFERENCE_POINTS), "void": False}
 
 
 @dataclass(frozen=True)

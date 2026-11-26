@@ -81,11 +81,24 @@ def test_p4_fails_a_head_that_absorbs_the_engine_and_returns_no_level() -> None:
     valid = np.ones(n, bool)
     quiet = real.p4_absorb(pv=np.full(n, 3.0), running=running, hh=hh, valid=valid)
     assert quiet["pass"]
-    assert set(quiet) == {"pass", "n_running", "void"}
+    assert set(quiet) == {"pass", "void"}
     assert not real.p4_absorb(pv=np.where(running, 6.0, 3.0), running=running, hh=hh, valid=valid)[
         "pass"
     ]
     assert real.p4_absorb(pv=np.zeros(n), running=np.ones(n, bool), hh=hh, valid=valid)["void"]
+
+
+def test_p4_keeps_the_running_count_out_of_its_result_and_in_the_private_log() -> None:
+    n = 400
+    hh = np.tile(np.arange(48), n // 48 + 1)[:n]
+    running = (np.arange(n) // 48) % 2 == 0
+    lines: list[str] = []
+    out = real.p4_absorb(
+        pv=np.full(n, 3.0), running=running, hh=hh, valid=np.ones(n, bool), private_log=lines.append
+    )
+    assert set(out) == {"pass", "void"}
+    assert len(lines) == 1
+    assert str(int(running.sum())) in lines[0]
 
 
 def test_spearman_handles_ties_and_constants() -> None:
@@ -176,7 +189,7 @@ def test_every_real_check_fails_on_a_nan_output() -> None:
     running = (np.arange(n) // 48) % 2 == 0
     out = real.p4_absorb(pv=np.full(n, np.nan), running=running, hh=hh, valid=np.ones(n, bool))
     assert not out["pass"]
-    assert set(out) == {"pass", "n_running", "void"}
+    assert set(out) == {"pass", "void"}
 
 
 def test_the_real_constants_are_the_cores() -> None:
