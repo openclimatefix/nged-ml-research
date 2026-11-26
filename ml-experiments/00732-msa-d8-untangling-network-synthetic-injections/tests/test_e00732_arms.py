@@ -694,7 +694,7 @@ def test_a_check_with_no_case_fails(world: World) -> None:
 def test_real_pseudo_segments_carry_the_neighbours_when_given_and_zeros_without(
     world: World,
 ) -> None:
-    """A real run reaches the neighbour channels through `prepare_plain` (a pseudo-segment has no beta)."""
+    """A real run reaches the neighbour channels (a pseudo-segment has no beta)."""
     use = np.ones(len(world.cal.dates), bool)
     reading = np.nan_to_num(world.cal.reading, nan=5.0)
     real = [
