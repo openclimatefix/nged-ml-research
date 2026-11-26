@@ -14,6 +14,7 @@ with `DATA_PATH_INTERNAL` set. Aggregates only.
 
 import json
 import sys
+from collections.abc import Mapping
 
 import e00732_paths as paths
 
@@ -29,6 +30,23 @@ import numpy as np
 ARMS_SIGN = ("S", "S+", "U*", "U-NC", "U-NCw", "U-SG", "U-N", "U-noBSP", "S-L", "U*-L")
 ARMS_SOLAR = ("U*", "U-NC", "U-NCw", "U-SG", "U-N", "U-noBSP", "U*-L", "B-PV0", "B-PV1", "B-PV2")
 ARMS_STEP = ("U*", "U-NC", "U-NCw", "U-SG", "U-N", "U-noBSP", "U*-L", "B-TN", "B-T")
+
+
+def present(*, by_name: Mapping[str, np.ndarray | None]) -> dict[str, np.ndarray]:
+    """Return the arrays of `by_name` that exist, dropping the arms whose array is `None`."""
+    return {name: array for name, array in by_name.items() if array is not None}
+
+
+def required(*, by_name: Mapping[str, np.ndarray | None]) -> dict[str, np.ndarray]:
+    """Return `by_name` with every array present.
+
+    Raises:
+        ValueError: If any arm's array is `None`.
+    """
+    missing = [name for name, array in by_name.items() if array is None]
+    if missing:
+        raise ValueError(f"arms without the required array: {missing}")
+    return present(by_name=by_name)
 
 
 def clean(value: object) -> object:
@@ -97,7 +115,7 @@ def main() -> None:
 
     up = score.sun_up(cosz=truth_.cosz) & ~truth_.exclude
     solar_rows = score.solar_world(rows=rows)
-    pv = {n: arm_map[n].pv for n in ARMS_SOLAR if arm_map[n].pv is not None}
+    pv = present(by_name={n: arm_map[n].pv for n in ARMS_SOLAR})
     out["solar_mae"] = {
         n: {
             "mae_sun_up": float(np.abs(v - rows.solar)[up].mean()),
@@ -112,10 +130,10 @@ def main() -> None:
     out["t1_solar_by_world_source"] = score.solar_error_table(
         rows=rows, cosz=truth_.cosz, pv_by_arm=pv
     )
+    pv_tr = present(by_name={n: arm_map[n].pv_tr for n in ("U*", "U-N")})
     out["t1_transfer"] = score.transfer_solar_table(
-        rows=rows, cosz=truth_.cosz, tr=truth_.tr,
-        pv_tr_by_arm={n: arm_map[n].pv_tr for n in ("U*", "U-N") if arm_map[n].pv_tr is not None},
-    )  # fmt: skip
+        rows=rows, cosz=truth_.cosz, tr=truth_.tr, pv_tr_by_arm=pv_tr
+    )
 
     keep = {
         a: score.injection_keep(delta=truth_.delta[a], amount=a, cosz=truth_.cosz, pair=truth_.pair[a].astype(float), exclude=truth_.exclude)
@@ -181,6 +199,14 @@ def main() -> None:
         if a.step is None:
             continue
         f = score.step_f1(step_p=a.step[None, :], event=one["e"], size=one["s"], valid=one["v"])
+        t6 = score.step_table(
+            step_p=a.step, size_hat=a.size_hat, event=truth_.event, size=truth_.size, tr=tr
+        )
+        precision_all = score.precision_all(step_p=a.step, event=truth_.event)
+        counts = {
+            "below": int(((truth_.event > 0.5) & (tr.edge_noise < 4.0) & tr.edge).sum()),
+            "above": int(((truth_.event > 0.5) & (tr.edge_noise >= 4.0) & tr.edge).sum()),
+        }
         step[n] = {
             "f1_big": f,
             "brier_step": float(((a.step - truth_.event) ** 2).mean()),
@@ -194,26 +220,16 @@ def main() -> None:
                     valid=np.ones_like(truth_.event, bool),
                 )
             ),
-            "precision_all": score.precision_all(step_p=a.step, event=truth_.event),
-            "t6": score.step_table(
-                step_p=a.step, size_hat=a.size_hat, event=truth_.event, size=truth_.size, tr=tr
+            "precision_all": precision_all,
+            "t6": t6,
+            "detectability": score.detectability(
+                table=t6["size_noise_units"], precision=precision_all, counts=counts
             ),
+            "counts_by_4_noise_units": counts,
         }
-        counts = {
-            "below": int(((truth_.event > 0.5) & (tr.edge_noise < 4.0) & tr.edge).sum()),
-            "above": int(((truth_.event > 0.5) & (tr.edge_noise >= 4.0) & tr.edge).sum()),
-        }
-        step[n]["detectability"] = score.detectability(
-            table=step[n]["t6"]["size_noise_units"],
-            precision=step[n]["precision_all"],
-            counts=counts,
-        )  # type: ignore[index]
-        step[n]["counts_by_4_noise_units"] = counts
     out["step"] = step
-    out["r18"] = score.recall_gap_r18(
-        steps={n: arm_map[n].step for n in ("U*", "U-N", "B-TN", "B-T") if arm_map[n].step is not None},
-        event=truth_.event, size=truth_.size, tr=tr,
-    )  # fmt: skip
+    r18_steps = present(by_name={n: arm_map[n].step for n in ("U*", "U-N", "B-TN", "B-T")})
+    out["r18"] = score.recall_gap_r18(steps=r18_steps, event=truth_.event, size=truth_.size, tr=tr)
     out["n_edges_total"] = int(((truth_.event > 0.5) & tr.edge).sum())
     out["n_edges_5_points_plus"] = int(((truth_.event > 0.5) & (np.abs(truth_.size) >= 5.0)).sum())
     out["n_transfer_rows"] = int(truth_.event.size)
@@ -226,9 +242,8 @@ def main() -> None:
             if arm_map[n].p_tr is not None or arm_map[n].step is not None
         },
     )
-    out["t3_ambiguity"] = score.ambiguity_table(
-        rows=rows, p_by_arm={n: arm_map[n].p for n in ("U*", "S+", "U-SG", "S")}
-    )
+    p_by_arm = required(by_name={n: arm_map[n].p for n in ("U*", "S+", "U-SG", "S")})
+    out["t3_ambiguity"] = score.ambiguity_table(rows=rows, p_by_arm=p_by_arm)
     # T5: U* with the BSP channel hidden
     a = arm_map["U*"]
     if a.pv is not None and a.p_nobsp is not None:
@@ -243,7 +258,8 @@ def main() -> None:
     out["n_unreliable_excluded"] = int(truth_.exclude.sum())
     out["share_reverse_rows"] = float((x < 0).mean())
     out["share_import_below_1mva"] = float(((x >= 0) & ~dec).mean())
-    out["mean_p_s_on_reverse"] = {n: float(arm_map[n].p[x < 0].mean()) for n in ("S", "S+", "U*")}
+    p_reverse = required(by_name={n: arm_map[n].p for n in ("S", "S+", "U*")})
+    out["mean_p_s_on_reverse"] = {n: float(p[x < 0].mean()) for n, p in p_reverse.items()}
     path = root / "scores" / "tables.json"
     path.write_text(json.dumps(clean(out), indent=1))
     print(f"wrote {path.name}: arms {sorted(sign)}")
