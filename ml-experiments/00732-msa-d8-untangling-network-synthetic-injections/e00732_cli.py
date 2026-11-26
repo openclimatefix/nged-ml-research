@@ -28,11 +28,6 @@ import e00732_neighbours as nb
 import e00732_stages as stages
 import numpy as np
 
-CPU_ONLY_STAGES = (
-    "banks", "neighbours", "limits", "overlays", "tensor", "solar_diag", "gallery", "panels", "real", "score",
-    "report", "figures", "loss_curves", "series",
-)  # fmt: skip
-
 
 def log(line: str) -> None:
     """Print one progress line with a UTC time stamp."""

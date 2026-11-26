@@ -552,7 +552,8 @@ def stage_limits(
 ) -> dict:  # fmt: skip
     """Write `limits.json` once from the test bank's truth and the training base days alone.
 
-    The function stops when the pooled limit is not experiment 730's.
+    The function stops when the pooled limit is not experiment 730's, and when an existing
+    `limits.json` differs from the limits recomputed from the test bank.
     """
     guard_run(root=root, root730=root730, stage="limits")
     test = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
@@ -564,7 +565,16 @@ def stage_limits(
         raise StoppedError(msg)
     path = root / "limits.json"
     if path.exists():
-        return read_json(path=path)
+        stored = read_json(path=path)
+        recomputed = {
+            k: {"share": v.share, "limit": v.limit, "n_rows": v.n_rows} for k, v in limits.items()
+        }
+        if stored["bands"] != recomputed or stored["n_rows"] != rows.n:
+            msg = (
+                "limits.json differs from the limits recomputed from the test bank (verdict row 0)"
+            )
+            raise StoppedError(msg)
+        return stored
     record = core.write_limits_file(
         path=path, limits=limits, s=float(np.mean(rows.x < 0.0)), n_rows=rows.n,
         noise_units=noise_units(base=base, arrays=arrays),

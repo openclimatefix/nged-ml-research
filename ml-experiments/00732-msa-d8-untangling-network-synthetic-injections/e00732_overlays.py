@@ -696,6 +696,10 @@ def plain_overlays(
     The neighbours still enter every window as their stored readings, and their fold floors are
     drawn from `seed` and the segment's position, so a plain window and its transfer-overlaid twin
     share the floors of the same overlay kind only when the caller passes the same seed.
+
+    The floors come from the seed sequence `[seed, 3, index]`, with `seed` 0 by default. The plain
+    bank, the injection overlay, and the raised-sky overlay therefore share one set of floors for
+    each segment, so that the three differ only in what the experiment changes in them.
     """
     out = []
     for index, seg in enumerate(segments):

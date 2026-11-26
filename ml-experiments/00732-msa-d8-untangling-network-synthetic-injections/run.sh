@@ -4,7 +4,7 @@
 # The wrapper starts nothing by default: it needs `--go` before the script name, so that a stray
 # invocation only prints this help.
 #
-# Usage:  SLOT_CPUS=<cpu list, at most 6 cores, e.g. 16-21> run.sh --go e00732_cli.py <banks|neighbours|limits|overlays|tensor|gallery|panels|timing|fit|real|score|report|figures|loss_curves|series|chain> <arguments>
+# Usage:  SLOT_CPUS=<cpu list, at most 6 cores, e.g. 16-21> run.sh --go e00732_cli.py <banks|neighbours|limits|overlays|tensor|solar_diag|gallery|panels|timing|fit|real|score|report|figures|loss_curves|series|chain> <arguments>
 #         SLOT_CPUS=<list> FITS_STARTING=1 run.sh --go ...     prints the "fits starting" line for the manager
 #         SLOT_CPUS=<list> LAST_FIT_ENDED=1 run.sh --go ...    prints the "last fit ended" line for the manager
 #
@@ -13,7 +13,7 @@
 #   - one scope at a time: `systemd-run --user --scope`, `MemoryMax=$SLOT_MEM`, `MemorySwapMax=0`,
 #     `OOMPolicy=continue`, `AllowedCPUs=$SLOT_CPUS`;
 #   - one thread per worker for every numerical library (OMP, MKL, OpenBLAS, Polars, and Rayon);
-#   - `uptime` load at most 24 and at least 25 GB available at launch, or the wrapper refuses;
+#   - `uptime` load below 24 and at least 25 GB available at launch, or the wrapper refuses;
 #   - `taskset -c $SLOT_CPUS` as well, and `e00732_paths.pin_threads` asserts that `os.sched_getaffinity` shows at most 6 cores;
 #   - the venv's Python called directly (never `uv run` inside the scope); `PYTHON` names a venv built
 #     with `uv sync --group gpu` for the fits, and defaults to the `msa-f7-pv-part-1` worktree's venv,
@@ -21,7 +21,7 @@
 #   - for a command that uses the GPU (no `--device cpu`, and `CUDA_VISIBLE_DEVICES` not empty): the
 #     `nvidia-smi` totals leave room for 6 GB under the total of 36 GB, at most one other GPU process
 #     (of this experiment or another, counted together) holds the GPU, and a lock file allows one worker
-#     of this experiment at a time. `banks`, `limits`, `overlays`, `gallery`, `panels`, `real`, `score`, `report`, `figures`, and `series` run on the CPU and skip both checks;
+#     of this experiment at a time. `banks`, `neighbours`, `limits`, `overlays`, `tensor`, `solar_diag`, `gallery`, `panels`, `real`, `score`, `report`, `figures`, and `series` run on the CPU and skip both checks;
 #   - this folder on PYTHONPATH: `e00732_paths.py` adds the folders of experiment 730, and of the experiments that 730 imports, from this checkout.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # default to dummy values because the contracts package reads them at import. Each fit holds at most
@@ -62,8 +62,8 @@ if [ "${available_gb:-0}" -lt 25 ]; then
     exit 1
 fi
 load=$(awk '{print int($1)}' /proc/loadavg)
-if [ "$load" -gt 24 ]; then
-    echo "one-minute load ${load} is above 24; wait" >&2
+if [ "$load" -ge 24 ]; then
+    echo "one-minute load ${load} is 24 or above; wait" >&2
     exit 1
 fi
 # `e00732_paths.py` puts the sibling experiment folders on sys.path.
@@ -77,6 +77,10 @@ export DATA_PATH_INTERNAL
 if [ -n "${FITS_STARTING:-}" ]; then
     echo "fits starting: experiment 732, ${script} $*, core ${SLOT_CPUS}, $(date -u +%FT%TZ)"
 fi
+# Set PYTHON explicitly, for example `PYTHON=/path/to/venv/bin/python` (a venv built with `uv sync
+# --group gpu`). The default venv path holds the text `msa-f7`, so the scorer check below would match
+# a fit of this experiment that runs with the default interpreter. The check therefore ignores command
+# lines that name `e00732`, and it keeps refusing on any other match.
 default_python="$(dirname "$root")/.claude/worktrees/msa-f7-pv-part-1/.venv/bin/python"
 [ -x "$default_python" ] || default_python="$HOME/dev/nged-ml-research/.claude/worktrees/msa-f7-pv-part-1/.venv/bin/python"
 python_bin="${PYTHON:-$default_python}"
@@ -88,7 +92,7 @@ uses_gpu=1
 [ -z "${CUDA_VISIBLE_DEVICES+x}" ] || [ -n "${CUDA_VISIBLE_DEVICES}" ] || uses_gpu=0
 for arg in "$@"; do [ "$arg" = "cpu" ] && uses_gpu=0; done
 # these stages read files and compute on the CPU only: no GPU check and no GPU lock
-case "${1:-}" in banks | neighbours | limits | overlays | tensor | gallery | panels | real | score | report | figures | loss_curves | series) uses_gpu=0 ;; esac
+case "${1:-}" in banks | neighbours | limits | overlays | tensor | solar_diag | gallery | panels | real | score | report | figures | loss_curves | series) uses_gpu=0 ;; esac
 lock_prefix=""
 if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
     used_mb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '{s+=$1} END {print s+0}')
@@ -101,11 +105,15 @@ if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
     for pid in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader); do
         if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q 'e00732'; then ours=$((ours + 1)); else others=$((others + 1)); fi
     done
-    if [ "$ours" -ge 1 ]; then
-        echo "a process of experiment 732 already holds the GPU; the slot allows one GPU process" >&2
+    if [ $((ours + others)) -ge 2 ]; then
+        echo "GPU processes: ${ours} of experiment 732 and ${others} of others; at most 2 GPU processes run at once across all agents, and this one would be the third" >&2
         exit 1
     fi
-    if pgrep -f 'e0071[67]_score|msa-f7' >/dev/null; then
+    if [ "$ours" -ge 1 ]; then
+        echo "a process of experiment 732 already holds the GPU; the slot allows one GPU process of this experiment" >&2
+        exit 1
+    fi
+    if pgrep -af 'e0071[67]_score|msa-f7' | grep -qv 'e00732\b' ; then
         echo "a scorer of experiment 716 or 717, or an F7 job, holds the GPU: wait" >&2
         exit 1
     fi

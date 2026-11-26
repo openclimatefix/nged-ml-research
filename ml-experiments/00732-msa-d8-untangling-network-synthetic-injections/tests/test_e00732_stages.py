@@ -119,6 +119,24 @@ def test_limits_are_written_once_and_a_wrong_pooled_limit_stops(
         )
 
 
+def test_an_existing_limits_file_that_differs_from_the_recomputed_limits_stops(
+    folders: Any,
+) -> None:
+    root, root730, world = folders
+    stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
+    kwargs = {
+        "root": root, "root730": root730, "holidays": world["cal"].holidays, "log": print,
+        "base": world["base"], "arrays": world["neighbours"],
+    }  # fmt: skip
+    stages.stage_limits(**kwargs)
+    path = root / "limits.json"
+    record = json.loads(path.read_text())
+    record["bands"]["pooled"]["limit"] += 0.01
+    path.write_text(json.dumps(record))
+    with pytest.raises(stages.StoppedError, match="differs from the limits recomputed"):
+        stages.stage_limits(**kwargs)
+
+
 def test_guard_orders_the_stages_and_a_recorded_failure_ends_the_run(folders: Any) -> None:
     root, root730, world = folders
     with pytest.raises(RuntimeError, match="run `banks` first"):

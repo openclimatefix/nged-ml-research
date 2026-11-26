@@ -9,6 +9,9 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
+import e00732_paths  # noqa: F401
+
+# isort: split
 import e00729_banks as banks729
 import e00730_banks as banks730
 import e00732_arms as arms
