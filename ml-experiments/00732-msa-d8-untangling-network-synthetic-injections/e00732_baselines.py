@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 732: the baselines B-PV0, B-PV1, B-PV2 (solar output without a solar head), and B-T and B-TN (step rules).
+"""Experiment 732: the baselines B-PV0, B-PV1, B-PV2, B-T, and B-TN.
+
+B-PV0, B-PV1, and B-PV2 give solar output without a solar head. B-T and B-TN are step rules.
 
 This module imports no torch at the top. B-PV1 and B-PV2 read stored probabilities and demand
 outputs of experiment 730 and, on the injection overlay, the outputs of experiment 730's stored
@@ -67,7 +69,10 @@ def b_pv2(
     r: np.ndarray,
     cosz: np.ndarray,
 ) -> np.ndarray:
-    """Return B-PV2: the rule per seed of SD*, averaged over seeds 0 to 2 (it fails on a seed count that is not 3)."""
+    """Return B-PV2: the rule per seed of SD*, averaged over seeds 0 to 2.
+
+    It fails on a seed count that is not 3.
+    """
     if len(demand_by_seed) != len(core.SEEDS) or len(p_by_seed) != len(core.SEEDS):
         msg = "B-PV2 needs the three seeds of SD* (a missing seed makes the baseline void)"
         raise ValueError(msg)
@@ -110,7 +115,9 @@ class Outputs730:
 
 
 def b_pv_member(*, outputs: Outputs730, demand_median: np.ndarray | None = None) -> np.ndarray:
-    """Return B-PV2 (when `outputs` holds a demand output) or B-PV1 (with `demand_median`) on one member of the windows.
+    """Return B-PV2 (when `outputs` holds a demand output) or B-PV1 (with `demand_median`).
+
+    The result covers one member of the windows.
 
     The plain member and the injected member each give one estimate, so the recovery of a rule on the
     injection overlay is the difference of the two estimates against delta, exactly as for a head.
@@ -215,7 +222,11 @@ PV0_NAMES: Final = (
 
 
 def pv0_features(*, csi: np.ndarray, clear: np.ndarray, cosz: np.ndarray) -> np.ndarray:
-    """Return B-PV0's inputs `(..., 6)`: the CAMS index times the clear-sky irradiance, the irradiance, the cosine of the zenith angle, and their pairwise products."""
+    """Return B-PV0's inputs `(..., 6)`.
+
+    The columns are the CAMS index times the clear-sky irradiance, the irradiance, the cosine of the
+    zenith angle, and their pairwise products.
+    """
     a = csi * clear
     return np.stack([a, clear, cosz, a * clear, a * cosz, clear * cosz], axis=-1)
 
@@ -257,7 +268,9 @@ def b_pv0(
 
 
 def sky_of_windows(*, x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return the CAMS index, the clear-sky irradiance, and the cosine of the zenith angle of the scored day of plain windows.
+    """Return the CAMS index, the clear-sky irradiance, and the cosine of the zenith angle.
+
+    The values are those of the scored day of plain windows.
 
     Args:
         x: Plain windows `(B, C, 96)` (the sky channels are those of experiment 730's stack).
