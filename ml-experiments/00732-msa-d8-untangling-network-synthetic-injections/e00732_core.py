@@ -51,9 +51,10 @@ MIN_STEP_POINTS_REACHABLE: Final = 5.0
 # --------------------------------------------------------------------------- the bootstrap
 
 BLOCK_DAYS: Final = core729.BLOCK_DAYS
-N_CONTRASTS: Final = 6
+N_CONTRASTS: Final = 7
 LEVEL: Final = 1.0 - 0.05 / N_CONTRASTS
-"""Bonferroni level across the 6 counted contrasts (99.167%)."""
+"""Bonferroni level across the 7 counted contrasts, C1 to C7 (99.286%). The harm reading HB, the
+bar reading R23, and every other report-only reading are read at the same level outside the count."""
 N_RESAMPLES: Final = 20_000
 GENERATOR_SEED: Final = 732
 MASK_SEED: Final = 730
@@ -68,12 +69,40 @@ TRANSFER_RATE_FIXED: Final = 6.0
 TRANSFER_HOURS: Final = (1.0, 96.0)
 """Duration of one transfer: 1 hour to 4 days, log-uniform."""
 TRANSFER_POINTS: Final = (3.0, 40.0)
-"""Size of one transfer in points, log-uniform."""
-TRANSFER_INSIDE_BSP_A: Final = 0.7
-"""Probability that the partner Primary sits under BSP A (the BSP meter is unchanged)."""
+"""Size T0 of one transfer in points, log-uniform."""
+READ_PARTNERS: Final = ("D3", "D5", "D14")
+"""The neighbours that the neural network reads; a read partner is drawn with equal shares."""
+UNREAD_PARTNER: Final = "unread"
+"""Another Primary under BSP A that the neural network does not read (no mirror, BSP unchanged)."""
+OTHER_BSP_PARTNER: Final = "other_bsp"
+"""A Primary under another BSP (no mirror, the BSP meter moves by beta T)."""
+PARTNER_MIX: Final = {"read": 0.6, UNREAD_PARTNER: 0.2, OTHER_BSP_PARTNER: 0.2}
+"""The share of drawn transfers by partner case."""
+SHAPES: Final = ("constant", "demand", "solar")
+SHAPE_MIX: Final = {"constant": 0.6, "demand": 0.2, "solar": 0.2}
+"""The share of drawn transfers by shape."""
+SOLAR_SHAPE_KAPPA: Final = (0.3, 1.0)
+"""The depth kappa of a solar-shaped transfer, uniform; it is halved until the floor holds."""
+SHAPE_FLOOR: Final = 0.1
+"""A transfer's load never falls below this share of T0 on any half-hour (so T never changes sign)."""
+DONOR_CAP: Final = 0.8
+"""The load that a donor gives is at most this share of the donor's demand on every half-hour."""
+DONOR_REDRAWS: Final = 20
+"""A size that breaks the donor rule is redrawn this many times, and then the transfer is dropped."""
+MAX_DROPPED_SHARE: Final = 0.05
+"""At most this share of the drawn transfers may be dropped by the donor rule."""
+MIRROR_JITTER_SHARE: Final = 0.3
+"""The share of mirrored transfers whose mirror is jittered; the rest are exact."""
+MIRROR_JITTER_RANGE: Final = (0.7, 1.3)
+"""The factor j of a jittered mirror: the partner's series changes by minus j T."""
+MIRROR_TOLERANCE_POINTS: Final = 0.01
+"""The mirror check: the mean partner change equals minus j times the mean T within this many points."""
+MIN_PARTNER_COVERAGE: Final = 0.5
+"""A read partner must hold a reading on at least this share of the transfer's half-hours."""
 TICKS_PER_HALF_HOUR: Final = 6
 """A transfer starts on a 5-minute grid."""
 MAX_REDRAWS: Final = 200
+"""Placement redraws of a transfer whose edges or span do not fit."""
 INJECTION_POINTS: Final = (2.0, 60.0)
 """The extra injection a in training: log-uniform per window and epoch."""
 TEST_INJECTION_POINTS: Final = (5.0, 20.0, 50.0)
@@ -91,10 +120,18 @@ OVERLAY_KINDS: Final = ("train", "validation", "test")
 BANK_CODE: Final = {"train": 0, "validation": 1, "test": 2, "shifted": 3}
 DELTA_SHARE_OF_A: Final = 0.05
 """The injection readings keep half-hours where delta is at least this share of a."""
+DELTA_ACTIVE_POINTS: Final = 0.01
+"""A half-hour counts as carrying an injection when delta is above this many points."""
+CLEAR_DAY_CSI: Final = 0.8
+"""A clear day has a mean clear-sky index of at least this on its sun-up half-hours."""
+MIN_SOLAR_TARGET_SHARE: Final = 0.99
+"""The solar target is above zero on at least this share of sun-up half-hours of clear solar days."""
+TENSOR_CHECK_TOLERANCE: Final = 1e-5
+"""Channel values closer than this count as equal in the checks on the input tensors."""
 
 # --------------------------------------------------------------------------- training regime
 
-N_FITS: Final = 18
+N_FITS: Final = 24
 SEEDS: Final = (0, 1, 2)
 MAX_EPOCHS: Final = core730.MAX_EPOCHS
 EPOCH_WINDOWS: Final = core730.EPOCH_WINDOWS
@@ -130,6 +167,8 @@ class ArmSpec732:
         stop_gradient: The solar, step, and size heads read the backbone through a stop-gradient.
         inject: The arm sees each window's injected member.
         raised: The arm sees each window's raised-sky member.
+        neighbours: The arm reads the 12 neighbour channels (False for U-N, whose batches hold none).
+        bsp_zeroed: The arm's BSP-step channel and its mask are zero in every window (U-noBSP).
         role: The arm's pre-registered role.
     """
 
@@ -140,6 +179,8 @@ class ArmSpec732:
     stop_gradient: bool = False
     inject: bool = False
     raised: bool = False
+    neighbours: bool = True
+    bsp_zeroed: bool = False
     role: str = ""
 
     @property
@@ -172,19 +213,35 @@ ARMS: Final = {
         role="report only: stop-gradient",
     ),
     "U*-L": ArmSpec732("U*-L", "bilstm", True, _w(), inject=True, raised=True, role="report only: architecture"),
+    "U-N": ArmSpec732(
+        "U-N", "unet", True, _w(), inject=True, raised=True, neighbours=False,
+        role="control of C7: no neighbour channels",
+    ),
+    "U-noBSP": ArmSpec732(
+        "U-noBSP", "unet", True, _w(), inject=True, raised=True, bsp_zeroed=True,
+        role="report only: control of R19, the BSP channel is zero",
+    ),
 }  # fmt: skip
 FIT_ARMS: Final = tuple(ARMS)
-NEEDED_ARMS: Final = ("U*", "U-NC", "S+")
-"""A failed fit of one of these arms makes verdict row 2 (C1, C2, C3, C6, R4, and the bars)."""
-REPORT_ONLY_ARMS: Final = ("U-NCw", "U-SG", "U*-L")
+COUNTED_ARMS: Final = ("S+", "U*", "U-N", "U-NC")
+"""The four arms (12 fits) that the counted contrasts C1 to C7 read besides stored arms and rules."""
+NEEDED_ARMS: Final = COUNTED_ARMS
+"""A failed fit of one of these arms, not rerun under the rerun rule, makes verdict row 2."""
+REPORT_ONLY_ARMS: Final = ("U-NCw", "U-SG", "U*-L", "U-noBSP")
 FIT_FAMILIES: Final = (
     ("timing", ()),
-    ("U*, U-NC", ("U*", "U-NC")),
-    ("U-NCw, S+", ("U-NCw", "S+")),
+    ("S+, U*", ("S+", "U*")),
+    ("U-N", ("U-N",)),
+    ("U-NC", ("U-NC",)),
+    ("U-noBSP", ("U-noBSP",)),
+    ("U-NCw", ("U-NCw",)),
     ("U-SG", ("U-SG",)),
     ("U*-L", ("U*-L",)),
 )
-"""The families of fits, in order; a "fits starting" line precedes each."""
+"""The families of fits, in order; a "fits starting" line precedes each. The report-only arms come
+last, so that a stop at the stop line loses report-only readings before any counted reading."""
+DROP_ORDER: Final = ("U*-L", "U-SG", "U-NCw", "U-noBSP")
+"""The report-only arms that the timing gate drops, in order, while the projection exceeds the stop line."""
 STORED_730: Final = {
     "S": ("S", "unet"),
     "S-L": ("S", "bilstm"),
@@ -193,19 +250,39 @@ STORED_730: Final = {
 """The stored arms of experiment 730 read as controls: name -> (its fit name, architecture)."""
 CONTRASTS: Final = {
     "C1": ("U*", "S"), "C2": ("U*", "U-NC"), "C3": ("U*", "U-NC"), "C4": ("U*", "B-PV2"),
-    "C5": ("U*", "B-T"), "C6": ("U*", "S+"),
+    "C5": ("U*", "B-TN"), "C6": ("U*", "S+"), "C7": ("U*", "U-N"),
 }  # fmt: skip
 """Each counted contrast as (arm minus arm); a negative difference is a gain. C3 reads the injection error."""
+HARM_READING: Final = "HB"
+"""U* minus S in the band of 1 to 3 MVA, a one-sided lower bound at `LEVEL`, outside the count of 7."""
 REPORT_ONLY: Final = {
-    "R1": "U-SG minus S+, Brier of P(X<0)", "R2": "U* minus U-SG, Brier of P(X<0)",
-    "R3": "U*-L minus S-L (730), Brier of P(X<0)", "R4": "S+ minus S (730), Brier of P(X<0)",
-    "R5": "U* minus U-NC, Brier of P(X<0)", "R6": "U* minus B-PV1, solar mean absolute error",
-    "R7": "U*-L minus U*, solar mean absolute error", "R8": "U* minus S+, Brier of P(X<0) on the transfer overlay",
-    "R9": "U* minus U-NC, share of monotonicity violations", "R10": "U* minus U-NCw, solar mean absolute error",
-    "R11": "U* minus U-NCw, mean absolute injection error", "R12": "C4 on the solar-only rows and on the no-injection rows",
-    "B13": "U* minus S (730), mean P(X<0) on import half-hours of 1 to 3 MVA",
+    "R1": "U-SG minus S+, Brier score of P(X<0)",
+    "R2": "U* minus U-SG, Brier score of P(X<0)",
+    "R3": "U*-L minus S-L (730), Brier score of P(X<0)",
+    "R4": "S+ minus S (730), Brier score of P(X<0)",
+    "R5": "U* minus U-NC, Brier score of P(X<0)",
+    "R6": "U* minus B-PV1, solar mean absolute error",
+    "R7": "U*-L minus U*, solar mean absolute error",
+    "R8": "U* minus S+, Brier score of P(X<0) on the transfer overlay",
+    "R9": "U* minus U-NC, share of monotonicity violations",
+    "R10": "U* minus U-NCw, solar mean absolute error",
+    "R11": "U* minus U-NCw, mean absolute injection error",
+    "R12": "C4 on the solar-only rows and on the no-injection rows, each alone",
+    "R13": "U* minus U-N, Brier score of P(X<0) on the plain test rows",
+    "R14": "U* minus U-N, Brier score of P(X<0) on the transfer overlay, split by whether the transfer has a mirror at a read neighbour",
+    "R15": "U-N minus B-T, Brier score of the step event",
+    "R16": "C7 split by partner case",
+    "R17": "C5 and C7 split by the transfer's shape",
+    "R18": "recall of U*, U-N, B-TN, and B-T on solar-shaped transfers minus recall on constant transfers",
+    "R19": "U* minus U-noBSP, Brier score of P(X<0) on the plain test rows of the two BSP test months",
+    "R20": "R19 split by world type, and R19 on all plain test rows",
+    "R21": "U* with the BSP channel and its mask zero at scoring time minus U*, Brier score of P(X<0) on the two BSP test months",
+    "R22": "U* minus U-noBSP, Brier score of the step event on the transfer overlay, split by partner case",
+    "R23": "U* minus B-PV0, solar mean absolute error on the sun-up rows of solar-world windows",
 }  # fmt: skip
 N_REPORT_ONLY: Final = len(REPORT_ONLY)
+TABLES: Final = ("T1", "T2", "T3", "T4", "T5", "T6")
+"""The report tables of the plan's section "Contrasts"."""
 
 # --------------------------------------------------------------------------- limits and bars
 
@@ -218,7 +295,13 @@ BANDS: Final = ("pooled", "1-3MVA", "3MVA+")
 FALSE_ALARM_THRESHOLD: Final = core730.FALSE_ALARM_THRESHOLD
 LIMIT_RANGE: Final = core730.LIMIT_RANGE
 RECOVERY_BAND: Final = (0.9, 1.1)
+"""The recovery ratio at each injected amount must lie in this band."""
 RECOVERY_MEDIAN_ERROR: Final = 0.1
+"""The median of |dPV - delta| over a must be at most this."""
+RECOVERY_REVERSE_BAND: Final = (0.8, 1.2)
+"""The recovery ratio on half-hours where the plain member is in reverse flow, pooled over amounts."""
+ABSOLUTE_BAR_SHARE: Final = 0.5
+"""The solar mean absolute error on sun-up solar-world half-hours is at most this share of the mean target."""
 NIGHT_MEAN_POINTS: Final = 0.05
 NIGHT_EXCEED_POINTS: Final = 0.5
 NIGHT_EXCEED_SHARE: Final = 0.005
@@ -227,7 +310,24 @@ MONOTONE_MAX_SHARE: Final = 0.05
 RESPONSE_MIN_TARGET_POINTS: Final = 1.0
 RESPONSE_MIN_SHARE: Final = 0.5
 TRANSFER_F1_BAR: Final = 0.6
-SOLAR_BARS: Final = ("recovery", "night", "monotone", "response", "better_than_demand")
+SOLAR_BARS: Final = (
+    "recovery", "recovery_reverse", "absolute", "better_than_sky", "night", "monotone", "response",
+    "better_than_demand",
+)  # fmt: skip
+"""The eight solar bars, each read on U* on the test bank."""
+SOLAR_CORE_BARS: Final = ("recovery", "recovery_reverse", "absolute", "better_than_sky")
+"""The bars that a "partly" solar word still needs: the two recovery bars, the absolute bar, and the sky bar."""
+DETECTABLE_RECALL: Final = 0.5
+DETECTABLE_PRECISION: Final = 0.5
+"""A size band is detectable when recall and precision at the 0.5 threshold both reach these."""
+SIZE_BANDS_NOISE_UNITS: Final = (2.0, 4.0, 8.0)
+"""Edges of T6's bands of size in D8's noise units: under 2, 2 to 4, 4 to 8, and 8 and more."""
+SIZE_BANDS_POINTS: Final = (3.0, 5.0, 10.0, 20.0, 40.0)
+DURATION_BANDS_HOURS: Final = (1.0, 3.0, 12.0, 48.0, 96.0)
+MIN_STEPS_PER_SIDE: Final = 100
+"""The detectability statement needs this many scored steps under, and at, 4 noise units."""
+MIN_BSP_REVERSE_HALF_HOURS: Final = 200
+"""R19 and the BSP word are void below this many reverse-flow half-hours in the two BSP test months."""
 Q_HAT_MVA: Final = 0.1
 """The reactive floor that B-PV2 and B-PV1 remove from the reading."""
 Q_HAT_POINTS: Final = Q_HAT_MVA / core729.CAPACITY_MVA * core729.POINTS
@@ -254,30 +354,31 @@ STOP_LINE_HOURS: Final = 16.0
 MEMORY_CAP_GB: Final = 14.0
 GPU_MEMORY_GB: Final = 6.0
 TIMING_EPOCHS: Final = 5
-TIMING_ARMS: Final = ("U*", "U-NC", "S+", "U-SG", "U*-L")
-INFERENCE_HOURS: Final = 0.25
+TIMING_ARMS: Final = ("U*", "U-N", "U-NC", "S+", "U-SG", "U*-L")
+INFERENCE_HOURS: Final = 0.3
 TIMING_GATE_HOURS: Final = 0.05
 FITS_PER_ARM: Final = len(SEEDS)
 RATE_OF: Final = {
     "U*": "U*",
+    "U-N": "U-N",
     "U-NC": "U-NC",
     "U-NCw": "U-NC",
     "S+": "S+",
     "U-SG": "U-SG",
     "U*-L": "U*-L",
+    "U-noBSP": "U*",
 }
 """The timed arm whose seconds an epoch prices each fitted arm."""
 MAX_SLOT_WORKERS: Final = 6
 
 # --------------------------------------------------------------------------- the verdict
 
-Verdict = Literal[
-    "stopped", "invalid", "failed", "not supported", "supported", "partly supported", "inconclusive"
-]
+Verdict = Literal["stopped", "invalid", "failed", "not supported", "supported", "inconclusive"]
 VERDICT_WORDS: Final = {
     0: "stopped", 1: "invalid", 2: "failed", 3: "not supported", 4: "supported",
-    5: "partly supported", 6: "not supported", 7: "inconclusive", 8: "not supported",
+    5: "inconclusive", 6: "not supported",
 }  # fmt: skip
+"""The verdict table of the plan: the first row that matches is the verdict."""
 FRONT_MATTER_WORD: Final = {"stopped": "inconclusive"}
 """Row 0 is recorded as `inconclusive` in the front matter."""
 
@@ -288,20 +389,20 @@ class VerdictInputs:
 
     Attributes:
         stopped: Row 0 applies.
-        invalid: Row 1 applies.
+        invalid: A correctness check of row 1 failed.
+        silent_test_missed: A known-answer test of a silenced component did not fail (row 1).
         failed: Row 2 applies.
         h1_pooled_pass: H1 pooled passed for U*.
         h1_high_pass: H1 at 3 MVA and above passed for U*.
         h2_pass: H2 passed.
-        band_fail: The band of 1 to 3 MVA is above its limit and B13's lower end is above zero.
+        band_fail: The band of 1 to 3 MVA is above its limit and HB's lower bound is above zero.
         c1: The headline contrast C1 (U* minus S).
         margin: The margin m.
-        solar_bars: Whether each of the five solar bars passed.
-        c2_gain: C2's interval excludes zero on the negative side.
     """
 
     stopped: bool
     invalid: bool
+    silent_test_missed: bool
     failed: bool
     h1_pooled_pass: bool
     h1_high_pass: bool
@@ -309,13 +410,15 @@ class VerdictInputs:
     band_fail: bool
     c1: core729.Reading
     margin: float
-    solar_bars: Mapping[str, bool]
-    c2_gain: bool
 
 
-def solar_bars_pass(*, bars: Mapping[str, bool]) -> bool:
-    """Return whether every one of the five solar bars is present and passed (a missing bar fails)."""
-    return all(bool(bars.get(name, False)) for name in SOLAR_BARS)
+def band_fails(*, band_mean: float, band_limit_value: float, hb_lower: float) -> bool:
+    """Return whether the band of 1 to 3 MVA fails H1: above its limit and HB's lower bound above zero.
+
+    A band that is above its limit with HB's lower bound at or below zero is "at the calibrated
+    boundary" and does not fail.
+    """
+    return bool(band_mean > band_limit_value and hb_lower > 0.0)
 
 
 def harm_row_fails(*, v: VerdictInputs) -> str | None:
@@ -327,28 +430,30 @@ def harm_row_fails(*, v: VerdictInputs) -> str | None:
     if not v.h2_pass:
         return "H2"
     if v.band_fail:
-        return "H1 in the band of 1 to 3 MVA (against B13)"
+        return "H1 in the band of 1 to 3 MVA (against HB)"
     return None
 
 
+def non_inferior(*, c1: core729.Reading, margin: float) -> bool:
+    """Return whether C1's upper end is at most the margin (NI)."""
+    return bool(c1.upper <= margin)
+
+
 def verdict_row(*, v: VerdictInputs) -> int:  # noqa: PLR0911
-    """Return the first row of the verdict table that matches (0 to 8)."""
+    """Return the first row of the verdict table that matches (0 to 6)."""
     if v.stopped:
         return 0
-    if v.invalid:
+    if v.invalid or v.silent_test_missed:
         return 1
     if v.failed:
         return 2
     if harm_row_fails(v=v) is not None:
         return 3
-    non_inferior = v.c1.upper <= v.margin
-    if non_inferior:
-        if not solar_bars_pass(bars=v.solar_bars):
-            return 6
-        return 4 if v.c2_gain else 5
+    if non_inferior(c1=v.c1, margin=v.margin):
+        return 4
     if v.c1.lower <= 0.0:
-        return 7
-    return 8
+        return 5
+    return 6
 
 
 def verdict_word(*, v: VerdictInputs) -> Verdict:
@@ -361,33 +466,127 @@ def front_matter_word(*, word: str) -> str:
     return FRONT_MATTER_WORD.get(word, word)
 
 
+def ni_note(*, c1: core729.Reading, margin: float) -> str | None:
+    """Return the sentence that row 4 carries when C1 is detectably worse by less than the margin."""
+    if non_inferior(c1=c1, margin=margin) and c1.lower > 0.0:
+        return "the sign is detectably worse, by less than the spread between seeds of experiment 730's S"
+    return None
+
+
+def sign_change_carrier(*, c6: core729.Reading, r4: core729.Reading) -> str:
+    """Return which of C6 and R4 carries a change in the sign (rows 3 to 6 print both).
+
+    A change in R4 comes from this experiment's training windows and inputs, and a change in C6
+    comes from the extra heads.
+    """
+    c6_moves = _excludes_zero(reading=c6)
+    r4_moves = _excludes_zero(reading=r4)
+    if c6_moves and r4_moves:
+        return "both C6 and R4"
+    if c6_moves:
+        return "C6"
+    if r4_moves:
+        return "R4"
+    return "neither"
+
+
+def _excludes_zero(*, reading: core729.Reading) -> bool:
+    """Return whether a finite interval excludes zero."""
+    finite = all(math.isfinite(z) for z in (reading.point, reading.lower, reading.upper))
+    return bool(finite and (reading.upper < 0.0 or reading.lower > 0.0))
+
+
+def is_gain(*, reading: core729.Reading) -> bool:
+    """Return whether a counted reading is a gain: an interval that lies below zero."""
+    return bool(math.isfinite(reading.upper) and reading.upper < 0.0)
+
+
+def is_loss(*, reading: core729.Reading) -> bool:
+    """Return whether a counted reading is a loss: an interval that lies above zero."""
+    return bool(math.isfinite(reading.lower) and reading.lower > 0.0)
+
+
+def reading_word(*, reading: core729.Reading | None) -> str:
+    """Return "gain", "loss", "no detectable difference", or "void" for a reading read at a threshold of zero."""
+    if reading is None or not all(
+        math.isfinite(z) for z in (reading.point, reading.lower, reading.upper)
+    ):
+        return "void"
+    if is_gain(reading=reading):
+        return "gain"
+    if is_loss(reading=reading):
+        return "loss"
+    return "no detectable difference"
+
+
+def solar_word(*, bars: Mapping[str, bool], reachable: bool) -> str:
+    """Return the solar word: "reasonable", "partly", "not shown", or "void".
+
+    "reasonable" needs all eight bars. "partly" needs the two recovery bars, the absolute bar, and
+    the bar against the sky alone, with another bar failing. A missing bar fails.
+    """
+    if not reachable:
+        return "void"
+    passed = {name: bool(bars.get(name, False)) for name in SOLAR_BARS}
+    if all(passed.values()):
+        return "reasonable"
+    if all(passed[name] for name in SOLAR_CORE_BARS):
+        return "partly"
+    return "not shown"
+
+
 def transfer_word(*, c5: core729.Reading | None, f1: float, reachable: bool) -> str:
-    """Return the transfer output's verdict word, read from C5 and the F1 bar.
+    """Return the transfer output's reading word, read from C5 and the F1 bar.
 
     Args:
-        c5: C5's reading (U* minus B-T in the step Brier score), or None.
+        c5: C5's reading (U* minus B-TN in the step Brier score), or None.
         f1: U*'s F1 at 0.5 on transfer steps of 5 points and more.
         reachable: The reachability count of transfer steps holds.
 
     Returns:
         "works", "works only in Brier score", "no better than the rule", "worse than the rule", or "void".
     """
-    if (
-        not reachable
-        or c5 is None
-        or not all(math.isfinite(z) for z in (c5.point, c5.lower, c5.upper))
-    ):
+    word = reading_word(reading=c5)
+    if not reachable or word == "void":
         return "void"
-    if c5.upper < 0.0:
+    if word == "gain":
         return "works" if f1 >= TRANSFER_F1_BAR else "works only in Brier score"
-    if c5.lower > 0.0:
+    if word == "loss":
         return "worse than the rule"
     return "no better than the rule"
 
 
-def is_gain(*, reading: core729.Reading) -> bool:
-    """Return whether a counted reading is a gain: an interval that lies below zero."""
-    return bool(math.isfinite(reading.upper) and reading.upper < 0.0)
+def neighbour_word(*, c7: core729.Reading | None, reachable: bool) -> str:
+    """Return the neighbour word, read from C7: "the neighbours help", "no detectable difference", "the neighbours hurt", or "void"."""
+    word = reading_word(reading=c7)
+    if not reachable or word == "void":
+        return "void"
+    return {
+        "gain": "the neighbours help",
+        "loss": "the neighbours hurt",
+        "no detectable difference": "no detectable difference",
+    }[word]
+
+
+def bsp_word(*, r19: core729.Reading | None, n_reverse_half_hours: int) -> str:
+    """Return the BSP word, read from R19: "helps", "no detectable difference", "hurts", or "void".
+
+    R19 reads the two test months that the BSP meter covers and is void below
+    `MIN_BSP_REVERSE_HALF_HOURS` reverse-flow half-hours there.
+    """
+    word = reading_word(reading=r19)
+    if n_reverse_half_hours < MIN_BSP_REVERSE_HALF_HOURS or word == "void":
+        return "void"
+    return {
+        "gain": "helps",
+        "loss": "hurts",
+        "no detectable difference": "no detectable difference",
+    }[word]
+
+
+def detectable_band(*, recall: float, precision: float) -> bool:
+    """Return whether a size band of table T6 is detectable (recall and precision both at least 0.5)."""
+    return bool(recall >= DETECTABLE_RECALL and precision >= DETECTABLE_PRECISION)
 
 
 # --------------------------------------------------------------------------- limits
@@ -438,13 +637,31 @@ def band_limits(*, x: np.ndarray, r: np.ndarray) -> dict[str, BandLimit]:
     }
 
 
+NOISE_UNIT_NAMES: Final = ("D8", "D3", "D5", "D14")
+"""The four series that have a noise unit, in points."""
+
+
 def write_limits_file(
-    *, path: Path, limits: Mapping[str, BandLimit], s: float, n_rows: int
-) -> dict:
-    """Write `limits.json` once (a second write raises `FileExistsError`) and return the record."""
+    *, path: Path, limits: Mapping[str, BandLimit], s: float, n_rows: int,
+    noise_units: Mapping[str, float] | None = None,
+) -> dict:  # fmt: skip
+    """Write `limits.json` once (a second write raises `FileExistsError`) and return the record.
+
+    Args:
+        path: The file.
+        limits: The harm limits of the three bands.
+        s: The test bank's share of reverse-flow half-hours.
+        n_rows: The test bank's scored half-hours.
+        noise_units: The four noise units in points (D8, D3, D5, D14), from the training base days
+            alone; the file holds them before any fit.
+    """
+    if noise_units is not None and set(noise_units) != set(NOISE_UNIT_NAMES):
+        msg = f"the noise units must name exactly {NOISE_UNIT_NAMES}"
+        raise ValueError(msg)
     record = {
         "s": s, "n_rows": n_rows,
         "bands": {k: {"share": v.share, "limit": v.limit, "n_rows": v.n_rows} for k, v in limits.items()},
+        "noise_units": None if noise_units is None else dict(noise_units),
     }  # fmt: skip
     core730.write_once_json(path=path, payload=record)
     return record
@@ -460,6 +677,18 @@ def read_limits_file(*, path: Path) -> dict[str, BandLimit]:
         k: BandLimit(share=v["share"], limit=v["limit"], n_rows=v["n_rows"])
         for k, v in bands.items()
     }
+
+
+def read_noise_units(*, path: Path) -> dict[str, float]:
+    """Read the four noise units from `limits.json` and fail when they are missing."""
+    if not path.exists():
+        msg = f"{path} does not exist: the limits must be written before any fit"
+        raise FileNotFoundError(msg)
+    units = json.loads(path.read_text()).get("noise_units")
+    if not units or set(units) != set(NOISE_UNIT_NAMES):
+        msg = f"{path} holds no complete set of noise units"
+        raise KeyError(msg)
+    return {k: float(v) for k, v in units.items()}
 
 
 def limit_problems(*, limits: Mapping[str, BandLimit]) -> list[str]:
@@ -481,29 +710,74 @@ def limit_problems(*, limits: Mapping[str, BandLimit]) -> list[str]:
 # --------------------------------------------------------------------------- stop line and timing
 
 
-def projected_hours(*, seconds_per_epoch: Mapping[str, float], epochs: int = MAX_EPOCHS) -> float:
-    """Return the GPU-process-hours of the 18 fits at `epochs` epochs each, at each arm's own rate.
+def projected_hours(
+    *, seconds_per_epoch: Mapping[str, float], epochs: int = MAX_EPOCHS,
+    arms: Sequence[str] = FIT_ARMS,
+) -> float:  # fmt: skip
+    """Return the GPU-process-hours of the fits of `arms` at `epochs` epochs each, at each arm's own rate.
 
     Args:
         seconds_per_epoch: The timed seconds an epoch of each arm in `TIMING_ARMS`.
         epochs: The cap of every fit.
+        arms: The arms fitted (all eight by default).
 
     Returns:
         The fits plus the inference allowance and the timing gate.
     """
-    missing = [a for a in set(RATE_OF.values()) if a not in seconds_per_epoch]
+    missing = sorted({RATE_OF[a] for a in arms} - set(seconds_per_epoch))
     if missing:
         msg = f"no timing for {missing}"
         raise KeyError(msg)
-    fits = sum(FITS_PER_ARM * seconds_per_epoch[RATE_OF[a]] * epochs for a in FIT_ARMS) / 3600.0
+    fits = sum(FITS_PER_ARM * seconds_per_epoch[RATE_OF[a]] * epochs for a in arms) / 3600.0
     return fits + INFERENCE_HOURS + TIMING_GATE_HOURS
 
 
+@dataclass(frozen=True)
+class DropPlan:
+    """The arms that the timing gate keeps and drops.
+
+    Attributes:
+        kept: The arms fitted, in `FIT_ARMS` order.
+        dropped: The report-only arms dropped, in the order dropped (their readings are void).
+        hours: The projection of the kept arms at the cap.
+        stop: The 12 fits of the counted arms alone exceed the stop line (verdict row 0).
+    """
+
+    kept: tuple[str, ...]
+    dropped: tuple[str, ...]
+    hours: float
+    stop: bool
+
+
+def drop_report_only(
+    *, seconds_per_epoch: Mapping[str, float], epochs: int = MAX_EPOCHS
+) -> DropPlan:
+    """Apply the stop-line rule: drop report-only arms in `DROP_ORDER` until the projection fits.
+
+    If the counted arms alone still exceed the stop line, the plan says `stop`.
+    """
+    kept = list(FIT_ARMS)
+    dropped: list[str] = []
+    hours = projected_hours(seconds_per_epoch=seconds_per_epoch, epochs=epochs, arms=kept)
+    for arm in DROP_ORDER:
+        if hours <= STOP_LINE_HOURS:
+            break
+        kept.remove(arm)
+        dropped.append(arm)
+        hours = projected_hours(seconds_per_epoch=seconds_per_epoch, epochs=epochs, arms=kept)
+    return DropPlan(tuple(kept), tuple(dropped), hours, stop=hours > STOP_LINE_HOURS)
+
+
 def timing_gate_report(*, seconds_per_epoch: Mapping[str, float], peak_gpu_gb: float, peak_rss_gb: float,
-                       pair_seconds_per_epoch: float) -> dict[str, float | bool]:  # fmt: skip
-    """Return the projection at the cap and whether it, the GPU memory, and the memory pass the gate."""
-    hours = projected_hours(seconds_per_epoch=seconds_per_epoch)
+                       pair_seconds_per_epoch: float) -> dict[str, object]:  # fmt: skip
+    """Return the projection at the cap and whether it, the GPU memory, and the memory pass the gate.
+
+    The projection is that of the arms kept after the drop rule; the dropped arms are listed.
+    """
+    plan = drop_report_only(seconds_per_epoch=seconds_per_epoch)
+    hours = plan.hours
     return {
+        "dropped_arms": list(plan.dropped), "counted_arms_over_line": plan.stop,
         "hours_at_cap": hours, "stop_line_hours": STOP_LINE_HOURS,
         "within_stop_line": hours <= STOP_LINE_HOURS, "peak_gpu_gb": peak_gpu_gb,
         "gpu_ok": peak_gpu_gb <= GPU_MEMORY_GB, "peak_rss_gb": peak_rss_gb,
@@ -513,7 +787,7 @@ def timing_gate_report(*, seconds_per_epoch: Mapping[str, float], peak_gpu_gb: f
 
 
 def timing_gate_passes(*, report: Mapping[str, object], manager_approved: bool) -> bool:
-    """Return whether fits may start: memory and GPU within bounds, and the projection within the line or approved."""
+    """Return whether fits may start: memory and GPU within bounds, and the kept arms within the line or approved."""
     return bool(
         report["memory_ok"]
         and report["gpu_ok"]
@@ -524,33 +798,61 @@ def timing_gate_passes(*, report: Mapping[str, object], manager_approved: bool) 
 # --------------------------------------------------------------------------- the gallery's list
 
 PANEL_REQUIREMENTS: Final = {
-    "G10_transfers": "every transfer changes the truth by the drawn size on every half-hour inside it, each edge is marked, and a partial half-hour at an edge shows a smaller step",
+    "G10_transfers": "every transfer changes the truth by the drawn load on every half-hour inside it, each edge is marked, a partial half-hour at an edge shows a smaller step, and the BSP steps mark both edges only for a transfer to a Primary under another BSP",
     "G11_pairs": "every pair's re-folded reading equals the original where delta is zero, the pair differs only on sun-up half-hours, and the truth drops by delta",
     "G12_raised_sky": "every raised index is above the original on every raisable half-hour and equal elsewhere, with the reading unchanged",
-    "G13_targets": "the solar target, the step events, and the step sizes are non-empty for the world that carries them and aligned with their cause",
-    "G14_parameters": "every histogram of a drawn transfer parameter lies inside its registered range",
+    "G13_targets": "the solar target, the step events, and the step sizes are non-empty for the world that carries them and aligned with their cause, with the hidden span shaded",
+    "G14_parameters": "every histogram of a drawn transfer parameter lies inside its registered range, and the settled T0 after the donor rule is split by direction, partner, and duration",
     "G15_everything": "the window with an engine run, S2 solar output, a load transfer, and an extra injection shows every component and the injected member differs from the plain one",
     "G16_pairing": "every month of every training seed has a sibling pair for at least 95% of its windows",
     "G17_s1_pairs": "the pairs built from source S1 are written to the private folder only",
+    "G18_neighbours": "every mirror is equal and opposite at the drawn partner and absent at the other neighbours, the neighbour moves by j times the transfer in the jittered case, and no neighbour moves when the partner is not read",
+    "G19_shapes": "a constant, a demand-shaped, and a solar-shaped transfer of the same T0 differ in shape, share the mean T0, never fall below 0.1 T0, and leave the solar target unchanged",
+    "G20_neighbour_table": "every neighbour covers at least 90% of the base-day half-hours in every month, the drawn sizes in D8's noise units reach both sides of 4, and every mirror check point lies on the line of equality",
+    "G21_input_tensor": "every neighbour channel is flat where the list says it must move or zero inside the hidden span, the injected member differs from the plain one only in the reading, BSP, and sign-aligned channels, and U-N and U-noBSP differ from U* only in the neighbour and BSP channels",
 }
 """The written list of what each new gallery panel must show. The session that runs the experiment
 checks each panel against it and records the result in `PRIVATE/gallery/panel_check.json`."""
-GALLERY_PUBLISHED: Final = (
-    "G10_transfers",
-    "G11_pairs",
-    "G12_raised_sky",
-    "G13_targets",
-    "G14_parameters",
-    "G15_everything",
-    "G16_pairing",
-)
 GALLERY_PRIVATE_ONLY: Final = ("G17_s1_pairs",)
+GALLERY_PUBLISHED: Final = tuple(k for k in PANEL_REQUIREMENTS if k not in GALLERY_PRIVATE_ONLY)
+
+SERIES_WINDOWS: Final = {
+    "W1": "an evening engine run, the window with the median depth of reverse flow",
+    "W2": "a morning engine run, the window with the median depth of reverse flow",
+    "W3": "solar output alone, the window with the median depth of reverse flow",
+    "W4": "engine and solar together, the window with the median depth of reverse flow",
+    "W5": "a window whose reading comes within 0.3 MVA of zero on at least 4 half-hours",
+    "W6": "the import window with U*'s largest mean P(X<0) on decidable rows",
+    "W7": "the window on which U* gains most against S (730) in Brier score",
+    "W8": "the window on which U* loses most against S (730) in Brier score",
+    "W9": "one injection pair at an amount of 5 points",
+    "W10": "one injection pair at an amount of 20 points",
+    "W11": "one injection pair at an amount of 50 points",
+    "W12": "the engine-only window with U*'s largest solar output",
+    "W13": "the clear S2 window with U*'s largest solar error",
+    "W14": "a load-transfer window that adds load",
+    "W15": "a second load-transfer window that adds load",
+    "W16": "a load-transfer window that removes load",
+    "W17": "a second load-transfer window that removes load",
+    "W18": "a load-transfer window inside a solar spell",
+    "W19": "a load-transfer window at a partner under another BSP",
+    "W20": "a solar-shaped transfer with a mirror",
+    "W21": "a solar-shaped transfer without a mirror",
+    "W22": "the mirrored transfer with U*'s largest gain over U-N in the step Brier score",
+    "W23": "the transfer of at least 4 noise units that U* misses by the widest margin",
+    "W24": "a real pre-engine window around a logged closure at D8 (reading and step probability only)",
+    "W25": "a second real pre-engine window around a logged closure at D8",
+}
+"""The 25 single-window time series figures, each picked by a fixed rule. W20 to W25 are the windows
+that the transfers, the neighbours, and the real closures add; W24 and W25 draw only if K3 is not void."""
+SERIES_PRIVATE_SOURCES: Final = ("S1",)
+"""A window whose solar output comes from this source goes to the private folder."""
 
 # --------------------------------------------------------------------------- the schedule
 
 
 def fit_jobs() -> list[tuple[str, str, int]]:
-    """Return the 18 fits as (arm, architecture, seed), in the order of the families."""
+    """Return the 24 fits as (arm, architecture, seed), in the order of the families."""
     return [
         (arm, ARMS[arm].arch, seed) for _, arms in FIT_FAMILIES for arm in arms for seed in SEEDS
     ]
@@ -574,6 +876,7 @@ def stage_names() -> Sequence[str]:
     """Return the stage names of the command line, in the order of the plan."""
     return (
         "banks",
+        "neighbours",
         "limits",
         "overlays",
         "gallery",
