@@ -322,8 +322,8 @@ elif MINE.command == "fit":
         def close(self):
             self.rows.append(
                 {
-                    "train_nll_unweighted": float(self.tr) / self.tr_n,
-                    "val_nll": float(self.va) / self.va_n,
+                    "train_nll_unweighted": float(self.tr) / self.tr_n,  # ty: ignore[invalid-argument-type]
+                    "val_nll": float(self.va) / self.va_n,  # ty: ignore[invalid-argument-type]
                 }
             )
             self.in_val = False

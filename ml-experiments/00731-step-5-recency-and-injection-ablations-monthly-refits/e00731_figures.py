@@ -121,7 +121,7 @@ def loss_curves(*, out: Path, month: str = LOSS_MONTH, seed: int = 0) -> None:
             }
         )
         lines = (
-            alt.Chart(df)
+            alt.Chart(df)  # ty: ignore[unresolved-attribute]
             .mark_line(point=True)
             .encode(
                 x=alt.X("epoch:Q", title="Epoch", axis=alt.Axis(tickMinStep=1, format="d")),
@@ -140,12 +140,12 @@ def loss_curves(*, out: Path, month: str = LOSS_MONTH, seed: int = 0) -> None:
             )
         )
         rule = (
-            alt.Chart(pl.DataFrame({"epoch": [h["stored_epoch"]]}))
+            alt.Chart(pl.DataFrame({"epoch": [h["stored_epoch"]]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color=BLACK, strokeDash=[4, 3])
             .encode(x="epoch:Q")
         )
         label = (
-            alt.Chart(
+            alt.Chart(  # ty: ignore[unresolved-attribute]
                 pl.DataFrame(
                     {"epoch": [h["stored_epoch"]], "text": [f"stored epoch {h['stored_epoch']}"]}
                 )
@@ -211,7 +211,7 @@ def worlds(*, out: Path, months=WORLD_MONTHS, primary: str = EXAMPLE_PRIMARY) ->
         ).unpivot(index="day", variable_name="lag input", value_name="share")
         start = lib.GRID_START + timedelta(minutes=30 * int(t[0]))
         panels.append(
-            alt.Chart(df)
+            alt.Chart(df)  # ty: ignore[unresolved-attribute]
             .mark_line(clip=True)
             .encode(
                 x=alt.X(
@@ -300,7 +300,7 @@ def forecasts(*, out: Path) -> None:
             }
         )
         layers = [
-            alt.Chart(obs_df)
+            alt.Chart(obs_df)  # ty: ignore[unresolved-attribute]
             .mark_line(color=BLACK, clip=True)
             .encode(
                 x=alt.X("time:T", title="Valid time (UTC)"),
@@ -322,11 +322,11 @@ def forecasts(*, out: Path) -> None:
                 }
             )
             layers.append(
-                alt.Chart(df)
+                alt.Chart(df)  # ty: ignore[unresolved-attribute]
                 .mark_area(opacity=0.18, color=colour)
                 .encode(x="time:T", y="q05:Q", y2="q95:Q")
             )
-            layers.append(alt.Chart(df).mark_line(color=colour).encode(x="time:T", y="q50:Q"))
+            layers.append(alt.Chart(df).mark_line(color=colour).encode(x="time:T", y="q50:Q"))  # ty: ignore[unresolved-attribute]
         panels.append(alt.layer(*layers).properties(width=WIDTH - 90, height=170, title=title))
     alt.vconcat(*panels).properties(
         title=alt.TitleParams(
@@ -376,12 +376,12 @@ def events(*, out: Path, n_min: int = 6) -> None:
         )
         obs_df = pl.DataFrame({"time": obs["valid_time"].to_list(), "mw": obs["power"].to_list()})
         layers = [
-            alt.Chart(
+            alt.Chart(  # ty: ignore[unresolved-attribute]
                 pl.DataFrame({"a": [max(at(ev["start"]), lo)], "b": [min(at(ev["end"]), hi)]})
             )
             .mark_rect(color="#DDDDDD", opacity=0.6)
             .encode(x="a:T", x2="b:T"),
-            alt.Chart(obs_df)
+            alt.Chart(obs_df)  # ty: ignore[unresolved-attribute]
             .mark_line(color=BLACK, clip=True)
             .encode(
                 x=alt.X("time:T", title="Valid time (UTC)"),
@@ -392,7 +392,7 @@ def events(*, out: Path, n_min: int = 6) -> None:
             f = seed_mean_window(name=name, tsid=tsid, lo=lo, hi=hi, lead=(24.0, 48.0))
             df = pl.DataFrame({"time": f["valid_time"].to_list(), "mw": f["q50"].to_list()})
             layers.append(
-                alt.Chart(df)
+                alt.Chart(df)  # ty: ignore[unresolved-attribute]
                 .mark_line(color=colour, opacity=0.9, clip=True)
                 .encode(x="time:T", y="mw:Q")
             )

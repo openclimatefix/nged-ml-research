@@ -58,20 +58,20 @@ def main() -> None:
         "placebo:N", scale=alt.Scale(domain=[False, True], range=[BLUE, ORANGE]), legend=None
     )
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}))
+        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="black", strokeDash=[4, 3])
         .encode(x="x:Q")
     )
     panels = []
     for group_label in frame["group_label"].unique(maintain_order=True):
         base = alt.Chart(frame.filter(pl.col("group_label") == group_label))
-        bars = base.mark_rule().encode(
+        bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lo:Q", title=None),
             x2="hi:Q",
             y=alt.Y("label:N", sort=order, title=None),
             color=colour,
         )
-        points = base.mark_point(filled=True, size=70).encode(
+        points = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "diff:Q",
                 title="Arm minus R0, normalised MAE of the median (points of capacity)",

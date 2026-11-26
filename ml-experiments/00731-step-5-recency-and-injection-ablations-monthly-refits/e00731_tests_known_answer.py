@@ -22,25 +22,27 @@ Usage: `python e00731_tests_known_answer.py [--skip-build]`. Tests, in this proc
    reads each file's own `power_fcst_init_time` and requires it to equal the file's date plus 9 hours,
    which ties the file name to its rows.
 
-Child processes (`--child ARM`; `--child TRAIN` runs test 9), which `exec` the setup of `e00731_k1.py` (everything before the first
-command) so that the real patches are tested, on a fixed CPU core pair:
+Child processes (`--child ARM`; `--child TRAIN` runs test 9), which `exec` the setup of
+`e00731_k1.py` (everything before the first command) so that the real patches are tested, on a
+fixed CPU core pair:
 
-6. R0: weights 1, 0.5, and 0.25 at ages 0, 90, and 180 days (the formula, and the original
+- Test 6: R0: weights 1, 0.5, and 0.25 at ages 0, 90, and 180 days (the formula, and the original
    `select_rows` at ages just past its cut), and the E3 halving of the 7 days after the 7-day embargo;
-7. WP: the E3 window is unchanged by the placebo, and the placebo's total weight is printed;
-8. IP, one real month, CPU only, build only: the lag block of the IP arm equals the plain unshifted
-   `build_month` block on all rows and on the columns `x[:, 37:45]`, and a depth of 0.3 shifts the lag
-   values by the label's sign where the label is nonzero. This builds one month of rows (about 4
-   million rows, a few GB, about a minute on 2 cores): `--skip-build` leaves it out. At depth 0.3,
-   the lag value moves by a scale per Primary that equals the scale of `e.block_of` on a series with
-   0.3 added to that Primary alone;
-9. TRAIN: `e.train` on random rows gives identical state dicts and the same stored epoch with and
-   without the patch-C wrappers (`row_nll_recorded`, `select_rows_report`).
+- Test 7: WP: the E3 window is unchanged by the placebo, and the placebo's total weight is printed;
+- Test 8: IP, one real month, CPU only, build only: the lag block of the IP arm equals the plain
+  unshifted `build_month` block on all rows and on the columns `x[:, 37:45]`, and a depth of 0.3
+  shifts the lag values by the label's sign where the label is nonzero. This builds one month of
+  rows (about 4 million rows, a few GB, about a minute on 2 cores): `--skip-build` leaves it out. At
+  depth 0.3, the lag value moves by a scale per Primary that equals the scale of `e.block_of` on a
+  series with 0.3 added to that Primary alone;
+- Test 9: TRAIN: `e.train` on random rows gives identical state dicts and the same stored epoch with
+  and without the patch-C wrappers (`row_nll_recorded`, `select_rows_report`).
 """
 
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -81,13 +83,15 @@ def strip_patches(*, text: str) -> str:
 
 
 def test_unpatched_equals_original() -> None:
-    """Assert that the unpatched part of the copy equals the original from `import argparse` on."""
+    """Assert that the unpatched part of the copy equals the original, bar `ty: ignore` comments."""
     mine = K1_731.read_text()
     original = K1_677.read_text()
     n_blocks = mine.count(BEGIN)
     assert n_blocks == mine.count(END) == 3, n_blocks
     cut = "import argparse\n"
-    assert strip_patches(text=mine.partition(cut)[2]) == original.partition(cut)[2]
+    ty_ignore = re.compile(r"  # ty: ignore\[[\w-]+\]$", flags=re.MULTILINE)
+    unpatched = ty_ignore.sub("", strip_patches(text=mine.partition(cut)[2]))
+    assert unpatched == ty_ignore.sub("", original.partition(cut)[2])
     print(
         f"[1] unpatched part of e00731_k1.py equals e00677_k1.py (3 patch blocks, {len(mine.splitlines())} lines)"
     )
@@ -296,6 +300,7 @@ def test_weather_lookahead() -> None:
         n += 1
         day += timedelta(days=1)
     assert n == 123, n
+    assert example is not None
     print(
         f"[5] weather look-ahead: {n} origins, run time <= origin - 9 h; example run {example[0]:%Y-%m-%d %H:%M} UTC, origin {example[1]:%Y-%m-%d %H:%M} UTC ({example[2]})"
     )

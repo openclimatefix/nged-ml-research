@@ -792,7 +792,7 @@ def report(
         verdict = "supported"
     elif any(c1 and not h for c1, h in zip(c1_holds, helped, strict=True)):
         verdict = "inconclusive"  # C1 holds at a group where the control C6 fails
-    elif sum(helped) == 1:
+    elif sum(helped) == 1:  # ty: ignore[no-matching-overload]
         verdict = "partly supported"
     elif any(v["C1_below_zero"] for v in groups_):
         verdict = "refuted"
