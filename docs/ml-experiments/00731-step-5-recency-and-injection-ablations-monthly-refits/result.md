@@ -89,84 +89,104 @@ metric: >-
 best_arm: >-
   The reference, arm 9a replayed as R0 (90-day weights, injected events, monthly refits): normalised
   MAE of the median 5.62 points of capacity at the six signed-MW Primaries and 6.70 at the eight
-  MVA-only Primaries, CRPS 3.24 and 3.70. No arm replaces it, because the only arm with a lower
-  error at both groups (no injected events) copies 0.126 of an injected shift against 0.071.
+  MVA-only Primaries, CRPS 3.24 and 3.70. No arm replaces R0, because the arms with a lower
+  error at both groups (no injected events, and its zero-size-shift twin) copy 0.126 of an injected
+  shift against 0.071.
 headline: >-
   Taking the 90-day recency weights out of the final fine-tune raises the normalised MAE of the
   median by +0.044 points of capacity at the six signed-MW Primaries (99.5% interval +0.004 to
   +0.090) and by +0.134 at the eight MVA-only Primaries (+0.068 to +0.206), and an age-permuted
-  placebo is worse still (+0.088 and +0.112). A 30-day half-life gains nothing at the six and the
-  eight and a 270-day half-life gains nothing at the six. Taking out the injected events lowers the
+  placebo (the same total weight on random ages) is also worse than R0 (+0.088 and +0.112). Neither
+  a 30-day nor a 270-day half-life beats 90 days at either group, and 270 days is worse at the
+  eight (+0.051, interval +0.009 to +0.102). Taking out the injected events lowers the
   error by 0.062 (-0.095 to -0.033) at the six and 0.031 (-0.051 to -0.012) at the eight, but raises
   the share of an injected shift that the forecast copies from 0.071 to 0.126, so arm 9a stays. The
   recency result rests on a few Primaries (D14 and D16 at the six, D8 and D22 at the eight), and the
-  interval at the six starts only 0.004 above zero.
+  interval at the six starts only 0.004 above zero. Read without D8, the placebo contrast at the
+  eight (+0.039) has an interval that crosses zero (-0.009 to +0.092).
 lessons: >-
   (1) The final fine-tune of arm 9a is in effect one epoch: early stopping on an unweighted
-  validation week stores epoch 1 in 72% of its fits, so the weights act mainly through the rows the
-  first epoch sees. (2) A weight with the right total mass but random ages is worse than equal
-  weights at the six, so the age ordering, not only the effective sample size, carries the gain. (3)
-  The 30-day half-life that helps the two short-history Primaries D15 and D18 hurts the others,
-  which points to a half-life per Primary. (4) A placebo of zero-size shifts reproduces the no-
-  injection arm to float rounding, so it controls the code path and tests nothing else.
+  validation week stores epoch 1 in 72% of its fits, against 14% for equal weights, so the weights
+  and the length of the fine-tune change together and the equal-weights contrast cannot separate
+  them. (2) Weights of the same total mass placed on random months are worse than the true-age
+  weights (the placebo contrast, C6), so the weights help only when they sit on the recent months.
+  That result cannot tell recency from nearness in the season, because the recent months are also
+  the nearest ones in the season. (3) The 30-day half-life lowers the error at D15 and D18 and at
+  three other Primaries (D16, D22, and D21, by under 0.08 points), and raises it at 11 of the 16.
+  That pattern suggests testing a separate half-life for each Primary. (4) A placebo of zero-size
+  shifts reproduces the injection-free arm to floating-point rounding, so it controls the code
+  path and tests nothing else.
 take_home_message: >-
-  The two training choices of the Primaries' step-5 demand network, weighting recent rows more
-  heavily and showing the network injected switching events, are both worth keeping. Taking out the
-  recency weights raises the forecast error at the six signed-MW and the eight MVA-only Primaries,
-  though the gain at the six is small and rests on a few substations. Taking out the injected events
-  lowers the error slightly but makes the forecast copy 0.126 instead of 0.071 of an injected shift,
-  so the current recipe stays and no new bundle is needed.
+  Weighting recent training rows more heavily in the final fine-tune of the Primaries' step-5
+  demand network is worth keeping, though the gain at the six signed-MW Primaries is small and
+  rests on a few substations. Injecting switching events into the training lags raises the forecast
+  error slightly, but the forecast copies 0.071 of an injected shift with injection and 0.126
+  without it, so the current recipe stays. The logged real events show no gain from injection, so
+  that choice rests on the synthetic shifts alone.
 advice:
   - >-
-    Keep the 90-day recency weights in the step-5 final fine-tune, and test a half-life per Primary
-    before testing one global half-life, because 30 days helps D15 and D18 by 0.18 to 1.75 points
-    and hurts the other Primaries (C1, C2).
+    Keep the 90-day recency weights in the step-5 final fine-tune, because removing them raises MAE
+    at both groups and a placebo of random-age weights raises it more (C1, C6).
   - >-
-    Keep the injected switching events in the step-5 final fine-tune, because removing them lowers
-    MAE by 0.03 to 0.06 points but raises the copied share of an injected shift from 0.071 to 0.126
-    (C4, bank table).
+    Test a half-life chosen per Primary against a single half-life for all Primaries, because 30
+    days lowers MAE at D15 by 1.75 points and at D18 by 0.18 but raises it at 11 of the 16 Primaries
+    (C2); treat this as a hypothesis, because D15 and D18 are reported only.
   - >-
-    Choose the final fine-tune's stopping epoch on a recency-weighted validation set, because early
-    stopping on an unweighted week keeps epoch 1 in 72% of arm 9a's fits (loss figure).
+    Keep the injected switching events in the step-5 final fine-tune on the strength of the copied
+    share alone (0.071 against 0.126 without injection, on the held-out bank of injected shifts),
+    because the logged real events show no gain from injection (C4, scenario table).
   - >-
-    Read every recency contrast at the eight MVA-only Primaries without D8 and D22 as well, because
-    C1 there falls from +0.134 to +0.016 (interval -0.034 to +0.065) without them (audit).
+    Test a final fine-tune whose stopping epoch comes from a recency-weighted validation set, and
+    fix the fine-tune at one epoch and at six epochs for R0, W0, and WP, because the stopping epoch
+    differs between arms and confounds the weights with the length of the fine-tune (epoch table).
   - >-
-    Do not count a zero-size-shift placebo as an independent control, because it reproduces the no-
-    injection arm to float rounding by construction (C8).
+    Read every recency contrast at the eight MVA-only Primaries without D8 and D22 as well, as a
+    post hoc reading, because C1 there falls from +0.134 to +0.016 (interval -0.034 to +0.065) and
+    C6 without D8 has an interval that crosses zero (-0.009 to +0.092) (Checks).
+  - >-
+    Do not count a zero-size-shift placebo as an independent control, because it reproduces the
+    injection-free arm to floating-point rounding by construction (C8).
 ---
 
-**The step-5 demand network already trains with two choices that the maintainer asked us to test, so
-this experiment took each choice out and compared.** The network forecasts the power drawn at 16
-Primary substations, and experiment
-[677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md) refits it
-every month. Its final fine-tune weights each training row by `0.5 ** (age_days / 90)`, so a row
-loses half its weight every 90 days of age, and it injects synthetic switching events (a level shift
-added to the lag inputs, never to the target). We refitted the final fine-tune of 12 monthly refits
-in 7 arms (a replay of arm 9a and 6 variants with the weights or the events changed), three random
-seeds each, and
-scored every variant on experiment 677's one-year backtest. Taking out the weights raised the
-forecast error. Taking out the events lowered the error slightly but made the forecast copy more of
-an injected shift, so no variant replaces the current recipe.
+**The step-5 demand neural network already trains with two choices, recency weights and injected
+switching events, and this experiment took each choice out and compared the forecasts.** The neural
+network forecasts the power drawn at 16 Primary substations, and experiment
+[677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md) (the
+build-up of this demand neural network, one component at a time) refits the network every month.
+The network's final fine-tune weights each training row by `0.5 ** (age_days / 90)`, so a row loses
+half its weight every 90 days of age. The fine-tune also injects synthetic switching events, each a
+level shift added to the lag inputs (past demand fed in as input) and never to the target. We
+refitted the final fine-tune once per month for 12 months, for each of 7 arms (a replay of arm 9a
+and 6 variants with the weights or the events changed) and each of 3 random seeds. We scored every
+arm on experiment 677's one-year backtest. Taking out the weights raised the forecast error. Taking
+out the events lowered the error slightly but made the forecast copy more of an injected shift, so
+no variant replaces arm 9a's training.
 
 **Verdict: `supported` under the pre-registered rule, with a recency result that is fragile.** The
-pre-registered reading is that the 90-day weights help when removing them raises the error and an
-age-permuted placebo raises it as well. Both held at both Primary groups, and the sign agreed in all
-three seeds. The audit confirmed the numbers from the raw forecasts, and it also showed that the
-gain at the six signed-MW Primaries starts 0.004 points above zero and that the gain at the eight
-MVA-only Primaries rests on D8 and D22. No variant meets the pre-registered rule for replacing arm
-9a, so the production candidate and the exported step-5 bundle stay as they are. **The production
-port is not blocked on this experiment.**
+pre-registered rule says the 90-day weights help when removing them raises the error and when a
+placebo with randomly permuted ages also raises the error, both relative to R0. Both held at both
+Primary groups, and the sign agreed in all three seeds.
+
+**Four readings weaken the verdict.** The lower limit of C1 at the six is only +0.004. Leaving out
+D14 or D16 moves C1 at the six to +0.026 or +0.025 with an interval that crosses zero, and the gain
+at the eight rests on D8 and D22. The pre-registered reading of the eight without D8 holds for C1
+(+0.066, +0.008 to +0.135) but fails for the placebo C6 (+0.039, -0.009 to +0.092), so a gate on
+that reading alone would give `inconclusive` at the eight. The audit, a fresh agent that re-derived
+the numbers from the raw forecasts, confirmed all the point estimates.
+
+**No variant meets the pre-registered rule for replacing arm 9a.** This result gives no reason to
+change arm 9a's training before it is used in production.
 
 ## Results
 
 **The score is the normalised mean absolute error of the median forecast, in points of capacity;
-lower is better.** One point means a median forecast that is on average 1% of a Primary's capacity
-away from the observed power. Every contrast below is the variant minus R0 (the replay of arm 9a),
-so a positive number means the variant is worse. The six signed-MW Primaries are the six whose
-meters record the direction of flow. The eight MVA-only Primaries have apparent-power meters that
-hide reverse flow, so the two groups are scored separately. D15 and D18 are reported only, because
-their history is short and noisy.
+lower is better.** CRPS is the continuous ranked probability score of the whole forecast
+distribution, in the same unit. One point means a median forecast that is on average 1% of a
+Primary's capacity away from the observed power. Every contrast below is the variant minus R0 (the
+replay of arm 9a), so a positive number means the variant is worse. The six signed-MW Primaries are
+the six whose meters record the direction of flow. The eight MVA-only Primaries have apparent-power
+meters that hide reverse flow, so the two groups are scored separately. D15 and D18 are reported
+only, because their history is short and noisy.
 
 | Arm | What changed from arm 9a | Six, MAE | Eight, MAE | Six, CRPS | Eight, CRPS |
 |---|---|---|---|---|---|
@@ -199,22 +219,24 @@ experiment 677 ran. Arm 9a scores 7.3646 on the shared rows. R0 equals arm 9a to
 | C7 placebo, zero-size shifts (IP) | -0.062 (-0.095, -0.033) | -0.031 (-0.051, -0.012) |
 | C8 IP minus 5wo | under 2e-8 | under 2e-8 |
 
-**The 90-day weights help, and the effect is largest where the Primary's history changes most.** C1
-is positive at both groups. At D15 and D18 (reported only) it is +1.80 and +0.39, and the 30-day
-half-life lowers D15's error by 1.75 (-2.81 to -0.75) and D18's by 0.18, yet raises the error at
-11 of the 16 Primaries. A half-life per Primary may therefore beat one global half-life, which this
-experiment
-did not test.
+**The 90-day weights help at both groups, and most at D15 and D18, whose histories are shortest.**
+C1 is positive at both groups. At D15 and D18 (reported only) C1 is +1.80 and +0.39. The 30-day
+half-life lowers D15's error by 1.75 (-2.81 to -0.75) and D18's by 0.18. The same half-life raises
+the error at 11 of the 16 Primaries and lowers it at five (D15, D18, D16, D22, and D21). A half-life
+chosen separately for each Primary may therefore beat a single half-life for all Primaries. This
+experiment did not test a half-life per Primary.
 
 **Taking out the injected events lowers the error but increases the copying of shifts.** C4 is
 negative at both groups, and its interval stays below zero whichever one Primary is left out. The
-held-out
-bank of injected shifts shows the cost: the forecast copies 0.071 of an injected shift in arm 9a
-(seed spread 0.006) and 0.126 without injection (0.004). The pre-registered rule for replacing arm
-9a requires a copied share no more than 0.02 above arm 9a's, so the injection-free arm does not
-replace it. Inside the 10 logged events of more than 7 days, C4 is -0.142 (-0.245 to -0.022) on
-105,500 half-hours, and in the 7 days after an event ends it is +0.170 (-0.022 to +0.363) on 32,116
-half-hours.
+held-out bank of injected shifts shows the trade-off: the forecast copies 0.071 of an injected shift
+in arm 9a (seed spread 0.006) and 0.126 without injection (0.004). The pre-registered rule for
+replacing arm 9a requires a copied share no more than 0.02 above arm 9a's, so the injection-free arm
+does not replace it. Equal weights also lower the copied share (W0 0.059, W30 0.083), so removing
+the weights trades a higher error for less copying. Inside the 10 logged events of more than 7 days,
+C4 is -0.142 (-0.245 to -0.022) on 105,500 half-hours. In the 7 days after an event ends, C4 is
++0.170 (-0.022 to +0.363) on 32,116 half-hours. The logged events therefore show no gain from
+injection, and the case for keeping it rests on the synthetic bank, which comes from the same
+generator that R0 trained on.
 
 | Scenario of the 10 logged events (C1, C4) | All rows | Outside events | Inside events | 7 days after |
 |---|---|---|---|---|
@@ -247,40 +269,54 @@ median of R0 and of the injection-free arm around one logged event of a Primary.
 
 ## Checks
 
-- **Predictions:** C1 at the six (+0.044), C4, and C5 fell inside the registered ranges. C1 at the
-  eight (+0.134 against 0 to +0.05), C3 at the eight (+0.051 against under +0.04), and the placebo
-  C6 (+0.088 and +0.112, where the registration said within 0.02 of C1) fell outside. The audit's
-  explanation for C6 is that the permuted weights keep arm 9a's effective share of about 35% of rows
-  but put the heavy weights on random calendar months, so the placebo trains on a seasonally
-  mismatched sample and is worse than equal weights at the six (+0.044, interval +0.003 to +0.087).
-- **Median minus mean forecast per Primary:** the check is approximate, because the mean is
-  estimated from the 11 quantiles by the midpoint rule, and the values run from -6.8 to -0.06
-  across the arms and Primaries. Only differences between arms are informative. The table is
-  private (`scores/summary/median_minus_mean.csv`).
-- **MAE beside CRPS:** the two metrics agree in sign for C1, C4, and C6 at both groups. C2 at all 16
-  Primaries has an MAE interval below zero (-0.067, -0.131 to -0.002) and a CRPS interval that
-  crosses zero (-0.015), which D15 and D18 cause.
-- **Audit triggers that fired:** trigger 2 (C1 at the eight and the placebo C6 contradict the
-  prediction) and trigger 4 (leaving out D14 or D16 moves C1 at the six to +0.026 and +0.025 with
-  intervals that cross zero). A fresh Sonnet agent re-derived C1, C4, and C6 from the raw fit files
-  with its own code and matched every point estimate to 0.0001 and every interval limit to 0.004.
-  It found no error. It added that C1 at the eight without D8 and D22 is +0.016 (-0.034 to +0.065)
-  and that the fine-tune is one epoch in 72% of arm 9a's fits. The pre-registered verdict stands,
-  and
-  these two findings are post hoc readings.
-- **The zero-size-shift placebo:** arm IP reproduces the injection-free arm 5wo to 8e-7 of capacity,
-  as expected when the shifts are zero, so C7 equals C4 and C8 is zero by construction. The pair
-  confirms that the code path is equivalent, and it tests no other idea.
-- **Tails:** on 3,879,313 half-hours the share of observations at or below the q01, q05, q95, and
-  q99 forecasts is 0.0297, 0.0894, 0.9122, and 0.9701 for R0, against nominal 0.01, 0.05, 0.95, and
-  0.99, so the tails are too narrow in every arm. Pinball loss at q05 is 0.925 for R0, 0.943 for
-  equal weights, and 0.922 for the injection-free arm. Cold winter nights and the avoidable
-  curtailment cost were not computed.
-- **Limits:** the per-fit total weight and effective rows were not retained (the prediction pass
-  overwrote the logs), so the effective-row shares in the audit are an analytic reconstruction.
-  The scores are tuning-adjacent, because the year includes valid times from 2026-07 to
-  2026-10 that the protocol reserves for finalists, and the fine-tune is short enough that its
-  stopping epoch confounds the weights with how long the fine-tune runs.
+- **Predictions:** C1 at the six (+0.044), C4 at both groups, and C5 at the six fell inside the
+  registered ranges. C1 at the eight (+0.134 against 0 to +0.05), C2 at the eight (+0.051 against a
+  ceiling of +0.05), C3 at the eight (+0.051 against under +0.04), C5 at the eight (+0.091), and the
+  placebo C6 (+0.088 and +0.112, where the registration said within 0.02 of C1) fell outside. The
+  audit's explanation for C6 is that the permuted weights keep arm 9a's effective share of about 35%
+  of rows but put the heavy weights on random calendar months, so the placebo trains on a seasonally
+  mismatched sample and is worse than equal weights at the six (C6 minus C1 is +0.044, interval
+  +0.002 to +0.087). - **Median minus mean forecast per Primary:** the check is approximate, because
+  the mean is estimated from the 11 quantiles by the midpoint rule, and the values run from -6.8 to
+  -0.06 across the arms and Primaries. Only differences between arms are informative. The table is
+  private (`scores/summary/median_minus_mean.csv`). - **MAE beside CRPS:** the two metrics agree in
+  sign for C1, C4, and C6 at both groups. C2 at all 16 Primaries has an MAE interval below zero
+  (-0.067, -0.131 to -0.002) and a CRPS interval that crosses zero (-0.015), which D15 and D18
+  cause. - **Fine-tune length:** the stored epoch differs between arms, so C1, C2, and C3 compare
+  weightings of different training length. Across the 36 fits per arm, the mean stored epoch and the
+  share stored at epoch 1 are 1.7 and 72% for R0, 6.2 and 14% for W0, 1.1 and 92% for W30, 5.6 and
+  25% for W270, 1.9 and 64% for WP, 1.2 and 83% for IP, and 2.6 and 44% for B0. WP is close to R0 in
+  length, so C6 is the cleaner test of the weights. The placebo shows that weights on random months
+  are worse than weights on the recent months. It cannot separate recency from nearness in the
+  season, because the recent months are also the nearest in the season. - **Placebo contrasts:** C9
+  (WP minus W0) is -0.023 (-0.090 to +0.036) at the eight, so the placebo is worse than equal
+  weights at the six only. C6 at the eight without D8 is +0.039 (-0.009 to +0.092). - **Intervals:**
+  the 7-day blocks of origin days are pre-registered, but one fitted network per seed serves a whole
+  refit month, so a training choice varies over 12 refit months. The intervals are therefore
+  probably too narrow, and C1 at the six is the reading most likely to cross zero. The 3 seeds share
+  frozen stages 1 and 2 and one injected world, so the agreement of signs across seeds is weak
+  evidence. The per-Primary, leave-one-out, and scenario readings carry no correction for multiple
+  comparisons. - **Audit triggers that fired:** trigger 2 (C1 at the eight and the placebo C6
+  contradict the prediction) and trigger 4 (leaving out D14 or D16 moves C1 at the six to +0.026 and
+  +0.025 with intervals that cross zero). A fresh Sonnet agent re-derived C1, C4, and C6 from the
+  raw fit files with its own code and matched every point estimate to 0.0001 and every interval
+  limit to 0.004. It found no error. It added that C1 at the eight without D8 and D22 is +0.016
+  (-0.034 to +0.065) and that the fine-tune is one epoch in 72% of arm 9a's fits. The pre-registered
+  verdict stands, and these two findings are post hoc readings. - **The zero-size-shift placebo:**
+  arm IP reproduces the injection-free arm 5wo to 8e-7 of capacity, as expected when the shifts are
+  zero, so C7 equals C4 and C8 is zero by construction. The pair confirms that the code path is
+  equivalent, and it tests no other idea. - **Tails:** on 3,879,313 half-hours the share of
+  observations at or below the q01, q05, q95, and q99 forecasts is 0.0297, 0.0894, 0.9122, and
+  0.9701 for R0, against nominal 0.01, 0.05, 0.95, and 0.99, so the tails of R0 are too narrow.
+  Pinball loss at q05 is 0.925 for R0, 0.943 for equal weights, and 0.922 for the injection-free
+  arm. Cold winter nights and the avoidable curtailment cost were not computed. - **Limits:** the
+  per-fit total weight and effective rows were not retained (the prediction pass overwrote the
+  logs), so the effective-row shares in the audit are an analytic reconstruction. The scores are
+  tuning-adjacent, because R0 is the incumbent whose 90-day half-life and injection settings earlier
+  experiments chose, so the variants start at a disadvantage in C2 and C3, and because the year
+  includes valid times from 2026-07 to 2026-10 that the protocol reserves for finalists, and the
+  fine-tune is short enough that its stopping epoch confounds the weights with how long the
+  fine-tune runs.
 
 ## Method
 
@@ -304,31 +340,28 @@ median of R0 and of the injection-free arm around one logged event of a Primary.
 
 - Stage 3 fine-tunes from the stage-2 weights with AdamW (learning rate 2e-4, weight decay 1e-3),
   batches of 8,192 rows, up to 60 epochs with patience 8, and the weighted mixture negative
-  log-likelihood as the loss. Validation is unweighted.
-- Training rows come from the 730 days before each refit, cleaned of the half-hours that the
-  `substation_zero` rule flags, with the noisy start of the short-history Primaries cut, as in
-  experiment 677. The newest 7 days are dropped and the next 7 days are halved (experiment 599's
-  E3).
-- Injection (arm 9a, W0, W30, W270, WP): events cover 5% of each Primary's half-hours (8.5% of rows
-  carry a shifted lag in the 2026-04 refit), shift the lag inputs by 0.15, 0.30, or 0.50 of
-  capacity for 3, 7, 15, or 30 days, and one world per refit month is shared by the three seeds. The
-  early-stopping week is shifted too.
-- The 12 monthly refits run from 2025-11-01 to 2026-10-01, seeds 0 to 2. Each of the 7 new arms
-  fitted 36 networks (252 in all), each saved as a state file with its per-epoch loss history.
-- Variants: W0 and B0 set an infinite half-life, W30 and W270 set 30 and 270 days (each keeps the E3
-  embargo and halving), WP replaces the ages in the recency weight with experiment 710's
-  `permuted_age_days` (calendar months permuted, one permutation per refit month shared by the
-  seeds, E3 acting on the true ages), IP sets every shift depth to zero (same onsets, lengths, and
-  signs), and B0 also drops injection.
-- The runner `e00731_k1.py` is a copy of experiment 677's `e00677_k1.py` with three marked patch
-  blocks (experiment 677 is immutable), and a test checks that the unpatched part equals the
-  original. Every script asserts that its data root contains `00731`, and a prediction pass refuses
-  to run unless all fits exist and passed their checks. A hash of the runner is stored with every
-  fit, and a changed runner refuses to reuse old outputs.
-- The experiment used 5.43 GPU-process-hours (fits 2.24, forecast passes 1.64, held-out-bank passes
-  1.55), 2 processes at once for the fits and 3 for the held-out banks, on 6 GB of GPU memory
-  each, and a peak resident memory of 6.8
-  GB per process.
+  log-likelihood as the loss. Validation is unweighted. - Training rows come from the 730 days
+  before each refit, cleaned of the half-hours that the `substation_zero` rule flags, with the noisy
+  start of the short-history Primaries cut, as in experiment 677. The newest 7 days are dropped and
+  the next 7 days are halved (experiment 599's E3). - Injection (arm 9a, W0, W30, W270, WP): events
+  cover 5% of each Primary's half-hours (8.5% of rows carry a shifted lag in the 2026-04 refit),
+  shift the lag inputs by 0.15, 0.30, or 0.50 of capacity for 3, 7, 15, or 30 days, and one world
+  per refit month is shared by the three seeds. The early-stopping week is shifted too. - The 12
+  monthly refits run from 2025-11-01 to 2026-10-01, seeds 0 to 2. Each of the 7 new arms fitted 36
+  networks (252 in all), each saved as a state file with its per-epoch loss history. - Variants: W0
+  and B0 set an infinite half-life, W30 and W270 set 30 and 270 days (each keeps the E3 embargo and
+  halving), WP replaces the ages in the recency weight with experiment 710's `permuted_age_days`
+  (calendar months permuted, one permutation per refit month shared by the seeds, E3 acting on the
+  true ages), IP sets every shift depth to zero (same onsets, lengths, and signs), and B0 also drops
+  injection. - The runner `e00731_k1.py` is a copy of experiment 677's `e00677_k1.py` with three
+  marked patch blocks (experiment 677 is immutable), and a test checks that the unpatched part
+  equals the original. Every script asserts that its data root contains `00731`, and a prediction
+  pass refuses to run unless all fits exist and passed their checks. A hash of the runner is stored
+  with every fit, and a changed runner refuses to reuse old outputs. - The experiment used 5.43
+  GPU-process-hours (fits 2.24, forecast passes 1.64, held-out-bank passes 1.55; the hours include a
+  duplicate run of the 2026-01 fits and forecast passes), mostly 2 processes at once for the fits (3
+  for a short stretch) and 3 for the held-out banks, on 6 GB of GPU memory each, and a peak resident
+  memory of 6.8 GB per process.
 
 ### Measurement
 
