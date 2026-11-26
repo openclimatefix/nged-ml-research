@@ -318,3 +318,51 @@ def test_load_sets_fails_on_a_pair_index_of_another_bank(run: Any, monkeypatch: 
     )
     with pytest.raises(leak.CorrectnessFailureError, match="another bank"):
         fit.load_sets(root730=root730, env=env, seed=0)
+
+
+def test_a_real_fit_stores_the_row_keys_of_every_test_set_and_a_wrong_key_stops_the_fit(
+    run: Any, monkeypatch: Any
+) -> None:
+    import e00729_banks as banks729
+    import e00729_score as score729
+    import e00730_banks as banks730
+    import e00732_report as report
+
+    root, root730, env = run
+    monkeypatch.setattr(core, "STOP_LINE_HOURS", 1e9)
+    fit.stage_timing(
+        root=root, root730=root730, env=env, device="cpu", manager_approved=True, log=print
+    )
+    fit.fit_one(
+        root=root, root730=root730, env=env, arm="U*", seed=0, device="cpu", log=print, max_epochs=1
+    )
+    folder = root / "predictions" / "Ustar_unet_s0"
+    te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
+    keys = report.row_keys_of(
+        rows=score729.rows_from_segments(segments=te.segments, holidays=env.holidays)
+    )
+    sets = sorted(p.stem for p in folder.glob("test*.npz"))
+    assert "test_transfer" in sets
+    assert {f"test_inj_{a:g}" for a in core.TEST_INJECTION_POINTS} <= set(sets)
+    for name in sets:
+        report.check_stored_keys(
+            arrays=[report.read_set(folder=folder, name=name)], keys=keys, what=name
+        )
+    # a fit that stores a shifted key is stopped as a correctness failure
+    real = fit.store_set
+
+    def shifted(**kw: Any) -> None:
+        real(**kw)
+        path = kw["folder"] / f"{kw['name']}.npz"
+        with np.load(path) as z:
+            arrays = {k: z[k] for k in z.files}
+        if kw["name"] == "test_transfer":
+            arrays["row_hh"] = (arrays["row_hh"] + 1) % 48
+        np.savez(path, **arrays)
+
+    monkeypatch.setattr(fit, "store_set", shifted)
+    with pytest.raises(leak.CorrectnessFailureError, match="stored row keys differ"):
+        fit.fit_one(
+            root=root, root730=root730, env=env, arm="S+", seed=0, device="cpu", log=print,
+            max_epochs=1,
+        )  # fmt: skip

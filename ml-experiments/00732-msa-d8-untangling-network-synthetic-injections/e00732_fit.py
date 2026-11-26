@@ -138,6 +138,39 @@ def store_set(
     train729.save_predictions(arrays=flat, path=folder / f"{name}.npz")
 
 
+def check_stored_rows(*, root: Path, root730: Path, name: str, env: stages.Env) -> None:
+    """Check that every test set a fit stored holds the row keys of the test bank's rows.
+
+    The check runs on `test`, `test_transfer`, `test_nobsp`, every injection set, and `test_raised`.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        name: The fit's name (its folder under `predictions`).
+        env: The stages' environment (the holidays the rows are built with).
+
+    Raises:
+        CorrectnessFailureError: When a stored file lacks the keys or they differ (verdict row 1).
+    """
+    import e00729_score as score729
+    import e00732_report as report
+
+    te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
+    rows = score729.rows_from_segments(segments=te.segments, holidays=env.holidays)
+    keys = report.row_keys_of(rows=rows)
+    folder = root / "predictions" / name
+    files = sorted(folder.glob("test*.npz"))
+    if not files:
+        msg = f"{name}: no test set was stored"
+        raise leak.CorrectnessFailureError(msg)
+    for path in files:
+        report.check_stored_keys(
+            arrays=[report.read_set(folder=folder, name=path.stem)],
+            keys=keys,
+            what=f"{name} {path.stem}",
+        )
+
+
 def store_predictions(
     *,
     root: Path,
@@ -239,6 +272,7 @@ def fit_one(
     store_predictions(
         root=root, root730=root730, name=name, net=net, spec=spec, device=device, env=env, sets=sets
     )
+    check_stored_rows(root=root, root730=root730, name=name, env=env)
     payload = {**record.as_dict(), "peak_rss_gb": train.peak_rss_gb()}
     stages.write_json(path=record_path, payload=payload)
     return payload
