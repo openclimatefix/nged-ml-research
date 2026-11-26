@@ -1241,6 +1241,10 @@ def shifted_table(*, root: Path, arch: str, style: str, limit: float, holidays: 
 # --------------------------------------------------------------------------- real, report, figures
 
 
+HALF_HOURS_KEY_BASE: Final = 100
+"""Multiplier that packs a (date, half-hour) pair into one integer key (a half-hour is under 48)."""
+
+
 def align_k2_to_k1(*, k1: score729.Rows, k2: score729.Rows) -> np.ndarray:
     """Return the index into the K2 rows of each K1 row, matched by (date, half-hour).
 
@@ -1260,8 +1264,10 @@ def align_k2_to_k1(*, k1: score729.Rows, k2: score729.Rows) -> np.ndarray:
             the aligned K2 keys differ from the K1 keys (verdict row 1).
     """
     msg = "the K1 and K2 rows do not align half-hour by half-hour"
-    key1 = k1.date.astype(np.int64) * 100 + k1.hh
-    key2 = k2.date.astype(np.int64) * 100 + k2.hh
+    if max(int(k1.hh.max(initial=0)), int(k2.hh.max(initial=0))) >= HALF_HOURS_KEY_BASE:
+        raise leak.CorrectnessFailureError(msg)
+    key1 = k1.date.astype(np.int64) * HALF_HOURS_KEY_BASE + k1.hh
+    key2 = k2.date.astype(np.int64) * HALF_HOURS_KEY_BASE + k2.hh
     if len(np.unique(key1)) != len(key1) or len(np.unique(key2)) != len(key2):
         raise leak.CorrectnessFailureError(msg)
     order = np.argsort(key2, kind="stable")
@@ -1438,7 +1444,7 @@ def stage_figures(*, root: Path, log: Log) -> list[Path]:
         chart = figures.causal_readout_chart(
             brier_by_k={int(k): b for k, b in by_k.items()},
             two_sided=v["checks_by_arm"]["SD*"]["brier"],
-            p0=v["checks_by_arm"]["SD*"].get("p0_brier", 0.0),
+            p0=core.read_limits_file(path=root / "limits.json").s,
         )
         figures.save_svg(chart=chart, path=folder / "causal.svg")
         written.append(folder / "causal.svg")

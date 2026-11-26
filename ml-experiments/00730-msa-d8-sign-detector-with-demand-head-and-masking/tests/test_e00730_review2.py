@@ -24,7 +24,7 @@ import e00730_score as score
 import e00730_stages as stages
 import numpy as np
 import pytest
-from fixture730 import make_root, write_choices, write_predictions, write_real
+from fixture730 import make_root, with_unique_keys, write_choices, write_predictions, write_real
 from test_e00730_stages import fit_invented_baselines
 from world730 import make_calendar
 
@@ -403,7 +403,7 @@ def test_s9_r3_reads_sd_star_c_in_the_causal_protocol_on_the_real_eras(world: tu
     test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
     write_predictions(root, rows)
-    real_rows = dict.fromkeys(("r1", "k1", "k2", "eras"), rows)
+    real_rows = dict.fromkeys(("r1", "k1", "k2", "eras"), with_unique_keys(rows))
     era = np.array(["net", "solar"])[np.arange(rows.n) % 2]
     out = stages.stage_real(
         root=root, real_rows=real_rows, era_of_row=era,

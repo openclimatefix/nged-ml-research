@@ -1,6 +1,7 @@
 """A tiny synthetic data folder: banks, gate, gallery check, choices, and invented predictions."""
 
 import contextlib
+import dataclasses
 import json
 from pathlib import Path
 
@@ -103,3 +104,12 @@ def write_predictions(root: Path, rows, *, arch: str = "bilstm", style: str = "K
 def write_real(root: Path, *, passed: bool = True) -> None:
     """Write a minimal `scores/real.json`: H2 read, so that the score stage may run."""
     banks.write_json(path=root / "scores" / "real.json", payload={"h2": {"pass": passed}})
+
+
+def with_unique_keys(rows):  # noqa: ANN001
+    """Return `rows` with a distinct (date, half-hour) key on every row, as real rows have.
+
+    Real rows come from one segment per month, so no key repeats; the test bank holds several
+    draws of each day, so its rows repeat keys.
+    """
+    return dataclasses.replace(rows, date=np.arange(rows.n) // 48, hh=np.arange(rows.n) % 48)

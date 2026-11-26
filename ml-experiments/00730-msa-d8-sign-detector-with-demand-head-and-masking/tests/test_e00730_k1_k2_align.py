@@ -50,3 +50,9 @@ def test_k2_smaller_than_k1_fails() -> None:
     k1 = rows(date=[10, 10, 10, 11, 11, 11], hh=[0, 1, 2, 0, 1, 2])
     with pytest.raises(leak.CorrectnessFailureError):
         stages.align_k2_to_k1(k1=k1, k2=K2)
+
+
+def test_half_hour_beyond_the_key_base_fails() -> None:
+    k1 = rows(date=[10], hh=[100])
+    with pytest.raises(leak.CorrectnessFailureError):
+        stages.align_k2_to_k1(k1=k1, k2=K2)

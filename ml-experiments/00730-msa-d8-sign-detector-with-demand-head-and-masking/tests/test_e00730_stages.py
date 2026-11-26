@@ -3,6 +3,7 @@
 import dataclasses
 import json
 from pathlib import Path
+from typing import Any
 
 import e00729_banks as banks729
 import e00729_baselines as base
@@ -12,7 +13,14 @@ import e00730_core as core
 import e00730_stages as stages
 import numpy as np
 import pytest
-from fixture730 import make_root, open_gallery, write_choices, write_predictions, write_real
+from fixture730 import (
+    make_root,
+    open_gallery,
+    with_unique_keys,
+    write_choices,
+    write_predictions,
+    write_real,
+)
 
 ALL_STAGES = (
     "gallery", "pretrain", "timing", "screen", "styles", "later", "refit729", "score", "real",
@@ -184,15 +192,15 @@ def test_panel_check_needs_both_the_automatic_check_and_the_design_lead(world: t
     assert not banks.gallery_passed(root=root)
 
 
-def test_score_real_report_figures_and_series_on_invented_predictions(world: tuple) -> None:
+def test_score_real_report_figures_and_series_on_invented_predictions(
+    world: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
     root, holidays, _ = world
     write_choices(root)
     test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
     write_predictions(root, rows)
-    # Real rows come from one segment per month, so no (date, hh) key repeats; the test bank has
-    # several draws of each day, so the invented real rows get unique keys.
-    unique = dataclasses.replace(rows, date=np.arange(rows.n) // 48, hh=np.arange(rows.n) % 48)
+    unique = with_unique_keys(rows)
     real_rows = dict.fromkeys(("r1", "k1", "k2", "eras"), unique)
     era = np.array(["net", "solar"])[np.arange(rows.n) % 2]
     baselines = fit_invented_baselines(rows)
@@ -223,8 +231,20 @@ def test_score_real_report_figures_and_series_on_invented_predictions(world: tup
     text = stages.stage_report(root=root)
     assert "verdict row" in text
     assert "2022-" not in text
+    import e00730_figures as figures
+
+    seen: dict[str, float] = {}
+    draw = figures.causal_readout_chart
+
+    def spy(**kwargs: Any) -> Any:
+        seen["p0"] = kwargs["p0"]
+        return draw(**kwargs)
+
+    monkeypatch.setattr(figures, "causal_readout_chart", spy)
     written = stages.stage_figures(root=root, log=lambda _: None)
     assert written
+    assert seen["p0"] == core.read_limits_file(path=root / "limits.json").s  # P0's Brier score
+    assert seen["p0"] > 0
     table, windows = stages.series_inputs(root=root, holidays=holidays, real_rows=real_rows)
     assert table.real.any()  # ty: ignore[unresolved-attribute]
     assert len(windows) == len(table.world)  # ty: ignore[unresolved-attribute]
@@ -282,3 +302,56 @@ def test_the_refit_stage_runs_the_nine_refits_of_729s_arms(world: tuple) -> None
     assert counts["run"] == 9
     assert {a for a, _, _ in seen} == {"A", "D", "D-sign"}
     assert {ar for _, ar, _ in seen} == {"bilstm"}
+
+
+def take_rows(rows: score729.Rows, keep: np.ndarray) -> score729.Rows:
+    """Return the rows where `keep` is true, with every array and the baselines' features cut."""
+    cut = {
+        f.name: getattr(rows, f.name)[keep]
+        for f in dataclasses.fields(rows)
+        if isinstance(getattr(rows, f.name), np.ndarray)
+    }
+    features = dataclasses.replace(
+        rows.features,
+        **{
+            f.name: getattr(rows.features, f.name)[keep]
+            for f in dataclasses.fields(rows.features)
+            if isinstance(getattr(rows.features, f.name), np.ndarray)
+        },
+    )
+    return dataclasses.replace(rows, features=features, **cut)
+
+
+def test_real_stage_aligns_a_k1_that_lacks_the_half_hours_where_the_record_has_no_row(
+    world: tuple,
+) -> None:
+    root, holidays, _ = world
+    write_choices(root)
+    test = banks729.load_bank(path=banks.bank_path(root=root, kind="test"))
+    rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
+    write_predictions(root, rows)
+    unique = with_unique_keys(rows)
+    keep = np.ones(rows.n, dtype=bool)
+    keep[[3, 4, 100, rows.n - 1]] = False  # half-hours where the record has no row
+    k1 = take_rows(unique, keep)
+    arm = f"SD-{json.loads((root / 'style.json').read_text())['chosen']}"
+    arch = stages.chosen_architecture(root=root)
+    for seed in core.ARCH_SEEDS:
+        folder = root / "predictions" / stages.job_name(arm=arm, arch=arch, seed=seed)
+        np.savez(
+            folder / "real_k1.npz",
+            p=np.full(k1.n, 0.01),
+            demand_mu=np.full(k1.n, 50.0),
+        )
+    real_rows = {"r1": unique, "k1": k1, "k2": unique, "eras": unique}
+    era = np.array(["net", "solar"])[np.arange(rows.n) % 2]
+    real = stages.stage_real(
+        root=root,
+        real_rows=real_rows,
+        era_of_row=era,
+        baselines=fit_invented_baselines(rows),
+        log=lambda _: None,
+    )
+    assert "demand_mae" in real["k1"]
+    assert real["k2"]["n"] == rows.n  # K2's harm check keeps every half-hour
+    assert not (root / "scores" / "invalid.json").exists()
