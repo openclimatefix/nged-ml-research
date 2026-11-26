@@ -58,6 +58,9 @@ class Truth:
     def flat_keys(self) -> np.ndarray:
         """Return the row keys `(3, N)` on the valid half-hours: segment, date, half-hour.
 
+        Returns:
+            The keys, one row each for the segment, the date, and the half-hour.
+
         Raises:
             ValueError: When the truth holds no keys.
         """

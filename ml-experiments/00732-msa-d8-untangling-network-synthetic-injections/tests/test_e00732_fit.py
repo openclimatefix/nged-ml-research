@@ -112,7 +112,7 @@ def test_timing_gate_then_one_fit_stores_record_network_and_predictions(
         root=root, root730=root730, env=env, arm="S+", seed=0, device="cpu", log=print, max_epochs=1
     )
     with np.load(root / "predictions" / "Splus_unet_s0" / "test.npz") as z:
-        assert set(z.files) == {"p"}
+        assert set(z.files) == {"p", "row_seg", "row_date", "row_hh"}
     assert not (root / "predictions" / "Splus_unet_s0" / "test_raised.npz").exists()
 
 
@@ -288,6 +288,7 @@ def test_assert_fit_inputs_runs_the_channel_assertions_on_a_real_batch(
 
     def leaking(**kw: Any) -> Any:
         batch = real(**kw)
+        assert batch.xi is not None
         xi = batch.xi.copy()
         xi[:, arms.ROW["csi"], 3] += 0.1
         return dataclasses.replace(batch, xi=xi)

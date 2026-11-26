@@ -58,7 +58,11 @@ def p1_night(
 
 
 def p2_no_farm(*, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray) -> dict:
-    """Return P2: on pre-engine held-out sun-up half-hours, the mean at most 1 point and at most 1% above 5 points."""
+    """Return P2: the pre-engine solar output stays near zero.
+
+    On held-out pre-engine sun-up half-hours, the mean is at most 1 point and at most 1% of them are
+    above 5 points.
+    """
     keep = valid & score.sun_up(cosz=cosz)
     if not score.finite_on(pv, keep=keep):
         return {"mean_rounded": float("nan"), "share_above": float("nan"), "n": 0, "pass": False}
@@ -217,7 +221,10 @@ def closure_edges_from_sheets(
 def k3_hit_rate(
     *, edges: Sequence[Edge], step_p: np.ndarray, day_index: dict[date, int], valid: np.ndarray
 ) -> dict:
-    """Return K3's hit share: logged edges with a step probability above 0.5 within 2 hours (or on the logged day).
+    """Return K3's hit share of the logged closure edges.
+
+    An edge is hit when a step probability above 0.5 lies within 2 hours of it, or on the logged
+    day.
 
     Args:
         edges: The logged edges.
@@ -254,7 +261,9 @@ def k3_rules(
     valid: np.ndarray,
     closure_days: np.ndarray,
 ) -> dict[str, dict[str, dict]]:
-    """Return K3 for each rule (U*, U-N, and B-TN): the hit share and the flagged steps per day, counts and shares only.
+    """Return K3 for each rule (U*, U-N, and B-TN).
+
+    The result holds the hit share and the flagged steps per day, as counts and shares only.
 
     Args:
         edges: The logged edges of D8.
@@ -278,7 +287,9 @@ def k3_rules(
 def by_hour(
     *, pv: np.ndarray, hh: np.ndarray, keep: np.ndarray, threshold: float
 ) -> dict[int, dict[str, float]]:
-    """Return, for each UTC hour of the kept half-hours, their count and the share of them above `threshold` points.
+    """Return the breakdown by UTC hour of the kept half-hours.
+
+    Each hour holds the count and the share of half-hours above `threshold` points.
 
     The caller passes only night half-hours or pre-engine half-hours, so the breakdown never shows a
     level of a real solar era. An hour with no kept half-hour is absent.
@@ -302,7 +313,10 @@ def night_by_hour(
 def pre_engine_by_hour(
     *, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray, hh: np.ndarray, pre_engine: np.ndarray
 ) -> dict[int, dict[str, float]]:
-    """Return P2's breakdown by UTC hour on sun-up half-hours of the pre-engine era: the count and the share above 5 points."""
+    """Return P2's breakdown by UTC hour on pre-engine sun-up half-hours.
+
+    Each hour holds the count and the share above 5 points.
+    """
     keep = valid & pre_engine & score.sun_up(cosz=cosz)
     return by_hour(pv=pv, hh=hh, keep=keep, threshold=core.P2_EXCEED_POINTS)
 

@@ -44,7 +44,7 @@ class GuardError(RuntimeError):
 
 
 RUN_MARKER: Final = "run_marker.json"
-CODE_VERSION: Final = 1
+CODE_VERSION: Final = 2
 """The version of this experiment's code that the run marker records. A change that alters a stored output raises it."""
 INVALID_FILE: Final = "scores/invalid.json"
 BANKS_CHECK: Final = "banks_check.json"
@@ -779,8 +779,9 @@ def stage_overlays(
     """Build every overlay on the CPU, run the component checks, and write `overlays/summary.json`.
 
     The stage stops at verdict row 0 when a component check fails or has no cases (the mirror check
-    included), a month lacks sibling pairs for more than 5% of its windows, or the training share of reverse flow with the transfers differs from the stored share by
-    more than 10% of the stored share. A reachability shortfall only voids a word of the verdict (the
+    included), a month lacks sibling pairs for more than 5% of its windows, or the training share of
+    reverse flow with the transfers differs from the stored share by more than 10% of the stored
+    share. A reachability shortfall only voids a word of the verdict (the
     plan says the line does not stop), so the summary lists it under `reachability_short` of the test
     bank and `stage_score` reads the counts again.
 
@@ -918,6 +919,10 @@ def assert_batch_channels(*, batch: arms.Batch, spec: core.ArmSpec732) -> None:
 
     A neighbour value must be non-negative and a neighbour mask 0 or 1, and w+ must differ from w
     only in the reading, the BSP step, and the sign-aligned changes.
+
+    Args:
+        batch: A batch built by `arms.make_batch` or `arms.make_eval_batch`.
+        spec: The arm the batch was built for.
 
     Raises:
         CorrectnessFailureError: When one of those fails (verdict row 1).

@@ -153,6 +153,84 @@ def check_closure_edges() -> str:
     return f"switching logs status: {status}, closure edges read: {len(edges)} (K3 needs at least {core.K3_MIN_EDGES})"
 
 
+def _table_and_base() -> tuple[object, dict[str, np.ndarray]]:
+    """Return D8's base calendar and the stored neighbour table (the neighbours stage must have run)."""
+    import e00732_cli as cli
+
+    ctx = cli.real_context()
+    base = cli.real_base(ctx=ctx)
+    path = e00732_paths.data_root() / nb.TABLE_NAME
+    if not path.exists():
+        msg = "the neighbour table does not exist: run the neighbours stage first"
+        raise FileNotFoundError(msg)
+    return base, nb.read_table(root=e00732_paths.data_root(), dates=base.dates)  # ty: ignore[unresolved-attribute]
+
+
+def check_sibling_selection_by_month() -> str:
+    """Print the share of training windows (seed 0) with a sibling, for each month in time order."""
+    import e00729_banks as banks729
+    import e00730_banks as banks730
+    import e00732_overlays as ov
+
+    bank = banks729.load_bank(
+        path=banks730.bank_path(root=e00732_paths.root_730(), kind="train", seed=0)
+    )
+    index = ov.build_pair_index(segments=bank.segments)
+    unpaired = index.share_unpaired()
+    shares = [round(1.0 - unpaired[m], 3) for m in sorted(unpaired)]
+    return (
+        f"months: {len(shares)}, share of windows with a sibling by month (time order): {shares}, "
+        f"every month at least {1.0 - core.MAX_UNPAIRED_SHARE:.2f}: {all(v >= 1.0 - core.MAX_UNPAIRED_SHARE for v in shares)}"
+    )
+
+
+def check_negative_power_share_of_d5_and_d14() -> str:
+    """Write the share of negative half-hours of D5 and D14 to the private log and print only that it was written."""
+    base, table = _table_and_base()
+    del base
+    lines = []
+    for n in ("D5", "D14"):
+        finite = table[n][np.isfinite(table[n])]
+        lines.append(
+            f"{n}: negative share {float((finite < 0.0).mean()):.4f} of {finite.size} half-hours"
+        )
+    log = e00732_paths.private_dir() / "smoke_private.log"
+    log.write_text("\n".join(lines) + "\n")
+    return f"private log written with the negative-power share of D5 and D14: {log.exists()}"
+
+
+def check_lag_correlations_and_noise_units() -> str:
+    """Print each neighbour's correlation of the half-hour changes at lags -1, 0, and +1, and the noise units."""
+    import e00732_stages as stages
+
+    base, table = _table_and_base()
+    out = []
+    for n in nb.NEIGHBOURS:
+        corr = nb.lag_correlations(reading=base.reading, neighbour=table[n])  # ty: ignore[unresolved-attribute]
+        out.append(f"{n} {{{', '.join(f'{k}: {v:.3f}' for k, v in sorted(corr.items()))}}}")
+    units = stages.noise_units(base=base, arrays=table)  # ty: ignore[invalid-argument-type]
+    return (
+        f"lag correlations of the changes: {'; '.join(out)}; "
+        f"noise units in points: {', '.join(f'{k} {v:.2f}' for k, v in units.items())}; "
+        f"all four finite and positive: {all(np.isfinite(v) and v > 0 for v in units.values())}"
+    )
+
+
+def check_experiment_729_smoke_test() -> str:
+    """Run experiment 729's own smoke test of its real files and report its exit status."""
+    import importlib.util
+    from pathlib import Path
+
+    path = next(Path(__file__).resolve().parents[2].glob("00729-*/tests/smoke_real_files.py"))
+    spec = importlib.util.spec_from_file_location("smoke_real_files_729", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    status = module.main()
+    return f"experiment 729's smoke test passed: {status == 0} (exit status {status})"
+
+
 def check_private_splits() -> str:
     """Check that experiment 729's private split table exists."""
     return f"private split table present: {e00732_paths.splits_md_path().exists()}"
@@ -174,6 +252,10 @@ CHECKS: dict[str, Callable[[], str]] = {
     "real sets": check_real_sets,
     "real row alignment": check_real_row_alignment,
     "closure edges": check_closure_edges,
+    "sibling selection": check_sibling_selection_by_month,
+    "negative power of D5 and D14": check_negative_power_share_of_d5_and_d14,
+    "lag correlations and noise units": check_lag_correlations_and_noise_units,
+    "experiment 729 smoke test": check_experiment_729_smoke_test,
     "timing inputs": check_timing_inputs,
 }
 

@@ -344,8 +344,9 @@ def test_a_changed_code_version_allows_one_more_gate_attempt_and_no_more(
     stages.begin_gate_attempt(root=root)
     stages.begin_gate_attempt(root=root)  # the same version is no new attempt
     assert stages.gate_attempts(root=root)["attempts"] == 1
-    monkeypatch.setattr(stages, "CODE_VERSION", 2)
-    with pytest.raises(RuntimeError, match="no run marker"):  # the marker holds version 1
+    version = stages.CODE_VERSION
+    monkeypatch.setattr(stages, "CODE_VERSION", version + 1)
+    with pytest.raises(RuntimeError, match="no run marker"):  # the marker holds the version before
         stages.guard_run(root=root, root730=root730, stage="limits")
     stages.guard_run(
         root=root, root730=root730, stage="banks"
@@ -353,7 +354,7 @@ def test_a_changed_code_version_allows_one_more_gate_attempt_and_no_more(
     stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
     stages.begin_gate_attempt(root=root)
     assert stages.gate_attempts(root=root)["attempts"] == 2
-    monkeypatch.setattr(stages, "CODE_VERSION", 3)
+    monkeypatch.setattr(stages, "CODE_VERSION", version + 2)
     with pytest.raises(RuntimeError, match="one attempt"):
         stages.guard_run(root=root, root730=root730, stage="banks")
     with pytest.raises(stages.StoppedError, match="one attempt"):
@@ -367,7 +368,7 @@ def test_the_banks_stage_refuses_a_changed_marker_once_a_fit_exists(
     stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
     (root / "fits").mkdir()
     (root / "fits" / "x.json").write_text("{}")
-    monkeypatch.setattr(stages, "CODE_VERSION", 2)
+    monkeypatch.setattr(stages, "CODE_VERSION", stages.CODE_VERSION + 1)
     with pytest.raises(RuntimeError, match="superseded_run"):
         stages.guard_run(root=root, root730=root730, stage="banks")
 
@@ -559,7 +560,7 @@ def _write_stub_predictions(*, root: Any, truth_rows: int) -> None:
         ):
             np.savez(
                 folder / f"{name}.npz",
-                **{k: v.astype(np.float32) for k, v in (base | keys).items()},
+                **{k: v.astype(np.float32) for k, v in (base | keys).items()},  # ty: ignore[invalid-argument-type]
             )  # ty: ignore[invalid-argument-type]
 
 
@@ -1019,7 +1020,7 @@ def test_the_rebuilt_windows_must_hold_the_rows_of_the_test_bank(gated: Any, fol
     import e00732_report as report
     import e00732_truth as truth
 
-    root, root730, env = gated
+    _root, root730, env = gated
     world = folders[2]
     te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
     plain = arms.prepare_plain(
