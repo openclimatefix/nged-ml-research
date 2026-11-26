@@ -1,5 +1,8 @@
 # ruff: noqa: E501
-"""Experiment 732: the scores, the eight solar bars, the step readings, the contrasts, the words, and the verdict (numpy only).
+"""Experiment 732: the scores, the bars, the contrasts, and the verdict.
+
+This module holds the scores, the eight solar bars, the step readings, the contrasts, the words, and
+the verdict (numpy only).
 
 **A forecast is a flat array on the valid half-hours of one bank, in experiment 729's `Rows` order.**
 The overlay readings (injection, raised sky, transfers) are flat arrays on the same rows, so the
@@ -76,27 +79,34 @@ def rmse_on(*, values_sq: np.ndarray, keep: np.ndarray) -> float:
 
 
 def injection_keep(
-    *, delta: np.ndarray, amount: float, cosz: np.ndarray, pair: np.ndarray
-) -> np.ndarray:
-    """Return the half-hours an injection reading uses: paired window, sun up, and delta at least 5% of the amount.
+    *, delta: np.ndarray, amount: float, cosz: np.ndarray, pair: np.ndarray,
+    exclude: np.ndarray | None = None,
+) -> np.ndarray:  # fmt: skip
+    """Return the half-hours an injection reading uses.
+
+    They lie in a paired window, with the sun up and delta at least 5% of the amount.
 
     Args:
         delta: The scored delta (flat, or `(P, 48)`).
         amount: The injected amount a, in points.
         cosz: The cosine of the zenith angle, the same shape as `delta`.
         pair: 1 where the window has a pair: the same shape as `delta`, or one value per window.
+        exclude: Unreliable half-hours of S1 solar output (zero-filled gaps) to leave out, or None.
 
     Returns:
         The boolean mask of the half-hours the reading uses.
     """
     pair_b = pair.reshape(pair.shape + (1,) * (delta.ndim - pair.ndim))
-    return (pair_b > 0.5) & sun_up(cosz=cosz) & (delta >= core.DELTA_SHARE_OF_A * amount)
+    keep = (pair_b > 0.5) & sun_up(cosz=cosz) & (delta >= core.DELTA_SHARE_OF_A * amount)
+    return keep if exclude is None else keep & ~exclude
 
 
 def recovery_bar(
     *, pv_inj: np.ndarray, pv_plain: np.ndarray, delta: np.ndarray, amount: float, keep: np.ndarray
 ) -> Bar:
-    """Return the recovery bar at one amount: the ratio of summed response to summed delta, and the median relative error.
+    """Return the recovery bar at one amount.
+
+    The bar reads the ratio of summed response to summed delta, and the median relative error.
 
     The bar fails when there is no half-hour to read, and when a kept value is not finite.
     """
@@ -154,13 +164,20 @@ def injection_error_rows(
 
 
 def absolute_bar(
-    *, pv: np.ndarray, solar: np.ndarray, cosz: np.ndarray, world_is_solar: np.ndarray
-) -> Bar:
-    """Return the absolute bar: on sun-up half-hours of solar worlds, the mean absolute error is at most half the mean target.
+    *, pv: np.ndarray, solar: np.ndarray, cosz: np.ndarray, world_is_solar: np.ndarray,
+    exclude: np.ndarray | None = None,
+) -> Bar:  # fmt: skip
+    """Return the absolute bar.
 
-    The bar fails when no row is kept, when the mean target is zero (a silent solar world), and when a kept value is not finite.
+    The bar passes when, on sun-up half-hours of solar worlds, the mean absolute error is at most
+    half the mean target.
+
+    The bar fails when no row is kept, when the mean target is zero (a silent solar world), and when
+    a kept value is not finite.
     """
     keep = world_is_solar & sun_up(cosz=cosz)
+    if exclude is not None:
+        keep = keep & ~exclude
     if not finite_on(pv, solar, keep=keep):
         return {"mae": float("nan"), "mean_target": float("nan"), "n": 0, "pass": False}
     mae = float(np.abs(pv - solar)[keep].mean())
@@ -188,7 +205,10 @@ def night_bar(*, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray) -> Bar:
 
 
 def violations(*, pv: np.ndarray, pv_raised: np.ndarray) -> np.ndarray:
-    """Return 1.0 where PV(w) - PV(wc) exceeds the tolerance (a monotonicity violation), and NaN where an output is not finite."""
+    """Return 1.0 where PV(w) - PV(wc) exceeds the tolerance.
+
+    Such a half-hour is a monotonicity violation. The result is NaN where an output is not finite.
+    """
     out = ((pv - pv_raised) > core.MONOTONE_TOLERANCE_POINTS).astype(np.float64)
     return np.where(np.isfinite(pv) & np.isfinite(pv_raised), out, np.nan)
 
@@ -208,7 +228,11 @@ def monotone_bar(*, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray)
 def response_bar(
     *, pv: np.ndarray, pv_raised: np.ndarray, raisable: np.ndarray, solar_target: np.ndarray
 ) -> Bar:
-    """Return the response bar: the share of raisable half-hours of solar windows (target at least 1 point) that respond."""
+    """Return the response bar.
+
+    The bar is the share of raisable half-hours of solar windows (target at least 1 point) that
+    respond.
+    """
     keep = raisable & (solar_target >= core.RESPONSE_MIN_TARGET_POINTS)
     if not finite_on(pv, pv_raised, solar_target, keep=keep):
         return {"share": float("nan"), "n": 0, "pass": False}
@@ -217,7 +241,10 @@ def response_bar(
 
 
 def gain_bar(*, reading: score729.ContrastReading | None) -> Bar:
-    """Return a bar that passes when a counted or report-only contrast is a gain (its upper end below zero); a void reading fails.
+    """Return a bar that passes when a contrast is a gain.
+
+    The contrast is counted or report-only, and a gain means its upper end lies below zero. A void
+    reading fails.
 
     "Better than the sky alone" reads R23 through this bar, and "better than the demand output" reads C4.
     """
@@ -241,7 +268,10 @@ def solar_bars(
     response: Bar | None,
     demand: Bar | None,
 ) -> dict[str, bool]:
-    """Return the eight solar bars as pass flags. A bar that was not read, or a recovery bar missing an amount, fails."""
+    """Return the eight solar bars as pass flags.
+
+    A bar that was not read fails, and so does a recovery bar that is missing an amount.
+    """
     flags = {
         "recovery": bool(
             recovery is not None
@@ -323,7 +353,8 @@ def step_f1(
     Calls and true steps of any size are matched one to one within one half-hour (`match_steps`), so
     a true step is found by at most one call and a call finds at most one true step. A true step of
     `min_points` or more counts as found when it is matched, and a call counts as right when it is
-    matched to a true step of any size, because a call at a smaller real step is not a false alarm. The inputs are `(P, 48)`, or `(1, N)` for a flat series.
+    matched to a true step of any size, because a call at a smaller real step is not a false alarm.
+    The inputs are `(P, 48)`, or `(1, N)` for a flat series.
 
     Args:
         step_p: The step probability.
@@ -332,7 +363,8 @@ def step_f1(
         valid: Valid half-hours.
         threshold: The call threshold.
         min_points: The smallest step the recall and the F1 read.
-        select: Restricts the true steps the recall reads (a band of table T6); the precision still reads every call.
+        select: Restricts the true steps the recall reads (a band of table T6); the precision still
+            reads every call.
 
     Returns:
         The precision, recall, F1, the number of true steps read, and the number of calls.
@@ -378,11 +410,13 @@ def transfer_scenarios(
 
     Args:
         inside: Half-hours inside a transfer.
-        since_end_days: Days since the end of the latest transfer to end before the half-hour (inf where none).
+        since_end_days: Days since the end of the latest transfer to end before the half-hour (inf
+            where none).
         valid: Valid half-hours.
 
     Returns:
-        The masks "all", "outside" (outside a transfer and at least 7 days after one ends), "inside", and "after" (within 7 days after a transfer ends).
+        The masks "all", "outside" (outside a transfer and at least 7 days after one ends),
+        "inside", and "after" (within 7 days after a transfer ends).
     """
     after = valid & ~inside & (since_end_days >= 0) & (since_end_days < 7)
     outside = valid & ~inside & (since_end_days >= 7)
@@ -391,19 +425,24 @@ def transfer_scenarios(
 
 @dataclass(frozen=True)
 class TransferRows:
-    """What each scored half-hour of the transfer overlay knows about its transfers (flat, in the order of the rows).
+    """What each scored half-hour of the transfer overlay knows about its transfers.
+
+    The arrays are flat, in the order of the rows.
 
     Attributes:
         inside: The half-hour lies inside a transfer.
-        since_end_days: Days since the end of the latest transfer to end before the half-hour (inf where none).
+        since_end_days: Days since the end of the latest transfer to end before the half-hour (inf
+            where none).
         edge: The half-hour holds a transfer edge.
         edge_points: The size of the transfer that holds the edge, in points (0 elsewhere).
         edge_noise: The same in D8's noise units.
         edge_hours: The duration of the transfer that holds the edge, in hours (0 elsewhere).
         edge_direction: +1 where the transfer gives D8 load, -1 where it takes load, 0 off an edge.
-        edge_shape: The shape of the transfer that holds the edge, as an index into `SHAPE_NAMES` (-1 off an edge).
+        edge_shape: The shape of the transfer that holds the edge, as an index into `SHAPE_NAMES`
+            (-1 off an edge).
         edge_case: The partner case of that transfer, as an index into `CASE_NAMES` (-1 off an edge).
-        win_case: The partner case of the transfer that holds the half-hour or, failing that, the first transfer that touches its window (-1 where the window holds none).
+        win_case: The partner case of the transfer that holds the half-hour or, failing that, the
+            first transfer that touches its window (-1 where the window holds none).
         win_shape: The shape of that transfer (-1 where none).
         win_edge: A transfer edge lies in the half-hour's input window.
     """
@@ -518,7 +557,10 @@ def step_table(
     size: np.ndarray,
     tr: TransferRows,
 ) -> dict[str, dict[str, dict[str, float | bool]]]:
-    """Return table T6 for one arm or rule: recall and the step-size error by direction, noise-unit band, point band, and duration band.
+    """Return table T6 for one arm or rule.
+
+    The table holds recall and the step-size error by direction, noise-unit band, point band, and
+    duration band.
 
     The inputs are flat rows of the transfer overlay, read as one series of `N` half-hours. The
     precision of a band is the precision over all calls, because a call has no band of its own.
@@ -560,7 +602,10 @@ def step_table(
 
 
 def precision_all(*, step_p: np.ndarray, event: np.ndarray) -> float:
-    """Return the precision of the step calls over the whole transfer overlay, counting a call near any true step as right."""
+    """Return the precision of the step calls over the whole transfer overlay.
+
+    A call near any true step counts as right.
+    """
     called = (step_p > core.STEP_THRESHOLD)[None, :]
     if not called.any():
         return 0.0
@@ -579,7 +624,7 @@ def detectability(
     side of 4 noise units, and a void statement never stops the line.
 
     Args:
-        table: T6's noise-unit bands for the arm (`step_table(...)["size_noise_units"]`).
+        table: T6's noise-unit bands for the arm (the `size_noise_units` entry of `step_table`).
         precision: The precision of the arm over every call.
         counts: The scored steps under 4 noise units ("below") and at 4 and more ("above").
 
@@ -628,7 +673,11 @@ def harm_by_band(
 
 
 def band_boundary(*, band: Mapping[str, float | bool], b13_lower: float) -> str:
-    """Return how the band of 1 to 3 MVA reads: "pass", "at the calibrated boundary", or "fail" (above its limit with HB's lower bound above zero)."""
+    """Return how the band of 1 to 3 MVA reads.
+
+    The reading is "pass", "at the calibrated boundary", or "fail". It fails when the band is above
+    its limit with HB's lower bound above zero.
+    """
     if band["pass"]:
         return "pass"
     return "fail" if b13_lower > 0.0 else "at the calibrated boundary"
@@ -699,7 +748,9 @@ def contrast_of(
 def harm_hb(
     *, rows: score729.Rows, p_u: np.ndarray, p_s: np.ndarray, n_resamples: int = core.N_RESAMPLES
 ) -> score729.ContrastReading:
-    """Return HB: U* minus S in the mean P(X<0) on import half-hours of the band of 1 to 3 MVA, read as a one-sided lower bound.
+    """Return HB: U* minus S in the mean P(X<0) on import half-hours of the band of 1 to 3 MVA.
+
+    The reading is a one-sided lower bound.
 
     The one-sided lower bound at `core.LEVEL` is the lower end of the two-sided reading at
     `HB_LEVEL`. HB is outside the Bonferroni count of seven.
@@ -788,7 +839,11 @@ def injection_contrast(
 
 
 def reading_dict(*, reading: score729.ContrastReading | None) -> dict[str, float | bool]:
-    """Return a contrast reading as a plain dictionary: point, ends, rows, Kish numbers, widening, and whether it is void."""
+    """Return a contrast reading as a plain dictionary.
+
+    The dictionary holds the point, the ends, the rows, the Kish numbers, the widening, and whether
+    the reading is void.
+    """
     if reading is None:
         nan = float("nan")
         return {
@@ -852,7 +907,9 @@ def with_overrides(*, rows: score729.Rows, **fields: np.ndarray) -> score729.Row
 
 @dataclass
 class ArmScores:
-    """One arm's (or rule's) seed-averaged outputs on the flat valid rows of the test bank; None means the output does not exist.
+    """One arm's (or rule's) seed-averaged outputs on the flat valid rows of the test bank.
+
+    None means the output does not exist.
 
     Attributes:
         p: P(X<0) on the plain rows.
@@ -891,6 +948,7 @@ class Truth:
         delta: The injected output by amount.
         pair: Whether the window has a pair, by amount.
         tr: The transfer overlay's row attributes.
+        unreliable: The unreliable S1 solar half-hours on the plain rows (None when absent).
     """
 
     rows: score729.Rows
@@ -902,10 +960,21 @@ class Truth:
     delta: dict[float, np.ndarray]
     pair: dict[float, np.ndarray]
     tr: TransferRows
+    unreliable: np.ndarray | None = None
+
+    @property
+    def exclude(self) -> np.ndarray:
+        """The unreliable S1 solar half-hours on the plain rows (all False when none was recorded)."""
+        if self.unreliable is None:
+            return np.zeros(self.cosz.shape, dtype=bool)
+        return self.unreliable
 
 
 def injection_stack(*, truth: Truth, arm: ArmScores) -> np.ndarray | None:
-    """Return an arm's per-row absolute injection error stacked over the three amounts, or None when the arm lacks an amount or the plain output."""
+    """Return an arm's per-row absolute injection error stacked over the three amounts.
+
+    The result is None when the arm lacks an amount or the plain output.
+    """
     if arm.pv is None or set(arm.pv_inj) != set(core.TEST_INJECTION_POINTS):
         return None
     return np.concatenate(
@@ -921,7 +990,11 @@ def injection_keep_stack(*, truth: Truth) -> np.ndarray:
     return np.concatenate(
         [
             injection_keep(
-                delta=truth.delta[a], amount=a, cosz=truth.cosz, pair=truth.pair[a].astype(float)
+                delta=truth.delta[a],
+                amount=a,
+                cosz=truth.cosz,
+                pair=truth.pair[a].astype(float),
+                exclude=truth.exclude,
             )
             for a in core.TEST_INJECTION_POINTS
         ]
@@ -944,7 +1017,9 @@ def compute_readings(
     arms: Mapping[str, ArmScores],
     n_resamples: int = core.N_RESAMPLES,
 ) -> dict[str, object]:
-    """Return C1 to C7, HB, and the report-only contrasts as contrast readings (None where an input is missing: the reading is void).
+    """Return C1 to C7, HB, and the report-only contrasts as contrast readings.
+
+    A reading is None, and so void, where an input is missing.
 
     Every reading pairs the two arms on the same rows. The arms are keyed `U*`, `U-NC`, `U-NCw`, `S+`,
     `U-SG`, `U*-L`, `U-N`, `U-noBSP`, the stored `S` and `S-L`, and the baselines `B-PV0`, `B-PV1`,
@@ -956,11 +1031,12 @@ def compute_readings(
         n_resamples: The resamples of every reading.
 
     Returns:
-        "counted" (C1 to C7), "hb", and "report" (R-readings; a split reading is keyed `R16_read_exact` and the like).
+        "counted" (C1 to C7), "hb", and "report" (R-readings; a split reading is keyed
+        `R16_read_exact` and the like).
     """
     rows = truth.rows
     solar = rows.solar
-    up = sun_up(cosz=truth.cosz)
+    up = sun_up(cosz=truth.cosz) & ~truth.exclude
     bsp_keep = np.asarray(rows.has_bsp, dtype=bool)
     bsp_months = score729.bsp_months(rows=rows) if bsp_keep.any() else None
     tr = truth.tr
@@ -1076,7 +1152,9 @@ def compute_readings(
 def recall_gap_r18(
     *, steps: Mapping[str, np.ndarray], event: np.ndarray, size: np.ndarray, tr: TransferRows
 ) -> dict[str, dict[str, float]]:
-    """Return R18: each rule's recall on solar-shaped transfers minus its recall on constant transfers (steps of 5 points and more).
+    """Return R18: each rule's recall on solar-shaped transfers minus its recall on constant transfers.
+
+    The transfers counted are steps of 5 points and more.
 
     Args:
         steps: The step probability of U*, U-N, B-TN, and B-T on the transfer overlay (flat).
@@ -1085,7 +1163,8 @@ def recall_gap_r18(
         tr: The transfer overlay's row attributes.
 
     Returns:
-        For each rule, its recall on solar-shaped transfers, its recall on constant transfers, and the gap between them.
+        For each rule, its recall on solar-shaped transfers, its recall on constant transfers, and
+        the gap between them.
     """
     one = {"e": event[None, :], "s": size[None, :], "v": np.ones((1, event.size), dtype=bool)}
     out = {}
@@ -1107,7 +1186,9 @@ def recall_gap_r18(
 def solar_error_table(
     *, rows: score729.Rows, cosz: np.ndarray, pv_by_arm: Mapping[str, np.ndarray]
 ) -> dict[str, dict[str, dict[str, float]]]:
-    """Return table T1: the solar error (mean absolute and root mean squared, in points) of each arm by world type and by source, on sun-up half-hours.
+    """Return table T1: the solar error of each arm by world type and by source.
+
+    The error is the mean absolute and root mean squared error in points, on sun-up half-hours.
 
     A day that fell back to source S2 is not counted as source S1.
     """
@@ -1136,7 +1217,11 @@ def transfer_solar_table(
     tr: TransferRows,
     pv_tr_by_arm: Mapping[str, np.ndarray],
 ) -> dict[str, dict[str, dict[str, float]]]:
-    """Return T1's transfer part: the solar error by whether a transfer edge lies in the window, and inside solar-shaped transfers with and without a mirror."""
+    """Return T1's transfer part: the solar error by transfer.
+
+    The rows split by whether a transfer edge lies in the window, and by inside solar-shaped
+    transfers with and without a constant partner.
+    """
     up = sun_up(cosz=cosz)
     inside_solar = tr.inside & (tr.win_shape == SHAPE_NAMES.index("solar"))
     groups = {
@@ -1158,14 +1243,18 @@ def transfer_solar_table(
 def scenario_table(
     *, truth: Truth, arms: Mapping[str, ArmScores]
 ) -> dict[str, dict[str, dict[str, float]]]:
-    """Return table T2: the four load-transfer scenarios, each with the Brier score of P(X<0), the solar error, and the step Brier score of each arm that has them."""
+    """Return table T2: the four load-transfer scenarios.
+
+    Each scenario shows the Brier score of P(X<0), the solar error, and the step Brier score of each
+    arm.
+    """
     tr = truth.tr
     masks = transfer_scenarios(
         inside=tr.inside,
         since_end_days=tr.since_end_days,
         valid=np.ones(tr.inside.shape, dtype=bool),
     )
-    up = sun_up(cosz=truth.cosz)
+    up = sun_up(cosz=truth.cosz) & ~truth.exclude
     out: dict[str, dict[str, dict[str, float]]] = {}
     for name, a in arms.items():
         out[name] = {}
@@ -1188,7 +1277,10 @@ def scenario_table(
 def shifted_table(
     *, rows: score729.Rows, p_by_arm: Mapping[str, np.ndarray], limits: Mapping[str, core.BandLimit]
 ) -> dict[str, dict[str, object]]:
-    """Return table T4: the Brier score, the reliability term, and H1 of each arm on the shifted-mix bank (no bar)."""
+    """Return table T4 for the shifted-mix bank (no bar).
+
+    The table holds the Brier score, the reliability term, and H1 of each arm.
+    """
     out: dict[str, dict[str, object]] = {}
     for name, p in p_by_arm.items():
         rel = score729.dist.reliability_term(prob=p, observed=rows.x < 0)
@@ -1220,7 +1312,8 @@ def recovery_by_group(
         truth: The truth and the row attributes.
         pv_plain: The plain member's solar output.
         pv_inj: The injected member's solar output by amount.
-        groups: Row masks over the plain rows: terciles of the BSP coupling, the BSP half hidden, or import, reverse flow, and sign change.
+        groups: Row masks over the plain rows: terciles of the BSP coupling, the BSP half hidden, or
+            import, reverse flow, and sign change.
 
     Returns:
         For each group, the pooled recovery ratio `rho` and the number of half-hours `n`.
@@ -1249,7 +1342,11 @@ def recovery_by_group(
 
 
 def sign_change_groups(*, truth: Truth, amount: float) -> dict[str, np.ndarray]:
-    """Return the rows where the plain member imports, where it is in reverse flow, and where the injection changes the sign (table T5)."""
+    """Return the row groups of table T5.
+
+    The groups are the rows where the plain member imports, where it is in reverse flow, and where
+    the injection changes the sign.
+    """
     x, d = truth.rows.x, truth.delta[amount]
     return {
         "import": (x >= 0) & (x - d >= 0),
@@ -1284,7 +1381,9 @@ def stored_prediction_problems(
     recorded_digest: str | None,
     canary_arm: str = "S",
 ) -> list[str]:
-    """Return why experiment 730's stored predictions do not match the rows (each is a correctness failure, verdict row 1).
+    """Return why experiment 730's stored predictions do not match the rows.
+
+    Each reason is a correctness failure (verdict row 1).
 
     The three links: every stored array has `core.N_TEST_ROWS` rows (and as many as the rows); the
     digest of the rows' keys equals the digest recorded before any fit; and the Brier score of the
@@ -1327,7 +1426,10 @@ def stored_prediction_problems(
 def overlay_reachability(
     *, n_transfer_steps: int, windows_by_amount: Mapping[float, int]
 ) -> dict[str, bool]:
-    """Return whether the test overlay holds enough transfer steps and enough injected windows (a shortfall voids words and never stops the line)."""
+    """Return whether the test overlay holds enough transfer steps and injected windows.
+
+    A shortfall voids words and never stops the line.
+    """
     return {
         "transfer_reachable": n_transfer_steps >= core.MIN_TRANSFER_STEPS_TEST,
         "injection_reachable": set(windows_by_amount) == set(core.TEST_INJECTION_POINTS)
@@ -1380,7 +1482,10 @@ class VerdictFacts:
 
 
 def unread_checks(*, facts: VerdictFacts) -> list[str]:
-    """Return the checks that the row reads and that cannot be read (C1, H1 by band, H2): each makes the run `failed`, never a silent row 6."""
+    """Return the checks that the row reads and that cannot be read.
+
+    The checks are C1, H1 by band, and H2. Each makes the run `failed`, never a silent row 6.
+    """
     unread = []
     if not finite_reading(reading=facts.c.get("C1")):
         unread.append("C1")
@@ -1395,7 +1500,10 @@ def unread_checks(*, facts: VerdictFacts) -> list[str]:
 
 
 def build_verdict(*, facts: VerdictFacts) -> dict[str, object]:
-    """Return the content of `verdict.json`: the first matching row of the verdict table, the four reading words, and the readings printed beside it.
+    """Return the content of `verdict.json`.
+
+    The content is the first matching row of the verdict table, the four reading words, and the
+    readings printed beside it.
 
     The row reads only C1, the margin, H1, H2, HB, and the stop, invalid, and failed flags. The
     solar, transfer, neighbour, and BSP words read their own readings and never change a row. A C1

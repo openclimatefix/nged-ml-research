@@ -719,6 +719,11 @@ def test_the_figures_stage_fails_loudly_without_u_star_and_draws_the_real_checks
         root=root, root730=root730, env=env, base=world["base"], log=print
     )
     assert {"contrasts", "bsp_input", "real_checks"} <= set(written)
+    for name in (
+        "fig01_brier_by_group", "fig03_harm", "fig04_reliability", "fig05_solar_error",
+        "fig06_recovery", "fig07_solar_checks", "fig08_transfer_steps", "fig09_scenarios",
+    ):  # fmt: skip
+        assert (root / "figures" / f"{name}.svg").stat().st_size > 1000, name
     assert (
         figures.real_check_rows(real={"p1": {"all": {"pass": True}}})["word"].to_list()[0] == "pass"
     )
@@ -742,3 +747,63 @@ def test_arm_scores_read_the_bsp_hidden_set_for_r21(folders: Any) -> None:
     got = report.arm_scores(root=root, arm="U*", n_rows=world["n"])
     assert got.p_nobsp is not None
     assert got.p_nobsp.shape == (world["n"],)
+
+
+def _run_overlays(*, folders: Any) -> dict:
+    root, root730, world = folders
+    banks_and_limits(root=root, root730=root730, world=world)
+    return stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+
+
+def test_overlays_stage_records_the_unreliable_share_per_bank(folders: Any) -> None:
+    summary = _run_overlays(folders=folders)
+    for name in ("train_s0", "validation", "test"):
+        rec = summary["banks"][name]["unreliable"]
+        assert rec["all_half_hours_by_mask"] == rec["all_half_hours_by_loop"]
+        assert 0.0 <= rec["share"] <= core.MAX_UNRELIABLE_SHARE
+        assert summary["banks"][name]["unreliable_digest"]
+    assert any(k.endswith("/unreliable") for k in json.loads(
+        (folders[0] / "overlays" / "summary.json").read_text()
+    )["digests"])  # fmt: skip
+
+
+def test_overlays_stage_stops_when_more_than_five_percent_are_unreliable(
+    folders: Any, monkeypatch: Any
+) -> None:
+    import e00732_overlays as ov
+
+    monkeypatch.setattr(ov, "unreliable_counts", lambda *, segments: (10, 100))
+    with pytest.raises(stages.StoppedError, match="unreliable solar targets"):
+        _run_overlays(folders=folders)
+
+
+def test_overlays_stage_stops_on_a_silent_mask(folders: Any, monkeypatch: Any) -> None:
+    import e00732_overlays as ov
+
+    monkeypatch.setattr(
+        ov, "unreliable_by_loop", lambda *, seg: 4
+    )  # a gap exists, the mask finds none
+    with pytest.raises(stages.StoppedError, match="independent count"):
+        _run_overlays(folders=folders)
+
+
+def test_every_result_figure_fails_loudly_without_any_fitted_arm(gated: Any, folders: Any) -> None:
+    import e00732_report as report
+    import e00732_result_figures as rf
+
+    root, root730, env = gated
+    world = folders[2]
+    truth_, _, _ = report.build_truth(root730=root730, env=env, noise_d8=1.0)
+    limits = core.read_limits_file(path=root / "limits.json")
+    assert truth_.rows.n == world["n"]
+    for draw in (
+        rf.fig1_brier_by_group, rf.fig4_reliability, rf.fig5_solar_error, rf.fig6_recovery,
+        rf.fig7_solar_checks, rf.fig8_transfer_steps, rf.fig9_scenarios,
+    ):  # fmt: skip
+        with pytest.raises((rf.FiguresError, ValueError)):
+            draw(truth=truth_, arms={})
+    with pytest.raises(rf.FiguresError):
+        rf.fig3_harm(truth=truth_, arms={}, limits=limits)

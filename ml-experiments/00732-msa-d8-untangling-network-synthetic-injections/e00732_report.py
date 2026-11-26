@@ -27,6 +27,7 @@ import e00732_baselines as baselines
 import e00732_core as core
 import e00732_overlays as ov
 import e00732_real as real
+import e00732_result_figures as rf
 import e00732_score as score
 import e00732_series_figures as sf
 import e00732_stages as stages
@@ -40,8 +41,7 @@ VERDICT_FILE = f"{SCORES}/verdict.json"
 FITTED_ARMS = ("U*", "U-NC", "U-NCw", "S+", "U-SG", "U*-L", "U-N", "U-noBSP")
 
 
-class FiguresError(RuntimeError):
-    """A figure needs fitted outputs that do not exist (no empty plot is drawn)."""
+FiguresError = rf.FiguresError
 
 
 class ScoreError(RuntimeError):
@@ -162,6 +162,9 @@ def build_truth(
             rows=rows, x_tr=t_tr.flat(values=t_tr.row(name="x")), event=t_tr.flat(values=t_tr.row(name="event")),
             size=t_tr.flat(values=t_tr.row(name="size")), cosz=t_plain.flat(values=t_plain.cosz),
             raisable=t_raised.flat(values=t_raised.keep_raisable), delta=delta, pair=pair, tr=tr,
+            unreliable=(
+                None if t_plain.unreliable is None else t_plain.flat(values=t_plain.unreliable)
+            ),
         ),
         overlay,
         valid,
@@ -319,7 +322,7 @@ def solar_bar_flags(
     rows, up = truth_.rows, score.sun_up(cosz=truth_.cosz)
     del up
     keep = {
-        amt: score.injection_keep(delta=truth_.delta[amt], amount=amt, cosz=truth_.cosz, pair=truth_.pair[amt].astype(float))
+        amt: score.injection_keep(delta=truth_.delta[amt], amount=amt, cosz=truth_.cosz, pair=truth_.pair[amt].astype(float), exclude=truth_.exclude)
         for amt in core.TEST_INJECTION_POINTS
     }  # fmt: skip
     reverse = rows.x < 0.0
@@ -339,13 +342,53 @@ def solar_bar_flags(
     return score.solar_bars(
         recovery=recovery,
         recovery_reverse=reverse_bar,
-        absolute=None if a.pv is None else score.absolute_bar(pv=a.pv, solar=rows.solar, cosz=truth_.cosz, world_is_solar=score.solar_world(rows=rows)),
+        absolute=None if a.pv is None else score.absolute_bar(pv=a.pv, solar=rows.solar, cosz=truth_.cosz, world_is_solar=score.solar_world(rows=rows), exclude=truth_.exclude),
         sky=score.gain_bar(reading=report["R23"]),  # ty: ignore[invalid-argument-type, not-subscriptable]
         night=None if a.pv is None else score.night_bar(pv=a.pv, cosz=truth_.cosz, valid=np.ones(rows.n, dtype=bool)),
         monotone=None if a.pv is None or a.pv_raised is None else score.monotone_bar(pv=a.pv, pv_raised=a.pv_raised, raisable=truth_.raisable),
         response=None if a.pv is None or a.pv_raised is None else score.response_bar(pv=a.pv, pv_raised=a.pv_raised, raisable=truth_.raisable, solar_target=rows.solar),
         demand=score.gain_bar(reading=counted["C4"]),  # ty: ignore[invalid-argument-type, not-subscriptable]
     )  # fmt: skip
+
+
+def assemble_arms(
+    *, root: Path, root730: Path, env: stages.Env, base: stages.BaseDays, truth_: score.Truth,
+    ctx: object = None, test_overlay: Sequence[arms.Prepared] | None = None, test_valid: np.ndarray | None = None,
+) -> dict[str, score.ArmScores]:  # fmt: skip
+    """Return every arm's and baseline's seed-averaged outputs on the test rows.
+
+    An output that does not exist is None.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: The stages' environment.
+        base: D8's base calendar.
+        truth_: The test rows' truth.
+        ctx: Experiment 729's context (B-PV1's climatology); without it B-PV1 stays void.
+        test_overlay: The prepared transfer overlay (rebuilt when None).
+        test_valid: The plain window's valid mask (rebuilt when None).
+
+    Returns:
+        The outputs by arm name.
+    """
+    if test_overlay is None or test_valid is None:
+        _, test_overlay, test_valid = build_truth(root730=root730, env=env, noise_d8=1.0)
+    n = truth_.rows.n
+    arm_map: dict[str, score.ArmScores] = {
+        a: arm_scores(root=root, arm=a, n_rows=n) for a in FITTED_ARMS
+    }
+    arm_map["S"], arm_map["S-L"] = (stored_arm_scores(root730=root730, arm=a) for a in ("S", "S-L"))
+    arm_map["B-PV2"] = pv2_scores(root730=root730, truth_=truth_)
+    arm_map["B-PV0"] = pv0_scores(root730=root730, env=env)
+    if ctx is not None:
+        arm_map["B-PV1"] = pv1_scores(root730=root730, truth_=truth_, ctx=ctx)
+    arm_map.update(
+        step_rule_scores(
+            root730=root730, env=env, base=base, test_overlay=test_overlay, test_valid=test_valid
+        )
+    )
+    return arm_map
 
 
 def stage_score(
@@ -391,18 +434,15 @@ def stage_score(
         msg = "stored predictions do not line up with the rows: " + " | ".join(problems)
         raise stages.leak.CorrectnessFailureError(msg)
     n = truth_.rows.n
-    arm_map: dict[str, score.ArmScores] = {
-        a: arm_scores(root=root, arm=a, n_rows=n) for a in FITTED_ARMS
-    }
-    arm_map["S"], arm_map["S-L"] = (stored_arm_scores(root730=root730, arm=a) for a in ("S", "S-L"))
-    arm_map["B-PV2"] = pv2_scores(root730=root730, truth_=truth_)
-    arm_map["B-PV0"] = pv0_scores(root730=root730, env=env)
-    if ctx is not None:
-        arm_map["B-PV1"] = pv1_scores(root730=root730, truth_=truth_, ctx=ctx)
-    arm_map.update(
-        step_rule_scores(
-            root730=root730, env=env, base=base, test_overlay=overlay, test_valid=valid
-        )
+    arm_map = assemble_arms(
+        root=root,
+        root730=root730,
+        env=env,
+        base=base,
+        truth_=truth_,
+        ctx=ctx,
+        test_overlay=overlay,
+        test_valid=valid,
     )
     readings = score.compute_readings(truth=truth_, arms=arm_map)
     h1 = (
@@ -421,7 +461,7 @@ def stage_score(
         f1_big = float(found["f1"])
     record = {
         "readings": reading_json(readings=readings), "h1": h1, "solar_bars": bars, "f1_big": f1_big,
-        "n_rows": n, "n_transfer_steps": int(truth_.event.sum()),
+        "n_rows": n, "n_unreliable_excluded": int(truth_.exclude.sum()), "n_transfer_steps": int(truth_.event.sum()),
         "windows_by_amount": {str(a): int(truth_.pair[a].sum()) for a in core.TEST_INJECTION_POINTS},
         "n_bsp_reverse": int(((truth_.rows.x < 0.0) & np.asarray(truth_.rows.has_bsp, dtype=bool)).sum()),
         "arms_present": sorted(k for k, v in arm_map.items() if v.p is not None or v.pv is not None or v.step is not None),
@@ -961,7 +1001,6 @@ def stage_figures(
     Returns:
         The file names written.
     """
-    del root730, env, base, ctx
     import e00732_figures as figures
 
     rec = stages.read_json(path=root / READINGS_FILE)
@@ -969,6 +1008,17 @@ def stage_figures(
         msg = "the figures need the stored outputs of U* (no empty plot is drawn)"
         raise FiguresError(msg)
     written = {}
+    noise = float(stages.read_json(path=root / "limits.json")["noise_units"]["D8"])
+    truth_, overlay, valid = build_truth(root730=root730, env=env, noise_d8=noise)
+    arm_map = assemble_arms(
+        root=root, root730=root730, env=env, base=base, truth_=truth_, ctx=ctx,
+        test_overlay=overlay, test_valid=valid,
+    )  # fmt: skip
+    for name, chart in rf.all_figures(
+        truth=truth_, arms=arm_map, limits=core.read_limits_file(path=root / "limits.json")
+    ).items():
+        figures.save_svg(chart=chart, path=root / "figures" / f"{name}.svg")
+        written[name] = f"{name}.svg"
     path = root / "figures" / "contrasts.svg"
     figures.save_svg(chart=figures.contrast_chart(readings=rec["readings"]["counted"]), path=path)
     written["contrasts"] = path.name

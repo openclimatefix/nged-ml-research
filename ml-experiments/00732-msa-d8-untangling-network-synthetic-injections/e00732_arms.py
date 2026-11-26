@@ -72,6 +72,7 @@ class Prepared:
         medians: The neighbours' training medians, `(3,)`, the scale of the value channels.
         transfers: The segment's transfers (the tensor checks read their edges and partners).
         world: The simulated world type of the segment ("none" for a real segment).
+        unreliable: The half-hours of S1 solar output that are zero-filled gaps, flat (None: none).
     """
 
     base: arms730.PreparedSegment
@@ -85,6 +86,7 @@ class Prepared:
     medians: np.ndarray
     transfers: list[ov.Transfer] = field(default_factory=list)
     world: str = "none"
+    unreliable: np.ndarray | None = None
 
     @property
     def days(self) -> np.ndarray:
@@ -156,6 +158,7 @@ def prepare(
                 nb_folded=_folded(series=o.neighbours, floors=o.floors, length=length),
                 nb_folded_real=_folded(series=o.neighbours_real, floors=o.floors, length=length),
                 medians=scale, transfers=list(o.transfers), world=str(getattr(o.seg, "world", "none")),
+                unreliable=ov.unreliable_solar(seg=o.seg).reshape(-1),
             )
         )  # fmt: skip
     return out
@@ -342,6 +345,13 @@ def raised_window(*, plain: np.ndarray, eps: float) -> np.ndarray:
     return out
 
 
+def unreliable_day(*, p: Prepared, day: int) -> np.ndarray:
+    """Return the unreliable S1 solar half-hours of the scored day `(48,)`."""
+    if p.unreliable is None:
+        return np.zeros(48, dtype=bool)
+    return p.unreliable[day * 48 : day * 48 + 48]
+
+
 def keeps_of(
     *, p: Prepared, day: int, window: np.ndarray, hidden: np.ndarray | None, target: np.ndarray
 ) -> np.ndarray:
@@ -350,16 +360,17 @@ def keeps_of(
     The sign, step, size, and injection terms drop hidden half-hours; the solar term keeps them.
     """
     valid = target[T["valid"]] > 0.5
+    gap = unreliable_day(p=p, day=day)
     shown = np.ones(48, dtype=bool) if hidden is None else ~hidden[MID : MID + 48]
     scored = slice(MID, MID + 48)
     cosz = window[ROW["cosz"], scored]
     csi = window[ROW["csi"], scored]
     out = np.zeros((len(KEEP_ROWS), 48), dtype=np.float32)
     out[K["sign"]] = valid & shown
-    out[K["solar"]] = valid
+    out[K["solar"]] = valid & ~gap
     out[K["step"]] = valid & shown
     out[K["size"]] = valid & shown & (target[T["event"]] > 0.5)
-    out[K["injection"]] = valid & shown
+    out[K["injection"]] = valid & shown & ~gap
     out[K["night"]] = valid & (cosz <= core.NIGHT_COSZ)
     out[K["raisable"]] = valid & ov.raisable(csi=csi, cosz=cosz)
     return out
@@ -676,7 +687,10 @@ def _members(*, batch: Batch) -> list[np.ndarray]:
 def check_mirror_edges(
     *, batch: Batch, prepared: Sequence[Prepared], spec: core.ArmSpec732
 ) -> ov.Share:
-    """At each scored edge of a mirrored transfer, only the partner's channels differ from the window built without the overlay.
+    """Check that only the partner's channels differ at a mirrored transfer's edge.
+
+    At each scored edge of a mirrored transfer, only the partner's channels differ from the window
+    built without the overlay.
 
     The partner's value channel (at the edge half-hour or the one before) or its change channel
     differs, and the other two neighbours' value and change channels do not.
@@ -721,7 +735,11 @@ def check_mirror_edges(
 
 
 def check_aligned(*, batch: Batch) -> dict[str, ov.Share]:
-    """The sign-aligned channel is the neighbour's change times the sign of D8's change of reading, never the truth's."""
+    """Check the sign-aligned channel against D8's change of reading.
+
+    The sign-aligned channel is the neighbour's change times the sign of D8's change of reading,
+    never the truth's.
+    """
     nonzero = [0, 0]
     exact = [0, 0]
     discriminating = [0, 0]
@@ -765,7 +783,11 @@ def check_hidden(*, batch: Batch) -> ov.Share:
 
 
 def check_injected(*, batch: Batch, prepared: Sequence[Prepared]) -> dict[str, ov.Share]:
-    """The injected member's reading and BSP channels differ from the plain window's on half-hours with extra output, and nowhere else."""
+    """Check what the injection changes in the injected member.
+
+    The injected member's reading and BSP channels differ from the plain window's on half-hours with
+    extra output, and nowhere else.
+    """
     counts = {k: [0, 0] for k in ("reading_on", "reading_off", "bsp_on", "bsp_off")}
     if batch.xi is not None:
         for k in np.flatnonzero(batch.pair > 0.5):
@@ -817,10 +839,21 @@ def check_raised(*, batch: Batch) -> ov.Share:
     )
 
 
-def check_solar_target(*, batch: Batch, prepared: Sequence[Prepared]) -> ov.Share:
-    """The solar target is above zero on the sun-up half-hours of clear days in solar-world windows."""
-    passed = n = 0
-    for k, (seg_i, _) in enumerate(batch.picks):
+def check_solar_target(*, batch: Batch, prepared: Sequence[Prepared]) -> dict[str, ov.Share]:
+    """Return the solar-target check on the sun-up half-hours of clear days in solar-world windows.
+
+    The check excludes the unreliable half-hours (zero-filled gaps of S1 solar output). The
+    unmasked share is returned as information and has no bar.
+
+    Args:
+        batch: The batch.
+        prepared: The prepared segments.
+
+    Returns:
+        "solar_target_positive" (the bar's share) and "info_solar_target_positive_unmasked".
+    """
+    passed = n = passed_all = n_all = 0
+    for k, (seg_i, day) in enumerate(batch.picks):
         if prepared[seg_i].world not in ov.SOLAR_WORLDS:
             continue
         scored = slice(MID, MID + 48)
@@ -828,13 +861,23 @@ def check_solar_target(*, batch: Batch, prepared: Sequence[Prepared]) -> ov.Shar
         csi = batch.x[k, ROW["csi"], scored]
         if not up.any() or csi[up].mean() < core.CLEAR_DAY_CSI:
             continue
-        n += int(up.sum())
-        passed += int((batch.t[k, T["solar"]][up] > 0.0).sum())
-    return _share(passed=passed, n=n)
+        positive = batch.t[k, T["solar"]] > 0.0
+        n_all += int(up.sum())
+        passed_all += int(positive[up].sum())
+        kept = up & ~unreliable_day(p=prepared[seg_i], day=day)
+        n += int(kept.sum())
+        passed += int(positive[kept].sum())
+    return {
+        "solar_target_positive": _share(passed=passed, n=n),
+        "info_solar_target_positive_unmasked": _share(passed=passed_all, n=n_all),
+    }
 
 
 def check_arm_inputs(*, batch: Batch, spec: core.ArmSpec732) -> dict[str, ov.Share]:
-    """A batch of an arm has the channels the arm reads: no neighbour channel for U-N, and a zero BSP channel and mask for U-noBSP."""
+    """Check that a batch holds the channels its arm reads.
+
+    A batch has no neighbour channel for U-N, and a zero BSP channel and mask for U-noBSP.
+    """
     members = _members(batch=batch)
     out = {
         "channel_count": _share(
@@ -852,7 +895,9 @@ def check_arm_inputs(*, batch: Batch, spec: core.ArmSpec732) -> dict[str, ov.Sha
 def tensor_checks(
     *, batch: Batch, prepared: Sequence[Prepared], spec: core.ArmSpec732
 ) -> dict[str, ov.Share]:
-    """Return every check on a built batch that applies to the arm (a failure stops the line at verdict row 0).
+    """Return every check on a built batch that applies to the arm.
+
+    A failure stops the line at verdict row 0.
 
     Args:
         batch: A batch built by `make_batch` or `make_eval_batch`.
@@ -877,7 +922,7 @@ def tensor_checks(
         out.update(injected)
     if spec.raised:
         out["raised_above"] = check_raised(batch=batch)
-    out["solar_target_positive"] = check_solar_target(batch=batch, prepared=prepared)
+    out.update(check_solar_target(batch=batch, prepared=prepared))
     return out
 
 
@@ -886,5 +931,5 @@ def tensor_problems(*, checks: Mapping[str, ov.Share]) -> list[str]:
     return [
         name
         for name, share in checks.items()
-        if not ov.share_passes(share=share, bar=TENSOR_BARS[name])
+        if not name.startswith("info_") and not ov.share_passes(share=share, bar=TENSOR_BARS[name])
     ]

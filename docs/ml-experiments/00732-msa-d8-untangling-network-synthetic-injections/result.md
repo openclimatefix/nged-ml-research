@@ -651,9 +651,22 @@ a unit test that does not fail is verdict row 1.
   D8's reading there differs.
 - The CAMS channel of the raised-sky member w^c is above that of w on every raisable half-hour.
 - The solar target is above zero on at least 99% of the sun-up half-hours of clear days in
-  solar-world windows.
+  solar-world windows, leaving out the unreliable half-hours defined below. The check also prints
+  the share without that exclusion, for information only.
 - A batch of U-N has no neighbour channel, and the BSP channel and its mask are zero on every
   half-hour of a batch of U-noBSP.
+
+**Zero-filled gaps of S1 solar output are unreliable targets, and the rule that excludes them was
+fixed before any fit.** Experiment 729's `draw_solar` keeps a day of S1 output when the farm has at
+least 40 of 48 readings, and it fills each missing half-hour with zero. The pinned banks therefore
+hold zeros that are unknown outputs, not measured zeros. A half-hour of S1 solar output is
+unreliable when its output is zero, the nearest non-zero outputs before and after it in the same day
+are both positive, the cosine of the zenith angle is at least 0.2, and the CAMS index is present.
+The unreliable half-hours leave the solar loss, the injection loss, the solar-target check above,
+and the solar bars and solar contrasts, and the score stage records how many half-hours it
+excluded. The overlays stage reports the unreliable share of the S1 sun-up half-hours of solar
+worlds for each bank and stops the line at verdict row 0 when any bank exceeds 5%, the same bound
+as the exclusion of metered zeros. The banks themselves are not changed.
 
 ## The four outputs of the network
 

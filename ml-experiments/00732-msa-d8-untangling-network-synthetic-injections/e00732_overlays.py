@@ -1,5 +1,8 @@
 # ruff: noqa: E501
-"""Experiment 732: the load-transfer generator, the re-fold, the pairing of extra solar, and the raised sky.
+"""Experiment 732: the load-transfer generator and the raised sky.
+
+This module holds the load-transfer generator, the re-fold, the pairing of extra solar, and the
+raised sky.
 
 This module needs no torch. An overlay is a pure function of a stored bank, a segment's position in
 it, the neighbours' stored readings, and a fixed seed: it never edits a bank, and it builds new
@@ -20,7 +23,7 @@ import pickle
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Final, NamedTuple
+from typing import Any, Final, NamedTuple
 
 import e00732_paths  # noqa: F401
 
@@ -32,6 +35,77 @@ import e00732_neighbours as nb
 import numpy as np
 
 SOLAR_WORLDS: Final = ("solar", "both")
+
+
+def unreliable_solar(*, seg: object) -> np.ndarray:
+    """Return the half-hours of S1 solar output that are unreliable targets `(D + 2, 48)`.
+
+    Experiment 729's `draw_solar` keeps an S1 day with at least 40 readings of the farm and fills each
+    missing half-hour with zero, so a zero between two positive outputs of the same day is a gap and
+    not a measurement. A half-hour is unreliable when the source is S1, its output is zero, the
+    nearest non-zero output before and after it in the same day are both positive, the cosine of the
+    zenith angle is at least `UNRELIABLE_MIN_COSZ`, and the CAMS index is present.
+
+    Args:
+        seg: A simulated segment (`source`, `solar`, `cosz`, and `csi`).
+
+    Returns:
+        The mask (all False for a segment of another source, and for real pseudo-segments).
+    """
+    solar = np.asarray(getattr(seg, "solar", np.zeros((0, 48))))
+    if getattr(seg, "source", "none") != "S1":
+        return np.zeros(solar.shape, dtype=bool)
+    positive = solar > 0.0
+    idx = np.arange(solar.shape[1])
+    before = np.maximum.accumulate(np.where(positive, idx, -1), axis=1)
+    after = np.minimum.accumulate(np.where(positive, idx, solar.shape[1])[:, ::-1], axis=1)[:, ::-1]
+    inside = ~positive & (before >= 0) & (after < solar.shape[1])
+    cosz = np.asarray(seg.cosz, dtype=np.float64)  # ty: ignore[unresolved-attribute]
+    csi = np.asarray(seg.csi, dtype=np.float64)  # ty: ignore[unresolved-attribute]
+    return inside & (cosz >= core.UNRELIABLE_MIN_COSZ) & np.isfinite(csi)
+
+
+def unreliable_by_loop(*, seg: object) -> int:
+    """Return the number of unreliable half-hours of a segment, counted by a plain loop (the mask's cross-check)."""
+    if getattr(seg, "source", "none") != "S1":
+        return 0
+    solar, cosz, csi = (np.asarray(getattr(seg, k)) for k in ("solar", "cosz", "csi"))
+    n = 0
+    for d in range(solar.shape[0]):
+        positives = [h for h in range(48) if solar[d, h] > 0.0]
+        if not positives:
+            continue
+        for h in range(positives[0] + 1, positives[-1]):
+            if (
+                solar[d, h] <= 0.0
+                and cosz[d, h] >= core.UNRELIABLE_MIN_COSZ
+                and np.isfinite(csi[d, h])
+            ):
+                n += 1
+    return n
+
+
+def unreliable_counts(*, segments: Sequence[object]) -> tuple[int, int]:
+    """Return the unreliable half-hours and the S1 sun-up half-hours of solar worlds in a bank's segments."""
+    bad = total = 0
+    for seg in segments:
+        if (
+            getattr(seg, "source", "none") != "S1"
+            or getattr(seg, "world", "none") not in SOLAR_WORLDS
+        ):
+            continue
+        s: Any = seg
+        base = np.asarray(s.cal_index) >= 0
+        up = (
+            (np.asarray(s.cosz) > core.SUN_UP_COSZ)
+            & np.asarray(s.valid, dtype=bool)
+            & base[:, None]
+        )
+        total += int(up.sum())
+        bad += int((unreliable_solar(seg=seg) & up).sum())
+    return bad, total
+
+
 CAPACITY_KEY: Final = "solar_capacity_points"
 BETA_KEY: Final = "beta"
 TOLERANCE: Final = 1e-4
@@ -511,7 +585,10 @@ def apply_transfers(
     neighbours: Mapping[str, np.ndarray] | None = None, floors: Mapping[str, float] | None = None,
     n_dropped: int = 0,
 ) -> TransferOverlay:  # fmt: skip
-    """Return the segment with its transfers applied: `x + T`, the re-folded reading, `base + T`, the BSP meter, and the mirrors.
+    """Return the segment with its transfers applied.
+
+    The segment then holds `x + T`, the re-folded reading, `base + T`, the BSP meter, and the
+    mirrors.
 
     Args:
         seg: The stored segment (never edited).
@@ -1060,7 +1137,10 @@ def check_problems(*, checks: Mapping[str, Share]) -> list[str]:
 
 
 def shape_counts(*, overlays: Sequence[TransferOverlay]) -> dict[str, dict[str, int]]:
-    """Return how many transfers of each shape, partner, and mirror kind the overlays hold (for the registered shares)."""
+    """Return how many transfers the overlays hold of each kind.
+
+    The kinds are shape, partner, and mirror kind. The counts feed the registered shares.
+    """
     shapes = dict.fromkeys(core.SHAPES, 0)
     partners = dict.fromkeys((*core.READ_PARTNERS, core.UNREAD_PARTNER, core.OTHER_BSP_PARTNER), 0)
     mirrors = {"exact": 0, "jittered": 0}

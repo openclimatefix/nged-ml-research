@@ -114,6 +114,10 @@ TEST_EPS: Final = 0.2
 CSI_CLIP: Final = 1.5
 RAISABLE_MAX_CSI: Final = 1.25
 SUN_UP_COSZ: Final = 0.1
+UNRELIABLE_MIN_COSZ: Final = 0.2
+"""A zero of S1 solar output counts as an unreliable target only at a cosine of the zenith angle of at least this."""
+MAX_UNRELIABLE_SHARE: Final = 0.05
+"""A bank may have at most this share of unreliable half-hours among its S1 sun-up half-hours of solar worlds."""
 NIGHT_COSZ: Final = 0.0
 SEED_TRAIN_OVERLAY: Final = 732_100
 SEED_VALIDATION_OVERLAY: Final = 732_050

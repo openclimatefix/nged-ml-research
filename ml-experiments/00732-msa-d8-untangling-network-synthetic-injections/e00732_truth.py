@@ -35,6 +35,7 @@ class Truth:
         dbsp: The BSP step channel (scaled; zero where the meter has no data).
         keep_raisable: The raisable half-hours of the plain window.
         picks: The (segment, day) of each window.
+        unreliable: The unreliable S1 solar half-hours `(P, 48)`.
     """
 
     t: np.ndarray
@@ -46,6 +47,7 @@ class Truth:
     dbsp: np.ndarray
     keep_raisable: np.ndarray
     picks: list[tuple[int, int]]
+    unreliable: np.ndarray | None = None
 
     def valid(self) -> np.ndarray:
         """Return the valid half-hours `(P, 48)`."""
@@ -107,4 +109,7 @@ def truth(
         dbsp=cat["dbsp"],  # ty: ignore[invalid-argument-type]
         keep_raisable=cat["raisable"],  # ty: ignore[invalid-argument-type]
         picks=picks,
+        unreliable=np.stack([arms.unreliable_day(p=prepared[i], day=d) for i, d in picks])
+        if picks
+        else None,
     )  # ty: ignore[invalid-argument-type]

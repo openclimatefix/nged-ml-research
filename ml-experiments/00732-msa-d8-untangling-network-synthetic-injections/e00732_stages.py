@@ -627,6 +627,23 @@ def overlay_stage_bank(
         "reverse_share_stored": reverse_share(segments=segments, holidays=holidays),
         "transfer_checks": share_json(shares=checks),
     }  # fmt: skip
+    n_bad, n_up = ov.unreliable_counts(segments=segments)
+    record["unreliable"] = {"n": n_bad, "of": n_up, "share": n_bad / n_up if n_up else 0.0}
+    record["unreliable_digest"] = hashlib.sha256(
+        b"".join(ov.unreliable_solar(seg=s).tobytes() for s in segments)
+    ).hexdigest()
+    by_mask = sum(int(ov.unreliable_solar(seg=s).sum()) for s in segments)
+    by_loop = sum(ov.unreliable_by_loop(seg=s) for s in segments)
+    record["unreliable"]["all_half_hours_by_mask"] = by_mask
+    record["unreliable"]["all_half_hours_by_loop"] = by_loop
+    if by_mask != by_loop:
+        problems.append(
+            f"{name}: the unreliable-solar mask holds {by_mask} half-hours and an independent count holds {by_loop}"
+        )
+    if n_up and n_bad / n_up > core.MAX_UNRELIABLE_SHARE:
+        problems.append(
+            f"{name}: {n_bad} of {n_up} S1 sun-up half-hours of solar worlds are unreliable solar targets (more than 5%)"
+        )
     if test:
         windows = {}
         index = ov.build_pair_index(segments=segments, sources=core.TEST_SIBLING_SOURCES)
@@ -721,7 +738,9 @@ def stage_overlays(
         "pass": not problems,
     }
     path = root / "overlays" / "summary.json"
-    digests = {k: v["digest"] for k, v in records.items()}
+    digests = {k: v["digest"] for k, v in records.items()} | {
+        f"{k}/unreliable": v["unreliable_digest"] for k, v in records.items()
+    }
     if (
         path.exists()
         and read_json(path=path).get("pass")

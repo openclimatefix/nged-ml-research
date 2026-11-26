@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Tests of the windows, the neighbour channels, the batches, and the checks on the tensors."""
 
 import dataclasses
@@ -529,7 +530,9 @@ def failing(*, world: World, batch: arms.Batch, spec: core.ArmSpec732 = FULL) ->
 def test_every_tensor_check_passes_on_a_real_training_batch(world: World) -> None:
     batch = make_checked(world=world)
     checks = arms.tensor_checks(batch=batch, prepared=world.prepared, spec=FULL)
-    assert set(checks) == set(arms.TENSOR_BARS) - {"bsp_zero"}
+    assert set(checks) - {"info_solar_target_positive_unmasked"} == set(arms.TENSOR_BARS) - {
+        "bsp_zero"
+    }
     assert arms.tensor_problems(checks=checks) == [], checks
     for name, share in checks.items():
         assert share.n > 0, name
@@ -713,3 +716,116 @@ def test_real_pseudo_segments_carry_the_neighbours_when_given_and_zeros_without(
     assert shown[nb_mask_rows].min() == 1.0  # every neighbour present on a real day
     assert not absent[arms.N_BASE :].any()  # no neighbours: all twelve channels are zero
     assert np.isfinite(with_nb[0].nb_folded[:, day * 48 : day * 48 + 48]).all()
+
+
+# ------------------------------------------------ the unreliable-solar mask (zero-filled gaps of S1 output)
+
+
+def _gap_segment(*, source: str = "S1", cosz_floor: float = 0.5) -> Any:
+    """A segment shaped like experiment 729's `draw_solar` output.
+
+    It has zeros at night, positive output by day, and a zero-filled gap.
+    """
+    from types import SimpleNamespace
+
+    solar = np.zeros((3, 48))
+    solar[1, 12:36] = 10.0
+    solar[1, 20:23] = 0.0  # a gap of missing readings filled with zero, inside the day's output
+    cosz = np.zeros((3, 48))
+    cosz[1, 12:36] = np.maximum(np.sin(np.linspace(0.2, np.pi - 0.2, 24)), cosz_floor)
+    csi = np.full((3, 48), 0.9)
+    return SimpleNamespace(source=source, solar=solar, cosz=cosz, csi=csi)
+
+
+def test_a_zero_filled_gap_inside_a_day_of_output_is_masked() -> None:
+    import e00732_overlays as ov
+
+    seg = _gap_segment()
+    mask = ov.unreliable_solar(seg=seg)
+    assert mask[1, 20:23].all()
+    assert int(mask.sum()) == 3
+    assert ov.unreliable_by_loop(seg=seg) == 3
+
+
+def test_nightly_and_dawn_dusk_zeros_are_not_masked() -> None:
+    import e00732_overlays as ov
+
+    seg = _gap_segment()
+    assert not ov.unreliable_solar(seg=seg)[1, :12].any()  # before the first positive half-hour
+    assert not ov.unreliable_solar(seg=seg)[1, 36:].any()  # after the last positive half-hour
+    low = _gap_segment(cosz_floor=0.0)
+    low.cosz[1, 20:23] = 0.1  # the gap lies at dawn or dusk (cosine of the zenith below 0.2)
+    assert not ov.unreliable_solar(seg=low).any()
+    missing_sky = _gap_segment()
+    missing_sky.csi[1, 20:23] = np.nan  # no CAMS index there
+    assert not ov.unreliable_solar(seg=missing_sky).any()
+
+
+def test_a_segment_of_another_source_is_never_masked() -> None:
+    import e00732_overlays as ov
+
+    assert not ov.unreliable_solar(seg=_gap_segment(source="S2")).any()
+    assert ov.unreliable_by_loop(seg=_gap_segment(source="S2")) == 0
+
+
+def test_the_solar_check_excludes_masked_half_hours_and_reports_the_unmasked_share(
+    world: World,
+) -> None:
+    import dataclasses
+
+    batch = make_checked(world=world)
+    prepared = list(world.prepared)
+    base = arms.check_solar_target(batch=batch, prepared=prepared)
+    assert base["solar_target_positive"].n > 0
+    # zero the target at three sun-up half-hours of a solar window: the unmasked share falls, the masked one does not
+    k, (seg_i, day) = next(
+        (k, pk) for k, pk in enumerate(batch.picks) if prepared[pk[0]].world in arms.ov.SOLAR_WORLDS
+    )
+    scored = slice(arms.MID, arms.MID + 48)
+    up = np.flatnonzero(batch.x[k, arms.ROW["cosz"], scored] > core.SUN_UP_COSZ)
+    cut = up[:3]
+    batch.t[k, arms.T["solar"], cut] = 0.0
+    csi = batch.x[k, arms.ROW["csi"], scored]
+    if csi[up].mean() >= core.CLEAR_DAY_CSI:
+        before = arms.check_solar_target(batch=batch, prepared=prepared)
+        assert (
+            before["info_solar_target_positive_unmasked"].value
+            < base["info_solar_target_positive_unmasked"].value
+        )
+        flat = np.zeros(prepared[seg_i].base.targets.shape[1], dtype=bool)
+        flat[day * 48 + cut] = True
+        prepared[seg_i] = dataclasses.replace(prepared[seg_i], unreliable=flat)
+        after = arms.check_solar_target(batch=batch, prepared=prepared)
+        assert after["solar_target_positive"].value >= base["solar_target_positive"].value - 1e-9
+        assert after["solar_target_positive"].n < before["solar_target_positive"].n
+        assert after["solar_target_positive"].value > before["solar_target_positive"].value
+
+
+def test_a_tensor_check_with_an_empty_counter_fails() -> None:
+    import e00732_overlays as ov
+
+    empty = ov.Share(value=0.0, n=0)
+    assert arms.tensor_problems(checks={"solar_target_positive": empty}) == [
+        "solar_target_positive"
+    ]
+    assert arms.tensor_problems(checks={"info_solar_target_positive_unmasked": empty}) == []
+
+
+def test_the_keeps_leave_masked_half_hours_out_of_the_solar_and_injection_terms(
+    world: World,
+) -> None:
+    import dataclasses
+
+    p = world.prepared[0]
+    day = int(p.days[0])
+    flat = np.zeros(p.base.targets.shape[1], dtype=bool)
+    flat[day * 48 + 10 : day * 48 + 14] = True
+    masked = dataclasses.replace(p, unreliable=flat)
+    window = np.zeros((arms.N_BASE, 96), dtype=np.float32)
+    target = arms.target_window(p=masked, day=day)
+    target[arms.T["valid"]] = 1.0
+    keeps = arms.keeps_of(p=masked, day=day, window=window, hidden=None, target=target)
+    assert not keeps[arms.K["solar"], 10:14].any()
+    assert not keeps[arms.K["injection"], 10:14].any()
+    assert keeps[arms.K["solar"], 14:].all()
+    assert keeps[arms.K["sign"], 10:14].all()

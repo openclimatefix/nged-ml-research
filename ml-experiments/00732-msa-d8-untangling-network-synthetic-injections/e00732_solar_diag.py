@@ -64,6 +64,12 @@ def classify(
             if tensor[h] > 0.0:
                 continue
             tags = [
+                "masked by the unreliable rule"
+                if ov.unreliable_solar(seg=seg)[day, h]
+                else "not masked",
+                "day has any positive output"
+                if (overlay > 0).any()
+                else "no positive output that day",
                 f"source {seg.source}",
                 "fallback day (no farm power or sky)"
                 if fallback
@@ -132,6 +138,31 @@ def run(
     return result
 
 
+def report_mask(
+    *,
+    where: str,
+    segments: Sequence,
+    batch: arms.Batch,
+    prepared: Sequence,
+    log: Callable[[str], None],
+) -> None:
+    """Print the unreliable share of a bank and the solar-target check.
+
+    The check runs with and without the mask. The output holds counts and shares only.
+    """
+    bad, total = ov.unreliable_counts(segments=segments)
+    checks = arms.check_solar_target(batch=batch, prepared=prepared)
+    masked, unmasked = (
+        checks["solar_target_positive"],
+        checks["info_solar_target_positive_unmasked"],
+    )
+    log(
+        f"{where}: unreliable {bad} of {total} S1 sun-up half-hours of solar worlds "
+        f"({bad / max(total, 1):.4f}); solar target positive on the rest {masked.value:.4f} "
+        f"(n {masked.n}), unmasked {unmasked.value:.4f} (n {unmasked.n})"
+    )
+
+
 def stage_solar_diag(
     *,
     root: Path,
@@ -152,7 +183,6 @@ def stage_solar_diag(
     Returns:
         The class counts of the train and validation banks.
     """
-    stages.guard_run(root=root, root730=root730, stage="tensor")
     spec = core.ARMS["U*"]
     banks: dict[str, tuple] = {}
     for where, kind in (("train", "train"), ("validation", "validation")):
@@ -182,4 +212,5 @@ def stage_solar_diag(
         else:
             batch = arms.make_eval_batch(prepared=prepared, picks=picks, spec=spec)
         banks[where] = (batch, overlays, bank.segments)
+        report_mask(where=where, segments=bank.segments, batch=batch, prepared=prepared, log=log)
     return run(root=root, banks=banks, log=log)
