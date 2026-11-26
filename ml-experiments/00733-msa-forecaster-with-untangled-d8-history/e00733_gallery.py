@@ -27,8 +27,6 @@ import e00733_paths as paths  # noqa: F401
 import e00733_synth as sy
 import numpy as np
 
-SUN_UP_SHORTWAVE: Final = 10.0
-"""The shortwave (in the units of the weather column) above which a half-hour counts as sun-up."""
 MOST: Final = 0.5
 """'Most' means more than this share of the half-hours the check counts."""
 CORRELATION_FLOOR: Final = 0.0
@@ -193,6 +191,7 @@ def g13_channels_against_truth(
     *,
     segments: Sequence[sy.SegmentArrays],
     shortwave_col: int,
+    sun_up: float,
     min_reverse_points: float,
     reading_points: Sequence[np.ndarray],
 ) -> PanelResult:
@@ -208,6 +207,8 @@ def g13_channels_against_truth(
     Args:
         segments: The test segments drawn.
         shortwave_col: The index of the shortwave column of `hist_weather`.
+        sun_up: The sun-up threshold in the units of `hist_weather` (standardised: the value of
+            `e00733_world.sun_up_threshold`).
         min_reverse_points: 1 MVA in points of D8's capacity.
         reading_points: Each segment's folded reading in points `(n_days * 48,)`.
 
@@ -216,11 +217,7 @@ def g13_channels_against_truth(
     """
     nonzero_share, p_above, n_rev = [], [], 0
     for seg, rp in zip(segments, reading_points, strict=True):
-        sun = (
-            (seg.hist_weather[:, shortwave_col] > SUN_UP_SHORTWAVE)
-            & seg.u_ok
-            & (seg.solar_points > 0)
-        )
+        sun = (seg.hist_weather[:, shortwave_col] > sun_up) & seg.u_ok & (seg.solar_points > 0)
         if sun.any():
             nonzero_share.append(
                 float(
@@ -299,7 +296,11 @@ def g14_rerun_difference(*, segments: Sequence[sy.SegmentArrays]) -> PanelResult
 
 
 def g15_base_rate(
-    *, segments: Sequence[sy.SegmentArrays], clim: np.ndarray, shortwave_col: int
+    *,
+    segments: Sequence[sy.SegmentArrays],
+    clim: np.ndarray,
+    shortwave_col: int,
+    sun_up: float,
 ) -> PanelResult:
     """G15: the share of reverse flow in the target rows by lead day and by half-hour of the day.
 
@@ -321,9 +322,9 @@ def g15_base_rate(
             ok = np.isfinite(x)
             num[k] += np.where(ok, x, 0.0).sum(axis=0)
             den[k] += ok.sum(axis=0)
-        sun_hh |= (
-            seg.hist_weather[:, shortwave_col].reshape(seg.n_days, sy.STEPS) > SUN_UP_SHORTWAVE
-        ).mean(axis=0) > MOST
+        sun_hh |= (seg.hist_weather[:, shortwave_col].reshape(seg.n_days, sy.STEPS) > sun_up).mean(
+            axis=0
+        ) > MOST
     with np.errstate(invalid="ignore", divide="ignore"):
         share = np.where(den > 0, num / den, np.nan)
     items = {

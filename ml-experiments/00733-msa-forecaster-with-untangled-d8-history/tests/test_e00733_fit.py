@@ -135,7 +135,14 @@ def test_synthetic_fit_on_cuda_takes_the_capped_branch(
     monkeypatch.setattr(
         fit.train729, "limit_gpu_memory", lambda *, gigabytes: calls.append(gigabytes)
     )
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    asked: list[bool] = []
+
+    def _available_once() -> bool:
+        # Only the fit's own device check sees a GPU; torch's optimiser asks again and must not.
+        asked.append(True)
+        return len(asked) == 1
+
+    monkeypatch.setattr(torch.cuda, "is_available", _available_once)
     monkeypatch.setattr(torch.cuda, "max_memory_allocated", lambda: 10**9)
     monkeypatch.setattr(torch.nn.Module, "to", lambda self, *_a, **_k: self)
     monkeypatch.setattr(tn, "train_synthetic", _cpu_train)

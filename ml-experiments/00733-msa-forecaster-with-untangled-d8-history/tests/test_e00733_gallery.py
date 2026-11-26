@@ -71,18 +71,18 @@ def test_g13_fails_on_a_silent_solar_channel() -> None:
     segs = [_world(i) for i in range(3)]
     reading = [np.full(s.n_days * 48, 5.0) for s in segs]
     assert gal.g13_channels_against_truth(
-        segments=segs, shortwave_col=SW, min_reverse_points=1.0, reading_points=reading
+        segments=segs, shortwave_col=SW, sun_up=10.0, min_reverse_points=1.0, reading_points=reading
     ).passed
     for s in segs:
         s.u_raw[:, core.CHANNEL_NAMES.index("solar")] = 0.0
     assert not gal.g13_channels_against_truth(
-        segments=segs, shortwave_col=SW, min_reverse_points=1.0, reading_points=reading
+        segments=segs, shortwave_col=SW, sun_up=10.0, min_reverse_points=1.0, reading_points=reading
     ).passed
     segs = [_world(i) for i in range(3)]
     for s in segs:
         s.u_raw[:, core.P_NEG] = 0.1
     assert not gal.g13_channels_against_truth(
-        segments=segs, shortwave_col=SW, min_reverse_points=1.0, reading_points=reading
+        segments=segs, shortwave_col=SW, sun_up=10.0, min_reverse_points=1.0, reading_points=reading
     ).passed
 
 
@@ -108,10 +108,11 @@ def test_g14_needs_zero_difference_before_the_limit() -> None:
 def test_g15_needs_reverse_flow_on_sun_up_half_hours() -> None:
     """A world with reverse flow by day passes; a world with none fails."""
     seg = _world(3)
-    r = gal.g15_base_rate(segments=[seg], clim=np.full(48, 0.2), shortwave_col=SW)
+    r = gal.g15_base_rate(segments=[seg], clim=np.full(48, 0.2), shortwave_col=SW, sun_up=10.0)
     assert r.passed and r.data["share"].shape == (14, 48)
     seg.x_neg[:] = np.where(np.isnan(seg.x_neg), np.nan, 0.0)
-    assert not gal.g15_base_rate(segments=[seg], clim=np.full(48, 0.2), shortwave_col=SW).passed
+    flat = gal.g15_base_rate(segments=[seg], clim=np.full(48, 0.2), shortwave_col=SW, sun_up=10.0)
+    assert not flat.passed
 
 
 def test_panel_check_marks_a_missing_panel_failed_and_is_read_by_the_guard(tmp_path: Path) -> None:
@@ -124,3 +125,27 @@ def test_panel_check_marks_a_missing_panel_failed_and_is_read_by_the_guard(tmp_p
     )
     path = gal.write_panel_check(root=tmp_path, payload=payload)
     assert json.loads(path.read_text())["banks_digest"] == "d"
+
+
+def _standardised_world() -> sy.SegmentArrays:
+    """Return a world whose weather column is standardised: night -0.6, day 1.2 (all below 10)."""
+    seg = _world(4)
+    sun = np.tile((np.arange(48) >= 12) & (np.arange(48) < 36), seg.n_days)
+    seg.hist_weather[:, SW] = np.where(sun, 1.2, -0.6)
+    return seg
+
+
+def test_g13_and_g15_use_the_standardised_sun_up_threshold() -> None:
+    """Standardised weather never exceeds the old 10 W/m2 constant, so the old comparison saw no
+    sun; with the standardised threshold both panels pass, and with 10.0 both fail."""
+    seg = _standardised_world()
+    reading = [np.full(seg.n_days * 48, 5.0)]
+    kw = {"segments": [seg], "shortwave_col": SW}
+    assert gal.g13_channels_against_truth(
+        **kw, sun_up=0.0, min_reverse_points=1.0, reading_points=reading
+    ).passed
+    assert not gal.g13_channels_against_truth(
+        **kw, sun_up=10.0, min_reverse_points=1.0, reading_points=reading
+    ).passed
+    assert gal.g15_base_rate(**kw, clim=np.full(48, 0.2), sun_up=0.0).passed
+    assert not gal.g15_base_rate(**kw, clim=np.full(48, 0.2), sun_up=10.0).passed
