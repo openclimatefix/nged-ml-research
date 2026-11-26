@@ -544,6 +544,8 @@ def test_the_score_stage_reads_stored_arms_and_leaves_a_missing_arm_void(
     record = report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
     assert record["n_rows"] == world["n"]
     assert "U*" in record["arms_present"]
+    assert "B-PV0" in record["arms_present"]  # the sky-only rule is fitted on the validation bank
+    assert "B-PV1" not in record["arms_present"]  # without the context, B-PV1 stays void
     c = record["readings"]["counted"]
     assert c["C1"]["void"] is False  # U* and the stored S are both present
     assert c["C6"]["void"] is True  # S+ was not fitted: a missing arm is void, never zero
@@ -571,6 +573,9 @@ def test_the_series_and_figures_stages_draw_windows_and_the_contrast_chart(
     result = report.stage_series(root=root, root730=root730, env=env, base=world["base"], log=print)
     assert result["drawn"]
     assert list((root / "figures" / "series").glob("series_W*.svg"))
+    pairs = [n for n in ("W9", "W10", "W11") if n in result["drawn"]]
+    assert pairs or {"W9", "W10", "W11"} <= set(result["no_window"])
+    assert {"W24", "W25"} <= set(result["no_window"])  # no real window without K3
     assert not next(iter((root / "figures" / "series").glob("*.svg"))).read_text().count("2022-")
     report.stage_figures(root=root, root730=root730, env=env, base=world["base"], log=print)
     assert (root / "figures" / "contrasts.svg").exists()
@@ -584,12 +589,12 @@ def test_the_train_tensor_check_has_a_bsp_present_injected_pair(gated: Any) -> N
 
 
 def test_bsp_present_picks_hold_only_windows_with_a_meter_and_solar_output(gated: Any) -> None:
+    import e00730_banks as banks730
     import e00732_arms as arms
     import e00732_overlays as ov
     from e00729_banks import load_bank
-    import e00730_banks as banks730
 
-    root, root730, env = gated
+    _, root730, env = gated
     bank = load_bank(path=banks730.bank_path(root=root730, kind="train", seed=0))
     over = ov.overlay_segments(
         segments=bank.segments, kind="train", seed=0, neighbours=env.neighbours
@@ -617,3 +622,123 @@ def test_a_tensor_check_without_a_case_is_a_problem() -> None:
     assert arms.tensor_problems(checks={"injected_bsp_on_delta": empty}) == [
         "injected_bsp_on_delta"
     ]
+
+
+def _real_rows(*, n_days: int, first_day: int = 0) -> Any:
+    import e00732_report as report
+
+    hh = np.tile(np.arange(48), n_days)
+    day = np.repeat(np.arange(first_day, first_day + n_days), 48)
+    cosz = np.tile(np.clip(np.sin(np.linspace(0, np.pi, 48)), 0, 1), n_days)
+    csi = np.repeat(np.linspace(0.1, 1.0, n_days), 48)
+    return report.RealRows(cosz=cosz, csi=csi, hh=hh, day=day)
+
+
+def test_real_day_checks_read_p2_p3_p4_and_k3_and_leave_missing_inputs_void() -> None:
+    import e00732_real as real
+    import e00732_report as report
+
+    n_days = 30
+    eras = _real_rows(n_days=n_days)
+    r1 = _real_rows(n_days=4, first_day=20)
+    k1 = _real_rows(n_days=4, first_day=40)
+    # the solar output follows the sky (P3), is zero before the farm exists (P2), and ignores the engine (P4)
+    pv_eras = eras.csi * eras.cosz * 10.0
+    day_eras = np.array(["solar"] * 60)
+    running = np.zeros(len(k1.hh), dtype=bool)
+    running[::7] = True
+    dates = np.datetime64("2022-01-01") + np.arange(60)
+    outputs = {
+        "r1": {"pv": np.zeros(len(r1.hh)), "u_step": np.zeros(len(r1.hh)), "un_step": np.zeros(len(r1.hh))},
+        "eras": {"pv": pv_eras},
+        "k1": {"pv": np.ones(len(k1.hh))},
+    }  # fmt: skip
+    got = report.real_day_checks(
+        r1=r1, eras=eras, k1=k1, outputs=outputs, day_eras=day_eras, running_k1=running, edges=[],
+        closure_days=np.zeros(60, dtype=bool), dates=dates,
+    )  # fmt: skip
+    assert got["p2"]["pass"] is True
+    assert got["p3"]["pass"] is True
+    assert got["p4"]["pass"] is True
+    assert set(got["k3"]) == {"U*", "U-N"}
+    assert got["k3"]["U*"]["hit"]["void"] is True  # no logged edges: void, never zero
+    assert got["k3"]["U*"]["false"]["flagged_per_day"] == 0.0
+    # a solar output that ignores the sky fails P3, and a missing set leaves its check None
+    flat = {**outputs, "eras": {"pv": np.full(len(eras.hh), 3.0)}}
+    bad = report.real_day_checks(
+        r1=r1, eras=eras, k1=None, outputs=flat, day_eras=day_eras, running_k1=None, edges=[],
+        closure_days=None, dates=dates,
+    )  # fmt: skip
+    assert bad["p3"]["pass"] is False
+    assert bad["p4"] is None
+    assert bad["k3"] is None
+    assert isinstance(real.Edge, type)
+
+
+def test_the_series_stage_fails_loudly_without_fitted_outputs(gated: Any, folders: Any) -> None:
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    import shutil
+
+    for folder in (root / "predictions").iterdir():
+        shutil.rmtree(folder)
+    with pytest.raises(report.FiguresError, match="no empty plot"):
+        report.stage_series(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert not (root / "figures" / "series").exists() or not list(
+        (root / "figures" / "series").glob("*.svg")
+    )
+
+
+def test_the_figures_stage_fails_loudly_without_u_star_and_draws_the_real_checks(
+    gated: Any, folders: Any
+) -> None:
+    import e00732_figures as figures
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    record = report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    stages.write_json(
+        path=root / report.REAL_FILE,
+        payload={"p1": {"all": {"pass": True}}, "p2": {"pass": False}, "p3": None, "p4": None, "k3": None, "h2": None},
+    )  # fmt: skip
+    written = report.stage_figures(
+        root=root, root730=root730, env=env, base=world["base"], log=print
+    )
+    assert {"contrasts", "bsp_input", "real_checks"} <= set(written)
+    assert (
+        figures.real_check_rows(real={"p1": {"all": {"pass": True}}})["word"].to_list()[0] == "pass"
+    )
+    with pytest.raises(figures.HistoryError, match="empty"):
+        figures.real_check_rows(real={})
+    record["arms_present"].remove("U*")
+    stages.write_json(path=root / report.READINGS_FILE, payload=record)
+    with pytest.raises(report.FiguresError, match="no empty plot"):
+        report.stage_figures(root=root, root730=root730, env=env, base=world["base"], log=print)
+
+
+def test_arm_scores_read_the_bsp_hidden_set_for_r21(folders: Any) -> None:
+    import e00732_report as report
+
+    root, _, world = folders
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    assert report.arm_scores(root=root, arm="U*", n_rows=world["n"]).p_nobsp is None
+    for s in core.SEEDS:
+        folder = root / "predictions" / core.job_name(arm="U*", arch=core.ARMS["U*"].arch, seed=s)
+        np.savez(folder / "test_nobsp.npz", p=np.full(world["n"], 0.01, dtype=np.float32))
+    got = report.arm_scores(root=root, arm="U*", n_rows=world["n"])
+    assert got.p_nobsp is not None
+    assert got.p_nobsp.shape == (world["n"],)

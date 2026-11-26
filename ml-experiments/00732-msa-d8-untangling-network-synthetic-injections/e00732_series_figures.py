@@ -1,11 +1,11 @@
 # ruff: noqa: E501
 """Experiment 732: the rules that pick the 25 time series windows W1 to W25, and the window figure.
 
-Each rule picks one window (one scored day) of a scored bank from a table of per-window numbers, with
-no randomness, so that a rerun draws the same windows. A window whose solar output comes from source S1
-is drawn to the private folder only; the published figure draws the same rule over source S2 and
-engine-only windows. No window carries a calendar date, and a window is labelled by hours from the
-start of its day.
+Each rule picks one window (one scored day) of a scored bank from a table of per-window numbers,
+with no randomness, so that a rerun draws the same windows. A window whose solar output comes from
+source S1 is drawn to the private folder only; the published figure draws the same rule over source
+S2 and engine-only windows. No window carries a calendar date, and a window is labelled by hours
+from the start of its day.
 """
 
 from collections.abc import Mapping
@@ -31,7 +31,9 @@ NOT_IMPLEMENTED: Final = ()
 
 @dataclass
 class WindowTable:
-    """Per-window numbers of the test bank (arrays of length `n`; a transfer attribute is False on a window without a transfer).
+    """Per-window numbers of the test bank, as arrays of length `n`.
+
+    A transfer attribute is False on a window without a transfer.
 
     Attributes:
         world: The world type of each window's segment.
@@ -131,7 +133,9 @@ def _second(*, mask: np.ndarray) -> int | None:
 
 
 def window_figure(*, window: Mapping[str, np.ndarray], title: str) -> alt.VConcatChart:
-    """Return one window as three rows: the truth and the reading, the solar target and output, and the step event and probability.
+    """Return one window as three rows of lines.
+
+    The rows are the truth and the reading, the solar target and output, and the step event and probability.
 
     Args:
         window: Arrays over the window's half-hours: `truth`, `reading`, `solar`, `pv`, `step_event`,
@@ -159,3 +163,31 @@ def window_figure(*, window: Mapping[str, np.ndarray], title: str) -> alt.VConca
             ),
         )
     return gallery.stack(charts=rows, title=title)
+
+
+def injection_figure(*, window: Mapping[str, np.ndarray], title: str) -> alt.VConcatChart:
+    """Return one injection pair: the solar output of w, of w+, and the line of PV(w) + delta.
+
+    Args:
+        window: Arrays over the window's half-hours: `pv`, `pv_inj`, and `delta`.
+        title: The rule's name and what it picked (no date).
+
+    Returns:
+        The stacked chart, built from `gallery.lines_chart` so that no calendar date reaches the axis.
+    """
+    n_days = max(len(window["pv"]) // 48, 1)
+    return gallery.stack(
+        charts=[
+            gallery.lines_chart(
+                series={
+                    "PV(w)": window["pv"],
+                    "PV(w+)": window["pv_inj"],
+                    "PV(w) + delta": window["pv"] + window["delta"],
+                },
+                title=title,
+                n_days=n_days,
+                y_title="Solar output (points)",
+            )
+        ],
+        title=title,
+    )

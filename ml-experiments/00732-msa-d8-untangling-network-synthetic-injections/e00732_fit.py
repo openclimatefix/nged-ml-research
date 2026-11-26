@@ -157,6 +157,9 @@ def store_predictions(
     store_set(
         folder=folder, name="test_transfer", pred=pred, tr=truth.truth(prepared=test_transfer)
     )
+    if not spec.bsp_zeroed:
+        pred = train.predict(net=net, prepared=test_plain, device=device, hide_bsp=True, spec=spec)
+        store_set(folder=folder, name="test_nobsp", pred=pred, tr=truth.truth(prepared=test_plain))
     if spec.heads:
         for hide in (False, True):
             for a in core.TEST_INJECTION_POINTS:

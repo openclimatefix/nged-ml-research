@@ -11,6 +11,7 @@ or a name; the files hold aggregates only.
 """
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,10 @@ READINGS_FILE = f"{SCORES}/readings.json"
 REAL_FILE = f"{SCORES}/real.json"
 VERDICT_FILE = f"{SCORES}/verdict.json"
 FITTED_ARMS = ("U*", "U-NC", "U-NCw", "S+", "U-SG", "U*-L", "U-N", "U-noBSP")
+
+
+class FiguresError(RuntimeError):
+    """A figure needs fitted outputs that do not exist (no empty plot is drawn)."""
 
 
 class ScoreError(RuntimeError):
@@ -94,7 +99,7 @@ def arm_scores(*, root: Path, arm: str, n_rows: int) -> score.ArmScores:
         return out
 
     return score.ArmScores(
-        p=get("test", "p"), p_tr=get("test_transfer", "p"),
+        p=get("test", "p"), p_tr=get("test_transfer", "p"), p_nobsp=get("test_nobsp", "p"),
         pv=get("test", "pv") if spec.heads else None,
         pv_tr=get("test_transfer", "pv") if spec.heads else None,
         pv_inj={a: v for a in core.TEST_INJECTION_POINTS if spec.heads and (v := get(f"test_inj_{a:g}", "pv")) is not None},
@@ -211,6 +216,91 @@ def pv2_scores(*, root730: Path, truth_: score.Truth) -> score.ArmScores:
     return score.ArmScores(pv=pv)
 
 
+def sky_rows(*, prepared: Sequence[arms.Prepared]) -> dict[str, np.ndarray]:
+    """Return the sky and the solar target of plain windows, flat on the valid half-hours.
+
+    The arrays are the CAMS index, the clear-sky irradiance, the cosine of the zenith angle, and
+    the solar target.
+
+    Args:
+        prepared: Plain prepared segments.
+
+    Returns:
+        Four flat arrays `csi`, `clear`, `cosz`, and `solar`, in the order of the stored predictions.
+    """
+    picks = arms.all_picks(prepared=prepared)
+    spec = arms.eval_spec(inject=False, neighbours=False)
+    parts: dict[str, list[np.ndarray]] = {k: [] for k in ("csi", "clear", "cosz", "solar", "valid")}
+    for i in range(0, len(picks), truth.CHUNK):
+        batch = arms.make_eval_batch(prepared=prepared, picks=picks[i : i + truth.CHUNK], spec=spec)
+        csi, clear, cosz = baselines.sky_of_windows(x=batch.x)
+        parts["csi"].append(csi)
+        parts["clear"].append(clear)
+        parts["cosz"].append(cosz)
+        parts["solar"].append(batch.t[:, arms.T["solar"]])
+        parts["valid"].append(batch.t[:, arms.T["valid"]] > 0.5)
+    valid = np.concatenate(parts["valid"])
+    return {k: np.concatenate(v)[valid] for k, v in parts.items() if k != "valid"}
+
+
+def pv0_scores(*, root730: Path, env: stages.Env) -> score.ArmScores:
+    """Return B-PV0 on the plain test rows: the sky-only rule fitted on the plain validation bank.
+
+    Args:
+        root730: Experiment 730's data folder (read only).
+        env: The stages' environment.
+
+    Returns:
+        The rule's solar estimate on the test rows.
+    """
+    common = {"holidays": env.holidays, "stats": env.stats, "medians": env.medians}
+    va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
+    te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
+    fit_rows = sky_rows(
+        prepared=arms.prepare_plain(segments=va.segments, neighbours=env.neighbours, **common)
+    )
+    try:
+        weights = baselines.fit_pv0(
+            csi=fit_rows["csi"],
+            clear=fit_rows["clear"],
+            cosz=fit_rows["cosz"],
+            target=fit_rows["solar"],
+        )
+    except ValueError:
+        return score.ArmScores()  # no validation half-hour holds solar output: B-PV0 is void
+    t = sky_rows(
+        prepared=arms.prepare_plain(segments=te.segments, neighbours=env.neighbours, **common)
+    )
+    return score.ArmScores(pv=baselines.b_pv0(weights=weights, csi=t["csi"], clear=t["clear"], cosz=t["cosz"]))  # fmt: skip
+
+
+def pv1_scores(*, root730: Path, truth_: score.Truth, ctx: object) -> score.ArmScores:
+    """Return B-PV1 on the plain test rows.
+
+    The rule uses the climatology's median demand in place of SD*'s demand, with S's P(X<0).
+
+    Args:
+        root730: Experiment 730's data folder (read only).
+        truth_: The test rows' truth.
+        ctx: Experiment 729's context (the climatology is fitted on its training base days).
+
+    Returns:
+        The rule's solar estimate (void, with no output, when a seed of S is missing).
+    """
+    import e00729_stages as stages729
+    import e00730_signed as signed
+
+    folder, arch = stages.CONTROL_FOLDERS["S"]
+    arrays = stages.load_stored(root730=root730, arm=folder, arch=arch)
+    climatology, _ = stages729.fit_baselines(ctx=ctx)  # ty: ignore[invalid-argument-type]
+    median = signed.demand_climatology(climatology=climatology, features=truth_.rows.features)
+    pv = baselines.b_pv1(
+        demand_median=median, p_by_seed=[a["p"].astype(np.float64) for a in arrays],
+        r=truth_.rows.r, cosz=truth_.cosz,
+    )  # fmt: skip
+    return score.ArmScores(pv=pv)
+
+
 def reading_json(*, readings: Mapping[str, object]) -> dict[str, Any]:
     """Return the readings as plain numbers (a void reading carries `void` true and NaN numbers)."""
     out: dict[str, Any] = {}
@@ -275,7 +365,7 @@ def stage_score(
         env: The stages' environment.
         base: D8's base calendar.
         log: Receives progress lines.
-        ctx: Unused.
+        ctx: Experiment 729's context (B-PV1's climatology); without it B-PV1 stays void.
 
     Returns:
         The record written to `scores/readings.json`.
@@ -284,7 +374,6 @@ def stage_score(
         StoppedError: When experiment 730's stored predictions do not line up with the rows
             (correctness failure).
     """
-    del ctx
     stages.guard_run(root=root, root730=root730, stage="score")
     limits = stages.read_json(path=root / "limits.json")
     truth_, overlay, valid = build_truth(
@@ -307,6 +396,9 @@ def stage_score(
     }
     arm_map["S"], arm_map["S-L"] = (stored_arm_scores(root730=root730, arm=a) for a in ("S", "S-L"))
     arm_map["B-PV2"] = pv2_scores(root730=root730, truth_=truth_)
+    arm_map["B-PV0"] = pv0_scores(root730=root730, env=env)
+    if ctx is not None:
+        arm_map["B-PV1"] = pv1_scores(root730=root730, truth_=truth_, ctx=ctx)
     arm_map.update(
         step_rule_scores(
             root730=root730, env=env, base=base, test_overlay=overlay, test_valid=valid
@@ -339,6 +431,132 @@ def stage_score(
     return record
 
 
+@dataclass(frozen=True)
+class RealRows:
+    """The valid half-hours of real-day pseudo-segments, flat in the order of the stored predictions.
+
+    Attributes:
+        cosz: The cosine of the solar zenith angle.
+        csi: The CAMS clear-sky index.
+        hh: The UTC half-hour of the day, 0 to 47.
+        day: The calendar row of each half-hour's day.
+    """
+
+    cosz: np.ndarray
+    csi: np.ndarray
+    hh: np.ndarray
+    day: np.ndarray
+
+
+def real_rows_of(*, segments: Sequence[Any]) -> RealRows:
+    """Return the real-day half-hours of pseudo-segments (the rows that `rows_from_segments` scores)."""
+    cosz, csi, hh, day = [], [], [], []
+    for seg in segments:
+        for d in np.flatnonzero(seg.cal_index >= 0):
+            ok = seg.valid[d] & np.isfinite(seg.x[d])
+            cosz.append(seg.cosz[d][ok])
+            csi.append(seg.csi[d][ok])
+            hh.append(np.arange(48)[ok])
+            day.append(np.full(int(ok.sum()), int(seg.cal_index[d])))
+    return RealRows(
+        cosz=np.concatenate(cosz).astype(np.float64), csi=np.concatenate(csi).astype(np.float64),
+        hh=np.concatenate(hh), day=np.concatenate(day),
+    )  # fmt: skip
+
+
+def to_days(*, rows: RealRows, values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Scatter flat per-half-hour values onto whole days.
+
+    Args:
+        rows: The half-hours of the values.
+        values: One value per half-hour.
+
+    Returns:
+        The values `(D, 48)` (NaN where the half-hour has no row), the valid mask `(D, 48)`, and the
+        calendar row of each day.
+    """
+    days = np.unique(rows.day)
+    where = np.searchsorted(days, rows.day)
+    out = np.full((len(days), 48), np.nan)
+    valid = np.zeros((len(days), 48), dtype=bool)
+    out[where, rows.hh] = values
+    valid[where, rows.hh] = True
+    return out, valid, days
+
+
+def real_day_checks(
+    *,
+    r1: RealRows | None,
+    eras: RealRows | None,
+    k1: RealRows | None,
+    outputs: Mapping[str, Mapping[str, np.ndarray | None]],
+    day_eras: np.ndarray,
+    running_k1: np.ndarray | None,
+    edges: Sequence[real.Edge],
+    closure_days: np.ndarray | None,
+    dates: np.ndarray,
+) -> dict[str, Any]:
+    """Return P2, P3, P4, and K3 from the stored real-day outputs, as aggregates only.
+
+    A missing input leaves its check None.
+
+    Args:
+        r1: The half-hours of the held-out pre-engine days.
+        eras: The half-hours of the net, solar, and fade era days.
+        k1: The half-hours of the days with a metered engine record.
+        outputs: The seed-averaged outputs by set (`r1`, `eras`, `k1`) and key (`pv`, `step_p`), and
+            for the rules K3 reads, `u_step` and `un_step` on `r1`.
+        day_eras: The era name of each calendar row.
+        running_k1: Whether the metered engine is running, on each half-hour of `k1`.
+        edges: The logged closure edges of D8.
+        closure_days: Whether each calendar row lies within a logged closure.
+        dates: The date of each calendar row (`datetime64[D]`).
+
+    Returns:
+        "p2", "p3", "p4", and "k3" (each None when its inputs are missing).
+    """
+    out: dict[str, Any] = {"p2": None, "p3": None, "p4": None, "k3": None}
+    pv_r1 = outputs.get("r1", {}).get("pv")
+    if r1 is not None and pv_r1 is not None:
+        out["p2"] = real.p2_no_farm(pv=pv_r1, cosz=r1.cosz, valid=np.ones(len(pv_r1), dtype=bool))
+    pv_e = outputs.get("eras", {}).get("pv")
+    if eras is not None and pv_e is not None:
+        pv_d, valid, days = to_days(rows=eras, values=pv_e)
+        csi_d, _, _ = to_days(rows=eras, values=eras.csi)
+        cosz_d, _, _ = to_days(rows=eras, values=eras.cosz)
+        solar_days = np.isin(day_eras[days], ["solar", "fade"])
+        out["p3"] = real.p3_follows_sky(
+            pv=np.nan_to_num(pv_d[solar_days]), csi=np.nan_to_num(csi_d[solar_days]),
+            cosz=np.nan_to_num(cosz_d[solar_days]), valid=valid[solar_days],
+        )  # fmt: skip
+    pv_k = outputs.get("k1", {}).get("pv")
+    if k1 is not None and pv_k is not None and running_k1 is not None:
+        out["p4"] = real.p4_absorb(
+            pv=pv_k, running=np.asarray(running_k1, dtype=bool), hh=k1.hh,
+            valid=np.ones(len(pv_k), dtype=bool),
+        )  # fmt: skip
+    steps = {
+        n: outputs["r1"].get(k)
+        for n, k in (("U*", "u_step"), ("U-N", "un_step"))
+        if "r1" in outputs
+    }
+    if r1 is not None and closure_days is not None and any(v is not None for v in steps.values()):
+        shaped = {}
+        valid_d = days_r1 = None
+        for name, flat in steps.items():
+            if flat is None:
+                continue
+            shaped[name], valid_d, days_r1 = to_days(rows=r1, values=flat)
+        assert valid_d is not None
+        assert days_r1 is not None
+        day_index = {dates[d].astype(object): i for i, d in enumerate(days_r1)}
+        out["k3"] = real.k3_rules(
+            edges=edges, steps={k: np.nan_to_num(v) for k, v in shaped.items()}, day_index=day_index,
+            valid=valid_d, closure_days=np.asarray(closure_days)[days_r1],
+        )  # fmt: skip
+    return out
+
+
 def stage_real(
     *,
     root: Path,
@@ -348,9 +566,10 @@ def stage_real(
     log: stages.Log,
     ctx: object = None,
 ) -> dict:
-    """Read the real-day sets of U*: H2 on the held-out pre-engine days and the night bar P1.
+    """Read the real-day sets of U*: H2, P1, P2, P3, P4, and K3 for U* and U-N.
 
-    The function reads every era and writes aggregates only.
+    The function reads every era and writes aggregates only. K3 for B-TN stays unread, and K3 is
+    void unless the switching logs give at least 10 closure edges of D8 on days with a reading.
 
     Args:
         root: The data folder of this experiment.
@@ -365,27 +584,65 @@ def stage_real(
     """
     del env, base
     stages.guard_run(root=root, root730=root730, stage="real")
-    folders = [
-        root / "predictions" / core.job_name(arm="U*", arch=core.ARMS["U*"].arch, seed=s)
-        for s in core.SEEDS
-    ]
+
+    def folders_of(arm: str) -> list[Path]:
+        spec = core.ARMS[arm]
+        return [
+            root / "predictions" / core.job_name(arm=arm, arch=spec.arch, seed=s)
+            for s in core.SEEDS
+        ]
+
+    folders = folders_of("U*")
     limits = core.read_limits_file(path=root / "limits.json")
-    out: dict[str, Any] = {"h2": None, "p1": None}
+    out: dict[str, Any] = {"h2": None, "p1": None, "p2": None, "p3": None, "p4": None, "k3": None}
     r1 = mean_over_seeds(arrays=[read_set(folder=f, name="real_r1") for f in folders], key="p")
     if r1 is not None:
         out["h2"] = score730.real_harm_check(p=r1, limit=limits["pooled"].limit)
     eras = [read_set(folder=f, name="real_eras") for f in folders]
     pv = mean_over_seeds(arrays=eras, key="pv")
-    if pv is not None and ctx is not None:
+    if ctx is not None:
+        import e00729_data as data729
         import e00729_stages as stages729
 
-        segs = stages729.real_sets(ctx=ctx)["eras"]  # ty: ignore[invalid-argument-type]
-        rows = score729.rows_from_segments(segments=segs, holidays=ctx.cal.holidays)  # ty: ignore[unresolved-attribute]
-        cosz = np.concatenate([s.cosz[s.cal_index >= 0].reshape(-1) for s in segs])
-        if cosz.shape[0] == pv.shape[0] == rows.n:
-            out["p1"] = real.p1_night(pv=pv, cosz=cosz, valid=np.ones(rows.n, dtype=bool))
+        sets = stages729.real_sets(ctx=ctx)  # ty: ignore[invalid-argument-type]
+        cal = ctx.table.calendar  # ty: ignore[unresolved-attribute]
+        rows = {k: real_rows_of(segments=v) for k, v in sets.items()}
+        if pv is not None and rows["eras"].cosz.shape[0] == pv.shape[0]:
+            out["p1"] = real.p1_night(
+                pv=pv, cosz=rows["eras"].cosz, valid=np.ones(len(pv), dtype=bool)
+            )
+        outputs: dict[str, dict[str, np.ndarray | None]] = {
+            "r1": {"pv": mean_over_seeds(arrays=[read_set(folder=f, name="real_r1") for f in folders], key="pv"),
+                   "u_step": mean_over_seeds(arrays=[read_set(folder=f, name="real_r1") for f in folders], key="step_p"),
+                   "un_step": mean_over_seeds(arrays=[read_set(folder=f, name="real_r1") for f in folders_of("U-N")], key="step_p")},
+            "eras": {"pv": pv},
+            "k1": {"pv": mean_over_seeds(arrays=[read_set(folder=f, name="real_k1") for f in folders], key="pv")},
+        }  # fmt: skip
+        units = data729.record_by_day(
+            record=data729.metered_record(), days=cal.dates, column="units"
+        )
+        running = (
+            np.nan_to_num(stages729.record_values_for_rows(segments=sets["k1"], record=units)) >= 1
+        )
+        edges, status = real.load_closure_edges()
+        closure, _ = data729.load_closure_days()
+        closure_days = np.array(
+            [d.astype(object) in closure for d in cal.dates.astype("datetime64[D]")]
+        )
+        out.update(
+            real_day_checks(
+                r1=rows["r1"], eras=rows["eras"], k1=rows["k1"], outputs=outputs,
+                day_eras=np.asarray(ctx.table.era), running_k1=running, edges=edges,  # ty: ignore[unresolved-attribute]
+                closure_days=closure_days, dates=cal.dates.astype("datetime64[D]"),
+            )
+        )  # fmt: skip
+        out["k3_status"] = status
+        out["k3_note"] = "B-TN is not read on real days"
     stages.write_json(path=root / REAL_FILE, payload=out)
-    log(f"real: H2 read {out['h2'] is not None}, P1 read {out['p1'] is not None}")
+    log(
+        "real: "
+        + ", ".join(f"{k} read {out[k] is not None}" for k in ("h2", "p1", "p2", "p3", "p4", "k3"))
+    )
     return out
 
 
@@ -575,6 +832,9 @@ def stage_series(
     t_plain = truth.truth(prepared=plain)
     arm_map = {a: arm_scores(root=root, arm=a, n_rows=truth_.rows.n) for a in ("U*", "U-N")}
     arm_map["S"] = stored_arm_scores(root730=root730, arm="S")
+    if arm_map["U*"].p is None or arm_map["U*"].pv is None or arm_map["U*"].step is None:
+        msg = "the series figures need the stored outputs of the three seeds of U* (no empty plot is drawn)"
+        raise FiguresError(msg)
     sources = [s.source for s in te.segments]
     table = window_table(
         truth_=truth_,
@@ -610,8 +870,71 @@ def stage_series(
                 path=folder / f"series_{name}.svg",
             )
             drawn.append(name)
+    pair_index = ov.build_pair_index(segments=te.segments, sources=core.TEST_SIBLING_SOURCES)
+    for name, amount in zip(("W9", "W10", "W11"), core.TEST_INJECTION_POINTS, strict=True):
+        drawn_pair = draw_injection_window(
+            root=root, name=name, amount=amount, plain=plain, pair_index=pair_index, valid=valid,
+            arm=arm_map["U*"], sources=sources,
+        )  # fmt: skip
+        drawn += drawn_pair
+        if not drawn_pair:
+            missing.append(name)
     log(f"series: drawn {len(drawn)} windows; no window fits {sorted(set(missing))}")
     return {"drawn": sorted(set(drawn)), "no_window": sorted(set(missing))}
+
+
+def draw_injection_window(
+    *, root: Path, name: str, amount: float, plain: Sequence[arms.Prepared], pair_index: ov.PairIndex,
+    valid: np.ndarray, arm: score.ArmScores, sources: Sequence[str],
+) -> list[str]:  # fmt: skip
+    """Draw the injection pair of one amount whose total delta is the median of its pairs.
+
+    Windows whose solar source is S1 go to the private folder, the others to the published one.
+
+    Args:
+        root: The data folder of this experiment.
+        name: The window's name (W9, W10, or W11).
+        amount: The injected amount in points.
+        plain: The prepared plain test segments.
+        pair_index: The pair index of the test bank.
+        valid: The valid half-hours `(P, 48)`.
+        arm: U*'s seed-averaged outputs.
+        sources: The solar source of each segment.
+
+    Returns:
+        The name when a window was drawn, else an empty list.
+
+    Raises:
+        FiguresError: When U*'s solar output of the injected member is missing.
+    """
+    import e00732_figures as figures
+
+    pv_inj = arm.pv_inj.get(amount)
+    if arm.pv is None or pv_inj is None:
+        msg = f"{name} needs U*'s solar output on the injected member (amount {amount:g})"
+        raise FiguresError(msg)
+    ti = truth.truth(prepared=plain, index=pair_index, amount=amount)
+    totals = np.nansum(ti.delta, axis=1)
+    seg_source = np.array([sources[seg_i] for seg_i, _ in ti.picks])
+    drawn: list[str] = []
+    for published in (True, False):
+        mask = (ti.pair > 0.5) & (totals > 0)
+        mask &= (seg_source != "S1") if published else (seg_source == "S1")
+        i = sf.series730.median_depth_index(mask=mask, depth=totals)
+        if i is None:
+            continue
+        window = {
+            "pv": np.nan_to_num(unflatten(flat=arm.pv, valid=valid)[i]),  # ty: ignore[not-subscriptable]
+            "pv_inj": np.nan_to_num(unflatten(flat=pv_inj, valid=valid)[i]),  # ty: ignore[not-subscriptable]
+            "delta": ti.delta[i],
+        }
+        folder = root / "figures" / "series" if published else root / "PRIVATE" / "series"
+        figures.save_svg(
+            chart=sf.injection_figure(window=window, title=f"{name}: {core.SERIES_WINDOWS[name]}"),
+            path=folder / f"series_{name}.svg",
+        )
+        drawn.append(name)
+    return drawn
 
 
 def stage_figures(
@@ -642,7 +965,31 @@ def stage_figures(
     import e00732_figures as figures
 
     rec = stages.read_json(path=root / READINGS_FILE)
+    if "U*" not in rec["arms_present"]:
+        msg = "the figures need the stored outputs of U* (no empty plot is drawn)"
+        raise FiguresError(msg)
+    written = {}
     path = root / "figures" / "contrasts.svg"
     figures.save_svg(chart=figures.contrast_chart(readings=rec["readings"]["counted"]), path=path)
-    log("figures: contrasts written")
-    return {"contrasts": str(path.name)}
+    written["contrasts"] = path.name
+    bsp = {
+        k: v for k, v in rec["readings"]["report"].items() if k.split("_")[0] in ("R19", "R20", "R21", "R22")
+    }  # fmt: skip
+    path = root / "figures" / "bsp_input.svg"
+    try:
+        chart = figures.contrast_chart(
+            readings=bsp, title="The BSP input: R19 to R22 with their intervals"
+        )
+    except figures.HistoryError:
+        written["bsp_input"] = "every BSP reading is void: not drawn"
+    else:
+        figures.save_svg(chart=chart, path=path)
+        written["bsp_input"] = path.name
+    if (root / REAL_FILE).exists():
+        path = root / "figures" / "real_checks.svg"
+        figures.save_svg(
+            chart=figures.real_checks_chart(real=stages.read_json(path=root / REAL_FILE)), path=path
+        )
+        written["real_checks"] = path.name
+    log("figures: " + ", ".join(sorted(written)))
+    return written

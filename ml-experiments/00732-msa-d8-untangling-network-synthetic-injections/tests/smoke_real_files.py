@@ -6,8 +6,8 @@ It is not a pytest module. Run it once by hand, only when the code review's chec
     CUDA_VISIBLE_DEVICES= python tests/smoke_real_files.py
 
 Each check opens one input once and prints one line of flags and counts: a column-presence flag, a
-row-count flag, or a status word. It prints no power value, no date, no site name, no engine size, and no
-series identifier. Exit status 0 means every input opened with what the code reads.
+row-count flag, or a status word. It prints no power value, no date, no site name, no engine size,
+and no series identifier. Exit status 0 means every input opened with what the code reads.
 """
 
 import sys
@@ -66,7 +66,9 @@ def check_neighbour_sources() -> str:
 
 
 def check_context_and_neighbour_table() -> str:
-    """Build experiment 729's context and read the neighbour table on D8's base calendar, if the neighbours stage has run."""
+    """Build experiment 729's context and read the neighbour table on D8's base calendar.
+
+    The table is read only if the neighbours stage has run."""
     import e00732_cli as cli
 
     ctx = cli.real_context()
@@ -83,7 +85,9 @@ def check_context_and_neighbour_table() -> str:
 
 
 def check_real_day_neighbours() -> str:
-    """Check that the neighbours place onto D8's whole day table (the calendar of the real-day sets) and cover most of it."""
+    """Check that the neighbours place onto D8's whole day table and cover most of it.
+
+    The whole day table is the calendar of the real-day sets."""
     import e00732_cli as cli
 
     ctx = cli.real_context()
@@ -109,12 +113,44 @@ def check_real_sets() -> str:
     )
 
 
+def check_real_row_alignment() -> str:
+    """Check that the real-day rows of the real checks match the rows that experiment 729 scores.
+
+    The check runs for every set."""
+    import e00729_score as score729
+    import e00729_stages as stages729
+    import e00732_cli as cli
+    import e00732_report as report
+
+    ctx = cli.real_context()
+    sets = stages729.real_sets(ctx=ctx)
+    same = {
+        name: report.real_rows_of(segments=segs).hh.shape[0]
+        == score729.rows_from_segments(segments=segs, holidays=ctx.table.calendar.holidays).n
+        for name, segs in sets.items()
+    }
+    import e00729_data as data729
+
+    cal = ctx.table.calendar
+    units = data729.record_by_day(record=data729.metered_record(), days=cal.dates, column="units")
+    running = stages729.record_values_for_rows(segments=sets["k1"], record=units)
+    closure, _ = data729.load_closure_days()
+    closure_days = np.array(
+        [d.astype(object) in closure for d in cal.dates.astype("datetime64[D]")]
+    )
+    return (
+        f"real rows match the scored rows in every set: {all(same.values())}, "
+        f"engine record covers the K1 rows: {len(running) == report.real_rows_of(segments=sets['k1']).hh.shape[0]}, "
+        f"closure-day flags cover the day table: {len(closure_days) == len(cal.dates)}"
+    )
+
+
 def check_closure_edges() -> str:
     """Load the switching logs and print the status word and the number of edges (K3 is void unless `loaded`)."""
     import e00732_real as real
 
     edges, status = real.load_closure_edges()
-    return f"switching logs status: {status}, closure edges read: {len(edges) > 0}"
+    return f"switching logs status: {status}, closure edges read: {len(edges)} (K3 needs at least {core.K3_MIN_EDGES})"
 
 
 def check_private_splits() -> str:
@@ -136,6 +172,7 @@ CHECKS: dict[str, Callable[[], str]] = {
     "context and neighbour table": check_context_and_neighbour_table,
     "real-day neighbours": check_real_day_neighbours,
     "real sets": check_real_sets,
+    "real row alignment": check_real_row_alignment,
     "closure edges": check_closure_edges,
     "timing inputs": check_timing_inputs,
 }

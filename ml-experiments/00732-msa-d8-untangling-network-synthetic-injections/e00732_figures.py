@@ -214,13 +214,18 @@ def contrast_rows(*, readings: Mapping[str, Mapping[str, float | bool]]) -> pl.D
     )  # fmt: skip
 
 
-def contrast_chart(*, readings: Mapping[str, Mapping[str, float | bool]]) -> alt.LayerChart:
+def contrast_chart(
+    *,
+    readings: Mapping[str, Mapping[str, float | bool]],
+    title: str = "The seven counted contrasts C1 to C7, with the zero rule",
+) -> alt.LayerChart:
     """Return the counted contrasts as points with intervals.
 
     The chart draws a labelled zero rule (a negative value favours the first arm).
 
     Args:
-        readings: The counted contrasts' readings by name (`reading_dict` output).
+        readings: The contrasts' readings by name (`reading_dict` output).
+        title: The chart's title.
 
     Returns:
         The chart.
@@ -251,7 +256,65 @@ def contrast_chart(*, readings: Mapping[str, Mapping[str, float | bool]]) -> alt
     return (bars + dots + zero).properties(
         width=WIDTH_PX,
         height=160,
-        title=alt.TitleParams(
-            "The seven counted contrasts C1 to C7, with the zero rule", anchor="start"
-        ),
+        title=alt.TitleParams(title, anchor="start"),
+    )
+
+
+def real_check_rows(*, real: Mapping[str, object]) -> pl.DataFrame:
+    """Return one row per real-day check with its pass or fail word (a check that was not read is "not read").
+
+    Args:
+        real: The record of `scores/real.json`.
+
+    Returns:
+        The checks P1 to P4 and K3 with their words.
+
+    Raises:
+        HistoryError: When no check was read, because the figure would be empty.
+    """
+    rows = []
+    for name in ("p1", "p2", "p3", "p4", "k3"):
+        item = real.get(name)
+        if item is None:
+            word = "not read"
+        elif name == "k3":
+            hit = item["U*"]["hit"] if isinstance(item, dict) and "U*" in item else None  # ty: ignore[invalid-argument-type]
+            word = "void" if hit is None or hit["void"] else "read"  # ty: ignore[invalid-argument-type, not-subscriptable]
+        elif name == "p1":
+            word = "pass" if item["all"].get("pass", False) else "fail"  # ty: ignore[invalid-argument-type, not-subscriptable, unresolved-attribute]
+        else:
+            word = "pass" if item.get("pass", False) else "fail"  # ty: ignore[unresolved-attribute]
+        rows.append({"check": name.upper(), "word": word})
+    if all(r["word"] == "not read" for r in rows):
+        msg = "no real-day check was read, so the figure would be empty"
+        raise HistoryError(msg)
+    return pl.DataFrame(rows)
+
+
+def real_checks_chart(*, real: Mapping[str, object]) -> alt.Chart:
+    """Return the real-day checks as one row of pass, fail, void, or not-read words (no level of the solar output)."""
+    data = real_check_rows(real=real)
+    return (
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
+        .mark_text(fontSize=14, aria=False)
+        .encode(
+            y=alt.Y("check:N", title=None, sort=list(data["check"])),
+            text="word:N",
+            color=alt.Color(
+                "word:N",
+                scale=alt.Scale(
+                    domain=["pass", "fail", "void", "read", "not read"],
+                    range=["#17A34A", "#FF4901", "#666666", "#306BFF", "#999999"],
+                ),
+                legend=None,
+            ),
+        )
+        .properties(
+            width=WIDTH_PX,
+            height=120,
+            title=alt.TitleParams(
+                "Real-day checks P1 to P4 and K3: the word of each, with no level of the solar output",
+                anchor="start",
+            ),
+        )
     )
