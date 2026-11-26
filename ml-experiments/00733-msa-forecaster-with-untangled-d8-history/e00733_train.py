@@ -7,8 +7,8 @@ Two loops share the batch and loss helpers:
   716's `e00716_train.py` (the batch, the parameter groups, and the clip differ). The parameters of M*
   keep 713's groups, the warm-up, and a clip of 1.0 over them; the new parameters (`u_*`) form
   their own groups with no warm-up, their own clip of 1.0, a gain at 3e-3 without weight decay,
-  and every other new parameter at 2e-3. The two mask draws hide the channels of the age-2 row and part of the age-3
-  row on 10% of training samples, and of ages 2 to 5 on another 10%.
+  and every other new parameter at 2e-3. The two mask draws hide the channels of the age-2 row and
+  part of the age-3 row on 10% of training samples, and of ages 2 to 5 on another 10%.
 - `train_synthetic`: one stage on the synthetic forecasting world: AdamW at 5e-4 with weight decay
   1e-3, batch 256, gradient clip 1.0, at most 80 passes with a patience of 20 on the validation loss,
   which is the mixture negative log-likelihood plus the sign head's cross-entropy, each with weight 1.0.
