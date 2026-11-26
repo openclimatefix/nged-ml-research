@@ -65,6 +65,12 @@ PAIR_SUFFIX: Final = re.compile(
 """Strips the suffix that tells the thin member of a pair from the thick one, so that both take one colour."""
 
 
+WINDOW_X_TITLE: Final = (
+    "Hours from 12:00 UTC on the day before the scored day (tint: the scored day)"
+)
+NO_BSP_NOTE: Final = "no BSP meter in this segment (BSP channels absent)"
+
+
 def gallery_private_dir(*, root: Path) -> Path:
     """Return the private folder that holds G17, `auto_check.json`, and `panel_check.json`."""
     return root / "PRIVATE" / PRIVATE_SUBFOLDER
@@ -85,6 +91,7 @@ def lines_chart(
     height: int = 120,
     n_days: int = 2,
     colours: Mapping[str, str] | None = None,
+    scored: bool = False,
 ) -> alt.LayerChart | alt.Chart:
     """Return lines over a window of `n_days` days with the edges as rules.
 
@@ -102,6 +109,9 @@ def lines_chart(
         n_days: The window length in days.
         colours: Colour by series name (the default order of `COLOURS` otherwise), so that a thin
             and a thick line of one quantity share a colour.
+        scored: The window is a 96-half-hour training window, which starts at 12:00 UTC on the day
+            before the scored day. The x-axis then counts hours from that time, and the scored
+            day (hours 12 to 36) is tinted.
 
     Returns:
         The chart, with no calendar date anywhere.
@@ -126,7 +136,7 @@ def lines_chart(
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "hour:Q",
-                title="Hours from the start of day 1 (UTC)",
+                title=WINDOW_X_TITLE if scored else "Hours from the start of day 1 (UTC)",
                 axis=alt.Axis(values=list(range(0, 24 * n_days + 1, step))),
             ),
             y=alt.Y("value:Q", title=y_title),
@@ -150,6 +160,12 @@ def lines_chart(
         )
     )
     layers: list[alt.Chart] = []
+    if scored:
+        layers.append(
+            alt.Chart(pl.DataFrame({"a": [12.0], "b": [36.0]}))
+            .mark_rect(color=SKY, opacity=0.12, aria=False)
+            .encode(x="a:Q", x2="b:Q")  # ty: ignore[unresolved-attribute]
+        )
     if hidden is not None and hidden.any():
         idx = np.flatnonzero(hidden)
         span = pl.DataFrame({"a": [idx[0] / 2.0], "b": [(idx[-1] + 1) / 2.0]})
@@ -423,7 +439,13 @@ def g10_charts(*, wins: Sequence[Win], title: str, n_days: int) -> alt.VConcatCh
             widths={"BSP step without the transfer": 0.8, "BSP step with the transfer": 2.2},
             title="The BSP meter's half-hour steps", rules=rules, height=70, n_days=n_days,
         )  # fmt: skip
-        charts += [top, bottom]
+        added = np.diff(np.nan_to_num(w.bsp1 - w.bsp0, nan=0.0), prepend=0.0)
+        step = lines_chart(
+            series={"step added by the transfer": added},
+            title="The step the transfer adds to the BSP meter (the two lines above differ by this; dotted: edges)",
+            rules=rules, height=70, n_days=n_days,
+        )  # fmt: skip
+        charts += [top, bottom, step]
     return stack(charts=charts, title=title, subtitle=G10_SUBTITLE)
 
 
@@ -605,11 +627,12 @@ def pair_charts(*, pairs: Sequence[PairWin], title: str) -> alt.VConcatChart:
         widths = {"original": 0.8, "with the injection": 2.2}
         same = {"original": BLUE, "with the injection": BLUE}
         marks = np.flatnonzero(p.delta > 0)
+        has_bsp = bool(np.isfinite(p.bsp0).any())
         charts += [
-            lines_chart(series={"extra injection": p.delta}, title=f"Draw {k + 1}: the extra solar injection (a = {p.amount:g} points)", height=60, marks=None),
-            lines_chart(series={"original": p.x0, "with the injection": p.x1}, widths=widths, colours=same, title="Signed truth", height=90),
-            lines_chart(series={"original": np.nan_to_num(p.r0), "with the injection": np.nan_to_num(p.r1)}, widths=widths, colours=same, title="Reading (the injection re-folded; ticks: half-hours with the injection)", height=90, marks=marks),
-            lines_chart(series={"original": np.nan_to_num(p.bsp0), "with the injection": np.nan_to_num(p.bsp1)}, widths=widths, colours=same, title="BSP meter", height=70),
+            lines_chart(series={"extra injection": p.delta}, title=f"Draw {k + 1}: the extra solar injection (a = {p.amount:g} points)", height=60, marks=None, scored=True),
+            lines_chart(series={"original": p.x0, "with the injection": p.x1}, widths=widths, colours=same, title="Signed truth", height=90, scored=True),
+            lines_chart(series={"original": np.nan_to_num(p.r0), "with the injection": np.nan_to_num(p.r1)}, widths=widths, colours=same, title="Reading (the injection re-folded; ticks: half-hours with the injection)", height=90, marks=marks, scored=True),
+            lines_chart(series={"original": np.nan_to_num(p.bsp0), "with the injection": np.nan_to_num(p.bsp1)}, widths=widths, colours=same, title="BSP meter" if has_bsp else f"BSP meter: {NO_BSP_NOTE}", height=70, scored=True),
         ]  # fmt: skip
     return stack(charts=charts, title=title)
 
@@ -898,6 +921,7 @@ def histogram_chart(
     title: str,
     x_title: str,
     log: bool = False,
+    subtitle: str = "",
 ) -> alt.LayerChart:
     """Return a share histogram of one parameter for each overlay, with the registered range as two rules."""
     rows = []
@@ -941,7 +965,9 @@ def histogram_chart(
         .encode(x="v:Q")
     )  # ty: ignore[unresolved-attribute]
     return (bars + rules).properties(
-        width=WIDTH_PX, height=110, title=alt.TitleParams(title, anchor="start")
+        width=WIDTH_PX,
+        height=110,
+        title=alt.TitleParams(title, anchor="start", subtitle=subtitle or alt.Undefined),
     )
 
 
@@ -999,7 +1025,7 @@ def panel_g14(
         "hours": core.TRANSFER_HOURS, "points": core.TRANSFER_POINTS,
     }  # fmt: skip
     charts = [
-        histogram_chart(values={n: p["drawn_rate"] for n, p in params.items()}, bounds=ranges["drawn_rate"], title="Drawn transfer rate of each segment (rules: the registered range)", x_title="Transfers per 30 days"),
+        histogram_chart(values={n: p["drawn_rate"] for n, p in params.items()}, bounds=ranges["drawn_rate"], title="Drawn transfer rate of each segment (rules: the registered range)", x_title="Transfers per 30 days", subtitle="Every test segment has exactly 6 transfers by construction, so the test bar sits at 6.0."),
         histogram_chart(values={n: p["hours"] for n, p in params.items()}, bounds=ranges["hours"], title="Duration of a transfer", x_title="Hours", log=True),
         histogram_chart(values={n: p["points"] for n, p in params.items()}, bounds=ranges["points"], title="Settled size T0 after the donor rule", x_title="Points of capacity", log=True),
         histogram_chart(values={n: p["under_bsp_a"] for n, p in params.items()}, bounds=(0.0, 1.0), title="Partner under BSP A (1) or under another BSP (0); registered share 0.8", x_title="Under BSP A"),
@@ -1091,9 +1117,9 @@ def panel_g15(
             }  # fmt: skip
             windows.append(w)
             charts += [
-                lines_chart(series={"base demand": w["base"], "engine output": w["engine"], "solar output": w["solar"], "transferred load": w["t"], "extra injection": delta}, title=f"Draw {len(windows)}: the components", height=100),
-                lines_chart(series={"truth w": x, "truth w+": w["x_inj"], "reading w": np.nan_to_num(w["r"]), "reading w+": w["r_inj"]}, widths={"truth w": 0.8, "reading w": 0.8, "truth w+": 2.2, "reading w+": 2.2}, title="The window w and its injected member w+", height=100),
-                lines_chart(series={"BSP w": w["bsp"], "BSP w+": w["bsp_inj"]}, widths={"BSP w": 0.8, "BSP w+": 2.2}, title="The BSP meter", height=70),
+                lines_chart(series={"base demand": w["base"], "engine output": w["engine"], "solar output": w["solar"], "transferred load": w["t"], "extra injection": delta}, title=f"Draw {len(windows)}: the components", height=100, scored=True),
+                lines_chart(series={"truth w": x, "truth w+": w["x_inj"], "reading w": np.nan_to_num(w["r"]), "reading w+": w["r_inj"]}, widths={"truth w": 0.8, "reading w": 0.8, "truth w+": 2.2, "reading w+": 2.2}, title="The window w and its injected member w+", height=100, scored=True),
+                lines_chart(series={"BSP w": w["bsp"], "BSP w+": w["bsp_inj"]}, widths={"BSP w": 0.8, "BSP w+": 2.2}, title="The BSP meter", height=70, scored=True),
             ]  # fmt: skip
             break
     ok = check_g15(windows=windows)
@@ -1810,7 +1836,7 @@ def variant_chart(
         series={"U*": t.plain[row], short: window[row]},
         widths={"U*": 2.2, short: 1.0},
         title=f"{label}: {arms.ALL_NAMES[row]}",
-        rules=rules, hidden=t.hidden, y_title=arms.ALL_NAMES[row], height=44,
+        rules=rules, hidden=t.hidden, y_title=arms.ALL_NAMES[row], height=44, scored=True,
     )  # fmt: skip
 
 
@@ -1834,6 +1860,7 @@ def tensor_charts(*, t: Tensor) -> dict[str, alt.TopLevelMixin]:
                 marks=marks,
                 y_title=name,
                 height=44,
+                scored=True,
             )
         )
     subtitle = (

@@ -308,3 +308,72 @@ def test_g20_coverage_axis_reaches_the_lowest_monthly_coverage(world: World) -> 
     cov = g.monthly_coverage(base_dates=world.cal.dates, reading=world.cal.reading, arrays=thin)
     lowest = min(float(v.min()) for v in cov.values())
     assert f'"domain": [{min(0.5, float(np.floor(lowest * 10) / 10))}, 1.0]' in text
+
+
+def test_window_panels_say_where_their_x_axis_starts_and_note_a_missing_bsp_meter(
+    world: World,
+) -> None:
+    pairs = g.pair_windows(
+        segments=world.segs,
+        overlays=None,
+        index=world.index_s2,
+        amount=20.0,
+        source="S2",
+        public=True,
+    )
+    text = json.dumps(g.pair_charts(pairs=pairs, title="t").to_dict())
+    assert "Hours from 12:00 UTC on the day before the scored day" in text
+    assert "Hours from the start of day 1 (UTC)" not in text
+    no_bsp = [dataclasses.replace(p, bsp0=np.full_like(p.bsp0, np.nan)) for p in pairs]
+    assert g.NO_BSP_NOTE in json.dumps(g.pair_charts(pairs=no_bsp, title="t").to_dict())
+    wins = g.choose_windows(overlays=world.test, originals=world.segs, keep=lambda o, tr: True)
+    assert "Hours from the start of day 1 (UTC)" in json.dumps(
+        g.g10_charts(wins=wins, title="t", n_days=2).to_dict()
+    )
+
+
+def test_g10_shows_the_step_each_transfer_adds_to_the_bsp_meter(world: World) -> None:
+    wins = g.choose_windows(overlays=world.test, originals=world.segs, keep=lambda o, tr: True)
+    spec = g.g10_charts(wins=wins, title="t", n_days=2).to_dict()
+    assert len(spec["vconcat"]) == 3 * len(wins)
+    assert "step added by the transfer" in json.dumps(spec)
+
+
+def test_other_bsp_transfers_step_the_bsp_meter_at_both_edges_and_same_bsp_ones_do_not(
+    world: World,
+) -> None:
+    other = same = 0
+    for o, s in zip(world.test, world.segs, strict=True):
+        added = (np.asarray(o.seg.bsp, float) - np.asarray(s.bsp, float)).reshape(-1)
+        total = o.beta * np.asarray(o.t_bsp, float).reshape(-1)
+        seen = np.isfinite(added)
+        assert np.allclose(added[seen], total[seen], atol=1e-3)
+        for tr in o.transfers:
+            a, b = tr.start_half_hour, tr.end_half_hour
+            if tr.inside_bsp_a:
+                same += 1
+                continue
+            level = tr.mean_levels()
+            if (
+                seen[a]
+                and seen[a - 1]
+                and not any(
+                    x is not tr
+                    and not x.inside_bsp_a
+                    and x.start_half_hour - 1 <= b
+                    and x.end_half_hour >= a - 1
+                    for x in o.transfers
+                )
+            ):
+                other += 1
+                assert added[a] - added[a - 1] == pytest.approx(o.beta * level[0], abs=1e-3)
+    assert other + same > 0
+
+
+def test_g14_subtitle_says_the_test_bar_sits_at_six(world: World) -> None:
+    charts, _, _, _ = g.panel_g14(
+        overlays_by_name={"train seed 0": world.train, "test": world.test}
+    )
+    assert "exactly 6 transfers by construction" in json.dumps(
+        {k: v.to_dict() for k, v in charts.items()}
+    )
