@@ -12,7 +12,6 @@ import e00729_banks as banks729
 import e00729_core as core729
 import e00729_score as score729
 import e00729_sim as sim
-import e00729_train as train729
 import e00730_banks as banks
 import e00730_cli as cli
 import e00730_core as core
@@ -27,6 +26,10 @@ import pytest
 from fixture730 import make_root, with_unique_keys, write_choices, write_predictions, write_real
 from test_e00730_stages import fit_invented_baselines
 from world730 import make_calendar
+
+pytest.importorskip("torch")  # e00729_train imports torch at module level; CI has no torch.
+
+import e00729_train as train729
 
 HERE = Path(__file__).resolve().parent
 CODE = HERE.parent
