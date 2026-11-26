@@ -4,7 +4,6 @@
 from types import SimpleNamespace
 
 import e00733_core as core
-import e00733_inputs as inp
 import e00733_leakage as leak
 import e00733_model as model
 import e00733_synth as sy
@@ -15,7 +14,7 @@ from synth_fixture import make_segment
 torch = pytest.importorskip("torch")
 import e00713_layout as lay  # noqa: E402  # ty: ignore[unresolved-import]
 import e00733_train as tn  # noqa: E402
-from torch_inputs import make_inputs  # noqa: E402
+from torch_inputs import FakeSource, make_channel_tensors  # noqa: E402
 
 
 class _FakeTensor:
@@ -64,68 +63,10 @@ def test_param_groups_put_every_new_parameter_in_a_group_without_warmup() -> Non
     assert len(new) == len(new_ids) and not {id(p) for p in trunk} & new_ids
 
 
-class _FakeSource:
-    """A 713-style source: random `MsaInputs` fields, a target with NaN past the cut, and run times."""
-
-    def __init__(self, *, run_offset_us: int = 0) -> None:
-        self.device = "cpu"
-        self.ens = SimpleNamespace(first_day=0, run_us=None)
-        self.run_offset_us = run_offset_us
-
-    def assemble(
-        self,
-        *,
-        primary: torch.Tensor,
-        c_idx: torch.Tensor,
-        lead_day: torch.Tensor,
-        ensemble: bool,
-        mask_all_power: object,
-        mask_newest_row: object,
-        target_end: object,
-    ) -> SimpleNamespace:
-        b = len(primary)
-        mi = make_inputs(b=b, seed=int(c_idx[0]), channels=False)
-        base = {k: v for k, v in mi.__dict__.items() if k not in {"hist_u", "hist_u_ok"}}
-        base["primary"], base["lead_day"] = primary, lead_day
-        from e00713_model import MsaInputs  # ty: ignore[unresolved-import]
-
-        hist_idx = (
-            c_idx[:, None, None]
-            - 48 * torch.arange(2, 16)[None, :, None]
-            + torch.arange(48)[None, None, :]
-        )
-        target_idx = c_idx[:, None] + 48 * lead_day[:, None] + torch.arange(48)[None, :]
-        target = torch.randn(b, 48)
-        self.ens.run_us = torch.zeros(16, 4000, dtype=torch.int64)
-        day = c_idx // 48
-        for i in range(b):
-            origin_day = int(day[i])
-            self.ens.run_us[int(primary[i]), origin_day] = (
-                lay.GRID_START_US + origin_day * lay.DAY_US + self.run_offset_us
-            )
-        return SimpleNamespace(
-            inputs=MsaInputs(**base), target=target, target_idx=target_idx, hist_idx=hist_idx
-        )
-
-
-def _tensors(*, n_grid: int, d8: int = 3) -> inp.ChannelTensors:
-    rng = np.random.default_rng(0)
-    values = np.stack(
-        [rng.random(n_grid), rng.random(n_grid) * 20, rng.random(n_grid)], axis=1
-    ).astype(np.float32)
-    return inp.build_tensors(
-        dense_values=values,
-        dense_ok=np.ones(n_grid, bool),
-        n_primaries=16,
-        d8_index=d8,
-        target_std=2.0,
-    )
-
-
 def test_unt_source_adds_channels_only_at_d8_and_checks_the_run() -> None:
     """The batch carries channels at D8 only; a run issued at the wrong time fails the origin-time assertion."""
     n_grid = 48 * 400
-    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=n_grid))
+    src = tn.UntSource(source=FakeSource(), tensors=make_channel_tensors(n_grid=n_grid))
     c_idx = torch.tensor([48 * 300 + 24, 48 * 301 + 24])
     primary = torch.tensor([3, 5])
     got = src.assemble(
@@ -134,7 +75,8 @@ def test_unt_source_adds_channels_only_at_d8_and_checks_the_run() -> None:
     assert got.inputs.hist_u_ok[0].any() and not got.inputs.hist_u_ok[1].any()
     assert (got.inputs.hist_u[1] == 0).all()
     late = tn.UntSource(
-        source=_FakeSource(run_offset_us=3 * lay.HOUR_US), tensors=_tensors(n_grid=n_grid)
+        source=FakeSource(run_offset_us=3 * lay.HOUR_US),
+        tensors=make_channel_tensors(n_grid=n_grid),
     )
     with pytest.raises(leak.CorrectnessFailureError):
         late.assemble(primary=primary, c_idx=c_idx, lead_day=torch.tensor([0, 2]))
@@ -142,7 +84,7 @@ def test_unt_source_adds_channels_only_at_d8_and_checks_the_run() -> None:
 
 def test_check_batch_rejects_history_after_the_target() -> None:
     """A history token at or after the first target token fails the batch check."""
-    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=48 * 400))
+    src = tn.UntSource(source=FakeSource(), tensors=make_channel_tensors(n_grid=48 * 400))
     b = src.assemble(
         primary=torch.tensor([3]), c_idx=torch.tensor([48 * 300 + 24]), lead_day=torch.tensor([0])
     )
@@ -270,7 +212,7 @@ def test_real_fold_loop_trains_the_new_parameters_and_records_history(
         "block_dropout_masks",
         lambda **kw: (np.zeros(len(kw["origin_idx"]), bool), np.zeros(len(kw["origin_idx"]), bool)),
     )
-    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=48 * 400))
+    src = tn.UntSource(source=FakeSource(), tensors=make_channel_tensors(n_grid=48 * 400))
     net = model.UntangledNet(seed=0)
     net.freeze_encoders()
     before = {
@@ -308,7 +250,7 @@ def test_real_fold_loop_with_zero_new_rate_leaves_the_gain_at_zero(
         "block_dropout_masks",
         lambda **kw: (np.zeros(len(kw["origin_idx"]), bool), np.zeros(len(kw["origin_idx"]), bool)),
     )
-    src = tn.UntSource(source=_FakeSource(), tensors=_tensors(n_grid=48 * 400))
+    src = tn.UntSource(source=FakeSource(), tensors=make_channel_tensors(n_grid=48 * 400))
     net = model.UntangledNet(seed=0)
     net.freeze_encoders()
     tn.train_stage(

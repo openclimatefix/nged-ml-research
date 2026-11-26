@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, C408
+# ruff: noqa: E501, PT018
 """Tests of `e00733_synth`: the ensemble coverage result, the sample layout, visibility, and leakage."""
 
 from pathlib import Path
@@ -85,7 +85,10 @@ def test_history_and_target_slots_follow_the_layout() -> None:
 
 
 def test_samples_need_seven_history_rows_and_a_target_inside_the_segment() -> None:
-    """A sample on day 5 has too few history rows; one near the end has a target row outside; a missing day drops rows."""
+    """A sample on day 5 has too few history rows.
+
+    One near the end has a target row outside; a missing day drops rows.
+    """
     seg = make_segment(n_days=40)
     idx = sy.enumerate_samples(segments=[seg])
     assert len(idx) > 0
@@ -111,7 +114,10 @@ def test_an_origin_without_a_run_has_no_sample() -> None:
 
 
 def test_gather_reads_nothing_after_the_visibility_limit_or_from_the_target_row() -> None:
-    """Poisoning the reading, sign, and channels from the first invisible slot of an origin changes no history input."""
+    """Poisoning the reading, sign.
+
+    And channels from the first invisible slot of an origin changes no history input.
+    """
     seg = make_segment(n_days=40)
     idx = sy.enumerate_samples(segments=[seg])
     rows = np.flatnonzero((idx.origin_day == 25) & (idx.lead_index == 3))

@@ -150,6 +150,9 @@ def ens_coverage(
 def assert_enough_test_segments(*, result: CoverageResult) -> None:
     """Stop the line (verdict row 0) when more than half of the test segments are left out.
 
+    Args:
+        result: The coverage of the synthetic base dates by the ensemble runs.
+
     Raises:
         StoppedError: When the test split holds no segment or the left-out share is above the limit.
     """
@@ -184,10 +187,16 @@ class SegmentArrays:
         hist_weather: `(n_days * 48, 21)` the history weather columns (ERA5 and CAMS).
         hist_datetime: `(n_days * 48, 21)` the date-time columns.
         day_type: `(n_days * 48,)` int the day type (0 to 7).
-        top_weather: `(n_days, 14, 48, 21)` the target-row weather of the ensemble run of the base day, per lead day.
+        local_hh: `(n_days * 48,)` int the local half-hour of the day (0 to 47), the key of B-clim.
+        month: `(n_days,)` int the local calendar month (1 to 12), the key of B-clim.
+        top_weather: `(n_days, 14, 48, 21)` the target-row weather of the ensemble run of
+            the base day, per lead day.
         top_spread: `(n_days, 14, 48, 7)` the ensemble spread columns.
         top_datetime: `(n_days, 14, 48, 21)` the date-time columns of the target rows.
         top_day_type: `(n_days, 14, 48)` int.
+        u_rerun: `(n_days, 2, 48, 3)` the re-run outputs of UTC days D - 2 and D - 1 for an origin on
+            dense day D (None: the stored outputs are used for every history day).
+        u_rerun_ok: `(n_days, 2, 48)` bool, the flag of `u_rerun`.
     """
 
     present: np.ndarray
@@ -200,10 +209,14 @@ class SegmentArrays:
     hist_weather: np.ndarray
     hist_datetime: np.ndarray
     day_type: np.ndarray
+    local_hh: np.ndarray
+    month: np.ndarray
     top_weather: np.ndarray
     top_spread: np.ndarray
     top_datetime: np.ndarray
     top_day_type: np.ndarray
+    u_rerun: np.ndarray | None = None
+    u_rerun_ok: np.ndarray | None = None
 
     @property
     def n_days(self) -> int:
@@ -216,7 +229,7 @@ class SegmentArrays:
         want = {
             "covered": (n,), "reading_z": (s,), "x_neg": (s,), "solar_points": (s,),
             "u_raw": (s, core.N_CHANNELS), "u_ok": (s,), "hist_weather": (s, N_WEATHER_COLUMNS),
-            "hist_datetime": (s, N_WEATHER_COLUMNS), "day_type": (s,),
+            "hist_datetime": (s, N_WEATHER_COLUMNS), "day_type": (s,), "local_hh": (s,), "month": (n,),
             "top_weather": (n, TOP_ROWS, STEPS, N_WEATHER_COLUMNS),
             "top_spread": (n, TOP_ROWS, STEPS, N_SPREAD_COLUMNS),
             "top_datetime": (n, TOP_ROWS, STEPS, N_WEATHER_COLUMNS),
@@ -338,7 +351,8 @@ class SynthBatch:
         arrays: The `UntInputs` fields by name.
         target_z: `(B, 48)` the folded reading, standardised; NaN where invalid.
         sign_truth: `(B, 48)` the indicator of X < 0, NaN where unknown.
-        history_x_neg: `(B, 14, 48)` the true sign of each history half-hour (the oracle's input; NaN where unknown).
+        history_x_neg: `(B, 14, 48)` the true sign of each history half-hour (the oracle's
+            input; NaN where unknown).
     """
 
     arrays: dict[str, np.ndarray]
@@ -428,7 +442,7 @@ def gather_batch(
         sign_truth[n] = seg.x_neg[ts]
         hist_x[n] = np.where(vis, seg.x_neg[hs_c], np.nan)
         out["hist_u"][n], out["hist_u_ok"][n] = _channels(
-            seg=seg, slots=hs_c, ok=finite, mode=mode, target_std=target_std
+            seg=seg, slots=hs_c, ok=finite, mode=mode, target_std=target_std, origin_day=d
         )
     if mask_history is not None:
         _apply_masks(out=out, masks=mask_history)
@@ -438,7 +452,13 @@ def gather_batch(
 
 
 def _channels(
-    *, seg: SegmentArrays, slots: np.ndarray, ok: np.ndarray, mode: str, target_std: float
+    *,
+    seg: SegmentArrays,
+    slots: np.ndarray,
+    ok: np.ndarray,
+    mode: str,
+    target_std: float,
+    origin_day: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the `(14, 48, 3)` channels and flag of one sample's history, in the forecaster's input units."""
     if mode == "absent":
@@ -455,7 +475,15 @@ def _channels(
         )
     else:
         have = ok & seg.u_ok[slots]
-        raw = seg.u_raw[slots]
+        raw = seg.u_raw[slots].copy()
+        if seg.u_rerun is not None and seg.u_rerun_ok is not None:
+            token_day = slots // STEPS
+            age_days = origin_day - token_day
+            use = (age_days == 1) | (age_days == 2)
+            k = np.clip(2 - age_days, 0, 1)
+            hh = slots % STEPS
+            raw = np.where(use[..., None], seg.u_rerun[origin_day, k, hh], raw)
+            have = np.where(use, ok & seg.u_rerun_ok[origin_day, k, hh], have)
         u = np.stack(
             [raw[..., 0], solar_unit(points=raw[..., 1], target_std=target_std), raw[..., 2]],
             axis=-1,

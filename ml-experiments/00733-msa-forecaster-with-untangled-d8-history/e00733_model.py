@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, C408
+# ruff: noqa: E501, PT018
 """Experiment 733: the axial-attention forecaster with the untangled history path and the sign head.
 
 `UntangledNet` subclasses experiment 713's `MsaNet`, keeps every module name, and builds the new
@@ -269,9 +269,9 @@ class UntangledNet(mdl.MsaNet):
         skip = cover * (u_logit - self.sign_clim)
         return learned + skip
 
-    def forward(self, inp: UntInputs, *, return_attention: bool = False) -> UntOutput:  # ty: ignore[invalid-method-override]
+    def forward(self, inp: UntInputs, *, return_attention: bool = False) -> UntOutput:  # ty: ignore[invalid-method-override]  # noqa: PLR0912
         """Return the raw mixture outputs; a network with no new part runs 713's forward unchanged."""
-        if not self.has_path:
+        if not self.has_path and not self.has_sign_head:
             base_out = super().forward(inp, return_attention=return_attention)
             return UntOutput(**base_out.__dict__)
         x, row_exists = self._tokens(inp)
@@ -286,11 +286,20 @@ class UntangledNet(mdl.MsaNet):
         for block in self.blocks:
             x = block(x, row_exists=row_exists)
         h0, base, spread, no_history, alpha = self._readout(x, inp)
-        means, cover = self.readout_means(inp=inp, alpha=alpha)
-        out = self._mixture_untangled(
-            h0=h0, base=base, spread=spread, no_history=no_history, lead_day=inp.lead_day,
-            means=means, cover=cover,
-        )  # fmt: skip
+        if self.has_path:
+            means, cover = self.readout_means(inp=inp, alpha=alpha)
+            out = self._mixture_untangled(
+                h0=h0, base=base, spread=spread, no_history=no_history, lead_day=inp.lead_day,
+                means=means, cover=cover,
+            )  # fmt: skip
+        else:  # the control arm of the synthetic world: the sign head and no untangled path
+            means = torch.zeros(
+                *cover_shape(base), core.N_CHANNELS, device=base.device, dtype=base.dtype
+            )
+            cover = torch.zeros_like(base)
+            out = self._mixture_out(
+                h0=h0, base=base, spread=spread, no_history=no_history, lead_day=inp.lead_day
+            )
         sign = None
         if self.has_sign_head:
             sign = self.sign_logit_of(
@@ -308,10 +317,15 @@ class UntangledNet(mdl.MsaNet):
                 else:
                     attention[name] = w[:, :, 0, :].view(b, mdl.N_COLS, *w.shape[1:2], w.shape[-1])
         return UntOutput(
-            out=out, base=base, spread=spread, no_history=no_history, alpha=alpha,
-            attention=attention, target_vector=h0.detach() if return_attention else None,
+            out=out, base=base, spread=spread, no_history=no_history, alpha=alpha,  # ty: ignore[unknown-argument]
+            attention=attention, target_vector=h0.detach() if return_attention else None,  # ty: ignore[unknown-argument]
             sign_logit=sign,
         )  # fmt: skip
+
+
+def cover_shape(base: torch.Tensor) -> tuple[int, ...]:
+    """Return the `(B, 48)` shape of a per-column tensor."""
+    return tuple(base.shape)
 
 
 def new_parameter_count(*, model: UntangledNet) -> int:

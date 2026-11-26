@@ -457,8 +457,9 @@ def poisoned_calendar(*, cal: Any, origin_epoch_day: int, value: float) -> Any:
     The neighbours are poisoned by `poisoned_neighbours`.
     """
     import copy
+    import dataclasses
 
-    out = copy.copy(cal)
+    updates: dict[str, np.ndarray] = {}
     epoch = np.asarray(cal.dates).astype("datetime64[D]").astype(np.int64)
     limit = last_visible_abs_slot(origin_day=origin_epoch_day - GRID_START_EPOCH_DAY)
     slot = (epoch[:, None] - GRID_START_EPOCH_DAY) * core.STEPS_PER_DAY + np.arange(
@@ -468,6 +469,11 @@ def poisoned_calendar(*, cal: Any, origin_epoch_day: int, value: float) -> Any:
     for name in ("reading", "bsp", "csi", "t2m", "wind10", "precip"):
         arr = np.array(getattr(cal, name), dtype=np.float32, copy=True)
         arr[after] = value
+        updates[name] = arr
+    if dataclasses.is_dataclass(cal):
+        return dataclasses.replace(cal, **updates)
+    out = copy.copy(cal)
+    for name, arr in updates.items():
         setattr(out, name, arr)
     return out
 

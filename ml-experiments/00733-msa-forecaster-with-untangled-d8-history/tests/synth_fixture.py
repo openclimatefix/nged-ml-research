@@ -32,6 +32,8 @@ def make_segment(
         hist_weather=rng.normal(size=(s, sy.N_WEATHER_COLUMNS)).astype(np.float32),
         hist_datetime=rng.normal(size=(s, sy.N_WEATHER_COLUMNS)).astype(np.float32),
         day_type=rng.integers(0, 8, s),
+        local_hh=np.tile(np.arange(sy.STEPS), n_days),
+        month=np.full(n_days, 6),
         top_weather=rng.normal(size=(n_days, 14, 48, sy.N_WEATHER_COLUMNS)).astype(np.float32),
         top_spread=rng.random((n_days, 14, 48, sy.N_SPREAD_COLUMNS)).astype(np.float32),
         top_datetime=rng.normal(size=(n_days, 14, 48, sy.N_WEATHER_COLUMNS)).astype(np.float32),

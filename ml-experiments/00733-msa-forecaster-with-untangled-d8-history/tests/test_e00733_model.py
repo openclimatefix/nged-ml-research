@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, C408
+# ruff: noqa: E501, PT018
 """Tests of `e00733_model`: the zero-initialised path, the read-out features, and the sign head's start."""
 
 import e00733_model as model
@@ -90,7 +90,10 @@ def test_parameter_counts_match_the_plan() -> None:
 
 
 def test_sign_head_starts_as_the_persistence_of_the_history() -> None:
-    """Where the history covers a column fully, the untrained head's logit is the logit of the weighted mean of P(X<0)."""
+    """Where the history covers a column fully.
+
+    The untrained head's logit is the logit of the weighted mean of P(X<0).
+    """
     inp = make_inputs(b=2, channels=True)
     ok = torch.ones_like(inp.hist_u_ok)
     u = inp.hist_u.clone()
@@ -139,3 +142,26 @@ def test_attention_flag_does_not_change_the_forecast() -> None:
         b = net(inp, return_attention=True)
     assert torch.equal(a.out, b.out)
     assert b.attention is not None and "within_0" in b.attention
+
+
+def test_control_arm_has_the_sign_head_and_no_path() -> None:
+    """With no path and a sign head, the forecast has a probability.
+
+    The mixture equals M*'s, and only the head is new.
+    """
+    m = _m_star()
+    inp = make_inputs(channels=False)
+    net = model.UntangledNet(seed=1, path=False, sign_head=True, clim_logit=-1.0)
+    net.load_m_star(state=m.state_dict())
+    net.eval()
+    with torch.no_grad():
+        out = net(inp)
+        want = m(inp).out
+    assert torch.equal(out.out, want)
+    assert out.sign_logit is not None
+    assert torch.allclose(
+        torch.sigmoid(out.sign_logit),
+        torch.sigmoid(torch.tensor(-1.0)).expand_as(out.sign_logit),
+        atol=1e-6,
+    )
+    assert model.new_parameter_count(model=net) == (80 * 32 + 32) + (32 + 1)
