@@ -263,7 +263,7 @@ def overlay_rng(*, kind: str, seed: int | None, index: int) -> np.random.Generat
 
 
 def overlay_segments(
-    *, segments: Sequence[sim729.Segment], kind: str, seed: int | None = None
+    *, segments: Sequence[sim729.Segment], kind: str, seed: int | None = None, first_index: int = 0
 ) -> list[TransferOverlay]:
     """Return the transfer overlay of a bank: one overlay per segment, from the bank's fixed seed.
 
@@ -271,13 +271,14 @@ def overlay_segments(
         segments: The bank's segments.
         kind: "train", "validation", or "test".
         seed: The training seed (None for validation and test).
+        first_index: The position of the first segment in its bank (a leakage check builds one segment alone).
 
     Returns:
         The overlays, in the order of `segments`. The overlay of a segment depends only on the
         segment, its position, the kind, and the seed.
     """
     out = []
-    for index, seg in enumerate(segments):
+    for index, seg in enumerate(segments, start=first_index):
         rng = overlay_rng(kind=kind, seed=seed, index=index)
         rate = float(rng.uniform(*core.TRANSFER_RATE_TRAIN)) if kind == "train" else core.TRANSFER_RATE_FIXED
         transfers, failed = draw_transfers(seg=seg, rate=rate, rng=rng)
