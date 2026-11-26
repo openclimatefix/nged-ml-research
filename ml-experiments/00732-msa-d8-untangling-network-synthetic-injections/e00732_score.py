@@ -85,6 +85,9 @@ def injection_keep(
         amount: The injected amount a, in points.
         cosz: The cosine of the zenith angle, the same shape as `delta`.
         pair: 1 where the window has a pair: the same shape as `delta`, or one value per window.
+
+    Returns:
+        The boolean mask of the half-hours the reading uses.
     """
     pair_b = pair.reshape(pair.shape + (1,) * (delta.ndim - pair.ndim))
     return (pair_b > 0.5) & sun_up(cosz=cosz) & (delta >= core.DELTA_SHARE_OF_A * amount)
@@ -121,6 +124,9 @@ def recovery_reverse_bar(
         delta: The scored delta by amount.
         keep: The rows each amount's injection reading uses (`injection_keep`).
         reverse: Where the plain member's signed truth is negative.
+
+    Returns:
+        The pooled ratio `rho`, the number of half-hours `n`, and the pass flag.
     """
     num = den = 0.0
     n = 0
@@ -294,6 +300,9 @@ def step_f1(
         threshold: The call threshold.
         min_points: The smallest step the recall and the F1 read.
         select: Restricts the true steps the recall reads (a band of table T6); the precision still reads every call.
+
+    Returns:
+        The precision, recall, F1, the number of true steps read, and the number of calls.
     """
     all_true = (event > 0.5) & valid
     true_big = all_true & (np.abs(size) >= min_points)
@@ -404,6 +413,9 @@ def transfer_rows(
         picks: `(segment index, dense day)` of each window, as `arms.all_picks` gives them.
         valid: The valid half-hours `(P, 48)`.
         noise_d8: D8's noise unit in points.
+
+    Returns:
+        The row attributes of the transfer overlay.
     """
     n = len(picks)
     cols = {
@@ -539,6 +551,9 @@ def detectability(
         table: T6's noise-unit bands for the arm (`step_table(...)["size_noise_units"]`).
         precision: The precision of the arm over every call.
         counts: The scored steps under 4 noise units ("below") and at 4 and more ("above").
+
+    Returns:
+        Whether the statement is void, the smallest detectable band, and every detectable band.
     """
     void = (
         counts.get("below", 0) < core.MIN_STEPS_PER_SIDE
@@ -617,6 +632,9 @@ def contrast_at_level(
 
     Raises:
         ValueError: When a kept row has a non-finite difference.
+
+    Returns:
+        The contrast reading.
     """
     diff = a - b
     if keep.any() and not np.isfinite(diff[keep]).all():
@@ -719,8 +737,18 @@ def injection_contrast(
 ) -> score729.ContrastReading:
     """Return C3: the contrast of the injection errors of two arms on the stacked rows, keyed by amount.
 
+    Args:
+        rows: The stacked rows (`stack_amounts`).
+        a: The first arm's per-row injection error.
+        b: The second arm's per-row injection error.
+        keep: The rows read.
+        n_resamples: The number of resamples.
+
     Raises:
         ValueError: When the keys repeat, because the bootstrap would then double-count a row.
+
+    Returns:
+        The contrast reading.
     """
     if not keys_are_unique(rows=rows):
         msg = "the injection rows repeat a (segment, date, half-hour, amount) key"
@@ -1024,6 +1052,9 @@ def recall_gap_r18(
         event: The step event.
         size: The signed step size.
         tr: The transfer overlay's row attributes.
+
+    Returns:
+        For each rule, its recall on solar-shaped transfers, its recall on constant transfers, and the gap between them.
     """
     one = {"e": event[None, :], "s": size[None, :], "v": np.ones((1, event.size), dtype=bool)}
     out = {}
@@ -1159,6 +1190,9 @@ def recovery_by_group(
         pv_plain: The plain member's solar output.
         pv_inj: The injected member's solar output by amount.
         groups: Row masks over the plain rows: terciles of the BSP coupling, the BSP half hidden, or import, reverse flow, and sign change.
+
+    Returns:
+        For each group, the pooled recovery ratio `rho` and the number of half-hours `n`.
     """
     out = {}
     for label, mask in groups.items():
@@ -1231,6 +1265,9 @@ def stored_prediction_problems(
         rows: The test bank's rows.
         recorded_digest: The row-key digest recorded before any fit (None when none was recorded).
         canary_arm: The arm whose Brier score is the canary.
+
+    Returns:
+        One sentence for each link that fails (an empty list when every link holds).
     """
     problems = []
     if rows.n != core.N_TEST_ROWS:
