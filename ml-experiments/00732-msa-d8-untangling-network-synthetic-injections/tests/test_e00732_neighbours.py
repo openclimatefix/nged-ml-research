@@ -149,3 +149,13 @@ def test_gate_problems_collects_coverage_and_alignment():
     problems = nb.gate_problems(arrays=arrays, reading=reading)
     assert len(problems) == 1
     assert "D5" in problems[0]
+
+
+def test_the_daily_shape_is_the_median_over_the_training_days_not_the_mean():
+    values = np.zeros((10, 48))
+    values[:5, 0] = [0.0, 0.0, 0.0, 0.0, 100.0]
+    values[5:, 0] = [0.0, 0.0, 0.0, 0.0, 100.0]
+    weekend = np.array([False] * 5 + [True] * 5)
+    shape = nb.daily_shape(values=values, weekend=weekend, train_rows=np.ones(10, dtype=bool))
+    assert shape[0, 0] == 0.0
+    assert shape[1, 0] == 0.0  # the mean of each group would be 20

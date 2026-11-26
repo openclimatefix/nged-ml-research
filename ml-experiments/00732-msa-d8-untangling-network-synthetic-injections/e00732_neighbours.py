@@ -173,14 +173,14 @@ def training_median(*, folded: np.ndarray, train_rows: np.ndarray) -> float:
 
 
 def daily_shape(*, values: np.ndarray, weekend: np.ndarray, train_rows: np.ndarray) -> np.ndarray:
-    """Return the mean daily profile per half-hour, weekdays and weekends apart, `(2, 48)`."""
+    """Return the median daily profile over the training base days per half-hour, weekdays and weekends apart, `(2, 48)`."""
     out = np.zeros((2, HALF_HOURS))
     for k in (0, 1):
         rows = train_rows & (weekend == bool(k))
         sub = values[rows]
         if sub.shape[0] == 0 or not np.isfinite(sub).any(axis=0).all():
             raise NeighbourError("a daily shape has a half-hour with no training value")
-        out[k] = np.nanmean(sub, axis=0)
+        out[k] = np.nanmedian(sub, axis=0)
     return out
 
 
