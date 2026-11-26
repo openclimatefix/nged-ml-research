@@ -182,18 +182,32 @@ def prepare_plain(
     Returns:
         The prepared segments.
     """
-    overlays = ov.plain_overlays(segments=segments, neighbours=neighbours) if all(
-        "beta" in s.params for s in segments
-    ) else [_no_transfer(seg=s) for s in segments]  # fmt: skip
+    simulated = all("beta" in s.params for s in segments)
+    overlays = (
+        ov.plain_overlays(segments=segments, neighbours=neighbours)
+        if simulated
+        else [_no_transfer(seg=s, neighbours=neighbours, index=i) for i, s in enumerate(segments)]
+    )
     return prepare(overlays=overlays, holidays=holidays, stats=stats, medians=medians)
 
 
-def _no_transfer(*, seg: object) -> ov.TransferOverlay:
-    """Return an overlay of a real pseudo-segment (no BSP coupling, no transfer, no neighbour)."""
+def _no_transfer(
+    *, seg: object, neighbours: Mapping[str, np.ndarray] | None, index: int
+) -> ov.TransferOverlay:
+    """Return an overlay of a real pseudo-segment: no BSP coupling, no transfer, real neighbours.
+
+    The neighbours' series are placed on the segment's dense axis with the segment's `cal_index`, so
+    they must be on the same calendar as the pseudo-segment's real days. Their fold floors are drawn
+    as `plain_overlays` draws them. Without `neighbours`, every neighbour channel is zero.
+    """
     shape = seg.x.shape  # ty: ignore[unresolved-attribute]
     zeros = np.zeros(shape, dtype=np.float32)
+    dense = None if neighbours is None else ov.dense_neighbours(seg=seg, series=neighbours)  # ty: ignore[invalid-argument-type]
+    real = {} if dense is None else {k: v.astype(np.float32) for k, v in dense.items()}
+    floors = ov.draw_floors(rng=np.random.default_rng(np.random.SeedSequence([0, 3, index])))
     return ov.TransferOverlay(
         seg=seg, q=zeros, beta=0.0, transfers=[], t=zeros, t_bsp=zeros, event=zeros, size=zeros, n_failed=0, rate=0.0,  # ty: ignore[invalid-argument-type]
+        neighbours_real=real, neighbours=dict(real), floors=floors if real else {},
     )  # fmt: skip
 
 

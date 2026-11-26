@@ -689,3 +689,27 @@ def test_a_check_with_no_case_fails(world: World) -> None:
     assert {"hidden_zero", "injected_reading_on_delta", "injected_bsp_on_delta"} <= set(bad)
     assert "raised_above" in failing(world=world, batch=dataclasses.replace(batch, xc=None))
     assert arms.tensor_problems(checks={"hidden_zero": ov.Share(0.0, 0)}) == ["hidden_zero"]
+
+
+def test_real_pseudo_segments_carry_the_neighbours_when_given_and_zeros_without(
+    world: World,
+) -> None:
+    """A real run reaches the neighbour channels through `prepare_plain` (a pseudo-segment has no beta)."""
+    use = np.ones(len(world.cal.dates), bool)
+    reading = np.nan_to_num(world.cal.reading, nan=5.0)
+    real = [
+        sim.real_segment(cal=world.cal, month=m, use=use, reading=reading, truth=reading)
+        for m in ("2022-03", "2022-04")
+    ]
+    assert not any("beta" in s.params for s in real)
+    spec = arms.eval_spec()
+    kwargs = {"holidays": world.cal.holidays, "stats": world.stats, "medians": world.medians}
+    with_nb = arms.prepare_plain(segments=real, neighbours=world.series, **kwargs)
+    without = arms.prepare_plain(segments=real, neighbours=None, **kwargs)
+    day = int(with_nb[0].days[3])
+    shown = arms.plain_window(p=with_nb[0], day=day, spec=spec, hidden=None)
+    absent = arms.plain_window(p=without[0], day=day, spec=spec, hidden=None)
+    nb_mask_rows = [arms.NB_ROW[f"{n}_mask"] for n in nb.NEIGHBOURS]
+    assert shown[nb_mask_rows].min() == 1.0  # every neighbour present on a real day
+    assert not absent[arms.N_BASE :].any()  # no neighbours: all twelve channels are zero
+    assert np.isfinite(with_nb[0].nb_folded[:, day * 48 : day * 48 + 48]).all()
