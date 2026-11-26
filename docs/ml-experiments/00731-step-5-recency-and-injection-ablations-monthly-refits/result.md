@@ -277,7 +277,8 @@ median of R0 and of the injection-free arm around one logged event of a Primary.
   equal weights, and 0.922 for the injection-free arm. Cold winter nights and the avoidable
   curtailment cost were not computed.
 - **Limits:** the per-fit total weight and effective rows were not retained (the prediction pass
-  overwrote the logs), so the effective-row shares in the audit are an analytic reconstruction. The scores are tuning-adjacent, because the year includes valid times from 2026-07 to
+  overwrote the logs), so the effective-row shares in the audit are an analytic reconstruction.
+  The scores are tuning-adjacent, because the year includes valid times from 2026-07 to
   2026-10 that the protocol reserves for finalists, and the fine-tune is short enough that its
   stopping epoch confounds the weights with how long the fine-tune runs.
 
