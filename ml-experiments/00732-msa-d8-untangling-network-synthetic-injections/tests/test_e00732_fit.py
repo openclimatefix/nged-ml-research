@@ -489,3 +489,66 @@ def test_a_stale_failed_file_is_ignored_once_the_fit_record_exists(run: Any) -> 
 
     status = fit.stage_chain(root=root, root730=root730, run_one=fake, log=lambda _line: None)
     assert status["state"] == "complete"
+
+
+def test_every_numpy_call_in_the_experiment_follows_a_cpu_call() -> None:
+    """A CUDA tensor has no `.numpy()`: the receiver must have been moved with `.cpu()` first."""
+    import ast
+    from pathlib import Path
+
+    bad: list[str] = []
+    for path in sorted(Path(fit.__file__).parent.glob("e00732_*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "numpy"
+                and not node.args
+            ):
+                continue
+            chain, recv = [], node.func.value
+            while isinstance(recv, ast.Call | ast.Attribute | ast.Subscript):
+                chain.append(
+                    recv.func.attr
+                    if isinstance(recv, ast.Call) and isinstance(recv.func, ast.Attribute)
+                    else getattr(recv, "attr", "")
+                )
+                recv = (
+                    recv.func.value
+                    if isinstance(recv, ast.Call) and isinstance(recv.func, ast.Attribute)
+                    else getattr(recv, "value", None)
+                )
+                if recv is None:
+                    break
+            if "cpu" not in chain:
+                bad.append(f"{path.name}:{node.lineno}")
+    assert not bad
+
+
+def test_assert_net_checks_moves_its_outputs_to_the_cpu_before_numpy(monkeypatch: Any) -> None:
+    """A tensor that refuses `.numpy()` unless `.cpu()` ran stands in for a CUDA tensor."""
+    import torch
+
+    class Gpu(torch.Tensor):
+        on_cpu = False
+
+        def cpu(self, *a: Any, **k: Any) -> Any:
+            out = super().cpu(*a, **k).as_subclass(Gpu)
+            out.on_cpu = True
+            return out
+
+        def numpy(self, *a: Any, **k: Any) -> Any:
+            if not self.on_cpu:
+                raise TypeError("can't convert cuda:0 device type tensor to numpy")
+            return super().numpy(*a, **k)
+
+    class Net(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.backbone = torch.nn.Linear(3, 3)
+            self.extra = torch.nn.Linear(3, 3)
+
+        def forward(self, x: Any) -> Any:
+            return self.backbone(x).as_subclass(Gpu)
+
+    fit.assert_net_checks(net=Net(), spec=core.ARMS["U*"], x=torch.zeros(2, 3, 3))

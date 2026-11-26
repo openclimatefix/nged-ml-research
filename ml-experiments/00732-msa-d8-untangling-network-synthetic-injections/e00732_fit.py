@@ -109,11 +109,11 @@ def assert_net_checks(*, net: nets.Net, spec: core.ArmSpec732, x: torch.Tensor) 
         return
     net.eval()
     with torch.no_grad():
-        before = net(x)[:, 0].clone().numpy()
+        before = net(x)[:, 0].detach().cpu().numpy()
         saved = {k: v.clone() for k, v in net.extra.state_dict().items()}
         for p in net.extra.parameters():
             p.add_(1.0)
-        after = net(x)[:, 0].numpy()
+        after = net(x)[:, 0].detach().cpu().numpy()
         net.extra.load_state_dict(saved)
     leak.assert_sign_ignores_the_extra_heads(sign_before=before, sign_after=after)
     if spec.stop_gradient:
