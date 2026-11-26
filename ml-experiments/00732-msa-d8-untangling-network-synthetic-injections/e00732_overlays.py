@@ -41,10 +41,10 @@ def unreliable_solar(*, seg: object) -> np.ndarray:
     """Return the half-hours of S1 solar output that are unreliable targets `(D + 2, 48)`.
 
     Experiment 729's `draw_solar` keeps an S1 day with at least 40 readings of the farm and fills each
-    missing half-hour with zero, so a zero between two positive outputs of the same day is a gap and
-    not a measurement. A half-hour is unreliable when the source is S1, its output is zero, the
-    nearest non-zero output before and after it in the same day are both positive, the cosine of the
-    zenith angle is at least `UNRELIABLE_MIN_COSZ`, and the CAMS index is present.
+    missing half-hour with zero, so a zero in a day that has positive output elsewhere is a gap,
+    inside the day or in a leading or trailing tail, and not a measurement. A half-hour is
+    unreliable when the source is S1, its output is zero, the same day has positive output, the
+    cosine of the zenith angle is at least `UNRELIABLE_MIN_COSZ`, and the CAMS index is present.
 
     Args:
         seg: A simulated segment (`source`, `solar`, `cosz`, and `csi`).
@@ -56,10 +56,7 @@ def unreliable_solar(*, seg: object) -> np.ndarray:
     if getattr(seg, "source", "none") != "S1":
         return np.zeros(solar.shape, dtype=bool)
     positive = solar > 0.0
-    idx = np.arange(solar.shape[1])
-    before = np.maximum.accumulate(np.where(positive, idx, -1), axis=1)
-    after = np.minimum.accumulate(np.where(positive, idx, solar.shape[1])[:, ::-1], axis=1)[:, ::-1]
-    inside = ~positive & (before >= 0) & (after < solar.shape[1])
+    inside = ~positive & positive.any(axis=1, keepdims=True)
     cosz = np.asarray(seg.cosz, dtype=np.float64)  # ty: ignore[unresolved-attribute]
     csi = np.asarray(seg.csi, dtype=np.float64)  # ty: ignore[unresolved-attribute]
     return inside & (cosz >= core.UNRELIABLE_MIN_COSZ) & np.isfinite(csi)
@@ -75,7 +72,7 @@ def unreliable_by_loop(*, seg: object) -> int:
         positives = [h for h in range(48) if solar[d, h] > 0.0]
         if not positives:
             continue
-        for h in range(positives[0] + 1, positives[-1]):
+        for h in range(48):
             if (
                 solar[d, h] <= 0.0
                 and cosz[d, h] >= core.UNRELIABLE_MIN_COSZ

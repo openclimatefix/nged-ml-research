@@ -747,6 +747,22 @@ def test_a_zero_filled_gap_inside_a_day_of_output_is_masked() -> None:
     assert ov.unreliable_by_loop(seg=seg) == 3
 
 
+def test_a_zero_filled_edge_tail_of_a_day_with_output_is_masked() -> None:
+    import e00732_overlays as ov
+
+    seg = _gap_segment()
+    seg.solar[1, 12:16] = 0.0  # a leading tail filled with zero while the sun is up
+    seg.solar[1, 32:36] = 0.0  # a trailing tail
+    mask = ov.unreliable_solar(seg=seg)
+    assert mask[1, 12:16].all()
+    assert mask[1, 32:36].all()
+    assert int(mask.sum()) == 3 + 8
+    assert ov.unreliable_by_loop(seg=seg) == int(mask.sum())
+    assert not mask[0].any()  # a day with no positive output has no reference
+    assert not mask[1, :12].any()
+    assert not mask[1, 36:].any()
+
+
 def test_nightly_and_dawn_dusk_zeros_are_not_masked() -> None:
     import e00732_overlays as ov
 

@@ -660,8 +660,11 @@ a unit test that does not fail is verdict row 1.
 fixed before any fit.** Experiment 729's `draw_solar` keeps a day of S1 output when the farm has at
 least 40 of 48 readings, and it fills each missing half-hour with zero. The pinned banks therefore
 hold zeros that are unknown outputs, not measured zeros. A half-hour of S1 solar output is
-unreliable when its output is zero, the nearest non-zero outputs before and after it in the same day
-are both positive, the cosine of the zenith angle is at least 0.2, and the CAMS index is present.
+unreliable when its output is zero, the same day has positive output elsewhere (so the zero lies
+inside the day or in a leading or trailing tail), the cosine of the zenith angle is at least 0.2,
+and the CAMS index is present. The rule was refined once more before any fit, by the same read-only
+diagnostic: the first version required positive output on both sides of the zero, and the diagnostic
+showed that zero-filled tails at the edges of a day fail the solar-target check in the same way.
 The unreliable half-hours leave the solar loss, the injection loss, the solar-target check above,
 and the solar bars and solar contrasts, and the score stage records how many half-hours it
 excluded. The overlays stage reports the unreliable share of the S1 sun-up half-hours of solar
