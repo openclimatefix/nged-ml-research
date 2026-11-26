@@ -351,6 +351,9 @@ def interval(
         diff: Per-block sums of the paired difference.
         count: Per-block row counts.
         pick: Bootstrap draws of block indices, shape (draws, blocks).
+
+    Returns:
+        The pooled mean, the lower limit, and the upper limit, or three NaNs when no rows exist.
     """
     if count.sum() == 0:
         return float("nan"), float("nan"), float("nan")
