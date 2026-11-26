@@ -676,3 +676,26 @@ def test_side_readings_never_change_a_row_and_a_short_count_voids_its_word() -> 
         "neighbour": "void",
         "bsp": "void",
     }
+
+
+def test_step_matching_is_one_to_one_so_two_calls_at_one_edge_halve_the_precision() -> None:
+    event = np.zeros((1, 48))
+    event[0, 10] = 1.0
+    size = event * 8.0
+    valid = np.ones((1, 48), dtype=bool)
+    p = np.zeros((1, 48))
+    p[0, 9] = p[0, 10] = 0.9
+    r = sc.step_f1(step_p=p, event=event, size=size, valid=valid)
+    assert r["recall"] == 1.0
+    assert r["precision"] == 0.5
+    assert sc.precision_all(step_p=p[0], event=event[0]) == 0.5
+
+
+def test_step_matching_does_not_cross_rows() -> None:
+    called = np.zeros((2, 48), dtype=bool)
+    true = np.zeros((2, 48), dtype=bool)
+    called[0, 47] = True
+    true[1, 0] = True
+    call_ok, true_ok = sc.match_steps(called=called, true=true)
+    assert not call_ok.any()
+    assert not true_ok.any()

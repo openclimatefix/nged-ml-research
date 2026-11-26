@@ -267,13 +267,45 @@ def step_brier_rows(*, step_p: np.ndarray, event: np.ndarray) -> np.ndarray:
     return (step_p - event) ** 2
 
 
-def _dilate(*, a: np.ndarray, width: int) -> np.ndarray:
-    """Return a boolean array that is True within `width` half-hours (along the last axis) of a True entry."""
-    out = a.copy()
-    for k in range(1, width + 1):
-        out[..., k:] |= a[..., :-k]
-        out[..., :-k] |= a[..., k:]
-    return out
+def match_steps(
+    *, called: np.ndarray, true: np.ndarray, tolerance: int = core.STEP_TOLERANCE_HALF_HOURS
+) -> tuple[np.ndarray, np.ndarray]:
+    """Match calls to true steps one to one, each within `tolerance` half-hours along the last axis.
+
+    A call matches at most one true step and a true step at most one call (the plan's rule). The
+    greedy pass along each row in time order gives the largest possible number of matches.
+
+    Args:
+        called: Boolean calls `(P, T)`.
+        true: Boolean true steps `(P, T)`.
+        tolerance: The largest distance in half-hours of a match.
+
+    Returns:
+        Which calls found a true step, and which true steps were found, both shaped like the inputs.
+    """
+    width = called.shape[-1] + 2 * tolerance + 2
+    flat_called = np.flatnonzero(np.pad(called, [(0, 0), (0, 2 * tolerance + 2)]).reshape(-1))
+    flat_true = np.flatnonzero(np.pad(true, [(0, 0), (0, 2 * tolerance + 2)]).reshape(-1))
+    call_ok = np.zeros(flat_called.size, dtype=bool)
+    true_ok = np.zeros(flat_true.size, dtype=bool)
+    i = j = 0
+    while i < flat_called.size and j < flat_true.size:
+        gap = int(flat_called[i]) - int(flat_true[j])
+        if abs(gap) <= tolerance:
+            call_ok[i] = true_ok[j] = True
+            i += 1
+            j += 1
+        elif gap < 0:
+            i += 1
+        else:
+            j += 1
+    out_called = np.zeros(called.size + called.shape[0] * (width - called.shape[-1]), dtype=bool)
+    out_true = np.zeros_like(out_called)
+    out_called[flat_called[call_ok]] = True
+    out_true[flat_true[true_ok]] = True
+    shape = (called.shape[0], width)
+    keep = slice(0, called.shape[-1])
+    return out_called.reshape(shape)[:, keep], out_true.reshape(shape)[:, keep]
 
 
 def step_f1(
@@ -288,9 +320,10 @@ def step_f1(
 ) -> dict[str, float | bool]:
     """Return precision, recall, and F1 of the step output at `threshold` on steps of at least `min_points`.
 
-    A true step counts as found when a call lies within one half-hour of it. A call counts as right
-    when a true step of any size lies within one half-hour of it, because a call at a smaller real
-    step is not a false alarm. The inputs are `(P, 48)`, or `(1, N)` for a flat series.
+    Calls and true steps of any size are matched one to one within one half-hour (`match_steps`), so
+    a true step is found by at most one call and a call finds at most one true step. A true step of
+    `min_points` or more counts as found when it is matched, and a call counts as right when it is
+    matched to a true step of any size, because a call at a smaller real step is not a false alarm. The inputs are `(P, 48)`, or `(1, N)` for a flat series.
 
     Args:
         step_p: The step probability.
@@ -317,12 +350,9 @@ def step_f1(
             "n_true": 0,
             "n_called": int(called.sum()),
         }
-    recall = float(_dilate(a=called, width=core.STEP_TOLERANCE_HALF_HOURS)[true_big].mean())
-    precision = (
-        float(_dilate(a=all_true, width=core.STEP_TOLERANCE_HALF_HOURS)[called].mean())
-        if called.any()
-        else 0.0
-    )
+    call_ok, true_ok = match_steps(called=called, true=all_true)
+    recall = float(true_ok[true_big].mean())
+    precision = float(call_ok[called].mean()) if called.any() else 0.0
     f1 = 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
     return {
         "precision": precision,
@@ -535,7 +565,8 @@ def precision_all(*, step_p: np.ndarray, event: np.ndarray) -> float:
     if not called.any():
         return 0.0
     true = (event > 0.5)[None, :]
-    return float(_dilate(a=true, width=core.STEP_TOLERANCE_HALF_HOURS)[called].mean())
+    call_ok, _ = match_steps(called=called, true=true)
+    return float(call_ok[called].mean())
 
 
 def detectability(
