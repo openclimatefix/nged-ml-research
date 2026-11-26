@@ -473,8 +473,11 @@ epochs. Half of each epoch's windows come from the training months that carry re
 
 **Every arm stops early on the sign, so the solar and transfer outputs are read at the sign's best
 epoch.** The sign is the output that C1 compares with experiment 730's S, which stopped on the same
-score. Each fit also records the validation solar error and step Brier score at every epoch, so the
-write-up can say whether the solar head was still improving when the fit stopped.
+score. Each fit stores its loss history in its fit JSON under `fits/`: at every epoch, the training
+loss and the validation loss of each of the seven terms and of their weighted sum, the validation
+Brier score of the sign, the validation solar error, and the validation step Brier score, with the
+epoch of the stored state file marked. The write-up can then say whether the solar head was still
+improving when the fit stopped.
 
 ## Baselines
 
@@ -973,6 +976,11 @@ output below D8.
 10. The real-data checks P1 to P4 and K3, as shares, correlations, and pass or fail words by era;
     a breakdown by UTC hour appears only for the night half-hours and for the pre-engine era, and
     no figure shows a level of the real solar output.
+11. The training curves: the training loss and the validation loss against the epoch for each of
+    the six fitted arms, with the epoch of the stored state file marked, drawn for seed 0 of each
+    arm (the full set of 18 fits would crowd the panels; seeds 1 and 2 go to the private folder),
+    with one panel per arm and the per-term validation losses of the solar head beside the sum.
+    The figure reads the stored loss histories only, so it adds no GPU time and no fit.
 
 **At least 16 time series figures show single 48-hour windows, each picked by a fixed rule.** Each
 figure shows, in a top row, the signed truth, the reading, and the base demand; in a second row, the
@@ -1047,6 +1055,8 @@ and each rule draws from S2 and engine-only segments for the published figure:
 - The optimiser, the sampler, the early stop on the validation Brier score of the sign, and the
   cap of 300 epochs are experiment 730's; seeds 0 to 2 set the initial weights and the training
   bank of each fit.
+- Each fit stores its per-term training and validation loss history in its fit JSON, and figure 11
+  plots the history of seed 0 of each arm with the stored epoch marked.
 
 **Measurement:**
 
@@ -1091,8 +1101,8 @@ switching logs), and `tests/smoke_real_files.py`.
 - `e00732_nets.py`: the four heads on experiment 729's backbones, the softplus solar output, and the
   stop-gradient of U-SG.
 - `e00732_losses.py`: the seven loss terms and their weights.
-- `e00732_train.py`: the fit loop, the per-epoch record of the solar and step validation scores,
-  the timing gate, and the fit schedule.
+- `e00732_train.py`: the fit loop, the per-epoch loss history of every term (training and
+  validation) written to each fit JSON, the timing gate, and the fit schedule.
 - `e00732_baselines.py`: B-PV1, B-PV2 from experiment 730's stored predictions, and B-T.
 - `e00732_score.py`: the solar error, the recovery, the night and monotonicity readings, the step
   metrics, the load-transfer scenarios, and the contrasts.
@@ -1100,8 +1110,8 @@ switching logs), and `tests/smoke_real_files.py`.
 - `e00732_leakage.py`: the new assertions of verdict row 1.
 - `e00732_gallery.py`, `e00732_figures.py`, `e00732_series_figures.py`, `e00732_report.py`,
   `e00732_stages.py`, `e00732_cli.py`, and `run.sh`: the gallery panels G10 to G17, the result
-  figures, the time series figures, the printed report, the stage orchestration, the command line,
-  and the launch wrapper.
+  figures (the training curves of figure 11 drawn from the stored fit JSONs), the time series
+  figures, the printed report, the stage orchestration, the command line, and the launch wrapper.
 - `tests/`: tests on synthetic arrays only, including known-answer tests of the re-fold, the
   transfer overlay, the pairing, the contrastive terms, and the stop-gradient, an end-to-end run of
   the stages with tiny fits on the CPU, and `smoke_real_files.py`; the tests that need `torch` skip
@@ -1121,5 +1131,6 @@ switching logs), and `tests/smoke_real_files.py`.
   experiment 729's loaders for the real-day checks.
 - `data/ml-experiments/00732-msa-d8-untangling-network-synthetic-injections/`: written. It will hold
   `limits.json`, `overlays/` (the test and validation overlays and `summary.json` with their digests
-  and component checks), `gallery/` and `PRIVATE/gallery/`, `networks/`, `fits/`, `predictions/`,
+  and component checks), `gallery/` and `PRIVATE/gallery/`, `networks/`, `fits/` (one JSON per
+  fit, with its loss history and stored epoch), `predictions/`,
   `scores/`, `verdict.json`, and the run logs.
