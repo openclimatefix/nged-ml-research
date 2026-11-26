@@ -12,79 +12,90 @@ also_relevant_to:
 status: planned
 kind: other
 size: >-
-  Anything else. (1) The experiment stores 18 fitted neural networks, three synthetic overlay
-  tables, a fitted rule for load-transfer steps, per-half-hour predictions, and score tables, all
-  private; (2) more than one design defensibly tests the hypothesis (with or without the
-  contrastive terms, with shared or stopped gradients, and on the U-net or the bidirectional LSTM),
-  so each is an arm with a pre-registered role; (3) the experiment reads experiment 730's banks,
-  margin, limits, and stored predictions, and imports the code of experiments 729 and 730, whose
-  callers cannot be named without searching the repository; (4) the experiment touches no serving
-  path or degradation rule; (5) the experiment changes no contract. Reviews, in order: this Opus
-  plan, a Sonnet plan review, Sonnet code, a fresh Opus code review before any first run, a
-  real-file smoke test, then the results, write-up, and prose reviews.
+  Anything else. (1) The experiment stores 24 fitted neural networks, three synthetic overlay
+  tables, D8's neighbour input table, two fitted rules for load-transfer steps, per-half-hour
+  predictions, and score tables, all private; (2) more than one design defensibly tests the
+  hypothesis (with or without the contrastive terms, the neighbour inputs, or the BSP input, with
+  shared or stopped gradients, and on the U-net or the bidirectional LSTM), so each is an arm with
+  a pre-registered role; (3) the experiment reads experiment 730's banks, margin, limits, and
+  stored predictions, and the stored power series of D8's three electrical neighbours, and imports
+  the code of experiments 722, 729, and 730, whose callers cannot be named without searching the
+  repository; (4) the experiment touches no serving path or degradation rule; (5) the experiment
+  changes no contract. Reviews, in order: this Opus plan, a Sonnet plan review, Sonnet code, a
+  fresh Opus code review before any first run, a real-file smoke test, then the results, write-up,
+  and prose reviews. An Opus review of this revised plan comes before any further code.
 hypothesis: >-
-  On held-out synthetic days built from D8's own pre-engine readings, one U-net with three outputs
-  (the probability that D8's signed power is negative, the output of the injected solar panels in
-  points of D8's capacity, and the probability and size of a load-transfer step at each half-hour),
-  trained with a contrastive loss on pairs of windows that differ only by a known extra solar
-  injection, gives a Brier score of the probability of reverse flow no worse than experiment 730's
-  sign-only arm S by more than experiment 730's margin, raises no more false alarms on import
-  half-hours than the harm checks allow, and gives a solar output that rises by the injected amount,
-  stays at zero at night, and rises with the satellite sunshine input.
+  On held-out synthetic days built from D8's own pre-engine readings, one U-net that reads D8's
+  reading, the sky, the BSP steps, and the readings of D8's three electrical neighbours, and that
+  learns three tasks (the probability that D8's signed power is negative, the output of the
+  injected solar panels, and the load-transfer steps), gives a Brier score of the probability of
+  reverse flow no worse than experiment 730's sign-only arm S by more than experiment 730's margin,
+  and raises no more false alarms on import half-hours than the harm checks allow. The solar
+  output and the transfer steps are judged by their own reading words, and do not set the verdict.
 prediction: >-
-  Written before any code exists. Non-inferiority needs a point estimate of C1 at or below about
-  zero, because the margin m (0.00122) is about the half-width of experiment 730's own C1 interval
-  (0.00117). C1, U* minus experiment 730's S in the Brier score of P(X<0), has a point estimate
-  between -0.0006 and 0.0000, so its upper end lies at or below +m. C6 (U* minus S+) and R4 (S+
-  minus S) each have an interval that includes zero, and the stop-gradient arm U-SG scores within
-  0.0003 of S+. U* passes H1 pooled and at 3 MVA and above; in the band of 1 to 3 MVA, where
-  experiment 730's S sat at the limit, U* is not detectably worse than S. The solar output recovers
-  0.93 to 1.03 of each injected amount, every solar bar passes, and C4 is a gain of at least 2 points
-  of capacity. C3 is a gain, and C2 is no detectable difference. The likeliest verdict is therefore
-  row 5 (`partly supported`); the next likeliest is row 7 (`inconclusive`), reached if C1's point is
-  above about zero, which would show that the extra outputs cost the sign less than about 2 m but
-  not that they cost less than m. The transfer output beats the reading-step rule B-T in the Brier
-  score of the step event (C5, a gain), with an F1 of at least 0.6 on steps of 5 points and more. The
-  prediction fails if C1's upper end exceeds +m, or if any solar bar fails.
+  Written before any fit or score exists. Non-inferiority needs a point estimate of C1 at or below
+  about zero, because the margin m (0.00122) is about the half-width of experiment 730's own C1
+  interval (0.00117). C1, U* minus experiment 730's S in the Brier score of P(X<0), has a point
+  estimate between -0.0006 and 0.0000, so its upper end lies at or below +m and the verdict is row
+  4 (`supported`), with C1's own reading word "no detectable difference". The next likeliest
+  verdict is row 5 (`inconclusive`), reached if C1's point is above about zero, which would show
+  that the extra tasks cost the sign less than about 2 m but not that they cost less than m. C6 (U*
+  minus S+) and R4 (S+ minus S) each have an interval that includes zero, so the extra tasks neither
+  improve nor worsen the sign. U* passes H1 pooled and at 3 MVA and above, and is not detectably
+  worse than S in the band of 1 to 3 MVA. The BSP word is "no detectable difference" with C7's
+  point at or above zero, and "hurts" is the next likeliest word: on experiment 729's banks the BSP
+  steps added to sunshine lost 0.149 points, experiment 124 found that a BSP term worsened clean
+  forecasts at every weight, and experiment 722 found that the BSP moves 2.53 times as much as the
+  Primary in lit hours. The solar word is "reasonable": the recovery lies at 0.93 to 1.03 of each
+  injected amount, every solar bar passes, and C4 is a gain of at least 2 points of capacity. The
+  transfer word is "works": C5 is a gain over the rule B-TN, and U* reaches an F1 of at least 0.6
+  on steps of 5 points and more. C8 (the neighbour inputs) is a gain in the step Brier score, and
+  the whole of that gain sits on transfers whose partner is a neighbour that the network reads.
+  Steps under about 4 noise units are not detectable with or without the neighbours, recall on
+  solar-shaped transfers is at least 0.2 below recall on constant transfers, and the neighbour
+  inputs make no detectable difference to the sign (R13). The prediction fails if C1's upper end
+  exceeds +m.
 decision_rule: >-
   Every bar and constant is a named `Final` of `e00732_core.py`, fixed before any fit or score
-  exists. Six contrasts are counted at 99.167% (Bonferroni, 1 - 0.05 / 6), from experiment 729's
+  exists. Eight contrasts are counted at 99.375% (Bonferroni, 1 - 0.05 / 8), from experiment 729's
   two-way bootstrap with Kish widening; the section "Contrasts" defines them. The margin m is
   experiment 730's, 0.00122. Non-inferiority (NI) holds when C1's upper end is at most +m. The harm
-  limits are formulas evaluated on the test bank's truth before any fit. The five solar bars are in
-  the section "Checks on false alarms and solar output". Verdict, first row that matches: (0)
-  stopped; (1) `invalid`; (2) `failed`; (3) `not supported`, a harm check fails; (4) `supported`,
-  NI, the five solar bars pass, and C2 is a gain; (5) `partly supported`, NI and the five solar bars
-  pass, and C2 is not a gain; (6) `not supported`, NI and a solar bar fails; (7) `inconclusive`,
-  C1's upper end above +m and its lower end at or below zero; (8) `not supported`, every other case.
-  Every row from 3 to 8 prints C6 and R4 beside it. C5 carries a separate transfer verdict word. The
-  section "Verdict table" gives every row in full. The experiment ports nothing, so no smallest gain
-  applies beyond m.
+  limits are formulas evaluated on the test bank's truth before any fit. Verdict, first row that
+  matches: (0) stopped; (1) `invalid`; (2) `failed`; (3) `not supported`, a harm check fails; (4)
+  `supported`, NI; (5) `inconclusive`, C1's upper end above +m and its lower end at or below zero;
+  (6) `not supported`, every other case. Every row from 3 to 6 prints C6 and R4 beside it. Four
+  reading words sit beside the verdict and do not change it: the solar word (from five bars), the
+  transfer word (from C5 and an F1 bar), the neighbour word (from C8), and the BSP word (from C7,
+  read on the test months that the BSP meter covers). The section "Verdict table" gives every row in
+  full. The experiment ports nothing, so no smallest gain applies beyond m.
 benchmark: >-
   Experiment 730's sign-only U-net S (stored folders `S_unet_s0` to `S_unet_s2`) for the sign, and
   its bidirectional LSTM S (`S_bilstm_s0` to `S_bilstm_s2`) for the architecture reading; P0 (the
   reading read as signed import) for the harm checks; for the solar output, B-PV2 (experiment 730's
   chosen demand-output arm SD*, stored as `SD-R_unet_s0` to `SD-R_unet_s2`, with its demand output
   minus the signed reading implied by its P(X<0), clipped at zero and set to zero at night) and
-  B-PV1 (the same with D8's demand climatology and S's P(X<0)); for the transfer steps, B-T, a
-  logistic regression on the half-hour changes of the reading and of the synthetic BSP meter,
-  fitted on the validation overlay.
+  B-PV1 (the same with D8's demand climatology and S's P(X<0)); for the transfer steps, B-TN and
+  B-T, logistic regressions on the steps of the reading and of the synthetic BSP meter in noise
+  units, fitted on the validation overlay. B-TN adds the neighbours' steps, sign-aligned with D8's
+  step, and the count of neighbours that step the same way as D8, the feature of experiment 70.
 row_set_id: >-
   e00730_synthetic_d8_v1 for the sign and the solar output: experiment 730's 94,080 scored
   half-hours (8 held-out calendar months of D8's pre-engine base days, 8 synthetic segment draws
   each, the middle 24 hours of a 48-hour window). e00732_overlay_d8_v1 for the transfer steps and
-  the injection recovery: the same windows carrying this experiment's fixed test overlays. Real
-  checks read the same months without injection, the metered engine record's days, the days of
-  logged closures at D8, and D8's eras up to 2026-06-30. No valid time on or after 2026-07-01 is
-  read. No forecast is made.
+  the injection recovery: the same windows carrying this experiment's fixed test overlays. The BSP
+  contrast C7 reads the rows of e00730_synthetic_d8_v1 that fall in the two test months that the BSP
+  meter covers. Real checks read the same months without injection, the metered engine record's
+  days, the days of logged closures at D8, and D8's eras up to 2026-06-30. No valid time on or after
+  2026-07-01 is read. No forecast is made.
 metric: >-
   The Brier score and the log loss of P(X<0) on all, import, and reverse-flow half-hours and by
-  reading band; the harm means of H1 pooled and by band; the mean absolute error of the solar
-  output in points (and MW) on sun-up half-hours, by world type and source; the recovery ratio and
-  the mean and median absolute injection error at injected amounts of 5, 20, and 50 points; the
-  night mean and night share; the shares of monotonicity violations and of responsive half-hours;
-  the Brier score, precision, recall, and F1 of the transfer step, and the error of the step size;
-  the normalised mean absolute error of the median of the signed distribution, for continuity.
+  reading band; the harm means of H1 pooled and by band; the mean absolute error of the solar output
+  in points (and MW) on sun-up half-hours, by world type and source; the recovery ratio and the mean
+  and median absolute injection error at injected amounts of 5, 20, and 50 points; the night mean
+  and night share; the shares of monotonicity violations and of responsive half-hours; the Brier
+  score, precision, recall, and F1 of the transfer step, by band of size in noise units, by
+  duration, by shape, and by partner, and the error of the step size; the normalised mean absolute
+  error of the median of the signed distribution, for continuity.
 production_status: not-for-production
 adopted_in: none
 ---
@@ -105,7 +116,14 @@ simulated engine, simulated solar output, and simulated load transfers, and fold
 magnitude the way the meter does. To teach the solar output to behave like solar power, we show the
 neural network two copies of the same window that differ only by a known extra amount of solar
 output, and require its solar answer to rise by exactly that amount. We then test on synthetic days
-that training never saw, and run checks of physical sense on real days.
+that training never saw, and run checks of physical sense on real days. Each of the extra answers
+gets its own reading word, and the verdict rests on the probability of reverse flow alone.
+
+**The neural network also reads the meters of D8's three electrical neighbours, because a load
+transfer shows as a mirror image there.** When customers move from a neighbouring Primary to D8,
+D8's demand steps up and the neighbour's steps down by the same amount, so the simulated transfers
+change the neighbours' readings too. We also ask whether the meter of the bulk supply point above
+D8 helps the neural network tell the direction of D8's power flow.
 
 **The main question is whether learning the extra answers makes the probability of reverse flow
 worse.** In [experiment 730](../00730-msa-d8-sign-detector-with-demand-head-and-masking/result.md),
@@ -124,8 +142,78 @@ windows with a known solar injection take forward the contrastive term of [exper
 built as it was there; "The loss and the contrastive terms" says what differs here. The U-net is
 that of [Ronneberger et al. (2015)](https://doi.org/10.1007/978-3-319-24574-4_28), a
 convolutional neural network whose layers shrink the window and then grow it back, with skip
-connections that carry the detail of each level across. Every section from "Terms" to "Method" is
-the plan, written before any code exists.
+connections that carry the detail of each level across. Every section from "Why this design" to
+"Method" is the plan, written before any fit or score exists.
+
+## Why this design
+
+**The project wants three facts about D8's past: when its power flowed in reverse, how much the
+unmetered solar panels below D8 produced, and when load was moved to or from another substation.**
+No meter recorded any of the three facts. A neural network has to infer them from the reading, and
+its answers can be marked right or wrong only on a synthetic day with a known answer. A later
+experiment will pass the probability of reverse flow to the forecaster of D8, so that probability
+is the output that must not get worse.
+
+**The verdict rests on the probability of reverse flow alone, because experiment 730 found that an
+extra output can harm that probability.** A neural network that also learned D8's demand scored
+detectably worse on the direction of flow than the same neural network without the demand output.
+The verdict therefore asks one question: does a neural network that also learns the solar output
+and the load transfers give a probability of reverse flow as good as the best sign-only network?
+A verdict that also required a good solar output could read "not supported" for two unrelated
+reasons, and a reader could not tell which. The solar output, the detection of load transfers, and
+the meter of the bulk supply point each get a reading word of their own, printed under every
+verdict row.
+
+**Each of the maintainer's four questions has its own counted comparison, and each comparison
+changes one element of the design.**
+
+| Question | Comparison | The one element that differs |
+|---|---|---|
+| (a) Do the extra training tasks improve the probability of reverse flow? | The full network against a sign-only network with the same inputs and training days (contrast C6); the verdict compares the full network with experiment 730's stored sign-only network (C1) | The solar and transfer outputs and their loss terms |
+| (b) Does the network do a reasonable job of separating the solar output? | Five fixed bars on known solar injections, and the network against a rule built from experiment 730's demand output (C2 to C4) | A known number of megawatts of solar output added to a window |
+| (c) Can the network detect load transfers, and does it need the neighbours? | The network against a fitted rule that reads the neighbours too (C5), and the network with and without the neighbours' readings (C8) | The neighbours' input channels |
+| (d) Do the steps of the bulk supply point's meter help the direction of flow? | The network with and without that input (C7) | The input channels of the bulk supply point |
+
+**The neighbours' readings belong in this experiment, because a load transfer cannot be told from a
+gas engine's step without them.** A load transfer and a gas engine both change D8's level by a
+roughly constant number of megawatts. A transfer shows the opposite change at the substation that
+gives or takes the load, and an engine does not. A transfer output trained and scored without the
+neighbours would test a detector that has no way to make that distinction, and its failure would
+teach nothing. The earlier experiments on real and injected transfers found only small gains from
+neighbour signals ("What the earlier load-transfer and BSP experiments found" lists them), so the
+gain from the neighbours is measured by a counted comparison and never assumed. The neighbours cost
+two arms (6 fits, about 0.8 GPU-process-hours at the epoch cap) and one input table built from
+stored files.
+
+**We considered a sign-and-solar experiment followed by a separate load-transfer experiment, and
+rejected the split.** Question (a) is about the neural network that carries every task, because
+that network is the candidate for untangling D8's history. The split would answer question (a) for
+a neural network with fewer tasks, and would fit the shared arms twice. The combined experiment
+stays focused because one contrast carries the verdict and every other reading is labelled as a
+side reading before any fit. We also left out arms that learn one extra task only (the sign with
+the solar output, or the sign with the transfers). If the extra tasks harm the sign, the arm with
+a stop-gradient says whether shared gradients are the cause, and only then would a one-task arm be
+worth 6 more fits.
+
+**The solar and transfer readings are claims about synthetic days, and four safeguards stop a
+reader from taking them for more.**
+
+- Every synthetic generator's output is drawn and checked before any fit, because a component that
+  silently produces nothing passes every score (experiment 729).
+- The solar output is judged against a known injection in the units of the target, and the injected
+  shape comes from a different farm site than the sunshine input that the neural network reads.
+- Each known shortcut has a control: the copy of the injection in the BSP meter, an engine mistaken
+  for solar output, a transferred block of customers that carries rooftop solar panels, and a
+  transfer whose mirror image at the neighbour is missing.
+- Real days are checked in aggregate: the solar output at night, on days before any solar farm
+  existed, against the sky, and against the engine's running hours, and the transfer output against
+  the logged closures at D8.
+
+**The design leaves three questions to later experiments.** A window of 48 hours shows at most one
+edge of a transfer longer than 2 days, so long transfers and the arrival of a new generator need a
+neural network with a longer memory. The synthetic transfers follow the maintainer's working
+description, and no experiment has yet measured the size or the length of a real transfer at D8.
+Passing the probability of reverse flow to the forecaster is a separate experiment.
 
 ## Terms
 
@@ -148,6 +236,20 @@ the plan, written before any code exists.
   Primaries. Its meter reports signed MW. **The BSP steps** are the half-hour changes of that meter.
   A transfer between D8 and another Primary under BSP A leaves the BSP meter unchanged, and a
   transfer to a Primary under another BSP moves the BSP meter with D8.
+- **D8's electrical neighbours** are D3, D5, and D14, the three Primaries that the earlier
+  load-transfer experiments (for example [experiment
+  159](../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md) and [experiment
+  709](../00709-era-signal-in-the-candidate-part-1/result.md)) list as interconnected with D8. All
+  three sit under BSP A. D3 is metered in MVA and has no generator in its service area, by
+  [experiment 722](../00722-msa-mva-bsp-closure-and-fast-hint/result.md)'s census; D5 and D14 are
+  metered in signed MW.
+- **The partner** of a load transfer is the Primary that gives load to D8 or takes load from D8,
+  and **the donor** is whichever of the two loses the load. **The mirror** is the partner's change
+  of level, equal and opposite to D8's.
+- **The step statistic** of a series at a half-hour is the mean of the series over the next 2 hours
+  minus its mean over the previous 2 hours. **A noise unit** of a series is 1.4826 times the median
+  absolute step statistic of that series over the training base days, the usual size of a step
+  that no injection or transfer causes. Each of D8, D3, D5, and D14 has its own noise unit.
 - **A base day** is a UTC day of D8's real reading in the pre-engine era. **A segment** is one
   calendar month of base days carrying one continuous injection draw. **A world type** says what a
   segment holds: no injection, engine only, solar only, or engine and solar.
@@ -191,6 +293,63 @@ solar world without solar output. Experiment 730 rebuilt the banks with the fixe
 contrastive term.** A paired-difference term with a weight of 1.0, a scale of 0.05, and dropout on
 in both forward passes made a demand network fit the paired rows and lose the real rows, and its
 advice is to retry the idea at a smaller weight with the same function in both passes.
+
+### What the earlier load-transfer and BSP experiments found
+
+**The earlier experiments on load transfers found that neighbour signals help a little, on some
+transfers, and each finding below sets one choice of this plan.** Those experiments injected
+transfers into the power history of 16 Primaries and scored detectors built from step statistics.
+
+- **A count of neighbours that step the same way found more of the moved megawatts.** In
+  [experiment 70](../00070-sw2-19-same-sign-neighbour-count/result.md) (same-sign neighbour count)
+  the gain was +0.048 of the moved MW (interval +0.021 to +0.096) over the single-series detector
+  at 80 unexplained alarms. The gain held only for transfers with no metered receiver and a donor
+  step of 2 to 6 noise units, it was 0.000 for transfers of 15.6 to 60 days, and on 35 real
+  transfers the two detectors found 7 against 8, too few to confirm. The rule B-TN carries that
+  count.
+- **The mirror step at a neighbour gained little as a score and lost as a gate.** In [experiment
+  65](../00065-sw2-14-combined-single-series-and-neighbour-score/result.md) (combined own and
+  neighbour score) the mirror cue gained +0.005 (interval −0.011 to +0.062), and a hard neighbour
+  gate was about 0.1 worse. The neighbours are therefore inputs here, never a gate.
+- **Most injected transfers stepped by less than 4 noise units.** [Experiment
+  55](../00055-sw2-8-neighbour-veto-single-series-detector/result.md) and [experiment
+  58](../00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md) (neighbour veto) raised recall
+  by 0.008 to 0.013 and precision by 3 to 7 points, and found that 77% of the unmetered injected
+  transfers stepped by less than 4 noise units. This plan reads the detection by size in noise
+  units and expects no detection under about 4.
+- **A fixed list of interconnected Primaries flatters a search for the partner.** [Experiment
+  43](../00043-sw2-1-detector-scoreboard/result.md) (detector scoreboard) found so, and 40% of the
+  transfers drawn here have a partner that the neural network does not read.
+- **A joint fit on hourly residuals lost to step statistics in noise units.** [Experiment
+  67](../00067-sw2-15-joint-edge-flow-estimator/result.md) (joint edge-flow estimator) found 0.108
+  of the moved power against 0.646, and noted that 8 of the 16 Primaries are metered in MVA only.
+  The rules here read step statistics in noise units, and every neighbour enters as a magnitude.
+- **A transfer that follows the donor's solar shape is much harder to find.** In [experiment
+  162](../00162-switching-shaped-transfers-donor-demand-and-pv-shapes/result.md) (switching-shaped
+  transfers) such a transfer cut recall by about 0.40, and constant-MW injections hid that loss. A
+  share of the transfers drawn here is solar-shaped.
+- **Neighbours did not help the ordinary rows of a demand forecast.** [Experiment
+  426](../00426-mdn-neighbouring-primaries-graph-and-bottom-up-design/result.md) (neighbouring
+  primaries graph) and [experiment
+  715](../00715-msa-neighbour-row-group-in-the-axial-attention-demand-network/result.md) (neighbour
+  row group in the axial-attention network) found no gain from the neighbours' lagged residuals or
+  last 14 days, so the value of a neighbour lies in events. This plan expects the neighbours to
+  change the sign by no detectable amount (R13).
+- **A neighbour cue needs the sign of the Primary's own step and a clean reference level.**
+  [Experiment 714](../00714-msa-era-identifiability-audit-and-frozen-probe/result.md) (era audit)
+  and [experiment 709](../00709-era-signal-in-the-candidate-part-1/result.md) (era signal) found
+  that the error of the reference level was as large as many injected steps. The step statistic
+  here takes its reference level from the 2 hours before the half-hour, and each neighbour's step
+  is multiplied by the sign of D8's step.
+
+**Three experiments suggest that the BSP steps add little to the direction of flow, or harm it.**
+On experiment 729's banks, as experiment 730's page reports, the BSP steps added to sunshine lost
+0.149 points of signed CRPS (interval 0.068 to 0.455) on the two months that the BSP meter covers.
+[Experiment 124](../00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/result.md) (BSP
+closure audit) found that a BSP term in the Primaries' loss worsened forecasts on clean data at
+every weight above zero. Experiment 722 (BSP closure and fast hint) found that the BSP follows the
+Primary in dark hours and moves 2.53 times as much in lit hours. Experiment 730 added no BSP
+contrast, so this experiment's C7 is the first reading of the BSP input on the sign-only design.
 
 ## The synthetic world
 
@@ -236,30 +395,110 @@ the new reading r′ = sqrt(x′² + q²). The synthetic BSP meter of a segment 
 times the injection, with β stored in the segment's parameters, so an overlay that adds output δ
 below D8 gives the BSP meter minus β δ.
 
+### The neighbours' readings, from stored files
+
+**Experiment 730's banks hold no neighbour series, so this experiment builds a neighbour input
+table from power series already stored in the private data folder.** The cleaned half-hourly power
+of D3, D5, and D14 is in the cleaned power table that `studies.power.scan_power` reads, and
+experiment 722 loads the same three children of BSP A through `e00722_data.load_power`.
+`e00732_neighbours.py` reads the three series with that loader and places them on D8's base
+calendar, one row per base day and half-hour, in `neighbours/table.parquet`. The plan needs no
+download and no new data source.
+
+**The table must cover at least 90% of the base-day half-hours for every neighbour, or the line
+stops at verdict row 0.** The real-file smoke test prints the coverage per neighbour and per split.
+A missing half-hour gets a presence mask of zero, as D8's missing readings do. If the coverage
+gate fails, a fresh export of the neighbours' series is a new data source, and the section
+"Decisions that need the maintainer" holds that case.
+
+**Every neighbour enters the neural network the way D8's reading does: as a magnitude, with a
+presence mask, and hidden with D8's reading.** D3's reading is a magnitude already. D5's and D14's
+signed series are folded with a reactive floor drawn per segment from 0 to 0.3 MVA, exactly as
+experiment 729 folds D8, so no neighbour channel carries a sign. A signed neighbour channel would
+show when a neighbour's own generation exceeds its demand. That cue bears on D8's label, and no
+neighbour metered in MVA can supply it, so a rule learned from a signed channel would fail at the 8
+of 16 Primaries metered in MVA only. The neighbours' readings on a base day are their real readings
+of that day, so they carry the neighbours' own demand, weather response, and any real transfer; only
+the mirror of a synthetic transfer is added to them.
+
+**Each neighbour has four input channels.** The four channels are the folded reading divided by
+the neighbour's median over the training base days, the half-hour change of that scaled reading,
+the same change multiplied by the sign of D8's half-hour change of reading, and a presence mask.
+The third channel is the sign-aligned cue: where both Primaries import, the sign-aligned cue is
+negative at a mirrored step and positive where D8 and the neighbour step the same way. A hidden
+span of style R hides D8's reading and all four channels of the three neighbours over the same
+half-hours. The sign head therefore never reads a neighbour's step where D8's reading is hidden,
+and the sign-aligned cue cannot reveal the direction of D8's hidden step.
+
+**The neighbours can inform the sign only at a transfer edge, and that information exists on real
+days too.** When D8 gains load while D8 is in reverse flow, D8's reading falls while the
+neighbour's reading also falls, so a mirrored step with both readings moving the same way marks
+reverse flow at D8. The reading R13 (U\* minus U-N in the sign's Brier score) measures that
+effect. The plain test rows carry no synthetic transfer, so R13 is expected to show no detectable
+difference there, and R8 reads the sign on the transfer overlay.
+
 ### Load transfers, a new generator
 
-**The transfer generator adds steps of constant size to D8's demand, with the BSP meter unchanged
-for a transfer inside BSP A.** The constant size follows the maintainer's working description of a load
-transfer: a donor Primary loses a roughly constant number of megawatts, often mirrored at a
-neighbour. The generator draws, per segment:
+**The transfer generator adds a block of load to D8's demand and takes the same block from the
+partner's demand.** The generator follows the maintainer's working description of a load transfer:
+the donor loses a roughly constant number of megawatts, often (not always) mirrored at a neighbour,
+so a transfer shows as a flat change of level with a mirror image at the partner. A gas engine's
+steps are flat as well, and only their frequency and the missing mirror separate them, so the
+engine worlds stay in the training mix. The generator draws, per segment:
 
 | Parameter | Range |
 |---|---|
 | Transfers per 30 days | 0 to 6 in training (uniform per segment); exactly 6 in the test and validation overlays |
 | Duration of one transfer | 1 hour to 4 days, log-uniform |
-| Size | 3 to 40 points, log-uniform |
+| Size T₀, the mean of the transferred load over the transfer | 3 to 40 points, log-uniform |
 | Direction | D8 gains or loses the load, each with probability 0.5 |
-| Partner under BSP A (BSP meter unchanged) | probability 0.7; otherwise the BSP meter moves by β times the transfer |
+| Shape | constant (T = T₀) with probability 0.6; demand-shaped with probability 0.2; solar-shaped with probability 0.2 |
+| Partner | one of D3, D5, and D14 with probability 0.6 (equal shares; the partner's series changes by −T, and the BSP meter is unchanged); another Primary under BSP A that the neural network does not read, with probability 0.2 (no mirror, BSP meter unchanged); a Primary under another BSP, with probability 0.2 (no mirror, the BSP meter moves by β T) |
 | Start time | continuous on a 5-minute grid, so a half-hour holding an edge carries a partial mean |
 | Overlap | transfers never overlap; a draw that overlaps is redrawn |
 
+**Two shapes other than a constant keep the detector from learning that every transfer is flat.**
+Experiment 162 found that a constant-MW injection hides how much harder a shaped transfer is to
+find. A demand-shaped transfer is T₀ times the donor's own demand divided by the donor's mean
+demand over the transfer, so the block rises and falls with the donor's day. A solar-shaped
+transfer is a block of customers with rooftop solar panels: T = T₀ (1 + κ (ḡ − g)), where g is the
+CAMS clear-sky index times the clear-sky irradiance divided by 1,000 at D8, ḡ is the mean of g
+over the transfer, and κ is drawn uniformly from 0.3 to 1.0. The block's load dips when the sun
+shines, and its mean stays T₀. The donor's demand is D8's base demand when D8 loses the load, and
+the partner's series when a neighbour that the neural network reads loses the load; for a partner
+that the neural network does not read, D8's base demand stands in for the donor's shape.
+
+**The solar target does not change during a solar-shaped transfer.** The solar head estimates the
+solar output connected below D8 in its normal arrangement, which is the quantity a forecast under
+the normal arrangement needs. A solar-shaped transfer is therefore a deliberate confuser: the
+neural network must attribute the midday dip to the transfer, and the mirror at a neighbour is the
+cue that allows that attribution. Table T1 prints the solar error inside solar-shaped transfers,
+with and without a mirror, apart from the other rows.
+
+**A donor never gives more load than the donor has.** When D8 loses the load, T is at most 0.8
+times D8's base demand at every half-hour of the transfer. When a neighbour that the neural network
+reads loses the load, T is at most 0.8 times that neighbour's signed power (D3's reading) at every
+half-hour. A draw that breaks the rule redraws its size, up to 20 times, and is then dropped and
+counted. Without the rule, a large transfer could push D8's signed power below zero with no
+generator running, which no real transfer does.
+
 **The signed truth becomes x + T, where T is the transferred load in points (positive when D8 gains
-load).** A transfer that removes load during a solar spell deepens the reverse flow, and a transfer
-that adds load can lift a reverse-flow half-hour to import, so the sign truth of an overlaid window
-differs from the bank's. **The ranges are wide guesses, set from no fitted real value,** because no
-experiment so far measures the size or the length of a load transfer at D8. The real base days may
-hold transfers that no log records, which act as label noise; days within 24 hours of a logged
-closure at D8 were dropped from the base days by experiment 729's rule.
+load), and a neighbour partner's series becomes its own series minus T.** The mirror is converted
+from D8's points to MW at 0.104 MW a point, which assumes a power factor of 1 at D8. D5's and
+D14's signed series take the mirror before the fold. D3 has no generator in its service area, so
+D3's reading is read as signed import and takes the mirror directly; the donor rule keeps the
+changed reading above zero. A transfer that removes load during a solar spell deepens the reverse
+flow, and a transfer that adds load can lift a reverse-flow half-hour to import, so the sign truth
+of an overlaid window differs from the bank's. **The ranges are wide guesses, set from no fitted
+real value,** because no experiment so far measures the size or the length of a load transfer at
+D8. The real base days may hold transfers that no log records, which act as label noise; days
+within 24 hours of a logged closure at D8 were dropped from the base days by experiment 729's rule.
+
+**The step targets follow the edges, and the size target is the mean level.** A transfer step is
+the half-hour that holds the start or the end of a transfer, whatever the transfer's shape, and
+the step-size target at an edge is plus or minus T₀. The limits stage computes each series' noise
+unit from the training base days and writes the four noise units to `limits.json` before any fit.
+A transfer's size in noise units is T₀ divided by D8's noise unit.
 
 **The training overlay is drawn once per training bank and seed, from seed 732,100 plus the seed,
 and the test and validation overlays from 732,000 and 732,050.** Experiment 730's test bank
@@ -311,11 +550,25 @@ fit.** Experiment 729 showed that a silent component passes every score-based ch
 stage counts, per bank kind and seed, and fails at verdict row 0 below `MIN_OUTPUT_SHARE` (0.99,
 the constant of experiment 730):
 
-- the share of drawn transfers whose span changes the truth by the drawn size on every base-day
-  half-hour inside it, and the share of transfer steps that fall on a scored half-hour of some
-  window;
-- the share of partner-inside-BSP-A transfers that leave the BSP meter unchanged, and the share of
-  other transfers that move it by β T;
+- the share of drawn transfers whose span changes the truth by T on every base-day half-hour
+  inside it, with a mean change of T₀, and the share of transfer steps that fall on a scored
+  half-hour of some window;
+- the share of transfers inside BSP A that leave the BSP meter unchanged, and the share of other
+  transfers that move it by β T;
+- **the mirror check:** for every transfer whose partner is D3, D5, or D14, the mean change of the
+  partner's series before the fold, over the transfer's half-hours, equals minus the mean of T
+  within 0.01 points, and the mean change is nonzero (1.0 is required); a transfer with a silent
+  mirror, or a mirror at a neighbour that is not the drawn partner, fails the check. The check also
+  requires that no neighbour series changes on a transfer whose partner the neural network does
+  not read, and that no neighbour series changes outside a transfer. A known-answer unit test
+  feeds the check an overlay whose mirror is zero, and one whose mirror sits at the wrong
+  neighbour, and requires the check to fail on both;
+- the share of drawn transfers of each shape against the registered shares, the share of
+  solar-shaped transfers whose T differs from T₀ on at least one sun-up half-hour, and the count
+  of draws dropped by the donor rule (at most 5% of the draws);
+- that the test overlay holds at least 100 scored transfer steps under 4 noise units and at least
+  100 of 4 noise units and more, or the detectability statement is `void` on the short side (a
+  shortfall here voids the statement and does not stop the line);
 - the share of extra-injection pairs whose δ is above zero on at least one sun-up half-hour, and
   the share whose re-folded reading equals the bank's reading where δ is zero (1.0 is required);
 - the share of raised-sky windows whose index differs from the original on every sun-up half-hour
@@ -407,8 +660,8 @@ carrier.
 **The U-net of experiments 729 and 730 carries every arm, and the bidirectional LSTM repeats the
 headline arm.** No architecture screen runs, because experiment 730's screen chose the U-net on
 validation and found no gain from the transformer. The U-net has four levels of 32, 64, 128, and 256
-channels, kernels of width 5, group normalisation, GELU activations, and skip connections, about 1.06
-million weights plus the four output layers. The bidirectional LSTM is a 1-D convolution of 16
+channels, kernels of width 5, group normalisation, GELU activations, and skip connections, about
+1.06 million weights plus the four output layers. The bidirectional LSTM is a 1-D convolution of 16
 filters of width 5, two bidirectional layers of 128 units, and a linear output layer at each
 half-hour, about 0.55 million weights.
 
@@ -424,7 +677,9 @@ to 0 to 1.5), the clear-sky irradiance divided by 1,000, the cosine of the solar
 CAMS presence mask at D8; the half-hour change of the synthetic BSP meter divided by 20 and a BSP
 presence mask; and the local half-hour (sine and cosine), the day of the week (sine and cosine), the
 bank-holiday flag, and ERA5's 2 m temperature, 10 m wind speed, and log precipitation at D8's grid
-cell. No input reads the month or the day of the year.
+cell. Every arm except U-N adds the 12 neighbour channels: for each of D3, D5, and D14, the scaled
+folded reading, its half-hour change, the sign-aligned change, and a presence mask. U-noBSP drops
+the BSP change and its mask. No input reads the month or the day of the year.
 
 **The weather is the observed ERA5 and CAMS weather at the scored times, which is legitimate only
 because this experiment reconstructs the past.** No forecast origin exists, and no arm reads
@@ -434,10 +689,11 @@ print one example. No origin-time-weather test applies here, because no row has 
 
 ## Arms
 
-**Six arms are fitted, each with seeds 0 to 2, and two arms of experiment 730 are read from stored
+**Eight arms are fitted, each with seeds 0 to 2, and two arms of experiment 730 are read from stored
 predictions.** Every fitted arm trains on the same plain windows: experiment 730's training banks
-with this experiment's transfer overlay. Every arm with a solar head also sees each window's injected
-member, and only U\* and U-SG also see the raised-sky member, which carries no supervised target.
+with this experiment's transfer overlay. Every arm with a solar head also sees each window's
+injected member, and only U\* and U-SG also see the raised-sky member, which carries no supervised
+target.
 
 | Arm | Architecture | Outputs | Contrastive terms | Role |
 |---|---|---|---|---|
@@ -447,6 +703,8 @@ member, and only U\* and U-SG also see the raised-sky member, which carries no s
 | S+ | U-net | Sign | None | The control of C6: sign-only on this experiment's windows |
 | U-SG | U-net | Sign, solar, step, size | As U\* | Report only: no gradient from the solar, step, and size terms reaches the backbone |
 | U\*-L | Bidirectional LSTM | As U\* | As U\* | Report only: the architecture |
+| U-N | U-net | As U\* | As U\* | The control of C8: no neighbour channels |
+| U-noBSP | U-net | As U\* | As U\* | The control of C7: no BSP channel |
 | S (730) | U-net | Sign | None | The control of C1, stored predictions of experiment 730, seeds 0 to 2 |
 | S-L (730) | Bidirectional LSTM | Sign | None | The control of R3, stored predictions of experiment 730, seeds 0 to 2 |
 
@@ -456,6 +714,18 @@ through a stop-gradient (an operation that passes values forward but blocks the 
 back), so their losses train only their own linear layers and the sign is learned as in S+. If U-SG
 matches S+ while U\* is worse, shared gradients are what hurt the sign; if U\* and U-SG both match
 S+, the heads cost the sign nothing in this design.
+
+**U-N and U-noBSP each remove one input from U\*, and nothing else.** U-N reads no neighbour
+channel, so U\* minus U-N in the step Brier score (C8) is what the neighbours add to the detection
+of transfers, the maintainer's question (c). U-noBSP reads no BSP channel, so U\* minus U-noBSP in
+the sign's Brier score (C7) is what the BSP steps add to the direction of D8's flow, the
+maintainer's question (d). Both arms train on the same windows as U\*, whose transfers still carry
+their mirror and BSP changes; only the input is removed. S+ reads the same inputs as U\*, the
+neighbours and the BSP steps included, so C6 changes the outputs and the loss alone.
+
+**The fits run in an order that puts the verdict first.** The families are, in order: S+ and U\*
+(C1 and C6, the verdict), U-N and U-noBSP (C8 and C7), U-NC and U-NCw (C2 and C3), U-SG, and
+U\*-L. A stop at the stop line therefore loses report-only readings before any counted reading.
 
 **U-NCw separates the contrastive terms from a heavier solar loss.** In U\* the four terms that
 train the solar head (the supervised solar term, the injection term, the night term, and the
@@ -494,18 +764,45 @@ so they need no fit.**
   fitted on the training base days) in place of the demand output, and S's P(X<0) in place of
   SD\*'s. B-PV1 is reported only.
 
-**B-T is a logistic regression for the step event, fitted on the validation overlay.** Its inputs at
-each half-hour are the absolute half-hour change of the reading, the same change divided by the
-window's median absolute change, the absolute half-hour change of the synthetic BSP meter, the
-absolute difference between the two changes, and the cosine of the solar zenith angle. Neither
-experiment 729 nor experiment 730 has a transfer output or a transfer baseline, so B-T is the
-closest rule on the same inputs.
+**B-TN and B-T are logistic regressions for the step event, fitted on the validation overlay, and
+both read step statistics in noise units.** Experiment 67 found that step statistics in noise units
+beat hourly residuals, and experiments 714 and 709 found that a step needs a clean reference level,
+so each feature is a step statistic (the mean of the next 2 hours minus the mean of the previous 2
+hours) divided by the series' noise unit. The inputs of B-T at each half-hour are the absolute step
+of D8's reading, the absolute step of the synthetic BSP meter, the absolute difference between
+those two steps in points, and the cosine of the solar zenith angle.
+
+**B-TN adds three neighbour features, each taken from an earlier neighbour detector.**
+
+- **The sign-aligned step of each of D3, D5, and D14:** the neighbour's step times the sign of D8's
+  step, negative at a mirror (experiments 714 and 709).
+- **The largest opposite-sign step among the three neighbours,** the mirror cue of experiment 65.
+- **The count of neighbours whose step is at least 2 noise units and has the sign of D8's step,**
+  the same-sign neighbour count of experiment 70.
+
+**B-TN is the counted reference of C5, and B-T is reported only.** A neural network that reads the
+neighbours must beat a rule that reads the neighbours, or the transfer head adds nothing beyond
+those three features. Neither experiment 729 nor experiment 730 has a transfer output or a transfer
+baseline.
 
 ## Contrasts
 
-**Six contrasts are counted, each read at 99.167% (Bonferroni, 1 − 0.05 / 6).** A negative
-difference is a gain of the first arm. C1 carries the verdict through NI. The other five read
-"gain", "loss", or "no detectable difference" at a threshold of zero, because nothing is ported.
+**Eight contrasts are counted, each read at 99.375% (Bonferroni, 1 − 0.05 / 8).** A negative
+difference is a gain of the first arm. C1 carries the verdict through NI. Every contrast, C1
+included, also reads "gain", "loss", or "no detectable difference" at a threshold of zero, because
+nothing is ported. C7 and C8 are counted, not report-only, because each answers one of the
+maintainer's four questions for this experiment directly (does the BSP input help the direction of
+flow, and do the neighbours help the detection of transfers), so each needs an interval at the
+experiment's level.
+
+**C7 reads only the test months in which the BSP meter has data, because the BSP channel is empty
+in every other month.** Experiment 730's split holds two such test months, and its banks stage
+required at least 200 reverse-flow half-hours outside the dead band there. In the other six test
+months the BSP presence mask is zero for both arms, so those rows would dilute the contrast with
+rows on which the input cannot act. The banks stage of this experiment counts the reverse-flow
+half-hours of the two BSP test months again, and C7 and the BSP word are `void` below 200. Two
+months give C7 a wide interval, so C7 can show a large effect of the BSP input and cannot rule out
+a small one.
 
 | Contrast | Difference | Rows | Question |
 |---|---|---|---|
@@ -513,8 +810,10 @@ difference is a gain of the first arm. C1 carries the verdict through NI. The ot
 | C2 | U\* minus U-NC, solar mean absolute error | Sun-up plain test rows | Do the contrastive terms improve the solar output? |
 | C3 | U\* minus U-NC, mean absolute injection error \|ΔPV − δ\| | Injection overlay, sun-up half-hours with δ at least 5% of a, three amounts pooled, with the amount in the row key | Do the contrastive terms improve the response to an injection? |
 | C4 | U\* minus B-PV2, solar mean absolute error | Sun-up plain test rows | Is the solar head better than experiment 730's demand output used as a solar estimate? |
-| C5 | U\* minus B-T, Brier score of the step event | Transfer overlay, valid scored rows | Does the transfer head beat the reading-step rule? |
+| C5 | U\* minus B-TN, Brier score of the step event | Transfer overlay, valid scored rows | Does the transfer head beat the step rule that reads the neighbours? |
 | C6 | U\* minus S+, Brier score of P(X<0) | All plain test rows | Do the extra heads change the sign, on the same training windows? |
+| C7 | U\* minus U-noBSP, Brier score of P(X<0) | Plain test rows of the two test months that the BSP meter covers | Does the BSP input help the direction of D8's flow? |
+| C8 | U\* minus U-N, Brier score of the step event | Transfer overlay, valid scored rows | Do the neighbours' readings help the detection of transfers? |
 
 **Every counted reading pairs arms on the same rows and averages seeds 0 to 2.** The point estimate
 is the mean over the seeds of each row's loss, and each resample uses the seed-averaged losses.
@@ -547,7 +846,16 @@ level.**
 | R11 | U\* minus U-NCw, mean absolute injection error |
 | R12 | C4 on the solar-only rows and on the no-injection rows, each alone |
 | B13 | U\* minus S (730), mean P(X<0) on import half-hours of 1 to 3 MVA: the band reading of row 3 |
-| T1 | The solar error by world type (no injection, engine only, solar only, engine and solar) and by source (S1 as an aggregate, S2), for U\*, U-NC, U-SG, U\*-L, B-PV1, and B-PV2 |
+| R13 | U\* minus U-N, Brier score of P(X<0): the neighbours and the sign |
+| R14 | C7 split by world type (engine only, solar only, engine and solar), and C7 on all plain test rows |
+| R17 | U\* with the BSP channel and its mask set to zero at scoring time minus U\*, Brier score of P(X<0) on the two BSP test months: the BSP input removed with no refit |
+| R18 | U\* minus U-noBSP, Brier score of the step event on the transfer overlay, split by partner case: the BSP input and the transfers |
+| R19 | C5 and C8 split by the transfer's shape (constant, demand-shaped, solar-shaped) |
+| R20 | The recall of U\*, U-N, B-TN, and B-T on solar-shaped transfers minus the recall on constant transfers |
+| R15 | U-N minus B-T, Brier score of the step event: the transfer head without neighbours against the rule without neighbours |
+| R16 | C8 split by partner case (a neighbour that the network reads, another Primary under BSP A, a Primary under another BSP) |
+| T6 | The transfer step's F1, recall, and step-size error for U\*, U-N, B-TN, and B-T by band of size in D8's noise units (under 2, 2 to 4, 4 to 8, and 8 and more), by band of size in points (3 to 5, 5 to 10, 10 to 20, and 20 to 40), and by band of duration (1 to 3 hours, 3 to 12 hours, 12 hours to 2 days, and 2 to 4 days) |
+| T1 | The solar error by world type (no injection, engine only, solar only, engine and solar) and by source (S1 as an aggregate, S2), for U\*, U-NC, U-SG, U\*-L, B-PV1, and B-PV2; and, on the transfer overlay, U\*'s and U-N's solar error inside solar-shaped transfers, with and without a mirror |
 | T2 | The four load-transfer scenarios below, for U\*, S+, and S (730) |
 | T3 | The ambiguity read-out of experiment 730 (four reading bands and four bands of \|X\|) for U\*, S+, U-SG, and S (730) |
 | T4 | The shifted-mix bank: the Brier score, the reliability term, and H1 for U\* and S (730), with no bar |
@@ -562,21 +870,21 @@ because every arm was trained with BSP presence masks that are zero in the month
 **Table T2 reads the four scenarios that the `ml-experiment` skill requires of any experiment
 related to load transfers, on the transfer overlay of the test bank.** The scenarios are all rows;
 rows outside a transfer and at least 7 days after one ends; rows inside a transfer; and rows within
-the 7 days after a transfer ends. Each scenario gives the Brier score of P(X<0), the solar error, and
-the step Brier score.
+the 7 days after a transfer ends. Each scenario gives the Brier score of P(X<0), the solar error,
+and the step Brier score.
 
 ## Checks on false alarms and solar output
 
 **H1 reads U\*'s seed-averaged probability of reverse flow on import half-hours where the reading
-decides the sign, pooled and in each of two reading bands.** The probability is averaged over seeds 0
-to 2 before H1 is read, as in C1. On the synthetic import rows with a reading of at
-least 1 MVA, H1 reads the mean P(X<0) and the share of rows with P(X<0) above 0.5, each at most the
-limit. The limit is L = 0.25 s₁ / (1 − s₁), where s₁ is the share of reverse-flow rows among the
-rows in question: the pooled decidable rows, the rows of 1 to 3 MVA, and the rows of 3 MVA and above.
-Each limit is rounded down to two significant figures and written to `limits.json` before any fit.
-The pooled limit must equal experiment 730's 0.0071, because the rows are the same, or the line
-stops at verdict row 0. From experiment 730's printed counts the band limits come to about 0.083
-for 1 to 3 MVA and about 0.0042 for 3 MVA and above.
+decides the sign, pooled and in each of two reading bands.** The probability is averaged over seeds
+0 to 2 before H1 is read, as in C1. On the synthetic import rows with a reading of at least 1 MVA,
+H1 reads the mean P(X<0) and the share of rows with P(X<0) above 0.5, each at most the limit. The
+limit is L = 0.25 s₁ / (1 − s₁), where s₁ is the share of reverse-flow rows among the rows in
+question: the pooled decidable rows, the rows of 1 to 3 MVA, and the rows of 3 MVA and above. Each
+limit is rounded down to two significant figures and written to `limits.json` before any fit. The
+pooled limit must equal experiment 730's 0.0071, because the rows are the same, or the line stops at
+verdict row 0. From experiment 730's printed counts the band limits come to about 0.083 for 1 to 3
+MVA and about 0.0042 for 3 MVA and above.
 
 **H1 is read by band because experiment 730's advice says that a pooled mean can hide a higher
 mean in the band of 1 to 3 MVA.** That band holds 4% of the decidable import rows and most of
@@ -617,12 +925,40 @@ of the solar zenith angle is an input, so a head can learn zero at night from th
 a head that ignores the CAMS index passes the monotonicity bar. The response bar closes the second
 gap on synthetic days, and the real checks P1 (night) and P3 (the sky) carry the physical test.
 
-**The transfer output has its own verdict word, read from C5 and one bar.** The word is "works" when
-C5 is a gain and U\*'s F1 at a threshold of 0.5 on transfer steps of 5 points and more is at least
-0.6; "no better than the rule" when C5's interval includes zero; "worse than the rule" when C5 is a
-loss; and "works only in Brier score" when C5 is a gain and the F1 bar fails. The word is `void` if
-the reachability count of transfer steps falls short. The transfer word changes no verdict row,
-because the transfer generator is new and has no realism gate.
+**Four reading words sit beside the verdict, and none changes a verdict row.** The verdict rests on
+the sign alone, the maintainer's first question.
+
+- **The solar word** answers whether the network does a reasonable job of disaggregating the solar
+  output. The word is "reasonable" when all five solar bars pass; "partly" when the recovery bar and
+  C4 pass and another bar fails; and "not shown" otherwise. C2, the gain of the contrastive terms,
+  is printed beside the word with its own reading word.
+- **The transfer word** answers whether the neural network detects load transfers. The word is
+  "works" when C5 is a gain and U\*'s F1 at a threshold of 0.5 on transfer steps of 5 points and
+  more is at least 0.6; "works only in Brier score" when C5 is a gain and the F1 bar fails; "no
+  better than the rule" when C5's interval includes zero; and "worse than the rule" when C5 is a
+  loss. The word is `void` if the reachability count of transfer steps falls short. The transfer
+  generator is new and has no realism gate, so the word describes the synthetic world only.
+- **The neighbour word,** printed beside the transfer word, answers whether the neural network
+  needs the neighbours to detect load transfers. The word is "the neighbours help" when C8 is a
+  gain, "no detectable difference" when C8's interval includes zero, and "the neighbours hurt" when
+  C8 is a loss. R16 says on which partner case the difference sits.
+- **The BSP word** answers whether the BSP steps help the neural network tell the direction of D8's
+  flow. The word is "helps" when C7 is a gain, "no detectable difference" when C7's interval
+  includes zero, and "hurts" when C7 is a loss. R17 and table T5 are printed beside the word,
+  because the BSP channel of an injected window copies the injection scaled by β.
+
+**The detectability statement says how large a transfer must be for U\* to find it, in D8's noise
+units.** A size band of table T6 is called detectable when U\*'s recall at a threshold of 0.5 in
+the band is at least 0.5 with a precision of at least 0.5 over the whole transfer overlay. The
+statement names the smallest detectable band, for U\* and for U-N. The plan expects the bands
+under 4 noise units not to be detectable with or without the neighbours, as experiments 55 and 58
+found for step detectors, and expects the bands of 4 noise units and more to be detectable. The
+noise unit here is a 2-hour step of the reading, and the noise unit of experiments 55, 58, and 70
+is a 24-hour step of a residual, so the figure of 4 is a prediction and no bar.
+
+**No claim is made outside the drawn ranges.** The generator draws sizes of 3 to 40 points (0.3 to
+4.2 MW) and durations of 1 hour to 4 days. A transfer longer than the 48-hour window shows at most
+one of its edges in a window.
 
 **The sign calibration bar and the detection bar of experiment 730 are reported for U\* and every
 arm, with no verdict role.** They are the reliability term of P(X<0) outside the dead band (at most
@@ -640,31 +976,33 @@ import half-hours is not usable however well the solar head scores.
 
 | Row | Condition | Verdict |
 |---|---|---|
-| 0 | The line stops before C1 is read: the manager halts it; a bank digest differs from experiment 730's; experiment 730's stored predictions or `margin.json` differ from their recorded digests; the recomputed pooled limit differs from 0.0071; the training share of reverse flow differs from experiment 730's by more than 10%; an overlay component check fails, a month lacks sibling pairs for more than 5% of its windows, or a reachability count is short; a gallery panel does not show what the written list requires; the timing projection exceeds the stop line and the manager declines; or a review gate has not passed when a fit would start | Stopped, no verdict (`inconclusive` in the front matter) |
-| 1 | A correctness check fails: a leakage assertion below, the row count, row-key digest, or Brier canary of experiment 730's stored predictions, or a known-answer unit test of the Brier score, the overlays, the re-fold, the injection pairing, the contrastive terms, the stop-gradient, the masks, or the bootstrap | `invalid` |
+| 0 | The line stops before C1 is read: the manager halts it; a bank digest differs from experiment 730's; experiment 730's stored predictions or `margin.json` differ from their recorded digests; the recomputed pooled limit differs from 0.0071; the training share of reverse flow differs from experiment 730's by more than 10%; the neighbour table covers less than 90% of the base-day half-hours for a neighbour; an overlay component check fails (the mirror check included), a month lacks sibling pairs for more than 5% of its windows, or a reachability count is short; a gallery panel does not show what the written list requires; the timing projection exceeds the stop line and the manager declines; or a review gate has not passed when a fit would start | Stopped, no verdict (`inconclusive` in the front matter) |
+| 1 | A correctness check fails: a leakage assertion below, the row count, row-key digest, or Brier canary of experiment 730's stored predictions, or a known-answer unit test of the Brier score, the overlays, the re-fold, the mirror, the injection pairing, the contrastive terms, the stop-gradient, the masks, or the bootstrap | `invalid` |
 | 2 | A fit that a counted reading needs raised and was not rerun under the rerun rule | `failed` |
 | 3 | For U\*, H1 pooled or H1 at 3 MVA and above fails, H2 fails, or the band of 1 to 3 MVA is above its limit with B13's lower end above zero; the row names the check that failed | `not supported` |
-| 4 | NI, the five solar bars pass, and C2 is a gain | `supported` |
-| 5 | NI and the five solar bars pass, and C2 is not a gain | `partly supported` |
-| 6 | NI, and at least one solar bar fails | `not supported` |
-| 7 | C1's upper end above +m and its lower end at or below zero | `inconclusive` |
-| 8 | Every other case (C1's lower end above zero and its upper end above +m) | `not supported` |
+| 4 | NI | `supported` |
+| 5 | C1's upper end above +m and its lower end at or below zero | `inconclusive` |
+| 6 | Every other case (C1's lower end above zero and its upper end above +m) | `not supported` |
 
-**Every row from 3 to 8 prints C6 (U\* minus S+) and R4 (S+ minus S) beside the verdict word, and
+**Every row from 3 to 6 prints C6 (U\* minus S+) and R4 (S+ minus S) beside the verdict word, and
 says which of the two carries a change in the sign.** A change that sits in R4 comes from this
-experiment's training windows (the transfer overlay), and a change that sits in C6 comes from the
-extra heads. Row 3 also names the failed check, so that a fail in the band of 1 to 3 MVA cannot hide
-a solar head that passed its bars.
+experiment's training windows and inputs (the transfer overlay and the neighbour channels), and a
+change that sits in C6 comes from the extra heads. C1's own reading word says whether the extra
+tasks improve the sign ("gain"), leave it unchanged, or worsen it. Row 3 also names the failed
+check, and the solar, transfer, neighbour, and BSP words are printed under every row, so that a fail
+in the band of 1 to 3 MVA cannot hide a solar head or a transfer head that worked.
 
 **NI allows a detectable loss smaller than m, and the write-up says so when it happens.** If C1's
 lower end is above zero while its upper end is at most +m, the sign is detectably worse, by less
-than the spread between seeds of experiment 730's S, and the verdict word follows rows 4 to 6 with
-that sentence beside it.
+than the spread between seeds of experiment 730's S, and the verdict word follows row 4 with that
+sentence beside it.
 
-**A failed report-only fit leaves the verdict untouched.** A missing seed of U-SG or U\*-L makes its
-readings `void`. A rerun is the same attempt only when a fit raised, or a check that reads no bar
-failed, the fix changes no constant, and the Opus reviewer confirms the fix. `inconclusive` and
-`not supported` are never rerun.
+**A failed report-only fit leaves the verdict untouched.** A missing seed of U-SG, U-NCw, or U\*-L
+makes its readings `void`, and a missing seed of U-N or U-noBSP makes C8 or C7 and its reading word
+`void`. C7 and the BSP word are also `void` when the two BSP test months hold fewer than 200
+reverse-flow half-hours. No `void` reading changes a verdict row. A rerun is the same attempt only
+when a fit raised, or a check that reads no bar failed, the fix changes no constant, and the Opus
+reviewer confirms the fix. `inconclusive` and `not supported` are never rerun.
 
 ## Real-data checks
 
@@ -700,7 +1038,10 @@ reported as passes, fails, or void.
   the log holds no time), and the number of flagged steps per day on held-out pre-engine days with
   no logged closure. K3 is `void` with fewer than 10 logged edges at D8 on days with a reading. The
   logs may miss transfers, so the false-step rate is an upper bound, and the hit rate counts only
-  logged events.
+  logged events. K3 is read for U\*, U-N, and B-TN, so that the real neighbours' own mirrors of
+  real transfers show whether the neighbour channels help on real days as well. Experiment 159
+  found that D8's logged multi-day drops did not clearly look like transfers to D3, D14, or D5, so
+  K3 may show no gain from the neighbours on real days whatever C8 shows on synthetic days.
 
 **The real checks publish correlations, ratios, shares, and pass or fail words, never a solar level
 of a real era.** The solar output on a real solar-era day estimates the output of a metered
@@ -714,7 +1055,14 @@ pass or fail word only.
 experiments 729 and 730 on the banks run unchanged, and these are added:
 
 - The solar target, the step targets, δ, T, and the base demand are target rows only, and no input
-  channel of any window equals any of them.
+  channel of any window equals any of them; no neighbour channel carries a sign, because every
+  neighbour enters folded.
+- A neighbour series changes only by the mirror of a transfer whose drawn partner it is, and never
+  by the engine, the solar output, or δ, which sit below D8 alone.
+- Wherever a hidden span sets D8's reading and its mask to zero, all four channels of every
+  neighbour are zero too, so the sign-aligned change never carries the sign of a hidden step.
+- The four noise units are computed from the training base days alone, and `limits.json` holds
+  them before any fit.
 - No output feeds an input or another output; a unit test changes the solar, step, and size heads'
   weights and checks that the sign logits do not change.
 - In U-SG, a unit test checks that the solar, step, and size losses give zero gradient on every
@@ -727,8 +1075,8 @@ experiments 729 and 730 on the banks run unchanged, and these are added:
   of experiment 730 are read only after their row count, row-key digest, and Brier canary pass.
 - No choice of this experiment reads a test score: B-T is fitted on the validation overlay, and the
   fits stop on validation, before the first-test-score marker exists.
-- `limits.json` is written from the test bank's truth alone, before any fit, and is older than every
-  fit record.
+- `limits.json` is written from the test bank's truth (the harm limits) and the training base days
+  (the noise units) alone, before any fit, and is older than every fit record.
 - No input reads the month or the day of the year.
 
 ## Compute, stop line, and gates
@@ -739,57 +1087,64 @@ least 25 GB available at launch (the `available` column of `free -g`), with the 
 with `MemoryMax=14G` (and `SLOT_MEM=14G`), `MemorySwapMax=0`, `OOMPolicy=continue`, and
 `AllowedCPUs=16-21`, under `taskset`, with one thread for every numerical library. The wrapper
 refuses to start a GPU command while a 716 or 717 scorer or an F7 job runs, while another process of
-this experiment holds the GPU, while the GPU lacks 6 GB, while less than 25 GB is available, or while
-the load is 24 or above. The fits run one at a time. The overlay, scoring, bootstrap, and real stages
-may run up to 6 single-threaded workers on the CPU.
+this experiment holds the GPU, while the GPU lacks 6 GB, while less than 25 GB is available, or
+while the load is 24 or above. The fits run one at a time. The overlay, scoring, bootstrap, and real
+stages may run up to 6 single-threaded workers on the CPU.
 
-**The plan has 18 fits: 6 arms with seeds 0 to 2.** The projection uses experiment 730's measured
-times (`scores/timing.json` projected 5.49 GPU-process-hours at the cap for its 59 fits, and the
-fits took 1.48 hours in total). Experiment 730's U-net with an auxiliary output took 0.54 seconds
-an epoch of 8,000 windows, its sign-only U-net 0.42 seconds, and its bidirectional LSTM 0.70
-seconds. A pair doubles the forward passes and a triple triples them.
+**The plan has 24 fits: 8 arms with seeds 0 to 2.** The projection uses experiment 730's measured
+times. Experiment 730's `scores/timing.json` projected 5.49 GPU-process-hours at the cap for its
+59 fits, with a peak resident memory of 6.19 GB against the cap of 14 GB, and the fits took 1.48
+hours in total. Experiment 730's U-net with an auxiliary output took 0.54 seconds an epoch of
+8,000 windows, its sign-only U-net 0.42 seconds, and its bidirectional LSTM 0.70 seconds. A pair
+doubles the forward passes and a triple triples them.
 
 | Work | Fits | Seconds an epoch | Hours at the cap of 300 epochs |
 |---|---|---|---|
-| U\* and U-SG, U-net, triples | 6 | 1.6 | 0.81 |
+| U\*, U-SG, U-N, and U-noBSP, U-net, triples | 12 | 1.6 | 1.60 |
 | U-NC and U-NCw, U-net, pairs | 6 | 1.1 | 0.55 |
 | S+, U-net, plain windows | 3 | 0.45 | 0.11 |
 | U\*-L, bidirectional LSTM, triples | 3 | 2.1 | 0.53 |
-| Inference: validation, plain test, three injection overlays (and the same with the BSP channel hidden), transfer overlay, raised-sky overlay, shifted bank, and real days | | | 0.25 |
+| Inference: validation, plain test, three injection overlays (and the same with the BSP channel hidden), transfer overlay, raised-sky overlay, shifted bank, and real days | | | 0.3 |
 | Timing gate | | | 0.05 |
-| Total | | | about 2.3 |
+| Total | | | about 3.1 |
 
 **An early stop near 140 epochs, where experiment 730's U-net fits stopped, halves the projection
-to about 1.2 GPU-process-hours.** The stop line is 16 GPU-process-hours, the brief's default, and
-the projection at the cap is 13.7 hours below it. **The timing gate runs before the first fit:** 5
-epochs each of U\*, U-NC, S+, U-SG, and U\*-L, recording the seconds an epoch (with the overlay and
-pair building on one CPU thread inside the measured time), the seconds per epoch of the pair
-building alone, the peak GPU memory (at most 6
-GB), and the peak resident memory (at most 14 GB). It projects every fit at its own measured rate,
-and a projection above 16 hours at the cap stops the line and goes to the manager.
+to about 1.6 GPU-process-hours.** The stop line is 16 GPU-process-hours, the brief's default, and
+the projection at the cap is 12.9 hours below the stop line. The 12 neighbour channels widen the
+U-net's first layer only, and the timing gate measures what that costs. **The timing gate runs
+before the first fit:** 5 epochs each of U\*, U-N, U-NC, S+, U-SG, and U\*-L, recording the seconds
+an epoch (with the overlay, the mirror, and the pair building on one CPU thread inside the measured
+time), the seconds per epoch of the pair building alone, the peak GPU memory (at most 6 GB), and
+the peak resident memory (at most 14 GB). The gate projects every fit at its own measured rate
+(U-noBSP at U\*'s rate, and U-NCw at U-NC's), and a projection above 16 hours at the cap stops the
+line and goes to the manager.
 
 **The CPU work is about 2 hours of wall time on the 6 cores.** The overlays and their component
 checks take under 20 minutes, the gallery under 20 minutes, B-T under 5 minutes, the scoring and the
-bootstrap of 20,000 resamples over 6 counted and 13 report-only readings about 1 hour, and the real
+bootstrap of 20,000 resamples over 8 counted and 21 report-only readings about 1.5 hours, the
+neighbour table and the noise units under 10 minutes, and the real
 checks and figures under 30 minutes.
 
 **The gates run in the maintainer's order.**
 
-1. This Opus plan, then a Sonnet plan review.
+1. This Opus plan, then a Sonnet plan review, then an Opus review of the revised plan.
 2. Sonnet code, then a fresh Opus code review before any first run, and a review of the fixes.
 3. A real-file smoke test of every script that reads a file the synthetic-array tests do not: the
    switching logs (for K3's edges with their times), experiment 730's banks, `margin.json`,
    `limits.json`, and stored predictions (digests, row count, row-key digest, and the Brier canary),
-   the sibling selection of the contrastive pairs on the stored training bank of seed 0, and the
+   the sibling selection of the contrastive pairs on the stored training bank of seed 0, the
+   neighbours' cleaned power through `e00722_data.load_power` (coverage per neighbour and per
+   split, the four noise units, and the share of half-hours on which D5's and D14's signed power
+   is negative), the mirror check on the stored validation bank, and the
    real-day inputs of H2, K1, K2, and P1 to P4 through experiment 730's loaders. The smoke test also
    runs experiment 729's `tests/smoke_real_files.py`.
 4. The banks digest check, the limits, the overlays, and their component checks, on the CPU.
-5. The synthetic world gallery G10 to G17, drawn from the overlays. The session that runs the
-   experiment checks each panel against the written list in `e00732_core.py` and records the result
-   in `PRIVATE/gallery/panel_check.json`.
+5. The synthetic world gallery G10 to G20, drawn from the overlays and the neighbour table. The
+   session that runs the experiment checks each panel against the written list in `e00732_core.py`
+   and records the result in `PRIVATE/gallery/panel_check.json`.
 6. The plan goes to the manager, with the gallery's folder, before any run of a fit, and a "fits
    starting" line to the manager carries the projection and the cores before each family of fits
-   (the timing gate, U\* and U-NC, U-NCw and S+, U-SG, U\*-L).
+   (the timing gate, S+ and U\*, U-N and U-noBSP, U-NC and U-NCw, U-SG, U\*-L).
 
 **The first fit starts only after every gate above has passed.** Every fitted neural network is
 saved in this experiment's data folder as its state file.
@@ -807,7 +1162,7 @@ load-transfer scenarios apply, in table T2, and the load-transfer event plots ap
 planned"; D8 is metered in MVA only, so the two metering groups that the skill names cannot both be
 shown.
 
-**The plan follows ten items of earlier advice and departs from none.**
+**The plan follows fifteen items of earlier advice and departs from none.**
 
 - It uses experiment 730's sign-only U-net S as the reference (730), and answers that advice's
   question of why a shared auxiliary output hurt the sign with three readings: the loss weights set
@@ -822,14 +1177,31 @@ shown.
   the night bar over night half-hours, and the solar error over sun-up half-hours.
 - It asks of every overlay whether the overlay actually changes the windows (729), in the component
   checks.
+- It reads a step at D8 as a transfer only together with the neighbours' own steps (159), through
+  the mirror in the generator, the neighbour channels, and B-TN.
+- It tests the detector on solar-shaped transfers as well as on constant transfers (162).
+- It builds the step rules from step statistics in noise units, never from hourly residuals (67).
+- It does not let a fixed list of interconnected Primaries stand for every partner (43): 40% of
+  the drawn transfers have a partner that the neural network does not read.
+- It sign-aligns every neighbour cue and takes each step from a reference level of its own (714
+  and 709).
 - It retries the contrastive term at a smaller weight with the same function in both passes (624).
 - It judges recovery against an injection in the target's own units (624), so a recovery below 1 is
   an error of the neural network and not a scaling convention.
 
 ## Decisions that need the maintainer
 
-**None: the plan spends nothing, calls no large language model on substation data, adds no data
-source or download, and changes no threshold after data are seen.**
+**None, as planned: the plan spends nothing, calls no large language model on substation data, adds
+no data source or download, and changes no threshold after data are seen.** The neighbours' series
+come from the cleaned power table already stored. Two cases would become decisions for the
+maintainer, and the line stops at verdict row 0 in the first:
+
+- **The neighbour table covers less than 90% of the base-day half-hours for a neighbour.** A fresh
+  export of that neighbour's series is a new data source.
+- **The maintainer wants the transfer generator fitted to real transfers.** The ranges of size,
+  duration, shape, and partner are wide guesses, and a fit to NGED's switching logs for the
+  Primaries under BSP A would be a new use of a data source. The plan does not need that fit, and
+  the transfer word is limited to the synthetic world without it.
 
 ## Anonymisation
 
@@ -840,8 +1212,10 @@ drawn capacity, so it appears only in aggregate panels and aggregate rows, and e
 from S1, including any extra injection drawn from an S1 segment, stays in the private
 `PRIVATE/gallery/` folder. The real solar output below D8 appears only as the correlations, ratios,
 shares, and pass or fail words of P1 to P4. The metered engine record enters only as K1, K2, and P4
-aggregates. K3 prints counts and shares, never a date of a closure. The test and validation months
-follow the rule of experiment 729, and the month list stays in experiment 729's private
+aggregates. K3 prints counts and shares, never a date of a closure. D3, D5, and D14 are substations,
+so their readings may be drawn; the gallery draws each as a multiple of its own median on an axis of
+hours with no calendar date, and names no generator in their service areas. The test and validation
+months follow the rule of experiment 729, and the month list stays in experiment 729's private
 `PRIVATE/splits.md`. Printed output holds counts, shares, flags, and scores only.
 
 ## Synthetic world gallery
@@ -851,7 +1225,8 @@ the panels of experiment 730's generators are already drawn from the same banks.
 drew panels G1 to G9 from the banks that this experiment reads, after the sky-gap repair, and the
 design lead of experiment 730 checked every panel. The banks are digest-pinned, so the panels below
 show the engine, the solar sources, the BSP meter, the fold, the base days, and the masks of this
-experiment's windows as well. The new overlays get panels G10 to G17, drawn before any fit.
+experiment's windows as well. The new overlays and the neighbour table get panels G10 to G20,
+drawn before any fit.
 
 ### G1: engine days, from experiment 730
 
@@ -909,16 +1284,16 @@ its bar.
 
 ![G9: the component checks against their bar and bounds](../00730-msa-d8-sign-detector-with-demand-head-and-masking/gallery_g9_components.svg)
 
-### G10 to G17: the new overlays, drawn before any fit
+### G10 to G20: the new overlays and the neighbours, drawn before any fit
 
-**The figures stage draws the new panels from the test and validation overlays and the training
-overlay of seed 0, on the CPU, before any fit.** Every window carries hours from the start of day 1
-on its axis and no calendar date, every panel is a small multiple of 3 draws from different
-segments, and every published window comes from an engine-only, S2, or no-injection segment. The
-written list in `e00732_core.py` says what each panel must show:
+**The figures stage draws the new panels from the test and validation overlays, the training overlay
+of seed 0, and the neighbour table, on the CPU, before any fit.** Every window carries hours from
+the start of day 1 on its axis and no calendar date, every panel is a small multiple of 3 draws from
+different segments, and every published window comes from an engine-only, S2, or no-injection
+segment. The written list in `e00732_core.py` says what each panel must show:
 
-- **G10, load transfers.** Four panels: a transfer that adds load on an import day, inside BSP A
-  (the truth, the reading, and the base demand step up and back, and the BSP steps stay flat); a
+- **G10, load transfers at D8.** Four panels: a transfer that adds load on an import day, inside BSP
+  A (the truth, the reading, and the base demand step up and back, and the BSP steps stay flat); a
   transfer that removes load during an S2 solar spell (the reverse flow deepens, and the reading
   folds at the new crossings); a transfer to a Primary under another BSP (the BSP steps mark both
   edges); and a transfer of 2 days or more in a 5-day window. Each edge is marked, and a partial
@@ -943,9 +1318,26 @@ written list in `e00732_core.py` says what each panel must show:
   with no month name, the share of windows with a sibling pair, against the bound of 95%.
 - **G17, pairs built from source S1.** The G11 panels for extra injections drawn from S1 segments,
   written to the private `PRIVATE/gallery/` folder only.
+- **G18, D8 and the neighbours together, before and after a transfer.** Four panels of 3 draws
+  each: a transfer whose partner is D3, one whose partner is D5, one whose partner is D14, and one
+  whose partner the neural network does not read. Each draw shows, on one time axis, D8's truth and
+  reading and the three neighbours' series before the fold and their folded channels, each without
+  the overlay (a thin line) and with the overlay (a thick line), with both edges marked. The
+  partner's series moves by the opposite of D8's change, the other two neighbours' lines lie on top
+  of their originals, and in the fourth panel no neighbour moves. Each neighbour's series is drawn
+  as a multiple of its own median, with no axis in MW.
+- **G19, the three transfer shapes.** For a constant, a demand-shaped, and a solar-shaped transfer
+  of the same T₀: the transferred load T against time with the line of T₀, D8's truth, the
+  partner's series, and the solar target, which is unchanged in all three.
+- **G20, the neighbour table and the noise units.** The coverage of each neighbour per month index,
+  against the bound of 90%; the histogram of the drawn sizes in D8's noise units for the training
+  overlay of seed 0 and the test overlay, with a line at 4 noise units; and, per partner, the
+  mirror check's mean change of the partner against minus the mean of T, with the line of
+  equality.
 
 **The gallery passes when each panel shows what the list requires,** for example that every G10
-transfer changes the truth by the drawn size, that every G11 pair's re-folded reading equals the
+transfer changes the truth by the drawn size, that every G18 mirror is equal and opposite at the
+drawn partner and absent elsewhere, that every G11 pair's re-folded reading equals the
 original where δ is zero, that every G12 raised index is above the original on every raisable
 half-hour, and that every G14 histogram lies inside its range. A panel that fails stops the line at
 verdict row 0. The maintainer reads the same panels in the write-up.
@@ -957,12 +1349,14 @@ the metered farms, and real series as aggregates only.** No figure shows the met
 a K1 or K2 day, a date of the engine, a date of a closure, or any level or shape of the real solar
 output below D8.
 
-**The write-up carries the published gallery (G1 to G16) and these result figures:**
+**The write-up carries the published gallery (G1 to G16 and G18 to G20) and these result
+figures:**
 
 1. The Brier score of P(X<0) of every arm and of S (730) on all, import, and reverse-flow rows and
    by reading band, as staggered dots on striped rows (`dot_chart` of experiment 700), each arm in
    its own colour or with its name on the axis.
-2. The 6 counted contrasts with their intervals, the margin m, and zero.
+2. The 8 counted contrasts with their intervals, the margin m, and zero, grouped by the
+   maintainer's four questions.
 3. H1 pooled and by band for every arm, against the three limits.
 4. Reliability diagrams of P(X<0) for U\*, S+, U-SG, and S (730).
 5. The solar error by world type and source for U\*, U-NC, U-SG, U\*-L, B-PV1, and B-PV2.
@@ -970,22 +1364,27 @@ output below D8.
    recovery, for U\* and U-NC.
 7. The night output, the monotonicity violations, and the response to the sky for U\* and U-NC,
    and table T5's recovery by tercile of β and with the BSP channel hidden.
-8. The transfer step: precision and recall against the threshold for U\* and B-T, and the step-size
-   error against the true size.
+8. The transfer step: precision and recall against the threshold for U\*, U-N, B-TN, and B-T; the
+   recall of the same four by size in D8's noise units, with a line at 4 noise units, and by shape
+   and partner case (T6, R16, and R19); and the step-size error against the true size.
 9. The four load-transfer scenarios of T2.
 10. The real-data checks P1 to P4 and K3, as shares, correlations, and pass or fail words by era;
     a breakdown by UTC hour appears only for the night half-hours and for the pre-engine era, and
     no figure shows a level of the real solar output.
 11. The training curves: the training loss and the validation loss against the epoch for each of
-    the six fitted arms, with the epoch of the stored state file marked, drawn for seed 0 of each
-    arm (the full set of 18 fits would crowd the panels; seeds 1 and 2 go to the private folder),
+    the eight fitted arms, with the epoch of the stored state file marked, drawn for seed 0 of each
+    arm (the full set of 24 fits would crowd the panels; seeds 1 and 2 go to the private folder),
     with one panel per arm and the per-term validation losses of the solar head beside the sum.
     The figure reads the stored loss histories only, so it adds no GPU time and no fit.
+12. The BSP input: C7, R14, R17, and R18 with their intervals, and the number of half-hours behind
+    each.
 
 **At least 16 time series figures show single 48-hour windows, each picked by a fixed rule.** Each
 figure shows, in a top row, the signed truth, the reading, and the base demand; in a second row, the
 solar target and U\*'s solar output (with U-NC's); in a third row, P(X<0) of U\*, S+, and S (730);
-and in a fourth row, the true transfer edges and U\*'s step probability. Hidden spans are shaded and
+and in a fourth row, the true transfer edges and the step probability of U\* and of U-N. The
+load-transfer windows add a fifth row with the three neighbours' folded readings, each as a
+multiple of its own median. Hidden spans are shaded and
 no calendar date appears. Windows whose solar output comes from source S1 go to the private folder,
 and each rule draws from S2 and engine-only segments for the published figure:
 
@@ -1003,6 +1402,9 @@ and each rule draws from S2 and engine-only segments for the published figure:
   transfer, two that add load, two that remove load, one inside a solar spell, and one at a
   partner under another BSP, each showing how P(X<0), the solar output, and the step probability
   respond.
+- W22 to W25: a solar-shaped transfer with a mirror, a solar-shaped transfer without a mirror, the
+  mirrored transfer with U\*'s largest gain over U-N in the step Brier score, and the transfer of
+  at least 4 noise units that U\* misses by the widest margin.
 - W20 and W21: two real pre-engine windows around a logged closure at D8, the reading and U\*'s
   step probability only, with no date, if K3 is not void.
 
@@ -1022,8 +1424,20 @@ and each rule draws from S2 and engine-only segments for the published figure:
   what the neural network learned.
 - **Every arm stops early on the validation Brier score of the sign,** so that C1 compares two arms
   stopped by the same rule.
-- **The transfer output gets its own verdict word,** because the transfer generator is new and has
+- **The transfer output gets its own reading word,** because the transfer generator is new and has
   no realism gate.
+- **The verdict rests on the sign alone,** so one comparison decides the verdict and the solar,
+  transfer, neighbour, and BSP readings cannot hide behind it or change it.
+- **The neighbours enter folded, with their own masks, and hidden with D8's reading,** so the rule
+  that the neural network learns could apply at a Primary whose neighbours are metered in MVA.
+- **The mirror is exact for 60% of the transfers and absent for 40%,** because real transfers often,
+  and not always, show a mirror at a metered neighbour.
+- **The solar target ignores the rooftop solar panels of a transferred block,** because the target
+  is the solar output below D8 in its normal arrangement.
+- **C7 reads the two test months that the BSP meter covers,** because the BSP input is empty
+  elsewhere.
+- **The transfer bars stay in points and the detectability statement is in noise units,** because
+  the bars must be fixed before the noise units are computed from data.
 
 ## Method
 
@@ -1033,12 +1447,15 @@ and each rule draws from S2 and engine-only segments for the published figure:
   clear-sky irradiance, solar zenith cosine, and CAMS mask at D8, the synthetic BSP steps and their
   mask, the local half-hour, day of week, bank-holiday flag, and the coincident ERA5 temperature, 10
   m wind speed, and precipitation) over a 48-hour window, on experiment 729's U-net.
+- U\* also reads 12 neighbour channels: for each of D3, D5, and D14, the folded reading divided by
+  the neighbour's median, its half-hour change, that change times the sign of D8's change of
+  reading, and a presence mask.
 - U\* outputs, at each half-hour of the middle 24 hours, a sign logit, a non-negative solar output
   in points, a transfer-step logit, and a step size, each a linear layer on the U-net's last hidden
   layer.
 - U-SG differs only by a stop-gradient between the backbone and the solar, step, and size heads,
-  U-NC and U-NCw differ in the loss only, S+ has the sign output only, and U\*-L uses experiment
-  729's bidirectional LSTM.
+  U-NC and U-NCw differ in the loss only, S+ has the sign output only, U-N reads no neighbour
+  channel, U-noBSP reads no BSP channel, and U\*-L uses experiment 729's bidirectional LSTM.
 - No arm reads the month or the day of the year, and no arm reads weather issued at a forecast
   origin.
 
@@ -1047,6 +1464,11 @@ and each rule draws from S2 and engine-only segments for the published figure:
 - The training windows come from experiment 730's training banks (32 segment draws per training
   month, seeds 0 to 2), with this experiment's load-transfer overlay drawn once per seed and an
   extra solar injection drawn for every window and epoch.
+- The load transfers are synthetic: 0 to 6 per 30 days, 1 hour to 4 days long, 3 to 40 points in
+  mean size, constant (60%), demand-shaped (20%), or solar-shaped (20%), and mirrored at D3, D5, or
+  D14 in 60% of draws.
+- The neighbours' readings are the real cleaned readings of D3, D5, and D14 on each base day, with
+  D5 and D14 folded to a magnitude.
 - The loss is the sign cross-entropy on the plain member plus the step cross-entropy plus 0.02
   times each of the solar Huber loss, the size Huber loss, the injection term, the night term, and
   the monotone term; U-NC drops the last three, U-NCw drops them and gives the solar Huber loss a
@@ -1062,16 +1484,20 @@ and each rule draws from S2 and engine-only segments for the published figure:
 
 - The sign and the solar output are scored on experiment 730's 94,080 test half-hours, the
   injection recovery and the monotonicity on this experiment's fixed test overlays of the same
-  windows, and the transfer steps on the transfer overlay.
+  windows, the transfer steps on the transfer overlay, and the BSP contrast on the two test months
+  that the BSP meter covers.
+- The baselines are experiment 730's stored S for the sign, the rules B-PV1 and B-PV2 for the solar
+  output, and the logistic regressions B-TN and B-T for the transfer steps.
 - The metrics, the two-way bootstrap, the Kish widening, the margin, the contrasts, the harm checks,
   the bars, the real checks, and the verdict table are in the sections above.
 - Every table reports the normalised mean absolute error of the median beside its own metrics.
 
 ## Files
 
-**The code imports the merged modules of experiments 729 and 730 unchanged and adds modules for the
-overlays, the heads, the losses, the baselines, and the scores.** `e00732_paths.py` puts the folders
-of experiments 730 and 729 and their imports on `sys.path`. No file of an earlier experiment is
+**The code imports the merged modules of experiments 722, 729, and 730 unchanged and adds modules
+for the neighbours, the overlays, the heads, the losses, the baselines, and the scores.**
+`e00732_paths.py` puts the folders of experiments 730, 729, and 722 and their imports on
+`sys.path`. No file of an earlier experiment is
 edited.
 
 **Reused unchanged from
@@ -1087,15 +1513,25 @@ harm, detection, and calibration readings, and the contrasts), `e00730_real.py` 
 the Kish numbers), `e00729_baselines.py` (the B1 cells), `e00729_data.py` (the loaders and the
 switching logs), and `tests/smoke_real_files.py`.
 
+**Reused unchanged from `ml-experiments/00722-msa-mva-bsp-closure-and-fast-hint/`:**
+`e00722_data.py` (`load_power`, which reads the cleaned power table and refuses rows on or after
+2026-07-01) and `e00722_core.py` (the labels of the children of BSP A).
+
 **New in `ml-experiments/00732-msa-d8-untangling-network-synthetic-injections/`:**
 
 - `e00732_paths.py`: the data folder, the read-only folders of experiments 729 and 730, thread
   pinning, and the sibling folders.
 - `e00732_core.py`: every named constant and bar on this page, the transfer ranges, the loss
   weights, the arms, the gallery's written list, and the verdict rule.
-- `e00732_overlays.py`: the load-transfer generator, the re-fold, the contrastive pairing of extra
-  solar from sibling segments, the raised sky, the overlay digests, and the component checks.
-- `e00732_arms.py`: the arm specifications (U\*, U-NC, U-NCw, S+, U-SG, and U\*-L), the target stack
+- `e00732_neighbours.py`: the neighbour table of D3, D5, and D14 on D8's base calendar, read
+  through `e00722_data.load_power`; the coverage gate; the fold of D5 and D14; the scaling by each
+  neighbour's median; the four noise units; and the 12 neighbour channels with their shared hidden
+  spans.
+- `e00732_overlays.py`: the load-transfer generator with its three shapes, its donor rule, and its
+  mirror at the partner; the re-fold; the contrastive pairing of extra solar from sibling segments;
+  the raised sky; the overlay digests; and the component checks, the mirror check included.
+- `e00732_arms.py`: the arm specifications (U\*, U-NC, U-NCw, S+, U-SG, U\*-L, U-N, and U-noBSP),
+  the target stack
   (sign truth, solar target, step events, step sizes), and the batch builder of pairs and triples
   with shared hidden spans.
 - `e00732_nets.py`: the four heads on experiment 729's backbones, the softplus solar output, and the
@@ -1103,17 +1539,20 @@ switching logs), and `tests/smoke_real_files.py`.
 - `e00732_losses.py`: the seven loss terms and their weights.
 - `e00732_train.py`: the fit loop, the per-epoch loss history of every term (training and
   validation) written to each fit JSON, the timing gate, and the fit schedule.
-- `e00732_baselines.py`: B-PV1, B-PV2 from experiment 730's stored predictions, and B-T.
+- `e00732_baselines.py`: B-PV1, B-PV2 from experiment 730's stored predictions, and the step
+  rules B-T and B-TN with their step statistics in noise units.
 - `e00732_score.py`: the solar error, the recovery, the night and monotonicity readings, the step
-  metrics, the load-transfer scenarios, and the contrasts.
+  metrics by size in noise units, shape, and partner, the load-transfer scenarios, the BSP readings
+  on the BSP test months, the four reading words, and the contrasts.
 - `e00732_real.py`: P1 to P4 and K3, with H2, K1, and K2 through experiment 730's functions.
 - `e00732_leakage.py`: the new assertions of verdict row 1.
 - `e00732_gallery.py`, `e00732_figures.py`, `e00732_series_figures.py`, `e00732_report.py`,
-  `e00732_stages.py`, `e00732_cli.py`, and `run.sh`: the gallery panels G10 to G17, the result
+  `e00732_stages.py`, `e00732_cli.py`, and `run.sh`: the gallery panels G10 to G20, the result
   figures (the training curves of figure 11 drawn from the stored fit JSONs), the time series
   figures, the printed report, the stage orchestration, the command line, and the launch wrapper.
 - `tests/`: tests on synthetic arrays only, including known-answer tests of the re-fold, the
-  transfer overlay, the pairing, the contrastive terms, and the stop-gradient, an end-to-end run of
+  transfer overlay, the mirror check (which must fail on a silent mirror and on a mirror at the
+  wrong neighbour), the pairing, the contrastive terms, and the stop-gradient, an end-to-end run of
   the stages with tiny fits on the CPU, and `smoke_real_files.py`; the tests that need `torch` skip
   in CI.
 
@@ -1126,11 +1565,13 @@ switching logs), and `tests/smoke_real_files.py`.
 - `data/ml-experiments/00729-msa-d8-neural-untangler-synthetic-known-answers/PRIVATE/splits.md`:
   read only, the month lists of [experiment
   729](../00729-msa-d8-neural-untangler-synthetic-known-answers/result.md).
+- The cleaned power of D3, D5, and D14: read through experiment 722's `load_power` for the
+  neighbour table.
 - D8's cleaned reading, the BSP A meter, experiment 39's frame of CAMS fields and temperature at D8,
   the metered engine record from experiment 194's window table, and the switching logs: read through
   experiment 729's loaders for the real-day checks.
 - `data/ml-experiments/00732-msa-d8-untangling-network-synthetic-injections/`: written. It will hold
-  `limits.json`, `overlays/` (the test and validation overlays and `summary.json` with their digests
-  and component checks), `gallery/` and `PRIVATE/gallery/`, `networks/`, `fits/` (one JSON per
-  fit, with its loss history and stored epoch), `predictions/`,
-  `scores/`, `verdict.json`, and the run logs.
+  `limits.json` (the harm limits and the four noise units), `neighbours/table.parquet`, `overlays/`
+  (the test and validation overlays and `summary.json` with their digests and component checks),
+  `gallery/` and `PRIVATE/gallery/`, `networks/`, `fits/` (one JSON per fit, with its loss history
+  and stored epoch), `predictions/`, `scores/`, `verdict.json`, and the run logs.
