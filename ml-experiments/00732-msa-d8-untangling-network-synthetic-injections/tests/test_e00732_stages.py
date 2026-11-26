@@ -611,6 +611,8 @@ def test_the_series_and_figures_stages_draw_windows_and_the_contrast_chart(
     assert list((root / "figures" / "series").glob("series_W*.svg"))
     pairs = [n for n in ("W9", "W10", "W11") if n in result["drawn"]]
     assert pairs or {"W9", "W10", "W11"} <= set(result["no_window"])
+    # a window that was drawn is not listed as missing
+    assert not set(pairs) & set(result["no_window"])
     assert {"W24", "W25"} <= set(result["no_window"])  # no real window without K3
     assert not next(iter((root / "figures" / "series").glob("*.svg"))).read_text().count("2022-")
     report.stage_figures(root=root, root730=root730, env=env, base=world["base"], log=print)

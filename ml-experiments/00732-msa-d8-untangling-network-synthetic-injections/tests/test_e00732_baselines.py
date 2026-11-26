@@ -224,6 +224,22 @@ def test_the_step_features_come_out_in_noise_units_with_the_daily_shape_removed(
     assert float(np.nanmax(stat / u["D8"])) == pytest.approx(1.0)
 
 
+def test_step_features_stay_finite_where_the_banks_hold_a_nan_cosine_of_the_zenith_angle(
+    world: World,
+) -> None:
+    """The real banks hold NaN cosines on padding days and on a few half-hours of other days."""
+    series = world.steps[0]
+    cosz = series.cosz.copy()
+    cosz[0, :] = np.nan
+    cosz[1, 5:9] = np.nan
+    stats = bl.step_statistics(series=series, scales=world.scales)
+    for neighbours in (False, True):
+        f = bl.step_features(stats=stats, cosz=cosz, neighbours=neighbours)
+        assert np.isfinite(f).all()
+        assert (f[0, :, 3] == 0).all()
+        assert (f[1, 5:9, 3] == 0).all()
+
+
 def test_weekend_flags_follow_the_calendar() -> None:
     dates = np.arange(np.datetime64("2022-03-04"), np.datetime64("2022-03-10"))  # Fri to Wed
     flags = bl.weekend_flags(dates=dates, holidays=np.array([np.datetime64("2022-03-07")]))

@@ -448,7 +448,8 @@ def step_features(*, stats: StepStatistics, cosz: np.ndarray, neighbours: bool) 
     """Return B-T's (or B-TN's) inputs `(n, 48, F)` from step statistics in noise units.
 
     A missing statistic (NaN) gives 0 in its inputs. Where the BSP meter has no data, the two BSP
-    inputs are 0.
+    inputs are 0. A half-hour whose cosine of the zenith angle is NaN (the real banks hold NaN on
+    padding days and on a few half-hours of other days) counts as sun down, so its `cosz` input is 0.
 
     Args:
         stats: The step statistics.
@@ -460,7 +461,7 @@ def step_features(*, stats: StepStatistics, cosz: np.ndarray, neighbours: bool) 
     """
     s8 = np.nan_to_num(stats.d8, nan=0.0)
     sb = np.nan_to_num(stats.bsp, nan=0.0)
-    columns = [np.abs(s8), np.abs(sb), np.abs(s8 - sb), cosz]
+    columns = [np.abs(s8), np.abs(sb), np.abs(s8 - sb), np.nan_to_num(cosz, nan=0.0)]
     if neighbours:
         sign = np.sign(s8)
         aligned = np.stack(

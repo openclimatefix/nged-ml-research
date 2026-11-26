@@ -1022,6 +1022,7 @@ def stage_series(
         drawn += drawn_pair
         if not drawn_pair:
             missing.append(name)
+    missing = [name for name in missing if name not in drawn]
     log(f"series: drawn {len(drawn)} windows; no window fits {sorted(set(missing))}")
     return {"drawn": sorted(set(drawn)), "no_window": sorted(set(missing))}
 
