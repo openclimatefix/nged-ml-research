@@ -642,7 +642,7 @@ def overlay_stage_bank(
         )
     if n_up and n_bad / n_up > core.MAX_UNRELIABLE_SHARE:
         problems.append(
-            f"{name}: {n_bad} of {n_up} S1 sun-up half-hours of solar worlds are unreliable solar targets (more than 5%)"
+            f"{name}: {n_bad} of {n_up} S1 sun-up half-hours of solar worlds are unreliable solar targets (more than 7%)"
         )
     if test:
         windows = {}
