@@ -15,6 +15,7 @@ Every published window comes from an engine-only, S2, or no-injection segment, a
 drawn as a multiple of its own median.
 """
 
+import itertools
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -46,6 +47,8 @@ HIDDEN_FILL: Final = "#BBBBBB"
 PRIVATE_SUBFOLDER: Final = "gallery"
 PANEL_FILE: Final = "panel_check.json"
 AUTO_FILE: Final = "auto_check.json"
+PAIR_ORDER_SEED: Final = 732_011
+"""Seeds the order in which G11 and G17 visit their candidate windows (the same order at every amount)."""
 N_DRAWS: Final = 3
 """Each panel shows this many draws, from different segments."""
 TOL: Final = 1e-3
@@ -173,9 +176,12 @@ def lines_chart(
     )
 
 
-def stack(*, charts: Sequence[alt.TopLevelMixin], title: str) -> alt.VConcatChart:
-    """Stack panels vertically under one title."""
-    return alt.vconcat(*charts, title=alt.TitleParams(title, anchor="start")).resolve_scale(  # ty: ignore[invalid-argument-type]
+def stack(
+    *, charts: Sequence[alt.TopLevelMixin], title: str, subtitle: str | Sequence[str] = ""
+) -> alt.VConcatChart:
+    """Stack panels vertically under one title, and an optional subtitle of one or more lines."""
+    head = alt.TitleParams(title, anchor="start", subtitle=subtitle or alt.Undefined)
+    return alt.vconcat(*charts, title=head).resolve_scale(  # ty: ignore[invalid-argument-type]
         color="independent", size="independent"
     )
 
@@ -386,6 +392,13 @@ def check_g10(*, wins: Sequence[Win], expect_bsp_moves: bool | None, min_days: i
     return True
 
 
+BASE_LABEL: Final = "base demand with the transfer, before generation"
+G10_SUBTITLE: Final = (
+    "Import is positive. A transfer that adds load lifts the thick truth line above the thin one by the load added; one that removes load lowers it.",
+    "The truth also holds the engine and solar output, which lowers it below the base demand line by the generation.",
+)
+
+
 def g10_charts(*, wins: Sequence[Win], title: str, n_days: int) -> alt.VConcatChart:
     """Return a panel of draws: the truth with and without the overlay, and the base demand.
 
@@ -397,9 +410,10 @@ def g10_charts(*, wins: Sequence[Win], title: str, n_days: int) -> alt.VConcatCh
         top = lines_chart(
             series={
                 "truth without the transfer": w.x0, "truth with the transfer": w.x1,
-                "reading": w.r1, "base demand": w.base1,
+                "reading": w.r1, BASE_LABEL: w.base1,
             },
             widths={"truth without the transfer": 0.8, "truth with the transfer": 2.2},
+            colours={"truth without the transfer": SKY, "truth with the transfer": BLUE},
             title=f"Draw {k + 1}: D8 (dotted: transfer edges)", rules=rules, n_days=n_days,
         )  # fmt: skip
         d = np.concatenate([[0.0], np.diff(np.nan_to_num(w.bsp1, nan=0.0))])
@@ -410,7 +424,7 @@ def g10_charts(*, wins: Sequence[Win], title: str, n_days: int) -> alt.VConcatCh
             title="The BSP meter's half-hour steps", rules=rules, height=70, n_days=n_days,
         )  # fmt: skip
         charts += [top, bottom]
-    return stack(charts=charts, title=title)
+    return stack(charts=charts, title=title, subtitle=G10_SUBTITLE)
 
 
 def panel_g10(
@@ -491,7 +505,12 @@ def pair_windows(
     *, segments: Sequence[sim729.Segment], overlays: Sequence[ov.TransferOverlay] | None,
     index: ov.PairIndex, amount: float, source: str, public: bool, n: int = N_DRAWS,
 ) -> list[PairWin]:  # fmt: skip
-    """Return up to `n` pair windows of different segments, with a sibling of the given source.
+    """Return up to `n` pair windows with a sibling of the given source.
+
+    The windows differ in segment, in calendar day, and in sibling. Segments of one bank share a
+    calendar, so taking the first candidates would give the same day and the same sibling shape to
+    every draw. The candidates are visited in a fixed pseudo-random order instead, which is the same
+    for every amount.
 
     Args:
         segments: The bank's stored segments (the plain window).
@@ -507,7 +526,12 @@ def pair_windows(
     """
     out: list[PairWin] = []
     used: set[int] = set()
-    for (i, d), sibs in sorted(index.siblings.items()):
+    days: set[int] = set()
+    siblings: set[int] = set()
+    candidates = sorted(index.siblings.items())
+    order = np.random.default_rng(PAIR_ORDER_SEED).permutation(len(candidates))
+    for k in order:
+        (i, d), sibs = candidates[int(k)]
         seg = segments[i]
         if i in used or d < 1 or (public and not publishable(seg=seg)):
             continue
@@ -519,9 +543,12 @@ def pair_windows(
         cols = window_cols(day=d)
         if cols.start < 0 or cols.stop > seg.x.size or seg.cal_index[d] < 0:
             continue
+        if int(seg.cal_index[d]) in days or pick[0] in siblings:
+            continue
         delta97 = ov.window_delta(index=index, sibling=pick[0], amount=amount, day=d)
         delta = delta97[1:].astype(np.float64)
-        if not (delta > 0).any():
+        sun_up = seg.cosz.reshape(-1)[cols] > core.NIGHT_COSZ
+        if not (delta > 0).any() or (delta[~sun_up] > 0).any():
             continue
         x = seg.x.reshape(-1)[cols].astype(np.float64)
         q = ov.reactive_floor(seg=seg).reshape(-1)[cols]
@@ -538,6 +565,8 @@ def pair_windows(
             )
         )  # fmt: skip
         used.add(i)
+        days.add(int(seg.cal_index[d]))
+        siblings.add(pick[0])
         if len(out) == n:
             break
     return out
@@ -547,10 +576,13 @@ def check_pairs(*, pairs: Sequence[PairWin]) -> bool:
     """Check one pair panel: delta is above zero somewhere and only on sun-up half-hours.
 
     The truth drops by delta there. The re-folded reading equals the original where delta is zero
-    and differs where it is not.
+    and differs where it is not. No two draws may share one injection or one truth.
     """
     if not pairs:
         return False
+    for a, b in itertools.combinations(pairs, 2):
+        if np.array_equal(a.delta, b.delta) or np.array_equal(a.x0, b.x0, equal_nan=True):
+            return False
     for p in pairs:
         active = p.delta > 0.0
         if not active.any() or (active & ~(p.cosz > core.NIGHT_COSZ)).any():
@@ -963,11 +995,11 @@ def panel_g14(
     table = settled_table(overlays_by_name=overlays_by_name)
     ok = check_g14(params=params, table=table)
     ranges = {
-        "per_30_days": (core.TRANSFER_RATE_TRAIN[0], core.TRANSFER_RATE_TRAIN[1]),
+        "drawn_rate": (core.TRANSFER_RATE_TRAIN[0], core.TRANSFER_RATE_TRAIN[1]),
         "hours": core.TRANSFER_HOURS, "points": core.TRANSFER_POINTS,
     }  # fmt: skip
     charts = [
-        histogram_chart(values={n: p["per_30_days"] for n, p in params.items()}, bounds=ranges["per_30_days"], title="Transfers per 30 days of each segment (rules: the registered range)", x_title="Transfers per 30 days"),
+        histogram_chart(values={n: p["drawn_rate"] for n, p in params.items()}, bounds=ranges["drawn_rate"], title="Drawn transfer rate of each segment (rules: the registered range)", x_title="Transfers per 30 days"),
         histogram_chart(values={n: p["hours"] for n, p in params.items()}, bounds=ranges["hours"], title="Duration of a transfer", x_title="Hours", log=True),
         histogram_chart(values={n: p["points"] for n, p in params.items()}, bounds=ranges["points"], title="Settled size T0 after the donor rule", x_title="Points of capacity", log=True),
         histogram_chart(values={n: p["under_bsp_a"] for n, p in params.items()}, bounds=(0.0, 1.0), title="Partner under BSP A (1) or under another BSP (0); registered share 0.8", x_title="Under BSP A"),
@@ -1518,6 +1550,8 @@ def panel_g20(
         for n, vs in coverage.items()
         for k, v in enumerate(vs)
     ]
+    lowest = min(float(r["share"]) for r in cov_rows)  # ty: ignore[invalid-argument-type]
+    coverage_floor = min(0.5, float(np.floor(lowest * 10.0) / 10.0))
     cov = (
         alt.Chart(pl.DataFrame(cov_rows))  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, aria=False)
@@ -1526,7 +1560,7 @@ def panel_g20(
             y=alt.Y(
                 "share:Q",
                 title="Coverage of D8's present half-hours",
-                scale=alt.Scale(domain=[0.5, 1.0]),
+                scale=alt.Scale(domain=[coverage_floor, 1.0]),
             ),
             color=alt.Color(
                 "neighbour:N",
@@ -1635,6 +1669,13 @@ class Tensor:
     no_bsp: np.ndarray
 
 
+def bsp_step_outside(*, x: np.ndarray, hidden: np.ndarray) -> bool:
+    """Return whether a window shows the BSP meter: a non-zero step with its mask set, outside the hidden span."""
+    step = np.abs(x[arms.ROW["d_bsp"]]) > 0.0
+    present = x[arms.ROW["bsp_mask"]] > 0.5
+    return bool((step & present & ~hidden).any())
+
+
 def build_tensor(
     *, prepared: Sequence[arms.Prepared], index: ov.PairIndex, rng_seed: int = 0
 ) -> Tensor | None:
@@ -1642,12 +1683,13 @@ def build_tensor(
 
     The function builds the same window for U-N and U-noBSP.
 
-    The window comes from an engine-only or no-injection segment (never a metered farm), with a sibling of
-    source S2 and an edge of a transfer that a read neighbour mirrors, outside the hidden span.
+    The window comes from an engine-only or no-injection segment (never a metered farm) that has a
+    BSP meter (only 1 segment in 7 does), with a sibling of source S2, an edge of a transfer that a
+    read neighbour mirrors outside the hidden span, and a BSP step outside the hidden span.
     """
     full = arms.eval_spec(inject=True, raised=True)
     for p in prepared:
-        if p.world in ov.SOLAR_WORLDS:
+        if p.world in ov.SOLAR_WORLDS or not p.has_bsp:
             continue
         days = {int(x) for x in p.days}
         for tr in p.transfers:
@@ -1700,7 +1742,11 @@ def build_tensor(
                     delta=delta,
                     eps=core.TEST_EPS,
                 )
-                if trip.xi is None or trip.xc is None:
+                if (
+                    trip.xi is None
+                    or trip.xc is None
+                    or not bsp_step_outside(x=trip.x, hidden=hidden)
+                ):
                     continue
                 return Tensor(
                     trip.x, trip.xi, trip.xc, hidden, delta, edges, tr.partner, un.x, nobsp.x
@@ -1749,8 +1795,23 @@ def check_g21(*, t: Tensor | None) -> bool:
     if not np.array_equal(t.no_neighbours, t.plain[: arms.N_BASE]):
         return False
     bsp_rows = [arms.ROW["d_bsp"], arms.ROW["bsp_mask"]]
+    if not bsp_step_outside(x=t.plain, hidden=h):
+        return False
     rest = np.setdiff1d(np.arange(arms.N_CHANNELS), bsp_rows)
     return bool(np.array_equal(t.no_bsp[rest], t.plain[rest]) and not t.no_bsp[bsp_rows].any())
+
+
+def variant_chart(
+    *, t: Tensor, label: str, window: np.ndarray, row: int, rules: Sequence[float]
+) -> alt.LayerChart | alt.Chart:
+    """Return one channel of a variant window drawn over the same channel of U*."""
+    short = label.split(":", maxsplit=1)[0]
+    return lines_chart(
+        series={"U*": t.plain[row], short: window[row]},
+        widths={"U*": 2.2, short: 1.0},
+        title=f"{label}: {arms.ALL_NAMES[row]}",
+        rules=rules, hidden=t.hidden, y_title=arms.ALL_NAMES[row], height=44,
+    )  # fmt: skip
 
 
 def tensor_charts(*, t: Tensor) -> dict[str, alt.TopLevelMixin]:
@@ -1775,30 +1836,39 @@ def tensor_charts(*, t: Tensor) -> dict[str, alt.TopLevelMixin]:
                 height=44,
             )
         )
+    subtitle = (
+        "The extra injection comes from a sibling of source S2 (a published farm, never a metered one).",
+        "The window comes from a segment with a BSP meter, so the BSP step is not flat.",
+    )
     first = stack(
         charts=panels,
         title="G21: every input channel of one training window w, its injected member w+, and its raised-sky member w^c (grey: hidden span; dotted: transfer edges; ticks: half-hours with an injection)",
+        subtitle=subtitle,
     )
     variants = []
+    absent = np.zeros((arms.N_CHANNELS - t.no_neighbours.shape[0], t.no_neighbours.shape[1]))
     for label, window in (
-        ("U-N: no neighbour channel", t.no_neighbours),
+        (
+            "U-N: the neighbour channels are absent (drawn as zero)",
+            np.concatenate([t.no_neighbours, absent]),
+        ),
         ("U-noBSP: the BSP step and its mask are zero", t.no_bsp),
     ):
-        for row in (
+        rows = (
             arms.ROW["r"],
             arms.ROW["d_bsp"],
             arms.ROW["bsp_mask"],
             *(arms.NB_ROW[f"{n}_change"] for n in nb.NEIGHBOURS),
-        ):
-            if row >= window.shape[0]:
-                continue
-            variants.append(
-                lines_chart(series={"U*": t.plain[row], label.split(":")[0]: window[row]}, widths={"U*": 2.2, label.split(":")[0]: 1.0}, title=f"{label}: {arms.ALL_NAMES[row]}", rules=rules, hidden=t.hidden, y_title=arms.ALL_NAMES[row], height=44)
-            )  # fmt: skip
+        )
+        variants.extend(
+            variant_chart(t=t, label=label, window=window, row=row, rules=rules) for row in rows
+        )
     return {
         "g21_tensor": first,
         "g21_variants": stack(
-            charts=variants, title="G21: the same window as built for U-N and U-noBSP against U*"
+            charts=variants,
+            title="G21: the same window as built for U-N and U-noBSP against U*",
+            subtitle=subtitle,
         ),
     }
 

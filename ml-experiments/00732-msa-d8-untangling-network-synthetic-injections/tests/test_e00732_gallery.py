@@ -2,6 +2,7 @@
 """Tests of the gallery panels: each check passes on a sound bank and fails when a component is silent."""
 
 import dataclasses
+import itertools
 import json
 from typing import NamedTuple
 
@@ -240,3 +241,70 @@ def test_no_panel_names_a_calendar_date(world: World) -> None:
     assert "temporal" not in text
     assert "T00:00" not in text
     assert "2022-" not in text
+
+
+def test_g11_draws_differ_and_the_same_windows_recur_at_each_amount(world: World) -> None:
+    def draw(amount: float) -> list[g.PairWin]:
+        return g.pair_windows(
+            segments=world.segs, overlays=None, index=world.index_s2, amount=amount,
+            source="S2", public=True,
+        )  # fmt: skip
+
+    small, large = draw(5.0), draw(50.0)
+    assert len(small) == len(large) >= 2
+    for a, b in itertools.combinations(small, 2):
+        assert not np.array_equal(a.x0, b.x0, equal_nan=True)
+        assert not np.array_equal(a.delta / 5.0, b.delta / 5.0)
+    for a, b in zip(small, large, strict=True):
+        assert np.array_equal(a.x0, b.x0, equal_nan=True)
+    twin = [dataclasses.replace(small[0]), dataclasses.replace(small[0]), *small[1:]]
+    assert not g.check_pairs(pairs=twin)
+
+
+def test_g21_window_shows_a_bsp_step_and_draws_the_neighbours_absent_from_u_n(world: World) -> None:
+    tensor = g.build_tensor(prepared=world.prepared, index=world.train_index)
+    assert tensor is not None
+    assert g.bsp_step_outside(x=tensor.plain, hidden=tensor.hidden)
+    assert not g.bsp_step_outside(x=tensor.no_bsp, hidden=tensor.hidden)
+    flat = tensor.plain.copy()
+    flat[[arms.ROW["d_bsp"], arms.ROW["bsp_mask"]]] = 0.0
+    assert not g.check_g21(t=dataclasses.replace(tensor, plain=flat))
+    spec = json.dumps(g.tensor_charts(t=tensor)["g21_variants"].to_dict())
+    assert "sibling of source S2" in spec
+    for name in nb.NEIGHBOURS:
+        assert f"{name}_change" in spec
+
+
+def test_g10_truth_lines_have_distinct_colours_and_the_sign_is_explained(world: World) -> None:
+    wins = g.choose_windows(overlays=world.test, originals=world.segs, keep=lambda o, tr: True)
+    spec = g.g10_charts(wins=wins, title="t", n_days=2).to_dict()
+    text = json.dumps(spec)
+    assert "Import is positive" in text
+    scale = spec["vconcat"][0]["layer"][-2]["encoding"]["color"]["scale"]
+    colours = dict(zip(scale["domain"], scale["range"], strict=True))
+    assert colours["truth without the transfer"] != colours["truth with the transfer"]
+
+
+def test_g14_histogram_draws_the_registered_rate_not_the_realised_count(world: World) -> None:
+    for overlays in (world.train, world.test):
+        p = g.parameter_arrays(overlays=overlays)
+        lo, hi = core.TRANSFER_RATE_TRAIN
+        assert p["drawn_rate"].min() >= lo - 1e-9
+        assert p["drawn_rate"].max() <= hi + 1e-9
+
+
+def test_g20_coverage_axis_reaches_the_lowest_monthly_coverage(world: World) -> None:
+    thin = {
+        **world.series,
+        "D14": np.where(
+            np.arange(world.series["D14"].shape[0])[:, None] < 40, np.nan, world.series["D14"]
+        ),
+    }
+    charts, _, _ = g.panel_g20(
+        base_dates=world.cal.dates, reading=world.cal.reading, arrays=thin,
+        overlays_by_name={"train seed 0": world.train, "test": world.test}, noise_d8=5.0,
+    )  # fmt: skip
+    text = json.dumps({k: v.to_dict() for k, v in charts.items()})
+    cov = g.monthly_coverage(base_dates=world.cal.dates, reading=world.cal.reading, arrays=thin)
+    lowest = min(float(v.min()) for v in cov.values())
+    assert f'"domain": [{min(0.5, float(np.floor(lowest * 10) / 10))}, 1.0]' in text
