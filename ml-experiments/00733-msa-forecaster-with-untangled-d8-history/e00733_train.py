@@ -5,9 +5,9 @@ Two loops share the batch and loss helpers:
 
 - `train_stage`: stages 2 and 3 of experiment 713's recipe on the real folds, copied from experiment
   716's `e00716_train.py` (the batch, the parameter groups, and the clip differ). The parameters of M*
-  keep 713's groups, the warm-up, and a clip of 1.0 over them; the new parameters (`u_*`) form their own
-  groups with no warm-up, their own clip of 1.0, a gain at 3e-3 without weight decay, and every other
-  new parameter at 2e-3. The two mask draws hide the channels of the age-2 row and part of the age-3
+  keep 713's groups, the warm-up, and a clip of 1.0 over them; the new parameters (`u_*`) form
+  their own groups with no warm-up, their own clip of 1.0, a gain at 3e-3 without weight decay,
+  and every other new parameter at 2e-3. The two mask draws hide the channels of the age-2 row and part of the age-3
   row on 10% of training samples, and of ages 2 to 5 on another 10%.
 - `train_synthetic`: one stage on the synthetic forecasting world: AdamW at 5e-4 with weight decay
   1e-3, batch 256, gradient clip 1.0, at most 80 passes with a patience of 20 on the validation loss,
@@ -47,7 +47,10 @@ VALIDATION_LEADS_SYNTHETIC: Final = (1, 3, 6, 9)
 
 
 def to_numpy(*, tensor: torch.Tensor) -> np.ndarray:
-    """Return a tensor as a NumPy array: detach, move to the host, then convert (a CUDA tensor cannot be converted directly)."""
+    """Return a tensor as a NumPy array: detach, move to the host, then convert.
+
+    A CUDA tensor cannot be converted directly.
+    """
     return tensor.detach().cpu().numpy()
 
 
@@ -99,7 +102,11 @@ class UntAssembled:
 
 
 def day_start_us(*, c_idx: np.ndarray) -> np.ndarray:
-    """Return 00:00 UTC of the origin's day in microseconds (the latest valid time that the plan's example row prints for the other target-row columns)."""
+    """Return 00:00 UTC of the origin's day in microseconds.
+
+    This is the latest valid time that the plan's example row prints for the other target-row
+    columns.
+    """
     stamp = lay.GRID_START_US + np.asarray(c_idx, dtype=np.int64) * lay.STEP_US
     return stamp // lay.DAY_US * lay.DAY_US
 
@@ -174,7 +181,10 @@ class UntSource:
 
 
 def check_batch(*, batch: UntAssembled) -> None:
-    """Run the per-batch assertions: the origin-time weather of every target token, the history order, and the channel ranges.
+    """Run the per-batch assertions.
+
+    The assertions cover the origin-time weather of every target token, the history order, and the
+    channel ranges.
 
     Args:
         batch: The assembled batch.
@@ -206,7 +216,10 @@ def batch_for(
     dropout: tuple[np.ndarray, np.ndarray] | None = None,
     masks: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> UntAssembled:  # fmt: skip
-    """Assemble the batch of `samples[index]` at lead days `lead` (`dropout` is 713's pair, `masks` the channel masks)."""
+    """Assemble the batch of `samples[index]` at lead days `lead`.
+
+    `dropout` is experiment 713's pair, and `masks` are the channel masks.
+    """
     dev = source.device
 
     def to(a: np.ndarray) -> torch.Tensor:
@@ -272,7 +285,10 @@ def param_groups(
 
 
 def split_params(*, optimiser: torch.optim.Optimizer, net: torch.nn.Module) -> tuple[list, list]:
-    """Return the trunk's parameters in `net.parameters()` order and the new parameters (each clipped on its own)."""
+    """Return the trunk's parameters in `net.parameters()` order and the new parameters.
+
+    Each group is clipped on its own.
+    """
     is_trunk = {id(p) for g in optimiser.param_groups if g["trunk"] for p in g["params"]}
     trunk = [p for p in net.parameters() if id(p) in is_trunk]
     new = [p for g in optimiser.param_groups if not g["trunk"] for p in g["params"]]
@@ -282,12 +298,18 @@ def split_params(*, optimiser: torch.optim.Optimizer, net: torch.nn.Module) -> t
 def dropout_masks(
     *, seed: int, stage: int, epoch: int, batch: int, n: int
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the two channel mask draws of one batch (experiment 733's own generator, never the global torch stream)."""
+    """Return the two channel mask draws of one batch.
+
+    The draws use experiment 733's own generator, never the global torch stream.
+    """
     return inputs.dropout_masks(seed=seed, stage=stage, epoch=epoch, batch=batch, n=n)
 
 
 def calibration_batches(*, samples: object, source: UntSource, cut: int):  # noqa: ANN201
-    """Yield the training samples' `UntInputs` in batches (no mask, lead day `index mod 14`), to set the path's scale `r`."""
+    """Yield the training samples' `UntInputs` in batches, to set the path's scale `r`.
+
+    The batches carry no mask and use lead day `index mod 14`.
+    """
     train_idx = np.nonzero(~samples.is_val)[0]  # ty: ignore[unresolved-attribute]
     for start in range(0, len(train_idx), tr.BATCH * 2):
         sel = train_idx[start : start + tr.BATCH * 2]
@@ -298,7 +320,10 @@ def calibration_batches(*, samples: object, source: UntSource, cut: int):  # noq
 def validation_loss(
     *, net: model.UntangledNet, source: UntSource, samples: object, cut: int
 ) -> float:
-    """Return the unweighted mixture negative log-likelihood on the held-out (sample, lead day) pairs, with no mask."""
+    """Return the unweighted mixture negative log-likelihood on the held-out pairs, with no mask.
+
+    The pairs are (sample, lead day).
+    """
     net.eval()
     idx = np.nonzero(samples.is_val)[0]  # ty: ignore[unresolved-attribute]
     total, count = 0.0, 0
@@ -465,7 +490,10 @@ def synthetic_validation(
     *, net: model.UntangledNet, segments: Sequence[sy.SegmentArrays], index: sy.SampleIndex,
     d8_index: int, target_std: float, mode: str, device: str, batch_size: int = 256,
 ) -> tuple[float, float, float]:  # fmt: skip
-    """Return the validation loss, its mixture part, and its sign part, on the samples at the validation lead days."""
+    """Return the validation loss, its mixture part, and its sign part.
+
+    The samples are those at the validation lead days.
+    """
     net.eval()
     rows = np.flatnonzero(np.isin(index.lead_index, np.asarray(VALIDATION_LEADS_SYNTHETIC)))
     tot = nll = bce = 0.0
@@ -502,7 +530,9 @@ def train_synthetic(
     batch_size: int = core.SYNTHETIC_BATCH,
     max_steps: int | None = None,
 ) -> History:  # fmt: skip
-    """Train the synthetic forecaster in place (one stage) and leave it at the state of the best validation loss.
+    """Train the synthetic forecaster in place (one stage).
+
+    The network is left at the state of the best validation loss.
 
     The loop trains the whole network from the random start of `net`, with the channel masks of the
     real folds applied to the channels only, and stops on the validation bank. No test row is read.
