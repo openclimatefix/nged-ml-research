@@ -1,0 +1,269 @@
+# ruff: noqa: E501
+"""Experiment 732: one fit, the stored predictions of a fit, the timing gate, and the chain runner (torch).
+
+A fit stores its record (`fits/<name>.json`, with the per-epoch history of every loss term), its best
+weights (`networks/<name>.pt`), and its predictions on every set a scoring needs
+(`predictions/<name>/*.npz`). Every array is flat on the valid half-hours in experiment 729's `Rows`
+order (the overlay sets are `(P, 48)` arrays cut to the valid half-hours).
+"""
+
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import e00732_paths  # noqa: F401
+
+# isort: split
+import e00729_banks as banks729
+import e00729_train as train729
+import e00730_banks as banks730
+import e00730_train as train730
+import e00732_arms as arms
+import e00732_core as core
+import e00732_leakage as leak
+import e00732_nets as nets
+import e00732_overlays as ov
+import e00732_stages as stages
+import e00732_train as train
+import e00732_truth as truth
+import numpy as np
+import torch
+
+Log = stages.Log
+
+
+@dataclass
+class Sets:
+    """The prepared sets of one fit.
+
+    Attributes:
+        train: The training bank with its transfer overlay.
+        index: The training bank's pair index.
+        val_plain: The validation bank, plain.
+        val_transfer: The validation bank with its transfer overlay.
+        val_index: The validation bank's pair index.
+    """
+
+    train: list[arms.Prepared]
+    index: ov.PairIndex
+    val_plain: list[arms.Prepared]
+    val_transfer: list[arms.Prepared]
+    val_index: ov.PairIndex
+
+
+def load_sets(*, root730: Path, env: stages.Env, seed: int) -> Sets:
+    """Build the prepared training and validation sets of one seed (from experiment 730's banks, read only)."""
+    tr = banks729.load_bank(path=banks730.bank_path(root=root730, kind="train", seed=seed))
+    va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
+    return Sets(
+        train=arms.prepare(overlays=ov.overlay_segments(segments=tr.segments, kind="train", seed=seed), holidays=env.holidays, stats=env.stats),
+        index=ov.build_pair_index(segments=tr.segments),
+        val_plain=arms.prepare_plain(segments=va.segments, holidays=env.holidays, stats=env.stats),
+        val_transfer=arms.prepare(overlays=ov.overlay_segments(segments=va.segments, kind="validation"), holidays=env.holidays, stats=env.stats),
+        val_index=ov.build_pair_index(segments=va.segments),
+    )  # fmt: skip
+
+
+def assert_fit_inputs(*, spec: core.ArmSpec732, sets: Sets, seed: int) -> None:
+    """Run the plan's input leakage assertions on one training batch of the arm (verdict row 1 on a failure)."""
+    leak.assert_arm_weights(arm=spec.name)
+    leak.assert_no_month_or_day_of_year()
+    rng = np.random.default_rng(seed)
+    picks = arms.sample_picks(prepared=sets.train, n=64, rng=rng)
+    b = arms.make_batch(prepared=sets.train, picks=picks, spec=spec, rng=rng, index=sets.index if spec.inject else None)
+    leak.assert_inputs_not_targets(windows=b.x, targets=b.t, delta=b.delta)
+    if b.xi is not None:
+        leak.assert_inputs_not_targets(windows=b.xi, targets=b.ti, delta=b.delta)  # ty: ignore[invalid-argument-type]
+    if (b.keeps[:, arms.K["sign"]] > 0.5).sum() == 0:
+        msg = "the sign term reads no half-hour of a training batch"
+        raise leak.CorrectnessFailureError(msg)
+
+
+def assert_net_checks(*, net: nets.Net, spec: core.ArmSpec732, x: torch.Tensor) -> None:
+    """Check, on the fitted network, that the sign logits ignore the extra heads and (U-SG) that the extra losses do not reach the backbone."""
+    if net.extra is None:
+        return
+    net.eval()
+    with torch.no_grad():
+        before = net(x)[:, 0].clone().numpy()
+        saved = {k: v.clone() for k, v in net.extra.state_dict().items()}
+        for p in net.extra.parameters():
+            p.add_(1.0)
+        after = net(x)[:, 0].numpy()
+        net.extra.load_state_dict(saved)
+    leak.assert_sign_ignores_the_extra_heads(sign_before=before, sign_after=after)
+    if spec.stop_gradient:
+        net.zero_grad()
+        net(x)[:, 1:].sum().backward()
+        grads = [float(p.grad.abs().sum()) if p.grad is not None else 0.0 for p in net.backbone.parameters()]
+        net.zero_grad()
+        leak.assert_stop_gradient_blocks_backbone(backbone_grad_sums=grads)
+
+
+def store_set(*, folder: Path, name: str, pred: train.Predictions, tr: truth.Truth, member: str = "plain") -> None:
+    """Store one member of a prediction set, flat on the valid half-hours."""
+    arrays = getattr(pred, member)
+    flat = {k: tr.flat(values=v) for k, v in arrays.items()}
+    train729.save_predictions(arrays=flat, path=folder / f"{name}.npz")
+
+
+def store_predictions(*, root: Path, root730: Path, name: str, net: nets.Net, spec: core.ArmSpec732, device: str, env: stages.Env, sets: Sets) -> None:
+    """Store a fit's outputs on the validation, test, transfer, injection, raised-sky, shifted, and real sets."""
+    folder = root / "predictions" / name
+    te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
+    sh = banks729.load_bank(path=banks730.bank_path(root=root730, kind="shifted"))
+    test_plain = arms.prepare_plain(segments=te.segments, holidays=env.holidays, stats=env.stats)
+    test_transfer = arms.prepare(overlays=ov.overlay_segments(segments=te.segments, kind="test"), holidays=env.holidays, stats=env.stats)
+    test_index = ov.build_pair_index(segments=te.segments)
+    shifted = arms.prepare_plain(segments=sh.segments, holidays=env.holidays, stats=env.stats)
+    for name_, prep in (("validation", sets.val_plain), ("test", test_plain), ("shifted", shifted)):
+        pred = train.predict(net=net, prepared=prep, device=device, extra_heads=spec.heads)
+        store_set(folder=folder, name=name_, pred=pred, tr=truth.truth(prepared=prep))
+    pred = train.predict(net=net, prepared=test_transfer, device=device, extra_heads=spec.heads)
+    store_set(folder=folder, name="test_transfer", pred=pred, tr=truth.truth(prepared=test_transfer))
+    if spec.heads:
+        for hide in (False, True):
+            for a in core.TEST_INJECTION_POINTS:
+                pred = train.predict(net=net, prepared=test_plain, device=device, index=test_index, amount=a, hide_bsp=hide)
+                store_set(folder=folder, name=f"test_inj_{a:g}{'_nobsp' if hide else ''}", pred=pred, tr=truth.truth(prepared=test_plain, index=test_index, amount=a), member="inj")
+        pred = train.predict(net=net, prepared=test_plain, device=device, eps=core.TEST_EPS)
+        store_set(folder=folder, name="test_raised", pred=pred, tr=truth.truth(prepared=test_plain, eps=core.TEST_EPS), member="raised")
+    if env.real_sets is not None:
+        for set_name, segments in env.real_sets().items():
+            prep = arms.prepare_plain(segments=segments, holidays=env.holidays, stats=env.stats)
+            pred = train.predict(net=net, prepared=prep, device=device, extra_heads=spec.heads)
+            store_set(folder=folder, name=f"real_{set_name}", pred=pred, tr=truth.truth(prepared=prep))
+
+
+def fit_one(*, root: Path, root730: Path, env: stages.Env, arm: str, seed: int, device: str, log: Log, max_epochs: int = core.MAX_EPOCHS) -> dict:
+    """Fit one network, save it, store its predictions, and write its record (a fit whose record exists is skipped)."""
+    stages.guard_run(root=root, root730=root730, stage="fit")
+    spec = core.ARMS[arm]
+    name = core.job_name(arm=arm, arch=spec.arch, seed=seed)
+    record_path = stages.job_path(root=root, arm=arm, arch=spec.arch, seed=seed)
+    if record_path.exists():
+        return stages.read_json(path=record_path)
+    if device == "cuda":
+        train730.limit_gpu_memory()
+    sets = load_sets(root730=root730, env=env, seed=seed)
+    assert_fit_inputs(spec=spec, sets=sets, seed=seed)
+    net, record = train.fit(
+        spec=spec, seed=seed, train=sets.train, index=sets.index, val_plain=sets.val_plain, val_transfer=sets.val_transfer,
+        device=device, val_index=sets.val_index, max_epochs=max_epochs, out_path=root / "networks" / f"{name}.pt", log=log,
+    )  # fmt: skip
+    probe = torch.from_numpy(np.random.default_rng(seed).normal(size=(2, arms.N_CHANNELS, arms.STEPS)).astype(np.float32)).to(device)
+    assert_net_checks(net=net.to(device), spec=spec, x=probe)
+    store_predictions(root=root, root730=root730, name=name, net=net, spec=spec, device=device, env=env, sets=sets)
+    payload = {**record.as_dict(), "peak_rss_gb": train.peak_rss_gb()}
+    stages.write_json(path=record_path, payload=payload)
+    return payload
+
+
+def run_jobs(*, root: Path, jobs: Sequence[tuple[str, str, int]], run_one: Callable[[str, str, int], dict], log: Log) -> dict[str, int]:
+    """Run fits one at a time; a fit that raises is recorded as failed (verdict row 2 when needed), not rerun, and the run goes on.
+
+    A `CorrectnessFailureError` is never hidden as a failed fit: it propagates (verdict row 1).
+    """
+    counts = {"run": 0, "skipped": 0, "failed": 0}
+    for arm, arch, seed in jobs:
+        record = stages.job_path(root=root, arm=arm, arch=arch, seed=seed)
+        if record.exists():
+            counts["skipped"] += 1
+            continue
+        try:
+            run_one(arm, arch, seed)
+            record.with_suffix(".failed.json").unlink(missing_ok=True)
+            counts["run"] += 1
+        except leak.CorrectnessFailureError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            counts["failed"] += 1
+            stages.write_json(path=record.with_suffix(".failed.json"), payload={"error": type(exc).__name__})
+            log(f"fit {record.stem} failed: {type(exc).__name__}")
+    return counts
+
+
+def stage_timing(*, root: Path, root730: Path, env: stages.Env, device: str, manager_approved: bool, log: Log, epochs: int = core.TIMING_EPOCHS) -> dict:
+    """Run the timing gate: a few epochs of each timed arm, then project every fit, and write `scores/timing.json`.
+
+    Raises:
+        StoppedError: When the projection is over the stop line and the manager has not approved, or the memory is over its cap.
+    """
+    stages.guard_run(root=root, root730=root730, stage="timing")
+    sets = load_sets(root730=root730, env=env, seed=0)
+    secs, pair_secs, peak_gpu = {}, 0.0, 0.0
+    for arm in core.TIMING_ARMS:
+        spec = core.ARMS[arm]
+        if device == "cuda":
+            torch.cuda.reset_peak_memory_stats()
+        secs[arm] = train.measure_seconds_per_epoch(spec=spec, train=sets.train, index=sets.index, val_plain=sets.val_plain, val_transfer=sets.val_transfer, device=device, epochs=epochs)
+        if device == "cuda":
+            peak_gpu = max(peak_gpu, torch.cuda.max_memory_allocated() / 1e9)
+        if arm == "U*":
+            pair_secs = train.time_pair_building(spec=spec, train=sets.train, index=sets.index)
+    report = core.timing_gate_report(seconds_per_epoch=secs, peak_gpu_gb=peak_gpu, peak_rss_gb=train.peak_rss_gb(), pair_seconds_per_epoch=pair_secs)
+    passes = core.timing_gate_passes(report=report, manager_approved=manager_approved)
+    stages.write_json(path=root / "scores" / "timing.json", payload={**report, "pass": passes})
+    log(f"timing gate: projection {report['hours_at_cap']:.2f} h at the cap, pass {passes}")
+    if not passes:
+        msg = "the timing gate failed: the projection or a memory peak is over its line (verdict row 0)"
+        raise stages.StoppedError(msg)
+    return {**report, "pass": passes}
+
+
+def fits_starting_line(*, family: str, hours: float, cores: str) -> str:
+    """Return the line sent to the manager before each family of fits (the timing gate, U* and U-NC, U-NCw and S+, U-SG, U*-L)."""
+    return f"fits starting: experiment 732, family {family}, projection {hours:.2f} GPU-process-hours at the cap, core {cores}, {datetime.now(UTC):%FT%TZ}"
+
+
+def last_fit_ended_line(*, family: str, counts: dict[str, int]) -> str:
+    """Return the line printed after the last fit of a family."""
+    return f"last fit ended: experiment 732, family {family}, {counts}, {datetime.now(UTC):%FT%TZ}"
+
+
+def write_status(*, root: Path, status: dict[str, Any]) -> None:
+    """Write `chain_status.json` (atomic): the stage reached, its outcome, and the reason of a stop (names and counts only)."""
+    stages.write_json(path=root / "chain_status.json", payload={**status, "time": datetime.now(UTC).isoformat(timespec="seconds")})
+
+
+def stage_chain(*, root: Path, root730: Path, run_one: Callable[[str, str, int], dict], log: Log, cores: str = "?") -> dict:
+    """Run the 18 fits family by family, stopping and reporting at the first stop or failure, and writing a status file.
+
+    Every family prints a "fits starting" line and a "last fit ended" line. A stop (row 0), a correctness
+    failure (row 1), or a fit that raised and a counted reading needs (row 2) ends the chain with
+    `chain_status.json` holding `state` "stopped", "invalid", or "failed". A report-only family that
+    failed (U-NCw, U-SG, U*-L) does not end the chain.
+
+    Returns:
+        The status record.
+    """
+    timing = stages.read_json(path=root / "scores" / "timing.json")
+    done: list[str] = []
+    for family, arm_names in core.FIT_FAMILIES:
+        if not arm_names:
+            continue
+        jobs = [(a, core.ARMS[a].arch, s) for a in arm_names for s in core.SEEDS]
+        write_status(root=root, status={"state": "running", "family": family, "done": done})
+        log(fits_starting_line(family=family, hours=float(timing["hours_at_cap"]), cores=cores))
+        try:
+            counts = run_jobs(root=root, jobs=jobs, run_one=run_one, log=log)
+        except leak.CorrectnessFailureError as exc:
+            stages.record_invalid(root=root, rule=str(exc))
+            status = {"state": "invalid", "family": family, "reason": str(exc), "done": done}
+            write_status(root=root, status=status)
+            raise
+        except stages.StoppedError as exc:
+            write_status(root=root, status={"state": "stopped", "family": family, "reason": str(exc), "done": done})
+            raise
+        log(last_fit_ended_line(family=family, counts=counts))
+        needed_failed = [a for a in arm_names if a in core.NEEDED_ARMS and any((stages.job_path(root=root, arm=a, arch=core.ARMS[a].arch, seed=s).with_suffix(".failed.json")).exists() for s in core.SEEDS)]
+        done.append(family)
+        if needed_failed:
+            status = {"state": "failed", "family": family, "arms": needed_failed, "done": done}
+            write_status(root=root, status=status)
+            return status
+    status = {"state": "complete", "done": done}
+    write_status(root=root, status=status)
+    return status
