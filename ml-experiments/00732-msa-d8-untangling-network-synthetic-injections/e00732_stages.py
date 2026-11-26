@@ -55,6 +55,7 @@ GATE_ATTEMPTS: Final = "scores/gate_attempts.json"
 MAX_GATE_VERSIONS: Final = 2
 """The gates run under at most two code versions: the first, and one after a change."""
 TEST_MARKER: Final = "test_started"
+BT_RECORD: Final = "scores/bt_fit.json"
 GATED_STAGES: Final = ("timing", "fit", "chain")
 """The stages that start a fit: they need the neighbour table, the limits, the overlays, the tensor checks, the gallery check, and no recorded failure."""
 FIT_STAGES: Final = ("fit", "chain")
@@ -153,6 +154,58 @@ def record_invalid(*, root: Path, rule: str) -> None:
     path = root / INVALID_FILE
     if not path.exists():
         write_json(path=path, payload={"rule": rule})
+
+
+READING_STAGES: Final = ("score", "real", "report", "figures", "series")
+"""The stages that read the test outputs; none may run while the chain is fitting."""
+CHAIN_STATUS: Final = "chain_status.json"
+
+
+def marker_exists(*, root: Path) -> bool:
+    """Return whether the first test score has been taken (the marker exists)."""
+    return (root / "scores" / TEST_MARKER).exists()
+
+
+def chain_running(*, root: Path) -> bool:
+    """Return whether `chain_status.json` says that the chain is running."""
+    path = root / CHAIN_STATUS
+    return path.exists() and read_json(path=path).get("state") == "running"
+
+
+def choice_events(*, root: Path) -> list[str]:
+    """Return the choices of the run and the first test score, in order of file time.
+
+    The events are `limits` (`limits.json`), `fits` (the newest stored prediction file), `bt` (the
+    record of the B-T fit, `scores/bt_fit.json`), and `test_score` (the marker `scores/test_started`,
+    made now when it does not exist yet). A choice that was rewritten after the first test score
+    sorts after `test_score`, and `leak.assert_no_test_choice` fails. A choice that does not exist is
+    left out, and `assert_no_test_choice` fails on that too.
+
+    Args:
+        root: The data folder.
+
+    Returns:
+        The event names, earliest first.
+    """
+    marker = root / "scores" / TEST_MARKER
+    if not marker.exists():
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("")
+    stamps: dict[str, int] = {"test_score": marker.stat().st_mtime_ns}
+    if (root / "limits.json").exists():
+        stamps["limits"] = (root / "limits.json").stat().st_mtime_ns
+    fits = prediction_files(root=root)
+    if fits:
+        stamps["fits"] = max(p.stat().st_mtime_ns for p in fits)
+    bt = root / BT_RECORD
+    if bt.exists():
+        stamps["bt"] = bt.stat().st_mtime_ns
+    return sorted(stamps, key=lambda k: (stamps[k], k == "test_score"))
+
+
+def prediction_files(*, root: Path) -> list[Path]:
+    """Return the stored prediction files of this experiment's fits."""
+    return sorted((root / "predictions").glob("*/*.npz"))
 
 
 def invalid_recorded(*, root: Path) -> bool:
@@ -306,6 +359,9 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
         if not ok:
             msg = f"`{stage}` needs {what} first"
             raise GuardError(msg)
+    if stage in GATED_STAGES and marker_exists(root=root):
+        msg = f"`{stage}` starts a fit, but the first test score was already taken: a fit now would be a choice made after the test (verdict row 1)"
+        raise GuardError(msg)
     if stage in GATED_STAGES:
         if invalid_recorded(root=root):
             msg = f"`{stage}` starts a fit, but {INVALID_FILE} records a failed correctness check (verdict row 1): the run is over"
@@ -334,6 +390,9 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
         and not (root / "limits.json").exists()
     ):
         msg = f"`{stage}` needs limits.json"
+        raise GuardError(msg)
+    if stage in READING_STAGES and chain_running(root=root):
+        msg = f"`{stage}` reads the test outputs, but the chain is running (`chain_status.json` says running): wait for the last fit"
         raise GuardError(msg)
 
 
@@ -380,6 +439,26 @@ def seed_mean_p(*, arrays: Sequence[Mapping[str, np.ndarray]]) -> np.ndarray:
     return score730.seed_mean(p_by_seed=[a["p"].astype(np.float64) for a in arrays])
 
 
+def assert_bank_months_disjoint(*, root730: Path, test_segments: Sequence[Any]) -> None:
+    """Check that no month of the test bank is a month of a training bank or of the validation bank.
+
+    Args:
+        root730: The data folder of experiment 730 (read only).
+        test_segments: The test bank's segments.
+
+    Raises:
+        CorrectnessFailureError: When a month is shared, or a month list is empty.
+    """
+    used: dict[str, set[str]] = {"validation": set()}
+    va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
+    used["validation"] = {str(seg.month) for seg in va.segments}
+    train: set[str] = set()
+    for path in sorted((root730 / "banks").glob("train_s*.pkl")):
+        train |= {str(seg.month) for seg in banks729.load_bank(path=path).segments}
+    used["training"] = train
+    leak.assert_months_disjoint(used=used, test_months=[str(seg.month) for seg in test_segments])
+
+
 def stage_banks(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) -> dict:
     """Verify experiment 730's banks and stored files, record their digests once, and write the run marker.
 
@@ -404,6 +483,11 @@ def stage_banks(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) ->
     guard_run(root=root, root730=root730, stage="banks")
     banks730.verify_banks_digest(root=root730)
     test = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
+    assert_bank_months_disjoint(root730=root730, test_segments=test.segments)
+    leak.assert_pair_index_from_own_bank(
+        index=ov.build_pair_index(segments=test.segments, sources=core.TEST_SIBLING_SOURCES),
+        segments=test.segments,
+    )
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
     path = root / BANKS_CHECK
     first = read_json(path=path) if path.exists() else None
@@ -829,6 +913,21 @@ def bsp_present_solar_picks(
     return picks
 
 
+def assert_batch_channels(*, batch: arms.Batch, spec: core.ArmSpec732) -> None:
+    """Check a batch's neighbour channels and its injected member with the leakage assertions.
+
+    A neighbour value must be non-negative and a neighbour mask 0 or 1, and w+ must differ from w
+    only in the reading, the BSP step, and the sign-aligned changes.
+
+    Raises:
+        CorrectnessFailureError: When one of those fails (verdict row 1).
+    """
+    if spec.neighbours:
+        leak.assert_neighbours_unsigned_and_masks_binary(batch=batch)
+    if spec.inject:
+        leak.assert_injection_changes_only_allowed_channels(batch=batch)
+
+
 def tensor_check_specs() -> dict[str, core.ArmSpec732]:
     """Return the arms whose batches the tensor checks run on: U*, U-N, and U-noBSP."""
     return {name: core.ARMS[name] for name in ("U*", "U-N", "U-noBSP")}
@@ -910,6 +1009,7 @@ def stage_tensor_checks(
             ),
         }  # fmt: skip
         for where, (batch, prepared) in batches.items():
+            assert_batch_channels(batch=batch, spec=spec)
             checks = arms.tensor_checks(batch=batch, prepared=prepared, spec=spec)
             found = arms.tensor_problems(checks=checks)
             record[f"{name}/{where}"] = share_json(shares=checks)

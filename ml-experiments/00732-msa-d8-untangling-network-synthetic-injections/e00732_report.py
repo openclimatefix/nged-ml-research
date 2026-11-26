@@ -25,6 +25,7 @@ import e00730_score as score730
 import e00732_arms as arms
 import e00732_baselines as baselines
 import e00732_core as core
+import e00732_leakage as leak
 import e00732_overlays as ov
 import e00732_real as real
 import e00732_result_figures as rf
@@ -173,11 +174,13 @@ def build_truth(
 
 def step_rule_scores(
     *, root730: Path, env: stages.Env, base: stages.BaseDays, test_overlay: Sequence[arms.Prepared],
-    test_valid: np.ndarray,
+    test_valid: np.ndarray, root: Path | None = None,
 ) -> dict[str, score.ArmScores]:  # fmt: skip
     """Fit B-T and B-TN on the validation overlay and return their step probabilities.
 
-    The probabilities are for the test overlay (flat on the valid rows).
+    The probabilities are for the test overlay (flat on the valid rows). With `root`, the function
+    writes `scores/bt_fit.json` once (the number of weights of each rule and the split it was fitted
+    on), so that the order of the choices and the first test score can be checked.
     """
     va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
     te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
@@ -193,6 +196,7 @@ def step_rule_scores(
     series_te = [baselines.series_of_overlay(overlay=o, holidays=env.holidays) for o in te_ov]
     t_va = truth.truth(prepared=va_prep)
     out = {}
+    fitted: dict[str, dict[str, object]] = {}
     for name, with_neighbours in (("B-TN", True), ("B-T", False)):
         weights = baselines.fit_step_rule(
             features=baselines.step_feature_rows(series=series_va, prepared=va_prep, scales=scales, neighbours=with_neighbours),
@@ -204,6 +208,9 @@ def step_rule_scores(
         out[name] = score.ArmScores(
             step=baselines.predict_step_rule(features=feats, weights=weights)[test_valid]
         )
+        fitted[name] = {"n_weights": int(np.size(weights)), "fitted_on": "validation"}
+    if root is not None and not (root / stages.BT_RECORD).exists():
+        stages.write_once_json(path=root / stages.BT_RECORD, payload=fitted)
     return out
 
 
@@ -385,7 +392,12 @@ def assemble_arms(
         arm_map["B-PV1"] = pv1_scores(root730=root730, truth_=truth_, ctx=ctx)
     arm_map.update(
         step_rule_scores(
-            root730=root730, env=env, base=base, test_overlay=test_overlay, test_valid=test_valid
+            root730=root730,
+            env=env,
+            base=base,
+            test_overlay=test_overlay,
+            test_valid=test_valid,
+            root=root,
         )
     )
     return arm_map
@@ -444,6 +456,10 @@ def stage_score(
         test_overlay=overlay,
         test_valid=valid,
     )
+    leak.assert_limits_before_fits(
+        limits=root / "limits.json", fit_records=stages.prediction_files(root=root)
+    )
+    leak.assert_no_test_choice(events=stages.choice_events(root=root))
     readings = score.compute_readings(truth=truth_, arms=arm_map)
     h1 = (
         score.harm_by_band(rows=truth_.rows, p=arm_map["U*"].p, limits=core.read_limits_file(path=root / "limits.json"))  # ty: ignore[invalid-argument-type]

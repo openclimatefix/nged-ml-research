@@ -119,7 +119,7 @@ def assert_overlay_depends_only_on_its_segment(
 
 def assert_pair_index_from_own_bank(*, index: ov.PairIndex, segments: Sequence[object]) -> None:
     """Check that the pair index covers exactly the segments of the bank it serves (no other bank's solar output)."""
-    if len(index.months) != len(segments):
+    if list(index.months) != [getattr(seg, "month", None) for seg in segments]:
         _fail(message="the pair index was built from another bank's segments")
 
 
@@ -175,12 +175,7 @@ def assert_arm_weights(*, arm: str) -> None:
 
 NEIGHBOUR_ROWS: Final = tuple(arms.NB_ROW[n] for n in arms.NEIGHBOUR_NAMES)
 """The 12 neighbour channels (value, change, sign-aligned change, and mask of each of D3, D5, and D14)."""
-INJECTION_MAY_CHANGE: Final = (
-    arms.ROW["r"],
-    arms.ROW["d_bsp"],
-    *(arms.NB_ROW[f"{n}_aligned"] for n in nb.NEIGHBOURS),
-)
-"""The channels an injected member may differ from its plain window in: the reading, the BSP step, and the three sign-aligned changes."""
+INJECTION_MAY_CHANGE: Final = arms.INJECTION_MAY_CHANGE
 
 
 def assert_tensor_checks(

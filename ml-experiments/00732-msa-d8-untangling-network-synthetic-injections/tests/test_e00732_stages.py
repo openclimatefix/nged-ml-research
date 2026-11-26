@@ -832,3 +832,135 @@ def test_every_result_figure_fails_loudly_without_any_fitted_arm(gated: Any, fol
             draw(truth=truth_, arms={})
     with pytest.raises(rf.FiguresError):
         rf.fig3_harm(truth=truth_, arms={}, limits=limits)
+
+
+# ---------------------------------------------------- the leakage assertions on the real code paths
+
+
+def _corrupt_make_batch(*, monkeypatch: Any, how: str) -> None:
+    import dataclasses
+
+    import e00732_arms as arms
+
+    real = arms.make_batch
+    real_eval = arms.make_eval_batch
+
+    def corrupt(batch: Any) -> Any:
+        if how == "injection":
+            xi = batch.xi.copy()
+            xi[:, arms.ROW["csi"], 3] += 0.1
+            return dataclasses.replace(batch, xi=xi)
+        x = batch.x.copy()
+        x[:, arms.NB_ROW["D3_value"], 5] = -1.0
+        return dataclasses.replace(batch, x=x)
+
+    monkeypatch.setattr(arms, "make_batch", lambda **kw: corrupt(real(**kw)))
+    monkeypatch.setattr(arms, "make_eval_batch", lambda **kw: corrupt(real_eval(**kw)))
+
+
+@pytest.mark.parametrize("how", ["injection", "signed_neighbour"])
+def test_the_tensor_stage_fails_on_a_leaking_batch_through_the_leakage_assertions(
+    gated: Any, monkeypatch: Any, how: str
+) -> None:
+    root, root730, env = gated
+    _corrupt_make_batch(monkeypatch=monkeypatch, how=how)
+    with pytest.raises(leak.CorrectnessFailureError, match=r"neighbour|injected member"):
+        stages.stage_tensor_checks(root=root, root730=root730, env=env, log=print)
+
+
+def test_the_limits_must_be_older_than_every_stored_prediction_at_the_first_test_score(
+    gated: Any, folders: Any
+) -> None:
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    (root / "limits.json").touch()  # limits rewritten after the fits
+    with pytest.raises(leak.CorrectnessFailureError, match="limits before fits"):
+        report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert not (root / "scores" / stages.TEST_MARKER).exists()
+
+
+def test_the_first_test_score_writes_the_marker_and_later_fits_and_chain_scores_are_refused(
+    gated: Any, folders: Any
+) -> None:
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0,),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    stages.write_json(path=root / stages.CHAIN_STATUS, payload={"state": "running"})
+    with pytest.raises(stages.GuardError, match="chain is running"):
+        report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert not (root / "scores" / stages.TEST_MARKER).exists()
+    stages.write_json(path=root / stages.CHAIN_STATUS, payload={"state": "complete"})
+    report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert (root / "scores" / stages.TEST_MARKER).exists()
+    assert (root / stages.BT_RECORD).exists()
+    report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)  # again
+    with pytest.raises(stages.GuardError, match="after the test"):
+        stages.guard_run(root=root, root730=root730, stage="timing")
+    stages.write_json(path=root / stages.CHAIN_STATUS, payload={"state": "running"})
+    with pytest.raises(stages.GuardError, match="chain is running"):
+        stages.guard_run(root=root, root730=root730, stage="report")
+
+
+def test_a_choice_made_after_the_first_test_score_or_never_made_fails(
+    gated: Any, folders: Any
+) -> None:
+    import os
+
+    root, _root730, _env = gated
+    world = folders[2]
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    (root / "scores").mkdir(exist_ok=True)
+    stages.write_json(path=root / stages.BT_RECORD, payload={"B-T": {}})
+    events = stages.choice_events(root=root)
+    assert events[-1] == "test_score"
+    assert set(events) == {"limits", "fits", "bt", "test_score"}
+    leak.assert_no_test_choice(events=events)
+    stages.write_json(path=root / stages.BT_RECORD, payload={"B-T": {}})
+    marker = root / "scores" / stages.TEST_MARKER
+    os.utime(marker, ns=(1, 1))  # the marker is older than the B-T record: B-T was fixed after
+    with pytest.raises(leak.CorrectnessFailureError, match="not fixed before"):
+        leak.assert_no_test_choice(events=stages.choice_events(root=root))
+    (root / stages.BT_RECORD).unlink()
+    os.utime(marker, ns=(4 * 10**18, 4 * 10**18))
+    with pytest.raises(leak.CorrectnessFailureError, match="bt was not fixed"):
+        leak.assert_no_test_choice(events=stages.choice_events(root=root))
+
+
+def test_the_banks_stage_fails_when_a_test_month_is_used_elsewhere(folders: Any) -> None:
+    import e00729_banks as banks729
+    import e00730_banks as banks730
+
+    root, root730, world = folders
+    stages.stage_banks(root=root, root730=root730, holidays=world["cal"].holidays, log=print)
+    stages.assert_bank_months_disjoint(
+        root730=root730,
+        test_segments=banks729.load_bank(
+            path=banks730.bank_path(root=root730, kind="test")
+        ).segments,
+    )
+    train = banks729.load_bank(path=banks730.bank_path(root=root730, kind="train", seed=0))
+    with pytest.raises(leak.CorrectnessFailureError, match="test months are used by"):
+        stages.assert_bank_months_disjoint(root730=root730, test_segments=train.segments)
+
+
+def test_the_pair_index_of_another_bank_fails_the_own_bank_check(folders: Any) -> None:
+    import e00729_banks as banks729
+    import e00730_banks as banks730
+    import e00732_overlays as ov
+
+    _root, root730, _world = folders
+    tr = banks729.load_bank(path=banks730.bank_path(root=root730, kind="train", seed=0))
+    va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
+    index = ov.build_pair_index(segments=tr.segments)
+    leak.assert_pair_index_from_own_bank(index=index, segments=tr.segments)
+    with pytest.raises(leak.CorrectnessFailureError, match="another bank"):
+        leak.assert_pair_index_from_own_bank(index=index, segments=va.segments)

@@ -658,6 +658,43 @@ def test_an_injected_member_that_changes_elsewhere_fails_the_injection_check(wor
     assert {"injected_reading_elsewhere", "injected_bsp_elsewhere"} <= set(bad)
 
 
+def test_an_injected_member_that_changes_a_channel_outside_the_allowed_ones_fails(
+    world: World,
+) -> None:
+    batch = make_checked(world=world)
+    xi = need(batch.xi).copy()
+    b = int(np.flatnonzero(batch.pair > 0)[0])
+    xi[b, arms.ROW["csi"], 3] += 0.1  # the clear-sky index may not change in w+
+    assert "injection_only_allowed_channels" in failing(
+        world=world, batch=dataclasses.replace(batch, xi=xi)
+    )
+    xi = need(batch.xi).copy()
+    xi[b, arms.NB_ROW["D3_value"], 3] += 0.1  # a neighbour value may not change either
+    assert "injection_only_allowed_channels" in failing(
+        world=world, batch=dataclasses.replace(batch, xi=xi)
+    )
+    nothing = dataclasses.replace(batch, pair=np.zeros_like(batch.pair))
+    assert "injection_only_allowed_channels" in failing(
+        world=world, batch=nothing
+    )  # no case: fails
+
+
+def test_a_signed_neighbour_value_or_a_non_binary_mask_fails_the_neighbour_check(
+    world: World,
+) -> None:
+    batch = make_checked(world=world)
+    signed = batch.x.copy()
+    signed[0, arms.NB_ROW["D5_value"], 5] = -0.3
+    assert "neighbours_unsigned_binary" in failing(
+        world=world, batch=dataclasses.replace(batch, x=signed)
+    )
+    soft = batch.x.copy()
+    soft[0, arms.NB_ROW["D14_mask"], 5] = 0.5
+    assert "neighbours_unsigned_binary" in failing(
+        world=world, batch=dataclasses.replace(batch, x=soft)
+    )
+
+
 def test_a_raised_member_that_does_not_raise_fails_the_raised_check(world: World) -> None:
     batch = make_checked(world=world)
     assert "raised_above" in failing(

@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """An invented copy of experiment 730's data folder (banks, summary, stored predictions) for the stage tests."""
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
@@ -22,13 +23,15 @@ def build(*, root: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
         ("shifted", None),
     ]
     for kind, seed in kinds:
+        # the real banks hold disjoint months, so each bank gets its own month labels
+        segs_kind = [dataclasses.replace(seg, month=f"{kind}{seed}-{seg.month}") for seg in segs]
         bank = banks729.Bank(
             kind=kind,
             seed=seed,
             root=0,
             none_share={},
-            segments=segs,
-            digest=banks729.bank_digest(segments=segs),
+            segments=segs_kind,
+            digest=banks729.bank_digest(segments=segs_kind),
         )
         path = root / "banks" / (f"{kind}_s{seed}.pkl" if seed is not None else f"{kind}.pkl")
         banks729.save_bank(bank=bank, path=path)

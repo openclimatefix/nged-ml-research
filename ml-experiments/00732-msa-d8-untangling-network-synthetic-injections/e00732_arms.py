@@ -665,6 +665,8 @@ TENSOR_BARS: Final = {
     "injected_bsp_on_delta": core.EXACT_SHARE,
     "injected_bsp_elsewhere": core.EXACT_SHARE,
     "raised_above": core.EXACT_SHARE,
+    "injection_only_allowed_channels": core.EXACT_SHARE,
+    "neighbours_unsigned_binary": core.EXACT_SHARE,
     "solar_target_positive": core.MIN_SOLAR_TARGET_SHARE,
     "channel_count": core.EXACT_SHARE,
     "bsp_zero": core.EXACT_SHARE,
@@ -828,6 +830,42 @@ def check_injected(*, batch: Batch, prepared: Sequence[Prepared]) -> dict[str, o
     }  # fmt: skip
 
 
+INJECTION_MAY_CHANGE: Final = (
+    ROW["r"],
+    ROW["d_bsp"],
+    *(NB_ROW[f"{n}_aligned"] for n in nb.NEIGHBOURS),
+)
+"""The channels an injected member may differ from its plain window in: the reading, the BSP step, and the three sign-aligned changes."""
+
+
+def check_injection_only_allowed_channels(*, batch: Batch) -> ov.Share:
+    """Check that every channel of w+ outside the reading, BSP, and sign-aligned channels equals w.
+
+    The share counts windows with a sibling pair. A batch with no such window has an empty counter,
+    which fails.
+    """
+    if batch.xi is None:
+        return _share(passed=0, n=0)
+    paired = np.flatnonzero(batch.pair > 0.5)
+    other = [c for c in range(batch.x.shape[1]) if c not in INJECTION_MAY_CHANGE]
+    passed = sum(int((batch.x[b][other] == batch.xi[b][other]).all()) for b in paired)
+    return _share(passed=passed, n=int(paired.size))
+
+
+def check_neighbours_unsigned_binary(*, batch: Batch) -> ov.Share:
+    """Check that every neighbour value channel is non-negative and every neighbour mask is 0 or 1.
+
+    The share counts the neighbour channels of every member of the batch.
+    """
+    passed = n = 0
+    for member in _members(batch=batch):
+        for name in nb.NEIGHBOURS:
+            value, mask = member[:, NB_ROW[f"{name}_value"]], member[:, NB_ROW[f"{name}_mask"]]
+            n += 1
+            passed += int(bool((value >= 0.0).all() and np.isin(mask, (0.0, 1.0)).all()))
+    return _share(passed=passed, n=n)
+
+
 def check_raised(*, batch: Batch) -> ov.Share:
     """The raised member's clear-sky index is above the plain window's on every raisable half-hour."""
     if batch.xc is None:
@@ -915,7 +953,9 @@ def tensor_checks(
         out["mirror_edges"] = check_mirror_edges(batch=batch, prepared=prepared, spec=spec)
         out.update(check_aligned(batch=batch))
         out["hidden_zero"] = check_hidden(batch=batch)
+        out["neighbours_unsigned_binary"] = check_neighbours_unsigned_binary(batch=batch)
     if spec.inject:
+        out["injection_only_allowed_channels"] = check_injection_only_allowed_channels(batch=batch)
         injected = check_injected(batch=batch, prepared=prepared)
         if spec.bsp_zeroed:
             injected = {k: v for k, v in injected.items() if "bsp" not in k}

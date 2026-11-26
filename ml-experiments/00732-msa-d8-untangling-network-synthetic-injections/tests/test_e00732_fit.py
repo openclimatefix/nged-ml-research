@@ -272,3 +272,48 @@ def test_net_checks_fire_on_a_head_that_leaks_into_the_sign_and_on_a_missing_sto
         fit.assert_net_checks(
             net=leaky, spec=core.ARMS["U-SG"], x=x
         )  # the spec says stop-gradient, the net has none
+
+
+def test_assert_fit_inputs_runs_the_channel_assertions_on_a_real_batch(
+    run: Any, monkeypatch: Any
+) -> None:
+    import dataclasses
+
+    import e00732_arms as arms
+
+    _root, root730, env = run
+    sets = fit.load_sets(root730=root730, env=env, seed=0)
+    fit.assert_fit_inputs(spec=core.ARMS["U*"], sets=sets, seed=0)
+    real = arms.make_batch
+
+    def leaking(**kw: Any) -> Any:
+        batch = real(**kw)
+        xi = batch.xi.copy()
+        xi[:, arms.ROW["csi"], 3] += 0.1
+        return dataclasses.replace(batch, xi=xi)
+
+    monkeypatch.setattr(arms, "make_batch", leaking)
+    with pytest.raises(leak.CorrectnessFailureError, match="injected member"):
+        fit.assert_fit_inputs(spec=core.ARMS["U*"], sets=sets, seed=0)
+
+    def signed(**kw: Any) -> Any:
+        batch = real(**kw)
+        x = batch.x.copy()
+        x[:, arms.NB_ROW["D14_value"], 5] = -1.0
+        return dataclasses.replace(batch, x=x)
+
+    monkeypatch.setattr(arms, "make_batch", signed)
+    with pytest.raises(leak.CorrectnessFailureError, match="neighbour value"):
+        fit.assert_fit_inputs(spec=core.ARMS["U*"], sets=sets, seed=0)
+
+
+def test_load_sets_fails_on_a_pair_index_of_another_bank(run: Any, monkeypatch: Any) -> None:
+    import e00732_overlays as ov
+
+    _root, root730, env = run
+    real = ov.build_pair_index
+    monkeypatch.setattr(
+        ov, "build_pair_index", lambda *, segments, **kw: real(segments=segments[:-1], **kw)
+    )
+    with pytest.raises(leak.CorrectnessFailureError, match="another bank"):
+        fit.load_sets(root730=root730, env=env, seed=0)

@@ -61,12 +61,18 @@ def load_sets(*, root730: Path, env: stages.Env, seed: int) -> Sets:
     tr = banks729.load_bank(path=banks730.bank_path(root=root730, kind="train", seed=seed))
     va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
     common = {"holidays": env.holidays, "stats": env.stats, "medians": env.medians}
+    index, val_index = (
+        ov.build_pair_index(segments=tr.segments),
+        ov.build_pair_index(segments=va.segments),
+    )
+    leak.assert_pair_index_from_own_bank(index=index, segments=tr.segments)
+    leak.assert_pair_index_from_own_bank(index=val_index, segments=va.segments)
     return Sets(
         train=arms.prepare(overlays=ov.overlay_segments(segments=tr.segments, kind="train", seed=seed, neighbours=env.neighbours), **common),
-        index=ov.build_pair_index(segments=tr.segments),
+        index=index,
         val_plain=arms.prepare_plain(segments=va.segments, neighbours=env.neighbours, **common),
         val_transfer=arms.prepare(overlays=ov.overlay_segments(segments=va.segments, kind="validation", neighbours=env.neighbours), **common),
-        val_index=ov.build_pair_index(segments=va.segments),
+        val_index=val_index,
     )  # fmt: skip
 
 
@@ -75,7 +81,9 @@ def assert_fit_inputs(*, spec: core.ArmSpec732, sets: Sets, seed: int) -> None:
     leak.assert_arm_weights(arm=spec.name)
     leak.assert_no_month_or_day_of_year()
     rng = np.random.default_rng(seed)
-    picks = arms.sample_picks(prepared=sets.train, n=64, rng=rng)
+    picks = arms.sample_picks(prepared=sets.train, n=64, rng=rng) + stages.solar_world_picks(
+        prepared=sets.train, limit=32
+    )
     b = arms.make_batch(
         prepared=sets.train,
         picks=picks,
@@ -83,6 +91,7 @@ def assert_fit_inputs(*, spec: core.ArmSpec732, sets: Sets, seed: int) -> None:
         rng=rng,
         index=sets.index if spec.inject else None,
     )
+    stages.assert_batch_channels(batch=b, spec=spec)
     leak.assert_inputs_not_targets(windows=b.x, targets=b.t, delta=b.delta)
     if b.xi is not None:
         leak.assert_inputs_not_targets(windows=b.xi, targets=b.ti, delta=b.delta)  # ty: ignore[invalid-argument-type]
