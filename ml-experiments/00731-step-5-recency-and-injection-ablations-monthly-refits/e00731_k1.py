@@ -264,7 +264,7 @@ elif MINE.command == "step2":
     e.step2(months=e.ARGS.months, seeds=e.ARGS.seeds, device="cuda")
 elif MINE.command == "fit":
     e.row_nll = arm.row_nll
-# >>> E00731 PATCH BEGIN (C: diagnostics and per-epoch loss history; no change to the fit)
+    # >>> E00731 PATCH BEGIN (C: diagnostics and per-epoch loss history; no change to the fit)
     _marker = OUT / "work" / f"code_hash_{MINE.months[0]}.txt"
     _existing = [
         *(OUT / "work" / "models" / "P5").glob(f"{MINE.months[0]}_d0_s*.pt"),
@@ -403,7 +403,7 @@ elif MINE.command == "fit":
         return fixed, n_events
 
     arm.bank.synthetic_clean = synthetic_clean_recorded
-# <<< E00731 PATCH END (C: diagnostics and per-epoch loss history; no change to the fit)
+    # <<< E00731 PATCH END (C: diagnostics and per-epoch loss history; no change to the fit)
     if MINE.synthetic:
         e.k.build_month = arm.build_month_syn
         e.k.GpuMonth = arm.AuxGpuMonth

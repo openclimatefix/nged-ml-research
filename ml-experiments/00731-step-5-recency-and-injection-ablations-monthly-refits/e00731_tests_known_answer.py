@@ -70,11 +70,11 @@ def strip_patches(*, text: str) -> str:
     """Return `text` without the lines from a patch's BEGIN line to its END line, inclusive."""
     out, inside = [], False
     for line in text.splitlines(keepends=True):
-        if line.startswith(BEGIN):
+        if line.lstrip().startswith(BEGIN):
             inside = True
         if not inside:
             out.append(line)
-        if line.startswith(END):
+        if line.lstrip().startswith(END):
             inside = False
     assert not inside, "unterminated patch block"
     return "".join(out)
@@ -469,7 +469,11 @@ def child_build(*, arm: str) -> dict:
         d_med, b_med = float(np.nanmedian(direct)), float(np.nanmedian(built))
         assert abs(d_med - b_med) < 1e-3 * max(1.0, abs(d_med)), (prim, d_med, b_med)
         near = float(np.mean(np.abs(built[np.isfinite(built)] - b_med) < 1e-3 * abs(b_med)))
-        assert near > 0.9, (prim, b_med, near)  # rows at a clipped value, mostly at the short-history Primaries
+        assert near > 0.9, (
+            prim,
+            b_med,
+            near,
+        )  # rows at a clipped value, mostly at the short-history Primaries
         print(
             f"[8] Primary {prim}: scale of a 0.3 shift in the lag value, direct {d_med:.4f}, through the injection {b_med:.4f} ({near:.4f} of rows within 0.1%)"
         )
