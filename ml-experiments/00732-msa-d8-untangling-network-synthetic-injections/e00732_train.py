@@ -319,7 +319,7 @@ def fit(
     seed_all = train730.fit_seed(arm=spec.name, arch=spec.arch, seed=seed)
     torch.manual_seed(seed_all)
     rng = np.random.default_rng(seed_all)
-    net = nets.build_net(spec=spec, c_in=arms.N_CHANNELS).to(device)
+    net = nets.build_net(spec=spec, c_in=arms.n_channels(spec=spec)).to(device)
     params = [p for p in net.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(

@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 732: the target stack, the windows of a training triple, and the batches.
+"""Experiment 732: the target stack, the windows of a training triple, the batches, and the tensor checks.
 
 This module needs no torch. A segment (with its load transfers applied) becomes a channel stack once,
 through experiment 730's `prepare_segments`, and a window is a slice of it. The target stack has eight
@@ -7,11 +7,19 @@ rows: experiment 730's six (truth, valid, engine, solar, reading, base demand) a
 the signed step size. A **triple** is the plain window `w`, the injected window `w+` (the same window
 with an extra solar injection delta from a sibling segment), and the raised-sky window `wc`. The
 three members share one hidden span of the reading. The inputs of `w+` differ from `w` only in the
-reading channel and the BSP-step channel; the inputs of `wc` differ only in the clear-sky index.
+reading channel, the BSP-step channel, and the sign-aligned neighbour channels (which read the
+change of the reading); the inputs of `wc` differ only in the clear-sky index.
+
+Every arm except U-N appends 12 neighbour channels to the 730 stack: for each of D3, D5, and D14, the
+folded reading over the neighbour's training median, its half-hour change, that change times the
+sign of D8's half-hour change of reading, and a presence mask. The neighbours are hidden wherever
+D8's reading is hidden. U-noBSP keeps the stack's shape and sets the BSP-step channel and its mask to
+zero. `tensor_checks` reads a built batch, not an overlay, and fails when a component went silent
+between the overlay and the tensor.
 """
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Final
 
 import e00732_paths  # noqa: F401
@@ -22,6 +30,7 @@ import e00729_core as core729
 import e00730_arms as arms730
 import e00730_masks as masks
 import e00732_core as core
+import e00732_neighbours as nb
 import e00732_overlays as ov
 import numpy as np
 
@@ -29,7 +38,14 @@ STACK_SPEC: Final = arms730.ArmSpec("S732", "d", demand=False, style=core.STYLE)
 """The channel stack of every arm: experiment 730's arm S inputs."""
 NAMES: Final = tuple(arms730.stack_names(spec=STACK_SPEC))
 ROW: Final = {name: i for i, name in enumerate(NAMES)}
-N_CHANNELS: Final = len(NAMES)
+N_BASE: Final = len(NAMES)
+"""The channels of experiment 730's arm S stack (the channels of a batch of U-N)."""
+NEIGHBOUR_KINDS: Final = ("value", "change", "aligned", "mask")
+NEIGHBOUR_NAMES: Final = tuple(f"{n}_{kind}" for n in nb.NEIGHBOURS for kind in NEIGHBOUR_KINDS)
+NB_ROW: Final = {name: N_BASE + i for i, name in enumerate(NEIGHBOUR_NAMES)}
+ALL_NAMES: Final = (*NAMES, *NEIGHBOUR_NAMES)
+N_CHANNELS: Final = len(ALL_NAMES)
+"""The channels of a batch of every arm except U-N: the stack and the 12 neighbour channels."""
 TARGET_ROWS: Final = ("x", "valid", "engine", "solar", "r", "base", "event", "size")
 T: Final = {name: i for i, name in enumerate(TARGET_ROWS)}
 KEEP_ROWS: Final = ("sign", "solar", "step", "size", "injection", "night", "raisable")
@@ -41,7 +57,7 @@ MID: Final = core729.MIDDLE_START
 
 @dataclass
 class Prepared:
-    """A transfer-overlaid segment with its stack, targets, and the arrays the pairs need.
+    """A transfer-overlaid segment with its stack, targets, neighbours, and the arrays the pairs need.
 
     Attributes:
         base: Experiment 730's prepared segment of the overlaid segment (stack and six target rows).
@@ -50,6 +66,12 @@ class Prepared:
         beta: The segment's BSP coupling.
         event: The step event, flat.
         size: The signed step size, flat.
+        nb_folded: The three neighbours' folded readings after the mirrors, `(3, L)` in points, NaN
+            where absent.
+        nb_folded_real: The same without the mirrors (the stored neighbours).
+        medians: The neighbours' training medians, `(3,)`, the scale of the value channels.
+        transfers: The segment's transfers (the tensor checks read their edges and partners).
+        world: The simulated world type of the segment ("none" for a real segment).
     """
 
     base: arms730.PreparedSegment
@@ -58,6 +80,11 @@ class Prepared:
     beta: float
     event: np.ndarray
     size: np.ndarray
+    nb_folded: np.ndarray
+    nb_folded_real: np.ndarray
+    medians: np.ndarray
+    transfers: list[ov.Transfer] = field(default_factory=list)
+    world: str = "none"
 
     @property
     def days(self) -> np.ndarray:
@@ -80,8 +107,28 @@ class Prepared:
         return self.base.offsets
 
 
+def n_channels(*, spec: core.ArmSpec732) -> int:
+    """Return the number of input channels of an arm's windows."""
+    return N_CHANNELS if spec.neighbours else N_BASE
+
+
+def _folded(
+    *, series: Mapping[str, np.ndarray], floors: Mapping[str, float], length: int
+) -> np.ndarray:
+    """Return the three neighbours' folded readings `(3, L)`, all NaN for a neighbour with no series."""
+    out = np.full((len(nb.NEIGHBOURS), length), np.nan, dtype=np.float32)
+    for i, name in enumerate(nb.NEIGHBOURS):
+        if name in series:
+            out[i] = nb.fold(signed=series[name].reshape(-1), floor=floors.get(name, 0.0))
+    return out
+
+
 def prepare(
-    *, overlays: Sequence[ov.TransferOverlay], holidays: np.ndarray, stats: arms729.InputStats
+    *,
+    overlays: Sequence[ov.TransferOverlay],
+    holidays: np.ndarray,
+    stats: arms729.InputStats,
+    medians: Mapping[str, float],
 ) -> list[Prepared]:
     """Return the prepared segments of a bank's transfer overlays (segments without a base day are dropped).
 
@@ -89,6 +136,7 @@ def prepare(
         overlays: The overlays, in the order of the bank's segments.
         holidays: Bank-holiday dates.
         stats: The standardisation constants of the temperature and wind speed.
+        medians: The training median of each folded neighbour, by name (the scale of its channels).
 
     Returns:
         The prepared segments; `source_index` is the segment's position in the bank.
@@ -96,29 +144,52 @@ def prepare(
     base = arms730.prepare_segments(
         segments=[o.seg for o in overlays], spec=STACK_SPEC, holidays=holidays, stats=stats
     )
-    return [
-        Prepared(
-            base=b, q=overlays[b.source_index].q.reshape(-1), bsp=overlays[b.source_index].seg.bsp.reshape(-1),
-            beta=overlays[b.source_index].beta, event=overlays[b.source_index].event.reshape(-1),
-            size=overlays[b.source_index].size.reshape(-1),
-        )
-        for b in base
-    ]  # fmt: skip
+    scale = np.asarray([medians[n] for n in nb.NEIGHBOURS], dtype=np.float64)
+    out = []
+    for b in base:
+        o = overlays[b.source_index]
+        length = o.seg.x.size
+        out.append(
+            Prepared(
+                base=b, q=o.q.reshape(-1), bsp=o.seg.bsp.reshape(-1), beta=o.beta,
+                event=o.event.reshape(-1), size=o.size.reshape(-1),
+                nb_folded=_folded(series=o.neighbours, floors=o.floors, length=length),
+                nb_folded_real=_folded(series=o.neighbours_real, floors=o.floors, length=length),
+                medians=scale, transfers=list(o.transfers), world=str(getattr(o.seg, "world", "none")),
+            )
+        )  # fmt: skip
+    return out
 
 
 def prepare_plain(
-    *, segments: Sequence, holidays: np.ndarray, stats: arms729.InputStats
+    *,
+    segments: Sequence,
+    holidays: np.ndarray,
+    stats: arms729.InputStats,
+    medians: Mapping[str, float],
+    neighbours: Mapping[str, np.ndarray] | None = None,
 ) -> list[Prepared]:
-    """Return the prepared segments of a bank or real set with no load transfer (all zeros)."""
-    overlays = [
-        ov.apply_transfers(seg=s, transfers=[]) if "beta" in s.params else _no_transfer(seg=s)
-        for s in segments
-    ]
-    return prepare(overlays=overlays, holidays=holidays, stats=stats)
+    """Return the prepared segments of a bank or real set with no load transfer (all zeros).
+
+    Args:
+        segments: Simulated segments, or real pseudo-segments (which have no BSP coupling).
+        holidays: Bank-holiday dates.
+        stats: The standardisation constants of the temperature and wind speed.
+        medians: The training median of each folded neighbour.
+        neighbours: The neighbours' stored series on D8's base calendar, or None when the
+            neighbours hold no reading (their channels are then all zero with a zero mask).
+
+    Returns:
+        The prepared segments.
+    """
+    overlays = ov.plain_overlays(segments=segments, neighbours=neighbours) if all(
+        "beta" in s.params for s in segments
+    ) else [_no_transfer(seg=s) for s in segments]  # fmt: skip
+    return prepare(overlays=overlays, holidays=holidays, stats=stats, medians=medians)
 
 
 def _no_transfer(*, seg: object) -> ov.TransferOverlay:
-    """Return an overlay of a real pseudo-segment (no BSP coupling, no transfer)."""
+    """Return an overlay of a real pseudo-segment (no BSP coupling, no transfer, no neighbour)."""
     shape = seg.x.shape  # ty: ignore[unresolved-attribute]
     zeros = np.zeros(shape, dtype=np.float32)
     return ov.TransferOverlay(
@@ -138,20 +209,89 @@ def target_window(*, p: Prepared, day: int) -> np.ndarray:
     return np.concatenate(rows, axis=0).astype(np.float32).copy()
 
 
+# --------------------------------------------------------------------------- neighbour channels
+
+
+def reading_change(*, window: np.ndarray) -> np.ndarray:
+    """Return D8's half-hour change of reading `(96,)`, zero wherever either half-hour is not shown.
+
+    A hidden or missing half-hour has a zero reading and a zero mask, so a change that touches one
+    is zero, and the sign of a hidden step never reaches the sign-aligned channel.
+    """
+    reading = window[ROW["r"]].astype(np.float64)
+    shown = window[ROW["r_mask"]] > 0.5
+    change = np.zeros_like(reading)
+    change[1:] = np.where(shown[1:] & shown[:-1], reading[1:] - reading[:-1], 0.0)
+    return change
+
+
+def neighbour_rows(
+    *, p: Prepared, start: int, window: np.ndarray, hidden: np.ndarray | None, real: bool = False
+) -> np.ndarray:
+    """Return the 12 neighbour channels `(12, 96)` of the window that starts at stack column `start`.
+
+    Args:
+        p: The prepared segment.
+        start: The window's first stack column.
+        window: The window's base channels `(N_BASE, 96)` after the hidden span is applied (the
+            reading and its mask give the sign-aligned channel).
+        hidden: The hidden positions `(96,)`, or None. A neighbour is hidden where D8 is.
+        real: Build from the stored neighbours, without the transfers' mirrors (a check reads this).
+
+    Returns:
+        The channels in the order of `NEIGHBOUR_NAMES`.
+    """
+    folded = (p.nb_folded_real if real else p.nb_folded)[:, start : start + STEPS]
+    change = reading_change(window=window)
+    rows = [
+        nb.channels(folded=folded[i], median=float(p.medians[i]), d8_change=change, hidden=hidden)
+        for i in range(len(nb.NEIGHBOURS))
+    ]
+    return np.concatenate(rows, axis=0).astype(np.float32)
+
+
+def plain_window(
+    *, p: Prepared, day: int, spec: core.ArmSpec732, hidden: np.ndarray | None, real: bool = False
+) -> np.ndarray:
+    """Return the plain window `w` `(C, 96)`: the 730 stack with the hidden span, then the neighbours."""
+    s = window_start(day=day)
+    out = p.base.stack[:, s : s + STEPS].copy()
+    if hidden is not None:
+        masks.apply_hidden(window=out, hidden=hidden)
+    if spec.neighbours:
+        rows = neighbour_rows(p=p, start=s, window=out, hidden=hidden, real=real)
+        out = np.concatenate([out, rows], axis=0)
+    return out
+
+
+def _zero_bsp(*, window: np.ndarray) -> None:
+    """Set the BSP-step channel and its mask to zero, in place."""
+    window[ROW["d_bsp"]] = 0.0
+    window[ROW["bsp_mask"]] = 0.0
+
+
+# --------------------------------------------------------------------------- the members
+
+
 def injected_window(
-    *, p: Prepared, day: int, plain: np.ndarray, delta_flat: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    *, p: Prepared, day: int, plain: np.ndarray, delta: np.ndarray, hidden: np.ndarray | None,
+    spec: core.ArmSpec732,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # fmt: skip
     """Return the injected member `w+` of a window, its `(8, 48)` targets, and the scored delta.
 
-    The reading channel is re-folded from the truth less delta and the segment's reactive floor
-    (zero where the reading is hidden or missing), and the BSP-step channel is the half-hour change
-    of the BSP meter less `beta * delta`. No other channel changes.
+    The reading channel is re-folded from the truth less delta and the segment's reactive floor on
+    the shown half-hours where delta is above zero, and the BSP-step channel is the half-hour change
+    of the BSP meter less `beta * delta`, so both channels equal the plain window's elsewhere. The
+    sign-aligned neighbour channels are rebuilt from the injected reading. No other channel changes.
 
     Args:
         p: The prepared segment.
         day: The scored day's dense index.
         plain: The plain window `(C, 96)`, after the hidden span is applied.
-        delta_flat: The extra injection over the whole dense axis, in points.
+        delta: The extra injection over the window's 97 half-hours (the half-hour before it
+            first), in points.
+        hidden: The hidden positions of the window, or None.
+        spec: The arm.
 
     Returns:
         The window, the targets of `w+` (truth less delta, solar plus delta, re-folded reading), and
@@ -159,24 +299,26 @@ def injected_window(
     """
     s = window_start(day=day)
     out = plain.copy()
+    here = delta[1:].astype(np.float64)
     x = p.base.targets[T["x"], s : s + STEPS]
-    delta = delta_flat[s : s + STEPS].astype(np.float64)
-    r_new = ov.refold(x=x - delta, q=p.q[s : s + STEPS])
-    shown = plain[ROW["r_mask"]] > 0.5
-    out[ROW["r"]] = np.where(shown, r_new / arms729.R_SCALE, 0.0)
-    ext = p.bsp[s - 1 : s + STEPS] - p.beta * delta_flat[s - 1 : s + STEPS]
-    d = np.diff(ext)
-    ok = np.isfinite(d)
-    out[ROW["d_bsp"]] = np.where(ok, d / arms729.BSP_SCALE, 0.0)
-    out[ROW["bsp_mask"]] = ok.astype(np.float32)
+    r_new = ov.refold(x=np.nan_to_num(x - here, nan=0.0), q=p.q[s : s + STEPS])
+    moved = (plain[ROW["r_mask"]] > 0.5) & (here != 0.0)
+    out[ROW["r"]] = np.where(moved, r_new / arms729.R_SCALE, plain[ROW["r"]])
+    step = np.diff(p.beta * delta.astype(np.float64))
+    shifted = (plain[ROW["bsp_mask"]] > 0.5) & (step != 0.0)
+    out[ROW["d_bsp"]] = np.where(
+        shifted, plain[ROW["d_bsp"]] - step / arms729.BSP_SCALE, plain[ROW["d_bsp"]]
+    )
+    if spec.neighbours:
+        out[N_BASE:] = neighbour_rows(p=p, start=s, window=out[:N_BASE], hidden=hidden)
     target = target_window(p=p, day=day)
-    scored = delta_flat[day * 48 : day * 48 + 48]
+    scored = delta[1 + MID : 1 + MID + 48].astype(np.float32)
     target[T["x"]] -= scored
     target[T["solar"]] += scored
     target[T["r"]] = np.nan_to_num(
         ov.refold(x=target[T["x"]], q=p.q[day * 48 : day * 48 + 48]), nan=0.0
     )
-    return out, target, scored.astype(np.float32)
+    return out, target, scored
 
 
 def raised_window(*, plain: np.ndarray, eps: float) -> np.ndarray:
@@ -210,6 +352,33 @@ def keeps_of(
 
 
 @dataclass
+class Triple:
+    """One window with its injected and raised members.
+
+    Attributes:
+        x: The plain window `(C, 96)`.
+        xi: The injected window (a copy of `x` where there is no pair), or None.
+        xc: The raised-sky window, or None.
+        t: The plain targets `(8, 48)`.
+        ti: The injected targets, or None.
+        keeps: `(7, 48)`.
+        delta: The scored delta `(48,)`.
+        delta_win: The delta over the window's 97 half-hours (zero without a pair).
+        hidden: The hidden positions `(96,)`.
+    """
+
+    x: np.ndarray
+    xi: np.ndarray | None
+    xc: np.ndarray | None
+    t: np.ndarray
+    ti: np.ndarray | None
+    keeps: np.ndarray
+    delta: np.ndarray
+    delta_win: np.ndarray
+    hidden: np.ndarray
+
+
+@dataclass
 class Batch:
     """A batch of triples.
 
@@ -223,6 +392,9 @@ class Batch:
         delta: The scored delta `(B, 48)` (zero where there is no pair).
         pair: 1.0 where the window has a pair (a sibling with output that day), else 0.0.
         amount: The injected amount of each window (0 without a pair).
+        delta_win: The delta over each window's 97 half-hours `(B, 97)`.
+        hidden: The hidden positions of each window `(B, 96)`.
+        picks: The `(segment index in prepared, dense day)` of each window.
     """
 
     x: np.ndarray
@@ -234,12 +406,15 @@ class Batch:
     delta: np.ndarray
     pair: np.ndarray
     amount: np.ndarray
+    delta_win: np.ndarray
+    hidden: np.ndarray
+    picks: list[tuple[int, int]]
 
 
 def build_triple(
     *, p: Prepared, day: int, spec: core.ArmSpec732, hidden: np.ndarray | None,
-    delta_flat: np.ndarray | None, eps: float | None,
-) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None, np.ndarray, np.ndarray | None, np.ndarray, np.ndarray]:  # fmt: skip
+    delta: np.ndarray | None, eps: float | None,
+) -> Triple:  # fmt: skip
     """Return one window and, when the arm needs them, its injected and raised members.
 
     Args:
@@ -247,43 +422,54 @@ def build_triple(
         day: The scored day's dense index (at least 1).
         spec: The arm.
         hidden: The hidden positions `(96,)` shared by the three members, or None.
-        delta_flat: The extra injection over the dense axis, or None when the window has no pair.
+        delta: The extra injection over the window's 97 half-hours (`window_delta`), or None when
+            the window has no pair.
         eps: The raised-sky factor, or None.
 
     Returns:
-        `w`, `w+` (a copy of `w` where `delta_flat` is None), `wc`, the targets of `w`, the targets
-        of `w+`, the keeps, and the scored delta.
+        The triple; its injected member is a copy of the plain window where `delta` is None.
     """
-    s = window_start(day=day)
-    plain = p.base.stack[:, s : s + STEPS].copy()
-    if hidden is not None:
-        masks.apply_hidden(window=plain, hidden=hidden)
+    plain = plain_window(p=p, day=day, spec=spec, hidden=hidden)
     target = target_window(p=p, day=day)
     keeps = keeps_of(p=p, day=day, window=plain, hidden=hidden, target=target)
     inj = inj_target = None
     scored = np.zeros(48, dtype=np.float32)
     if spec.inject:
-        if delta_flat is None:
+        if delta is None:
             inj, inj_target = plain.copy(), target.copy()
         else:
             inj, inj_target, scored = injected_window(
-                p=p, day=day, plain=plain, delta_flat=delta_flat
+                p=p, day=day, plain=plain, delta=delta, hidden=hidden, spec=spec
             )
     raised = None
     if spec.raised:
         raised = raised_window(plain=plain, eps=core.TEST_EPS if eps is None else eps)
-    return plain, inj, raised, target, inj_target, keeps, scored
+    if spec.bsp_zeroed:
+        for member in (plain, inj, raised):
+            if member is not None:
+                _zero_bsp(window=member)
+    return Triple(
+        x=plain, xi=inj, xc=raised, t=target, ti=inj_target, keeps=keeps, delta=scored,
+        delta_win=np.zeros(ov.WINDOW_DELTA_LEN, np.float32) if delta is None else delta.astype(np.float32),
+        hidden=np.zeros(STEPS, dtype=bool) if hidden is None else hidden,
+    )  # fmt: skip
 
 
 def collate(
-    *, parts: Sequence[tuple], pair: Sequence[bool], amount: Sequence[float], spec: core.ArmSpec732
-) -> Batch:
+    *, parts: Sequence[Triple], pair: Sequence[bool], amount: Sequence[float],
+    picks: Sequence[tuple[int, int]], spec: core.ArmSpec732,
+) -> Batch:  # fmt: skip
     """Stack the triples of a batch."""
-    xs, xis, xcs, ts, tis, ks, ds = zip(*parts, strict=True)
+
+    def stack(name: str) -> np.ndarray:
+        return np.stack([getattr(part, name) for part in parts])
+
     return Batch(
-        x=np.stack(xs), xi=np.stack(xis) if spec.inject else None, xc=np.stack(xcs) if spec.raised else None,
-        t=np.stack(ts), ti=np.stack(tis) if spec.inject else None, keeps=np.stack(ks), delta=np.stack(ds),
-        pair=np.asarray(pair, dtype=np.float32), amount=np.asarray(amount, dtype=np.float32),
+        x=stack("x"), xi=stack("xi") if spec.inject else None, xc=stack("xc") if spec.raised else None,
+        t=stack("t"), ti=stack("ti") if spec.inject else None, keeps=stack("keeps"),
+        delta=stack("delta"), pair=np.asarray(pair, dtype=np.float32),
+        amount=np.asarray(amount, dtype=np.float32), delta_win=stack("delta_win"),
+        hidden=stack("hidden"), picks=list(picks),
     )  # fmt: skip
 
 
@@ -293,36 +479,54 @@ def make_batch(
 ) -> Batch:  # fmt: skip
     """Return a training batch: hidden spans on half the windows, a sibling pair, and a raised sky.
 
+    The generator draws, in this order, one hidden-span decision per window, then the siblings and
+    amounts of all windows together (`draw_pairs`, one operation), then one raised-sky factor per
+    window, so a batch is the same whatever the schedule.
+
     Args:
         prepared: The prepared segments of the training bank.
         picks: `(segment index in prepared, dense day)` pairs.
         spec: The arm.
-        rng: The generator (one draw stream per fit, so a batch is the same whatever the schedule).
+        rng: The generator (one draw stream per fit).
         index: The pair index of the training bank, or None for an arm without the injected member.
 
     Returns:
         The batch. A window whose month has no other solar segment with output that day takes no pair.
     """
-    parts, pair, amount = [], [], []
+    hidden: list[np.ndarray | None] = []
     for seg_i, day in picks:
         p = prepared[seg_i]
-        hidden = None
-        if rng.uniform() < core729.MASK_PROBABILITY:
-            hidden = masks.hidden_positions(style=core.STYLE, rng=rng, utc_offset=p.offsets[day])
-        delta_flat = None
-        a = 0.0
-        if spec.inject and index is not None:
-            sib = ov.pick_sibling(index=index, segment=p.source_index, day=day, rng=rng)
-            a = ov.draw_amount(rng=rng)
-            if sib is not None:
-                delta_flat = ov.delta_flat(index=index, sibling=sib, amount=a)
-        eps = float(rng.uniform(*core.EPS_RANGE)) if spec.raised else None
-        parts.append(
-            build_triple(p=p, day=day, spec=spec, hidden=hidden, delta_flat=delta_flat, eps=eps)
+        masked = rng.uniform() < core729.MASK_PROBABILITY
+        hidden.append(
+            masks.hidden_positions(style=core.STYLE, rng=rng, utc_offset=p.offsets[day])
+            if masked
+            else None
         )
-        pair.append(delta_flat is not None)
-        amount.append(a if delta_flat is not None else 0.0)
-    return collate(parts=parts, pair=pair, amount=amount, spec=spec)
+    paired = spec.inject and index is not None
+    draw = (
+        ov.draw_pairs(
+            index=index,
+            segments=[prepared[i].source_index for i, _ in picks],
+            days=[d for _, d in picks],
+            rng=rng,
+        )
+        if paired and index is not None
+        else None
+    )
+    eps = rng.uniform(*core.EPS_RANGE, size=len(picks)) if spec.raised else None
+    parts, pair, amount = [], [], []
+    for k, (seg_i, day) in enumerate(picks):
+        has_pair = draw is not None and draw.sibling[k] >= 0
+        parts.append(
+            build_triple(
+                p=prepared[seg_i], day=day, spec=spec, hidden=hidden[k],
+                delta=draw.delta[k] if draw is not None and has_pair else None,
+                eps=None if eps is None else float(eps[k]),
+            )
+        )  # fmt: skip
+        pair.append(has_pair)
+        amount.append(float(draw.amount[k]) if draw is not None and has_pair else 0.0)
+    return collate(parts=parts, pair=pair, amount=amount, picks=picks, spec=spec)
 
 
 def make_eval_batch(
@@ -349,24 +553,20 @@ def make_eval_batch(
     parts, pair, amt = [], [], []
     for i, (seg_i, day) in enumerate(picks):
         p = prepared[seg_i]
-        delta_flat = None
+        delta = None
         if amount is not None and index is not None:
             sib = ov.fixed_sibling(index=index, segment=p.source_index, day=day)
             if sib is not None:
-                delta_flat = ov.delta_flat(index=index, sibling=sib, amount=amount)
+                delta = ov.window_delta(index=index, sibling=sib, amount=amount, day=day)
         parts.append(
             build_triple(
-                p=p,
-                day=day,
-                spec=spec,
-                hidden=None if hidden is None else hidden[i],
-                delta_flat=delta_flat,
-                eps=eps,
+                p=p, day=day, spec=spec, hidden=None if hidden is None else hidden[i],
+                delta=delta, eps=eps,
             )
-        )
-        pair.append(delta_flat is not None)
-        amt.append(amount if delta_flat is not None and amount is not None else 0.0)
-    batch = collate(parts=parts, pair=pair, amount=amt, spec=spec)
+        )  # fmt: skip
+        pair.append(delta is not None)
+        amt.append(amount if delta is not None and amount is not None else 0.0)
+    batch = collate(parts=parts, pair=pair, amount=amt, picks=picks, spec=spec)
     if hide_bsp:
         for member in (batch.x, batch.xi, batch.xc):
             if member is not None:
@@ -375,9 +575,14 @@ def make_eval_batch(
     return batch
 
 
-def eval_spec(*, inject: bool = False, raised: bool = False) -> core.ArmSpec732:
+def eval_spec(
+    *, inject: bool = False, raised: bool = False, neighbours: bool = True, bsp_zeroed: bool = False
+) -> core.ArmSpec732:
     """Return an arm that builds the members an evaluation needs (the weights play no role)."""
-    return core.ArmSpec732("eval", "unet", True, core.BASE_WEIGHTS, inject=inject, raised=raised)
+    return core.ArmSpec732(
+        "eval", "unet", True, core.BASE_WEIGHTS, inject=inject, raised=raised,
+        neighbours=neighbours, bsp_zeroed=bsp_zeroed,
+    )  # fmt: skip
 
 
 def input_equals_target(
@@ -420,3 +625,252 @@ def sample_picks(
 ) -> list[tuple[int, int]]:
     """Draw `n` picks, half from segments with real BSP steps (experiment 729's sampler)."""
     return arms729.sample_picks(prepared=prepared, n=n, rng=rng)  # ty: ignore[invalid-argument-type]
+
+
+# --------------------------------------------------------------------------- checks on the tensors
+
+TENSOR_BARS: Final = {
+    "mirror_edges": core.EXACT_SHARE,
+    "aligned_nonzero": core.EXACT_SHARE,
+    "aligned_exact": core.EXACT_SHARE,
+    "aligned_reading_not_truth": core.EXACT_SHARE,
+    "hidden_zero": core.EXACT_SHARE,
+    "injected_reading_on_delta": core.EXACT_SHARE,
+    "injected_reading_elsewhere": core.EXACT_SHARE,
+    "injected_bsp_on_delta": core.EXACT_SHARE,
+    "injected_bsp_elsewhere": core.EXACT_SHARE,
+    "raised_above": core.EXACT_SHARE,
+    "solar_target_positive": core.MIN_SOLAR_TARGET_SHARE,
+    "channel_count": core.EXACT_SHARE,
+    "bsp_zero": core.EXACT_SHARE,
+}
+"""The bar of each check on the tensors: all need 1.0 except the solar target (99%)."""
+DETECTABLE: Final = 1e-5
+"""The smallest change of a scaled channel that a check requires to be present."""
+
+
+def _share(*, passed: int, n: int) -> ov.Share:
+    """Return a share, with an empty counter as `n` of 0 (which fails)."""
+    return ov.Share(passed / n if n else 0.0, n)
+
+
+def _members(*, batch: Batch) -> list[np.ndarray]:
+    """Return the batch's window tensors (the plain, injected, and raised members that exist)."""
+    return [m for m in (batch.x, batch.xi, batch.xc) if m is not None]
+
+
+def check_mirror_edges(
+    *, batch: Batch, prepared: Sequence[Prepared], spec: core.ArmSpec732
+) -> ov.Share:
+    """At each scored edge of a mirrored transfer, only the partner's channels differ from the window built without the overlay.
+
+    The partner's value channel (at the edge half-hour or the one before) or its change channel
+    differs, and the other two neighbours' value and change channels do not.
+    """
+    passed = n = 0
+    for k, (seg_i, day) in enumerate(batch.picks):
+        p = prepared[seg_i]
+        start = window_start(day=day)
+        hidden = batch.hidden[k]
+        real = plain_window(
+            p=p, day=day, spec=spec, hidden=hidden if hidden.any() else None, real=True
+        )
+        for tr in p.transfers:
+            if not tr.mirrored:
+                continue
+            i = nb.NEIGHBOURS.index(tr.partner)
+            for hh in (tr.start_half_hour, tr.end_half_hour):
+                col = hh - start
+                if not (MID <= col < MID + 48) or hidden[col] or hidden[col - 1]:
+                    continue
+                others = [
+                    o
+                    for o in p.transfers
+                    if o is not tr and o.start_half_hour <= hh and o.end_half_hour >= hh - 1
+                ]
+                if others or not np.isfinite(p.nb_folded[i, hh - 1 : hh + 1]).all():
+                    continue
+                n += 1
+                ok = True
+                for j, name in enumerate(nb.NEIGHBOURS):
+                    # a transfer that ends on a half-hour boundary leaves the value of its end
+                    # half-hour alone, so the value is read at the edge and the half-hour before it
+                    value = NB_ROW[f"{name}_value"]
+                    changed = (
+                        batch.x[k, value, col - 1 : col + 1] != real[value, col - 1 : col + 1]
+                    ).any() or batch.x[k, NB_ROW[f"{name}_change"], col] != real[
+                        NB_ROW[f"{name}_change"], col
+                    ]
+                    ok &= bool(changed) if j == i else not bool(changed)
+                passed += ok
+    return _share(passed=passed, n=n)
+
+
+def check_aligned(*, batch: Batch) -> dict[str, ov.Share]:
+    """The sign-aligned channel is the neighbour's change times the sign of D8's change of reading, never the truth's."""
+    nonzero = [0, 0]
+    exact = [0, 0]
+    discriminating = [0, 0]
+    truth_step = np.sign(np.diff(batch.t[:, T["x"]], axis=1))
+    for member in (m for m in (batch.x, batch.xi) if m is not None):
+        for b in range(len(member)):
+            sign = np.sign(reading_change(window=member[b][:N_BASE]))
+            for name in nb.NEIGHBOURS:
+                change = member[b, NB_ROW[f"{name}_change"]]
+                aligned = member[b, NB_ROW[f"{name}_aligned"]]
+                want = change * sign
+                right = np.isclose(aligned, want, atol=1e-6)
+                exact[0] += int(right.sum())
+                exact[1] += right.size
+                both = (change != 0) & (sign != 0)
+                nonzero[0] += int((right & (aligned != 0) & both).sum())
+                nonzero[1] += int(both.sum())
+                scored = slice(MID + 1, MID + 48)
+                differs = (
+                    both[scored] & (sign[scored] != truth_step[b, :47]) & (truth_step[b, :47] != 0)
+                )
+                discriminating[0] += int((right[scored] & differs).sum())
+                discriminating[1] += int(differs.sum())
+    return {
+        "aligned_nonzero": _share(passed=nonzero[0], n=nonzero[1]),
+        "aligned_exact": _share(passed=exact[0], n=exact[1]),
+        "aligned_reading_not_truth": _share(passed=discriminating[0], n=discriminating[1]),
+    }
+
+
+def check_hidden(*, batch: Batch) -> ov.Share:
+    """All 12 neighbour channels are zero on every hidden half-hour of every member."""
+    passed = n = 0
+    for member in _members(batch=batch):
+        rows = member[:, N_BASE:]
+        for b in range(len(member)):
+            cols = np.flatnonzero(batch.hidden[b])
+            n += cols.size
+            passed += int((np.abs(rows[b][:, cols]).sum(axis=0) == 0).sum())
+    return _share(passed=passed, n=n)
+
+
+def check_injected(*, batch: Batch, prepared: Sequence[Prepared]) -> dict[str, ov.Share]:
+    """The injected member's reading and BSP channels differ from the plain window's on half-hours with extra output, and nowhere else."""
+    counts = {k: [0, 0] for k in ("reading_on", "reading_off", "bsp_on", "bsp_off")}
+    if batch.xi is not None:
+        for k in np.flatnonzero(batch.pair > 0.5):
+            seg_i, day = batch.picks[k]
+            p = prepared[seg_i]
+            s = window_start(day=day)
+            delta = batch.delta_win[k].astype(np.float64)
+            x, xi = batch.x[k], batch.xi[k]
+            shown = x[ROW["r_mask"]] > 0.5
+            old = ov.refold(
+                x=np.nan_to_num(p.base.targets[T["x"], s : s + STEPS]), q=p.q[s : s + STEPS]
+            )
+            new = ov.refold(
+                x=np.nan_to_num(p.base.targets[T["x"], s : s + STEPS]) - delta[1:],
+                q=p.q[s : s + STEPS],
+            )
+            moves = shown & (np.abs(new - old) / arms729.R_SCALE > DETECTABLE)
+            differs = xi[ROW["r"]] != x[ROW["r"]]
+            counts["reading_on"][0] += int((differs & moves).sum())
+            counts["reading_on"][1] += int(moves.sum())
+            still = delta[1:] == 0.0
+            counts["reading_off"][0] += int((~differs & still).sum())
+            counts["reading_off"][1] += int(still.sum())
+            step = np.diff(p.beta * delta)
+            present = x[ROW["bsp_mask"]] > 0.5
+            bsp_moves = present & (np.abs(step) / arms729.BSP_SCALE > DETECTABLE)
+            bsp_differs = xi[ROW["d_bsp"]] != x[ROW["d_bsp"]]
+            counts["bsp_on"][0] += int((bsp_differs & bsp_moves).sum())
+            counts["bsp_on"][1] += int(bsp_moves.sum())
+            flat = step == 0.0
+            counts["bsp_off"][0] += int((~bsp_differs & flat).sum())
+            counts["bsp_off"][1] += int(flat.sum())
+    return {
+        "injected_reading_on_delta": _share(passed=counts["reading_on"][0], n=counts["reading_on"][1]),
+        "injected_reading_elsewhere": _share(passed=counts["reading_off"][0], n=counts["reading_off"][1]),
+        "injected_bsp_on_delta": _share(passed=counts["bsp_on"][0], n=counts["bsp_on"][1]),
+        "injected_bsp_elsewhere": _share(passed=counts["bsp_off"][0], n=counts["bsp_off"][1]),
+    }  # fmt: skip
+
+
+def check_raised(*, batch: Batch) -> ov.Share:
+    """The raised member's clear-sky index is above the plain window's on every raisable half-hour."""
+    if batch.xc is None:
+        return _share(passed=0, n=0)
+    plain = batch.x[:, ROW["csi"]]
+    mask = ov.raisable(csi=plain, cosz=batch.x[:, ROW["cosz"]])
+    return _share(
+        passed=int((batch.xc[:, ROW["csi"]][mask] > plain[mask]).sum()), n=int(mask.sum())
+    )
+
+
+def check_solar_target(*, batch: Batch, prepared: Sequence[Prepared]) -> ov.Share:
+    """The solar target is above zero on the sun-up half-hours of clear days in solar-world windows."""
+    passed = n = 0
+    for k, (seg_i, _) in enumerate(batch.picks):
+        if prepared[seg_i].world not in ov.SOLAR_WORLDS:
+            continue
+        scored = slice(MID, MID + 48)
+        up = (batch.x[k, ROW["cosz"], scored] > core.SUN_UP_COSZ) & (batch.t[k, T["valid"]] > 0.5)
+        csi = batch.x[k, ROW["csi"], scored]
+        if not up.any() or csi[up].mean() < core.CLEAR_DAY_CSI:
+            continue
+        n += int(up.sum())
+        passed += int((batch.t[k, T["solar"]][up] > 0.0).sum())
+    return _share(passed=passed, n=n)
+
+
+def check_arm_inputs(*, batch: Batch, spec: core.ArmSpec732) -> dict[str, ov.Share]:
+    """A batch of an arm has the channels the arm reads: no neighbour channel for U-N, and a zero BSP channel and mask for U-noBSP."""
+    members = _members(batch=batch)
+    out = {
+        "channel_count": _share(
+            passed=sum(m.shape[1] == n_channels(spec=spec) for m in members), n=len(members)
+        )
+    }
+    if spec.bsp_zeroed:
+        zero = sum(
+            int(not m[:, [ROW["d_bsp"], ROW["bsp_mask"]]].any(axis=(1, 2)).any()) for m in members
+        )
+        out["bsp_zero"] = _share(passed=zero, n=len(members))
+    return out
+
+
+def tensor_checks(
+    *, batch: Batch, prepared: Sequence[Prepared], spec: core.ArmSpec732
+) -> dict[str, ov.Share]:
+    """Return every check on a built batch that applies to the arm (a failure stops the line at verdict row 0).
+
+    Args:
+        batch: A batch built by `make_batch` or `make_eval_batch`.
+        prepared: The prepared segments the batch was built from.
+        spec: The arm the batch was built for.
+
+    Returns:
+        The share of cases that pass each check. A check with no case fails, so a batch that never
+        exercises a component is a failure.
+    """
+    out: dict[str, ov.Share] = check_arm_inputs(batch=batch, spec=spec)
+    if out["channel_count"].value < 1.0:
+        return out  # the other checks index channels that a wrong-shaped batch does not have
+    if spec.neighbours:
+        out["mirror_edges"] = check_mirror_edges(batch=batch, prepared=prepared, spec=spec)
+        out.update(check_aligned(batch=batch))
+        out["hidden_zero"] = check_hidden(batch=batch)
+    if spec.inject:
+        injected = check_injected(batch=batch, prepared=prepared)
+        if spec.bsp_zeroed:
+            injected = {k: v for k, v in injected.items() if "bsp" not in k}
+        out.update(injected)
+    if spec.raised:
+        out["raised_above"] = check_raised(batch=batch)
+    out["solar_target_positive"] = check_solar_target(batch=batch, prepared=prepared)
+    return out
+
+
+def tensor_problems(*, checks: Mapping[str, ov.Share]) -> list[str]:
+    """Return the checks below their bar (an empty counter fails)."""
+    return [
+        name
+        for name, share in checks.items()
+        if not ov.share_passes(share=share, bar=TENSOR_BARS[name])
+    ]

@@ -212,7 +212,7 @@ def fit_one(
         device=device, val_index=sets.val_index, max_epochs=max_epochs, out_path=root / "networks" / f"{name}.pt", log=log,
     )  # fmt: skip
     probe = torch.from_numpy(
-        np.random.default_rng(seed).normal(size=(2, arms.N_CHANNELS, arms.STEPS)).astype(np.float32)
+        np.random.default_rng(seed).normal(size=(2, arms.n_channels(spec=spec), arms.STEPS)).astype(np.float32)
     ).to(device)
     assert_net_checks(net=net.to(device), spec=spec, x=probe)
     store_predictions(
