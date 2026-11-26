@@ -60,7 +60,9 @@ def build_neighbours(*, base: stages.BaseDays) -> dict[str, np.ndarray]:
     return nb.build_arrays(dates=base.dates, log=guard.ReadLog())
 
 
-def real_env(*, root: Path, ctx: stages729.Context, base: stages.BaseDays, with_real: bool) -> stages.Env:
+def real_env(
+    *, root: Path, ctx: stages729.Context, base: stages.BaseDays, with_real: bool
+) -> stages.Env:
     """Return the stages' environment from the real files (the neighbour table and medians must exist).
 
     Args:
@@ -75,11 +77,15 @@ def real_env(*, root: Path, ctx: stages729.Context, base: stages.BaseDays, with_
     """
     arrays, medians = stages.read_neighbour_inputs(root=root, base=base)
     if not with_real:
-        return stages.Env(holidays=ctx.cal.holidays, stats=ctx.stats, neighbours=arrays, medians=medians)
+        return stages.Env(
+            holidays=ctx.cal.holidays, stats=ctx.stats, neighbours=arrays, medians=medians
+        )
     import e00722_guard as guard
 
     table_dates = ctx.table.calendar.dates
-    real_neighbours = nb.build_arrays(dates=table_dates, log=guard.ReadLog(), name="neighbours_real_days")
+    real_neighbours = nb.build_arrays(
+        dates=table_dates, log=guard.ReadLog(), name="neighbours_real_days"
+    )
     return stages.Env(
         holidays=ctx.cal.holidays, stats=ctx.stats, neighbours=arrays, medians=medians,
         real_sets=lambda: stages729.real_sets(ctx=ctx), real_neighbours=real_neighbours,
@@ -132,23 +138,38 @@ def dispatch(*, args: argparse.Namespace, root: Path, root730: Path) -> int:
         stages.stage_banks(root=root, root730=root730, holidays=holidays, log=log)
     elif stage == "neighbours":
         stages.stage_neighbours(
-            root=root, root730=root730, base=base, build=lambda: build_neighbours(base=base), log=log
+            root=root,
+            root730=root730,
+            base=base,
+            build=lambda: build_neighbours(base=base),
+            log=log,
         )
     elif stage == "limits":
         arrays, _ = stages.read_neighbour_inputs(root=root, base=base)
-        stages.stage_limits(root=root, root730=root730, holidays=holidays, base=base, arrays=arrays, log=log)
+        stages.stage_limits(
+            root=root, root730=root730, holidays=holidays, base=base, arrays=arrays, log=log
+        )
     elif stage == "overlays":
         arrays, _ = stages.read_neighbour_inputs(root=root, base=base)
-        stages.stage_overlays(root=root, root730=root730, holidays=holidays, neighbours=arrays, log=log)
+        stages.stage_overlays(
+            root=root, root730=root730, holidays=holidays, neighbours=arrays, log=log
+        )
     elif stage == "tensor":
         stages.stage_tensor_checks(
-            root=root, root730=root730, env=real_env(root=root, ctx=ctx, base=base, with_real=False), log=log
+            root=root,
+            root730=root730,
+            env=real_env(root=root, ctx=ctx, base=base, with_real=False),
+            log=log,
         )
     elif stage == "gallery":
         import e00732_gallery as gallery
 
         results = gallery.stage_gallery(
-            root=root, root730=root730, env=real_env(root=root, ctx=ctx, base=base, with_real=False), base=base, log=log
+            root=root,
+            root730=root730,
+            env=real_env(root=root, ctx=ctx, base=base, with_real=False),
+            base=base,
+            log=log,
         )
         log(f"gallery: {sum(results.values())} of {len(results)} panels pass their automatic check")
     elif stage in ("timing", "fit", "chain"):
@@ -165,7 +186,13 @@ def dispatch(*, args: argparse.Namespace, root: Path, root730: Path) -> int:
             def run_one(arm: str, arch: str, seed: int) -> dict:
                 del arch
                 return fit.fit_one(
-                    root=root, root730=root730, env=env, arm=arm, seed=seed, device=args.device, log=log
+                    root=root,
+                    root730=root730,
+                    env=env,
+                    arm=arm,
+                    seed=seed,
+                    device=args.device,
+                    log=log,
                 )
 
             if stage == "fit":

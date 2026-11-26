@@ -29,10 +29,17 @@ def check_experiment_730_files() -> str:
     import e00732_stages as stages
 
     root = e00732_paths.root_730()
-    banks = {k: banks730.bank_path(root=root, kind=k).exists() for k in ("validation", "test", "shifted")}
+    banks = {
+        k: banks730.bank_path(root=root, kind=k).exists() for k in ("validation", "test", "shifted")
+    }
     banks["train seed 0"] = banks730.bank_path(root=root, kind="train", seed=0).exists()
     stored = {
-        arm: (root / "predictions" / f"{stages.CONTROL_FOLDERS[arm][0]}_{stages.CONTROL_FOLDERS[arm][1]}_s0" / "test.npz").exists()
+        arm: (
+            root
+            / "predictions"
+            / f"{stages.CONTROL_FOLDERS[arm][0]}_{stages.CONTROL_FOLDERS[arm][1]}_s0"
+            / "test.npz"
+        ).exists()
         for arm in ("S", "S-L", "SD*")
     }
     return (
@@ -48,7 +55,9 @@ def check_neighbour_sources() -> str:
     import e00722_guard as guard
 
     ids = common722.load_topology().ids_of(labels=nb.NEIGHBOURS)
-    grids = data722.load_power(ids=[ids[n] for n in nb.NEIGHBOURS], log=guard.ReadLog(), name="smoke")
+    grids = data722.load_power(
+        ids=[ids[n] for n in nb.NEIGHBOURS], log=guard.ReadLog(), name="smoke"
+    )
     return (
         f"neighbours with an id: {len(ids)} of {len(nb.NEIGHBOURS)}; "
         f"each has power rows: {all(len(grids[ids[n]]) > 0 for n in nb.NEIGHBOURS)}; "
@@ -82,7 +91,9 @@ def check_real_day_neighbours() -> str:
     del base
     import e00722_guard as guard
 
-    arrays = nb.build_arrays(dates=ctx.table.calendar.dates, log=guard.ReadLog(), name="smoke_real_days")
+    arrays = nb.build_arrays(
+        dates=ctx.table.calendar.dates, log=guard.ReadLog(), name="smoke_real_days"
+    )
     cover = nb.coverage(table=arrays, reading=ctx.table.calendar.reading)
     return f"coverage of the whole day table by neighbour at least {nb.MIN_COVERAGE}: {all(v >= nb.MIN_COVERAGE for v in cover.values())}, shape ok: {all(a.shape[0] == len(ctx.table.calendar.dates) for a in arrays.values())}"
 
@@ -93,7 +104,9 @@ def check_real_sets() -> str:
     import e00732_cli as cli
 
     sets = stages729.real_sets(ctx=cli.real_context())
-    return f"real sets built: {sorted(sets)}, each non-empty: {all(len(v) > 0 for v in sets.values())}"
+    return (
+        f"real sets built: {sorted(sets)}, each non-empty: {all(len(v) > 0 for v in sets.values())}"
+    )
 
 
 def check_closure_edges() -> str:
@@ -111,7 +124,9 @@ def check_private_splits() -> str:
 
 def check_timing_inputs() -> str:
     """Check that the constants the timing gate reads are present."""
-    return f"stop line {core.STOP_LINE_HOURS} GPU-process-hours, timing arms {len(core.TIMING_ARMS)}"
+    return (
+        f"stop line {core.STOP_LINE_HOURS} GPU-process-hours, timing arms {len(core.TIMING_ARMS)}"
+    )
 
 
 CHECKS: dict[str, Callable[[], str]] = {

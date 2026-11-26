@@ -643,7 +643,9 @@ a unit test that does not fail is verdict row 1.
   the sign of the change of the truth x.
 - All 12 neighbour channels are zero on every half-hour of a hidden span.
 - The reading channel and the BSP channel of the injected member w⁺ differ from those of w on
-  half-hours with δ above zero, and on no other half-hour.
+  half-hours with δ above zero, and on no other half-hour. The sign-aligned channel of w⁺ may also
+  differ from that of w on a half-hour next to a half-hour with δ above zero, because the change of
+  D8's reading there differs.
 - The CAMS channel of the raised-sky member w^c is above that of w on every raisable half-hour.
 - The solar target is above zero on at least 99% of the sun-up half-hours of clear days in
   solar-world windows.
@@ -846,7 +848,8 @@ beat hourly residuals, and experiments 714 and 709 found that a step needs a cle
 so each feature is a step statistic (the mean of the next 2 hours minus the mean of the previous 2
 hours) divided by the series' noise unit. The inputs of B-T at each half-hour are the absolute step
 of D8's reading, the absolute step of the synthetic BSP meter, the absolute difference between
-those two steps in points, and the cosine of the solar zenith angle.
+those two steps in points, and the cosine of the solar zenith angle. The synthetic BSP meter's step
+is divided by D8's noise unit, because both series are in points.
 
 **B-TN adds three neighbour features, each taken from an earlier neighbour detector.**
 

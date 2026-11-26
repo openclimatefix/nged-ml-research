@@ -181,3 +181,49 @@ def stage_loss_curves(*, root: Path, log) -> list[Path]:  # noqa: ANN001
     save_svg(chart=loss_curves_chart(records=records), path=path)
     log(f"loss curves drawn for {len(records)} arms; checks {sum(checks.values())}/{len(checks)}")
     return [path]
+
+
+def contrast_rows(*, readings: Mapping[str, Mapping[str, float | bool]]) -> pl.DataFrame:
+    """Return one row per counted contrast with its point, interval ends, and whether the reading is void (a void reading draws nothing)."""
+    return pl.DataFrame(
+        [
+            {"contrast": name, "point": float(r["point"]), "lower": float(r["lower"]), "upper": float(r["upper"]), "void": bool(r["void"])}
+            for name, r in readings.items()
+        ],
+        schema={"contrast": pl.Utf8, "point": pl.Float64, "lower": pl.Float64, "upper": pl.Float64, "void": pl.Boolean},
+    )  # fmt: skip
+
+
+def contrast_chart(*, readings: Mapping[str, Mapping[str, float | bool]]) -> alt.LayerChart:
+    """Return the counted contrasts as points with their intervals around a labelled zero rule (a negative value favours the first arm).
+
+    Raises:
+        HistoryError: When every reading is void, because the chart would be empty.
+    """
+    data = contrast_rows(readings=readings).filter(~pl.col("void"))
+    if data.height == 0:
+        msg = "every counted contrast is void"
+        raise HistoryError(msg)
+    base = alt.Chart(data).encode(y=alt.Y("contrast:N", title=None, sort=list(readings)))
+    bars = base.mark_rule(color=figures729.BLUE, aria=False).encode(
+        x=alt.X(
+            "lower:Q",
+            title="Contrast in mean score (negative: the first arm is better; Bonferroni 99.286% interval)",
+        ),
+        x2="upper:Q",
+    )  # ty: ignore[unresolved-attribute]
+    dots = base.mark_point(filled=True, color=figures729.BLUE, size=60, aria=False).encode(
+        x="point:Q"
+    )  # ty: ignore[unresolved-attribute]
+    zero = (
+        alt.Chart(pl.DataFrame({"z": [0.0]}))
+        .mark_rule(color="#000000", strokeDash=[3, 3], aria=False)
+        .encode(x="z:Q")
+    )  # ty: ignore[unresolved-attribute]
+    return (bars + dots + zero).properties(
+        width=WIDTH_PX,
+        height=160,
+        title=alt.TitleParams(
+            "The seven counted contrasts C1 to C7, with the zero rule", anchor="start"
+        ),
+    )

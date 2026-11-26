@@ -391,3 +391,56 @@ def test_the_gallery_stage_writes_published_and_private_panels_and_the_check_fil
     record = gallery.record_panel_check(root=root, root730=root730, confirms=confirms)
     assert record["panels"] == auto["panels"]  # the reading cannot turn a failed check into a pass
     assert not gallery.record_panel_check(root=root, root730=root730, confirms=dict.fromkeys(confirms, False))["all_passed"]
+
+
+def _write_stub_predictions(*, root, truth_rows: int) -> None:
+    """Write seed folders for U* with invented outputs of the right row count (the plain, transfer, injection, and raised sets)."""
+    rng = np.random.default_rng(0)
+    spec = core.ARMS["U*"]
+    for s in core.SEEDS:
+        folder = root / "predictions" / core.job_name(arm="U*", arch=spec.arch, seed=s)
+        folder.mkdir(parents=True)
+        base = {
+            "p": rng.uniform(0, 0.02, truth_rows), "pv": rng.uniform(0, 5, truth_rows),
+            "step_p": rng.uniform(0, 0.1, truth_rows), "size": rng.normal(0, 1, truth_rows),
+        }  # fmt: skip
+        for name in ("test", "test_transfer", "test_raised", *(f"test_inj_{a:g}" for a in core.TEST_INJECTION_POINTS)):
+            np.savez(folder / f"{name}.npz", **{k: v.astype(np.float32) for k, v in base.items()})
+
+
+def test_the_score_stage_reads_stored_arms_and_leaves_a_missing_arm_void(gated, folders) -> None:
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    record = report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert record["n_rows"] == world["n"] and "U*" in record["arms_present"]
+    c = record["readings"]["counted"]
+    assert c["C1"]["void"] is False  # U* and the stored S are both present
+    assert c["C6"]["void"] is True  # S+ was not fitted: a missing arm is void, never zero
+    verdict = report.stage_report(root=root, root730=root730, env=env, base=world["base"], log=print)
+    # H2 was not read (no real-day predictions) and S+ is missing: the run is "failed" (row 2), never a silent row 6
+    assert verdict["row"] == 2 and "H2" in str(verdict["reason"])
+
+
+def test_the_series_and_figures_stages_draw_windows_and_the_contrast_chart(gated, folders) -> None:
+    import e00732_report as report
+
+    root, root730, env = gated
+    world = folders[2]
+    stages.stage_overlays(
+        root=root, root730=root730, holidays=world["cal"].holidays, log=print, train_seeds=(0, 1),
+        neighbours=world["neighbours"],
+    )  # fmt: skip
+    _write_stub_predictions(root=root, truth_rows=world["n"])
+    report.stage_score(root=root, root730=root730, env=env, base=world["base"], log=print)
+    result = report.stage_series(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert result["drawn"] and list((root / "figures" / "series").glob("series_W*.svg"))
+    assert not list((root / "figures" / "series").glob("*.svg"))[0].read_text().count("2022-")
+    report.stage_figures(root=root, root730=root730, env=env, base=world["base"], log=print)
+    assert (root / "figures" / "contrasts.svg").exists()
