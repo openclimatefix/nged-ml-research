@@ -70,8 +70,21 @@ degradation rule, so an experiment never touches either.
   manager, use Opus only when the experiment is very complex or the result is very surprising,
   because two Opus reviews per experiment use too much quota.
 
-**Smoke-test the reviewed code on a small input before the first fit whose numbers you will
-quote.** A small run catches a crash or a silent zero before the full run spends its compute.
+**Run a real-environment smoke test before the first fit whose numbers you will quote, and do not
+treat a code review as a substitute for the smoke test.** The unit tests and the review read code
+that has never run on the real device or the real files. In experiment 732, two bugs failed every
+fit within seconds, because both sat on the `cuda` branch that every CPU test skipped: a call to a
+function that does not exist, and a CUDA tensor passed to `.numpy()`. The smoke test has three
+parts.
+
+- **Run one epoch of every arm on the real GPU and the real files, in a scratch folder outside the
+  data folder.** Take each arm through the network checks, the prediction step, and a read of the
+  stored output by the scoring code.
+- **Run every later stage once on validation rows only** (score, report, figures), and never touch
+  the test months.
+- **Keep three cheap guards in the code.** Add a test that every attribute taken from an imported
+  module exists. Make the failure record store the exception message and the traceback. Make a
+  failed chain exit with a non-zero code that differs from the launcher's "slot busy" code.
 
 Either size then runs the triggers in "Audit before merge", below, and gets an audit if one fires.
 
