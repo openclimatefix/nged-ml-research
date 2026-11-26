@@ -91,24 +91,26 @@ verdict: not supported
 best_arm: >-
   S, the sign-only arm on the U-net (a convolutional neural network with skip connections), with no
   demand output. It has the lowest Brier score on all test rows (0.00853) and the lowest H1 mean of
-  any arm (0.00453). No arm with a demand output beats it. All numbers are interim.
+  any arm (0.00453). Every arm with a demand output has a worse point estimate on both. All numbers
+  are interim.
 headline: >-
-  Adding a demand output did not make the probability of reverse flow better: on the synthetic test
-  days, SD* (the chosen demand-output arm) scored a Brier score 0.00105 worse than the sign-only arm
-  S (interval -0.00011 to +0.00222), and SD* failed the harm check H1 (false alarms on import
-  half-hours) narrowly: mean P(X<0) of 0.00744 on import half-hours with a reading of at least 1
-  MVA, against a limit of 0.0071. On the import half-hours with a reading of 1 to 3 MVA, the mean
-  P(X<0) is 0.083 for S and 0.136 for SD*, far above the limit. All numbers are interim.
+  Adding a demand output did not make the probability of reverse flow better on the synthetic test
+  days. SD* (the chosen demand-output arm) scored a Brier score 0.00105 higher (worse) than the
+  sign-only arm S, but the interval (-0.00011 to +0.00222) includes zero. SD* failed the harm check
+  H1 (false alarms on import half-hours) narrowly, with a mean P(X<0) of 0.00744 against a limit of
+  0.0071, because it over-forecasts: on import half-hours with a reading of 1 to 3 MVA its mean
+  P(X<0) is 0.136 against 0.083 for S, and 0.083 is the limit that the plan's formula gives for that
+  band. All numbers are interim.
 lessons: >-
-  The demand output worsened the sign probability in every design tried: without hidden input it was
-  0.00168 worse than S, random spans of hidden input recovered 0.00063 of that difference, and no
-  arm beat S. The demand output itself works, with an error of 3.6 to 4.1 points of capacity on
-  hidden half-hours against 7.03 for the demand climatology. Pre-training the encoders and the
-  transformer made no detectable difference. Every arm is uncertain where the reading is 1 to 3 MVA,
-  because 25% of those half-hours are reverse flow and an import half-hour looks the same. The first
-  run of the real-day stage stopped on a correctness failure that was a gap in the metered engine
-  record, and a sky-gap bug in experiment 729's simulator was found in the gallery before any fit.
-  All numbers are interim.
+  Every point estimate puts the arms with a demand output behind the sign-only arm S, and one
+  comparison is detectable: SD-0 (a demand output with no hidden input) minus S is +0.00168 in Brier
+  score. Random spans of hidden input recovered 0.00063 of that difference. The demand output itself
+  works, with an error of 3.6 to 4.1 points of capacity on hidden half-hours against 7.03 for the
+  demand climatology. Pre-training the encoders and the transformer made no detectable difference.
+  Every arm is uncertain where the reading is 1 to 3 MVA, because 25% of those half-hours are
+  reverse flow and an import half-hour looks the same. The first run of the real-day stage stopped
+  on a correctness failure that was a gap in the metered engine record, and a sky-gap bug in
+  experiment 729's simulator was found in the gallery before any fit. All numbers are interim.
 take_home_message: >-
   A neural network that also learns D8's demand did not give a better probability of reverse flow
   than the same neural network without the demand output, on synthetic days with a known answer. The
@@ -117,13 +119,14 @@ take_home_message: >-
   calibrated mix of import and reverse flow, and gives no hard sign. All numbers are interim.
 advice:
   - >-
-    Use the sign-only U-net (arm S) as the reference for later sign experiments on D8, and do not
-    add a demand output with a shared encoder unless the new design answers why the demand output
-    made the sign probability worse here.
+    Use the sign-only U-net (arm S) as the reference for later sign experiments on D8, because no
+    arm with a demand output had a better point estimate here. Add a demand output with a shared
+    encoder only if the new design answers why SD-0 was detectably worse than S here.
   - >-
-    Read the harm check per reading band as well as pooled, because the pooled mean of P(X<0) on
-    import half-hours is dominated by readings of 3 MVA and above and hides the 1 to 3 MVA band,
-    where both S and SD* are far above the limit.
+    Read the harm check per reading band as well as pooled, because half-hours of 3 MVA and above
+    dominate the count of half-hours in H1, so the pooled mean can hide a higher mean in the 1 to 3
+    MVA band. Compare each band with the limit that the plan's formula gives for the band's own
+    share of reverse flow.
   - >-
     Draw every arm in a dot chart with its own colour or label, because a chart in which most arms
     share one grey needs a table beside it to identify any arm.
@@ -187,17 +190,18 @@ P(X<0), is the neural network's probability that a half-hour's signed power is n
 reverse flow. SD\* is the arm with a demand output and random spans of the reading hidden during
 training, on the U-net architecture. C1 is +0.00105 (interval −0.00011 to +0.00222, read at
 99.286%): the Brier score of P(X<0) for SD\*, minus the Brier score for the sign-only arm S. A
-positive difference means SD\* does worse than S, and the interval includes zero. The margin m is
-0.00122.
+positive difference means SD\* does worse than S, and the interval includes zero, so the verdict
+word for C1 is "no detectable difference". The margin m is 0.00122.
 
 **H1 reads the mean P(X<0) on import half-hours with a reading of at least 1 MVA (89,556
 half-hours), and SD\* misses it by a small margin.** SD\* scores 0.00744 against the limit L of
 0.0071, and S scores 0.00453. The share of those half-hours with P(X<0) above 0.5 is 0.00245 for
 SD\*, and that share is within the limit. The detection bar (a mean P(X<0) of at least 0.75 on the
 2,554 reverse-flow half-hours with a reading of at least 1 MVA) passes at 0.802. The sign
-calibration bar also passes, at a reliability term of 0.00016 against 0.00364. Row 3 applies because
-H1 fails. If H1 had passed, C1's interval would include zero with a half-width of 0.00117, below m,
-and the verdict would still be `not supported`, by row 8.
+calibration bar also passes, at a reliability term of 0.00016 against 0.00364, and its bin bar
+passes too: the largest gap between a bin's forecast and observed share is 0.083 against 0.1. Row 3
+applies because H1 fails. If H1 had passed, C1's interval would include zero with a half-width of
+0.00117, below m, and the verdict would still be `not supported`, by row 8.
 
 **The plan's prediction fails, because C1 is a loss and the prediction said it would be a gain of
 0.0005 to 0.0030.** The prediction named H1 as the likeliest miss, and H1 missed. The part of the
@@ -206,8 +210,8 @@ cannot be tested, because there is no gain to place. The other parts fare as fol
 
 - Hiding the whole scored day (W) gave no gain (C3 is +0.00009, and the interval includes zero), so
   W did not give the largest gain.
-- Hiding random spans (R) gave the only gain among C2 to C4 (C4 is −0.00063, interval −0.00153 to
-  −0.00001), so at least one of C2 to C4 is a gain, as predicted.
+- Hiding random spans (R) gave the only gain among C2 to C4, and a narrow one (C4 is −0.00063,
+  interval −0.00153 to −0.00001), so at least one of C2 to C4 is a gain, as predicted.
 - The W-trained demand output beats the demand climatology by 3.25 points of capacity on whole days
   it did not see (3.78 points against 7.03). That is more than the 1 point the prediction asked for.
 - Pre-trained and fresh encoders show no detectable difference (C5), and neither do the transformer
@@ -218,17 +222,17 @@ cannot be tested, because there is no gain to place. The other parts fare as fol
 
 ### Only hiding random spans improved on the unmasked demand output
 
-**Seven contrasts are counted, and only C4 is a gain and only C7 is a loss at the Bonferroni
-level.** A negative Brier difference is a gain of the first arm. The arms are these:
+**Seven contrasts are counted, and only C4 is a gain, a narrow one, and only C7 is a loss at the
+Bonferroni level.** A negative Brier difference is a gain of the first arm. The arms are these:
 
 - **S** is the sign-only arm, and **S-A** is a sign-only arm that reads only the reading and its
   mask. - **SD-0, SD-K, SD-W, and SD-R** add the demand output and hide nothing, the engine blocks,
   the whole scored day, and random spans of the reading in training. **SD\*** is the style chosen on
   validation, which is SD-R.
 - **SDe-PT and SDe-FR** are SD\* with encoders in place of the calendar and weather rows, with the
-  encoders pre-trained on 16 Primaries (PT) or fresh (FR).
-- **SD\*-C** is the causal variant, which sees no half-hour after the scored one, and **SD\*-λ**
-  repeats SD\* with a demand loss weight of 0.5 instead of 0.1.
+  encoders pre-trained on 16 Primaries (PT) or fresh (FR). - **SD\*-C** is the causal variant, which
+  sees no half-hour after the scored one, and **SD\*-lambda** repeats SD\* with a demand loss weight
+  of 0.5 instead of 0.1.
 - **A, D, and D-sign** are experiment 729's two-lobe arms (A and D) and sign arm (D-sign), refitted
   on the rebuilt banks.
 
@@ -239,21 +243,40 @@ The last column of the table is the log loss of the same pair.
 | C1 | SD\* minus S: the demand output, with random spans hidden, against none | +0.00105 | -0.00011 to +0.00222 | no detectable difference | +0.00351 |
 | C2 | SD-K minus SD-0: hiding the engine blocks against hiding nothing | +0.00006 | -0.00085 to +0.00090 | no detectable difference | +0.00029 |
 | C3 | SD-W minus SD-0: hiding the whole scored day against hiding nothing | +0.00009 | -0.00067 to +0.00091 | no detectable difference | +0.00044 |
-| C4 | SD-R minus SD-0: hiding random spans against hiding nothing | -0.00063 | -0.00153 to -0.00001 | gain | -0.00211 |
+| C4 | SD-R minus SD-0: hiding random spans against hiding nothing | -0.00063 | -0.00153 to -0.00001 | narrow gain | -0.00211 |
 | C5 | SDe-PT minus SDe-FR: pre-trained encoders against fresh encoders | +0.00003 | -0.00063 to +0.00089 | no detectable difference | -0.00061 |
 | C6 | The better transformer variant minus the bidirectional LSTM, both on arm S | +0.00016 | -0.00064 to +0.00097 | no detectable difference | +0.00098 |
 | C7 | SD\*-C in the causal protocol at k = 0 minus SD\* two-sided | +0.00407 | +0.00180 to +0.00855 | loss | +0.01516 |
 
-**The opposite signs of C5's Brier and log-loss points are audit trigger 3 of the `ml-experiment`
-skill.** Both of C5's intervals include zero, so the result stays "no detectable
-difference". No other contrast triggers the audit.
+**Two audit triggers of the `ml-experiment` skill fired, and a third is arguable.** Trigger 3 fired
+because the signs of C5's Brier and log-loss points are opposite. Trigger 2 fired because C1 is a
+loss where the prediction said gain, and because W was not the best masking. Trigger 5 may apply,
+because S, which has less to do than any arm with a demand output, has a better Brier point
+estimate than every one of them.
+
+**The stored evidence explains each trigger, and the independent audit is left to the manager.** The
+skill says that an agent other than the experiment's session runs the audit, so this page records
+only what the stored scores show.
+
+- Trigger 3: C5's Brier point is +0.00003, so the sign of the Brier point is a rounding of zero.
+  Both of C5's intervals include zero (the log-loss interval is −0.00242 to +0.00166), and the
+  result stays "no detectable difference".
+- Trigger 2: SD-0 minus S (R7) is +0.00168 with an interval that excludes zero, and raising the
+  demand loss weight from 0.1 to 0.5 worsens the Brier score by a further 0.00359 (R9). Both
+  results are in the direction of an explanation in which the demand loss competes with the sign
+  loss in the shared encoder, and random spans recover 0.00063 of the worsening (C4). A second
+  explanation covers W: whole-day hiding gives the lowest demand error on whole days hidden (3.78
+  points, against 4.11 for R), and it gives no detectable difference in the sign (C3). Neither
+  explanation has been tested by a new run.
+- Trigger 5: arms S and SD-0 differ in the demand output and its loss, so the comparison is the same
+  as R7.
 
 **Three report-only comparisons add three results.** SD-0 minus S (R7) is +0.00168 (interval
 +0.00055 to +0.00288), so a demand output without hidden input worsens the sign probability.
-SD\*-λ minus SD\* (R9) is +0.00359, so raising the demand loss weight from 0.1 to 0.5 worsens the
-sign probability again, and SD\*-λ fails the detection bar (0.694). SD\*-C in the two-sided protocol
-minus SD\* (R10) is +0.00092 (interval +0.00016 to +0.00194), so training with the future hidden
-slightly lowers the two-sided score.
+SD\*-lambda minus SD\* (R9) is +0.00359, so raising the demand loss weight from 0.1 to 0.5 worsens
+the sign probability again, and SD\*-lambda fails the detection bar (0.694). SD\*-C in the two-sided
+protocol minus SD\* (R10) is +0.00092 (interval +0.00016 to +0.00194), so training with the future
+hidden slightly lowers the two-sided score.
 
 ![The seven counted contrasts with their intervals and the margin](fig_contrasts.svg)
 
@@ -284,14 +307,14 @@ row subset is the share of reverse-flow half-hours in it.
 | SDe-PT | 0.00923 | 0.00368 | 0.1559 | 0.0701 | 0.00572 | 0.801 |
 | SDe-FR | 0.00920 | 0.00373 | 0.1538 | 0.0705 | 0.00682 | 0.799 |
 | SD\*-C (causal protocol, k = 48) | 0.01049 | 0.00499 | 0.1560 | 0.0863 | 0.00979 | 0.784 |
-| SD\*-λ | 0.01316 | 0.00554 | 0.2147 | 0.1075 | 0.01440 | 0.694 |
+| SD\*-lambda | 0.01316 | 0.00554 | 0.2147 | 0.1075 | 0.01440 | 0.694 |
 | D-sign | 0.00977 | 0.00438 | 0.1525 | 0.0767 | 0.00664 | 0.777 |
 | D | 0.01594 | 0.00593 | 0.2808 | 0.1266 | 0.01274 | 0.526 |
 | A | 0.02247 | 0.01026 | 0.3453 | 0.1545 | 0.02360 | 0.366 |
 
 **H1 passes for S-A, S, SDe-PT, SDe-FR, and D-sign, and fails for SD-0, SD-K, SD-W, SD-R, SD\*-C,
-SD\*-λ, D, and A.** SDe-PT and SDe-FR sit below the limit with a demand output, but neither beats S
-in Brier score. Arms D and A fail the detection bar as well (0.526 and 0.366).
+SD\*-lambda, D, and A.** SDe-PT and SDe-FR sit below the limit with a demand output, but neither
+beats S in Brier score. Arms D and A fail the detection bar as well (0.526 and 0.366).
 
 ![The Brier score of every arm by row subset and reading band](fig_brier_by_subset.svg)
 
@@ -301,34 +324,42 @@ lists 15 entries to match the 15 rows of the table. On import rows and on rows o
 every arm sits near zero. The arms separate on reverse-flow rows and on rows below 3 MVA, where P0
 scores 1.0 on reverse-flow rows and 0.25 on rows of 1 to 3 MVA.
 
-### False alarms on import half-hours are far above the limit at readings of 1 to 3 MVA
+### SD* fails H1 because it over-forecasts, mostly at readings of 1 to 3 MVA
 
-**On import half-hours with a reading of 1 to 3 MVA, the mean P(X<0) is far above the limit line for
-both S and SD\*.** S scores 0.0828 and SD\* scores 0.1361, against L = 0.0071, so the two means are
-12 and 19 times the limit. Half-hours with a reading of 3 MVA and above score 0.0015 for S and
-0.0025 for SD\*, well below the limit. H1 pools every half-hour with a reading of at least 1 MVA.
-Most of those half-hours read 3 MVA and above, so the pooled mean passes for S (0.00453) and misses
-narrowly for SD\* (0.00744), while the 1 to 3 MVA subset is far over the limit for both. The plan
-registered the pooled limit and not a limit per band, and the verdict follows the plan.
+**SD\* fails H1 because it over-forecasts, and most of its excess is in the band of 1 to 3 MVA.**
+The mean P(X<0) on import half-hours with a reading of 1 to 3 MVA is 0.0828 for S and 0.1361 for
+SD\*. That band holds about 3,289 import half-hours, 3.7% of H1's 89,556, so at SD\*'s mean it adds
+about 0.0050 of SD\*'s H1 mean of 0.00744. On readings of 3 MVA and above, SD\* scores 0.0025 and S
+scores 0.0015, and SD\* would pass H1 on those half-hours alone.
 
-**The high value in the 1 to 3 MVA band comes from the fold, the folding of negative power into a
-positive reading, and the means below show that both arms are calibrated there.** In that band,
-25.1% of the 4,389 half-hours are reverse flow. SD\* gives a mean forecast of 0.2745 against an
-observed share of 0.2506, and S gives 0.2479 against 0.2506. A reading of 1 to 3 MVA is therefore
-close to ambiguous: an import half-hour looks like a reverse-flow half-hour. A calibrated
-probability on an import half-hour in this band must be well above zero. The limit L is still the
-registered measure of false alarms. An operator who read P(X<0) on import half-hours with a reading
-of 1 to 3 MVA would see 0.08 to 0.14, and SD\* raises that mean by 0.053 over S.
+**H1 has no design flaw, because a calibrated detector passes it whenever its detection d is at
+least 0.75.** The plan shows that a calibrated detector's H1 mean is s₁ (1 − d) / (1 − s₁), where s₁
+is the share of reverse flow among half-hours with a reading of at least 1 MVA (0.0277). With d =
+0.802, a calibrated SD\* would score 0.0057, below L = 0.0071. S fits the identity: it predicts
+0.00451 and scores 0.00453, and S's summed P(X<0) over half-hours with a reading of at least 1 MVA
+is about 2,556 against 2,554 reverse-flow half-hours. SD\* sums to about 2,715, which is 6% more
+than the 2,554 reverse-flow half-hours, so SD\* fails H1 because it over-forecasts.
+
+**The limit that the plan's formula gives for the band of 1 to 3 MVA is about 0.083, and S sits at
+it.** In that band 25.1% of the 4,389 half-hours are reverse flow. Applying L = 0.25 s / (1 − s) to
+the band's share of 0.2506 gives 0.0836. S (0.0828) is at that limit, and SD\* (0.1361) is 1.6 times
+it. The band is where the fold makes an import half-hour look like a reverse-flow half-hour, which
+is the folding of negative power into a positive reading, so a calibrated probability on an import
+half-hour in this band is above zero. That is context and not an excuse for SD\*.
+
+**Only S is calibrated in the band of 1 to 3 MVA.** S gives a mean forecast of 0.2479 against an
+observed share of 0.2506, with a reliability term of 0.00033. SD\* gives 0.2745 against 0.2506, with
+a reliability term of 0.00288, nine times S's.
 
 ![Harm and detection by world type and reading band](fig_harm_detection.svg)
 
-**Figure 5 shows two rows far right of the limit line, and the 1 to 3 MVA row is the farthest.** In
+**Figure 5 shows two rows right of the pooled limit line, and the 1 to 3 MVA row is far right.** In
 each row the left dot is S and the right dot is SD\*, because both arms are drawn in the same grey.
-The dashed line is L in the upper panel and the detection bar in the lower panel. The world_both
-row is also right of the line (0.0091 for S and 0.0136 for SD\*). The two bands below 1 MVA are
-empty, because the check reads decidable half-hours only, which have a reading of at least 1 MVA.
-Detection by band is 0.741 for S and 0.688 for SD\* in the 1 to 3 MVA band, both below the bar of
-0.75, and 0.918 and 0.888 at 3 MVA and above.
+The dashed line is the pooled L in the upper panel and the detection bar in the lower panel. The
+world_both row is also right of the line (0.0091 for S and 0.0136 for SD\*). The two bands below 1
+MVA are empty, because the check reads decidable half-hours only, which have a reading of at least 1
+MVA. Detection by band is 0.741 for S and 0.688 for SD\* in the 1 to 3 MVA band, both below the bar
+of 0.75, and 0.918 and 0.888 at 3 MVA and above.
 
 **The real held-out pre-engine days pass the real harm check H2.** The mean P(X<0) is 0.00031, and
 no half-hour is above 0.5, over 11,760 half-hours. K2 is the same check on the days of the metered
@@ -336,14 +367,15 @@ engine record, with D8's reading unchanged, and it also passes (mean 0.00030, no
 
 ### On real days, H2 and K2 pass, K1 is void, and R2 and R3 have no bar
 
-**K1 is `void`, because the days of the metered engine record hold no reverse-flow half-hour with a
-reading of at least 1 MVA once the record is subtracted.** The bar needs at least 100 such
-half-hours, and the days hold none. K1's numbers are still counted. SD\*'s demand output has a mean
-absolute error of 3.26 points against D8's real reading on K1's half-hours, and the demand
-climatology has 8.92 points. On the import half-hours of K1 with a reading of at least 1 MVA, the
-mean P(X<0) is 0.0334 against the limit L of 0.0071, and the share above 0.5 is 0.0151. K1 changes
-no verdict word. The limit L was set from the synthetic test bank, and the mean on these real days
-is higher than the mean on the pre-engine days (0.00031).
+**K1 is `void`, so it changes no verdict word, because the days of the metered engine record hold no
+reverse-flow half-hour with a reading of at least 1 MVA once the record is subtracted.** The bar
+needs at least 100 such half-hours, and the days hold none. The numbers are still counted, and on
+these days the answer derived from the record is import on every half-hour, so P0's Brier score is
+0. SD\*'s Brier score there is 0.0156, its mean P(X<0) on import half-hours with a reading of at
+least 1 MVA is 0.0334 (4.7 times L), and the share above 0.5 is 0.0151. These are false alarms
+against a known answer, and they are higher than on the pre-engine days (0.00031). SD\*'s demand
+output has a mean absolute error of 3.26 points against D8's real reading on K1's half-hours, and
+the demand climatology has 8.92 points.
 
 **On the real eras, SD\* puts P(X<0) above 0.5 on 5.1% of net-era half-hours, 15.8% of solar-era
 half-hours, and 19.2% of fade-era half-hours.** The causal SD\*-C at k = 0 gives 3.8%, 11.9%, and
@@ -422,10 +454,11 @@ and keeps both calibrated.** S scores a Brier score of 0.00445 and SD\* 0.00516 
 ![The reliability diagrams of S, SD\*, and D-sign](fig_reliability.svg)
 
 **Figure 4 shows S close to the diagonal and SD\* below it at forecasts of 0.1 to 0.6.** SD\*
-observes 0.096 at a mean forecast of 0.146 and 0.285 at 0.349, and sits above the diagonal from 0.65
-to 1. SD\* therefore understates the risk in the middle and overstates it at the top. D-sign is
-close to the diagonal only in the upper bins (0.989 observed at a forecast of 0.968). At a forecast
-of 0.146 it observes 0.100, as far below the diagonal as SD\*.
+observes less than it forecasts there (0.096 at a mean forecast of 0.146 and 0.285 at 0.349), so it
+overstates the risk in the middle. From 0.65 to 1 it observes more than it forecasts (0.711 at
+0.650), so it understates the risk at the top. D-sign is close to the diagonal only in the upper
+bins (0.989 observed at a forecast of 0.968). At a forecast of 0.146 it observes 0.100, as far below
+the diagonal as SD\*.
 
 **Experiment 729's comparisons, redone on the rebuilt banks, show the same order as before.** In
 signed continuous ranked probability score (CRPS) on all rows, D minus B1 is −29.9 points (R2), A
@@ -548,7 +581,9 @@ page where it happened.**
 - **S1 clear base days with no solar output are excluded from the share when the real record
   explains them, and the excluded days are bounded at 5%.** The bound is 5 times the pooled real
   rate of 1.0%, and it was set after the first `banks` run stopped on the fault, before any rebuilt
-  bank passed ("Rebuilding the banks and the realism gate").
+  bank passed. The realised excluded share is 0 in the validation, test, and shifted banks and 0.3%
+  to 2.4% in the training banks, so every bank is inside the bound ("Rebuilding the banks and the
+  realism gate").
 - **The component checks use pooled bars.** The bar of 20 cases applies to the solar cases pooled
   over worlds and seasons for each bank kind and source. The harm limit L pools every import
   half-hour with a reading of at least 1 MVA, so no band has its own bar.
@@ -587,20 +622,28 @@ have one (0.00453). The result does not show that a demand output cannot help in
 shows that this design did not help, with an encoder shared by the sign output and the demand output
 and a demand loss weight of 0.1.
 
-**The 1 to 3 MVA band is where every arm is uncertain, and the verdict does not rest on it.** The
-harm and detection means in that band (S 0.083 and 0.741, SD\* 0.136 and 0.688) show how little a
-reading near the fold says. A later experiment that uses P(X<0) should treat the bands below 3 MVA
-as a calibrated mix of import and reverse flow, and not as a sign.
+**The 1 to 3 MVA band is where every arm is uncertain, and it holds most of SD\*'s excess in H1.**
+The harm and detection means in that band (S 0.083 and 0.741, SD\* 0.136 and 0.688) show how little
+a reading near the fold says. H1's failure comes from SD\*'s higher mean in that band: the band adds
+about 0.0050 of SD\*'s 0.00744. A later experiment that uses P(X<0) should treat the bands below 3
+MVA as a calibrated mix of import and reverse flow, and not as a sign.
 
-**Two results on real days need care.** On the metered engine record's days, SD\* raises more false
-alarms than on the pre-engine days: its mean P(X<0) is 0.0334 against 0.00031. The share of
-half-hours above 0.5 also reaches 16% to 19% in the solar and fade eras. The synthetic world was
-built to look like these days, but the real answer in the eras is unknown, so neither number says
-whether the flagged half-hours are reverse flow.
+**Coincident weather is legitimate here only because this experiment reconstructs the past.** The
+synthetic days use observed ERA5 and CAMS weather at the scored times. The later experiment 731
+reads P(X<0) in history rows near a forecast origin, and any forecasting use must use only the
+weather available at the forecast origin. The causal variant hides the future of the reading, and it
+does not hide the future of the weather.
+
+**The two real-day results differ in what is known.** On the metered engine record's days the
+answer is import, so SD\*'s mean P(X<0) of 0.0334 against 0.00031 on the pre-engine days is a false
+alarm. In the solar and fade eras the real answer is unknown, so the share of half-hours above 0.5
+(16% to 19%) does not say whether the flagged half-hours are reverse flow.
 
 ## The plan as registered
 
-**The sections below hold the plan as registered before any code existed.** Where the run departed
+**The sections below hold the plan as registered before any code existed, with two later
+amendments, the 5% metered-zero bound and the stop line of 16 GPU-process-hours, both marked in the
+text.** Where the run departed
 from the plan, "The run departed from the plan in ten ways" says so.
 
 ## Terms
