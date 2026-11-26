@@ -10,19 +10,29 @@ import e00732_arms as arms  # noqa: E402
 import e00732_core as core  # noqa: E402
 import e00732_losses as losses  # noqa: E402
 import e00732_nets as nets  # noqa: E402
+import e00732_neighbours as nb  # noqa: E402
 import e00732_overlays as ov  # noqa: E402
 import e00732_train as train  # noqa: E402
 import numpy as np  # noqa: E402
-from world732 import make_bank  # noqa: E402
+from world732 import make_bank, make_neighbours  # noqa: E402
 
 
 @pytest.fixture(scope="module")
 def world():
     cal, segs = make_bank(draws_per_world=3)
     stats = arms729.input_stats(cal=cal, train_days=np.arange(len(cal.dates)))
-    overlays = ov.overlay_segments(segments=segs, kind="train", seed=0)
-    prepared = arms.prepare(overlays=overlays, holidays=cal.holidays, stats=stats)
-    plain = arms.prepare_plain(segments=segs, holidays=cal.holidays, stats=stats)
+    series = make_neighbours(cal=cal)
+    medians = {
+        n: nb.training_median(
+            folded=nb.fold(signed=series[n], floor=0.0), train_rows=np.arange(len(cal.dates))
+        )
+        for n in nb.NEIGHBOURS
+    }
+    overlays = ov.overlay_segments(segments=segs, kind="train", seed=0, neighbours=series)
+    prepared = arms.prepare(overlays=overlays, holidays=cal.holidays, stats=stats, medians=medians)
+    plain = arms.prepare_plain(
+        segments=segs, holidays=cal.holidays, stats=stats, medians=medians, neighbours=series
+    )
     return cal, segs, prepared, plain, ov.build_pair_index(segments=segs)
 
 

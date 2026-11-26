@@ -54,14 +54,18 @@ class Sets:
 
 
 def load_sets(*, root730: Path, env: stages.Env, seed: int) -> Sets:
-    """Build the prepared training and validation sets of one seed (from experiment 730's banks, read only)."""
+    """Build the prepared training and validation sets of one seed (from experiment 730's banks, read only).
+
+    The neighbour table and the training medians come from `env`, and every set reads them.
+    """
     tr = banks729.load_bank(path=banks730.bank_path(root=root730, kind="train", seed=seed))
     va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
+    common = {"holidays": env.holidays, "stats": env.stats, "medians": env.medians}
     return Sets(
-        train=arms.prepare(overlays=ov.overlay_segments(segments=tr.segments, kind="train", seed=seed), holidays=env.holidays, stats=env.stats),
+        train=arms.prepare(overlays=ov.overlay_segments(segments=tr.segments, kind="train", seed=seed, neighbours=env.neighbours), **common),
         index=ov.build_pair_index(segments=tr.segments),
-        val_plain=arms.prepare_plain(segments=va.segments, holidays=env.holidays, stats=env.stats),
-        val_transfer=arms.prepare(overlays=ov.overlay_segments(segments=va.segments, kind="validation"), holidays=env.holidays, stats=env.stats),
+        val_plain=arms.prepare_plain(segments=va.segments, neighbours=env.neighbours, **common),
+        val_transfer=arms.prepare(overlays=ov.overlay_segments(segments=va.segments, kind="validation", neighbours=env.neighbours), **common),
         val_index=ov.build_pair_index(segments=va.segments),
     )  # fmt: skip
 
@@ -135,18 +139,18 @@ def store_predictions(
     folder = root / "predictions" / name
     te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
     sh = banks729.load_bank(path=banks730.bank_path(root=root730, kind="shifted"))
-    test_plain = arms.prepare_plain(segments=te.segments, holidays=env.holidays, stats=env.stats)
+    common = {"holidays": env.holidays, "stats": env.stats, "medians": env.medians}
+    test_plain = arms.prepare_plain(segments=te.segments, neighbours=env.neighbours, **common)
     test_transfer = arms.prepare(
-        overlays=ov.overlay_segments(segments=te.segments, kind="test"),
-        holidays=env.holidays,
-        stats=env.stats,
+        overlays=ov.overlay_segments(segments=te.segments, kind="test", neighbours=env.neighbours),
+        **common,
     )
-    test_index = ov.build_pair_index(segments=te.segments)
-    shifted = arms.prepare_plain(segments=sh.segments, holidays=env.holidays, stats=env.stats)
+    test_index = ov.build_pair_index(segments=te.segments, sources=core.TEST_SIBLING_SOURCES)
+    shifted = arms.prepare_plain(segments=sh.segments, neighbours=env.neighbours, **common)
     for name_, prep in (("validation", sets.val_plain), ("test", test_plain), ("shifted", shifted)):
-        pred = train.predict(net=net, prepared=prep, device=device, extra_heads=spec.heads)
+        pred = train.predict(net=net, prepared=prep, device=device, spec=spec)
         store_set(folder=folder, name=name_, pred=pred, tr=truth.truth(prepared=prep))
-    pred = train.predict(net=net, prepared=test_transfer, device=device, extra_heads=spec.heads)
+    pred = train.predict(net=net, prepared=test_transfer, device=device, spec=spec)
     store_set(
         folder=folder, name="test_transfer", pred=pred, tr=truth.truth(prepared=test_transfer)
     )
@@ -154,13 +158,9 @@ def store_predictions(
         for hide in (False, True):
             for a in core.TEST_INJECTION_POINTS:
                 pred = train.predict(
-                    net=net,
-                    prepared=test_plain,
-                    device=device,
-                    index=test_index,
-                    amount=a,
-                    hide_bsp=hide,
-                )
+                    net=net, prepared=test_plain, device=device, index=test_index, amount=a,
+                    hide_bsp=hide, spec=spec,
+                )  # fmt: skip
                 store_set(
                     folder=folder,
                     name=f"test_inj_{a:g}{'_nobsp' if hide else ''}",
@@ -168,7 +168,7 @@ def store_predictions(
                     tr=truth.truth(prepared=test_plain, index=test_index, amount=a),
                     member="inj",
                 )
-        pred = train.predict(net=net, prepared=test_plain, device=device, eps=core.TEST_EPS)
+        pred = train.predict(net=net, prepared=test_plain, device=device, eps=core.TEST_EPS, spec=spec)
         store_set(
             folder=folder,
             name="test_raised",
@@ -178,8 +178,8 @@ def store_predictions(
         )
     if env.real_sets is not None:
         for set_name, segments in env.real_sets().items():
-            prep = arms.prepare_plain(segments=segments, holidays=env.holidays, stats=env.stats)
-            pred = train.predict(net=net, prepared=prep, device=device, extra_heads=spec.heads)
+            prep = arms.prepare_plain(segments=segments, neighbours=env.real_neighbours, **common)
+            pred = train.predict(net=net, prepared=prep, device=device, spec=spec)
             store_set(
                 folder=folder, name=f"real_{set_name}", pred=pred, tr=truth.truth(prepared=prep)
             )
@@ -264,6 +264,7 @@ def stage_timing(
     manager_approved: bool,
     log: Log,
     epochs: int = core.TIMING_EPOCHS,
+    cores: str = "?",
 ) -> dict:
     """Run the timing gate: a few epochs of each timed arm, then project every fit, and write `scores/timing.json`.
 
@@ -271,8 +272,9 @@ def stage_timing(
         StoppedError: When the projection is over the stop line and the manager has not approved, or the memory is over its cap.
     """
     stages.guard_run(root=root, root730=root730, stage="timing")
+    log(fits_starting_line(family="timing", hours=core.TIMING_GATE_HOURS, cores=cores))
     sets = load_sets(root730=root730, env=env, seed=0)
-    secs, pair_secs, peak_gpu = {}, 0.0, 0.0
+    secs, building, peak_gpu = {}, {}, 0.0
     for arm in core.TIMING_ARMS:
         spec = core.ARMS[arm]
         if device == "cuda":
@@ -288,17 +290,18 @@ def stage_timing(
         )
         if device == "cuda":
             peak_gpu = max(peak_gpu, torch.cuda.max_memory_allocated() / 1e9)
-        if arm == "U*":
-            pair_secs = train.time_pair_building(spec=spec, train=sets.train, index=sets.index)
+        building[arm] = train.time_pair_building(spec=spec, train=sets.train, index=sets.index)
     report = core.timing_gate_report(
         seconds_per_epoch=secs,
         peak_gpu_gb=peak_gpu,
         peak_rss_gb=train.peak_rss_gb(),
-        pair_seconds_per_epoch=pair_secs,
+        pair_seconds_per_epoch=building["U*"],
     )
+    report["window_building_seconds_per_epoch"] = building
     passes = core.timing_gate_passes(report=report, manager_approved=manager_approved)
     stages.write_json(path=root / "scores" / "timing.json", payload={**report, "pass": passes})
-    log(f"timing gate: projection {report['hours_at_cap']:.2f} h at the cap, pass {passes}")
+    log(f"timing gate: projection {report['hours_at_cap']:.2f} h at the cap, dropped {report['dropped_arms']}, pass {passes}")
+    log(last_fit_ended_line(family="timing", counts={"timed": len(secs)}))
     if not passes:
         msg = "the timing gate failed: the projection or a memory peak is over its line (verdict row 0)"
         raise stages.StoppedError(msg)
@@ -306,7 +309,7 @@ def stage_timing(
 
 
 def fits_starting_line(*, family: str, hours: float, cores: str) -> str:
-    """Return the line sent to the manager before each family of fits (the timing gate, U* and U-NC, U-NCw and S+, U-SG, U*-L)."""
+    """Return the line sent to the manager before each family of fits (the timing gate, S+ and U*, U-N, U-NC, U-noBSP, U-NCw, U-SG, U*-L)."""
     return f"fits starting: experiment 732, family {family}, projection {hours:.2f} GPU-process-hours at the cap, core {cores}, {datetime.now(UTC):%FT%TZ}"
 
 
@@ -331,7 +334,9 @@ def stage_chain(
     log: Log,
     cores: str = "?",
 ) -> dict:
-    """Run the 18 fits family by family, stopping and reporting at the first stop or failure, and writing a status file.
+    """Run the fits family by family, stopping and reporting at the first stop or failure, and writing a status file.
+
+    The arms that the timing gate dropped (`dropped_arms` of `scores/timing.json`) are not fitted.
 
     Every family prints a "fits starting" line and a "last fit ended" line. A stop (row 0), a correctness
     failure (row 1), or a fit that raised and a counted reading needs (row 2) ends the chain with
@@ -341,9 +346,12 @@ def stage_chain(
     Returns:
         The status record.
     """
+    stages.guard_run(root=root, root730=root730, stage="chain")
     timing = stages.read_json(path=root / "scores" / "timing.json")
+    dropped = set(timing.get("dropped_arms", []))
     done: list[str] = []
-    for family, arm_names in core.FIT_FAMILIES:
+    for family, all_arms in core.FIT_FAMILIES:
+        arm_names = tuple(a for a in all_arms if a not in dropped)
         if not arm_names:
             continue
         jobs = [(a, core.ARMS[a].arch, s) for a in arm_names for s in core.SEEDS]

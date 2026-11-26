@@ -106,6 +106,8 @@ MAX_REDRAWS: Final = 200
 INJECTION_POINTS: Final = (2.0, 60.0)
 """The extra injection a in training: log-uniform per window and epoch."""
 TEST_INJECTION_POINTS: Final = (5.0, 20.0, 50.0)
+TEST_SIBLING_SOURCES: Final = ("S2",)
+"""The test overlay lends its extra injection from a sibling of this source only (S1 is a real farm's metered output)."""
 EPS_RANGE: Final = (0.05, 0.3)
 """The raised-sky factor in training: uniform per window."""
 TEST_EPS: Final = 0.2

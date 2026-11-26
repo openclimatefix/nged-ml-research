@@ -12,6 +12,7 @@ import e00732_leakage as leak  # noqa: E402
 import e00732_nets as nets  # noqa: E402
 import e00732_stages as stages  # noqa: E402
 import fake730  # noqa: E402
+from world732 import seed_neighbour_files  # noqa: E402
 import numpy as np  # noqa: E402
 import e00729_arms as arms729  # noqa: E402
 
@@ -26,10 +27,15 @@ def run(tmp_path, monkeypatch):
     monkeypatch.setattr(core, "BATCH_SIZE", 16)
     monkeypatch.setattr(core, "TIMING_EPOCHS", 1)
     holidays = world["cal"].holidays
+    base = world["base"]
     stages.stage_banks(root=root, root730=root730, holidays=holidays, log=print)
-    stages.stage_limits(root=root, root730=root730, holidays=holidays, log=print)
+    seed_neighbour_files(root=root, base=base, arrays=world["neighbours"])
+    stages.stage_limits(
+        root=root, root730=root730, holidays=holidays, log=print, base=base, arrays=world["neighbours"]
+    )
     stages.stage_overlays(
-        root=root, root730=root730, holidays=holidays, log=print, train_seeds=(0, 1)
+        root=root, root730=root730, holidays=holidays, log=print, train_seeds=(0, 1),
+        neighbours=world["neighbours"],
     )
     gallery = root / "PRIVATE" / "gallery"
     gallery.mkdir(parents=True)
@@ -42,7 +48,9 @@ def run(tmp_path, monkeypatch):
         )
     )
     stats = arms729.input_stats(cal=world["cal"], train_days=np.arange(len(world["cal"].dates)))
-    env = stages.Env(holidays=holidays, stats=stats)
+    medians = stages.read_json(path=root / stages.MEDIANS_FILE)
+    env = stages.Env(holidays=holidays, stats=stats, neighbours=world["neighbours"], medians=medians)
+    stages.write_json(path=root / stages.TENSOR_FILE, payload={"pass": True})
     return root, root730, env
 
 
@@ -129,7 +137,7 @@ def test_chain_stops_and_reports_on_a_correctness_failure_and_a_failed_needed_ar
     status = json.loads((root / "chain_status.json").read_text())
     assert (
         status["state"] == "invalid"
-        and status["family"] == "U*, U-NC"
+        and status["family"] == "S+, U*"
         and (root / "scores" / "invalid.json").exists()
     )
     assert any(line.startswith("fits starting") for line in lines)
@@ -159,6 +167,7 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
 
     lines: list[str] = []
     status = fit.stage_chain(root=root, root730=root730, run_one=fake, log=lines.append)
+    assert sum(line.startswith("fits starting") for line in lines) == 7
     assert (
         status["state"] == "complete"
         and "U*-L" in calls
@@ -167,7 +176,7 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
     assert (
         stages.job_path(root=root, arm="U-SG", arch="unet", seed=0).with_suffix(".failed.json")
     ).exists()
-    assert sum(line.startswith("last fit ended") for line in lines) == 4
+    assert sum(line.startswith("last fit ended") for line in lines) == 7
     for p in root.glob("fits/*.json"):
         p.unlink()
 

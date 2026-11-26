@@ -67,6 +67,8 @@ class Env:
             `neighbours.read_table` returns them.
         medians: The training median of each folded neighbour (the scale of its channels).
         real_sets: A function that returns the real-day pseudo-segments by set name (None without real data).
+        real_neighbours: The three neighbours' series on the calendar of the real-day pseudo-segments
+            (D8's whole day table, not only the base days), in points, or None for zero channels.
     """
 
     holidays: np.ndarray
@@ -74,6 +76,7 @@ class Env:
     neighbours: Mapping[str, np.ndarray]
     medians: Mapping[str, float]
     real_sets: Callable[[], dict[str, list]] | None = None
+    real_neighbours: Mapping[str, np.ndarray] | None = None
 
 
 @dataclass
@@ -588,6 +591,7 @@ def overlay_stage_bank(
     }  # fmt: skip
     if test:
         windows = {}
+        index = ov.build_pair_index(segments=segments, sources=core.TEST_SIBLING_SOURCES)
         for a in core.TEST_INJECTION_POINTS:
             pair = ov.pair_checks(segments=segments, index=index, amount=a)
             problems += failed_shares(shares=pair, where=f"{name} pairs at {a:g}")

@@ -155,7 +155,7 @@ class Predictions:
 def predict(
     *, net: torch.nn.Module, prepared: Sequence[arms.Prepared], device: str, index: ov.PairIndex | None = None,
     amount: float | None = None, eps: float | None = None, picks: list[tuple[int, int]] | None = None,
-    hidden: np.ndarray | None = None, extra_heads: bool = True, hide_bsp: bool = False,
+    hidden: np.ndarray | None = None, spec: core.ArmSpec732 | None = None, hide_bsp: bool = False,
 ) -> Predictions:  # fmt: skip
     """Return the net's outputs on every scored day, with the injected and raised members when asked.
 
@@ -168,7 +168,9 @@ def predict(
         eps: The raised-sky factor of the raised member, or None for no raised member.
         picks: The picks, or None for every scored day.
         hidden: Fixed hidden positions `(P, 96)`, or None.
-        extra_heads: Whether the net has the extra heads (the members need them).
+        spec: The arm whose net this is: it decides the input channels (no neighbour channels for U-N,
+            a zero BSP channel for U-noBSP) and whether the injected and raised members exist
+            (only an arm with the extra heads has them). None reads every channel and every head.
         hide_bsp: Whether to zero the BSP channel and its mask (table T5).
 
     Returns:
@@ -176,16 +178,18 @@ def predict(
     """
     net.eval()
     picks = arms.all_picks(prepared=prepared) if picks is None else picks
-    spec = arms.eval_spec(
-        inject=amount is not None and extra_heads, raised=eps is not None and extra_heads
-    )
+    heads = spec is None or spec.heads
+    eval_spec = arms.eval_spec(
+        inject=amount is not None and heads, raised=eps is not None and heads,
+        neighbours=spec is None or spec.neighbours, bsp_zeroed=spec is not None and spec.bsp_zeroed,
+    )  # fmt: skip
     chunks: dict[str, list] = {
         k: [] for k in ("plain", "inj", "raised", "t", "ti", "pair", "delta", "cosz", "csi")
     }
     for i in range(0, len(picks), INFER_BATCH):
         j = slice(i, i + INFER_BATCH)
         batch = arms.make_eval_batch(
-            prepared=prepared, picks=picks[j], spec=spec, index=index, amount=amount, eps=eps,
+            prepared=prepared, picks=picks[j], spec=eval_spec, index=index, amount=amount, eps=eps,
             hidden=None if hidden is None else hidden[j], hide_bsp=hide_bsp,
         )  # fmt: skip
         raw_w, raw_i, raw_c = forward_members(net=net, batch=batch, device=device)
@@ -234,7 +238,7 @@ def validation_scores(
     val_transfer: Sequence[arms.Prepared], device: str,
 ) -> dict[str, float]:  # fmt: skip
     """Return the validation Brier score of the sign, and (with the extra heads) the solar error and step Brier score."""
-    pred = predict(net=net, prepared=val_plain, device=device)
+    pred = predict(net=net, prepared=val_plain, device=device, spec=spec)
     x = valid_flat(values=pred.t[:, arms.T["x"]], targets=pred.t)
     p = valid_flat(values=pred.plain["p"], targets=pred.t)
     out = {"brier": float(np.mean((p - (x < 0.0)) ** 2))}
@@ -245,7 +249,7 @@ def validation_scores(
             - valid_flat(values=pred.t[:, arms.T["solar"]], targets=pred.t)
         )
         out["solar_mae"] = float(err[up].mean()) if up.any() else float("nan")
-        tp = predict(net=net, prepared=val_transfer, device=device)
+        tp = predict(net=net, prepared=val_transfer, device=device, spec=spec)
         ev = valid_flat(values=tp.t[:, arms.T["event"]], targets=tp.t)
         sp = valid_flat(values=tp.plain["step_p"], targets=tp.t)
         out["step_brier"] = float(np.mean((sp - ev) ** 2))
