@@ -1,24 +1,27 @@
-"""End-to-end tests of the fit stage, the timing gate, and the chain runner with tiny CPU fits on an invented bank (need torch)."""
+"""End-to-end tests of the fit stage, the timing gate, and the chain runner with tiny CPU fits on an
+invented bank (need torch).
+"""
 
 import json
+from typing import Any
 
 import pytest
 
 torch = pytest.importorskip("torch")
 
+import e00729_arms as arms729  # noqa: E402
 import e00732_core as core  # noqa: E402
 import e00732_fit as fit  # noqa: E402
 import e00732_leakage as leak  # noqa: E402
 import e00732_nets as nets  # noqa: E402
 import e00732_stages as stages  # noqa: E402
 import fake730  # noqa: E402
-from world732 import seed_neighbour_files  # noqa: E402
 import numpy as np  # noqa: E402
-import e00729_arms as arms729  # noqa: E402
+from world732 import seed_neighbour_files  # noqa: E402
 
 
 @pytest.fixture
-def run(tmp_path, monkeypatch):
+def run(tmp_path: Any, monkeypatch: Any):
     root730, root = tmp_path / "730", tmp_path / "732"
     root.mkdir()
     world = fake730.build(root=root730)
@@ -31,10 +34,19 @@ def run(tmp_path, monkeypatch):
     stages.stage_banks(root=root, root730=root730, holidays=holidays, log=print)
     seed_neighbour_files(root=root, base=base, arrays=world["neighbours"])
     stages.stage_limits(
-        root=root, root730=root730, holidays=holidays, log=print, base=base, arrays=world["neighbours"]
+        root=root,
+        root730=root730,
+        holidays=holidays,
+        log=print,
+        base=base,
+        arrays=world["neighbours"],
     )
     stages.stage_overlays(
-        root=root, root730=root730, holidays=holidays, log=print, train_seeds=(0, 1),
+        root=root,
+        root730=root730,
+        holidays=holidays,
+        log=print,
+        train_seeds=(0, 1),
         neighbours=world["neighbours"],
     )
     gallery = root / "PRIVATE" / "gallery"
@@ -49,12 +61,16 @@ def run(tmp_path, monkeypatch):
     )
     stats = arms729.input_stats(cal=world["cal"], train_days=np.arange(len(world["cal"].dates)))
     medians = stages.read_json(path=root / stages.MEDIANS_FILE)
-    env = stages.Env(holidays=holidays, stats=stats, neighbours=world["neighbours"], medians=medians)
+    env = stages.Env(
+        holidays=holidays, stats=stats, neighbours=world["neighbours"], medians=medians
+    )
     stages.write_json(path=root / stages.TENSOR_FILE, payload={"pass": True})
     return root, root730, env
 
 
-def test_timing_gate_then_one_fit_stores_record_network_and_predictions(run, monkeypatch) -> None:
+def test_timing_gate_then_one_fit_stores_record_network_and_predictions(
+    run: Any, monkeypatch: Any
+) -> None:
     root, root730, env = run
     monkeypatch.setattr(core, "STOP_LINE_HOURS", 1e9)
     with pytest.raises(RuntimeError, match="timing"):
@@ -71,15 +87,14 @@ def test_timing_gate_then_one_fit_stores_record_network_and_predictions(run, mon
     report = fit.stage_timing(
         root=root, root730=root730, env=env, device="cpu", manager_approved=False, log=print
     )
-    assert report["pass"] and set(report["seconds_per_epoch"]) == set(core.TIMING_ARMS)
+    assert report["pass"]
+    assert set(report["seconds_per_epoch"]) == set(core.TIMING_ARMS)
     rec = fit.fit_one(
         root=root, root730=root730, env=env, arm="U*", seed=0, device="cpu", log=print, max_epochs=1
     )
-    assert (
-        rec["epochs"] == 1
-        and len(rec["train_terms"]["sign"]) == 1
-        and (root / "networks" / "Ustar_unet_s0.pt").exists()
-    )
+    assert rec["epochs"] == 1
+    assert len(rec["train_terms"]["sign"]) == 1
+    assert (root / "networks" / "Ustar_unet_s0.pt").exists()
     folder = root / "predictions" / "Ustar_unet_s0"
     names = {p.stem for p in folder.glob("*.npz")}
     assert {"validation", "test", "shifted", "test_transfer", "test_raised"} <= names
@@ -87,9 +102,8 @@ def test_timing_gate_then_one_fit_stores_record_network_and_predictions(run, mon
         f"test_inj_{a:g}{s}" for a in core.TEST_INJECTION_POINTS for s in ("", "_nobsp")
     } <= names
     with np.load(folder / "test.npz") as z:
-        assert set(z.files) == {"p", "pv", "step_p", "size"} and len(z["p"]) == fake730_rows(
-            root730
-        )
+        assert set(z.files) == {"p", "pv", "step_p", "size"}
+        assert len(z["p"]) == fake730_rows(root730)
     assert (
         fit.fit_one(root=root, root730=root730, env=env, arm="U*", seed=0, device="cpu", log=print)
         == rec
@@ -102,11 +116,13 @@ def test_timing_gate_then_one_fit_stores_record_network_and_predictions(run, mon
     assert not (root / "predictions" / "Splus_unet_s0" / "test_raised.npz").exists()
 
 
-def fake730_rows(root730) -> int:
+def fake730_rows(root730: Any) -> int:
     return len(stages.load_stored(root730=root730, arm="S", arch="unet")[0]["p"])
 
 
-def test_timing_gate_stops_over_the_line_unless_the_manager_approves(run, monkeypatch) -> None:
+def test_timing_gate_stops_over_the_line_unless_the_manager_approves(
+    run: Any, monkeypatch: Any
+) -> None:
     root, root730, env = run
     monkeypatch.setattr(core, "STOP_LINE_HOURS", 0.0)
     with pytest.raises(stages.StoppedError, match="timing gate"):
@@ -120,33 +136,33 @@ def test_timing_gate_stops_over_the_line_unless_the_manager_approves(run, monkey
 
 
 def test_chain_stops_and_reports_on_a_correctness_failure_and_a_failed_needed_arm(
-    run, monkeypatch
+    run: Any, monkeypatch: Any
 ) -> None:
-    root, root730, env = run
+    root, root730, _env = run
     (root / "scores").mkdir(exist_ok=True)
     stages.write_json(
         path=root / "scores" / "timing.json", payload={"pass": True, "hours_at_cap": 3.0}
     )
     lines = []
 
-    def boom(arm, arch, seed):
+    def boom(arm: Any, arch: Any, seed: Any) -> Any:
         raise leak.CorrectnessFailureError("a planted leak")
 
     with pytest.raises(leak.CorrectnessFailureError):
         fit.stage_chain(root=root, root730=root730, run_one=boom, log=lines.append)
     status = json.loads((root / "chain_status.json").read_text())
-    assert (
-        status["state"] == "invalid"
-        and status["family"] == "S+, U*"
-        and (root / "scores" / "invalid.json").exists()
-    )
+    assert status["state"] == "invalid"
+    assert status["family"] == "S+, U*"
+    assert (root / "scores" / "invalid.json").exists()
     assert any(line.startswith("fits starting") for line in lines)
     with pytest.raises(RuntimeError, match="correctness"):
         stages.guard_run(root=root, root730=root730, stage="fit")
 
 
-def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_arm(run) -> None:
-    root, root730, env = run
+def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_arm(
+    run: Any,
+) -> None:
+    root, root730, _env = run
     stages.write_json(
         path=root / "scores" / "timing.json", payload={"pass": True, "hours_at_cap": 3.0}
     ) if (root / "scores").exists() else None
@@ -156,7 +172,7 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
     )
     calls = []
 
-    def fake(arm, arch, seed):
+    def fake(arm: Any, arch: Any, seed: Any) -> Any:
         calls.append(arm)
         if arm == "U-SG":
             raise RuntimeError("a report-only fit raised")
@@ -168,11 +184,9 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
     lines: list[str] = []
     status = fit.stage_chain(root=root, root730=root730, run_one=fake, log=lines.append)
     assert sum(line.startswith("fits starting") for line in lines) == 7
-    assert (
-        status["state"] == "complete"
-        and "U*-L" in calls
-        and len([c for c in calls if c == "U-SG"]) == 3
-    )
+    assert status["state"] == "complete"
+    assert "U*-L" in calls
+    assert len([c for c in calls if c == "U-SG"]) == 3
     assert (
         stages.job_path(root=root, arm="U-SG", arch="unet", seed=0).with_suffix(".failed.json")
     ).exists()
@@ -180,7 +194,7 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
     for p in root.glob("fits/*.json"):
         p.unlink()
 
-    def needed_fails(arm, arch, seed):
+    def needed_fails(arm: Any, arch: Any, seed: Any) -> Any:
         if arm == "S+":
             raise RuntimeError("a needed fit raised")
         stages.write_json(
@@ -189,7 +203,8 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
         return {}
 
     status = fit.stage_chain(root=root, root730=root730, run_one=needed_fails, log=lines.append)
-    assert status["state"] == "failed" and status["arms"] == ["S+"]
+    assert status["state"] == "failed"
+    assert status["arms"] == ["S+"]
     assert json.loads((root / "chain_status.json").read_text())["state"] == "failed"
 
 

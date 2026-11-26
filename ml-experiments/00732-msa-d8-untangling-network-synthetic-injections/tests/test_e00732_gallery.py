@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Tests of the gallery panels: each check passes on a sound bank and fails when a component is silent."""
 
 import dataclasses
@@ -54,7 +55,8 @@ def world() -> World:
 
 def test_g10_passes_and_fails_when_the_transfer_is_silent(world: World) -> None:
     charts, ok, _ = g.panel_g10(overlays=world.test, originals=world.segs)
-    assert ok and len(charts) == 4
+    assert ok
+    assert len(charts) == 4
     silent = [dataclasses.replace(o, t=np.zeros_like(o.t)) for o in world.test]
     assert not g.panel_g10(overlays=silent, originals=world.segs)[1]
 
@@ -62,15 +64,23 @@ def test_g10_passes_and_fails_when_the_transfer_is_silent(world: World) -> None:
 def test_g10_fails_when_the_bsp_meter_does_not_follow_another_bsp(world: World) -> None:
     broken = [dataclasses.replace(o, t_bsp=np.zeros_like(o.t_bsp)) for o in world.test]
     wins = g.choose_windows(
-        overlays=broken, originals=world.segs, keep=lambda o, tr: tr.partner == core.OTHER_BSP_PARTNER
+        overlays=broken,
+        originals=world.segs,
+        keep=lambda o, tr: tr.partner == core.OTHER_BSP_PARTNER,
     )
-    assert wins and not g.check_g10(wins=wins, expect_bsp_moves=True)
+    assert wins
+    assert not g.check_g10(wins=wins, expect_bsp_moves=True)
 
 
 def test_pair_panels_pass_and_fail_when_the_injection_is_silent(world: World) -> None:
     assert g.panel_g11(segments=world.segs, index=world.index_s2)[1]
     pairs = g.pair_windows(
-        segments=world.segs, overlays=None, index=world.index_s2, amount=20.0, source="S2", public=True
+        segments=world.segs,
+        overlays=None,
+        index=world.index_s2,
+        amount=20.0,
+        source="S2",
+        public=True,
     )
     assert g.check_pairs(pairs=pairs)
     silent = [dataclasses.replace(p, delta=np.zeros_like(p.delta)) for p in pairs]
@@ -80,8 +90,11 @@ def test_pair_panels_pass_and_fail_when_the_injection_is_silent(world: World) ->
 
 
 def test_g17_holds_s1_pairs_and_stays_out_of_the_public_set(world: World) -> None:
-    charts, ok, _ = g.panel_g11(segments=world.segs, index=world.index_all, public=False, source="S1")
-    assert ok and all(k.startswith("g17") for k in charts)
+    charts, ok, _ = g.panel_g11(
+        segments=world.segs, index=world.index_all, public=False, source="S1"
+    )
+    assert ok
+    assert all(k.startswith("g17") for k in charts)
     assert g.check_private_only(public={"g11_pairs_5": 1}, private=charts)
     assert not g.check_private_only(public={"g17_pairs_5": 1}, private=charts)
     assert not g.check_private_only(public={}, private={})
@@ -89,7 +102,8 @@ def test_g17_holds_s1_pairs_and_stays_out_of_the_public_set(world: World) -> Non
 
 def test_g12_passes_and_fails_when_the_sky_is_not_raised(world: World) -> None:
     charts, ok, _ = g.panel_g12(segments=world.segs)
-    assert ok and charts
+    assert ok
+    assert charts
     csi = np.array([0.5, 0.5, 0.0])
     cosz = np.array([0.5, 0.5, 0.0])
     good = {"csi": csi, "cosz": cosz, "raised": csi * 1.2}
@@ -111,8 +125,12 @@ def test_g13_passes_and_fails_when_the_solar_target_is_silent(world: World) -> N
 
 
 def test_g14_passes_and_fails_outside_the_registered_ranges(world: World) -> None:
-    charts, ok, _, table = g.panel_g14(overlays_by_name={"train seed 0": world.train, "test": world.test})
-    assert ok and charts and {r["direction"] for r in table} == {"D8 gains load", "D8 loses load"}
+    charts, ok, _, table = g.panel_g14(
+        overlays_by_name={"train seed 0": world.train, "test": world.test}
+    )
+    assert ok
+    assert charts
+    assert {r["direction"] for r in table} == {"D8 gains load", "D8 loses load"}
     params = {n: g.parameter_arrays(overlays=o) for n, o in {"test": world.test}.items()}
     assert g.check_g14(params=params, table=table)
     too_big = {"test": {**params["test"], "points": params["test"]["points"] * 3}}
@@ -124,7 +142,8 @@ def test_g14_passes_and_fails_outside_the_registered_ranges(world: World) -> Non
 
 def test_g15_passes_and_fails_when_a_component_is_silent(world: World) -> None:
     charts, ok, _ = g.panel_g15(overlays=world.test, originals=world.segs, index=world.index_s2)
-    assert ok and charts
+    assert ok
+    assert charts
     silent = [
         dataclasses.replace(o, seg=dataclasses.replace(o.seg, engine=np.zeros_like(o.seg.engine)))
         for o in world.test
@@ -143,7 +162,8 @@ def test_g16_reads_the_pairing_shares_and_fails_below_the_bar() -> None:
 
 def test_g18_passes_and_fails_when_a_mirror_is_silent(world: World) -> None:
     charts, ok, _ = g.panel_g18(overlays=world.test, originals=world.segs, medians=world.medians)
-    assert ok and len(charts) == 4
+    assert ok
+    assert len(charts) == 4
     silent = [dataclasses.replace(o, neighbours=o.neighbours_real) for o in world.test]
     assert not g.panel_g18(overlays=silent, originals=world.segs, medians=world.medians)[1]
 
@@ -165,14 +185,16 @@ def test_g20_passes_and_fails_when_a_neighbour_goes_missing(world: World) -> Non
         "overlays_by_name": {"train seed 0": world.train, "test": world.test}, "noise_d8": 5.0,
     }  # fmt: skip
     charts, ok, _ = g.panel_g20(**kwargs)
-    assert ok and charts
+    assert ok
+    assert charts
     gone = {**world.series, "D3": np.full_like(world.series["D3"], np.nan)}
-    assert not g.panel_g20(**{**kwargs, "arrays": gone})[1]
+    assert not g.panel_g20(**{**kwargs, "arrays": gone})[1]  # ty: ignore[invalid-argument-type]
 
 
 def test_g21_passes_and_fails_when_the_hidden_neighbours_leak(world: World) -> None:
     tensor = g.build_tensor(prepared=world.prepared, index=world.train_index)
-    assert tensor is not None and g.check_g21(t=tensor)
+    assert tensor is not None
+    assert g.check_g21(t=tensor)
     leaked = tensor.plain.copy()
     leaked[arms.NB_ROW["D3_value"], np.flatnonzero(tensor.hidden)[0]] = 1.0
     assert not g.check_g21(t=dataclasses.replace(tensor, plain=leaked))
@@ -184,15 +206,18 @@ def test_g21_passes_and_fails_when_the_hidden_neighbours_leak(world: World) -> N
 
 
 def test_auto_check_lists_every_required_panel_and_fails_on_a_missing_one() -> None:
-    panels = g.Panels(results={k: True for k in core.PANEL_REQUIREMENTS})
+    panels = g.Panels(results=dict.fromkeys(core.PANEL_REQUIREMENTS, True))
     assert g.auto_check_record(panels=panels, banks_digest="d")["all_passed"]
     panels.results.pop("G21_input_tensor")
     record = g.auto_check_record(panels=panels, banks_digest="d")
-    assert not record["all_passed"] and not record["panels"]["G21_input_tensor"]
+    assert not record["all_passed"]
+    assert not record["panels"]["G21_input_tensor"]
     json.dumps(record)
 
 
 def test_no_panel_names_a_calendar_date(world: World) -> None:
     chart = g.panel_g10(overlays=world.test, originals=world.segs)[0]["g10_other_bsp"]
     text = json.dumps(chart.to_dict())
-    assert "temporal" not in text and "T00:00" not in text and "2022-" not in text
+    assert "temporal" not in text
+    assert "T00:00" not in text
+    assert "2022-" not in text

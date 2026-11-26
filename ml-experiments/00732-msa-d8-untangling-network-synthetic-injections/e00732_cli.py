@@ -1,4 +1,5 @@
-# ruff: noqa: E402, PLR0912, PLR0915, E501
+# ruff: noqa: E501
+# ruff: noqa: E402, PLR0912, E501
 """Experiment 732: the command line. Run it through `run.sh`, never directly.
 
     SLOT_CPUS=<list> run.sh --go e00732_cli.py <stage> [options]
@@ -21,7 +22,6 @@ import e00732_paths as paths
 paths.pin_threads()
 
 import e00729_stages as stages729
-import e00730_banks as banks730
 import e00732_core as core
 import e00732_leakage as leak
 import e00732_neighbours as nb

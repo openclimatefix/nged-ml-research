@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 732: the four heads on experiment 729's backbones, the softplus solar output, and the stop-gradient.
 
 This module needs torch. Every network maps `(batch, channels, steps)` to `(batch, outputs, steps)`.
@@ -112,7 +113,10 @@ def solar_of(*, raw: torch.Tensor) -> torch.Tensor:
 
 
 def decode(*, raw: torch.Tensor) -> dict[str, torch.Tensor]:
-    """Decode raw outputs `(N, outputs, 48)` into P(X<0) and, with the extra heads, the solar output, step probability, and step size."""
+    """Decode raw outputs `(N, outputs, 48)` into P(X<0) and, with the extra heads.
+
+    The solar output, step probability, and step size.
+    """
     out = {"p": torch.sigmoid(raw[:, 0])}
     if raw.shape[1] > 1:
         out["pv"] = solar_of(raw=raw[:, 1])

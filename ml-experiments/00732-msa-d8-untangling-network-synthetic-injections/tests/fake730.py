@@ -1,7 +1,9 @@
+# ruff: noqa: E501
 """An invented copy of experiment 730's data folder (banks, summary, stored predictions) for the stage tests."""
 
 import json
 from pathlib import Path
+from typing import Any
 
 import e00729_banks as banks729
 import e00729_score as score729
@@ -56,7 +58,7 @@ def build(*, root: Path, seeds: tuple[int, ...] = (0, 1)) -> dict:
     }  # fmt: skip
 
 
-def patch_constants(monkeypatch, *, root: Path, world: dict) -> None:
+def patch_constants(monkeypatch: Any, *, root: Path, world: dict) -> None:
     """Point the plan's constants at the invented bank (row count, canary, pooled limit, limit range)."""
     import e00730_score as score730
     import e00732_core as core

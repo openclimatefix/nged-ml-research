@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 732: the seven loss terms of a training triple and their weights.
 
 This module needs torch. The loss of one triple (the plain window `w`, its injected member `w+`, and

@@ -1,5 +1,7 @@
 """Tests of the heads, the loss terms, the stop-gradient, and a tiny fit on the CPU (need torch)."""
 
+from typing import Any
+
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -9,8 +11,8 @@ import e00729_nets as nets729  # noqa: E402
 import e00732_arms as arms  # noqa: E402
 import e00732_core as core  # noqa: E402
 import e00732_losses as losses  # noqa: E402
-import e00732_nets as nets  # noqa: E402
 import e00732_neighbours as nb  # noqa: E402
+import e00732_nets as nets  # noqa: E402
 import e00732_overlays as ov  # noqa: E402
 import e00732_train as train  # noqa: E402
 import numpy as np  # noqa: E402
@@ -37,7 +39,7 @@ def world():
 
 
 @pytest.mark.parametrize("arch", ["unet", "bilstm"])
-def test_the_sign_channel_is_experiment_729s_backbone_output(arch) -> None:
+def test_the_sign_channel_is_experiment_729s_backbone_output(arch: Any) -> None:
     torch.manual_seed(0)
     net = nets.Net(arch=arch, c_in=arms.N_CHANNELS, heads=True)
     x = torch.randn(3, arms.N_CHANNELS, 96)
@@ -45,7 +47,8 @@ def test_the_sign_channel_is_experiment_729s_backbone_output(arch) -> None:
     assert out.shape == (3, 4, 96)
     torch.testing.assert_close(out[:, :1], net.backbone(x), rtol=1e-5, atol=1e-5)
     plus = nets.Net(arch=arch, c_in=arms.N_CHANNELS, heads=False)
-    assert plus(x).shape == (3, 1, 96) and plus.extra is None
+    assert plus(x).shape == (3, 1, 96)
+    assert plus.extra is None
 
 
 def test_unet_weight_count_is_the_plans() -> None:
@@ -64,7 +67,7 @@ def test_unet_weight_count_is_the_plans() -> None:
 
 
 @pytest.mark.parametrize("arch", ["unet", "bilstm"])
-def test_changing_the_extra_heads_does_not_change_the_sign_logits(arch) -> None:
+def test_changing_the_extra_heads_does_not_change_the_sign_logits(arch: Any) -> None:
     torch.manual_seed(1)
     net = nets.Net(arch=arch, c_in=arms.N_CHANNELS, heads=True)
     x = torch.randn(2, arms.N_CHANNELS, 96)
@@ -105,7 +108,8 @@ def test_stop_gradient_blocks_every_extra_loss_from_the_backbone_and_only_those(
         grads = [p.grad for p in net.backbone.parameters() if p.grad is not None]
         has = any(float(g.abs().sum()) > 0 for g in grads)
         assert has == expect_backbone_grad
-        assert net.extra.weight.grad is not None and float(net.extra.weight.grad.abs().sum()) > 0
+        assert net.extra.weight.grad is not None
+        assert float(net.extra.weight.grad.abs().sum()) > 0
         net.zero_grad()
         values["sign"].backward()
         assert any(
@@ -249,7 +253,7 @@ def test_total_uses_only_positive_weights_and_s_plus_has_only_the_sign() -> None
         losses.total(values={"solar": torch.tensor(1.0)}, weights=core.ARMS["S+"].weights)
 
 
-def test_predict_rows_match_rows_from_segments_and_members_are_built(world) -> None:
+def test_predict_rows_match_rows_from_segments_and_members_are_built(world: Any) -> None:
     import e00729_score as score729
 
     cal, segs, _, plain, index = world
@@ -261,14 +265,16 @@ def test_predict_rows_match_rows_from_segments_and_members_are_built(world) -> N
     np.testing.assert_allclose(
         train.valid_flat(values=pred.t[:, arms.T["x"]], targets=pred.t), rows.x, atol=1e-5
     )
-    assert pred.inj is not None and pred.raised is not None and pred.pair.sum() > 0
+    assert pred.inj is not None
+    assert pred.raised is not None
+    assert pred.pair.sum() > 0
     assert not np.allclose(
         pred.inj["pv"][pred.pair == 1], pred.plain["pv"][pred.pair == 1]
     )  # the injected window is a different input
 
 
 def test_a_tiny_fit_runs_records_every_epoch_and_is_repeatable(
-    world, monkeypatch, tmp_path
+    world: Any, monkeypatch: Any, tmp_path: Any
 ) -> None:
     monkeypatch.setattr(core, "EPOCH_WINDOWS", 48)
     monkeypatch.setattr(core, "BATCH_SIZE", 16)
@@ -284,26 +290,28 @@ def test_a_tiny_fit_runs_records_every_epoch_and_is_repeatable(
         "device": "cpu",
         "max_epochs": 2,
     }
-    net, rec = train.fit(**kwargs, out_path=tmp_path / "n.pt")
-    _, rec2 = train.fit(**kwargs)
-    assert (
-        rec.epochs == 2 and len(rec.history) == len(rec.solar_history) == len(rec.step_history) == 2
-    )
-    assert rec.history == rec2.history and rec.solar_history == rec2.solar_history
+    net, rec = train.fit(**kwargs, out_path=tmp_path / "n.pt")  # ty: ignore[invalid-argument-type]
+    _, rec2 = train.fit(**kwargs)  # ty: ignore[invalid-argument-type]
+    assert rec.epochs == 2
+    assert len(rec.history) == len(rec.solar_history) == len(rec.step_history) == 2
+    assert rec.history == rec2.history
+    assert rec.solar_history == rec2.solar_history
     for terms_by_epoch in (rec.train_terms, rec.val_terms):
         assert {"total", "sign", "solar", "step", "size", "injection", "night", "monotone"} <= set(
             terms_by_epoch
         )
         assert all(len(v) == 2 and np.isfinite(v).all() for v in terms_by_epoch.values())
-    assert rec.train_terms == rec2.train_terms and rec.val_terms == rec2.val_terms
-    assert (tmp_path / "n.pt").exists() and 0.0 <= rec.unpaired_share <= 1.0
+    assert rec.train_terms == rec2.train_terms
+    assert rec.val_terms == rec2.val_terms
+    assert (tmp_path / "n.pt").exists()
+    assert 0.0 <= rec.unpaired_share <= 1.0
     state = torch.load(tmp_path / "n.pt")
     assert set(state) == set(net.state_dict())
-    _, rec3 = train.fit(**{**kwargs, "seed": 1})
+    _, rec3 = train.fit(**{**kwargs, "seed": 1})  # ty: ignore[invalid-argument-type]
     assert rec3.history != rec.history
 
 
-def test_a_tiny_fit_of_every_arm_runs(world, monkeypatch) -> None:
+def test_a_tiny_fit_of_every_arm_runs(world: Any, monkeypatch: Any) -> None:
     monkeypatch.setattr(core, "EPOCH_WINDOWS", 32)
     monkeypatch.setattr(core, "BATCH_SIZE", 16)
     _, _, prepared, plain, index = world
@@ -318,13 +326,15 @@ def test_a_tiny_fit_of_every_arm_runs(world, monkeypatch) -> None:
             device="cpu",
             max_epochs=1,
         )
-        assert rec.arm == name and np.isfinite(rec.best_val_brier)
-        assert set(rec.train_terms) == set(rec.val_terms) and "total" in rec.train_terms
+        assert rec.arm == name
+        assert np.isfinite(rec.best_val_brier)
+        assert set(rec.train_terms) == set(rec.val_terms)
+        assert "total" in rec.train_terms
         assert ("solar" in rec.train_terms) == spec.heads  # a sign-only arm has the sign term alone
         assert np.isfinite(rec.solar_history[0]) == spec.heads
 
 
-def test_the_unet_of_a_plus_arm_is_experiment_729s(world) -> None:
+def test_the_unet_of_a_plus_arm_is_experiment_729s(world: Any) -> None:
     net = nets.build_net(spec=core.ARMS["S+"], c_in=arms.N_CHANNELS)
     ref = nets729.UNet1d(arms.N_CHANNELS, 1)
     assert nets.count_weights(net=net) == nets729.count_weights(net=ref)

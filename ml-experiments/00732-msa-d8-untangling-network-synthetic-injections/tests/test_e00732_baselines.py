@@ -54,7 +54,9 @@ def world() -> World:
 
 
 def edge_rows(*, world: World, mirrored: bool, big: float = 10.0) -> list[tuple[int, int, int]]:
-    """Return (row of all_picks, half-hour) of the start edges of mirrored (or unmirrored) transfers of at least `big` points."""
+    """Return (row of all_picks, half-hour) of the start edges of mirrored (or unmirrored) transfers
+    of at least `big` points.
+    """
     picks = arms.all_picks(prepared=world.prepared)
     where = {pick: k for k, pick in enumerate(picks)}
     out = []
@@ -93,7 +95,9 @@ def test_signed_reading_estimate_and_b_pv2_known_answers() -> None:
 
 
 def test_a_rule_recovers_an_injection_in_both_signs_only_with_the_right_sign() -> None:
-    """B-PV2 recovers delta whether the plain member imports or exports; a head that reads the reading as import falls in reverse flow."""
+    """B-PV2 recovers delta whether the plain member imports or exports; a head that reads the
+    reading as import falls in reverse flow.
+    """
     delta = np.array([5.0, 5.0])
     x = np.array([30.0, -12.0])  # one import row, one reverse-flow row
     r_plain = np.sqrt(x**2 + core.Q_HAT_POINTS**2)  # so that M is exactly |x|
@@ -122,7 +126,9 @@ def test_b_pv1_needs_the_climatology_and_b_pv2_the_demand_output() -> None:
 def test_infer_730_runs_a_stored_network_of_730_on_this_experiments_windows(
     world: World, tmp_path: Path
 ) -> None:
-    """The inference reads a state file of 730's shape, builds windows without neighbours, and returns plain and injected outputs."""
+    """The inference reads a state file of 730's shape, builds windows without neighbours, and
+    returns plain and injected outputs.
+    """
     torch = pytest.importorskip("torch")
     import e00730_arms as arms730
     import e00730_nets as nets730
@@ -142,7 +148,7 @@ def test_infer_730_runs_a_stored_network_of_730_on_this_experiments_windows(
     assert plain["p"].shape == (n, 48)
     assert plain["demand_mu"].shape == (n, 48)
     assert inj["p"].shape == (n, 48)
-    assert out["pair"].sum() > 0  # type: ignore[union-attr]
+    assert out["pair"].sum() > 0  # type: ignore[union-attr]  # ty: ignore[unresolved-attribute]
     # a window with a pair changes the injected member's outputs; a window without one does not
     paired = np.asarray(out["pair"]) > 0.5
     assert not np.allclose(plain["p"][paired], inj["p"][paired])
@@ -164,7 +170,7 @@ def test_b_pv0_reads_the_sky_alone_and_fails_on_a_silent_target() -> None:
     assert (est[cosz <= core.NIGHT_COSZ] == 0).all()
     assert float(np.abs(est - target).mean()) < 0.1 * float(target.mean())
     # it reads no reading, so a window's reading cannot change it: it takes only the sky
-    assert bl.PV0_NAMES
+    assert bl.PV0_NAMES  # ty: ignore[redundant-condition]
     assert bl.pv0_features(csi=csi, clear=clear, cosz=cosz).shape == (4000, 6)
     with pytest.raises(ValueError, match="solar output"):
         bl.fit_pv0(csi=csi, clear=clear, cosz=cosz, target=np.zeros(4000))
@@ -225,7 +231,9 @@ def test_weekend_flags_follow_the_calendar() -> None:
 
 
 def test_step_features_at_a_mirrored_edge_carry_the_mirror_cue(world: World) -> None:
-    """On the real overlay path, a mirrored transfer's start shows a large step, a negative aligned step, and an opposite-sign cue."""
+    """On the real overlay path, a mirrored transfer's start shows a large step, a negative aligned
+    step, and an opposite-sign cue.
+    """
     f = bl.step_feature_rows(
         series=world.steps, prepared=world.prepared, scales=world.scales, neighbours=True
     )

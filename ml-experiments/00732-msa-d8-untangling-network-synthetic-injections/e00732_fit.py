@@ -92,7 +92,10 @@ def assert_fit_inputs(*, spec: core.ArmSpec732, sets: Sets, seed: int) -> None:
 
 
 def assert_net_checks(*, net: nets.Net, spec: core.ArmSpec732, x: torch.Tensor) -> None:
-    """Check, on the fitted network, that the sign logits ignore the extra heads and (U-SG) that the extra losses do not reach the backbone."""
+    """Check, on the fitted network, that the sign logits ignore the extra heads.
+
+    For U-SG, the check also confirms that the extra losses do not reach the backbone.
+    """
     if net.extra is None:
         return
     net.eval()
@@ -168,7 +171,9 @@ def store_predictions(
                     tr=truth.truth(prepared=test_plain, index=test_index, amount=a),
                     member="inj",
                 )
-        pred = train.predict(net=net, prepared=test_plain, device=device, eps=core.TEST_EPS, spec=spec)
+        pred = train.predict(
+            net=net, prepared=test_plain, device=device, eps=core.TEST_EPS, spec=spec
+        )
         store_set(
             folder=folder,
             name="test_raised",
@@ -212,7 +217,9 @@ def fit_one(
         device=device, val_index=sets.val_index, max_epochs=max_epochs, out_path=root / "networks" / f"{name}.pt", log=log,
     )  # fmt: skip
     probe = torch.from_numpy(
-        np.random.default_rng(seed).normal(size=(2, arms.n_channels(spec=spec), arms.STEPS)).astype(np.float32)
+        np.random.default_rng(seed)
+        .normal(size=(2, arms.n_channels(spec=spec), arms.STEPS))
+        .astype(np.float32)
     ).to(device)
     assert_net_checks(net=net.to(device), spec=spec, x=probe)
     store_predictions(
@@ -230,7 +237,9 @@ def run_jobs(
     run_one: Callable[[str, str, int], dict],
     log: Log,
 ) -> dict[str, int]:
-    """Run fits one at a time; a fit that raises is recorded as failed (verdict row 2 when needed), not rerun, and the run goes on.
+    """Run fits one at a time; a fit that raises is recorded as failed (verdict row 2 when needed).
+
+    Not rerun, and the run goes on.
 
     A `CorrectnessFailureError` is never hidden as a failed fit: it propagates (verdict row 1).
     """
@@ -268,8 +277,22 @@ def stage_timing(
 ) -> dict:
     """Run the timing gate: a few epochs of each timed arm, then project every fit, and write `scores/timing.json`.
 
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: The stages' environment.
+        device: "cuda" or "cpu".
+        manager_approved: Whether the manager approved a projection over the stop line.
+        log: Receives progress lines.
+        epochs: The epochs timed for each arm.
+        cores: The slot's cores, for the printed lines.
+
+    Returns:
+        The timing report with its pass flag.
+
     Raises:
-        StoppedError: When the projection is over the stop line and the manager has not approved, or the memory is over its cap.
+        StoppedError: When the projection is over the stop line and the manager has not approved, or
+            the memory is over its cap.
     """
     stages.guard_run(root=root, root730=root730, stage="timing")
     log(fits_starting_line(family="timing", hours=core.TIMING_GATE_HOURS, cores=cores))
@@ -300,7 +323,9 @@ def stage_timing(
     report["window_building_seconds_per_epoch"] = building
     passes = core.timing_gate_passes(report=report, manager_approved=manager_approved)
     stages.write_json(path=root / "scores" / "timing.json", payload={**report, "pass": passes})
-    log(f"timing gate: projection {report['hours_at_cap']:.2f} h at the cap, dropped {report['dropped_arms']}, pass {passes}")
+    log(
+        f"timing gate: projection {report['hours_at_cap']:.2f} h at the cap, dropped {report['dropped_arms']}, pass {passes}"
+    )
     log(last_fit_ended_line(family="timing", counts={"timed": len(secs)}))
     if not passes:
         msg = "the timing gate failed: the projection or a memory peak is over its line (verdict row 0)"
@@ -309,7 +334,10 @@ def stage_timing(
 
 
 def fits_starting_line(*, family: str, hours: float, cores: str) -> str:
-    """Return the line sent to the manager before each family of fits (the timing gate, S+ and U*, U-N, U-NC, U-noBSP, U-NCw, U-SG, U*-L)."""
+    """Return the line sent to the manager before each family of fits (the timing gate, S+ and U*.
+
+    U-N, U-NC, U-noBSP, U-NCw, U-SG, U*-L).
+    """
     return f"fits starting: experiment 732, family {family}, projection {hours:.2f} GPU-process-hours at the cap, core {cores}, {datetime.now(UTC):%FT%TZ}"
 
 
@@ -319,7 +347,10 @@ def last_fit_ended_line(*, family: str, counts: dict[str, int]) -> str:
 
 
 def write_status(*, root: Path, status: dict[str, Any]) -> None:
-    """Write `chain_status.json` (atomic): the stage reached, its outcome, and the reason of a stop (names and counts only)."""
+    """Write `chain_status.json` (atomic) with the stage reached and its outcome.
+
+    For a stop, the file also holds the reason (names and counts only).
+    """
     stages.write_json(
         path=root / "chain_status.json",
         payload={**status, "time": datetime.now(UTC).isoformat(timespec="seconds")},
@@ -334,7 +365,9 @@ def stage_chain(
     log: Log,
     cores: str = "?",
 ) -> dict:
-    """Run the fits family by family, stopping and reporting at the first stop or failure, and writing a status file.
+    """Run the fits family by family, stopping at the first stop or failure.
+
+    The function reports each stop and writes a status file.
 
     The arms that the timing gate dropped (`dropped_arms` of `scores/timing.json`) are not fitted.
 
@@ -342,6 +375,13 @@ def stage_chain(
     failure (row 1), or a fit that raised and a counted reading needs (row 2) ends the chain with
     `chain_status.json` holding `state` "stopped", "invalid", or "failed". A report-only family that
     failed (U-NCw, U-SG, U*-L) does not end the chain.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        run_one: Runs one fit given its arm, architecture, and seed.
+        log: Receives progress lines.
+        cores: The slot's cores, for the printed lines.
 
     Returns:
         The status record.

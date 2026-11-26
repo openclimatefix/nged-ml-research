@@ -62,7 +62,17 @@ def mean_over_seeds(
 
 
 def arm_scores(*, root: Path, arm: str, n_rows: int) -> score.ArmScores:
-    """Return one fitted arm's seed-averaged outputs on the test rows, with None for an output that was not stored.
+    """Return one fitted arm's seed-averaged outputs on the test rows.
+
+    An output that was not stored is returned as None.
+
+    Args:
+        root: The data folder of this experiment.
+        arm: The arm's name.
+        n_rows: The number of scored rows of the test bank.
+
+    Returns:
+        The arm's outputs (None where an output was not stored).
 
     Raises:
         ScoreError: When a stored array does not have `n_rows` rows.
@@ -104,7 +114,14 @@ def stored_arm_scores(*, root730: Path, arm: str) -> score.ArmScores:
 def build_truth(
     *, root730: Path, env: stages.Env, noise_d8: float
 ) -> tuple[score.Truth, list[arms.Prepared], np.ndarray]:
-    """Rebuild the test rows, the transfer overlay's truth, and the injection deltas, all flat on the valid rows.
+    """Rebuild the test rows, the transfer overlay's truth, and the injection deltas, all flat.
+
+    The arrays cover the valid rows only.
+
+    Args:
+        root730: Experiment 730's data folder (read only).
+        env: The stages' environment.
+        noise_d8: D8's noise unit in points.
 
     Returns:
         The truth, the prepared transfer overlay, and the plain window's `valid` mask `(P, 48)`.
@@ -150,7 +167,10 @@ def step_rule_scores(
     *, root730: Path, env: stages.Env, base: stages.BaseDays, test_overlay: Sequence[arms.Prepared],
     test_valid: np.ndarray,
 ) -> dict[str, score.ArmScores]:  # fmt: skip
-    """Fit B-T and B-TN on the validation overlay and return their step probabilities on the test overlay (flat on the valid rows)."""
+    """Fit B-T and B-TN on the validation overlay and return their step probabilities.
+
+    The probabilities are for the test overlay (flat on the valid rows).
+    """
     va = banks729.load_bank(path=banks730.bank_path(root=root730, kind="validation"))
     te = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
     common = {"holidays": env.holidays, "stats": env.stats, "medians": env.medians}
@@ -249,8 +269,20 @@ def stage_score(
 ) -> dict:
     """Score every fitted arm and baseline on the test bank and write `scores/readings.json` (aggregates only).
 
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: The stages' environment.
+        base: D8's base calendar.
+        log: Receives progress lines.
+        ctx: Unused.
+
+    Returns:
+        The record written to `scores/readings.json`.
+
     Raises:
-        StoppedError: When experiment 730's stored predictions do not line up with the rows (correctness failure).
+        StoppedError: When experiment 730's stored predictions do not line up with the rows
+            (correctness failure).
     """
     del ctx
     stages.guard_run(root=root, root730=root730, stage="score")
@@ -316,7 +348,21 @@ def stage_real(
     log: stages.Log,
     ctx: object = None,
 ) -> dict:
-    """Read the real-day sets of U*: H2 on the held-out pre-engine days and the night bar P1 on every era (aggregates only)."""
+    """Read the real-day sets of U*: H2 on the held-out pre-engine days and the night bar P1.
+
+    The function reads every era and writes aggregates only.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: Unused.
+        base: Unused.
+        log: Receives progress lines.
+        ctx: The context (the real-day sets are rebuilt from it).
+
+    Returns:
+        The record written to `scores/real.json`.
+    """
     del env, base
     stages.guard_run(root=root, root730=root730, stage="real")
     folders = [
@@ -352,7 +398,19 @@ def stage_report(
     log: stages.Log,
     ctx: object = None,
 ) -> dict:
-    """Write `scores/verdict.json` from the readings, the harm checks, and the stop and invalid files."""
+    """Write `scores/verdict.json` from the readings, the harm checks, and the stop and invalid files.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: Unused.
+        base: Unused.
+        log: Receives progress lines.
+        ctx: Unused.
+
+    Returns:
+        The verdict record.
+    """
     del env, base, ctx
     stages.guard_run(root=root, root730=root730, stage="report")
     rec = stages.read_json(path=root / READINGS_FILE)
@@ -416,7 +474,10 @@ def window_table(
     t_plain: truth.Truth,
     noise_d8: float,
 ) -> sf.WindowTable:
-    """Build the per-window table of the test bank (one window per scored day), from the flat rows and the stored outputs."""
+    """Build the per-window table of the test bank (one window per scored day) from the flat rows.
+
+    The table also holds the stored outputs.
+    """
     picks = arms.all_picks(prepared=plain)
     p_n = len(picks)
     nan = np.full((p_n, 48), np.nan)
@@ -434,20 +495,20 @@ def window_table(
     brier = lambda q: np.nanmean((q - (xv < 0.0)) ** 2, axis=1)  # noqa: E731
     first_engine = np.where((engine > 0).any(axis=1), np.argmax(engine > 0, axis=1), 0)
     tr = truth_.tr
-    edge = unflatten(flat=tr.edge.astype(float), valid=valid) > 0
+    edge = unflatten(flat=tr.edge.astype(float), valid=valid) > 0  # ty: ignore[unsupported-operator]
     direction = unflatten(flat=tr.edge_direction, valid=valid)
     step_p, step_un = (
         unflatten(flat=ustar.step, valid=valid),
         unflatten(flat=arm_map.get("U-N", score.ArmScores()).step, valid=valid),
     )
     event = unflatten(flat=truth_.event, valid=valid)
-    sq = lambda q: (q - np.where(np.isnan(event), 0, event)) ** 2  # noqa: E731
+    sq = lambda q: (q - np.where(np.isnan(event), 0, event)) ** 2  # noqa: E731  # ty: ignore[no-matching-overload]
     noise = unflatten(flat=tr.edge_noise, valid=valid)
     shape = unflatten(flat=tr.edge_shape.astype(float), valid=valid)
     case = unflatten(flat=tr.edge_case.astype(float), valid=valid)
-    inside = unflatten(flat=tr.inside.astype(float), valid=valid) > 0
+    inside = unflatten(flat=tr.inside.astype(float), valid=valid) > 0  # ty: ignore[unsupported-operator]
     missed = (
-        np.where(edge & (step_p < 0.5), noise, 0.0) if step_p is not None else np.zeros((p_n, 48))
+        np.where(edge & (step_p < 0.5), noise, 0.0) if step_p is not None else np.zeros((p_n, 48))  # ty: ignore[no-matching-overload]
     )
     with np.errstate(all="ignore"):
         return sf.WindowTable(
@@ -458,10 +519,10 @@ def window_table(
             near_zero=(np.abs(reading) < sf.NEAR_ZERO_POINTS).sum(axis=1), mean_p=np.nanmean(p, axis=1), max_p=np.nanmax(np.where(valid, p, -1), axis=1),
             gain_vs_s=brier(p_s) - brier(p) if p_s is not None else np.zeros(p_n),
             solar_error=np.nanmean(np.where(up & valid, np.abs(pv - solar), np.nan), axis=1), pv_max=np.nanmax(np.where(valid, pv, -np.inf), axis=1),
-            adds=(edge & (direction > 0)).any(axis=1), removes=(edge & (direction < 0)).any(axis=1),
+            adds=(edge & (direction > 0)).any(axis=1), removes=(edge & (direction < 0)).any(axis=1),  # ty: ignore[unsupported-operator]
             in_solar=(inside & (solar > 0)).any(axis=1) & edge.any(axis=1),
             other_bsp=(edge & (case == 3)).any(axis=1), solar_shape=(edge & (shape == 2)).any(axis=1),
-            mirrored=(edge & np.isin(case, (0, 1))).any(axis=1),
+            mirrored=(edge & np.isin(case, (0, 1))).any(axis=1),  # ty: ignore[invalid-argument-type]
             step_gain_vs_un=np.nanmean(sq(step_un), axis=1) - np.nanmean(sq(step_p), axis=1) if step_un is not None and step_p is not None else np.zeros(p_n),
             missed_noise_units=missed.max(axis=1), real=np.zeros(p_n, dtype=bool),
         )  # fmt: skip
@@ -476,11 +537,25 @@ def stage_series(
     log: stages.Log,
     ctx: object = None,
 ) -> dict:
-    """Draw the windows W1 to W23 of the test bank to `figures/series/` (windows with S1 solar output go to `PRIVATE/series/` only).
+    """Draw the windows W1 to W23 of the test bank to `figures/series/`.
+
+    Windows with S1 solar output go to `PRIVATE/series/` only.
 
     Each rule is applied to the published table (S2 and engine-only windows) and to the full table; a
-    figure is written only when a window fits. W9 to W11 draw one injection pair each, and W24 and W25 need real-day predictions
+    figure is written only when a window fits. W9 to W11 draw one injection pair each, and W24 and
+    W25 need real-day predictions
     (a rule without a window is listed as not drawn). Only counts are returned.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: The stages' environment.
+        base: Unused.
+        log: Receives progress lines.
+        ctx: Unused.
+
+    Returns:
+        The windows drawn and the rules that found no window.
     """
     del ctx
     import e00732_figures as figures
@@ -525,10 +600,10 @@ def stage_series(
                 continue
             win = {
                 "truth": t_plain.row(name="x")[i], "reading": t_plain.row(name="r")[i], "solar": t_plain.row(name="solar")[i],
-                "pv": np.nan_to_num((unflatten(flat=arm_map["U*"].pv, valid=valid) if arm_map["U*"].pv is not None else np.zeros(valid.shape))[i]),
+                "pv": np.nan_to_num((unflatten(flat=arm_map["U*"].pv, valid=valid) if arm_map["U*"].pv is not None else np.zeros(valid.shape))[i]),  # ty: ignore[not-subscriptable]
                 "step_event": t_tr.row(name="event")[i],
-                "step_p": np.nan_to_num((unflatten(flat=arm_map["U*"].step, valid=valid) if arm_map["U*"].step is not None else np.zeros(valid.shape))[i]),
-                "p": np.nan_to_num((unflatten(flat=arm_map["U*"].p, valid=valid) if arm_map["U*"].p is not None else np.zeros(valid.shape))[i]),
+                "step_p": np.nan_to_num((unflatten(flat=arm_map["U*"].step, valid=valid) if arm_map["U*"].step is not None else np.zeros(valid.shape))[i]),  # ty: ignore[not-subscriptable]
+                "p": np.nan_to_num((unflatten(flat=arm_map["U*"].p, valid=valid) if arm_map["U*"].p is not None else np.zeros(valid.shape))[i]),  # ty: ignore[not-subscriptable]
             }  # fmt: skip
             figures.save_svg(
                 chart=sf.window_figure(window=win, title=f"{name}: {core.SERIES_WINDOWS[name]}"),
@@ -548,7 +623,21 @@ def stage_figures(
     log: stages.Log,
     ctx: object = None,
 ) -> dict:
-    """Draw the contrast figure (C1 to C7 with their intervals) from `scores/readings.json` (the loss curves have their own stage)."""
+    """Draw the contrast figure (C1 to C7 with their intervals).
+
+    The figure reads `scores/readings.json`. The loss curves have their own stage.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: Unused.
+        base: Unused.
+        log: Receives progress lines.
+        ctx: Unused.
+
+    Returns:
+        The file names written.
+    """
     del root730, env, base, ctx
     import e00732_figures as figures
 

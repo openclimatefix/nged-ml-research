@@ -1,5 +1,6 @@
-"""Tests of the leakage assertions: each fires on a planted fault and stays quiet on the clean case (no torch)."""
-# ruff: noqa: E501
+"""Tests of the leakage assertions: each fires on a planted fault and stays quiet on the clean case
+(no torch).
+"""
 
 import copy
 from pathlib import Path
@@ -191,7 +192,7 @@ def test_hidden_spans_zero_all_twelve_neighbour_channels_and_the_check_fires_on_
     leak.assert_hidden_neighbours_zero(batch=batch)
     broken = copy.deepcopy(batch)
     k, pos = map(int, np.argwhere(np.asarray(broken.hidden) > 0.5)[0])
-    broken.xi[k, arms.NB_ROW["D5_change"], pos] = 0.5
+    broken.xi[k, arms.NB_ROW["D5_change"], pos] = 0.5  # ty: ignore[invalid-assignment]
     with pytest.raises(leak.CorrectnessFailureError, match="hidden span"):
         leak.assert_hidden_neighbours_zero(batch=broken)
     unhidden = copy.deepcopy(batch)
@@ -223,7 +224,7 @@ def test_an_injected_member_differs_only_in_the_reading_the_bsp_step_and_the_ali
     # the rebuilt aligned channel may differ from the plain one, and the check allows it
     aligned = arms.NB_ROW["D3_aligned"]
     moved = copy.deepcopy(batch)
-    moved.xi[paired, aligned] += 1.0
+    moved.xi[paired, aligned] += 1.0  # ty: ignore[not-subscriptable]
     leak.assert_injection_changes_only_allowed_channels(batch=moved)
     for channel in (
         arms.ROW["csi"],
@@ -233,7 +234,7 @@ def test_an_injected_member_differs_only_in_the_reading_the_bsp_step_and_the_ali
         arms.ROW["r_mask"],
     ):
         broken = copy.deepcopy(batch)
-        broken.xi[paired, channel, 7] += 1.0
+        broken.xi[paired, channel, 7] += 1.0  # ty: ignore[not-subscriptable]
         with pytest.raises(leak.CorrectnessFailureError, match="may not change"):
             leak.assert_injection_changes_only_allowed_channels(batch=broken)
     silent = copy.deepcopy(batch)

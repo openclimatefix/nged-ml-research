@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 732: the gates and the stages that need no torch (the banks check, neighbours, limits, overlays, tensor checks, guard).
+"""Experiment 732: the gates and the stages that need no torch (the banks check, neighbours.
+
+Limits, overlays, tensor checks, guard).
 
 Every stage takes the data folder `root` of this experiment and experiment 730's data folder
 `root730`, which is read and never written. A stage runs `guard_run` first, so a stage on the outputs
@@ -10,7 +12,6 @@ value of a real solar era.
 """
 
 import hashlib
-import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -157,7 +158,10 @@ def invalid_recorded(*, root: Path) -> bool:
 
 
 def run_marker_payload(*, root730: Path) -> dict:
-    """Return what the run marker holds: the experiment, the row set, the code version, and the id of experiment 730's banks."""
+    """Return what the run marker holds: the experiment, the row set, and the code version.
+
+    The marker also holds the id of experiment 730's banks.
+    """
     return {
         "experiment": "00732",
         "row_set_id": core.ROW_SET_ID,
@@ -167,7 +171,10 @@ def run_marker_payload(*, root730: Path) -> dict:
 
 
 def gallery_passed(*, root: Path, root730: Path) -> bool:
-    """Return whether `PRIVATE/gallery/panel_check.json` records every panel of the written list as passed on the banks in use."""
+    """Return whether `PRIVATE/gallery/panel_check.json` records every panel as passed.
+
+    The record must be for the banks in use.
+    """
     path = root / "PRIVATE" / "gallery" / "panel_check.json"
     if not path.exists():
         return False
@@ -227,6 +234,9 @@ def begin_gate_attempt(*, root: Path) -> None:
     The run has one attempt, and one more after a change of `CODE_VERSION`. A run of the same code
     version is not a new attempt, because the gates are deterministic.
 
+    Args:
+        root: The data folder.
+
     Raises:
         StoppedError: When a third code version asks for a gate attempt (verdict row 0).
     """
@@ -265,7 +275,8 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
         stage: The stage name.
 
     Raises:
-        RuntimeError: When a gate is open, a correctness check has failed, or the folder holds outputs of another run.
+        RuntimeError: When a gate is open, a correctness check has failed, or the folder holds
+            outputs of another run.
     """
     expected = run_marker_payload(root730=root730)
     marker = root / RUN_MARKER
@@ -294,11 +305,17 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
             msg = f"`{stage}` starts a fit, but {INVALID_FILE} records a failed correctness check (verdict row 1): the run is over"
             raise RuntimeError(msg)
         for what, ok in (
-            ("neighbours/check.json with a pass and the neighbour table", neighbours_passed(root=root)),
+            (
+                "neighbours/check.json with a pass and the neighbour table",
+                neighbours_passed(root=root),
+            ),
             ("limits.json, written before any fit", (root / "limits.json").exists()),
             ("overlays/summary.json with a pass", overlays_passed(root=root)),
             (f"{TENSOR_FILE} with a pass", tensor_passed(root=root)),
-            ("PRIVATE/gallery/panel_check.json with every panel passed (the gallery gate of the plan)", gallery_passed(root=root, root730=root730)),
+            (
+                "PRIVATE/gallery/panel_check.json with every panel passed (the gallery gate of the plan)",
+                gallery_passed(root=root, root730=root730),
+            ),
         ):
             if not ok:
                 msg = f"`{stage}` needs {what}"
@@ -306,7 +323,10 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
     if stage in FIT_STAGES and not timing_passed(root=root):
         msg = f"`{stage}` needs scores/timing.json with a pass: run `timing` first"
         raise RuntimeError(msg)
-    if stage in ("score", "real", "report", "figures", "series") and not (root / "limits.json").exists():
+    if (
+        stage in ("score", "real", "report", "figures", "series")
+        and not (root / "limits.json").exists()
+    ):
         msg = f"`{stage}` needs limits.json"
         raise RuntimeError(msg)
 
@@ -315,7 +335,10 @@ def guard_run(*, root: Path, root730: Path, stage: str) -> None:
 
 
 def job_name_730(*, arm: str, arch: str, seed: int) -> str:
-    """Return the folder name of one of experiment 730's fits (`SD*` would be `SDstar`; no stored control holds an asterisk)."""
+    """Return the folder name of one of experiment 730's fits.
+
+    The name for `SD*` is `SDstar`, because no stored control holds an asterisk.
+    """
     return f"{arm.replace('*', 'star')}_{arch}_s{seed}"
 
 
@@ -385,7 +408,9 @@ def stage_banks(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) ->
     problems = score.stored_prediction_problems(
         arrays=stored,
         rows=rows,
-        recorded_digest=score.row_key_digest(rows=rows) if first is None else first["row_key_digest"],
+        recorded_digest=score.row_key_digest(rows=rows)
+        if first is None
+        else first["row_key_digest"],
     )
     if problems:
         msg = "; ".join(problems) + " (verdict row 1)"
@@ -404,7 +429,10 @@ def stage_banks(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) ->
         "predictions": files, "margin_json": file_digest(path=root730 / "margin.json"), "banks_digest": banks730.banks_digest_id(root=root730),
     }  # fmt: skip
     if first is not None:
-        if first["predictions"] != record["predictions"] or first["margin_json"] != record["margin_json"]:
+        if (
+            first["predictions"] != record["predictions"]
+            or first["margin_json"] != record["margin_json"]
+        ):
             msg = "experiment 730's stored predictions or margin.json differ from their recorded digests (verdict row 0)"
             raise StoppedError(msg)
     else:
@@ -417,7 +445,9 @@ def stage_banks(*, root: Path, root730: Path, holidays: np.ndarray, log: Log) ->
 # --------------------------------------------------------------------------- the neighbour table
 
 
-def split_coverage(*, base: BaseDays, arrays: Mapping[str, np.ndarray]) -> dict[str, dict[str, float]]:
+def split_coverage(
+    *, base: BaseDays, arrays: Mapping[str, np.ndarray]
+) -> dict[str, dict[str, float]]:
     """Return each neighbour's coverage of D8's present half-hours in each split."""
     out: dict[str, dict[str, float]] = {}
     for split in ("training", "validation", "test"):
@@ -495,7 +525,9 @@ def stage_neighbours(
     return record
 
 
-def read_neighbour_inputs(*, root: Path, base: BaseDays) -> tuple[dict[str, np.ndarray], dict[str, float]]:
+def read_neighbour_inputs(
+    *, root: Path, base: BaseDays
+) -> tuple[dict[str, np.ndarray], dict[str, float]]:
     """Read the stored neighbour table and the training medians (the inputs of every later stage)."""
     arrays = nb.read_table(root=root, dates=base.dates)
     medians = {k: float(v) for k, v in read_json(path=root / MEDIANS_FILE).items()}
@@ -518,7 +550,10 @@ def stage_limits(
     *, root: Path, root730: Path, holidays: np.ndarray, base: BaseDays,
     arrays: Mapping[str, np.ndarray], log: Log,
 ) -> dict:  # fmt: skip
-    """Write `limits.json` once from the test bank's truth and the training base days alone, and stop when the pooled limit is not experiment 730's."""
+    """Write `limits.json` once from the test bank's truth and the training base days alone.
+
+    The function stops when the pooled limit is not experiment 730's.
+    """
     guard_run(root=root, root730=root730, stage="limits")
     test = banks729.load_bank(path=banks730.bank_path(root=root730, kind="test"))
     rows = score729.rows_from_segments(segments=test.segments, holidays=holidays)
@@ -556,7 +591,10 @@ def failed_shares(*, shares: Mapping[str, ov.Share], where: str) -> list[str]:
 
 
 def reverse_share(*, segments: Sequence[Any], holidays: np.ndarray) -> float:
-    """Return the share of scored half-hours with a negative truth (the sign-supervised half-hours, hidden spans aside)."""
+    """Return the share of scored half-hours with a negative truth (the sign-supervised half-hours.
+
+    Hidden spans aside).
+    """
     return float(
         np.mean(score729.rows_from_segments(segments=list(segments), holidays=holidays).x < 0.0)
     )
@@ -633,6 +671,17 @@ def stage_overlays(
     more than 10% of the stored share. A reachability shortfall that the plan says only voids a word
     is listed in the summary and does not stop the line (the check of `ov.reachability` reports it).
 
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        holidays: Bank-holiday dates.
+        neighbours: The neighbour table on D8's base calendar.
+        log: Receives progress lines.
+        train_seeds: The training seeds to build.
+
+    Returns:
+        The summary written to `overlays/summary.json`.
+
     Raises:
         StoppedError: With every problem listed (counts and names only).
     """
@@ -673,7 +722,11 @@ def stage_overlays(
     }
     path = root / "overlays" / "summary.json"
     digests = {k: v["digest"] for k, v in records.items()}
-    if path.exists() and read_json(path=path).get("pass") and read_json(path=path)["digests"] != digests:
+    if (
+        path.exists()
+        and read_json(path=path).get("pass")
+        and read_json(path=path)["digests"] != digests
+    ):
         msg = "an overlay digest differs from the one recorded at the first run"
         raise leak.CorrectnessFailureError(msg)
     write_json(path=path, payload={**summary, "digests": digests})
@@ -691,7 +744,7 @@ def mirror_edge_picks(*, prepared: Sequence[arms.Prepared], limit: int) -> list[
     picks: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
     for i, p in enumerate(prepared):
-        days = set(int(d) for d in p.days)
+        days = {int(d) for d in p.days}
         for tr in p.transfers:
             if not tr.mirrored:
                 continue
@@ -725,12 +778,26 @@ def stage_tensor_checks(
     *, root: Path, root730: Path, env: Env, log: Log, n_edges: int = 80, n_solar: int = 80,
     seed: int = 0,
 ) -> dict:  # fmt: skip
-    """Run the checks on the input tensors on the stored training bank of seed 0 and on the validation bank, before any fit.
+    """Run the checks on the input tensors on the stored training bank of seed 0.
+
+    The function also checks the validation bank, before any fit.
 
     The training batches come from `arms.make_batch` (hidden spans on half the windows), and the
     validation batches from `arms.make_eval_batch` with fixed hidden spans (`masks.fixed_hidden_for_picks`),
     a fixed injected amount, and the fixed raised sky. Each of U*, U-N, and U-noBSP is checked. A
     check that finds no case fails.
+
+    Args:
+        root: The data folder of this experiment.
+        root730: Experiment 730's data folder (read only).
+        env: The stages' environment.
+        log: Receives progress lines.
+        n_edges: Windows at mirrored transfer edges per batch.
+        n_solar: Windows of solar worlds per batch.
+        seed: The seed of the training batches.
+
+    Returns:
+        The record written to `scores/tensor_checks.json`.
 
     Raises:
         StoppedError: With every failed check (verdict row 0).
@@ -747,11 +814,18 @@ def stage_tensor_checks(
         overlays=ov.overlay_segments(segments=va.segments, kind="validation", neighbours=env.neighbours),
         holidays=env.holidays, stats=env.stats, medians=env.medians,
     )  # fmt: skip
-    index_tr, index_va = ov.build_pair_index(segments=tr.segments), ov.build_pair_index(segments=va.segments)
+    index_tr, index_va = (
+        ov.build_pair_index(segments=tr.segments),
+        ov.build_pair_index(segments=va.segments),
+    )
     record: dict[str, Any] = {}
     problems: list[str] = []
-    picks_tr = mirror_edge_picks(prepared=train, limit=n_edges) + solar_world_picks(prepared=train, limit=n_solar)
-    picks_va = mirror_edge_picks(prepared=val, limit=n_edges) + solar_world_picks(prepared=val, limit=n_solar)
+    picks_tr = mirror_edge_picks(prepared=train, limit=n_edges) + solar_world_picks(
+        prepared=train, limit=n_solar
+    )
+    picks_va = mirror_edge_picks(prepared=val, limit=n_edges) + solar_world_picks(
+        prepared=val, limit=n_solar
+    )
     hidden = masks.fixed_hidden_for_picks(
         style=core.STYLE, picks=picks_va, offsets=[p.offsets for p in val],
         segment_ids=[p.source_index for p in val],

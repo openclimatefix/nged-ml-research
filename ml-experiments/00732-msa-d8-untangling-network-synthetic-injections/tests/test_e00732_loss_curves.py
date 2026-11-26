@@ -1,6 +1,10 @@
-"""Tests of the loss-curve figure on a stored-history fixture shaped like experiment 730's `fits/S_unet_s0.json` (no torch)."""
+# ruff: noqa: E501
+"""Tests of the loss-curve figure on a stored-history fixture shaped like experiment 730's
+`fits/S_unet_s0.json` (no torch).
+"""
 
 import json
+from typing import Any
 
 import e00732_core as core
 import e00732_figures as figures
@@ -37,7 +41,8 @@ def record(
 def test_the_marker_is_the_stored_best_epoch_and_the_rows_cover_every_term_and_split() -> None:
     r = record()
     rows = figures.curve_rows(record=r)
-    assert rows.height == 2 * 4 * 40 and set(rows["split"]) == {"train", "validation"}
+    assert rows.height == 2 * 4 * 40
+    assert set(rows["split"]) == {"train", "validation"}
     assert figures.best_epoch_of(record=r) == r["best_epoch"] == 30
     chart = figures.loss_panel(record=r)
     spec = chart.to_dict()
@@ -88,7 +93,7 @@ def test_a_short_nonfinite_or_mismatched_curve_fails() -> None:
         figures.curve_rows(record=r)
 
 
-def test_the_stage_reads_stored_records_only_and_names_the_seed_in_the_title(tmp_path) -> None:
+def test_the_stage_reads_stored_records_only_and_names_the_seed_in_the_title(tmp_path: Any) -> None:
     fits = tmp_path / "fits"
     fits.mkdir()
     for arm, spec in core.ARMS.items():
@@ -103,15 +108,13 @@ def test_the_stage_reads_stored_records_only_and_names_the_seed_in_the_title(tmp
     logged = []
     written = figures.stage_loss_curves(root=tmp_path, log=logged.append)
     svg = written[0].read_text()
-    assert (
-        written[0].name == "loss_curves.svg"
-        and "<svg" in svg
-        and "seed 0" in svg
-        and "stored model at epoch 30" in svg
-    )
+    assert written[0].name == "loss_curves.svg"
+    assert "<svg" in svg
+    assert "seed 0" in svg
+    assert "stored model at epoch 30" in svg
     assert len(logged) == 1
     (fits / f"{core.job_name(arm='U-SG', arch='unet', seed=0)}.json").unlink()
-    with pytest.raises(FileNotFoundError, match="U-SG|USG"):
+    with pytest.raises(FileNotFoundError, match=r"U-SG|USG"):
         figures.stage_loss_curves(root=tmp_path, log=logged.append)
 
 

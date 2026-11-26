@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 732: the truth arrays of an evaluation set (numpy only), in the order that `predict` writes predictions.
+"""Experiment 732: the truth arrays of an evaluation set (numpy only).
+
+In the order that `predict` writes predictions.
 
 The scoring stage needs the targets, the delta of each pair, the sky, and the BSP step of every window,
 and needs no torch to rebuild them: the windows come from `make_eval_batch`, the same function that
@@ -66,7 +68,10 @@ def truth(
     eps: float | None = None,
     picks: list[tuple[int, int]] | None = None,
 ) -> Truth:
-    """Return the truth arrays of every scored day of `prepared`, with the injected member's targets when an amount is given."""
+    """Return the truth arrays of every scored day of `prepared`.
+
+    The arrays include the injected member's targets when an amount is given.
+    """
     picks = arms.all_picks(prepared=prepared) if picks is None else picks
     spec = arms.eval_spec(inject=amount is not None, raised=eps is not None)
     parts: dict[str, list[np.ndarray]] = {
@@ -93,13 +98,13 @@ def truth(
         parts["raisable"].append(b.keeps[:, arms.K["raisable"]] > 0.5)
     cat = {k: np.concatenate(v) if v else None for k, v in parts.items()}
     return Truth(
-        t=cat["t"],
+        t=cat["t"],  # ty: ignore[invalid-argument-type]
         ti=cat["ti"],
-        pair=cat["pair"],
-        delta=cat["delta"],
-        cosz=cat["cosz"],
-        csi=cat["csi"],
-        dbsp=cat["dbsp"],
-        keep_raisable=cat["raisable"],
+        pair=cat["pair"],  # ty: ignore[invalid-argument-type]
+        delta=cat["delta"],  # ty: ignore[invalid-argument-type]
+        cosz=cat["cosz"],  # ty: ignore[invalid-argument-type]
+        csi=cat["csi"],  # ty: ignore[invalid-argument-type]
+        dbsp=cat["dbsp"],  # ty: ignore[invalid-argument-type]
+        keep_raisable=cat["raisable"],  # ty: ignore[invalid-argument-type]
         picks=picks,
     )  # ty: ignore[invalid-argument-type]

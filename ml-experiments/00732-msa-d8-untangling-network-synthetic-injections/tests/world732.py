@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """A tiny synthetic bank for the tests: two months of base days with invented values.
 
 The calendar comes from experiment 730's `tests/world730.py`, loaded by path (this module imports
@@ -80,7 +81,9 @@ def make_neighbours(*, cal: sim.Calendar, seed: int = 0) -> dict[str, np.ndarray
 
 
 def make_base(*, cal: sim.Calendar) -> object:
-    """Return D8's base calendar as the stages read it: the first 60% of the days train, then validation, then test."""
+    """Return D8's base calendar as the stages read it: the first 60% of the days train, then
+    validation, then test.
+    """
     import e00732_stages as stages
 
     n = len(cal.dates)
@@ -93,7 +96,8 @@ def make_base(*, cal: sim.Calendar) -> object:
 
 
 def seed_neighbour_files(*, root: Path, base: object, arrays: dict[str, np.ndarray]) -> None:
-    """Write the neighbour table, the medians, and a passing check file, as a passed `neighbours` stage leaves them.
+    """Write the neighbour table, the medians, and a passing check file, as a passed `neighbours`
+    stage leaves them.
 
     The invented neighbours do not mirror the invented reading, so the stage's own gates are tested apart.
     """
@@ -103,7 +107,8 @@ def seed_neighbour_files(*, root: Path, base: object, arrays: dict[str, np.ndarr
     nb.write_table(root=root, dates=base.dates, arrays=arrays)  # ty: ignore[unresolved-attribute]
     medians = {
         n: nb.training_median(
-            folded=nb.fold(signed=arrays[n], floor=0.0), train_rows=base.train_rows  # ty: ignore[unresolved-attribute]
+            folded=nb.fold(signed=arrays[n], floor=0.0),
+            train_rows=base.train_rows,  # ty: ignore[unresolved-attribute]
         )
         for n in nb.NEIGHBOURS
     }

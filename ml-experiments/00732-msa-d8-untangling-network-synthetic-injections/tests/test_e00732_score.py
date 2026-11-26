@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Known-answer tests of the scores, the eight solar bars, the readings, the stored-prediction links, and the verdict (no torch)."""
+"""Known-answer tests of the scores, the eight solar bars, the readings, the stored-prediction
+links, and the verdict (no torch).
+"""
 
 import e00729_arms as arms729
 import e00729_score as score729
@@ -350,25 +352,25 @@ def test_compute_readings_reads_each_contrast_on_the_same_rows_and_voids_missing
     }
     out = sc.compute_readings(truth=truth, arms=arms_, n_resamples=200)
     counted = out["counted"]
-    assert set(counted) == {f"C{k}" for k in range(1, 8)}
-    for name in counted:
-        assert counted[name] is not None, name
-        assert counted[name].reading.point < 0, name  # U* is better in every contrast
-    assert counted["C3"].n_rows == int(sc.injection_keep_stack(truth=truth).sum())
-    assert counted["C1"].n_rows == world.rows.n
+    assert set(counted) == {f"C{k}" for k in range(1, 8)}  # ty: ignore[invalid-argument-type]
+    for name in counted:  # ty: ignore[not-iterable]
+        assert counted[name] is not None, name  # ty: ignore[not-subscriptable]
+        assert counted[name].reading.point < 0, name  # U* is better in every contrast  # ty: ignore[not-subscriptable]
+    assert counted["C3"].n_rows == int(sc.injection_keep_stack(truth=truth).sum())  # ty: ignore[not-subscriptable]
+    assert counted["C1"].n_rows == world.rows.n  # ty: ignore[not-subscriptable]
     assert out["hb"] is not None
     report = out["report"]
-    assert report["R1"] is None  # U-SG is absent: void, not zero
-    assert report["R19"] is None  # U-noBSP is absent
+    assert report["R1"] is None  # U-SG is absent: void, not zero  # ty: ignore[not-subscriptable]
+    assert report["R19"] is None  # U-noBSP is absent  # ty: ignore[not-subscriptable]
     with_bsp = sc.compute_readings(
         truth=truth, arms={**arms_, "U-noBSP": make_arm(truth=truth, better=False)}, n_resamples=100
     )
-    assert with_bsp["report"]["R19"] is not None
-    assert with_bsp["report"]["R19"].reading.point < 0
-    assert counted["C4"].n_rows == int((sc.sun_up(cosz=truth.cosz)).sum())
+    assert with_bsp["report"]["R19"] is not None  # ty: ignore[not-subscriptable]
+    assert with_bsp["report"]["R19"].reading.point < 0  # ty: ignore[not-subscriptable]
+    assert counted["C4"].n_rows == int((sc.sun_up(cosz=truth.cosz)).sum())  # ty: ignore[not-subscriptable]
     # a NaN output on a kept row makes the contrast refuse, never read zero
     bad = make_arm(truth=truth, better=True)
-    bad.pv = bad.pv.copy()
+    bad.pv = bad.pv.copy()  # ty: ignore[unresolved-attribute]
     bad.pv[np.flatnonzero(sc.sun_up(cosz=truth.cosz))[0]] = np.nan
     with pytest.raises(ValueError, match="non-finite"):
         sc.compute_readings(truth=truth, arms={**arms_, "U*": bad}, n_resamples=50)
@@ -477,16 +479,16 @@ def test_solar_bars_need_all_eight_and_a_missing_amount_fails() -> None:
         "response": good,
         "demand": good,
     }
-    flags = sc.solar_bars(**kw)
+    flags = sc.solar_bars(**kw)  # ty: ignore[invalid-argument-type]
     assert list(flags) == list(core.SOLAR_BARS)
     assert all(flags.values())
     assert core.solar_word(bars=flags, reachable=True) == "reasonable"
     for name in kw:
-        flags = sc.solar_bars(**{**kw, name: None})
+        flags = sc.solar_bars(**{**kw, name: None})  # ty: ignore[invalid-argument-type]
         assert not all(flags.values()), name
-    short = sc.solar_bars(**{**kw, "recovery": {5.0: good, 20.0: good}})
+    short = sc.solar_bars(**{**kw, "recovery": {5.0: good, 20.0: good}})  # ty: ignore[invalid-argument-type]
     assert not short["recovery"]
-    assert not sc.solar_bars(**{**kw, "recovery": {**recovery, 50.0: {"pass": False}}})["recovery"]
+    assert not sc.solar_bars(**{**kw, "recovery": {**recovery, 50.0: {"pass": False}}})["recovery"]  # ty: ignore[invalid-argument-type]
 
 
 def test_gain_bar_reads_the_upper_end(world: World) -> None:
@@ -602,7 +604,7 @@ def facts(**over: object) -> sc.VerdictFacts:
         "n_bsp_reverse": 10_000,
     }
     base.update(over)
-    return sc.VerdictFacts(**base)
+    return sc.VerdictFacts(**base)  # ty: ignore[invalid-argument-type]
 
 
 def test_verdict_rows_follow_the_table_in_order() -> None:
@@ -639,7 +641,7 @@ def test_unread_c1_or_harm_checks_are_row_2_never_a_silent_row_6() -> None:
     nan = reading(point=float("nan"), lower=float("nan"), upper=float("nan"))
     out = sc.build_verdict(facts=facts(c={**facts().c, "C1": nan}))
     assert out["row"] == 2
-    assert "C1" in out["reason"]
+    assert "C1" in out["reason"]  # ty: ignore[unsupported-operator]
     assert (
         sc.build_verdict(facts=facts(c={k: v for k, v in facts().c.items() if k != "C1"}))["row"]
         == 2
@@ -662,10 +664,10 @@ def test_side_readings_never_change_a_row_and_a_short_count_voids_its_word() -> 
     )
     assert base["row"] == other["row"]
     assert base["verdict"] == other["verdict"]
-    assert other["words"]["solar"] == "not shown"
-    assert other["words"]["bsp"] == "void"
-    assert other["words"]["neighbour"] == "void"
-    assert other["words"]["transfer"] == "worse than the rule"
+    assert other["words"]["solar"] == "not shown"  # ty: ignore[not-subscriptable]
+    assert other["words"]["bsp"] == "void"  # ty: ignore[not-subscriptable]
+    assert other["words"]["neighbour"] == "void"  # ty: ignore[not-subscriptable]
+    assert other["words"]["transfer"] == "worse than the rule"  # ty: ignore[not-subscriptable]
     short = sc.build_verdict(
         facts=facts(transfer_reachable=False, injection_reachable=False, n_bsp_reverse=0)
     )

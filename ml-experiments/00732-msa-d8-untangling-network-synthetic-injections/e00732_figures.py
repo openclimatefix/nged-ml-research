@@ -6,7 +6,7 @@ curves read the stored per-epoch histories of the fit records and refit nothing.
 built by a function that returns the plotted arrays, so a check can read what the chart draws.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Final
 
@@ -45,14 +45,15 @@ def curve_rows(*, record: Mapping[str, object]) -> pl.DataFrame:
         The rows, one per epoch, split, and term.
 
     Raises:
-        HistoryError: When a history is empty, the two splits hold different terms, a curve is not as long as `epochs`, a
+        HistoryError: When a history is empty, the two splits hold different terms, a curve is not
+            as long as `epochs`, a
             value is not finite, or `best_epoch` is outside the epochs run.
     """
     train, val = record.get("train_terms") or {}, record.get("val_terms") or {}
     if not train or not val:
         msg = f"the fit record of {record.get('arm')} seed {record.get('seed')} holds no per-epoch loss history"
         raise HistoryError(msg)
-    if set(train) != set(val):
+    if set(train) != set(val):  # ty: ignore[invalid-argument-type]
         msg = "the training and validation histories hold different loss terms"
         raise HistoryError(msg)
     n = int(record["epochs"])  # ty: ignore[invalid-argument-type]
@@ -61,7 +62,7 @@ def curve_rows(*, record: Mapping[str, object]) -> pl.DataFrame:
         raise HistoryError(msg)
     parts = []
     for split, terms in (("train", train), ("validation", val)):
-        for term, values in terms.items():
+        for term, values in terms.items():  # ty: ignore[unresolved-attribute]
             v = np.asarray(values, dtype=float)
             if len(v) != n or not np.isfinite(v).all():
                 msg = f"the {split} history of term {term} is not {n} finite values"
@@ -75,7 +76,10 @@ def curve_rows(*, record: Mapping[str, object]) -> pl.DataFrame:
 
 
 def best_epoch_of(*, record: Mapping[str, object]) -> int:
-    """Return the marked epoch of a fit: its stored `best_epoch`, checked against the lowest validation Brier score of the sign."""
+    """Return the marked epoch of a fit: its stored `best_epoch`.
+
+    Checked against the lowest validation Brier score of the sign.
+    """
     history = np.asarray(record.get("history") or [], dtype=float)
     if history.size == 0:
         msg = "the fit record holds no validation history of the sign"
@@ -90,7 +94,10 @@ def best_epoch_of(*, record: Mapping[str, object]) -> int:
 
 
 def loss_panel(*, record: Mapping[str, object]) -> alt.LayerChart:
-    """Return one arm's panel: train (solid) and validation (dashed) curves per term, with the stored model's epoch marked."""
+    """Return one arm's panel of train (solid) and validation (dashed) curves per term.
+
+    The panel marks the epoch of the stored weights.
+    """
     rows = curve_rows(record=record)
     best = best_epoch_of(record=record)
     terms = list(dict.fromkeys(rows["term"].to_list()))
@@ -117,7 +124,7 @@ def loss_panel(*, record: Mapping[str, object]) -> alt.LayerChart:
         )
     )
     mark = (
-        alt.Chart(pl.DataFrame({"epoch": [best], "label": [f"stored model: epoch {best}"]}))
+        alt.Chart(pl.DataFrame({"epoch": [best], "label": [f"stored model: epoch {best}"]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#000000", strokeDash=[2, 2], aria=False)
         .encode(x="epoch:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -144,7 +151,10 @@ def loss_curves_chart(*, records: Sequence[Mapping[str, object]]) -> alt.VConcat
 
 
 def loss_curve_checks(*, records: Sequence[Mapping[str, object]]) -> dict[str, bool]:
-    """Return the checks on the plotted arrays: every arm drawn, every curve finite and long enough, every marker equal to the stored best epoch."""
+    """Return the checks on the plotted arrays: every arm drawn, every curve finite and long enough.
+
+    Every marker equal to the stored best epoch.
+    """
     out = {"every_arm_drawn": {r["arm"] for r in records} == set(CURVE_ARMS)}
     for r in records:
         rows = curve_rows(record=r)
@@ -155,8 +165,15 @@ def loss_curve_checks(*, records: Sequence[Mapping[str, object]]) -> dict[str, b
     return out
 
 
-def stage_loss_curves(*, root: Path, log) -> list[Path]:  # noqa: ANN001
+def stage_loss_curves(*, root: Path, log: Callable[[str], None]) -> list[Path]:
     """Draw `figures/loss_curves.svg` from the stored fit records of seed 0 of every arm (no refit).
+
+    Args:
+        root: The data folder.
+        log: Receives progress lines.
+
+    Returns:
+        The paths of the figures written.
 
     Raises:
         HistoryError: When a record is missing or its history is empty.
@@ -184,7 +201,10 @@ def stage_loss_curves(*, root: Path, log) -> list[Path]:  # noqa: ANN001
 
 
 def contrast_rows(*, readings: Mapping[str, Mapping[str, float | bool]]) -> pl.DataFrame:
-    """Return one row per counted contrast with its point, interval ends, and whether the reading is void (a void reading draws nothing)."""
+    """Return one row per counted contrast, with its point and interval ends.
+
+    Each row also says whether the reading is void (a void reading draws nothing).
+    """
     return pl.DataFrame(
         [
             {"contrast": name, "point": float(r["point"]), "lower": float(r["lower"]), "upper": float(r["upper"]), "void": bool(r["void"])}
@@ -195,7 +215,15 @@ def contrast_rows(*, readings: Mapping[str, Mapping[str, float | bool]]) -> pl.D
 
 
 def contrast_chart(*, readings: Mapping[str, Mapping[str, float | bool]]) -> alt.LayerChart:
-    """Return the counted contrasts as points with their intervals around a labelled zero rule (a negative value favours the first arm).
+    """Return the counted contrasts as points with intervals.
+
+    The chart draws a labelled zero rule (a negative value favours the first arm).
+
+    Args:
+        readings: The counted contrasts' readings by name (`reading_dict` output).
+
+    Returns:
+        The chart.
 
     Raises:
         HistoryError: When every reading is void, because the chart would be empty.
@@ -205,18 +233,18 @@ def contrast_chart(*, readings: Mapping[str, Mapping[str, float | bool]]) -> alt
         msg = "every counted contrast is void"
         raise HistoryError(msg)
     base = alt.Chart(data).encode(y=alt.Y("contrast:N", title=None, sort=list(readings)))
-    bars = base.mark_rule(color=figures729.BLUE, aria=False).encode(
+    bars = base.mark_rule(color=figures729.BLUE, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "lower:Q",
             title="Contrast in mean score (negative: the first arm is better; Bonferroni 99.286% interval)",
         ),
         x2="upper:Q",
     )  # ty: ignore[unresolved-attribute]
-    dots = base.mark_point(filled=True, color=figures729.BLUE, size=60, aria=False).encode(
+    dots = base.mark_point(filled=True, color=figures729.BLUE, size=60, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x="point:Q"
     )  # ty: ignore[unresolved-attribute]
     zero = (
-        alt.Chart(pl.DataFrame({"z": [0.0]}))
+        alt.Chart(pl.DataFrame({"z": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#000000", strokeDash=[3, 3], aria=False)
         .encode(x="z:Q")
     )  # ty: ignore[unresolved-attribute]

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 732: the fit loop, the predictions, the per-epoch record, and the timing gate (torch).
 
 Every fit uses experiment 730's optimiser and stopping rule: AdamW with a learning rate of 1e-3,
@@ -237,7 +238,10 @@ def validation_scores(
     *, net: torch.nn.Module, spec: core.ArmSpec732, val_plain: Sequence[arms.Prepared],
     val_transfer: Sequence[arms.Prepared], device: str,
 ) -> dict[str, float]:  # fmt: skip
-    """Return the validation Brier score of the sign, and (with the extra heads) the solar error and step Brier score."""
+    """Return the validation Brier score of the sign and, with the extra heads, the solar error.
+
+    The result also holds the step Brier score.
+    """
     pred = predict(net=net, prepared=val_plain, device=device, spec=spec)
     x = valid_flat(values=pred.t[:, arms.T["x"]], targets=pred.t)
     p = valid_flat(values=pred.plain["p"], targets=pred.t)
@@ -312,7 +316,8 @@ def fit(
         val_plain: The prepared plain validation bank (the early stop reads its sign Brier score).
         val_transfer: The prepared validation transfer overlay.
         device: "cuda" or "cpu".
-        val_index: The validation bank's pair index (for the injected terms of the validation loss); None gives the plain terms only.
+        val_index: The validation bank's pair index (for the injected terms of the validation loss);
+            None gives the plain terms only.
         max_epochs: The cap on epochs (300; the timing gate passes 5).
         out_path: Where to save the best weights, or None.
         log: Receives one progress line per epoch (never a month or a date).

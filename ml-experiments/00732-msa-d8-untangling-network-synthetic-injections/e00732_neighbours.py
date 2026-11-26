@@ -173,7 +173,10 @@ def training_median(*, folded: np.ndarray, train_rows: np.ndarray) -> float:
 
 
 def daily_shape(*, values: np.ndarray, weekend: np.ndarray, train_rows: np.ndarray) -> np.ndarray:
-    """Return the median daily profile over the training base days per half-hour, weekdays and weekends apart, `(2, 48)`."""
+    """Return the median daily profile over the training base days, per half-hour.
+
+    The weekday and weekend profiles are separate, so the result has shape `(2, 48)`.
+    """
     out = np.zeros((2, HALF_HOURS))
     for k in (0, 1):
         rows = train_rows & (weekend == bool(k))
@@ -309,6 +312,14 @@ def build_arrays(
 
 def write_table(*, root: Path, dates: np.ndarray, arrays: Mapping[str, np.ndarray]) -> Path:
     """Write the neighbour table once, one row per base day and half-hour.
+
+    Args:
+        root: The data folder.
+        dates: D8's base days.
+        arrays: The three neighbours on the base calendar, in points.
+
+    Returns:
+        The path of the table.
 
     Raises:
         FileExistsError: When the table exists already.

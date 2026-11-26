@@ -33,7 +33,10 @@ def _fail(*, message: str) -> None:
 def assert_inputs_not_targets(
     *, windows: np.ndarray, targets: np.ndarray, delta: np.ndarray | None = None
 ) -> None:
-    """Check that no input channel of any window equals the solar target, a step target, delta, or the base demand."""
+    """Check that no input channel of any window equals the solar target, a step target, delta.
+
+    Or the base demand.
+    """
     for i in range(len(windows)):
         if arms.input_equals_target(
             window=windows[i], targets=targets[i], delta=None if delta is None else delta[i]
@@ -72,7 +75,9 @@ def assert_seed_spaces_disjoint(*, train_seeds: Sequence[int] = tuple(range(5)))
 def assert_months_disjoint(
     *, used: Mapping[str, Iterable[str]], test_months: Iterable[str]
 ) -> None:
-    """Check that no month of the test bank is used by the training banks, the pre-training, or the validation bank.
+    """Check that no month of the test bank is used by the training banks, the pre-training.
+
+    Or the validation bank.
 
     Args:
         used: The months each consumer uses, by consumer name (training, pre-training, validation).
@@ -218,7 +223,10 @@ def assert_hidden_neighbours_zero(*, batch: arms.Batch) -> None:
 
 
 def assert_neighbours_unsigned_and_masks_binary(*, batch: arms.Batch) -> None:
-    """Check that every neighbour value channel is non-negative (the fold) and every neighbour mask is 0 or 1."""
+    """Check that every neighbour value channel is non-negative (the fold).
+
+    The check also requires every neighbour mask to be 0 or 1.
+    """
     for member in _members(batch=batch):
         for n in nb.NEIGHBOURS:
             value, mask = member[:, arms.NB_ROW[f"{n}_value"]], member[:, arms.NB_ROW[f"{n}_mask"]]
@@ -229,7 +237,9 @@ def assert_neighbours_unsigned_and_masks_binary(*, batch: arms.Batch) -> None:
 
 
 def assert_injection_changes_only_allowed_channels(*, batch: arms.Batch) -> None:
-    """Check that an injected member differs from its plain window in the reading, the BSP step, and the sign-aligned changes only.
+    """Check that an injected member differs from its plain window only in the allowed channels.
+
+    The allowed channels are the reading, the BSP step, and the sign-aligned changes.
 
     The plain window and the injected window share every other channel: the clear-sky index, the
     time and calendar channels, the weather, the masks, and the neighbours' values and changes. The
@@ -242,7 +252,7 @@ def assert_injection_changes_only_allowed_channels(*, batch: arms.Batch) -> None
     if not paired.any():
         _fail(message="the batch holds no paired window, so the injection check read nothing")
     other = [c for c in range(batch.x.shape[1]) if c not in INJECTION_MAY_CHANGE]
-    plain, injected = batch.x[paired], batch.xi[paired]
+    plain, injected = batch.x[paired], batch.xi[paired]  # ty: ignore[not-subscriptable]
     if (plain[:, other] != injected[:, other]).any():
         _fail(
             message="an injected member differs from its plain window in a channel that may not change"
@@ -252,7 +262,9 @@ def assert_injection_changes_only_allowed_channels(*, batch: arms.Batch) -> None
 
 
 def assert_neighbours_move_only_by_mirror(*, overlays: Sequence[ov.TransferOverlay]) -> None:
-    """Check that a neighbour's series differs from its real series only inside a transfer whose drawn partner it is.
+    """Check that a neighbour's series differs from its real series only inside a transfer.
+
+    The transfer must be one whose drawn partner the neighbour is.
 
     The engine, the solar output, and delta sit below D8 alone, so none of them reaches a neighbour.
     The check fails when no overlay holds a mirrored transfer, because it would then read nothing.
