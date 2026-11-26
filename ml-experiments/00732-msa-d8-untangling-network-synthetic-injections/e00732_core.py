@@ -540,4 +540,4 @@ def job_name(*, arm: str, arch: str, seed: int) -> str:
 
 def stage_names() -> Sequence[str]:
     """Return the stage names of the command line, in the order of the plan."""
-    return ("banks", "limits", "overlays", "gallery", "panels", "timing", "fit", "real", "score", "report", "figures", "series", "chain")
+    return ("banks", "limits", "overlays", "gallery", "panels", "timing", "fit", "real", "score", "report", "figures", "loss_curves", "series", "chain")

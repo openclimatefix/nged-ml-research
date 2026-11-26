@@ -4,7 +4,7 @@
 # The wrapper starts nothing by default: it needs `--go` before the script name, so that a stray
 # invocation only prints this help.
 #
-# Usage:  SLOT_CPUS=<cpu list, at most 6 cores, e.g. 16-21> run.sh --go e00732_cli.py <banks|limits|overlays|gallery|panels|timing|fit|real|score|report|figures|series|chain> <arguments>
+# Usage:  SLOT_CPUS=<cpu list, at most 6 cores, e.g. 16-21> run.sh --go e00732_cli.py <banks|limits|overlays|gallery|panels|timing|fit|real|score|report|figures|loss_curves|series|chain> <arguments>
 #         SLOT_CPUS=<list> FITS_STARTING=1 run.sh --go ...     prints the "fits starting" line for the manager
 #         SLOT_CPUS=<list> LAST_FIT_ENDED=1 run.sh --go ...    prints the "last fit ended" line for the manager
 #
@@ -88,7 +88,7 @@ uses_gpu=1
 [ -z "${CUDA_VISIBLE_DEVICES+x}" ] || [ -n "${CUDA_VISIBLE_DEVICES}" ] || uses_gpu=0
 for arg in "$@"; do [ "$arg" = "cpu" ] && uses_gpu=0; done
 # these stages read files and compute on the CPU only: no GPU check and no GPU lock
-case "${1:-}" in banks | limits | overlays | gallery | panels | real | score | report | figures | series) uses_gpu=0 ;; esac
+case "${1:-}" in banks | limits | overlays | gallery | panels | real | score | report | figures | loss_curves | series) uses_gpu=0 ;; esac
 lock_prefix=""
 if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
     used_mb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '{s+=$1} END {print s+0}')

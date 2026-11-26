@@ -56,6 +56,10 @@ class FitRecord:
         solar_history: The validation solar mean absolute error on sun-up half-hours at every epoch.
         step_history: The validation Brier score of the step event at every epoch.
         unpaired_share: The share of training windows that took no pair, over the whole fit.
+        train_terms: For each loss term ("sign", "solar", "step", "size", "injection", "night", "monotone")
+            that the arm has, and for "total" (the weighted loss), the mean unweighted value on the
+            training batches of each epoch.
+        val_terms: The same terms on one fixed set of validation triples, evaluated after each epoch.
     """
 
     arm: str
@@ -72,6 +76,8 @@ class FitRecord:
     solar_history: list[float] = field(default_factory=list)
     step_history: list[float] = field(default_factory=list)
     unpaired_share: float = 0.0
+    train_terms: dict[str, list[float]] = field(default_factory=dict)
+    val_terms: dict[str, list[float]] = field(default_factory=dict)
 
     def as_dict(self) -> dict:
         """Return the fields as a plain dictionary."""
@@ -229,6 +235,35 @@ def validation_scores(
     return out
 
 
+VAL_TRIPLES: Final = 512
+"""The number of validation triples whose loss terms are recorded after each epoch."""
+VAL_BATCH_SEED: Final = 7320
+
+
+@torch.no_grad()
+def validation_terms(
+    *, net: torch.nn.Module, spec: core.ArmSpec732, prepared: Sequence[arms.Prepared], index: ov.PairIndex | None,
+    device: str, n: int = VAL_TRIPLES,
+) -> dict[str, float]:  # fmt: skip
+    """Return the mean unweighted loss terms, and the weighted total, on one fixed set of validation triples.
+
+    The triples come from a generator seeded with `VAL_BATCH_SEED`, so every epoch reads the same
+    windows, masks, and pairs and the curve shows the weights changing, not the draw.
+    """
+    net.eval()
+    rng = np.random.default_rng(VAL_BATCH_SEED)
+    picks = arms.sample_picks(prepared=prepared, n=n, rng=rng)
+    sums: dict[str, float] = {}
+    count = 0
+    for i in range(0, len(picks), core.BATCH_SIZE):
+        batch = arms.make_batch(prepared=prepared, picks=picks[i : i + core.BATCH_SIZE], spec=spec, rng=rng, index=index if spec.inject else None)
+        loss, values = batch_loss(net=net, spec=spec, batch=batch, device=device)
+        for k, v in {**values, "total": loss}.items():
+            sums[k] = sums.get(k, 0.0) + float(v) * len(batch.x)
+        count += len(batch.x)
+    return {k: v / max(count, 1) for k, v in sums.items()}
+
+
 def save_state(*, state: dict, path: Path) -> None:
     """Save a state dictionary atomically."""
     train729.save_state(state=state, path=path)
@@ -237,7 +272,7 @@ def save_state(*, state: dict, path: Path) -> None:
 def fit(
     *, spec: core.ArmSpec732, seed: int, train: Sequence[arms.Prepared], index: ov.PairIndex,
     val_plain: Sequence[arms.Prepared], val_transfer: Sequence[arms.Prepared], device: str,
-    max_epochs: int = core.MAX_EPOCHS, out_path: Path | None = None,
+    val_index: ov.PairIndex | None = None, max_epochs: int = core.MAX_EPOCHS, out_path: Path | None = None,
     log: Callable[[str], None] = lambda _: None,
 ) -> tuple[torch.nn.Module, FitRecord]:  # fmt: skip
     """Fit one network of experiment 732.
@@ -250,6 +285,7 @@ def fit(
         val_plain: The prepared plain validation bank (the early stop reads its sign Brier score).
         val_transfer: The prepared validation transfer overlay.
         device: "cuda" or "cpu".
+        val_index: The validation bank's pair index (for the injected terms of the validation loss); None gives the plain terms only.
         max_epochs: The cap on epochs (300; the timing gate passes 5).
         out_path: Where to save the best weights, or None.
         log: Receives one progress line per epoch (never a month or a date).
@@ -271,10 +307,14 @@ def fit(
     solar_history: list[float] = []
     step_history: list[float] = []
     n_windows = n_unpaired = 0
+    train_terms: dict[str, list[float]] = {}
+    val_terms: dict[str, list[float]] = {}
     started = time.perf_counter()
     for epoch in range(1, max_epochs + 1):
         net.train()
         picks = arms.sample_picks(prepared=train, n=core.EPOCH_WINDOWS, rng=rng)
+        epoch_sums: dict[str, float] = {}
+        epoch_count = 0
         for i in range(0, len(picks), core.BATCH_SIZE):
             batch = arms.make_batch(
                 prepared=train, picks=picks[i : i + core.BATCH_SIZE], spec=spec, rng=rng,
@@ -282,13 +322,20 @@ def fit(
             )  # fmt: skip
             n_windows += len(batch.x)
             n_unpaired += int((batch.pair == 0).sum()) if spec.inject else 0
-            loss, _ = batch_loss(net=net, spec=spec, batch=batch, device=device)
+            loss, values = batch_loss(net=net, spec=spec, batch=batch, device=device)
+            for k, v in {**values, "total": loss}.items():
+                epoch_sums[k] = epoch_sums.get(k, 0.0) + float(v.detach()) * len(batch.x)
+            epoch_count += len(batch.x)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(params, CLIP_NORM)
             opt.step()
         scores = validation_scores(net=net, spec=spec, val_plain=val_plain, val_transfer=val_transfer, device=device)
         history.append(scores["brier"])
+        for k, v in epoch_sums.items():
+            train_terms.setdefault(k, []).append(v / max(epoch_count, 1))
+        for k, v in validation_terms(net=net, spec=spec, prepared=val_transfer, index=val_index, device=device).items():
+            val_terms.setdefault(k, []).append(v)
         solar_history.append(scores.get("solar_mae", float("nan")))
         step_history.append(scores.get("step_brier", float("nan")))
         sched.step(scores["brier"])
@@ -306,7 +353,7 @@ def fit(
         arm=spec.name, arch=spec.arch, seed=seed, epochs=len(history), best_epoch=best_epoch, best_val_brier=best,
         n_weights=nets.count_weights(net=net), seconds=seconds, seconds_per_epoch=seconds / max(len(history), 1),
         peak_memory_gb=peak, history=history, solar_history=solar_history, step_history=step_history,
-        unpaired_share=n_unpaired / max(n_windows, 1),
+        unpaired_share=n_unpaired / max(n_windows, 1), train_terms=train_terms, val_terms=val_terms,
     )  # fmt: skip
 
 

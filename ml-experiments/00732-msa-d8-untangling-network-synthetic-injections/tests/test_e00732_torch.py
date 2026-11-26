@@ -189,6 +189,10 @@ def test_a_tiny_fit_runs_records_every_epoch_and_is_repeatable(world, monkeypatc
     _, rec2 = train.fit(**kwargs)
     assert rec.epochs == 2 and len(rec.history) == len(rec.solar_history) == len(rec.step_history) == 2
     assert rec.history == rec2.history and rec.solar_history == rec2.solar_history
+    for terms_by_epoch in (rec.train_terms, rec.val_terms):
+        assert {"total", "sign", "solar", "step", "size", "injection", "night", "monotone"} <= set(terms_by_epoch)
+        assert all(len(v) == 2 and np.isfinite(v).all() for v in terms_by_epoch.values())
+    assert rec.train_terms == rec2.train_terms and rec.val_terms == rec2.val_terms
     assert (tmp_path / "n.pt").exists() and 0.0 <= rec.unpaired_share <= 1.0
     state = torch.load(tmp_path / "n.pt")
     assert set(state) == set(net.state_dict())
@@ -203,6 +207,8 @@ def test_a_tiny_fit_of_every_arm_runs(world, monkeypatch) -> None:
     for name, spec in core.ARMS.items():
         _, rec = train.fit(spec=spec, seed=0, train=prepared, index=index, val_plain=plain, val_transfer=prepared, device="cpu", max_epochs=1)
         assert rec.arm == name and np.isfinite(rec.best_val_brier)
+        assert set(rec.train_terms) == set(rec.val_terms) and "total" in rec.train_terms
+        assert ("solar" in rec.train_terms) == spec.heads  # a sign-only arm has the sign term alone
         assert np.isfinite(rec.solar_history[0]) == spec.heads
 
 
