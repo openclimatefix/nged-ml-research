@@ -145,7 +145,7 @@ class Predictions:
 def predict(
     *, net: torch.nn.Module, prepared: Sequence[arms.Prepared], device: str, index: ov.PairIndex | None = None,
     amount: float | None = None, eps: float | None = None, picks: list[tuple[int, int]] | None = None,
-    hidden: np.ndarray | None = None, extra_heads: bool = True,
+    hidden: np.ndarray | None = None, extra_heads: bool = True, hide_bsp: bool = False,
 ) -> Predictions:  # fmt: skip
     """Return the net's outputs on every scored day, with the injected and raised members when asked.
 
@@ -159,6 +159,7 @@ def predict(
         picks: The picks, or None for every scored day.
         hidden: Fixed hidden positions `(P, 96)`, or None.
         extra_heads: Whether the net has the extra heads (the members need them).
+        hide_bsp: Whether to zero the BSP channel and its mask (table T5).
 
     Returns:
         The predictions.
@@ -171,7 +172,7 @@ def predict(
         j = slice(i, i + INFER_BATCH)
         batch = arms.make_eval_batch(
             prepared=prepared, picks=picks[j], spec=spec, index=index, amount=amount, eps=eps,
-            hidden=None if hidden is None else hidden[j],
+            hidden=None if hidden is None else hidden[j], hide_bsp=hide_bsp,
         )  # fmt: skip
         raw_w, raw_i, raw_c = forward_members(net=net, batch=batch, device=device)
         chunks["plain"].append({k: v.float().cpu().numpy() for k, v in nets.decode(raw=raw_w).items()})

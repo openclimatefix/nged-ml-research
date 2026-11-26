@@ -313,7 +313,7 @@ def make_batch(
 def make_eval_batch(
     *, prepared: Sequence[Prepared], picks: Sequence[tuple[int, int]], spec: core.ArmSpec732,
     index: ov.PairIndex | None = None, amount: float | None = None, eps: float | None = None,
-    hidden: np.ndarray | None = None,
+    hidden: np.ndarray | None = None, hide_bsp: bool = False,
 ) -> Batch:  # fmt: skip
     """Return an evaluation batch: never masked, with the fixed test pair of amount `amount` when given.
 
@@ -325,6 +325,8 @@ def make_eval_batch(
         amount: The injected amount in points, or None for no injected member's delta.
         eps: The raised-sky factor of the raised member (0.2 by default).
         hidden: Fixed hidden positions `(B, 96)`, or None.
+        hide_bsp: Whether to set the BSP step channel and its presence mask to zero in every member
+            (table T5's check that the solar head does not read the BSP meter).
 
     Returns:
         The batch.
@@ -342,7 +344,13 @@ def make_eval_batch(
         )
         pair.append(delta_flat is not None)
         amt.append(amount if delta_flat is not None and amount is not None else 0.0)
-    return collate(parts=parts, pair=pair, amount=amt, spec=spec)
+    batch = collate(parts=parts, pair=pair, amount=amt, spec=spec)
+    if hide_bsp:
+        for member in (batch.x, batch.xi, batch.xc):
+            if member is not None:
+                member[:, ROW["d_bsp"]] = 0.0
+                member[:, ROW["bsp_mask"]] = 0.0
+    return batch
 
 
 def eval_spec(*, inject: bool = False, raised: bool = False) -> core.ArmSpec732:

@@ -246,3 +246,21 @@ def test_eval_batch_has_the_fixed_pair_and_skips_windows_without_a_sibling(world
     plain = arms.make_eval_batch(prepared=prep, picks=picks, spec=arms.eval_spec())
     np.testing.assert_array_equal(plain.x, batch.x)  # an evaluation window is never masked
     assert masks.SCORED_START == arms.MID and core729.WINDOW_STEPS == arms.STEPS
+
+
+def test_hide_bsp_zeroes_only_the_bsp_channels_in_every_member() -> None:
+    cal, segs = make_bank(draws_per_world=2)
+    stats = arms729.input_stats(cal=cal, train_days=np.arange(len(cal.dates)))
+    prepared = arms.prepare(overlays=ov.overlay_segments(segments=segs, kind="test"), holidays=cal.holidays, stats=stats)
+    index = ov.build_pair_index(segments=segs)
+    picks = arms.all_picks(prepared=prepared)[:6]
+    spec = arms.eval_spec(inject=True, raised=True)
+    kw = {"prepared": prepared, "picks": picks, "spec": spec, "index": index, "amount": 20.0, "eps": 0.2}
+    shown = arms.make_eval_batch(**kw)
+    hidden = arms.make_eval_batch(**kw, hide_bsp=True)
+    for a, b in ((shown.x, hidden.x), (shown.xi, hidden.xi), (shown.xc, hidden.xc)):
+        assert (b[:, arms.ROW["d_bsp"]] == 0).all() and (b[:, arms.ROW["bsp_mask"]] == 0).all()
+        keep = [i for i in range(arms.N_CHANNELS) if i not in (arms.ROW["d_bsp"], arms.ROW["bsp_mask"])]
+        np.testing.assert_array_equal(a[:, keep], b[:, keep])
+    assert (shown.x[:, arms.ROW["bsp_mask"]] > 0).any()
+    np.testing.assert_array_equal(shown.t, hidden.t)
