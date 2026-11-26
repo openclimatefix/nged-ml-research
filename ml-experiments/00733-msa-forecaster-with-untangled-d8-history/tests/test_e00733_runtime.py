@@ -240,3 +240,80 @@ def test_an_unexpected_error_in_the_chain_does_not_leave_the_status_running(tmp_
     status = st.run_chain(root=tmp_path, steps=steps)
     assert status["state"] == "failed" and "Traceback" in status["traceback"]
     assert st.exit_code(status=status) == 5
+
+
+# --------------------------------------------------------------------------- the world's files
+
+
+def _write_world(root: Path) -> None:
+    import e00733_world as world
+    from synth_fixture import make_segment
+
+    for i, kind in enumerate(world.KINDS):
+        world.write_world(
+            root=root, kind=kind, segments=[make_segment(n_days=40, seed=i)], extra={}
+        )
+    world.write_meta(
+        root=root, payload={"constants": {"mean": 0.1, "std": 0.2, "n": 1.0}, "banks_digest": "d"}
+    )
+
+
+def test_limits_then_the_synthetic_loader_read_the_cached_world(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`limits.json` holds g, B-clim, and a nonzero count per bank; the loader's constants are the
+    reading's standard deviation and the logit of B-clim's overall share."""
+    import e00733_adapters as adapters
+
+    _write_world(tmp_path)
+    payload = rt.stage_limits(_args(), tmp_path)
+    assert set(payload) == set(core.LIMITS_KEYS)
+    counts = payload["n_synthetic"]
+    assert all(counts[k] > 0 for k in ("train_s3", "train_s4", "validation", "test"))
+    monkeypatch.setattr(adapters, "d8_index", lambda: 5)
+    got = rt.synthetic_loader(root=tmp_path)("YU", 0, "cpu")
+    overall = payload["b_clim"]["overall"]
+    assert got.d8_index == 5 and got.target_std == pytest.approx(0.2)
+    assert got.clim_logit == pytest.approx(np.log(overall / (1 - overall)))
+    assert len(got.train_segments) == 2 and len(got.val_segments) == 1
+    assert len(got.train_index) > 0 and len(got.val_index) > 0
+
+
+def test_gallery_stage_writes_the_panel_check_for_every_panel(tmp_path: Path) -> None:
+    """The stage records G10 to G15 with the banks' digest, and refuses fewer than 3 test
+    segments."""
+    import e00733_world as world
+    from synth_fixture import make_segment
+
+    _write_world(tmp_path)
+    rt.stage_limits(_args(), tmp_path)
+    np.savez(
+        world.world_dir(root=tmp_path) / world.WEATHER_FILE,
+        weather=np.zeros((10, 21), np.float16), datetime=np.zeros((10, 21), np.float16),
+        day_type=np.zeros(10, np.int8), local_hh=np.zeros(10, np.int8),
+        local_month=np.ones(10, np.int8), mean=np.zeros(14), std=np.ones(14),
+    )  # fmt: skip
+    with pytest.raises(st.CorrectnessFailureError):
+        rt.stage_gallery(_args(), tmp_path)
+    world.write_world(
+        root=tmp_path, kind="test", extra={},
+        segments=[make_segment(n_days=40, seed=i) for i in range(3)],
+    )  # fmt: skip
+    payload = rt.stage_gallery(_args(), tmp_path)
+    assert set(payload["panels"]) == set(core.GALLERY_PANELS) and payload["banks_digest"] == "d"
+    assert (tmp_path / "PRIVATE" / "gallery" / "G15.svg").exists()
+
+
+def test_fit_stage_on_cuda_without_a_gpu_is_refused_before_any_input_is_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cuda branch of the stage reaches `prepare_device`, which refuses; no GPU is touched."""
+    import e00733_fit as fit
+    import torch
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    for arm, fold in (("FU", "2025-11"), ("YU", None)):
+        with pytest.raises(fit.GuardError):
+            rt.stage_fit(_args(arm=arm, fold=fold, seed=0, device="cuda"), tmp_path)
+    with pytest.raises(rt.RuntimeError733):
+        rt.stage_fit(_args(arm=None, device="cpu"), tmp_path)

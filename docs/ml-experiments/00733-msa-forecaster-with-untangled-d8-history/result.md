@@ -800,6 +800,13 @@ published page carries the coverage counts.
   experiment 732's U\*, the solar output dropped (zeroed, flag off), and the transfer-step
   probability from U\*. FU carries P(X<0) and the transfer step, FS carries P(X<0) alone, and FU and
   FS are distinct arms.
+- **The top-row trailing columns of target-row B1 read the origin day's start (ruling of the design
+  lead, 2026-11-26).** Experiment 713's getter cannot read observed valid-time columns for these
+  columns, so the synthetic world and the real folds give them the weather of 00:00 UTC on the
+  origin day. The page labels these columns a ceiling, as it does for the history rows.
+- **The fold-coverage training window starts at 2024-04-01 (ruling of the design lead,
+  2026-11-26),** the first run of experiment 607, because no ensemble run exists earlier, so no origin
+  earlier has a re-run.
 - **All 16 Primaries with the channels at D8 alone,** so that M\* is an exact control and the recipe
   stays experiment 713's.
 - **No sign head on the real folds,** because no real day has a known sign, and a head trained on
