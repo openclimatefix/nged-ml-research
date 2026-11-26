@@ -886,6 +886,7 @@ def stage_names() -> Sequence[str]:
         "overlays",
         "gallery",
         "panels",
+        "tensor",
         "timing",
         "fit",
         "real",

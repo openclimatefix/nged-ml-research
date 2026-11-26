@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
+import re
+
 import e00732_paths  # noqa: F401
 
 # isort: split
@@ -54,6 +56,8 @@ SIZE_NOISE_LINE: Final = 4.0
 """The size in D8's noise units that the plan expects to separate detectable from undetectable."""
 DURATION_BAND_LABELS: Final = ("1-3 h", "3-12 h", "12 h-2 d", "2-4 d")
 COLOURS: Final = (BLUE, ORANGE, GREEN, PURPLE, SKY, GREY)
+PAIR_SUFFIX: Final = re.compile(r" (without( the transfer)?|with( the transfer| the injection)?|w\+?)$")
+"""Strips the suffix that tells the thin member of a pair from the thick one, so that both take one colour."""
 
 
 def gallery_private_dir(*, root: Path) -> Path:
@@ -75,6 +79,7 @@ def lines_chart(
     y_title: str = "Points of capacity",
     height: int = 120,
     n_days: int = 2,
+    colours: Mapping[str, str] | None = None,
 ) -> alt.LayerChart | alt.Chart:
     """Return lines over a window of `n_days` days, with edges as rules, a hidden span shaded, and half-hours marked.
 
@@ -88,11 +93,15 @@ def lines_chart(
         y_title: The y-axis title with its unit.
         height: Plot height in pixels.
         n_days: The window length in days.
+        colours: Colour by series name (the default order of `COLOURS` otherwise), so that a thin and a thick line of one quantity share a colour.
 
     Returns:
         The chart, with no calendar date anywhere.
     """
     names = list(series)
+    roots = [PAIR_SUFFIX.sub("", k) for k in names]
+    palette = {r: COLOURS[i % len(COLOURS)] for i, r in enumerate(dict.fromkeys(roots))}
+    colours = {k: (colours or {}).get(k, palette[r]) for k, r in zip(names, roots, strict=True)}
     n = len(series[names[0]])
     data = pl.DataFrame(
         {
@@ -115,8 +124,8 @@ def lines_chart(
             y=alt.Y("value:Q", title=y_title),
             color=alt.Color(
                 "series:N",
-                scale=alt.Scale(domain=names, range=list(COLOURS[: len(names)])),
-                legend=alt.Legend(orient="top", title=None),
+                scale=alt.Scale(domain=names, range=[colours[k] for k in names]),
+                legend=alt.Legend(orient="top", title=None, symbolType="stroke", symbolStrokeWidth=3, labelLimit=400, columns=2),
             ),
             size=alt.Size(
                 "series:N",
@@ -359,8 +368,8 @@ def g10_charts(*, wins: Sequence[Win], title: str, n_days: int) -> alt.VConcatCh
             widths={"truth without the transfer": 0.8, "truth with the transfer": 2.2},
             title=f"Draw {k + 1}: D8 (dotted: transfer edges)", rules=rules, n_days=n_days,
         )  # fmt: skip
-        d = np.diff(np.nan_to_num(w.bsp1, nan=0.0), prepend=0.0)
-        d0 = np.diff(np.nan_to_num(w.bsp0, nan=0.0), prepend=0.0)
+        d = np.concatenate([[0.0], np.diff(np.nan_to_num(w.bsp1, nan=0.0))])
+        d0 = np.concatenate([[0.0], np.diff(np.nan_to_num(w.bsp0, nan=0.0))])
         bottom = lines_chart(
             series={"BSP step without the transfer": d0, "BSP step with the transfer": d},
             widths={"BSP step without the transfer": 0.8, "BSP step with the transfer": 2.2},
@@ -386,8 +395,8 @@ def panel_g10(
     cases = {
         "g10_adds_load": ("A transfer that adds load on an import day, inside BSP A", adds_on_import_day, False, 0, 2),
         "g10_removes_load_in_solar_spell": ("A transfer that removes load during a solar spell", removes_in_solar_spell, False, 0, 2),
-        "g10_other_bsp": ("A transfer to a Primary under another BSP", lambda o, tr: tr.partner == core.OTHER_BSP_PARTNER, True, 0, 2),
-        "g10_long": ("A transfer of 2 days or more in a 5-day window", lambda o, tr: tr.ticks >= 2 * 48 * 6, None, 2, 5),
+        "g10_other_bsp": ("A transfer to a Primary under another BSP", lambda o, tr: tr.partner == core.OTHER_BSP_PARTNER and bool(np.isfinite(o.seg.bsp[max(tr.start_half_hour // 48, 1) : max(tr.start_half_hour // 48, 1) + 2]).all()), True, 0, 2),
+        "g10_long": ("A transfer of 2 days or more in a 5-day window", lambda o, tr: tr.ticks >= 2 * 48 * 6 and (tr.inside_bsp_a or bool(np.isfinite(o.seg.bsp[max(tr.start_half_hour // 48, 1) : max(tr.start_half_hour // 48, 1) + 5]).all())), None, 2, 5),
     }  # fmt: skip
     charts: dict[str, alt.TopLevelMixin] = {}
     ok = True
@@ -515,12 +524,13 @@ def pair_charts(*, pairs: Sequence[PairWin], title: str) -> alt.VConcatChart:
     charts: list[alt.TopLevelMixin] = []
     for k, p in enumerate(pairs):
         widths = {"original": 0.8, "with the injection": 2.2}
+        same = {"original": BLUE, "with the injection": BLUE}
         marks = np.flatnonzero(p.delta > 0)
         charts += [
             lines_chart(series={"extra injection": p.delta}, title=f"Draw {k + 1}: the extra solar injection (a = {p.amount:g} points)", height=60, marks=None),
-            lines_chart(series={"original": p.x0, "with the injection": p.x1}, widths=widths, title="Signed truth", height=90),
-            lines_chart(series={"original": np.nan_to_num(p.r0), "with the injection": np.nan_to_num(p.r1)}, widths=widths, title="Reading (the injection re-folded; ticks: half-hours with the injection)", height=90, marks=marks),
-            lines_chart(series={"original": np.nan_to_num(p.bsp0), "with the injection": np.nan_to_num(p.bsp1)}, widths=widths, title="BSP meter", height=70),
+            lines_chart(series={"original": p.x0, "with the injection": p.x1}, widths=widths, colours=same, title="Signed truth", height=90),
+            lines_chart(series={"original": np.nan_to_num(p.r0), "with the injection": np.nan_to_num(p.r1)}, widths=widths, colours=same, title="Reading (the injection re-folded; ticks: half-hours with the injection)", height=90, marks=marks),
+            lines_chart(series={"original": np.nan_to_num(p.bsp0), "with the injection": np.nan_to_num(p.bsp1)}, widths=widths, colours=same, title="BSP meter", height=70),
         ]  # fmt: skip
     return stack(charts=charts, title=title)
 
@@ -685,11 +695,13 @@ def settled_table(*, overlays_by_name: Mapping[str, Sequence[ov.TransferOverlay]
 
 def parameter_arrays(*, overlays: Sequence[ov.TransferOverlay]) -> dict[str, np.ndarray]:
     """Return the drawn parameters of a bank: the transfers per 30 days of each segment, the durations in hours, the sizes in points, and whether the partner sits under BSP A."""
-    rate = np.array([len(o.transfers) * 30.0 / (o.seg.x.shape[0] - 2) for o in overlays])
+    rate = np.array([len(o.transfers) * 30.0 / o.seg.n_dense for o in overlays])
     drawn = np.array([o.rate for o in overlays])
     trs = [tr for o in overlays for tr in o.transfers]
     return {
         "per_30_days": rate, "drawn_rate": drawn,
+        "n_transfers": np.array([len(o.transfers) for o in overlays], dtype=float),
+        "n_expected": np.array([round(o.rate * o.seg.n_dense / 30.0) for o in overlays], dtype=float),
         "hours": np.array([duration_hours(transfer=t) for t in trs]),
         "points": np.array([abs(t.size) for t in trs]),
         "under_bsp_a": np.array([t.inside_bsp_a for t in trs], dtype=float),
@@ -713,7 +725,7 @@ def check_g14(*, params: Mapping[str, Mapping[str, np.ndarray]], table: Sequence
         lo, hi = core.TRANSFER_RATE_FIXED if name == "test" else core.TRANSFER_RATE_TRAIN[0], core.TRANSFER_RATE_FIXED if name == "test" else core.TRANSFER_RATE_TRAIN[1]
         if not ((a["drawn_rate"] >= lo - 1e-9) & (a["drawn_rate"] <= hi + 1e-9)).all():
             return False
-        if (a["per_30_days"] > a["drawn_rate"] + 0.5).any():
+        if (a["n_transfers"] > a["n_expected"]).any():
             return False
         if not ((a["hours"] >= core.TRANSFER_HOURS[0] - 1e-9) & (a["hours"] <= core.TRANSFER_HOURS[1] + 1e-9)).all():
             return False
@@ -820,7 +832,7 @@ def panel_g15(
             def flat(a: np.ndarray, cols: slice = cols) -> np.ndarray:
                 return np.asarray(a).reshape(-1)[cols].astype(np.float64)
 
-            if not all(np.abs(flat(a)).max() > 0 for a in (seg.engine, seg.solar, o.t)):
+            if not all(np.abs(flat(a)).max() > 0 for a in (seg.engine, seg.solar, o.t)) or not np.isfinite(flat(seg.bsp)).all():
                 continue
             delta = ov.window_delta(index=index, sibling=sibs[0], amount=20.0, day=d)[1:].astype(np.float64)
             if not (delta > 0).any():
@@ -1055,20 +1067,33 @@ def monthly_coverage(*, base_dates: np.ndarray, reading: np.ndarray, arrays: Map
 
 
 def mirror_points(*, overlays: Sequence[ov.TransferOverlay]) -> list[dict[str, object]]:
-    """Return, for every mirrored transfer, the partner's mean change over the transfer and minus the mean transferred load, in points."""
+    """Return, for every mirrored transfer, the partner's mean change over the transfer, minus the transfer's mean load, and the largest half-hour gap to the mirror that the overlay should hold.
+
+    The gap compares the partner's change in each half-hour with minus the summed `j` times the load of
+    every transfer that mirrors onto that partner, so a transfer that shares an edge half-hour with another
+    transfer is compared with both loads. Half-hours where the partner holds no reading are left out.
+    """
     rows = []
     for o in overlays:
+        shape = o.neighbours_real["D3"].shape
+        expected = {n: np.zeros(shape[0] * shape[1]) for n in core.READ_PARTNERS}
+        for tr in o.transfers:
+            if tr.mirrored:
+                expected[tr.partner][tr.start_half_hour : tr.end_half_hour + 1] += tr.jitter * tr.mean_levels()
         for tr in o.transfers:
             if not tr.mirrored:
                 continue
-            lo, hi = tr.start_half_hour, tr.end_half_hour + 1
-            diff = (o.neighbours[tr.partner].reshape(-1) - o.neighbours_real[tr.partner].reshape(-1))[lo:hi]
-            t = o.t.reshape(-1)[lo:hi]
-            seen = np.isfinite(diff) & (np.abs(t) > 0)
+            span = slice(tr.start_half_hour, tr.end_half_hour + 1)
+            diff = (o.neighbours[tr.partner].reshape(-1) - o.neighbours_real[tr.partner].reshape(-1))[span]
+            level = tr.mean_levels()
+            seen = np.isfinite(diff)
             if not seen.any():
                 continue
-            change, load = float(np.mean(diff[seen])), float(np.mean(t[seen]))
-            rows.append({"partner": tr.partner, "jittered": tr.jitter != 1.0, "change": change, "minus_load": -load, "j": float(tr.jitter)})
+            rows.append({
+                "partner": tr.partner, "jittered": tr.jitter != 1.0, "j": float(tr.jitter),
+                "change": float(np.mean(diff[seen])), "minus_load": -float(np.mean(level[seen])),
+                "max_gap": float(np.max(np.abs(diff[seen] + expected[tr.partner][span][seen]))),
+            })  # fmt: skip
     return rows
 
 
@@ -1084,7 +1109,7 @@ def check_g20(*, coverage: Mapping[str, np.ndarray], noise_sizes: Mapping[str, n
     test = noise_sizes.get("test")
     if test is None or test.size == 0 or not ((test < SIZE_NOISE_LINE).any() and (test >= SIZE_NOISE_LINE).any()):
         return False
-    return len(points) >= 10 and all(abs(float(p["change"]) - float(p["j"]) * float(p["minus_load"])) <= core.MIRROR_TOLERANCE_POINTS for p in points)  # noqa: PLR2004
+    return len(points) >= 10 and all(float(p["max_gap"]) <= core.MIRROR_TOLERANCE_POINTS for p in points)  # noqa: PLR2004
 
 
 def panel_g20(
