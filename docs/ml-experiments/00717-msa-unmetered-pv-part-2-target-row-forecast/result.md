@@ -553,11 +553,11 @@ world W1 sits at 0.0220 against the rung-4 limit of 0.0225.
 months 12, 1, and 2, which the protocol's slice does not, and reads the sun at the grid stamp, not
 at the half-hour midpoint.
 
-**Merge experiment 716 (part 1) first, then rebase this branch onto `main`.** Until part 1 is on
-`main`, `ty check` cannot resolve the `e00716_*` imports of this folder, so they carry `ty: ignore`
-comments. Every script here calls `e00717_guard.require_part1`, which refuses to run when
-`EXTRA_PYTHONPATH` does not name an existing part 1 folder or when an `e00716_*` module comes from
-any other folder, so a removed part 1 checkout cannot silently give way to a stale copy.
+**The `e00716_*` imports of this folder carry `ty: ignore` comments.** The part 1 modules sit in
+another folder, which `ty check` does not search. Every script here calls
+`e00717_guard.require_part1`, which refuses to run when `EXTRA_PYTHONPATH` does not name an existing
+part 1 folder or when an `e00716_*` module comes from any other folder, so a removed part 1 checkout
+cannot silently give way to a stale copy.
 
 **The fits of `HT`, `HT-S`, and `T` run through this folder's `run.sh`,** which finds
 `e00716_fit.py` and `e00716_predict.py` in part 1's folder through `EXTRA_PYTHONPATH`. The fits
