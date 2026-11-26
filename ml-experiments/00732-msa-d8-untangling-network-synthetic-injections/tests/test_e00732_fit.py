@@ -184,7 +184,9 @@ def test_chain_marks_a_failed_needed_arm_and_goes_on_past_a_failed_report_only_a
     lines: list[str] = []
     status = fit.stage_chain(root=root, root730=root730, run_one=fake, log=lines.append)
     assert sum(line.startswith("fits starting") for line in lines) == 7
-    assert status["state"] == "complete"
+    assert status["state"] == "failed"
+    assert status["arms"] == ["U-SG"]
+    assert status["needed"] is False
     assert "U*-L" in calls
     assert len([c for c in calls if c == "U-SG"]) == 3
     assert (
@@ -366,3 +368,77 @@ def test_a_real_fit_stores_the_row_keys_of_every_test_set_and_a_wrong_key_stops_
             root=root, root730=root730, env=env, arm="S+", seed=0, device="cpu", log=print,
             max_epochs=1,
         )  # fmt: skip
+
+
+def test_a_failed_fit_stores_the_exception_type_message_and_traceback(run: Any) -> None:
+    root, _root730, _env = run
+
+    def broken(arm: Any, arch: Any, seed: Any) -> Any:
+        raise AttributeError("module has no attribute 'limit'")
+
+    fit.run_jobs(root=root, jobs=[("U*", "unet", 0)], run_one=broken, log=print)
+    failed = json.loads(
+        stages.job_path(root=root, arm="U*", arch="unet", seed=0)
+        .with_suffix(".failed.json")
+        .read_text()
+    )
+    assert failed["error"] == "AttributeError"
+    assert "no attribute 'limit'" in failed["message"]
+    assert "Traceback" in failed["traceback"]
+    assert "broken" in failed["traceback"]
+
+
+def test_the_chain_exit_status_is_non_zero_unless_every_fit_succeeded() -> None:
+    assert fit.chain_exit_code(status={"state": "complete", "done": []}) == 0
+    for state in ("failed", "stopped", "invalid", "running"):
+        assert fit.chain_exit_code(status={"state": state}) == 1
+
+
+def test_the_cuda_branch_caps_the_gpu_memory_through_a_function_that_exists(
+    run: Any, monkeypatch: Any
+) -> None:
+    """The invented-bank fits ran on the CPU only, so the `device == "cuda"` line never ran."""
+    root, root730, env = run
+    calls: list[str] = []
+    monkeypatch.setattr(fit.train729, "limit_gpu_memory", lambda: calls.append("capped"))
+
+    class StopHere(Exception):
+        pass
+
+    def stop(**_kwargs: Any) -> Any:
+        raise StopHere
+
+    monkeypatch.setattr(fit, "load_sets", stop)
+    monkeypatch.setattr(fit.stages, "guard_run", lambda **_kwargs: None)
+    with pytest.raises(StopHere):
+        fit.fit_one(root=root, root730=root730, env=env, arm="U*", seed=0, device="cuda", log=print)
+    assert calls == ["capped"]
+    assert callable(fit.train729.limit_gpu_memory)
+
+
+def test_every_attribute_that_the_code_takes_from_an_imported_module_exists() -> None:
+    """A call such as `train730.limit_gpu_memory()` on the wrong module only fails when it runs."""
+    import ast
+    import importlib
+    from pathlib import Path
+
+    missing: list[str] = []
+    for path in sorted(Path(fit.__file__).parent.glob("e00732_*.py")):
+        tree = ast.parse(path.read_text())
+        aliases = {
+            (a.asname or a.name): a.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for a in node.names
+            if a.name.startswith(("e00729_", "e00730_", "e00732_", "e00722_"))
+        }
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id in aliases
+            ):
+                module = importlib.import_module(aliases[node.value.id])
+                if not hasattr(module, node.attr):
+                    missing.append(f"{path.name}:{node.lineno} {node.value.id}.{node.attr}")
+    assert not missing

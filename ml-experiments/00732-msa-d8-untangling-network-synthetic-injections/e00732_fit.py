@@ -7,7 +7,8 @@ weights (`networks/<name>.pt`), and its predictions on every set a scoring needs
 order (the overlay sets are `(P, 48)` arrays cut to the valid half-hours).
 """
 
-from collections.abc import Callable, Sequence
+import traceback
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,7 +20,6 @@ import e00732_paths  # noqa: F401
 import e00729_banks as banks729
 import e00729_train as train729
 import e00730_banks as banks730
-import e00730_train as train730
 import e00732_arms as arms
 import e00732_core as core
 import e00732_leakage as leak
@@ -256,7 +256,7 @@ def fit_one(
     if record_path.exists():
         return stages.read_json(path=record_path)
     if device == "cuda":
-        train730.limit_gpu_memory()
+        train729.limit_gpu_memory()
     sets = load_sets(root730=root730, env=env, seed=seed)
     assert_fit_inputs(spec=spec, sets=sets, seed=seed)
     net, record = train.fit(
@@ -320,8 +320,15 @@ def run_jobs(
             raise
         except Exception as exc:  # noqa: BLE001
             counts["failed"] += 1
-            stages.write_json(path=failed_path, payload={"error": type(exc).__name__})
-            log(f"fit {record.stem} failed: {type(exc).__name__}")
+            stages.write_json(
+                path=failed_path,
+                payload={
+                    "error": type(exc).__name__,
+                    "message": str(exc),
+                    "traceback": traceback.format_exc(),
+                },
+            )
+            log(f"fit {record.stem} failed: {type(exc).__name__}: {exc}")
     return counts
 
 
@@ -418,6 +425,11 @@ def write_status(*, root: Path, status: dict[str, Any]) -> None:
     )
 
 
+def chain_exit_code(*, status: Mapping[str, Any]) -> int:
+    """Return the process exit status of a chain run: 0 only when every fit succeeded."""
+    return 0 if status.get("state") == "complete" else 1
+
+
 def stage_chain(
     *,
     root: Path,
@@ -436,7 +448,8 @@ def stage_chain(
     Every family prints a "fits starting" line and a "last fit ended" line. A stop (row 0), a correctness
     failure (row 1), or a fit that raised and a counted reading needs (row 2) ends the chain with
     `chain_status.json` holding `state` "stopped", "invalid", or "failed". A report-only family that
-    failed (U-NCw, U-SG, U*-L) does not end the chain.
+    failed (U-NCw, U-SG, U*-L) does not end the chain, but the final state is then "failed" (with
+    `needed` false), never "complete", so that a launcher cannot read the status as a success.
 
     Args:
         root: The data folder of this experiment.
@@ -492,6 +505,21 @@ def stage_chain(
             status = {"state": "failed", "family": family, "arms": needed_failed, "done": done}
             write_status(root=root, status=status)
             return status
-    status = {"state": "complete", "done": done}
+    failed_arms = [
+        a
+        for _family, all_arms in core.FIT_FAMILIES
+        for a in all_arms
+        if a not in dropped
+        and any(
+            stages.job_path(root=root, arm=a, arch=core.ARMS[a].arch, seed=s)
+            .with_suffix(".failed.json")
+            .exists()
+            for s in core.SEEDS
+        )
+    ]
+    if failed_arms:
+        status = {"state": "failed", "arms": failed_arms, "needed": False, "done": done}
+    else:
+        status = {"state": "complete", "done": done}
     write_status(root=root, status=status)
     return status

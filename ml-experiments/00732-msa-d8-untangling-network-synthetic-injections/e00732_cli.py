@@ -214,6 +214,7 @@ def dispatch(*, args: argparse.Namespace, root: Path, root730: Path) -> int:
                     rerun=args.rerun,
                 )
                 log(f"chain: {status['state']}")
+                return fit.chain_exit_code(status=status)
     else:
         import e00732_report as report
 
