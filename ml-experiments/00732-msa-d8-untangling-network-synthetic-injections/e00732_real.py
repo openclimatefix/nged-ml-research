@@ -7,15 +7,19 @@ function returns the level, the daily shape, or the peak of the solar output on 
 and P2 alone returns a mean (of the pre-engine era, which holds no solar farm) rounded to 0.1 points.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Final
 from datetime import date, datetime
+from typing import Final
 
 import e00732_paths  # noqa: F401
 
 # isort: split
+import e00729_arms as arms729
+import e00729_real as real729
+import e00729_sim as sim
 import e00730_real as real730
+import e00732_arms as arms
 import e00732_core as core
 import e00732_score as score
 import numpy as np
@@ -24,19 +28,12 @@ import polars as pl
 h2 = real730.h2
 k_reading = real730.k_reading
 
-MIDDAY: Final = slice(20, 28)
-"""Half-hours 20 to 27 are 10:00 to 14:00 UTC."""
-CLEAR_INDEX: Final = 0.8
-CLOUDY_INDEX: Final = 0.3
+MIDDAY: Final = slice(2 * core.P3_MIDDAY_UTC[0], 2 * core.P3_MIDDAY_UTC[1])
+"""The half-hours of the midday window of P3 (10:00 to 14:00 UTC)."""
 MIN_DAYS_PER_SKY: Final = 5
-P2_MEAN_MAX: Final = 1.0
-P2_EXCEED_POINTS: Final = 5.0
-P2_EXCEED_SHARE: Final = 0.01
-P3_MIN_CORRELATION: Final = 0.5
-P3_MIN_RATIO: Final = 2.0
-P4_MAX_DIFFERENCE: Final = 1.0
-K3_MIN_EDGES: Final = 10
-K3_WINDOW_HALF_HOURS: Final = 4
+"""The fewest clear days, and the fewest cloudy days, that P3's ratio reads."""
+K3_WINDOW_HALF_HOURS: Final = int(core.K3_WINDOW_HOURS * 2)
+"""K3 counts a logged edge as hit when a flag lies within this many half-hours of its logged time."""
 
 
 def p1_night(
@@ -63,14 +60,14 @@ def p1_night(
 def p2_no_farm(*, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray) -> dict:
     """Return P2: on pre-engine held-out sun-up half-hours, the mean at most 1 point and at most 1% above 5 points."""
     keep = valid & score.sun_up(cosz=cosz)
-    if not keep.any():
+    if not score.finite_on(pv, keep=keep):
         return {"mean_rounded": float("nan"), "share_above": float("nan"), "n": 0, "pass": False}
-    mean, share = float(pv[keep].mean()), float(np.mean(pv[keep] > P2_EXCEED_POINTS))
+    mean, share = float(pv[keep].mean()), float(np.mean(pv[keep] > core.P2_EXCEED_POINTS))
     return {
         "mean_rounded": round(mean, 1),
         "share_above": share,
         "n": int(keep.sum()),
-        "pass": bool(mean <= P2_MEAN_MAX and share <= P2_EXCEED_SHARE),
+        "pass": bool(mean <= core.P2_MEAN_POINTS and share <= core.P2_EXCEED_SHARE),
     }
 
 
@@ -115,8 +112,8 @@ def p3_follows_sky(*, pv: np.ndarray, csi: np.ndarray, cosz: np.ndarray, valid: 
     mid_valid = valid[:, MIDDAY].all(axis=1)
     mid_pv = pv[:, MIDDAY].mean(axis=1)
     mid_csi = csi[:, MIDDAY].mean(axis=1)
-    clear = mid_valid & (mid_csi >= CLEAR_INDEX)
-    cloudy = mid_valid & (mid_csi < CLOUDY_INDEX)
+    clear = mid_valid & (mid_csi >= core.P3_CLEAR_CSI)
+    cloudy = mid_valid & (mid_csi < core.P3_CLOUDY_CSI)
     if (
         clear.sum() < MIN_DAYS_PER_SKY
         or cloudy.sum() < MIN_DAYS_PER_SKY
@@ -128,7 +125,7 @@ def p3_follows_sky(*, pv: np.ndarray, csi: np.ndarray, cosz: np.ndarray, valid: 
         "spearman": rho,
         "ratio": ratio,
         "n_days": int(days.sum()),
-        "pass": bool(rho > P3_MIN_CORRELATION and ratio > P3_MIN_RATIO),
+        "pass": bool(rho > core.P3_SPEARMAN and ratio > core.P3_RATIO),
     }
 
 
@@ -139,6 +136,8 @@ def p4_absorb(*, pv: np.ndarray, running: np.ndarray, hh: np.ndarray, valid: np.
     half-hours when the engine is off, and the differences are averaged with the running counts as
     weights. The function returns a pass flag and counts, never a mean or a difference.
     """
+    if not score.finite_on(pv, keep=valid & running):
+        return {"pass": False, "n_running": int((valid & running).sum()), "void": False}
     num, den = 0.0, 0.0
     for h in range(48):
         on = valid & running & (hh == h)
@@ -149,7 +148,7 @@ def p4_absorb(*, pv: np.ndarray, running: np.ndarray, hh: np.ndarray, valid: np.
     if den == 0.0:
         return {"pass": False, "n_running": int((valid & running).sum()), "void": True}
     return {
-        "pass": bool(num / den <= P4_MAX_DIFFERENCE),
+        "pass": bool(num / den <= core.P4_MAX_DIFFERENCE_POINTS),
         "n_running": int((valid & running).sum()),
         "void": False,
     }
@@ -194,7 +193,7 @@ def closure_edges_from_sheets(
                     edges.append(Edge(when=value, has_time=True))
                 elif isinstance(value, date):
                     edges.append(
-                        Edge(when=datetime(value.year, value.month, value.day), has_time=False)
+                        Edge(when=datetime(value.year, value.month, value.day), has_time=False)  # noqa: DTZ001
                     )
     return edges
 
@@ -219,16 +218,132 @@ def k3_hit_rate(
         if d is None or not valid[d].any():
             continue
         n += 1
-        flagged = (step_p[d] > core.STEP_THRESHOLD) & valid[d]
+        flagged = (step_p[d] > core.K3_HIT_THRESHOLD) & valid[d]
         if e.has_time:
             h = e.when.hour * 2 + e.when.minute // 30
             lo, hi = max(h - K3_WINDOW_HALF_HOURS, 0), min(h + K3_WINDOW_HALF_HOURS + 1, 48)
             hits += int(flagged[lo:hi].any())
         else:
             hits += int(flagged.any())
-    if n < K3_MIN_EDGES:
+    if n < core.K3_MIN_EDGES:
         return {"void": True, "n_edges": n, "hit_share": float("nan")}
     return {"void": False, "n_edges": n, "hit_share": hits / n}
+
+
+def k3_rules(
+    *,
+    edges: Sequence[Edge],
+    steps: Mapping[str, np.ndarray],
+    day_index: dict[date, int],
+    valid: np.ndarray,
+    closure_days: np.ndarray,
+) -> dict[str, dict[str, dict]]:
+    """Return K3 for each rule (U*, U-N, and B-TN): the hit share and the flagged steps per day, counts and shares only.
+
+    Args:
+        edges: The logged edges of D8.
+        steps: The step output of each rule `(D, 48)` on the real days.
+        day_index: The row of each real day.
+        valid: Valid half-hours `(D, 48)`.
+        closure_days: Days within the logged closures `(D,)`.
+
+    Returns:
+        For each rule, `hit` (`k3_hit_rate`) and `false` (`k3_false_steps`).
+    """
+    return {
+        name: {
+            "hit": k3_hit_rate(edges=edges, step_p=p, day_index=day_index, valid=valid),
+            "false": k3_false_steps(step_p=p, valid=valid, closure_days=closure_days),
+        }
+        for name, p in steps.items()
+    }
+
+
+def by_hour(
+    *, pv: np.ndarray, hh: np.ndarray, keep: np.ndarray, threshold: float
+) -> dict[int, dict[str, float]]:
+    """Return, for each UTC hour of the kept half-hours, their count and the share of them above `threshold` points.
+
+    The caller passes only night half-hours or pre-engine half-hours, so the breakdown never shows a
+    level of a real solar era. An hour with no kept half-hour is absent.
+    """
+    out = {}
+    for hour in range(24):
+        sel = keep & (hh // 2 == hour)
+        if sel.any():
+            out[hour] = {"n": float(sel.sum()), "share_above": float(np.mean(pv[sel] > threshold))}
+    return out
+
+
+def night_by_hour(
+    *, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray, hh: np.ndarray
+) -> dict[int, dict[str, float]]:
+    """Return P1's breakdown by UTC hour on night half-hours: the count and the share above 0.5 points."""
+    keep = valid & (cosz <= core.NIGHT_COSZ)
+    return by_hour(pv=pv, hh=hh, keep=keep, threshold=core.NIGHT_EXCEED_POINTS)
+
+
+def pre_engine_by_hour(
+    *, pv: np.ndarray, cosz: np.ndarray, valid: np.ndarray, hh: np.ndarray, pre_engine: np.ndarray
+) -> dict[int, dict[str, float]]:
+    """Return P2's breakdown by UTC hour on sun-up half-hours of the pre-engine era: the count and the share above 5 points."""
+    keep = valid & pre_engine & score.sun_up(cosz=cosz)
+    return by_hour(pv=pv, hh=hh, keep=keep, threshold=core.P2_EXCEED_POINTS)
+
+
+def negative_power_shares(*, signed: Mapping[str, np.ndarray]) -> dict[str, float]:
+    """Return the share of half-hours with negative signed power at D5 and D14, for the private log only.
+
+    A neighbour whose share is above zero exports at times, which bears on the sign cue of its
+    channels. Missing half-hours (NaN) are not counted. The numbers stay in the private log.
+
+    Args:
+        signed: Each neighbour's signed power in points (any shape).
+
+    Returns:
+        The share for D5 and for D14 (NaN where a neighbour has no reading).
+    """
+    out = {}
+    for name in ("D5", "D14"):
+        x = np.asarray(signed[name], dtype=np.float64)
+        x = x[np.isfinite(x)]
+        out[name] = float(np.mean(x < 0.0)) if x.size else float("nan")
+    return out
+
+
+def real_day_windows(
+    *,
+    cal: sim.Calendar,
+    use: np.ndarray,
+    reading: np.ndarray,
+    truth: np.ndarray,
+    stats: arms729.InputStats,
+    medians: Mapping[str, float],
+    neighbours: Mapping[str, np.ndarray] | None,
+) -> tuple[list[arms.Prepared], list[sim.Segment]]:
+    """Return the prepared segments of real days, with the neighbours' real series in their channels.
+
+    Args:
+        cal: The calendar of D8's real days.
+        use: The days to include `(D,)`.
+        reading: D8's reading in points on the calendar axis.
+        truth: The answer in points (NaN where there is none).
+        stats: The standardisation constants of the temperature and wind speed.
+        medians: The training median of each folded neighbour.
+        neighbours: The neighbours' series on the calendar `(D, 48)`, or None for zero channels.
+
+    Returns:
+        The prepared segments and the pseudo-segments they came from, one pair per month.
+    """
+    segments = real729.real_segments(cal=cal, use=use, reading=reading, truth=truth)
+    prepared = arms.prepare_plain(
+        segments=segments,
+        holidays=cal.holidays,
+        stats=stats,
+        medians=medians,
+        neighbours=neighbours,
+    )
+    return prepared, segments
 
 
 def k3_false_steps(*, step_p: np.ndarray, valid: np.ndarray, closure_days: np.ndarray) -> dict:
@@ -239,7 +354,7 @@ def k3_false_steps(*, step_p: np.ndarray, valid: np.ndarray, closure_days: np.nd
     days = ~closure_days & valid.any(axis=1)
     if not days.any():
         return {"void": True, "n_days": 0, "flagged_per_day": float("nan")}
-    flagged = ((step_p > core.STEP_THRESHOLD) & valid)[days].sum(axis=1)
+    flagged = ((step_p > core.K3_HIT_THRESHOLD) & valid)[days].sum(axis=1)
     return {"void": False, "n_days": int(days.sum()), "flagged_per_day": float(flagged.mean())}
 
 
