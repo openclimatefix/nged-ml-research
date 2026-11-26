@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import e00732_paths  # noqa: F401
 
@@ -364,6 +364,8 @@ def stage_timing(
     """
     stages.guard_run(root=root, root730=root730, stage="timing")
     log(fits_starting_line(family="timing", hours=core.TIMING_GATE_HOURS, cores=cores))
+    if device == "cuda":
+        train729.limit_gpu_memory()
     sets = load_sets(root730=root730, env=env, seed=0)
     secs, building, peak_gpu = {}, {}, 0.0
     for arm in core.TIMING_ARMS:
@@ -425,9 +427,25 @@ def write_status(*, root: Path, status: dict[str, Any]) -> None:
     )
 
 
+CHAIN_FAILED_EXIT: Final = 5
+"""The exit status of a chain with a failed fit (3 is a stop and 4 a correctness failure; `run.sh` uses 1 for a refused slot and 64 for bad usage, and a launcher retries on 1)."""
+
+
+def arm_failed(*, root: Path, arm: str) -> bool:
+    """Return whether an arm has a seed whose last attempt failed: a `.failed.json` and no fit record.
+
+    A `.failed.json` left from an earlier attempt that a later run completed is stale and is ignored.
+    """
+    for seed in core.SEEDS:
+        record = stages.job_path(root=root, arm=arm, arch=core.ARMS[arm].arch, seed=seed)
+        if record.with_suffix(".failed.json").exists() and not record.exists():
+            return True
+    return False
+
+
 def chain_exit_code(*, status: Mapping[str, Any]) -> int:
     """Return the process exit status of a chain run: 0 only when every fit succeeded."""
-    return 0 if status.get("state") == "complete" else 1
+    return 0 if status.get("state") == "complete" else CHAIN_FAILED_EXIT
 
 
 def stage_chain(
@@ -488,17 +506,7 @@ def stage_chain(
             raise
         log(last_fit_ended_line(family=family, counts=counts))
         needed_failed = [
-            a
-            for a in arm_names
-            if a in core.NEEDED_ARMS
-            and any(
-                (
-                    stages.job_path(root=root, arm=a, arch=core.ARMS[a].arch, seed=s).with_suffix(
-                        ".failed.json"
-                    )
-                ).exists()
-                for s in core.SEEDS
-            )
+            a for a in arm_names if a in core.NEEDED_ARMS and arm_failed(root=root, arm=a)
         ]
         done.append(family)
         if needed_failed:
@@ -509,13 +517,7 @@ def stage_chain(
         a
         for _family, all_arms in core.FIT_FAMILIES
         for a in all_arms
-        if a not in dropped
-        and any(
-            stages.job_path(root=root, arm=a, arch=core.ARMS[a].arch, seed=s)
-            .with_suffix(".failed.json")
-            .exists()
-            for s in core.SEEDS
-        )
+        if a not in dropped and arm_failed(root=root, arm=a)
     ]
     if failed_arms:
         status = {"state": "failed", "arms": failed_arms, "needed": False, "done": done}

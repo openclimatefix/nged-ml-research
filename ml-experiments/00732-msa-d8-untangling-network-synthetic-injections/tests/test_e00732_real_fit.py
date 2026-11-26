@@ -7,7 +7,8 @@ medians, and the zero-fill mask) and fits one epoch of each arm into a throwaway
 private data folder, so it runs only when `RUN_REAL_FIT=1` (on the workstation, with
 `CUDA_VISIBLE_DEVICES=` and a slot's cores):
 
-    RUN_REAL_FIT=1 CUDA_VISIBLE_DEVICES= taskset -c 16-21 pytest --run-studies tests/test_e00732_real_fit.py
+    DATA_PATH_INTERNAL=<data folder> RUN_REAL_FIT=1 CUDA_VISIBLE_DEVICES= PYTHONPATH=<this experiment's folder> \
+    taskset -c 16-21 <python of the gpu venv> -m pytest --run-studies tests/test_e00732_real_fit.py
 
 It reads the data folder and writes only under `tmp_path`.
 """
@@ -30,7 +31,7 @@ pytestmark = pytest.mark.skipif(
     reason="reads the private data folder; set RUN_REAL_FIT=1",
 )
 
-ONE_ARM_PER_FAMILY = tuple(core.ARMS)
+ALL_ARMS = tuple(core.ARMS)
 
 
 @pytest.fixture(scope="module")
@@ -51,7 +52,7 @@ def real(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, stages.E
     return scratch, cli.paths.root_730(), env
 
 
-@pytest.mark.parametrize("arm", ONE_ARM_PER_FAMILY)
+@pytest.mark.parametrize("arm", ALL_ARMS)
 def test_one_real_epoch_of_each_arm_stores_a_record_and_predictions(
     real: tuple[Path, Path, stages.Env], arm: str
 ) -> None:

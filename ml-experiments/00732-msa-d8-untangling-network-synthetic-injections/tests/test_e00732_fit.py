@@ -390,8 +390,12 @@ def test_a_failed_fit_stores_the_exception_type_message_and_traceback(run: Any) 
 
 def test_the_chain_exit_status_is_non_zero_unless_every_fit_succeeded() -> None:
     assert fit.chain_exit_code(status={"state": "complete", "done": []}) == 0
-    for state in ("failed", "stopped", "invalid", "running"):
-        assert fit.chain_exit_code(status={"state": state}) == 1
+    codes = {
+        state: fit.chain_exit_code(status={"state": state})
+        for state in ("failed", "stopped", "invalid", "running")
+    }
+    assert set(codes.values()) == {fit.CHAIN_FAILED_EXIT}
+    assert fit.CHAIN_FAILED_EXIT not in (0, 1, 2, 3, 4, 64)  # 1 is a refused slot in `run.sh`
 
 
 def test_the_cuda_branch_caps_the_gpu_memory_through_a_function_that_exists(
@@ -442,3 +446,46 @@ def test_every_attribute_that_the_code_takes_from_an_imported_module_exists() ->
                 if not hasattr(module, node.attr):
                     missing.append(f"{path.name}:{node.lineno} {node.value.id}.{node.attr}")
     assert not missing
+
+
+def test_the_timing_gate_caps_the_gpu_memory_on_its_cuda_path(run: Any, monkeypatch: Any) -> None:
+    root, root730, env = run
+    calls: list[str] = []
+    monkeypatch.setattr(fit.train729, "limit_gpu_memory", lambda: calls.append("capped"))
+
+    class StopHere(Exception):
+        pass
+
+    def stop(**_kwargs: Any) -> Any:
+        raise StopHere
+
+    monkeypatch.setattr(fit, "load_sets", stop)
+    monkeypatch.setattr(fit.stages, "guard_run", lambda **_kwargs: None)
+    with pytest.raises(StopHere):
+        fit.stage_timing(
+            root=root, root730=root730, env=env, device="cuda", manager_approved=False, log=print
+        )
+    assert calls == ["capped"]
+
+
+def test_a_stale_failed_file_is_ignored_once_the_fit_record_exists(run: Any) -> None:
+    root, root730, _env = run
+    (root / "scores").mkdir(exist_ok=True)
+    stages.write_json(
+        path=root / "scores" / "timing.json", payload={"pass": True, "hours_at_cap": 3.0}
+    )
+    first = stages.job_path(root=root, arm="S+", arch="unet", seed=0)
+    first.parent.mkdir(parents=True, exist_ok=True)
+    stages.write_json(path=first.with_suffix(".failed.json"), payload={"error": "Old"})
+    assert fit.arm_failed(root=root, arm="S+")
+    stages.write_json(path=first, payload={"arm": "S+"})
+    assert not fit.arm_failed(root=root, arm="S+")  # the record exists beside the stale file
+
+    def fake(arm: Any, arch: Any, seed: Any) -> Any:
+        stages.write_json(
+            path=stages.job_path(root=root, arm=arm, arch=arch, seed=seed), payload={"arm": arm}
+        )
+        return {}
+
+    status = fit.stage_chain(root=root, root730=root730, run_one=fake, log=lambda _line: None)
+    assert status["state"] == "complete"
