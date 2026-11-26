@@ -49,3 +49,31 @@ def make_bank(
 def folder(*, name: str) -> Path:
     """Return a path under the experiment folder (for tests that read the code)."""
     return e00732_paths.HERE / name
+
+
+def make_neighbours(*, cal: sim.Calendar, seed: int = 0) -> dict[str, np.ndarray]:
+    """Return D3, D5, and D14 on the calendar, in the shape that `neighbours.build_arrays` returns.
+
+    The series start on a master grid that begins a few days before the calendar and ends a few days
+    after it, with invented values in points (D5 signed with one export day, D14 with one missing
+    day), and are placed on the calendar by the real `place_on_calendar`, as the real loader does.
+    """
+    import e00732_neighbours as nb
+
+    rng = np.random.default_rng([seed, 99])
+    first = cal.dates[0] - np.timedelta64(3, "D")
+    n_grid_days = len(cal.dates) + 8
+    hh = np.tile(np.arange(48), n_grid_days)
+    day = np.repeat(np.arange(n_grid_days), 48)
+    shape = np.sin(np.pi * (hh - 10) / 48.0) ** 2
+    grids = {
+        "D3": 90.0 + 25.0 * shape + rng.normal(0, 1.0, hh.size),
+        "D5": 70.0 + 20.0 * shape + rng.normal(0, 1.0, hh.size),
+        "D14": 100.0 + 30.0 * shape + rng.normal(0, 1.0, hh.size),
+    }
+    grids["D5"][(day == 20)] = -15.0 + rng.normal(0, 1.0, (day == 20).sum())  # one export day
+    grids["D14"][(day == 30)] = np.nan  # one missing day
+    return {
+        name: nb.place_on_calendar(grid=grid, dates=cal.dates, first_day=first)
+        for name, grid in grids.items()
+    }
