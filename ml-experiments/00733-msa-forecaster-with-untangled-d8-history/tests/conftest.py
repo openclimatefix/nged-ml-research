@@ -2,12 +2,15 @@
 
 The experiment folder is put on `sys.path` here, so the tests import `e00733_core` and its
 siblings by bare name. The tests need no data file and no GPU, and they are skipped unless
-`--run-studies` is passed. The tests that need `torch` skip without it.
+`--run-studies` is passed. The tests that need `torch` are not collected without it (see
+`NEEDS_TORCH`).
 """
 
+import importlib.util
 import sys
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Final
 
 import numpy as np
 import pytest
@@ -20,6 +23,37 @@ sys.path.insert(0, str(_TESTS))
 import e00733_paths  # noqa: E402  (puts the sibling experiments on sys.path)
 
 e00733_paths.pin_threads()
+
+NEEDS_TORCH: Final = (
+    "test_e00733_adapters.py",
+    "test_e00733_cli.py",
+    "test_e00733_figures.py",
+    "test_e00733_fit.py",
+    "test_e00733_model.py",
+    "test_e00733_posthoc.py",
+    "test_e00733_posthoc_guard.py",
+    "test_e00733_predict.py",
+    "test_e00733_predictions.py",
+    "test_e00733_runtime.py",
+    "test_e00733_scoring_synth.py",
+    "test_e00733_series.py",
+    "test_e00733_signdata.py",
+    "test_e00733_smoke.py",
+    "test_e00733_smokerun.py",
+    "test_e00733_stages.py",
+    "test_e00733_train.py",
+    "test_e00733_store.py",
+    "test_e00733_scoring.py",
+    "test_e00733_score.py",
+    "test_e00733_report.py",
+    "test_e00733_gallery2.py",
+    "test_e00733_core.py",
+    "test_e00733_baselines.py",
+)
+"""The test modules that import `torch`, directly or through the modules of the experiment."""
+
+collect_ignore: list[str] = [] if importlib.util.find_spec("torch") else list(NEEDS_TORCH)
+"""Without `torch`, as in CI, pytest does not collect the modules in `NEEDS_TORCH`."""
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.Item]) -> None:
