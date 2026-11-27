@@ -1112,6 +1112,10 @@ def stage_posthoc(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     stage writes no file outside `posthoc/`: not `scores/test_started`, the verdict, the readings,
     or `chain_status.json`. A failed fit is report-only.
 
+    A clean Ctrl-C writes the status `stopped` with the reason "interrupted". SIGKILL leaves the
+    status `running`, and `posthoc` then refuses to start until `posthoc/posthoc_status.json` is
+    deleted by hand. The wall seconds of a failed fit count towards the cost cap.
+
     Args:
         args: The parsed arguments (`--device`, and on a scratch root `--max-passes` and
             `--first-job-per-family`).

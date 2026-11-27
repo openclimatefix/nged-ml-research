@@ -131,7 +131,7 @@ def test_posthoc_refuses_while_another_posthoc_run_is_running(tmp_path: Path) ->
     st.write_posthoc_status(root=root, state="running")
     with pytest.raises(st.GuardError, match="is running"):
         st.guard_posthoc(root=root, stage="posthoc", banks_digest=DIGEST)
-    with pytest.raises(st.GuardError, match="complete or failed"):
+    with pytest.raises(st.GuardError, match="complete, failed, or stopped"):
         st.guard_posthoc(root=root, stage="posthoc_score", banks_digest=DIGEST)
     assert cli.run_stage(args=_args("posthoc"), root=root, digest=DIGEST) == 2
     assert st.posthoc_state(root=root) == "running"
@@ -140,7 +140,7 @@ def test_posthoc_refuses_while_another_posthoc_run_is_running(tmp_path: Path) ->
 def test_posthoc_score_needs_a_finished_posthoc_run(tmp_path: Path) -> None:
     """Without a status file the readings have nothing to read."""
     root = _finished_main_run(tmp_path)
-    with pytest.raises(st.GuardError, match="complete or failed"):
+    with pytest.raises(st.GuardError, match="complete, failed, or stopped"):
         st.guard_posthoc(root=root, stage="posthoc_score", banks_digest=DIGEST)
 
 
@@ -451,3 +451,63 @@ def test_the_measured_cost_is_read_from_the_job_records(tmp_path: Path) -> None:
     assert cost["posthoc"] == 3.0 and cost["running_total"] == 4.5
     assert st.job_hours_of(root=fit_root, arm="YO", fold=None, seed=0) == 1.5
     assert st.job_hours_of(root=fit_root, arm="YS", fold=None, seed=0) is None
+
+
+# --------------------------------------------------------------------------- stopped runs, failed jobs, Ctrl-C
+
+
+def test_posthoc_score_accepts_a_stopped_run(tmp_path: Path) -> None:
+    """A cost-cap stop leaves partial results, and the readings may read them."""
+    root = _finished_main_run(tmp_path)
+    st.write_posthoc_status(root=root, state="stopped", reason=st.COST_CAP_MESSAGE)
+    st.guard_posthoc(root=root, stage="posthoc_score", banks_digest=DIGEST)
+    st.guard_posthoc(root=root, stage="posthoc", banks_digest=DIGEST)
+
+
+def test_a_failed_job_adds_its_wall_seconds_to_the_total_and_a_resume_keeps_them(
+    tmp_path: Path,
+) -> None:
+    """A failing job writes no job record, so its seconds are recorded and count towards the cap."""
+    root = _finished_main_run(tmp_path)
+    steps, started, _ = _cap_steps(root, main=1.0, hours_of={"YO": 0.01, "FS": 0.01, "YS": 0.01})
+    clock = [0.0]
+    inner = steps.run_job
+
+    def run_job(arm: str, fold: str | None, seed: int) -> dict:
+        clock[0] += 7200.0 if (arm, seed) == ("YO", 0) else 1.0
+        if (arm, seed) == ("YO", 0):
+            msg = "boom"
+            raise RuntimeError(msg)
+        return inner(arm, fold, seed)
+
+    steps.run_job = run_job
+    steps.clock = lambda: clock[0]
+    status = st.run_posthoc(root=root, steps=steps)
+    assert status["failed"] == ["YO_s0"]
+    assert st.failed_hours(root=root) == pytest.approx(2.0)
+    assert status["hours"]["failed"] == pytest.approx(2.0)
+    assert status["hours"]["running_total"] == pytest.approx(1.0 + 2.0 + 0.01 * (len(started)))
+    assert st.posthoc_cost(root=root)["failed"] == pytest.approx(2.0)
+    # A resume starts from the recorded seconds: with the main chain at 9.9 hours, 2 more hours of
+    # failed time pass the cap before any job starts.
+    steps2, started2, _ = _cap_steps(root, main=9.9, hours_of={"YO": 0.01, "FS": 0.01, "YS": 0.01})
+    status2 = st.run_posthoc(root=root, steps=steps2)
+    assert status2["state"] == "stopped" and started2 == []
+
+
+def test_a_clean_ctrl_c_writes_stopped_with_the_reason_interrupted_and_reraises(
+    tmp_path: Path,
+) -> None:
+    """KeyboardInterrupt ends the run with the status `stopped`, so `posthoc` can start again."""
+    root = _finished_main_run(tmp_path)
+    steps, _, _ = _cap_steps(root, main=1.0, hours_of={"YO": 0.01, "FS": 0.01, "YS": 0.01})
+
+    def run_job(_arm: str, _fold: str | None, _seed: int) -> dict:
+        raise KeyboardInterrupt
+
+    steps.run_job = run_job
+    with pytest.raises(KeyboardInterrupt):
+        st.run_posthoc(root=root, steps=steps)
+    status = st.read_json(path=root / st.POSTHOC_STATUS)
+    assert status["state"] == "stopped" and status["reason"] == "interrupted"
+    st.guard_posthoc(root=root, stage="posthoc", banks_digest=DIGEST)

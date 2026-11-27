@@ -23,6 +23,8 @@
 #     (of this experiment or another, counted together) holds the GPU, and a lock file allows one worker
 #     of this experiment at a time. `guard`, `banks`, `channels`, `limits`, `gallery`, `gallery2`, `score`, `report`, `figures`, `loss_curves`, `attention`, `series`, and `posthoc_score` run on the CPU and skip both checks (`posthoc`, the post hoc fits of FS and YS, uses the GPU like `chain`);
 #   - this folder on PYTHONPATH: `e00733_paths.py` adds the folders of experiment 730, and of the experiments that 730 imports, from this checkout.
+# `posthoc` writes `posthoc/posthoc_status.json`. A clean Ctrl-C leaves the state `stopped`, but
+# SIGKILL leaves `running`, and `posthoc` then refuses to start until that file is deleted by hand.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # default to dummy values because the contracts package reads them at import. Each fit holds at most
 # 6 GB of the GPU (`e00729_train.limit_gpu_memory, called by e00733_cli`).

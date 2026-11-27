@@ -169,6 +169,22 @@ def test_yo_reads_the_true_channels_of_history_half_hours_before_the_origin_only
     )
     assert not u[..., 2].any(), "the transfer-step channel is absent"
     assert ok.any() and np.isfinite(u).all()
+    # The cut-off is exact: the slot c - 55 (stamp c - 54) is the newest visible and carries the
+    # truth, and the slot c - 54 is not visible, so a cut-off moved by one half-hour fails either way.
+    newest, first_hidden = (
+        origin - core.NEWEST_VISIBLE_BEFORE_CONTRACT - 1,
+        origin - core.NEWEST_VISIBLE_BEFORE_CONTRACT,
+    )
+    at_newest = np.argwhere(hs == newest)
+    at_hidden = np.argwhere(hs == first_hidden)
+    assert len(at_newest) == 1 and len(at_hidden) == 1
+    rn, jn = (int(v) for v in at_newest[0])
+    rh, jh = (int(v) for v in at_hidden[0])
+    assert np.isfinite(seg.x_neg[newest]) and ok[rn, jn] and not ok[rh, jh]
+    assert u[rn, jn, 0] == seg.x_neg[newest]
+    assert np.isclose(
+        u[rn, jn, 1], sy.solar_unit(points=seg.solar_points[newest : newest + 1], target_std=2.0)[0]
+    )
 
 
 # --------------------------------------------------------------------------- the readings
@@ -211,8 +227,8 @@ def test_a_missing_arm_leaves_only_its_contrasts_unread(world_root: Path) -> Non
     assert [got[n]["status"] for n in ("P3", "P4", "P5", "P6")] == [
         "read",
         "read",
-        "unread",
-        "unread",
+        "void",
+        "void",
     ]
     assert "YO" in got["P5"]["reason"]
 
@@ -225,7 +241,7 @@ def test_synthetic_contrasts_are_unread_without_the_ys_archive(world_root: Path)
         rows="validation",
         n_resamples=50,
     )
-    assert {v["status"] for v in got.values()} == {"unread"} and "YS" in got["P3"]["reason"]
+    assert {v["status"] for v in got.values()} == {"void"} and "YS" in got["P3"]["reason"]
     assert "YO" in got["P5"]["reason"]
 
 
@@ -270,7 +286,7 @@ def test_real_contrasts_are_unread_when_a_forecast_is_missing(
     got = ph.real_contrasts(
         root=tmp_path, fit_root=tmp_path / "p", rows="validation", n_resamples=50
     )
-    assert {v["status"] for v in got.values()} == {"unread"}
+    assert {v["status"] for v in got.values()} == {"void"}
 
 
 def _canned(*, rows: str = "test") -> dict[str, Any]:
@@ -398,3 +414,68 @@ def test_the_main_smoke_still_runs_every_chain_arm() -> None:
     """The chain's smoke test covers the arms of `FIT_ORDER`, and no post hoc arm joins it."""
     assert tuple(a for a in core.FIT_ORDER if a != "FU-screen") == smoke.SMOKE_ARMS
     assert not set(smoke.SMOKE_ARMS) & {a for a, s in core.ARMS.items() if s.post_hoc}
+
+
+# --------------------------------------------------------------------------- a stopped run is read as far as it went
+
+
+def _copy_archive(*, src_root: Path, src_arm: str, dst_root: Path, dst_arm: str, seed: int) -> None:
+    """Copy the validation archive of `src_arm` seed 0 to the test archive of `dst_arm` at `seed`."""
+    dst = ss.archive_path(root=dst_root, arm=dst_arm, seed=seed, rows="test")
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(ss.archive_path(root=src_root, arm=src_arm, seed=0, rows="validation"), dst)
+
+
+def test_a_stopped_run_is_read_as_far_as_it_went(
+    world_root: Path,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the status `stopped` and YS at seeds 0 and 1 only, P3 and P4 are void and name the seeds
+    held, and P1, P2, P5, and P6 are computed; the report says what is missing."""
+    fit_root = st.posthoc_fit_root(root=world_root)
+    for arm in ("Y0", "YU"):
+        for seed in core.SYNTHETIC_SEEDS:
+            _copy_archive(
+                src_root=world_root, src_arm=arm, dst_root=world_root, dst_arm=arm, seed=seed
+            )
+    for seed in core.SYNTHETIC_SEEDS:
+        _copy_archive(src_root=world_root, src_arm="YU", dst_root=fit_root, dst_arm="YO", seed=seed)
+    for seed in (0, 1):
+        _copy_archive(src_root=world_root, src_arm="YU", dst_root=fit_root, dst_arm="YS", seed=seed)
+    st.write_posthoc_status(
+        root=world_root,
+        state="stopped",
+        reason=st.COST_CAP_MESSAGE,
+        skipped=[{"job": "YS_s2"}],
+        failed=[],
+    )
+    canned = _canned()["contrasts"]
+    monkeypatch.setattr(ph, "real_contrasts", lambda **_: {"P1": canned["P1"], "P2": canned["P2"]})
+    readings = ph.posthoc_readings(root=world_root, rows="test", n_resamples_synthetic=50)
+    status = {n: e["status"] for n, e in readings["contrasts"].items()}
+    assert status == {
+        "P1": "read",
+        "P2": "read",
+        "P3": "void",
+        "P4": "void",
+        "P5": "read",
+        "P6": "read",
+    }
+    assert "YS holds seeds [0, 1] of [0, 1, 2]" in readings["contrasts"]["P3"]["reason"]
+    assert readings["post_hoc_run"]["state"] == "stopped"
+    text = ph.render_report(readings=readings, verdict_row=7)
+    assert "ended stopped" in text and "P3 (post hoc) was not read: YS holds seeds [0, 1]" in text
+    assert len(text.splitlines()) <= 25
+
+
+def test_the_scratch_folder_of_the_post_hoc_smoke_may_not_lie_in_or_contain_the_data_folder(
+    tmp_path: Path,
+) -> None:
+    """`smoke --arms` fits after the first test score, so it refuses a scratch inside the data folder."""
+    root = tmp_path / "data" / "00733-x"
+    (root / "scores").mkdir(parents=True)
+    for scratch in (root / "scratch", root, tmp_path / "data", tmp_path):
+        args = argparse.Namespace(scratch=str(scratch), device="cpu", arms="YS")
+        with pytest.raises(st.GuardError):
+            smokerun.stage_smoke_arms(args, root)
+    assert not (root / "scratch").exists()

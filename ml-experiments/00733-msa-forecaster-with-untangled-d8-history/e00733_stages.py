@@ -92,6 +92,8 @@ expected hours, would pass this cap. The absolute stop line is `core.STOP_LINE_H
 POSTHOC_DIR: Final = "posthoc"
 POSTHOC_STARTED: Final = "posthoc/posthoc_started.json"
 POSTHOC_STATUS: Final = "posthoc/posthoc_status.json"
+POSTHOC_FAILED_HOURS: Final = "posthoc/failed_hours.json"
+"""Wall seconds of each post hoc job that failed, by job name; the cost cap counts them."""
 POSTHOC_GATE_RECORDS: Final = (PRE_FIT_GUARDS, PANEL_CHECK, REVIEW_GATE, SMOKE_FILE, TIMING_FILE)
 """The gate records of the main run that the fits of the post hoc root read (copied, never changed)."""
 
@@ -450,6 +452,9 @@ def guard_posthoc(*, root: Path, stage: str, banks_digest: str) -> None:
             failed, a pre-fit gate, the smoke test, or the timing gate has not passed, another post
             hoc run is running (stage `posthoc`), or no post hoc run has finished (stage
             `posthoc_score`).
+
+    A run killed by SIGKILL leaves `posthoc/posthoc_status.json` saying `running`, and `posthoc`
+    then refuses to start until a person deletes that file. A clean Ctrl-C writes `stopped` instead.
     """
     if stage not in POSTHOC_STAGES:
         msg = f"`{stage}` is not a post hoc stage"
@@ -488,9 +493,10 @@ def guard_posthoc(*, root: Path, stage: str, banks_digest: str) -> None:
     if stage == "posthoc" and state == "running":
         msg = f"`posthoc` refuses to start: {POSTHOC_STATUS} says that a post hoc run is running"
         raise GuardError(msg)
-    if stage == "posthoc_score" and state not in ("complete", "failed"):
+    if stage == "posthoc_score" and state not in ("complete", "failed", "stopped"):
         msg = (
-            f"`posthoc_score` needs {POSTHOC_STATUS} that says complete or failed (it says {state})"
+            f"`posthoc_score` needs {POSTHOC_STATUS} that says complete, failed, or stopped "
+            f"(it says {state})"
         )
         raise GuardError(msg)
 
@@ -854,6 +860,23 @@ def main_chain_hours(*, root: Path) -> float:
     )
 
 
+def failed_hours(*, root: Path) -> float:
+    """Return the GPU-process-hours of post hoc jobs that failed, from `posthoc/failed_hours.json`.
+
+    A failed job writes no `*.job.json`, so the file is the only record of the time it used.
+    """
+    path = root / POSTHOC_FAILED_HOURS
+    return sum(read_json(path=path).values()) / 3600.0 if path.exists() else 0.0
+
+
+def add_failed_seconds(*, root: Path, job: str, seconds: float) -> None:
+    """Add the wall seconds of a failed post hoc job to `posthoc/failed_hours.json`."""
+    path = root / POSTHOC_FAILED_HOURS
+    seen = read_json(path=path) if path.exists() else {}
+    seen[job] = float(seen.get(job, 0.0)) + seconds
+    write_json(path=path, payload=seen)
+
+
 def posthoc_cost(*, root: Path) -> dict[str, Any]:
     """Return the measured cost of the post hoc fits, in GPU-process-hours, and the running total.
 
@@ -861,8 +884,9 @@ def posthoc_cost(*, root: Path) -> dict[str, Any]:
         root: The data folder of the main run.
 
     Returns:
-        `main_chain`, `per_arm` (each post hoc arm that has a job record), `posthoc`, and
-        `running_total` (the main chain's hours plus the post hoc fits').
+        `main_chain`, `per_arm` (each post hoc arm that has a job record), `failed` (the hours
+        that failed jobs used), `posthoc` (finished and failed jobs), and `running_total` (the
+        main chain's hours plus `posthoc`).
     """
     fit_root = posthoc_fit_root(root=root)
     per_arm = {
@@ -871,9 +895,11 @@ def posthoc_cost(*, root: Path) -> dict[str, Any]:
         if (hours := arm_job_hours(root=fit_root, arm=arm))
     }
     main = main_chain_hours(root=root)
-    posthoc = sum(per_arm.values())
+    failed = failed_hours(root=root)
+    posthoc = sum(per_arm.values()) + failed
     return {
-        "main_chain": round(main, 3), "per_arm": per_arm, "posthoc": round(posthoc, 3),
+        "main_chain": round(main, 3), "per_arm": per_arm, "failed": round(failed, 3),
+        "posthoc": round(posthoc, 3),
         "running_total": round(main + posthoc, 3),
     }  # fmt: skip
 
@@ -890,6 +916,7 @@ class PosthocSteps:
         main_hours: Returns the measured GPU-process-hours of the main chain.
         job_hours: Returns the measured hours of a finished post hoc job, or None when it has none.
         reference_hours: Returns the expected hours of the first fit of an arm (YU's mean).
+        clock: Returns the time in seconds; the run times each job with it.
     """
 
     run_job: Callable[[str, str | None, int], dict]
@@ -903,6 +930,7 @@ class PosthocSteps:
         default=lambda _arm, _fold, _seed: None
     )
     reference_hours: Callable[[str], float] = field(default=lambda _arm: 0.0)
+    clock: Callable[[], float] = time.monotonic
 
 
 COST_CAP_MESSAGE: Final = "stopped at the cost cap; ask the manager"
@@ -925,6 +953,12 @@ def run_posthoc(*, root: Path, steps: PosthocSteps) -> dict[str, Any]:  # noqa: 
     are the first to go, and the run ends `stopped` (exit code 3) with the skipped jobs and the
     reason in the status file. A job whose record exists from an earlier run is counted and not run
     again.
+
+    A job that fails (or is interrupted) writes no job record, so the run adds its wall seconds to
+    `posthoc/failed_hours.json`, and the running total counts them. A rerun reads that file first,
+    so the cap never loses them. A clean Ctrl-C or `SystemExit` writes the status `stopped` with the
+    reason "interrupted" and re-raises. SIGKILL cannot be caught: it leaves the status `running`, and
+    `guard_posthoc` then refuses `posthoc` until a person deletes `posthoc/posthoc_status.json`.
 
     Args:
         root: The data folder of the main run.
@@ -951,13 +985,14 @@ def run_posthoc(*, root: Path, steps: PosthocSteps) -> dict[str, Any]:  # noqa: 
             finished.setdefault(arm, []).append(hours)
 
     def total() -> float:
-        return main + sum(sum(v) for v in finished.values())
+        return main + sum(sum(v) for v in finished.values()) + failed_hours(root=root)
 
     def payload() -> dict[str, Any]:
         return {
             "hours": {
                 "main_chain": round(main, 3),
                 "per_arm": {a: round(sum(v), 3) for a, v in finished.items()},
+                "failed": round(failed_hours(root=root), 3),
                 "running_total": round(total(), 3), "cap": POSTHOC_COST_CAP_HOURS,
                 "stop_line": core.STOP_LINE_HOURS,
             },
@@ -990,15 +1025,18 @@ def run_posthoc(*, root: Path, steps: PosthocSteps) -> dict[str, Any]:  # noqa: 
                 capped = True
                 break
             steps.log(f"post hoc fit {name}: running total {total():.2f}, expected {expected:.2f}")
+            began = steps.clock()
             try:
                 steps.run_job(arm, fold, seed)
                 (steps.fit_root / "fits" / f"{name}.failed.json").unlink(missing_ok=True)
                 hours = steps.job_hours(arm, fold, seed)
                 if hours is not None:
                     finished.setdefault(arm, []).append(hours)
-            except CorrectnessFailureError, StoppedError, GuardError:
+            except CorrectnessFailureError, StoppedError, GuardError, KeyboardInterrupt, SystemExit:
+                add_failed_seconds(root=root, job=name, seconds=steps.clock() - began)
                 raise
             except Exception as exc:  # noqa: BLE001
+                add_failed_seconds(root=root, job=name, seconds=steps.clock() - began)
                 failed.append(name)
                 write_json(
                     path=steps.fit_root / "fits" / f"{name}.failed.json",
@@ -1007,6 +1045,9 @@ def run_posthoc(*, root: Path, steps: PosthocSteps) -> dict[str, Any]:  # noqa: 
                 steps.log(f"post hoc fit {name} failed: {type(exc).__name__}: {exc}")
     except StoppedError as exc:
         write_posthoc_status(root=root, state="stopped", reason=str(exc), **payload())
+    except KeyboardInterrupt, SystemExit:
+        write_posthoc_status(root=root, state="stopped", reason="interrupted", **payload())
+        raise
     except CorrectnessFailureError:
         write_posthoc_status(
             root=root, state="failed", reason="correctness failure",

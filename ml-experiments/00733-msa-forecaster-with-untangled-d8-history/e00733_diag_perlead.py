@@ -148,9 +148,9 @@ def per_lead_chart(*, rows: pl.DataFrame) -> alt.VConcatChart:
     )  # fmt: skip
     top_base = alt.Chart(levels).encode(x=x, color=colour)  # ty: ignore[unresolved-attribute]
     top = (
-        top_base.mark_line(aria=False).encode(
+        top_base.mark_line(aria=False).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("point:Q", title="Sign Brier score (smaller is better)", scale=alt.Scale(zero=False))
-        )  # ty: ignore[unresolved-attribute]
+        )
         + top_base.mark_circle(size=45, aria=False).encode(y="point:Q")  # ty: ignore[unresolved-attribute]
     ).properties(
         width=figures729.WIDTH_PX, height=170,

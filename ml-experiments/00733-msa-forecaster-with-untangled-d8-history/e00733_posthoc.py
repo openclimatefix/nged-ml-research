@@ -5,7 +5,7 @@ The maintainer asked for the fits of FS and YS after seeing the verdict, and the
 oracle YO, so every reading here is post hoc and report-only. FS, YS, and YO are read from the post
 hoc data folder
 (`posthoc/<name of the data folder>`); FU, M*, Y0, and YU are read from the main data folder, which
-this module never writes. The four contrasts use the machinery of the counted contrasts C1 and C4:
+this module never writes. The six contrasts use the machinery of the counted contrasts C1 and C4:
 the month-block bootstrap widened by a t ratio on the real folds, the two-way bootstrap on the
 synthetic world, and the same level (`core.LEVEL`).
 
@@ -63,11 +63,11 @@ def contrast_label(*, name: str) -> str:
 
 
 def unread(*, name: str, reason: str) -> dict[str, Any]:
-    """Return the entry of a contrast that could not be read."""
+    """Return the entry of a contrast that could not be read: status `void`, with the reason."""
     return {
         "post_hoc": True,
         "label": contrast_label(name=name),
-        "status": "unread",
+        "status": "void",
         "reason": reason,
     }
 
@@ -89,7 +89,7 @@ def real_contrasts(
         n_resamples: The bootstrap resamples (default the plan's, or 1,000 on validation rows).
 
     Returns:
-        P1 and P2, each labelled post hoc; a contrast without a complete plan is `unread`.
+        P1 and P2, each labelled post hoc; a contrast without a complete plan is `void`.
     """
     import e00713_score as s713  # ty: ignore[unresolved-import]
 
@@ -141,7 +141,8 @@ def synthetic_contrasts(
     """Read P3 to P6: YS and YO (post hoc folder) against Y0 and YU (main folder), sign Brier score.
 
     The scored half-hours are those of the counted contrast C4: lead days 2 to 10 of the test bank
-    that hold a sign. A contrast whose arm has a seed missing is `unread` with the reason.
+    that hold a sign. A contrast whose arm lacks a seed on test rows is `void`, and the reason
+    names the seeds held.
 
     Args:
         root: The data folder of the main run (read only).
@@ -163,6 +164,14 @@ def synthetic_contrasts(
     )
     roots = {"YS": fit_root, "YO": fit_root, "Y0": root, "YU": root}
     held = {a: ss.seeds_held(root=r, arm=a, rows=rows) for a, r in roots.items()}
+    any_held = {
+        a: tuple(
+            sd
+            for sd in core.SYNTHETIC_SEEDS
+            if ss.archive_path(root=r, arm=a, seed=sd, rows=rows).exists()
+        )
+        for a, r in roots.items()
+    }
     arms = {
         a: ss.read_arm(root=roots[a], arm=a, seeds=held[a], rows=rows) if held[a] else None
         for a in roots
@@ -173,7 +182,11 @@ def synthetic_contrasts(
     out: dict[str, dict[str, Any]] = {
         n: unread(
             name=n,
-            reason=f"the archives of {', '.join(a for a in pair if arms[a] is None)} are missing",
+            reason="; ".join(
+                f"{a} holds seeds {list(any_held[a])} of {list(core.SYNTHETIC_SEEDS)}"
+                for a in pair
+                if arms[a] is None
+            ),
         )
         for n, pair in SYNTHETIC_SPECS.items()
         if n not in readable
@@ -221,8 +234,14 @@ def posthoc_readings(
     *, root: Path, rows: str = "test", n_resamples_real: int | None = None,
     n_resamples_synthetic: int | None = None,
 ) -> dict[str, Any]:  # fmt: skip
-    """Return the four post hoc contrasts, each labelled post hoc, with the level they share."""
+    """Return the six post hoc contrasts, each labelled post hoc, with the level they share.
+
+    A contrast whose arms lack the required forecasts is `void` with the reason, so a run that
+    stopped at the cost cap is read as far as it went. `post_hoc_run` carries the state of the run
+    and its skipped and failed jobs.
+    """
     fit_root = st.posthoc_fit_root(root=root)
+    status_path = root / st.POSTHOC_STATUS
     contrasts = {
         **real_contrasts(root=root, fit_root=fit_root, rows=rows, n_resamples=n_resamples_real),
         **synthetic_contrasts(
@@ -232,6 +251,11 @@ def posthoc_readings(
     return {
         "post_hoc": True, "rows": rows, "level": core.LEVEL, "code_version": core.CODE_VERSION,
         "cost": st.posthoc_cost(root=root),
+        "post_hoc_run": (
+            {k: st.read_json(path=status_path).get(k) for k in ("state", "reason", "skipped", "failed")}
+            if status_path.exists()
+            else None
+        ),
         "contrasts": {n: contrasts[n] for n in (*REAL_SPECS, *SYNTHETIC_SPECS)},
     }  # fmt: skip
 
@@ -287,6 +311,15 @@ def render_report(*, readings: Mapping[str, Any], verdict_row: int | None) -> st
     ]
     lines += [read_line(name=n, entry=e) for n, e in readings["contrasts"].items()]
     lines += ["", cost_line(cost=readings.get("cost"))]
+    run = readings.get("post_hoc_run") or {}
+    if run.get("state") in ("stopped", "failed") or run.get("failed"):
+        lines += [
+            (
+                f"The post hoc run ended {run.get('state')} ({run.get('reason')}): "
+                f"{len(run.get('skipped') or [])} fits were skipped and {len(run.get('failed') or [])} failed, "
+                "so each contrast above uses only the forecasts that exist, and a void contrast names what is missing (post hoc)."
+            )
+        ]
     lines += [
         "",
         (
@@ -334,7 +367,7 @@ def figure_rows(*, readings: Mapping[str, Any]) -> pl.DataFrame:
 
 
 def contrast_figure(*, readings: Mapping[str, Any]) -> Any:
-    """Return the figure of the four contrasts with their intervals; every label says post hoc.
+    """Return the figure of the six contrasts with their intervals; every label says post hoc.
 
     Raises:
         ValueError: When no contrast has a reading to draw.
@@ -404,7 +437,12 @@ def write_outputs(*, root: Path, readings: Mapping[str, Any]) -> dict[str, Path]
 
 
 def stage_posthoc_score(args: argparse.Namespace, root: Path) -> dict[str, Any]:
-    """Run the `posthoc_score` stage: read P1 to P4 and write the three files under `posthoc/`.
+    """Run the `posthoc_score` stage: read P1 to P6 and write the three files under `posthoc/`.
+
+    The stage runs after a post hoc run that ended complete, failed, or stopped (at the cost cap or
+    by Ctrl-C). It reads what exists: a contrast whose arms lack all required seeds on the test
+    rows is `void` with a reason, and the others are computed. The report says which arms or seeds
+    are missing.
 
     Args:
         args: The parsed arguments (`--validation-only` on a scratch root reads validation rows).

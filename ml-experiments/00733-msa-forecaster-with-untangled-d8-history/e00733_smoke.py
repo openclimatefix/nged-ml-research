@@ -38,7 +38,7 @@ LATER_STAGES: Final = ("score", "report", "figures", "loss_curves", "attention",
 """The stages after the fits; each runs once on validation rows only."""
 
 
-class SmokeError(RuntimeError):
+class SmokeError(st.GuardError):
     """The smoke test cannot start (a scratch folder inside the data folder.
 
     Or a test score already taken).
@@ -77,22 +77,22 @@ class SmokeSteps:
 
 
 def assert_scratch_outside(*, scratch: Path, data_root: Path) -> None:
-    """Refuse a scratch folder that is, or lies inside.
+    """Refuse a scratch folder that is, lies inside, or contains the data folder.
 
-    The data folder of this or any earlier experiment.
+    The data folder is this experiment's or the folder that holds every experiment's.
 
     Args:
         scratch: The scratch folder.
         data_root: This experiment's data folder.
 
     Raises:
-        SmokeError: When the scratch folder is inside `DATA_PATH_INTERNAL`'s `ml-experiments`
-            folder.
+        SmokeError: When the scratch folder is, lies inside, or contains the data folder or its
+            parent folder under `DATA_PATH_INTERNAL`.
     """
     inside = paths.data_root().parent.resolve()
     for folder in (data_root.resolve(), inside):
         s = scratch.resolve()
-        if s == folder or folder in s.parents:
+        if s == folder or folder in s.parents or s in folder.parents:
             msg = "the scratch folder lies inside the data folder: use a scratch root outside it"
             raise SmokeError(msg)
 

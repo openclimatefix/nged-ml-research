@@ -275,6 +275,10 @@ def stage_smoke_arms(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     inside the scratch folder only: the data folder gets no file, and `scores/smoke.json`, the gate
     of the chain, is not touched.
 
+    This route fits arms, and `guard_run` does not gate it after the first test score. It writes
+    only inside the scratch folder and reads validation rows alone, and it refuses (`GuardError`)
+    a scratch folder that is, contains, or lies inside the data folder.
+
     Args:
         args: The parsed arguments (`--scratch`, `--arms`, `--device`).
         root: This experiment's data folder (read only).
@@ -283,6 +287,8 @@ def stage_smoke_arms(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         The record.
 
     Raises:
+        SmokeError: When the scratch folder lies inside, contains, or is the data folder (a
+            `GuardError`).
         RuntimeError733: When an arm is not a post hoc arm or a step failed.
     """
     import e00733_predictions as pr
