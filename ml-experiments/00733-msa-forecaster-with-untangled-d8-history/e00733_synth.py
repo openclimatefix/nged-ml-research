@@ -586,43 +586,87 @@ def gather_batch(
     sign_truth = np.full((b, STEPS), np.nan, dtype=np.float32)
     hist_x = np.full((b, core.N_HISTORY_ROWS, STEPS), np.nan, dtype=np.float32)
     times = OriginTimes.empty(b=b)
-    for n, r in enumerate(rows):
-        seg = segments[int(index.seg[r])]
-        d, k = int(index.origin_day[r]), int(index.lead_index[r])
-        times.take(n=n, seg=seg, d=d, k=k)
-        hs = history_slots(origin_day=np.array([d]))[0]
-        inside = (hs >= 0) & (hs < seg.n_days * STEPS)
-        hs_c = np.clip(hs, 0, seg.n_days * STEPS - 1)
-        exists = _slot_present(seg=seg, slots=hs).all(axis=1)
-        vis = visible_slots(origin_day=np.array([d]), slots=hs[None])[0] & inside & exists[:, None]
-        reading = seg.reading_z[hs_c]
-        finite = np.isfinite(reading) & vis
-        out["row_exists"][n] = exists
-        out["hist_visible"][n] = finite
-        out["hist_power"][n] = np.where(finite, reading, 0.0)
-        out["hist_weather"][n] = seg.hist_weather[hs_c] * inside[..., None]
-        out["hist_datetime"][n] = seg.hist_datetime[hs_c] * inside[..., None]
-        out["day_type_hist"][n] = seg.day_type[hs_c]
-        out["top_weather"][n] = seg.top_weather[d, k]
-        out["top_spread"][n] = seg.top_spread[d, k]
-        out["top_datetime"][n] = seg.top_datetime[d, k]
-        out["day_type_top"][n] = seg.top_day_type[d, k]
-        ts = target_slots(origin_day=np.array([d]), lead_index=np.array([k]))[0]
-        if ts.min() < 0 or ts.max() >= seg.n_days * STEPS:
-            msg = "a target row lies outside its segment"
-            raise SynthError(msg)
-        target_z[n] = seg.reading_z[ts]
-        sign_truth[n] = seg.x_neg[ts]
-        hist_x[n] = np.where(vis, seg.x_neg[hs_c], np.nan)
-        out["hist_u"][n], out["hist_u_ok"][n] = _channels(
-            seg=seg, slots=hs_c, ok=finite, mode=mode, target_std=target_std, origin_day=d
-        )
+    seg_of = index.seg[rows]
+    for si in np.unique(seg_of):
+        pos = np.flatnonzero(seg_of == si)
+        _gather_segment(
+            seg=segments[int(si)], index=index, rows=rows[pos], pos=pos, out=out,
+            arrays=(target_z, sign_truth, hist_x), times=times, mode=mode, target_std=target_std,
+        )  # fmt: skip
     times.assert_origin_time_weather()
     if mask_history is not None:
         _apply_masks(out=out, masks=mask_history)
     out["primary"] = np.full(b, d8_index, dtype=np.int64)
     out["lead_day"] = index.lead_index[rows].astype(np.int64)
     return SynthBatch(arrays=out, target_z=target_z, sign_truth=sign_truth, history_x_neg=hist_x)
+
+
+def _gather_segment(
+    *,
+    seg: SegmentArrays,
+    index: SampleIndex,
+    rows: np.ndarray,
+    pos: np.ndarray,
+    out: dict[str, np.ndarray],
+    arrays: tuple[np.ndarray, np.ndarray, np.ndarray],
+    times: OriginTimes,
+    mode: str,
+    target_std: float,
+) -> None:
+    """Write the samples `rows` of one segment into batch positions `pos`, vectorised.
+
+    Args:
+        seg: The segment that holds every sample of `rows`.
+        index: The split's samples.
+        rows: The positions in `index` of these samples.
+        pos: The positions in the batch that receive them.
+        out: The batch's arrays, written in place.
+        arrays: The batch's `target_z`, `sign_truth`, and `hist_x`, written in place.
+        times: The batch's origin-time record, written in place.
+        mode: One of `CHANNEL_MODES`.
+        target_std: D8's target standard deviation.
+
+    Raises:
+        SynthError: When a target row lies outside the segment, or a gathered array is not finite
+            where the batch promises finite values.
+    """
+    target_z, sign_truth, hist_x = arrays
+    d = index.origin_day[rows].astype(np.int64)
+    k = index.lead_index[rows].astype(np.int64)
+    for j, n in enumerate(pos):
+        times.take(n=int(n), seg=seg, d=int(d[j]), k=int(k[j]))
+    n_slots = seg.n_days * STEPS
+    hs = history_slots(origin_day=d)
+    inside = (hs >= 0) & (hs < n_slots)
+    hs_c = np.clip(hs, 0, n_slots - 1)
+    exists = _slot_present(seg=seg, slots=hs).all(axis=2)
+    vis = visible_slots(origin_day=d, slots=hs) & inside & exists[:, :, None]
+    reading = seg.reading_z[hs_c]
+    finite = np.isfinite(reading) & vis
+    out["row_exists"][pos] = exists
+    out["hist_visible"][pos] = finite
+    out["hist_power"][pos] = np.where(finite, reading, 0.0)
+    out["hist_weather"][pos] = seg.hist_weather[hs_c] * inside[..., None]
+    out["hist_datetime"][pos] = seg.hist_datetime[hs_c] * inside[..., None]
+    out["day_type_hist"][pos] = seg.day_type[hs_c]
+    out["top_weather"][pos] = seg.top_weather[d, k]
+    out["top_spread"][pos] = seg.top_spread[d, k]
+    out["top_datetime"][pos] = seg.top_datetime[d, k]
+    out["day_type_top"][pos] = seg.top_day_type[d, k]
+    ts = target_slots(origin_day=d, lead_index=k)
+    if ts.min() < 0 or ts.max() >= n_slots:
+        msg = "a target row lies outside its segment"
+        raise SynthError(msg)
+    target_z[pos] = seg.reading_z[ts]
+    sign_truth[pos] = seg.x_neg[ts]
+    hist_x[pos] = np.where(vis, seg.x_neg[hs_c], np.nan)
+    u, u_ok = _channels(
+        seg=seg, slots=hs_c, ok=finite, mode=mode, target_std=target_std, origin_day=d
+    )
+    if not np.isfinite(u).all():
+        msg = "a gathered channel value is not finite"
+        raise SynthError(msg)
+    out["hist_u"][pos], out["hist_u_ok"][pos] = u, u_ok
 
 
 def _channels(
@@ -632,9 +676,9 @@ def _channels(
     ok: np.ndarray,
     mode: str,
     target_std: float,
-    origin_day: int,
+    origin_day: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the `(14, 48, 3)` channels and flag of one sample's history.
+    """Return the `(N, 14, 48, 3)` channels and `(N, 14, 48)` flag of `N` samples' histories.
 
     In the forecaster's input units.
     """
@@ -654,13 +698,14 @@ def _channels(
         have = ok & seg.u_ok[slots]
         raw = seg.u_raw[slots].copy()
         if seg.u_rerun is not None and seg.u_rerun_ok is not None:
+            od = origin_day[:, None, None]
             token_day = slots // STEPS
-            age_days = origin_day - token_day
+            age_days = od - token_day
             use = (age_days == 1) | (age_days == 2)
             k = np.clip(2 - age_days, 0, 1)
             hh = slots % STEPS
-            raw = np.where(use[..., None], seg.u_rerun[origin_day, k, hh], raw)
-            have = np.where(use, ok & seg.u_rerun_ok[origin_day, k, hh], have)
+            raw = np.where(use[..., None], seg.u_rerun[od, k, hh], raw)
+            have = np.where(use, ok & seg.u_rerun_ok[od, k, hh], have)
         u = np.stack(
             [raw[..., 0], solar_unit(points=raw[..., 1], target_std=target_std), raw[..., 2]],
             axis=-1,

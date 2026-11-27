@@ -2,6 +2,7 @@
 """Tests of `e00733_synth`: the ensemble coverage result, the sample layout, visibility, and
 leakage."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import e00733_channels as ch
@@ -282,3 +283,108 @@ def test_the_test_segment_rule_stops_the_line_on_counts() -> None:
         sy.assert_enough_test_segments_counted(n_segments=64, n_left_out=40)
     with pytest.raises(sy.StoppedError):
         sy.assert_enough_test_segments_counted(n_segments=0, n_left_out=0)
+
+
+def _loop_channels(
+    *, seg: sy.SegmentArrays, slots: np.ndarray, ok: np.ndarray, mode: str, std: float, day: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return one sample's channels with the per-sample loop that the vectorised gather replaced."""
+    if mode == "absent":
+        return np.zeros((*ok.shape, core.N_CHANNELS), np.float32), np.zeros_like(ok)
+    if mode == "true":
+        have = ok & np.isfinite(seg.x_neg[slots])
+        u = np.stack(
+            [
+                np.nan_to_num(seg.x_neg[slots]),
+                sy.solar_unit(points=seg.solar_points[slots], target_std=std),
+                np.zeros(slots.shape),
+            ],
+            axis=-1,
+        )
+    else:
+        have = ok & seg.u_ok[slots]
+        raw = seg.u_raw[slots].copy()
+        if seg.u_rerun is not None and seg.u_rerun_ok is not None:
+            age = day - slots // sy.STEPS
+            use = (age == 1) | (age == 2)
+            kk = np.clip(2 - age, 0, 1)
+            hh = slots % sy.STEPS
+            raw = np.where(use[..., None], seg.u_rerun[day, kk, hh], raw)
+            have = np.where(use, ok & seg.u_rerun_ok[day, kk, hh], have)
+        u = np.stack(
+            [raw[..., 0], sy.solar_unit(points=raw[..., 1], target_std=std), raw[..., 2]], axis=-1
+        )
+    return np.where(have[..., None], u, 0.0).astype(np.float32), have
+
+
+def _loop_gather(
+    *, segments: list[sy.SegmentArrays], index: sy.SampleIndex, rows: np.ndarray, mode: str
+) -> dict[str, np.ndarray]:
+    """Return the batch arrays that the old per-sample loop built, one sample at a time."""
+    s, h = sy.STEPS, core.N_HISTORY_ROWS
+    res: dict[str, list[np.ndarray]] = {}
+    for r in rows:
+        seg = segments[int(index.seg[r])]
+        d, k = int(index.origin_day[r]), int(index.lead_index[r])
+        hs = sy.history_slots(origin_day=np.array([d]))[0]
+        inside = (hs >= 0) & (hs < seg.n_days * s)
+        hs_c = np.clip(hs, 0, seg.n_days * s - 1)
+        exists = sy._slot_present(seg=seg, slots=hs).all(axis=1)
+        vis = sy.visible_slots(origin_day=np.array([d]), slots=hs[None])[0] & inside
+        vis = vis & exists[:, None]
+        reading = seg.reading_z[hs_c]
+        finite = np.isfinite(reading) & vis
+        ts = sy.target_slots(origin_day=np.array([d]), lead_index=np.array([k]))[0]
+        u, ok = _loop_channels(seg=seg, slots=hs_c, ok=finite, mode=mode, std=2.0, day=d)
+        got = {
+            "row_exists": exists, "hist_visible": finite,
+            "hist_power": np.where(finite, reading, 0.0),
+            "hist_weather": seg.hist_weather[hs_c] * inside[..., None],
+            "hist_datetime": seg.hist_datetime[hs_c] * inside[..., None],
+            "day_type_hist": seg.day_type[hs_c], "top_weather": seg.top_weather[d, k],
+            "top_spread": seg.top_spread[d, k], "top_datetime": seg.top_datetime[d, k],
+            "day_type_top": seg.top_day_type[d, k], "target_z": seg.reading_z[ts],
+            "sign_truth": seg.x_neg[ts], "hist_x": np.where(vis, seg.x_neg[hs_c], np.nan),
+            "hist_u": u, "hist_u_ok": ok,
+        }  # fmt: skip
+        for name, v in got.items():
+            res.setdefault(name, []).append(v)
+    del h
+    return {name: np.stack(v) for name, v in res.items()}
+
+
+@pytest.mark.parametrize("mode", ["untangled", "true", "absent"])
+def test_the_vectorised_gather_equals_the_per_sample_loop(mode: str) -> None:
+    """Rows from two segments, in mixed order, with a re-run, give the old loop's arrays exactly."""
+    rng = np.random.default_rng(3)
+    a = make_segment(n_days=40, seed=1, missing_days=(10, 11))
+    b = make_segment(n_days=45, seed=2)
+    rerun = rng.random((45, 2, sy.STEPS, core.N_CHANNELS)).astype(np.float32)
+    b = replace(b, u_rerun=rerun, u_rerun_ok=rng.random((45, 2, sy.STEPS)) < 0.8)
+    segs = [a, b]
+    idx = sy.enumerate_samples(segments=segs)
+    rows = rng.permutation(len(idx))[:60]
+    new = sy.gather_batch(
+        segments=segs, index=idx, rows=rows, d8_index=0, target_std=2.0, mode=mode
+    )
+    old = _loop_gather(segments=segs, index=idx, rows=rows, mode=mode)
+    for name, want in old.items():
+        if name in new.arrays:
+            got = new.arrays[name]
+        else:
+            got = {
+                "target_z": new.target_z,
+                "sign_truth": new.sign_truth,
+                "hist_x": new.history_x_neg,
+            }[name]
+        assert got.dtype == want.dtype or name == "hist_u", name
+        assert np.array_equal(got, want, equal_nan=True), name
+
+
+def test_a_non_finite_gathered_channel_is_refused() -> None:
+    """A NaN solar point in a visible, flagged slot raises instead of reaching the network."""
+    seg = make_segment(n_days=40)
+    seg.u_raw[:, 1] = np.nan
+    idx = sy.enumerate_samples(segments=[seg])
+    with pytest.raises(sy.SynthError, match="not finite"):
+        sy.gather_batch(segments=[seg], index=idx, rows=np.arange(3), d8_index=0, target_std=1.0)
