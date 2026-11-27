@@ -1079,7 +1079,7 @@ def test_677_hashes() -> None:
 def test_zero_start() -> None:
     """With zero weights on the new columns, every arm's network gives the control's outputs on 1,000 rows, with labels attached and detached."""
     try:
-        import torch
+        import torch  # ty: ignore[unresolved-import]
     except ModuleNotFoundError:
         print("SKIP zero start: torch is not installed")
         return
