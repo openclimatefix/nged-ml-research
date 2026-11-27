@@ -256,6 +256,12 @@ POSTHOC_SMOKE_FILE: Final = "scores/smoke_posthoc.json"
 def parse_arms(*, text: str) -> tuple[str, ...]:
     """Return the arms of `--arms FS,Y0b,YUb,YOb`, which must be post hoc arms.
 
+    Args:
+        text: The comma-separated value of the `--arms` option.
+
+    Returns:
+        The arm names, in the order given.
+
     Raises:
         RuntimeError733: When an arm is not one of `core.POST_HOC_ARMS`.
     """
