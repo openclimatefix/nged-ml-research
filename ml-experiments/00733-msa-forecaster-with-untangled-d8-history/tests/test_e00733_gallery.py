@@ -103,7 +103,44 @@ def _decaying_rerun(seg: Any, scale: float = 1.0) -> None:
             seg.u_rerun[d, r, :, core.P_NEG] += decay.astype(np.float32)
 
 
-def test_g14_follows_the_ruling_of_2026_11_26() -> None:
+def _binned(means: list[float]) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
+    """Return a stack, its hours, and the 6-hour table whose bin k has mean `means[k]`.
+
+    Bin 0 is the nearest the limit. A NaN entry leaves its bin empty.
+    """
+    hours, vals = [], []
+    for k, m in enumerate(means):
+        if np.isnan(m):
+            continue
+        h = -(k * 6.0 + 0.25 + 0.5 * np.arange(10))
+        hours.append(h)
+        vals.append(np.full(10, m))
+    stack, hrs = np.concatenate(vals)[None], np.concatenate(hours)[None]
+    return stack, hrs, gal.binned_difference(stack=stack, hours=hrs)
+
+
+def _conditions(means: list[float]) -> tuple[bool, bool]:
+    """Return G14's conditions (c') and (c'') for a profile with these 6-hour bin means."""
+    stack, hours, table = _binned(means)
+    return gal.g14_decay_conditions(stack=stack, hours=hours, table=table)
+
+
+def test_g14_decay_conditions_follow_the_ruling_of_2026_11_27() -> None:
+    """The validation bank's real bin means pass; a flat profile, a profile growing with distance,
+    and empty bins fail."""
+    assert _conditions([0.0123, 0.0028, 0.0019, 0.0036, 0.0011, 0.0005]) == (True, True)
+    assert _conditions([0.003] * 6) == (False, True)
+    assert _conditions([0.001, 0.002, 0.003, 0.004, 0.005, 0.006]) == (False, True)
+    assert _conditions([0.05, 0.02, 0.012, 0.001, 0.001, 0.001]) == (True, False)
+    assert _conditions([np.nan, 0.001, 0.001, 0.001]) == (False, False)
+    assert _conditions([0.01, 0.01]) == (False, False)
+    nothing = np.full((1, 3), np.nan)
+    hours = np.array([[-1.0, -2.0, -3.0]])
+    table = gal.binned_difference(stack=nothing, hours=hours)
+    assert gal.g14_decay_conditions(stack=nothing, hours=hours, table=table) == (False, False)
+
+
+def test_g14_follows_the_ruling_of_2026_11_27() -> None:
     """A decaying difference with a passed poison test passes; each ruling item can fail alone."""
     seg = _world(2)
     _decaying_rerun(seg)
@@ -116,12 +153,16 @@ def test_g14_follows_the_ruling_of_2026_11_26() -> None:
     _decaying_rerun(big, scale=100.0)
     bad = gal.g14_rerun_difference(segments=[big], poison_passed=True)
     assert not bad.items["mean_difference_below_limit_more_than_24_hours_before_the_limit"]
-    far_up = _world(2)
-    _decaying_rerun(far_up)
-    assert far_up.u_rerun is not None
-    far_up.u_rerun[2:, 0, :8, core.P_NEG] += 0.009
-    flagged = gal.g14_rerun_difference(segments=[far_up], poison_passed=True)
-    assert not flagged.items["difference_does_not_increase_with_hours_before_the_limit"]
+    flat = _world(2)
+    _decaying_rerun(flat)
+    assert flat.u_rerun is not None
+    for d in range(2, flat.n_days):
+        for r in (0, 1):
+            day = d - 2 + r
+            stored = flat.u_raw[day * 48 : (day + 1) * 48, core.P_NEG]
+            flat.u_rerun[d, r, :, core.P_NEG] = stored + 0.003
+    flagged = gal.g14_rerun_difference(segments=[flat], poison_passed=True)
+    assert not flagged.items["nearest_bin_mean_at_least_3_times_the_mean_more_than_12_hours_before"]
     assert not gal.g14_rerun_difference(segments=[make_segment()], poison_passed=True).passed
 
 

@@ -277,6 +277,35 @@ def binned_difference(*, stack: np.ndarray, hours: np.ndarray) -> dict[str, np.n
     }  # fmt: skip
 
 
+def g14_decay_conditions(
+    *, stack: np.ndarray, hours: np.ndarray, table: dict[str, np.ndarray]
+) -> tuple[bool, bool]:
+    """Return G14's conditions (c') and (c'').
+
+    Args:
+        stack: The stored-minus-re-run differences, NaN where the re-run is not visible.
+        hours: The hours after the visibility limit of each difference (negative before it).
+        table: The output of `binned_difference` for the same arrays.
+
+    Returns:
+        Whether the nearest 6-hour bin's mean is at least `G14_NEAR_FACTOR` times the mean over all
+        half-hours more than `G14_DECAY_HOURS` before the limit (c'), and whether every bin more
+        than that distance before the limit has a mean below `G14_MEAN_LIMIT` (c''). Both are False
+        when the nearest bin or every far bin is empty.
+    """
+    starts, means = table["bin_start"], table["mean_abs"]
+    near = means[starts == 0.0]
+    far_bins = means[starts >= core.G14_DECAY_HOURS]
+    far = np.isfinite(stack) & (hours < -core.G14_DECAY_HOURS)
+    if len(near) == 0 or len(far_bins) == 0 or not far.any():
+        return False, False
+    far_mean = float(np.abs(stack[far]).mean())
+    return (
+        bool(near[0] >= core.G14_NEAR_FACTOR * far_mean),
+        bool(np.all(far_bins < core.G14_MEAN_LIMIT)),
+    )
+
+
 def g14_rerun_difference(
     *, segments: Sequence[sy.SegmentArrays], poison_passed: bool = False
 ) -> PanelResult:
@@ -284,8 +313,11 @@ def g14_rerun_difference(
 
     The untangling network reads the whole window, so the difference is not zero before the limit.
     The check (ruling of the design lead, 2026-11-26) requires the poison test to have passed, the
-    mean absolute difference over origins more than 24 hours before the limit to be below 0.01, and
-    the mean absolute difference to be non-increasing with the hours before the limit (6-hour bins).
+    mean absolute difference over origins more than 24 hours before the limit to be below 0.01, the
+    mean difference in the nearest 6-hour bin to be at least 3 times the mean over all half-hours
+    more than 12 hours before the limit, and every 6-hour bin more than 12 hours before the limit to
+    have a mean below 0.01 (ruling of 2026-11-27, replacing a monotone-decay rule). An empty near
+    bin or no far bin fails.
 
     Args:
         segments: The validation bank's segments.
@@ -325,15 +357,15 @@ def g14_rerun_difference(
     far = np.isfinite(stack) & (hours < -core.G14_FAR_HOURS)
     far_mean = float(np.abs(stack[far]).mean()) if far.any() else float("nan")
     table = binned_difference(stack=stack, hours=hours)
-    means = table["mean_abs"]
-    decays = bool(len(means) >= 2 and np.all(np.diff(means) <= core.G14_MONOTONE_TOLERANCE))
+    near_ok, far_bins_ok = g14_decay_conditions(stack=stack, hours=hours, table=table)
     items = {
         "some_rerun_exists": True,
         "poison_test_passes": bool(poison_passed),
         "mean_difference_below_limit_more_than_24_hours_before_the_limit": bool(
             far.any() and far_mean < core.G14_MEAN_LIMIT
         ),
-        "difference_does_not_increase_with_hours_before_the_limit": decays,
+        "nearest_bin_mean_at_least_3_times_the_mean_more_than_12_hours_before": near_ok,
+        "every_bin_more_than_12_hours_before_the_limit_has_a_mean_below_0.01": far_bins_ok,
         "some_half_hour_after_the_limit": bool((hours > 0).any()),
     }
     return _result(

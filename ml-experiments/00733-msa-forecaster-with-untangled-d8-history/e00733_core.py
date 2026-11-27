@@ -127,10 +127,13 @@ G14_MEAN_LIMIT: Final = 0.01
 2026-11-26)."""
 G14_FAR_HOURS: Final = 24.0
 G14_BIN_HOURS: Final = 6.0
-G14_MONOTONE_TOLERANCE: Final = 5e-4
-"""The slack, in P(X<0), by which a 6-hour bin's mean may exceed the bin nearer the limit: 5% of
-`G14_MEAN_LIMIT`, because bin means on 1,944 half-hours differ by about 2e-4 by chance (set
-2026-11-27 after the first real-network run; the ruling states no tolerance)."""
+G14_NEAR_FACTOR: Final = 3.0
+"""G14 (c'): the mean difference in the nearest 6-hour bin (0 to 6 hours before the limit) must be at
+least this many times the mean difference over all half-hours more than `G14_DECAY_HOURS` before the
+limit (ruling of the design lead, 2026-11-27, which replaces a monotone-decay rule because the real
+differences decay noisily)."""
+G14_DECAY_HOURS: Final = 12.0
+"""G14 (c'), (c''): the distance before the limit beyond which a bin counts as far."""
 
 # --------------------------------------------------------------------------- contrasts and bars
 
@@ -668,7 +671,7 @@ GALLERY_PANELS: Final = {
         "the distribution of the difference between the stored and the re-run outputs on the synthetic validation bank, by hour after the visibility limit",
         "the poison test passes: NaN and 1e6 placed in every hidden input after the limit leave the re-run output unchanged",
         "the mean absolute difference over origins more than 24 hours before the limit is below 0.01",
-        "the mean absolute difference does not increase with the hours before the limit (a monotone decay, in bins of 6 hours)",
+        "the mean absolute difference in the 6 hours before the limit is at least 3 times the mean more than 12 hours before it, and every 6-hour bin more than 12 hours before the limit has a mean below 0.01",
     ),
     "G15": (
         "the share of reverse flow in the synthetic target rows by lead day and by hour of day, with B-clim beside it",
