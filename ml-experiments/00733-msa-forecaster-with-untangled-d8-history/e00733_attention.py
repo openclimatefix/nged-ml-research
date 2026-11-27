@@ -387,6 +387,15 @@ def cases_of_folds(
     return [(plan.folds[0] if f in missing else f, names) for f, names in wanted], [note]
 
 
+def release_memory(*, device: str) -> None:
+    """Free the fold dataset that was just used (host memory, and the GPU cache on the GPU)."""
+    import gc
+
+    gc.collect()
+    if device == "cuda":
+        torch.cuda.empty_cache()
+
+
 def draw_real_cases(
     *, root: Path, rows: str, device: str, seed: int, wanted: Any
 ) -> dict[str, Any]:
@@ -399,21 +408,30 @@ def draw_real_cases(
     cases: dict[str, dict[str, list[int]]] = {}
     gains: dict[str, float] = {}
     for fold, names in wanted:
-        opened = {
-            label: open_fold(root=root, arm=arm, fold=fold, seed=seed, device=device, rows=rows)
-            for arm, label in REAL_ARMS
-        }
-        _, source, origins = opened["FU"]
-        picked = pick_real_cases(
-            shortwave=mean_target_shortwave(source=source, d8=d8, origins=origins), names=names
-        )
-        for name, pos in picked.items():
-            maps = {
-                label: real_case_maps(
-                    net=net, source=src, d8=d8, origin=int(origins[pos]), device=device
+        maps_by_case: dict[str, dict[str, dict[str, Any]]] = {}
+        origins_by_label: dict[str, np.ndarray] = {}
+        picked: dict[str, int] = {}
+        for arm, label in REAL_ARMS:  # one fold dataset in memory at a time (the host holds 14 GB)
+            net, source, origins = open_fold(
+                root=root, arm=arm, fold=fold, seed=seed, device=device, rows=rows
+            )
+            origins_by_label[label] = np.asarray(origins)
+            if label == "FU":
+                picked = pick_real_cases(
+                    shortwave=mean_target_shortwave(source=source, d8=d8, origins=origins),
+                    names=names,
                 )
-                for label, (net, src, _) in opened.items()
-            }
+            elif not np.array_equal(origins_by_label[label], origins_by_label["FU"]):
+                msg = f"the origins of {label} and FU differ on the fold {fold}, so a case is not one origin"
+                raise AttentionError(msg)
+            for name, pos in picked.items():
+                maps_by_case.setdefault(name, {})[label] = real_case_maps(
+                    net=net, source=source, d8=d8, origin=int(origins[pos]), device=device
+                )
+            del net, source, origins
+            release_memory(device=device)
+        for name in picked:
+            maps = maps_by_case[name]
             for label, m in maps.items():
                 if label == "M*":
                     m["gamma"] = np.zeros(0)

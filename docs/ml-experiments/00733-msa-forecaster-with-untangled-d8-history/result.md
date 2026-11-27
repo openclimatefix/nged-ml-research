@@ -921,6 +921,16 @@ published page carries the coverage counts.
   there, and a source with no root prints the row and writes nothing. A session-wide check in the
   test configuration compares the listing of the data folder before and after the tests and fails
   on any change, and a test checks the example row with and without a root.
+- **The attention stage runs on the CPU, and opens one fold dataset at a time (ruling of the design
+  lead, 2026-11-27, set before any experiment 733 fit exists).** The launcher treated `attention` as
+  a stage without a GPU check and without the GPU lock, but the stage defaulted to `--device cuda`,
+  so it would have used the GPU unchecked. The attention stage reads stored networks and draws 8
+  maps, and on the scratch root it took 1 minute 42 seconds on one core, so it is a CPU stage: every
+  stage that the launcher runs without a GPU check now defaults to `--device cpu` and refuses
+  `--device cuda`, and a test compares the launcher's list with the stage code's list. The stage had
+  also built the datasets of FU and of M\* for a fold at once, which risks the host limit of 14 GB;
+  it now builds one, takes its maps, frees it, and builds the other, and checks that both arms
+  draw from the same origins.
 
 ## Method
 

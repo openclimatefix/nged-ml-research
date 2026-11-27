@@ -156,7 +156,12 @@ def parser() -> argparse.ArgumentParser:
     """Return the argument parser."""
     p = argparse.ArgumentParser(prog="e00733_cli.py")
     p.add_argument("stage", choices=STAGES)
-    p.add_argument("--device", default="cuda", choices=("cuda", "cpu"))
+    p.add_argument(
+        "--device",
+        default=None,
+        choices=("cuda", "cpu"),
+        help="default: cpu for the stages that run.sh runs without a GPU check, else cuda",
+    )
     p.add_argument(
         "--measured", default=None, help="JSON of the timing gate's measurements (stage timing)"
     )
@@ -205,6 +210,8 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse the arguments, pin the threads, and run the stage."""
     args = parser().parse_args(argv)
+    if args.device is None:
+        args.device = "cpu" if args.stage in st.CPU_ONLY_STAGES else "cuda"
     try:
         paths.pin_threads()
         install_runtime()

@@ -65,6 +65,12 @@ EXIT_INVALID: Final = 4
 EXIT_FAILED: Final = core.CHAIN_FAILED_EXIT
 READING_STAGES: Final = ("score", "report", "figures", "loss_curves", "attention", "series")
 """The stages that read the test outputs; none may run while the chain is fitting."""
+CPU_ONLY_STAGES: Final = (
+    "guard", "banks", "channels", "limits", "gallery", "score", "report", "figures", "loss_curves",
+    "attention", "series",
+)  # fmt: skip
+"""The stages that compute on the CPU: `run.sh` skips the GPU check and the GPU lock for them, so
+they default to `--device cpu` and refuse `--device cuda`."""
 TEST_ROW_STAGES: Final = ("figures", "series", "attention")
 """The reading stages that draw test rows: each needs the first-test-score marker, which `score`
 writes after `assert_no_test_choice`, unless it is asked for validation rows only."""

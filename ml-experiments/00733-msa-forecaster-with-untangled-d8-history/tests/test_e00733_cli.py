@@ -135,3 +135,27 @@ def test_run_sh_lists_exactly_the_stages_of_the_cli() -> None:
     assert tuple(listed) == cli.STAGES
     for stale in ("neighbours", "overlays", "solar_diag", "panels"):
         assert stale not in text
+
+
+def test_the_cpu_stages_of_run_sh_are_the_stages_that_default_to_the_cpu() -> None:
+    """`run.sh` skips the GPU check for exactly the stages of `CPU_ONLY_STAGES`, and `main` gives
+    them the device `cpu` (the parser leaves the device unset)."""
+    import re
+
+    text = (Path(__file__).parent.parent / "run.sh").read_text()
+    match = re.search(r"case \"\$\{1:-\}\" in ([a-z_ |]+)\) uses_gpu=0", text)
+    assert match is not None
+    in_run_sh = {name.strip() for name in match.group(1).split("|")}
+    assert in_run_sh == set(st.CPU_ONLY_STAGES)
+    assert set(st.CPU_ONLY_STAGES) <= set(cli.STAGES)
+    for stage in cli.STAGES:
+        parsed = cli.parser().parse_args([stage])
+        assert parsed.device is None
+    assert "attention" in st.CPU_ONLY_STAGES
+
+
+def test_a_cpu_stage_refuses_the_gpu(tmp_path: Path) -> None:
+    """`--device cuda` on a stage that `run.sh` runs without the GPU check exits 2."""
+    _ready(tmp_path, through="timing")
+    (tmp_path / "scores" / st.TEST_MARKER).touch()
+    assert cli.run_stage(args=_args("attention", device="cuda"), root=tmp_path, digest=DIGEST) == 2
