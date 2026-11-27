@@ -314,6 +314,9 @@ def equal_rate_tau(
         by_tau: For each tau, each filter's row from `real_rates`.
         rates: E1-J-sym's `all` and `big` rates.
         filter_name: The filter to look up.
+
+    Returns:
+        The lowest tau that meets both rates, or None when no tau does.
     """
     for tau in sorted(by_tau):
         r = by_tau[tau][filter_name]

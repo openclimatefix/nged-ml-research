@@ -172,6 +172,10 @@ def register_h_own_extension(*, out: Path, number: int) -> None:
     A run that resumes after a crash registers the same number again and passes. A third
     extension raises, so no re-run of `tune` can extend the grid again.
 
+    Args:
+        out: The experiment's data folder, which holds the extension state file.
+        number: The extension being registered (1 or 2).
+
     Raises:
         ValueError: If `number` is above `MAX_H_OWN_EXTENSIONS` or skips an extension.
     """

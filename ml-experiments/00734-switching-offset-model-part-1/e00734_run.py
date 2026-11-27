@@ -1170,6 +1170,9 @@ def _register_tau_extension() -> str:
     needs no decoding. The truth rows of the tuning worlds at the new taus need H-nbr decoded once
     more (about 2.3 CPU-hours for 3 kappa values over the 30 worlds).
 
+    Returns:
+        The tag of the stored H-nbr outputs (`tuning.nbr_tag`).
+
     Raises:
         ValueError: If the choice is not the floor, or a call rate binds so that no lower tau is
             eligible, or a different extension was registered before.
