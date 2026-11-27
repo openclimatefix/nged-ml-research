@@ -81,6 +81,27 @@ def test_unt_source_adds_channels_only_at_d8_and_checks_the_run() -> None:
         late.assemble(primary=primary, c_idx=c_idx, lead_day=torch.tensor([0, 2]))
 
 
+def test_channels_are_absent_where_stage_3_shifts_the_power() -> None:
+    """Tokens whose history power differs from the clean power carry no channel; the rest keep it."""
+    fake = FakeSource()
+    c_idx, primary, lead = torch.tensor([48 * 300 + 24]), torch.tensor([3]), torch.tensor([0])
+    src = tn.UntSource(source=fake, tensors=make_channel_tensors(n_grid=48 * 400))
+    clean = src.assemble(primary=primary, c_idx=c_idx, lead_day=lead)
+    assert clean.inputs.hist_u_ok[0, 5].any()
+    shifted_power = fake.power_z.clone()
+    row = 5
+    idx = clean.hist_idx[0, row]
+    shifted_power[3, idx] += 1.0
+    shifted_power[3, clean.hist_idx[0, 7, 0]] = float("nan")  # NaN in both: not a shift
+    fake.power_z[3, clean.hist_idx[0, 7, 0]] = float("nan")
+    fake.power_in = shifted_power
+    got = src.assemble(primary=primary, c_idx=c_idx, lead_day=lead)
+    ok = got.inputs.hist_u_ok[0]
+    assert not ok[row].any() and (got.inputs.hist_u[0, row] == 0).all()
+    keep = [r for r in range(14) if r != row]
+    assert torch.equal(ok[keep], clean.inputs.hist_u_ok[0][keep])
+
+
 def test_check_batch_rejects_history_after_the_target() -> None:
     """A history token at or after the first target token fails the batch check."""
     src = tn.UntSource(source=FakeSource(), tensors=make_channel_tensors(n_grid=48 * 400))

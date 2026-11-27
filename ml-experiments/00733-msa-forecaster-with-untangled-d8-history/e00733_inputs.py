@@ -163,6 +163,7 @@ def gather(
     power_visible: torch.Tensor,
     cams_rule: torch.Tensor | None = None,
     convention: torch.Tensor | None = None,
+    power_shifted: torch.Tensor | None = None,
 ) -> History:  # fmt: skip
     """Return the channels of the 14 history rows of a batch.
 
@@ -175,6 +176,9 @@ def gather(
             untangled channel is present only where it is.
         cams_rule: `(B,)` bool, the mask of the age-2 row and part of the age-3 row (training dropout).
         convention: `(B,)` bool, the mask of ages 2 to 5.
+        power_shifted: `(B, 14, 48)` bool, where stage 3's synthetic shift changed the history
+            power. The channel is absent there, because the stored output belongs to the unshifted
+            power.
 
     Returns:
         The channels and the flag.
@@ -203,6 +207,8 @@ def gather(
         ok = torch.where(use, tensors.rerun_ok[r, k, hh], ok)
     by_time = hist_idx <= (c_idx - core.NEWEST_VISIBLE_BEFORE_CONTRACT)[:, None, None]
     ok = ok & power_visible & by_time & is_d8[:, None, None]
+    if power_shifted is not None:
+        ok = ok & ~power_shifted
     ok = batch716.apply_ok_mask(ok=ok, cams_rule=cams_rule, convention=convention)
     units = to_input_units(raw=raw, target_std=tensors.target_std)
     out = torch.where(ok[..., None], units, torch.zeros_like(units))

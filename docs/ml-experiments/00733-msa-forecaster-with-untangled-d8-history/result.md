@@ -837,6 +837,11 @@ published page carries the coverage counts.
   otherwise raises. Row 2 (`failed`) follows the table's text, "a fit that C1 or C2 needs raised":
   a failed F0r (which gates C1), FU, or FU-S job. A failed Y0 or YU job is not row 2, because C3 and
   C4 are not in the verdict table; the sign-forecast word and the history word read `void`.
+- **The channel is absent on every history token whose power stage 3 shifted (ruling of the design
+  lead, 2026-11-27, set before any experiment 733 score or fit exists).** The stored channel output
+  at a token belongs to the unshifted power, so a shifted token carries no channel: its flag is off
+  and its three channel values are 0. The rule covers FU, FU-S, and FS alike, because all three read
+  their channels through the same source.
 - **All 16 Primaries with the channels at D8 alone,** so that M\* is an exact control and the recipe
   stays experiment 713's.
 - **No sign head on the real folds,** because no real day has a known sign, and a head trained on

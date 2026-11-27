@@ -49,6 +49,7 @@ class FakeSource:
         )
         self.steps = torch.arange(48)
         self.power_z = torch.randn(16, 48 * 4100)
+        self.power_in = self.power_z
         self.run_offset_us = run_offset_us
         self.avail_extra_us = 0
         self.other_extra_us = 0

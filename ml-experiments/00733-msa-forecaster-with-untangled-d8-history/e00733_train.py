@@ -173,6 +173,7 @@ class UntSource:
         hist = inputs.gather(
             tensors=self.tensors, primary=primary, hist_idx=out.hist_idx, c_idx=c_idx,
             power_visible=out.inputs.hist_visible, cams_rule=cams_rule, convention=convention,
+            power_shifted=shifted_tokens(source=self, primary=primary, hist_idx=out.hist_idx),
         )  # fmt: skip
         batch_inputs = model.UntInputs(
             **out.inputs.__dict__, hist_u=hist.channels, hist_u_ok=hist.ok
@@ -186,6 +187,32 @@ class UntSource:
         if check:
             check_batch(batch=batch)
         return batch
+
+
+def shifted_tokens(
+    *, source: UntSource, primary: torch.Tensor, hist_idx: torch.Tensor
+) -> torch.Tensor | None:
+    """Return which history tokens carry stage 3's shifted power (None when no power is shifted).
+
+    The history power of a stage 3 source differs from the clean power where the synthetic shift
+    moved it. The stored channel output at such a token belongs to the unshifted power, so the
+    channel is absent there.
+
+    Args:
+        source: The batch's source.
+        primary: `(B,)` long.
+        hist_idx: `(B, 14, 48)` long, the grid index of each history token.
+
+    Returns:
+        A `(B, 14, 48)` bool tensor, or None for a source that reads the clean power.
+    """
+    wrapped = source.source
+    power_in, power_z = wrapped.power_in, wrapped.power_z  # ty: ignore[unresolved-attribute]
+    if power_in is power_z:
+        return None
+    p3 = primary[:, None, None]
+    a, b = power_in[p3, hist_idx], power_z[p3, hist_idx]
+    return ~((a == b) | (torch.isnan(a) & torch.isnan(b)))
 
 
 def run_times_of(
