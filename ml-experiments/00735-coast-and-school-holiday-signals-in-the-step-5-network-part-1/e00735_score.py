@@ -1441,7 +1441,8 @@ def stage_smoke() -> int:
     if times.exists():
         t = pl.read_csv(times).with_columns(
             minutes=(
-                pl.col("end_utc").str.to_datetime() - pl.col("start_utc").str.to_datetime()
+                pl.col("end_utc").str.to_datetime(format="%Y-%m-%dT%H:%M:%SZ")
+                - pl.col("start_utc").str.to_datetime(format="%Y-%m-%dT%H:%M:%SZ")
             ).dt.total_seconds()
             / 60.0
         )
