@@ -62,6 +62,8 @@ class SmokeSteps:
             fold, experiment 729's smoke script).
         later: The later stages, each called with `validation_only=True`.
         log: Receives one line per step.
+        gpu_info: Returns `{"gpu_name", "peak_gpu_gb"}` of this process after the steps (the real
+            GPU run gives it; the CPU run has none).
     """
 
     fit_real: Callable[[str, str, int], dict]
@@ -71,6 +73,7 @@ class SmokeSteps:
     checks: Mapping[str, Callable[[], str]] = field(default_factory=dict)
     later: Mapping[str, Callable[..., object]] = field(default_factory=dict)
     log: Callable[[str], None] = print
+    gpu_info: Callable[[], Mapping[str, Any]] | None = None
 
 
 def assert_scratch_outside(*, scratch: Path, data_root: Path) -> None:
@@ -113,13 +116,14 @@ def _step(
 
 
 def run_smoke(*, root: Path, scratch: Path, steps: SmokeSteps, device: str) -> dict[str, Any]:
-    """Run the smoke test and write `scores/smoke.json`.
+    """Run the smoke test and write `scores/smoke.json` (`scores/smoke_cpu.json` on the CPU).
 
     Args:
         root: This experiment's data folder (the record is written here; nothing else is).
         scratch: The scratch folder for states and forecasts (outside the data folder).
         steps: The steps.
-        device: "cuda" or "cpu" (recorded; the real smoke test runs on "cuda").
+        device: "cuda" or "cpu" (recorded; only a "cuda" record opens the chain, and it carries the
+            GPU's name and the peak GPU memory of the steps).
 
     Returns:
         The record, with `pass` true only when every step passed.
@@ -193,5 +197,9 @@ def run_smoke(*, root: Path, scratch: Path, steps: SmokeSteps, device: str) -> d
         "pass": all(v["ok"] for v in steps_record.values()), "code_version": st.CODE_VERSION, "device": device,
         "scratch_outside_data_folder": True, "steps": steps_record,
     }  # fmt: skip
-    st.write_json(path=root / st.SMOKE_FILE, payload=record)
+    if device == "cuda":
+        info = dict(steps.gpu_info()) if steps.gpu_info is not None else {}
+        record["gpu_name"] = str(info.get("gpu_name", ""))
+        record["peak_gpu_gb"] = float(info.get("peak_gpu_gb", 0.0))
+    st.write_json(path=root / st.smoke_file(device=device), payload=record)
     return record

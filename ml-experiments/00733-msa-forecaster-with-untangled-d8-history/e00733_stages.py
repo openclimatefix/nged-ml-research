@@ -15,6 +15,7 @@ generator value.
 
 import hashlib
 import json
+import math
 import os
 import time
 import traceback
@@ -52,6 +53,8 @@ with no overlap, and the channel coverage including the re-run reaches 90% (both
 `channels`), and the synthetic test segments are covered by ensemble runs (written by `banks`)."""
 PRE_FIT_GUARD_NAMES: Final = ("base_day_guards", "rerun_coverage", "test_segment_coverage")
 SMOKE_FILE: Final = "scores/smoke.json"
+SMOKE_CPU_FILE: Final = "scores/smoke_cpu.json"
+"""The record of a smoke test on the CPU, which never opens the chain."""
 TIMING_FILE: Final = "scores/timing.json"
 SCREEN_FILE: Final = "scores/screen.json"
 PANEL_CHECK: Final = "PRIVATE/gallery/panel_check.json"
@@ -236,13 +239,30 @@ def review_gate_passed(*, root: Path) -> bool:
     return bool(record.get("opus_code_review")) and bool(record.get("fix_review"))
 
 
-def smoke_passed(*, root: Path) -> bool:
-    """Return whether `scores/smoke.json` records a pass under this code version.
+def smoke_file(*, device: str) -> str:
+    """Return the record file of a smoke test on `device`: only the GPU's opens the chain."""
+    return SMOKE_FILE if device == "cuda" else SMOKE_CPU_FILE
 
-    The smoke test is the real-environment one.
+
+def smoke_passed(*, root: Path) -> bool:
+    """Return whether `scores/smoke.json` records a pass on the GPU under this code version.
+
+    The smoke test is the real-environment one: the record must name the device `cuda`, the GPU,
+    and a positive peak GPU memory.
     """
     path = root / SMOKE_FILE
-    return _passed(path=path) and read_json(path=path).get("code_version") == CODE_VERSION
+    if not _passed(path=path):
+        return False
+    record = read_json(path=path)
+    peak = record.get("peak_gpu_gb")
+    return (
+        record.get("code_version") == CODE_VERSION
+        and record.get("device") == "cuda"
+        and bool(record.get("gpu_name"))
+        and isinstance(peak, int | float)
+        and math.isfinite(peak)
+        and peak > 0
+    )
 
 
 def timing_passed(*, root: Path) -> bool:

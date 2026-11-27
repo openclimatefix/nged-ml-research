@@ -900,6 +900,13 @@ published page carries the coverage counts.
   validation rows, where the target-poison check never runs. The gate now fits the fold 2026-06 and
   predicts the test rows, with the check, in a scratch folder. It scores nothing, writes no
   `test_started` marker, and no chain job reads its predictions.
+- **Only a smoke test on the GPU opens the chain (ruling of the design lead, 2026-11-27, set before
+  any experiment 733 fit exists).** A smoke test on the CPU had written a passing `scores/smoke.json`
+  on the real data folder, which opened the chain. The smoke test now writes `scores/smoke.json`
+  only on the device `cuda`, with the GPU's name and the peak GPU memory of its steps, and
+  `smoke_passed` refuses a record without all three. A smoke test on the CPU writes
+  `scores/smoke_cpu.json`, which no gate reads. The review gate stays a file that the session writes
+  and no code does.
 
 ## Method
 

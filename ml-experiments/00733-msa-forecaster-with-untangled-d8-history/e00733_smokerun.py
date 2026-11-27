@@ -5,7 +5,8 @@ One epoch of every arm runs in a scratch folder outside the data folder (`--scra
 device of `--device` (the real GPU for the official run). The scratch folder links to the data
 folder's read-only inputs (`limits.json`, `channels.json`, `channels/`, and `world/`), holds the
 states, records, and prediction sets of the smoke fits, and receives the outputs of the later
-stages. The data folder gets `scores/smoke.json` only.
+stages. The data folder gets `scores/smoke.json` only (`scores/smoke_cpu.json` on the CPU, which never
+opens the chain).
 """
 
 import argparse
@@ -186,12 +187,23 @@ def later_steps(*, scratch: Path, device: str = "cpu") -> dict[str, Any]:
     }  # fmt: skip
 
 
+def gpu_info() -> dict[str, Any]:
+    """Return the name of the GPU and this process's peak GPU memory in gigabytes."""
+    import torch
+
+    return {
+        "gpu_name": torch.cuda.get_device_name(0),
+        "peak_gpu_gb": torch.cuda.max_memory_allocated() / 1e9,
+    }
+
+
 def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
-    """Run the smoke test: one epoch of every arm in `--scratch`, then every later stage on validation rows.
+    """Run the smoke test: one epoch of every arm, then every later stage on validation rows.
 
     Args:
         args: The parsed arguments (`--scratch`, `--device`).
-        root: This experiment's data folder (it receives `scores/smoke.json` only).
+        root: This experiment's data folder (it receives `scores/smoke.json` only, or
+            `scores/smoke_cpu.json` on the CPU).
 
     Returns:
         The smoke record.
@@ -220,12 +232,14 @@ def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         fit_synthetic=lambda arm, seed: run_job(arm, None, seed),
         predict=predict, read_stored=read_stored_step(scratch=scratch),
         checks=check_steps(root=root), later=later_steps(scratch=scratch, device=args.device),
+        gpu_info=gpu_info if args.device == "cuda" else None,
     )  # fmt: skip
     started = time.monotonic()
     record = smoke.run_smoke(root=root, scratch=scratch, steps=steps, device=args.device)
     record["seconds"] = round(time.monotonic() - started, 1)
-    st.write_json(path=root / st.SMOKE_FILE, payload=record)
-    leak.assert_wrote_only_here(written=[root / st.SMOKE_FILE], data_root=root)
+    out_file = root / st.smoke_file(device=args.device)
+    st.write_json(path=out_file, payload=record)
+    leak.assert_wrote_only_here(written=[out_file], data_root=root)
     if not record["pass"]:
         failed = [k for k, v in record["steps"].items() if not v["ok"]]
         msg = f"the smoke test failed at: {failed}"

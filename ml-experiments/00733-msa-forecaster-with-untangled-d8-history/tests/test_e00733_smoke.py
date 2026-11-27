@@ -55,7 +55,7 @@ def test_smoke_runs_every_arm_and_every_later_stage_on_validation_rows(tmp_path:
     assert rec["pass"] and set(sm.SMOKE_ARMS) == {"F0r", "FU", "FU-S", "FS", "Y0", "YU", "YT"}
     assert [x[1] for x in seen if x[0] == "fit"] == list(sm.SMOKE_ARMS)
     assert [x for x in seen if x[0] in sm.LATER_STAGES] == [(n, True) for n in sm.LATER_STAGES]
-    assert json.loads((root / st.SMOKE_FILE).read_text())["pass"] and not st.marker_exists(
+    assert json.loads((root / st.SMOKE_CPU_FILE).read_text())["pass"] and not st.marker_exists(
         root=root
     )
     assert core.ARMS["FU"].folds[0] in {x[2] for x in seen if x[0] == "fit" and x[1] == "FU"}
@@ -98,3 +98,34 @@ def test_a_missing_later_stage_fails_the_smoke(tmp_path: Path) -> None:
     steps = _steps(tmp_path)
     steps.later = {k: v for k, v in steps.later.items() if k != "attention"}
     assert not sm.run_smoke(root=root, scratch=tmp_path / "s", steps=steps, device="cpu")["pass"]
+
+
+def test_a_cpu_smoke_never_opens_the_chain(tmp_path: Path) -> None:
+    """A passing CPU smoke test writes `smoke_cpu.json` only, so `smoke_passed` stays false."""
+    root = tmp_path / "data"
+    root.mkdir()
+    assert sm.run_smoke(root=root, scratch=tmp_path / "s", steps=_steps(tmp_path), device="cpu")[
+        "pass"
+    ]
+    assert (root / st.SMOKE_CPU_FILE).exists() and not (root / st.SMOKE_FILE).exists()
+    assert not st.smoke_passed(root=root)
+    st.write_json(  # a CPU record copied into the chain's file is refused as well
+        path=root / st.SMOKE_FILE,
+        payload={"pass": True, "code_version": st.CODE_VERSION, "device": "cpu"},
+    )
+    assert not st.smoke_passed(root=root)
+
+
+def test_a_cuda_smoke_opens_the_chain_only_with_a_gpu_name_and_a_peak(tmp_path: Path) -> None:
+    """The GPU record names the GPU and its peak memory; a record without either does not pass."""
+    root = tmp_path / "data"
+    root.mkdir()
+    steps = _steps(tmp_path)
+    steps.gpu_info = lambda: {"gpu_name": "stub GPU", "peak_gpu_gb": 3.1}
+    rec = sm.run_smoke(root=root, scratch=tmp_path / "s", steps=steps, device="cuda")
+    assert rec["gpu_name"] == "stub GPU" and rec["peak_gpu_gb"] == 3.1
+    assert st.smoke_passed(root=root) and not (root / st.SMOKE_CPU_FILE).exists()
+    for bad in ({"gpu_name": "", "peak_gpu_gb": 3.1}, {"gpu_name": "stub GPU", "peak_gpu_gb": 0.0}):
+        steps.gpu_info = lambda bad=bad: bad
+        sm.run_smoke(root=root, scratch=tmp_path / "s", steps=steps, device="cuda")
+        assert not st.smoke_passed(root=root)

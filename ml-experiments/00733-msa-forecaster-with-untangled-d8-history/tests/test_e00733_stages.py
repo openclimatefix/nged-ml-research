@@ -44,7 +44,14 @@ def _ready(root: Path, *, through: str = "review") -> None:
             )
         elif step == "smoke":
             st.write_json(
-                path=root / st.SMOKE_FILE, payload={"pass": True, "code_version": st.CODE_VERSION}
+                path=root / st.SMOKE_FILE,
+                payload={
+                    "pass": True,
+                    "code_version": st.CODE_VERSION,
+                    "device": "cuda",
+                    "gpu_name": "stub GPU",
+                    "peak_gpu_gb": 2.5,
+                },
             )
         elif step == "timing":
             st.write_json(
