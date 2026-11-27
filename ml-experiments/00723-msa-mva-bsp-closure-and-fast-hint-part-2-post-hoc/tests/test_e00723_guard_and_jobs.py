@@ -16,7 +16,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-HOME_PREFIX = "/home/" + "jack"
+HOME_PREFIX = "/ho" + "me/" + "jack"
 FOLDER = Path(__file__).resolve().parent.parent
 
 
