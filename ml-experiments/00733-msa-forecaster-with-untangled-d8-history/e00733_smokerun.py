@@ -130,15 +130,25 @@ def check_steps(*, root: Path) -> dict[str, Any]:
 
     def smoke_729() -> str:
         folder = paths.ROOT / "00729-msa-d8-neural-untangler-synthetic-known-answers"
-        env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(folder), *sys.path])}
+        here = Path(__file__).resolve().parent
+        extra = [
+            here,
+            folder,
+            folder / "tests",
+            paths.ROOT / "00730-msa-d8-sign-detector-with-demand-head-and-masking",
+        ]
+        env = {**os.environ, "PYTHONPATH": os.pathsep.join([*map(str, extra), *sys.path])}
         done = subprocess.run(
-            [sys.executable, str(folder / "tests" / "smoke_real_files.py")], capture_output=True,
+            [sys.executable, str(here / "e00733_smoke729.py")], capture_output=True,
             text=True, check=False, timeout=SMOKE_729_TIMEOUT_SECONDS, env=env,
         )  # fmt: skip
-        if done.returncode != 0:
-            msg = f"experiment 729's smoke_real_files.py exited {done.returncode}: {(done.stdout + done.stderr)[-400:]}"
+        lines = done.stdout.splitlines()
+        if done.returncode != 0 or not any(
+            line.startswith("bank_s2_solar: test bank present: True") for line in lines
+        ):
+            msg = f"experiment 729's checks on experiment 730's banks exited {done.returncode}: {(done.stdout + done.stderr)[-600:]}"
             raise rt.RuntimeError733(msg)
-        return "experiment 729's smoke_real_files.py passed"
+        return f"experiment 729's {len(lines)} real-file checks passed on experiment 730's banks"
 
     return {
         "bank digests": banks, "re-run outputs per fold": rerun_coverage, "poison test": poison,
