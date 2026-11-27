@@ -1,9 +1,6 @@
 G2 readings in the power table: 4643, first 2023-04-11 13:30:00+00:00, last 2026-01-26 13:00:00+00:00
   above zero: 441; first 2023-07-03 14:00:00+00:00, last 2026-01-23 12:00:00+00:00
-  2023-07: 283 positive readings, max 5.93 MW
-  2023-08: 157 positive readings, max 5.91 MW
-  2026-01: 1 positive readings, max 0.21 MW
-  most common positive levels (MW, count): [(3.940000057220459, 70), (5.909999847412109, 51), (3.930000066757202, 36), (1.9600000381469727, 33), (1.9500000476837158, 31), (1.9700000286102295, 30), (5.920000076293945, 18), (5.900000095367432, 7)]
+  [withheld]
 
 Window 2023-07-03 to 2023-08-16: readings 2054
   half-hours joined to the system price: 2054 (design: 2,054)

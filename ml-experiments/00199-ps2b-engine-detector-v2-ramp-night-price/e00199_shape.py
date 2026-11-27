@@ -132,7 +132,7 @@ def transfer_edges() -> list[dict]:
 
 
 def unlabelled_d8_steps() -> list[dict]:
-    """Large steps in D8's clean history (reading, 2022-01 to 2023-06) with no label."""
+    """Large steps in D8's clean history (reading, before the engine connected) with no label."""
     panel = load_panel()
     p = panel[key_of(panel=panel, label="D8")]
     x = np.asarray(p["power"], dtype=float) - np.asarray(p["expected"], dtype=float)

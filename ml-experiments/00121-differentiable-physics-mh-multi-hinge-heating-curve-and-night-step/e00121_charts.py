@@ -17,6 +17,7 @@ import altair as alt
 import e00121_common as common
 import plotting.ocf_theme as ocf
 import polars as pl
+from engine_figure_guard import save_chart  # ty: ignore[unresolved-import]
 
 DOCS_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -55,7 +56,7 @@ def _title(*, text: str, subtitle: str) -> alt.TitleParams:
 def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     PNG_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(DOCS_DIR / f"{name}.svg")
+    save_chart(chart=chart, path=DOCS_DIR / f"{name}.svg")
     chart.save(PNG_DIR / f"{name}.png", scale_factor=1.5)
     print("wrote", name)
 
@@ -210,7 +211,7 @@ def figure_2_cold_nights() -> alt.TopLevelMixin:
                     "Scored winter 2025-26, weekday nights 22:00 to 08:00 with a daily mean "
                     "temperature below 8 C. Dashed black line: observed power. Coloured lines: "
                     "median day-ahead forecast after the filter. Past weather. The page's table "
-                    "gives the step in points and MW."
+                    "gives the step in points."
                 ),
             )
         )
@@ -362,7 +363,7 @@ def figure_5_gate4() -> alt.TopLevelMixin:
                 text="The screening design cannot detect a 4-point night step in night-row scores",
                 subtitle=(
                     "Gate 4'': synthetic substations with real noise, 5% false positives. Dashed "
-                    "rule: the 80% detection target. A 4-point step is 0.2 to 0.5 MW."
+                    "rule: the 80% detection target."
                 ),
             )
         )

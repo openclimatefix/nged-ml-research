@@ -7,13 +7,13 @@ Usage: e00713_known_answer.py MONTH [--device cuda] [--skip-fits]
 `--selftest` runs on the CPU with no data and no fit: it builds a small synthetic world from random
 arrays and checks the world's formula, the follow share, and the gate file logic.
 
-The full run needs the GPU for up to about 2 hours. It runs, for the fold MONTH, KA5 (poisoned power),
-KA6 (future weather canary) on the real inputs, then fits the synthetic worlds W0 and W1 with the
-training loop of `e00713_train` (stage 1, at most 400 passes with patience 30, arms `M`, `P`, `N`, `E`, `G`) and checks
-KA2, KA3, KA4, KA10, and KA12. KA1, KA7, and KA9 are run by `e00713_check_model.py` and
-`e00713_check_layout.py`; KA8 is run by `e00713_score.py`; KA11 by `e00713_era.py`. The script writes
-`work/known_answers_passed.json` only if every check it runs passes; `e00713_fit.py` refuses to run
-without the file. A failed check fires audit trigger 1.
+The full run needs the GPU for up to about 2 hours. It runs, for the fold MONTH, KA5 (poisoned
+power), KA6 (future weather canary) on the real inputs, then fits the synthetic worlds W0 and W1
+with the training loop of `e00713_train` (stage 1, at most 400 passes with patience 30, arms `M`,
+`P`, `N`, `E`, `G`) and checks KA2, KA3, KA4, KA10, and KA12. KA1, KA7, and KA9 are run by
+`e00713_check_model.py` and `e00713_check_layout.py`; KA8 is run by `e00713_score.py`; KA11 by
+`e00713_era.py`. The script writes `work/known_answers_passed.json` only if every check it runs
+passes; `e00713_fit.py` refuses to run without the file. A failed check fires audit trigger 1.
 
 The synthetic world keeps the real grid, the real ERA5 weather, and the real calendar of four
 Primaries, and replaces the power with a known function, in shares of capacity:

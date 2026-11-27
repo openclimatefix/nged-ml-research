@@ -1,7 +1,8 @@
 """Run experiment 191's arms at one or more sites and write the prediction frames.
 
 Run it under `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue` with
-`uv run --no-sync python`, for example with the arguments `--sites D8 D14 [--ungated]`.
+`uv run --no-sync python`, for example with the arguments `--sites D8 <the register's Primary>
+[--ungated]`, where the register's Primary is the label in the private constants file.
 """
 
 import argparse
@@ -31,7 +32,7 @@ def main() -> None:
     jobs = [(site, args.ungated, args.features) for site in args.sites]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for site, written in pool.map(one_site, jobs):
-            print(site, written, flush=True)
+            print(common.shown(site), written, flush=True)
 
 
 if __name__ == "__main__":

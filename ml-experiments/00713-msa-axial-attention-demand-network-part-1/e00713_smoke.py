@@ -1,11 +1,14 @@
 # ruff: noqa: E501, ANN001, ANN202, D103
-"""Experiment 713 smoke job (code review 3): train, crash, resume, rebuild, predict, and score one tiny fit.
+"""Experiment 713 smoke job (code review 3): train, crash, resume, rebuild, predict, and score.
 
-The script is part of the hashed fit modules (`arms.FIT_CODE_FILES`). It imports the experiment's own modules unchanged and narrows
-three things only: the training pairs to the six signed-MW Primaries (`make_samples(primaries=...)`),
-the pass caps (`CAP_FIRST`, `CAP_RERUN`), and the data folder (everything under
-`00713-*/smoke/`, never `00713-*/work/`). Run each mode in its own process through `run.sh e00713_smoke.py MODE`; the real fit's commands follow
-the same path. Delete `00713-*/smoke/` afterwards.
+The job fits one tiny network.
+
+The script is part of the hashed fit modules (`arms.FIT_CODE_FILES`). It imports the experiment's
+own modules unchanged and narrows three things only: the training pairs to the six signed-MW
+Primaries (`make_samples(primaries=...)`), the pass caps (`CAP_FIRST`, `CAP_RERUN`), and the data
+folder (everything under `00713-*/smoke/`, never `00713-*/work/`). Run each mode in its own process
+through `run.sh e00713_smoke.py MODE`; the real fit's commands follow the same path. Delete
+`00713-*/smoke/` afterwards.
 
 Modes:
     count             build the fold (train phase) and print the pair and step counts per stage; no training

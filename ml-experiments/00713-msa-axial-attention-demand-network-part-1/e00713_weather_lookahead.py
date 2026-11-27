@@ -8,11 +8,11 @@ row of the 15 x 48 matrix, the weather source, the issue time of the weather aga
 origin, and the span of valid times, and it prints the newest power timestamp against the origin. The
 layout is computed from `e00713_layout` alone, so the statement needs no fit and reads no power.
 
-With `--check-data` the script also reads the stored run frame that the Candidate reads for the native origin
-(`demand_frame_path`; a stub frame is refused) and prints one PASS or FAIL line: PASS when its latest
-`nwp_init_time` is at least 9 hours before the native origin and its `power_fcst_init_time` is the native
-origin. The exit status is 1 on FAIL. Without the flag, the "(before: yes, by the layout alone)" on row 0 is the layout's
-own arithmetic, not a data check.
+With `--check-data` the script also reads the stored run frame that the Candidate reads for the
+native origin (`demand_frame_path`; a stub frame is refused) and prints one PASS or FAIL line: PASS
+when its latest `nwp_init_time` is at least 9 hours before the native origin and its
+`power_fcst_init_time` is the native origin. The exit status is 1 on FAIL. Without the flag, the
+"(before: yes, by the layout alone)" on row 0 is the layout's own arithmetic, not a data check.
 """
 
 import argparse

@@ -79,11 +79,11 @@ arm3_vs_arm3_indicator_qs        all: +12.75% [+10.08, +15.85] | ordinary: +11.9
 C1 leave-one-month-out range: +9.81% to +10.81%
 Persisted-state flag vs target flag: P(state flag | running) = 0.651, P(state flag | ordinary) = 0.370
 
-Term out of sample (MW per unit of state):  {'slope_error_on_persisted_state_mw': [0.15459411509212148, -0.05511862816727728, 0.32418934200051047], 'slope_error_on_target_state_mw': [2.2048711418959344, 1.7159619265963422, 2.6473516346928907], 'persisted_state_mean': 0.515110621411228, 'persisted_state_agreement_with_target_flag': 0.6407351667834907}
+Term out of sample (MW per unit of state):  {'slope_error_on_persisted_state_mw': [0.15459411509212148, -0.05511862816727728, 0.32418934200051047], 'slope_error_on_target_state_mw': '[withheld]', 'persisted_state_mean': 0.515110621411228, 'persisted_state_agreement_with_target_flag': 0.6407351667834907}
 Engine coefficient on the lagged (matched) state, MW: [1.0, 1.01, 1.02, 0.97, 0.96, 0.95, 0.95, 0.94, 0.95, 0.94, 0.94, 0.91]
 
-Engine coefficient per monthly refit, scored year, MW (P(1+ unit) column): [3.63, 3.62, 3.59, 3.57, 3.59, 3.59, 3.61, 3.6, 3.6, 3.57, 3.53, 3.47]
-Engine coefficient per running unit (expected-units column), MW: [1.46, 1.45, 1.44, 1.43, 1.43, 1.43, 1.43, 1.43, 1.43, 1.42, 1.41, 1.39]
+Engine coefficient per monthly refit, scored year, MW (P(1+ unit) column): [withheld]
+Engine coefficient per running unit (expected-units column), MW: [withheld]
 break coefficient D8 (points): [4.63, 4.85, 5.47, 5.72, 5.77, 5.86, 5.87, 5.79, 5.83, 5.89, 6.03, 6.3]
 
 === D5: 84,137 rows, engine-flag share (filtered, target) 0.033

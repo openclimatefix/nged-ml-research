@@ -68,8 +68,9 @@ docs).
   explain under 1% of the day-to-day variation in the best-guess forecast's loss.** Giving the
   Kalman filter the signal in hindsight made the score slightly worse (exp 185; 5 substations, 1,683
   substation-days of one scored year; provisional).
-- **Modelling a price-following asset in the history did not improve the forecast at D8 or D14.** The
-  ceiling with the true price gained 0.6% at D8 (exp 191; 2 Primaries; provisional).
+- **Modelling a price-following asset in the history did not improve the forecast at either of
+  the 2 Primaries tested.** The ceiling with the true price gained 0.6% at D8 (exp 191; 2
+  Primaries; provisional).
 - **PV_Live lags at the two grid supply points gave no resolved gain** (-0.03 points of capacity;
   exp 27; 2 GSPs; provisional). A PV_Live-based solar forecast gave -0.14 with an interval that
   included zero, and the true PV_Live value gave -0.50, almost all at leads of 7 to 15 days (exp 28;

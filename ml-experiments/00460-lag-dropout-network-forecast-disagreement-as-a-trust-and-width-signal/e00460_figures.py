@@ -52,6 +52,7 @@ CLASS_TITLES: Final[dict[str, str]] = {
     "harm_real": "Real harm rows",
     "tgt_real": "Rows inside real events (NRA-corrected actuals)",
 }
+FIRST_EVENT_FIGURE: Final[int] = 7  # the figure number of the first real event
 EVENTS: Final[tuple[tuple[str, int, int], ...]] = (
     ("D5", 112321, 112550),
     ("D5", 111746, 111922),
@@ -389,9 +390,9 @@ def figure_event(*, site: str, onset: int, end: int, number: int) -> None:
     group = "MVA-only eight" if site in fit.MVA_ONLY else "signed-MW six"
     chart = (shade + area + line).properties(
         width=WIDTH - 110, height=190,
-        title=alt.TitleParams([f"Primary {site} ({group}), real event, {month} forecasts, 12 to 36 h ahead", "Orange band: B-mix 90% interval. Lines: medians. Shaded: the event."], anchor="start"),
+        title=alt.TitleParams([f"Primary {site} ({group}), real event {number - FIRST_EVENT_FIGURE + 1}, forecasts 12 to 36 h ahead", "Orange band: B-mix 90% interval. Lines: medians. Shaded: the event."], anchor="start"),
     )  # fmt: skip
-    chart.save(FIGURE_DIR / f"figure_{number}_event_{site}_{onset}.svg")
+    chart.save(FIGURE_DIR / f"figure_{number}_event_{number - 6}.svg")
 
 
 def main() -> None:
@@ -402,7 +403,7 @@ def main() -> None:
     figure_auc()
     figure_absolute()
     figure_examples()
-    for i, (site, onset, end) in enumerate(EVENTS, start=7):
+    for i, (site, onset, end) in enumerate(EVENTS, start=FIRST_EVENT_FIGURE):
         figure_event(site=site, onset=onset, end=end, number=i)
 
 

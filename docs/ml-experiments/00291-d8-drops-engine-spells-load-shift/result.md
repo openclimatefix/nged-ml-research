@@ -21,11 +21,11 @@ hypothesis: >-
   D8's load-shift alarms that fall inside drops are engine edges.
 prediction: >-
   Written before any result. At least 70% of the in-scope drops (28 of 29 start on or after
-  2023-08-15; the first, in 2022, precedes the engine's appearance in D8) overlap engine-running
+  2023-08-15; the first, in 2022, falls before the detector's window) overlap engine-running
   states, meaning at least half of the drop's half-hours have the smoothed probability of one or
   more units above 0.5 under experiment 196's detector (arm v1). The share of overlapping drops
   exceeds the share in matched placebo windows on D8 (one-sided p below 0.05). The depths cluster
-  at multiples of one unit of 1.97 MW: the mean distance from a depth to the nearest multiple, in
+  at multiples of one engine unit: the mean distance from a depth to the nearest multiple, in
   units, has a 95% bootstrap interval wholly below 0.25, the value for a uniform spread. Expected
   weak points: the drops and the detector read the same D8 residual, so some overlap is built in;
   the detector over-flags D8 from 2025-03 (40% of half-hours), where 17 of the 29 drops lie.
@@ -45,9 +45,9 @@ decision_rule: >-
   2023-08-15 and 2026-06-30 that overlap no drop and lie on the same side of 2025-03-01 as the
   drop; 5,000 draws of one placebo window per drop give the distribution of the overlap count. The
   same windows are scored on D5, D10, and D11 (where the detector over-flags) as a control. The
-  clustering test uses 5,000 bootstrap resamples of the drops; the unit of 1.97 MW is the spacing
-  of the four output levels of the recorded engine (0, 1.96, 3.93, 5.93 MW) over its 44 days of
-  known answer, and 1.75 MW (experiment 196's fitted value) is a sensitivity. The pre-2025-03
+  clustering test uses 5,000 bootstrap resamples of the drops; the unit size is the spacing
+  of the output levels of the recorded engine, and experiment 196's fitted value is a sensitivity.
+  The pre-2025-03
   stratum (11 in-scope drops, where the detector's known-answer gate applies) is reported on its
   own. No change to production follows from this experiment, so there is no porting threshold.
 benchmark: >-
@@ -74,14 +74,14 @@ headline: >-
 lessons: >-
   D8's long drops coincide with the engine detector's running states. At three Primaries that the
   engine does not feed, the same detector flags almost nothing on the same dates. The drop depths
-  may be too blurred by the noise in the residual (about 1 MW) to show whole units.
+  may be too blurred by the noise in the residual to show whole units.
 take_home_message: >-
   D8's multi-day drops coincide with the engine detector's running states, which is consistent with
   the gas engine running: the detector flags 27 of the 28 drops that began after the engine left
   D8's reading, against about 1 in 5 comparable stretches of D8, and it flags almost nothing at
   three other Primaries on the same dates. This cannot be called proved, because the drops and the
   detector both read D8's residual, and the depths of the drops do not fall at whole multiples of
-  the engine's 1.97 MW unit. D8's drops should be flagged as a probable generator regime and
+  the engine's unit size. D8's drops should be flagged as a probable generator regime and
   reported apart from the load-shift scoring until NGED confirms the engine's running hours, and the
   next step is a forecast model for D8 that is told when the engine is running.
 production_status: not-for-production
@@ -97,8 +97,8 @@ advice:
     partly built in (Checks).
   - >-
     Do not expect drop depths to fall on whole engine units; the 24-hour median of D8's residual has
-    a standard deviation of 0.9 to 1.2 MW, about half a unit, so only the onset steps could show
-    quantisation (Figure 2).
+    a standard deviation of 0.9 to 1.2 MW, so only the onset steps could show quantisation
+    (Figure 2).
   - >-
     Report D8's engine-explained alarms against the random-time baseline of 0.73, not as a raw
     share, because engine spells widened by 3 hours cover 73% of D8's half-hours from 2023-08-15
@@ -120,21 +120,20 @@ the prediction failed, and the verdict is `partly supported`: one of the two tes
 rule held.
 
 **We asked whether D8's drops coincide with a gas engine running.** A drop is a stretch of 2 to 19
-days in which D8's metered power sat about 2.7 MW below the power that the fitted expected-power
+days in which D8's metered power sat below the power that the fitted expected-power
 model of experiment
 [159](../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md) predicted. That
-experiment found 29 drops. The first, in 2022, predates the engine's disappearance from D8's
-reading (experiments
+experiment found 29 drops. The first, in 2022, falls before the detector's window (experiments
 [194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)
 and
 [196](../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)), so 28 drops
-are scored. The engine has up to three units of about 2 MW each. The detector of experiments 196
+are scored. The engine has up to three units. The detector of experiments 196
 and [199](../00199-ps2b-engine-detector-v2-ramp-night-price/result.md) gives, for each half-hour,
 the probability that one or more units run. We call a half-hour "flagged" when that probability
 exceeds 0.5, and a drop "overlapping" when at least half of its half-hours are flagged. We compared
 the number of overlapping drops with the same number in 5,000 draws of placebo windows. A placebo
 window has the length of a drop, lies a whole number of weeks away, and avoids every drop. We also
-checked whether the drops' depths are whole numbers of one unit (1.97 MW), and whether the
+checked whether the drops' depths are whole numbers of one unit, and whether the
 load-shift alarms of D8 fall inside the engine's spells.
 
 ## Figures
@@ -144,15 +143,16 @@ load-shift alarms of D8 fall inside the engine's spells.
 *Figure 1. The detector flags at least half of the half-hours in 0.96 of D8's drops, in 0.19 of
 matched placebo windows, and in none of the drops' dates at D5, D10, and D11.*
 
-![Histogram of the drops' depths in units of 1.97 MW](figure_2.svg)
+![Histogram of the drops' depths in units of one engine unit](figure_2.svg)
 
 *Figure 2. The depths spread across 0.6 to 2.7 units, with the most drops between 1.0 and 1.25
 units.*
 
-![D8's monthly flag share and left-tail share, with the drops started](figure_3.svg)
+![D8's flag share, left-tail share, and drops started, pooled before and after the shortfall fades](figure_3.svg)
 
 *Figure 3. D8's shortfall fades from March 2026 and no drop starts, but the detector still flags
-39% to 48% of half-hours.*
+39% to 48% of half-hours. The figure pools the months before and
+after the fade.*
 
 ## Results
 
@@ -173,19 +173,20 @@ units.*
 
 **The depths of the drops do not stand at whole units.**
 
-- **Unit:** the unit estimated from the engine's recorded output is 1.93 MW (95% interval 1.91 to
-  1.95). The plan fixed 1.97 MW.
 - **Depths:** the mean distance of the 28 depths from the nearest multiple of one unit is 0.287
-  units (0.233 to 0.342) at 1.97 MW, 0.277 at 1.93 MW, and 0.230 at 1.75 MW. A uniform spread gives
+  units (0.233 to 0.342) at the planned unit size. A uniform spread gives
   0.25, and the prediction needed the interval wholly below 0.25. Depths from 2023-08-15 to
-  2025-02-28 (11 drops, median 3.6 MW) give 0.319, and depths from 2025-03 (17 drops, median
-  2.4 MW) give 0.266.
-- **Steps at the drops' edges:** the onset steps give 0.214 (0.159 to 0.273, p 0.046) at 1.97 MW but
-  0.222 at 1.75 MW (p 0.24). The end steps give 0.258 (0.207 to 0.307).
+  2025-02-28 (11 drops) give 0.319, and depths from 2025-03 (17 drops) give 0.266.
+- **Sensitivity to the unit size:** the depths' mean distance and the onset steps' p value both
+  changed when the unit size was set to the fitted value from experiment 196 instead of the planned
+  unit size, so the clustering result depends on the unit size chosen. The values are not reported
+  here.
+- **Steps at the drops' edges:** the onset steps give 0.214 (0.159 to 0.273, p 0.046) at the planned
+  unit size. The end steps give 0.258 (0.207 to 0.307).
 - **Possible reason:** the 24-hour median of D8's residual outside the drops (metered power minus
-  expected power) has a standard deviation of 1.20 MW before March 2025 and 0.91 MW after, about
-  half of one unit. The test may therefore be unable to resolve whole units at this noise. We have
-  not tested that explanation, so the failed prediction neither supports nor refutes the engine.
+  expected power) has a standard deviation of 1.20 MW before March 2025 and 0.91 MW after. The test
+  may therefore be unable to resolve whole units at this noise. We have not tested that explanation,
+  so the failed prediction neither supports nor refutes the engine.
 
 **The drops sit in dearer half-hours, and none began after January 2026.**
 
@@ -233,17 +234,26 @@ units.*
   therefore do not apply.
 - **Circularity:** the drops and the detector both read D8's residual, so some overlap is built in.
   The controls rule out a shared regional cause, and the placebo rules out a detector that flags
-  everything (0.19), but neither tests the engine directly. D8's own record of the engine after
-  2023-08-15 is zeros or absent (experiment 194), so we found no independent record. The engine's
-  recorded output exists only for the 44 days from 2023-07-03 to 2023-08-15, and no drop falls in
-  them (the first drop after the 2022 one starts on 2023-10-21), so that check cannot be run.
-  Experiment 196 also fitted D8's detector parameters and noise on 2023-09 to 2025-12, a window that
-  contains most of the drops, whereas the three controls fit their own noise on their own history.
+  everything (0.19), but neither tests the engine directly. D8's own record of the engine after NGED
+  stopped adding the engine's output to D8's reading is zeros or absent (experiment 194), so we
+  found no independent record. The engine's recorded output exists only for a short period, and no
+  drop falls in it (the first drop after the 2022 one starts on 2023-10-21), so that check cannot be
+  run. Experiment 196 also fitted D8's detector parameters and noise on 2023-09 to 2025-12, a window
+  that contains most of the drops, whereas the three controls fit their own noise on their own
+  history.
 - **Detector reliability:** experiment 196 judged the detector `not supported` after March 2025,
   and 17 of the 28 drops lie there. The period before March 2025, where the detector's
   known-answer test applies, gives 10 of 11 against 0.12.
 - **Reproduction:** arm v1 agrees with the stored probabilities of experiment 196 on every
   half-hour, and the 29 drops are those of experiment 159.
+
+**The scripts read the engine's connection date and recorded unit size from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it. The analysis also
+reads experiment 196's private gate results (`gate_results_fixed.json`) for the sensitivity unit
+size, and writes the lines that hold the unit size to a private report in its data folder, not to
+`printed_report.txt`.
 
 ## What the next experiment should answer
 

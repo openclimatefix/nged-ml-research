@@ -31,6 +31,11 @@ count
 - **A series is metered in MW (signed active power) or in MVA (apparent power, never negative).**
   Read the unit from the `units` column. Eight of the 16 Primaries are metered only in MVA, so solar
   output behind one of them appears as demand in daylight (disk).
+- **NGED reports 398 MVA-metered (non-directional) sites and 1,330 MW-metered (directional) sites in
+  its whole network.** The 398 MVA sites are 23% of the 1,728 sites. Only the 1,330 MW sites report
+  the sign of the flow, and the rows of the 398 MVA sites need the dark-row rule below. NGED gave
+  both counts as rough numbers (NGED reply, November 2026; rough; provisional), and the counts cover
+  the whole network, not only the Primaries.
 - **Use an MVA Primary for demand only on dark rows.** The rule, its evidence, and the row counts
   are in the [data-processing page](../data-processing.md#decide-which-rows-are-demand) (exp 103; 8
   MVA Primaries; established).
@@ -103,7 +108,7 @@ count
   of at least 1.5 MVA in 2023-09 to 2025-02 are rises, and from 8 to 10 MVA, 259 of 260 are falls
   ([experiment 694](../00694-gas-engine-state-tracker-part-1/result.md); D8; provisional).
 - **A tracker that fits the engine's unit count and size from the reading alone finds three units
-  of about 1.75 MW at D8 and flags none at the other seven Primaries.** The tracker finds a 1 MW
+  at D8 and flags none at the other seven Primaries.** The tracker finds a 1 MW
   unit injected into other Primaries in only 13 of 44 segments ([experiment
   694](../00694-gas-engine-state-tracker-part-1/result.md); 8 Primaries, 44 injected segments;
   provisional).

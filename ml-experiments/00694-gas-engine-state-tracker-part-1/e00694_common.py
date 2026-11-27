@@ -5,6 +5,7 @@ be named.
 """
 
 import pickle
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -12,6 +13,9 @@ from typing import Final
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 SLUG: Final[str] = "gas-engine-state-tracker-part-1"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"00694-{SLUG}"
@@ -27,7 +31,9 @@ GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
 N_GRID: Final[int] = 78816
 SOLAR_START: Final[datetime] = datetime(2025, 3, 24, tzinfo=UTC)
 POST_SOLAR_START: Final[datetime] = datetime(2025, 4, 1, tzinfo=UTC)
-ENGINE_CONNECTED: Final[datetime] = datetime(2023, 6, 13, tzinfo=UTC)
+SYNTHETIC_UNIT_MW: Final[float] = round(engine.engine_float(key="d8_engine_unit_mw"), 1)
+"""The unit size of the synthetic schedules: the recorded unit size rounded to one decimal."""
+ENGINE_CONNECTED: Final[datetime] = engine.engine_datetime(key="d8_engine_connected_date")
 NET_START: Final[datetime] = datetime(2023, 9, 1, tzinfo=UTC)
 NET_END: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
 FADE_START: Final[datetime] = datetime(2026, 3, 1, tzinfo=UTC)

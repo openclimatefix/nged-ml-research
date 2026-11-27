@@ -35,6 +35,7 @@ IQ = c.IQ
 W = 620
 GREY, ORANGE, BLUE, SKY = "#6b6b6b", theme.BRAND_ORANGE, theme.DATA_BLUE, theme.DATA_SKY
 INJECT_MONTH = "2026-03"
+ENGINE_SUBSTATION = "D8"
 # The maintainer's switch times for the December 2025 example event (UTC).
 SWITCH_TIMES = [datetime(2025, 12, 30, 1, 0), datetime(2026, 1, 14, 11, 30)]
 DESIGNS = [  # (length in days, depth share of capacity, sign): spans depth, length, and sign
@@ -173,6 +174,8 @@ def labelled(*, t, look, st, tables):
     )
     sel = sel.sort("label_length_days", "adepth", descending=True)
     for e in sel.iter_rows(named=True):
+        if e["label"] == ENGINE_SUBSTATION:  # its drops identify the engine, so draw none
+            continue
         p = lab_to_p[e["label"]]
         onset, end = e["label_onset_idx"], e["label_end_idx"]
         rows, r0 = get_rows(t=t, look=look, prim=p, lo=onset - 7 * 48, hi=end + 7 * 48)

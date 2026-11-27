@@ -394,9 +394,11 @@ stored for these events, so they cannot show what injection changed.
   within 0.004 points of the scorer. Whether that review stands in for the audit is for the
   maintainer to decide.
 
-This verdict adds no `not supported` or `refuted` to the theme's stop-rule count, which holds three
-`not supported` verdicts on recency weighting (experiments 331, 407, and 466) and one on one-shot
-ENS training (experiment 519).
+This verdict adds no `not supported` or `refuted` to the theme's stop-rule count, which holds four
+`not supported` verdicts on recency weighting (experiments 331, 407, 419, and 466) and one on
+one-shot ENS training (experiment 519). Experiment 419's verdict covers a bundle of three changes,
+and its 0.25-year half-life arm was mixed (higher signed-MW six CRPS, lower CRPS at D15 and D18), so
+the count of four includes one verdict that is not purely a recency-weight result.
 
 ## What was not run
 
