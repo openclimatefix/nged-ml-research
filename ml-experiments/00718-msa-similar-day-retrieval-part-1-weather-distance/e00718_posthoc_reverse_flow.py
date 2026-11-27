@@ -61,7 +61,7 @@ def main() -> int:
             "eight_without_D8": d.filter(pl.col("label").is_in(list(eight - {"D8"}))),
             "D8_only": d.filter(pl.col("label") == "D8"),
         }
-        out[name]["groups"] = {k: round(float(v["d"].mean()), 4) for k, v in sub.items()}
+        out[name]["groups"] = {k: round(float(v["d"].mean()), 4) for k, v in sub.items()}  # ty: ignore[invalid-argument-type]
         out[name]["monthly"] = {
             k: {
                 m: round(float(x), 3)
@@ -81,8 +81,8 @@ def main() -> int:
                 ),
                 "mean_d_negative": None
                 if (v["actual"] < 0).sum() == 0
-                else round(float(v.filter(pl.col("actual") < 0)["d"].mean()), 4),
-                "mean_d_other": round(float(v.filter(pl.col("actual") >= 0)["d"].mean()), 4),
+                else round(float(v.filter(pl.col("actual") < 0)["d"].mean()), 4),  # ty: ignore[invalid-argument-type]
+                "mean_d_other": round(float(v.filter(pl.col("actual") >= 0)["d"].mean()), 4),  # ty: ignore[invalid-argument-type]
             }
             for k, v in sub.items()
         }

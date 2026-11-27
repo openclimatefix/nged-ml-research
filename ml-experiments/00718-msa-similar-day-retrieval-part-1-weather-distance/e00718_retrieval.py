@@ -391,6 +391,9 @@ def rows_for_sample(
         lead_day: The lead day index 0 to 13.
         primary: The Primary index.
         day: The origin's day number.
+
+    Returns:
+        The ages, the measure codes, and whether the target row has no weather.
     """
     n_rows = lay.ROWS_PER_ARM[arm]
     no_weather = distance is None
@@ -548,6 +551,9 @@ def build_tables(  # noqa: PLR0915
             (4, 48, 7) float64 weather that the blocks of ages 2 to 5 read in the distance (the
             stored ensemble forecast), or None to keep the analysis. Ages 6 and above always read
             the analysis. The default None is the pool of every arm.
+
+    Returns:
+        The row table of each arm, keyed by the arm's name.
     """
     weather_arms = {"R", "R-A", "U", "U-A", "UX", "U27", "U27-A"}
     shape = (len(primaries), len(days), lay.N_LEAD_DAYS)

@@ -108,7 +108,7 @@ def main() -> int:
     pooled = []
     for arm in ARMS[args.part]:
         model, source, data = load(arm=arm, month=args.month, seed=args.seed, device=args.device)
-        c_all = data.test_origin_idx + lay713.NATIVE_OFFSET_STEPS
+        c_all = data.test_origin_idx + lay713.NATIVE_OFFSET_STEPS  # ty: ignore[unresolved-attribute]
         if c_pick is None:
             c_pick = rng.choice(c_all, N_CASES)
             p_pick = rng.integers(0, 16, N_CASES)
@@ -131,7 +131,7 @@ def main() -> int:
                 }
             )
             hm = (
-                alt.Chart(heat)
+                alt.Chart(heat)  # ty: ignore[unresolved-attribute]
                 .mark_rect()
                 .encode(
                     x=alt.X(
@@ -150,7 +150,7 @@ def main() -> int:
                 {"row": ["target", *[str(int(a)) for a in ages]], "attention": across_rows}
             )
             bar = (
-                alt.Chart(bars)
+                alt.Chart(bars)  # ty: ignore[unresolved-attribute]
                 .mark_bar(color=fig.COLOUR.get(arm, "#555"))
                 .encode(
                     x=alt.X(
@@ -169,7 +169,7 @@ def main() -> int:
             )
             f713.save(chart, path=args.out_dir / f"attention_part{args.part}_{arm}_{label}.svg")
         # pooled mean read-out weight by age, over the same cases for every arm
-        for c, p in zip(c_pick, p_pick, strict=True):
+        for c, p in zip(c_pick, p_pick, strict=True):  # ty: ignore[invalid-argument-type]
             got = case(model=model, source=source, primary=int(p), c_idx=int(c), lead_day=1)
             mass = got["alpha"].sum(axis=1) / 48.0
             pooled += [
@@ -183,7 +183,7 @@ def main() -> int:
         .sort("arm", "age_days")
     )
     chart = (
-        alt.Chart(df)
+        alt.Chart(df)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=22)
         .encode(
             x=alt.X(

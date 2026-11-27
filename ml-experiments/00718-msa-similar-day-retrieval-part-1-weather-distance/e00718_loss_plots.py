@@ -57,7 +57,7 @@ def main() -> int:
     domain = [label[a] for a in ARMS[part] if a in label]
     scale = alt.Scale(domain=domain, range=[fig.COLOUR[a] for a in ARMS[part] if a in label])
     chart = (
-        alt.Chart(agg)
+        alt.Chart(agg)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1.6)
         .encode(
             x=alt.X("pass:Q", title="Training pass"),

@@ -95,6 +95,9 @@ class F9Source:
             power_in: Override of the power read as history (the poison checks).
             ens_day_offset: Days added to the origin's day when the ensemble row is looked up (must be 0).
             ages_override: (B, H) ages that replace the table's (the negative controls of the poison check).
+
+        Returns:
+            The assembled batch of the samples.
         """
         p_np, c_np, k_np = (x.detach().cpu().numpy() for x in (primary, c_idx, lead_day))
         if ages_override is None:
