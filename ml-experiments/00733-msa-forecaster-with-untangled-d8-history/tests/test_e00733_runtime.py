@@ -15,6 +15,7 @@ import e00733_runtime as rt
 import e00733_stages as st
 import numpy as np
 import pytest
+from e00733_channels import StoppedError
 from test_e00733_stages import _ready
 
 
@@ -25,8 +26,8 @@ def _args(**kw: object) -> argparse.Namespace:
 
 
 def test_stage_functions_are_installed_by_main_and_not_at_import() -> None:
-    """Importing the CLI installs nothing; `install_runtime` installs the nine built stages and
-    leaves the stages not built (figures, score, ...) without a function."""
+    """Importing the CLI installs nothing; `install_runtime` installs the built stages and leaves
+    the stages of part 5c (figures, series, attention) without a function."""
     assert cli.STAGE_FUNCTIONS == {}
     cli.install_runtime()
     try:
@@ -37,8 +38,11 @@ def test_stage_functions_are_installed_by_main_and_not_at_import() -> None:
             "gallery",
             "fit",
             "chain",
+            "predict",
+            "score",
+            "smoke",
         }
-        assert "figures" not in cli.STAGE_FUNCTIONS and "score" not in cli.STAGE_FUNCTIONS
+        assert not {"figures", "series", "attention"} & set(cli.STAGE_FUNCTIONS)
     finally:
         cli.STAGE_FUNCTIONS.clear()
 
@@ -194,14 +198,14 @@ def test_the_timing_gate_drops_yt_then_fs_from_the_end(tmp_path: Path) -> None:
     assert "YT" not in ran and "FS" not in ran and "YU" in ran
 
 
-def test_chain_gates_raise_until_the_predict_stage_exists(tmp_path: Path) -> None:
-    """Without `--skip-gates` the F0r gate raises, and the chain records the failure (exit 5)."""
+def test_chain_gates_stop_the_line_without_f0r_forecasts(tmp_path: Path) -> None:
+    """Without `--skip-gates` the F0r gate finds no F0r forecast, and the chain stops (exit 3)."""
     _ready(tmp_path, through="timing")
     args = _args(data_root="/scratch", first_job_per_family=True, skip_gates=False)
-    with pytest.raises(rt.RuntimeError733):
+    with pytest.raises(StoppedError):
         rt.build_chain_steps(root=tmp_path, args=args, run_one=lambda *_: {}, counter={}).f0r_gate()
     status = rt.run_chain_stage(root=tmp_path, args=args, run_one=lambda *_: {})
-    assert status["state"] == "failed" and st.exit_code(status=status) == 5
+    assert status["state"] == "stopped" and st.exit_code(status=status) == 3
 
 
 # --------------------------------------------------------------------------- the real files
@@ -228,9 +232,17 @@ def test_real_neighbours_have_the_length_of_the_real_calendar() -> None:
     assert all(len(v) == len(cal.dates) for v in got.values())
 
 
-def test_an_unexpected_error_in_the_chain_does_not_leave_the_status_running(tmp_path: Path) -> None:
+def test_an_unexpected_error_in_the_chain_does_not_leave_the_status_running(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A failure outside a fit (a gate step) writes state failed with the traceback."""
     _ready(tmp_path, through="timing")
+
+    def boom(**_k: object) -> None:
+        msg = "an unexpected error"
+        raise ValueError(msg)
+
+    monkeypatch.setattr(rt.scoring, "f0r_gate", boom)
     steps = rt.build_chain_steps(
         root=tmp_path,
         args=_args(data_root="/scratch", first_job_per_family=True, skip_gates=False),

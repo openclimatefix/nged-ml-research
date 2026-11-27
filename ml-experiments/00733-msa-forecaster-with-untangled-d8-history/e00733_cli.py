@@ -11,10 +11,10 @@ and 5 for any failed fit or chain; never 1, which the launcher reserves for "slo
 leaves
 `scores/failure_<stage>.json` with the message and the traceback.
 
-Stages built: `guard`, `banks`, `channels`, `limits`, `gallery`, `timing`, `fit`, `chain`, `report`,
-and `loss_curves`. `main` installs the stage functions of `e00733_runtime` into `STAGE_FUNCTIONS`,
-never at import. The stages not built yet (`smoke`, `score`, `figures`, `attention`, `series`,
-`predict`) have no function, and such a stage exits 2 with a message, never silently.
+Stages built: `guard`, `banks`, `channels`, `limits`, `gallery`, `smoke`, `timing`, `fit`, `chain`,
+`predict`, `score`, `report`, and `loss_curves`. `main` installs the stage functions of
+`e00733_runtime` into `STAGE_FUNCTIONS`, never at import. The stages not built yet (`figures`,
+`attention`, `series`) have no function, and such a stage exits 2 with a message, never silently.
 """
 
 import argparse
@@ -38,6 +38,7 @@ STAGES: Final = (
     "timing",
     "fit",
     "chain",
+    "predict",
     "score",
     "report",
     "figures",
@@ -74,7 +75,11 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
         if args.stage == "guard":
             print("guard passed")
             return st.EXIT_OK
-        if args.stage == "score" and not st.marker_exists(root=root):
+        if (
+            args.stage == "score"
+            and not getattr(args, "validation_only", False)
+            and not st.marker_exists(root=root)
+        ):
             st.write_test_marker(root=root)
         fn = STAGE_FUNCTIONS.get(args.stage) or BUILTIN.get(args.stage)
         if fn is None:
@@ -97,11 +102,15 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
 def install_runtime() -> None:
     """Put the stage functions of `e00733_runtime` into `STAGE_FUNCTIONS`."""
     import e00733_runtime as rt
+    import e00733_scorestage as scorestage
+    import e00733_smokerun as smokerun
 
     STAGE_FUNCTIONS.update(
         {
             "banks": rt.stage_banks, "channels": rt.stage_channels, "limits": rt.stage_limits,
             "gallery": rt.stage_gallery, "fit": rt.stage_fit, "chain": rt.stage_chain,
+            "predict": rt.stage_predict, "score": scorestage.stage_score,
+            "smoke": smokerun.stage_smoke,
         }
     )  # fmt: skip
 
@@ -168,6 +177,20 @@ def parser() -> argparse.ArgumentParser:
         "--first-job-per-family",
         action="store_true",
         help="scratch root only: the chain fits one job of each family",
+    )
+    p.add_argument(
+        "--rows",
+        default="test",
+        choices=("test", "validation"),
+        help="stage predict: the rows predicted (validation rows are held out of the fits)",
+    )
+    p.add_argument(
+        "--validation-only",
+        action="store_true",
+        help="scratch root only: score validation rows, F0r in place of M*, no marker",
+    )
+    p.add_argument(
+        "--scratch", default=None, help="stage smoke: a scratch folder outside the data folder"
     )
     p.add_argument("--arm", default=None)
     p.add_argument("--fold", default=None)

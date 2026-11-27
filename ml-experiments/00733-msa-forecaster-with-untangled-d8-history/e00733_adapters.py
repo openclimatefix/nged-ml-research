@@ -31,7 +31,9 @@ import e00733_inputs as inputs
 import e00733_leakage as leak
 import e00733_paths as paths
 import e00733_rerun as rerun
+import e00733_stages as st
 import e00733_train as train
+import numpy as np
 
 D8_LABEL: Final = "D8"
 
@@ -66,8 +68,9 @@ def d8_index() -> int:
 
 
 def arm_tensors_for(
-    *, arm: str, base: Path, data: object, device: str, variant: str | None = None
-) -> tuple[inputs.ChannelTensors, tuple[str, ...]]:
+    *, arm: str, base: Path, data: object, device: str, variant: str | None = None,
+    poison_idx: np.ndarray | None = None,
+) -> tuple[inputs.ChannelTensors, tuple[str, ...]]:  # fmt: skip
     """Return the channel tensors of one arm on one fold, and the channels the arm keeps.
 
     Args:
@@ -78,6 +81,8 @@ def arm_tensors_for(
         variant: None for the arm itself, "masked" for reading R4 (every channel and flag zero), or
             "stored" for reading R12 (the stored outputs of days D - 2 and D - 1 in place of the
             re-run).
+        poison_idx: Grid indices whose table values are set to NaN (the target-row poison check of
+            `e00733_leakage`); None leaves the table as stored.
 
     Returns:
         The tensors and the kept channels.
@@ -103,9 +108,18 @@ def arm_tensors_for(
         )
     values, ok = channels.read_table(path=paths.table_path(root=base)).dense(n_grid=n_grid)
     outputs = None
+    if poison_idx is not None:
+        poisoned, _ = leak.poison_target_cells(
+            values=values[None], ok=ok[None], primary=0, target_idx=poison_idx
+        )
+        values = poisoned[0]
     if shift_days:
+        before = values
         values, ok = channels.placebo(
             values=values, ok=ok, shift_steps=shift_days * core.STEPS_PER_DAY
+        )
+        check_placebo(
+            before=before, after=values, ok=ok, shift_steps=shift_days * core.STEPS_PER_DAY
         )
     elif reads_rerun and variant != "stored":
         outputs = rerun.read_rerun(path=paths.rerun_dir(root=base) / f"{data.month}.npz")  # ty: ignore[unresolved-attribute]
@@ -116,6 +130,36 @@ def arm_tensors_for(
     if variant == "masked":
         tensors = inputs.mask_all(tensors=tensors)
     return tensors, kept
+
+
+def check_placebo(
+    *, before: np.ndarray, after: np.ndarray, ok: np.ndarray, shift_steps: int
+) -> int:
+    """Check that each placebo value is the stored value from `shift_steps` earlier, and 28 days at least.
+
+    Args:
+        before: The stored values `(n_grid, 3)`.
+        after: The placebo values.
+        ok: The placebo's presence flag.
+        shift_steps: The shift in half-hours.
+
+    Returns:
+        The number of tokens checked.
+
+    Raises:
+        CorrectnessFailureError: When a placebo value differs from the stored value it should copy.
+    """
+    token = np.flatnonzero(ok)
+    source = token - shift_steps
+    if not np.array_equal(after[token], before[source]):
+        msg = "a placebo value is not the stored value from the shifted half-hour"
+        raise st.CorrectnessFailureError(msg)
+    return leak.assert_placebo_from_28_days_earlier(source_idx=source, token_idx=token)
+
+
+def table_flags(*, base: Path, n_grid: int) -> np.ndarray:
+    """Return whether the channel table holds a value at each grid index, `(n_grid,)`."""
+    return channels.read_table(path=paths.table_path(root=base)).dense(n_grid=n_grid)[1]
 
 
 def real_loader(*, root: Path | None = None) -> fit.RealLoader:

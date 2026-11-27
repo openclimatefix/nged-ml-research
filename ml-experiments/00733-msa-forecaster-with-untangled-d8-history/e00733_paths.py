@@ -35,7 +35,9 @@ CODE_732_ENV: Final = "E00733_732_CODE"
 """The environment variable that may name a folder holding experiment 732's code."""
 UNTANGLER_WORKTREE: Final = "exp-untangler-plan"
 """The sibling worktree that holds experiment 732's code until the experiment merges."""
-SIBLING_PREFIXES: Final = ("00713-", "00716-", "00717-", "00725-", "00707-", "00709-", "00667-")
+SIBLING_PREFIXES: Final = (
+    "00713-", "00716-", "00717-", "00725-", "00707-", "00709-", "00667-", "00377-",
+)  # fmt: skip
 """Folders whose modules this experiment imports by bare name, beyond experiment 713's recipe."""
 
 HERE_STR: Final = str(HERE)

@@ -17,6 +17,7 @@ import e00733_channels as ch
 import e00733_core as core
 import e00733_paths as paths
 import e00733_rerun as rr
+import e00733_scoring as scoring
 import e00733_stages as st
 import e00733_synth as sy
 import e00733_world as world
@@ -512,11 +513,22 @@ def synthetic_loader(*, root: Path) -> Any:
     """
     import e00733_adapters as adapters
     import e00733_fit as fit
+    import e00733_leakage as leak
+    import e00733_model as model
 
     cached: dict[str, fit.SyntheticInputs] = {}
 
     def load(arm: str, seed: int, device: str) -> fit.SyntheticInputs:
         if "inputs" not in cached:
+            leak.assert_synthetic_train_banks(
+                seeds=[
+                    int(b[1]) for b in BANK_FILES.values() if b[0] == "train" and b[1] is not None
+                ],
+                fit_seeds_732=list(core.SOURCE_SEEDS),
+            )
+            leak.assert_synthetic_inputs_clean(
+                input_names=list(model.UntInputs.__dataclass_fields__)
+            )
             train = train_segments(root=root)
             valid = world.read_world(root=root, kind="validation")[0]
             limits = json.loads((root / "limits.json").read_text())
@@ -570,6 +582,81 @@ def make_run_job(
     return run_job
 
 
+def make_predicting_job(
+    *, root: Path, device: str, max_passes: int | None, rows: str = "test"
+) -> Any:  # fmt: skip
+    """Return `run(arm, fold, seed) -> record`: the fit, then its stored prediction sets.
+
+    Args:
+        root: This experiment's data folder.
+        device: "cuda" or "cpu".
+        max_passes: Replaces the plan's caps (scratch debug runs only).
+        rows: The rows predicted ("test" for the chain).
+
+    Returns:
+        The function. A fit that raised leaves no prediction; a prediction that raised fails the job.
+    """
+    import e00733_fit as fit
+    import e00733_leakage as leak
+    import e00733_predictions as pr
+
+    run_job = make_run_job(root=root, device=device, max_passes=max_passes)
+
+    def run(arm: str, fold: str | None, seed: int) -> dict[str, Any]:
+        record = run_job(arm, fold, seed)
+        leak.assert_limits_before_fits(
+            limits=root / "limits.json",
+            fit_records=[fit.record_path(root=root, arm=arm, fold=fold, seed=seed)],
+        )
+        pr.predict_job(root=root, arm=arm, fold=fold, seed=seed, device=device, rows=rows)
+        return record
+
+    return run
+
+
+def stage_predict(args: argparse.Namespace, root: Path) -> dict[str, Any]:
+    """Write the stored prediction sets of one fit (`--arm`, `--fold`, `--seed`) or of every fit.
+
+    With no `--arm`, the stage predicts every fit that has a record, in the plan's order. `--rows
+    validation` predicts the held-out validation rows instead of the test rows.
+
+    Args:
+        args: The parsed arguments (`--rows`, `--device`).
+        root: This experiment's data folder.
+
+    Returns:
+        The names of the sets written or found, and the number of fits predicted.
+
+    Raises:
+        RuntimeError733: When no fit exists to predict (the stage would pass on an empty counter).
+    """
+    import e00733_fit as fit
+    import e00733_predictions as pr
+
+    rows = getattr(args, "rows", "test")
+    if args.arm is not None:
+        jobs = [(args.arm, args.fold, args.seed)]
+    else:
+        jobs = [
+            job
+            for family in core.FIT_ORDER
+            for job in st.family_jobs(family=family)
+            if fit.record_path(root=root, arm=job[0], fold=job[1], seed=job[2]).exists()
+        ]
+    done: list[str] = []
+    for arm, fold, seed in jobs:
+        done += [
+            str(p.name)
+            for p in pr.predict_job(
+                root=root, arm=arm, fold=fold, seed=seed, device=args.device, rows=rows
+            )
+        ]
+    if not jobs:
+        msg = "no fit exists, so the predict stage would write nothing"
+        raise RuntimeError733(msg)
+    return {"fits": len(jobs), "sets": done}
+
+
 def stage_fit(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     """Run one fit (`--arm`, `--fold`, `--seed`) and return its record.
 
@@ -603,8 +690,8 @@ def build_chain_steps(
 ) -> st.ChainSteps:
     """Return the chain's steps: the job runner, the two gates, and the job selection.
 
-    The F0r gate and the screen point read stored predictions, which the predict stage writes. Until
-    then they raise; a scratch run passes `--skip-gates` to run the fits alone.
+    The F0r gate and the screen point read the stored predictions, which the chain writes after each
+    fit. A scratch run may pass `--skip-gates` to run the fits alone.
 
     Args:
         root: This experiment's data folder.
@@ -631,14 +718,16 @@ def build_chain_steps(
         counter["run"] = counter.get("run", 0) + 1
         return record
 
-    def not_built(*_a: object) -> Any:
-        msg = "the F0r gate and the screen read stored predictions: the predict stage is not built yet"
-        raise RuntimeError733(msg)
+    def f0r_gate() -> None:
+        scoring.f0r_gate(root=root, require_all=not scratch)
+
+    def screen_point() -> float:
+        return scoring.screen_point(root=root)
 
     return st.ChainSteps(
         run_job=run_job,
-        f0r_gate=(lambda: None) if skip else not_built,
-        screen_point=(lambda: 0.0) if skip else not_built,
+        f0r_gate=(lambda: None) if skip else f0r_gate,
+        screen_point=(lambda: 0.0) if skip else screen_point,
         select_jobs=keep_first_job if first else (lambda _f, jobs: jobs),
     )
 
@@ -659,7 +748,7 @@ def run_chain_stage(*, root: Path, args: argparse.Namespace, run_one: Any) -> di
 def stage_chain(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     """Run the fit families in the plan's order (the dropped arms are skipped)."""
     cap = check_max_passes_allowed(args=args)
-    run_one = make_run_job(root=root, device=args.device, max_passes=cap)
+    run_one = make_predicting_job(root=root, device=args.device, max_passes=cap)
     return run_chain_stage(root=root, args=args, run_one=run_one)
 
 
