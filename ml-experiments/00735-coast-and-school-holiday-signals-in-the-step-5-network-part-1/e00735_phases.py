@@ -59,8 +59,8 @@ MONTHS: Final = (
 PHASES: Final = ("columns", "smoke", "gate", "fit", "score")
 SMOKE_MONTH: Final = "2026-01"
 GATE_MONTH: Final = "2026-10"
-STOP_HOURS: Final = 5.5
-"""The maintainer's line: more than this many GPU-process-hours needs a new request."""
+STOP_HOURS: Final = float(os.environ.get("STOP_HOURS", "5.5"))
+"""The line, in GPU-process-hours, past which the runner stops and asks (5.5 unless the manager sets the environment variable `STOP_HOURS`; the manager set 6.5 for the fit phase on 2026-11-27)."""
 EXIT_FAILED: Final = 20
 EXIT_STOP: Final = 21
 EXIT_USAGE: Final = 2
