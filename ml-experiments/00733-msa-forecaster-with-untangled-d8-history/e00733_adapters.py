@@ -151,7 +151,7 @@ def check_placebo(
     """
     token = np.flatnonzero(ok)
     source = token - shift_steps
-    if not np.array_equal(after[token], before[source]):
+    if not np.array_equal(after[token], before[source], equal_nan=True):
         msg = "a placebo value is not the stored value from the shifted half-hour"
         raise st.CorrectnessFailureError(msg)
     return leak.assert_placebo_from_28_days_earlier(source_idx=source, token_idx=token)

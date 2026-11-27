@@ -42,3 +42,19 @@ def test_check_placebo_reads_the_shifted_table_and_refuses_a_copy_of_the_present
         ad.check_placebo(before=values, after=values, ok=ok_shifted, shift_steps=shift)
     with pytest.raises(CorrectnessFailureError):
         ad.check_placebo(before=values, after=shifted, ok=ok_shifted, shift_steps=shift - 1)
+
+
+def test_check_placebo_accepts_poisoned_target_cells_that_the_shift_copies() -> None:
+    """A NaN cell that the placebo copies from the poisoned target rows is not a difference."""
+    import e00733_channels as channels
+    import e00733_core as core
+    import numpy as np
+
+    shift = core.PLACEBO_SHIFT_DAYS * core.STEPS_PER_DAY
+    rng = np.random.default_rng(1)
+    values = rng.random((shift + 200, 3)).astype(np.float32)
+    values[10:20] = np.nan
+    ok = np.ones(shift + 200, dtype=bool)
+    shifted, ok_shifted = channels.placebo(values=values, ok=ok, shift_steps=shift)
+    assert np.isnan(shifted[shift + 10 : shift + 20]).all()
+    assert ad.check_placebo(before=values, after=shifted, ok=ok_shifted, shift_steps=shift) == 200
