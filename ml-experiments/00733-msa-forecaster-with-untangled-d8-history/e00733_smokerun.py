@@ -9,6 +9,7 @@ stages. The data folder gets `scores/smoke.json` only.
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,15 @@ import numpy as np
 
 LINKED_INPUTS: Final = ("limits.json", "channels.json", "channels", "world")
 SMOKE_729_TIMEOUT_SECONDS: Final = 3600
+
+
+def scratch_root(*, outer: Path, root: Path) -> Path:
+    """Return the smoke test's own data folder, named like `root`.
+
+    The experiment store finds the folder of experiment 733 by its name, so the folder under the
+    scratch folder carries the name of the data folder.
+    """
+    return outer / root.name
 
 
 def link_inputs(*, root: Path, scratch: Path) -> list[str]:
@@ -119,18 +129,14 @@ def check_steps(*, root: Path) -> dict[str, Any]:
         return f"{n} samples with ENS rows from one test segment"
 
     def smoke_729() -> str:
-        script = (
-            paths.ROOT
-            / "00729-msa-d8-neural-untangler-synthetic-known-answers"
-            / "tests"
-            / "smoke_real_files.py"
-        )
+        folder = paths.ROOT / "00729-msa-d8-neural-untangler-synthetic-known-answers"
+        env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(folder), *sys.path])}
         done = subprocess.run(
-            [sys.executable, "-I", str(script)], capture_output=True, text=True, check=False,
-            timeout=SMOKE_729_TIMEOUT_SECONDS,
+            [sys.executable, str(folder / "tests" / "smoke_real_files.py")], capture_output=True,
+            text=True, check=False, timeout=SMOKE_729_TIMEOUT_SECONDS, env=env,
         )  # fmt: skip
         if done.returncode != 0:
-            msg = f"experiment 729's smoke_real_files.py exited {done.returncode}: {done.stdout[-400:]}"
+            msg = f"experiment 729's smoke_real_files.py exited {done.returncode}: {(done.stdout + done.stderr)[-400:]}"
             raise rt.RuntimeError733(msg)
         return "experiment 729's smoke_real_files.py passed"
 
@@ -190,8 +196,9 @@ def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     if getattr(args, "scratch", None) is None:
         msg = "the smoke stage needs --scratch, a folder outside the data folder"
         raise rt.RuntimeError733(msg)
-    scratch = Path(args.scratch)
-    smoke.assert_scratch_outside(scratch=scratch, data_root=root)
+    outer = Path(args.scratch)
+    smoke.assert_scratch_outside(scratch=outer, data_root=root)
+    scratch = scratch_root(outer=outer, root=root)
     link_inputs(root=root, scratch=scratch)
     run_job = rt.make_run_job(root=scratch, device=args.device, max_passes=1)
 

@@ -82,3 +82,18 @@ def test_a_set_round_trips_through_the_experiment_store(tmp_path: Path) -> None:
     assert got.height == 3 and store.set_folder(root=root, name=name).is_dir()
     with pytest.raises(ValueError, match="row set"):
         store.read_set(root=root, name=name, rows="test")
+
+
+def test_the_smoke_scratch_folder_is_named_like_the_data_folder(tmp_path: Path) -> None:
+    """The store finds experiment 733 by folder name, so a smoke prediction needs that name."""
+    import e00733_smokerun as sr
+
+    root = tmp_path / "ml-experiments" / "00733-slug"
+    scratch = sr.scratch_root(outer=tmp_path / "smoke", root=root)
+    (scratch / "predictions").mkdir(parents=True)
+    frame = _frame().with_columns(valid_time=pl.col("valid_time").dt.replace_time_zone("UTC"))
+    experiment_store.write_predictions(
+        experiment_id=733, name="f0r_2025-11_s0_val", frame=frame, kind="quantiles",
+        row_set_id=store.row_set_id(rows="validation"), data_dir=store.data_dir(root=scratch),
+    )  # fmt: skip
+    assert store.read_set(root=scratch, name="f0r_2025-11_s0_val", rows="validation").height == 3
