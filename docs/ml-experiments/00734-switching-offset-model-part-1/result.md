@@ -7,7 +7,7 @@ title: >-
 theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
-status: planned
+status: finished
 date: 2026-11-27
 kind: other
 size: >-
@@ -94,6 +94,21 @@ metric: >-
   on
   hard negatives, cold spells, and solar growth; logged shifts matched under experiment 254's
   strict and loose rules.
+verdict: not supported
+best_arm: >-
+  E1-J-sym in the long and shallow cell (0.393 of the injected megawatts found, against PELT 0.384,
+  H-nbr 0.355, and H-own 0.352). H-nbr is best in the medium cells (0.449 against 0.352 for
+  E1-J-sym in the medium and shallow cell). On the real record H-nbr calls 0.34 times as many
+  events as E1-J-sym, but 1.09 times as many events of 2 noise units or more. All numbers are
+  interim.
+headline: >-
+  The probabilistic offset model with neighbour evidence (H-nbr) found a smaller share of the
+  megawatts of long, shallow injected load transfers than the event table E1-J-sym (0.355 against
+  0.393; C1 -0.039, 97.5% world interval -0.090 to +0.014), so the verdict is `not supported`. Of
+  the 10 predictions, only P6 held. H-nbr did find more in the medium cells, and in event-free time
+  it called about a quarter as many events as E1-J-sym when all called events are counted, and 0.97
+  times as many when only events of 2 noise units or more are counted. Neither probabilistic model
+  beat the plain changepoint search (C2 -0.029, -0.078 to +0.016).
 code: ml-experiments/00734-switching-offset-model-part-1/
 ---
 
@@ -112,13 +127,133 @@ probability distribution over the switched megawatts in every 6-hour block, plus
 with a grade that says how sure the probabilistic model is that each event is a switch. To test
 the probabilistic model, we add synthetic transfers of known
 size, start, and end to the real history of 15 Primaries, and measure how many of the added
-megawatts each method finds. This page is the plan; no world has been decoded.
+megawatts each method finds. This page holds the plan, which was written before any world was
+decoded, and the result.
 
 **The headroom is larger than the earlier pages suggest.** The figure of 0.67 of long, deep
 megawatts found, quoted on the event-table pages, comes from the six worlds of experiment 653's own
 injector. On the 40 default worlds of the shared generator of experiment 660, which this experiment
 uses, the event table E1-J-sym finds 0.515 of the long and deep megawatts and 0.393 of the long and
 shallow megawatts (stored rows of experiment 680, recomputed for this plan).
+
+## Result
+
+*Every number below comes from the first and only scoring of the scored worlds, and is interim until
+the reviews are complete. The numbers come from the console output of the report stage, stored as
+`report_output.txt`, and from the tables it reads: `scored/<set>/<arm>_<seed>.parquet` and
+`scored/<set>/<arm>_<seed>_calls.parquet` (each world), `real/summary.json` and
+`real/events_<arm>.parquet` (the real record), `params.json`, `edge_check.json`, and `g3b.json`, all
+under `data/ml-experiments/00734-switching-offset-model-part-1/`. No figure on this page is a chart
+of real substation demand. The event figures made from the real record and from the synthetic worlds
+show demand of D8-region Primaries and stay in the private folder.*
+
+### The result in plain terms
+
+**The offset model did not find more of the long, shallow transfers than the event table.** The
+question was whether a hidden Markov model that reads a Primary's whole record (H-nbr: the model
+with the shared term and the neighbour mirror evidence) finds more of the megawatts of injected
+transfers that last more than 7 days (or never end) and are 2 to under 8 noise units deep. The score
+is the MW-weighted share found: the injected megawatts of the transfers a method found, over all the
+injected megawatts in the cell (higher is better; 0.355 means that 35.5% of the injected megawatts
+were found). On the 40 scored default worlds H-nbr found 0.355, E1-J-sym (the event table of
+experiment 680, a detector that segments each Primary's record with a fixed penalty per block) found
+0.393, and PELT (a plain per-Primary penalised changepoint search) found 0.384.
+
+**C1, the counted contrast, is -0.039, and its interval includes zero.** C1 is H-nbr minus E1-J-sym
+in the long and shallow cell. The 97.5% interval resampling whole worlds is -0.090 to +0.014, and
+the interval resampling the calendar months of the events is -0.094 to +0.019. The bar was +0.10, so
+the verdict is `not supported`. Both vetoes passed, so they do not change the verdict. H-nbr's
+called rates on the real record, as multiples of E1-J-sym's, are 0.34 for all called events and 1.09
+for events of 2 noise units or more (V1, limit 1.10). In event-free time they are 0.26 and 0.97 (V2,
+limit 1.10).
+
+**C2 also fails: H-nbr minus PELT is -0.029 (world interval -0.078 to +0.016).** The two
+probabilistic models, H-own (the model without neighbour evidence) and H-nbr, are no better than a
+plain penalised search in the cell H-own and H-nbr were built for. H-nbr minus H-own (P4) is +0.003
+(-0.031 to +0.036), so the neighbour evidence added nothing in the long and shallow cell.
+
+**All of this is on synthetic transfers injected into the real history of 15 Primaries.** The real
+record has no labels that could confirm the result. The 77 logged shifts in the real record are
+matched by H-nbr 13 times under the strict rule and 19 under the loose rule, and by H-own 14 and 22
+times.
+
+### Found share by cell, 40 scored default worlds
+
+| Cell | Injected events | H-own | H-nbr | PELT | E1-J-sym |
+|---|---|---|---|---|---|
+| long, deep | 220 | 0.511 | 0.465 | 0.522 | 0.515 |
+| long, shallow (counted) | 840 | 0.352 | 0.355 | 0.384 | 0.393 |
+| medium, deep | 127 | 0.583 | 0.571 | 0.468 | 0.485 |
+| medium, shallow | 458 | 0.406 | 0.449 | 0.286 | 0.352 |
+| short, deep | 163 | 0.098 | 0.110 | 0.162 | 0.119 |
+| short, shallow | 561 | 0.019 | 0.023 | 0.021 | 0.047 |
+
+**H-nbr finds more than E1-J-sym in the two medium cells and less in the long cells, and every
+method finds little in the short cells.** The gain is +0.096 in the medium and shallow cell and
++0.086 in the medium and deep cell. In the long and deep cell H-nbr is 0.050 below E1-J-sym (P5,
+whose bar was +0.05 or more), so H-own and H-nbr do best on events of 1 to 7 days. E1-J-sym finds
+those events less well. The short and shallow cell is close to zero for every method (0.019 to
+0.047), and the short and deep cell is low (0.098 to 0.162). H-nbr is within 0.03 of E1-J-sym in
+both short cells, as the plan predicted (P6 held).
+
+### Predictions
+
+| Id | Claim | Value | Held |
+|---|---|---|---|
+| P1 | C1, H-nbr minus E1-J-sym, long and shallow: +0.10 or more | -0.039 | no |
+| P2 | C2, H-nbr minus PELT: +0.15 or more | -0.029 | no |
+| P3 | H-own minus E1-J-sym: +0.03 to +0.08 | -0.042 | no |
+| P4 | H-nbr minus H-own: +0.02 or more | +0.003 | no |
+| P5 | H-nbr minus E1-J-sym, long and deep: +0.05 or more | -0.050 | no |
+| P6 | H-nbr within 0.03 of E1-J-sym in both short cells | -0.009 (deep) and -0.024 (shallow) | yes |
+| P7 | 80% interval covers the injected megawatts in 0.70 to 0.90 of the half-hour blocks inside found temporary events, in each long and medium cell | 0.03 to 0.36 | no |
+| P8 | cascade worlds: H-nbr at least E1-J-sym, and H-nbr at least 0.05 above H-nbr-noramp | -0.006 and +0.025 | no |
+| P9 | cold-spell worlds: H-nbr calls at most half as many events in spells as H-nbr-noshared | 0.82 (441 against 535) | no |
+| P10 | H-nbr's called rates each within 10% of E1-J-sym's in event-free time (ratio 0.90 to 1.10) | 0.26 and 0.97 | no |
+
+**P10 failed on the all-calls rate, which was 0.26 times E1-J-sym's, below the band of 0.90 to 1.10,
+while the veto V2 only limits the ratio from above.**
+
+**The 80% intervals are far too narrow (P7).** The interval of the predicted switched megawatts
+covered the injected megawatts in only 0.03 to 0.36 of the half-hour blocks inside found temporary
+events in each long and medium cell, where 0.80 was the target. A user who reads the interval as a
+probability statement would be misled. The output of the offset model therefore cannot yet serve as
+the distribution over switched power that the use "interpreting lagged power features" on the
+[switching events](../background/switching-events.md) page needs.
+
+**Removing the shared term lowers the long and shallow share by 0.028, and removing the ramp rule
+changes it by less than 0.001.** Without the shared term (H-nbr-noshared) the share falls from 0.355
+to 0.327 and the calls inside cold spells rise from 441 to 535. Without the ramp rule (H-nbr-noramp)
+the long and shallow share stays at 0.355, and the share found in the cascade worlds falls from
+0.392 (H-nbr) to 0.367.
+
+### Other reads
+
+- **The real record, scored years:** over 36.3 Primary-years H-nbr calls 84 events (2.32 per
+  Primary-year, 1.93 for events of 2 noise units or more), H-own 99, PELT 89, and E1-J-sym 6.87 and
+  1.76 per Primary-year. Of H-nbr's 84 events, 10 are mirrored and returned, 64 returned without a
+  visible partner, and 10 neither.
+- **Hard negatives (steps, ramps, pulses, and placebo pairs that are not switching events):** H-nbr
+  makes 0.86 calls per hard negative, H-own 1.15, PELT 0.97, and E1-J-sym 1.90.
+- **Placebo worlds (the same events moved to random times):** C1 on the placebo worlds is -0.100
+  (world interval -0.164 to -0.038), so H-nbr loses to E1-J-sym there too.
+- **Un-injected worlds:** H-own calls 3 false events, H-nbr 2, and PELT 73.
+- **Solar growth (24 worlds, 72 grown Primaries) and seasonal bias (2 worlds, 10 grown Primaries):**
+  H-nbr makes 0.48 false events per grown Primary-year under solar growth and 0.96 under seasonal
+  bias; H-own makes 0.60 and 1.04.
+- **Tuning:** H-own's best value of the return-to-zero rate (`rho_off`) sat on the edge of its
+  extended search grid. The other tuned values were interior or limited by a called rate (see
+  Amendment 1).
+
+### What the result means
+
+**In the long and shallow cell, H-nbr finds fewer injected megawatts than E1-J-sym, so the result
+gives no reason to replace E1-J-sym there.** H-nbr does find more megawatts of events that last 1 to
+7 days, and it calls fewer events in total on the real record (0.34 times E1-J-sym's rate), though
+about as many events of 2 noise units or more (1.09 times). The claim the plan set out to test, a
+gain of +0.10 in the long and shallow cell, did not hold. The plan's later step, a restricted
+version of the offset model (part 2), is for the maintainer to decide; this page makes no
+commitment.
 
 ## Terms
 
@@ -816,7 +951,7 @@ planning.**
 - **Mirror window.** The memo says "within one step"; the plan uses 3 blocks, because the generator
   starts a recipient up to 36 half-hours after its donor.
 
-## Method (planned)
+## Method
 
 **Architecture.**
 
@@ -834,8 +969,8 @@ planning.**
 
 - **No training:** priors, κ, τ, and the PELT penalty are tuned once on 30 tuning worlds with the
   scored years hidden and on the real record of 2022 and 2023; NGED's labels enter nothing.
-- **Compute:** CPU only, about 32 CPU-hours or more at 1 thread per worker (stop at 40), 0
-  GPU-process-hours.
+- **Compute:** CPU only, about 68 CPU-hours at 1 thread per worker (stop at 90 after two
+  extensions), 0 GPU-process-hours.
 
 **Measurement.**
 
@@ -847,7 +982,7 @@ planning.**
 - **Real record:** called rates in 2024 to mid-2026 and in event-free time, logged shifts matched,
   and the verified transfers.
 
-## Files (planned)
+## Files
 
 - `ml-experiments/00734-switching-offset-model-part-1/e00734_panel.py`: loads the residual panel,
   the forecast, the noise units, and the neighbour graph, and builds the block means and the shared
@@ -857,7 +992,8 @@ planning.**
 - `.../e00734_events.py`: event extraction, grading, and half-hour refinement.
 - `.../e00734_pelt.py`: the hand-written PELT search.
 - `.../e00734_layers.py`: the cascade and cold-spell layers and their truth tables.
-- `.../e00734_run.py`: stages 0 to 4, one world and arm per job.
+- `.../e00734_run.py`: stages 0 to 4, one world and arm per job, and the `freeze-code` stage that
+  hashes the scoring code.
 - `.../e00734_score.py` and `.../e00734_figures.py`: scoring, intervals, and every figure.
 - `.../test_e00734_hmm.py`: the known-answer tests of gate G3.
 - Read only: the folders of experiments 653, 660, 665, 670, and 680; experiment 327's stored power
