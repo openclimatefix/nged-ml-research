@@ -342,7 +342,7 @@ def fit_synthetic(
         seed: The seed.
         device: "cuda" or "cpu".
         loader: Builds the fit's inputs.
-        max_epochs: Replaces the cap of 80 passes (the smoke test runs one pass).
+        max_epochs: Replaces the cap of 40 passes (the smoke test runs one pass).
 
     Returns:
         The record. A fit whose record exists is skipped and its record returned.

@@ -856,7 +856,7 @@ def write_job_record(
 
 def make_predicting_job(
     *, root: Path, device: str, max_passes: int | None, rows: str = "test",
-    data_root: str | None = None, new_process: bool = True,
+    data_root: str | None = None, new_process: bool = True, predict_new_process: bool = False,
 ) -> Any:  # fmt: skip
     """Return `run(arm, fold, seed) -> record`: the fit, then its stored prediction sets.
 
@@ -867,7 +867,10 @@ def make_predicting_job(
         rows: The rows predicted ("test" for the chain).
         data_root: The scratch data root of the command line, passed on to the new processes.
         new_process: Whether the fit and the prediction each run in a process of their own (the
-            chain). The timing gate runs both in this process so that it can cap the passes.
+            chain). The timing gate runs the fit in this process so that it can cap the passes.
+        predict_new_process: Whether the prediction runs in a new process although the fit does not.
+            The prediction phase of the experiment 713 pipeline is fixed when the pipeline module is
+            first imported, so a prediction in the process that fitted would see the training phase.
 
     Returns:
         The function. A fit that raised leaves no prediction; a prediction that raised fails the
@@ -895,7 +898,7 @@ def make_predicting_job(
             fit_records=[fit.record_path(root=root, arm=arm, fold=fold, seed=seed)],
         )
         started = time.monotonic()
-        if new_process:
+        if new_process or predict_new_process:
             run_stage_in_new_process(
                 stage="predict", arm=arm, fold=fold, seed=seed, device=device, root=root,
                 data_root=data_root, max_passes=None, rows=rows,
@@ -1093,7 +1096,7 @@ def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
 
     Returns:
         The measurements that `timing_decision` reads: seconds of a whole real job, seconds of a
-        whole synthetic job at 80 passes, the peaks, and the seconds of the smoke test and of this
+        whole synthetic job at the pass cap, the peaks, and the seconds of the smoke test and of this
         measurement.
     """
     import e00733_smokerun as smokerun
@@ -1104,8 +1107,17 @@ def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
     shutil.rmtree(outer, ignore_errors=True)
     scratch = smokerun.scratch_root(outer=outer, root=root)
     smokerun.link_inputs(root=root, scratch=scratch)
+    # the prediction process runs `guard_run`, which refuses a folder without the run marker
+    scratch.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / st.RUN_MARKER, scratch / st.RUN_MARKER)
     real_job = make_predicting_job(
-        root=scratch, device=args.device, max_passes=cap, rows="test", new_process=False
+        root=scratch,
+        device=args.device,
+        max_passes=cap,
+        rows="test",
+        new_process=False,
+        predict_new_process=True,
+        data_root=str(scratch),
     )
     real = real_job("FU", core.TIMING_FOLD, 0)
     passes = 5 if cap is None else cap
@@ -1121,7 +1133,7 @@ def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
     )
     return {
         "seconds_per_real_fit": float(real["seconds"]) + float(real["predict_seconds"]),
-        "seconds_per_synthetic_fit": per_pass * 80 + float(syn["predict_seconds"]),
+        "seconds_per_synthetic_fit": per_pass * core.SYNTHETIC_MAX_EPOCHS + float(syn["predict_seconds"]),
         "peak_gpu_gb": max(float(real["peak_gpu_gb"]), float(syn["peak_gpu_gb"])),
         "peak_rss_gb": max(
             float(real["peak_rss_gb"]), float(syn["peak_rss_gb"]), float(real["predict_peak_rss_gb"]),

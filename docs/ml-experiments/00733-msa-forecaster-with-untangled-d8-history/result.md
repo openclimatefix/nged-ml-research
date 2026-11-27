@@ -399,7 +399,7 @@ alone.** Experiment 713's stage 1 states trained on D8's real readings of the ba
 warm start could carry the base demand of a test month into the test score. The synthetic forecaster
 has experiment 713's architecture, the history path above, and the sign head, and trains in one
 stage on ERA5 history weather and ENS target weather: AdamW with a learning rate of 5e-4 and weight
-decay of 1e-3, batch 256, gradient clipping at 1.0, at most 80 passes with a patience of 20 on the
+decay of 1e-3, batch 256, gradient clipping at 1.0, at most 40 passes with a patience of 20 on the
 validation loss, which is the sum of the mixture negative log-likelihood and the sign head's binary
 cross-entropy, each with weight 1.0. The patience is longer than experiment 713's 8, because
 experiment 716 found that a patience of 8 stopped a slow history path after 4 to 23 passes.
@@ -590,9 +590,10 @@ planned 0.08 GPU-process-hours for one fit with its prediction and measured 0.04
 alone. The plan takes 0.08 hours for each real-fold fit. Experiment 713's fits of all three stages
 took a mean of 630 seconds (arm M1, 40 fits). A synthetic fit has up to about 37,000 samples per pass,
 against 21,396 in experiment 713's stage 1, and the plan takes 0.3 hours for one synthetic fit at
-the cap of 80 passes. Experiment 732's `timing.json` gives 3.4 seconds an epoch of 8,000 windows for
-U\*, so the re-runs of the untangling network take minutes. The peak GPU memory of experiments 716
-and 717 was 3.5 GB, under the cap of 6 GB.
+the cap of 80 passes (the ruling of 2026-11-27 on the pass cap replaces that figure). Experiment
+732's `timing.json` gives 3.4 seconds an epoch of 8,000 windows for U\*, so the re-runs of the
+untangling network take minutes. The peak GPU memory of experiments 716 and 717 was 3.5 GB, under
+the cap of 6 GB.
 
 | Work | Fits | Hours each | GPU-process-hours |
 |---|---|---|---|
@@ -688,7 +689,7 @@ metering groups that the skill names.
 
 **The plan departs from one item of earlier advice.** Experiment 715 advises 400 passes with a
 patience of 30 before a known-answer test of the axial-attention network. The synthetic fits here
-run at most 80 passes with a patience of 20, because 400 passes would cost more than the 12
+run at most 40 passes with a patience of 20, because 400 passes would cost more than the 12
 GPU-process-hours of the slot; every fit logs whether the validation loss was still falling at the
 cap, and a fit that hits the cap is reported.
 
@@ -900,6 +901,20 @@ published page carries the coverage counts.
   validation rows, where the target-poison check never runs. The gate now fits the fold 2026-06 and
   predicts the test rows, with the check, in a scratch folder. It scores nothing, writes no
   `test_started` marker, and no chain job reads its predictions.
+- **The synthetic fits stop at 40 passes, on a measured cost of 90 seconds a pass (ruling of the
+  design lead, 2026-11-27, set before any experiment 733 fit exists).** The timing gate fitted
+  YU for 5 passes in 470 seconds and Y0 for 5 passes in 456 seconds on the real GPU, which is about
+  90 seconds a pass, because each batch also runs the frozen untangling network forward (the
+  data-path speed-up above cut the batch cutting only). A fit at the cap of 80 passes would take
+  2 hours, and the six counted synthetic fits (Y0 and YU, seeds 0 to 2) with the 68 real-fold fits
+  (210 seconds each, below the 288 seconds that the plan assumed) projected to 17.1
+  GPU-process-hours, above the stop line of 12, so the gate stopped the line at verdict row 0 and
+  the manager chose the cut: the cap on the synthetic passes falls from 80 to 40, and the patience
+  of 20, every registered bar, the seeds, the real-fold fits, and the stop line of 12 hours are
+  unchanged. The gate still projects at the cap, now 40 passes, and still drops YT and then FS from
+  the end. A fit whose validation loss was still falling at the cap is reported, as before. The
+  first synthetic fits stop early in practice (the validation loss of YU was lowest after the first
+  pass in the gate's fit), so the cap is expected to bind rarely.
 - **Only a smoke test on the GPU opens the chain (ruling of the design lead, 2026-11-27, set before
   any experiment 733 fit exists).** A smoke test on the CPU had written a passing `scores/smoke.json`
   on the real data folder, which opened the chain. The smoke test now writes `scores/smoke.json`

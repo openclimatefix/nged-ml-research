@@ -456,6 +456,53 @@ def test_the_chain_job_fits_and_predicts_in_two_new_processes(
     assert calls == ["fit", "predict"] and got["predict_seconds"] == 4.0
 
 
+def test_the_timing_gate_predicts_in_a_new_process_after_an_in_process_fit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pipeline fixes its phase at import, so a prediction after an in-process fit needs a new process."""
+    import e00733_fit as fit
+    import e00733_leakage as leak
+
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_process(**kw: Any) -> None:
+        calls.append((kw["stage"], kw["data_root"]))
+        st.write_json(
+            path=rt.predict_record_path(root=tmp_path, arm="Y0", fold=None, seed=0),
+            payload={"seconds": 4.0, "peak_rss_gb": 1.5},
+        )
+
+    monkeypatch.setattr(rt, "run_stage_in_new_process", fake_process)
+    monkeypatch.setattr(leak, "assert_limits_before_fits", lambda **_: None)
+    (tmp_path / "limits.json").write_text("{}")
+    st.write_json(
+        path=fit.record_path(root=tmp_path, arm="Y0", fold=None, seed=0),
+        payload={"seconds": 3.0, "peak_rss_gb": 2.0},
+    )
+    monkeypatch.setattr(
+        rt,
+        "make_run_job",
+        lambda **_: (
+            lambda arm, fold, seed: {
+                "seconds": 3.0,
+                "peak_rss_gb": 2.0,
+                "peak_gpu_gb": 1.0,
+                "fit_peak_rss_gb": 2.0,
+            }
+        ),
+    )
+    job = rt.make_predicting_job(
+        root=tmp_path,
+        device="cpu",
+        max_passes=None,
+        new_process=False,
+        predict_new_process=True,
+        data_root=str(tmp_path),
+    )
+    job("Y0", None, 0)
+    assert calls == [("predict", str(tmp_path))]
+
+
 @pytest.mark.parametrize(
     ("code", "error"),
     [
@@ -505,6 +552,7 @@ def test_the_timing_gate_times_the_longest_window_fold_on_test_rows(
 
     monkeypatch.setattr(rt, "make_predicting_job", fake_make)
     monkeypatch.setattr(smokerun, "link_inputs", lambda **_: [])
+    (tmp_path / st.RUN_MARKER).write_text("{}")
     out = rt.measure_timing(_args(), tmp_path)
     assert calls == [("FU", core.ALL_FOLDS[-1], "test"), ("YU", None, "test")]
     assert out["seconds_per_real_fit"] == 11.0
@@ -537,6 +585,7 @@ def test_the_timing_gate_clears_stale_scratch_and_deletes_its_test_row_predictio
 
     monkeypatch.setattr(rt, "make_predicting_job", fake_make)
     monkeypatch.setattr(smokerun, "link_inputs", lambda **_: [])
+    (tmp_path / st.RUN_MARKER).write_text("{}")
     keep = tmp_path / "scores" / "other.json"
     keep.write_text("{}")
     rt.measure_timing(_args(), tmp_path)
