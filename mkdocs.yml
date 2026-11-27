@@ -110,6 +110,7 @@ nav:
           - Log of versions: ml-experiments/research-default-log.md
       - Final models for the production port: ml-experiments/final-models.md
       - Data processing: ml-experiments/data-processing.md
+      - How the history detectors fit together: ml-experiments/detector-pipeline.md
       - Glossary: ml-experiments/glossary.md
       - Kalman filter explainer: ml-experiments/kalman-gam-explainer.md
       - Calibration and uncertainty:
