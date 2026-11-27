@@ -1,0 +1,433 @@
+# ruff: noqa: E501, PLR0915
+"""Experiment 718: fit one network (one arm, one fold, one seed) in the training phase (design
+sections 6 and 11).
+
+Usage: e00718_fit.py ARM MONTH SEED [--device cuda] [--smoke] [--accumulate N]
+[--accept-code-change OLD_HASH ...] [--accept-gate-change OLD_HASH]
+
+Run it through `run.sh`. `load_pipeline(phase="train")` sets `E00667_PHASE=train` before the fold
+module is imported, under which the fold month's cleaned power is NaN, so no code path can read a
+held-out reading. The row tables are read from `work/tables/<arm>/<month>_{era5,ens}.npz`, which
+`e00718_tables.py` builds in the prediction phase, and their hashes go into the log. Every arm is
+fitted with all three stages from the seed's own initialisation (design section 6.1); the
+encoders of `M*` are loaded from the Candidate chain and frozen. A real fit refuses to start
+without `work/known_answers_passed.json` (part 1's gate). The `--smoke` path skips the gate,
+writes under `work/smoke/`, stops each stage after 2 passes, and its outputs are never scored. A
+stage that ends at the 60-pass cap is rerun from its starting state with a cap of 120 passes.
+After the fit the hashes of experiment 713's selection file and the job's encoder file are
+asserted unchanged.
+
+**Code policy.** Every stage log carries the code hash, the git commit, and a dirty flag. A
+resume, a finished-job skip, and the gate file are refused when their hash differs from the
+current code's, unless `--accept-code-change OLD_HASH` (stage states, repeatable) or
+`--accept-gate-change OLD_HASH` (the gate record) names the exact old hash.
+"""  # noqa: D205
+
+import argparse
+import copy
+import hashlib
+import json
+import os
+import resource
+import sys
+import time
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+
+os.environ.setdefault("E00667_PHASE", "train")
+
+from typing import Final
+
+import e00713_inputs as inp  # ty: ignore[unresolved-import]
+import e00713_layout as lay713  # ty: ignore[unresolved-import]
+import e00713_train as tr  # ty: ignore[unresolved-import]
+import e00718_arms as arms
+import e00718_batch as fb
+import e00718_model as f9
+import e00718_retrieval as ret
+import e00718_train as ftr
+import numpy as np
+import torch  # ty: ignore[unresolved-import]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+torch.set_num_threads(1)
+CAP_FIRST, CAP_RERUN = 60, 120
+SMOKE_PASSES = 2
+
+
+@dataclass
+class Loaded:
+    """What a fit reads: the world, the standardiser fingerprint, and the dropped counts."""
+
+    world: tr.World
+    fingerprint: str
+    dropped: dict
+    inputs_digest: str = ""
+
+
+Loader = Callable[[str, int, str], Loaded]
+
+
+def real_loader(month: str, seed: int, device: str) -> Loaded:
+    """Load the fold in the training phase from the Candidate pipeline (needs the stored data)."""
+    pipe = inp.load_pipeline(
+        month=month, phase="train", chain_root=inp.chain_root_of_seed(seed=seed)
+    )
+    data = inp.build_fold_data(pipe=pipe, device=device)
+    world = tr.World(
+        source=data.source, cutoff_idx=data.cutoff_idx, clean=data.clean, target_mean=data.target_mean,
+        target_std=data.target_std, month=month, placebo_pool=None,
+    )  # fmt: skip
+    return Loaded(
+        world=world, fingerprint=data.fingerprint, dropped=data.dropped_per_fold,
+        inputs_digest=inputs_digest(source=data.source, cutoff_idx=data.cutoff_idx),
+    )  # fmt: skip
+
+
+TABLE_CODE_FILES: Final = (
+    "e00718_retrieval",
+    "e00718_tables",
+    "e00718_layout",
+    "e00718_build_tables",
+)
+"""The modules whose code decides the contents of a row table."""
+
+
+def table_code_hash() -> str:
+    """Return a hash of the modules that build a row table."""
+    h = hashlib.sha256()
+    for name in TABLE_CODE_FILES:
+        h.update(Path(__file__).with_name(f"{name}.py").read_bytes())
+    return h.hexdigest()[:16]
+
+
+def inputs_digest(*, source: object, cutoff_idx: int) -> str:
+    """Return a digest of the arrays that decide a table and that do not depend on the phase.
+
+    The digest covers the pool weather, the day types, and the ensemble table for the origin days
+    before the fold's cutoff, which the training and prediction phases share. The ensemble table
+    of the fold's own days differs between the phases by design and is left out.
+    """
+    h = hashlib.sha256()
+    arrays = [source.dense_weather[..., :7], source.day_type]  # ty: ignore[unresolved-attribute]
+    ens = source.ens  # ty: ignore[unresolved-attribute]
+    if ens is not None:
+        n_days = max(cutoff_idx // lay713.STEPS_PER_DAY - lay713.N_LEAD_DAYS - ens.first_day, 0)
+        arrays += [ens.weather[:, :n_days], ens.filled[:, :n_days], ens.run_us[:, :n_days]]
+    for a in arrays:
+        h.update(np.ascontiguousarray(a.cpu().numpy()).tobytes())
+    return h.hexdigest()[:16]
+
+
+def table_meta(
+    *, arm: str, month: str, fingerprint: str, phase: str, digest: str = "", limit_days: int | None = None,
+) -> dict[str, str]:  # fmt: skip
+    """Return the provenance a row table carries.
+
+    It holds the hash of the builder's code, the phase the builder ran in (`pipe.fold.PHASE`),
+    the arm, the month, the standardiser fingerprint, a digest of the input arrays, and the
+    `--limit-days` value (`none` for a full build), so that a limited table never passes for a
+    full one.
+    """
+    return {
+        "builder_hash": table_code_hash(),
+        "phase": phase,
+        "arm": arm,
+        "month": month,
+        "fingerprint": fingerprint,
+        "inputs_digest": digest,
+        "limit_days": "none" if limit_days is None else str(limit_days),
+    }
+
+
+def fit_expectation(*, loaded: Loaded, arm: str, month: str) -> dict[str, str]:
+    """Return the provenance that a fit and a prediction require: a full table built in the
+    prediction phase from these inputs.
+    """  # noqa: D205
+    meta = table_meta(
+        arm=arm, month=month, fingerprint=loaded.fingerprint, phase="predict", digest=loaded.inputs_digest,
+    )  # fmt: skip
+    if not loaded.inputs_digest:
+        del meta["inputs_digest"]
+    return meta
+
+
+def save_table(*, table: ret.RowTable, path: Path, meta: dict[str, str] | None = None) -> None:
+    """Write a row table atomically, with its digest and provenance."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp.npz")
+    np.savez(
+        tmp,
+        arm=table.arm,
+        primaries=table.primaries,
+        days=table.days,
+        ages=table.ages,
+        measure=table.measure,
+        no_weather=table.no_weather,
+        distance=table.distance,  # ty: ignore[invalid-argument-type]
+        digest=table.digest(),
+        meta=json.dumps(meta or {}, sort_keys=True),
+    )
+    tmp.rename(path)
+
+
+def provenance_diff(*, path: Path, expect: dict[str, str]) -> dict[str, tuple[str | None, str]]:
+    """Return the keys of `expect` that a stored table's provenance does not match, as (found, expected)."""
+    z = np.load(path)
+    meta = json.loads(str(z["meta"])) if "meta" in z.files else {}
+    return {k: (meta.get(k), v) for k, v in expect.items() if meta.get(k) != v}
+
+
+def load_table(*, path: Path, expect: dict[str, str] | None = None) -> ret.RowTable:
+    """Read a row table, check its digest, and check that its provenance equals `expect` on every key given."""
+    z = np.load(path)
+    if expect is not None:
+        meta = json.loads(str(z["meta"])) if "meta" in z.files else {}
+        wrong = {k: (meta.get(k), v) for k, v in expect.items() if meta.get(k) != v}
+        assert not wrong, f"{path.name} has the wrong provenance (found, expected): {wrong}"
+    table = ret.RowTable(
+        arm=str(z["arm"]),
+        primaries=z["primaries"],
+        days=z["days"],
+        ages=z["ages"],
+        measure=z["measure"],
+        no_weather=z["no_weather"],
+        distance=z["distance"],
+    )
+    assert table.digest() == str(z["digest"]), f"{path} does not match its digest"
+    if expect is not None and "arm" in expect:
+        assert table.arm == expect["arm"], f"{path.name} holds arm {table.arm}"
+    return table
+
+
+def new_model(
+    *, seed: int, month: str, device: str, data_dir: Path, load_encoders: bool = True
+) -> f9.F9Net:
+    """Build the network for `seed` and load and freeze the encoders of `M*`."""
+    torch.manual_seed(seed)
+    model = f9.F9Net(seed=seed)
+    mode = arms.encoders_mode(data_dir=data_dir) if load_encoders else "random"
+    if mode in {"frozen", "trained"}:
+        model.load_encoders(
+            path=inp.pretrained_encoder_file(
+                chain_root=inp.chain_root_of_seed(seed=seed), month=month, seed=seed
+            )
+        )
+    if mode == "frozen":
+        model.freeze_encoders()
+    return model.to(device)
+
+
+def check_fingerprint(*, fingerprint: str, data_dir: Path, month: str) -> None:
+    """Write the fold's standardiser hash (under part 1's folder), or assert it is unchanged; the
+    prediction phase compares it.
+    """  # noqa: D205
+    path = arms.root(data_dir=data_dir, part=1) / "work" / "standardiser" / f"{month}.sha256"
+    if path.exists():
+        assert path.read_text() == fingerprint, "the standardiser changed between two fits"
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    tmp.write_text(fingerprint)
+    tmp.rename(path)
+
+
+def write_json_atomic(*, obj: dict, path: Path) -> None:
+    """Write a JSON file under a temporary name that carries the process id, then rename it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(obj, indent=1, default=str))
+    tmp.rename(path)
+
+
+def stage_log_file(
+    *, data_dir: Path, arm: str, month: str, seed: int, stage: int, smoke: bool
+) -> Path:
+    """Return the log of one stage."""
+    path = arms.log_file(
+        data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit", smoke=smoke
+    )
+    return path.with_name(f"{path.stem}_stage{stage}.json")
+
+
+def fit(
+    *, arm: str, month: str, seed: int, device: str, data_dir: Path, accept: Sequence[str] = (),
+    accept_gate: str | None = None, smoke: bool = False, accumulate: int = 1,
+    loader: Loader = real_loader, make_samples: Callable = tr.make_samples,
+    encoders: str | None = None, tables: dict[str, ret.RowTable] | None = None,
+) -> dict:  # fmt: skip
+    """Fit the three stages and return the log. `loader`, `make_samples`, `encoders`, and `tables`
+    exist for the checks.
+    """  # noqa: D205
+    spec = arms.resolve(arm=arm, accumulate=accumulate)
+    log: dict = {"arm": arm, "month": month, "seed": seed, "smoke": smoke, "accumulate": accumulate}
+    if not smoke:
+        gate = arms.gate_file(data_dir=data_dir)
+        assert gate.exists(), f"{gate} is missing: run e00718_known_answer.py first"
+        gate_record = json.loads(gate.read_text())
+        log["gate"] = {
+            "manager_accepts_unread_ks3": gate_record.get("result", {}).get(
+                "manager_accepts_unread_ks3"
+            ),
+            "manager_note": gate_record.get("result", {}).get("manager_note"),
+        }
+        arms.check_code(
+            earlier=json.loads(gate.read_text()).get("code", {}),  # carries the gate hash
+            accept=[accept_gate] if accept_gate else [],
+            record=log,
+            what="the known-answer gate file",
+            kind="gate",
+        )
+    final = arms.model_file(
+        data_dir=data_dir, arm=arm, month=month, seed=seed, stage=3, smoke=smoke
+    )
+    stage_logs = {
+        s: stage_log_file(data_dir=data_dir, arm=arm, month=month, seed=seed, stage=s, smoke=smoke)
+        for s in (1, 2, 3)
+    }
+    final_log = arms.log_file(
+        data_dir=data_dir, arm=arm, month=month, seed=seed, kind="fit", smoke=smoke
+    )
+    if final.exists():
+        stages = []
+        for s, path in stage_logs.items():
+            assert path.exists(), f"{path} is missing: refit the job"
+            earlier = json.loads(path.read_text())
+            arms.check_code(
+                earlier=earlier, accept=accept, record=log, what=f"{arm} {month} s{seed} stage {s}"
+            )
+            stages.append(earlier)
+        if not final_log.exists():
+            write_json_atomic(
+                obj={
+                    **log,
+                    "stages": stages,
+                    "rebuilt_from_stage_logs": True,
+                    **arms.code_record(),
+                },
+                path=final_log,
+            )
+        print(f"{arm} {month} s{seed}: done, skipped", flush=True)
+        return json.loads(final_log.read_text())
+    started = time.monotonic()
+    before = arms.watched_713_files(data_dir=data_dir, month=month, seed=seed)
+    loaded = loader(month, seed, device)
+    world = loaded.world
+    if not smoke:
+        check_fingerprint(fingerprint=loaded.fingerprint, data_dir=data_dir, month=month)
+    if tables is None:
+        tables = {
+            v: load_table(
+                path=arms.table_file(data_dir=data_dir, arm=arm, month=month, version=v),
+                expect=None if smoke else fit_expectation(loaded=loaded, arm=arm, month=month),
+            )
+            for v in (fb.TABLE_ERA5, fb.TABLE_ENS)
+        }
+    log.update(
+        stages=[],
+        dropped=loaded.dropped,
+        table_digests={v: t.digest() for v, t in tables.items()},
+        recipe=arms.recipe_hashes(),
+        **arms.code_record(),
+    )
+    mode = encoders or arms.encoders_mode(data_dir=data_dir)
+    model = new_model(
+        seed=seed, month=month, device=device, data_dir=data_dir, load_encoders=encoders is None
+    )
+    for stage in (1, 2, 3):
+        path = arms.model_file(
+            data_dir=data_dir, arm=arm, month=month, seed=seed, stage=stage, smoke=smoke
+        )
+        if path.exists():
+            model.load_state_dict(torch.load(path, map_location=device))
+            assert stage_logs[stage].exists(), f"{path} has no stage log: refit the stage"
+            earlier = json.loads(stage_logs[stage].read_text())
+            arms.check_code(earlier=earlier, accept=accept, record=log, what=path.name)
+            log["stages"].append(earlier)
+            continue
+        samples = make_samples(world=world, stage=stage, placebo=False)
+        start_state = copy.deepcopy(model.state_dict())
+        cap = SMOKE_PASSES if smoke else CAP_FIRST
+        record = ftr.train_stage(
+            model=model,
+            world=world,
+            tables=tables,
+            arm=arm,
+            stage=stage,
+            samples=samples,
+            seed=seed,
+            encoders=mode,
+            max_passes=cap,
+            accumulate=spec.accumulate,
+        )
+        entry = {"stage": stage, "pairs": len(samples), "first": vars(record).copy(), "rerun": None}
+        if record.cap_hit and not smoke:
+            model.load_state_dict(start_state)
+            record = ftr.train_stage(
+                model=model,
+                world=world,
+                tables=tables,
+                arm=arm,
+                stage=stage,
+                samples=samples,
+                seed=seed,
+                encoders=mode,
+                max_passes=CAP_RERUN,
+                accumulate=spec.accumulate,
+            )
+            entry["rerun"] = vars(record).copy()
+        entry.update(
+            passes=record.passes,
+            best_val=record.best_val,
+            cap_hit=record.cap_hit,
+            smoke=smoke,
+            **arms.code_record(),
+            recipe=arms.recipe_hashes(),
+        )
+        log["stages"].append(entry)
+        write_json_atomic(
+            obj=entry, path=stage_logs[stage]
+        )  # written before the state file, so a state file always has its log
+        tr.save_atomic(state=model.state_dict(), path=path)
+        print(
+            f"{arm} {month} s{seed} stage {stage}: {record.passes} passes, val {record.best_val:.4f}",
+            flush=True,
+        )
+    log["seconds"] = round(time.monotonic() - started, 1)
+    log["peak_host_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    if device.startswith("cuda"):
+        log["peak_gpu_mb"] = torch.cuda.max_memory_allocated() / 2**20
+    write_json_atomic(obj=log, path=final_log)
+    after = arms.watched_713_files(data_dir=data_dir, month=month, seed=seed)
+    changed = arms.changed_watched_files(before=before, after=after)
+    assert not changed, (
+        f"a file of experiment 713 that this fit reads changed during the fit: {changed[:3]}"
+    )
+    return log
+
+
+def main() -> int:
+    """Parse the command line and fit."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("arm")
+    parser.add_argument("month")
+    parser.add_argument("seed", type=int)
+    parser.add_argument("--device", default="cuda")
+    parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--accumulate", type=int, default=1)
+    parser.add_argument("--accept-code-change", action="append", default=[], metavar="OLD_HASH")
+    parser.add_argument("--accept-gate-change", default=None, metavar="OLD_HASH")
+    args = parser.parse_args()
+    data_dir = ML_EXPERIMENTS_DATA_DIR
+    arms.install_own_cache(data_dir=data_dir)
+    fit(
+        arm=args.arm, month=args.month, seed=args.seed, device=args.device, data_dir=data_dir,
+        accept=args.accept_code_change, accept_gate=args.accept_gate_change, smoke=args.smoke,
+        accumulate=args.accumulate,
+    )  # fmt: skip
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
