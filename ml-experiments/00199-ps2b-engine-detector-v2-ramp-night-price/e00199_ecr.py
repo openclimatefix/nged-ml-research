@@ -80,14 +80,33 @@ def main() -> None:
                 )
                 .filter(pl.col("distance_km") <= RADIUS_KM)
                 .select(
-                    "source", "technology", "chp", "mw", "status", "connected_date", "distance_km"
+                    "source",
+                    "technology",
+                    "chp",
+                    "mw",
+                    "status",
+                    "connected_date",
+                    "distance_km",
+                    "text",
                 )
                 .sort("distance_km")
             )
             print(
                 f"== {label}: {near.height} gas, oil, CHP, biogas, or storage slots within {RADIUS_KM} km"
             )
-            print(near)
+            is_engine = pl.col("text").str.contains("engine") & pl.col("text").str.contains(
+                "gas|oil|fossil"
+            )
+            # NGED withholds a gas or oil engine's size, connection date, and distance.
+            print(
+                near.with_columns(
+                    pl.when(is_engine)
+                    .then(pl.lit("[withheld]"))
+                    .otherwise(pl.col(column).cast(pl.String))
+                    .alias(column)
+                    for column in ("mw", "connected_date", "distance_km")
+                ).drop("text")
+            )
 
 
 if __name__ == "__main__":

@@ -107,7 +107,9 @@ def waiver_statement() -> str:
 
 
 def audit_triggers() -> dict[str, str]:  # noqa: PLR0912
-    """Return the seven audit triggers of the `ml-experiment` skill as fired / not fired / not computed, with the reason.
+    """Return the seven audit triggers of the `ml-experiment` skill, each with its reason.
+
+    Each trigger is reported as fired, not fired, or not computed.
 
     A trigger that needs a number the stored files do not hold is reported as `not computed`, never as
     not fired.
@@ -204,7 +206,10 @@ def audit_triggers() -> dict[str, str]:  # noqa: PLR0912
 
 
 def median_minus_mean() -> None:
-    """Print, per site, the mean of the median forecast minus the mean forecast of the selected arm (a stored `mean` column)."""
+    """Print, per site, the mean of the median forecast minus the mean forecast of the selected arm.
+
+    The mean forecast is the stored `mean` column.
+    """
     star = arms.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)
     parts = []
     for month in arms.ALL_FOLDS:

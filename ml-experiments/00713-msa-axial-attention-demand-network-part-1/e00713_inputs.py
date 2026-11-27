@@ -61,7 +61,9 @@ class Pipeline:
 
 
 def run_frame_timing(*, origin: datetime) -> tuple[datetime, datetime, Path]:
-    """Return the latest `nwp_init_time`, the `power_fcst_init_time`, and the path of an origin's stored run frame.
+    """Return the latest `nwp_init_time`, the `power_fcst_init_time`, and the run frame path.
+
+    The path is that of the origin's stored run frame.
 
     The frame is the one the Candidate reads (`demand_frame_path` for the run issued one publication
     delay before the origin). A stub frame that `e00667_fold` writes for the months after 2026-06 holds

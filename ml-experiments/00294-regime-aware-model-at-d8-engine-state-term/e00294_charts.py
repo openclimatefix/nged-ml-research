@@ -4,7 +4,7 @@
 uv run --no-sync python ml-experiments/00294-*/e00294_charts.py
 """
 
-import json
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any, Final
@@ -15,6 +15,9 @@ import e00294_score as sc
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 DOCS_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -52,8 +55,8 @@ def _chart(data: pl.DataFrame) -> Any:
 def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     PNG_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(DOCS_DIR / f"{name}.svg")
-    chart.save(PNG_DIR / f"{name}.png", scale_factor=1.5)
+    guard.save_chart(chart=chart, path=DOCS_DIR / f"{name}.svg")
+    guard.save_chart(chart=chart, path=PNG_DIR / f"{name}.png", scale_factor=1.5)
     print("wrote", name)
 
 
@@ -140,182 +143,6 @@ def headline() -> None:
     _save(chart, name="figure_1_relative_score")
 
 
-def coefficients(*, score: dict) -> None:
-    """The engine coefficient of each monthly refit, in MW, against the recorded unit."""
-    rows = []
-    for r in score["checks"]["coefficients"]["D8"]:
-        if "regF" not in r:
-            continue
-        rows += [
-            {
-                "cut": r["cut"],
-                "series": "Per half-hour with 1+ units running",
-                "mw": r["regF"][1] * 0.1,
-            },
-            {
-                "cut": r["cut"],
-                "series": "Per running unit (expected units)",
-                "mw": r["regU"][1] * 0.1,
-            },
-            {
-                "cut": r["cut"],
-                "series": "On last-day state (trained lagged)",
-                "mw": r["regP"][1] * 0.1,
-            },
-        ]
-    data = pl.DataFrame(rows).with_columns(pl.col("cut").str.to_date())
-    domain = [
-        "Per half-hour with 1+ units running",
-        "Per running unit (expected units)",
-        "On last-day state (trained lagged)",
-    ]
-    colour = alt.Color(
-        "series:N",
-        scale=alt.Scale(domain=domain, range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_PURPLE]),
-        legend=alt.Legend(orient="top", title=None, columns=1),
-    )
-    lines = (
-        _chart(data)
-        .mark_line(point=True)
-        .encode(
-            x=alt.X("cut:T", title="Monthly refit date"),
-            y=alt.Y("mw:Q", title="Fitted offset, MW", scale=alt.Scale(domain=[0, 4])),
-            color=colour,
-        )
-    )
-    unit = (
-        _chart(pl.DataFrame({"y": [1.97]}))
-        .mark_rule(color="#555555", strokeDash=[4, 3])
-        .encode(y="y:Q")
-    )
-    chart = (lines + unit).properties(
-        width=WIDTH,
-        height=220,
-        title=_title(
-            title="The fitted offset is steady across refits, and is smaller when the state is a day old",
-            subtitle="D8, arm 3's engine column. Each point is one monthly refit on the whole history. Dashed line: one engine unit, 1.97 MW, from the engine's recorded output.",
-        ),
-    )
-    _save(chart, name="figure_2_engine_offset")
-
-
-def shortfall(*, score: dict) -> None:
-    """Mean error (reading minus forecast) on engine-running and other half-hours."""
-    rows = []
-    for subset, label in (
-        ("running", "Engine running (filtered probability above 0.5)"),
-        ("ordinary", "Other half-hours"),
-    ):
-        for arm, row in score["scores"][f"D8/{subset}"].items():
-            if arm in {"arm1", *LABELS}:
-                rows.append(
-                    {
-                        "subset": label,
-                        "arm": LABELS.get(arm, "Arm 1: single model"),
-                        "err": row["mean_error"] * 0.1,
-                    }
-                )
-    labels = {**LABELS, "arm1": "Arm 1: single model"}
-    colours = {**COLOURS, "arm1": ocf.DATA_GREEN}
-    scale = alt.Scale(domain=[labels[k] for k in labels], range=[colours[k] for k in labels])
-    data = pl.DataFrame(rows)
-    chart = (
-        _chart(data)
-        .mark_bar()
-        .encode(
-            y=alt.Y(
-                "arm:N",
-                sort=[labels[k] for k in ("arm1", *LABELS)],
-                title=None,
-                axis=alt.Axis(labelLimit=240),
-            ),
-            x=alt.X("err:Q", title="Reading minus forecast mean, MW"),
-            color=alt.Color("arm:N", scale=scale, legend=None),
-        )
-        .properties(width=WIDTH - 250, height=170)
-        .facet(
-            row=alt.Row(
-                "subset:N", title=None, header=alt.Header(labelAnchor="start", labelFontSize=12)
-            )
-        )
-        .properties(
-            title=_title(
-                title="Arm 1 over-forecasts by 1.1 MW while the engine runs and under-forecasts by 0.8 MW otherwise",
-                subtitle="D8, scored year. Mean of the reading minus the forecast mean. Zero means no bias.",
-            )
-        )
-    )
-    _save(chart, name="figure_3_shortfall_by_state")
-
-
-def example_weeks() -> None:
-    """Three weeks of D8 readings, forecasts and the engine state (one lead band)."""
-    arms = {
-        "arm1": "Arm 1",
-        "arm3_matched": "Post hoc matched arm",
-        "arm3_hindsight": "State at the target",
-    }
-    frames = {}
-    for key, (c, k) in ((a, sc.D8_ARMS[a]) for a in arms):
-        f = sc.load_arm(config=c, kind=k, site="D8").filter(
-            (pl.col("lead_hours") >= 12) & (pl.col("lead_hours") < 36)
-        )
-        frames[key] = f
-    base = frames["arm1"].filter(
-        (pl.col("valid_time") >= pl.datetime(2025, 12, 1, time_zone="UTC"))
-        & (pl.col("valid_time") < pl.datetime(2025, 12, 22, time_zone="UTC"))
-    )
-    rows = []
-    for key, label in arms.items():
-        f = frames[key].join(base.select("run", "valid_time"), on=["run", "valid_time"])
-        rows += [
-            {"valid_time": t, "mw": m * 0.1, "series": label, "run": int(r)}
-            for t, m, r in zip(f["valid_time"], f["mean"], f["run"], strict=True)
-        ]
-    rows += [
-        {"valid_time": t, "mw": a * 0.1, "series": "Reading", "run": int(r)}
-        for t, a, r in zip(base["valid_time"], base["actual"], base["run"], strict=True)
-    ]
-    shade = (
-        base.select("valid_time", "p_engine_filtered")
-        .with_columns((pl.col("p_engine_filtered") > 0.5).alias("on"))
-        .filter("on")
-        .select("valid_time")
-    )
-    domain = ["Reading", "Arm 1", "Post hoc matched arm", "State at the target"]
-    colour = alt.Color(
-        "series:N",
-        scale=alt.Scale(
-            domain=domain, range=["#222222", ocf.DATA_GREEN, ocf.DATA_PURPLE, ocf.BRAND_ORANGE]
-        ),
-        legend=alt.Legend(orient="top", title=None, columns=2),
-    )
-    lines = (
-        _chart(pl.DataFrame(rows))
-        .mark_line(clip=True, strokeWidth=1.2)
-        .encode(
-            detail="run:N",
-            x=alt.X("valid_time:T", title="Valid time, December 2025", axis=alt.Axis(format="%d")),
-            y=alt.Y("mw:Q", title="D8 power, MW (forecast 12 to 36 hours ahead)"),
-            color=colour,
-        )
-    )
-    bands = (
-        _chart(shade.with_columns((pl.col("valid_time") + pl.duration(minutes=30)).alias("end")))
-        .mark_rect(opacity=0.15, color=ocf.BRAND_ORANGE)
-        .encode(x="valid_time:T", x2="end:T", y=alt.value(0), y2=alt.value(240))
-    )
-    chart = (bands + lines).properties(
-        width=WIDTH,
-        height=240,
-        title=_title(
-            title="Only a forecast that sees the engine state at the target is pulled down during the shaded spells",
-            subtitle="D8, 1 to 21 December 2025. Shading: half-hours when the detector's filtered probability of a running engine exceeds 0.5.",
-        ),
-    )
-    _save(chart, name="figure_4_example_weeks")
-
-
 def controls() -> None:
     """Arm 3 and the post hoc arm against arm 1 at the three Primaries without an engine."""
     rows = []
@@ -384,12 +211,12 @@ def controls() -> None:
 
 
 def main() -> None:
-    """Draw every figure."""
-    score = json.loads(sc.OUT_PATH.read_text())
+    """Draw every figure.
+
+    The engine offset per refit and the example weeks are not drawn, because they show the
+    inferred engine state or its fitted size on calendar dates.
+    """
     headline()
-    coefficients(score=score)
-    shortfall(score=score)
-    example_weeks()
     controls()
 
 

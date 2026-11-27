@@ -2,8 +2,8 @@
 id: "00198"
 slug: d8-summer-spikes-cooling-load-and-residual-test
 title: >-
-  Are the summer spikes in D8's power air-conditioning load, and does adding a cooling term lower the
-  best-guess forecast's summer error at D8 and at the other Primaries?
+  Are the summer spikes in D8's power air-conditioning load, and does adding a cooling term lower
+  the best-guess forecast's summer error at D8 and at the other Primaries?
 theme: differentiable-physics-demand-calendar-and-weather
 also_relevant_to:
   - differentiable-physics-embedded-generation
@@ -19,19 +19,19 @@ size: >-
   experiment 155's stored forecasts (arm D), experiment 111's stored ensemble temperatures, and
   experiment 159's stored D8 panel, and call reviewed `studies.*` modules without changing them.
 hypothesis: >-
-  The summer spikes a colleague saw in D8's power (time series 26, Marsh Lane) are air-conditioning
-  load: they rise smoothly with temperature, peak in the afternoon of the hottest days, and repeat
-  every year. The best-guess forecast has a heating hinge but no cooling term, so its summer
-  residual (metered minus forecast) rises with temperature, and a cooling hinge on the ensemble
-  mean temperature fitted on past residuals lowers its summer score.
+  The summer spikes a colleague saw in D8's power (time series 26, Marsh Lane) are
+  air-conditioning load: they rise smoothly with temperature, peak in the afternoon of the hottest
+  days, and repeat every year. The best-guess forecast has a heating hinge but no cooling term, so
+  its summer residual (metered minus forecast) rises with temperature, and a cooling hinge on the
+  ensemble mean temperature fitted on past residuals lowers its summer score.
 prediction: >-
   Written before any result is read. I expect cooling to fail. Experiments 159, 186, and 194 found
-  D8's large departures are downward shortfalls of 1.5 MW or more that follow an added-back 6 MW
-  gas engine and the electricity price, not temperature. An exploratory peek at the stored panel
-  while writing this plan (not a test) gave a correlation of 0.13 between D8's daily maximum power
-  and the day's maximum ERA5 temperature in June to September. A UK Primary's cooling load is
-  small. Predictions: (1) at D8 before the engine's readings stop carrying output (2022-06-01 to
-  2023-08-14, a date range taken from experiment 194, so no residual is used to choose rows), the
+  D8's large departures are downward shortfalls of 1.5 MW or more that follow an added-back gas
+  engine and the electricity price, not temperature. An exploratory peek at the stored panel while
+  writing this plan (not a test) gave a correlation of 0.13 between D8's daily maximum power and
+  the day's maximum ERA5 temperature in June to September. A UK Primary's cooling load is small.
+  Predictions: (1) at D8 before the engine's readings stop carrying output (the earlier era,
+  whose rows are taken from experiment 194, so no residual is used to choose rows), the
   partial Spearman correlation between the summer afternoon residual and the hinge variable max(0,
   T - 20) on days with a day maximum of 22 degrees or more, controlling for day of year, is below
   +0.15; (2) the same correlation is below +0.15 at 5 or 6 of the 6 stored Primaries; (3) C1
@@ -76,12 +76,12 @@ decision_rule: >-
   covers D5, D9, D10, D11, D14, D16, and D18), so D8 uses experiment 159's stored panel (metered
   power, the frozen convex model's expected power, whose freeze date is read from experiment 130
   and printed, and ERA5 temperature) as a lab shortcut: the cooling hinge is fitted by median
-  regression on the residual of summers 2022 and 2023 before 2023-08-15 and scored on summer 2023
-  after the break and summers 2024 to 2025, as the mean absolute error in MW with a 2-week-block
-  bootstrap interval, with a sensitivity that adds the ensemble-versus-ERA5 temperature error as
-  noise. D8 has no error-correction layer, so its gain is not comparable with the Primaries' and
-  stays out of the quantile-score verdict. The correlations of prediction (2) are descriptive and
-  enter no verdict.
+  regression on the residual of summers 2022 and 2023 in the earlier era and scored on
+  the later era of summer 2023 and summers 2024 to 2025, as the mean absolute error in MW with a
+  2-week-block bootstrap interval, with a sensitivity that adds the ensemble-versus-ERA5
+  temperature error as noise. D8 has no error-correction layer, so its gain is not comparable with
+  the Primaries' and stays out of the quantile-score verdict. The correlations of prediction (2)
+  are descriptive and enter no verdict.
 benchmark: >-
   Experiment 155's arm D as stored (2.791 points over all rows at the five decision Primaries),
   rescored on the summer rows; climatology and manual_heuristic as stored by experiment 111 for
@@ -97,26 +97,27 @@ code: ml-experiments/00198-d8-summer-spikes-cooling-load-and-residual-test/
 date: 2026-10-22
 verdict: inconclusive
 best_arm: >-
-  Not applicable. The cooling arm scored the same as arm D: C1 -0.0002 points (99% interval -0.0103
-  to +0.0147) over 157,860 June-to-September rows at the five decision Primaries.
+  Not applicable. The cooling arm scored the same as arm D: C1 -0.0002 points (99% interval
+  -0.0103 to +0.0147) over 157,860 June-to-September rows at the five decision Primaries.
 headline: >-
   D8's afternoon residual (metered minus expected power) does not rise with temperature, and its
   large summer departures are mostly downward shortfalls, so the spikes are not air-conditioning
   load. A cooling term gave no gain at the five decision Primaries, but two controls fixed in the
-  plan failed (the check that the cooling threshold gains in held-out months, and the check that an
-  injected cooling load is recovered), so the verdict is inconclusive. On afternoons with an
+  plan failed (the check that the cooling threshold gains in held-out months, and the check that
+  an injected cooling load is recovered), so the verdict is inconclusive. On afternoons with an
   ensemble-mean temperature of 25 degrees Celsius or more, metered power exceeded arm D's forecast
-  by 0.6 to 5.1 points on average at each of six Primaries, but each average rests on 5 to 29 days.
+  by 0.6 to 5.1 points on average at each of six Primaries, but each average rests on 5 to 29
+  days.
 lessons:
   - >-
     The 4 fit months held too few hot days. At the chosen threshold of 24 degrees Celsius the
-    median Primary had 18 days and 193 daytime half-hours above it. The held-out gain was negative
-    in only 2 of the 4 months.
+    median Primary had 18 days and 193 daytime half-hours above it. The held-out gain was
+    negative in only 2 of the 4 months.
   - >-
-    The known-answer check recovered 49% of an injected cooling load of 0.1 MW per degree above 20
-    degrees Celsius with the ensemble temperature, and 78% to 83% with ERA5 temperature (checks
-    added after the result). Ensemble temperature error therefore blunts a cooling term, and
-    recipe R, the step in arm D that corrects the last 14 days' error, may blunt it too.
+    The known-answer check recovered 49% of an injected cooling load of 0.1 MW per degree above
+    20 degrees Celsius with the ensemble temperature, and 78% to 83% with ERA5 temperature
+    (checks added after the result). Ensemble temperature error therefore blunts a cooling term,
+    and recipe R, the step in arm D that corrects the last 14 days' error, may blunt it too.
 take_home_message: >-
   D8's afternoon power does not rise with temperature, and its large summer departures from
   expected power are mostly downward shortfalls of 1.5 MW or more, which grow from 18% of summer
@@ -124,13 +125,13 @@ take_home_message: >-
   added to the best-guess forecast changed the summer score at the five decision Primaries by
   0.0002 points (interval -0.010 to +0.015), but the 4 fit months held too few hot days and the
   known-answer control failed, so the experiment cannot rule a cooling term out. On afternoons of
-  25 degrees Celsius or more, metered power exceeds the forecast by 0.6 to 5.1 points on average at
-  each of six Primaries, so a term fitted on the full multi-year history of past weather, pooled
-  across Primaries, is the next test.
+  25 degrees Celsius or more, metered power exceeds the forecast by 0.6 to 5.1 points on average
+  at each of six Primaries, so a term fitted on the full multi-year history of past weather,
+  pooled across Primaries, is the next test.
 advice:
   - >-
-    Do not read D8's summer shortfalls as a temperature effect: before 2023-08-15, when the
-    engine's readings stop carrying output, its afternoon residual has a partial Spearman
+    Do not read D8's summer shortfalls as a temperature effect: before the engine's output
+    stopped being added back to the readings, its afternoon residual has a partial Spearman
     correlation of +0.004 with the temperature above 20 degrees Celsius (D8 results).
   - >-
     Fit any cooling term on the full weather history pooled across Primaries, not on the four
@@ -138,8 +139,8 @@ advice:
     (eligibility counts in the results for the five decision Primaries).
   - >-
     Include a known-answer injection in any weather-term test on arm D: with arm D's error
-    correction and the ensemble's temperature error in place, the fit recovered only about half of
-    an injected load (known-answer check).
+    correction and the ensemble's temperature error in place, the fit recovered only about half
+    of an injected load (known-answer check).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -155,16 +156,17 @@ D10, D11, D14, and D16), the substations that have stored arm D forecasts (D8 ha
 rescored the June-to-September rows.
 
 **D8's spikes are not cooling load, and the cooling term did not help, but the experiment could not
-rule a cooling term out.** Before 2023-08-15, D8's afternoon residual (metered minus expected power)
-has a partial Spearman correlation of +0.004 with the temperature above 20 degrees Celsius,
-controlling for day of year. Its large departures from expected power are mostly downward (the
-figures of D8's departures below), which matches experiments 186 and 194: a 6 MW gas engine, whose
-output is added back to D8's reading, causes downward shortfalls that follow the electricity price.
-The cooling term changed the five Primaries' summer score by -0.0002 points of quantile score (the
-pinball loss averaged over 11 quantiles, in points of effective capacity). The check that a
-threshold chosen on 4 fit months (July to September 2024 and June 2025) also helps in each held-out
-month failed, so the rule we fixed before seeing any result gives the verdict `inconclusive`.
-ERA5 below is the European Centre for Medium-Range Weather Forecasts' reanalysis of past weather.
+rule a cooling term out.** Before the engine's output stopped being added back, D8's afternoon
+residual (metered minus expected power) has a partial Spearman correlation of +0.004 with the
+temperature above 20 degrees Celsius, controlling for day of year. Its large departures from
+expected power are mostly downward (the figures of D8's departures below), which matches experiments
+186 and 194: a gas engine, whose output is added back to D8's reading, causes downward shortfalls
+that follow the electricity price. The cooling term changed the five Primaries' summer score by
+-0.0002 points of quantile score (the pinball loss averaged over 11 quantiles, in points of
+effective capacity). The check that a threshold chosen on 4 fit months (July to September 2024 and
+June 2025) also helps in each held-out month failed, so the rule we fixed before seeing any result
+gives the verdict `inconclusive`. ERA5 below is the European Centre for Medium-Range Weather
+Forecasts' reanalysis of past weather.
 
 ## Figures
 
@@ -174,7 +176,7 @@ ERA5 below is the European Centre for Medium-Range Weather Forecasts' reanalysis
 
 ![D8's daily maximum power against the day's maximum temperature](figure_d8_power_vs_temperature.svg)
 
-![D8's afternoon residual against temperature, before and after 2023-08-15](figure_d8_residual_vs_temperature.svg)
+![D8's afternoon residual against temperature, in the earlier era and the later era](figure_d8_residual_vs_temperature.svg)
 
 ![The hour of day of D8's large summer departures](figure_d8_departure_hours.svg)
 
@@ -194,16 +196,14 @@ observed after the fact, which a live forecast would not have).**
   summer half-hours. The daily maximum power has a correlation of 0.13 with the day's maximum
   temperature (a look at the data before the plan was written, not a test).
 - Prediction (1), that the correlation is below +0.15: the partial Spearman correlation of the
-  afternoon residual with the hinge
-  max(0, T - 20), on days of 22 degrees Celsius or more and before 2023-08-15, when the engine's
-  readings stop carrying output, is +0.004 on 912 half-hours,
-  below the +0.15 bar. After 2023-08-15 it is +0.051 on 1,308 half-hours.
-- We fitted the cooling hinge with tau 20 by median regression on summers 2022 and 2023 before
-  2023-08-15. On 15,407 later summer half-hours it changes the mean absolute residual by -0.001 MW
-  (99% interval -0.004 to +0.001), against 1.97 MW before the term. With noise added to the
-  temperature the
-  change is -0.0001 MW (-0.002 to +0.001). The noise standard deviation of 1.2 degrees is an
-  assumption, not a measured ensemble error.
+  afternoon residual with the hinge max(0, T - 20), on days of 22 degrees Celsius or more and before
+  the engine's output stopped being added back to the readings, is +0.004 on 912 half-hours, below
+  the +0.15 bar. Afterwards it is +0.051 on 1,308 half-hours.
+- We fitted the cooling hinge with tau 20 by median regression on summers 2022 and 2023 before the
+  engine's output stopped being added back. On 15,407 later summer half-hours it changes the mean
+  absolute residual by -0.001 MW (99% interval -0.004 to +0.001), against 1.97 MW before the term.
+  With noise added to the temperature the change is -0.0001 MW (-0.002 to +0.001). The noise
+  standard deviation of 1.2 degrees is an assumption, not a measured ensemble error.
 - The spikes are therefore not cooling load. The upward departures appear mostly when the downward
   shortfall fades in 2026. That pattern fits expected power having been learned from a window that
   contains the engine's shortfalls. We did not test that account here.

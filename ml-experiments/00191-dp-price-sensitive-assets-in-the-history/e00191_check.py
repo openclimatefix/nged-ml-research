@@ -14,14 +14,14 @@ from studies.dp_gam import TrainingWindow, fit_gam
 
 
 def main() -> None:
-    """Fit D14 at one cut both ways and print the differences."""
+    """Fit the register's Primary at one cut both ways and print the differences."""
     torch_threads = 4
     import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(torch_threads)
     cache = common.load_cache()
     cut = datetime(2025, 7, 1, tzinfo=UTC)
-    for site, ungated in (("D14", False), ("D8", False)):
+    for site, ungated in ((common.REGISTER_PRIMARY, False), ("D8", False)):
         work = engine.masked_cache(cache=cache, site=site)
         grid = engine.build_price_grid(cache=work, site=site, ungated=ungated)
         started = time.monotonic()
@@ -37,7 +37,7 @@ def main() -> None:
         )
         diff = float(np.abs(mine.a0.theta - reference.theta).max())
         print(
-            f"{site}: fit seconds {seconds:.0f}; rows {mine.n_rows}; masked {mine.n_masked}; "
+            f"{common.shown(site)}: fit seconds {seconds:.0f}; rows {mine.n_rows}; masked {mine.n_masked}; "
             f"max |theta_a0 - fit_gam theta| = {diff:.2e}; "
             f"price coefficients {np.round(mine.joint.theta_price, 4)}; "
             f"rows with a gate of 1 and no price: {grid.n_missing}; "

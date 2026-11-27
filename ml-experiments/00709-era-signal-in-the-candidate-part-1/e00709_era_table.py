@@ -4,8 +4,8 @@ The era table (`era_table.parquet`) comes from NGED's Embedded Capacity Register
 `studies.ecr_reader.read_sheet` because `read_ecr` drops the `Date Connected` column, plus the
 telemetry dates of the plan. The table holds no customer name. It lists:
 
-- D8's two register connections (a 6 MW gas engine of 2023-06-13 that the register files under
-  D14's name, and an 8.91 MW solar farm of 2025-03-24) and the undated 0.7 MW solar row, which is
+- D8's two register connections (a gas engine that the register files under another Primary's
+  name, and an 8.91 MW solar farm of 2025-03-24) and the undated 0.7 MW solar row, which is
   *not* an era because it has no date;
 - D8's fade from 2026-03, which only telemetry shows and is unresolved;
 - every other register connection of 1 MW or more since 2019-09 at the 16 Primaries, as
@@ -21,6 +21,7 @@ Run with the folders of experiments 86 on `PYTHONPATH`:
         uv run --no-sync python ml-experiments/00709-*/e00709_era_table.py
 """
 
+import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -33,6 +34,9 @@ import numpy as np
 import polars as pl
 from studies.ecr_reader import ECR_PATH, REGISTER_SHEETS, read_sheet
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 ERA_TABLE_PATH: Final[Path] = features.DATA_DIR / "era_table.parquet"
 KNOWN_EVENTS_PATH: Final[Path] = features.DATA_DIR / "known_events.parquet"
@@ -55,12 +59,14 @@ PRIMARY_NAMES: Final[dict[str, str]] = {
 }  # fmt: skip
 """Substring of the register's Primary column that identifies each site (as in experiment 191)."""
 
-D8_GAS_DATE: Final[date] = date(2023, 6, 13)
+D8_GAS_DATE: Final[date] = engine.engine_datetime(key="d8_engine_connected_date").date()
 D8_GAS_TELEMETRY_DATE: Final[date] = date(2023, 8, 15)
 D8_SOLAR_DATE: Final[date] = date(2025, 3, 24)
 D8_FADE_DATE: Final[date] = date(2026, 3, 1)
 """The month of the fade; only the month is known, and the plan lists it as telemetry only."""
-D8_GAS_MW: Final[float] = 6.0
+D8_REGISTER_PRIMARY: Final[str] = engine.engine_string(key="d8_engine_register_primary")
+"""The Primary whose register entries hold the engine (read from the private file)."""
+D8_GAS_MW: Final[float] = engine.engine_float(key="d8_engine_register_mw")
 D8_SOLAR_MW: Final[float] = 8.91
 D8_SMALL_SOLAR_MW: Final[float] = 0.7
 D8_SOLAR_RECOLLECTION_MW: Final[float] = 0.7
@@ -183,15 +189,14 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         The rows for era 1 (gas engine), era 2 (solar farm), the undated solar row, and the fade.
     """
     gas = assets.filter(
-        (pl.col("site") == "D14") & _is_gas_engine() & (pl.col("mw") >= D8_GAS_MW - 0.5)
+        (pl.col("site") == D8_REGISTER_PRIMARY)
+        & _is_gas_engine()
+        & (pl.col("mw") >= D8_GAS_MW - 0.5)
     )
     solar = assets.filter((pl.col("site") == "D8") & _is_solar())
-    with pl.Config(tbl_rows=30, fmt_str_lengths=60):
-        print("Register rows behind the plan's D8 eras (no customer names):")
-        print("Gas engine of about 6 MW listed under D14:")
-        print(gas)
-        print("Solar rows listed under D8:")
-        print(solar)
+    print("Register rows behind the plan's D8 eras: [withheld]")
+    print(f"Gas engine rows listed under another Primary: {gas.height}")
+    print(f"Solar rows listed under D8: {solar.height}")
     found_gas = gas.filter(pl.col("connected_date") == D8_GAS_DATE).height > 0
     found_solar = solar.filter(pl.col("connected_date") == D8_SOLAR_DATE).height > 0
     small = solar.filter(pl.col("connected_date").is_null() & pl.col("mw").is_between(0.6, 0.8))
@@ -206,10 +211,11 @@ def d8_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
             "primary": "D8", "era_index": 1, "register_date": D8_GAS_DATE,
             "telemetry_date": D8_GAS_TELEMETRY_DATE, "technology": "gas engine",
             "size_mw_register": D8_GAS_MW, "size_mw_telemetry": None,
-            "size_mw_recollection": None, "source": f"{source}, listed under D14's name",
+            "size_mw_recollection": None,
+            "source": f"{source}, listed under {D8_REGISTER_PRIMARY}",
             "confidence": "register date confirmed" if found_gas else "plan value, not re-found",
-            "note": "D8's reading stopped including the engine's output on 2023-08-15, 63 days "
-            "after the register date (experiment 194). The oracle switches on the telemetry date.",
+            "note": "D8's reading stopped including the engine's output on 2023-08-15 "
+            "(experiment 194). The oracle switches on the telemetry date.",
         },
         {
             "primary": "D8", "era_index": 2, "register_date": D8_SOLAR_DATE,
@@ -250,8 +256,8 @@ def other_register_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         assets: The output of `read_register_assets`.
 
     Returns:
-        One row per connection, numbered by date within each Primary. The 6 MW gas engine that the
-        plan assigns to D8 is left out of D14's rows.
+        One row per connection, numbered by date within each Primary. The gas engine that the
+        plan assigns to D8 is left out of its register Primary's rows.
     """
     kept = assets.filter(
         (pl.col("site") != "D8")
@@ -259,7 +265,11 @@ def other_register_rows(*, assets: pl.DataFrame) -> list[dict[str, object]]:
         & (pl.col("mw") >= MIN_ERA_MW)
         & (pl.col("connected_date") >= FIRST_ERA_DATE)
     ).filter(
-        ~((pl.col("site") == "D14") & (pl.col("connected_date") == D8_GAS_DATE) & _is_gas_engine())
+        ~(
+            (pl.col("site") == D8_REGISTER_PRIMARY)
+            & (pl.col("connected_date") == D8_GAS_DATE)
+            & _is_gas_engine()
+        )
     )
     kept = kept.sort("site", "connected_date").with_columns(
         era_index=pl.int_range(pl.len(), dtype=pl.Int32).over("site") + 1

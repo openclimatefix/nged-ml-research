@@ -101,7 +101,7 @@ def main() -> None:
         arms = {arm: frame.filter(pl.col("arm") == arm) for arm in ARMS}
         report[site] = {}
         print(
-            f"\n=== {site} ({args.variant}) rows per arm: {arms['a0'].height:,}, "
+            f"\n=== {common.shown(site)} ({args.variant}) rows per arm: {arms['a0'].height:,}, "
             f"gate-on share {arms['a0']['gate'].mean():.2f}, "
             f"spread-positive share {arms['a0']['spread_positive'].mean():.2f}"
         )

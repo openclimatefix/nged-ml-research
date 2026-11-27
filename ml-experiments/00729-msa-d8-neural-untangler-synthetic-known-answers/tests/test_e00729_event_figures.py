@@ -1,0 +1,365 @@
+# ruff: noqa: E501, PT018
+"""Tests of the event-generator figures on invented engine records and segments."""
+
+import re
+from pathlib import Path
+from types import SimpleNamespace
+
+import e00729_event_figures as ev
+import e00729_figures as figures
+import numpy as np
+import polars as pl
+
+START = np.datetime64("2030-01-07", "D")
+ONE_DAY = np.timedelta64(1, "D")
+
+
+def evening_engine(*, n_days: int, level: float = 30.0) -> np.ndarray:
+    """Return days with a 4-hour run from 17:00 on every day."""
+    out = np.zeros((n_days, 48))
+    out[:, 34:42] = level
+    return out
+
+
+def test_weekday_of_monday_is_zero() -> None:
+    assert ev.weekday_of(days=START + np.arange(7) * ONE_DAY).tolist() == [0, 1, 2, 3, 4, 5, 6]
+
+
+def test_event_stats_on_a_known_engine() -> None:
+    days = evening_engine(n_days=14)
+    stats = ev.event_stats(days=days, dates=START + np.arange(14) * ONE_DAY)
+    assert stats.n_days == {"weekday": 10, "weekend": 4}
+    assert np.allclose(stats.run_lengths_h, 4.0)
+    assert len(stats.run_lengths_h) == 14
+    assert stats.weekly_starts.tolist() == [7.0, 7.0]
+    ref = ev.reference_level(series=days.ravel())
+    assert ref is not None
+    prob = stats.run_probability(kind="weekday")
+    assert prob[17] == 1.0 and prob[16] == 0.0 and prob[21] == 0.0
+    assert np.allclose(stats.daily_energy, 8 * 0.5 * (30.0 / ref) / 24.0)
+    assert np.allclose(stats.steps, 1.0)
+
+
+def test_the_statistics_do_not_depend_on_the_engine_size() -> None:
+    dates = START + np.arange(14) * ONE_DAY
+    a = ev.event_stats(days=evening_engine(n_days=14, level=30.0), dates=dates)
+    b = ev.event_stats(days=evening_engine(n_days=14, level=7.5), dates=dates)
+    assert np.allclose(a.steps, b.steps) and np.allclose(a.daily_energy, b.daily_energy)
+
+
+def test_an_engine_that_never_runs_counts_its_days_with_zero_events() -> None:
+    stats = ev.event_stats(days=np.zeros((7, 48)), dates=START + np.arange(7) * ONE_DAY)
+    assert stats.n_days == {"weekday": 5, "weekend": 2}
+    assert stats.run_lengths_h.size == 0 and stats.steps.size == 0
+    assert stats.weekly_starts.tolist() == [0.0]
+    assert stats.daily_energy.tolist() == [0.0] * 7
+
+
+def test_idle_noise_cannot_set_the_reference_level() -> None:
+    series = np.full(1000, 0.01)
+    series[:10] = 30.0
+    assert ev.reference_level(series=series) == 30.0
+    assert ev.reference_level(series=np.zeros(5)) is None
+
+
+def test_a_day_with_a_missing_half_hour_splits_the_stretch() -> None:
+    days = evening_engine(n_days=15)
+    days[7, 3] = np.nan
+    assert ev.complete_stretches(days=days) == [(0, 7), (8, 15)]
+    stats = ev.event_stats(days=days, dates=START + np.arange(15) * ONE_DAY)
+    assert stats.weekly_starts.tolist() == [7.0, 7.0]
+
+
+def test_a_run_cut_by_a_stretch_edge_is_not_a_run_length() -> None:
+    days = np.zeros((7, 48))
+    days[0, :10] = 30.0
+    days[3, 30:40] = 30.0
+    stats = ev.event_stats(days=days, dates=START + np.arange(7) * ONE_DAY)
+    assert stats.run_lengths_h.tolist() == [5.0]
+
+
+def test_merge_sparse_bins_merges_a_short_last_group_back() -> None:
+    counts = np.array([1.0, 2.0, 10.0, 0.0, 3.0])
+    assert ev.merge_sparse_bins(real_counts=counts, min_count=5) == [(0, 5)]
+    counts = np.array([6.0, 5.0, 0.0, 7.0, 1.0])
+    assert ev.merge_sparse_bins(real_counts=counts, min_count=5) == [(0, 1), (1, 2), (2, 5)]
+
+
+def test_merge_sparse_bins_with_too_few_events_gives_one_group() -> None:
+    assert ev.merge_sparse_bins(real_counts=np.array([1.0, 0.0, 2.0]), min_count=5) == [(0, 3)]
+
+
+def test_grouped_shares_build_the_groups_from_the_real_counts() -> None:
+    real = np.array([0.5] * 6 + [3.0] * 6 + [30.0])
+    simv = np.array([0.5, 1.5, 3.0, 5.0, 10.0, 30.0] * 10)
+    groups, rs, ss = ev.grouped_shares(real=real, sim_values=simv, lower=ev.RUN_LENGTH_LOWER_H)
+    assert groups == [(0, 1), (1, 6)]
+    assert np.allclose(rs, [0.45, 0.55])
+    assert np.allclose(ss, [0.15, 0.85])
+    labels = ev.group_labels(lower=ev.RUN_LENGTH_LOWER_H, groups=groups, unit=" h")
+    assert labels == ["0 to 1 h", "1+ h"]
+
+
+def test_published_shares_are_multiples_of_the_step() -> None:
+    rng = np.random.default_rng(1)
+    real, simv = rng.exponential(3.0, 77), rng.exponential(3.5, 4001)
+    _, rs, ss = ev.grouped_shares(real=real, sim_values=simv, lower=ev.RUN_LENGTH_LOWER_H)
+    for shares in (rs, ss):
+        assert np.allclose(shares / ev.SHARE_STEP, np.round(shares / ev.SHARE_STEP))
+
+
+def test_every_published_real_group_holds_the_minimum_events() -> None:
+    days = evening_engine(n_days=60)
+    days[::4, 34:42] = 12.0
+    stats = ev.event_stats(days=days, dates=START + np.arange(60) * ONE_DAY)
+    for d in ev.distributions(real=stats, sim_stats=stats):
+        counts = ev.bin_counts(values=d.real, lower=d.lower)
+        groups = ev.merge_sparse_bins(real_counts=counts)
+        assert counts.sum() == len(d.real)
+        assert all(counts[a:b].sum() >= ev.MIN_REAL_EVENTS for a, b in groups)
+
+
+def test_negative_daily_energy_is_kept_in_the_lowest_bin() -> None:
+    values = np.array([-0.3, 0.0, 0.001, 0.1, 0.6])
+    counts = ev.bin_counts(values=values, lower=ev.ENERGY_LOWER)
+    assert counts.sum() == len(values)
+    assert counts[0] == 3
+    labels = ev.group_labels(lower=ev.ENERGY_LOWER, groups=[(0, 2), (2, 6)], unit="")
+    assert labels == ["under 0.05", "0.05+"]
+
+
+def test_a_negative_real_day_counts_in_the_energy_chart() -> None:
+    days = evening_engine(n_days=14)
+    days[2] = -0.5
+    stats = ev.event_stats(days=days, dates=START + np.arange(14) * ONE_DAY)
+    assert (stats.daily_energy < 0).sum() == 1
+    assert ev.bin_counts(values=stats.daily_energy, lower=ev.ENERGY_LOWER).sum() == 14
+
+
+def test_hour_probabilities_are_rounded_and_sparse_real_hours_are_blank() -> None:
+    days = evening_engine(n_days=14)
+    days[0, 10] = 30.0
+    days[0, 11] = 30.0
+    stats = ev.event_stats(days=days, dates=START + np.arange(14) * ONE_DAY)
+    real = stats.published_probability(kind="weekday", blank_sparse=True)
+    sim = stats.published_probability(kind="weekday", blank_sparse=False)
+    assert np.isnan(real[5]) and sim[5] == 0.1
+    assert real[17] == 1.0 and real[0] == 0.0
+    ok = real[~np.isnan(real)]
+    assert np.allclose(ok / ev.SHARE_STEP, np.round(ok / ev.SHARE_STEP))
+    xs, ys = ev.hour_points(probability=real)
+    assert len(xs) == len(ys) == 48
+    assert xs[:4] == [0.0, 1.0, 1.0, 2.0]
+    assert ys[10] is None and ys[11] is None
+
+
+def test_uk_clock_offset_changes_on_the_last_sundays_of_march_and_october() -> None:
+    days = np.array(
+        ["2030-01-15", "2030-03-30", "2030-03-31", "2030-07-01", "2030-10-26", "2030-10-27"],
+        dtype="datetime64[D]",
+    )
+    assert ev.uk_utc_offset(dates=days).tolist() == [0.0, 0.0, 1.0, 1.0, 1.0, 0.0]
+
+
+def test_the_draws_start_on_mondays_spread_over_the_year() -> None:
+    firsts = np.array([ev.draw_dates(i=i)[0] for i in range(52)])
+    assert (ev.weekday_of(days=firsts) == 0).all()
+    months = {int(str(d)[5:7]) for d in firsts}
+    assert months == set(range(1, 13))
+
+
+def test_no_real_bin_shows_fewer_than_the_minimum_events() -> None:
+    rng = np.random.default_rng(0)
+    real = rng.exponential(3.0, size=40)
+    rc = ev.bin_counts(values=real, lower=ev.RUN_LENGTH_LOWER_H)
+    for a, b in ev.merge_sparse_bins(real_counts=rc):
+        assert rc[a:b].sum() >= ev.MIN_REAL_EVENTS
+
+
+def test_simulated_draws_are_reproducible_and_inside_the_ranges() -> None:
+    a = ev.draw_engines(n=6)
+    b = ev.draw_engines(n=6)
+    assert all(np.array_equal(x[0], y[0]) for x, y in zip(a, b, strict=True))
+    for engine, params in a:
+        assert engine.shape == (ev.N_DAYS_PER_DRAW, 48)
+        assert engine.min() >= 0
+        assert engine.max() <= params["total_points_cap"] + 1e-9
+
+
+def test_picked_cases_are_distinct_windows_and_cover_several_kinds() -> None:
+    draws = ev.draw_engines(n=60)
+    cases = ev.pick_cases(draws=draws)
+    assert len(cases) >= 8
+    assert len({c.label for c in cases}) == len(cases)
+    again = ev.pick_cases(draws=draws)
+    assert [(c.label, c.draw, c.first_day) for c in cases] == [
+        (c.label, c.draw, c.first_day) for c in again
+    ]
+
+
+def solar_segment(*, source: str, month: int, csi: float, n: int = 3) -> SimpleNamespace:
+    hh = np.arange(48)
+    day = np.where((hh >= 14) & (hh < 34), 20.0 * csi, 0.0)
+    dates = np.datetime64(f"2030-{month:02d}-01", "D") + np.arange(n + 2) * ONE_DAY
+    cal_index = np.r_[-1, np.arange(n), -1]
+    return SimpleNamespace(
+        source=source, dates=dates, cal_index=cal_index, solar=np.tile(day, (n + 2, 1)),
+        csi=np.full((n + 2, 48), csi), s1_fallback=np.zeros(n + 2, dtype=bool),
+    )  # fmt: skip
+
+
+def test_pick_solar_days_takes_the_clearest_and_cloudiest_of_each_season() -> None:
+    segs = [
+        solar_segment(source="S2", month=m, csi=c)
+        for m, c in ((1, 0.9), (1, 0.2), (7, 0.8), (7, 0.4), (4, 0.5))
+    ]
+    segs.append(solar_segment(source="S1", month=1, csi=0.99))
+    days = ev.pick_solar_days(segments=segs, source="S2", dated=False)
+    assert [d.label for d in days] == [
+        "winter, clearest", "winter, cloudiest", "spring, clearest", "spring, cloudiest", "summer, clearest", "summer, cloudiest",
+    ]  # fmt: skip
+    assert days[0].output.max() == 20.0 * 0.9
+    assert all(d.title_extra == "" for d in days)
+
+
+def test_pick_solar_days_dates_only_when_asked() -> None:
+    segs = [solar_segment(source="S1", month=7, csi=0.8)]
+    assert ev.pick_solar_days(segments=segs, source="S1", dated=True)[0].title_extra.startswith(
+        "2030-07"
+    )
+    assert ev.pick_solar_days(segments=segs, source="S2", dated=False) == []
+
+
+def test_write_event_figures_keeps_real_series_out_of_the_published_files(tmp_path: Path) -> None:
+    n_days = 40
+    start = np.datetime64("2030-01-07T00:00", "m")
+    times = start + (np.arange(n_days * 48) + 1) * np.timedelta64(30, "m")
+    power = (
+        evening_engine(n_days=n_days) * 0.10379 * (np.arange(n_days)[:, None] % 3 != 0) + 0.0
+    ).ravel()
+    record = pl.DataFrame(
+        {"time": times.astype("datetime64[us]"), "power": power, "units": np.ones(n_days * 48)}
+    )
+    segs = [solar_segment(source="S2", month=m, csi=c) for m, c in ((1, 0.9), (1, 0.2), (7, 0.8))]
+    segs.append(solar_segment(source="S1", month=7, csi=0.7))
+    messages: list[str] = []
+    out_dir, private = tmp_path / "figures", tmp_path / "PRIVATE" / "event_generator"
+    written = ev.write_event_figures(
+        segments=segs, record=record, out_dir=out_dir, private_dir=private, log=messages.append
+    )
+    names = {p.name for p in written}
+    assert {
+        "events_01_engine_days.svg",
+        "events_02_solar_s2_days.svg",
+        "events_03_hour_of_day.svg",
+    } <= names
+    assert all(p.exists() for p in written)
+    assert (private / "real_engine_windows.svg").exists() and (
+        private / "solar_s1_days.svg"
+    ).exists()
+    assert {p.name for p in out_dir.iterdir()} == names
+    assert all(p.name.startswith("events_") for p in out_dir.iterdir())
+    published_text = " ".join(p.read_text() for p in written) + " ".join(messages)
+    assert "2030-01-" not in published_text
+    assert "S1" not in published_text and "metered farms" not in published_text
+
+
+def odd_length_stats() -> tuple[ev.EventStats, ev.EventStats]:
+    """Return real stats with a sparse hour 5 (2 running half-hours) and unrounded simulated stats."""
+    n = 17
+    dates = START + np.arange(n) * ONE_DAY
+    real_days_ = evening_engine(n_days=n)
+    real_days_[0, 10:12] = 30.0
+    sim_days = evening_engine(n_days=n)
+    sim_days[:5, 20] = 30.0
+    return (
+        ev.event_stats(days=real_days_, dates=dates),
+        ev.event_stats(days=sim_days, dates=dates),
+    )
+
+
+def chart_rows(chart: object, *, panel: int) -> list[dict]:
+    spec = chart.to_dict()  # ty: ignore[unresolved-attribute]
+    return spec["datasets"][spec["vconcat"][panel]["data"]["name"]]
+
+
+def test_the_hour_chart_data_blank_the_sparse_real_hour_and_round_every_value() -> None:
+    real, sim = odd_length_stats()
+    rows = chart_rows(ev.hour_chart(real=real, sim_stats=sim), panel=0)
+    real_rows = [r for r in rows if r["source"] == "Real record"]
+    sim_rows = [r for r in rows if r["source"] == "Simulated draws"]
+    assert min(r["hour"] for r in rows) == 0.0 and max(r["hour"] for r in rows) == 24.0
+    assert [
+        r["share"] for r in real_rows if 5.0 <= r["hour"] <= 6.0 and r["order"] in (10, 11)
+    ] == [None, None]
+    assert all(r["share"] is not None for r in real_rows if r["order"] not in (10, 11))
+    for r in (*real_rows, *sim_rows):
+        if r["share"] is not None:
+            assert abs(r["share"] / ev.SHARE_STEP - round(r["share"] / ev.SHARE_STEP)) < 1e-9
+    assert any(r["share"] is not None and r["share"] > 0 for r in sim_rows)
+    assert (
+        sim.run_probability(kind="weekday")[10]
+        != ev.quantise(values=sim.run_probability(kind="weekday"))[10]
+    )
+
+
+def line_paths(svg: str, *, colour: str) -> list[str]:
+    paths = re.findall(r'<path[^>]*?d="([^"]+)"[^>]*?stroke="' + colour + '"', svg)
+    paths += re.findall(r'<path[^>]*?stroke="' + colour + r'"[^>]*?d="([^"]+)"', svg)
+    return paths
+
+
+def test_a_blank_real_hour_is_a_true_gap_in_the_rendered_chart(tmp_path: Path) -> None:
+    real, sim = odd_length_stats()
+    out = tmp_path / "hour.svg"
+    figures.save_svg(chart=ev.hour_chart(real=real, sim_stats=sim), path=out)
+    paths = line_paths(out.read_text(), colour=figures.ORANGE)
+    broken = [d for d in paths if d.count("M") >= 2]
+    assert len(broken) >= 1
+    width = figures.WIDTH_PX - 100
+    xs = [float(x) for x, _ in re.findall(r"(-?\d+\.?\d*)[ ,](-?\d+\.?\d*)", broken[0])]
+    px = width / 24.0
+    assert not [x for x in xs if 5 * px + 1 < x < 6 * px - 1]
+    assert [x for x in xs if x < 5 * px - 1]
+    assert [x for x in xs if x > 6 * px + 1]
+    assert [x for x in xs if 4 * px + 1 < x < 5 * px - 1 or abs(x - 4 * px) < 1]
+
+
+def test_draw_engines_passes_the_uk_clock_offset(monkeypatch) -> None:  # noqa: ANN001
+    seen = []
+
+    def fake(*, rng, utc_offset, quiet_day, record) -> np.ndarray:  # noqa: ANN001
+        seen.append(np.asarray(utc_offset).copy())
+        record["n_units"] = 1.0
+        return np.zeros((ev.N_DAYS_PER_DRAW, 48))
+
+    monkeypatch.setattr(ev.sim, "draw_engine", fake)
+    ev.draw_engines(n=52)
+    assert any((o == 1.0).any() for o in seen)
+    assert any((o == 0.0).all() for o in seen)
+    for i, o in enumerate(seen):
+        assert np.array_equal(o, ev.uk_utc_offset(dates=ev.draw_dates(i=i)))
+
+
+def test_a_chart_is_skipped_below_the_floor_of_real_events() -> None:
+    small = ev.event_stats(days=evening_engine(n_days=10), dates=START + np.arange(10) * ONE_DAY)
+    messages: list[str] = []
+    assert ev.aggregate_charts(real=small, sim_stats=small, log=messages.append) == {}
+    assert messages == [ev.SKIP_MESSAGE] * 5
+
+
+def test_every_chart_is_published_above_the_floor() -> None:
+    big = ev.event_stats(days=evening_engine(n_days=1000), dates=START + np.arange(1000) * ONE_DAY)
+    messages: list[str] = []
+    charts = ev.aggregate_charts(real=big, sim_stats=big, log=messages.append)
+    assert len(charts) == 5 and messages == []
+
+
+def test_only_the_distributions_above_the_floor_are_published() -> None:
+    days = evening_engine(n_days=300)
+    stats = ev.event_stats(days=days, dates=START + np.arange(300) * ONE_DAY)
+    assert len(stats.weekly_starts) < ev.MIN_PUBLISHED_EVENTS <= len(stats.run_lengths_h)
+    messages: list[str] = []
+    charts = ev.aggregate_charts(real=stats, sim_stats=stats, log=messages.append)
+    assert len(charts) == 4 and messages == [ev.SKIP_MESSAGE]
+    assert "events_06_starts.svg" not in charts

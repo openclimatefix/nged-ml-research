@@ -1,0 +1,385 @@
+# ruff: noqa: E501
+"""Experiment 729: build, hash, and store the synthetic banks, and the realism gate's functions.
+
+A bank is a list of segments of one kind. Training banks hold 32 draws per training month per seed
+and draw their own no-injection share. Validation, test, and shifted-mix banks hold 8 draws per
+month in separate seed spaces, are built once, and are hashed so that every arm reads identical
+bytes. No function prints a month or a date.
+"""
+
+import hashlib
+import os
+import pickle
+from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Final, Literal
+
+import e00729_core as core
+import e00729_sim as sim
+import numpy as np
+
+BankKind = Literal["train", "validation", "test", "shifted"]
+SPLIT_OF_KIND: Final = {
+    "train": "training", "validation": "validation", "test": "test", "shifted": "test",
+}  # fmt: skip
+SEED_BASE: Final = {
+    "train": core.TRAIN_SEED_BASE, "validation": core.VALIDATION_SEED_BASE,
+    "test": core.EVAL_SEED_BASE, "shifted": core.SHIFTED_SEED_BASE,
+}  # fmt: skip
+"""The first entry of each bank kind's `SeedSequence`. Every evaluation kind has its own root, so no
+two banks share a draw, and no root meets a training seed."""
+
+
+@dataclass
+class Bank:
+    """A hashed list of segments of one kind.
+
+    Attributes:
+        kind: "train", "validation", "test", or "shifted".
+        seed: The training seed, or None for the shared evaluation banks.
+        root: The first entry of the seed sequence that built every segment.
+        none_share: The no-injection share of each (month) sub-bank, by month.
+        segments: The segments.
+        digest: The SHA-256 of the bank's arrays.
+    """
+
+    kind: BankKind
+    seed: int | None
+    root: int
+    none_share: dict[str, float]
+    segments: list[sim.Segment]
+    digest: str
+
+
+def bank_root(*, kind: BankKind, seed: int | None) -> int:
+    """Return the first seed-sequence entry of a bank: 7290 plus the seed, or the evaluation base."""
+    if kind == "train":
+        assert seed is not None
+        return core.TRAIN_SEED_BASE + seed
+    return SEED_BASE[kind]
+
+
+def seed_spaces_disjoint(*, train_seeds: Sequence[int]) -> bool:
+    """Return whether no training root equals an evaluation root (the leakage check's core)."""
+    train = {bank_root(kind="train", seed=s) for s in train_seeds}
+    evals = {bank_root(kind=k, seed=None) for k in ("validation", "test", "shifted")}
+    evaluation_roots = [bank_root(kind=k, seed=None) for k in ("validation", "test", "shifted")]
+    return not (train & evals) and len(evals) == len(evaluation_roots)
+
+
+def bank_digest(*, segments: Sequence[sim.Segment]) -> str:
+    """Return the SHA-256 of the segments' truth, reading, and BSP arrays and world labels."""
+    h = hashlib.sha256()
+    for s in segments:
+        h.update(s.world.encode())
+        h.update(s.month.encode())
+        for arr in (s.x, s.r, s.bsp, s.engine, s.solar):
+            h.update(np.ascontiguousarray(np.nan_to_num(arr, nan=-1.0)).tobytes())
+    return h.hexdigest()
+
+
+def deal_across_months(*, worlds: Sequence[str], n_months: int) -> list[str]:
+    """Spread a bank's world types over its months, so that each month gets its share of each type.
+
+    The world types are sorted and dealt out in turn, one month at a time, so a type with `k`
+    segments gives each month `k // n_months` or one more. Each month still holds the same number of
+    segments. The result lists month 0's segments first, then month 1's, and so on.
+
+    Args:
+        worlds: The bank's world types (the quota assignment).
+        n_months: The number of months of the bank.
+
+    Returns:
+        The world types in month-major order.
+    """
+    ordered = sorted(worlds)
+    per_month = len(ordered) // n_months
+    out: list[str] = []
+    for month in range(n_months):
+        out.extend(ordered[month::n_months][:per_month])
+    return out
+
+
+def build_bank(
+    *, cal: sim.Calendar, kind: BankKind, seed: int | None, months: Sequence[str],
+    month_use: dict[str, np.ndarray],
+) -> Bank:  # fmt: skip
+    """Build one bank.
+
+    Args:
+        cal: The calendar of base days.
+        kind: The bank kind.
+        seed: The training seed (None for evaluation banks).
+        months: The months of this bank (training months, or validation or test months).
+        month_use: For each month, which base days of `cal` the segments may use.
+
+    Returns:
+        The bank.
+    """
+    root = bank_root(kind=kind, seed=seed)
+    n_draws = core.SEGMENT_DRAWS_TRAIN if kind == "train" else core.SEGMENT_DRAWS_EVAL
+    segments: list[sim.Segment] = []
+    none_share: dict[str, float] = {}
+    ordered = sorted(months)
+    planned = None
+    if kind != "train":
+        # evaluation worlds are assigned by quota across the whole bank, so the realised mix is the planned mix
+        planned = deal_across_months(
+            worlds=core.quota_world_types(
+                rng=np.random.default_rng(np.random.SeedSequence([root, 10_000_000])),
+                n=n_draws * len(ordered),
+                none_share=core.SHIFTED_NONE_SHARE if kind == "shifted" else core.TEST_MIX["none"],
+            ),
+            n_months=len(ordered),
+        )
+    for index, month in enumerate(ordered):
+        ss = np.random.SeedSequence([root, index])
+        children = ss.spawn(n_draws + 1)
+        if planned is None:
+            rng_mix = np.random.default_rng(children[0])
+            share = core.draw_none_share(rng=rng_mix)
+            worlds = core.draw_world_types(rng=rng_mix, n=n_draws, none_share=share)
+        else:
+            worlds = planned[index * n_draws : (index + 1) * n_draws]
+            share = worlds.count("none") / n_draws
+        none_share[month] = share
+        segments.extend(
+            sim.simulate_segment(
+                cal=cal,
+                month=month,
+                use=month_use[month],
+                world=worlds[draw],
+                rng=np.random.default_rng(children[draw + 1]),
+            )
+            for draw in range(n_draws)
+        )
+    return Bank(
+        kind=kind, seed=seed, root=root, none_share=none_share, segments=segments,
+        digest=bank_digest(segments=segments),
+    )  # fmt: skip
+
+
+def injected_share(*, bank: Bank) -> float:
+    """Return the share of a bank's segments that carry an injection (the prior pi of B1 and B2)."""
+    return float(np.mean([s.world != "none" for s in bank.segments]))
+
+
+def save_bank(*, bank: Bank, path: Path) -> None:
+    """Write a bank atomically (a temporary file in the same folder, then a rename)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    tmp.write_bytes(pickle.dumps(bank, protocol=pickle.HIGHEST_PROTOCOL))
+    tmp.replace(path)
+
+
+def load_bank(*, path: Path) -> Bank:
+    """Read a bank and check that its stored digest matches its arrays."""
+    bank = pickle.loads(path.read_bytes())
+    assert bank_digest(segments=bank.segments) == bank.digest, "a stored bank changed on disk"
+    return bank
+
+
+def reverse_counts(*, bank: Bank) -> tuple[int, int]:
+    """Return the reverse-flow half-hours outside the dead band, in all segments and in BSP ones."""
+    total = bsp = 0
+    for s in bank.segments:
+        n = int(((s.x < -core.DEAD_BAND_POINTS) & s.valid).sum())
+        total += n
+        if s.has_bsp:
+            bsp += n
+    return total, bsp
+
+
+# --------------------------------------------------------------------------- the realism gate
+
+REAL_MIN_POINTS: Final = core.GATE_MIN_VALUE_MVA / core.CAPACITY_MVA * core.POINTS
+"""1.0 MVA in points: the level under which a half-hour counts as near zero."""
+
+
+def near_zero_shares(*, r: np.ndarray) -> tuple[float, float]:
+    """Return the share of days with a daily minimum under 1.0 MVA and of half-hours under it.
+
+    Args:
+        r: Readings in points, shape `(days, 48)`, NaN where missing.
+
+    Returns:
+        The two shares, over days that hold at least one finite half-hour.
+    """
+    ok = np.isfinite(r).any(axis=1)
+    if not ok.any():
+        return float("nan"), float("nan")
+    day_min = np.nanmin(r[ok], axis=1)
+    finite = np.isfinite(r)
+    return float((day_min < REAL_MIN_POINTS).mean()), float((r[finite] < REAL_MIN_POINTS).mean())
+
+
+def bank_shares_by_world(*, bank: Bank, worlds: Sequence[str]) -> tuple[float, float]:
+    """Return `near_zero_shares` over the base days of a bank's segments of the given worlds."""
+    masked = []
+    for s in bank.segments:
+        if s.world in worlds:
+            on = s.cal_index >= 0
+            masked.append(np.where(s.valid[on], s.r[on], np.nan))
+    if not masked:
+        return float("nan"), float("nan")
+    return near_zero_shares(r=np.vstack(masked))
+
+
+@dataclass(frozen=True)
+class StepFit:
+    """A regression of BSP steps on engine steps.
+
+    Attributes:
+        slope: The slope of the BSP step per point of engine step.
+        se: The slope's standard error.
+        resid_sd: The residual standard deviation in points.
+        n: The number of finite step pairs behind the fit.
+    """
+
+    slope: float
+    se: float
+    resid_sd: float
+    n: int = 1
+
+
+def step_fit(*, d_bsp: np.ndarray, d_eng: np.ndarray, weights: np.ndarray | None = None) -> StepFit:
+    """Fit `d_bsp = slope * d_eng + noise` by (weighted) least squares through the origin.
+
+    Args:
+        d_bsp: Half-hour changes of the BSP meter (NaN allowed).
+        d_eng: Half-hour changes of the engine output.
+        weights: Optional row weights.
+
+    Returns:
+        The slope, its standard error, and the residual standard deviation.
+    """
+    ok = np.isfinite(d_bsp) & np.isfinite(d_eng)
+    w = np.ones(ok.sum()) if weights is None else weights[ok]
+    x, y = d_eng[ok], d_bsp[ok]
+    sxx = float((w * x * x).sum())
+    if sxx <= 0 or len(x) < 3:
+        return StepFit(float("nan"), float("nan"), float("nan"), len(x))
+    slope = float((w * x * y).sum() / sxx)
+    sigma2 = float((w * (y - slope * x) ** 2).sum() / max(w.sum() - 1.0, 1.0))
+    return StepFit(slope, float(np.sqrt(sigma2 / sxx)), float(np.sqrt(sigma2)), len(x))
+
+
+ZERO_STEP: Final = 1e-9
+"""An engine step with an absolute size below this counts as exactly zero (its own size bin)."""
+N_SIZE_BINS: Final = 1 + core.GATE_STEP_BINS
+"""Bin 0 holds the zero steps; bins 1 to 5 are the quintiles of the record's non-zero steps."""
+
+
+def size_bins(*, d_eng: np.ndarray, edges: np.ndarray) -> np.ndarray:
+    """Return the size bin (0 to 5) of each absolute engine step: 0 for a zero step, else a quintile."""
+    size = np.abs(d_eng)
+    inside = np.searchsorted(edges, size, side="right") - 1
+    quintile = 1 + np.clip(inside, 0, core.GATE_STEP_BINS - 1)
+    return np.where(size < ZERO_STEP, 0, quintile)
+
+
+def real_bin_edges(*, d_eng: np.ndarray) -> np.ndarray:
+    """Return the 6 edges of the quintile bins of the real record's non-zero absolute steps.
+
+    Most steps of an engine record are exactly zero, so quintiles of all steps would repeat an edge.
+    The zero steps are their own bin (see `size_bins`).
+    """
+    size = np.abs(d_eng[np.isfinite(d_eng)])
+    size = size[size >= ZERO_STEP]
+    return np.quantile(size, np.linspace(0.0, 1.0, core.GATE_STEP_BINS + 1))
+
+
+def real_bin_shares(*, d_eng: np.ndarray, edges: np.ndarray) -> np.ndarray:
+    """Return the share of the real record's finite steps in each of the 6 size bins."""
+    finite = np.isfinite(d_eng)
+    counts = np.bincount(size_bins(d_eng=d_eng[finite], edges=edges), minlength=N_SIZE_BINS)
+    return counts / max(int(counts.sum()), 1)
+
+
+def size_matched_weights(*, d_eng: np.ndarray, edges: np.ndarray, shares: np.ndarray) -> np.ndarray:
+    """Return row weights so that each non-empty size bin holds the real record's share of rows.
+
+    Args:
+        d_eng: A synthetic stretch's engine steps.
+        edges: The real record's quintile edges from `real_bin_edges`.
+        shares: The real record's share of steps per bin, from `real_bin_shares`.
+
+    Returns:
+        One weight per row (0 where the step is not finite). The shares of empty bins are shared out
+        among the other bins, and the weights sum to the finite count.
+    """
+    bins = size_bins(d_eng=np.nan_to_num(d_eng), edges=edges)
+    finite = np.isfinite(d_eng)
+    weights = np.zeros(len(d_eng))
+    present = [b for b in range(N_SIZE_BINS) if (finite & (bins == b)).any()]
+    total = float(sum(shares[b] for b in present))
+    if total <= 0:
+        return weights
+    for b in present:
+        sel = finite & (bins == b)
+        weights[sel] = (shares[b] / total) / (sel.sum() / finite.sum())
+    return weights
+
+
+def chunk_fits(
+    *, d_bsp: np.ndarray, d_eng: np.ndarray, length: int, edges: np.ndarray | None = None,
+    shares: np.ndarray | None = None, min_steps: int = 100,
+) -> list[StepFit]:  # fmt: skip
+    """Fit the step regression on consecutive chunks of `length` half-hours.
+
+    Args:
+        d_bsp: BSP steps (NaN across gaps).
+        d_eng: Engine steps.
+        length: The chunk length in half-hours.
+        edges: The real record's edges; when given with `shares`, each chunk is size-matched.
+        shares: The real record's share of steps per bin.
+        min_steps: A chunk with fewer finite engine steps is skipped.
+
+    Returns:
+        One fit per chunk.
+    """
+    fits = []
+    for a in range(0, len(d_eng) - length + 1, length):
+        e, b = d_eng[a : a + length], d_bsp[a : a + length]
+        if int(np.isfinite(e).sum()) < min_steps:
+            continue
+        w = None
+        if edges is not None and shares is not None:
+            w = size_matched_weights(d_eng=e, edges=edges, shares=shares)
+        fits.append(step_fit(d_bsp=b, d_eng=e, weights=w))
+    return fits
+
+
+def bsp_gate(
+    *, real: StepFit, real_ci: tuple[float, float], synthetic: Sequence[StepFit]
+) -> dict[str, bool | float]:
+    """Return the gate's verdict on the synthetic BSP steps against the real relation.
+
+    Args:
+        real: The real record's fit.
+        real_ci: The 95% interval of the real slope.
+        synthetic: One size-matched fit per synthetic stretch.
+
+    Returns:
+        Each condition, `void` (True when fewer than `GATE_MIN_SYNTHETIC_FITS` finite synthetic fits
+        exist, so that the gate could not be read and does not pass), the finite count, and whether
+        the gate passes: the real slope's interval overlaps -1.0 to
+        -0.6, and the real standard error and residual sd each lie in the 5th to 95th percentile of
+        the synthetic stretches.
+    """
+    lo_b, hi_b = -core.RANGES["beta"][1], -core.RANGES["beta"][0]
+    overlap = bool(real_ci[0] <= hi_b and real_ci[1] >= lo_b)
+    finite = [f for f in synthetic if np.isfinite(f.se) and np.isfinite(f.resid_sd)]
+    n_finite = len(finite)
+    if n_finite < core.GATE_MIN_SYNTHETIC_FITS or not np.isfinite(real.se):
+        return {"slope_overlap": overlap, "se_inside": False, "sd_inside": False, "void": True,
+                "n_finite_fits": n_finite, "pass": False}  # fmt: skip
+    # a standard error falls as one over the root of the number of step pairs, so compare se * sqrt(n)
+    se = np.array([f.se * np.sqrt(f.n) for f in finite])
+    sd = np.array([f.resid_sd for f in finite])
+    real_se = real.se * np.sqrt(real.n)
+    se_in = bool(np.percentile(se, 5) <= real_se <= np.percentile(se, 95))
+    sd_in = bool(np.percentile(sd, 5) <= real.resid_sd <= np.percentile(sd, 95))
+    return {"slope_overlap": overlap, "se_inside": se_in, "sd_inside": sd_in, "void": False,
+            "n_finite_fits": n_finite, "pass": bool(overlap and se_in and sd_in)}  # fmt: skip

@@ -151,5 +151,5 @@ def drive_series(
 
 
 def units_of(*, g: np.ndarray) -> np.ndarray:
-    """Return whole units running, from the output in MW, rounded to the nearest 1.97 MW."""
+    """Return whole units running, from the output in MW, rounded to the nearest whole unit."""
     return np.rint(np.asarray(g) / UNIT_MW).astype(int)

@@ -5,6 +5,8 @@ OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00198-*/e00198_charts.p
 """
 
 import json
+import sys
+from pathlib import Path
 from typing import Final
 
 import altair as alt
@@ -13,6 +15,9 @@ import e00198_fit as fit
 import numpy as np
 import polars as pl
 from plotting import ocf_theme as ocf
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 WIDTH: Final[int] = 590
 
@@ -48,20 +53,23 @@ def headline_chart(*, results: dict) -> None:
         + alt.Chart(alt.InlineData(values=[{"x": 0}])).mark_rule(color="#888", strokeDash=[4, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         + alt.Chart(alt.InlineData(values=[{"x": fit.SUPPORTED_BAR}])).mark_rule(color="#888", strokeDash=[1, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )  # fmt: skip
-    layer.properties(
-        width=WIDTH - 250,
-        height=220,
-        title=alt.TitleParams(
-            "A cooling term does not lower the summer score, and an injected one would have shown",
-            subtitle=[
-                "Dot: estimate. Line: 99% interval from resampling 14-day blocks. Dashed rule: no change.",
-                "Dotted rule: the pre-registered bar of -0.01. Five decision Primaries, June to September.",
-            ],
-            anchor="start",
-            fontSize=13,
-            subtitleFontSize=11,
+    guard.save_chart(
+        chart=layer.properties(
+            width=WIDTH - 250,
+            height=220,
+            title=alt.TitleParams(
+                "A cooling term does not lower the summer score, and an injected one would have shown",
+                subtitle=[
+                    "Dot: estimate. Line: 99% interval from resampling 14-day blocks. Dashed rule: no change.",
+                    "Dotted rule: the pre-registered bar of -0.01. Five decision Primaries, June to September.",
+                ],
+                anchor="start",
+                fontSize=13,
+                subtitleFontSize=11,
+            ),
         ),
-    ).save(common.FIGURE_DIR / "figure_1_contrasts.svg")
+        path=common.FIGURE_DIR / "figure_1_contrasts.svg",
+    )
 
 
 def residual_chart(*, sites: list[fit.SiteData]) -> None:
@@ -109,12 +117,15 @@ def residual_chart(*, sites: list[fit.SiteData]) -> None:
             ),
         )
     )
-    (
-        chart
-        + alt.Chart(alt.InlineData(values=[{"y": 0}]))  # ty: ignore[unresolved-attribute]
-        .mark_rule(color="#888", strokeDash=[4, 3])
-        .encode(y="y:Q")
-    ).save(common.FIGURE_DIR / "figure_2_residual_vs_temperature.svg")
+    guard.save_chart(
+        chart=(
+            chart
+            + alt.Chart(alt.InlineData(values=[{"y": 0}]))  # ty: ignore[unresolved-attribute]
+            .mark_rule(color="#888", strokeDash=[4, 3])
+            .encode(y="y:Q")
+        ),
+        path=common.FIGURE_DIR / "figure_2_residual_vs_temperature.svg",
+    )
 
 
 def hot_end_summary(*, sites: list[fit.SiteData]) -> None:

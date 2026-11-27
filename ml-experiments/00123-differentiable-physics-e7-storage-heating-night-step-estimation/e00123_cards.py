@@ -28,17 +28,16 @@ def main() -> None:
     jumps = {r["site"]: r for r in numbers["bst_jump"]}
     timing = {r["site"]: r for r in numbers["timing"]}
     print(
-        "| Series | Step at 3 C, points (90% interval) | Step, MW (MVA at D12) | "
+        "| Series | Step at 3 C, points (90% interval) | "
         "Slope, points per degree | "
         "Cold-dependent part, points | Flat part, points | "
         "Summer reference, points | Winters |"
     )
-    print("|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|")
     for r in numbers["unpooled"]:
         site = r["site"]
         print(
             f"| {site} | {r['step']:.1f} ({r['step_low']:.1f} to {r['step_high']:.1f}) | "
-            f"{r['step_mw']:.2f} | "
             f"{r['slope']:.2f} ({r['slope_low']:.2f} to {r['slope_high']:.2f}) | "
             f"{r['slope'] * common.REFERENCE_COLD_C:.1f} | {r['flat']:.1f} | "
             f"{raw[site]['d_summer']:.1f} | {r['winters'].replace(',', ', ')} |"

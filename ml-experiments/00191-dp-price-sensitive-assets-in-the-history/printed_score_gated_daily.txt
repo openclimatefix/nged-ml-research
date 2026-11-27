@@ -103,7 +103,7 @@ jb  n=  55210 qs=12.0601 mae=16.5283 cov90=0.381
    jb-a0 qs: +0.8871 [+0.4906, +1.2339] = +7.94%
    jb-a0 ae: +0.9714 [+0.4703, +1.4007] = +6.24%
 
-=== D14 (gated_daily) rows per arm: 95,056, gate-on share 1.00, spread-positive share 0.50
+=== REG (gated_daily) rows per arm: 95,056, gate-on share 1.00, spread-positive share 0.50
 -- cut all
 a0  n=  95056 qs=2.1630 mae=3.8400 cov90=0.887
 h   n=  95056 qs=2.2034 mae=3.9081 cov90=0.880

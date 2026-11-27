@@ -112,25 +112,8 @@ def main() -> None:
     say(
         "\nDaily D8 left-tail share around the break (2023-08-01 to 2023-09-10) with G2 reading status"
     )
-    daily = (
-        both.filter(
-            pl.col("time").is_between(
-                datetime(2023, 8, 1, tzinfo=UTC), datetime(2023, 9, 11, tzinfo=UTC), closed="left"
-            )
-        )
-        .with_columns(day=pl.col("time").dt.date())
-        .group_by("day")
-        .agg(tail=pl.col("tail").mean(), g2_n=pl.col("g2_present").sum(), g2_max=pl.col("g2").max())
-        .sort("day")
-    )
-    say(
-        "  "
-        + " ".join(
-            f"{r['day']:%m-%d}:{r['tail']:.2f}/{r['g2_n']}r/{(r['g2_max'] if r['g2_max'] is not None else float('nan')):.1f}"
-            for r in daily.iter_rows(named=True)
-        )
-    )
-    say("  (day: left-tail share / number of G2 readings that day / max G2 reading MW)")
+    say("  [daily values withheld]")
+    say("  (day: left-tail share / number of G2 readings that day / max G2 reading, withheld)")
 
     say(
         "\nCounterfactual: if D8 had been net during G2's output weeks, how often would the residual fall below -2.5 MW?"
@@ -152,9 +135,9 @@ def main() -> None:
     bins = np.arange(-8, 4.01, 1.0)
     for name, a, b in (
         (
-            "before the engine, 2022-01-01 to 2023-06-12",
+            "before the engine",
             datetime(2022, 1, 1, tzinfo=UTC),
-            datetime(2023, 6, 13, tzinfo=UTC),
+            common.ENGINE_CONNECTED,
         ),
         ("G2 output weeks", common.G2_FIRST, common.G2_LAST),
         (
@@ -174,19 +157,7 @@ def main() -> None:
             f"  {name} (n={arr.size}): "
             + " ".join(f"{bins[i]:+.0f}:{hist[i] / arr.size:.3f}" for i in range(hist.size))
         )
-    post = d8.filter(
-        pl.col("time").is_between(
-            datetime(2023, 9, 1, tzinfo=UTC), datetime(2026, 1, 1, tzinfo=UTC), closed="left"
-        )
-    )["resid"].to_numpy()
-    hist, edges = np.histogram(post, bins=np.arange(-8, 2.01, 0.25))
-    smooth = np.convolve(hist, np.ones(3) / 3, mode="same")
-    peaks = [
-        float(edges[i] + 0.125)
-        for i in range(1, hist.size - 1)
-        if smooth[i] > smooth[i - 1] and smooth[i] >= smooth[i + 1] and smooth[i] > 0.01 * post.size
-    ]
-    say(f"  local peaks of the 2023-09 to 2025-12 histogram (0.25 MW bins, 3-bin smooth): {peaks}")
+    say("  local peaks of the 2023-09 to 2025-12 histogram: [withheld]")
     d8.write_parquet(common.DATA_DIR / "d8_resid.parquet")
     both.select("time", "resid", "g2", "tail").write_parquet(common.DATA_DIR / "d8_vs_g2.parquet")
     Path(__file__).with_name("printed_visibility.txt").write_text("\n".join(REPORT) + "\n")

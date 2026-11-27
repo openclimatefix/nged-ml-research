@@ -1,23 +1,27 @@
 # ruff: noqa: E501
-"""Experiment 713: report-only diagnostic of the token's scale and of the forecast's sensitivity to history power.
+"""Experiment 713: report-only diagnostic of the token scale and the forecast sensitivity.
+
+The diagnostic measures the length of each part of the token and how far the forecast moves with
+history power.
 
 Usage: e00713_token_diagnostic.py ARM MONTH SEED [--device cuda] [--random-init]
 
-For one fitted network (`work/` stage 3 state; `--random-init` builds an untrained network for a smoke
-test and labels the file), on `N_SAMPLES` real batches of one fold (random Primaries and test origins, lead
-days 1 and 7), the script writes `work/token_diagnostic/<arm>_<month>_s<seed>.json` with:
+For one fitted network (`work/` stage 3 state; `--random-init` builds an untrained network for a
+smoke test and labels the file), on `N_SAMPLES` real batches of one fold (random Primaries and test
+origins, lead days 1 and 7), the script writes `work/token_diagnostic/<arm>_<month>_s<seed>.json`
+with:
 
-(a) **The mean length of each part of the token.** The L2 length over the 64 numbers of the weather part
-(`proj_w` of the weather encoder), the date-time part, the Primary table, the time-of-day table, the
-day-age table, and the power part (`z * power_u + power_b` on visible history tokens, with its
-`z * power_u` and `power_b` pieces), on visible history tokens; and the lead, ensemble-spread, and
-`m_target` parts on the target row.
+(a) **The mean length of each part of the token.** The L2 length over the 64 numbers of the weather
+part (`proj_w` of the weather encoder), the date-time part, the Primary table, the time-of-day
+table, the day-age table, and the power part (`z * power_u + power_b` on visible history tokens,
+with its `z * power_u` and `power_b` pieces), on visible history tokens; and the lead,
+ensemble-spread, and `m_target` parts on the target row.
 
-(b) **How far the forecast moves with history power.** The sensitivity of the standardised mixture mean
-of the 48 target tokens to each visible history reading: the sum over the visible tokens of the absolute
-derivative with respect to `z`, averaged over the samples. The derivative is split into the part
-through the read-out `base` and `spread` (the trunk output held fixed) and the part through the trunk
-(`tokens -> blocks -> h0`).
+(b) **How far the forecast moves with history power.** The sensitivity of the standardised mixture
+mean of the 48 target tokens to each visible history reading: the sum over the visible tokens of the
+absolute derivative with respect to `z`, averaged over the samples. The derivative is split into the
+part through the read-out `base` and `spread` (the trunk output held fixed) and the part through the
+trunk (`tokens -> blocks -> h0`).
 
 (c) **The distance between the masked token and a `z = 0` token.** The L2 distance between the token
 with `m_hist` and the same token at `z = 0` (`power_b` in place of `m_hist`), before and after the

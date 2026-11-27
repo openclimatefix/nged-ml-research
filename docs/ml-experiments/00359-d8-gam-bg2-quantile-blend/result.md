@@ -203,6 +203,12 @@ stack at D2 and D4.**
   Sonnet only. Triggers 1, 3, 5, 6, and 7 did not fire, and trigger 4 (leave one site out) does not
   apply to one site.
 
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
+
 ## Caveats
 
 - **Lead range.** The stored forecasts cover 0.5 to 168 hours. NGED needs forecasts 1 to 10 days

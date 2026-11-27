@@ -88,8 +88,6 @@ clear-sky irradiance at Spearman +0.44 (p = 0.033) across the 24 hours, against 
 drops. The extra shortfall is also large at 20:00 to 22:00 (2.4 to 3.3 MW), which a solar farm
 cannot explain, so the daylight pattern is a hint and not a signature.
 
-![Readings per month for the two farms](figure_1.svg)
-
 ![Windows with a farm anomaly, drops against random windows](figure_2.svg)
 
 ![D8's extra shortfall in drops by hour, with clear-sky irradiance](figure_3.svg)

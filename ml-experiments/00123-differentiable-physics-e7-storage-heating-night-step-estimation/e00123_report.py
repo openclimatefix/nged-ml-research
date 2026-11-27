@@ -444,9 +444,7 @@ def raw_cold_step_rows(*, infos: dict[str, common.SeriesInfo], table: pl.DataFra
             {
                 "site": site,
                 "cold_nights": len(steps),
-                "step_mw": mean,
                 "step_points": mean * 100.0 / info.effective_capacity_mw,
-                "effective_capacity_mw": info.effective_capacity_mw,
             }
         )
     return rows
@@ -462,7 +460,7 @@ def main() -> None:
     infos = common.series_infos()
     table = pl.read_parquet(common.WORK_DIR / "night_tables.parquet")
     label = f"{stage}: " + ", ".join(str(w) for w in winters)
-    fits = pl.read_parquet(common.WORK_DIR / f"fit_{stage}.parquet")
+    fits = pl.read_parquet(common.WORK_DIR / f"fit_{stage}.parquet").drop("step_mw", strict=False)
     headline = fits.filter(pl.col("winter_set") == label)
     nights = load_stage_nights(table=table, infos=infos, winters=winters)
     raw = pl.DataFrame(

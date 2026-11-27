@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from multiprocessing import get_context
+from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
@@ -28,6 +29,7 @@ from e00694_common import (
     PRE_ROLL,
     SEGMENT_LEN,
     SOLAR_START,
+    SYNTHETIC_UNIT_MW,
     causal_spread,
     f1_counts,
     inject_folded,
@@ -53,10 +55,13 @@ from e00694_trackers import (
     select_grid,
 )
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
+
 ARMS: Final[tuple[str, ...]] = ("M0", "M1", "M2", "M2-dwell")
 N_WEEKS: Final[int] = 7
 TOTAL_LEN: Final[int] = PRE_ROLL + SEGMENT_LEN
-UNIT_MW: Final[float] = 1.97
+UNIT_MW: Final[float] = engine.engine_float(key="d8_engine_unit_mw")
 """One engine unit, from the record's output levels (experiment 196)."""
 N_WORKERS: Final[int] = 24
 
@@ -104,8 +109,14 @@ def build_schedules() -> dict[str, dict[str, Any]]:
     }
     for seed in range(4):
         u = synthetic_units(units=units, seed=seed, k_cap=3)
-        out[f"synth{seed}"] = {"units": u, "g": u * 2.0, "primary": True, "k": 3, "u": 2.0}
-    extra = ((4, 1.0, 3), (5, 3.0, 3), (6, 2.0, 1), (7, 2.0, 2))
+        out[f"synth{seed}"] = {
+            "units": u,
+            "g": u * SYNTHETIC_UNIT_MW,
+            "primary": True,
+            "k": 3,
+            "u": SYNTHETIC_UNIT_MW,
+        }
+    extra = ((4, 1.0, 3), (5, 3.0, 3), (6, SYNTHETIC_UNIT_MW, 1), (7, SYNTHETIC_UNIT_MW, 2))
     for seed, unit, k_cap in extra:
         u = synthetic_units(units=units, seed=seed, k_cap=k_cap)
         out[f"synth{seed}"] = {"units": u, "g": u * unit, "primary": False, "k": k_cap, "u": unit}
