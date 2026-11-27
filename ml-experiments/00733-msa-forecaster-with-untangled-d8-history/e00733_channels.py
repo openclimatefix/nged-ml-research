@@ -605,6 +605,65 @@ def coverage(*, origin_days: np.ndarray, reading_ok: np.ndarray, channel_ok: np.
     return float((visible & have).sum() / n)
 
 
+def coverage_with_rerun(
+    *, origin_days: np.ndarray, reading_ok: np.ndarray, channel_ok: np.ndarray,
+    rerun_origin_days: np.ndarray, rerun_ok: np.ndarray,
+) -> float:  # fmt: skip
+    """Return the share of visible history half-hours that hold a channel as the forecaster reads it.
+
+    A sample at origin day D reads the stored channel for history days before D - 2, and the re-run
+    for UTC days D - 2 and D - 1. An origin that has no re-run reads those two days as absent, so
+    the re-run's own gaps count against coverage.
+
+    Args:
+        origin_days: The grid day index of each origin.
+        reading_ok: Whether D8's cleaned reading exists at each grid index.
+        channel_ok: Whether a stored untangled channel exists at each grid index.
+        rerun_origin_days: `(m,)` the grid day index of each origin that has a re-run.
+        rerun_ok: `(m, 2, 48)` the re-run's flags for UTC days D - 2 and D - 1.
+
+    Returns:
+        The share.
+
+    Raises:
+        CorrectnessFailureError: When no visible half-hour holds a reading (an empty denominator).
+    """
+    visible = visible_history_mask(origin_days=origin_days, reading_ok=reading_ok)
+    n = int(visible.sum())
+    if n == 0:
+        msg = "no visible history half-hour holds a reading, so the coverage cannot be counted"
+        raise CorrectnessFailureError(msg)
+    origins = np.asarray(origin_days, dtype=np.int64)
+    c = origins * core.STEPS_PER_DAY + 24
+    ages = np.arange(core.MIN_AGE, core.MAX_AGE + 1)
+    gi = (
+        c[:, None, None]
+        - core.STEPS_PER_DAY * ages[None, :, None]
+        + np.arange(core.STEPS_PER_DAY)[None, None, :]
+    )
+    have = np.zeros(gi.shape, dtype=bool)
+    inside = (gi >= 0) & (gi < len(channel_ok))
+    have[inside] = channel_ok[gi[inside]]
+    order = np.argsort(rerun_origin_days)
+    sorted_days = np.asarray(rerun_origin_days)[order]
+    pos = np.clip(np.searchsorted(sorted_days, origins), 0, max(len(sorted_days) - 1, 0))
+    has_rerun = (
+        (sorted_days[pos] == origins) if len(sorted_days) else np.zeros(len(origins), dtype=bool)
+    )
+    row = order[pos] if len(sorted_days) else np.zeros(len(origins), dtype=np.int64)
+    utc_day = gi // core.STEPS_PER_DAY
+    half_hour = gi % core.STEPS_PER_DAY
+    for slot, lag in ((0, 2), (1, 1)):
+        on_day = inside & (utc_day == (origins[:, None, None] - lag))
+        flags = np.zeros(gi.shape, dtype=bool)
+        if len(sorted_days):
+            flags = (
+                np.asarray(rerun_ok)[row[:, None, None], slot, half_hour] & has_rerun[:, None, None]
+            )
+        have = np.where(on_day, flags, have)
+    return float((visible & have).sum() / n)
+
+
 def assert_coverage(*, coverages: Mapping[str, float]) -> None:
     """Stop the line (verdict row 0) when any fold's coverage is under `COVERAGE_MIN` or not a number.
 

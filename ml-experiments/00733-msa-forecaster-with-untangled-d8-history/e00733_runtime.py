@@ -271,6 +271,37 @@ def fold_coverages(
     return out
 
 
+def fold_coverages_with_rerun(
+    *, reading_ok: np.ndarray, channel_ok: np.ndarray, outputs: rr.RerunOutputs,
+    folds: tuple[str, ...] = core.ALL_FOLDS,
+) -> dict[str, float]:  # fmt: skip
+    """Return the coverage of each fold's training window and month as the forecaster reads it.
+
+    The forecaster reads the stored channel for older history days and the re-run for days D - 2
+    and D - 1, so an origin with no re-run counts both days as absent.
+
+    Args:
+        reading_ok: Whether D8's reading exists at each grid index.
+        channel_ok: Whether a stored untangled channel exists at each grid index.
+        outputs: The re-run outputs of every origin.
+        folds: The fold months.
+
+    Returns:
+        The share by name `<fold> train` and `<fold> month`.
+    """
+    offset = ch.GRID_START_EPOCH_DAY
+    start = epoch_day(text=TRAIN_WINDOW_START)
+    out: dict[str, float] = {}
+    for fold in folds:
+        first, last = fold_days(fold=fold)
+        for name, lo, hi in (("train", start, first - 1), ("month", first, last)):
+            out[f"{fold} {name}"] = ch.coverage_with_rerun(
+                origin_days=np.arange(lo, hi + 1) - offset, reading_ok=reading_ok,
+                channel_ok=channel_ok, rerun_origin_days=outputs.origin_days, rerun_ok=outputs.ok,
+            )  # fmt: skip
+    return out
+
+
 def real_neighbours(*, cal: Any) -> dict[str, np.ndarray]:
     """Return the three neighbours' real series on experiment 729's calendar (read only).
 
@@ -334,6 +365,13 @@ def stage_channels(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         run_exists=lambda d: windows_run_exists(windows=windows, epoch_day=d),
     )  # fmt: skip
     n_covered = int(all_outputs.ok.any(axis=(1, 2)).sum())
+    rerun_cov = fold_coverages_with_rerun(
+        reading_ok=reading_ok, channel_ok=channel_ok, outputs=all_outputs
+    )
+    for name, share in rerun_cov.items():
+        print(f"channel coverage with the re-run, {name}: {share:.3f}")
+    ch.assert_coverage(coverages=rerun_cov)
+    st.record_pre_fit_guard(root=root, name="rerun_coverage", payload=rerun_cov)
     for fold in core.ALL_FOLDS:
         rr.write_rerun(
             outputs=slice_rerun(
@@ -350,6 +388,7 @@ def stage_channels(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         "choice": choice.usable,
         "poison": poison,
         "coverage": coverages,
+        "coverage_with_rerun": rerun_cov,
         "origins": len(all_outputs.origin_days),
         "origins_with_rerun": n_covered,
         "missing_ens_columns": windows.missing_ens_columns,

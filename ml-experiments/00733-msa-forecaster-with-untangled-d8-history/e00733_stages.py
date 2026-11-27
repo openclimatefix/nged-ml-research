@@ -48,9 +48,9 @@ REVIEW_GATE: Final = "scores/review_gate.json"
 fixes have passed."""
 PRE_FIT_GUARDS: Final = "scores/pre_fit_guards.json"
 """The record of the guards that must pass before any fit: the base days precede every fold's history
-with no overlap (written by `channels`), and the synthetic test segments are covered by ensemble
-runs (written by `banks`)."""
-PRE_FIT_GUARD_NAMES: Final = ("base_day_guards", "test_segment_coverage")
+with no overlap, and the channel coverage including the re-run reaches 90% (both written by
+`channels`), and the synthetic test segments are covered by ensemble runs (written by `banks`)."""
+PRE_FIT_GUARD_NAMES: Final = ("base_day_guards", "rerun_coverage", "test_segment_coverage")
 SMOKE_FILE: Final = "scores/smoke.json"
 TIMING_FILE: Final = "scores/timing.json"
 SCREEN_FILE: Final = "scores/screen.json"

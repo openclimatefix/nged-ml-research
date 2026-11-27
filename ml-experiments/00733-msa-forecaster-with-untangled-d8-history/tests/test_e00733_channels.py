@@ -305,3 +305,47 @@ def test_the_rule_on_experiment_732s_real_score_files() -> None:
     assert choice.usable == ("p_neg", "step_p")
     assert choice.dropped == ("solar",)
     assert not choice.fu_equals_fs
+
+
+def test_coverage_with_rerun_counts_the_gaps_of_the_rerun_against_the_stored_table() -> None:
+    """Days D - 2 and D - 1 read the re-run, so an origin without one loses those two days."""
+    n_grid = 48 * 40
+    reading = np.ones(n_grid, dtype=bool)
+    stored = np.ones(n_grid, dtype=bool)
+    origins = np.arange(25, 30)
+    full = ch.coverage(origin_days=origins, reading_ok=reading, channel_ok=stored)
+    ok = np.ones((len(origins), 2, 48), dtype=bool)
+    same = ch.coverage_with_rerun(
+        origin_days=origins,
+        reading_ok=reading,
+        channel_ok=stored,
+        rerun_origin_days=origins,
+        rerun_ok=ok,
+    )
+    assert same == pytest.approx(full)
+    fewer = ch.coverage_with_rerun(
+        origin_days=origins,
+        reading_ok=reading,
+        channel_ok=stored,
+        rerun_origin_days=origins[:3],
+        rerun_ok=ok[:3],
+    )
+    assert fewer < full
+    none = ch.coverage_with_rerun(
+        origin_days=origins,
+        reading_ok=reading,
+        channel_ok=stored,
+        rerun_origin_days=origins[:0],
+        rerun_ok=ok[:0],
+    )
+    assert none < fewer
+    holes = ok.copy()
+    holes[:, :, ::2] = False
+    half = ch.coverage_with_rerun(
+        origin_days=origins,
+        reading_ok=reading,
+        channel_ok=stored,
+        rerun_origin_days=origins,
+        rerun_ok=holes,
+    )
+    assert half < same
