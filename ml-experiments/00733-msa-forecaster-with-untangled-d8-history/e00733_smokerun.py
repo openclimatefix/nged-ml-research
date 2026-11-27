@@ -231,7 +231,7 @@ def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         fit_real=run_job,
         fit_synthetic=lambda arm, seed: run_job(arm, None, seed),
         predict=predict, read_stored=read_stored_step(scratch=scratch),
-        checks=check_steps(root=root), later=later_steps(scratch=scratch, device=args.device),
+        checks=check_steps(root=root), later=later_steps(scratch=scratch, device="cpu"),
         gpu_info=gpu_info if args.device == "cuda" else None,
     )  # fmt: skip
     started = time.monotonic()
