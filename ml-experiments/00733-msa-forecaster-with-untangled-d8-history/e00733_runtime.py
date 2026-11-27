@@ -287,13 +287,86 @@ def stage_channels(args: argparse.Namespace, root: Path) -> dict[str, Any]:
             ),
             path=paths.rerun_dir(root=root) / f"{fold}.npz",
         )  # fmt: skip
+    poison = poison_check(
+        root=root, cal=cal, neighbours=real_neighbours(cal=cal), use=use, ctx=ctx, env=env,
+        outputs=all_outputs, first_epoch_day=first,
+    )  # fmt: skip
     return {
         "choice": choice.usable,
+        "poison": poison,
         "coverage": coverages,
         "origins": len(all_outputs.origin_days),
         "origins_with_rerun": n_covered,
         "missing_ens_columns": windows.missing_ens_columns,
     }
+
+
+POISON_FILE: Final = "scores/poison_test.json"
+"""The record of the poison test on one real origin, which G14 reads."""
+
+
+def poison_check(
+    *, root: Path, cal: Any, neighbours: dict[str, np.ndarray], use: np.ndarray, ctx: Any, env: Any,
+    outputs: rr.RerunOutputs, first_epoch_day: int,
+) -> dict[str, Any]:  # fmt: skip
+    """Re-run one real origin with NaN and 1e6 in every input after the limit and record the result.
+
+    Args:
+        root: This experiment's data folder (the record is `scores/poison_test.json`).
+        cal: The calendar of the whole day table.
+        neighbours: The neighbours' real series on the calendar axis.
+        use: Whether each calendar day holds a reading.
+        ctx: The channel context (`holidays`, `stats`).
+        env: The channel environment (`medians`, `predict`, `n_seeds`).
+        outputs: The re-run of every origin (the origin is the last one with a visible output).
+        first_epoch_day: The first origin day, as an epoch day.
+
+    Returns:
+        The record: `passed`, `n_poison`, and `origin_day`.
+
+    Raises:
+        RuntimeError733: When no origin has a visible re-run output, or the re-run changed.
+    """
+    import e00733_real as rl
+
+    covered = np.flatnonzero(outputs.ok.any(axis=(1, 2)))
+    if not len(covered):
+        msg = "no origin has a visible re-run output, so the poison test would check nothing"
+        raise RuntimeError733(msg)
+    origin = int(outputs.origin_days[covered[-1]])
+    o_epoch = origin + ch.GRID_START_EPOCH_DAY
+
+    def make(c: Any, nb: Any) -> Any:
+        return rl.build_real_windows(
+            cal=c, reading_rule_use=use, holidays=ctx.cal.holidays, stats=ctx.stats,
+            medians=env.medians, neighbours=nb, summary_dir=paths.ens_summary_dirs(),
+            first_epoch_day=o_epoch - 8, last_epoch_day=o_epoch + 2,
+        )  # fmt: skip
+
+    record: dict[str, Any] = {"origin_day": origin, "first_epoch_day": first_epoch_day}
+    try:
+        n_poison = rl.poisoned_origin_run(
+            make_windows=make, cal=cal, neighbours=neighbours, origin_day=origin,
+            predict=env.predict, n_seeds=env.n_seeds,
+        )  # fmt: skip
+    except rr.RerunError as exc:
+        st.write_json(
+            path=root / POISON_FILE, payload={**record, "passed": False, "n_poison": 0, "message": str(exc)}
+        )  # fmt: skip
+        msg = f"the poison test failed: {exc}"
+        raise st.CorrectnessFailureError(msg) from exc
+    record = {**record, "passed": n_poison > 0, "n_poison": n_poison}
+    st.write_json(path=root / POISON_FILE, payload=record)
+    return record
+
+
+def poison_passed(*, root: Path) -> bool:
+    """Return whether `scores/poison_test.json` records a passed poison test on at least one value."""
+    path = root / POISON_FILE
+    if not path.exists():
+        return False
+    rec = json.loads(path.read_text())
+    return bool(rec.get("passed")) and int(rec.get("n_poison", 0)) > 0
 
 
 def windows_run_exists(*, windows: Any, epoch_day: int) -> bool:
@@ -389,7 +462,7 @@ def stage_gallery(args: argparse.Namespace, root: Path) -> dict[str, Any]:
             min_reverse_points=float(core730.DECIDABLE_READING_POINTS), reading_points=reading_points,
         )
     )  # fmt: skip
-    results.append(gal.g14_rerun_difference(segments=valid))
+    results.append(gal.g14_rerun_difference(segments=valid, poison_passed=poison_passed(root=root)))
     results.append(
         gal.g15_base_rate(
             segments=test, clim=clim, shortwave_col=world.SHORTWAVE_COLUMN, sun_up=sun_up

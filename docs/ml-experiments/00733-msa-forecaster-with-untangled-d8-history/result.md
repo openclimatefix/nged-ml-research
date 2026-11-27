@@ -746,7 +746,10 @@ show.**
   half-hours of at least 1 MVA.
 - **G14, the re-run of days D − 2 and D − 1:** the distribution of the difference between the stored
   and the re-run outputs on the synthetic validation bank, by hour after the visibility limit. The
-  panel must show a difference of zero before the limit.
+  poison test must pass (NaN and 1e6 placed in every hidden input after the limit leave the re-run
+  output unchanged), the mean absolute difference over origins more than 24 hours before the limit
+  must be below 0.01, and the mean absolute difference must not increase with the hours before the
+  limit (a monotone decay, in bins of 6 hours).
 - **G15, the base rate the sign head forecasts:** the share of reverse flow in the synthetic target
   rows by lead day and by hour of day, with B-clim beside it. The panel must show a share above zero
   on sun-up half-hours.
@@ -800,6 +803,14 @@ published page carries the coverage counts.
   experiment 732's U\*, the solar output dropped (zeroed, flag off), and the transfer-step
   probability from U\*. FU carries P(X<0) and the transfer step, FS carries P(X<0) alone, and FU and
   FS are distinct arms.
+- **G14 does not require a zero difference before the visibility limit (ruling of the design lead,
+  2026-11-26, set before any experiment 733 score exists).** The premise that stored and re-run
+  outputs are identical before the limit is wrong, because the untangling network reads the whole
+  window. On the real networks the largest absolute difference is 0.06 at 24 to 48 hours before the
+  limit, 0.13 at 12 to 24 hours, 0.39 at 6 to 12 hours, and 0.6 within 3 hours, and the mean is 3e-4
+  to 5e-3. G14 passes when the poison test passes, the mean absolute difference over origins more
+  than 24 hours before the limit is below 0.01, and the difference does not increase with the hours
+  before the limit (binned by 6 hours). The panel plots this table for the real networks.
 - **The top-row trailing columns of target-row B1 read the origin day's start (ruling of the design
   lead, 2026-11-26).** Experiment 713's getter cannot read observed valid-time columns for these
   columns, so the synthetic world and the real folds give them the weather of 00:00 UTC on the

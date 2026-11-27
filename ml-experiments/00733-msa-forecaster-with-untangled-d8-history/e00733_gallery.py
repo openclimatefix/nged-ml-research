@@ -247,13 +247,52 @@ def g13_channels_against_truth(
     )
 
 
-def g14_rerun_difference(*, segments: Sequence[sy.SegmentArrays]) -> PanelResult:
-    """G14: the stored output minus the re-run output of days D - 2 and D - 1.
+def binned_difference(*, stack: np.ndarray, hours: np.ndarray) -> dict[str, np.ndarray]:
+    """Return the mean and the largest absolute difference by 6-hour bin of hours before the limit.
 
-    By hour of the day after the visibility limit.
+    Args:
+        stack: The stored-minus-re-run differences, NaN where the re-run is not visible.
+        hours: The hours after the visibility limit of each difference (negative before it).
 
-    The check requires a difference of zero on every half-hour before the limit and at least one
-    origin with a re-run.
+    Returns:
+        `bin_start` (hours before the limit, the nearest edge of each bin), `mean_abs`, `max_abs`,
+        and `n` of each bin that holds a finite difference, from the limit outwards.
+    """
+    before = -hours
+    ok = np.isfinite(stack) & (before >= 0.0)
+    which = np.floor(before / core.G14_BIN_HOURS).astype(int)
+    starts, means, maxima, counts = [], [], [], []
+    for k in range(int(which[ok].max()) + 1 if ok.any() else 0):
+        pick = ok & (which == k)
+        if not pick.any():
+            continue
+        a = np.abs(stack[pick])
+        starts.append(k * core.G14_BIN_HOURS)
+        means.append(float(a.mean()))
+        maxima.append(float(a.max()))
+        counts.append(int(pick.sum()))
+    return {
+        "bin_start": np.asarray(starts), "mean_abs": np.asarray(means),
+        "max_abs": np.asarray(maxima), "n": np.asarray(counts),
+    }  # fmt: skip
+
+
+def g14_rerun_difference(
+    *, segments: Sequence[sy.SegmentArrays], poison_passed: bool = False
+) -> PanelResult:
+    """G14: the stored output minus the re-run output of days D - 2 and D - 1, by hours before the limit.
+
+    The untangling network reads the whole window, so the difference is not zero before the limit.
+    The check (ruling of the design lead, 2026-11-26) requires the poison test to have passed, the
+    mean absolute difference over origins more than 24 hours before the limit to be below 0.01, and
+    the mean absolute difference to be non-increasing with the hours before the limit (6-hour bins).
+
+    Args:
+        segments: The validation bank's segments.
+        poison_passed: Whether the poison test of the real re-run passed (read from the channel stage).
+
+    Returns:
+        The panel result; its data hold the stack, the hours, and the binned table.
     """
     diffs, after = [], []
     for seg in segments:
@@ -279,20 +318,28 @@ def g14_rerun_difference(*, segments: Sequence[sy.SegmentArrays]) -> PanelResult
                     - 24
                 )
     if not diffs:
-        return _result(panel="G14", items={"some_rerun_exists": False}, data={})
+        return _result(
+            panel="G14", items={"some_rerun_exists": False, "poison_test_passes": poison_passed}, data={}
+        )  # fmt: skip
     stack, hours = np.stack(diffs), np.stack(after) / 2.0
-    before = hours <= 0
-    zero_before = bool(
-        not np.isfinite(stack[before]).any() or np.nanmax(np.abs(stack[before])) <= ZERO_TOLERANCE
-    )
+    far = np.isfinite(stack) & (hours < -core.G14_FAR_HOURS)
+    far_mean = float(np.abs(stack[far]).mean()) if far.any() else float("nan")
+    table = binned_difference(stack=stack, hours=hours)
+    means = table["mean_abs"]
+    decays = bool(len(means) >= 2 and np.all(np.diff(means) <= core.G14_MONOTONE_TOLERANCE))
     items = {
         "some_rerun_exists": True,
-        "difference_zero_before_the_limit": zero_before,
-        "some_half_hour_after_the_limit": bool((~before).any()),
+        "poison_test_passes": bool(poison_passed),
+        "mean_difference_below_limit_more_than_24_hours_before_the_limit": bool(
+            far.any() and far_mean < core.G14_MEAN_LIMIT
+        ),
+        "difference_does_not_increase_with_hours_before_the_limit": decays,
+        "some_half_hour_after_the_limit": bool((hours > 0).any()),
     }
     return _result(
-        panel="G14", items=items, data={"differences": stack, "hours_after_limit": hours}
-    )
+        panel="G14", items=items,
+        data={"differences": stack, "hours_after_limit": hours, "far_mean": far_mean, **{f"binned_{k}": v for k, v in table.items()}},
+    )  # fmt: skip
 
 
 def g15_base_rate(
@@ -395,6 +442,21 @@ def draw(*, result: PanelResult, path: Path) -> Path:
                 x="half_hour:O",
                 y="lead_day:O",
                 color=alt.Color("share:Q", scale=alt.Scale(scheme="blues")),
+            )
+        )  # ty: ignore[unresolved-attribute]
+    elif result.panel == "G14" and "binned_mean_abs" in d:
+        rows = pl.DataFrame({
+            "hours_before_limit": np.concatenate([d["binned_bin_start"], d["binned_bin_start"]]),
+            "difference": np.concatenate([d["binned_mean_abs"], d["binned_max_abs"]]),
+            "statistic": ["mean"] * len(d["binned_mean_abs"]) + ["largest"] * len(d["binned_max_abs"]),
+        })  # fmt: skip
+        chart = (
+            alt.Chart(rows)  # ty: ignore[unresolved-attribute]
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("hours_before_limit:Q", title="hours before the visibility limit"),
+                y=alt.Y("difference:Q", title="absolute stored minus re-run P(X<0)"),
+                color="statistic:N",
             )
         )  # ty: ignore[unresolved-attribute]
     elif result.panel == "G12":

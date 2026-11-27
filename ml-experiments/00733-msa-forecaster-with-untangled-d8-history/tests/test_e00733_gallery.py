@@ -4,6 +4,7 @@ and fails on a silent one."""
 
 import json
 from pathlib import Path
+from typing import Any
 
 import e00733_core as core
 import e00733_gallery as gal
@@ -86,10 +87,8 @@ def test_g13_fails_on_a_silent_solar_channel() -> None:
     ).passed
 
 
-def test_g14_needs_zero_difference_before_the_limit() -> None:
-    """A re-run equal to the stored output before the limit passes; a difference before the limit
-    fails."""
-    seg = _world(2)
+def _decaying_rerun(seg: Any, scale: float = 1.0) -> None:
+    """Give a segment a re-run that differs from the stored output by a decaying amount."""
     n = seg.n_days
     seg.u_rerun = np.zeros((n, 2, 48, 3), np.float32)
     seg.u_rerun_ok = np.ones((n, 2, 48), bool)
@@ -97,12 +96,33 @@ def test_g14_needs_zero_difference_before_the_limit() -> None:
     for d in range(2, n):
         for r in (0, 1):
             day = d - 2 + r
+            stamps = 48 * (r - 2) + np.arange(48) + 1 + core.NEWEST_VISIBLE_BEFORE_CONTRACT - 24
+            hours_after = stamps / 2.0
+            decay = scale * 0.002 * np.exp(np.minimum(hours_after, 0.0) / 12.0) + 1e-6
             seg.u_rerun[d, r] = seg.u_raw[day * 48 : (day + 1) * 48]
-    after = gal.g14_rerun_difference(segments=[seg])
-    assert after.passed, after.items
-    seg.u_rerun[10, 0, 0, core.P_NEG] += 0.5
-    assert not gal.g14_rerun_difference(segments=[seg]).passed
-    assert not gal.g14_rerun_difference(segments=[make_segment()]).passed
+            seg.u_rerun[d, r, :, core.P_NEG] += decay.astype(np.float32)
+
+
+def test_g14_follows_the_ruling_of_2026_11_26() -> None:
+    """A decaying difference with a passed poison test passes; each ruling item can fail alone."""
+    seg = _world(2)
+    _decaying_rerun(seg)
+    ok = gal.g14_rerun_difference(segments=[seg], poison_passed=True)
+    assert ok.passed, ok.items
+    assert ok.data["far_mean"] < core.G14_MEAN_LIMIT
+    assert len(ok.data["binned_mean_abs"]) > 4
+    assert not gal.g14_rerun_difference(segments=[seg], poison_passed=False).passed
+    big = _world(2)
+    _decaying_rerun(big, scale=100.0)
+    bad = gal.g14_rerun_difference(segments=[big], poison_passed=True)
+    assert not bad.items["mean_difference_below_limit_more_than_24_hours_before_the_limit"]
+    far_up = _world(2)
+    _decaying_rerun(far_up)
+    assert far_up.u_rerun is not None
+    far_up.u_rerun[2:, 0, :8, core.P_NEG] += 0.009
+    flagged = gal.g14_rerun_difference(segments=[far_up], poison_passed=True)
+    assert not flagged.items["difference_does_not_increase_with_hours_before_the_limit"]
+    assert not gal.g14_rerun_difference(segments=[make_segment()], poison_passed=True).passed
 
 
 def test_g15_needs_reverse_flow_on_sun_up_half_hours() -> None:

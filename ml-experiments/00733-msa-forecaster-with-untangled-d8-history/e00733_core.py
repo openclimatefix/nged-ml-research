@@ -121,6 +121,16 @@ MAX_MISSING_TEST_SEGMENT_SHARE: Final = 0.5
 TOLERANCE_ZERO_PATH: Final = 1e-6
 TOLERANCE_POISON: Final = 1e-6
 TOLERANCE_F0R: Final = 1e-6
+G14_MEAN_LIMIT: Final = 0.01
+"""G14: the mean absolute stored-minus-re-run difference of P(X<0) over origins more than
+`G14_FAR_HOURS` before the visibility limit must stay below this (ruling of the design lead,
+2026-11-26)."""
+G14_FAR_HOURS: Final = 24.0
+G14_BIN_HOURS: Final = 6.0
+G14_MONOTONE_TOLERANCE: Final = 5e-4
+"""The slack, in P(X<0), by which a 6-hour bin's mean may exceed the bin nearer the limit: 5% of
+`G14_MEAN_LIMIT`, because bin means on 1,944 half-hours differ by about 2e-4 by chance (set
+2026-11-27 after the first real-network run; the ruling states no tolerance)."""
 
 # --------------------------------------------------------------------------- contrasts and bars
 
@@ -646,7 +656,9 @@ GALLERY_PANELS: Final = {
     ),
     "G14": (
         "the distribution of the difference between the stored and the re-run outputs on the synthetic validation bank, by hour after the visibility limit",
-        "a difference of zero before the limit",
+        "the poison test passes: NaN and 1e6 placed in every hidden input after the limit leave the re-run output unchanged",
+        "the mean absolute difference over origins more than 24 hours before the limit is below 0.01",
+        "the mean absolute difference does not increase with the hours before the limit (a monotone decay, in bins of 6 hours)",
     ),
     "G15": (
         "the share of reverse flow in the synthetic target rows by lead day and by hour of day, with B-clim beside it",
