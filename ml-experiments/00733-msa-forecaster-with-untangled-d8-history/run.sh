@@ -21,7 +21,7 @@
 #   - for a command that uses the GPU (no `--device cpu`, and `CUDA_VISIBLE_DEVICES` not empty): the
 #     `nvidia-smi` totals leave room for 6 GB under the total of 36 GB, at most one other GPU process
 #     (of this experiment or another, counted together) holds the GPU, and a lock file allows one worker
-#     of this experiment at a time. `guard`, `banks`, `channels`, `limits`, `gallery`, `gallery2`, `score`, `report`, `figures`, `loss_curves`, `attention`, `series`, and `posthoc_score` run on the CPU and skip both checks (`posthoc`, the post hoc fits of FS and YS, uses the GPU like `chain`);
+#     of this experiment at a time. `guard`, `banks`, `channels`, `limits`, `gallery`, `gallery2`, `score`, `report`, `figures`, `loss_curves`, `attention`, `series`, and `posthoc_score` run on the CPU and skip both checks (`posthoc`, the post hoc fits of FS, Y0b, YUb, and YOb, uses the GPU like `chain`);
 #   - this folder on PYTHONPATH: `e00733_paths.py` adds the folders of experiment 730, and of the experiments that 730 imports, from this checkout.
 # `posthoc` writes `posthoc/posthoc_status.json`. A clean Ctrl-C leaves the state `stopped`, but
 # SIGKILL leaves `running`, and `posthoc` then refuses to start until that file is deleted by hand.

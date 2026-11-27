@@ -232,7 +232,9 @@ def test_posthoc_writes_nothing_outside_its_folder(
     assert {p.name for p in posthoc.iterdir()} == {
         "posthoc_started.json", "posthoc_status.json", root.name,
     }  # fmt: skip
-    assert {c["arm"] for c in calls} == {"YO", "FS", "YS"} and {c["stage"] for c in calls} == {
+    assert {c["arm"] for c in calls} == {"FS", "Y0b", "YUb", "YOb"} and {
+        c["stage"] for c in calls
+    } == {
         "fit",
         "predict",
     }
@@ -241,7 +243,9 @@ def test_posthoc_writes_nothing_outside_its_folder(
     assert all(c["marker_seen"] for c in calls), "the marker is written before the first fit"
     started = json.loads((root / st.POSTHOC_STARTED).read_text())
     assert started["post_hoc"] is True and started["set_after_the_first_test_score"] is True
-    assert started["arms"] == ["YO", "FS", "YS"] and "maintainer" in started["requested_by"]
+    assert (
+        started["arms"] == ["FS", "Y0b", "YUb", "YOb"] and "maintainer" in started["requested_by"]
+    )
     assert json.loads((root / st.POSTHOC_STATUS).read_text())["state"] == "complete"
     for name in ("verdict.json", "readings.json", "failure_posthoc.json"):
         assert not (root / "scores" / name).exists()
@@ -276,7 +280,7 @@ def test_a_failed_posthoc_fit_is_report_only_and_the_run_goes_on(
     assert _run(root, monkeypatch, calls, fail=(job,)) == 5
     status = json.loads((root / st.POSTHOC_STATUS).read_text())
     assert status["state"] == "failed" and status["failed"] == [job]
-    assert {c["arm"] for c in calls} == {"YO", "FS", "YS"}
+    assert {c["arm"] for c in calls} == {"FS", "Y0b", "YUb", "YOb"}
     assert (st.posthoc_fit_root(root=root) / "fits" / f"{job}.failed.json").exists()
 
 
@@ -362,33 +366,30 @@ def test_the_cost_cap_stops_the_run_before_the_fit_that_would_pass_it(tmp_path: 
     """With 7.2 hours in the main chain and 1 hour per fit, the run stops with the last fits skipped."""
     root = _finished_main_run(tmp_path)
     steps, started, measured = _cap_steps(
-        root, main=7.2, hours_of={"YO": 1.0, "FS": 1.0, "YS": 1.0}
+        root, main=7.2, hours_of={"FS": 1.0, "Y0b": 1.0, "YUb": 1.0, "YOb": 1.0}
     )
     status = st.run_posthoc(root=root, steps=steps)
     assert status["state"] == "stopped" and st.exit_code(status=status) == 3
     assert status["reason"] == "stopped at the cost cap; ask the manager"
-    assert [a for a, _, _ in started] == ["YO"] * 3 + [
-        "FS"
-    ] * 1  # 7.2 + 4 = 11.2; one more passes 11.9
+    assert [a for a, _, _ in started] == ["FS"] * 4  # 7.2 + 4 = 11.2; one more passes 11.9
     assert len(measured) == 4 and status["hours"]["running_total"] == pytest.approx(11.2)
     skipped = [x["job"] for x in status["skipped"]]
-    assert len(skipped) == 23 + 3 and skipped[-3:] == ["YS_s0", "YS_s1", "YS_s2"]
+    assert len(skipped) == 20 + 3 and skipped[-3:] == ["Y0b_s0", "YUb_s0", "YOb_s0"]
     assert all("cap of 11.9" in x["reason"] for x in status["skipped"])
     assert not set(skipped) & set(measured)
 
 
-def test_the_cost_cap_skips_the_oracle_last_when_it_alone_passes_the_cap(tmp_path: Path) -> None:
-    """Every fit not started is skipped, YS first in the order of dropping, YO last."""
+def test_the_cost_cap_skips_every_fit_when_the_first_one_passes_the_cap(tmp_path: Path) -> None:
+    """Every fit not started is skipped, the three synthetic fits last in the list."""
     root = _finished_main_run(tmp_path)
-    steps, started, _ = _cap_steps(root, main=11.5, hours_of={"YO": 1.0, "FS": 1.0, "YS": 1.0})
+    steps, started, _ = _cap_steps(
+        root, main=11.5, hours_of={"FS": 1.0, "Y0b": 1.0, "YUb": 1.0, "YOb": 1.0}
+    )
     status = st.run_posthoc(root=root, steps=steps)
     assert started == [] and status["state"] == "stopped"
     skipped = [x["job"] for x in status["skipped"]]
-    assert skipped[:3] == ["YO_s0", "YO_s1", "YO_s2"] and skipped[-3:] == [
-        "YS_s0",
-        "YS_s1",
-        "YS_s2",
-    ]
+    assert len(skipped) == 27 and skipped[-3:] == ["Y0b_s0", "YUb_s0", "YOb_s0"]
+    assert skipped[0].startswith("FS_")
 
 
 def test_no_fit_starts_when_the_total_has_reached_the_stop_line(tmp_path: Path) -> None:
@@ -406,7 +407,9 @@ def test_a_fit_never_starts_past_the_stop_line_whatever_the_rates(
     """Over runs with several rates, the running total at the start of every fit stays below 12."""
     root = _finished_main_run(tmp_path / str(main))
     totals: list[float] = []
-    steps, _, measured = _cap_steps(root, main=main, hours_of={"YO": 0.9, "FS": 0.4, "YS": 0.9})
+    steps, _, measured = _cap_steps(
+        root, main=main, hours_of={"FS": 0.4, "Y0b": 0.9, "YUb": 0.9, "YOb": 0.9}
+    )
     inner = steps.run_job
 
     def run_job(arm: str, fold: str | None, seed: int) -> dict:
@@ -424,13 +427,13 @@ def test_a_run_inside_the_cap_completes_and_a_measured_job_is_not_run_again(tmp_
     """Jobs measured by an earlier run count towards the total and are not fitted again."""
     root = _finished_main_run(tmp_path)
     steps, started, measured = _cap_steps(
-        root, main=1.0, hours_of={"YO": 0.1, "FS": 0.1, "YS": 0.1}
+        root, main=1.0, hours_of={"FS": 0.1, "Y0b": 0.1, "YUb": 0.1, "YOb": 0.1}
     )
-    measured["YO_s0"] = 0.1
+    measured["Y0b_s0"] = 0.1
     status = st.run_posthoc(root=root, steps=steps)
     assert status["state"] == "complete" and status["skipped"] == []
-    assert ("YO", None, 0) not in started and len(started) == 29
-    assert status["hours"]["per_arm"]["YO"] == pytest.approx(0.3)
+    assert ("Y0b", None, 0) not in started and len(started) == 26
+    assert status["hours"]["per_arm"]["Y0b"] == pytest.approx(0.1)
 
 
 def test_the_measured_cost_is_read_from_the_job_records(tmp_path: Path) -> None:
@@ -444,13 +447,13 @@ def test_the_measured_cost_is_read_from_the_job_records(tmp_path: Path) -> None:
     }
     st.write_json(path=root / "fits" / "YU_s0.job.json", payload=rec)
     fit_root = st.posthoc_fit_root(root=root)
-    st.write_json(path=fit_root / "fits" / "YO_s0.job.json", payload=rec)
+    st.write_json(path=fit_root / "fits" / "Y0b_s0.job.json", payload=rec)
     st.write_json(path=fit_root / "fits" / "FS_2025-11_s0.job.json", payload=rec)
     cost = st.posthoc_cost(root=root)
-    assert cost["main_chain"] == 1.5 and cost["per_arm"] == {"YO": 1.5, "FS": 1.5}
+    assert cost["main_chain"] == 1.5 and cost["per_arm"] == {"Y0b": 1.5, "FS": 1.5}
     assert cost["posthoc"] == 3.0 and cost["running_total"] == 4.5
-    assert st.job_hours_of(root=fit_root, arm="YO", fold=None, seed=0) == 1.5
-    assert st.job_hours_of(root=fit_root, arm="YS", fold=None, seed=0) is None
+    assert st.job_hours_of(root=fit_root, arm="Y0b", fold=None, seed=0) == 1.5
+    assert st.job_hours_of(root=fit_root, arm="YUb", fold=None, seed=0) is None
 
 
 # --------------------------------------------------------------------------- stopped runs, failed jobs, Ctrl-C
@@ -469,13 +472,15 @@ def test_a_failed_job_adds_its_wall_seconds_to_the_total_and_a_resume_keeps_them
 ) -> None:
     """A failing job writes no job record, so its seconds are recorded and count towards the cap."""
     root = _finished_main_run(tmp_path)
-    steps, started, _ = _cap_steps(root, main=1.0, hours_of={"YO": 0.01, "FS": 0.01, "YS": 0.01})
+    steps, started, _ = _cap_steps(
+        root, main=1.0, hours_of={"FS": 0.01, "Y0b": 0.01, "YUb": 0.01, "YOb": 0.01}
+    )
     clock = [0.0]
     inner = steps.run_job
 
     def run_job(arm: str, fold: str | None, seed: int) -> dict:
-        clock[0] += 7200.0 if (arm, seed) == ("YO", 0) else 1.0
-        if (arm, seed) == ("YO", 0):
+        clock[0] += 7200.0 if (arm, seed) == ("Y0b", 0) else 1.0
+        if (arm, seed) == ("Y0b", 0):
             msg = "boom"
             raise RuntimeError(msg)
         return inner(arm, fold, seed)
@@ -483,14 +488,16 @@ def test_a_failed_job_adds_its_wall_seconds_to_the_total_and_a_resume_keeps_them
     steps.run_job = run_job
     steps.clock = lambda: clock[0]
     status = st.run_posthoc(root=root, steps=steps)
-    assert status["failed"] == ["YO_s0"]
+    assert status["failed"] == ["Y0b_s0"]
     assert st.failed_hours(root=root) == pytest.approx(2.0)
     assert status["hours"]["failed"] == pytest.approx(2.0)
     assert status["hours"]["running_total"] == pytest.approx(1.0 + 2.0 + 0.01 * (len(started)))
     assert st.posthoc_cost(root=root)["failed"] == pytest.approx(2.0)
     # A resume starts from the recorded seconds: with the main chain at 9.9 hours, 2 more hours of
     # failed time pass the cap before any job starts.
-    steps2, started2, _ = _cap_steps(root, main=9.9, hours_of={"YO": 0.01, "FS": 0.01, "YS": 0.01})
+    steps2, started2, _ = _cap_steps(
+        root, main=9.9, hours_of={"FS": 0.01, "Y0b": 0.01, "YUb": 0.01, "YOb": 0.01}
+    )
     status2 = st.run_posthoc(root=root, steps=steps2)
     assert status2["state"] == "stopped" and started2 == []
 
@@ -500,7 +507,9 @@ def test_a_clean_ctrl_c_writes_stopped_with_the_reason_interrupted_and_reraises(
 ) -> None:
     """KeyboardInterrupt ends the run with the status `stopped`, so `posthoc` can start again."""
     root = _finished_main_run(tmp_path)
-    steps, _, _ = _cap_steps(root, main=1.0, hours_of={"YO": 0.01, "FS": 0.01, "YS": 0.01})
+    steps, _, _ = _cap_steps(
+        root, main=1.0, hours_of={"FS": 0.01, "Y0b": 0.01, "YUb": 0.01, "YOb": 0.01}
+    )
 
     def run_job(_arm: str, _fold: str | None, _seed: int) -> dict:
         raise KeyboardInterrupt

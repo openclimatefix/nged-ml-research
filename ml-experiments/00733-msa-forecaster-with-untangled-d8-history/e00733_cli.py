@@ -233,7 +233,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--arms",
         default=None,
-        help="stage smoke: only these arms, such as FS,YS (the post hoc arms), in a scratch folder",
+        help="stage smoke: only these post hoc arms, such as FS,Y0b,YUb,YOb, in a scratch folder",
     )
     p.add_argument("--arm", default=None)
     p.add_argument("--fold", default=None)

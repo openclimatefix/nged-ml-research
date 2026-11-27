@@ -43,6 +43,8 @@ F0R_SEEDS: Final = (0, 1)
 HEADLINE_SEEDS: Final = (0, 1, 2, 3, 4)
 PLACEBO_SEEDS: Final = (0, 1, 2)
 SYNTHETIC_SEEDS: Final = (0, 1, 2)
+POSTHOC_SYNTHETIC_SEEDS: Final = (0,)
+"""The one seed of the post hoc synthetic check."""
 WORLD_WEATHER_FOLD: Final = "2025-11"
 """The fold whose standardiser the synthetic world's weather columns use."""
 N_HISTORY_ROWS: Final = 14
@@ -191,6 +193,9 @@ PLANNED_HOURS: Final = 10.56
 
 Where = Literal["real", "synthetic"]
 Source = Literal["stored", "fit"]
+StopOn = Literal["total", "sign_bce"]
+STOP_ON_TOTAL: Final = "total"
+STOP_ON_SIGN_BCE: Final = "sign_bce"
 
 
 @dataclass(frozen=True)
@@ -213,6 +218,9 @@ class ArmSpec733:
         true_channels: Whether the history reads the true signs and solar output (the oracle arm).
         post_hoc: Whether the arm belongs to the post hoc runs set after the verdict (it is no
             part of the chain's families, of its projection, or of its timing gate).
+        stop_on: The loss that picks the stored pass of a synthetic fit and counts the patience:
+            `STOP_ON_TOTAL` (the sum of the mixture NLL and the sign BCE, as in the main run) or
+            `STOP_ON_SIGN_BCE` (the sign head's own validation BCE alone).
     """
 
     name: str
@@ -229,6 +237,7 @@ class ArmSpec733:
     channel_subset: tuple[str, ...] | None = None
     true_channels: bool = False
     post_hoc: bool = False
+    stop_on: StopOn = "total"
 
     @property
     def n_fits(self) -> int:
@@ -335,36 +344,50 @@ ARMS: Final = {
             true_channels=True,
         ),
         ArmSpec733(
-            "YS",
+            "Y0b",
             "synthetic",
-            "The folded reading and P(X<0) alone",
+            "The folded reading",
             True,
-            SYNTHETIC_SEEDS,
+            POSTHOC_SYNTHETIC_SEEDS,
             (),
-            "Post hoc, report only: the sign alone, with the solar and transfer-step channels absent",
+            "Post hoc, report only: Y0 stopped on the sign head's own validation BCE",
             False,
-            channels=True,
-            channel_subset=("p_neg",),
             post_hoc=True,
+            stop_on="sign_bce",
         ),
         ArmSpec733(
-            "YO",
+            "YUb",
+            "synthetic",
+            "The folded reading and the untangled channels",
+            True,
+            POSTHOC_SYNTHETIC_SEEDS,
+            (),
+            "Post hoc, report only: YU stopped on the sign head's own validation BCE",
+            False,
+            channels=True,
+            post_hoc=True,
+            stop_on="sign_bce",
+        ),
+        ArmSpec733(
+            "YOb",
             "synthetic",
             "The folded reading and the true sign and solar output before the origin",
             True,
-            SYNTHETIC_SEEDS,
+            POSTHOC_SYNTHETIC_SEEDS,
             (),
-            "Post hoc, report only: the oracle history, with the transfer-step channel absent",
+            "Post hoc, report only: the oracle history, stopped on the sign head's own validation BCE",
             False,
             true_channels=True,
             post_hoc=True,
+            stop_on="sign_bce",
         ),
     )
 }
-POST_HOC_ARMS: Final = ("YO", "FS", "YS")
-"""The arms of the post hoc runs set after the verdict, in the order they are fitted: YO (the
-synthetic oracle), FS (real folds, dropped from the chain by the timing gate), and YS (the
-synthetic arm that reads P(X<0) alone)."""
+POST_HOC_ARMS: Final = ("FS", "Y0b", "YUb", "YOb")
+"""The arms of the post hoc runs set after the verdict, in the order they are fitted: FS (real
+folds, dropped from the chain by the timing gate), then the three synthetic arms of the one-seed
+check that stops on the sign head's own validation BCE: Y0b (as Y0), YUb (as YU), and YOb (the
+oracle that reads the true sign and solar output of the history)."""
 FIT_ORDER: Final = ("F0r", "FU-screen", "FU", "FU-S", "Y0", "YU", "FS", "YT")
 """The fits run in this order, so that a stop at the stop line loses report-only arms first."""
 REPORT_ONLY_ARMS: Final = ("FS", "YT")
@@ -649,7 +672,7 @@ def projected_hours(
     """Return the GPU-process-hours of the fits at a measured rate, with `dropped` arms left out.
 
     FU-S, FS, and F0r run at FU's rate; Y0 and YT at YU's, as the plan's timing gate projects. The
-    post hoc arm YS is no part of the projection.
+    post hoc arms are no part of the projection.
     """
     chain = {n: a for n, a in ARMS.items() if not a.post_hoc}
     real = sum(a.n_fits for n, a in chain.items() if a.where == "real" and n not in dropped)

@@ -84,8 +84,9 @@ POSTHOC_STAGES: Final = ("posthoc", "posthoc_score")
 """The stages of the post hoc runs set after the verdict. They are not in `GATED_STAGES`: `guard_run`
 refuses every fit once the first test score exists, and the post hoc stages have a guard of their own
 (`guard_posthoc`), which needs that score."""
-POSTHOC_FAMILIES: Final = ("YO", "FS", "YS")
-"""The families the `posthoc` stage fits, in order: the oracle YO, FS on the real folds, then YS."""
+POSTHOC_FAMILIES: Final = ("FS", "Y0b", "YUb", "YOb")
+"""The families the `posthoc` stage fits, in order: FS on the real folds (24 fits), then the three
+synthetic fits at seed 0 that stop on the sign head's own validation BCE: Y0b, YUb, and YOb."""
 POSTHOC_COST_CAP_HOURS: Final = 11.9
 """No post hoc fit starts when the running total of measured GPU-process-hours, plus the fit's
 expected hours, would pass this cap. The absolute stop line is `core.STOP_LINE_HOURS`."""
@@ -937,7 +938,7 @@ COST_CAP_MESSAGE: Final = "stopped at the cost cap; ask the manager"
 
 
 def run_posthoc(*, root: Path, steps: PosthocSteps) -> dict[str, Any]:  # noqa: PLR0912, PLR0915
-    """Fit the post hoc families (YO, then FS, then YS) and write `posthoc/posthoc_status.json`.
+    """Fit the post hoc families (FS, then Y0b, YUb, and YOb) and write `posthoc/posthoc_status.json`.
 
     The run writes the marker `posthoc/posthoc_started.json` before the first fit and nothing else
     outside `posthoc/`. A failed fit is report-only: its failure record goes to the fit folder, the
@@ -948,11 +949,12 @@ def run_posthoc(*, root: Path, steps: PosthocSteps) -> dict[str, Any]:  # noqa: 
     post hoc fits' as they finish. Before each fit, the run does not start it when the running
     total plus the fit's expected hours would pass `POSTHOC_COST_CAP_HOURS`, or when the running
     total has already reached the stop line `core.STOP_LINE_HOURS`, which no fit may start past.
-    The expected hours are the mean of the arm's finished fits, or the reference (YU's mean) for the
-    arm's first fit. Every fit not yet started is then skipped, so the last fits of the run (YS's)
-    are the first to go, and the run ends `stopped` (exit code 3) with the skipped jobs and the
-    reason in the status file. A job whose record exists from an earlier run is counted and not run
-    again.
+    The expected hours are the mean of the arm's finished fits, or the reference for the arm's first
+    fit (`stage_posthoc` gives the mean of the finished post hoc synthetic fits, else YU's mean in
+    the main chain). Every fit not yet started is then skipped, so the last fits of the run (YOb's,
+    then YUb's) are the first to go. The run ends `stopped` (exit code 3) with the skipped jobs and
+    the reason in the status file. A job whose record exists from an earlier run is counted and not
+    run again.
 
     A job that fails (or is interrupted) writes no job record, so the run adds its wall seconds to
     `posthoc/failed_hours.json`, and the running total counts them. A rerun reads that file first,

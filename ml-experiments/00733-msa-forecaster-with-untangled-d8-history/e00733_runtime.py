@@ -1106,7 +1106,7 @@ def prepare_posthoc_root(*, root: Path, fit_root: Path) -> None:
 
 
 def stage_posthoc(args: argparse.Namespace, root: Path) -> dict[str, Any]:
-    """Fit the post hoc arms YO and YS (synthetic) and FS (real folds) into `<root>/posthoc/`.
+    """Fit the post hoc arms FS (real folds) and Y0b, YUb, and YOb (synthetic) into `<root>/posthoc/`.
 
     The fits and predictions use the code and the caps of the chain, each in a new process. The
     stage writes no file outside `posthoc/`: not `scores/test_started`, the verdict, the readings,
@@ -1139,7 +1139,19 @@ def stage_posthoc(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     )
 
     def reference_hours(arm: str) -> float:
-        """Return the expected hours of an arm's first fit: YU's mean in the main run, else the plan's."""
+        """Return the expected hours of an arm's first fit.
+
+        A synthetic arm takes the mean of the post hoc synthetic fits that have finished, then YU's
+        mean in the main run, then the plan's hours.
+        """
+        done = [
+            h
+            for other in core.POST_HOC_ARMS
+            if core.ARMS[other].where == "synthetic"
+            for h in st.arm_job_hours(root=fit_root, arm=other)
+        ]
+        if core.ARMS[arm].where == "synthetic" and done:
+            return sum(done) / len(done)
         yu = st.arm_job_hours(root=root, arm="YU")
         return sum(yu) / len(yu) if yu else core.ARMS[arm].hours_per_fit
 

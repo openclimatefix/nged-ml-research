@@ -254,7 +254,7 @@ POSTHOC_SMOKE_FILE: Final = "scores/smoke_posthoc.json"
 
 
 def parse_arms(*, text: str) -> tuple[str, ...]:
-    """Return the arms of `--arms FS,YS`, which must be post hoc arms.
+    """Return the arms of `--arms FS,Y0b,YUb,YOb`, which must be post hoc arms.
 
     Raises:
         RuntimeError733: When an arm is not one of `core.POST_HOC_ARMS`.
@@ -268,7 +268,7 @@ def parse_arms(*, text: str) -> tuple[str, ...]:
 
 
 def stage_smoke_arms(args: argparse.Namespace, root: Path) -> dict[str, Any]:
-    """Run one pass of the post hoc arms (`--arms FS,YS`) in a scratch folder outside the data folder.
+    """Run one pass of the post hoc arms (`--arms FS,Y0b,YUb,YOb`) in a scratch folder outside the data folder.
 
     Each arm is fitted for one pass, predicted on validation rows, and read by the scoring code, as
     the smoke test does it for the chain's arms. The record `scores/smoke_posthoc.json` is written
