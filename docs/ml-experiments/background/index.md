@@ -21,8 +21,10 @@ the planner did not open.
 9. **[Problems and the best forecast](problems-and-current-best-forecast.md)**: baselines, best
    guess, scores.
 10. **[Adopted and open questions](adopted-and-open-questions.md)**: what is settled, who owns the rest.
-11. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
-12. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
+11. **[Switching events](switching-events.md)**: load transfers between substations, and what a
+    detector must output.
+12. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
+13. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
 
 The reference page [What is on disk](what-is-on-disk.md) says where each data set sits under
 `data/` and how to read it.
