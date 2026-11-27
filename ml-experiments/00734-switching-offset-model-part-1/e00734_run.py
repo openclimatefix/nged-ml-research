@@ -55,7 +55,7 @@ CODE_SHA: Final[Path] = OUT / "code.sha256"
 """Hash of the scoring code, written by `freeze-code` before stage 3."""
 EXIT_FAILED: Final[int] = 3
 """Exit code of a failed world (the launcher's busy code is different)."""
-STOP_CPU_HOURS: Final[float] = 55.0
+STOP_CPU_HOURS: Final[float] = 90.0
 SETS: Final[tuple[str, ...]] = (
     "default",
     "cascade",
