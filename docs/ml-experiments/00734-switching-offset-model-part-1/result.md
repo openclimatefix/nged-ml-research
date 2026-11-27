@@ -110,6 +110,16 @@ headline: >-
   times as many when only events of 2 noise units or more are counted. Neither probabilistic model
   beat the plain changepoint search (C2 -0.029, -0.078 to +0.016).
 code: ml-experiments/00734-switching-offset-model-part-1/
+take_home_message: >-
+  A probabilistic offset model of each Primary's whole history (H-nbr) found a smaller share of the
+  megawatts of long, shallow injected load transfers than the event table E1-J-sym of experiment
+  680 (0.355 against 0.393; C1 -0.039, 97.5% world interval -0.090 to +0.014, bar +0.10), and it
+  did not beat a plain changepoint search (C2 -0.029). It found more of the transfers that last 1
+  to 7 days (+0.096 in the medium and shallow cell), and it called 0.34 times as many events as
+  E1-J-sym on the real record, but 1.09 times as many events of 2 noise units or more. Only 1 of
+  10 predictions held, and its 80% intervals were far too narrow. All numbers are interim.
+production_status: not-for-production
+adopted_in: none
 ---
 
 **We ask whether a probabilistic model that reads a Primary substation's whole history can find
