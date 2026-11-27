@@ -65,6 +65,9 @@ EXIT_INVALID: Final = 4
 EXIT_FAILED: Final = core.CHAIN_FAILED_EXIT
 READING_STAGES: Final = ("score", "report", "figures", "loss_curves", "attention", "series")
 """The stages that read the test outputs; none may run while the chain is fitting."""
+TEST_ROW_STAGES: Final = ("figures", "series", "attention")
+"""The reading stages that draw test rows: each needs the first-test-score marker, which `score`
+writes after `assert_no_test_choice`, unless it is asked for validation rows only."""
 GATED_STAGES: Final = ("smoke_fit", "timing", "fit", "chain")
 """The stages that start a fit: they need the channels, the limits, the gallery check, the review
 gate, and no recorded failure."""
@@ -307,13 +310,14 @@ def pre_fit_guards_passed(*, root: Path) -> bool:
     return all(name in record for name in PRE_FIT_GUARD_NAMES)
 
 
-def guard_run(*, root: Path, stage: str, banks_digest: str) -> None:  # noqa: PLR0912
+def guard_run(*, root: Path, stage: str, banks_digest: str, validation_only: bool = False) -> None:  # noqa: PLR0912
     """Refuse to run a stage on the outputs of another run, or without its gates.
 
     Args:
         root: The data folder of this experiment.
         stage: The stage name.
         banks_digest: The digest id of experiment 730's banks in use.
+        validation_only: Whether the stage reads validation rows only (a scratch root).
 
     Raises:
         GuardError: When a gate is open, a correctness check has failed, or the folder holds the
@@ -377,6 +381,9 @@ def guard_run(*, root: Path, stage: str, banks_digest: str) -> None:  # noqa: PL
         if chain_running(root=root):
             msg = f"`{stage}` reads the test outputs, but the chain is running (`chain_status.json` says running): wait for the last fit"
             raise GuardError(msg)
+    if stage in TEST_ROW_STAGES and not validation_only and not marker_exists(root=root):
+        msg = f"`{stage}` reads test rows, but {TEST_MARKER} does not exist: run `score` first, because its marker is the record that the choices were fixed before any test row was read"
+        raise GuardError(msg)
     if stage == "score" and not chain_finished(root=root):
         msg = "`score` needs stored predictions and a `chain_status.json` that says complete, failed, or stopped: the first test score ends every later fit"
         raise GuardError(msg)

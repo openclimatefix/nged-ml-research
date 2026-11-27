@@ -907,6 +907,12 @@ published page carries the coverage counts.
   `smoke_passed` refuses a record without all three. A smoke test on the CPU writes
   `scores/smoke_cpu.json`, which no gate reads. The review gate stays a file that the session writes
   and no code does.
+- **The figure, series, and attention stages need the first-test-score marker before they read test
+  rows (ruling of the design lead, 2026-11-27, set before any experiment 733 score exists).** The
+  three stages had checked only `limits.json` and that the chain was not running, so a fit could
+  have followed a look at test figures. They now refuse without `scores/test_started`, which
+  `score` writes only after the choices were fixed. A run that reads validation rows only (a
+  scratch root) needs no marker, and `loss_curves` reads stored fit records only.
 
 ## Method
 

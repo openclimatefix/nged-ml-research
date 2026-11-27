@@ -20,6 +20,7 @@ def _args(stage: str, **kw: object) -> argparse.Namespace:
 def test_stage_without_function_is_refused_with_exit_2(tmp_path: Path) -> None:
     """A stage with no function in this build exits 2 (never 0, never 1)."""
     _ready(tmp_path, through="timing")
+    (tmp_path / "scores" / st.TEST_MARKER).touch()
     assert cli.run_stage(args=_args("figures"), root=tmp_path, digest=DIGEST) == 2
 
 
@@ -33,6 +34,7 @@ def test_exit_codes_and_failure_record(
     """A stopped stage exits 3, a correctness failure 4 (and writes `invalid.json`), any other
     failure 5; each leaves message and traceback."""
     _ready(tmp_path, through="timing")
+    (tmp_path / "scores" / st.TEST_MARKER).touch()
 
     def boom(_a: argparse.Namespace, _r: Path) -> None:
         raise exc

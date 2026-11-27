@@ -70,7 +70,10 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
     """Run one stage under its guard and return its exit code."""
     try:
         st.guard_run(
-            root=root, stage="chain" if args.stage == "guard" else args.stage, banks_digest=digest
+            root=root,
+            stage="chain" if args.stage == "guard" else args.stage,
+            banks_digest=digest,
+            validation_only=bool(getattr(args, "validation_only", False)),
         ) if args.stage != "banks" else st.guard_run(root=root, stage="banks", banks_digest=digest)
         if args.stage == "guard":
             print("guard passed")

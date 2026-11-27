@@ -143,6 +143,21 @@ def test_score_waits_for_the_chain_and_reading_stages_wait_while_it_runs(tmp_pat
     st.guard_run(root=tmp_path, stage="score", banks_digest=DIGEST)
 
 
+@pytest.mark.parametrize("stage", ["figures", "series", "attention"])
+def test_a_stage_that_draws_test_rows_needs_the_first_test_score_marker(
+    tmp_path: Path, stage: str
+) -> None:
+    """Without `scores/test_started`, a stage that reads test rows is refused; validation rows and
+    the marker both open it, and `loss_curves` (stored fit records only) needs neither."""
+    _ready(tmp_path, through="timing")
+    with pytest.raises(st.GuardError, match="test_started"):
+        st.guard_run(root=tmp_path, stage=stage, banks_digest=DIGEST)
+    st.guard_run(root=tmp_path, stage=stage, banks_digest=DIGEST, validation_only=True)
+    st.guard_run(root=tmp_path, stage="loss_curves", banks_digest=DIGEST)
+    (tmp_path / "scores" / st.TEST_MARKER).touch()
+    st.guard_run(root=tmp_path, stage=stage, banks_digest=DIGEST)
+
+
 def test_test_marker_is_written_only_after_the_choices_were_fixed(tmp_path: Path) -> None:
     """The marker needs `limits.json` and the stored predictions to be older than it; a late
     rewrite of the limits fails."""
