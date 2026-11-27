@@ -518,7 +518,7 @@ def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:  # noqa: PLR0
     FU, FU-S,
     Y0, YU, and the report-only arms FS and YT. An arm that the timing gate dropped (or that equals
     FU) is
-    skipped. A failed counted fit stops the chain at the end of its family; a failed report-only
+    skipped. A failed counted fit stops the chain at once; a failed report-only
     fit leaves the
     verdict untouched and the chain goes on. Each family sends a "fits starting" line first and a
     "last fit
@@ -581,6 +581,9 @@ def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:  # noqa: PLR0
                         payload=fit.failure_payload(exc=exc),
                     )
                     steps.log(f"fit {job} failed: {type(exc).__name__}: {exc}")
+                    if arm not in core.REPORT_ONLY_ARMS:
+                        steps.log(f"counted fit {job} failed: the chain stops at once")
+                        break
             steps.log(fit.last_fit_ended_line(family=family, counts=counts, now=steps.now()))
             if counts["failed"] and arm not in core.REPORT_ONLY_ARMS:
                 state = "failed"

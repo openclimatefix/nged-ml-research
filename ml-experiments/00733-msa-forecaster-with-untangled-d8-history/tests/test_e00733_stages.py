@@ -283,6 +283,8 @@ def test_chain_stops_on_a_failed_counted_fit_with_exit_5_and_records_the_traceba
     status = st.run_chain(root=tmp_path, steps=_steps(fail={"FU"}, calls=calls))
     assert status["state"] == "failed" and st.exit_code(status=status) == 5
     assert not [c for c in calls if c[0] == "Y0"]
+    assert len([c for c in calls if c[0] == "FU"]) == 1  # the chain stops at the first failure
+    assert status["failed"] == [st.fit.job_name(arm="FU", fold=calls[-1][1], seed=calls[-1][2])]
     failed = json.loads(next((tmp_path / "fits").glob("FU_*.failed.json")).read_text())
     assert failed["message"] == "boom" and "RuntimeError" in failed["traceback"]
     other = tmp_path / "o"
