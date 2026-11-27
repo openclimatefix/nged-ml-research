@@ -1414,7 +1414,8 @@ row 0 if more than half the test segments lack runs, and the check left out 8 of
 
 **D8 has 0 logged load-shift events with forecasts at both their start and end in the scored rows,
 so the plan's event plots could not be drawn.** The series stage found 0 such events
-(`scores/series_stage.json`), so no event panel exists. The R10 slices inside events and after events hold no half-hours.
+(`scores/series_stage.json`), so no event panel exists. The R10 slices inside events and after
+events hold no half-hours.
 
 **All six synthetic fits stored the first-pass network, which limits what C3 and C4 can show.** All
 six synthetic fits (Y0 and YU, seeds 0 to 2) stored the network of pass 1: the validation loss (the
@@ -1445,12 +1446,12 @@ days comes from a detector that experiment 732 found finds 7.7% of the simulated
 or more, so a null C1 says little about whether a good transfer signal would help.
 
 **Anonymisation.** The page shows no engine size, no connection date, no distance, no register
-entry, no series identifier, and no generator time series. D8 is a substation and is named.
-No forecast time series of D8's real reading and no real-day untangled channel is drawn, and no
-calendar date of a real day appears in a figure. The base dates of the synthetic samples appear only in the private log, and the page draws the synthetic
-series without dates. The panels of `PRIVATE/gallery2/` are not published: the history and placebo
-panels show real-day untangled channels, and the synthetic panels show the real base-day reading
-beside the injected series.
+entry, no series identifier, and no generator time series. D8 is a substation and is named. No
+forecast time series of D8's real reading and no real-day untangled channel is drawn, and no
+calendar date of a real day appears in a figure. The base dates of the synthetic samples appear only
+in the private log, and the page draws the synthetic series without dates. The panels of
+`PRIVATE/gallery2/` are not published: the history and placebo panels show real-day untangled
+channels, and the synthetic panels show the real base-day reading beside the injected series.
 
 ## Synthetic world gallery
 
