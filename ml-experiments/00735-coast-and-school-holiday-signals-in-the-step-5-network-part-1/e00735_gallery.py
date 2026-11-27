@@ -197,7 +197,7 @@ def w_panels(*, daily: win.DailyWeather, c_true: np.ndarray, labels: list[str], 
             color=alt.Color("Primary:N", scale=alt.Scale(domain=["D19", "D11"], range=["#FF4901", "#306BFF"]), legend=alt.Legend(orient="top", title=None)),
         )
         .properties(width=620, height=70)
-        .facet(row=alt.Row("column:N", sort=names, title=None))
+        .facet(row=alt.Row("column:N", sort=names, title=None, header=alt.Header(labelAngle=0, labelAlign="left", labelOrient="top")))
         .properties(title=alt.TitleParams("The weather columns W1 to W4 around the October 2026 half-term, D19 (coastal) and D11 (inland)", subtitle=["From realised daily weather (ERA5 to 2026-07-31, then the expected-weather table), not from the ENS rows. The half-term is 2026-10-24 to 2026-11-01. Substation demand only."]))
     )  # fmt: skip
     chart_.save(str(out / "w_panels.svg"))
@@ -245,11 +245,11 @@ def chart(
         .mark_area(opacity=0.8, interpolate="step-after")
         .encode(
             x=alt.X("date:T", title="Date", axis=alt.Axis(format="%b %Y", tickCount=7)),
-            y=alt.Y("K2:Q", title="K2 (closeness to coast x school holiday)", scale=alt.Scale(domain=[0, 1])),
+            y=alt.Y("K2:Q", title="K2", stack=None, scale=alt.Scale(domain=[0, 1])),
             color=alt.Color("calendar:N", scale=alt.Scale(domain=["real school holidays", "placebo (21 days later)"], range=["#FF4901", "#306BFF"]), legend=alt.Legend(orient="top", title=None)),
         )
         .properties(width=620, height=55)
-        .facet(row=alt.Row("Primary:N", sort=show, title=None))
+        .facet(row=alt.Row("Primary:N", sort=show, title=None, header=alt.Header(labelAngle=0, labelAlign="left", labelOrient="top")))
         .properties(title=alt.TitleParams("The school-holiday column K2 of each Primary, real and placebo", subtitle=["K2 is the coast closeness c (D9, D4, D19, and D2 are within 3 km of the coast; D11, D10, and D22 are inland) on school-holiday days and zero otherwise.", "Substation demand only; no metered generator appears. November 2025 to November 2026."]))
     )  # fmt: skip
     chart_.save(str(path))
