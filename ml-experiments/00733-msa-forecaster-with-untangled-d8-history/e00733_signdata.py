@@ -80,7 +80,9 @@ def segment_sources(*, root: Path, kind: str, segments: list[Any]) -> list[str]:
         msg = f"the {kind} bank keeps {len(kept)} covered segments, the world holds {len(segments)}"
         raise SignDataError(msg)
     for i, (b, w) in enumerate(zip(kept, segments, strict=True)):
-        if not np.array_equal(np.asarray(b.solar, dtype=np.float32).reshape(-1), w.solar_points):
+        if not np.array_equal(
+            np.asarray(b.solar, dtype=np.float32).reshape(-1), w.solar_points, equal_nan=True
+        ):
             msg = f"segment {i} of the {kind} world differs from the bank's segment in its solar output"
             raise SignDataError(msg)
     return [str(b.source) for b in kept]
@@ -105,7 +107,8 @@ def load_sign_data(*, root: Path, rows: str) -> SignData:
         The joined data.
 
     Raises:
-        SignDataError: When YU or Y0 holds no archive, or an archive holds another sample count.
+        SignDataError: When YU or Y0 holds no archive, or an archive holds another sample count or
+            other keys (segment, origin day, or lead index) than the world's samples.
     """
     import e00733_adapters as adapters
 
@@ -124,6 +127,10 @@ def load_sign_data(*, root: Path, rows: str) -> SignData:
         if len(got["seg"]) != len(index):
             msg = f"the archive of {arm} holds {len(got['seg'])} samples, the bank {len(index)}"
             raise SignDataError(msg)
+        for key in ("seg", "origin_day", "lead_index"):
+            if not np.array_equal(got[key], getattr(index, key)):
+                msg = f"the archive of {arm} holds other samples than the world's index ({key})"
+                raise SignDataError(msg)
         arms[arm] = got
     meta = world.read_meta(root=root)["constants"]
     base = ss.baseline_probabilities(

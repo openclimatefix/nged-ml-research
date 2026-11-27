@@ -931,6 +931,13 @@ published page carries the coverage counts.
   also built the datasets of FU and of M\* for a fold at once, which risks the host limit of 14 GB;
   it now builds one, takes its maps, frees it, and builds the other, and checks that both arms
   draw from the same origins.
+- **The sign-data join checks the archives' keys and reads solar output with NaN as equal (ruling of
+  the design lead, 2026-11-27, set before any experiment 733 score exists).** The join had compared
+  only the count of samples in a stored archive with the count in the world, so an archive of the
+  same size but other samples (another segment, origin day, or lead index) would have been joined
+  to the wrong truth. It now requires the three keys to equal the world's index. The comparison of
+  the bank's solar output with the world's uses `equal_nan=True`, so a NaN value fails no
+  comparison.
 
 ## Method
 
