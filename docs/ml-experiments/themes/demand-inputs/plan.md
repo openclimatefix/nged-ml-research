@@ -4,6 +4,7 @@
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 735 | Do school-holiday columns, and a distance-from-the-coast signal, lower the step-5 demand network's error in the weeks around school holidays and bank holidays at the 16 Primaries, especially at the coastal ones and on warm sunny holiday days? | High (maintainer request, 2026-11-27) | Nothing; fits wait for the GPU slot | Planned: plan PR open |
 | 437 | Do trailing and forward weather windows, calendar and tariff columns, and national signals lower the error of the pooled neural network? | High (maintainer request, 2026-10-31) | Nothing | Done: no bundle met the bar; thermal lag (bundle T) is the only candidate for a retest on more folds |
 | 442 | Does thermal lag (bundle T) lower the pooled neural network's error on cold winter nights, on six winter-weighted folds? | High (brief, 2026-10-31) | Nothing; fits wait for a free GPU slot | Finished (not supported): Thermal-lag columns are not supported as a help on cold winter nights on these six monthly folds, which is not the same as no effect. See [experiment 442](../../00442-thermal-lag-cold-night-test-on-six-winter-folds/result.md). |
 | 516 | Does a small convolutional encoder over a 24 h weather window improve a lag-free demand network that cannot see recent power? | High (maintainer request, 2026-11-02) | Experiment 515's window features and leak check | Done: neither encoder beat the base or the shuffled-day control |
