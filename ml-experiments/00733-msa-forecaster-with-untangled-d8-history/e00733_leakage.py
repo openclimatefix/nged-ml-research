@@ -415,6 +415,30 @@ def assert_bank_digests(
     return len(digests)
 
 
+def read_732_training_bank_seeds(*, root_732: Path) -> tuple[int, ...]:
+    """Return the seeds of the training banks that experiment 732's fits read, from its fit records.
+
+    Experiment 732's `load_sets` reads the training bank whose seed equals the fit's seed, so the
+    `seed` of each fit record in `fits/` names one training bank that a fit read.
+
+    Args:
+        root_732: Experiment 732's data folder.
+
+    Returns:
+        The sorted seeds, without repeats.
+
+    Raises:
+        CorrectnessFailureError: When the folder holds no fit record.
+    """
+    records = [
+        p for p in sorted((root_732 / "fits").glob("*.json")) if not p.name.endswith(".failed.json")
+    ]
+    seeds = sorted({int(json.loads(p.read_text())["seed"]) for p in records})
+    if not seeds:
+        _fail(message="experiment 732 holds no fit record, so its training banks cannot be listed")
+    return tuple(seeds)
+
+
 def assert_synthetic_train_banks(*, seeds: Sequence[int], fit_seeds_732: Sequence[int]) -> None:
     """Check that the synthetic forecaster trains on banks of seeds 3 and 4 only.
 

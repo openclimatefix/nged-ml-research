@@ -256,3 +256,21 @@ def test_read_run_files_reads_name_and_availability_column(tmp_path: Path) -> No
     )
     with pytest.raises(lk.CorrectnessFailureError):
         lk.read_run_files(summary_dirs=[tmp_path], epoch_days=[day + 1])
+
+
+def test_732_training_banks_are_read_from_its_fit_records(tmp_path: Path) -> None:
+    """Fit records name the training banks; a failed record does not count."""
+    fits = tmp_path / "fits"
+    fits.mkdir()
+    for seed in (0, 1, 2):
+        (fits / f"U-star_unet_s{seed}.json").write_text(json.dumps({"seed": seed}))
+    (fits / "U-star_unet_s3.failed.json").write_text(json.dumps({"seed": 3}))
+    assert lk.read_732_training_bank_seeds(root_732=tmp_path) == (0, 1, 2)
+    lk.assert_synthetic_train_banks(seeds=(3, 4), fit_seeds_732=(0, 1, 2))
+    (fits / "U-star_unet_s4.json").write_text(json.dumps({"seed": 4}))
+    with pytest.raises(lk.CorrectnessFailureError):
+        lk.assert_synthetic_train_banks(
+            seeds=(3, 4), fit_seeds_732=lk.read_732_training_bank_seeds(root_732=tmp_path)
+        )
+    with pytest.raises(lk.CorrectnessFailureError):
+        lk.read_732_training_bank_seeds(root_732=tmp_path / "other")

@@ -658,7 +658,7 @@ def synthetic_loader(*, root: Path) -> Any:
                 seeds=[
                     int(b[1]) for b in BANK_FILES.values() if b[0] == "train" and b[1] is not None
                 ],
-                fit_seeds_732=list(core.SOURCE_SEEDS),
+                fit_seeds_732=leak.read_732_training_bank_seeds(root_732=paths.root_732()),
             )
             leak.assert_synthetic_inputs_clean(
                 input_names=list(model.UntInputs.__dataclass_fields__)
