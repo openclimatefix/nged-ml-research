@@ -810,7 +810,8 @@ published page carries the coverage counts.
   limit, 0.13 at 12 to 24 hours, 0.39 at 6 to 12 hours, and 0.6 within 3 hours, and the mean is 3e-4
   to 5e-3. G14 passes when the poison test passes, the mean absolute difference over origins more
   than 24 hours before the limit is below 0.01, and the difference does not increase with the hours
-  before the limit (binned by 6 hours). The panel plots this table for the real networks.
+  before the limit (binned by 6 hours, with a slack of 5e-4, which is 5% of the 0.01 limit, accepted by
+  the design lead on 2026-11-27 for bin-to-bin noise). The panel plots this table for the real networks.
 - **The top-row trailing columns of target-row B1 read the origin day's start (ruling of the design
   lead, 2026-11-26).** Experiment 713's getter cannot read observed valid-time columns for these
   columns, so the synthetic world and the real folds give them the weather of 00:00 UTC on the
