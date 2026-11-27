@@ -14,6 +14,7 @@ the screen's four folds at seeds 0 and 1; else the folds and seeds that both arm
 or a stopped run). A contrast that reads less than the plan is marked `interim`.
 """
 
+import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
@@ -76,11 +77,29 @@ def has_job(*, root: Path, arm: Arm, fold: str, seed: int, rows: str) -> bool:
     return folder.exists()
 
 
+class IncompletePlanError(sc.ScoreError):
+    """A counted reading lacks stored forecasts for its plan (verdict row 1 on a test score)."""
+
+
+def screen_stops_rest(*, root: Path) -> bool:
+    """Return whether `scores/screen.json` says that the screen stopped the rest of FU and FU-S."""
+    path = root / "scores" / "screen.json"
+    if not path.exists():
+        return False
+    return bool(json.loads(path.read_text()).get("stops_rest"))
+
+
 def choose_plan(
     *, root: Path, arms: Sequence[Arm], wanted_seeds: Sequence[int], rows: str,
-    exists: Callable[..., bool] | None = None,
+    exists: Callable[..., bool] | None = None, screen_ok: bool = False, partial_ok: bool = False,
+    required: bool = False,
 ) -> Plan | None:  # fmt: skip
-    """Return the plan that every arm can read, or None when the arms share no fold and seed.
+    """Return the plan that every arm can read, or None (or raise) when none is complete.
+
+    The full plan reads every fold at every wanted seed. The screen (four folds, seeds 0 and 1) is
+    read only when `screen_ok` is true, which is the plan's rule that a stopped screen reads C1 and
+    C2 on the screen alone. The folds and seeds that happen to exist are read only when
+    `partial_ok` is true (figures) or on validation rows (scratch runs).
 
     Args:
         root: This experiment's data folder.
@@ -88,9 +107,15 @@ def choose_plan(
         wanted_seeds: The seeds the plan reads for the contrast.
         rows: "test" or "validation".
         exists: `(root, arm, fold, seed, rows) -> bool` (default `has_job`; tests replace it).
+        screen_ok: Whether the screen plan is a plan of this reading.
+        partial_ok: Whether the folds and seeds that exist are a plan of this reading.
+        required: Whether an incomplete plan raises (a counted reading) instead of returning None.
 
     Returns:
-        The first of the full plan, the screen, and the common folds and seeds that is complete.
+        The first allowed plan that is complete, or None.
+
+    Raises:
+        IncompletePlanError: When `required` and no allowed plan is complete.
     """
     check = has_job if exists is None else exists
     wanted = tuple(wanted_seeds)
@@ -106,8 +131,26 @@ def choose_plan(
     if full(core.ALL_FOLDS, wanted):
         return Plan(folds=core.ALL_FOLDS, seeds=wanted, interim=False)
     screen_seeds = tuple(s for s in core.SCREEN_SEEDS if s in wanted)
-    if screen_seeds and full(core.SCREEN_FOLDS, screen_seeds):
+    if screen_ok and screen_seeds and full(core.SCREEN_FOLDS, screen_seeds):
         return Plan(folds=core.SCREEN_FOLDS, seeds=screen_seeds, interim=True)
+    plan = (
+        _partial_plan(arms=arms, wanted=wanted, rows=rows, check=check, root=root)
+        if (partial_ok or rows != "test")
+        else None
+    )
+    if plan is None and required:
+        msg = (
+            f"no complete plan for {[a[0] for a in arms]}: the full plan lacks stored forecasts "
+            f"and the screen is {'allowed' if screen_ok else 'not allowed (it did not stop the rest)'}"
+        )
+        raise IncompletePlanError(msg)
+    return plan
+
+
+def _partial_plan(
+    *, arms: Sequence[Arm], wanted: tuple[int, ...], rows: str, check: Callable[..., bool], root: Path
+) -> Plan | None:  # fmt: skip
+    """Return the folds and seeds that every arm holds, labelled interim, or None."""
     held = {
         f: {
             s
@@ -309,7 +352,13 @@ def swap_reference(*, arm: Arm, rows: str) -> Arm:
     return (VALIDATION_REFERENCE, None) if arm[0] == "M*" and rows == "validation" else arm
 
 
-def real_readings(*, root: Path, rows: str, n_resamples: int | None = None) -> Readings:
+COUNTED_NAMES: Final = ("C1", "C2")
+"""The real-fold contrasts that the verdict table reads."""
+
+
+def real_readings(
+    *, root: Path, rows: str, n_resamples: int | None = None, tolerate_missing: bool = False
+) -> Readings:  # fmt: skip
     """Read every real-fold contrast, the three guards' inputs, and R8 to R10 from the stored sets.
 
     Args:
@@ -317,9 +366,15 @@ def real_readings(*, root: Path, rows: str, n_resamples: int | None = None) -> R
         rows: "test" or "validation".
         n_resamples: The bootstrap resamples (default: the plan's 100,000, or 1,000 on validation
             rows, whose intervals are interim).
+        tolerate_missing: Whether a counted contrast (C1 or C2) with an incomplete plan is read as
+            None. The score stage sets it only when the chain stopped, a fit failed, or a
+            correctness check failed, where the verdict row does not need the reading.
 
     Returns:
-        The readings; a contrast whose arms share no fold and seed is None.
+        The readings; a report-only contrast with no complete plan is None.
+
+    Raises:
+        IncompletePlanError: When C1 or C2 has no complete plan and `tolerate_missing` is false.
     """
     import e00713_score as s713  # ty: ignore[unresolved-import]
 
@@ -343,11 +398,16 @@ def real_readings(*, root: Path, rows: str, n_resamples: int | None = None) -> R
         return cache[key]
 
     contrasts: dict[str, sc.RealContrast | None] = {}
+    stops_rest = screen_stops_rest(root=root)
     plans: dict[str, dict[str, Any] | None] = {}
     frames: dict[str, tuple[pl.DataFrame, pl.DataFrame]] = {}
     for name, (treat, reference, seeds, where) in CONTRAST_SPECS.items():
         ref = swap_reference(arm=reference, rows=rows)
-        plan = choose_plan(root=root, arms=[treat, ref], wanted_seeds=seeds, rows=rows)
+        counted = name in COUNTED_NAMES
+        plan = choose_plan(
+            root=root, arms=[treat, ref], wanted_seeds=seeds, rows=rows, screen_ok=stops_rest,
+            required=counted and not tolerate_missing,
+        )  # fmt: skip
         plans[name] = None if plan is None else plan.as_dict()
         if plan is None:
             contrasts[name] = None
@@ -648,7 +708,9 @@ def screen_point(*, root: Path, truth: np.ndarray | None = None) -> float:
     from e00733_channels import StoppedError
 
     arms = (("FU", None), ("M*", None))
-    plan = choose_plan(root=root, arms=arms, wanted_seeds=core.SCREEN_SEEDS, rows="test")
+    plan = choose_plan(
+        root=root, arms=arms, wanted_seeds=core.SCREEN_SEEDS, rows="test", screen_ok=True
+    )
     if plan is None:
         msg = "the screen found no fold and seed that FU and M* share"
         raise StoppedError(msg)

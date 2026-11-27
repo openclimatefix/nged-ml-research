@@ -12,6 +12,8 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+import e00733_core as core
+import e00733_fit as fit
 import e00733_score as sc
 import e00733_scoring as scoring
 import e00733_scoring_synth as synth
@@ -19,6 +21,28 @@ import e00733_stages as st
 
 REAL_NAMES = ("C1", "C2", "R1", "R2", "R3", "R4", "R12")
 EXTRA_READINGS = ("R8", "R9", "R10", "R11")
+
+
+def counted_fit_failed(*, root: Path) -> bool:
+    """Return whether a fit that C1 or C2 needs raised and was not rerun (verdict row 2).
+
+    The fits that C1 and C2 read are FU (C1, C2) and FU-S (C2); F0r gates C1, so its failure is
+    counted too. A failed Y0 or YU fit is not row 2: C3 and C4 are not in the verdict table, so the
+    sign-forecast word and the history word read `void` instead. A failure of a report-only arm
+    (FS or YT) changes nothing.
+
+    Args:
+        root: This experiment's data folder.
+
+    Returns:
+        Whether any F0r, FU, or FU-S job has a failure record and no fit record.
+    """
+    return any(
+        fit.arm_failed(
+            root=root, arm=arm, folds=core.ARMS[arm].folds or (None,), seeds=core.ARMS[arm].seeds
+        )
+        for arm in ("F0r", "FU", "FU-S")
+    )
 
 
 def run_score(
@@ -36,24 +60,27 @@ def run_score(
         The verdict.
 
     Raises:
-        ScoreError: When C1 and C3 are both unread on test rows (the score would rest on nothing).
+        IncompletePlanError: When C1 or C2 lacks stored forecasts for every allowed plan, and the
+            chain did not stop, no fit failed, and no correctness check failed. A reading that is
+            missing or not finite after a complete chain is verdict row 1 in the table itself.
     """
-    real = scoring.real_readings(root=root, rows=rows, n_resamples=n_resamples_real)
+    state = st.chain_state(root=root)
+    failed = counted_fit_failed(root=root)
+    stopped, invalid = state == "stopped", st.invalid_recorded(root=root)
+    real = scoring.real_readings(
+        root=root, rows=rows, n_resamples=n_resamples_real,
+        tolerate_missing=stopped or invalid or failed,
+    )  # fmt: skip
     syn = synth.synthetic_readings(root=root, rows=rows, n_resamples=n_resamples_synthetic)
     contrasts: dict[str, Any] = {name: real.contrasts.get(name) for name in REAL_NAMES}
     contrasts.update(syn["contrasts"])
-    if rows == "test" and contrasts["C1"] is None and contrasts["C3"] is None:
-        msg = "neither C1 nor C3 could be read from the stored predictions"
-        raise sc.ScoreError(msg)
     c1 = contrasts["C1"]
     guards = None
     if c1 is not None and real.guards_inputs is not None:
         gi = real.guards_inputs
         guards = sc.guards_hold(c1=c1, mae_point=gi["mae"], q01=gi["q01"], q99=gi["q99"])
-    state = st.chain_state(root=root)
     verdict, readings = sc.assemble(
-        stopped=state == "stopped", invalid=st.invalid_recorded(root=root), failed=state == "failed",
-        c=contrasts, guards=guards, sign_inputs=syn["sign_inputs"], dropped_arms=st.dropped_arms(root=root),
+        stopped=stopped, invalid=invalid, failed=failed, c=contrasts, guards=guards, sign_inputs=syn["sign_inputs"], dropped_arms=st.dropped_arms(root=root),
     )  # fmt: skip
     readings.update({"R8": real.r8, "R9": real.r9, "R10": real.r10, "R11": syn["r11"]})
     readings["plans"] = real.plans

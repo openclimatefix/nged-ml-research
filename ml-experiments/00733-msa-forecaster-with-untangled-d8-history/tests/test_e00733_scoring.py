@@ -6,6 +6,7 @@ import sys
 import types
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import e00733_baselines as baselines
 import e00733_core as core
@@ -24,59 +25,50 @@ def _exists(held: set[tuple[str, str, int]]):  # noqa: ANN202
     return check
 
 
-def test_choose_plan_prefers_the_full_plan_then_the_screen_then_what_exists() -> None:
-    """The full plan needs every fold and seed; the screen needs four folds at seeds 0 and 1."""
+def _plan(**kw: Any) -> sg.Plan | None:
+    return sg.choose_plan(**kw)
+
+
+def test_choose_plan_never_falls_back_silently() -> None:
+    """Only the full plan is read unless the screen or a partial plan is allowed; a counted one raises."""
     arms = [("FU", None), ("M*", None)]
-    full = {(a, f, s) for a in ("FU", "M*") for f in core.ALL_FOLDS for s in core.HEADLINE_SEEDS}
-    plan = sg.choose_plan(
-        root=Path(), arms=arms, wanted_seeds=core.HEADLINE_SEEDS, rows="test", exists=_exists(full)
-    )
-    assert (
-        plan is not None
-        and not plan.interim
-        and plan.folds == core.ALL_FOLDS
-        and plan.seeds == core.HEADLINE_SEEDS
-    )
+    seeds = core.HEADLINE_SEEDS
+    full = {(a, f, s) for a in ("FU", "M*") for f in core.ALL_FOLDS for s in seeds}
+    plan = _plan(root=Path(), arms=arms, wanted_seeds=seeds, rows="test", exists=_exists(full))
+    assert plan is not None and not plan.interim and plan.folds == core.ALL_FOLDS
     screen = {(a, f, s) for a in ("FU", "M*") for f in core.SCREEN_FOLDS for s in core.SCREEN_SEEDS}
-    plan = sg.choose_plan(
-        root=Path(),
-        arms=arms,
-        wanted_seeds=core.HEADLINE_SEEDS,
-        rows="test",
-        exists=_exists(screen),
-    )
-    assert (
-        plan is not None
-        and plan.interim
-        and plan.folds == core.SCREEN_FOLDS
-        and plan.seeds == core.SCREEN_SEEDS
-    )
-    odd = {("FU", "2025-11", 0), ("M*", "2025-11", 0), ("FU", "2026-02", 1), ("M*", "2026-02", 1)}
-    assert (
-        sg.choose_plan(
-            root=Path(),
-            arms=arms,
-            wanted_seeds=core.HEADLINE_SEEDS,
-            rows="test",
-            exists=_exists(odd),
-        )
-        is None
-    )
+    kw: dict[str, Any] = {
+        "root": Path(), "arms": arms, "wanted_seeds": seeds, "rows": "test", "exists": _exists(screen),
+    }  # fmt: skip
+    assert _plan(**kw) is None
+    plan = _plan(**kw, screen_ok=True)
+    assert plan is not None and plan.interim and plan.folds == core.SCREEN_FOLDS
+    assert plan.seeds == core.SCREEN_SEEDS
+    with pytest.raises(sg.IncompletePlanError):
+        _plan(**kw, required=True)
     one = {("FU", "2025-11", 0), ("M*", "2025-11", 0), ("M*", "2026-02", 0)}
-    plan = sg.choose_plan(
-        root=Path(), arms=arms, wanted_seeds=core.HEADLINE_SEEDS, rows="test", exists=_exists(one)
-    )
+    kw["exists"] = _exists(one)
+    assert _plan(**kw) is None
+    plan = _plan(**kw, partial_ok=True)
     assert plan is not None and plan.folds == ("2025-11",) and plan.seeds == (0,) and plan.interim
-    assert (
-        sg.choose_plan(
-            root=Path(),
-            arms=arms,
-            wanted_seeds=core.HEADLINE_SEEDS,
-            rows="test",
-            exists=_exists(set()),
-        )
-        is None
-    )
+    assert _plan(**{**kw, "rows": "validation"}) is not None
+    odd = {("FU", "2025-11", 0), ("M*", "2025-11", 0), ("FU", "2026-02", 1), ("M*", "2026-02", 1)}
+    kw["exists"] = _exists(odd)
+    assert _plan(**kw, partial_ok=True) is None
+    with pytest.raises(sg.IncompletePlanError):
+        _plan(**{**kw, "exists": _exists(set())}, required=True, partial_ok=True)
+
+
+def test_the_screen_is_a_plan_of_a_counted_reading_only_when_it_stopped_the_rest(
+    tmp_path: Path,
+) -> None:
+    """`scores/screen.json` is read for `stops_rest`."""
+    assert not sg.screen_stops_rest(root=tmp_path)
+    (tmp_path / "scores").mkdir()
+    (tmp_path / "scores" / "screen.json").write_text('{"stops_rest": true}')
+    assert sg.screen_stops_rest(root=tmp_path)
+    (tmp_path / "scores" / "screen.json").write_text('{"stops_rest": false}')
+    assert not sg.screen_stops_rest(root=tmp_path)
 
 
 def test_validation_rows_swap_m_star_for_f0r() -> None:

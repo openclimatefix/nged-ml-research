@@ -828,6 +828,15 @@ published page carries the coverage counts.
   F0r also trains with the new parameters' learning rates set to 0, and the fit stops with a
   correctness failure if any new parameter, `gamma` included, differs from its initial value
   afterwards.
+- **A missing or non-finite counted reading is verdict row 1, and row 2 follows the plan's text
+  (ruling of the design lead, 2026-11-27, set before any experiment 733 score exists).** C1 is
+  counted always, and C2 is counted whenever C1 is a gain, because only then does C2 change the row.
+  A counted reading that is absent or not finite after a complete chain is row 1 (`invalid`), never
+  row 7. The score never falls back to the folds and seeds that happen to exist: it reads the full
+  plan, reads the screen only when `scores/screen.json` says the screen stopped the rest, and
+  otherwise raises. Row 2 (`failed`) follows the table's text, "a fit that C1 or C2 needs raised":
+  a failed F0r (which gates C1), FU, or FU-S job. A failed Y0 or YU job is not row 2, because C3 and
+  C4 are not in the verdict table; the sign-forecast word and the history word read `void`.
 - **All 16 Primaries with the channels at D8 alone,** so that M\* is an exact control and the recipe
   stays experiment 713's.
 - **No sign head on the real folds,** because no real day has a known sign, and a head trained on

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import e00733_core as core
-import e00733_score as sc
 import e00733_scorestage as stage
 import e00733_scoring as scoring
 import e00733_scoring_synth as synth
@@ -95,11 +94,52 @@ def test_run_score_writes_the_files_and_marks_validation_interim(
     assert verdict["interim"] is True and verdict["rows"] == "validation"
     readings = json.loads((tmp_path / "scores" / "readings.json").read_text())
     assert {"R8", "R9", "R10", "R11", "plans", "mae_of_median"} <= set(readings)
-    with pytest.raises(sc.ScoreError):
-        stage.run_score(root=tmp_path, rows="test")
+    assert stage.run_score(root=tmp_path, rows="test")["row"] == 1
     assert (
         segments
         and core.EXPERIMENT_ID == "00733"
         and sy.STEPS == 48
         and np.isfinite(fit_clim(segments=segments).overall)
     )
+
+
+def _stub_readings(monkeypatch: pytest.MonkeyPatch, *, c1: object, c2: object) -> list[bool]:
+    seen: list[bool] = []
+
+    def real(**kw: object) -> scoring.Readings:
+        seen.append(bool(kw["tolerate_missing"]))
+        contrasts = dict.fromkeys(stage.REAL_NAMES)
+        contrasts.update({"C1": c1, "C2": c2})
+        return scoring.Readings(
+            contrasts=contrasts, plans=dict.fromkeys(stage.REAL_NAMES), guards_inputs=None,
+            r8={"status": "void"}, r9={"status": "void"}, r10={"status": "void"},
+        )  # fmt: skip
+
+    monkeypatch.setattr(scoring, "real_readings", real)
+    syn = {"contrasts": dict.fromkeys(("C3", "C4", "R5", "R6", "R7")), "sign_inputs": None,
+           "log_loss": {}, "r11": {"status": "void"}, "n_scored": 0}  # fmt: skip
+    monkeypatch.setattr(synth, "synthetic_readings", lambda **_k: syn)
+    return seen
+
+
+def _failed_record(*, root: Path, arm: str, fold: str | None, seed: int) -> None:
+    path = fit.record_path(root=root, arm=arm, fold=fold, seed=seed).with_suffix(".failed.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}")
+
+
+def test_row_2_follows_the_fits_that_c1_and_c2_need_and_a_failed_synthetic_fit_does_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed FU, FU-S, or F0r job is row 2; a failed Y0 or YU job is not."""
+    seen = _stub_readings(monkeypatch, c1=None, c2=None)
+    _failed_record(root=tmp_path, arm="Y0", fold=None, seed=0)
+    _failed_record(root=tmp_path, arm="YU", fold=None, seed=0)
+    assert stage.counted_fit_failed(root=tmp_path) is False
+    assert stage.run_score(root=tmp_path, rows="test")["row"] == 1  # C1 unread on a complete chain
+    assert seen == [False]
+    _failed_record(root=tmp_path, arm="FU-S", fold="2025-11", seed=0)
+    assert stage.counted_fit_failed(root=tmp_path) is True
+    verdict = stage.run_score(root=tmp_path, rows="test")
+    assert verdict["row"] == 2 and seen[-1] is True
+    assert verdict["sign_forecast_word"] == "void"

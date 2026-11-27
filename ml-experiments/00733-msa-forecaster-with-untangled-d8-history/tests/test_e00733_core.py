@@ -84,13 +84,20 @@ def test_rows_0_to_2_come_first() -> None:
     assert core.front_matter_word(word="stopped") == "inconclusive"
 
 
-def test_a_non_finite_reading_is_neither_a_gain_nor_a_loss() -> None:
-    """A NaN interval cannot make a gain or a loss, so the verdict is row 7."""
+def test_a_missing_or_non_finite_counted_reading_is_row_1_never_row_7() -> None:
+    """A NaN or absent C1 is `invalid`; a NaN or absent C2 is `invalid` only when C1 is a gain."""
     nan = core.Reading(point=math.nan, lower=math.nan, upper=math.nan)
-    v = core.VerdictInputs(
-        stopped=False, invalid=False, failed=False, c1=nan, c2=nan, guards_hold=True
-    )
-    assert core.verdict_row(v=v) == 7
+    flat = core.Reading(point=0.0, lower=-0.1, upper=0.1)
+    gain = core.Reading(point=-0.04, lower=-0.06, upper=-0.01)
+    base = {"stopped": False, "invalid": False, "failed": False, "guards_hold": True}
+    for c1 in (nan, None):
+        assert core.verdict_row(v=core.VerdictInputs(c1=c1, c2=flat, **base)) == 1
+    for c2 in (nan, None):
+        assert core.verdict_row(v=core.VerdictInputs(c1=gain, c2=c2, **base)) == 1
+        assert core.verdict_row(v=core.VerdictInputs(c1=flat, c2=c2, **base)) == 7
+    assert core.verdict_row(v=core.VerdictInputs(c1=flat, c2=flat, **base)) == 7
+    stopped = {**base, "stopped": True}
+    assert core.verdict_row(v=core.VerdictInputs(c1=None, c2=None, **stopped)) == 0
 
 
 def test_the_stop_line_drops_report_only_arms_in_order() -> None:

@@ -490,7 +490,11 @@ CORRECTNESS_CHECKS: Final = (
 
 
 def verdict_row(*, v: VerdictInputs) -> int:  # noqa: PLR0911
-    """Return the first row of the verdict table that matches (0 to 7)."""
+    """Return the first row of the verdict table that matches (0 to 7).
+
+    A counted reading that is missing or not finite is row 1 (`invalid`), never row 7: C1 always,
+    and C2 whenever C1 is a gain, because only then does C2 change the row.
+    """
     if v.stopped:
         return 0
     if v.invalid:
@@ -498,6 +502,10 @@ def verdict_row(*, v: VerdictInputs) -> int:  # noqa: PLR0911
     if v.failed:
         return 2
     c1, c2 = v.c1, v.c2
+    if c1 is None or not c1.finite:
+        return 1
+    if c1.gain and (c2 is None or not c2.finite):
+        return 1
     c1_gain = c1 is not None and c1.gain
     c2_gain = c2 is not None and c2.gain
     if c1_gain and c2_gain and v.guards_hold:

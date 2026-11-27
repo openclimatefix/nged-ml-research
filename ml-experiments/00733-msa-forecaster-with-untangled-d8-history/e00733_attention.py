@@ -337,7 +337,10 @@ def real_case_maps(
 
 
 def mean_target_shortwave(*, source: Any, d8: int, origins: np.ndarray) -> np.ndarray:
-    """Return the mean reanalysis shortwave (column 0 of the dense weather) over each origin's lead-day-2 target day."""
+    """Return the mean reanalysis shortwave over each origin's lead-day-2 target day.
+
+    The shortwave is column 0 of the dense weather.
+    """
     import e00713_layout as lay  # ty: ignore[unresolved-import]
 
     dense = source.source.dense_weather
@@ -367,7 +370,9 @@ def cases_of_folds(
     import e00733_scoring as scoring
 
     arms = (("FU", None), ("F0r", None))
-    plan = scoring.choose_plan(root=root, arms=arms, wanted_seeds=(seed,), rows=rows)
+    plan = scoring.choose_plan(
+        root=root, arms=arms, wanted_seeds=(seed,), rows=rows, screen_ok=True, partial_ok=True
+    )
     if plan is None:
         msg = "no fold holds a fit and a stored forecast of both FU and F0r, so no attention map can be drawn"
         raise AttentionError(msg)

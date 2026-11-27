@@ -600,7 +600,14 @@ def run_series(*, root: Path, rows: str) -> dict[str, Any]:
     import e00733_signdata as signdata
 
     d8 = baselines.d8_series_id()
-    plan = scoring.choose_plan(root=root, arms=(("FU", None),), wanted_seeds=(SEED,), rows=rows)
+    plan = scoring.choose_plan(
+        root=root,
+        arms=(("FU", None),),
+        wanted_seeds=(SEED,),
+        rows=rows,
+        screen_ok=True,
+        partial_ok=True,
+    )
     if plan is None:
         msg = "no fold holds a stored forecast of FU at seed 0, so no series can be drawn"
         raise SeriesError(msg)
