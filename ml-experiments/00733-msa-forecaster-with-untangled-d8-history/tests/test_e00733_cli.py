@@ -123,3 +123,13 @@ def test_an_unexpected_error_in_the_setup_exits_5_never_1(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(cli, "install_runtime", broken)
     assert cli.main(["guard"]) == cli.st.EXIT_FAILED == 5
+
+
+def test_run_sh_lists_exactly_the_stages_of_the_cli() -> None:
+    """The wrapper's usage line names every stage of the cli, and no stage of another experiment."""
+    text = (Path(cli.__file__).parent / "run.sh").read_text()
+    usage = next(line for line in text.splitlines() if line.startswith("# Usage:"))
+    listed = usage.split("<")[2].split(">")[0].split("|")
+    assert tuple(listed) == cli.STAGES
+    for stale in ("neighbours", "overlays", "solar_diag", "panels"):
+        assert stale not in text
