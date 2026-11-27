@@ -435,9 +435,11 @@ def scored(*, index: SampleIndex) -> np.ndarray:
 
 # --------------------------------------------------------------------------- batches
 
-CHANNEL_MODES: Final = ("untangled", "absent", "true")
+CHANNEL_MODES: Final = ("untangled", "absent", "true", "p_neg")
 """`untangled`: the stored and re-run outputs (YU); `absent`: no channel (Y0); `true`: the true
-sign and solar output (YT)."""
+sign and solar output (YT, and the post hoc oracle YO); `p_neg`: the stored and re-run P(X<0) alone, with the solar and
+transfer-step channels zero as an arm of the real folds with `channel_subset=("p_neg",)` has them
+(YS)."""
 
 
 @dataclass
@@ -945,6 +947,9 @@ def _channels(
             [raw[..., 0], solar_unit(points=raw[..., 1], target_std=target_std), raw[..., 2]],
             axis=-1,
         )
+        if mode == "p_neg":
+            keep = np.array([name == "p_neg" for name in core.CHANNEL_NAMES])
+            u = np.where(keep, u, 0.0)
     return np.where(have[..., None], u, 0.0).astype(np.float32), have
 
 

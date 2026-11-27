@@ -115,31 +115,18 @@ def _step(
     return bool(record[name]["ok"])
 
 
-def run_smoke(*, root: Path, scratch: Path, steps: SmokeSteps, device: str) -> dict[str, Any]:
-    """Run the smoke test and write `scores/smoke.json` (`scores/smoke_cpu.json` on the CPU).
+def run_arm_steps(
+    *, arms: tuple[str, ...], steps: SmokeSteps, steps_record: dict[str, Any]
+) -> None:
+    """Run one pass, the prediction, and the scoring read of each arm in `arms`, recording each step.
 
     Args:
-        root: This experiment's data folder (the record is written here; nothing else is).
-        scratch: The scratch folder for states and forecasts (outside the data folder).
+        arms: The arms, each fitted for one pass on the first fold (real) or at seed 0 (synthetic).
         steps: The steps.
-        device: "cuda" or "cpu" (recorded; only a "cuda" record opens the chain, and it carries the
-            GPU's name and the peak GPU memory of the steps).
-
-    Returns:
-        The record, with `pass` true only when every step passed.
-
-    Raises:
-        SmokeError: When the scratch folder is inside the data folder or the first test score was
-            already taken.
+        steps_record: Receives one entry per step.
     """
-    assert_scratch_outside(scratch=scratch, data_root=root)
-    if st.marker_exists(root=root):
-        msg = "the first test score was already taken, so a smoke test would be a choice made after the test"
-        raise SmokeError(msg)
-    scratch.mkdir(parents=True, exist_ok=True)
-    steps_record: dict[str, Any] = {}
     stored: dict[str, Path] = {}
-    for arm in SMOKE_ARMS:
+    for arm in arms:
         spec = core.ARMS[arm]
         fold = spec.folds[0] if spec.where == "real" else None
         seed = 0
@@ -170,6 +157,32 @@ def run_smoke(*, root: Path, scratch: Path, steps: SmokeSteps, device: str) -> d
             record=steps_record, name=f"predict {arm}", fn=predict_one, log=steps.log
         ):
             _step(record=steps_record, name=f"read {arm}", fn=read_one, log=steps.log)
+
+
+def run_smoke(*, root: Path, scratch: Path, steps: SmokeSteps, device: str) -> dict[str, Any]:
+    """Run the smoke test and write `scores/smoke.json` (`scores/smoke_cpu.json` on the CPU).
+
+    Args:
+        root: This experiment's data folder (the record is written here; nothing else is).
+        scratch: The scratch folder for states and forecasts (outside the data folder).
+        steps: The steps.
+        device: "cuda" or "cpu" (recorded; only a "cuda" record opens the chain, and it carries the
+            GPU's name and the peak GPU memory of the steps).
+
+    Returns:
+        The record, with `pass` true only when every step passed.
+
+    Raises:
+        SmokeError: When the scratch folder is inside the data folder or the first test score was
+            already taken.
+    """
+    assert_scratch_outside(scratch=scratch, data_root=root)
+    if st.marker_exists(root=root):
+        msg = "the first test score was already taken, so a smoke test would be a choice made after the test"
+        raise SmokeError(msg)
+    scratch.mkdir(parents=True, exist_ok=True)
+    steps_record: dict[str, Any] = {}
+    run_arm_steps(arms=SMOKE_ARMS, steps=steps, steps_record=steps_record)
     for name, fn in steps.checks.items():
         _step(record=steps_record, name=f"check {name}", fn=fn, log=steps.log)
     for name in LATER_STAGES:

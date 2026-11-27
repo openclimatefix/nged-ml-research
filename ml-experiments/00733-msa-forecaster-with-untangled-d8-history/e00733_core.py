@@ -211,6 +211,8 @@ class ArmSpec733:
         shifted_days: How many days earlier each channel is taken (the placebo), or 0.
         channel_subset: The channels the arm reads, by name (`None` means every usable one).
         true_channels: Whether the history reads the true signs and solar output (the oracle arm).
+        post_hoc: Whether the arm belongs to the post hoc runs set after the verdict (it is no
+            part of the chain's families, of its projection, or of its timing gate).
     """
 
     name: str
@@ -226,6 +228,7 @@ class ArmSpec733:
     shifted_days: int = 0
     channel_subset: tuple[str, ...] | None = None
     true_channels: bool = False
+    post_hoc: bool = False
 
     @property
     def n_fits(self) -> int:
@@ -331,8 +334,37 @@ ARMS: Final = {
             False,
             true_channels=True,
         ),
+        ArmSpec733(
+            "YS",
+            "synthetic",
+            "The folded reading and P(X<0) alone",
+            True,
+            SYNTHETIC_SEEDS,
+            (),
+            "Post hoc, report only: the sign alone, with the solar and transfer-step channels absent",
+            False,
+            channels=True,
+            channel_subset=("p_neg",),
+            post_hoc=True,
+        ),
+        ArmSpec733(
+            "YO",
+            "synthetic",
+            "The folded reading and the true sign and solar output before the origin",
+            True,
+            SYNTHETIC_SEEDS,
+            (),
+            "Post hoc, report only: the oracle history, with the transfer-step channel absent",
+            False,
+            true_channels=True,
+            post_hoc=True,
+        ),
     )
 }
+POST_HOC_ARMS: Final = ("YO", "FS", "YS")
+"""The arms of the post hoc runs set after the verdict, in the order they are fitted: YO (the
+synthetic oracle), FS (real folds, dropped from the chain by the timing gate), and YS (the
+synthetic arm that reads P(X<0) alone)."""
 FIT_ORDER: Final = ("F0r", "FU-screen", "FU", "FU-S", "Y0", "YU", "FS", "YT")
 """The fits run in this order, so that a stop at the stop line loses report-only arms first."""
 REPORT_ONLY_ARMS: Final = ("FS", "YT")
@@ -616,11 +648,13 @@ def projected_hours(
 ) -> float:
     """Return the GPU-process-hours of the fits at a measured rate, with `dropped` arms left out.
 
-    FU-S, FS, and F0r run at FU's rate; Y0 and YT at YU's, as the plan's timing gate projects.
+    FU-S, FS, and F0r run at FU's rate; Y0 and YT at YU's, as the plan's timing gate projects. The
+    post hoc arm YS is no part of the projection.
     """
-    real = sum(a.n_fits for n, a in ARMS.items() if a.where == "real" and n not in dropped)
+    chain = {n: a for n, a in ARMS.items() if not a.post_hoc}
+    real = sum(a.n_fits for n, a in chain.items() if a.where == "real" and n not in dropped)
     synthetic = sum(
-        a.n_fits for n, a in ARMS.items() if a.where == "synthetic" and n not in dropped
+        a.n_fits for n, a in chain.items() if a.where == "synthetic" and n not in dropped
     )
     return (real * seconds_per_real_fit + synthetic * seconds_per_synthetic_fit) / 3600.0
 

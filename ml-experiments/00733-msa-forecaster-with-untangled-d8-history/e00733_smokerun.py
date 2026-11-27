@@ -216,6 +216,8 @@ def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     if getattr(args, "scratch", None) is None:
         msg = "the smoke stage needs --scratch, a folder outside the data folder"
         raise rt.RuntimeError733(msg)
+    if getattr(args, "arms", None):
+        return stage_smoke_arms(args, root)
     outer = Path(args.scratch)
     smoke.assert_scratch_outside(scratch=outer, data_root=root)
     scratch = scratch_root(outer=outer, root=root)
@@ -243,5 +245,76 @@ def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     if not record["pass"]:
         failed = [k for k, v in record["steps"].items() if not v["ok"]]
         msg = f"the smoke test failed at: {failed}"
+        raise rt.RuntimeError733(msg)
+    return record
+
+
+POSTHOC_SMOKE_FILE: Final = "scores/smoke_posthoc.json"
+"""The record of the post hoc smoke test, written inside the scratch folder only."""
+
+
+def parse_arms(*, text: str) -> tuple[str, ...]:
+    """Return the arms of `--arms FS,YS`, which must be post hoc arms.
+
+    Raises:
+        RuntimeError733: When an arm is not one of `core.POST_HOC_ARMS`.
+    """
+    arms = tuple(a.strip() for a in text.split(",") if a.strip())
+    bad = [a for a in arms if a not in core.POST_HOC_ARMS]
+    if not arms or bad:
+        msg = f"--arms takes arms of {core.POST_HOC_ARMS}, not {bad or text!r}"
+        raise rt.RuntimeError733(msg)
+    return arms
+
+
+def stage_smoke_arms(args: argparse.Namespace, root: Path) -> dict[str, Any]:
+    """Run one pass of the post hoc arms (`--arms FS,YS`) in a scratch folder outside the data folder.
+
+    Each arm is fitted for one pass, predicted on validation rows, and read by the scoring code, as
+    the smoke test does it for the chain's arms. The record `scores/smoke_posthoc.json` is written
+    inside the scratch folder only: the data folder gets no file, and `scores/smoke.json`, the gate
+    of the chain, is not touched.
+
+    Args:
+        args: The parsed arguments (`--scratch`, `--arms`, `--device`).
+        root: This experiment's data folder (read only).
+
+    Returns:
+        The record.
+
+    Raises:
+        RuntimeError733: When an arm is not a post hoc arm or a step failed.
+    """
+    import e00733_predictions as pr
+
+    arms = parse_arms(text=args.arms)
+    outer = Path(args.scratch)
+    smoke.assert_scratch_outside(scratch=outer, data_root=root)
+    scratch = scratch_root(outer=outer, root=root)
+    link_inputs(root=root, scratch=scratch)
+    run_job = rt.make_run_job(root=scratch, device=args.device, max_passes=1)
+
+    def predict(arm: str, fold: str | None, seed: int) -> Path:
+        return pr.predict_job(
+            root=scratch, arm=arm, fold=fold, seed=seed, device=args.device, rows="validation"
+        )[0]
+
+    steps = smoke.SmokeSteps(
+        fit_real=run_job, fit_synthetic=lambda arm, seed: run_job(arm, None, seed),
+        predict=predict, read_stored=read_stored_step(scratch=scratch),
+    )  # fmt: skip
+    started = time.monotonic()
+    steps_record: dict[str, Any] = {}
+    smoke.run_arm_steps(arms=arms, steps=steps, steps_record=steps_record)
+    record = {
+        "pass": all(v["ok"] for v in steps_record.values()), "post_hoc": True, "arms": list(arms),
+        "code_version": st.CODE_VERSION, "device": args.device,
+        "scratch_outside_data_folder": True, "steps": steps_record,
+        "seconds": round(time.monotonic() - started, 1),
+    }  # fmt: skip
+    st.write_json(path=scratch / POSTHOC_SMOKE_FILE, payload=record)
+    if not record["pass"]:
+        failed = [k for k, v in steps_record.items() if not v["ok"]]
+        msg = f"the post hoc smoke test failed at: {failed}"
         raise rt.RuntimeError733(msg)
     return record

@@ -964,6 +964,36 @@ published page carries the coverage counts.
   to the wrong truth. It now requires the three keys to equal the world's index. The comparison of
   the bank's solar output with the world's uses `equal_nan=True`, so a NaN value fails no
   comparison.
+- **Arms FS, YS, and YO run post hoc and report-only (ruling of the design lead, 2026-11-27, set
+  after the verdict and before the first post hoc fit).** The maintainer asked for FS to be fitted
+  after seeing the verdict (row 7, not supported), because the transfer-step channel may be so noisy
+  that it hides the gain of P(reverse flow) alone. The timing gate had dropped FS and YT on cost.
+  The runs add two synthetic arms: YS, the synthetic forecaster given P(reverse flow) alone, and YO,
+  an oracle. YS has the solar and transfer-step channels at zero and flagged absent, as FS has them
+  on the real folds. YO reads the true sign (1 where X < 0, else 0) and the true unmetered solar
+  output of the history half-hours in place of the untangler's outputs, with the transfer-step
+  channel absent; its inputs equal those of the dropped YT. Each oracle channel value is read from
+  the generator's truth only for history half-hours that the 27-hour visibility rule makes visible,
+  all of which lie strictly before the origin, and a test perturbs the truth at and after the origin
+  and finds YO's inputs unchanged. Every arm runs the code, the caps (40 passes on the synthetic
+  world, patience 20), the stopping rules, and the exit codes of the chain, with seeds 0 to 2 for YS
+  and YO and the seeds of FS. The cost is about 1.5 GPU-process-hours for FS and 1.6 for each of YS
+  and YO. With the main chain's 7.2 hours, the total comes to about 11.9, against the stop line of
+  12. The stage `posthoc` fits YO first, then FS, then YS, and keeps a running total of the measured
+  hours: the main chain's fit and prediction seconds from `fits/*.job.json`, plus each post hoc fit
+  as it finishes. Before each fit, it does not start the fit when the running total plus the fit's
+  expected hours (the mean of the arm's finished fits, or YU's mean for the arm's first fit) would
+  pass the cap of 11.9 hours, and no fit starts at or past 12. The fits not started are skipped,
+  YS's last seed first, then the rest of YS, then FS and YO, and the stage records the skipped jobs
+  and ends with exit code 3 and the message "stopped at the cost cap; ask the manager". The runs
+  live in `posthoc/` of the data folder, write no marker of the main run, and change no verdict,
+  counted contrast, bar, or table. The stage has its own guard, which needs the first test score and
+  a complete main chain, and the guard of the main run still refuses every fit once that score
+  exists. Six contrasts are read, each labelled post hoc: P1 is FS minus FU and P2 is FS minus M\*,
+  on the CRPS of D8 with the month-block bootstrap and t widening of C1; P3 is YS minus Y0, P4 is YS
+  minus YU, P5 is YO minus Y0, and P6 is YO minus YU, on the Brier score of the sign with the
+  two-way bootstrap of C4. All six use the level of the counted contrasts. Every figure and sentence
+  about them says post hoc, and a gain is a lead for a follow-up, not a finding.
 
 ## Method
 

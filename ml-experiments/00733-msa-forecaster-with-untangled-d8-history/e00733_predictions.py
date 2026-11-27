@@ -268,7 +268,7 @@ def predict_synthetic_arm(
 
     Args:
         root: This experiment's data folder.
-        arm: Y0, YU, or YT.
+        arm: Y0, YU, YT, or YS.
         seed: The seed.
         device: "cuda" or "cpu".
         rows: "test" or "validation".

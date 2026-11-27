@@ -18,13 +18,17 @@ def test_planned_hours_match_the_plan() -> None:
 
 def test_the_arms_have_the_registered_fit_counts() -> None:
     """FU runs 40 fits, FU-S 24, F0r 4, FS 24, Y0, YU, and YT 3 each, and M* none."""
-    n = {name: arm.n_fits for name, arm in core.ARMS.items()}
+    n = {name: arm.n_fits for name, arm in core.ARMS.items() if not arm.post_hoc}
     assert n == {"M*": 0, "F0r": 4, "FU": 40, "FU-S": 24, "FS": 24, "Y0": 3, "YU": 3, "YT": 3}
 
 
 def test_only_report_only_arms_are_uncounted_fits() -> None:
     """Every counted fit arm is a contrast arm; FS and YT are the report-only arms."""
-    assert {n for n, a in core.ARMS.items() if not a.counted} == {"F0r", "FS", "YT"}
+    assert {n for n, a in core.ARMS.items() if not a.counted and not a.post_hoc} == {
+        "F0r",
+        "FS",
+        "YT",
+    }
     assert set(core.REPORT_ONLY_ARMS) == {"FS", "YT"}
 
 

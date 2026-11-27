@@ -311,14 +311,20 @@ SyntheticLoader = Callable[[str, int, str], SyntheticInputs]
 
 
 def synthetic_mode(*, arm: str) -> str:
-    """Return the channel mode of a synthetic arm: `absent` (Y0), `untangled` (YU), or `true`.
+    """Return the channel mode of a synthetic arm.
 
-    (YT).
+    The modes are `absent` (Y0), `untangled` (YU), `true` (YT), and `p_neg` (YS, which reads P(X<0)
+    alone).
     """
     spec = core.ARMS[arm]
     if spec.where != "synthetic":
         msg = f"{arm} is not a synthetic arm"
         raise GuardError(msg)
+    if spec.channel_subset is not None:
+        if spec.channel_subset != ("p_neg",):
+            msg = f"the synthetic arm {arm} reads a channel subset that has no mode"
+            raise GuardError(msg)
+        return "p_neg"
     return "true" if spec.true_channels else "untangled" if spec.channels else "absent"
 
 
@@ -338,7 +344,7 @@ def fit_synthetic(
 
     Args:
         root: This experiment's data folder.
-        arm: Y0, YU, or YT.
+        arm: Y0, YU, YT, or YS.
         seed: The seed.
         device: "cuda" or "cpu".
         loader: Builds the fit's inputs.
